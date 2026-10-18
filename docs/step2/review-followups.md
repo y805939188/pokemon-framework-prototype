@@ -11,7 +11,7 @@ State after the fixes: code commit `e666bba` (engine rules, session guards, test
 | D1 | ~~`statusCount`~~ | — | **decided 2026-10-18 (your approval of my recommendation): additive field in protocol v1.** Implemented the same day: write set and result carry it, battle start seeds from it, poison counters are cleared after a battle (bad poison stored as plain poison, WP39), sleep keeps remaining turns; legacy records without it still get a fresh sleep draw. |
 | D2 | ~~Trainer-battle ball~~ | — | **decided 2026-10-18: follow the spec.** Implemented for singles and doubles: the ball can be thrown, is spent and is blocked by the trainer; `trainer` stays the refusal reason for running. |
 | D3 | ~~Item eligibility before registration; certain escape~~ | — | **confirmed 2026-10-18** (kept as implemented). |
-| D4 | Principle for conflicts between Showdown mechanics and Essentials mechanics inside battles (the route means Showdown wins by default; mega/dynamax order, escape timing, exp timing are already examples). And which data source the content pipeline uses in step 3. | default Showdown + a per-work-package difference list / default Essentials where observable | default Showdown, list differences per work package |
+| D4 | ~~Principle for Showdown-vs-Essentials conflicts inside battles~~ | — | **decided 2026-10-18 (first half): Showdown is authoritative in the battle.** Differences are listed per work package and the player-visible ones go to the user. **Still open (second half):** which data source the step 3 content pipeline uses (my lean: our own pipeline generated from the spec library, because Showdown has no base exp, growth curves, catch rates or Essentials learnsets) — settle at the start of step 3. |
 | D5 | Escape timing (decided in the turn vs. when chosen) matters for doubles (CM-26). | decide before the doubles UI | later, with the doubles batch |
 | D6 | ~~Push the updated `main` and a tag?~~ | — | done: pushed on 2026-10-18 with your approval |
 
@@ -47,7 +47,7 @@ Legend: **fixed** = changed and covered by a test or a run; **partial**; **defer
 | 17 | `versions.env` said 0.98.7 | **fixed.** 0.98.8 / `2dc2e10e` / 20260927.34; local checkouts verified with `git rev-parse` (`doctor` uses `setup-reactor.sh --check`); `REACTOR_ALLOW_OTHER_COMMIT=1` to override. Download mode is **not verified** for this commit (the local checkout's remote is a fork). |
 | 18 | Showdown internal interfaces under-listed | **fixed.** Complete list in the 2.3 report; `test-engine-contract.cjs` checks they exist with the expected shape. |
 | 19 | Staged copies vs sources | **fixed** (same test compares the two files and the staged SHA with `showdown.env`). |
-| 20 | No list of Showdown-vs-spec differences | **decision D4**; the known items are in `deviations.md` #5–#11. A per-work-package list starts with step 3. |
+| 20 | No list of Showdown-vs-spec differences | **principle decided (D4)**; the known items are in `deviations.md` #4, #6, #8 and #10; a per-work-package list starts with step 3. |
 
 ### Minor
 
