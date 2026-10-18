@@ -2,23 +2,19 @@
 
 读法：这些是第二步各结论的原始证据。包内报告的 `env.packageInfo`（`app.nw/package-info.json` 在打包时写入）记录产生时的代码状态：`gitHead`、`diffSha256`（未提交的代码改动的哈希，**不含 `docs/` 与 `experiments/step2/evidence/`**，因为它们在测试过程中会变；空输入的哈希 `e3b0c442…` 表示相对 `gitHead` 没有代码改动）、`signing`（`adhoc` / `adhoc+hardened-runtime` / `identity:…+hardened-runtime`）、`builtAt`。开发树里跑的流程测试没有 `packageInfo`（为 `null`），它对应的代码状态在下表里写明。
 
-## 最终证据（独立评审后重新生成，2026-10-18）
+## 当前证据（第三步候选，2026-10-18）
 
-两批，都来自**已提交**的代码（`diffSha256` 为空输入哈希：打包时除文档与证据外没有任何未提交改动）；这与 C2 时不同：C2 的证据来自 `482ea3d` 加未提交改动。
+`package/`、`flow/` 下的报告、截图与 `package/perf*` 现在是**第三步候选**（迁移成严格 TS、内容管线、本地化、存档版本之后）的证据，由提交 **`2f5b808`**（代码与 `dabe03a` 相同，仅多一个文档提交）的**已提交**代码产生：打包时 `diffSha256` 为空输入哈希、`signing` 为 `adhoc+hardened-runtime`、两次构建的 `builtAt` 分别为 18:08:03Z（第 1 次，流程测试）和 18:08:57Z（第 2 次：重启读档、场景矩阵、存档位置）。第二步最终证据（`e666bba`/`0556a68`，CJS 原型）仍在 git 历史里（提交 `f8f47cd`），已被它取代。
 
-- **包内测试与开发树流程**（`package/ps-*.json`、截图、`flow/*`）：提交 **`0556a68`**（用户决定 D1–D3 落地之后：`statusCount`、训练家战精灵球、T2 更新）。
-- **性能与 100 场内存**（`package/perf*`、`memory-100/`）：提交 **`e666bba`** 的包（D1–D3 之前；这些改动不涉及它们测量的内容，没有重测）。
+| 文件 | 内容 | 产生方式 |
+|---|---|---|
+| `package/ps-flow-report.json`、`ps-flow-verify-save.json`、`ps-saveloc.json` | 包内游戏内流程 T1–T10（含第二语言 T8、旧存档/不可用存档 T9、失效引用 T10）、重启读档 V1、默认存档位置 SL1 | `PF_PACKAGE_ARGS=--harden scripts/run-package-tests-mac.sh` |
+| `package/ps-matrix-package.json`、`ps-matrix-node.json` | 场景矩阵 S1–S10 在包内与普通 Node 22 的指纹（逐项相同，也等于入库基线），**并记录两个宿主各自加载的引擎包哈希（相同：`0f5c76de…`，140,710 字节）** | 同上 |
+| `package/perf-summary.json`、`package/perf/run{1,2,3}.json` | 3 次冷启动的性能与内存（第二次测量；第一次的动作延迟相同量级） | `scripts/run-package-perf-mac.sh 3`（同一个包） |
+| `flow/*` | 同一批流程在**开发树**里的报告与截图（`contentIdentity` 记录用的是内容管线样本，`logTail` 是脱敏的会话日志尾部） | `scripts/run-flow-test-mac.sh` |
+| `memory-100/after|before/` | 100 场战斗、强制 GC 的内存曲线（修复开/关）。**来自提交 `e666bba` 的包（第二步修复后），第三步没有重做**；第三步包的 24 场内存为 1,230–1,238 MB，与之一致 | 见第二步 |
 
-下表“构建”列里写的就是各文件对应的是哪一批。
-
-| 文件 | 内容 | 产生方式 | 构建 |
-|---|---|---|---|
-| `package/ps-flow-report.json` | 包内游戏内流程 T1–T7（真实按键/事件/MZ 存档） | `PF_PACKAGE_ARGS=--harden scripts/run-package-tests-mac.sh` | `0556a68`，第 1 次构建（`builtAt` 15:34:17Z），`adhoc+hardened-runtime` |
-| `package/ps-flow-verify-save.json`、`ps-matrix-package.json`、`ps-saveloc.json`、`ps-matrix-node.json` | 应用被**替换**为新构建后：重启读档校验 V1、场景矩阵 S1–S10（包内）、默认存档位置 SL1、同一矩阵在普通 Node 22 下的指纹 | 同上 | `0556a68`，第 2 次构建（`builtAt` 15:35:21Z）；脚本会检查四份报告来自预期的两次构建；包内与 Node 的指纹逐项相同，且都等于入库基线 `js/engine/fixtures/matrix-fingerprints.json`（已逐项核对） |
-| `package/perf-summary.json`、`package/perf/run{1,2,3}.json` | 3 次冷启动的性能与内存汇总及原始数据 | `scripts/run-package-perf-mac.sh 3`（硬化运行时临时签名的包；C2 的性能数据是普通临时签名） | `e666bba` 的包（`builtAt` 14:42:58Z） |
-| `memory-100/after/`、`memory-100/before/` | 100 场战斗（25 轮 × 4 种）、强制 GC 的内存曲线：修复后 / 关闭两处修复（`--ps-fix=no-texture,no-batcher`）；结果：关闭修复 RSS 1,141→1,538 MB（线性增长），开启修复 1,135→1,229 MB（平台）；渲染进程 JS 堆两次都是 28 MB（见 `runtime-issues.md`） | `PF_PERF_ARGS="--ps-perf-rounds=25 --js-flags=--expose-gc [--ps-fix=…]" scripts/run-package-perf-mac.sh 1 <目录>` | `e666bba` 的包 |
-| `package/01-…07-*.png`、`package/ps-flow-expected.json` | 包内流程截图与期望状态快照 | 同第一行 | `0556a68`，第 1 次构建 |
-| `flow/*` | 同一批流程在**开发树**（NW.js 直接启动项目，`--ps-save-dir` 指向证据目录）里的报告与截图 | `scripts/run-flow-test-mac.sh` | 提交 `0556a68` 的工作树（证据是当时唯一未提交的改动）；无 `packageInfo` |
+性能与 C2 对照（本机、3 次启动中位数；原始数据 `history/c2-perf-*.json`）：冷启动到插件 769 ms（C2 821）、到地图 1,796 ms（1,850）；首场战斗到菜单 550 ms（550）、后续 133 ms（133）；战斗场景帧 p50/p95 16.7/18.6 ms（相同）；24 场后 RSS 1,230 MB（C2 修复前 1,371）。**唯一变化：** 引擎动作延迟中位数 move/item/ball/run 约 3.4/3.4/2.4/1.8 ms → 4.7–5.6/5.7/3.1–4.2/2.5 ms（+1.5–2 ms，重复测量可复现）。已排除引擎与日志：在 NW.js 自己的 Node 环境里，旧 CJS 引擎、新 TS 引擎、带/不带日志同一批动作都是 0.2–0.4 ms；在完整应用里增加的部分没有隔离出原因（候选：同一场景回合里的界面侧改动）；对帧时间和到菜单的时间没有影响，绝对值仍在一帧以内，不阻塞，但**没有解释到底**。
 
 关于截图：`flow/` 与 `package/` 的 05–07 号截图逐字节相同，因为两个宿主在同一尺寸（816×624）下渲染同一个确定的占位界面，得到相同的像素；每次运行都会先删除再重写图片。开发树那次运行的 01–04 号截图是 2 倍尺寸（1632×1248），原因未查。
 

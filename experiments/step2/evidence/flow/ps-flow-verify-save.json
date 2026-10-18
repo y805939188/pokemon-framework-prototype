@@ -29,5 +29,11 @@
     "gameDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype",
     "packageInfo": null
   },
+  "contentIdentity": {
+    "kind": "sample",
+    "id": "sample",
+    "inputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625"
+  },
+  "logTail": null,
   "overall": "pass"
 }
