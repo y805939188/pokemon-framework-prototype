@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "recordedAt": "2026-10-17",
-  "status": "2.5 done, C2 submitted; protocol v1 frozen for the validated scope",
+  "status": "C2 decided (continue, singles first); runtime issues pass done (memory fixed, saves outside bundle, signing plan + hardened-runtime proof)",
   "template": {
     "repo": "https://github.com/y805939188/rpg-maker-mz-initialize",
     "commit": "b6fa1df099d5c3cf0b501755b73e06566b7e1939",
@@ -108,5 +108,22 @@
     "version": 1,
     "frozenFile": "docs/step2/protocol-v1.frozen.json",
     "contractTest": "experiments/step2/s5/test-protocol-freeze.cjs"
+  },
+  "runtimeFixes": {
+    "plugins": [
+      "PS_RuntimeFixes (texture stub leak, batcher leak)",
+      "PS_SaveLocation"
+    ],
+    "report": "docs/step2/runtime-issues.md"
+  },
+  "signing": {
+    "identitiesOnMachine": 0,
+    "hardenedRuntimeAdhocProven": true,
+    "entitlements": {
+      "required": "allow-jit",
+      "adhocAlsoNeeds": "disable-library-validation"
+    },
+    "plan": "docs/step2/signing-plan.md",
+    "notarization": "not run (no Developer ID)"
   }
 }

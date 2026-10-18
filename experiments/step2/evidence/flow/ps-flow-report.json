@@ -4,7 +4,7 @@
     {
       "id": "T1 trainer win: Fight, KO, exp, level-up, learn prompt (real keys), next turn uses new move, return to map",
       "status": "pass",
-      "ms": 2618,
+      "ms": 2799,
       "detail": {
         "level": 51,
         "exp": 125131,
@@ -14,38 +14,129 @@
     {
       "id": "T2 unavailable actions and cancel: nothing consumed, always back at a usable menu",
       "status": "pass",
-      "ms": 4639
+      "ms": 4638
     },
     {
       "id": "T3 wild run: faster user escapes, committed as 'ran', state unchanged apart from battle bookkeeping",
       "status": "pass",
-      "ms": 1217
+      "ms": 1200
     },
     {
       "id": "T4 capture: Master Ball from the bag, captured member joins with its stable id",
       "status": "pass",
-      "ms": 1617
+      "ms": 1636
     },
     {
       "id": "T5 item from the bag: Potion on the active member, consumed once and persisted",
       "status": "pass",
-      "ms": 1985
+      "ms": 1984
     },
     {
       "id": "T6 failure exit: engine error mid-battle aborts cleanly, nothing committed, the event still continues",
       "status": "pass",
-      "ms": 1202
+      "ms": 1201
     },
     {
       "id": "T7 save/restore outside battle + idempotent re-commit after restore",
       "status": "pass",
-      "ms": 1614,
+      "ms": 1604,
       "detail": {
         "saveCode": 0,
         "loadCode": 0
       }
     }
   ],
+  "focusLog": [
+    {
+      "ev": "focus",
+      "frame": 74,
+      "t": 1997,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 338,
+      "t": 6434,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 348,
+      "t": 6601,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 415,
+      "t": 7708,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 451,
+      "t": 8308,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 545,
+      "t": 9887,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 604,
+      "t": 10871,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 696,
+      "t": 12399,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 736,
+      "t": 13073,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 753,
+      "t": 13345,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 810,
+      "t": 14298,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 872,
+      "t": 15329,
+      "hasFocus": true,
+      "vis": "visible"
+    }
+  ],
+  "suppressedAudio": {
+    "playBgm": 1,
+    "playStaticSe": 68
+  },
+  "refocus": 12,
   "env": {
     "nw": "0.117.0",
     "node": "26.7.0",

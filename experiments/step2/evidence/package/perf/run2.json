@@ -8,6 +8,10 @@
     }
   ],
   "focusLog": [],
+  "suppressedAudio": {
+    "playBgm": 1,
+    "playStaticSe": 150
+  },
   "refocus": 0,
   "env": {
     "nw": "0.117.0",
@@ -19,9 +23,9 @@
     "execPath": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
     "gameDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
     "packageInfo": {
-      "builtAt": "2026-10-18T11:54:38.178Z",
-      "gitHead": "482ea3de6eb5ebfb6d4e7653b5a245ee168a44bd",
-      "workingTreeChanges": 19,
+      "builtAt": "2026-10-18T13:05:03.492Z",
+      "gitHead": "0ac24d4c0aec7ce9335f763f24f33d4f1d61094f",
+      "workingTreeChanges": 35,
       "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
       "withTests": true,
       "signing": "ad-hoc (local only)"
@@ -34,110 +38,110 @@
       "frames": "SceneManager.update deltas, window focused, fast=true (no message pacing)"
     },
     "stamps": {
-      "pluginLoadedAt": 1792324622900,
-      "pluginLoadedPerf": 133,
-      "mapReadyAt": 1792324623929,
-      "mapReadyPerf": 1162
+      "pluginLoadedAt": 1792328778456,
+      "pluginLoadedPerf": 159,
+      "mapReadyAt": 1792328779478,
+      "mapReadyPerf": 1180
     },
     "memory": [
       {
         "label": "map ready (before any battle)",
         "gcForced": false,
-        "nodeRssMb": 374,
+        "nodeRssMb": 300,
         "nodeHeapUsedMb": 22,
-        "jsHeapUsedMb": 36,
-        "appRssMb": 1207
+        "jsHeapUsedMb": 33,
+        "appRssMb": 1132
       },
       {
         "label": "after first round (4 battles)",
         "gcForced": false,
-        "nodeRssMb": 479,
-        "nodeHeapUsedMb": 48,
-        "jsHeapUsedMb": 36,
-        "appRssMb": 1307
+        "nodeRssMb": 401,
+        "nodeHeapUsedMb": 47,
+        "jsHeapUsedMb": 33,
+        "appRssMb": 1228
       },
       {
         "label": "after 3 rounds (12 battles)",
         "gcForced": false,
-        "nodeRssMb": 505,
+        "nodeRssMb": 407,
         "nodeHeapUsedMb": 49,
-        "jsHeapUsedMb": 36,
-        "appRssMb": 1334
+        "jsHeapUsedMb": 33,
+        "appRssMb": 1234
       },
       {
         "label": "after 6 rounds (24 battles)",
         "gcForced": false,
-        "nodeRssMb": 540,
-        "nodeHeapUsedMb": 52,
-        "jsHeapUsedMb": 36,
-        "appRssMb": 1371
+        "nodeRssMb": 408,
+        "nodeHeapUsedMb": 48,
+        "jsHeapUsedMb": 33,
+        "appRssMb": 1236
       }
     ],
     "coldStart": {
-      "launchToPluginMs": 821,
-      "launchToMapReadyMs": 1850
+      "launchToPluginMs": 870,
+      "launchToMapReadyMs": 1892
     },
-    "engineLoadMs": 2.1,
+    "engineLoadMs": 2.8,
     "firstBattle": {
-      "sessionMs": 161,
-      "firstMenuMs": 550.2,
-      "totalMs": 1036.5,
+      "sessionMs": 166.2,
+      "firstMenuMs": 549.3,
+      "totalMs": 1037.6,
       "label": "run",
       "blurred": false
     },
     "laterBattles": {
       "n": 23,
-      "sessionMsMedian": 2,
-      "firstMenuMsMedian": 132.4,
-      "firstMenuMsMax": 134.1,
+      "sessionMsMedian": 2.5,
+      "firstMenuMsMedian": 133.1,
+      "firstMenuMsMax": 134.5,
       "unblurredN": 23,
       "blurredN": 0,
-      "firstMenuMsMedianFocused": 132.4,
-      "firstMenuMsMaxFocused": 134.1
+      "firstMenuMsMedianFocused": 133.1,
+      "firstMenuMsMaxFocused": 134.5
     },
     "actionMs": {
       "run": {
         "n": 12,
-        "p50": 1.8,
-        "p95": 5.3,
-        "max": 5.3
+        "p50": 1.7,
+        "p95": 4.4,
+        "max": 4.4
       },
       "move": {
         "n": 6,
-        "p50": 3.4,
-        "p95": 10.9,
-        "max": 10.9
+        "p50": 4,
+        "p95": 10.4,
+        "max": 10.4
       },
       "item": {
         "n": 6,
-        "p50": 3.8,
-        "p95": 4.9,
-        "max": 4.9
+        "p50": 4.8,
+        "p95": 5.3,
+        "max": 5.3
       },
       "ball": {
         "n": 6,
-        "p50": 2,
-        "p95": 3.1,
-        "max": 3.1
+        "p50": 3.3,
+        "p95": 3.7,
+        "max": 3.7
       }
     },
     "frames": {
       "battleScene": {
         "n": 1236,
         "p50": 16.7,
-        "p95": 18.6,
-        "p99": 20.3,
-        "max": 172.5,
+        "p95": 17.7,
+        "p99": 18.4,
+        "max": 183.3,
         "over33": 1,
         "over50": 1,
         "over100": 1
       },
       "mapScene": {
-        "n": 1068,
+        "n": 1072,
         "p50": 16.7,
-        "p95": 18.6,
-        "p99": 23.1,
-        "max": 79.4,
+        "p95": 17.7,
+        "p99": 24.7,
+        "max": 72.3,
         "over33": 3,
         "over50": 2,
         "over100": 0

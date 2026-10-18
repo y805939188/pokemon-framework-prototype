@@ -6,6 +6,8 @@
 #
 # Usage: scripts/package-mac.sh [--with-tests] [--name NAME] [--out DIR]
 #   --with-tests  keep the smoke/flow-test plugins (needed by the package test matrix)
+#   --harden      sign inside-out with the hardened runtime (ad-hoc identity, see scripts/sign-mac.sh)
+#   --identity ID sign with a real identity (implies --harden --timestamp); none is available on this machine yet
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -14,9 +16,13 @@ NWAPP="$MZ_APP/Contents/Resources/nwjs-mac/nwjs.app"
 NAME="PokemonFrameworkPrototype"
 OUT="$ROOT/build/package"
 WITH_TESTS=0
+HARDEN=0
+IDENTITY="-"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --with-tests) WITH_TESTS=1 ;;
+    --harden) HARDEN=1 ;;
+    --identity) IDENTITY="$2"; HARDEN=1; shift ;;
     --name) NAME="$2"; shift ;;
     --out) OUT="$2"; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -41,7 +47,9 @@ EXCLUDES=(--exclude '*.map' --exclude '.DS_Store')
 if [[ "$WITH_TESTS" -eq 0 ]]; then
   EXCLUDES+=(--exclude 'PS_BattleSmoke.js' --exclude 'PS_BattleFlowTest.js')
 fi
-cp "$ROOT/index.html" "$ROOT/package.json" "$NW_RES/"
+cp "$ROOT/index.html" "$NW_RES/"
+# the manifest name decides the per-user data folder (~/Library/Application Support/<name>): make it per game
+node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));p.name=process.argv[3];fs.writeFileSync(process.argv[2],JSON.stringify(p,null,2)+"\n");' "$ROOT/package.json" "$NW_RES/package.json" "$NAME"
 for d in js data img audio fonts css effects icon; do
   [[ -d "$ROOT/$d" ]] && rsync -a "${EXCLUDES[@]}" "$ROOT/$d/" "$NW_RES/$d/"
 done
@@ -69,8 +77,13 @@ node -e '
 PLIST="$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleName $NAME" -c "Set :CFBundleDisplayName $NAME" -c "Set :CFBundleIdentifier io.github.pokemon-framework-prototype" "$PLIST"
 xattr -cr "$APP"
-codesign --force --deep -s - "$APP" >/dev/null 2>&1
-codesign -vv "$APP" 2>&1 | tail -2
+if [[ "$HARDEN" -eq 1 ]]; then
+  EXTRA=(); [[ "$IDENTITY" != "-" ]] && EXTRA=(--timestamp)
+  "$ROOT/scripts/sign-mac.sh" "$APP" --identity "$IDENTITY" --hardened ${EXTRA[@]+"${EXTRA[@]}"} | tail -3
+else
+  codesign --force --deep -s - "$APP" >/dev/null 2>&1
+  codesign -vv "$APP" 2>&1 | tail -2
+fi
 
 # ---- report ----
 BYTES="$(du -sk "$APP" | cut -f1)"

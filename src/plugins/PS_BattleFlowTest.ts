@@ -14,6 +14,26 @@
   if (!mode) return;
 
   const nodeRequire: any = G.require;
+
+  // Keep the scripted run going when the window is not focused (the user can work in other apps):
+  // 1) MZ/Reactor only update scenes while document.hasFocus() (SceneManager.isGameActive);
+  // 2) Input clears all key state on the window "blur" event, so swallow blur before Input sees it
+  //    (this listener is registered first because plugins load before Input.initialize);
+  // 3) Chromium itself throttles hidden/occluded windows: the run scripts add --disable-renderer-backgrounding,
+  //    --disable-background-timer-throttling, --disable-backgrounding-occluded-windows.
+  G.SceneManager.isGameActive = () => true;
+
+  // No sound during scripted runs (opt back in with --ps-sound). Belt and braces: the run scripts also pass
+  // Chromium's --mute-audio; here the AudioManager play calls are swallowed so nothing is even decoded/started.
+  const suppressedAudio: Record<string, number> = {};
+  if (!argv.includes("--ps-sound")) {
+    for (const fn of ["playBgm", "playBgs", "playMe", "playSe", "playStaticSe"]) {
+      if (G.AudioManager && typeof G.AudioManager[fn] === "function") {
+        G.AudioManager[fn] = () => { suppressedAudio[fn] = (suppressedAudio[fn] || 0) + 1; };
+      }
+    }
+  }
+  window.addEventListener("blur", (e) => e.stopImmediatePropagation(), true);
   const fs = nodeRequire("fs");
   const path = nodeRequire("path");
   const E = nodeRequire("./js/engine/game/growth.cjs");
@@ -56,10 +76,9 @@
    *  (observed: blur at frame 94 for ~800 frames). Take focus back before every key press. */
   let refocus = 0;
   async function ensureFocus() {
+    // No longer required (see the top of this file); kept as a cheap best effort that never blocks.
     if (document.hasFocus()) return;
-    const t0 = Date.now();
-    while (!document.hasFocus() && Date.now() - t0 < 20000) { try { G.nw.Window.get().focus(); } catch (e) { /* ignore */ } await sleep(50); }
-    refocus++;
+    try { G.nw.Window.get().focus(); refocus++; } catch (e) { /* ignore */ }
   }
   async function press(k: string, hold = 3) {
     await ensureFocus();
@@ -108,7 +127,7 @@
   let packageInfo: any = null;
   try { packageInfo = JSON.parse(fs.readFileSync(path.join(gameDir, "package-info.json"), "utf8")); } catch (e) { /* dev tree: no package-info */ }
   const pv = (G.process && G.process.versions) || {};
-  const report: any = { mode, results, focusLog, get refocus() { return refocus; }, env: { nw: pv.nw, node: pv.node, chromium: pv.chromium, v8: pv.v8, platform: G.process && G.process.platform, arch: G.process && G.process.arch, execPath: G.process && G.process.execPath, gameDir, packageInfo } };
+  const report: any = { mode, results, focusLog, suppressedAudio, get refocus() { return refocus; }, env: { nw: pv.nw, node: pv.node, chromium: pv.chromium, v8: pv.v8, platform: G.process && G.process.platform, arch: G.process && G.process.arch, execPath: G.process && G.process.execPath, gameDir, packageInfo } };
   async function scenario(id: string, fn: () => Promise<any>) {
     const t0 = Date.now();
     try { const detail = await fn(); results.push({ id, status: "pass", ms: Date.now() - t0, detail }); }
@@ -316,7 +335,7 @@
     const rounds = Number(arg("ps-perf-rounds")) || 6;
     for (let r = 0; r < rounds; r++) {
       for (const [name, ev, fn] of kindsList) {
-        game().bag.masterball = 5; game().bag.potion = 5; game().party[0].hp = 100; game().party.length = Math.min(game().party.length, 3);
+        game().bag.masterball = 5; game().bag.potion = 5; game().party[0].hp = 100; game().party[0].moves.forEach((m: any) => { m.pp = m.maxpp; }); game().party.length = Math.min(game().party.length, 3);
         W.PSFlow.perf.cur = null;
         try { await script(ev, fn); } catch (e: any) { perf.errors = (perf.errors || []).concat(`${name}#${r}: ${e.message}`); await recover(); }
         const b = W.PSFlow.perf.battles[W.PSFlow.perf.battles.length - 1];
@@ -403,6 +422,77 @@
     results.push({ id: "L1 leak bisect", status: "pass", ms: 0 });
   }
 
+  /**
+   * Leak hunt: walk the object graph from several roots, record the size of every array/Map/Set/object,
+   * run N battles, walk again and report the collections that grew (with their paths).
+   */
+  async function runLeakHunt() {
+    const N = Number(arg("ps-leak-n")) || 40;
+    function walk(roots: Record<string, any>, maxNodes = 400000): Map<string, number> {
+      const sizes = new Map<string, number>(); const seen = new WeakSet<object>(); let nodes = 0;
+      const stack: [string, any, number][] = Object.entries(roots).map(([k, v]) => [k, v, 0]);
+      while (stack.length && nodes < maxNodes) {
+        const [path_, v, d] = stack.pop()!;
+        if (!v || typeof v !== "object" || seen.has(v)) continue;
+        seen.add(v); nodes++;
+        let size = -1; let entries: [string, any][] = [];
+        try {
+          if (Array.isArray(v)) { size = v.length; if (d < 6) entries = v.slice(0, 200).map((x, i) => [String(i), x]); }
+          else if (v instanceof Map) { size = v.size; if (d < 6) entries = [...v.entries()].slice(0, 200).map(([k, x]) => [String(k), x]); }
+          else if (v instanceof Set) { size = v.size; if (d < 6) entries = [...v.values()].slice(0, 200).map((x, i) => [String(i), x]); }
+          else if (d < 6 && !(v instanceof Node) && !(v instanceof Window)) { const ks = Object.keys(v); size = ks.length; entries = ks.slice(0, 300).map((k) => { let x: any; try { x = v[k]; } catch (e) { x = undefined; } return [k, x] as [string, any]; }); }
+        } catch (e) { /* skip */ }
+        if (size >= 0) sizes.set(path_.replace(/\.\d+(?=\.|$)/g, ".#"), (sizes.get(path_.replace(/\.\d+(?=\.|$)/g, ".#")) || 0) + size);
+        for (const [k, x] of entries) stack.push([`${path_}.${k}`, x, d + 1]);
+      }
+      return sizes;
+    }
+    const roots = () => ({ app: G.Graphics.app, SceneManager: G.SceneManager, PIXI: G.PIXI, ImageManager: G.ImageManager, AudioManager: G.AudioManager, Reactor: G.ReactorEvents });
+    await toMap(); W.PSFlow.fast = true; W.PSFlow.seed = [1, 2, 3, 4];
+    const battle1 = async () => { await startEvent(1); await inMode("main"); await choose(/^Run/); await inMode("end"); await press("ok"); await dismissMessages(); };
+    for (let i = 0; i < 5; i++) await battle1(); // warm up caches
+    if (typeof G.gc === "function") { G.gc(); G.gc(); }
+    const before = walk(roots());
+    for (let i = 0; i < N; i++) await battle1();
+    if (typeof G.gc === "function") { G.gc(); G.gc(); }
+    await frames(120); // let Pixi's texture GC run
+    if (typeof G.gc === "function") { G.gc(); G.gc(); }
+    const after = walk(roots());
+    const grew: any[] = [];
+    for (const [k, v] of after) { const b = before.get(k) || 0; if (v - b >= Math.max(5, N / 4)) grew.push({ path: k, before: b, after: v, delta: v - b }); }
+    grew.sort((a, b) => b.delta - a.delta);
+    report.leakHunt = { N, nodesBefore: before.size, nodesAfter: after.size, grew: grew.slice(0, 60) };
+    results.push({ id: "L2 leak hunt", status: "pass", ms: 0 });
+  }
+
+  /** Write a V8 heap snapshot after N battles (+forced GC) for offline retainer analysis. */
+  async function runHeapSnapshot() {
+    const N = Number(arg("ps-leak-n")) || 10;
+    await toMap(); W.PSFlow.fast = true; W.PSFlow.seed = [1, 2, 3, 4];
+    const battle1 = async () => { await startEvent(1); await inMode("main"); await choose(/^Run/); await inMode("end"); await press("ok"); await dismissMessages(); };
+    for (let i = 0; i < N; i++) await battle1();
+    await frames(120);
+    if (typeof G.gc === "function") { G.gc(); G.gc(); }
+    // NW's embedded Node cannot write heap snapshots (v8.getHeapSnapshot asserts): signal the outside instead.
+    // The launching script attaches over the DevTools protocol (--remote-debugging-port), takes the snapshot, then
+    // touches the "done" file; we wait for it so the process stays alive.
+    const doneFile = arg("ps-heap-done");
+    report.heapReady = true;
+    if (OUT) { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT + ".ready", "1"); }
+    const t0w = Date.now();
+    while (doneFile && !fs.existsSync(doneFile) && Date.now() - t0w < 300000) await sleep(200);
+    results.push({ id: "H1 heap snapshot", status: "pass", ms: 0 });
+  }
+
+  /** Save written through the REAL default location logic (no --ps-save-dir): reports where it went. */
+  async function runSaveLocation() {
+    G.DataManager.setupNewGame(); W.PSFlow.resetGame();
+    const dir = G.StorageManager.fileDirectoryPath();
+    const code = await G.DataManager.saveGame(1);
+    report.saveLocation = { chosen: G.PSSaveLocation, dir, saveCode: code, fileExists: fs.existsSync(path.join(dir, "file1.rmmzsave")), gameDir };
+    results.push({ id: "SL1 save location", status: fs.existsSync(path.join(dir, "file1.rmmzsave")) ? "pass" : "fail", ms: 0 });
+  }
+
   async function verifySave() {
     await scenario("V1 real restart: the save written by the previous process loads with identical state, duplicates stay no-ops", async () => {
       const expected = JSON.parse(fs.readFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected.json"), "utf8"));
@@ -419,7 +509,7 @@
   G.Scene_Boot.prototype.start = function (this: any) {
     startAt.call(this);
     setTimeout(async () => {
-      try { if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else await runAll(); }
+      try { if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else await runAll(); }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       report.overall = results.every((r) => r.status === "pass") ? "pass" : "fail";
       if (OUT) { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, JSON.stringify(report, null, 2)); }

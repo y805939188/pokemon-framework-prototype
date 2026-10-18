@@ -14,40 +14,52 @@
     {
       "id": "T2 unavailable actions and cancel: nothing consumed, always back at a usable menu",
       "status": "pass",
-      "ms": 4638
+      "ms": 4636
     },
     {
       "id": "T3 wild run: faster user escapes, committed as 'ran', state unchanged apart from battle bookkeeping",
       "status": "pass",
-      "ms": 1200
+      "ms": 1220
     },
     {
       "id": "T4 capture: Master Ball from the bag, captured member joins with its stable id",
       "status": "pass",
-      "ms": 1635
+      "ms": 1650
     },
     {
       "id": "T5 item from the bag: Potion on the active member, consumed once and persisted",
       "status": "pass",
-      "ms": 1995
+      "ms": 2001
     },
     {
       "id": "T6 failure exit: engine error mid-battle aborts cleanly, nothing committed, the event still continues",
       "status": "pass",
-      "ms": 1215
+      "ms": 1200
     },
     {
       "id": "T7 save/restore outside battle + idempotent re-commit after restore",
       "status": "pass",
-      "ms": 1616,
+      "ms": 1622,
       "detail": {
         "saveCode": 0,
         "loadCode": 0
       }
     }
   ],
-  "focusLog": [],
-  "refocus": 0,
+  "focusLog": [
+    {
+      "ev": "focus",
+      "frame": 868,
+      "t": 15008,
+      "hasFocus": true,
+      "vis": "visible"
+    }
+  ],
+  "suppressedAudio": {
+    "playBgm": 1,
+    "playStaticSe": 69
+  },
+  "refocus": 1,
   "env": {
     "nw": "0.117.0",
     "node": "26.7.0",
@@ -58,9 +70,9 @@
     "execPath": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
     "gameDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
     "packageInfo": {
-      "builtAt": "2026-10-18T11:54:38.178Z",
-      "gitHead": "482ea3de6eb5ebfb6d4e7653b5a245ee168a44bd",
-      "workingTreeChanges": 19,
+      "builtAt": "2026-10-18T13:02:40.101Z",
+      "gitHead": "0ac24d4c0aec7ce9335f763f24f33d4f1d61094f",
+      "workingTreeChanges": 35,
       "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
       "withTests": true,
       "signing": "ad-hoc (local only)"

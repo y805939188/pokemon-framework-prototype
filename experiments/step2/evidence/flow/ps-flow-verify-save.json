@@ -13,6 +13,11 @@
       }
     }
   ],
+  "focusLog": [],
+  "suppressedAudio": {
+    "playBgm": 1
+  },
+  "refocus": 0,
   "env": {
     "nw": "0.117.0",
     "node": "26.7.0",

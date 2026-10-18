@@ -1,0 +1,13 @@
+/*:
+ * @target MZ
+ * @plugindesc Keeps save files outside a packaged app bundle (user data folder). Playtest / development keeps using the project's save folder.
+ *
+ * @param mode
+ * @text Mode
+ * @desc auto: user data folder when packaged, project folder otherwise. project / user force one of them.
+ * @type select
+ * @option auto
+ * @option project
+ * @option user
+ * @default auto
+ */

@@ -4,13 +4,13 @@
     {
       "id": "S1 (matrix)",
       "status": "pass",
-      "ms": 162,
+      "ms": 165,
       "fingerprint": "a85944939132d8f8d088a99ec036b8c84d6885896fa7ed424d8b4f7cae85832e"
     },
     {
       "id": "S2 (matrix)",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "c8f0a7d3f4d92e7414776b2ac6cb142aa6bef0427576b278cc9f656b7ec66a88"
     },
     {
@@ -22,7 +22,7 @@
     {
       "id": "S4 (matrix)",
       "status": "pass",
-      "ms": 2,
+      "ms": 1,
       "fingerprint": "cf3062f670d92a5f8aa91ce21e6865f44f87b4355a09f38fe8d02247bde878d7"
     },
     {
@@ -34,13 +34,13 @@
     {
       "id": "S6 (matrix)",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "02b317c1befc72427b5bc7e898debb7bed445198bd39530cff2561e6784a9f66"
     },
     {
       "id": "S7 (matrix)",
       "status": "pass",
-      "ms": 3,
+      "ms": 2,
       "fingerprint": "691c3da8c1d62689fb22325f1fed096c798b6496847e3b51f309100610adeade"
     },
     {
@@ -52,17 +52,20 @@
     {
       "id": "S9 (matrix)",
       "status": "pass",
-      "ms": 16,
+      "ms": 15,
       "fingerprint": "3373e0f0f457e125df76034c2bf47bc75ef3b0596ab9dd7c561ee92e0458011f"
     },
     {
       "id": "S10 (matrix)",
       "status": "pass",
-      "ms": 8,
+      "ms": 7,
       "fingerprint": "91781116c31992aa8af034e79ef35c08272488e19cfca0881cc6649fe149862f"
     }
   ],
   "focusLog": [],
+  "suppressedAudio": {
+    "playBgm": 1
+  },
   "refocus": 0,
   "env": {
     "nw": "0.117.0",
@@ -74,9 +77,9 @@
     "execPath": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
     "gameDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
     "packageInfo": {
-      "builtAt": "2026-10-18T11:54:38.178Z",
-      "gitHead": "482ea3de6eb5ebfb6d4e7653b5a245ee168a44bd",
-      "workingTreeChanges": 19,
+      "builtAt": "2026-10-18T13:03:42.725Z",
+      "gitHead": "0ac24d4c0aec7ce9335f763f24f33d4f1d61094f",
+      "workingTreeChanges": 35,
       "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
       "withTests": true,
       "signing": "ad-hoc (local only)"
@@ -86,13 +89,13 @@
     {
       "id": "S1",
       "status": "pass",
-      "ms": 162,
+      "ms": 165,
       "fingerprint": "a85944939132d8f8d088a99ec036b8c84d6885896fa7ed424d8b4f7cae85832e"
     },
     {
       "id": "S2",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "c8f0a7d3f4d92e7414776b2ac6cb142aa6bef0427576b278cc9f656b7ec66a88"
     },
     {
@@ -104,7 +107,7 @@
     {
       "id": "S4",
       "status": "pass",
-      "ms": 2,
+      "ms": 1,
       "fingerprint": "cf3062f670d92a5f8aa91ce21e6865f44f87b4355a09f38fe8d02247bde878d7"
     },
     {
@@ -116,13 +119,13 @@
     {
       "id": "S6",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "02b317c1befc72427b5bc7e898debb7bed445198bd39530cff2561e6784a9f66"
     },
     {
       "id": "S7",
       "status": "pass",
-      "ms": 3,
+      "ms": 2,
       "fingerprint": "691c3da8c1d62689fb22325f1fed096c798b6496847e3b51f309100610adeade"
     },
     {
@@ -134,16 +137,16 @@
     {
       "id": "S9",
       "status": "pass",
-      "ms": 16,
+      "ms": 15,
       "fingerprint": "3373e0f0f457e125df76034c2bf47bc75ef3b0596ab9dd7c561ee92e0458011f"
     },
     {
       "id": "S10",
       "status": "pass",
-      "ms": 8,
+      "ms": 7,
       "fingerprint": "91781116c31992aa8af034e79ef35c08272488e19cfca0881cc6649fe149862f"
     }
   ],
-  "matrixMs": 205,
+  "matrixMs": 207,
   "overall": "pass"
 }

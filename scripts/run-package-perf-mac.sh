@@ -13,9 +13,9 @@ APP="$ROOT/build/package/PokemonFrameworkPrototype.app"
 mkdir -p "$EVID/perf"; rm -f "$EVID"/perf/run*.json
 now_ms() { python3 -c 'import time;print(int(time.time()*1000))'; }
 for i in $(seq 1 "$RUNS"); do
-  OUT="$EVID/perf/run$i.json"; rm -rf "$APP/Contents/Resources/app.nw/save"
+  OUT="$EVID/perf/run$i.json"; rm -rf "$EVID/saves"
   T0="$(now_ms)"
-  open -n "$APP" --args "--ps-flow-test=perf" "--ps-flow-out=$OUT" "--ps-t0=$T0" --ps-flow-quit
+  open -n "$APP" --args "--mute-audio" "--disable-renderer-backgrounding" "--disable-background-timer-throttling" "--disable-backgrounding-occluded-windows" "--disable-features=CalculateNativeWinOcclusion" "--ps-save-dir=$EVID/saves" "--ps-flow-test=perf" "--ps-flow-out=$OUT" "--ps-t0=$T0" --ps-flow-quit
   for _ in $(seq 1 300); do [[ -f "$OUT" ]] && break; sleep 2; done
   [[ -f "$OUT" ]] || { echo "timeout on run $i" >&2; pkill -f "PokemonFrameworkPrototype.app/Contents/MacOS" || true; exit 1; }
   sleep 3

@@ -16,7 +16,7 @@ rm -f "$EVID"/ps-flow-*.json "$EVID"/*.png "$ROOT/save/file1.rmmzsave"
 wait_for() { for _ in $(seq 1 180); do [[ -f "$1" ]] && return 0; sleep 2; done; return 1; }
 run() { # mode out [extra args]
   local mode="$1" out="$2"; shift 2
-  "$NW" "$ROOT" "--ps-flow-test=$mode" "--ps-flow-out=$out" --ps-flow-quit "$@" >/dev/null 2>&1 &
+  "$NW" "$ROOT" "--mute-audio" "--disable-renderer-backgrounding" "--disable-background-timer-throttling" "--disable-backgrounding-occluded-windows" "--disable-features=CalculateNativeWinOcclusion" "--ps-flow-test=$mode" "--ps-flow-out=$out" --ps-flow-quit "$@" >/dev/null 2>&1 &
   wait_for "$out" || { echo "timeout waiting for $out" >&2; pkill -f "nwjs.app/Contents/MacOS/nwjs" || true; exit 1; }
   sleep 2
 }

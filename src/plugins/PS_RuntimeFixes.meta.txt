@@ -1,0 +1,4 @@
+/*:
+ * @target MZ
+ * @plugindesc Runtime fixes for RPGReactor on PixiJS 8: stops the per-sprite Texture leak (memory growth per scene).
+ */

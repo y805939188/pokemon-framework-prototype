@@ -3,6 +3,8 @@
 var $plugins =
 [
 {"name":"RR_Pixi8Particles","status":true,"description":"RPG Reactor / PixiJS 8 native Particle demo","parameters":{}},
+{"name":"PS_RuntimeFixes","status":true,"description":"Runtime fixes for RPGReactor on PixiJS 8: stops the leak of one Texture per Sprite (memory growth per scene).","parameters":{}},
+{"name":"PS_SaveLocation","status":true,"description":"Keeps save files outside a packaged app bundle (user data folder). Playtest / development keeps using the project save folder.","parameters":{"mode":"auto"}},
 {"name":"PS_BattleSmoke","status":true,"description":"Step 2.1 smoke: runs the Showdown gateway fixture inside the game runtime and writes a JSON report.","parameters":{"runOnBoot":"false"}},
 {"name":"PS_BattleFlow","status":true,"description":"Step 2.4: placeholder text battle scene driven by the Showdown session; map events start battles and wait.","parameters":{}},
 {"name":"PS_BattleFlowTest","status":true,"description":"Step 2.4 test driver (inert without --ps-flow-test).","parameters":{}}

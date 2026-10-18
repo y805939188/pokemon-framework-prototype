@@ -4,7 +4,7 @@
     {
       "id": "V1 real restart: the save written by the previous process loads with identical state, duplicates stay no-ops",
       "status": "pass",
-      "ms": 4,
+      "ms": 5,
       "detail": {
         "applied": [
           "wild-snorlax#1"
@@ -14,6 +14,9 @@
     }
   ],
   "focusLog": [],
+  "suppressedAudio": {
+    "playBgm": 1
+  },
   "refocus": 0,
   "env": {
     "nw": "0.117.0",
@@ -25,9 +28,9 @@
     "execPath": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
     "gameDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
     "packageInfo": {
-      "builtAt": "2026-10-18T11:54:38.178Z",
-      "gitHead": "482ea3de6eb5ebfb6d4e7653b5a245ee168a44bd",
-      "workingTreeChanges": 19,
+      "builtAt": "2026-10-18T13:03:42.725Z",
+      "gitHead": "0ac24d4c0aec7ce9335f763f24f33d4f1d61094f",
+      "workingTreeChanges": 35,
       "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
       "withTests": true,
       "signing": "ad-hoc (local only)"

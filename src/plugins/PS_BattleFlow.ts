@@ -363,9 +363,6 @@
   };
   P.terminate = function () {
     G.Scene_MenuBase.prototype.terminate.call(this);
-    // Measured in 2.5: every scene open/close retains ~1.5-2.5 MB in this runtime; releasing window canvases
-    // explicitly cuts that by roughly 40% (the rest is outside this plugin, see docs/step2/2.5-report.md).
-    for (const w of [this._status, this._log, this._menu]) { try { if (w.contents) w.contents.destroy(); if (w.contentsBack) w.contentsBack.destroy(); } catch (e) { /* already released */ } }
     if (PSFlow.running) PSFlow.close(0); // never leave the interpreter waiting
   };
 })();

@@ -4,7 +4,7 @@
     {
       "id": "S1",
       "status": "pass",
-      "ms": 212,
+      "ms": 211,
       "fingerprint": "a85944939132d8f8d088a99ec036b8c84d6885896fa7ed424d8b4f7cae85832e"
     },
     {
@@ -16,7 +16,7 @@
     {
       "id": "S3",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "9b3b04f4c72625eec6d74d0a59dde5190e4f54376d333252c0ecb3c54656033f"
     },
     {
@@ -52,7 +52,7 @@
     {
       "id": "S9",
       "status": "pass",
-      "ms": 26,
+      "ms": 35,
       "fingerprint": "3373e0f0f457e125df76034c2bf47bc75ef3b0596ab9dd7c561ee92e0458011f"
     },
     {
