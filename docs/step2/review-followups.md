@@ -12,7 +12,7 @@ State after the fixes: code commit `e666bba` (engine rules, session guards, test
 | D2 | ~~Trainer-battle ball~~ | — | **decided 2026-10-18: follow the spec.** Implemented for singles and doubles: the ball can be thrown, is spent and is blocked by the trainer; `trainer` stays the refusal reason for running. |
 | D3 | ~~Item eligibility before registration; certain escape~~ | — | **confirmed 2026-10-18** (kept as implemented). |
 | D4 | ~~Principle for Showdown-vs-Essentials conflicts inside battles~~ | — | **decided 2026-10-18 (first half): Showdown is authoritative in the battle.** Differences are listed per work package and the player-visible ones go to the user. **Still open (second half):** which data source the step 3 content pipeline uses (my lean: our own pipeline generated from the spec library, because Showdown has no base exp, growth curves, catch rates or Essentials learnsets) — settle at the start of step 3. |
-| D5 | Escape timing (decided in the turn vs. when chosen) matters for doubles (CM-26). | decide before the doubles UI | later, with the doubles batch |
+| D5 | ~~Escape timing~~ | — | **decided 2026-10-18: keep it inside the turn; re-check in the doubles batch** (`deviations.md` #6). |
 | D6 | ~~Push the updated `main` and a tag?~~ | — | done: pushed on 2026-10-18 with your approval |
 
 ## 2. Findings — disposition
@@ -74,7 +74,7 @@ Legend: **fixed** = changed and covered by a test or a run; **partial**; **defer
 | 34 | Which 35 uncommitted changes? Not recoverable beyond "they became commit `135cd7a`"; whether code changed between the 08:05 build and the 08:08 commit is unknown. The new evidence is built from a **committed** state (`gitHead e666bba`, empty diff hash `e3b0c442…`). |
 | 35 | Raw outputs of the 100-battle curve, heap snapshots, the focus-stealing run: not stored at the time. The 100-battle runs were repeated (section 3); the other two were not. |
 | 36 | `scripts/tests/reactor-install.test.cjs` outside `test-quick`: not intended; it is in the quick suite now (it passes, ≈2 s). |
-| 37 | Escape timing in doubles: **D5**. |
+| 37 | Escape timing in doubles: **D5**, decided: keep in the turn, re-check with the doubles UI. |
 | 38 | "Extra" meant the reasoning level above High: use `xhigh` (or `max`) for reviews; the guide says so now. |
 
 ## 3. What was run after the fixes (and what was not)
