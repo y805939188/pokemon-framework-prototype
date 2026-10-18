@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "recordedAt": "2026-10-17",
+  "status": "2.1 partial: Node + NW.js direct-launch pass; MZ Playtest and deployed package NOT yet run",
+  "template": {
+    "repo": "https://github.com/y805939188/rpg-maker-mz-initialize",
+    "commit": "b6fa1df099d5c3cf0b501755b73e06566b7e1939",
+    "importMethod": "git archive of tracked files (no .git/cache); bootstrap-mac.sh --skip-nwjs"
+  },
+  "rpgReactor": {
+    "source": "local checkout /Users/dingshinn/Desktop/RPGReactor (recorded in git-ignored .reactor-source)",
+    "commit": "2dc2e10e89445e252c929257f8bf249525045d36",
+    "runtimeVersion": "0.98.8",
+    "runtimeRevision": "20260927.34",
+    "deviationFromCandidate": "Candidate was 0.98.7 / 1a6501bc; that tag has no types/ bundle, which the template typecheck requires. 0.98.8 at 2dc2e10e is the only local source with types."
+  },
+  "mzEditor": { "app": "RPGMZ.app 1.10.0 (Steam)", "nwjsHost": "unchanged by us; already NW.js 0.117.0 SDK arm64" },
+  "toolchain": { "devNode": "22.21.1", "pnpm": "10.20.0", "typescript": "7.0.2", "vite": "8.3.1", "pixi.js": "8.20.0", "pnpmLockSha256": "bd7f521f901a1c01ad2d46be0a756866b296a3340f15ef5b5e764cc95111d0b4" },
+  "runtimeObserved": {
+    "where": "NW.js launched directly on the dev tree and on a trimmed copy (experiments/step2/evidence/*.json)",
+    "nw": "0.117.0", "nwFlavor": "sdk", "node": "26.7.0", "chromium": "154.0.8037.58", "v8": "15.4.80.11",
+    "note": "Source-declared (versions.env) and observed values agree for NW.js/Chromium."
+  },
+  "showdown": {
+    "repo": "https://github.com/smogon/pokemon-showdown.git",
+    "sha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+    "package": "pokemon-showdown 0.11.11, engines node >=22.18.0, license MIT",
+    "install": "npm ci --omit=optional (package-lock.json sha256 fd89ae0129d1855edb63f9d23d99bf67bc894a3f5be882f8c486041d8662b702)",
+    "build": "node build (esbuild; ~1s, output CommonJS dist/)",
+    "stagedRuntime": "js/engine/showdown: dist/{sim,data,lib,config} without .map + node_modules/ts-chacha20 (~40 MB)",
+    "patches": "none"
+  },
+  "fixture": {
+    "id": "gen8-3v3-v1",
+    "format": "gen8customgame ([Gen 8] Custom Game; candidate only, not the final ruleset)",
+    "seed": [1, 2, 3, 4],
+    "seedNote": "4-number seed selects the legacy Gen5 PRNG; default path uses the sodium (ChaCha20) PRNG",
+    "fixtureSha256": "89786e06cd80c83d39342bc68974420742a9faa1c46748124d700ea801708a68",
+    "goldenFile": "js/engine/fixtures/golden-gen8-3v3-seed1234.json",
+    "goldenMeaning": "engine regression baseline only; NOT verified against the Ruby reference",
+    "goldenResult": { "winner": "Bob", "turn": 7, "lines": 115, "sha256": "8cc092096889e676d6d510fadfa04382050ce4164c7531ba8c81e281590fac4b" },
+    "normalization": "drop only the wall-clock |t:| line; everything else compared verbatim"
+  }
+}
