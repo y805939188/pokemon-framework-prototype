@@ -24,7 +24,8 @@
   const os = nodeRequire("os");
 
   function decide(): { dir: string; why: string } {
-    const gameDir = path.dirname(G.process.mainModule.filename);
+    // the project folder = two levels above js/plugins.js, resolved relative to index.html (process.mainModule is deprecated)
+    const gameDir = path.dirname(path.dirname(nodeRequire.resolve("./js/plugins.js")));
     if (override) return { dir: path.resolve(override) + path.sep, why: "--ps-save-dir" };
     const mode = params.mode || "auto";
     const packaged = /\.app[\\/]Contents[\\/]Resources[\\/]/.test(gameDir);
