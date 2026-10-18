@@ -25,6 +25,7 @@ SUITES=(
   experiments/step3/test-content.cjs
   experiments/step3/test-i18n.cjs
   experiments/step3/test-save.cjs
+  experiments/step3/test-integration.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do

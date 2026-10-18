@@ -40,3 +40,26 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup): { co
   }
   return { content, errors };
 }
+
+export interface DanglingReference { path: string; message: string }
+
+/**
+ * References from a saved state into the current content: species that no longer exist, and (when a Showdown lookup is
+ * given) moves the battle engine does not know. Located like every other content error, so a save written against older
+ * content is explained instead of crashing a battle.
+ */
+export function findDanglingReferences(
+  state: { party: { species: string; moves: { id: string }[] }[]; boxes: { species: string; moves: { id: string }[] }[] },
+  content: Content,
+  dex?: DexLookup,
+): DanglingReference[] {
+  const out: DanglingReference[] = [];
+  for (const key of ["party", "boxes"] as const) {
+    for (const [i, m] of state[key].entries()) {
+      const path = `$.${key}[${i}]`;
+      if (!content.species[m.species]) out.push({ path: `${path}.species`, message: `"${m.species}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}` });
+      if (dex) for (const [j, mv] of m.moves.entries()) if (!dex.move(mv.id)) out.push({ path: `${path}.moves[${j}].id`, message: `"${mv.id}" is not a move in the pinned Showdown data` });
+    }
+  }
+  return out;
+}

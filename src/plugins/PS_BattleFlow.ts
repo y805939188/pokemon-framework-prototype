@@ -68,6 +68,7 @@
       return PSFlow._content;
     },
     _content: null as any,
+    _dex: null as any,
     /** Language of the battle screen: set by tests (setLanguage) or by the plugin parameter; unknown languages use English. */
     lang: null as string | null,
     _tr: null as any,
@@ -106,6 +107,10 @@
       const { Session, F, B } = engine();
       if (!PSFlow.logger) PSFlow.logger = B.log.createRingLogger(500);
       const req = PSFlow.request;
+      // a save written against older content must be explained, not crash a battle: check its references first
+      if (!PSFlow._dex) PSFlow._dex = B.dex.createDexLookup();
+      const dangling = B.contentRuntime.findDanglingReferences(PSFlow.game(), PSFlow.content(), PSFlow._dex);
+      if (dangling.length) throw new Error("the save refers to content that no longer exists: " + dangling.slice(0, 3).map((d: any) => `${d.path} ${d.message}`).join("; "));
       const team = req.foes.map((f: any, i: number) => F.foeMember(`W${req.seq}-${i + 1}`, f.species, f.level));
       const tCreate = performance.now();
       const session = await Session.create({

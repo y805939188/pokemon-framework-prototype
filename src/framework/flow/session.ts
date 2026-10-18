@@ -121,8 +121,15 @@ export class BattleSession {
   logger?: LogSink;
 
   static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger }: CreateOptions): Promise<BattleSession> {
+    // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
+    for (const m of [...game.party, ...foe.team]) {
+      if (!content.species[m.species]) throw new Error(`battle content: species "${m.species}" (member ${m.id}) is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
+    }
     const probe = await BattleGateway.create({ formatid, seed, players: [{ name: "p", team: [{ name: "x", species: "Pidgey", moves: ["Tackle"] }] }, { name: "q", team: [{ name: "y", species: "Pidgey", moves: ["Tackle"] }] }] });
     const moveName = (id: string): string => probe.moveInfo(id).name;
+    for (const m of [...game.party, ...foe.team]) {
+      for (const mv of m.moves) { try { moveName(mv.id); } catch { throw new Error(`battle content: move "${mv.id}" of member ${m.id} is not known to the battle engine`); } }
+    }
     // Showdown keeps the nickname (our stable id) truncated to 20 characters and strips separators,
     // so ids must survive that round trip untouched or results could not be mapped back.
     for (const m of [...game.party, ...foe.team]) {

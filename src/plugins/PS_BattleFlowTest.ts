@@ -318,6 +318,18 @@
       return { saveCodes: [rc1], loadCodes: [lc1] };
     });
 
+    await scenario("T10 a save that refers to content which no longer exists: the battle is refused with the reference named, the state is untouched", async () => {
+      fresh();
+      game().party[1].species = "Missingno"; game().party[0].moves[0].id = "notamove";
+      const before = clone(game());
+      await startEvent(1);
+      await waitFor(() => { const o = W.PSFlow.lastOutcome; return !!o && o.aborted === true; }, "the battle aborts");
+      const msg = W.PSFlow.lastOutcome.error;
+      assert(/species "Missingno" is not in the content "sample"/.test(msg) && /party\[0\]\.moves\[0\]\.id "notamove" is not a move/.test(msg), "the message names both references: " + msg);
+      eq(game(), before, "state untouched by the refused battle");
+      await recover();
+    });
+
     await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
       W.PSFlow.setLanguage("zh");
       try {
