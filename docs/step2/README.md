@@ -1,6 +1,6 @@
 # Step 2 — Battle integration experiment
 
-Status of 2.1 (environment and loading gate): **conditional pass** — Node, direct NW.js, MZ Playtest and a deployed package (repaired shell, see below) all pass; MZ's own Deploy output does not open without repair. See `.handoff/STATUS.md` in the workspace root for the live hand-off and `baseline.json` for pinned versions.
+Status of 2.1 (environment and loading gate): **PASS, accepted by the user on 2026-10-18, scoped to the local development environment** (MZ with replaced NW.js 0.117.0 + Reactor 0.98.8, Apple Silicon macOS). Node, direct NW.js, MZ Playtest and a deployed package (repaired shell, see below) all pass; MZ's own Deploy output does not open without repair. See `.handoff/STATUS.md` in the workspace root for the live hand-off and `baseline.json` for pinned versions.
 
 ## What exists
 
@@ -45,6 +45,13 @@ NW="$HOME/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.
 - **Workaround** `scripts/repair-deployed-app-mac.sh Game.app`: rebuilds `Game-repaired.app` from the pristine host `nwjs.app` (via `ditto`) + the deployed `app.nw`/`Info.plist`/icon, then ad-hoc signs. Launched via `open` (double-click path): PASS 4/4, same NW/Node/Chromium. Evidence: `evidence/deployed-package-repaired-shell.json`. Ad-hoc only: **not** Developer ID signing or notarization, not a distribution answer.
 - The deployed `app.nw` contained `js/engine/**` including `showdown/node_modules/ts-chacha20`, so that risk did not materialize.
 - MZ Deploy copies the whole project root (it shipped `src/`, `docs/`, `experiments/`, `scripts/`, `save/`, and earlier 400 MB of Showdown sources). Showdown sources now live outside the project (`~/Library/Caches/pokemon-framework/showdown-src`, override `SHOWDOWN_SRC`). A proper deploy allow-list is still to do.
+
+## Product-environment decision (user, 2026-10-18)
+
+- Stock MZ ships an old NW.js (the untouched Windows bundle has Node v14.12.0); the pinned Showdown needs Node >= 22.18, so the engine cannot run in a stock MZ.
+- **Decision:** the framework requires users to update their local MZ with our setup (replace NW.js and install the Reactor runtime, as the template's `bootstrap-mac.sh` already does). Priority is our own environment; reducing the user's setup cost is revisited after everything else is done.
+- Consequences to carry forward: (1) MZ's built-in Deploy is unsupported on macOS with the new NW.js, so we need our own packaging command (2.5; interim: `scripts/repair-deployed-app-mac.sh`); (2) setup modifies global MZ, so keep backup, add a restore command and a doctor check; (3) a Steam update can overwrite the replaced NW.js, doctor must detect it; (4) only Apple Silicon macOS verified: Windows (including MZ Deploy there) and Intel Mac are unverified; (5) higher user setup/support cost, so doctor must be thorough.
+- Not considered: option of running Showdown in a separate bundled Node process on stock MZ; it stays available if the decision is revisited.
 
 ## Not verified yet
 
