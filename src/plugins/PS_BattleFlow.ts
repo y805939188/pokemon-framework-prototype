@@ -163,6 +163,12 @@
     "choice-rejected": "That choice isn't available right now.", "not-registered": "That isn't possible right now.",
   };
 
+  /** Same reason code, different wording per action (a refused Ball is not a refused Run). */
+  const REASON_FOR: Record<string, Record<string, string>> = {
+    ball: { trainer: "The trainer blocked the Ball! Don't be a thief!", ballsdisabled: "Balls can't be used in this battle.", multiplefoes: "You can't aim at just one of several foes!" },
+    run: { trainer: "No! There's no running from a trainer battle!", trapped: "You can't escape, something is holding you!" },
+  };
+
   function Scene_PSBattle(this: any) { this.initialize(...(arguments as any)); }
   W.Scene_PSBattle = Scene_PSBattle;
   Scene_PSBattle.prototype = Object.create(G.Scene_MenuBase.prototype);
@@ -321,13 +327,12 @@
     Promise.resolve().then(fn).then((r: any) => {
       this._busy = false;
       if (r && r.ok === false) {
-        this._queue.push(REASON[r.reason] || `Not possible (${r.reason}).`);
+        this._queue.push((kind && REASON_FOR[kind] && REASON_FOR[kind][r.reason]) || REASON[r.reason] || `Not possible (${r.reason}).`);
         this._mode = "messages";
         return;
       }
       this.pushMessages(r.messages || []);
     }).catch((e: unknown) => { this._busy = false; this._failure = e; this.abort(e); });
-    void kind;
   };
   P.abort = function (e: unknown) {
     PSFlow.abort(e);

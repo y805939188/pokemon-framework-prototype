@@ -4,7 +4,7 @@
     {
       "id": "V1 real restart: the save written by the previous process loads with identical state, duplicates stay no-ops",
       "status": "pass",
-      "ms": 5,
+      "ms": 4,
       "detail": {
         "applied": [
           "wild-snorlax#1"

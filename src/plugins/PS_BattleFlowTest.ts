@@ -136,7 +136,8 @@
       assert(battle()._log._lines.some((l: string) => /no running from a trainer/i.test(l)), "run refused with a reason in a trainer battle");
       await choose(/^Bag/); await inMode("bag");
       await choose(/Poké Ball/); await inMode("main");
-      assert(battle()._log._lines.some((l: string) => /blocked|trainer|can't/i.test(l)), "ball refused in a trainer battle");
+      assert(battle()._log._lines.some((l: string) => /blocked the Ball/i.test(l)), "ball refused with ITS OWN message (not the run message)");
+      assert(battle()._log._lines.filter((l: string) => /no running from a trainer/i.test(l)).length === 1, "the run message appears only for the Run attempt");
       assert(battle()._session.bag.pokeball === 5, "refused ball is not consumed");
       await choose(/^Fight/); await inMode("moves"); await press("cancel"); await inMode("main");
       await choose(/^Bag/); await inMode("bag"); await choose(/Potion/); await inMode("party"); await press("cancel"); await inMode("bag");
