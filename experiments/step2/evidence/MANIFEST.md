@@ -4,16 +4,21 @@
 
 ## 最终证据（独立评审后重新生成，2026-10-18）
 
-全部由提交 **`e666bba`** 的代码产生（`diffSha256` 为空输入哈希：打包时除文档外没有任何未提交改动）。这与 C2 时不同：C2 的证据来自 `482ea3d` 加未提交改动。
+两批，都来自**已提交**的代码（`diffSha256` 为空输入哈希：打包时除文档与证据外没有任何未提交改动）；这与 C2 时不同：C2 的证据来自 `482ea3d` 加未提交改动。
+
+- **包内测试与开发树流程**（`package/ps-*.json`、截图、`flow/*`）：提交 **`0556a68`**（用户决定 D1–D3 落地之后：`statusCount`、训练家战精灵球、T2 更新）。
+- **性能与 100 场内存**（`package/perf*`、`memory-100/`）：提交 **`e666bba`** 的包（D1–D3 之前；这些改动不涉及它们测量的内容，没有重测）。
+
+下表“构建”列里写的就是各文件对应的是哪一批。
 
 | 文件 | 内容 | 产生方式 | 构建 |
 |---|---|---|---|
-| `package/ps-flow-report.json` | 包内游戏内流程 T1–T7（真实按键/事件/MZ 存档） | `PF_PACKAGE_ARGS=--harden scripts/run-package-tests-mac.sh` | 第 1 次构建（`builtAt` 14:42:21Z），`adhoc+hardened-runtime` |
-| `package/ps-flow-verify-save.json`、`ps-matrix-package.json`、`ps-saveloc.json`、`ps-matrix-node.json` | 应用被**替换**为新构建后：重启读档校验 V1、场景矩阵 S1–S10（包内）、默认存档位置 SL1、同一矩阵在普通 Node 22 下的指纹 | 同上 | 第 2 次构建（`builtAt` 14:42:58Z）；脚本会检查四份报告来自预期的两次构建；包内与 Node 的指纹逐项相同，且都等于入库基线 `js/engine/fixtures/matrix-fingerprints.json`（已逐项核对） |
-| `package/perf-summary.json`、`package/perf/run{1,2,3}.json` | 3 次冷启动的性能与内存汇总及原始数据 | `scripts/run-package-perf-mac.sh 3`（同一个包，因此是**硬化运行时**临时签名；C2 的性能数据是普通临时签名） | 同第 2 次构建 |
-| `memory-100/after/`、`memory-100/before/` | 100 场战斗（25 轮 × 4 种）、强制 GC 的内存曲线：修复后 / 关闭两处修复（`--ps-fix=no-texture,no-batcher`）；结果：关闭修复 RSS 1,141→1,538 MB（线性增长），开启修复 1,135→1,229 MB（平台）；渲染进程 JS 堆两次都是 28 MB（见 `runtime-issues.md`） | `PF_PERF_ARGS="--ps-perf-rounds=25 --js-flags=--expose-gc [--ps-fix=…]" scripts/run-package-perf-mac.sh 1 <目录>` | 同第 2 次构建 |
-| `package/01-…07-*.png`、`package/ps-flow-expected.json` | 包内流程截图与期望状态快照 | 同第一行 | 第 1 次构建 |
-| `flow/*` | 同一批流程在**开发树**（NW.js 直接启动项目，`--ps-save-dir` 指向证据目录）里的报告与截图 | `scripts/run-flow-test-mac.sh` | 提交 `e666bba` 的工作树（文档与证据是当时唯一未提交的改动）；无 `packageInfo` |
+| `package/ps-flow-report.json` | 包内游戏内流程 T1–T7（真实按键/事件/MZ 存档） | `PF_PACKAGE_ARGS=--harden scripts/run-package-tests-mac.sh` | `0556a68`，第 1 次构建（`builtAt` 15:34:17Z），`adhoc+hardened-runtime` |
+| `package/ps-flow-verify-save.json`、`ps-matrix-package.json`、`ps-saveloc.json`、`ps-matrix-node.json` | 应用被**替换**为新构建后：重启读档校验 V1、场景矩阵 S1–S10（包内）、默认存档位置 SL1、同一矩阵在普通 Node 22 下的指纹 | 同上 | `0556a68`，第 2 次构建（`builtAt` 15:35:21Z）；脚本会检查四份报告来自预期的两次构建；包内与 Node 的指纹逐项相同，且都等于入库基线 `js/engine/fixtures/matrix-fingerprints.json`（已逐项核对） |
+| `package/perf-summary.json`、`package/perf/run{1,2,3}.json` | 3 次冷启动的性能与内存汇总及原始数据 | `scripts/run-package-perf-mac.sh 3`（硬化运行时临时签名的包；C2 的性能数据是普通临时签名） | `e666bba` 的包（`builtAt` 14:42:58Z） |
+| `memory-100/after/`、`memory-100/before/` | 100 场战斗（25 轮 × 4 种）、强制 GC 的内存曲线：修复后 / 关闭两处修复（`--ps-fix=no-texture,no-batcher`）；结果：关闭修复 RSS 1,141→1,538 MB（线性增长），开启修复 1,135→1,229 MB（平台）；渲染进程 JS 堆两次都是 28 MB（见 `runtime-issues.md`） | `PF_PERF_ARGS="--ps-perf-rounds=25 --js-flags=--expose-gc [--ps-fix=…]" scripts/run-package-perf-mac.sh 1 <目录>` | `e666bba` 的包 |
+| `package/01-…07-*.png`、`package/ps-flow-expected.json` | 包内流程截图与期望状态快照 | 同第一行 | `0556a68`，第 1 次构建 |
+| `flow/*` | 同一批流程在**开发树**（NW.js 直接启动项目，`--ps-save-dir` 指向证据目录）里的报告与截图 | `scripts/run-flow-test-mac.sh` | 提交 `0556a68` 的工作树（证据是当时唯一未提交的改动）；无 `packageInfo` |
 
 关于截图：`flow/` 与 `package/` 的 05–07 号截图逐字节相同，因为两个宿主在同一尺寸（816×624）下渲染同一个确定的占位界面，得到相同的像素；每次运行都会先删除再重写图片。开发树那次运行的 01–04 号截图是 2 倍尺寸（1632×1248），原因未查。
 
