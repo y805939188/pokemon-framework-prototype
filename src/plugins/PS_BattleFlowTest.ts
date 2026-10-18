@@ -218,7 +218,7 @@
       for (let i = 0; i < 2; i++) { await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower/i); await frames(5); await waitFor(() => mode_() === "main" || mode_() === "end" || mode_() === "learn", "after attack"); if (mode_() === "learn") { await choose(/Don't learn/); } await frames(5); if (mode_() === "end") break; await inMode("main"); }
       await inMode("end"); await press("ok"); await dismissMessages();
       eq(W.PSFlow.lastOutcome.commit, "applied", "finished and committed");
-      eq(game().bag, before.bag, "bag unchanged after a battle that used nothing");
+      eq(game().bag, { ...before.bag, pokeball: before.bag.pokeball - 1 }, "committed bag: only the ball that the trainer blocked is spent");
     });
 
     await scenario("T3 wild run: faster user escapes, committed as 'ran', state unchanged apart from battle bookkeeping", async () => {
