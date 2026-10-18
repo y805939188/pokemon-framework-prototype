@@ -1,0 +1,4 @@
+{
+  "note": "Differences between the TS growth rules and the original-run cases, each with a class (spec-error | ts-implementation-error | environment | intended). Empty means every one of the 3504 cases is identical. A listed id must still differ, or the differential test fails.",
+  "differences": []
+}

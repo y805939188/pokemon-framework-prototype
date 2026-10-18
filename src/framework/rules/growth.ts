@@ -27,20 +27,60 @@ export const CURVES: Record<CurveId, (n: number) => number> = {
   },
 };
 
-export function minExp(curve: CurveId, level: number): number {
-  const L = Math.min(level, MAX_LEVEL);
-  if (!(L >= 1)) throw new RangeError("level must be >= 1");
-  return L === 1 ? 0 : CURVES[curve](L);
-}
-export const maxExp = (curve: CurveId): number => minExp(curve, MAX_LEVEL);
+/** The configured maximum level of the game (WP30 3.1: a configuration value, mechanically changeable). */
+export const DEFAULT_MAX_LEVEL = MAX_LEVEL;
+/** The level table has 101 entries (index 0..100); beyond it the curves' registered formulas apply (WP30 3.2). */
+const TABLE_LAST = 100;
 
-/** exp -> level: largest L with minExp(L) <= exp. */
-export function levelForExp(curve: CurveId, exp: number): number {
-  if (!(exp >= 0)) throw new RangeError("exp must be >= 0");
-  if (exp >= maxExp(curve)) return MAX_LEVEL;
+/**
+ * Registered formulas beyond the table. Erratic and Fluctuating use DIFFERENT functions than their in-table
+ * piecewise definitions (WP30 3.2): the piecewise description does not extrapolate. The other four continue unchanged.
+ */
+const BEYOND_TABLE: Record<CurveId, (n: number) => number> = {
+  medium: CURVES.medium,
+  fast: CURVES.fast,
+  slow: CURVES.slow,
+  parabolic: CURVES.parabolic,
+  erratic: (n) => Math.floor((n ** 4 + 2000 * n ** 3) / 3500),
+  fluctuating: (n) => Math.floor(((n ** 3 + Math.floor(n / 2) + 32) * 4) / (100 + n)),
+};
+
+/** Minimum exp of a level: the level is clamped to the maximum level first; table inside, registered formula beyond. */
+export function minExp(curve: CurveId, level: number, maxLevel: number = DEFAULT_MAX_LEVEL): number {
+  const L = Math.min(level, maxLevel);
+  if (!(L >= 1)) throw new RangeError("level must be >= 1");
+  if (L === 1) return 0;
+  return L <= TABLE_LAST ? CURVES[curve](L) : BEYOND_TABLE[curve](L);
+}
+export const maxExp = (curve: CurveId, maxLevel: number = DEFAULT_MAX_LEVEL): number => minExp(curve, maxLevel, maxLevel);
+
+export type Checked<T> = { ok: true; value: T } | { ok: false; error: "invalid-level" };
+
+/**
+ * Spec-level entry for "minimum exp of a level" (WP30 3.1): an empty, non-numeric or <= 0 level is an ERROR RESULT, not
+ * an exception (the original hands back an error object that only fails when it is used as a number).
+ */
+export function minimumExpForLevel(curve: CurveId, level: unknown, maxLevel: number = DEFAULT_MAX_LEVEL): Checked<number> {
+  if (typeof level !== "number" || !Number.isFinite(level) || level <= 0) return { ok: false, error: "invalid-level" };
+  return { ok: true, value: minExp(curve, level, maxLevel) };
+}
+
+/**
+ * exp -> level: the first level whose minimum exp is above the exp, minus one (so a non-monotonic curve cannot confuse
+ * it); at or above the maximum exp it is the maximum level. An empty or negative exp throws (the original raises).
+ */
+export function levelForExp(curve: CurveId, exp: number, maxLevel: number = DEFAULT_MAX_LEVEL): number {
+  // `null >= 0` is true in JavaScript: an empty exp must be refused explicitly (found by the Ruby differential, case GR-LFE-*-ENIL)
+  if (typeof exp !== "number" || !(exp >= 0)) throw new RangeError("exp must be a number >= 0");
+  if (exp >= maxExp(curve, maxLevel)) return maxLevel;
   let L = 1;
-  while (L < MAX_LEVEL && minExp(curve, L + 1) <= exp) L++;
+  while (L < maxLevel && minExp(curve, L + 1, maxLevel) <= exp) L++;
   return L;
+}
+
+/** Exp addition with the helper-entry semantics: the result is clamped to [0, max exp] (a raw setter does not clamp). */
+export function addExp(curve: CurveId, current: number, amount: number, maxLevel: number = DEFAULT_MAX_LEVEL): number {
+  return Math.min(Math.max(current + amount, 0), maxExp(curve, maxLevel));
 }
 
 // ---- WP19 5.4 stats ----
