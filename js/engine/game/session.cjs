@@ -18,6 +18,15 @@ const { HEAL_ITEMS, STATUS_ITEMS, STAT_ITEMS, itemEligibility } = require('../rp
 const END_REASONS = ['caught', 'run', 'tie', 'win'];
 const REFUSAL_REASONS = ['ballsdisabled', 'choice-rejected', 'invulnerable', 'item-no-effect', 'multiplefoes', 'noactive', 'none-left', 'norun', 'not-registered', 'notfirst', 'trainer', 'trapped', 'unknown-item', 'unknown-target'];
 
+/**
+ * Persistent form of an engine status at battle end (WP20 statusCount, WP39 after_battle): poison counters are
+ * cleared (bad poison becomes plain poison), sleep keeps its remaining turns, everything else has no counter.
+ */
+function persistentStatus(status, count) {
+	if (status === 'tox' || status === 'psn') return { status: 'psn', statusCount: 0 };
+	return { status: status || '', statusCount: status === 'slp' ? count || 0 : 0 };
+}
+
 const ITEM_IDS = new Set([...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS)]);
 
 function toSet(m, moveName) {
@@ -281,7 +290,7 @@ class BattleSession {
 		const st = Object.fromEntries(this.gw.readState('p1').map(x => [x.id, x]));
 		for (const m of this.party) {
 			const e = st[m.id]; if (!e) continue;
-			m.hp = e.hp; m.status = e.status;
+			m.hp = e.hp; m.status = e.status; m.statusCount = e.statusCount;
 			for (const mv of m.moves) if (e.pp[mv.id] !== undefined) mv.pp = e.pp[mv.id];
 		}
 	}
@@ -371,7 +380,7 @@ class BattleSession {
 		for (const e of this.ledger) if (e.state === 'reserved') this._refund(e, 'unexecuted');
 		this._syncWorkingFromEngine();
 		const members = {};
-		for (const m of this.party) members[m.id] = { level: m.level, exp: m.exp, hp: m.hp, status: m.status, moves: m.moves, evs: m.evs };
+		for (const m of this.party) members[m.id] = { level: m.level, exp: m.exp, hp: m.hp, ...persistentStatus(m.status, m.statusCount), moves: m.moves, evs: m.evs };
 		const bag = {};
 		for (const k of new Set([...Object.keys(this.startBag), ...Object.keys(this.bag)])) {
 			const d = (this.bag[k] || 0) - (this.startBag[k] || 0);
@@ -384,7 +393,7 @@ class BattleSession {
 			const eng = this.gw.readState('p2').find(x => x.id === c.id);
 			const curve = this.content.species[c.species].growth;
 			result.captured.push(S.newMember({
-				...c, exp: G.minExp(curve, c.level), hp: eng.hp, status: eng.status,
+				...c, exp: G.minExp(curve, c.level), hp: eng.hp, ...persistentStatus(eng.status, eng.statusCount),
 				moves: c.moves.map(mv => ({ id: mv.id, pp: eng.pp[mv.id] ?? mv.pp, maxpp: mv.maxpp })), ball: out.outcome.ball,
 			}));
 			result.dex.owned.push(c.species);

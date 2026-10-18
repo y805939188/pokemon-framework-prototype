@@ -170,10 +170,12 @@ test('S5 run failure: action consumed, foe acts, attempts raise the rate by 30 e
 });
 
 test('S6 restrictions: trainer battle, trapped, balls disabled, multiple foes', async () => {
-	// trainer: neither run nor ball is allowed; forcing the action is refused inside the turn and consumes the action
+	// trainer: running is refused (forcing it is refused inside the turn and consumes the action); a ball CAN be thrown
+	// (WP38 2 / CP16, decided 2026-10-18): the menu allows it, the trainer blocks it at execution
 	const t = await wild('snorlax', { wildOpt: false });
 	assert.equal(t.query('p1', 'run').allowed, false);
-	assert.equal(t.query('p1', 'ball').allowed, false);
+	assert.deepEqual(t.query('p1', 'run'), { allowed: false, reason: 'trainer' });
+	assert.deepEqual(t.query('p1', 'ball'), { allowed: true });
 	await t.act('p1', { kind: 'run' }); await t.choose('p2', 'move 1');
 	let msgs = drain(t); assert.equal(rpgLine(lines(msgs), 'run')[4], 'denied');
 	assert.ok(!msgs.some(m => m.kind === 'end'));
@@ -315,20 +317,49 @@ test('review #6: a semi-invulnerable target refuses the ball at the menu; a fain
 	assert.ok(!b.rpg.outcome);
 });
 
-test('review #3 (interim): a carried-in sleep restarts with a duration and ends; it no longer lasts forever', async () => {
-	const G2 = require('../../../js/engine/game/growth.cjs');
-	void G2;
+// ---- persistent status counters (WP20 statusCount): sleep = remaining turns, poison = 0 plain / 1 badly poisoned
+async function sleeper(game) {
 	const { BattleSession } = require('../../../js/engine/game/session.cjs');
 	const FX = require('../../../js/engine/fixtures/game.cjs');
-	const game = FX.makeGame(); game.party[0].status = 'slp';
-	const sess = await BattleSession.create({ game, battleId: 'R3', content: FX.content, seed: [1, 2, 3, 4], foe: { kind: 'wild', team: [FX.foeMember('W1-1', 'Snorlax', 40, { moves: ['protect'] })] } });
+	const sess = await BattleSession.create({ game, battleId: 'SC' + Math.random().toString(36).slice(2, 6), content: FX.content, seed: [1, 2, 3, 4], foe: { kind: 'wild', team: [FX.foeMember('W1-1', 'Snorlax', 40, { moves: ['protect'] })] } });
 	sess.take();
+	return sess;
+}
+const FXG = () => require('../../../js/engine/fixtures/game.cjs');
+
+test('statusCount: a carried-in sleep keeps its remaining turns, ticks down in battle and is written back', async () => {
+	const game = FXG().makeGame(); game.party[0].status = 'slp'; game.party[0].statusCount = 3;
+	const sess = await sleeper(game);
+	assert.equal(sess.gw.readState('p1').find(x => x.id === 'A-0001').statusCount, 3, 'seeded exactly');
+	// Showdown decrements once per move attempt and wakes at 0: time 3 = two turns lost, the member acts on the third
+	const acted = [];
+	for (let i = 0; i < 3; i++) { const r = await sess.chooseMove(1); acted.push(lines(r.messages).some(l => l.startsWith('|move|p1a: A-0001'))); }
+	assert.deepEqual(acted, [false, false, true]);
+	// and when the battle ends while still asleep, the remaining turns go back into the record
+	const g2 = FXG().makeGame(); g2.party[0].status = 'slp'; g2.party[0].statusCount = 4;
+	const s2 = await sleeper(g2);
+	await s2.chooseMove(1); // one lost turn: 4 -> 3
+	await s2.run(); assert.ok(s2.finished);
+	const m = s2.result().members['A-0001'];
+	assert.deepEqual([m.status, m.statusCount], ['slp', 3]);
+});
+
+test('statusCount: a legacy record without a counter still wakes up (fresh duration); poison counters are cleared after battle', async () => {
+	const legacy = FXG().makeGame(); legacy.party[0].status = 'slp'; delete legacy.party[0].statusCount;
+	const sess = await sleeper(legacy);
 	let moved = false;
-	for (let i = 0; i < 10 && !moved && !sess.finished; i++) {
-		const r = await sess.chooseMove(1);
-		moved = lines(r.messages).some(l => l.startsWith('|move|p1a: A-0001'));
-	}
-	assert.ok(moved, 'the member woke up and acted within 10 turns');
-	const st = sess.gw._debugBattle().sides[0].pokemon[0].statusState;
-	assert.ok(st === undefined || st.id !== 'slp' || st.time >= 0);
+	for (let i = 0; i < 10 && !moved && !sess.finished; i++) moved = lines((await sess.chooseMove(1)).messages).some(l => l.startsWith('|move|p1a: A-0001'));
+	assert.ok(moved, 'woke within 10 turns');
+	// badly poisoned flag (psn + 1) seeds toxic with its accumulation at 0; at the end it is plain poison with count 0 (WP39 after_battle)
+	const g = FXG().makeGame(); g.party[0].status = 'psn'; g.party[0].statusCount = 1;
+	const s = await sleeper(g);
+	const mon = s.gw._debugBattle().getSide('p1').pokemon[0];
+	assert.equal(mon.status, 'tox'); assert.equal(mon.statusState.stage, 0);
+	assert.equal(s.gw.readState('p1')[0].statusCount, 1);
+	await s.run(); assert.ok(s.finished);
+	const m = s.result().members['A-0001'];
+	assert.deepEqual([m.status, m.statusCount], ['psn', 0]);
+	const plain = FXG().makeGame(); plain.party[0].status = 'psn'; plain.party[0].statusCount = 0;
+	const sp = await sleeper(plain);
+	assert.equal(sp.gw._debugBattle().getSide('p1').pokemon[0].status, 'psn');
 });

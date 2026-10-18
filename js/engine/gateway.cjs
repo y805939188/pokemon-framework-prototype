@@ -159,7 +159,16 @@ class BattleGateway {
 		const s = b.getSide(side);
 		const active = s.active[slot];
 		const foes = s.foe.pokemon.filter(p => !p.fainted);
-		if (!b.rpg || !b.rpg.wild) return { allowed: what !== 'run' && what !== 'ball', reason: what === 'ball' ? 'trainer' : what === 'run' ? 'trainer' : undefined };
+		if (!b.rpg || !b.rpg.wild) {
+			if (what === 'run') return { allowed: false, reason: 'trainer' };
+			if (what === 'ball') {
+				// WP38 2 / CP16: in a trainer battle the ball CAN be thrown; it is spent and the trainer blocks it when it
+				// resolves (custom-formats.cjs resolveBall). Only the "balls disabled" flag and an absent active refuse here.
+				if (b.rpg && b.rpg.noBall) return { allowed: false, reason: 'ballsdisabled' };
+				if (!active || active.fainted) return { allowed: false, reason: 'noactive' };
+			}
+			return { allowed: true };
+		}
 		if (!active || active.fainted) return { allowed: false, reason: 'noactive' };
 		if (what === 'run') {
 			if (b.rpg.noRun) return { allowed: false, reason: 'norun' };
@@ -195,13 +204,18 @@ class BattleGateway {
 			p.hp = Math.min(r.hp, p.maxhp);
 			if (p.hp <= 0) { p.hp = 0; p.fainted = true; p.status = 'fnt'; }
 			else if (r.status) {
-				// Interim (see docs/step2/review-followups.md): the persistent record has no status counter yet, so a
-				// carried-in sleep restarts with a fresh duration (same draw as the engine's own sleep start) and
-				// bad poison restarts its stage; before this fix a carried-in sleep never ended.
-				p.status = r.status;
-				p.statusState = { id: r.status, target: p };
-				if (r.status === 'slp') { const t = this._battle.random(2, 5); p.statusState.startTime = t; p.statusState.time = t; }
-				if (r.status === 'tox') p.statusState.stage = 0;
+				// statusCount (WP20): sleep = remaining turns; poison = 0 normal / 1 badly poisoned. The toxic accumulation
+				// counter is battle-only and starts at 0. Legacy records without statusCount: a carried-in sleep gets a
+				// fresh duration (same draw as the engine's own sleep start); before that, it never ended.
+				const count = r.statusCount;
+				const status = (r.status === 'psn' && count === 1) ? 'tox' : r.status;
+				p.status = status;
+				p.statusState = { id: status, target: p };
+				if (status === 'slp') {
+					const t = Number.isInteger(count) && count >= 0 ? count : this._battle.random(2, 5);
+					p.statusState.startTime = t; p.statusState.time = t;
+				}
+				if (status === 'tox') p.statusState.stage = 0;
 			}
 			for (const m of r.moves || []) {
 				const slot = p.moveSlots.find(x => x.id === m.id);
@@ -216,6 +230,8 @@ class BattleGateway {
 		return this._battle.getSide(sideId).pokemon.map(p => ({
 			id: p.name, hp: p.hp, maxhp: p.maxhp, level: p.level, fainted: !!p.fainted,
 			status: p.fainted ? '' : p.status || '',
+			// persistent counter (WP20): remaining sleep turns, 1 for badly poisoned, else 0
+			statusCount: p.fainted ? 0 : p.status === 'slp' ? Math.max(0, (p.statusState && p.statusState.time) || 0) : p.status === 'tox' ? 1 : 0,
 			pp: Object.fromEntries(p.baseMoveSlots.map(m => [m.id, m.pp])),
 			stats: { ...p.baseStoredStats }, active: !!p.isActive,
 			confused: !!(p.volatiles && p.volatiles['confusion']), boosts: { ...p.boosts },

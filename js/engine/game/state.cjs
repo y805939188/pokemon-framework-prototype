@@ -9,13 +9,13 @@ const crypto = require('crypto');
 const PROTOCOL_VERSION = 1;
 
 /** Fields of a persistent member that a battle result may change. Everything else must be untouched. */
-const MEMBER_WRITE_SET = ['level', 'exp', 'hp', 'status', 'moves', 'evs', 'friendship'];
+const MEMBER_WRITE_SET = ['level', 'exp', 'hp', 'status', 'statusCount', 'moves', 'evs', 'friendship'];
 
 function clone(x) { return JSON.parse(JSON.stringify(x)); }
 
 function newMember(o) {
 	const m = {
-		id: o.id, species: o.species, nickname: o.nickname ?? null, level: o.level, exp: o.exp, hp: o.hp, status: o.status || '',
+		id: o.id, species: o.species, nickname: o.nickname ?? null, level: o.level, exp: o.exp, hp: o.hp, status: o.status || '', statusCount: o.statusCount ?? 0,
 		moves: o.moves.map(m => ({ id: m.id, pp: m.pp, maxpp: m.maxpp })),
 		item: o.item || '', ability: o.ability, nature: o.nature, gender: o.gender,
 		ivs: { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31, ...(o.ivs || {}) },
@@ -57,6 +57,7 @@ function applyBattleResult(state, result) {
 		if (!m) throw new Error(`result references unknown member ${id}`);
 		for (const k of Object.keys(patch)) {
 			if (!MEMBER_WRITE_SET.includes(k)) throw new Error(`result tries to write ${k} outside the write set`);
+			if (k === 'statusCount' && !(Number.isInteger(patch[k]) && patch[k] >= 0)) throw new Error('statusCount must be an integer >= 0');
 			m[k] = clone(patch[k]);
 		}
 	}

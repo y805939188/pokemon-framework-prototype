@@ -128,7 +128,7 @@ pnpm --dir src build                                                            
 - 失焦的游戏窗口默认暂停（MZ 的 `isGameActive`）；只有测试驱动覆盖了这一点。
 - macOS 自带 bash 3.2：`set -u` 下空数组展开会报错；`sed -i` 需要 `-i ''`。
 - 引擎使用 `js/engine/showdown/dist/config/` 里的规则拷贝，会话层使用 `js/engine/rpg/` 里的源文件；改了规则没重建会得到混合结果（`test-engine-contract.cjs` 会抓到）。
-- 持久化的睡眠/剧毒计数还没进协议（`statusCount`）：战斗开始时由引擎重新播种（临时措施，见 `docs/step2/review-followups.md`）。
+- 持久化的异常状态计数是 `statusCount`（睡眠=剩余回合；中毒 0 普通/1 剧毒标志）；战斗结束后中毒计数清零（剧毒按普通中毒存回），睡眠保留剩余回合；没有该字段的旧记录，睡眠会重新抽一个时长。
 - `reason: win` 且 `winner` 不是 `Player` 表示战败（结果里有 `outcome.winner`）。
 - zsh 里 `echo =====` 会被当成命令展开而报错；脚本用 bash。
 - 内存、泄漏相关改动依赖 PixiJS 内部实现，升级 Pixi/Reactor 后要重跑 100 场战斗内存检查（`docs/step2/runtime-issues.md`）。

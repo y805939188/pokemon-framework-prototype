@@ -110,7 +110,7 @@
     "version": 1,
     "frozenFile": "docs/step2/protocol-v1.frozen.json",
     "contractTest": "experiments/step2/s5/test-protocol-freeze.cjs",
-    "additiveRevision": "2026-10-18: outcome.winner, refusal reasons item-no-effect/unknown-target/norun/notfirst/invulnerable, canUseItem/currentRequest, foe noRun/noBall; statusCount still open",
+    "additiveRevision": "2026-10-18: outcome.winner, refusal reasons item-no-effect/unknown-target/norun/notfirst/invulnerable, canUseItem/currentRequest, foe noRun/noBall; statusCount in the write set and member record (sleep = remaining turns, poison 0/1; cleared after battle); trainer-battle ball is thrown, spent and blocked",
     "matrixBaseline": "js/engine/fixtures/matrix-fingerprints.json (update: experiments/step2/s5/update-matrix-baseline.cjs)"
   },
   "runtimeFixes": {

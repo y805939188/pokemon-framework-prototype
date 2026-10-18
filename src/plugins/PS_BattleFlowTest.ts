@@ -193,23 +193,23 @@
       return { level: p.level, exp: p.exp, hp: p.hp };
     });
 
-    await scenario("T2 unavailable actions and cancel: nothing consumed, always back at a usable menu", async () => {
+    await scenario("T2 trainer battle: Run refused with a reason (nothing consumed), a thrown Ball is spent and blocked by the trainer; cancels consume nothing", async () => {
       fresh(); const before = clone(game());
       await startEvent(2); await inMode("main");
       await choose(/^Run/); await inMode("main");
       assert(battle()._log._lines.some((l: string) => /no running from a trainer/i.test(l)), "run refused with a reason in a trainer battle");
       await choose(/^Bag/); await inMode("bag");
       await choose(/Poké Ball/); await inMode("main");
-      assert(battle()._log._lines.some((l: string) => /blocked the Ball/i.test(l)), "ball refused with ITS OWN message (not the run message)");
+      assert(battle()._log._lines.some((l: string) => /blocked the Ball/i.test(l)), "the trainer blocks the thrown ball (WP38 2 / CP16), with its own message");
       assert(battle()._log._lines.filter((l: string) => /no running from a trainer/i.test(l)).length === 1, "the run message appears only for the Run attempt");
-      assert(battle()._session.bag.pokeball === 5, "refused ball is not consumed");
+      assert(battle()._session.bag.pokeball === 4, "the blocked ball is spent (the run refusal consumed nothing)");
       await choose(/^Fight/); await inMode("moves"); await press("cancel"); await inMode("main");
       await choose(/^Bag/); await inMode("bag"); await choose(/Potion/); await inMode("party");
       const targets = battle()._menu._items;
       assert(targets.find((i: any) => /Blastoise/.test(i.name)).enabled === false, "a full-HP member is greyed out as a Potion target (refused before registration)");
       await press("cancel"); await inMode("bag");
       await press("cancel"); await inMode("main");
-      eq(battle()._session.bag, before.bag, "bag untouched after cancels/refusals");
+      eq(battle()._session.bag, { ...before.bag, pokeball: before.bag.pokeball - 1 }, "bag untouched by the cancels; only the thrown ball is spent");
       await choose(/^Pokémon/); await inMode("party");
       const items = battle()._menu._items;
       assert(items[0].enabled === false, "the active member cannot be switched to itself");

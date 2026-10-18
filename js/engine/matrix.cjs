@@ -118,8 +118,12 @@ const SCENARIOS = {
 	async S6() { // restricted inputs
 		const out = {};
 		const t = await make(F.makeGame(), trainer([['Pidgey', 5], ['Pidgey', 5]]));
-		out.trainerRun = await t.run(); out.trainerBall = await t.throwBall('pokeball');
-		eq([out.trainerRun.reason, out.trainerBall.reason, t.bag.pokeball], ['trainer', 'trainer', 5], 'trainer refusals consume nothing');
+		out.trainerRun = await t.run();
+		eq([out.trainerRun.reason, t.bag.pokeball], ['trainer', 5], 'a refused run consumes nothing');
+		const thrown = await t.throwBall('pokeball'); // WP38 2 / CP16: thrown, spent, blocked by the trainer
+		ensure(thrown.ok && !t.finished, 'the turn passes');
+		eq([rpgLines(thrown.messages, 'ball')[0][6], t.bag.pokeball], ['blocked', 4], 'trainer blocks the ball, it is spent');
+		out.trainerBall = { ok: true, lines: lines(thrown.messages) }; // normalized: raw messages carry the wall-clock |t:| line
 		const w = await make(F.makeGame(), wild('Snorlax', 40, ['protect']));
 		w.gw._debugBattle().getSide('p1').active[0].trapped = true;
 		out.trapped = await w.run(); eq(out.trapped.reason, 'trapped', 'trapped');
@@ -187,7 +191,7 @@ const SCENARIOS = {
 			const after = new SaveStore(file).load();
 			eq(after.party.map(m => m.id), game.party.map(m => m.id), 'persistent order unchanged');
 			const changed = S.diffPaths(game, after);
-			const allowed = [/^party\.\d\.(level|exp|hp|status|moves|evs|friendship)(\.|$)/, /^bag\./, /^dex\./, /^appliedBattles\./, /^money$/];
+			const allowed = [/^party\.\d\.(level|exp|hp|status|statusCount|moves|evs|friendship)(\.|$)/, /^bag\./, /^dex\./, /^appliedBattles\./, /^money$/];
 			for (const p of changed) ensure(allowed.some(re => re.test(p)), 'unexpected change at ' + p);
 			let tamper = false; try { const t = JSON.parse(JSON.stringify(result)); t.members['A-0001'].exp += 1; new SaveStore(file).commit(t); } catch (e) { tamper = /different result/.test(e.message); }
 			ensure(tamper, 'tampered result refused');

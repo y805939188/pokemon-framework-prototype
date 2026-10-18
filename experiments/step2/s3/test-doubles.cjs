@@ -206,12 +206,15 @@ test('review #5: chooseDoubles applies the same guards as the menu query (two fo
 	await one.chooseDoubles([{ move: 1, target: 1 }, { move: 4 }]); // one living foe left
 	assert.deepEqual(await one.chooseDoubles([{ move: 4 }, { kind: 'ball', ball: 'pokeball', target: 'W1-2' }]), { ok: false, reason: 'notfirst' });
 	assert.equal(one.bag.pokeball, 5);
-	// trainer battle: same refusal as in singles (consistent policy; see review-followups.md decision on the trainer ball)
+	// trainer battle (same policy as singles, decided 2026-10-18): running is refused; a ball is thrown, spent and blocked
 	const tr = await BattleSession.create({ game: makeGame(), battleId: 'R5c', content, seed: [1, 2, 3, 4], doubles: true, foe: { kind: 'trainer', team: twoFoes } });
 	tr.take();
 	assert.deepEqual(await tr.chooseDoubles([{ kind: 'run' }, { move: 4 }]), { ok: false, reason: 'trainer' });
-	assert.deepEqual(await tr.chooseDoubles([ball, { move: 4 }]), { ok: false, reason: 'trainer' });
-	assert.equal(tr.bag.pokeball, 5);
+	assert.equal(tr.bag.pokeball, 5, 'a refused run consumed nothing');
+	const thrown = await tr.chooseDoubles([ball, { move: 4 }]);
+	assert.ok(thrown.ok && !tr.finished);
+	assert.equal(rpg(lines(thrown.messages), 'ball')[0][6], 'blocked');
+	assert.equal(tr.bag.pokeball, 4, 'the ball is spent');
 });
 
 test('review #7: items that cannot work are refused at registration in doubles too (no reservation, no turn)', async () => {

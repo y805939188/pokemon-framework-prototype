@@ -176,7 +176,7 @@
 
   /** Same reason code, different wording per action (a refused Ball is not a refused Run). */
   const REASON_FOR: Record<string, Record<string, string>> = {
-    ball: { trainer: "The trainer blocked the Ball! Don't be a thief!", ballsdisabled: "Balls can't be used in this battle.", multiplefoes: "You can't aim at just one of several foes!" },
+    ball: { ballsdisabled: "Balls can't be used in this battle.", multiplefoes: "You can't aim at just one of several foes!" },
     run: { trainer: "No! There's no running from a trainer battle!", trapped: "You can't escape, something is holding you!", norun: "There's no running from this battle!" },
   };
 

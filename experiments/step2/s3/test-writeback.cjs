@@ -65,7 +65,7 @@ test('write set: nothing outside the allowed fields changes; bag deltas and ledg
 	const dir = tmp(); const store = new SaveStore(saveGame(dir, game));
 	const before = store.load(); store.commit(result); const after = store.load();
 	const changed = S.diffPaths(before, after);
-	const allowed = [/^party\.\d\.(level|exp|hp|status|moves|evs|friendship)(\.|$)/, /^bag\./, /^dex\./, /^appliedBattles\./, /^money$/];
+	const allowed = [/^party\.\d\.(level|exp|hp|status|statusCount|moves|evs|friendship)(\.|$)/, /^bag\./, /^dex\./, /^appliedBattles\./, /^money$/];
 	for (const p of changed) assert.ok(allowed.some(re => re.test(p)), `unexpected change at ${p}`);
 	assert.equal(after.bag.potion, 2);
 	for (const m of after.party) for (const k of ['nickname', 'item', 'ability', 'nature', 'gender', 'ivs', 'ball', 'ot', 'species', 'id']) {
@@ -228,7 +228,7 @@ test('persistent status survives, temporary boosts do not', async () => {
 	const run = await s.run(); assert.ok(run.ok);
 	assert.ok(s.finished);
 	const res = s.result();
-	assert.equal(res.members['A-0001'].status, 'psn');
+	assert.deepEqual([res.members['A-0001'].status, res.members['A-0001'].statusCount], ['psn', 0]);
 	assert.ok(!('boosts' in res.members['A-0001']));
 	assert.equal(res.outcome.kind, 'run');
 	assert.equal(res.bag.xattack, -1);
@@ -240,4 +240,21 @@ test('member ids must survive Showdown nickname handling (<=18 safe chars)', asy
 	await assert.rejects(() => session(game, { foe: { kind: 'wild', team: [foeMember('bad|id', 'Pidgey', 5)] } }), /not usable as a battle id/);
 	const ok = await session(game, { foe: { kind: 'wild', team: [foeMember('W123456-1', 'Pidgey', 5)] } });
 	assert.ok(ok.currentRequest());
+});
+
+test('statusCount is a write-set field: validated, applied, and bad poison is stored as plain poison after a battle', async () => {
+	const game = makeGame();
+	const S2 = require('../../../js/engine/game/state.cjs');
+	assert.ok(S2.MEMBER_WRITE_SET.includes('statusCount'));
+	const base = { protocol: 1, battleId: 'SC-1', outcome: { kind: 'run' }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] } };
+	for (const bad of [-1, 1.5, '2', null]) assert.throws(() => S2.applyBattleResult(game, { ...base, battleId: 'SC-bad', members: { 'A-0001': { statusCount: bad } } }), /statusCount must be an integer/);
+	const ok = S2.applyBattleResult(game, { ...base, members: { 'A-0001': { status: 'slp', statusCount: 2 } } });
+	assert.deepEqual([ok.state.party[0].status, ok.state.party[0].statusCount], ['slp', 2]);
+	// badly poisoned at the end of a battle becomes plain poison with a cleared counter (WP20 / WP39 after_battle)
+	const s = await session(game, { foe: { kind: 'wild', team: [foeMember('W-0001', 'Snorlax', 40, { moves: ['protect'] })] } }); s.take();
+	s.gw._debugBattle().getSide('p1').active[0].setStatus('tox');
+	assert.equal(s.gw.readState('p1')[0].statusCount, 1, 'engine view: badly poisoned = 1');
+	await s.run(); assert.ok(s.finished);
+	const m = s.result().members['A-0001'];
+	assert.deepEqual([m.status, m.statusCount], ['psn', 0]);
 });
