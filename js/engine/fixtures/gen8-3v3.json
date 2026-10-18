@@ -1,0 +1,23 @@
+{
+  "fixtureId": "gen8-3v3-v1",
+  "formatid": "gen8customgame",
+  "seed": [1, 2, 3, 4],
+  "players": [
+    {
+      "name": "Alice",
+      "team": [
+        { "name": "A-0001", "species": "Charizard", "item": "Leftovers", "ability": "Blaze", "moves": ["Flamethrower", "Air Slash", "Dragon Pulse", "Roost"], "nature": "Timid", "evs": {"spa": 252, "spe": 252, "hp": 4}, "level": 50, "gender": "M" },
+        { "name": "A-0002", "species": "Blastoise", "item": "Leftovers", "ability": "Torrent", "moves": ["Hydro Pump", "Ice Beam", "Flash Cannon", "Protect"], "nature": "Modest", "evs": {"hp": 252, "spa": 252, "spd": 4}, "level": 50, "gender": "M" },
+        { "name": "A-0003", "species": "Venusaur", "item": "Leftovers", "ability": "Overgrow", "moves": ["Giga Drain", "Sludge Bomb", "Earthquake", "Synthesis"], "nature": "Modest", "evs": {"hp": 252, "spa": 252, "spd": 4}, "level": 50, "gender": "M" }
+      ]
+    },
+    {
+      "name": "Bob",
+      "team": [
+        { "name": "B-0001", "species": "Gengar", "item": "Leftovers", "ability": "Cursed Body", "moves": ["Shadow Ball", "Sludge Bomb", "Focus Blast", "Protect"], "nature": "Timid", "evs": {"spa": 252, "spe": 252, "hp": 4}, "level": 50, "gender": "M" },
+        { "name": "B-0002", "species": "Snorlax", "item": "Leftovers", "ability": "Immunity", "moves": ["Body Slam", "Earthquake", "Crunch", "Rest"], "nature": "Adamant", "evs": {"hp": 252, "atk": 252, "spd": 4}, "level": 50, "gender": "M" },
+        { "name": "B-0003", "species": "Gyarados", "item": "Leftovers", "ability": "Intimidate", "moves": ["Waterfall", "Ice Fang", "Earthquake", "Dragon Dance"], "nature": "Adamant", "evs": {"hp": 4, "atk": 252, "spe": 252}, "level": 50, "gender": "M" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "fixtureId": "gen8-3v3-v1",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "winner": "Bob",
+  "turn": 7,
+  "reason": "win",
+  "lines": 115,
+  "sha256": "8cc092096889e676d6d510fadfa04382050ce4164c7531ba8c81e281590fac4b"
+}
