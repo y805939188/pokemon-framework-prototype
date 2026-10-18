@@ -24,9 +24,9 @@ jobs:
       - name: Build the pinned Showdown runtime
         env:
           SHOWDOWN_SRC: ${{ runner.temp }}/showdown-src
-        run: ./scripts/build-showdown.sh
+        run: ./scripts/ci-run.sh build-showdown ./scripts/build-showdown.sh
       - name: Headless suites
-        run: ./scripts/test-headless.sh
+        run: ./scripts/ci-run.sh headless-suites ./scripts/test-headless.sh
   plugins:
     name: plugins (Reactor types at the pinned commit, type check, build)
     runs-on: ubuntu-latest
@@ -37,15 +37,15 @@ jobs:
         with:
           node-version: '22.21.1'
       - name: Enable pnpm (version from src/package.json packageManager)
-        run: corepack enable && pnpm --version
+        run: ./scripts/ci-run.sh pnpm-setup bash -c 'corepack enable && pnpm --version'
       - name: Reactor runtime and declarations from the pinned commit
         env:
           REACTOR_SOURCE: download
           RMMZ_TEMPLATE_CACHE: ${{ runner.temp }}/reactor
-        run: ./scripts/setup-reactor.sh --install
+        run: ./scripts/ci-run.sh reactor-setup ./scripts/setup-reactor.sh --install
       - name: Install dependencies (lockfile)
-        run: pnpm --dir src install --frozen-lockfile
+        run: ./scripts/ci-run.sh pnpm-install pnpm --dir src install --frozen-lockfile
       - name: Type check
-        run: pnpm --dir src typecheck
+        run: ./scripts/ci-run.sh typecheck pnpm --dir src typecheck
       - name: Build plugins
-        run: pnpm --dir src build
+        run: ./scripts/ci-run.sh plugin-build pnpm --dir src build
