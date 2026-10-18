@@ -36,8 +36,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22.21.1'
-      - name: Enable pnpm (version from src/package.json packageManager)
-        run: ./scripts/ci-run.sh pnpm-setup bash -c 'corepack enable && pnpm --version'
+      - name: Enable the pinned pnpm (src/package.json packageManager; the repo root has none, so corepack would take the latest)
+        run: ./scripts/ci-run.sh pnpm-setup bash -c 'corepack enable && corepack prepare "$(node -p "require(\"./src/package.json\").packageManager")" --activate && pnpm --version'
       - name: Reactor runtime and declarations from the pinned commit
         env:
           REACTOR_SOURCE: download
