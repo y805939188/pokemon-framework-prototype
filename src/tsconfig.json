@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+
+    "strict": true,
+    "noEmit": true,
+
+    "lib": [
+      "ES2022"
+    ],
+
+    "types": [],
+    "skipLibCheck": false,
+    "typeRoots": ["./vendor/rpgreactor/types/compat"],
+
+    "allowJs": false,
+    "checkJs": false,
+
+    "useDefineForClassFields": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true
+  },
+
+  "include": [
+    "plugins/**/*.ts",
+    "types/**/*.d.ts",
+    "typecheck-runtime.ts"
+  ],
+
+  "files": [
+    "vendor/rpgreactor/types/globals.d.ts",
+    "vendor/rpgreactor/types/compat/lib.dom.generated.d.ts"
+  ],
+
+  "exclude": [
+    "node_modules",
+    "../js"
+  ]
+}

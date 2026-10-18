@@ -1,0 +1,17 @@
+/*:
+ * @target MZ
+ * @plugindesc RPG Reactor / PixiJS 8 native Particle demo
+ *
+ * @command Start
+ * @text Start PixiJS 8 Particles
+ *
+ * @arg count
+ * @text Particle Count
+ * @type number
+ * @min 100
+ * @max 5000
+ * @default 1500
+ *
+ * @command Stop
+ * @text Stop PixiJS 8 Particles
+ */

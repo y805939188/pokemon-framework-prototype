@@ -1,0 +1,20 @@
+{
+  "name": "reactor-pixi8-dev",
+  "private": true,
+  "scripts": {
+    "types:prepare": "node vendor/rpgreactor/types/tools/typecheck.cjs --prepare --compiler-root .",
+    "typecheck": "pnpm types:prepare && tsc --noEmit && tsc --noEmit -p tsconfig.tools.json",
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "pixi.js": "8.20.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.1"
+  }
+}
