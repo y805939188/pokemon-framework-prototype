@@ -121,7 +121,15 @@ const handlers = {
 	ball: resolveBall,
 };
 
+/** Non-serialized per-battle callbacks (engine objects are rebuilt on restore, hooks are re-attached by the gateway). */
+const hooks = new WeakMap();
+exports.hooks = hooks;
+
 const rpgHandlers = {
+	onFaint(pokemon) {
+		const h = hooks.get(this);
+		if (h) h({ event: 'faint', side: pokemon.side.id, id: pokemon.name });
+	},
 	onBegin() {
 		this.rpg = { pending: {}, attempts: {} };
 	},

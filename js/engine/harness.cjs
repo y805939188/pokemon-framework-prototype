@@ -173,6 +173,33 @@ const CHECKS = {
 		ensure(esc.end && esc.end.reason === 'run', 'faster user escapes');
 		return { potion: 'ok', ball: ball.end.outcome.mon, run: esc.end.reason };
 	},
+
+	/** 2.3: exp/level-up/learn inside a battle, then an idempotent durable write-back (temp file, committed twice). */
+	async 'growth-writeback'() {
+		const os = require('os');
+		const F = require('./fixtures/game.cjs');
+		const G = require('./game/growth.cjs');
+		const { BattleSession } = require('./game/session.cjs');
+		const { SaveStore } = require('./game/store.cjs');
+		const game = F.makeGame(); game.party[0].exp = G.minExp('parabolic', 51) - 1; game.party[0].hp = 70;
+		const s = await BattleSession.create({ game, battleId: 'smoke-1', content: F.content, seed: [1, 2, 3, 4], foe: { kind: 'trainer', team: [F.foeMember('T-1', 'Pidgey', 5)] } });
+		s.take();
+		ensure((await s.useItem('potion', 'A-0001')).ok, 'potion registered');
+		const r = await s.chooseMove(1);
+		ensure(r.messages.some(m => m.kind === 'growth' && m.levelUps.includes(51)), 'level-up reported');
+		if (s.pendingLearn) await s.decideLearn(3);
+		ensure(s.finished, 'battle finished');
+		const result = s.result();
+		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-smoke-'));
+		const file = path.join(dir, 'save.json'); fs.writeFileSync(file, JSON.stringify(game));
+		const store = new SaveStore(file);
+		ensure(store.commit(result).status === 'applied', 'first commit applies');
+		ensure(store.commit(result).status === 'already-applied', 'second commit is a no-op');
+		const saved = store.load();
+		ensure(saved.party[0].level === 51 && saved.bag.potion === 2, 'level and bag written exactly once');
+		fs.rmSync(dir, { recursive: true, force: true });
+		return { level: saved.party[0].level, potion: saved.bag.potion, moves: saved.party[0].moves.map(m => m.id) };
+	},
 };
 
 /** Run all checks, never throwing. Returns a JSON-serializable report. */

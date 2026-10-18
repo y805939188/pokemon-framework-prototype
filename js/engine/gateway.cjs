@@ -244,6 +244,16 @@ class BattleGateway {
 		return { before, after: { level: p.level, maxhp: p.maxhp, hp: p.hp }, stats };
 	}
 
+	/**
+	 * Attach a synchronous callback fired inside the turn when a Pokemon faints (mid-turn sync point).
+	 * Not serialized: re-attach after restore(). The callback may call applyGrowth(); it must not
+	 * choose or commit anything.
+	 */
+	setFaintHook(fn) {
+		const mod = require(path.join(this._env.root, 'dist', 'config', 'custom-formats.js'));
+		mod.hooks.set(this._battle, fn);
+	}
+
 	/** Static move facts the game layer needs (name/id/pp) without holding engine objects. */
 	moveInfo(nameOrId) {
 		const m = this._battle.dex.moves.get(nameOrId);
