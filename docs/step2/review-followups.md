@@ -2,7 +2,7 @@
 
 Review: Opus 5.5, read-only, baseline tag `step2-review-baseline` (`2e5f2e5`). Verdict: **conditional go to step 3** — 2 blockers, 18 important, 12 minor, 6 questions. The report itself lives in the workspace hand-off folder (`.handoff/reviews/step2-review-report.md`, not in git). This file records, per finding, what changed, what was only partly done, and what needs a decision. Reproduction first: findings 2, 4, 5, 6, 8 and the mutation results were re-run before anything was changed.
 
-State after the fixes: code commit `e666bba` (engine rules, session guards, tests, scripts) plus the commit that holds this file, the corrected reports and the regenerated evidence. Everything is local; nothing was pushed.
+State after the fixes: code commit `e666bba` (engine rules, session guards, tests, scripts) plus the commit that holds this file, the corrected reports and the regenerated evidence. `main` and the tag `step2-review-fixes` (at `c2a3e29`) were pushed to GitHub on 2026-10-18 with the user's approval (plain push).
 
 ## 1. Decisions needed from the user
 
@@ -13,7 +13,7 @@ State after the fixes: code commit `e666bba` (engine rules, session guards, test
 | D3 | Two spec-conformance changes you did not explicitly ask for: items that could do nothing are refused **before** registration (full-HP Potion no longer burns a turn; this supersedes the reading of your Playtest observation in the 2.4 report), and escape is deterministic for Ghost / Run Away / Smoke Ball and never reaches the trapped check. | confirm / revert | confirm — both are what the spec says |
 | D4 | Principle for conflicts between Showdown mechanics and Essentials mechanics inside battles (the route means Showdown wins by default; mega/dynamax order, escape timing, exp timing are already examples). And which data source the content pipeline uses in step 3. | default Showdown + a per-work-package difference list / default Essentials where observable | default Showdown, list differences per work package |
 | D5 | Escape timing (decided in the turn vs. when chosen) matters for doubles (CM-26). | decide before the doubles UI | later, with the doubles batch |
-| D6 | Push the updated `main` (and a new tag for the review-fix state) to GitHub? | yes / not yet | your call; nothing was pushed |
+| D6 | ~~Push the updated `main` and a tag?~~ | — | done: pushed on 2026-10-18 with your approval |
 
 ## 2. Findings — disposition
 
