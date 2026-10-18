@@ -30,6 +30,9 @@ for d in sim data lib config; do
   rsync -a --exclude '*.map' "$SRC/dist/$d/" "$STAGE/dist/$d/"
 done
 rsync -a "$SRC/node_modules/ts-chacha20/" "$STAGE/node_modules/ts-chacha20/"
+# RPG extension: Showdown merges dist/config/custom-formats.js into its format list.
+cp "$ROOT/js/engine/rpg/custom-formats.cjs" "$STAGE/dist/config/custom-formats.js"
+cp "$ROOT/js/engine/rpg/rules.cjs" "$STAGE/dist/config/rpg-rules.cjs"
 cp "$SRC/LICENSE" "$STAGE/LICENSE"
 printf '%s\n' "$SHOWDOWN_SHA" > "$STAGE/SOURCE_SHA"
 du -sh "$STAGE"

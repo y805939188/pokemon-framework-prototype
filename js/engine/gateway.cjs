@@ -89,6 +89,37 @@ class BattleGateway {
 		return ok;
 	}
 
+	/**
+	 * Register a non-move action (item / ball / run) as this side's whole choice for the turn.
+	 * It is queued as an engine 'event' action (priority above every move, after switches) and
+	 * resolved inside the turn by the RPG format's `onRpgAction`. Nothing is applied until the
+	 * turn runs, so cancelling before the other side commits changes no state.
+	 * Singles only (step 2.2); `payload` must be JSON-serializable.
+	 */
+	async act(side, payload) {
+		const b = this._battle;
+		const s = b.getSide(side);
+		if (!b.rpg) throw new Error('battle format has no RPG extension (use formatid gen8rpgcustomgame)');
+		if (b.requestState !== 'move' || !s.activeRequest || s.activeRequest.wait) {
+			this._emit({ kind: 'error', side, message: 'no move request pending', payload });
+			return false;
+		}
+		s.clearChoice();
+		b.rpg.pending[s.id] = JSON.parse(JSON.stringify(payload));
+		s.choice.actions.push({ choice: 'event', event: 'RpgAction', pokemon: s.active[0], priority: 99 });
+		if (b.allChoicesDone()) b.commitChoices();
+		this._pump();
+		return true;
+	}
+
+	/** Drop this side's registered choice (engine undo) and any pending RPG payload. */
+	async cancel(side) {
+		const b = this._battle;
+		if (b.rpg) delete b.rpg.pending[side];
+		b.undoChoice(side);
+		this._pump();
+	}
+
 	_pump() {
 		// Showdown batches output until sendUpdates(); BattleStream does this after each write.
 		this._battle.sendUpdates();
