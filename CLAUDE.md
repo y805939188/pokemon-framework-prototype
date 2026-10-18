@@ -1,13 +1,10 @@
 # pokemon-framework-prototype
 
-Step 2 experiment repo (battle integration on RPG Maker MZ + RPGReactor + Pokémon Showdown).
+主工作仓库。**动手前先读 [`docs/PROJECT-GUIDE.md`](docs/PROJECT-GUIDE.md)**（目标、铁律与授权边界、协作协议、架构、环境、命令、已知坑、文档地图），再读工作区的 `../.handoff/STATUS.md`（当前进度与下一步，不在 git 里），最后用 `git status` 核对实际状态。
 
-- Live hand-off: `../.handoff/STATUS.md` — read first, then check `git status`.
-- Experiment notes and findings: `docs/step2/README.md`; pinned versions: `docs/step2/baseline.json`.
-- Clean-room spec lives in `../pokemon-framework-reference`; read its specs/test vectors, never port Ruby.
-- Do not modify global MZ/NW.js (`--skip-nwjs` only). Showdown is built into `js/engine/showdown` by `scripts/build-showdown.sh` (git-ignored).
-- In-game flow test: `scripts/run-flow-test-mac.sh` (NW.js direct launch, real keys/events/save).
-- Packaged app: `scripts/package-mac.sh [--with-tests]`, `scripts/run-package-tests-mac.sh`, `scripts/run-package-perf-mac.sh` (never MZ Deploy on macOS).
-- Runtime fixes live in `src/plugins/PS_RuntimeFixes.ts` and `PS_SaveLocation.ts` (see `docs/step2/runtime-issues.md`); signing: `docs/step2/signing-plan.md`.
-- Verify with: `pnpm --dir src typecheck && pnpm --dir src build && node --test experiments/step2/test-headless.cjs`.
-- No push/merge to main without user approval.
+要点（细节都在指南里）：
+- clean-room：只读规格库 `../pokemon-framework-reference` 的正式规格，**不读不移植原版 Ruby**。
+- 推送/合并到 `main`、强制推送、永久删除、改全局 MZ/NW.js、使用凭据、改变首版范围：**先问用户**。
+- 子 agent 默认不用，只能用 Sonnet 5.5（除非用户指定）。
+- 快速自检：`scripts/test-quick.sh`（约 1 分钟，无窗口）。会弹窗口的测试见指南第 8 节。
+- 不用 MZ 的"部署"打包；用 `scripts/package-mac.sh`。

@@ -1,6 +1,6 @@
 # Runtime issues pass (after C2): memory growth, save location, test-run ergonomics
 
-Branch `runtime/memory-save-signing`. All measurements are inside the packaged app (NW.js 0.117.0 / Node 26.7.0 / Chromium 154, RPGReactor 0.98.8, Apple M1 Max) unless stated.
+State: tag `step2.runtime-pass` (branch merged into `main`). All measurements are inside the packaged app (NW.js 0.117.0 / Node 26.7.0 / Chromium 154, RPGReactor 0.98.8, Apple M1 Max) unless stated.
 
 ## 1. Scene memory growth — fixed (two upstream bugs, worked around in `PS_RuntimeFixes`)
 
