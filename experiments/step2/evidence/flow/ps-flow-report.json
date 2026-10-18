@@ -1,0 +1,54 @@
+{
+  "mode": "all",
+  "results": [
+    {
+      "id": "T1 trainer win: Fight, KO, exp, level-up, learn prompt (real keys), next turn uses new move, return to map",
+      "status": "pass",
+      "ms": 2233,
+      "detail": {
+        "level": 51,
+        "exp": 125131,
+        "hp": 156
+      }
+    },
+    {
+      "id": "T2 unavailable actions and cancel: nothing consumed, always back at a usable menu",
+      "status": "pass",
+      "ms": 3167
+    },
+    {
+      "id": "T3 wild run: faster user escapes, committed as 'ran', state unchanged apart from battle bookkeeping",
+      "status": "pass",
+      "ms": 1067
+    },
+    {
+      "id": "T4 capture: Master Ball from the bag, captured member joins with its stable id",
+      "status": "pass",
+      "ms": 1449
+    },
+    {
+      "id": "T5 item from the bag: Potion on the active member, consumed once and persisted",
+      "status": "pass",
+      "ms": 1536
+    },
+    {
+      "id": "T6 failure exit: engine error mid-battle aborts cleanly, nothing committed, the event still continues",
+      "status": "pass",
+      "ms": 980
+    },
+    {
+      "id": "T7 save/restore outside battle + idempotent re-commit after restore",
+      "status": "pass",
+      "ms": 1370,
+      "detail": {
+        "saveCode": 0,
+        "loadCode": 0
+      }
+    }
+  ],
+  "env": {
+    "nw": "0.117.0",
+    "node": "26.7.0"
+  },
+  "overall": "pass"
+}

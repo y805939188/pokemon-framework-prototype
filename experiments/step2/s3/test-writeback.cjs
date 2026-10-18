@@ -219,3 +219,11 @@ test('persistent status survives, temporary boosts do not', async () => {
 	assert.equal(res.outcome.kind, 'run');
 	assert.equal(res.bag.xattack, -1);
 });
+
+test('member ids must survive Showdown nickname handling (<=18 safe chars)', async () => {
+	const game = makeGame();
+	await assert.rejects(() => session(game, { foe: { kind: 'wild', team: [foeMember('W-this-id-is-way-too-long-1', 'Pidgey', 5)] } }), /not usable as a battle id/);
+	await assert.rejects(() => session(game, { foe: { kind: 'wild', team: [foeMember('bad|id', 'Pidgey', 5)] } }), /not usable as a battle id/);
+	const ok = await session(game, { foe: { kind: 'wild', team: [foeMember('W123456-1', 'Pidgey', 5)] } });
+	assert.ok(ok.currentRequest());
+});

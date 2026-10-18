@@ -1,0 +1,37 @@
+/*:
+ * @target MZ
+ * @plugindesc Step 2.4: placeholder text battle scene driven by the Showdown session; map events start battles and wait.
+ *
+ * @command StartBattle
+ * @text Start Battle
+ * @desc Opens the text battle scene and pauses this event until it ends.
+ *
+ * @arg kind
+ * @text Kind
+ * @type select
+ * @option wild
+ * @option trainer
+ * @default wild
+ *
+ * @arg foes
+ * @text Foes
+ * @desc Comma list of Species:Level, e.g. Pidgey:5,Pidgey:5
+ * @type string
+ * @default Pidgey:5
+ *
+ * @arg battleId
+ * @text Battle Id
+ * @desc Stable id of this encounter; each start appends a sequence number so every battle is unique.
+ * @type string
+ * @default battle
+ *
+ * @arg resultVariable
+ * @text Result Variable
+ * @desc Variable that receives 1 win, 2 caught, 3 ran, 4 lost/draw, 0 aborted.
+ * @type variable
+ * @default 10
+ *
+ * @command ResetGame
+ * @text Reset Prototype Game State
+ * @desc Recreates the prototype party/bag inside the save data (testing aid).
+ */

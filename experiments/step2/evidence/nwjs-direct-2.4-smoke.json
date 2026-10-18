@@ -1,0 +1,133 @@
+{
+  "protocolVersion": 0,
+  "fixtureId": "gen8-3v3-v1",
+  "engineSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "env": {
+    "processVersions": {
+      "node": "26.7.0",
+      "acorn": "8.18.0",
+      "ada": "4.0.0",
+      "amaro": "1.1.11",
+      "ares": "1.34.8",
+      "brotli": "1.2.0",
+      "cldr": "",
+      "icu": "78.2",
+      "llhttp": "9.4.3",
+      "merve": "1.2.2",
+      "modules": "147",
+      "napi": "10",
+      "nbytes": "0.1.4",
+      "ncrypto": "0.0.1",
+      "nghttp2": "1.70.0",
+      "nghttp3": "",
+      "ngtcp2": "",
+      "openssl": "3.5.7",
+      "simdjson": "4.6.6",
+      "simdutf": "7.7.0",
+      "sqlite": "3.53.4",
+      "tz": "",
+      "undici": "8.9.0",
+      "unicode": "17.0",
+      "uv": "1.52.1",
+      "uvwasi": "0.0.23",
+      "v8": "15.4.80.11",
+      "zlib": "1.3.2.1-motley-42c2f19",
+      "zstd": "1.5.7",
+      "nw": "0.117.0",
+      "node-webkit": "0.117.0",
+      "nw-commit-id": "a06bfc9-9fd7cb9-7d30a50-c824147",
+      "nw-flavor": "sdk",
+      "chromium": "154.0.8037.58"
+    },
+    "platform": "darwin",
+    "arch": "arm64",
+    "execPath": "/Users/dingshinn/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.app/Contents/Resources/nwjs-mac/nwjs.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
+    "harnessDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/js/engine",
+    "nwjs": "0.117.0",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+    "href": "chrome-extension://njgcanhfjdabfmnlmpmdedalocpafnhl/index.html",
+    "elapsedMs": 0,
+    "totalMs": 245
+  },
+  "overall": "pass",
+  "checks": [
+    {
+      "id": "s1.structure",
+      "status": "pass",
+      "ms": 162,
+      "detail": {
+        "winner": "Bob",
+        "turn": 7
+      }
+    },
+    {
+      "id": "s1.golden-and-repeat",
+      "status": "pass",
+      "ms": 10,
+      "detail": {
+        "winner": "Bob",
+        "turn": 7,
+        "reason": "win",
+        "lines": 115,
+        "sha256": "8cc092096889e676d6d510fadfa04382050ce4164c7531ba8c81e281590fac4b"
+      }
+    },
+    {
+      "id": "default-random",
+      "status": "pass",
+      "ms": 36,
+      "detail": {
+        "runs": 5,
+        "distinctSeeds": 5,
+        "ends": [
+          "Bob@8",
+          "Alice@11",
+          "Bob@8",
+          "Bob@12",
+          "Bob@8"
+        ]
+      }
+    },
+    {
+      "id": "snapshot-roundtrip",
+      "status": "pass",
+      "ms": 15,
+      "detail": {
+        "snapshotBytes": 22067,
+        "tailLines": 64
+      }
+    },
+    {
+      "id": "rpg-actions",
+      "status": "pass",
+      "ms": 4,
+      "detail": {
+        "potion": "ok",
+        "ball": {
+          "id": "W-0001",
+          "species": "Snorlax",
+          "level": 40,
+          "hp": 190,
+          "maxhp": 190,
+          "status": ""
+        },
+        "run": "run"
+      }
+    },
+    {
+      "id": "growth-writeback",
+      "status": "pass",
+      "ms": 18,
+      "detail": {
+        "level": 51,
+        "potion": 2,
+        "moves": [
+          "flamethrower",
+          "airslash",
+          "dragonpulse",
+          "slash"
+        ]
+      }
+    }
+  ]
+}

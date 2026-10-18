@@ -126,7 +126,7 @@ interface NodeFs {
   const bootStart = Scene_Boot.prototype.start;
   Scene_Boot.prototype.start = function (this: Scene_Boot) {
     bootStart.call(this);
-    if (params.runOnBoot !== "false") void run();
+    if (params.runOnBoot !== "false" || argValue("ps-smoke-out") !== undefined) void run();
   };
 
   PluginManager.registerCommand(PLUGIN_NAME, "Run", () => {

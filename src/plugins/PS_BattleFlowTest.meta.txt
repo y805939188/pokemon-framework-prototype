@@ -1,0 +1,4 @@
+/*:
+ * @target MZ
+ * @plugindesc Step 2.4 test driver: runs scripted battle-flow scenarios with real key events when the game is launched with --ps-flow-test. Inert otherwise.
+ */

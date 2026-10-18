@@ -1,0 +1,21 @@
+{
+  "mode": "verify-save",
+  "results": [
+    {
+      "id": "V1 real restart: the save written by the previous process loads with identical state, duplicates stay no-ops",
+      "status": "pass",
+      "ms": 5,
+      "detail": {
+        "applied": [
+          "wild-snorlax#1"
+        ],
+        "party": 4
+      }
+    }
+  ],
+  "env": {
+    "nw": "0.117.0",
+    "node": "26.7.0"
+  },
+  "overall": "pass"
+}

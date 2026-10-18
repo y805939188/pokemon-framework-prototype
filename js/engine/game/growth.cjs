@@ -65,11 +65,15 @@ function computeStats(base, ivs, evs, level, nature) {
 	return out;
 }
 
-/** WP19 5.5: current HP after a recalculation (persistent rule, independent of the engine). */
-function hpAfterRecalc(curHp, oldMax, newMax) {
+/**
+ * WP19 5.5: current HP after a recalculation (persistent rule, independent of the engine).
+ * Deliberate difference (user decision 2026-10-18): the reference "revives" a 0-HP member when max HP
+ * grows; we keep fainted members fainted unless `reviveFainted` (compat switch, default off).
+ */
+function hpAfterRecalc(curHp, oldMax, newMax, { reviveFainted = false } = {}) {
 	let hp;
 	if (curHp > 0) hp = Math.max(curHp + (newMax - oldMax), 1);
-	else hp = newMax > oldMax ? newMax - oldMax : 0; // fainted members are "revived" when max HP grows (recorded reference behaviour)
+	else hp = reviveFainted && newMax > oldMax ? newMax - oldMax : 0;
 	return Math.min(Math.max(hp, 0), newMax);
 }
 

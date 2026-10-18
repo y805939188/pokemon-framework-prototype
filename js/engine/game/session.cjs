@@ -27,6 +27,11 @@ class BattleSession {
 	static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? 'gen8rpgdoublescustomgame' : 'gen8rpgcustomgame', ai, rules }) {
 		const probe = await BattleGateway.create({ formatid, seed, players: [{ name: 'p', team: [{ name: 'x', species: 'Pidgey', moves: ['Tackle'] }] }, { name: 'q', team: [{ name: 'y', species: 'Pidgey', moves: ['Tackle'] }] }] });
 		const moveName = id => probe.moveInfo(id).name;
+		// Showdown keeps the nickname (our stable id) truncated to 20 characters and strips separators,
+		// so ids must survive that round trip untouched or results could not be mapped back.
+		for (const m of [...game.party, ...foe.team]) {
+			if (!/^[A-Za-z0-9#._:-]{1,18}$/.test(m.id)) throw new Error(`member id "${m.id}" is not usable as a battle id (1-18 chars of A-Z a-z 0-9 # . _ : -)`);
+		}
 		const party = S.clone(game.party).slice(0, 6);
 		const lead = [...party.filter(m => m.hp > 0), ...party.filter(m => m.hp <= 0)];
 		const s = new BattleSession();

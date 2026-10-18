@@ -24,11 +24,12 @@ test('battle exp: G11 CATERPIE vector and ordering of floors (WP30 4.2)', () => 
 	assert.equal(G.battleExp({ foe: { level: 10, baseExp: 50 }, receiver: { level: 10 }, participants: 3, rules: { scaled: false, splitAmongParticipants: true, trainerBonus: false } }), Math.floor(Math.floor(500 / 3) / 7));
 });
 
-test('HP after recalculation (WP19 5.5), incl. fainted-revival quirk', () => {
+test('HP after recalculation (WP19 5.5); fainted-revival is a compat switch, off by default', () => {
 	assert.equal(G.hpAfterRecalc(100, 150, 160), 110);
 	assert.equal(G.hpAfterRecalc(1, 150, 100), 1); // living members never drop to 0
-	assert.equal(G.hpAfterRecalc(0, 150, 160), 10); // recorded reference behaviour: fainted + max up => delta
-	assert.equal(G.hpAfterRecalc(0, 150, 150), 0);
+	assert.equal(G.hpAfterRecalc(0, 150, 160), 0, 'deliberate difference: fainted members stay fainted by default');
+	assert.equal(G.hpAfterRecalc(0, 150, 160, { reviveFainted: true }), 10, 'reference behaviour behind a compat switch');
+	assert.equal(G.hpAfterRecalc(0, 150, 150, { reviveFainted: true }), 0);
 });
 
 test('game-rule stats equal Showdown stats for random species/levels/EVs/natures', async () => {

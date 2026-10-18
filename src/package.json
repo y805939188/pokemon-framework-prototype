@@ -4,7 +4,7 @@
   "scripts": {
     "types:prepare": "node vendor/rpgreactor/types/tools/typecheck.cjs --prepare --compiler-root .",
     "typecheck": "pnpm types:prepare && tsc --noEmit && tsc --noEmit -p tsconfig.tools.json",
-    "build": "vite build && RR_PLUGIN=PS_BattleSmoke vite build",
+    "build": "vite build && RR_PLUGIN=PS_BattleSmoke vite build && RR_PLUGIN=PS_BattleFlow vite build && RR_PLUGIN=PS_BattleFlowTest vite build",
     "dev": "vite build --watch"
   },
   "engines": {

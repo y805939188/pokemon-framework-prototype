@@ -54,3 +54,7 @@ js/plugins/RR_Pixi8Particles.js.map
 js/engine/showdown/
 js/plugins/PS_BattleSmoke.js
 js/plugins/PS_BattleSmoke.js.map
+js/plugins/PS_BattleFlow.js
+js/plugins/PS_BattleFlow.js.map
+js/plugins/PS_BattleFlowTest.js
+js/plugins/PS_BattleFlowTest.js.map
