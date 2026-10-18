@@ -1,46 +1,48 @@
 /**
- * Turn session messages into plain text lines for the placeholder battle UI.
- * Pure and headless-testable. Display names come from `names` (stable id -> shown name).
- * Unknown event types are ignored on purpose: the text UI is a placeholder, not a protocol consumer.
+ * Turn session messages into plain text lines for the placeholder battle UI. Pure and headless-testable.
+ * Display names come from `names` (stable id -> shown name); every sentence comes from a text key resolved by the
+ * translator (English by default, so the English output is exactly the step 2 text). Unknown event types are ignored
+ * on purpose: the text UI is a placeholder, not a protocol consumer.
  */
+import { defaultTranslator } from "../i18n/index.ts";
+import type { Translator } from "../i18n/index.ts";
 import type { BattleEvent, SessionMessage } from "../battle/protocol.ts";
-
-const STATUS: Record<string, string> = { psn: "poisoned", tox: "badly poisoned", brn: "burned", par: "paralyzed", slp: "asleep", frz: "frozen" };
-const STAT: Record<string, string> = { atk: "Attack", def: "Defense", spa: "Sp. Atk", spd: "Sp. Def", spe: "Speed", accuracy: "accuracy", evasion: "evasiveness" };
 
 export interface Describer {
   message(m: SessionMessage): string[];
   event(e: BattleEvent): string[];
 }
 
-export function make(names: Record<string, string> = {}): Describer {
+export function make(names: Record<string, string> = {}, tr: Translator = defaultTranslator()): Describer {
+  const idOf = (ident: string): string => String(ident).replace(/^p\d[a-z]?: /, "");
   const nm = (ident: string): string => {
-    const id = String(ident).replace(/^p\d[a-z]?: /, "");
-    const own = String(ident).startsWith("p1");
-    const n = names[id] || id;
-    return own ? n : `The foe's ${n}`;
+    const name = names[idOf(ident)] || idOf(ident);
+    return String(ident).startsWith("p1") ? name : tr.t("battle.foe_prefix", { name });
   };
   const pct = (h: string): string => { const m = /^(\d+)\/(\d+)/.exec(h); return m ? `${m[1]}/${m[2]}` : h.startsWith("0") ? "0" : h; };
-  const itemName = (id: string): string => id.replace(/ball$/, " Ball").replace(/^./, (c) => c.toUpperCase());
+  const itemName = (id: string): string => tr.tOr(`item.name.${id}`, id.replace(/ball$/, " Ball").replace(/^./, (c) => c.toUpperCase()));
+  const statName = (id: string): string => tr.tOr(`stat.${id}`, id);
+  const status = (a0: string, id: string, kind: "inflicted" | "cured"): string =>
+    tr.has(`battle.status.${id}.${kind}`) ? tr.t(`battle.status.${id}.${kind}`, { name: nm(a0) }) : tr.t(`battle.status_${kind}`, { name: nm(a0), status: id });
 
   function event(e: BattleEvent): string[] {
     const a = e.args;
     const a0 = a[0] ?? "", a1 = a[1] ?? "";
     switch (e.type) {
-      case "switch": case "drag": return a0.startsWith("p1") ? [`Go! ${nm(a0).replace(/^The foe's /, "")}!`] : [`The foe sent out ${names[a0.replace(/^p\d[a-z]?: /, "")] || a0}!`];
-      case "move": return [`${nm(a0)} used ${a1}!`];
-      case "-damage": { if (/\[from\]/.test(a.join("|"))) return [`${nm(a0)} was hurt (${pct(a1)})`]; return a1.startsWith("0") ? [] : [`${nm(a0)} has ${pct(a1)} HP left.`]; }
-      case "-heal": return /\[silent\]/.test(a.join("|")) ? [] : [`${nm(a0)} recovered HP (${pct(a1)}).`];
-      case "faint": return [`${nm(a0)} fainted!`];
-      case "-supereffective": return ["It's super effective!"];
-      case "-resisted": return ["It's not very effective..."];
-      case "-immune": return [`It doesn't affect ${nm(a0)}...`];
-      case "-miss": return [`${nm(a0)}'s attack missed!`];
-      case "-crit": return ["A critical hit!"];
-      case "-status": return [`${nm(a0)} was ${STATUS[a1] || a1}!`];
-      case "-curestatus": return [`${nm(a0)} was cured of ${STATUS[a1] || a1}.`];
-      case "-boost": return [`${nm(a0)}'s ${STAT[a1] || a1} rose${Number(a[2]) > 1 ? " sharply" : ""}!`];
-      case "-unboost": return [`${nm(a0)}'s ${STAT[a1] || a1} fell!`];
+      case "switch": case "drag": return a0.startsWith("p1") ? [tr.t("battle.go", { name: names[idOf(a0)] || idOf(a0) })] : [tr.t("battle.foe_sent_out", { name: names[idOf(a0)] || a0 })];
+      case "move": return [tr.t("battle.used_move", { user: nm(a0), move: a1 })];
+      case "-damage": { if (/\[from\]/.test(a.join("|"))) return [tr.t("battle.hurt", { name: nm(a0), hp: pct(a1) })]; return a1.startsWith("0") ? [] : [tr.t("battle.hp_left", { name: nm(a0), hp: pct(a1) })]; }
+      case "-heal": return /\[silent\]/.test(a.join("|")) ? [] : [tr.t("battle.recovered", { name: nm(a0), hp: pct(a1) })];
+      case "faint": return [tr.t("battle.fainted", { name: nm(a0) })];
+      case "-supereffective": return [tr.t("battle.super_effective")];
+      case "-resisted": return [tr.t("battle.not_very_effective")];
+      case "-immune": return [tr.t("battle.immune", { name: nm(a0) })];
+      case "-miss": return [tr.t("battle.missed", { name: nm(a0) })];
+      case "-crit": return [tr.t("battle.crit")];
+      case "-status": return [status(a0, a1, "inflicted")];
+      case "-curestatus": return [status(a0, a1, "cured")];
+      case "-boost": return [tr.t(Number(a[2]) > 1 ? "battle.boost_rose_sharply" : "battle.boost_rose", { name: nm(a0), stat: statName(a1) })];
+      case "-unboost": return [tr.t("battle.stat_fell", { name: nm(a0), stat: statName(a1) })];
       case "rpg": return rpg(a);
       case "win": return [];
       default: return [];
@@ -51,23 +53,23 @@ export function make(names: Record<string, string> = {}): Describer {
     const what = a[0], x = a[2] ?? "", target = a[3] ?? "", res = a[4];
     const tn = names[target] || target;
     if (what === "item") {
-      if (res === "ok") return [a[5] !== undefined && /^\d+$/.test(a[5]) ? `Used ${itemName(x)} on ${tn}. Recovered ${a[5]} HP.` : `Used ${itemName(x)} on ${tn}.`];
-      if (res === "noeffect") return [`It won't have any effect. (${itemName(x)} was not used up)`];
-      return ["That can't be used."];
+      if (res === "ok") return [a[5] !== undefined && /^\d+$/.test(a[5]) ? tr.t("item.used_recovered", { item: itemName(x), target: tn, hp: a[5] }) : tr.t("item.used", { item: itemName(x), target: tn })];
+      if (res === "noeffect") return [tr.t("item.no_effect", { item: itemName(x) })];
+      return [tr.t("item.invalid")];
     }
     if (what === "ball") {
-      if (res === "blocked") return ["The trainer blocked the Ball! Don't be a thief!"];
-      if (res === "notarget") return ["There is no target for the Ball!"];
-      if (res === "caught") return [`You threw a ${itemName(x)}!`, `Gotcha! ${tn} was caught!`];
+      if (res === "blocked") return [tr.t("ball.blocked")];
+      if (res === "notarget") return [tr.t("ball.no_target")];
+      if (res === "caught") return [tr.t("ball.thrown", { ball: itemName(x) }), tr.t("ball.caught", { target: tn })];
       const shakes = Number(a[5]);
-      return [`You threw a ${itemName(x)}!`, shakes === 0 ? "Oh no! The Pokémon broke free!" : shakes === 1 ? "Aww! It appeared to be caught!" : shakes === 2 ? "Aargh! Almost had it!" : "Gah! It was so close, too!"];
+      return [tr.t("ball.thrown", { ball: itemName(x) }), tr.t(`ball.shake${shakes === 0 ? 0 : shakes === 1 ? 1 : shakes === 2 ? 2 : 3}`)];
     }
     if (what === "run") {
       // |rpg|run|side|ok|rate|attempts  (args: what, side, result, rate, attempts)
       const r = a[2];
-      if (r === "ok") return ["Got away safely!"];
-      if (r === "fail") return ["Can't escape!"];
-      if (r === "denied") return [a[3] === "trainer" ? "No! There's no running from a trainer battle!" : "You can't run away!"];
+      if (r === "ok") return [tr.t("run.ok")];
+      if (r === "fail") return [tr.t("run.fail")];
+      if (r === "denied") return [tr.t(a[3] === "trainer" ? "run.denied_trainer" : "run.denied_other")];
     }
     return [];
   }
@@ -76,15 +78,15 @@ export function make(names: Record<string, string> = {}): Describer {
     switch (m.kind) {
       case "events": return m.events.flatMap(event);
       case "growth": {
-        const n = names[m.member] || m.member;
-        const out = m.exp > 0 ? [`${n} gained ${m.exp} Exp. Points!`] : [];
-        for (const lv of m.levelUps) out.push(`${n} grew to Lv. ${lv}!`);
+        const name = names[m.member] || m.member;
+        const out = m.exp > 0 ? [tr.t("growth.gained", { name, exp: m.exp })] : [];
+        for (const lv of m.levelUps) out.push(tr.t("growth.grew", { name, level: lv }));
         return out;
       }
-      case "learned": return [`${names[m.member] || m.member} ${m.replaced === null ? "learned" : "forgot an old move and learned"} ${m.move}!`];
-      case "learn-prompt": return [`${names[m.member] || m.member} wants to learn ${m.move.name}, but already knows four moves.`];
-      case "error": return [`(${m.message})`];
-      case "end": return [m.reason === "win" ? (m.winner === "Player" ? "You won the battle!" : "You lost the battle...") : m.reason === "caught" ? "The wild Pokémon is yours!" : m.reason === "run" ? "You ran away." : "The battle ended in a draw."];
+      case "learned": return [tr.t(m.replaced === null ? "learn.learned" : "learn.replaced", { name: names[m.member] || m.member, move: m.move })];
+      case "learn-prompt": return [tr.t("learn.prompt", { name: names[m.member] || m.member, move: m.move.name })];
+      case "error": return [tr.t("error.line", { message: m.message })];
+      case "end": return [tr.t(m.reason === "win" ? (m.winner === "Player" ? "end.win" : "end.lose") : m.reason === "caught" ? "end.caught" : m.reason === "run" ? "end.ran" : "end.draw")];
       default: return [];
     }
   }

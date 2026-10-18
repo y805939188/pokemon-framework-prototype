@@ -10,6 +10,14 @@
  * @option fixture
  * @default sample
  *
+ * @param language
+ * @text Battle screen language
+ * @desc en or zh (Chinese sample). Unknown values use English; keys missing in a language fall back to English.
+ * @type select
+ * @option en
+ * @option zh
+ * @default en
+ *
  * @command StartBattle
  * @text Start Battle
  * @desc Opens the text battle scene and pauses this event until it ends.

@@ -97,7 +97,9 @@ test('assembly against the pinned Showdown data reproduces the step 2 fixture co
 	const dex = E.dex.createDexLookup();
 	const { content, errors } = assembleContent(compiled, dex);
 	assert.deepEqual(errors, []);
-	assert.deepEqual(content.species, E.fixtures.content.species, 'sample content == fixture content (same numbers, same Showdown base stats)');
+	// the sample adds one thing the fixture does not have: the text key of each display name
+	const withoutKeys = Object.fromEntries(Object.entries(content.species).map(([k, v]) => { const { nameKey, ...rest } = v; assert.match(nameKey, /^species\.[a-z]+$/); return [k, rest]; }));
+	assert.deepEqual(withoutKeys, E.fixtures.content.species, 'sample content == fixture content (same numbers, same Showdown base stats)');
 	assert.equal(content.meta.kind, 'sample'); assert.equal(content.meta.inputsHash, compiled.inputsHash);
 	assert.equal(E.fixtures.content.meta.kind, 'fixture', 'the fixture keeps a distinct identity');
 	assert.equal(loadCompiled(JSON.parse(JSON.stringify(compiled))).contentId, 'sample');

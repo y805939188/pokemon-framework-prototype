@@ -39,6 +39,8 @@ export interface SpeciesData {
   evYield: PartialStats;
   catchRate: number;
   learnset: Record<number, string[]>;
+  /** Text key of the display name (content-provided); absent in fixtures, which fall back to the Showdown name. */
+  nameKey?: string;
 }
 
 export interface Content {

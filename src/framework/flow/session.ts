@@ -16,6 +16,7 @@ import * as S from "../rules/state.ts";
 import type { BattleResult, GameState } from "../rules/state.ts";
 import type { Content, Member } from "../rules/types.ts";
 import type { BattleEvent, SessionMessage } from "../battle/protocol.ts";
+import type { LogLevel, LogSink } from "./log.ts";
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
 export const END_REASONS = ["caught", "run", "tie", "win"] as const;
@@ -60,6 +61,8 @@ export interface CreateOptions {
   formatid?: string;
   ai?: FoeAi;
   rules?: G.ExpRules;
+  /** Optional diagnostics sink (see flow/log.ts); the session never depends on it. */
+  logger?: LogSink;
 }
 
 export type Refusal = { ok: false; reason: string };
@@ -115,8 +118,9 @@ export class BattleSession {
   grew = false;
   _caughtAwarded = false;
   _result?: BattleResult;
+  logger?: LogSink;
 
-  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules }: CreateOptions): Promise<BattleSession> {
+  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger }: CreateOptions): Promise<BattleSession> {
     const probe = await BattleGateway.create({ formatid, seed, players: [{ name: "p", team: [{ name: "x", species: "Pidgey", moves: ["Tackle"] }] }, { name: "q", team: [{ name: "y", species: "Pidgey", moves: ["Tackle"] }] }] });
     const moveName = (id: string): string => probe.moveInfo(id).name;
     // Showdown keeps the nickname (our stable id) truncated to 20 characters and strips separators,
@@ -132,6 +136,7 @@ export class BattleSession {
     s.startBag = S.clone(game.bag); s.bag = S.clone(game.bag);
     s.startDexOwned = game.dex.owned.slice();
     s.doubles = doubles;
+    s.logger = logger;
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
     s.gw = await BattleGateway.create({
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
@@ -144,7 +149,19 @@ export class BattleSession {
     s.gw.refreshRequests();
     s._ingest();
     s._finishTurn();
+    s._log("info", "session.create", { content: content.meta ? { kind: content.meta.kind, id: content.meta.id, hash: content.meta.inputsHash?.slice(0, 12) } : null, format: formatid, doubles, foe: { kind: foe.kind, members: foe.team.length }, party: party.map((m) => m.id), seed: seed ?? null });
     return s;
+  }
+
+  _refuse(reason: string): Refusal {
+    this._log("warn", "refusal", { reason });
+    return { ok: false, reason };
+  }
+
+  /** Diagnostics: correlated by battle id, redacted, never throws into the battle. */
+  _log(level: LogLevel, kind: string, data: Record<string, unknown> = {}): void {
+    if (!this.logger) return;
+    try { this.logger({ battleId: this.battleId, level, kind, data }); } catch { /* diagnostics must not affect play */ }
   }
 
   static defaultAi(request: Req): string {
@@ -176,8 +193,9 @@ export class BattleSession {
 
   currentRequest(): Req | undefined { return this.requests && this.requests["p1"]; }
 
-  async chooseMove(index: number): Promise<TurnResult> { return this._turn(async () => this.gw.choose("p1", `move ${index}`)); }
+  async chooseMove(index: number): Promise<TurnResult> { this._log("info", "choice", { action: "move", index }); return this._turn(async () => this.gw.choose("p1", `move ${index}`)); }
   async chooseSwitch(memberId: string): Promise<TurnResult> {
+    this._log("info", "choice", { action: "switch", member: memberId });
     const i = (this.requests!["p1"]!["side"].pokemon as Req[]).findIndex((p) => p["ident"] === `p1: ${memberId}`);
     return this._turn(async () => this.gw.choose("p1", `switch ${i + 1}`));
   }
@@ -185,13 +203,14 @@ export class BattleSession {
 
   /** Reserve the item (deduct now), register the action; refunded on cancel/no-effect. */
   async useItem(itemId: string, targetId: string, { commit = true }: { commit?: boolean } = {}): Promise<TurnResult> {
-    if (!ITEM_IDS.has(itemId)) return { ok: false, reason: "unknown-item" };
-    if ((this.bag[itemId] || 0) < 1) return { ok: false, reason: "none-left" };
+    this._log("info", "choice", { action: "item", item: itemId, target: targetId, commit });
+    if (!ITEM_IDS.has(itemId)) return this._refuse("unknown-item");
+    if ((this.bag[itemId] || 0) < 1) return this._refuse("none-left");
     const el = this.canUseItem(itemId, targetId);
-    if (!el.ok) return { ok: false, reason: el.reason }; // refused before registration: nothing consumed, no turn used
+    if (!el.ok) return this._refuse(el.reason); // refused before registration: nothing consumed, no turn used
     const entry = this._reserve("item", itemId, targetId);
     const ok = await this.gw.act("p1", { kind: "item", item: itemId, target: targetId });
-    if (!ok) { this._refund(entry, "not-registered"); return { ok: false, reason: "not-registered" }; }
+    if (!ok) { this._refund(entry, "not-registered"); return this._refuse("not-registered"); }
     return commit ? this._resolveTurn() : { ok: true, staged: true };
   }
 
@@ -206,21 +225,22 @@ export class BattleSession {
    * and resolve the turn. Items/balls are reserved in the ledger first and refunded if the choice is refused.
    */
   async chooseDoubles(specs: (DoublesSpec | null)[], { commit = true }: { commit?: boolean } = {}): Promise<TurnResult> {
+    this._log("info", "choice", { action: "doubles", specs: specs.map((x) => (x ? x.kind ?? (x.switch !== undefined ? "switch" : "move") : null)), commit });
     // validate every spec BEFORE reserving anything: a refusal consumes nothing (WP38 2 / WP28 3.5)
     let acted = false;
     for (let i = 0; i < specs.length; i++) {
       const sp = specs[i];
       if (sp && sp.kind === "ball") {
-        if (acted) return { ok: false, reason: "notfirst" }; // a ball must be the first action of the round (WP38 2)
+        if (acted) return this._refuse("notfirst"); // a ball must be the first action of the round (WP38 2)
         const q = this.gw.query("p1", "ball", i);
-        if (!q.allowed) return { ok: false, reason: q.reason ?? "refused" };
+        if (!q.allowed) return this._refuse(q.reason ?? "refused");
       } else if (sp && sp.kind === "run") {
         const q = this.gw.query("p1", "run", i);
-        if (!q.allowed) return { ok: false, reason: q.reason ?? "refused" };
+        if (!q.allowed) return this._refuse(q.reason ?? "refused");
       } else if (sp && sp.kind === "item") {
-        if (!ITEM_IDS.has(sp.item as string)) return { ok: false, reason: "unknown-item" };
+        if (!ITEM_IDS.has(sp.item as string)) return this._refuse("unknown-item");
         const el = this.canUseItem(sp.item as string, sp.target);
-        if (!el.ok) return { ok: false, reason: el.reason };
+        if (!el.ok) return this._refuse(el.reason);
       }
       if (sp) acted = true;
     }
@@ -228,17 +248,17 @@ export class BattleSession {
     for (const sp of specs) {
       if (!sp || !sp.kind || sp.kind === "run") continue;
       const id = (sp.kind === "item" ? sp.item : sp.ball) as string;
-      if ((this.bag[id] || 0) < 1) { entries.forEach((e) => this._refund(e, "not-registered")); return { ok: false, reason: "none-left" }; }
+      if ((this.bag[id] || 0) < 1) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("none-left"); }
       if (sp.kind === "ball") {
         const rec = this.foeTeam.find((m) => m.id === sp.target);
-        if (!rec) { entries.forEach((e) => this._refund(e, "not-registered")); return { ok: false, reason: "unknown-target" }; }
+        if (!rec) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("unknown-target"); }
         sp.catchRate = this.content.species[rec.species]!.catchRate;
         sp.ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(rec.species) };
       }
       entries.push(this._reserve(sp.kind, id, sp.target));
     }
     const ok = await this.gw.chooseSlots("p1", specs);
-    if (!ok) { entries.forEach((e) => this._refund(e, "not-registered")); return { ok: false, reason: "choice-rejected" }; }
+    if (!ok) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("choice-rejected"); }
     return commit ? this._resolveTurn() : { ok: true, staged: true };
   }
 
@@ -246,21 +266,23 @@ export class BattleSession {
   async commitTurn(): Promise<TurnResult> { return this._resolveTurn(); }
 
   async throwBall(ballId: string): Promise<TurnResult> {
+    this._log("info", "choice", { action: "ball", ball: ballId });
     const q = this.gw.query("p1", "ball");
-    if (!q.allowed) return { ok: false, reason: q.reason ?? "refused" };
-    if ((this.bag[ballId] || 0) < 1) return { ok: false, reason: "none-left" };
+    if (!q.allowed) return this._refuse(q.reason ?? "refused");
+    if ((this.bag[ballId] || 0) < 1) return this._refuse("none-left");
     const foeActive = this.gw._debugBattle().getSide("p2").active[0];
     const foeRec = this.foeTeam.find((m) => m.id === foeActive.name)!;
     const entry = this._reserve("ball", ballId, foeRec.id);
     const ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(foeRec.species) };
     const ok = await this.gw.act("p1", { kind: "ball", ball: ballId, target: foeRec.id, catchRate: this.content.species[foeRec.species]!.catchRate, ctx });
-    if (!ok) { this._refund(entry, "not-registered"); return { ok: false, reason: "not-registered" }; }
+    if (!ok) { this._refund(entry, "not-registered"); return this._refuse("not-registered"); }
     return this._resolveTurn();
   }
 
   async run(): Promise<TurnResult> {
+    this._log("info", "choice", { action: "run" });
     const q = this.gw.query("p1", "run");
-    if (!q.allowed) return { ok: false, reason: q.reason ?? "refused" };
+    if (!q.allowed) return this._refuse(q.reason ?? "refused");
     await this.gw.act("p1", { kind: "run" });
     return this._resolveTurn();
   }
@@ -289,6 +311,7 @@ export class BattleSession {
   // ------------------------------------------------------------------ ledger
   _reserve(kind: string, itemId: string, target: unknown): LedgerEntry {
     this.bag[itemId] = (this.bag[itemId] as number) - 1;
+    this._log("info", "ledger", { op: "reserve", kind, item: itemId, left: this.bag[itemId] });
     const e: LedgerEntry = { kind, itemId, target, state: "reserved" };
     this.ledger.push(e);
     return e;
@@ -296,13 +319,14 @@ export class BattleSession {
   _refund(entry: LedgerEntry, why: string): void {
     if (entry.state === "refunded") return;
     entry.state = "refunded"; entry.why = why;
+    this._log("info", "ledger", { op: "refund", kind: entry.kind, item: entry.itemId, why });
     this.bag[entry.itemId] = (this.bag[entry.itemId] || 0) + 1;
   }
 
   // ------------------------------------------------------------------ turn handling
   async _turn(playerAction: () => Promise<boolean>): Promise<TurnResult> {
     const ok = await playerAction();
-    if (!ok) return { ok: false, reason: "choice-rejected" };
+    if (!ok) return this._refuse("choice-rejected");
     return this._resolveTurn();
   }
 
@@ -316,7 +340,11 @@ export class BattleSession {
     }
     this._ingest();
     await this._continueGrowth();
-    return { ok: true, messages: this.take() };
+    const messages = this.take();
+    const kinds: Record<string, number> = {};
+    for (const m of messages) kinds[m.kind] = (kinds[m.kind] ?? 0) + 1;
+    this._log("info", "turn", { messages: kinds, finished: this.finished });
+    return { ok: true, messages };
   }
 
   _ingest(): void {
@@ -331,6 +359,7 @@ export class BattleSession {
       } else if (m.kind === "end") {
         this.ended = m;
       } else if (m.kind === "error") {
+        this._log("warn", "engine.error", { side: m.side, message: m.message });
         this.out.push(m);
       }
     }
@@ -355,10 +384,10 @@ export class BattleSession {
       if (side !== "p1") return;
       if (what === "item") {
         const entry = this.ledger.find((l) => l.kind === "item" && l.state === "reserved" && l.itemId === itemId);
-        if (entry) { if (res === "ok") entry.state = "consumed"; else this._refund(entry, res ?? "invalid"); }
+        if (entry) { if (res === "ok") { entry.state = "consumed"; this._log("info", "ledger", { op: "consume", kind: "item", item: itemId }); } else this._refund(entry, res ?? "invalid"); }
       } else if (what === "ball") {
         const entry = this.ledger.find((l) => l.kind === "ball" && l.state === "reserved" && l.itemId === itemId);
-        if (entry) entry.state = "consumed"; // a thrown ball is spent whatever the outcome (WP38)
+        if (entry) { entry.state = "consumed"; this._log("info", "ledger", { op: "consume", kind: "ball", item: itemId, outcome: res ?? "" }); } // a thrown ball is spent whatever the outcome (WP38)
       }
     }
   }
@@ -425,9 +454,13 @@ export class BattleSession {
       const changed = amount > 0 || JSON.stringify(evs) !== JSON.stringify(m.evs);
       if (changed) {
         const eng = this.gw.applyGrowth("p1", m.id, { level: res.member.level, evs, expect: { stats: res.after.stats } });
-        if (eng.after.hp !== res.member.hp && m.hp > 0) throw new Error(`HP rule mismatch for ${m.id}: engine ${eng.after.hp} vs game ${res.member.hp}`);
+        if (eng.after.hp !== res.member.hp && m.hp > 0) {
+          this._log("error", "failure", { what: "hp-rule-mismatch", member: m.id, engine: eng.after.hp, game: res.member.hp });
+          throw new Error(`HP rule mismatch for ${m.id}: engine ${eng.after.hp} vs game ${res.member.hp}`);
+        }
         this.grew = true;
       }
+      this._log("info", "growth", { member: m.id, foe: foeId, exp: amount, level: res.member.level, levelUps: res.log.levels.length });
       this.out.push({ kind: "growth", member: m.id, foe: foeId, exp: amount, level: res.member.level, levelUps: res.log.levels.map((l) => l.level), hp: res.member.hp });
       for (const pm of res.log.pendingMoves) learns.push({ kind: "learn", memberId: m.id, move: this.gw.moveInfo(pm.move) });
     }
@@ -447,13 +480,14 @@ export class BattleSession {
   _finishTurn(): void {
     if (this.ended) {
       this._buildResult(); this.finished = true;
+      this._log("info", "end", { reason: this.ended.reason, winner: this.ended.winner, bag: this._result?.bag, members: Object.keys(this._result?.members ?? {}).length });
       this.out.push({ kind: "end", reason: this.ended.reason, outcome: this.ended.outcome || null, winner: this.ended.winner });
       return;
     }
     let reqs = this.held.splice(0).filter((m) => !(m.kind === "request" && m.side === "p2" && m.request["forceSwitch"])); // foe replacements are internal
     if (this.grew) { this.grew = false; reqs = this.gw.refreshRequests(); this.gw._queue.length = 0; }
     this.requests = {};
-    for (const m of reqs) if (m.kind === "request") { this.requests[m.side] = m.request; this.out.push(m); }
+    for (const m of reqs) if (m.kind === "request") { this.requests[m.side] = m.request; this.out.push(m); this._log("info", "request", { side: m.side, seq: m.seq, forceSwitch: !!m.request["forceSwitch"], wait: !!m.request["wait"] }); }
   }
 
   _buildResult(): void {

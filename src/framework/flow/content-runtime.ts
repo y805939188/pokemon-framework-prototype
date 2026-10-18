@@ -36,7 +36,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup): { co
       (learnset[e.level] ??= []).push(mv.name);
     }
     if (!ok) continue;
-    content.species[found.name] = { base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset };
+    content.species[found.name] = { base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset, nameKey: sp.nameKey };
   }
   return { content, errors };
 }

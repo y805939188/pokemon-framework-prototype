@@ -13,14 +13,15 @@ const path = require('path');
 const LAYERS = {
 	rules: ['rules'],
 	content: ['rules', 'content'],
+	i18n: ['i18n'], // pure text tables and resolution; imports nothing
 	battle: ['rules', 'battle'],
-	flow: ['rules', 'content', 'battle', 'flow'],
-	tools: ['rules', 'content', 'battle', 'flow', 'tools'],
-	entry: ['rules', 'content', 'battle', 'flow', 'tools'], // files at the framework root (the public index only re-exports)
+	flow: ['rules', 'content', 'battle', 'flow', 'i18n'],
+	tools: ['rules', 'content', 'battle', 'flow', 'tools', 'i18n'],
+	entry: ['rules', 'content', 'battle', 'flow', 'tools', 'i18n'], // files at the framework root (the public index only re-exports)
 };
 // Node built-ins a layer may import. Only tools (tests/fixtures/harness) may use the file system.
 const NODE_BUILTINS = {
-	rules: ['node:crypto'], content: ['node:crypto'], battle: ['node:path'], flow: [],
+	rules: ['node:crypto'], i18n: [], content: ['node:crypto'], battle: ['node:path'], flow: [],
 	tools: ['node:fs', 'node:os', 'node:path', 'node:crypto'], entry: [],
 };
 // Per-file additions to the layer's built-in list (the loader reads the pinned engine's SOURCE_SHA file).
