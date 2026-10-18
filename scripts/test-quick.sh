@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cheap, headless check (typically well under a minute, no windows, no GUI): type check + every Node test suite.
+# Cheap local check (typically well under a minute, no windows, no GUI): plugin type check + every headless Node suite.
 # It does NOT run the in-game flow, the packaged-app suite or the performance runs (those open NW.js windows:
 # scripts/run-flow-test-mac.sh, run-package-tests-mac.sh, run-package-perf-mac.sh).
 # Needs: dependencies installed (bootstrap), the engine staged (scripts/build-showdown.sh).
@@ -8,25 +8,4 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 [[ -d js/engine/showdown/dist ]] || { echo "engine not staged: run scripts/build-showdown.sh first" >&2; exit 1; }
 pnpm --dir src typecheck
-SUITES=(
-  experiments/step2/test-headless.cjs
-  experiments/step2/s2/test-actions.cjs
-  experiments/step2/s3/test-growth.cjs
-  experiments/step2/s3/test-writeback.cjs
-  experiments/step2/s3/test-doubles.cjs
-  experiments/step2/s4/test-describe.cjs
-  experiments/step2/s5/test-matrix.cjs
-  experiments/step2/s5/test-protocol-freeze.cjs
-  experiments/step2/s5/test-engine-contract.cjs
-  scripts/tests/reactor-install.test.cjs
-)
-fail=0
-for s in "${SUITES[@]}"; do
-  set +e
-  raw="$(node --test --test-reporter=tap "$s" 2>&1)"
-  set -e
-  out="$(printf '%s\n' "$raw" | grep -E '^# (pass|fail)' | tr '\n' ' ')"
-  echo "$s  ${out:-NO RESULT (see: node --test $s)}"
-  if [[ "$out" != *"# fail 0"* ]]; then fail=1; printf '%s\n' "$raw" | grep -E '^not ok' | sed 's/^/    /' | head -5; fi
-done
-exit $fail
+exec "$ROOT/scripts/test-headless.sh"
