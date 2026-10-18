@@ -55,6 +55,12 @@ class BattleGateway {
 		for (const [i, p] of opts.players.entries()) {
 			battle.setPlayer(`p${i + 1}`, { name: p.name, team: sim.Teams.pack(p.team) });
 		}
+		// The format's onBegin creates battle.rpg when the second player joins, so flags go after.
+		if (opts.wild !== undefined || opts.noBall !== undefined) {
+			if (!battle.rpg) throw new Error('wild/noBall need the RPG format (gen8rpgcustomgame)');
+			battle.rpg.wild = !!opts.wild;
+			if (opts.noBall) battle.rpg.noBall = true;
+		}
 		gw._pump();
 		return gw;
 	}
@@ -112,6 +118,29 @@ class BattleGateway {
 		return true;
 	}
 
+	/**
+	 * Menu-layer legality (read-only, nothing consumed). Mirrors the spec's "refuse without
+	 * consuming" checks for the cases step 2.2 covers. Returns { allowed, reason }.
+	 */
+	query(side, what) {
+		const b = this._battle;
+		const s = b.getSide(side);
+		const active = s.active[0];
+		const foes = s.foe.pokemon.filter(p => !p.fainted);
+		if (!b.rpg || !b.rpg.wild) return { allowed: what !== 'run' && what !== 'ball', reason: what === 'ball' ? 'trainer' : what === 'run' ? 'trainer' : undefined };
+		if (!active || active.fainted) return { allowed: false, reason: 'noactive' };
+		if (what === 'run') {
+			if (active.trapped || active.volatiles['partiallytrapped']) return { allowed: false, reason: 'trapped' };
+			return { allowed: true };
+		}
+		if (what === 'ball') {
+			if (b.rpg.noBall) return { allowed: false, reason: 'ballsdisabled' };
+			if (foes.length > 1) return { allowed: false, reason: 'multiplefoes' };
+			return { allowed: true };
+		}
+		return { allowed: true };
+	}
+
 	/** Drop this side's registered choice (engine undo) and any pending RPG payload. */
 	async cancel(side) {
 		const b = this._battle;
@@ -152,11 +181,13 @@ class BattleGateway {
 			}
 		} else if (type === 'end') {
 			const b = this._battle;
+			const outcome = b.rpg && b.rpg.outcome; // RPG outcomes (run/caught) are not engine wins
 			this._emit({
 				kind: 'end',
-				winner: b.winner || null,
+				winner: outcome ? null : b.winner || null,
 				turn: b.turn,
-				reason: b.winner ? 'win' : 'tie',
+				reason: outcome ? outcome.kind : b.winner ? 'win' : 'tie',
+				...(outcome ? { outcome } : {}),
 			});
 			this._closed = true;
 			for (const w of this._waiters.splice(0)) w(null);

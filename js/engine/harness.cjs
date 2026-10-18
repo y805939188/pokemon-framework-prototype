@@ -146,6 +146,33 @@ const CHECKS = {
 		}
 		return { snapshotBytes: snap.length, tailLines: orig.length };
 	},
+
+	/** 2.2: item / ball / run resolved inside the turn by the RPG format (same engine build in every runtime). */
+	async 'rpg-actions'() {
+		const W = JSON.parse(fs.readFileSync(path.join(FIXTURE_DIR, 'wild-1v1.json'), 'utf8'));
+		const mk = async (key, lead) => {
+			const gw = await BattleGateway.create({ formatid: W.formatid, seed: W.seed, wild: true, players: [{ name: 'A', team: W.playerTeam }, { name: 'W', team: [W.wilds[key].set] }] });
+			await gw.choose('p1', 'team ' + lead); await gw.choose('p2', 'team 1'); gw._queue.length = 0;
+			return gw;
+		};
+		const run = async (gw, payload, foeChoice) => {
+			await gw.act('p1', payload); await gw.choose('p2', foeChoice);
+			const msgs = gw._queue.splice(0);
+			return { msgs, lines: msgs.filter(m => m.kind === 'events').flatMap(m => m.events).map(e => e.raw), end: msgs.find(m => m.kind === 'end') };
+		};
+		const g1 = await mk('snorlax', '123');
+		const b = g1._debugBattle(); b.sides[0].pokemon[0].hp = 60;
+		const heal = await run(g1, { kind: 'item', item: 'potion', target: 'A-0001' }, 'move 1');
+		ensure(heal.lines.some(l => l.startsWith('|rpg|item|p1|potion|A-0001|ok|20|80|')), 'potion should heal 20');
+		const g2 = await mk('snorlax', '123');
+		const ball = await run(g2, { kind: 'ball', ball: 'masterball', target: 'W-0001', catchRate: 25 }, 'move 3');
+		ensure(ball.end && ball.end.reason === 'caught' && ball.end.outcome.mon.id === 'W-0001', 'master ball should catch with stable id');
+		ensure(!ball.lines.some(l => l.startsWith('|move|p2a')), 'foe must not act after a catch');
+		const g3 = await mk('snorlax', '123');
+		const esc = await run(g3, { kind: 'run' }, 'move 3');
+		ensure(esc.end && esc.end.reason === 'run', 'faster user escapes');
+		return { potion: 'ok', ball: ball.end.outcome.mon, run: esc.end.reason };
+	},
 };
 
 /** Run all checks, never throwing. Returns a JSON-serializable report. */
