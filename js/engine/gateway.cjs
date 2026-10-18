@@ -141,6 +141,101 @@ class BattleGateway {
 		return { allowed: true };
 	}
 
+	// ------------------------------------------------------------------------------------------
+	// State exchange with the game layer (step 2.3). Members are addressed by stable id (= the
+	// Showdown nickname we assigned), never by slot, so switches do not matter.
+	// ------------------------------------------------------------------------------------------
+
+	_mon(sideId, id) {
+		const p = this._battle.getSide(sideId).pokemon.find(x => x.name === id);
+		if (!p) throw new Error(`no pokemon with stable id ${id} on ${sideId}`);
+		return p;
+	}
+
+	/** Seed persistent dynamic state (hp/status/pp) from game records into the fresh battle. */
+	seedState(sideId, records) {
+		for (const r of records) {
+			const p = this._mon(sideId, r.id);
+			p.hp = Math.min(r.hp, p.maxhp);
+			if (p.hp <= 0) { p.hp = 0; p.fainted = true; p.status = 'fnt'; }
+			else if (r.status) { p.status = r.status; p.statusState = { id: r.status }; }
+			for (const m of r.moves || []) {
+				const slot = p.moveSlots.find(x => x.id === m.id);
+				if (slot) slot.pp = Math.min(m.pp, slot.maxpp);
+			}
+			const base = p.baseMoveSlots.find(x => (r.moves || []).some(m => m.id === x.id));
+			void base;
+			for (const bs of p.baseMoveSlots) { const m = (r.moves || []).find(x => x.id === bs.id); if (m) bs.pp = Math.min(m.pp, bs.maxpp); }
+		}
+	}
+
+	/** Read back the engine-owned dynamic state per member: hp, persistent status, pp per move. */
+	readState(sideId) {
+		return this._battle.getSide(sideId).pokemon.map(p => ({
+			id: p.name, hp: p.hp, maxhp: p.maxhp, level: p.level, fainted: !!p.fainted,
+			status: p.fainted ? '' : p.status || '',
+			pp: Object.fromEntries(p.baseMoveSlots.map(m => [m.id, m.pp])),
+			stats: { ...p.baseStoredStats }, active: !!p.isActive,
+		}));
+	}
+
+	/**
+	 * Push a growth result into the engine: new level/EVs, recomputed stats, HP rule and learned
+	 * moves. `expect.stats` (from the game rules) is cross-checked against the engine's own
+	 * computation; a mismatch throws instead of silently diverging.
+	 */
+	applyGrowth(sideId, id, { level, evs, expect, newMoves = [], replaceSlot } = {}) {
+		const b = this._battle;
+		const p = this._mon(sideId, id);
+		const before = { level: p.level, maxhp: p.maxhp, hp: p.hp };
+		p.set.level = level; p.level = level;
+		if (evs) p.set.evs = { ...evs };
+		const stats = b.spreadModify(p.species.baseStats, p.set);
+		p.baseStoredStats = stats;
+		for (const k of Object.keys(p.storedStats)) p.storedStats[k] = stats[k];
+		p.speed = p.storedStats.spe;
+		p.updateMaxHp(); // engine's own HP rule: current HP keeps its distance from max
+		p.details = p.getUpdatedDetails ? p.getUpdatedDetails() : p.details;
+		if (expect && expect.stats) {
+			for (const k of Object.keys(expect.stats)) {
+				if (stats[k] !== expect.stats[k]) throw new Error(`stat mismatch for ${id}.${k}: engine ${stats[k]} vs game ${expect.stats[k]}`);
+			}
+		}
+		for (const mv of newMoves) {
+			const dm = b.dex.moves.get(mv);
+			const slot = { move: dm.name, id: dm.id, pp: dm.pp, maxpp: dm.pp, target: dm.target, disabled: false, disabledSource: '', used: false };
+			if (replaceSlot !== undefined && replaceSlot !== null) {
+				p.baseMoveSlots[replaceSlot] = slot; p.moveSlots[replaceSlot] = { ...slot }; p.set.moves[replaceSlot] = dm.name;
+			} else {
+				p.baseMoveSlots.push(slot); p.moveSlots.push({ ...slot }); p.set.moves.push(dm.name);
+			}
+		}
+		return { before, after: { level: p.level, maxhp: p.maxhp, hp: p.hp }, stats };
+	}
+
+	/** Static move facts the game layer needs (name/id/pp) without holding engine objects. */
+	moveInfo(nameOrId) {
+		const m = this._battle.dex.moves.get(nameOrId);
+		if (!m.exists) throw new Error(`unknown move ${nameOrId}`);
+		return { id: m.id, name: m.name, pp: m.pp };
+	}
+
+	/**
+	 * Re-issue move/switch requests after state changes between turns (growth). Returns the
+	 * fresh requests per side and queues nothing else.
+	 */
+	refreshRequests() {
+		const b = this._battle;
+		const saved = this._queue.splice(0);
+		b.makeRequest(b.requestState);
+		// sendUpdates() only flushes requests when the log grew; a growth step may add no log line
+		if (!b.sentRequests) { for (const side of b.sides) side.emitRequest(); b.sentRequests = true; }
+		b.sendUpdates();
+		const fresh = this._queue.splice(0);
+		this._queue.push(...saved.filter(m => m.kind !== 'request'), ...fresh);
+		return fresh.filter(m => m.kind === 'request');
+	}
+
 	/** Drop this side's registered choice (engine undo) and any pending RPG payload. */
 	async cancel(side) {
 		const b = this._battle;
