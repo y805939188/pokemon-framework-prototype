@@ -1,6 +1,6 @@
 # 第三步：工程基础与首条 Ruby／TS 差分链
 
-状态：**进行中**（工作分支 `step3/foundation`，起点 `a77b6af` = 第二步收尾 `step2-closed` + 两个文档提交）。执行方案全文在工作区 `.handoff/step3-plan.md`（不在 git 里）；当前进度在 `.handoff/STATUS.md`。本文件只记范围、基线、关键决策、遗留分流和验证入口，随推进更新，不重复方案全文。
+状态：**进行中，批次 A 完成**（工作分支 `step3/foundation`，起点 `a77b6af` = 第二步收尾 `step2-closed` + 两个文档提交）。执行方案全文在工作区 `.handoff/step3-plan.md`（不在 git 里）；当前进度在 `.handoff/STATUS.md`。本文件只记范围、基线、关键决策、遗留分流和验证入口，随推进更新，不重复方案全文。
 
 ## 范围
 
@@ -35,6 +35,13 @@
 | 30 超级进化/极巨化先于 RPG 道具 | **长尾批次** | 做超级进化时处理（`deviations.md` #8） |
 | 31 SDK 版 NW.js 自带开发者工具 | **第七步（发布）** | 发布阶段换 normal 版本或关闭 DevTools |
 | 逃跑结算时机（双打） | **双打批次** | 已决定保持回合内结算，双打界面设计时复核 |
+
+## 批次 A 结果（工程化底座）
+
+- **A1 CI**（`.github/workflows/ci.yml`，权限 `contents: read`，Action 固定到提交 SHA）：第 1 层 headless（Linux：固定版本 Node 与 pnpm、锁文件安装、构建引擎包、按固定 SHA 构建 Showdown、`scripts/test-headless.sh` = 框架严格类型检查 + 导入边界检查 + 全部 Node 套件）和第 2 层 plugins（Reactor 固定提交的下载模式取得类型包、插件类型检查与构建）。两层在 `20a3553` 之后的提交上都已在 GitHub 上跑绿（读取方式：`scripts/ci-status.sh`，从公开的 Actions 页面取，失败信息经 `scripts/ci-run.sh` 变成运行注解）。**第 3 层（真实 MZ/NW.js、包内测试、性能）不在 CI**，在本机跑（`scripts/run-*-mac.sh`）。CI 没读到结果 = 未验证，不写“通过”。
+- **A2 小样与加载契约（NW.js 0.117.0 / Node 26.7.0 实测）**：`require` 加载构建产物可用；`require` 加载 Showdown 可用；`import()` 加载 Showdown 失败（`module is not defined`：按浏览器模块执行，没有 Node 上下文），`import()` 加载 `.cjs` 产物失败（取不到模块）。**结论：Showdown 必须经 `require` 加载**，因此 `require` 只允许出现在 `src/framework/battle/showdown-loader.ts`（由边界检查强制）；产物形态定为单文件 CJS 引擎包 + 独立的 Showdown 扩展包。
+- **A3 迁移**：`js/engine/**/*.cjs` 实现已迁成严格 TS（`src/framework/{rules,battle,flow,tools}`），由 Vite 构建为 `js/engine/build/engine.cjs`（API）和 `custom-formats.cjs`（运行在 Showdown 内部、自包含，由 `scripts/build-showdown.sh` 暂存）。`js/engine/*.cjs` 现在是几行的兼容门面（`module.exports = require('./build/engine.cjs').<namespace>`），插件与全部测试保持原来的 `require` 路径，**测试未改一行**。导入边界检查（`scripts/check-boundaries.cjs`，13 个测试证明每条规则都会失败）强制：规则层不碰 battle/flow/宿主、只有 Showdown 适配层碰 Showdown、`require` 白名单、无宿主全局与外部包、无导入环。
+- **A4 回归**：68 个原有测试 + 新增 13 个边界测试通过；矩阵指纹与第二步基线文件逐项相同；冻结协议未变；在含迁移的干净提交 `9d8bc62`（空差异哈希）上重跑包内全套（T1–T7、V1、S1–S10 指纹在包内、Node、基线三处一致、SL1、封印）和开发树流程，全部通过。引擎包的哈希现在记录进跨宿主证据（`engineArtifact`）并在两个宿主间比对。性能与内存的复测放在批次 B 之后统一做。
 
 ## 验证入口
 

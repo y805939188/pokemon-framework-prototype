@@ -4,13 +4,13 @@
     {
       "id": "S1",
       "status": "pass",
-      "ms": 210,
+      "ms": 211,
       "fingerprint": "1d78d0a8ff4b8b542414c4e6ba695fedaef324b118241e576c3e344b7ca5457a"
     },
     {
       "id": "S2",
       "status": "pass",
-      "ms": 4,
+      "ms": 3,
       "fingerprint": "32142bf740c3d23eca986b638434a3b28e4e885f122fda88af5627766bf28ec2"
     },
     {
@@ -40,19 +40,19 @@
     {
       "id": "S7",
       "status": "pass",
-      "ms": 3,
+      "ms": 4,
       "fingerprint": "691c3da8c1d62689fb22325f1fed096c798b6496847e3b51f309100610adeade"
     },
     {
       "id": "S8",
       "status": "pass",
-      "ms": 4,
+      "ms": 3,
       "fingerprint": "3b68ee3715147782cd63a4aaffdbd3c60efe1140966f72cdbda5e0bb0c61a308"
     },
     {
       "id": "S9",
       "status": "pass",
-      "ms": 23,
+      "ms": 26,
       "fingerprint": "3373e0f0f457e125df76034c2bf47bc75ef3b0596ab9dd7c561ee92e0458011f"
     },
     {

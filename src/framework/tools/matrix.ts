@@ -244,4 +244,13 @@ async function runMatrix(only?: string[]) {
 	return out;
 }
 
-export { runMatrix, SCENARIOS };
+/**
+ * Identity of the built engine artifact this code is running from (the file the host loaded). Cross-host evidence
+ * records it so "same code in Node and in the package" is a checked hash, not a claim.
+ */
+function artifactInfo(): { file: string; bytes: number; sha256: string } {
+	const buf = fs.readFileSync(__filename);
+	return { file: path.basename(__filename), bytes: buf.length, sha256: crypto.createHash('sha256').update(buf).digest('hex') };
+}
+
+export { runMatrix, SCENARIOS, artifactInfo };

@@ -289,7 +289,9 @@
   /** S1..S10 engine/session matrix (js/engine/matrix.cjs) inside this runtime; fingerprints are compared with a Node run. */
   async function runMatrixMode() {
     const t0 = performance.now();
-    const rows = await nodeRequire("./js/engine/matrix.cjs").runMatrix();
+    const matrixModule = nodeRequire("./js/engine/matrix.cjs");
+    const rows = await matrixModule.runMatrix();
+    report.engineArtifact = matrixModule.artifactInfo(); // hash of the engine bundle this host actually loaded
     report.matrix = rows;
     report.matrixMs = Math.round(performance.now() - t0);
     for (const r of rows) results.push({ id: `${r.id} (matrix)`, status: r.status, ms: r.ms, fingerprint: r.fingerprint, error: r.error });
