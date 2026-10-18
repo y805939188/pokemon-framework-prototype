@@ -1,0 +1,51 @@
+# CI layers (docs/step3/README.md): 1 = headless Node suites, 2 = plugin type check and build with Reactor's
+# declaration bundle. NOT covered here (needs MZ's NW.js and window): in-game flow, packaged-app suite, performance;
+# those run locally (scripts/run-*-mac.sh) and must be reported as not run in CI.
+name: ci
+on:
+  push:
+    branches: [main, 'step3/**']
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  headless:
+    name: headless (build pinned Showdown, run Node suites)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.21.1'
+      - name: Build the pinned Showdown runtime
+        env:
+          SHOWDOWN_SRC: ${{ runner.temp }}/showdown-src
+        run: ./scripts/build-showdown.sh
+      - name: Headless suites
+        run: ./scripts/test-headless.sh
+  plugins:
+    name: plugins (Reactor types at the pinned commit, type check, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.21.1'
+      - name: Enable pnpm (version from src/package.json packageManager)
+        run: corepack enable && pnpm --version
+      - name: Reactor runtime and declarations from the pinned commit
+        env:
+          REACTOR_SOURCE: download
+          RMMZ_TEMPLATE_CACHE: ${{ runner.temp }}/reactor
+        run: ./scripts/setup-reactor.sh --install
+      - name: Install dependencies (lockfile)
+        run: pnpm --dir src install --frozen-lockfile
+      - name: Type check
+        run: pnpm --dir src typecheck
+      - name: Build plugins
+        run: pnpm --dir src build
