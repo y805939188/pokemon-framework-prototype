@@ -1,0 +1,117 @@
+[
+  {
+    "id": "charizard",
+    "showdownId": "charizard",
+    "nameKey": "species.charizard",
+    "growth": "parabolic",
+    "baseExp": 267,
+    "evYield": {
+      "spa": 3
+    },
+    "catchRate": 45,
+    "learnset": [
+      {
+        "level": 51,
+        "move": "slash"
+      },
+      {
+        "level": 52,
+        "move": "outrage"
+      },
+      {
+        "level": 53,
+        "move": "heatwave"
+      }
+    ],
+    "source": "author-placeholder"
+  },
+  {
+    "id": "blastoise",
+    "showdownId": "blastoise",
+    "nameKey": "species.blastoise",
+    "growth": "parabolic",
+    "baseExp": 265,
+    "evYield": {
+      "spd": 3
+    },
+    "catchRate": 45,
+    "learnset": [
+      {
+        "level": 51,
+        "move": "waterfall"
+      }
+    ],
+    "source": "author-placeholder"
+  },
+  {
+    "id": "venusaur",
+    "showdownId": "venusaur",
+    "nameKey": "species.venusaur",
+    "growth": "parabolic",
+    "baseExp": 263,
+    "evYield": {
+      "spa": 2,
+      "spd": 1
+    },
+    "catchRate": 45,
+    "learnset": [
+      {
+        "level": 51,
+        "move": "powerwhip"
+      }
+    ],
+    "source": "author-placeholder"
+  },
+  {
+    "id": "snorlax",
+    "showdownId": "snorlax",
+    "nameKey": "species.snorlax",
+    "growth": "slow",
+    "baseExp": 189,
+    "evYield": {
+      "hp": 2
+    },
+    "catchRate": 25,
+    "learnset": [],
+    "source": "author-placeholder"
+  },
+  {
+    "id": "gengar",
+    "showdownId": "gengar",
+    "nameKey": "species.gengar",
+    "growth": "parabolic",
+    "baseExp": 250,
+    "evYield": {
+      "spa": 3
+    },
+    "catchRate": 45,
+    "learnset": [],
+    "source": "author-placeholder"
+  },
+  {
+    "id": "pidgey",
+    "showdownId": "pidgey",
+    "nameKey": "species.pidgey",
+    "growth": "parabolic",
+    "baseExp": 50,
+    "evYield": {
+      "spe": 1
+    },
+    "catchRate": 255,
+    "learnset": [],
+    "source": "author-placeholder"
+  },
+  {
+    "id": "caterpie",
+    "showdownId": "caterpie",
+    "nameKey": "species.caterpie",
+    "growth": "medium",
+    "baseExp": 39,
+    "evYield": {
+      "hp": 1
+    },
+    "catchRate": 255,
+    "learnset": [],
+    "source": "author-placeholder"
+  }
+]

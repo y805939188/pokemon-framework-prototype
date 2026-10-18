@@ -55,6 +55,11 @@ test('Showdown types stay inside battle', () => {
 test('custom-formats runs inside Showdown: only rules and the type alias', () => {
 	bad({ ...OK, 'battle/showdown-types.ts': 'export type X = any;\n', 'battle/custom-formats.ts': 'import { g } from "./gateway.ts";\nexport const f = g;\n' }, /runs inside Showdown/);
 });
+test('only the listed file may add node:fs to the battle layer', () => {
+	bad({ ...OK, 'battle/x.ts': 'import fs from "node:fs";\nexport const x = fs;\n' }, /layer "battle" may not import node:fs/);
+	const dir = tree({ ...OK, 'battle/showdown-loader.ts': 'import fs from "node:fs";\nexport const x = fs;\n' });
+	try { assert.deepEqual(check(dir).violations, []); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
 test('external packages and wrong node built-ins are refused', () => {
 	bad({ ...OK, 'rules/b.ts': 'import x from "lodash";\nexport const b = x;\n' }, /external package "lodash"/);
 	bad({ ...OK, 'rules/b.ts': 'import fs from "node:fs";\nexport const b = fs;\n' }, /layer "rules" may not import node:fs/);

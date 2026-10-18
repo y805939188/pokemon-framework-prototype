@@ -7,6 +7,7 @@
 import type { Content } from "../../rules/types.ts";
 
 export const fixtureContent: Content = {
+  meta: { kind: "fixture", id: "step2-fixture" },
   species: {
     Charizard: { base: { hp: 78, atk: 84, def: 78, spa: 109, spd: 85, spe: 100 }, growth: "parabolic", baseExp: 267, evYield: { spa: 3 }, catchRate: 45,
       learnset: { 51: ["Slash"], 52: ["Outrage"], 53: ["Heat Wave"] } },

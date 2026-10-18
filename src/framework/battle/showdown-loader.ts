@@ -4,6 +4,7 @@
  * loaded with `import()` inside NW.js (measured: step 3 / A2 spike, `docs/step3/README.md`). `require` is therefore
  * allowed in this file and nowhere else in the framework sources.
  */
+import fs from "node:fs";
 import path from "node:path";
 import type { ShowdownSim } from "./showdown-types.ts";
 
@@ -26,6 +27,11 @@ export function loadSim(engineRoot?: string): LoadedSim {
   const sim = nodeRequire(path.join(root, "dist", "sim"));
   const { extractChannelMessages } = nodeRequire(path.join(root, "dist", "sim", "battle"));
   return { sim, extractChannelMessages, root };
+}
+
+/** The SHA the staged Showdown build was made from (written by scripts/build-showdown.sh). */
+export function readEngineSha(root: string): string {
+  try { return fs.readFileSync(path.join(root, "SOURCE_SHA"), "utf8").trim(); } catch { return "unknown"; }
 }
 
 /** The staged RPG format extension (a copy of the custom-formats build); it owns the non-serialized hooks table. */

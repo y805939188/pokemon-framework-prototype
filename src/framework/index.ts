@@ -9,3 +9,7 @@ export * as session from "./flow/session.ts";
 export * as fixtures from "./tools/fixtures/game.ts";
 export * as harness from "./tools/harness.ts";
 export * as matrix from "./tools/matrix.ts";
+export * as contentSchema from "./content/schema.ts";
+export * as contentCompile from "./content/compile.ts";
+export * as contentRuntime from "./flow/content-runtime.ts";
+export * as dex from "./battle/dex.ts";

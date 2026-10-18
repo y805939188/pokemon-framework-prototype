@@ -20,9 +20,11 @@ const LAYERS = {
 };
 // Node built-ins a layer may import. Only tools (tests/fixtures/harness) may use the file system.
 const NODE_BUILTINS = {
-	rules: ['node:crypto'], content: [], battle: ['node:path'], flow: [],
+	rules: ['node:crypto'], content: ['node:crypto'], battle: ['node:path'], flow: [],
 	tools: ['node:fs', 'node:os', 'node:path', 'node:crypto'], entry: [],
 };
+// Per-file additions to the layer's built-in list (the loader reads the pinned engine's SOURCE_SHA file).
+const FILE_BUILTINS = { 'battle/showdown-loader.ts': ['node:fs'] };
 // The only file allowed to use `require` (loads the pinned Showdown build at run time).
 const REQUIRE_ALLOWED = new Set(['battle/showdown-loader.ts']);
 // Files that may only be imported from inside their own layer.
@@ -61,7 +63,7 @@ function check(root) {
 		for (const m of code.matchAll(/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g)) specs.push(m[1]);
 		for (const spec of specs) {
 			if (spec.startsWith('node:')) {
-				if (!NODE_BUILTINS[layer].includes(spec)) violations.push(`${rel}: layer "${layer}" may not import ${spec}`);
+				if (!NODE_BUILTINS[layer].includes(spec) && !(FILE_BUILTINS[rel] || []).includes(spec)) violations.push(`${rel}: layer "${layer}" may not import ${spec}`);
 				continue;
 			}
 			if (!spec.startsWith('.')) { violations.push(`${rel}: external package "${spec}" (the framework has no dependencies)`); continue; }

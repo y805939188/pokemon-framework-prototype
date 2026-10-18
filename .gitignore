@@ -67,3 +67,6 @@ experiments/step2/evidence/**/saves/
 
 # Engine bundles built from src/framework (pnpm --dir src build:engine)
 js/engine/build/
+
+# Compiled content (built from content/ by `pnpm --dir src content:build`)
+data/framework/

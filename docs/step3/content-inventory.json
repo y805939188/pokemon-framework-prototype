@@ -1,0 +1,173 @@
+{
+  "contentId": "sample",
+  "inputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625",
+  "note": "Field-level inventory only. Equal data is not equal behaviour. Framework-only fields have no Showdown counterpart to compare; the sample learnsets are synthetic placeholders, so 'differs' and 'framework-only' are expected there.",
+  "schema": 1,
+  "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "species": [
+    {
+      "baseStats": "showdown-only (read at run time; not stored in framework content)",
+      "battleMapping": "found",
+      "frameworkOnlyFields": [
+        "growth",
+        "baseExp",
+        "evYield",
+        "catchRate"
+      ],
+      "id": "blastoise",
+      "learnset": {
+        "authored": 1,
+        "entries": [
+          {
+            "comparison": "framework-only",
+            "level": 51,
+            "move": "waterfall",
+            "showdownGen8Levels": []
+          }
+        ],
+        "showdownGen8LevelUpMoves": 15
+      },
+      "showdownId": "blastoise"
+    },
+    {
+      "baseStats": "showdown-only (read at run time; not stored in framework content)",
+      "battleMapping": "found",
+      "frameworkOnlyFields": [
+        "growth",
+        "baseExp",
+        "evYield",
+        "catchRate"
+      ],
+      "id": "caterpie",
+      "learnset": {
+        "authored": 0,
+        "entries": [],
+        "showdownGen8LevelUpMoves": 3
+      },
+      "showdownId": "caterpie"
+    },
+    {
+      "baseStats": "showdown-only (read at run time; not stored in framework content)",
+      "battleMapping": "found",
+      "frameworkOnlyFields": [
+        "growth",
+        "baseExp",
+        "evYield",
+        "catchRate"
+      ],
+      "id": "charizard",
+      "learnset": {
+        "authored": 3,
+        "entries": [
+          {
+            "comparison": "differs",
+            "level": 51,
+            "move": "slash",
+            "showdownGen8Levels": [
+              24
+            ]
+          },
+          {
+            "comparison": "framework-only",
+            "level": 52,
+            "move": "outrage",
+            "showdownGen8Levels": []
+          },
+          {
+            "comparison": "differs",
+            "level": 53,
+            "move": "heatwave",
+            "showdownGen8Levels": [
+              1
+            ]
+          }
+        ],
+        "showdownGen8LevelUpMoves": 15
+      },
+      "showdownId": "charizard"
+    },
+    {
+      "baseStats": "showdown-only (read at run time; not stored in framework content)",
+      "battleMapping": "found",
+      "frameworkOnlyFields": [
+        "growth",
+        "baseExp",
+        "evYield",
+        "catchRate"
+      ],
+      "id": "gengar",
+      "learnset": {
+        "authored": 0,
+        "entries": [],
+        "showdownGen8LevelUpMoves": 17
+      },
+      "showdownId": "gengar"
+    },
+    {
+      "baseStats": "showdown-only (read at run time; not stored in framework content)",
+      "battleMapping": "found",
+      "frameworkOnlyFields": [
+        "growth",
+        "baseExp",
+        "evYield",
+        "catchRate"
+      ],
+      "id": "pidgey",
+      "learnset": {
+        "authored": 0,
+        "entries": [],
+        "showdownGen8LevelUpMoves": 0
+      },
+      "showdownId": "pidgey"
+    },
+    {
+      "baseStats": "showdown-only (read at run time; not stored in framework content)",
+      "battleMapping": "found",
+      "frameworkOnlyFields": [
+        "growth",
+        "baseExp",
+        "evYield",
+        "catchRate"
+      ],
+      "id": "snorlax",
+      "learnset": {
+        "authored": 0,
+        "entries": [],
+        "showdownGen8LevelUpMoves": 27
+      },
+      "showdownId": "snorlax"
+    },
+    {
+      "baseStats": "showdown-only (read at run time; not stored in framework content)",
+      "battleMapping": "found",
+      "frameworkOnlyFields": [
+        "growth",
+        "baseExp",
+        "evYield",
+        "catchRate"
+      ],
+      "id": "venusaur",
+      "learnset": {
+        "authored": 1,
+        "entries": [
+          {
+            "comparison": "framework-only",
+            "level": 51,
+            "move": "powerwhip",
+            "showdownGen8Levels": []
+          }
+        ],
+        "showdownGen8LevelUpMoves": 17
+      },
+      "showdownId": "venusaur"
+    }
+  ],
+  "summary": {
+    "learnComparisons": {
+      "consistent": 0,
+      "differs": 2,
+      "framework-only": 3
+    },
+    "species": 7
+  }
+}

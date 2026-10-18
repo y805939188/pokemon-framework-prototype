@@ -14,7 +14,7 @@
 
   const NAME = "PS_BattleFlow";
   const W = window as any;
-  const nodeRequire = (globalThis as any).require as ((id: string) => any) | undefined;
+  const nodeRequire = (globalThis as any).require as any; // NW.js Node require (has .resolve)
 
   // ---------------------------------------------------------------- engine access (loaded lazily, runtime-relative)
   let ENGINE: any = null;
@@ -27,6 +27,8 @@
         S: nodeRequire("./js/engine/game/state.cjs"),
         F: nodeRequire("./js/engine/fixtures/game.cjs"),
         D: nodeRequire("./js/engine/game/describe.cjs"),
+        B: nodeRequire("./js/engine/build/engine.cjs"), // the built engine bundle (content pipeline runtime, Showdown dex)
+        root: nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire.resolve("./js/engine/build/engine.cjs"))))),
       };
       W.PSFlow && (W.PSFlow.perf.engineLoadMs = Math.round((performance.now() - tLoad) * 10) / 10);
     }
@@ -43,6 +45,29 @@
     fast: false, // tests: no message pacing
     debug: {} as any, // tests: failure injection
     perf: { engineLoadMs: null as any, battles: [] as any[], cur: null as any }, // measurement hooks (cheap; read by the test driver)
+    /**
+     * The Content the battle session uses. `sample` (default) is the content pipeline's compiled output assembled with
+     * the pinned Showdown data; `fixture` is the synthetic step 2 test content. A missing or unusable compiled file is
+     * an error, never a silent fallback to the fixture.
+     */
+    content(): any {
+      if (!PSFlow._content) {
+        const params = G.PluginManager.parameters(NAME) as Record<string, string>;
+        const E = engine();
+        if ((params.contentSource || "sample") === "fixture") PSFlow._content = E.F.content;
+        else {
+          const file = nodeRequire("path").join(E.root, "data", "framework", "content.json");
+          let json: unknown;
+          try { json = JSON.parse(nodeRequire("fs").readFileSync(file, "utf8")); }
+          catch (e) { throw new Error(`content: cannot read ${file} (run: pnpm --dir src build): ${String(e instanceof Error ? e.message : e)}`); }
+          const { content, errors } = E.B.contentRuntime.assembleContent(E.B.contentRuntime.loadCompiled(json), E.B.dex.createDexLookup());
+          if (errors.length) throw new Error("content: " + errors.map((x: any) => `${x.path}: ${x.message}`).join("; "));
+          PSFlow._content = content;
+        }
+      }
+      return PSFlow._content;
+    },
+    _content: null as any,
     game(): any {
       if (!G.$gameSystem._psGame) G.$gameSystem._psGame = engine().F.makeGame();
       return G.$gameSystem._psGame;
@@ -63,7 +88,7 @@
       const team = req.foes.map((f: any, i: number) => F.foeMember(`W${req.seq}-${i + 1}`, f.species, f.level));
       const tCreate = performance.now();
       const session = await Session.create({
-        game: PSFlow.game(), battleId: req.battleId, content: F.content, seed: PSFlow.seed,
+        game: PSFlow.game(), battleId: req.battleId, content: PSFlow.content(), seed: PSFlow.seed,
         foe: { kind: req.kind, team },
       });
       if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round((performance.now() - tCreate) * 10) / 10;

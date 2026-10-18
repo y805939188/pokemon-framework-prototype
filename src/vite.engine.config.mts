@@ -9,6 +9,8 @@ const entries: Record<string, string> = {
   engine: "./framework/index.ts",
   // runs INSIDE Showdown (staged as dist/config/custom-formats.js): self-contained, rules bundled in
   "custom-formats": "./framework/battle/custom-formats.ts",
+  // content tooling (build/check/inventory); a Node program, not a library
+  "content-cli": "./framework/tools/content-cli.ts",
 };
 const name = process.env.ENGINE_ENTRY ?? "engine";
 const entry = entries[name];

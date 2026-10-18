@@ -43,4 +43,22 @@ export interface SpeciesData {
 
 export interface Content {
   species: Record<string, SpeciesData>;
+  meta?: ContentMeta;
+}
+
+/** What the content layer needs to know about Showdown's static data (the battle adapter implements it). */
+export interface DexLookup {
+  species(showdownId: string): { name: string; baseStats: Stats } | null;
+  move(showdownId: string): { name: string } | null;
+  /** Gen 8 level-up learn levels per move id (Showdown's learnset data), or null for an unknown species. */
+  levelUpMoves(showdownId: string): Record<string, number[]> | null;
+  /** The pinned Showdown build the answers come from (recorded into reports). */
+  sha(): string;
+}
+
+/** Where a Content object came from; carried so logs and reports say which one a battle used. */
+export interface ContentMeta {
+  kind: "fixture" | "sample";
+  id: string;
+  inputsHash?: string;
 }

@@ -22,6 +22,7 @@ SUITES=(
   experiments/step2/s5/test-engine-contract.cjs
   scripts/tests/reactor-install.test.cjs
   scripts/tests/check-boundaries.test.cjs
+  experiments/step3/test-content.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do
