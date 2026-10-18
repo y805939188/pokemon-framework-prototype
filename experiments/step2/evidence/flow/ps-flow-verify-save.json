@@ -4,7 +4,7 @@
     {
       "id": "V1 real restart: the save written by the previous process loads with identical state, duplicates stay no-ops",
       "status": "pass",
-      "ms": 4,
+      "ms": 5,
       "detail": {
         "applied": [
           "wild-snorlax#1"
@@ -15,7 +15,14 @@
   ],
   "env": {
     "nw": "0.117.0",
-    "node": "26.7.0"
+    "node": "26.7.0",
+    "chromium": "154.0.8037.58",
+    "v8": "15.4.80.11",
+    "platform": "darwin",
+    "arch": "arm64",
+    "execPath": "/Users/dingshinn/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.app/Contents/Resources/nwjs-mac/nwjs.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
+    "gameDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype",
+    "packageInfo": null
   },
   "overall": "pass"
 }

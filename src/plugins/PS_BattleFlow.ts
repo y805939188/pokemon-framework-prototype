@@ -20,6 +20,7 @@
   let ENGINE: any = null;
   function engine(): any {
     if (!ENGINE) {
+      const tLoad = performance.now();
       if (!nodeRequire) throw new Error("Node require() is not available in this runtime");
       ENGINE = {
         Session: nodeRequire("./js/engine/game/session.cjs").BattleSession,
@@ -27,6 +28,7 @@
         F: nodeRequire("./js/engine/fixtures/game.cjs"),
         D: nodeRequire("./js/engine/game/describe.cjs"),
       };
+      W.PSFlow && (W.PSFlow.perf.engineLoadMs = Math.round((performance.now() - tLoad) * 10) / 10);
     }
     return ENGINE;
   }
@@ -40,6 +42,7 @@
     seed: undefined as any, // tests pin the engine seed
     fast: false, // tests: no message pacing
     debug: {} as any, // tests: failure injection
+    perf: { engineLoadMs: null as any, battles: [] as any[], cur: null as any }, // measurement hooks (cheap; read by the test driver)
     game(): any {
       if (!G.$gameSystem._psGame) G.$gameSystem._psGame = engine().F.makeGame();
       return G.$gameSystem._psGame;
@@ -58,10 +61,13 @@
       const { Session, F } = engine();
       const req = PSFlow.request;
       const team = req.foes.map((f: any, i: number) => F.foeMember(`W${req.seq}-${i + 1}`, f.species, f.level));
-      return Session.create({
+      const tCreate = performance.now();
+      const session = await Session.create({
         game: PSFlow.game(), battleId: req.battleId, content: F.content, seed: PSFlow.seed,
         foe: { kind: req.kind, team },
       });
+      if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round((performance.now() - tCreate) * 10) / 10;
+      return session;
     },
     finish(session: any): any {
       const req = PSFlow.request;
@@ -79,6 +85,8 @@
       PSFlow.close(0);
     },
     close(code: number): void {
+      const cur = PSFlow.perf.cur;
+      if (cur && !cur.totalMs) { cur.totalMs = Math.round((performance.now() - cur.t0) * 10) / 10; cur.code = code; PSFlow.perf.battles.push(cur); }
       const v = PSFlow.request && PSFlow.request.resultVariable;
       if (v) G.$gameVariables.setValue(v, code);
       PSFlow.running = false;
@@ -105,6 +113,7 @@
     };
     PSFlow.running = true;
     PSFlow.lastOutcome = null;
+    PSFlow.perf.cur = { battleId: PSFlow.request.battleId, t0: performance.now(), actions: [] as any[] };
     G.SceneManager.push(W.Scene_PSBattle);
     this.setWaitMode("psBattle");
   });
@@ -244,6 +253,8 @@
 
   // --- menus
   P.show = function (mode: string, items: any[]) {
+    const cur = PSFlow.perf.cur;
+    if (cur && cur.firstMenuMs === undefined) cur.firstMenuMs = Math.round((performance.now() - cur.t0) * 10) / 10;
     this._mode = mode;
     this._menu.setItems(items);
     this._menu.show(); this._menu.activate();
@@ -304,18 +315,18 @@
         else if (ext === "party") this.showParty("switch");
         else if (ext === "run") this.act(() => this._session.run(), "run");
         return;
-      case "moves": this.act(() => { if (PSFlow.debug.failNext === "move") { PSFlow.debug.failNext = null; throw new Error("injected failure"); } return this._session.chooseMove(ext); }); return;
+      case "moves": this.act(() => { if (PSFlow.debug.failNext === "move") { PSFlow.debug.failNext = null; throw new Error("injected failure"); } return this._session.chooseMove(ext); }, "move"); return;
       case "bag":
         if (!ext) { this._menu.activate(); return; }
         if (/ball$/.test(ext)) this.act(() => this._session.throwBall(ext), "ball");
         else { this._pendingItem = ext; this.showParty("item"); }
         return;
       case "party":
-        if (this._pendingItem) { const item = this._pendingItem; this._pendingItem = null; this.act(() => this._session.useItem(item, ext)); }
-        else this.act(() => this._session.chooseSwitch(ext));
+        if (this._pendingItem) { const item = this._pendingItem; this._pendingItem = null; this.act(() => this._session.useItem(item, ext), "item"); }
+        else this.act(() => this._session.chooseSwitch(ext), "switch");
         return;
-      case "party-forced": this.act(() => this._session.chooseForcedSwitch(ext)); return;
-      case "learn": this.act(async () => ({ ok: true, messages: await this._session.decideLearn(ext) })); return;
+      case "party-forced": this.act(() => this._session.chooseForcedSwitch(ext), "switch"); return;
+      case "learn": this.act(async () => ({ ok: true, messages: await this._session.decideLearn(ext) }), "learn"); return;
       case "end": this.onEnd(); return;
     }
   };
@@ -324,8 +335,11 @@
   P.act = function (fn: () => Promise<any> | any, kind?: string) {
     this._busy = true;
     this._menu.deactivate(); this._menu.hide();
+    const tAct = performance.now();
     Promise.resolve().then(fn).then((r: any) => {
       this._busy = false;
+      const cur = PSFlow.perf.cur;
+      if (cur) cur.actions.push({ kind: kind || "other", ms: Math.round((performance.now() - tAct) * 10) / 10 });
       if (r && r.ok === false) {
         this._queue.push((kind && REASON_FOR[kind] && REASON_FOR[kind][r.reason]) || REASON[r.reason] || `Not possible (${r.reason}).`);
         this._mode = "messages";
@@ -349,6 +363,9 @@
   };
   P.terminate = function () {
     G.Scene_MenuBase.prototype.terminate.call(this);
+    // Measured in 2.5: every scene open/close retains ~1.5-2.5 MB in this runtime; releasing window canvases
+    // explicitly cuts that by roughly 40% (the rest is outside this plugin, see docs/step2/2.5-report.md).
+    for (const w of [this._status, this._log, this._menu]) { try { if (w.contents) w.contents.destroy(); if (w.contentsBack) w.contentsBack.destroy(); } catch (e) { /* already released */ } }
     if (PSFlow.running) PSFlow.close(0); // never leave the interpreter waiting
   };
 })();

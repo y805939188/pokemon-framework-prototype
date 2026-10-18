@@ -7,5 +7,6 @@ Step 2 experiment repo (battle integration on RPG Maker MZ + RPGReactor + Pokém
 - Clean-room spec lives in `../pokemon-framework-reference`; read its specs/test vectors, never port Ruby.
 - Do not modify global MZ/NW.js (`--skip-nwjs` only). Showdown is built into `js/engine/showdown` by `scripts/build-showdown.sh` (git-ignored).
 - In-game flow test: `scripts/run-flow-test-mac.sh` (NW.js direct launch, real keys/events/save).
+- Packaged app: `scripts/package-mac.sh [--with-tests]`, `scripts/run-package-tests-mac.sh`, `scripts/run-package-perf-mac.sh` (never MZ Deploy on macOS).
 - Verify with: `pnpm --dir src typecheck && pnpm --dir src build && node --test experiments/step2/test-headless.cjs`.
 - No push/merge to main without user approval.

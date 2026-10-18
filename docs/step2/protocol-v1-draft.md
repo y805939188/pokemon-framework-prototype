@@ -1,6 +1,9 @@
-# Battle protocol — v1 DRAFT (not frozen)
+# Battle protocol — v1 FROZEN for the validated scope (2026-10-18)
 
-Implemented in `js/engine/gateway.cjs` (engine boundary) and `js/engine/game/session.cjs` (game boundary). Everything crossing either boundary is a plain JSON value; UI/business code never holds Showdown objects. Freezing happens in 2.5 after the packaged-runtime matrix; until then treat shapes as changeable.
+Implemented in `js/engine/gateway.cjs` (engine boundary) and `js/engine/game/session.cjs` (game boundary). Everything crossing either boundary is a plain JSON value; UI/business code never holds Showdown objects. **Frozen** at 2.5 after the packaged-app matrix: the message kinds and their field sets, the `BattleResult` shape, the write set, the session call names, end reasons and refusal reasons are recorded in `protocol-v1.frozen.json` and guarded by `experiments/step2/s5/test-protocol-freeze.cjs` (observed shapes must equal the file; changing them requires a version bump and regenerating the file on purpose).
+
+**Validated scope of the freeze:** singles through the text-UI flow in NW.js 0.117.0 / RPGReactor 0.98.8 on Apple Silicon macOS, S1–S10 fixed-input outcomes identical in Node and in the packaged app, doubles at engine/session level (no doubles UI).
+**Not frozen / unverified:** doubles UI and its request shape handling, player forced-switch UI (implemented, not scripted), nicknames/receive menus, battle-time save and recordings, Windows/Intel, any non-Gen-8 rule set, mid-turn exp hook (`setFaintHook` exists but is not part of the protocol).
 
 ## Layers and owners
 

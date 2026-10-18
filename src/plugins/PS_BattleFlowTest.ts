@@ -13,7 +13,7 @@
   const mode = arg("ps-flow-test");
   if (!mode) return;
 
-  const nodeRequire = G.require as (id: string) => any;
+  const nodeRequire: any = G.require;
   const fs = nodeRequire("fs");
   const path = nodeRequire("path");
   const E = nodeRequire("./js/engine/game/growth.cjs");
@@ -21,8 +21,27 @@
   const SHOTS = arg("ps-flow-shots");
 
   let frame = 0;
+  const focusLog: any[] = [];
+  for (const ev of ["blur", "focus"]) window.addEventListener(ev, () => focusLog.push({ ev, frame, t: Math.round(performance.now()), hasFocus: document.hasFocus(), vis: document.visibilityState }));
+  document.addEventListener("visibilitychange", () => focusLog.push({ ev: "visibility", frame, vis: document.visibilityState }));
   const baseUpdate = G.SceneManager.update;
-  G.SceneManager.update = function (...a: any[]) { frame++; return baseUpdate.apply(this, a); };
+  const frameLog: Record<string, number[]> = { battle: [], map: [], other: [] };
+  let lastFrameAt = 0;
+  let sampling = false;
+  let skippedUnfocused = 0;
+  G.SceneManager.update = function (...a: any[]) {
+    frame++;
+    if (sampling && !document.hasFocus()) { skippedUnfocused++; lastFrameAt = 0; }
+    else if (sampling) {
+      const now = performance.now();
+      if (lastFrameAt) { const sc = G.SceneManager._scene; frameLog[sc && sc._psBattle ? "battle" : sc && sc._spriteset ? "map" : "other"].push(now - lastFrameAt); }
+      lastFrameAt = now;
+    }
+    return baseUpdate.apply(this, a);
+  };
+  const t0Arg = arg("ps-t0");
+  const t0 = t0Arg ? Number(t0Arg) : undefined; // epoch ms taken by the launching shell just before `open`
+  const stamps: any = { pluginLoadedAt: Date.now(), pluginLoadedPerf: Math.round(performance.now()) };
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   async function frames(n: number) { const t = frame + n; while (frame < t) await sleep(4); }
@@ -33,7 +52,17 @@
   const scene = (): any => G.SceneManager._scene;
   const battle = (): any => { const s = scene(); return s && s._psBattle ? s : null; };
   const KEY: Record<string, number> = { ok: 13, cancel: 27, down: 40, up: 38 };
+  /** A window that lost focus is throttled by Chromium and ignores input, which made scripted runs flaky
+   *  (observed: blur at frame 94 for ~800 frames). Take focus back before every key press. */
+  let refocus = 0;
+  async function ensureFocus() {
+    if (document.hasFocus()) return;
+    const t0 = Date.now();
+    while (!document.hasFocus() && Date.now() - t0 < 20000) { try { G.nw.Window.get().focus(); } catch (e) { /* ignore */ } await sleep(50); }
+    refocus++;
+  }
   async function press(k: string, hold = 3) {
+    await ensureFocus();
     const ev = (type: string) => document.dispatchEvent(new KeyboardEvent(type, { keyCode: KEY[k], which: KEY[k], bubbles: true } as any));
     ev("keydown"); await frames(hold); ev("keyup"); await frames(2);
   }
@@ -50,7 +79,16 @@
     if (m._items[idx].enabled === false) throw new Error(`menu item ${re} is disabled`);
     let guard = 0;
     while (m.index() !== idx && guard++ < 30) await press("down");
-    await press("ok");
+    // A key event can be swallowed while the window is busy (e.g. right after a screenshot): confirm that OK
+    // had an effect (mode or item list changed, scene left, or a request is in flight) and press again if not.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const b0 = battle(); const before = { mode: b0._mode, items: b0._menu._items, index: m.index() };
+      await press("ok");
+      await frames(8);
+      const b1 = battle();
+      if (!b1 || b1._mode !== before.mode || b1._menu._items !== before.items || b1._busy || b1._queue.length) return;
+    }
+    throw new Error(`OK on ${re} had no effect after 4 presses`);
   }
   const mode_ = () => (battle() ? battle()._mode : "");
   async function inMode(m: string, label?: string) { await waitFor(() => battle() && battle()._mode === m && battle()._queue.length === 0 && !battle()._busy, `mode ${m} ${label || ""}`); }
@@ -66,13 +104,19 @@
   const game = (): any => W.PSFlow.game();
   const clone = (x: any) => JSON.parse(JSON.stringify(x));
   const results: any[] = [];
-  const report: any = { mode, results, env: { nw: G.process && G.process.versions && G.process.versions.nw, node: G.process && G.process.versions && G.process.versions.node } };
+  const gameDir = path.dirname(path.dirname(path.dirname(path.dirname(nodeRequire.resolve("./js/engine/game/session.cjs")))));
+  let packageInfo: any = null;
+  try { packageInfo = JSON.parse(fs.readFileSync(path.join(gameDir, "package-info.json"), "utf8")); } catch (e) { /* dev tree: no package-info */ }
+  const pv = (G.process && G.process.versions) || {};
+  const report: any = { mode, results, focusLog, get refocus() { return refocus; }, env: { nw: pv.nw, node: pv.node, chromium: pv.chromium, v8: pv.v8, platform: G.process && G.process.platform, arch: G.process && G.process.arch, execPath: G.process && G.process.execPath, gameDir, packageInfo } };
   async function scenario(id: string, fn: () => Promise<any>) {
     const t0 = Date.now();
     try { const detail = await fn(); results.push({ id, status: "pass", ms: Date.now() - t0, detail }); }
     catch (e: any) {
       const b = battle();
-      results.push({ id, status: "fail", ms: Date.now() - t0, error: String(e && e.message || e), diag: b ? { mode: b._mode, failure: String(b._failure), log: b._log._lines, status: b._status._lines, queue: b._queue.slice(0, 5) } : null });
+      const itp = G.$gameMap && G.$gameMap._interpreter;
+      const mapDiag = { scene: scene() && scene().constructor && scene().constructor.name, psRunning: W.PSFlow.running, waitMode: itp && itp._waitMode, interpreterRunning: itp && itp.isRunning(), messageBusy: G.$gameMessage && G.$gameMessage.isBusy(), messageText: G.$gameMessage && G.$gameMessage._texts, lastOutcome: W.PSFlow.lastOutcome, frame, hasFocus: document.hasFocus(), vis: document.visibilityState };
+      results.push({ id, status: "fail", ms: Date.now() - t0, error: String(e && e.message || e), mapDiag, diag: b ? { mode: b._mode, failure: String(b._failure), log: b._log._lines, status: b._status._lines, queue: b._queue.slice(0, 5) } : null });
       await shot("fail-" + id.split(" ")[0]);
       try { await recover(); } catch (e2) { results.push({ id: id + " (recover)", status: "fail", error: String(e2) }); }
     }
@@ -94,6 +138,7 @@
     G.SceneManager.goto(G.Scene_Map);
     await waitFor(() => scene() && scene()._spriteset && !G.SceneManager.isSceneChanging() && G.$gameMap.mapId() === 4, "Scene_Map on map 4");
     await frames(10);
+    stamps.mapReadyAt = Date.now(); stamps.mapReadyPerf = Math.round(performance.now());
   }
   const fresh = () => { W.PSFlow.resetGame(); };
 
@@ -219,6 +264,145 @@
     });
   }
 
+  /** S1..S10 engine/session matrix (js/engine/matrix.cjs) inside this runtime; fingerprints are compared with a Node run. */
+  async function runMatrixMode() {
+    const t0 = performance.now();
+    const rows = await nodeRequire("./js/engine/matrix.cjs").runMatrix();
+    report.matrix = rows;
+    report.matrixMs = Math.round(performance.now() - t0);
+    for (const r of rows) results.push({ id: `${r.id} (matrix)`, status: r.status, ms: r.ms, fingerprint: r.fingerprint, error: r.error });
+  }
+
+  // ---------------------------------------------------------------- measurements (step 2.5)
+  const pct = (a: number[], p: number) => { if (!a.length) return null; const b = [...a].sort((x, y) => x - y); return Math.round(b[Math.min(b.length - 1, Math.floor(p * b.length))] * 10) / 10; };
+  const frameStats = (a: number[]) => ({ n: a.length, p50: pct(a, 0.5), p95: pct(a, 0.95), p99: pct(a, 0.99), max: a.length ? Math.round(Math.max(...a) * 10) / 10 : null, over33: a.filter((x) => x > 33.4).length, over50: a.filter((x) => x > 50).length, over100: a.filter((x) => x > 100).length });
+  function osRssMb(): number | null {
+    try {
+      const out: string = nodeRequire("child_process").execSync("ps -ax -o rss=,command=").toString();
+      let kb = 0; for (const l of out.split("\n")) if (l.includes("PokemonFrameworkPrototype.app")) kb += Number(l.trim().split(/\s+/)[0]) || 0;
+      return kb ? Math.round(kb / 1024) : null;
+    } catch (e) { return null; }
+  }
+  function mem(label: string) {
+    const forced = typeof G.gc === "function"; // launch with --js-flags=--expose-gc for leak checks
+    if (forced) { G.gc(); G.gc(); }
+    const m = G.process.memoryUsage();
+    const jh = (performance as any).memory;
+    return { label, gcForced: forced, nodeRssMb: Math.round(m.rss / 1048576), nodeHeapUsedMb: Math.round(m.heapUsed / 1048576), jsHeapUsedMb: jh ? Math.round(jh.usedJSHeapSize / 1048576) : null, appRssMb: osRssMb() };
+  }
+  const med = (a: number[]) => pct(a, 0.5);
+
+  async function runPerf() {
+    const perf: any = { method: { t0: "shell epoch ms just before launch", timers: "performance.now()/Date.now() in the renderer", frames: "SceneManager.update deltas, window focused, fast=true (no message pacing)" }, stamps, memory: [] as any[] };
+    if (t0) { perf.coldStart = { launchToPluginMs: stamps.pluginLoadedAt - t0 }; }
+    await toMap();
+    if (t0) { perf.coldStart.launchToMapReadyMs = stamps.mapReadyAt - t0; }
+    perf.memory.push(mem("map ready (before any battle)"));
+    sampling = true; lastFrameAt = 0;
+    await frames(120); // idle map baseline
+    // one battle of each kind; the very first includes the engine load
+    const script = async (ev: number, steps: () => Promise<void>) => {
+      await startEvent(ev); await inMode("main"); await steps();
+      await inMode("end"); await press("ok"); await dismissMessages();
+    };
+    const run = async () => { await choose(/^Run/); };
+    const fightKo = async () => { await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower/i); await frames(5); await waitFor(() => ["end", "main", "learn"].includes(mode_()), "after KO"); };
+    const potionRun = async () => { await choose(/^Bag/); await inMode("bag"); await choose(/Potion/); await inMode("party"); await choose(/Charizard/); await inMode("main"); await choose(/^Run/); };
+    const ball = async () => { await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); };
+    await G.DataManager.setupNewGame(); W.PSFlow.resetGame(); W.PSFlow.fast = true; W.PSFlow.seed = undefined;
+    G.$gamePlayer.reserveTransfer(4, 8, 8, 2, 0); G.SceneManager.goto(G.Scene_Map); await frames(30);
+    W.PSFlow.seed = [1, 2, 3, 4];
+    const kindsList: [string, number, () => Promise<void>][] = [["run", 1, run], ["fight-ko", 1, fightKo], ["potion+run", 1, potionRun], ["master-ball", 1, ball]];
+    const rounds = Number(arg("ps-perf-rounds")) || 6;
+    for (let r = 0; r < rounds; r++) {
+      for (const [name, ev, fn] of kindsList) {
+        game().bag.masterball = 5; game().bag.potion = 5; game().party[0].hp = 100; game().party.length = Math.min(game().party.length, 3);
+        W.PSFlow.perf.cur = null;
+        try { await script(ev, fn); } catch (e: any) { perf.errors = (perf.errors || []).concat(`${name}#${r}: ${e.message}`); await recover(); }
+        const b = W.PSFlow.perf.battles[W.PSFlow.perf.battles.length - 1];
+        if (b) b.label = name;
+      }
+      if (r === 0) perf.memory.push(mem("after first round (4 battles)"));
+      if (r === 2) perf.memory.push(mem("after 3 rounds (12 battles)"));
+      if (rounds > 6 && (r + 1) % 5 === 0 && r + 1 < rounds) perf.memory.push(mem(`after ${r + 1} rounds (${(r + 1) * 4} battles)`));
+    }
+    perf.memory.push(mem(`after ${rounds} rounds (${rounds * 4} battles)`));
+    sampling = false;
+    const bs: any[] = W.PSFlow.perf.battles;
+    perf.engineLoadMs = W.PSFlow.perf.engineLoadMs;
+    perf.firstBattle = bs[0] ? { sessionMs: bs[0].sessionMs, firstMenuMs: bs[0].firstMenuMs, totalMs: bs[0].totalMs, label: bs[0].label } : null;
+    const later = bs.slice(1);
+    perf.laterBattles = { n: later.length, sessionMsMedian: med(later.map((b) => b.sessionMs)), firstMenuMsMedian: med(later.map((b) => b.firstMenuMs)), firstMenuMsMax: Math.max(...later.map((b) => b.firstMenuMs)) };
+    const byKind: any = {};
+    for (const b of bs) for (const a of b.actions) (byKind[a.kind] ||= []).push(a.ms);
+    perf.actionMs = Object.fromEntries(Object.entries(byKind).map(([k, v]: any) => [k, { n: v.length, p50: pct(v, 0.5), p95: pct(v, 0.95), max: Math.max(...v) }]));
+    perf.frames = { battleScene: frameStats(frameLog.battle), mapScene: frameStats(frameLog.map) };
+    // battles that overlap a blur..focus interval are throttled by Chromium: keep them out of the "focused" statistics
+    const blurIv: [number, number][] = []; let bAt: number | null = null;
+    for (const e of focusLog) { if (e.ev === "blur") bAt = e.t; else if (e.ev === "focus" && bAt !== null) { blurIv.push([bAt, e.t]); bAt = null; } }
+    for (const b of bs) { const s0 = b.t0, e0 = b.t0 + (b.totalMs || 0); b.blurred = blurIv.some(([x, y]) => x < e0 && y > s0); }
+    const fb = bs.slice(1).filter((b) => !b.blurred);
+    perf.laterBattles.unblurredN = fb.length; perf.laterBattles.blurredN = bs.slice(1).length - fb.length;
+    perf.laterBattles.firstMenuMsMedianFocused = med(fb.map((b) => b.firstMenuMs)); perf.laterBattles.firstMenuMsMaxFocused = fb.length ? Math.max(...fb.map((b) => b.firstMenuMs)) : null;
+    perf.firstBattle.blurred = bs[0] ? bs[0].blurred : null;
+    perf.focus = { blurEvents: focusLog.filter((e) => e.ev === "blur").length, framesSkippedUnfocused: skippedUnfocused };
+    perf.battles = bs.length;
+    perf.window = { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio, refocusCount: refocus };
+    report.perf = perf;
+    results.push({ id: "P1 perf run", status: perf.errors ? "fail" : "pass", ms: 0, error: perf.errors && perf.errors.join("; ") });
+  }
+
+  /**
+   * Leak bisect: push/pop N copies of (a) a bare MenuBase scene with three windows and (b) the real battle scene,
+   * with forced GC (launch with --js-flags=--expose-gc), to see which layer keeps memory.
+   */
+  async function runLeakBisect() {
+    const N = Number(arg("ps-leak-n")) || 60;
+    const out: any = { N, samples: [] as any[] };
+    const mkBare = (Parent: any, windows: number, explicitDestroy = false) => {
+      function Scene_X(this: any) { this.initialize(...(arguments as any)); }
+      Scene_X.prototype = Object.create(Parent.prototype); Scene_X.prototype.constructor = Scene_X;
+      Scene_X.prototype.create = function () {
+        Parent.prototype.create.call(this);
+        if (Parent === G.Scene_Base) this.createWindowLayer();
+        for (let i = 0; i < windows; i++) this.addWindow(new G.Window_Base(new G.Rectangle(0, i * 100, 816, 90)));
+      };
+      if (explicitDestroy) {
+        Scene_X.prototype.terminate = function () {
+          Parent.prototype.terminate.call(this);
+          for (const c of [...this._windowLayer.children]) { try { if (c.contents) c.contents.destroy(); if (c.contentsBack) c.contentsBack.destroy(); c.destroy({ children: true, texture: true }); } catch (e) { /* ignore */ } }
+        };
+      }
+      Scene_X.prototype.update = function () { Parent.prototype.update.call(this); if (!this._t) this._t = 0; if (++this._t > 3) this.popScene(); };
+      return Scene_X;
+    };
+    const Scene_Bare = mkBare(G.Scene_MenuBase, 3);
+    async function loop(label: string, push: () => Promise<void>) {
+      await toMap();
+      out.samples.push({ phase: label, n: 0, ...mem(label + " start") });
+      for (let i = 1; i <= N; i++) {
+        await push();
+        if (i % 20 === 0) out.samples.push({ phase: label, n: i, ...mem(label) });
+      }
+    }
+    await loop("bare scene (3 windows, no engine)", async () => {
+      G.SceneManager.push(Scene_Bare);
+      await waitFor(() => scene() && scene().constructor === Scene_Bare || (scene() && scene()._t !== undefined), "bare scene");
+      await waitFor(() => scene() && scene()._spriteset, "back on map");
+      await frames(2);
+    });
+    W.PSFlow.fast = true; W.PSFlow.seed = [1, 2, 3, 4];
+    const pushOf = (C: any) => async () => { G.SceneManager.push(C); await waitFor(() => scene() && scene()._t !== undefined, "variant scene"); await waitFor(() => scene() && scene()._spriteset, "back on map"); await frames(2); };
+    await loop("Scene_Base + 3 windows (no MenuBase background)", pushOf(mkBare(G.Scene_Base, 3)));
+    await loop("Scene_MenuBase + 0 windows", pushOf(mkBare(G.Scene_MenuBase, 0)));
+    await loop("MenuBase + 3 windows + explicit contents destroy", pushOf(mkBare(G.Scene_MenuBase, 3, true)));
+    await loop("real battle scene + session, then Run", async () => {
+      await startEvent(1); await inMode("main"); await choose(/^Run/); await inMode("end"); await press("ok"); await dismissMessages();
+    });
+    report.leak = out;
+    results.push({ id: "L1 leak bisect", status: "pass", ms: 0 });
+  }
+
   async function verifySave() {
     await scenario("V1 real restart: the save written by the previous process loads with identical state, duplicates stay no-ops", async () => {
       const expected = JSON.parse(fs.readFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected.json"), "utf8"));
@@ -235,7 +419,7 @@
   G.Scene_Boot.prototype.start = function (this: any) {
     startAt.call(this);
     setTimeout(async () => {
-      try { if (mode === "verify-save") await verifySave(); else await runAll(); }
+      try { if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else await runAll(); }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       report.overall = results.every((r) => r.status === "pass") ? "pass" : "fail";
       if (OUT) { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, JSON.stringify(report, null, 2)); }

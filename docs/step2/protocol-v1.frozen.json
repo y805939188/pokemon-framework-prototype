@@ -1,0 +1,146 @@
+{
+  "protocol": 1,
+  "validatedScope": "singles text-UI flow in NW.js 0.117.0 / RPGReactor 0.98.8; doubles verified at engine/session level only",
+  "messageKeys": {
+    "end": [
+      "kind",
+      "outcome",
+      "reason",
+      "winner"
+    ],
+    "error": [
+      "choice",
+      "kind",
+      "message",
+      "seq",
+      "side"
+    ],
+    "events": [
+      "events",
+      "kind",
+      "seq"
+    ],
+    "growth": [
+      "exp",
+      "foe",
+      "hp",
+      "kind",
+      "level",
+      "levelUps",
+      "member"
+    ],
+    "learn-prompt": [
+      "kind",
+      "member",
+      "move",
+      "slots"
+    ],
+    "learned": [
+      "kind",
+      "member",
+      "move",
+      "replaced"
+    ],
+    "request": [
+      "kind",
+      "request",
+      "seq",
+      "side"
+    ]
+  },
+  "resultKeys": [
+    "bag",
+    "battleId",
+    "captured",
+    "dex",
+    "members",
+    "outcome",
+    "protocol"
+  ],
+  "outcomeKeys": {
+    "win": [
+      "kind"
+    ],
+    "caught": [
+      "ball",
+      "kind",
+      "target"
+    ]
+  },
+  "memberPatchKeys": [
+    "evs",
+    "exp",
+    "hp",
+    "level",
+    "moves",
+    "status"
+  ],
+  "capturedMemberKeys": [
+    "ability",
+    "ball",
+    "evs",
+    "exp",
+    "friendship",
+    "gender",
+    "hp",
+    "id",
+    "item",
+    "ivs",
+    "level",
+    "moves",
+    "nature",
+    "nickname",
+    "ot",
+    "species",
+    "status"
+  ],
+  "moveKeys": [
+    "id",
+    "maxpp",
+    "pp"
+  ],
+  "dexKeys": [
+    "owned",
+    "seen"
+  ],
+  "writeSet": [
+    "evs",
+    "exp",
+    "friendship",
+    "hp",
+    "level",
+    "moves",
+    "status"
+  ],
+  "sessionCalls": [
+    "cancel",
+    "chooseDoubles",
+    "chooseForcedSwitch",
+    "chooseMove",
+    "chooseSwitch",
+    "commitTurn",
+    "decideLearn",
+    "result",
+    "run",
+    "take",
+    "throwBall",
+    "useItem"
+  ],
+  "endReasons": [
+    "caught",
+    "run",
+    "tie",
+    "win"
+  ],
+  "refusalReasons": [
+    "ballsdisabled",
+    "choice-rejected",
+    "multiplefoes",
+    "noactive",
+    "none-left",
+    "not-registered",
+    "trainer",
+    "trapped",
+    "unknown-item"
+  ]
+}
