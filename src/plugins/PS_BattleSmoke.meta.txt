@@ -1,0 +1,12 @@
+/*:
+ * @target MZ
+ * @plugindesc Step 2.1 smoke: runs the Showdown gateway fixture inside the game runtime and writes a JSON report.
+ *
+ * @param runOnBoot
+ * @text Run On Boot
+ * @type boolean
+ * @default true
+ *
+ * @command Run
+ * @text Run Battle Smoke
+ */

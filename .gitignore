@@ -53,3 +53,5 @@ js/plugins/RR_Pixi8Particles.js.map
 # ------------------------------------------------------------
 third_party/
 js/engine/showdown/
+js/plugins/PS_BattleSmoke.js
+js/plugins/PS_BattleSmoke.js.map

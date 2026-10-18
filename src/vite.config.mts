@@ -2,13 +2,17 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 
+// One IIFE bundle per run. Select the plugin with RR_PLUGIN (default: the template demo);
+// `pnpm build` runs every plugin listed in package.json.
+const pluginName = process.env.RR_PLUGIN ?? "RR_Pixi8Particles";
+
 const pluginEntry = fileURLToPath(
-  new URL("./plugins/RR_Pixi8Particles.ts", import.meta.url),
+  new URL(`./plugins/${pluginName}.ts`, import.meta.url),
 );
 
 const pluginMetadata = readFileSync(
   fileURLToPath(
-    new URL("./plugins/RR_Pixi8Particles.meta.txt", import.meta.url),
+    new URL(`./plugins/${pluginName}.meta.txt`, import.meta.url),
   ),
   "utf8",
 ).trim();
@@ -29,9 +33,9 @@ export default defineConfig({
 
     lib: {
       entry: pluginEntry,
-      name: "RR_Pixi8ParticlesBundle",
+      name: `${pluginName}Bundle`,
       formats: ["iife"],
-      fileName: () => "RR_Pixi8Particles.js",
+      fileName: () => `${pluginName}.js`,
     },
 
     rolldownOptions: {
