@@ -172,3 +172,53 @@ test('D9 doubles ledger: item reserved per spec, refund on refused choice, spent
 	// ball refused with two living foes: nothing reserved
 	assert.deepEqual(s.gw.query('p1', 'ball', 0), { allowed: false, reason: 'multiplefoes' });
 });
+
+// ---------------------------------------------------------------- review follow-ups (doubles ledger and guards)
+test('review #4: a choice reserved in one slot but never executed (battle ended first) is refunded exactly once', async () => {
+	const game = makeGame(); game.party[1].hp = 60;
+	const s = await BattleSession.create({ game, battleId: 'R4', content, seed: [1, 2, 3, 4], doubles: true,
+		foe: { kind: 'wild', team: [foeMember('W1-1', 'Pidgey', 5), foeMember('W1-2', 'Snorlax', 40, ['protect'])] } });
+	s.take();
+	await s.chooseDoubles([{ move: 1, target: 1 }, { move: 4 }]); // Flamethrower removes the Pidgey: one living foe left
+	assert.ok(!s.finished);
+	// a single living foe: slot 0 throws the Master Ball (catches before anything else), slot 1 reserved a Potion for the ally
+	const r = await s.chooseDoubles([{ kind: 'ball', ball: 'masterball', target: 'W1-2' }, { kind: 'item', item: 'potion', target: 'A-0002' }]);
+	assert.ok(r.ok && s.finished);
+	const res = s.result();
+	assert.equal(res.outcome.kind, 'caught');
+	assert.equal(res.bag.potion, undefined, 'the never-executed Potion is back in the bag (bag delta 0)');
+	assert.equal(res.bag.masterball, -1);
+	assert.equal(s.ledger.find(e => e.itemId === 'potion').why, 'unexecuted');
+});
+
+test('review #5: chooseDoubles applies the same guards as the menu query (two foes, not first action, trainer, run)', async () => {
+	const game = makeGame();
+	const twoFoes = [foeMember('W1-1', 'Pidgey', 5), foeMember('W1-2', 'Pidgey', 5)];
+	const s = await BattleSession.create({ game, battleId: 'R5', content, seed: [1, 2, 3, 4], doubles: true, foe: { kind: 'wild', team: twoFoes } });
+	s.take();
+	const ball = { kind: 'ball', ball: 'pokeball', target: 'W1-1' };
+	assert.deepEqual(await s.chooseDoubles([ball, { move: 4 }]), { ok: false, reason: 'multiplefoes' });
+	assert.equal(s.bag.pokeball, 5, 'refused: no ball consumed');
+	assert.equal(s.ledger.length, 0);
+	// a ball must be the first action of the round
+	const one = await BattleSession.create({ game: makeGame(), battleId: 'R5b', content, seed: [1, 2, 3, 4], doubles: true, foe: { kind: 'wild', team: [foeMember('W1-1', 'Pidgey', 5), foeMember('W1-2', 'Snorlax', 40, ['protect'])] } });
+	one.take();
+	await one.chooseDoubles([{ move: 1, target: 1 }, { move: 4 }]); // one living foe left
+	assert.deepEqual(await one.chooseDoubles([{ move: 4 }, { kind: 'ball', ball: 'pokeball', target: 'W1-2' }]), { ok: false, reason: 'notfirst' });
+	assert.equal(one.bag.pokeball, 5);
+	// trainer battle: same refusal as in singles (consistent policy; see review-followups.md decision on the trainer ball)
+	const tr = await BattleSession.create({ game: makeGame(), battleId: 'R5c', content, seed: [1, 2, 3, 4], doubles: true, foe: { kind: 'trainer', team: twoFoes } });
+	tr.take();
+	assert.deepEqual(await tr.chooseDoubles([{ kind: 'run' }, { move: 4 }]), { ok: false, reason: 'trainer' });
+	assert.deepEqual(await tr.chooseDoubles([ball, { move: 4 }]), { ok: false, reason: 'trainer' });
+	assert.equal(tr.bag.pokeball, 5);
+});
+
+test('review #7: items that cannot work are refused at registration in doubles too (no reservation, no turn)', async () => {
+	const game = makeGame();
+	const s = await BattleSession.create({ game, battleId: 'R7', content, seed: [1, 2, 3, 4], doubles: true,
+		foe: { kind: 'wild', team: [foeMember('W1-1', 'Snorlax', 40, ['protect']), foeMember('W1-2', 'Snorlax', 40, ['protect'])] } });
+	s.take();
+	assert.deepEqual(await s.chooseDoubles([{ kind: 'item', item: 'potion', target: 'A-0001' }, { move: 4 }]), { ok: false, reason: 'item-no-effect' });
+	assert.equal(s.bag.potion, 3); assert.equal(s.ledger.length, 0); assert.deepEqual(s.take(), []);
+});

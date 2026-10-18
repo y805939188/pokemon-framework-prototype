@@ -70,8 +70,12 @@
       };
       walk(app.stage);
       if (!live.size) return; // cannot tell what is live: leave everything alone
+      const keys = Object.keys(map);
+      // If PixiJS ever keys this map by something else, no live uid would match and every batcher in use would be
+      // destroyed: only prune when the keys demonstrably are instruction-set uids (at least one live uid is among them).
+      if (!keys.some((k) => live.has(k))) { G.__psRuntimeFixes.batcherSkipped = (G.__psRuntimeFixes.batcherSkipped || 0) + 1; return; }
       let removed = 0;
-      for (const key of Object.keys(map)) {
+      for (const key of keys) {
         if (live.has(key)) continue;
         const entry = map[key];
         for (const name of Object.keys(entry || {})) { try { entry[name].destroy && entry[name].destroy(); } catch (e) { /* ignore */ } }

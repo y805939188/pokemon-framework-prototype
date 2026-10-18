@@ -12,7 +12,11 @@
 const { BattleGateway } = require('../gateway.cjs');
 const G = require('./growth.cjs');
 const S = require('./state.cjs');
-const { HEAL_ITEMS, STATUS_ITEMS, STAT_ITEMS } = require('../rpg/rules.cjs');
+const { HEAL_ITEMS, STATUS_ITEMS, STAT_ITEMS, itemEligibility } = require('../rpg/rules.cjs');
+
+/** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
+const END_REASONS = ['caught', 'run', 'tie', 'win'];
+const REFUSAL_REASONS = ['ballsdisabled', 'choice-rejected', 'invulnerable', 'item-no-effect', 'multiplefoes', 'noactive', 'none-left', 'norun', 'not-registered', 'notfirst', 'trainer', 'trapped', 'unknown-item', 'unknown-target'];
 
 const ITEM_IDS = new Set([...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS)]);
 
@@ -44,7 +48,7 @@ class BattleSession {
 		s.participants = {}; s.activeNow = { p1: [], p2: [] }; s.doubles = doubles;
 		s.ended = null; s.finished = false; s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
 		s.gw = await BattleGateway.create({
-			formatid, seed, wild: foe.kind === 'wild',
+			formatid, seed, wild: foe.kind === 'wild', noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
 			players: [{ name: 'Player', team: lead.map(m => toSet(m, moveName)) }, { name: foe.kind === 'wild' ? 'Wild' : 'Trainer', team: s.foeTeam.map(m => toSet(m, moveName)) }],
 		});
 		await s.gw.choose('p1', 'team ' + lead.map((_, i) => i + 1).join(''));
@@ -97,10 +101,18 @@ class BattleSession {
 	async useItem(itemId, targetId, { commit = true } = {}) {
 		if (!ITEM_IDS.has(itemId)) return { ok: false, reason: 'unknown-item' };
 		if ((this.bag[itemId] || 0) < 1) return { ok: false, reason: 'none-left' };
+		const el = this.canUseItem(itemId, targetId);
+		if (!el.ok) return { ok: false, reason: el.reason }; // refused before registration: nothing consumed, no turn used
 		const entry = this._reserve('item', itemId, targetId);
 		const ok = await this.gw.act('p1', { kind: 'item', item: itemId, target: targetId });
 		if (!ok) { this._refund(entry, 'not-registered'); return { ok: false, reason: 'not-registered' }; }
 		return commit ? this._resolveTurn() : { ok: true, staged: true };
+	}
+
+	/** Registration-time eligibility of an item for a party member (same rule the menu uses to grey out targets). */
+	canUseItem(itemId, targetId) {
+		const mon = this.gw.readState('p1').find(x => x.id === targetId);
+		return itemEligibility(itemId, mon);
 	}
 
 	/**
@@ -108,17 +120,34 @@ class BattleSession {
 	 * and resolve the turn. Items/balls are reserved in the ledger first and refunded if the choice is refused.
 	 */
 	async chooseDoubles(specs, { commit = true } = {}) {
+		// validate every spec BEFORE reserving anything: a refusal consumes nothing (WP38 2 / WP28 3.5)
+		let acted = false;
+		for (let i = 0; i < specs.length; i++) {
+			const sp = specs[i];
+			if (sp && sp.kind === 'ball') {
+				if (acted) return { ok: false, reason: 'notfirst' }; // a ball must be the first action of the round (WP38 2)
+				const q = this.gw.query('p1', 'ball', i);
+				if (!q.allowed) return { ok: false, reason: q.reason };
+			} else if (sp && sp.kind === 'run') {
+				const q = this.gw.query('p1', 'run', i);
+				if (!q.allowed) return { ok: false, reason: q.reason };
+			} else if (sp && sp.kind === 'item') {
+				if (!ITEM_IDS.has(sp.item)) return { ok: false, reason: 'unknown-item' };
+				const el = this.canUseItem(sp.item, sp.target);
+				if (!el.ok) return { ok: false, reason: el.reason };
+			}
+			if (sp) acted = true;
+		}
 		const entries = [];
 		for (const sp of specs) {
 			if (!sp || !sp.kind || sp.kind === 'run') continue;
 			const id = sp.kind === 'item' ? sp.item : sp.ball;
 			if ((this.bag[id] || 0) < 1) { entries.forEach(e => this._refund(e, 'not-registered')); return { ok: false, reason: 'none-left' }; }
 			if (sp.kind === 'ball') {
-				const foeActive = this.gw._debugBattle().getSide('p2').pokemon.find(p => p.name === sp.target);
 				const rec = this.foeTeam.find(m => m.id === sp.target);
+				if (!rec) { entries.forEach(e => this._refund(e, 'not-registered')); return { ok: false, reason: 'unknown-target' }; }
 				sp.catchRate = this.content.species[rec.species].catchRate;
 				sp.ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(rec.species) };
-				void foeActive;
 			}
 			entries.push(this._reserve(sp.kind, id, sp.target));
 		}
@@ -195,7 +224,6 @@ class BattleSession {
 		// auto-choose the foe from its own pending request, then process whatever the engine produced
 		const b = this.gw._debugBattle();
 		const foeSide = b.getSide('p2');
-		if (b.requestState && !b.getSide('p1').isChoiceDone === undefined) void 0;
 		if (foeSide.activeRequest && !foeSide.activeRequest.wait && !foeSide.isChoiceDone()) {
 			const c = this.ai(foeSide.activeRequest);
 			if (c) await this.gw.choose('p2', c);
@@ -244,7 +272,6 @@ class BattleSession {
 			} else if (what === 'ball') {
 				const entry = this.ledger.find(l => l.kind === 'ball' && l.state === 'reserved' && l.itemId === itemId);
 				if (entry) entry.state = 'consumed'; // a thrown ball is spent whatever the outcome (WP38)
-				void target;
 			}
 		}
 	}
@@ -289,8 +316,6 @@ class BattleSession {
 		const side = this.gw._debugBattle().getSide('p2');
 		const req = side.activeRequest;
 		if (!req || req.wait || !req.forceSwitch || side.isChoiceDone()) return false;
-		const held = this.held.filter(m => m.side === 'p2');
-		void held;
 		this.gw.choose('p2', this.ai(req));
 		return true;
 	}
@@ -307,7 +332,7 @@ class BattleSession {
 			const evs = G.gainEvs(m.evs, foeC.evYield);
 			const withEv = { ...m, evs };
 			const amount = G.battleExp({ foe: { level: foe.level, baseExp: foeC.baseExp }, receiver: withEv, participants: receivers.length, rules: this.rules, trainer: this.foe.kind === 'trainer' });
-			const res = G.applyExp(withEv, amount, this.content);
+			const res = G.applyExp(withEv, amount, this.content, m);
 			const idx = this.party.indexOf(m);
 			this.party[idx] = res.member;
 			const changed = amount > 0 || JSON.stringify(evs) !== JSON.stringify(m.evs);
@@ -341,6 +366,9 @@ class BattleSession {
 	}
 
 	_buildResult() {
+		// A choice that was registered (and deducted) but never executed because the battle ended first (e.g. a catch
+		// in another slot) goes back to the bag exactly once (WP40 4.2.1 / WP42 6; our "refund once" decision).
+		for (const e of this.ledger) if (e.state === 'reserved') this._refund(e, 'unexecuted');
 		this._syncWorkingFromEngine();
 		const members = {};
 		for (const m of this.party) members[m.id] = { level: m.level, exp: m.exp, hp: m.hp, status: m.status, moves: m.moves, evs: m.evs };
@@ -350,7 +378,7 @@ class BattleSession {
 			if (d) bag[k] = d;
 		}
 		const out = this.ended;
-		const result = { protocol: S.PROTOCOL_VERSION, battleId: this.battleId, outcome: { kind: out.reason, ...(out.outcome ? { target: out.outcome.target, ball: out.outcome.ball } : {}) }, members, bag, captured: [], dex: { seen: [...new Set(this.foeTeam.map(m => m.species))], owned: [] } };
+		const result = { protocol: S.PROTOCOL_VERSION, battleId: this.battleId, outcome: { kind: out.reason, winner: out.winner || null, ...(out.reason === 'caught' ? { target: out.outcome.target, ball: out.outcome.ball } : {}) }, members, bag, captured: [], dex: { seen: [...new Set(this.foeTeam.map(m => m.species))], owned: [] } };
 		if (out.reason === 'caught') {
 			const c = this.foeTeam.find(m => m.id === out.outcome.target);
 			const eng = this.gw.readState('p2').find(x => x.id === c.id);
@@ -365,4 +393,4 @@ class BattleSession {
 	}
 }
 
-module.exports = { BattleSession };
+module.exports = { BattleSession, END_REASONS, REFUSAL_REASONS };

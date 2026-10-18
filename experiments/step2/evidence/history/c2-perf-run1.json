@@ -1,0 +1,159 @@
+{
+  "mode": "perf",
+  "results": [
+    {
+      "id": "P1 perf run",
+      "status": "pass",
+      "ms": 0
+    }
+  ],
+  "focusLog": [],
+  "refocus": 0,
+  "env": {
+    "nw": "0.117.0",
+    "node": "26.7.0",
+    "chromium": "154.0.8037.58",
+    "v8": "15.4.80.11",
+    "platform": "darwin",
+    "arch": "arm64",
+    "execPath": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
+    "gameDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
+    "packageInfo": {
+      "builtAt": "2026-10-18T11:54:38.178Z",
+      "gitHead": "482ea3de6eb5ebfb6d4e7653b5a245ee168a44bd",
+      "workingTreeChanges": 19,
+      "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+      "withTests": true,
+      "signing": "ad-hoc (local only)"
+    }
+  },
+  "perf": {
+    "method": {
+      "t0": "shell epoch ms just before launch",
+      "timers": "performance.now()/Date.now() in the renderer",
+      "frames": "SceneManager.update deltas, window focused, fast=true (no message pacing)"
+    },
+    "stamps": {
+      "pluginLoadedAt": 1792324577452,
+      "pluginLoadedPerf": 134,
+      "mapReadyAt": 1792324578491,
+      "mapReadyPerf": 1173
+    },
+    "memory": [
+      {
+        "label": "map ready (before any battle)",
+        "gcForced": false,
+        "nodeRssMb": 372,
+        "nodeHeapUsedMb": 22,
+        "jsHeapUsedMb": 36,
+        "appRssMb": 1205
+      },
+      {
+        "label": "after first round (4 battles)",
+        "gcForced": false,
+        "nodeRssMb": 478,
+        "nodeHeapUsedMb": 48,
+        "jsHeapUsedMb": 36,
+        "appRssMb": 1305
+      },
+      {
+        "label": "after 3 rounds (12 battles)",
+        "gcForced": false,
+        "nodeRssMb": 503,
+        "nodeHeapUsedMb": 49,
+        "jsHeapUsedMb": 36,
+        "appRssMb": 1332
+      },
+      {
+        "label": "after 6 rounds (24 battles)",
+        "gcForced": false,
+        "nodeRssMb": 539,
+        "nodeHeapUsedMb": 52,
+        "jsHeapUsedMb": 36,
+        "appRssMb": 1368
+      }
+    ],
+    "coldStart": {
+      "launchToPluginMs": 792,
+      "launchToMapReadyMs": 1831
+    },
+    "engineLoadMs": 2.2,
+    "firstBattle": {
+      "sessionMs": 160.1,
+      "firstMenuMs": 550.3,
+      "totalMs": 1037.8,
+      "label": "run",
+      "blurred": false
+    },
+    "laterBattles": {
+      "n": 23,
+      "sessionMsMedian": 2.1,
+      "firstMenuMsMedian": 132.9,
+      "firstMenuMsMax": 134.6,
+      "unblurredN": 23,
+      "blurredN": 0,
+      "firstMenuMsMedianFocused": 132.9,
+      "firstMenuMsMaxFocused": 134.6
+    },
+    "actionMs": {
+      "run": {
+        "n": 12,
+        "p50": 2,
+        "p95": 4.8,
+        "max": 4.8
+      },
+      "move": {
+        "n": 6,
+        "p50": 4.3,
+        "p95": 10.2,
+        "max": 10.2
+      },
+      "item": {
+        "n": 6,
+        "p50": 2.7,
+        "p95": 5.5,
+        "max": 5.5
+      },
+      "ball": {
+        "n": 6,
+        "p50": 2.7,
+        "p95": 4.3,
+        "max": 4.3
+      }
+    },
+    "frames": {
+      "battleScene": {
+        "n": 1236,
+        "p50": 16.7,
+        "p95": 18.5,
+        "p99": 21,
+        "max": 177.5,
+        "over33": 1,
+        "over50": 1,
+        "over100": 1
+      },
+      "mapScene": {
+        "n": 1067,
+        "p50": 16.7,
+        "p95": 18.4,
+        "p99": 21.7,
+        "max": 76.2,
+        "over33": 3,
+        "over50": 2,
+        "over100": 0
+      }
+    },
+    "focus": {
+      "blurEvents": 0,
+      "framesSkippedUnfocused": 0
+    },
+    "battles": 24,
+    "window": {
+      "w": 816,
+      "h": 624,
+      "dpr": 1,
+      "refocusCount": 0
+    }
+  },
+  "overall": "pass"
+}

@@ -14,7 +14,9 @@ const { SaveStore } = require('../../../js/engine/game/store.cjs');
 const { BattleSession } = require('../../../js/engine/game/session.cjs');
 const { content, makeGame, foeMember } = require('./fixtures.cjs');
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'pf-wb-'));
+const madeDirs = [];
+const tmp = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-wb-')); madeDirs.push(d); return d; };
+test.after(() => { for (const d of madeDirs) fs.rmSync(d, { recursive: true, force: true }); });
 const saveGame = (dir, game) => { const f = path.join(dir, 'save.json'); fs.writeFileSync(f, JSON.stringify(game)); return f; };
 
 async function session(game, { battleId = 'B-1', foe, seed = [1, 2, 3, 4] } = {}) {
@@ -73,30 +75,42 @@ test('write set: nothing outside the allowed fields changes; bag deltas and ledg
 	for (const m of after.party) for (const k of ['boosts', 'volatiles', 'stages']) assert.ok(!(k in m));
 });
 
-test('item ledger: cancel refunds, no-effect refunds once, failed throw is spent', async () => {
-	const game = makeGame(); // everyone at full HP
+test('item ledger: cancel refunds once, ineligible use is refused up front, execution-time no-effect refunds once (also at the end), failed throw is spent', async () => {
+	const damaged = () => { const g = makeGame(); g.party[0].hp = 70; return g; };
 	const wildSnorlax = () => ({ kind: 'wild', team: [foeMember('W-0001', 'Snorlax', 40, { moves: ['protect'] })] });
 	// staged then cancelled: the reserved item goes back, nothing was applied
-	const s1 = await session(game, { foe: wildSnorlax() }); s1.take();
+	const s1 = await session(damaged(), { foe: wildSnorlax() }); s1.take();
 	const staged = await s1.useItem('potion', 'A-0001', { commit: false });
 	assert.ok(staged.staged); assert.equal(s1.bag.potion, 2, 'reserved at registration');
 	await s1.cancel();
 	assert.equal(s1.bag.potion, 3, 'cancel returns the item'); assert.equal(s1.ledger[0].why, 'cancelled');
 	await s1.cancel(); assert.equal(s1.bag.potion, 3, 'a second cancel cannot refund twice');
-	// after a cancel the same turn can still be played normally
-	const next = await s1.chooseMove(1); assert.ok(next.ok);
-	// execution-time no-effect (full HP): refunded exactly once
-	const s2 = await session(game, { foe: wildSnorlax() }); s2.take();
-	assert.ok((await s2.useItem('potion', 'A-0001')).ok);
-	assert.equal(s2.bag.potion, 3); assert.equal(s2.ledger[0].state, 'refunded'); assert.equal(s2.ledger[0].why, 'noeffect');
+	const next = await s1.chooseMove(1); assert.ok(next.ok); // after a cancel the same turn can still be played normally
+	// WP28 3.5: an item that cannot work is refused BEFORE registration: stays in the menu, nothing consumed, no turn used
+	const s2 = await session(makeGame(), { foe: wildSnorlax() }); s2.take();
+	assert.deepEqual(await s2.useItem('potion', 'A-0001'), { ok: false, reason: 'item-no-effect' });
+	assert.equal(s2.bag.potion, 3); assert.equal(s2.ledger.length, 0); assert.deepEqual(s2.take(), [], 'no turn was played');
+	assert.deepEqual(await s2.useItem('antidote', 'A-0001'), { ok: false, reason: 'item-no-effect' }, 'wrong/no status');
+	assert.deepEqual(await s2.useItem('potion', 'Z-9999'), { ok: false, reason: 'unknown-target' });
+	// execution-time no-effect (state changed after registration): refunded once, and NOT again at the end of the battle
+	const g3 = damaged();
+	const s3 = await session(g3, { foe: { kind: 'wild', team: [foeMember('W-0001', 'Pidgey', 5, { moves: ['tackle'] })] } }); s3.take();
+	assert.ok((await s3.useItem('potion', 'A-0001', { commit: false })).staged);
+	const mon = s3.gw._debugBattle().getSide('p1').pokemon.find(p => p.name === 'A-0001'); mon.hp = mon.maxhp; // healed by something else meanwhile
+	const r3 = await s3.commitTurn(); assert.ok(r3.ok);
+	assert.equal(s3.ledger[0].state, 'refunded'); assert.equal(s3.ledger[0].why, 'noeffect'); assert.equal(s3.bag.potion, 3);
+	await playOut(s3);
+	assert.equal(s3.result().bag.potion, undefined, 'WP42 6.0 anomaly NOT reproduced: the bag delta for the refunded potion is 0 after the whole battle');
+	assert.equal(s3.bag.potion, 3);
 	// unknown / none left are refused up front and consume nothing
-	assert.deepEqual(await s2.useItem('rarecandy', 'A-0001'), { ok: false, reason: 'unknown-item' });
-	assert.equal((await s2.useItem('xattack', 'A-0001')).ok, true);
-	assert.deepEqual(await s2.useItem('xattack', 'A-0001'), { ok: false, reason: 'none-left' });
+	const s4 = await session(damaged(), { foe: wildSnorlax() }); s4.take();
+	assert.deepEqual(await s4.useItem('rarecandy', 'A-0001'), { ok: false, reason: 'unknown-item' });
+	assert.equal((await s4.useItem('xattack', 'A-0001')).ok, true);
+	assert.deepEqual(await s4.useItem('xattack', 'A-0001'), { ok: false, reason: 'none-left' });
 	// a failed throw spends the ball
 	let spent = null;
 	for (let k = 1; k < 60 && !spent; k++) {
-		const w = await session(game, { seed: [k, 2, 3, 4], foe: wildSnorlax() }); w.take();
+		const w = await session(makeGame(), { seed: [k, 2, 3, 4], foe: wildSnorlax() }); w.take();
 		const t = await w.throwBall('pokeball');
 		if (t.ok && !w.finished) spent = w;
 	}

@@ -170,12 +170,14 @@
     ballsdisabled: "Balls can't be used here.", multiplefoes: "There are too many foes to aim at!",
     noactive: "There is no one to act.", "none-left": "You have none of that left.", "unknown-item": "That item can't be used in battle.",
     "choice-rejected": "That choice isn't available right now.", "not-registered": "That isn't possible right now.",
+    norun: "There's no running from this battle!", invulnerable: "You can't aim at a target that can't be reached right now!",
+    notfirst: "A Ball has to be the first action of the round.", "item-no-effect": "It won't have any effect.", "unknown-target": "That target isn't in your party.",
   };
 
   /** Same reason code, different wording per action (a refused Ball is not a refused Run). */
   const REASON_FOR: Record<string, Record<string, string>> = {
     ball: { trainer: "The trainer blocked the Ball! Don't be a thief!", ballsdisabled: "Balls can't be used in this battle.", multiplefoes: "You can't aim at just one of several foes!" },
-    run: { trainer: "No! There's no running from a trainer battle!", trapped: "You can't escape, something is holding you!" },
+    run: { trainer: "No! There's no running from a trainer battle!", trapped: "You can't escape, something is holding you!", norun: "There's no running from this battle!" },
   };
 
   function Scene_PSBattle(this: any) { this.initialize(...(arguments as any)); }
@@ -281,8 +283,9 @@
     const live = Object.fromEntries(s.gw.readState("p1").map((x: any) => [x.id, x]));
     const items = s.party.map((m: any) => {
       const x = live[m.id];
-      const can = sub === "item" ? true : !(x.active || x.fainted);
-      return { name: `${m.species}  Lv${x.level}  HP ${x.hp}/${x.maxhp}${x.fainted ? " (fainted)" : ""}${x.active ? " *" : ""}`, ext: m.id, enabled: can };
+      // an item that could not do anything is refused before it is registered (WP28 3.5): grey the target out
+      const can = sub === "item" ? s.canUseItem(this._pendingItem, m.id).ok : !(x.active || x.fainted);
+      return { name: `${m.species}  Lv${x.level}  HP ${x.hp}/${x.maxhp}${x.fainted ? " (fainted)" : ""}${x.active ? " *" : ""}${sub === "item" && !can ? "  (no effect)" : ""}`, ext: m.id, enabled: can };
     });
     this.show(sub === "forced" ? "party-forced" : "party", items);
   };

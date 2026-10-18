@@ -58,13 +58,23 @@
     "protocol"
   ],
   "outcomeKeys": {
-    "win": [
-      "kind"
-    ],
     "caught": [
       "ball",
       "kind",
-      "target"
+      "target",
+      "winner"
+    ],
+    "defeat": [
+      "kind",
+      "winner"
+    ],
+    "run": [
+      "kind",
+      "winner"
+    ],
+    "win": [
+      "kind",
+      "winner"
     ]
   },
   "memberPatchKeys": [
@@ -113,18 +123,23 @@
     "status"
   ],
   "sessionCalls": [
+    "canUseItem",
     "cancel",
     "chooseDoubles",
     "chooseForcedSwitch",
     "chooseMove",
     "chooseSwitch",
     "commitTurn",
+    "currentRequest",
     "decideLearn",
     "result",
     "run",
     "take",
     "throwBall",
     "useItem"
+  ],
+  "sessionStatics": [
+    "create"
   ],
   "endReasons": [
     "caught",
@@ -135,12 +150,20 @@
   "refusalReasons": [
     "ballsdisabled",
     "choice-rejected",
+    "invulnerable",
+    "item-no-effect",
     "multiplefoes",
     "noactive",
     "none-left",
+    "norun",
     "not-registered",
+    "notfirst",
     "trainer",
     "trapped",
-    "unknown-item"
-  ]
+    "unknown-item",
+    "unknown-target"
+  ],
+  "notProvoked": {
+    "tie": "only a Showdown draw produces it (no fixture reaches one); the code path is `b.winner ? win : tie` in gateway.cjs"
+  }
 }

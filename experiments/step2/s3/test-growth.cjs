@@ -145,3 +145,37 @@ test('two participants both receive exp (default rules: no splitting)', async ()
 	assert.ok(s.party[1].exp > st[1], 'the switched-in member also participated');
 	assert.equal(s.party[2].exp, st[2], 'bench member untouched');
 });
+
+// ---------------------------------------------------------------- review follow-ups (HP rule baseline)
+test('review #2: an EV gain that crosses a multiple of 4 must not break the HP rule (no level-up and with level-up)', async () => {
+	// Charizard with HP EV 3 defeats a Caterpie (+1 HP EV => floor(EV/4) goes 0 -> 1): max HP grows by 1 even without a level-up
+	const game = makeGame({ charizard: { evs: { hp: 3 } } });
+	const s = await BattleSession.create({ game, battleId: 'R2-a', content, seed: [1, 2, 3, 4], foe: { kind: 'wild', team: [foeMember('W1-1', 'Caterpie', 5)] } });
+	s.take();
+	const before = s.gw.readState('p1').find(x => x.id === 'A-0001');
+	const r = await s.chooseMove(1);
+	assert.ok(r.ok, 'the battle must not abort');
+	const after = s.gw.readState('p1').find(x => x.id === 'A-0001');
+	assert.equal(after.maxhp, before.maxhp + 1);
+	assert.equal(after.hp, before.hp + 1, 'current HP rises by the max-HP delta, engine and game rule agree');
+	assert.equal(s.party[0].hp, after.hp);
+	// same, but the exp also levels the member up (one exp short of 51)
+	const g2 = makeGame({ charizard: { evs: { hp: 3 } } }); g2.party[0].exp = G.minExp('parabolic', 51) - 1;
+	const s2 = await BattleSession.create({ game: g2, battleId: 'R2-b', content, seed: [1, 2, 3, 4], foe: { kind: 'wild', team: [foeMember('W1-1', 'Caterpie', 5)] } });
+	s2.take();
+	assert.ok((await s2.chooseMove(1)).ok);
+});
+
+test('review #2: applyExp takes the old max HP from the record BEFORE the EV gain (and recalculates on EV-only gains)', () => {
+	const prior = makeGame({ charizard: { evs: { hp: 3 } } }).party[0];
+	const withEv = { ...prior, evs: { ...prior.evs, hp: 4 } };
+	const iv = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+	const m0 = G.computeStats(content.species.Charizard.base, iv, prior.evs, 50, 'timid').hp;
+	const m1 = G.computeStats(content.species.Charizard.base, iv, withEv.evs, 50, 'timid').hp;
+	assert.equal(m1, m0 + 1);
+	const res = G.applyExp(withEv, 0, content, prior); // amount 0: nothing but the EV changed
+	assert.equal(res.member.hp, prior.hp + 1);
+	assert.equal(res.after.stats.hp, m1);
+	const res2 = G.applyExp(withEv, 5, content, prior);
+	assert.equal(res2.member.hp, prior.hp + 1);
+});

@@ -118,31 +118,33 @@ function gainEvs(evs, yieldTable, { perStat = 252, total = 510, multiplier = 1 }
 /**
  * Apply an exp gain to a persistent member record (pure: returns a new record plus the change log).
  * `content` supplies base stats, growth curve and learnset for the species.
+ * `member` is the record AFTER this battle's EV gain; `prior` is the record BEFORE it (default: the same
+ * record). The "old max HP" of the recalculation must come from `prior` (WP19 5.5: the stored values before
+ * the recalculation), otherwise an EV gain that crosses a multiple of 4 shifts the HP rule by one point.
  */
-function applyExp(member, amount, content) {
+function applyExp(member, amount, content, prior = member) {
 	const sp = content.species[member.species];
 	const curve = sp.growth;
 	const maxE = maxExp(curve);
-	const before = { level: member.level, exp: member.exp, hp: member.hp, stats: computeStats(sp.base, member.ivs, member.evs, member.level, member.nature) };
-	const exp = Math.min(Math.max(member.exp + amount, 0), maxE);
-	const delta = exp - member.exp;
-	const rec = { ...member, exp };
+	const before = { level: prior.level, exp: prior.exp, hp: prior.hp, stats: computeStats(sp.base, prior.ivs, prior.evs, prior.level, prior.nature) };
+	const exp = Math.min(Math.max(prior.exp + amount, 0), maxE);
+	const delta = exp - prior.exp;
 	const log = { gained: delta, levels: [], learned: [], pendingMoves: [] };
-	if (delta <= 0) return { member: rec, log, before, after: before };
-	const newLevel = levelForExp(curve, exp);
-	if (newLevel < member.level) throw new Error('new level below current level (data contradiction)');
-	let cur = rec;
+	const newLevel = delta > 0 ? levelForExp(curve, exp) : prior.level;
+	if (newLevel < prior.level) throw new Error('new level below current level (data contradiction)');
+	let cur = { ...member, exp };
 	let oldStats = before.stats;
-	for (let L = member.level + 1; L <= newLevel; L++) {
+	for (let L = prior.level + 1; L <= newLevel; L++) {
 		const stats = computeStats(sp.base, cur.ivs, cur.evs, L, cur.nature);
 		cur = { ...cur, level: L, hp: hpAfterRecalc(cur.hp, oldStats.hp, stats.hp) };
 		log.levels.push({ level: L, maxhp: stats.hp, hp: cur.hp, stats });
 		for (const mv of (sp.learnset[L] || [])) log.pendingMoves.push({ level: L, move: mv });
 		oldStats = stats;
 	}
-	// non-level-up case: stats recalculated against the same level (EV gain), HP follows rule too
-	const after = { level: cur.level, exp: cur.exp, hp: cur.hp, stats: computeStats(sp.base, cur.ivs, cur.evs, cur.level, cur.nature) };
-	if (newLevel === member.level && after.stats.hp !== before.stats.hp) cur = { ...cur, hp: hpAfterRecalc(cur.hp, before.stats.hp, after.stats.hp) };
+	// no level change (or no exp at all): stats are still recalculated against the same level because the EVs
+	// changed, and current HP follows the same rule
+	const after = { level: cur.level, exp: cur.exp, stats: computeStats(sp.base, cur.ivs, cur.evs, cur.level, cur.nature) };
+	if (newLevel === prior.level && after.stats.hp !== before.stats.hp) cur = { ...cur, hp: hpAfterRecalc(cur.hp, before.stats.hp, after.stats.hp) };
 	return { member: cur, log, before, after: { ...after, hp: cur.hp } };
 }
 

@@ -73,8 +73,11 @@ test('capture rolls: CP13 / CP14 / CP24 sequencing', () => {
 
 test('escape math (WP41 7.2)', () => {
 	assert.equal(R.escapeRate(100, 99, 1), 256);
-	assert.equal(R.escapeRate(98, 178, 1), Math.floor(98 * 128 / 178) + 30);
-	assert.equal(R.escapeRate(98, 178, 3), Math.floor(98 * 128 / 178) + 90);
+	// constants worked out by hand from WP41 7.2: floor(98*128/178) = 70, plus 30 per attempt
+	assert.equal(R.escapeRate(98, 178, 1), 100);
+	assert.equal(R.escapeRate(98, 178, 2), 130);
+	assert.equal(R.escapeRate(98, 178, 3), 160);
+	assert.equal(R.escapeRate(100, 100, 1), 158); // equal speed is NOT "faster": floor(100*128/100)+30
 });
 
 // ------------------------------------------------------------------ engine scenarios
@@ -230,4 +233,102 @@ test('S7 items: status cure, stat boost, restricted inputs', async () => {
 	L = lines(drain(gw)); assert.equal(rpgLine(L, 'item')[6], 'ok'); assert.equal(b.sides[0].pokemon[1].status, '');
 	await gw.act('p1', { kind: 'item', item: 'xattack', target: 'A-0002' }); await gw.choose('p2', 'move 1');
 	assert.equal(rpgLine(lines(drain(gw)), 'item')[6], 'noeffect');
+});
+
+// ---------------------------------------------------------------- review follow-ups
+test('review #8: the Master Ball always catches, also against an Ultra Beast (decided by the ball alone)', () => {
+	const ub = { ballId: 'masterball', baseRate: 45, maxHp: 100, hp: 100, ctx: { ultraBeast: true } };
+	assert.equal(R.captureNumbers(ub).certain, true);
+	assert.equal(R.captureNumbers({ ...ub, ctx: {} }).certain, true);
+	assert.equal(R.captureNumbers({ ...ub, ballId: 'pokeball' }).certain, false);
+	assert.equal(R.rollCapture(R.captureNumbers(ub), {}, () => { throw new Error('no random roll for a certain catch'); }).shakes, 4);
+});
+
+test('review: remaining spec vectors CP09, CP11, CP12 and the critical-capture tiers', () => {
+	assert.equal(R.ballRate('fastball', 45, { targetBaseSpeed: 100 }).rate, 180); // CP09
+	assert.equal(R.ballRate('fastball', 100, { targetBaseSpeed: 100 }).rate, 255); // x4 then capped at 255 before entering x
+	assert.equal(R.ballRate('fastball', 45, { targetBaseSpeed: 99 }).rate, 45);
+	assert.equal(R.ballRate('loveball', 45, { sameSpeciesOppositeGender: true }).rate, 255); // CP11: 360 capped
+	assert.equal(R.ballRate('moonball', 45, { moonStoneFamily: true }).rate, 180);
+	assert.equal(R.ballRate('duskball', 45, { timeOfDay: 2 }).rate, 135); // CP12 (new-style rates on)
+	assert.equal(R.ballRate('diveball', 45, { underwater: true }).rate, 157.5);
+	assert.equal(R.ballRate('lureball', 45, { fishing: true }).rate, 225);
+	assert.equal(R.ballRate('netball', 45, { targetTypes: ['Bug'] }).rate, 157.5);
+	for (const [owned, want] of [[30, 0], [31, 1], [150, 1], [151, 2], [300, 2], [301, 3], [450, 3], [451, 4], [600, 4], [601, 5]]) assert.equal(R.critCoefficient(owned, false), want, `owned ${owned}`);
+	// CP13: 700 owned + charm => coefficient 10; x=15 => c = floor(15*10/12) = 12; the gate roll must be < 12
+	const nums = R.captureNumbers({ ballId: 'pokeball', baseRate: 45, maxHp: 100, hp: 100 });
+	const gate = v => { const q = [v, 0]; const calls = []; const r = R.rollCapture(nums, { ownedCount: 700, catchingCharm: true }, n => { calls.push(n); return q.shift(); }); return { r, calls }; };
+	assert.equal(gate(11).r.critical, true);
+	assert.equal(gate(12).r.critical, false, '12 is not < 12');
+});
+
+// ---- engine-level: deterministic escape, noRun, invulnerable target, redirect, carried-in sleep
+const bigTeam = (first) => [first, ...F.playerTeam.slice(1)];
+async function battleWith(team0, { wildKey = 'snorlax', ...opts } = {}) {
+	const gw = await BattleGateway.create({ formatid: F.formatid, seed: F.seed, wild: true, ...opts, players: [{ name: 'A', team: bigTeam(team0) }, { name: 'W', team: [F.wilds[wildKey].set] }] });
+	await gw.choose('p1', 'team 123'); await gw.choose('p2', 'team 1'); drain(gw);
+	return gw;
+}
+const lead = (over) => ({ ...F.playerTeam[0], ...over });
+
+test('review #9: Ghost / Run Away / Smoke Ball escape for sure, before trapping, without counting an attempt', async () => {
+	const variants = [
+		['ghost type', lead({ species: 'Gengar', ability: 'Cursed Body', moves: ['Shadow Ball'] })],
+		['Run Away ability', lead({ ability: 'Run Away' })],
+		['Smoke Ball', lead({ item: 'Smoke Ball' })],
+	];
+	for (const [name, mon] of variants) {
+		const gw = await battleWith(mon, { wildKey: 'gengar' }); // the foe is faster than a Charizard-based lead; certainty must not depend on speed
+		gw._debugBattle().sides[0].active[0].trapped = true; // trapping must NOT matter
+		assert.deepEqual(gw.query('p1', 'run'), { allowed: true }, name);
+		await gw.act('p1', { kind: 'run' }); await gw.choose('p2', 'move 1');
+		const msgs = drain(gw); const l = rpgLine(lines(msgs), 'run');
+		assert.deepEqual(l.slice(4, 7), ['ok', 'certain', '0'], name);
+		assert.equal(msgs.find(m => m.kind === 'end').reason, 'run', name);
+	}
+	// a normal lead that is trapped still cannot run; and the battle rule can forbid running altogether
+	const t = await battleWith(lead({}));
+	t._debugBattle().sides[0].active[0].trapped = true;
+	assert.deepEqual(t.query('p1', 'run'), { allowed: false, reason: 'trapped' });
+	const nr = await battleWith(lead({ ability: 'Run Away' }), { noRun: true });
+	assert.deepEqual(nr.query('p1', 'run'), { allowed: false, reason: 'norun' });
+	await nr.act('p1', { kind: 'run' }); await nr.choose('p2', 'move 1');
+	assert.equal(rpgLine(lines(drain(nr)), 'run')[4], 'denied');
+});
+
+test('review #6: a semi-invulnerable target refuses the ball at the menu; a fainted target is redirected to a companion ON THE FIELD only', async () => {
+	const gw = await battleWith(lead({}));
+	const foe = gw._debugBattle().sides[1].active[0];
+	assert.deepEqual(gw.query('p1', 'ball'), { allowed: true });
+	foe.volatiles.fly = { id: 'fly', target: foe };
+	assert.deepEqual(gw.query('p1', 'ball'), { allowed: false, reason: 'invulnerable' });
+	// redirect: two foes, the second one on the bench; the active target is already fainted when the ball resolves
+	const g2 = await BattleGateway.create({ formatid: F.formatid, seed: F.seed, wild: true, players: [{ name: 'A', team: F.playerTeam }, { name: 'W', team: [F.wilds.snorlax.set, { ...F.wilds.pidgey.set, name: 'W-0002' }] }] });
+	await g2.choose('p1', 'team 123'); await g2.choose('p2', 'team 12'); drain(g2);
+	const b = g2._debugBattle();
+	const active = b.sides[1].active[0]; active.hp = 0; active.fainted = true;
+	b.rpg.pending['p1:0'] = { kind: 'ball', ball: 'masterball', target: active.name, catchRate: 25 };
+	b.format.onRpgAction.call(b, b.sides[0].active[0]);
+	const out = b.log.filter(l => l.startsWith('|rpg|ball|'));
+	assert.equal(out.length, 1);
+	assert.equal(out[0].split('|')[6], 'notarget', 'the benched companion must not be caught');
+	assert.ok(!b.rpg.outcome);
+});
+
+test('review #3 (interim): a carried-in sleep restarts with a duration and ends; it no longer lasts forever', async () => {
+	const G2 = require('../../../js/engine/game/growth.cjs');
+	void G2;
+	const { BattleSession } = require('../../../js/engine/game/session.cjs');
+	const FX = require('../../../js/engine/fixtures/game.cjs');
+	const game = FX.makeGame(); game.party[0].status = 'slp';
+	const sess = await BattleSession.create({ game, battleId: 'R3', content: FX.content, seed: [1, 2, 3, 4], foe: { kind: 'wild', team: [FX.foeMember('W1-1', 'Snorlax', 40, { moves: ['protect'] })] } });
+	sess.take();
+	let moved = false;
+	for (let i = 0; i < 10 && !moved && !sess.finished; i++) {
+		const r = await sess.chooseMove(1);
+		moved = lines(r.messages).some(l => l.startsWith('|move|p1a: A-0001'));
+	}
+	assert.ok(moved, 'the member woke up and acted within 10 turns');
+	const st = sess.gw._debugBattle().sides[0].pokemon[0].statusState;
+	assert.ok(st === undefined || st.id !== 'slp' || st.time >= 0);
 });

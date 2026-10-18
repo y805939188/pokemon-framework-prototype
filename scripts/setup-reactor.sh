@@ -262,6 +262,17 @@ if [[ -n "$LOCAL_SOURCE" ]]; then
   fi
   LOCAL_SOURCE="$(cd "$LOCAL_SOURCE" && pwd)"
   SOURCE_ROOT="$LOCAL_SOURCE"
+  # The pin is a commit, not a version string: refuse a checkout that moved (git pull, other branch) unless told otherwise.
+  if git -C "$LOCAL_SOURCE" rev-parse --git-dir >/dev/null 2>&1; then
+    LOCAL_COMMIT="$(git -C "$LOCAL_SOURCE" rev-parse HEAD)"
+    if [[ "$LOCAL_COMMIT" != "$REACTOR_COMMIT" && "${REACTOR_ALLOW_OTHER_COMMIT:-0}" != "1" ]]; then
+      echo "ERROR: Reactor checkout $LOCAL_SOURCE is at $LOCAL_COMMIT, the pin is $REACTOR_COMMIT (scripts/versions.env)." >&2
+      echo "Check out the pinned commit, or set REACTOR_ALLOW_OTHER_COMMIT=1 to accept this one (then update versions.env and the docs)." >&2
+      exit 1
+    fi
+  else
+    echo "WARNING: $LOCAL_SOURCE is not a git checkout; its commit cannot be verified against the pin." >&2
+  fi
   REACTOR_VERSION="$(runtime_version_for_file "$SOURCE_ROOT/runtime/reactor_main.js")"
   REACTOR_RUNTIME_REVISION="$(runtime_revision_for_file "$SOURCE_ROOT/runtime/reactor_main.js")"
   if [[ -z "$REACTOR_VERSION" || -z "$REACTOR_RUNTIME_REVISION" ]]; then

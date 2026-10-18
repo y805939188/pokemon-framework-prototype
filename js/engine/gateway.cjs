@@ -10,7 +10,7 @@
  */
 const path = require('path');
 
-const PROTOCOL_VERSION = 0; // experimental, not frozen
+const PROTOCOL_VERSION = 0; // version tag of the engine-level message stream used by the 2.2 harness only; NOT the game protocol (that is state.cjs PROTOCOL_VERSION = 1, docs/step2/protocol-v1.md)
 
 function loadSim(engineRoot) {
 	const root = engineRoot || path.join(__dirname, 'showdown');
@@ -56,10 +56,11 @@ class BattleGateway {
 			battle.setPlayer(`p${i + 1}`, { name: p.name, team: sim.Teams.pack(p.team) });
 		}
 		// The format's onBegin creates battle.rpg when the second player joins, so flags go after.
-		if (opts.wild !== undefined || opts.noBall !== undefined) {
-			if (!battle.rpg) throw new Error('wild/noBall need the RPG format (gen8rpgcustomgame)');
+		if (opts.wild !== undefined || opts.noBall !== undefined || opts.noRun !== undefined) {
+			if (!battle.rpg) throw new Error('wild/noBall/noRun need the RPG format (gen8rpgcustomgame)');
 			battle.rpg.wild = !!opts.wild;
 			if (opts.noBall) battle.rpg.noBall = true;
+			if (opts.noRun) battle.rpg.noRun = true;
 		}
 		gw._pump();
 		return gw;
@@ -161,12 +162,16 @@ class BattleGateway {
 		if (!b.rpg || !b.rpg.wild) return { allowed: what !== 'run' && what !== 'ball', reason: what === 'ball' ? 'trainer' : what === 'run' ? 'trainer' : undefined };
 		if (!active || active.fainted) return { allowed: false, reason: 'noactive' };
 		if (what === 'run') {
+			if (b.rpg.noRun) return { allowed: false, reason: 'norun' };
+			if (active.hasType('Ghost') || active.hasAbility('runaway') || active.hasItem('smokeball')) return { allowed: true }; // before trapping (WP41 7.1)
 			if (active.trapped || active.volatiles['partiallytrapped']) return { allowed: false, reason: 'trapped' };
 			return { allowed: true };
 		}
 		if (what === 'ball') {
 			if (b.rpg.noBall) return { allowed: false, reason: 'ballsdisabled' };
 			if (foes.length > 1) return { allowed: false, reason: 'multiplefoes' };
+			const target = s.foe.active.find(p => p && !p.fainted);
+			if (target && target.isSemiInvulnerable && target.isSemiInvulnerable()) return { allowed: false, reason: 'invulnerable' };
 			return { allowed: true };
 		}
 		return { allowed: true };
@@ -189,13 +194,19 @@ class BattleGateway {
 			const p = this._mon(sideId, r.id);
 			p.hp = Math.min(r.hp, p.maxhp);
 			if (p.hp <= 0) { p.hp = 0; p.fainted = true; p.status = 'fnt'; }
-			else if (r.status) { p.status = r.status; p.statusState = { id: r.status }; }
+			else if (r.status) {
+				// Interim (see docs/step2/review-followups.md): the persistent record has no status counter yet, so a
+				// carried-in sleep restarts with a fresh duration (same draw as the engine's own sleep start) and
+				// bad poison restarts its stage; before this fix a carried-in sleep never ended.
+				p.status = r.status;
+				p.statusState = { id: r.status, target: p };
+				if (r.status === 'slp') { const t = this._battle.random(2, 5); p.statusState.startTime = t; p.statusState.time = t; }
+				if (r.status === 'tox') p.statusState.stage = 0;
+			}
 			for (const m of r.moves || []) {
 				const slot = p.moveSlots.find(x => x.id === m.id);
 				if (slot) slot.pp = Math.min(m.pp, slot.maxpp);
 			}
-			const base = p.baseMoveSlots.find(x => (r.moves || []).some(m => m.id === x.id));
-			void base;
 			for (const bs of p.baseMoveSlots) { const m = (r.moves || []).find(x => x.id === bs.id); if (m) bs.pp = Math.min(m.pp, bs.maxpp); }
 		}
 	}
@@ -207,6 +218,7 @@ class BattleGateway {
 			status: p.fainted ? '' : p.status || '',
 			pp: Object.fromEntries(p.baseMoveSlots.map(m => [m.id, m.pp])),
 			stats: { ...p.baseStoredStats }, active: !!p.isActive,
+			confused: !!(p.volatiles && p.volatiles['confusion']), boosts: { ...p.boosts },
 		}));
 	}
 

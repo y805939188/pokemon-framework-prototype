@@ -4,7 +4,7 @@
 # app.nw + ad-hoc signature. Local/testing package only: NOT Developer ID signed, NOT notarized, and it
 # contains MZ stock assets copied from the local MZ install (do not redistribute them).
 #
-# Usage: scripts/package-mac.sh [--with-tests] [--name NAME] [--out DIR]
+# Usage: scripts/package-mac.sh [--with-tests] [--harden] [--identity ID] [--name NAME] [--out DIR]
 #   --with-tests  keep the smoke/flow-test plugins (needed by the package test matrix)
 #   --harden      sign inside-out with the hardened runtime (ad-hoc identity, see scripts/sign-mac.sh)
 #   --identity ID sign with a real identity (implies --harden --timestamp); none is available on this machine yet
@@ -67,11 +67,16 @@ fi
 # ---- identity ----
 GIT_HEAD="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
 GIT_DIRTY="$(git -C "$ROOT" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
+# Hash of the code state actually built: tracked diff + every untracked (non-ignored) file, evidence/docs excluded
+# (they change while the tests run). Two packages with the same gitHead and diffSha256 were built from the same code.
+EXCL=(':(exclude)experiments/step2/evidence' ':(exclude)docs')
+DIFF_SHA="$( { git -C "$ROOT" diff HEAD -- . "${EXCL[@]}"; git -C "$ROOT" ls-files -o --exclude-standard -z -- . "${EXCL[@]}" | (cd "$ROOT" && xargs -0 shasum -a 256 2>/dev/null); } 2>/dev/null | shasum -a 256 | cut -d' ' -f1)"
 ENGINE_SHA="$(cat "$ROOT/js/engine/showdown/SOURCE_SHA" 2>/dev/null || echo unknown)"
+if [[ "$HARDEN" -eq 0 ]]; then SIGNING="adhoc"; elif [[ "$IDENTITY" == "-" ]]; then SIGNING="adhoc+hardened-runtime"; else SIGNING="identity:$IDENTITY+hardened-runtime"; fi
 node -e '
-  const [out,head,dirty,engine,tests]=process.argv.slice(1);
-  require("fs").writeFileSync(out,JSON.stringify({builtAt:new Date().toISOString(),gitHead:head,workingTreeChanges:Number(dirty),showdownSha:engine,withTests:tests==="1",signing:"ad-hoc (local only)"},null,2)+"\n");
-' "$NW_RES/package-info.json" "$GIT_HEAD" "$GIT_DIRTY" "$ENGINE_SHA" "$WITH_TESTS"
+  const [out,head,dirty,diff,engine,tests,signing]=process.argv.slice(1);
+  require("fs").writeFileSync(out,JSON.stringify({builtAt:new Date().toISOString(),gitHead:head,workingTreeChanges:Number(dirty),diffSha256:diff,showdownSha:engine,withTests:tests==="1",signing},null,2)+"\n");
+' "$NW_RES/package-info.json" "$GIT_HEAD" "$GIT_DIRTY" "$DIFF_SHA" "$ENGINE_SHA" "$WITH_TESTS" "$SIGNING"
 
 # ---- bundle metadata + signature ----
 PLIST="$APP/Contents/Info.plist"
@@ -91,4 +96,4 @@ FILES="$(find "$NW_RES" -type f | wc -l | tr -d ' ')"
 APPNW_KB="$(du -sk "$NW_RES" | cut -f1)"
 echo "Package: $APP"
 echo "  app total ${BYTES} KB, app.nw ${APPNW_KB} KB, ${FILES} files in app.nw, withTests=$WITH_TESTS"
-echo "  gitHead=$GIT_HEAD (working-tree changes: $GIT_DIRTY) showdown=$ENGINE_SHA"
+echo "  gitHead=$GIT_HEAD (working-tree changes: $GIT_DIRTY, diff sha256 ${DIFF_SHA:0:12}) showdown=$ENGINE_SHA signing=$SIGNING"

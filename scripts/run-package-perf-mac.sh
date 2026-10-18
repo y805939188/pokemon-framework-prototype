@@ -2,8 +2,11 @@
 # Step 2.5 measurements inside the packaged app (3 separate process launches by default).
 # Usage: scripts/run-package-perf-mac.sh [runs] [evidence-dir]
 # Needs the package built with tests: scripts/package-mac.sh --with-tests  (run-package-tests-mac.sh does it).
-# The game window must be allowed to take focus; do not switch apps while it runs (a blurred window is
-# throttled by Chromium and would distort the numbers).
+# Extra game arguments: PF_PERF_ARGS="--ps-perf-rounds=25 --js-flags=--expose-gc [--ps-fix=no-texture,no-batcher]"
+#   (100 battles with forced GC, with or without the runtime fixes; see docs/step2/runtime-issues.md).
+# Focus: the driver keeps running while the window is unfocused (docs/step2/runtime-issues.md section 3), and the
+# "focused throughout" rows are computed separately; still keep the machine otherwise idle, because CPU contention
+# and a window that is not frontmost distort the timing rows.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNS="${1:-3}"
@@ -12,10 +15,12 @@ APP="$ROOT/build/package/PokemonFrameworkPrototype.app"
 [[ -d "$APP" ]] || { echo "build the package first (scripts/package-mac.sh --with-tests)" >&2; exit 1; }
 mkdir -p "$EVID/perf"; rm -f "$EVID"/perf/run*.json
 now_ms() { python3 -c 'import time;print(int(time.time()*1000))'; }
+EXTRA=(); [[ -n "${PF_PERF_ARGS:-}" ]] && read -r -a EXTRA <<< "$PF_PERF_ARGS"
+if pgrep -f "PokemonFrameworkPrototype.app/Contents/MacOS" >/dev/null 2>&1; then echo "PokemonFrameworkPrototype is running: close it first" >&2; exit 1; fi
 for i in $(seq 1 "$RUNS"); do
   OUT="$EVID/perf/run$i.json"; rm -rf "$EVID/saves"
   T0="$(now_ms)"
-  open -n "$APP" --args "--mute-audio" "--disable-renderer-backgrounding" "--disable-background-timer-throttling" "--disable-backgrounding-occluded-windows" "--disable-features=CalculateNativeWinOcclusion" "--ps-save-dir=$EVID/saves" "--ps-flow-test=perf" "--ps-flow-out=$OUT" "--ps-t0=$T0" --ps-flow-quit
+  open -n "$APP" --args "--mute-audio" "--disable-renderer-backgrounding" "--disable-background-timer-throttling" "--disable-backgrounding-occluded-windows" "--disable-features=CalculateNativeWinOcclusion" "--ps-save-dir=$EVID/saves" "--ps-flow-test=perf" "--ps-flow-out=$OUT" "--ps-t0=$T0" --ps-flow-quit ${EXTRA[@]+"${EXTRA[@]}"}
   for _ in $(seq 1 300); do [[ -f "$OUT" ]] && break; sleep 2; done
   [[ -f "$OUT" ]] || { echo "timeout on run $i" >&2; pkill -f "PokemonFrameworkPrototype.app/Contents/MacOS" || true; exit 1; }
   sleep 3

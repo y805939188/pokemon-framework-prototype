@@ -204,7 +204,10 @@
       assert(battle()._log._lines.filter((l: string) => /no running from a trainer/i.test(l)).length === 1, "the run message appears only for the Run attempt");
       assert(battle()._session.bag.pokeball === 5, "refused ball is not consumed");
       await choose(/^Fight/); await inMode("moves"); await press("cancel"); await inMode("main");
-      await choose(/^Bag/); await inMode("bag"); await choose(/Potion/); await inMode("party"); await press("cancel"); await inMode("bag");
+      await choose(/^Bag/); await inMode("bag"); await choose(/Potion/); await inMode("party");
+      const targets = battle()._menu._items;
+      assert(targets.find((i: any) => /Blastoise/.test(i.name)).enabled === false, "a full-HP member is greyed out as a Potion target (refused before registration)");
+      await press("cancel"); await inMode("bag");
       await press("cancel"); await inMode("main");
       eq(battle()._session.bag, before.bag, "bag untouched after cancels/refusals");
       await choose(/^Pokémon/); await inMode("party");
@@ -488,9 +491,24 @@
   async function runSaveLocation() {
     G.DataManager.setupNewGame(); W.PSFlow.resetGame();
     const dir = G.StorageManager.fileDirectoryPath();
-    const code = await G.DataManager.saveGame(1);
-    report.saveLocation = { chosen: G.PSSaveLocation, dir, saveCode: code, fileExists: fs.existsSync(path.join(dir, "file1.rmmzsave")), gameDir };
-    results.push({ id: "SL1 save location", status: fs.existsSync(path.join(dir, "file1.rmmzsave")) ? "pass" : "fail", ms: 0 });
+    // Never touch a player's data: use the first FREE slot from 99 downwards, and put global.rmmzsave back as it was.
+    let slot = 99;
+    while (slot > 90 && fs.existsSync(path.join(dir, `file${slot}.rmmzsave`))) slot--;
+    const file = path.join(dir, `file${slot}.rmmzsave`);
+    const globalFile = path.join(dir, "global.rmmzsave");
+    const occupied = fs.existsSync(file);
+    const globalBefore = fs.existsSync(globalFile) ? fs.readFileSync(globalFile) : null;
+    const startedAt = Date.now() - 2000; // file mtime granularity
+    let code: any = null, error: string | null = null, written = false, cleanedUp = false;
+    if (!occupied) {
+      try { code = await G.DataManager.saveGame(slot); } catch (e) { error = String(e); }
+      written = fs.existsSync(file) && fs.statSync(file).mtimeMs >= startedAt; // written by THIS run, not a leftover
+      try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch (e) { /* reported through cleanedUp */ }
+      try { if (globalBefore) fs.writeFileSync(globalFile, globalBefore); else if (fs.existsSync(globalFile)) fs.unlinkSync(globalFile); } catch (e) { /* reported through cleanedUp */ }
+      cleanedUp = !fs.existsSync(file) && (globalBefore ? fs.readFileSync(globalFile).equals(globalBefore) : !fs.existsSync(globalFile));
+    }
+    report.saveLocation = { chosen: G.PSSaveLocation, dir, slot, occupied, saveCode: code, writtenByThisRun: written, cleanedUp, error, gameDir };
+    results.push({ id: "SL1 save location: a fresh slot is written by this run (saveGame code 0) and removed again", status: !occupied && code === 0 && written && cleanedUp ? "pass" : "fail", ms: 0 });
   }
 
   async function verifySave() {

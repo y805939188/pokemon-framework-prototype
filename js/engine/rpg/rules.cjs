@@ -96,9 +96,11 @@ function ballRate(ballId, rate, c) {
 /** Spec 3, steps 2-6: returns { rate, x, y, certain } for HP A (max), B (current). */
 function captureNumbers({ ballId, baseRate, maxHp, hp, status, ctx = {} }) {
 	let rate = baseRate;
-	let certain = false;
+	// The unconditional ball (Master Ball) always catches (WP38 3.5/4): it is decided by the ball alone and
+	// must survive the Ultra Beast pre-gate, which only divides the rate.
+	let certain = ballRate(ballId, rate, ctx).certain === true;
 	if (ctx.ultraBeast && ballId !== 'beastball') rate = Math.floor(rate / 10); // pre-gate, integer division
-	else { const r = ballRate(ballId, rate, ctx); rate = r.rate; certain = !!r.certain; }
+	else { rate = ballRate(ballId, rate, ctx).rate; }
 	let m = ((3 * maxHp - 2 * hp) * rate) / (3 * maxHp); // keep float; the ONLY rounding is the final floor
 	if (status === 'slp' || status === 'frz') m *= 2.5;
 	else if (status) m *= 1.5;
@@ -143,4 +145,27 @@ function escapeRate(ownSpeed, foeSpeed, attempts) {
 	return Math.floor((ownSpeed * 128) / foeSpeed) + attempts * 30;
 }
 
-module.exports = { HEAL_ITEMS, STATUS_ITEMS, STAT_ITEMS, healRequest, ballRate, captureNumbers, critCoefficient, rollCapture, escapeRate };
+/**
+ * Registration-time eligibility of a battle item for one target (WP28 3.5: "can it be used" is evaluated BEFORE
+ * the choice is registered; a refusal stays in the menu and consumes nothing). `mon` is the readState() record.
+ * The in-turn handler (custom-formats.cjs resolveItem) re-checks at execution time as a safety net.
+ */
+function itemEligibility(item, mon) {
+	if (!mon) return { ok: false, reason: 'unknown-target' };
+	if (mon.fainted || mon.hp <= 0) return { ok: false, reason: 'item-no-effect' };
+	if (HEAL_ITEMS[item]) return mon.hp < mon.maxhp ? { ok: true } : { ok: false, reason: 'item-no-effect' };
+	const st = STATUS_ITEMS[item];
+	if (st) {
+		const cures = st.cures === 'all' ? !!mon.status : st.cures.includes(mon.status);
+		const confused = !!(st.confusion && mon.active && mon.confused);
+		return cures || confused ? { ok: true } : { ok: false, reason: 'item-no-effect' };
+	}
+	const stat = STAT_ITEMS[item];
+	if (stat) {
+		const capped = Object.keys(stat.boosts).every(k => (mon.boosts && mon.boosts[k] >= 6));
+		return mon.active && !capped ? { ok: true } : { ok: false, reason: 'item-no-effect' };
+	}
+	return { ok: false, reason: 'unknown-item' };
+}
+
+module.exports = { HEAL_ITEMS, STATUS_ITEMS, STAT_ITEMS, itemEligibility, healRequest, ballRate, captureNumbers, critCoefficient, rollCapture, escapeRate };

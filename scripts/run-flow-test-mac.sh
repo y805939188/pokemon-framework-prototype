@@ -11,14 +11,17 @@ EVID="${1:-$ROOT/experiments/step2/evidence/flow}"
 [[ -x "$NW" ]] || { echo "NW.js not found: $NW" >&2; exit 1; }
 pnpm --dir "$ROOT/src" build >/dev/null
 mkdir -p "$EVID"
-rm -f "$EVID"/ps-flow-*.json "$EVID"/*.png "$ROOT/save/file1.rmmzsave"
+rm -f "$EVID"/ps-flow-*.json "$EVID"/*.png
+# saves go to the evidence folder (--ps-save-dir), never to the project's save/ that a developer's Playtest uses
+SAVEDIR="$EVID/saves"; rm -rf "$SAVEDIR"
 
 wait_for() { for _ in $(seq 1 180); do [[ -f "$1" ]] && return 0; sleep 2; done; return 1; }
 run() { # mode out [extra args]
   local mode="$1" out="$2"; shift 2
-  "$NW" "$ROOT" "--mute-audio" "--disable-renderer-backgrounding" "--disable-background-timer-throttling" "--disable-backgrounding-occluded-windows" "--disable-features=CalculateNativeWinOcclusion" "--ps-flow-test=$mode" "--ps-flow-out=$out" --ps-flow-quit "$@" >/dev/null 2>&1 &
-  wait_for "$out" || { echo "timeout waiting for $out" >&2; pkill -f "nwjs.app/Contents/MacOS/nwjs" || true; exit 1; }
-  sleep 2
+  "$NW" "$ROOT" "--mute-audio" "--disable-renderer-backgrounding" "--disable-background-timer-throttling" "--disable-backgrounding-occluded-windows" "--disable-features=CalculateNativeWinOcclusion" "--ps-save-dir=$SAVEDIR" "--ps-flow-test=$mode" "--ps-flow-out=$out" --ps-flow-quit "$@" >/dev/null 2>&1 &
+  local pid=$!
+  wait_for "$out" || { echo "timeout waiting for $out" >&2; kill "$pid" 2>/dev/null || true; exit 1; } # only our own process
+  wait "$pid" 2>/dev/null || true
 }
 run all "$EVID/ps-flow-report.json" "--ps-flow-shots=$EVID"
 run verify-save "$EVID/ps-flow-verify-save.json"

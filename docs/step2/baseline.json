@@ -5,7 +5,7 @@
   "template": {
     "repo": "https://github.com/y805939188/rpg-maker-mz-initialize",
     "commit": "b6fa1df099d5c3cf0b501755b73e06566b7e1939",
-    "importMethod": "git archive of tracked files (no .git/cache); bootstrap-mac.sh --skip-nwjs"
+    "importMethod": "git archive of tracked files (no .git/cache); bootstrap-mac.sh (default: global NW.js untouched)"
   },
   "rpgReactor": {
     "source": "local checkout /Users/dingshinn/Desktop/RPGReactor (recorded in git-ignored .reactor-source)",

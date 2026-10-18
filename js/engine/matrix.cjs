@@ -134,8 +134,14 @@ const SCENARIOS = {
 		const s = await make(game, wild('Snorlax', 40, ['protect']));
 		let r = await s.useItem('potion', 'A-0001'); ensure(r.ok, 'potion ok');
 		const heal = rpgLines(r.messages, 'item')[0]; eq([heal[6], heal[7]], ['ok', '20'], 'healed 20');
-		r = await s.useItem('potion', 'A-0002'); // full HP bench member
-		eq(rpgLines(r.messages, 'item')[0][6], 'noeffect', 'no effect'); eq(s.bag.potion, 2, 'refunded exactly once');
+		r = await s.useItem('potion', 'A-0002'); // full-HP bench member: refused at registration (WP28 3.5), nothing consumed
+		eq([r.ok, r.reason, s.bag.potion, s.finished], [false, 'item-no-effect', 2, false], 'ineligible target refused, no turn used');
+		const lead = () => s.gw._debugBattle().getSide('p1').pokemon.find(p => p.name === 'A-0001');
+		eq((await s.useItem('potion', 'A-0001', { commit: false })).staged, true, 'staged'); eq(s.bag.potion, 1, 'reserved');
+		lead().hp = lead().maxhp; // healed meanwhile: the execution-time re-check finds no effect
+		r = await s.commitTurn();
+		eq(rpgLines(r.messages, 'item')[0][6], 'noeffect', 'no effect at execution'); eq(s.bag.potion, 2, 'refunded exactly once');
+		lead().hp = 50;
 		s.gw._debugBattle().getSide('p1').active[0].setStatus('psn');
 		r = await s.useItem('antidote', 'A-0001'); eq(rpgLines(r.messages, 'item')[0][6], 'ok', 'antidote');
 		r = await s.useItem('xattack', 'A-0001'); eq(rpgLines(r.messages, 'item')[0][6], 'ok', 'x attack');

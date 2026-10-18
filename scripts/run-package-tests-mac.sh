@@ -9,9 +9,14 @@ EVID="${1:-$ROOT/experiments/step2/evidence/package}"
 APP="$ROOT/build/package/PokemonFrameworkPrototype.app"
 SAVEDIR="$EVID/saves"
 USERDIR="$HOME/Library/Application Support/PokemonFrameworkPrototype"
+# a running packaged app (e.g. someone playing it) must not be killed by this script: refuse to start instead
+if pgrep -f "PokemonFrameworkPrototype.app/Contents/MacOS" >/dev/null 2>&1; then
+  echo "PokemonFrameworkPrototype is running: close it first (this script would kill it when a run times out)" >&2; exit 1
+fi
 "$ROOT/scripts/package-mac.sh" --with-tests ${PF_PACKAGE_ARGS:-} | tail -4
 mkdir -p "$EVID"
-rm -f "$EVID"/ps-flow-*.json "$EVID"/ps-matrix-*.json "$EVID"/*.png
+# every result file is removed first, so a stale one can never satisfy wait_for or the summary
+rm -f "$EVID"/ps-flow-*.json "$EVID"/ps-matrix-*.json "$EVID"/ps-saveloc.json "$EVID"/*.png
 rm -rf "$SAVEDIR"
 
 wait_for() { for _ in $(seq 1 240); do [[ -f "$1" ]] && return 0; sleep 2; done; return 1; }
@@ -28,12 +33,14 @@ launch verify-save "$EVID/ps-flow-verify-save.json"
 launch matrix "$EVID/ps-matrix-package.json"
 node -e 'require(process.argv[1]+"/js/engine/matrix.cjs").runMatrix().then(r=>require("fs").writeFileSync(process.argv[2],JSON.stringify({host:"node "+process.version,results:r},null,2)))' "$ROOT" "$EVID/ps-matrix-node.json"
 pkill -f "PokemonFrameworkPrototype.app/Contents/MacOS" 2>/dev/null || true
-# default location (no override): a packaged app saves under ~/Library/Application Support/<name>/save
+# default location (no override): a packaged app saves under ~/Library/Application Support/<name>/save.
+# The run writes ONE free high slot (99 downwards) and puts everything back; it never touches slots a player may have.
+# If the user folder did not exist before, it is removed again afterwards.
 HAD_USERDIR=0; [[ -d "$USERDIR" ]] && HAD_USERDIR=1
 open -n "$APP" --args "--mute-audio" "--ps-flow-test=saveloc" "--ps-flow-out=$EVID/ps-saveloc.json" --ps-flow-quit
-wait_for "$EVID/ps-saveloc.json" || { echo "timeout (saveloc)" >&2; exit 1; }
+wait_for "$EVID/ps-saveloc.json" || { echo "timeout (saveloc)" >&2; pkill -f "PokemonFrameworkPrototype.app/Contents/MacOS" 2>/dev/null || true; exit 1; }
 sleep 3; pkill -f "PokemonFrameworkPrototype.app/Contents/MacOS" 2>/dev/null || true
-if [[ "$HAD_USERDIR" -eq 0 ]]; then rm -rf "$USERDIR"; else rm -f "$USERDIR/save/file1.rmmzsave" "$USERDIR/save/global.rmmzsave"; fi
+if [[ "$HAD_USERDIR" -eq 0 ]]; then rm -rf "$USERDIR"; fi
 # nothing inside the bundle may have been modified by the runs: the ad-hoc seal must still verify
 codesign --verify --deep --strict "$APP" 2>&1 && echo "bundle seal still valid after the runs" || { echo "BUNDLE MODIFIED BY THE RUNS" >&2; exit 1; }
 node -e '
@@ -56,7 +63,12 @@ for (const r of pk.matrix) {
 }
 if (!pk.env.execPath.includes("PokemonFrameworkPrototype.app")) { console.log("NOT RUN FROM THE PACKAGE:", pk.env.execPath); bad++; }
 console.log("host:", pk.env.execPath.replace(/.*Contents\//,"Contents/"), "| package:", JSON.stringify(pk.env.packageInfo));
+// every report must come from the build under test: the first run used build #1, the three later runs build #2 (the app was replaced in between)
+const built = f => { const r=JSON.parse(fs.readFileSync(process.argv[1]+"/"+f,"utf8")); return r.env.packageInfo && r.env.packageInfo.builtAt; };
+const b1=built("ps-flow-report.json"), b2=["ps-flow-verify-save.json","ps-matrix-package.json","ps-saveloc.json"].map(built);
+if (!b1 || b2.some(b=>!b) || new Set(b2).size!==1 || b2[0]===b1) { console.log("BUILD MISMATCH: reports are not from the expected two builds", b1, b2); bad++; }
+else console.log("builds: flow run", b1, "-> replaced -> verify/matrix/saveloc runs", b2[0]);
 const sl=JSON.parse(fs.readFileSync(process.argv[1]+"/ps-saveloc.json","utf8")).saveLocation;
-console.log("default save location:", sl.dir, "(", sl.chosen.why, ") file written:", sl.fileExists);
+console.log("default save location:", sl.dir, "(", sl.chosen.why, ") slot", sl.slot, "written by this run:", sl.writtenByThisRun, "cleaned up:", sl.cleanedUp);
 if (!sl.dir.includes("Library/Application Support/PokemonFrameworkPrototype/save") || sl.dir.includes(".app/")) { console.log("SAVE LOCATION WRONG"); bad++; }
 process.exit(bad?1:0);' "$EVID"

@@ -15,13 +15,13 @@
 前提与细节见 `docs/PROJECT-GUIDE.md` 第 9 节。
 
 ```bash
-REACTOR_SOURCE=/Users/dingshinn/Desktop/RPGReactor ./scripts/bootstrap-mac.sh --skip-nwjs
+REACTOR_SOURCE=/Users/dingshinn/Desktop/RPGReactor ./scripts/bootstrap-mac.sh
 ./scripts/build-showdown.sh
 pnpm --dir src build
 ./scripts/test-quick.sh        # 类型检查 + 全部 Node 测试，约 1 分钟，无窗口
 ```
 
-只支持 macOS Apple Silicon（Windows/Intel 暂缓）。`--skip-nwjs` 不会改动已安装的 MZ。**不要使用 MZ 的"部署"打包**（会弄坏 NW.js 包），用 `scripts/package-mac.sh`。
+只支持 macOS Apple Silicon（Windows/Intel 暂缓）。bootstrap 默认不会改动已安装的 MZ（要替换它的 NW.js 必须显式加 `--install-nwjs`）。**不要使用 MZ 的"部署"打包**（会弄坏 NW.js 包），用 `scripts/package-mac.sh`。
 
 ## 目录
 

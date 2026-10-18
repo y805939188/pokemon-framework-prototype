@@ -41,7 +41,7 @@
    - 可自主做：读文件、在本仓库内编辑/新增、本地提交、创建实验分支、运行测试、在被授权的仓库里按用户要求推送/合并。
    - **必须先问用户**：推送或合并到 `main`（除非用户已明确授权那一次操作）、强制推送、永久删除不可恢复的数据、修改全局系统/MZ 安装/NW.js、使用或索取任何凭据、对外发布、改变首版范围或与原版的有意差异。
    - 不要 force 覆盖历史；保留用户已有修改；发现陌生的未提交改动先沟通，不覆盖、不 stash、不 reset。
-3. **不修改全局环境**：不修改用户安装的 MZ/NW.js（`bootstrap` 一律 `--skip-nwjs`），不改系统设置，不输入真实凭据。
+3. **不修改全局环境**：不修改用户安装的 MZ/NW.js（`bootstrap` 默认不动全局 NW.js；只有显式 `--install-nwjs` 才会替换），不改系统设置，不输入真实凭据。
 4. **本机测试进程要收拾干净**：结束自己启动的 NW.js/测试进程，或在交接记录里写明 PID、用途和停止方法。
 5. **诚实汇报**：状态只用 通过 / 失败 / 阻塞 / 未执行；事实与推断分开；构建成功不等于运行成功，类型声明存在不等于运行兼容；没有 CI 就不能说"CI 通过"；规格向量是"从规格推导的期望"，不是原版 Ruby 实际运行结果（本项目至今没有运行过原版 Ruby 参考程序）。
 
@@ -108,7 +108,7 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 
 ```bash
 cd pokemon-framework-prototype
-REACTOR_SOURCE=/Users/dingshinn/Desktop/RPGReactor ./scripts/bootstrap-mac.sh --skip-nwjs   # Reactor 运行时、MZ 素材、依赖、类型检查、构建、doctor（20 项应全过）
+REACTOR_SOURCE=/Users/dingshinn/Desktop/RPGReactor ./scripts/bootstrap-mac.sh   # Reactor 运行时、MZ 素材、依赖、类型检查、构建、doctor（20 项应全过）
 ./scripts/build-showdown.sh                                                                 # 固定提交的 Showdown → js/engine/showdown
 pnpm --dir src build                                                                        # 插件
 ./scripts/test-quick.sh                                                                     # 自检

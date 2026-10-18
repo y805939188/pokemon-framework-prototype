@@ -5,13 +5,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-SKIP_NWJS=0
+# Default: leave the user's global MZ NW.js alone (it is shared with every MZ project). Replacing it needs --install-nwjs.
+SKIP_NWJS=1
 
 usage() {
   cat <<USAGE
 Usage:
-  ./scripts/bootstrap-mac.sh
-  ./scripts/bootstrap-mac.sh --skip-nwjs
+  ./scripts/bootstrap-mac.sh                  (does NOT touch the global MZ NW.js)
+  ./scripts/bootstrap-mac.sh --install-nwjs   (replace MZ's NW.js with the pinned modern build; backup first)
 
 Environment overrides supported by child scripts:
   MZ_APP=/path/to/RPGMZ.app
@@ -21,8 +22,10 @@ Environment overrides supported by child scripts:
       Install runtime and declarations from the same local checkout.
 
 Options:
+  --install-nwjs
+      Also install/replace the RPG Maker MZ global NW.js (modifies the MZ installation for ALL projects).
   --skip-nwjs
-      Do not modify/check the RPG Maker MZ global NW.js installation.
+      Accepted for compatibility; this is the default.
 USAGE
 }
 
@@ -30,6 +33,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-nwjs)
       SKIP_NWJS=1
+      ;;
+    --install-nwjs)
+      SKIP_NWJS=0
       ;;
     -h|--help)
       usage
@@ -100,7 +106,7 @@ if [[ "$SKIP_NWJS" -eq 0 ]]; then
   "$SCRIPT_DIR/setup-nwjs-mac.sh" --install
 else
   step "1/7  Skip MZ NW.js host"
-  echo "NW.js setup skipped by request."
+  echo "Global NW.js left unchanged (use --install-nwjs to replace it)."
 fi
 
 # ------------------------------------------------------------

@@ -68,9 +68,23 @@ function foesOf(user) {
 	return user.side.foe.active.filter(p => p && !p.fainted);
 }
 
+/**
+ * Deterministic escape sources (WP41 7.1): Ghost type, an always-escape ability (Run Away), an always-escape
+ * item (Smoke Ball). They come BEFORE any trapping check and do not count as an attempt.
+ */
+function certainEscape(user) {
+	return user.hasType('Ghost') || user.hasAbility('runaway') || user.hasItem('smokeball');
+}
+
 function resolveRun(battle, user) {
 	const side = user.side;
 	if (!battle.rpg.wild) { emit(battle, 'run', side.id, 'denied', 'trainer'); return; }
+	if (battle.rpg.noRun) { emit(battle, 'run', side.id, 'denied', 'norun'); return; }
+	if (certainEscape(user)) {
+		emit(battle, 'run', side.id, 'ok', 'certain', battle.rpg.attempts[side.id] || 0);
+		finish(battle, { kind: 'run', side: side.id });
+		return;
+	}
 	if (user.trapped || user.volatiles['partiallytrapped'] || user.volatiles['trapped']) { emit(battle, 'run', side.id, 'denied', 'trapped'); return; }
 	const foes = foesOf(user);
 	if (!foes.length) { emit(battle, 'run', side.id, 'denied', 'nofoe'); return; }
@@ -89,8 +103,8 @@ function resolveBall(battle, user, payload) {
 	if (!battle.rpg.wild) { emit(battle, 'ball', side.id, payload.ball, '-', 'blocked'); return; } // trainer blocks the ball
 	let target = side.foe.pokemon.find(p => p.name === payload.target);
 	if (!target) { emit(battle, 'ball', side.id, payload.ball, payload.target || '-', 'notarget'); return; }
-	if (target.fainted) { // WP38 2: redirect to a living companion, else no target (ball already spent)
-		target = side.foe.pokemon.find(p => !p.fainted && p !== target);
+	if (target.fainted) { // WP38 2: redirect to a living companion ON THE FIELD (not the bench), else no target (ball already spent)
+		target = side.foe.active.find(p => p && !p.fainted && p !== target);
 		if (!target) { emit(battle, 'ball', side.id, payload.ball, payload.target, 'notarget'); return; }
 	}
 	const own = side.active.filter(p => p && !p.fainted);
