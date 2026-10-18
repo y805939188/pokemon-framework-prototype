@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 # Headless check: every Node test suite, no windows, no MZ, no Reactor sources (this is what CI layer 1 runs).
-# Needs: Node >= 22.18, the engine staged (scripts/build-showdown.sh). Type checking of the plugins needs Reactor's
+# Needs: Node >= 22.18, JS dependencies installed (pnpm --dir src install), the engine staged (scripts/build-showdown.sh). Type checking of the plugins needs Reactor's
 # declaration bundle and lives in scripts/test-quick.sh (typecheck + this script).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 [[ -d js/engine/showdown/dist ]] || { echo "engine not staged: run scripts/build-showdown.sh first" >&2; exit 1; }
+# the TS framework: strict type check, import-boundary check, then build the bundles every suite loads
+pnpm --dir src typecheck:framework
+node scripts/check-boundaries.cjs
+pnpm --dir src build:engine > /dev/null
 SUITES=(
   experiments/step2/test-headless.cjs
   experiments/step2/s2/test-actions.cjs
@@ -17,6 +21,7 @@ SUITES=(
   experiments/step2/s5/test-protocol-freeze.cjs
   experiments/step2/s5/test-engine-contract.cjs
   scripts/tests/reactor-install.test.cjs
+  scripts/tests/check-boundaries.test.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do

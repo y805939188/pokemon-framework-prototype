@@ -21,11 +21,17 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22.21.1'
+      - name: Enable the pinned pnpm (src/package.json packageManager; the repo root has none, so corepack would take the latest)
+        run: ./scripts/ci-run.sh pnpm-setup bash -c 'corepack enable && corepack prepare "$(node -p "require(\"./src/package.json\").packageManager")" --activate && pnpm --version'
+      - name: Install dependencies (lockfile)
+        run: ./scripts/ci-run.sh pnpm-install pnpm --dir src install --frozen-lockfile
+      - name: Build the engine bundles (the Showdown extension is staged from them)
+        run: ./scripts/ci-run.sh build-engine pnpm --dir src build:engine
       - name: Build the pinned Showdown runtime
         env:
           SHOWDOWN_SRC: ${{ runner.temp }}/showdown-src
         run: ./scripts/ci-run.sh build-showdown ./scripts/build-showdown.sh
-      - name: Headless suites
+      - name: Headless checks (framework type check, import boundaries, Node suites)
         run: ./scripts/ci-run.sh headless-suites ./scripts/test-headless.sh
   plugins:
     name: plugins (Reactor types at the pinned commit, type check, build)

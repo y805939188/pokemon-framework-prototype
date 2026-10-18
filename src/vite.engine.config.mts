@@ -7,6 +7,8 @@ import { defineConfig } from "vite";
 // (it is loaded at run time by the one adapter that is allowed to use require).
 const entries: Record<string, string> = {
   engine: "./framework/index.ts",
+  // runs INSIDE Showdown (staged as dist/config/custom-formats.js): self-contained, rules bundled in
+  "custom-formats": "./framework/battle/custom-formats.ts",
 };
 const name = process.env.ENGINE_ENTRY ?? "engine";
 const entry = entries[name];
