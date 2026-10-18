@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "recordedAt": "2026-10-18",
+  "purpose": "Migration baseline for step 3: what must stay true while the engine moves from CJS prototype to strict TS",
+  "code": {
+    "repo": "pokemon-framework-prototype",
+    "mainHead": "a77b6af498e25f62b550f4cf45baae0e76a13cb3",
+    "branchPoint": "a77b6af498e25f62b550f4cf45baae0e76a13cb3",
+    "tags": {
+      "step2-closed": "76cee14ab55820fd2117db2b3fb26b72f41c07cb",
+      "step2-review-baseline": "2e5f2e5f4553d86a32f5d063cbd6b53fd21b1514"
+    }
+  },
+  "externalIdentity": {
+    "showdown": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+    "nwjs": "0.117.0 (SDK, arm64); Node 26.7.0 and Chromium 154.0.8037.58 observed inside it",
+    "rpgReactor": "0.98.8 @ 2dc2e10e89445e252c929257f8bf249525045d36",
+    "pixi": "8.20.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.1",
+    "devNode": "v22.21.1",
+    "pnpm": "10.20.0"
+  },
+  "quickSuite": {
+    "command": "scripts/test-quick.sh",
+    "suites": [
+      {
+        "suite": "experiments/step2/test-headless.cjs",
+        "pass": 6,
+        "fail": 0
+      },
+      {
+        "suite": "experiments/step2/s2/test-actions.cjs",
+        "pass": 17,
+        "fail": 0
+      },
+      {
+        "suite": "experiments/step2/s3/test-growth.cjs",
+        "pass": 12,
+        "fail": 0
+      },
+      {
+        "suite": "experiments/step2/s3/test-writeback.cjs",
+        "pass": 11,
+        "fail": 0
+      },
+      {
+        "suite": "experiments/step2/s3/test-doubles.cjs",
+        "pass": 11,
+        "fail": 0
+      },
+      {
+        "suite": "experiments/step2/s4/test-describe.cjs",
+        "pass": 2,
+        "fail": 0
+      },
+      {
+        "suite": "experiments/step2/s5/test-matrix.cjs",
+        "pass": 1,
+        "fail": 0
+      },
+      {
+        "suite": "experiments/step2/s5/test-protocol-freeze.cjs",
+        "pass": 3,
+        "fail": 0
+      },
+      {
+        "suite": "experiments/step2/s5/test-engine-contract.cjs",
+        "pass": 2,
+        "fail": 0
+      },
+      {
+        "suite": "scripts/tests/reactor-install.test.cjs",
+        "pass": 3,
+        "fail": 0
+      }
+    ],
+    "totalPass": 68,
+    "totalFail": 0
+  },
+  "behaviourOracle": {
+    "matrixFingerprints": {
+      "file": "js/engine/fixtures/matrix-fingerprints.json",
+      "sha256": "e3af381656d97d793ba372f7c55b761f802fa94f16ad4cbfcc6894aa23aa273c",
+      "scenarios": 10,
+      "meaning": "S1-S10: sha256 of normalized events, requests and results for fixed inputs; identical in plain Node and in the packaged app at step2-closed"
+    },
+    "frozenProtocol": {
+      "file": "docs/step2/protocol-v1.frozen.json",
+      "sha256": "c95c11c9436cf1864c9abcab298c2467b031fa12d5e0481620b7aaabe339239d",
+      "guard": "experiments/step2/s5/test-protocol-freeze.cjs"
+    },
+    "engineContract": {
+      "guard": "experiments/step2/s5/test-engine-contract.cjs",
+      "meaning": "staged extension files equal their sources; Showdown internals exist with the expected shape"
+    },
+    "golden": {
+      "file": "js/engine/fixtures/golden-gen8-3v3-seed1234.json",
+      "sha256": "3f50b8c26f8fa95c56c91d5450276499758e1e5452e317f85e5db5607861ae39",
+      "meaning": "2.2 engine regression golden file; NOT verified against Ruby"
+    }
+  },
+  "reusableStep2Evidence": {
+    "stillValidWhileCodeUnchanged": [
+      "experiments/step2/evidence/package/ps-*.json and screenshots (build 0556a68)",
+      "experiments/step2/evidence/flow/* (dev tree, 0556a68)",
+      "experiments/step2/evidence/package/perf* and memory-100/ (build e666bba)"
+    ],
+    "mustBeRepeatedAfterMigration": [
+      "package suite (scripts/run-package-tests-mac.sh)",
+      "dev-tree flow (scripts/run-flow-test-mac.sh)",
+      "perf comparison (scripts/run-package-perf-mac.sh)"
+    ],
+    "note": "Step 2 evidence describes the CJS prototype. It proves nothing about migrated TS until it is regenerated from a commit that contains the migration."
+  }
+}
