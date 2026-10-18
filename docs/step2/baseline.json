@@ -12,6 +12,7 @@
     "commit": "2dc2e10e89445e252c929257f8bf249525045d36",
     "runtimeVersion": "0.98.8",
     "runtimeRevision": "20260927.34",
+    "deviationApproved": "user accepted 0.98.8 on 2026-10-18",
     "deviationFromCandidate": "Candidate was 0.98.7 / 1a6501bc; that tag has no types/ bundle, which the template typecheck requires. 0.98.8 at 2dc2e10e is the only local source with types."
   },
   "mzEditor": { "app": "RPGMZ.app 1.10.0 (Steam)", "nwjsHost": "unchanged by us; already NW.js 0.117.0 SDK arm64" },
