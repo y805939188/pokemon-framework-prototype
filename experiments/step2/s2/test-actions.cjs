@@ -197,7 +197,7 @@ test('snapshot with a parked ball: restored resolution and PRNG draws are identi
 	const gw = await wild('snorlax', { seed: [5, 6, 7, 8] });
 	await gw.act('p1', { kind: 'ball', ball: 'pokeball', target: 'W-0001', catchRate: 25 });
 	const snap = gw.snapshot();
-	assert.ok(JSON.parse(snap).rpg.pending.p1);
+	assert.ok(JSON.parse(snap).rpg.pending['p1:0']);
 	await gw.choose('p2', 'move 1');
 	const a = lines(drain(gw));
 	const r = await BattleGateway.restore(snap);

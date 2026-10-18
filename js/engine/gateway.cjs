@@ -96,23 +96,54 @@ class BattleGateway {
 	}
 
 	/**
-	 * Register a non-move action (item / ball / run) as this side's whole choice for the turn.
-	 * It is queued as an engine 'event' action (priority above every move, after switches) and
-	 * resolved inside the turn by the RPG format's `onRpgAction`. Nothing is applied until the
-	 * turn runs, so cancelling before the other side commits changes no state.
-	 * Singles only (step 2.2); `payload` must be JSON-serializable.
+	 * Register a non-move action (item / ball / run) as the whole choice of one active slot.
+	 * Singles shorthand for chooseSlots(side, [payload]) (slot 0). See chooseSlots.
 	 */
-	async act(side, payload) {
+	async act(side, payload, slot = 0) {
+		const specs = slot === 0 ? [payload] : [null, payload];
+		return this.chooseSlots(side, specs);
+	}
+
+	/**
+	 * Register this side's choice for every active slot in one go. Each spec is either
+	 *   { move: n, target?: loc } | { switch: n }                    -> ordinary engine choice
+	 *   { kind: 'item'|'ball'|'run', ... } (JSON payload)           -> RPG action
+	 *   null                                                        -> slot is fainted / auto-pass
+	 * RPG actions are queued as engine 'event' actions (priority 99: after switches, before every
+	 * move) and resolved inside the turn by the RPG format's `onRpgAction`. Nothing is applied
+	 * until the turn runs, so cancelling before the other side commits changes no state.
+	 */
+	async chooseSlots(side, specs) {
 		const b = this._battle;
 		const s = b.getSide(side);
-		if (!b.rpg) throw new Error('battle format has no RPG extension (use formatid gen8rpgcustomgame)');
+		if (!b.rpg) throw new Error('battle format has no RPG extension (use gen8rpgcustomgame / gen8rpgdoublescustomgame)');
 		if (b.requestState !== 'move' || !s.activeRequest || s.activeRequest.wait) {
-			this._emit({ kind: 'error', side, message: 'no move request pending', payload });
+			this._emit({ kind: 'error', side, message: 'no move request pending', payload: specs });
 			return false;
 		}
 		s.clearChoice();
-		b.rpg.pending[s.id] = JSON.parse(JSON.stringify(payload));
-		s.choice.actions.push({ choice: 'event', event: 'RpgAction', pokemon: s.active[0], priority: 99 });
+		for (const k of Object.keys(b.rpg.pending)) if (k.startsWith(side + ':')) delete b.rpg.pending[k];
+		let ok = true;
+		for (let i = 0; i < specs.length && ok; i++) {
+			const spec = specs[i];
+			const idx = s.getChoiceIndex(); // skips fainted slots like the engine does
+			if (idx >= s.active.length) break;
+			if (spec && spec.kind) {
+				b.rpg.pending[`${side}:${idx}`] = JSON.parse(JSON.stringify(spec));
+				s.choice.actions.push({ choice: 'event', event: 'RpgAction', pokemon: s.active[idx], priority: 99 });
+			} else if (spec && spec.move !== undefined) {
+				ok = !!s.chooseMove(spec.move, spec.target || 0);
+			} else if (spec && spec.switch !== undefined) {
+				ok = !!s.chooseSwitch(spec.switch);
+			}
+		}
+		if (!ok || !s.isChoiceDone()) {
+			for (const k of Object.keys(b.rpg.pending)) if (k.startsWith(side + ':')) delete b.rpg.pending[k];
+			s.clearChoice();
+			this._pump();
+			if (ok) this._emit({ kind: 'error', side, message: 'incomplete choice', payload: specs });
+			return false;
+		}
 		if (b.allChoicesDone()) b.commitChoices();
 		this._pump();
 		return true;
@@ -122,10 +153,10 @@ class BattleGateway {
 	 * Menu-layer legality (read-only, nothing consumed). Mirrors the spec's "refuse without
 	 * consuming" checks for the cases step 2.2 covers. Returns { allowed, reason }.
 	 */
-	query(side, what) {
+	query(side, what, slot = 0) {
 		const b = this._battle;
 		const s = b.getSide(side);
-		const active = s.active[0];
+		const active = s.active[slot];
 		const foes = s.foe.pokemon.filter(p => !p.fainted);
 		if (!b.rpg || !b.rpg.wild) return { allowed: what !== 'run' && what !== 'ball', reason: what === 'ball' ? 'trainer' : what === 'run' ? 'trainer' : undefined };
 		if (!active || active.fainted) return { allowed: false, reason: 'noactive' };
@@ -239,7 +270,7 @@ class BattleGateway {
 	/** Drop this side's registered choice (engine undo) and any pending RPG payload. */
 	async cancel(side) {
 		const b = this._battle;
-		if (b.rpg) delete b.rpg.pending[side];
+		if (b.rpg) for (const k of Object.keys(b.rpg.pending)) if (k.startsWith(side + ':')) delete b.rpg.pending[k];
 		b.undoChoice(side);
 		this._pump();
 	}

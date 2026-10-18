@@ -8,10 +8,11 @@
 const { HEAL_ITEMS, STATUS_ITEMS, STAT_ITEMS, healRequest, captureNumbers, rollCapture, escapeRate } = require('./rpg-rules.cjs');
 
 /** Pending actions live on the (serialized) battle object so snapshots carry them. */
-function pendingFor(battle, sideId) {
+function pendingFor(battle, sideId, position) {
 	const rpg = battle.rpg;
-	const p = rpg && rpg.pending[sideId];
-	if (rpg) delete rpg.pending[sideId];
+	const key = `${sideId}:${position}`;
+	const p = rpg && rpg.pending[key];
+	if (rpg) delete rpg.pending[key];
 	return p || null;
 }
 
@@ -120,27 +121,32 @@ const handlers = {
 	ball: resolveBall,
 };
 
+const rpgHandlers = {
+	onBegin() {
+		this.rpg = { pending: {}, attempts: {} };
+	},
+	onRpgAction(pokemon) {
+		const payload = pendingFor(this, pokemon.side.id, pokemon.position);
+		if (!payload) return;
+		const h = handlers[payload.kind];
+		if (!h) {
+			emit(this, 'unknown', pokemon.side.id, payload.kind);
+			return;
+		}
+		h(this, pokemon, payload);
+	},
+};
+const common = {
+	mod: 'gen8',
+	searchShow: false,
+	debug: true,
+	battle: { trunc: Math.trunc },
+	ruleset: ['Team Preview', 'Cancel Mod', 'Max Team Size = 24', 'Max Move Count = 24', 'Max Level = 9999', 'Default Level = 100'],
+	...rpgHandlers,
+};
+
 exports.Formats = [
 	{ section: 'RPG' }, // section header is its own list element
-	{
-		name: '[Gen 8] RPG Custom Game',
-		mod: 'gen8',
-		searchShow: false,
-		debug: true,
-		battle: { trunc: Math.trunc },
-		ruleset: ['Team Preview', 'Cancel Mod', 'Max Team Size = 24', 'Max Move Count = 24', 'Max Level = 9999', 'Default Level = 100'],
-		onBegin() {
-			this.rpg = { pending: {}, attempts: {} };
-		},
-		onRpgAction(pokemon) {
-			const payload = pendingFor(this, pokemon.side.id);
-			if (!payload) return;
-			const h = handlers[payload.kind];
-			if (!h) {
-				emit(this, 'unknown', pokemon.side.id, payload.kind);
-				return;
-			}
-			h(this, pokemon, payload);
-		},
-	},
+	{ name: '[Gen 8] RPG Custom Game', ...common },
+	{ name: '[Gen 8] RPG Doubles Custom Game', gameType: 'doubles', ...common },
 ];

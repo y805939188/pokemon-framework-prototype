@@ -24,7 +24,7 @@ function toSet(m, moveName) {
 }
 
 class BattleSession {
-	static async create({ game, battleId, foe, content, seed, formatid = 'gen8rpgcustomgame', ai, rules }) {
+	static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? 'gen8rpgdoublescustomgame' : 'gen8rpgcustomgame', ai, rules }) {
 		const probe = await BattleGateway.create({ formatid, seed, players: [{ name: 'p', team: [{ name: 'x', species: 'Pidgey', moves: ['Tackle'] }] }, { name: 'q', team: [{ name: 'y', species: 'Pidgey', moves: ['Tackle'] }] }] });
 		const moveName = id => probe.moveInfo(id).name;
 		const party = S.clone(game.party).slice(0, 6);
@@ -36,8 +36,8 @@ class BattleSession {
 		s.startDexOwned = game.dex.owned.slice();
 		s.ledger = [];
 		s.out = []; s.held = []; s.growthQueue = []; s.pendingLearn = null;
-		s.participants = {}; s.activeNow = { p1: [], p2: [] };
-		s.ended = null; s.finished = false; s.ai = ai || BattleSession.defaultAi;
+		s.participants = {}; s.activeNow = { p1: [], p2: [] }; s.doubles = doubles;
+		s.ended = null; s.finished = false; s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
 		s.gw = await BattleGateway.create({
 			formatid, seed, wild: foe.kind === 'wild',
 			players: [{ name: 'Player', team: lead.map(m => toSet(m, moveName)) }, { name: foe.kind === 'wild' ? 'Wild' : 'Trainer', team: s.foeTeam.map(m => toSet(m, moveName)) }],
@@ -61,6 +61,20 @@ class BattleSession {
 		return 'move ' + (i + 1);
 	}
 
+	/** Doubles foe AI: first usable move per live slot, aimed at foe slot 1 when a target is needed. */
+	static defaultAiDoubles(request) {
+		const needsTarget = t => ['normal', 'any', 'adjacentFoe'].includes(t);
+		if (request.forceSwitch) {
+			const bench = request.side.pokemon.map((p, i) => ({ p, i })).filter(({ p, i }) => i >= request.forceSwitch.length && !/ fnt$/.test(p.condition));
+			return request.forceSwitch.map(f => { if (!f) return 'pass'; const b = bench.shift(); return b ? `switch ${b.i + 1}` : 'pass'; }).join(', ');
+		}
+		return request.active.map((a, i) => {
+			if (/ fnt$/.test(request.side.pokemon[i].condition)) return 'pass';
+			const mi = a.moves.findIndex(m => !m.disabled && m.pp > 0);
+			return `move ${mi + 1}` + (needsTarget(a.moves[mi].target) ? ' 1' : '');
+		}).join(', ');
+	}
+
 	// ------------------------------------------------------------------ public actions
 	/** Returns and clears everything the UI should show since the last call. */
 	take() { return this.out.splice(0); }
@@ -81,6 +95,30 @@ class BattleSession {
 		const entry = this._reserve('item', itemId, targetId);
 		const ok = await this.gw.act('p1', { kind: 'item', item: itemId, target: targetId });
 		if (!ok) { this._refund(entry, 'not-registered'); return { ok: false, reason: 'not-registered' }; }
+		return commit ? this._resolveTurn() : { ok: true, staged: true };
+	}
+
+	/**
+	 * Doubles: register one spec per active slot ({move,target}|{switch}|{kind:'item'|'ball'|'run',...}|null)
+	 * and resolve the turn. Items/balls are reserved in the ledger first and refunded if the choice is refused.
+	 */
+	async chooseDoubles(specs, { commit = true } = {}) {
+		const entries = [];
+		for (const sp of specs) {
+			if (!sp || !sp.kind || sp.kind === 'run') continue;
+			const id = sp.kind === 'item' ? sp.item : sp.ball;
+			if ((this.bag[id] || 0) < 1) { entries.forEach(e => this._refund(e, 'not-registered')); return { ok: false, reason: 'none-left' }; }
+			if (sp.kind === 'ball') {
+				const foeActive = this.gw._debugBattle().getSide('p2').pokemon.find(p => p.name === sp.target);
+				const rec = this.foeTeam.find(m => m.id === sp.target);
+				sp.catchRate = this.content.species[rec.species].catchRate;
+				sp.ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(rec.species) };
+				void foeActive;
+			}
+			entries.push(this._reserve(sp.kind, id, sp.target));
+		}
+		const ok = await this.gw.chooseSlots('p1', specs);
+		if (!ok) { entries.forEach(e => this._refund(e, 'not-registered')); return { ok: false, reason: 'choice-rejected' }; }
 		return commit ? this._resolveTurn() : { ok: true, staged: true };
 	}
 
@@ -183,11 +221,14 @@ class BattleSession {
 		const idOf = s => s.replace(/^p\d[a-z]?: /, '');
 		if (e.type === 'switch' || e.type === 'drag') {
 			const side = e.args[0].slice(0, 2); const id = idOf(e.args[0]);
-			this.activeNow[side] = [id];
-			if (side === 'p2') this.participants[id] = new Set(this.activeNow.p1);
-			else for (const foe of this.activeNow.p2) (this.participants[foe] ||= new Set()).add(id);
+			const slot = e.args[0].charCodeAt(2) - 97; // 'a' -> 0, 'b' -> 1
+			this.activeNow[side][slot] = id;
+			const ours = this.activeNow.p1.filter(Boolean), theirs = this.activeNow.p2.filter(Boolean);
+			if (side === 'p2') this.participants[id] = new Set(ours);
+			else for (const foe of theirs) (this.participants[foe] ||= new Set()).add(id);
 		} else if (e.type === 'faint') {
 			const side = e.args[0].slice(0, 2); const id = idOf(e.args[0]);
+			this.activeNow[side][e.args[0].charCodeAt(2) - 97] = null; // off the field: not a participant for later arrivals
 			if (side === 'p2') this.growthQueue.push({ kind: 'award', foeId: id });
 		} else if (e.type === 'rpg') {
 			const [what, side, itemId, target, res] = e.args;

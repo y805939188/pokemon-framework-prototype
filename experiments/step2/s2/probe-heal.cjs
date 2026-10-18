@@ -59,9 +59,9 @@ async function atTurn1(gw) { await H.drive(gw, { stopAtTurn: 1 }); drain(gw); re
 	const g4 = await mk(); const b4 = await atTurn1(g4);
 	b4.sides[0].pokemon[0].hp = 50;
 	await g4.act('p1', { kind: 'item', item: 'maxpotion', target: 'A-0001' });
-	assert.ok(b4.rpg.pending.p1, 'payload parked');
+	assert.ok(b4.rpg.pending['p1:0'], 'payload parked');
 	await g4.cancel('p1');
-	assert.ok(!b4.rpg.pending.p1 && !b4.getSide('p1').isChoiceDone(), 'cancelled cleanly');
+	assert.ok(!b4.rpg.pending['p1:0'] && !b4.getSide('p1').isChoiceDone(), 'cancelled cleanly');
 	assert.equal(b4.sides[0].pokemon[0].hp, 50, 'no HP change after cancel');
 	await g4.choose('p1', 'move 1'); await g4.choose('p2', 'move 4'); // battle continues normally
 	assert.ok(raw(drain(g4)).some(l => l.startsWith('|move|p1a')), 'normal move works after cancel');
@@ -71,7 +71,7 @@ async function atTurn1(gw) { await H.drive(gw, { stopAtTurn: 1 }); drain(gw); re
 	b5.sides[0].pokemon[0].hp = 60;
 	await g5.act('p1', { kind: 'item', item: 'hyperpotion', target: 'A-0001' });
 	const snap = g5.snapshot();
-	assert.ok(JSON.parse(snap).rpg.pending.p1, 'pending payload is in the snapshot');
+	assert.ok(JSON.parse(snap).rpg.pending['p1:0'], 'pending payload is in the snapshot');
 	await g5.choose('p2', 'move 4');
 	const orig = raw(drain(g5));
 	const r = await BattleGateway.restore(snap);
