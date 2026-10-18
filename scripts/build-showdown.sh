@@ -7,7 +7,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC1091
 source "$ROOT/scripts/showdown.env"
 
-SRC="$ROOT/third_party/pokemon-showdown"
+# Kept outside the MZ project: MZ Deploy copies everything under the project root.
+SRC="${SHOWDOWN_SRC:-$HOME/Library/Caches/pokemon-framework/showdown-src}"
 STAGE="$ROOT/js/engine/showdown"
 
 if [[ ! -d "$SRC/.git" ]]; then
