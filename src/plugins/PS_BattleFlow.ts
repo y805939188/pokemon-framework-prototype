@@ -86,10 +86,13 @@
     /** Redacted, bounded diagnostics of every session (flow/log.ts); the flow test attaches its tail to the report. */
     logger: null as any,
     game(): any {
+      const err = G.$gameSystem._psSaveError;
+      if (err) throw new Error(`the save state is not usable (${err.code}): ${err.message}`); // never battle on, or overwrite, a state we could not read
       if (!G.$gameSystem._psGame) G.$gameSystem._psGame = engine().F.makeGame();
       return G.$gameSystem._psGame;
     },
     resetGame(): void {
+      delete G.$gameSystem._psSaveError; delete G.$gameSystem._psSaveInfo; delete G.$gameSystem._psSaveWarning; // an explicit reset is a deliberate act
       G.$gameSystem._psGame = engine().F.makeGame();
       G.$gameSystem._psBattleSeq = 0;
     },

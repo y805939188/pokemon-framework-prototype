@@ -1,15 +1,33 @@
 /**
- * Minimal durable store for headless tests: one JSON file replaced atomically (write temp, fsync, rename).
- * Atomicity claim is limited to what is implemented and tested here: a crash/throw at any point of
- * commit() leaves either the complete old file or the complete new file, and a re-submitted result
- * is applied at most once (appliedBattles). No claim about power loss beyond fsync+rename semantics.
- * Node-only (uses fs): the MZ runtime saves through MZ's own save files, not through this class.
+ * Durable single-file store for headless runs and tests: one JSON document replaced atomically (write temp, fsync,
+ * rename). Reading goes through the schema migration; a document that cannot be understood (damaged, newer, invalid)
+ * raises a SaveError and the file is NEVER overwritten or cleared. When a legacy document is upgraded, the original is
+ * first kept next to it as `<file>.v<from>.bak`.
+ *
+ * What is claimed (and tested): a throw, or a real process kill, at any point of commit() leaves either the complete
+ * old file or the complete new file (both readable), a leftover temp file is discarded on load, and a re-submitted
+ * result is applied at most once. Not claimed: power loss beyond fsync+rename, multi-file saves, battle-in-progress
+ * saves. Node-only (uses fs); the MZ runtime saves through MZ's own save files (see the PS_SaveState plugin).
  */
 import fs from "node:fs";
 import { applyBattleResult } from "../rules/state.ts";
 import type { BattleResult, GameState } from "../rules/state.ts";
+import { migrateGame } from "../rules/save-schema.ts";
+import type { MigrationResult, SaveErrorInfo } from "../rules/save-schema.ts";
 
-export type FaultPoint = "start" | "beforeSave" | "afterTmpWrite" | "beforeRename" | "afterRename";
+export type FaultPoint = "start" | "afterBackup" | "beforeSave" | "afterTmpWrite" | "beforeRename" | "afterRename";
+
+/** A save that must not be touched: the diagnostic travels with the error. */
+export class SaveError extends Error {
+  info: SaveErrorInfo;
+  constructor(info: SaveErrorInfo) {
+    super(`${info.code}: ${info.message}`);
+    this.name = "SaveError";
+    this.info = info;
+  }
+}
+
+export type LoadInfo = Extract<MigrationResult, { ok: true }>;
 
 export class SaveStore {
   file: string;
@@ -21,11 +39,19 @@ export class SaveStore {
   }
   private _at(point: FaultPoint): void { this.hooks.at?.(point); }
 
-  load(): GameState {
+  /** Read and migrate in memory; writes nothing. */
+  loadInfo(): LoadInfo {
     // A leftover temp file is an interrupted commit: the committed file is authoritative.
     try { fs.unlinkSync(this.file + ".tmp"); } catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; }
-    return JSON.parse(fs.readFileSync(this.file, "utf8")) as GameState;
+    let raw: unknown;
+    try { raw = JSON.parse(fs.readFileSync(this.file, "utf8")); }
+    catch (e) { throw new SaveError({ code: "corrupt", message: `cannot read the save file as JSON (${(e as Error).message.slice(0, 120)}); the file was left untouched` }); }
+    const r = migrateGame(raw);
+    if (!r.ok) throw new SaveError(r.error);
+    return r;
   }
+
+  load(): GameState { return this.loadInfo().state; }
 
   save(state: GameState): void {
     const tmp = this.file + ".tmp";
@@ -40,14 +66,23 @@ export class SaveStore {
     this._at("afterRename");
   }
 
+  /** Keep the original bytes of a legacy file before its first upgrade (atomic: copy to temp, rename). */
+  private _backup(from: number): void {
+    const bak = `${this.file}.v${from}.bak`;
+    if (fs.existsSync(bak)) return;
+    fs.copyFileSync(this.file, bak + ".tmp");
+    fs.renameSync(bak + ".tmp", bak);
+  }
+
   /** Apply a battle result durably and idempotently. Returns {status}. */
-  commit(result: BattleResult): { status: "applied" | "already-applied" } {
+  commit(result: BattleResult): { status: "applied" | "already-applied"; migratedFrom?: number } {
     this._at("start");
-    const state = this.load();
-    const r = applyBattleResult(state, result);
-    if (r.status === "already-applied") return { status: r.status };
+    const info = this.loadInfo();
+    const r = applyBattleResult(info.state, result);
+    if (info.migrated) { this._backup(info.from); this._at("afterBackup"); }
+    if (r.status === "already-applied" && !info.migrated) return { status: r.status };
     this._at("beforeSave");
     this.save(r.state);
-    return { status: r.status };
+    return { status: r.status, ...(info.migrated ? { migratedFrom: info.from } : {}) };
   }
 }

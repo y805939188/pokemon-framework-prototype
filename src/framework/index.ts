@@ -15,3 +15,4 @@ export * as contentRuntime from "./flow/content-runtime.ts";
 export * as dex from "./battle/dex.ts";
 export * as i18n from "./i18n/index.ts";
 export * as log from "./flow/log.ts";
+export * as saveSchema from "./rules/save-schema.ts";

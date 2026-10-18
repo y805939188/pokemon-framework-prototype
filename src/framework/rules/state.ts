@@ -8,6 +8,9 @@ import type { Member, MoveSlot, PartialStats, Stats } from "./types.ts";
 
 export const PROTOCOL_VERSION = 1;
 
+/** Version of the PERSISTENT game state document (rules/save-schema.ts migrates older ones). Not the battle protocol version. */
+export const GAME_SCHEMA = 2;
+
 /** Fields of a persistent member that a battle result may change. Everything else must be untouched. */
 export const MEMBER_WRITE_SET = ["level", "exp", "hp", "status", "statusCount", "moves", "evs", "friendship"] as const;
 export type WriteKey = (typeof MEMBER_WRITE_SET)[number];
@@ -85,7 +88,7 @@ export function newMember(o: NewMemberInput): Member {
 }
 
 export function newGame({ party, bag = {}, money = 0 }: { party: NewMemberInput[]; bag?: Record<string, number>; money?: number }): GameState {
-  return { schema: 1, party: party.map(newMember), boxes: [], bag: { ...bag }, money, dex: { seen: [], owned: [] }, appliedBattles: {} };
+  return { schema: GAME_SCHEMA, party: party.map(newMember), boxes: [], bag: { ...bag }, money, dex: { seen: [], owned: [] }, appliedBattles: {} };
 }
 
 /** Stable hash of a result, used for idempotency (same battleId + same hash => no-op). */
@@ -103,6 +106,7 @@ export type ApplyStatus = "applied" | "already-applied";
  */
 export function applyBattleResult(state: GameState, result: BattleResult): { state: GameState; status: ApplyStatus } {
   if (result.protocol !== PROTOCOL_VERSION) throw new Error(`unsupported protocol ${result.protocol}`);
+  if (state.schema !== GAME_SCHEMA) throw new Error(`game state has schema ${state.schema}, this build writes schema ${GAME_SCHEMA}: migrate it first (rules/save-schema.ts)`);
   if (!result.battleId) throw new Error("result without battleId");
   const h = resultHash(result);
   const prev = state.appliedBattles[result.battleId];

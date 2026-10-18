@@ -1,0 +1,4 @@
+/*:
+ * @target MZ
+ * @plugindesc Step 3: versioned game state inside the MZ save. Migrates older prototype states on load, refuses (and keeps) states it cannot understand, validates before saving.
+ */

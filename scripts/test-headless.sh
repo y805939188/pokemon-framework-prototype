@@ -24,6 +24,7 @@ SUITES=(
   scripts/tests/check-boundaries.test.cjs
   experiments/step3/test-content.cjs
   experiments/step3/test-i18n.cjs
+  experiments/step3/test-save.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do

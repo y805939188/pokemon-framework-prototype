@@ -285,6 +285,39 @@
       return { saveCode: rc, loadCode: lc };
     });
 
+    await scenario("T9 legacy and unusable saves through MZ's own save/load: schema 1 migrates, newer or damaged states are refused and kept", async () => {
+      fresh();
+      const legacy = clone(game()); legacy.schema = 1;
+      for (const m of legacy.party) delete m.statusCount;
+      legacy.party[1].status = "tox"; legacy.party[2].status = "slp";
+      G.$gameSystem._psGame = legacy;
+      const rc1 = await G.DataManager.saveGame(2);
+      G.$gameSystem._psGame = { diverged: true };
+      const lc1 = await G.DataManager.loadGame(2);
+      assert(!G.$gameSystem._psSaveError, "a schema 1 state loads without error");
+      eq([game().schema, game().party[1].status, game().party[1].statusCount, game().party[2].status, game().party[2].statusCount], [2, "psn", 0, "slp", undefined], "migrated on load");
+      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, 2, true], "migration recorded");
+      // a state written by a newer build, and a damaged one
+      for (const [slot, doc, code] of [[3, { ...clone(game()), schema: 9 }, "unknown-version"], [4, "not a state", "corrupt"]] as [number, any, string][]) {
+        G.$gameSystem._psGame = doc;
+        await G.DataManager.saveGame(slot);
+        G.$gameSystem._psGame = { diverged: true };
+        await G.DataManager.loadGame(slot);
+        eq(G.$gameSystem._psSaveError && G.$gameSystem._psSaveError.code, code, "refused with a diagnosis: " + code);
+        eq(G.$gameSystem._psGame, doc, "the raw document is kept exactly as saved");
+        let threw = ""; try { W.PSFlow.game(); } catch (e) { threw = String(e); }
+        assert(new RegExp(code).test(threw), "battles refuse to run on it: " + threw);
+        await startEvent(1);
+        await waitFor(() => { const o = W.PSFlow.lastOutcome; return !!o && o.aborted === true; }, "the battle aborts instead of running on an unusable state");
+        assert(new RegExp(code).test(W.PSFlow.lastOutcome.error), "the abort says why: " + W.PSFlow.lastOutcome.error);
+        eq(G.$gameSystem._psGame, doc, "still untouched after the refused battle (checked before the harness resets the game)");
+        await recover();
+      }
+      fresh();
+      assert(!G.$gameSystem._psSaveError, "an explicit reset clears the diagnosis");
+      return { saveCodes: [rc1], loadCodes: [lc1] };
+    });
+
     await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
       W.PSFlow.setLanguage("zh");
       try {
