@@ -4,43 +4,43 @@
     {
       "id": "S1 (matrix)",
       "status": "pass",
-      "ms": 165,
-      "fingerprint": "a85944939132d8f8d088a99ec036b8c84d6885896fa7ed424d8b4f7cae85832e"
+      "ms": 196,
+      "fingerprint": "8bf4ab88c2362e51d5fc1083b6a41b2502dbb4008bd693dbf132f20063b4a4ea"
     },
     {
       "id": "S2 (matrix)",
       "status": "pass",
       "ms": 3,
-      "fingerprint": "c8f0a7d3f4d92e7414776b2ac6cb142aa6bef0427576b278cc9f656b7ec66a88"
+      "fingerprint": "5b4c46bac4496630e20edbb2afaa8bfe3d348c96bcf5fdffbfb7d046f4a6f6c2"
     },
     {
       "id": "S3 (matrix)",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "9b3b04f4c72625eec6d74d0a59dde5190e4f54376d333252c0ecb3c54656033f"
     },
     {
       "id": "S4 (matrix)",
       "status": "pass",
-      "ms": 1,
-      "fingerprint": "cf3062f670d92a5f8aa91ce21e6865f44f87b4355a09f38fe8d02247bde878d7"
+      "ms": 2,
+      "fingerprint": "01c1f83d7c1e2bc24a9e3291b3020b412ea95a2d06601d772111b4efdf11077f"
     },
     {
       "id": "S5 (matrix)",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "9d70aa3397017a4f6e7f4391acbcdad5cc63e9ccdf3071c3669a646f55080aa4"
     },
     {
       "id": "S6 (matrix)",
       "status": "pass",
-      "ms": 3,
+      "ms": 4,
       "fingerprint": "02b317c1befc72427b5bc7e898debb7bed445198bd39530cff2561e6784a9f66"
     },
     {
       "id": "S7 (matrix)",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "691c3da8c1d62689fb22325f1fed096c798b6496847e3b51f309100610adeade"
     },
     {
@@ -52,13 +52,13 @@
     {
       "id": "S9 (matrix)",
       "status": "pass",
-      "ms": 15,
+      "ms": 17,
       "fingerprint": "3373e0f0f457e125df76034c2bf47bc75ef3b0596ab9dd7c561ee92e0458011f"
     },
     {
       "id": "S10 (matrix)",
       "status": "pass",
-      "ms": 7,
+      "ms": 9,
       "fingerprint": "91781116c31992aa8af034e79ef35c08272488e19cfca0881cc6649fe149862f"
     }
   ],
@@ -77,55 +77,56 @@
     "execPath": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
     "gameDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
     "packageInfo": {
-      "builtAt": "2026-10-18T13:03:42.725Z",
-      "gitHead": "0ac24d4c0aec7ce9335f763f24f33d4f1d61094f",
-      "workingTreeChanges": 35,
+      "builtAt": "2026-10-18T14:42:58.484Z",
+      "gitHead": "e666bba1f13a4872ff5b5cd77bc525b16c9862e5",
+      "workingTreeChanges": 12,
+      "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
       "withTests": true,
-      "signing": "ad-hoc (local only)"
+      "signing": "adhoc+hardened-runtime"
     }
   },
   "matrix": [
     {
       "id": "S1",
       "status": "pass",
-      "ms": 165,
-      "fingerprint": "a85944939132d8f8d088a99ec036b8c84d6885896fa7ed424d8b4f7cae85832e"
+      "ms": 196,
+      "fingerprint": "8bf4ab88c2362e51d5fc1083b6a41b2502dbb4008bd693dbf132f20063b4a4ea"
     },
     {
       "id": "S2",
       "status": "pass",
       "ms": 3,
-      "fingerprint": "c8f0a7d3f4d92e7414776b2ac6cb142aa6bef0427576b278cc9f656b7ec66a88"
+      "fingerprint": "5b4c46bac4496630e20edbb2afaa8bfe3d348c96bcf5fdffbfb7d046f4a6f6c2"
     },
     {
       "id": "S3",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "9b3b04f4c72625eec6d74d0a59dde5190e4f54376d333252c0ecb3c54656033f"
     },
     {
       "id": "S4",
       "status": "pass",
-      "ms": 1,
-      "fingerprint": "cf3062f670d92a5f8aa91ce21e6865f44f87b4355a09f38fe8d02247bde878d7"
+      "ms": 2,
+      "fingerprint": "01c1f83d7c1e2bc24a9e3291b3020b412ea95a2d06601d772111b4efdf11077f"
     },
     {
       "id": "S5",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "9d70aa3397017a4f6e7f4391acbcdad5cc63e9ccdf3071c3669a646f55080aa4"
     },
     {
       "id": "S6",
       "status": "pass",
-      "ms": 3,
+      "ms": 4,
       "fingerprint": "02b317c1befc72427b5bc7e898debb7bed445198bd39530cff2561e6784a9f66"
     },
     {
       "id": "S7",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "691c3da8c1d62689fb22325f1fed096c798b6496847e3b51f309100610adeade"
     },
     {
@@ -137,16 +138,16 @@
     {
       "id": "S9",
       "status": "pass",
-      "ms": 15,
+      "ms": 17,
       "fingerprint": "3373e0f0f457e125df76034c2bf47bc75ef3b0596ab9dd7c561ee92e0458011f"
     },
     {
       "id": "S10",
       "status": "pass",
-      "ms": 7,
+      "ms": 9,
       "fingerprint": "91781116c31992aa8af034e79ef35c08272488e19cfca0881cc6649fe149862f"
     }
   ],
-  "matrixMs": 207,
+  "matrixMs": 249,
   "overall": "pass"
 }

@@ -4,7 +4,7 @@
     {
       "id": "T1 trainer win: Fight, KO, exp, level-up, learn prompt (real keys), next turn uses new move, return to map",
       "status": "pass",
-      "ms": 2670,
+      "ms": 2620,
       "detail": {
         "level": 51,
         "exp": 125131,
@@ -14,32 +14,32 @@
     {
       "id": "T2 unavailable actions and cancel: nothing consumed, always back at a usable menu",
       "status": "pass",
-      "ms": 4636
+      "ms": 4621
     },
     {
       "id": "T3 wild run: faster user escapes, committed as 'ran', state unchanged apart from battle bookkeeping",
       "status": "pass",
-      "ms": 1220
+      "ms": 1199
     },
     {
       "id": "T4 capture: Master Ball from the bag, captured member joins with its stable id",
       "status": "pass",
-      "ms": 1650
+      "ms": 1637
     },
     {
       "id": "T5 item from the bag: Potion on the active member, consumed once and persisted",
       "status": "pass",
-      "ms": 2001
+      "ms": 1984
     },
     {
       "id": "T6 failure exit: engine error mid-battle aborts cleanly, nothing committed, the event still continues",
       "status": "pass",
-      "ms": 1200
+      "ms": 1199
     },
     {
       "id": "T7 save/restore outside battle + idempotent re-commit after restore",
       "status": "pass",
-      "ms": 1622,
+      "ms": 1617,
       "detail": {
         "saveCode": 0,
         "loadCode": 0
@@ -49,8 +49,78 @@
   "focusLog": [
     {
       "ev": "focus",
-      "frame": 868,
-      "t": 15008,
+      "frame": 111,
+      "t": 2445,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 268,
+      "t": 5060,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 293,
+      "t": 5490,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 316,
+      "t": 5871,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 335,
+      "t": 6175,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 403,
+      "t": 7324,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 536,
+      "t": 9541,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 686,
+      "t": 12053,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 738,
+      "t": 12914,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 830,
+      "t": 14453,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 843,
+      "t": 14679,
       "hasFocus": true,
       "vis": "visible"
     }
@@ -59,7 +129,7 @@
     "playBgm": 1,
     "playStaticSe": 69
   },
-  "refocus": 1,
+  "refocus": 11,
   "env": {
     "nw": "0.117.0",
     "node": "26.7.0",
@@ -70,12 +140,13 @@
     "execPath": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
     "gameDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
     "packageInfo": {
-      "builtAt": "2026-10-18T13:02:40.101Z",
-      "gitHead": "0ac24d4c0aec7ce9335f763f24f33d4f1d61094f",
-      "workingTreeChanges": 35,
+      "builtAt": "2026-10-18T14:42:21.611Z",
+      "gitHead": "e666bba1f13a4872ff5b5cd77bc525b16c9862e5",
+      "workingTreeChanges": 1,
+      "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
       "withTests": true,
-      "signing": "ad-hoc (local only)"
+      "signing": "adhoc+hardened-runtime"
     }
   },
   "overall": "pass"

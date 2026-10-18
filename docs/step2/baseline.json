@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "recordedAt": "2026-10-17",
-  "status": "C2 decided (continue, singles first); runtime issues pass done (memory fixed, saves outside bundle, signing plan + hardened-runtime proof)",
+  "recordedAt": "2026-10-18",
+  "status": "C2 decided (continue, singles first); runtime issues pass done; independent review fixes applied (docs/step2/review-followups.md)",
   "template": {
     "repo": "https://github.com/y805939188/rpg-maker-mz-initialize",
     "commit": "b6fa1df099d5c3cf0b501755b73e06566b7e1939",
@@ -28,7 +28,7 @@
     "pnpmLockSha256": "bd7f521f901a1c01ad2d46be0a756866b296a3340f15ef5b5e764cc95111d0b4"
   },
   "runtimeObserved": {
-    "where": "NW.js launched directly on the dev tree and on a trimmed copy (experiments/step2/evidence/*.json)",
+    "where": "NW.js launched directly on the dev tree and on a trimmed copy (experiments/step2/evidence/history/*.json) and inside the packaged app (experiments/step2/evidence/package/*.json)",
     "nw": "0.117.0",
     "nwFlavor": "sdk",
     "node": "26.7.0",
@@ -69,7 +69,7 @@
   },
   "deploy": {
     "mzDeployShell": "fails to open: symlinks in nwjs Framework.framework flattened, unsigned",
-    "workaround": "scripts/repair-deployed-app-mac.sh (ditto pristine nwjs.app + deployed app.nw, ad-hoc codesign)",
+    "workaround": "scripts/package-mac.sh (own packaging, replaces MZ Deploy); scripts/repair-deployed-app-mac.sh is the old rescue for an already deployed app",
     "observed": {
       "nw": "0.117.0",
       "node": "26.7.0",
@@ -90,24 +90,28 @@
     ]
   },
   "package": {
-    "command": "scripts/package-mac.sh [--with-tests]",
+    "command": "scripts/package-mac.sh [--with-tests] [--harden] [--identity ID]",
     "hostObservedInPackage": {
       "nw": "0.117.0",
       "node": "26.7.0",
       "chromium": "154.0.8037.58"
     },
-    "signing": "ad-hoc, local only",
-    "sizeMB": {
-      "app": 545,
-      "appNw": 146
-    },
+    "signing": "adhoc, adhoc+hardened-runtime (--harden) or identity+hardened-runtime (--identity); recorded in app.nw/package-info.json (signing, gitHead, diffSha256)",
     "tests": "scripts/run-package-tests-mac.sh",
-    "perf": "scripts/run-package-perf-mac.sh"
+    "perf": "scripts/run-package-perf-mac.sh",
+    "size": {
+      "unit": "KiB from du -sk (C2 build; ~545/146 MiB)",
+      "appKB": 557964,
+      "appNwKB": 149832,
+      "note": "earlier docs wrote 558/150 \"MB\" (KB/1000) and 545/146 (MiB): same measurement"
+    }
   },
   "protocol": {
     "version": 1,
     "frozenFile": "docs/step2/protocol-v1.frozen.json",
-    "contractTest": "experiments/step2/s5/test-protocol-freeze.cjs"
+    "contractTest": "experiments/step2/s5/test-protocol-freeze.cjs",
+    "additiveRevision": "2026-10-18: outcome.winner, refusal reasons item-no-effect/unknown-target/norun/notfirst/invulnerable, canUseItem/currentRequest, foe noRun/noBall; statusCount still open",
+    "matrixBaseline": "js/engine/fixtures/matrix-fingerprints.json (update: experiments/step2/s5/update-matrix-baseline.cjs)"
   },
   "runtimeFixes": {
     "plugins": [
@@ -125,5 +129,6 @@
     },
     "plan": "docs/step2/signing-plan.md",
     "notarization": "not run (no Developer ID)"
-  }
+  },
+  "updatedAfterReview": "2026-10-18: Reactor pin now also in scripts/versions.env; protocol v1 additive revision; evidence regenerated (see review-followups.md)"
 }

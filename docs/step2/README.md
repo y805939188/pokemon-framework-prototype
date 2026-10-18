@@ -10,6 +10,7 @@
 | 2.2 RPG 行动 | `step2.2-feasibility` | 自定义格式 + 引擎事件动作路线；道具/状态/能力道具、精灵球、逃跑；捕获与逃跑数学对照规格向量；战中升级探针 | `2.2-report.md` |
 | 2.3 成长与写回 | `step2.3-c1` | 经验/EV/升级/学招、稳定身份写回、背包台账、原子存档、双打关键组合；杀进程测试；提交 C1 | `2.3-report.md` |
 | 2.4 MZ 流程 | `step2.4-mz-flow` | 战斗插件、占位文字界面、测试地图、真实按键驱动测试；用户手动试玩发现的问题已修 | `2.4-report.md` |
+| 独立评审后的修订 | （`step2-review-baseline` 之后的提交） | 修了成长 HP 校验、台账、捕获/逃跑规则与菜单守卫、协议冻结与矩阵基线、脚本安全与证据；未决事项列表 | `review-followups.md` |
 | 2.5 打包与 C2 | `step2.5-c2` | 自己的打包命令；S1–S10 在包内与 Node 指纹一致；测量；协议 v1 冻结；提交 C2 | `2.5-report.md` |
 | C2 后运行时问题 | `step2.runtime-pass` | 内存泄漏修复、存档放包外、硬化运行时用临时签名跑通、测试可失焦且静音 | `runtime-issues.md`、`signing-plan.md` |
 
@@ -18,7 +19,8 @@
 | 文件 | 内容 |
 |---|---|
 | `c2-decision.md` | 用户的 C2 决定（继续、单打先行、平台范围） |
-| `deviations.md` | 与原版行为的 4 项有意差异及状态 |
+| `deviations.md` | 与原版行为的 4 项已决定的有意差异，以及尚未决定的差异清单 |
+| `review-followups.md` | 独立评审（Opus 5.5）的发现：哪些已修、哪些延后、哪些需要用户决定 |
 | `protocol-v1.md` + `protocol-v1.frozen.json` | 冻结的战斗协议（所有者、同步点、消息、结果结构、持久性声明）；契约测试 `experiments/step2/s5/test-protocol-freeze.cjs` |
 | `runtime-issues.md` | 内存泄漏诊断与修复证据、存档位置、失焦/静音、遗留问题 |
 | `signing-plan.md` | 签名与公证：现状、已验证/未验证、有账号后的步骤 |
@@ -40,11 +42,11 @@
 
 | 命令 | 覆盖 | 代价 |
 |---|---|---|
-| `scripts/test-quick.sh` | 类型检查 + 8 个 Node 套件共 50 个测试：无头流程、道具/捕获/逃跑、成长、写回/故障边界、双打、文字描述、场景矩阵、协议冻结 | 约 1 分钟，无窗口 |
+| `scripts/test-quick.sh` | 类型检查 + 10 个 Node 套件共 66 个测试：无头流程、道具/捕获/逃跑、成长、写回/故障边界、双打、文字描述、场景矩阵（对照入库的指纹基线）、协议冻结（从多场景观察）、引擎契约（拷贝一致 + Showdown 内部接口存在性）、Reactor 安装 | 约 10 秒（本机实测 7 s），无窗口 |
 | `node experiments/step2/s2/probe-*.cjs`、`s3/probe-midturn-growth.cjs` | 战中升级、回复道具、路线对比、回合内成长的可行性探针 | 秒级 |
 | `scripts/run-flow-test-mac.sh` | 游戏内流程 T1–T7 + 重启校验（NW.js 直接启动，真实按键/事件/存档） | 几分钟，弹窗口 |
 | `scripts/run-package-tests-mac.sh` | 同一批场景在**打包后的应用**里 + 场景矩阵 S1–S10（与 Node 指纹对比）+ 默认存档位置 + 包签名封印 | 几分钟，弹窗口 |
-| `scripts/run-package-perf-mac.sh` | 3 次冷启动的性能与内存（含 100 场战斗内存检查，用 `--ps-perf-rounds`） | 几分钟，弹窗口 |
+| `scripts/run-package-perf-mac.sh` | 3 次冷启动的性能与内存（100 场战斗内存检查：`PF_PERF_ARGS="--ps-perf-rounds=25 --js-flags=--expose-gc [--ps-fix=no-texture,no-batcher]"`） | 几分钟，弹窗口 |
 
 局限（不要在汇报中当作已完成）：没有运行过原版 Ruby；规格向量是推导的期望；黄金文件和指纹由同一套代码生成，证明"两个环境结果一致"，不证明"结果正确"；双打只测了关键组合且无界面；没有 Windows/Intel；没有 Developer ID 签名与公证；首次启动新包很慢（6–28 s，未诊断）；没有 CI。
 

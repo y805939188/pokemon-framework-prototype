@@ -54,7 +54,7 @@
 
 ## 5. 成本与子 agent
 
-直接读文件、脚本聚合、复用已验证结果优先；不让模型逐行吞大日志；不强制每步新会话。**子 agent 默认不用**，只在明确节省总成本或必须独立时使用，且只能用 **Sonnet 5.5**（除非用户明确指定 Opus）：写代码默认 Sonnet 5.5 High，review 用更高一级（Extra），不使用快速模式；简单任务可用更便宜的模型。
+直接读文件、脚本聚合、复用已验证结果优先；不让模型逐行吞大日志；不强制每步新会话。**子 agent 默认不用**，只在明确节省总成本或必须独立时使用，且只能用 **Sonnet 5.5**（除非用户明确指定 Opus）：写代码默认 Sonnet 5.5 High，review 用比写代码更高的一档推理强度（`xhigh`，必要时 `max`；以工具里可选的档位为准），不使用快速模式；简单任务可用更便宜的模型。
 
 ## 6. 架构一页纸
 
@@ -92,19 +92,21 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 
 | 目的 | 命令 | 代价 |
 |---|---|---|
-| 快速自检（类型检查 + 全部 Node 测试，约 1 分钟，无窗口） | `scripts/test-quick.sh` | 便宜，评审和日常首选 |
+| 快速自检（类型检查 + 全部 Node 测试 + 引擎契约检查，无窗口） | `scripts/test-quick.sh` | 便宜（本机实测 7 s），评审和日常首选；任何一个套件失败都会点名 |
 | 构建插件 | `pnpm --dir src build`（类型检查：`pnpm --dir src typecheck`） | 便宜 |
 | 构建/裁剪引擎 | `scripts/build-showdown.sh` | 首次约 1–2 分钟（下载依赖） |
 | 游戏内流程测试（开 NW.js 窗口，真实按键/事件/存档） | `scripts/run-flow-test-mac.sh` | 几分钟，弹窗口 |
-| 打包（不用 MZ 部署） | `scripts/package-mac.sh [--with-tests] [--harden]` | 约半分钟，550 MB |
+| 打包（不用 MZ 部署） | `scripts/package-mac.sh [--with-tests] [--harden] [--identity ID]` | 约半分钟，约 545 MiB（557,964 KB） |
 | 包内完整测试（流程 + 场景矩阵 + 存档位置 + 签名封印） | `scripts/run-package-tests-mac.sh`（`PF_PACKAGE_ARGS=--harden` 用硬化运行时） | 几分钟，弹窗口 |
 | 包内性能与内存测量 | `scripts/run-package-perf-mac.sh [次数]` | 几分钟，弹窗口 |
 
-测试脚本运行时窗口失焦、静音都不影响结果（见 `docs/step2/runtime-issues.md`）。
+测试脚本运行时窗口失焦、静音都不影响结果（见 `docs/step2/runtime-issues.md`）；脚本从不写玩家的存档槽（包内存档位置检查只用一个空闲的高位槽并还原；流程测试用 `--ps-save-dir`），也不会杀掉不是自己启动的进程（若已有打包应用在运行会拒绝启动）。
+
+改了 `js/engine/rpg/*.cjs` 之后必须重新 `scripts/build-showdown.sh`（引擎用的是 `dist/config/` 里的拷贝，`test-engine-contract.cjs` 会在两份不同时报错）。故意改变行为后：`node experiments/step2/s5/update-matrix-baseline.cjs`（矩阵指纹基线）与 `node experiments/step2/s5/protocol-freeze.cjs --update`（协议冻结文件）只在有意为之时运行，并在提交里说明。升级 Showdown 固定提交时先跑 `test-engine-contract.cjs`。
 
 ## 9. 环境准备（从零）
 
-前提：Apple Silicon Mac；Node ≥ 22（开发用 22.21.1，Showdown 要求 ≥ 22.18）；pnpm 10.20.0；git；已安装 RPG Maker MZ（Steam 版，其 NW.js 已是 0.117.0 SDK arm64——`scripts/doctor.sh` 会检查）；RPGReactor 源码检出在 `/Users/dingshinn/Desktop/RPGReactor`，必须是带类型声明的 `2dc2e10e`（0.98.8；0.98.7 标签没有类型包）。
+前提：Apple Silicon Mac；Node ≥ 22（开发用 22.21.1，Showdown 要求 ≥ 22.18）；pnpm 10.20.0；git；已安装 RPG Maker MZ（Steam 版，其 NW.js 已是 0.117.0 SDK arm64——`scripts/doctor.sh` 会检查）；RPGReactor 源码检出在 `/Users/dingshinn/Desktop/RPGReactor`，必须是带类型声明的 `2dc2e10e`（0.98.8；0.98.7 标签没有类型包）——`scripts/versions.env` 已固定该提交，本地检出不是它时 `setup-reactor.sh`/`doctor.sh` 会报错（确认要用别的提交时设 `REACTOR_ALLOW_OTHER_COMMIT=1` 并同步改 versions.env 与文档）；下载模式没有为这个提交验证过。
 
 ```bash
 cd pokemon-framework-prototype
@@ -114,7 +116,7 @@ pnpm --dir src build                                                            
 ./scripts/test-quick.sh                                                                     # 自检
 ```
 
-生成物/忽略项（不提交、可重建）：`js/engine/showdown/`、`js/plugins/PS_*.js`、`RR_*.js`、`js/libs`、`js/reactor_*.js`、`index.html`、`src/node_modules`、`src/vendor/rpgreactor`、`.reactor-source`、`save/`、`build/`，以及本地复制的 MZ 素材（`.git/info/exclude`）。Showdown 源码缓存放在仓库外（`SHOWDOWN_SRC` 可覆盖），因为 MZ 部署会复制整个项目根目录。
+生成物/忽略项（不提交、可重建）：`js/engine/showdown/`、`js/plugins/PS_*.js`、`RR_*.js`、`js/libs`、`js/reactor_*.js`、`index.html`、`src/node_modules`、`src/vendor/rpgreactor`、`.reactor-source`、`save/`、`build/`，以及本地复制的 MZ 素材（`.git/info/exclude`）。Showdown 源码缓存放在仓库外（`~/Library/Caches/pokemon-framework/showdown-src`，`SHOWDOWN_SRC` 可覆盖；首次 `build-showdown.sh` 时下载生成），因为 MZ 部署会复制整个项目根目录。已经 staged 的引擎不依赖缓存，只有重建才需要它。
 
 ## 10. 已知坑
 
@@ -125,6 +127,10 @@ pnpm --dir src build                                                            
 - 打包后存档在 `~/Library/Application Support/<包名>/save/`，与 NW.js 浏览器数据同在一个父目录。
 - 失焦的游戏窗口默认暂停（MZ 的 `isGameActive`）；只有测试驱动覆盖了这一点。
 - macOS 自带 bash 3.2：`set -u` 下空数组展开会报错；`sed -i` 需要 `-i ''`。
+- 引擎使用 `js/engine/showdown/dist/config/` 里的规则拷贝，会话层使用 `js/engine/rpg/` 里的源文件；改了规则没重建会得到混合结果（`test-engine-contract.cjs` 会抓到）。
+- 持久化的睡眠/剧毒计数还没进协议（`statusCount`）：战斗开始时由引擎重新播种（临时措施，见 `docs/step2/review-followups.md`）。
+- `reason: win` 且 `winner` 不是 `Player` 表示战败（结果里有 `outcome.winner`）。
+- zsh 里 `echo =====` 会被当成命令展开而报错；脚本用 bash。
 - 内存、泄漏相关改动依赖 PixiJS 内部实现，升级 Pixi/Reactor 后要重跑 100 场战斗内存检查（`docs/step2/runtime-issues.md`）。
 
 ## 11. 文档地图（建议阅读顺序）
@@ -133,11 +139,11 @@ pnpm --dir src build                                                            
 2. `docs/step2/README.md`（第二步总结与文档导航）
 3. `docs/step2/c2-decision.md`、`deviations.md`（用户的决定与有意差异）
 4. `docs/step2/protocol-v1.md`（冻结的协议）、`runtime-issues.md`、`signing-plan.md`
-5. 阶段报告 `docs/step2/2.2-report.md` … `2.5-report.md`（推导过程与证据，按需读）
+5. 阶段报告 `docs/step2/2.2-report.md` … `2.5-report.md`（推导过程与证据，按需读）；独立评审后的修订与未决事项见 `docs/step2/review-followups.md`（先读它，再读报告里标 *(corrected)* 的地方）
 6. `experiments/step2/evidence/MANIFEST.md`（每个证据文件的来源与对应的构建）
 
 ## 12. 分支、标签与提交约定
 
 - `main` 是唯一长期分支；新工作开短期分支，合并后删除。远端与本地保持一致。
-- 阶段里程碑用标签保留：`step2.1-accepted`、`step2.2-feasibility`、`step2.3-c1`、`step2.4-mz-flow`、`step2.5-c2`、`step2.runtime-pass`；评审基线标签见 `docs/step2/README.md`。
+- 阶段里程碑用标签保留：`step2.1-accepted`、`step2.2-feasibility`、`step2.3-c1`、`step2.4-mz-flow`、`step2.5-c2`、`step2.runtime-pass`；独立评审的基线标签是 `step2-review-baseline`（指向 `2e5f2e5`，评审报告审查的就是它）；评审后的修复在其后的提交里，见 `docs/step2/review-followups.md`。
 - 提交信息写清做了什么和为什么；AI 协作提交按所用工具要求添加署名行。

@@ -63,4 +63,4 @@ js/engine/showdown/
 experiments/step2/evidence/package/saves/
 
 # test run saves (package/flow evidence runs)
-experiments/step2/evidence/*/saves/
+experiments/step2/evidence/**/saves/

@@ -1,0 +1,340 @@
+{
+  "mode": "perf",
+  "results": [
+    {
+      "id": "P1 perf run",
+      "status": "pass",
+      "ms": 0
+    }
+  ],
+  "focusLog": [
+    {
+      "ev": "focus",
+      "frame": 224,
+      "t": 4331,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 232,
+      "t": 4473,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 491,
+      "t": 8792,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 515,
+      "t": 9191,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 697,
+      "t": 12264,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 992,
+      "t": 17184,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1136,
+      "t": 19583,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1186,
+      "t": 20406,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1272,
+      "t": 21839,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1339,
+      "t": 23010,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1440,
+      "t": 24695,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1454,
+      "t": 24925,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1498,
+      "t": 25659,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1555,
+      "t": 26624,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1631,
+      "t": 27894,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1676,
+      "t": 28630,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1723,
+      "t": 29427,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1769,
+      "t": 30180,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1830,
+      "t": 31213,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1856,
+      "t": 31646,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1929,
+      "t": 32850,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 1986,
+      "t": 33805,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 2040,
+      "t": 34700,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 2171,
+      "t": 36900,
+      "hasFocus": true,
+      "vis": "visible"
+    },
+    {
+      "ev": "focus",
+      "frame": 2287,
+      "t": 38835,
+      "hasFocus": true,
+      "vis": "visible"
+    }
+  ],
+  "suppressedAudio": {
+    "playBgm": 1,
+    "playStaticSe": 150
+  },
+  "refocus": 26,
+  "env": {
+    "nw": "0.117.0",
+    "node": "26.7.0",
+    "chromium": "154.0.8037.58",
+    "v8": "15.4.80.11",
+    "platform": "darwin",
+    "arch": "arm64",
+    "execPath": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
+    "gameDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
+    "packageInfo": {
+      "builtAt": "2026-10-18T14:42:58.484Z",
+      "gitHead": "e666bba1f13a4872ff5b5cd77bc525b16c9862e5",
+      "workingTreeChanges": 12,
+      "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+      "withTests": true,
+      "signing": "adhoc+hardened-runtime"
+    }
+  },
+  "perf": {
+    "method": {
+      "t0": "shell epoch ms just before launch",
+      "timers": "performance.now()/Date.now() in the renderer",
+      "frames": "SceneManager.update deltas, window focused, fast=true (no message pacing)"
+    },
+    "stamps": {
+      "pluginLoadedAt": 1792334814288,
+      "pluginLoadedPerf": 185,
+      "mapReadyAt": 1792334815327,
+      "mapReadyPerf": 1224
+    },
+    "memory": [
+      {
+        "label": "map ready (before any battle)",
+        "gcForced": false,
+        "nodeRssMb": 300,
+        "nodeHeapUsedMb": 21,
+        "jsHeapUsedMb": 33,
+        "appRssMb": 1131
+      },
+      {
+        "label": "after first round (4 battles)",
+        "gcForced": false,
+        "nodeRssMb": 400,
+        "nodeHeapUsedMb": 47,
+        "jsHeapUsedMb": 33,
+        "appRssMb": 1226
+      },
+      {
+        "label": "after 3 rounds (12 battles)",
+        "gcForced": false,
+        "nodeRssMb": 407,
+        "nodeHeapUsedMb": 49,
+        "jsHeapUsedMb": 33,
+        "appRssMb": 1235
+      },
+      {
+        "label": "after 6 rounds (24 battles)",
+        "gcForced": false,
+        "nodeRssMb": 411,
+        "nodeHeapUsedMb": 50,
+        "jsHeapUsedMb": 33,
+        "appRssMb": 1239
+      }
+    ],
+    "coldStart": {
+      "launchToPluginMs": 920,
+      "launchToMapReadyMs": 1959
+    },
+    "engineLoadMs": 2.6,
+    "firstBattle": {
+      "sessionMs": 152.1,
+      "firstMenuMs": 533.4,
+      "totalMs": 1017.7,
+      "label": "run",
+      "blurred": false
+    },
+    "laterBattles": {
+      "n": 23,
+      "sessionMsMedian": 1.6,
+      "firstMenuMsMedian": 133,
+      "firstMenuMsMax": 133.9,
+      "unblurredN": 23,
+      "blurredN": 0,
+      "firstMenuMsMedianFocused": 133,
+      "firstMenuMsMaxFocused": 133.9
+    },
+    "actionMs": {
+      "run": {
+        "n": 12,
+        "p50": 1.1,
+        "p95": 2.9,
+        "max": 2.9
+      },
+      "move": {
+        "n": 6,
+        "p50": 3.6,
+        "p95": 4.5,
+        "max": 4.5
+      },
+      "item": {
+        "n": 6,
+        "p50": 3.9,
+        "p95": 4,
+        "max": 4
+      },
+      "ball": {
+        "n": 6,
+        "p50": 3.9,
+        "p95": 4.9,
+        "max": 4.9
+      }
+    },
+    "frames": {
+      "battleScene": {
+        "n": 1143,
+        "p50": 16.7,
+        "p95": 17.7,
+        "p99": 18.1,
+        "max": 20.6,
+        "over33": 0,
+        "over50": 0,
+        "over100": 0
+      },
+      "mapScene": {
+        "n": 838,
+        "p50": 16.7,
+        "p95": 17.7,
+        "p99": 21.4,
+        "max": 90.6,
+        "over33": 2,
+        "over50": 2,
+        "over100": 0
+      }
+    },
+    "focus": {
+      "blurEvents": 0,
+      "framesSkippedUnfocused": 299
+    },
+    "battles": 24,
+    "window": {
+      "w": 816,
+      "h": 624,
+      "dpr": 1,
+      "refocusCount": 26
+    }
+  },
+  "overall": "pass"
+}

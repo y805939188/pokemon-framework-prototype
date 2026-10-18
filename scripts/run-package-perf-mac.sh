@@ -11,6 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNS="${1:-3}"
 EVID="${2:-$ROOT/experiments/step2/evidence/package}"
+mkdir -p "$EVID" && EVID="$(cd "$EVID" && pwd)"  # the game process writes its reports itself: needs an absolute path
 APP="$ROOT/build/package/PokemonFrameworkPrototype.app"
 [[ -d "$APP" ]] || { echo "build the package first (scripts/package-mac.sh --with-tests)" >&2; exit 1; }
 mkdir -p "$EVID/perf"; rm -f "$EVID"/perf/run*.json

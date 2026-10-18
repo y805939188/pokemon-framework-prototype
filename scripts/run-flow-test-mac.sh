@@ -8,6 +8,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MZ_APP="${MZ_APP:-$HOME/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.app}"
 NW="$MZ_APP/Contents/Resources/nwjs-mac/nwjs.app/Contents/MacOS/nwjs"
 EVID="${1:-$ROOT/experiments/step2/evidence/flow}"
+mkdir -p "$EVID" && EVID="$(cd "$EVID" && pwd)"  # the game process writes its reports itself: needs an absolute path
 [[ -x "$NW" ]] || { echo "NW.js not found: $NW" >&2; exit 1; }
 pnpm --dir "$ROOT/src" build >/dev/null
 mkdir -p "$EVID"
