@@ -24,6 +24,8 @@ State: tag `step2.runtime-pass` (branch merged into `main`). All measurements ar
 
 Without the fixes RSS grows linearly (≈ +4 MB per battle); with them it is flat after the first four battles. The renderer JS heap read 28 MB at every sample in **both** runs, so the earlier "JS heap 19 → 46 / 63 MB" figures are **not reproduced** by this measurement and should be treated as unverified; the growth that this evidence supports is native memory (canvases kept alive by stale batchers). The two fixes were only measured together (off/on), not one by one. The standard 3-launch run (24 battles) after the fixes: RSS after 4 / 12 / 24 battles = 1,234 / 1,238 / 1,229 MB (median of 3; C2: 1,307 / 1,334 / 1,371).
 
+**Decision (user, 2026-10-18):** upstream is slow to accept pull requests; we wait for them and keep `PS_RuntimeFixes` meanwhile. If they stop accepting PRs or release too slowly, we patch RPGReactor ourselves, and later may clone it and maintain our own copy (then `scripts/versions.env`, `setup-reactor.sh` and the signing/packaging docs must point at our copy).
+
 **Where it belongs:** upstream in RPGReactor (`reactor_core.js` `_refresh` for the stub; the batcher entry is a PixiJS-side lifecycle gap that Reactor's scene switching should clean up). Remove the plugin when the pinned Reactor contains the fixes. Risks: relies on PixiJS internals (re-run the 100-battle check on any Pixi/Reactor bump: `scripts/run-package-perf-mac.sh` with `--ps-perf-rounds=25`, or the leak modes below).
 
 ## 2. Save location — fixed (`PS_SaveLocation`)
