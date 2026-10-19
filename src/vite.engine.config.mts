@@ -9,6 +9,8 @@ const entries: Record<string, string> = {
   engine: "./framework/index.ts",
   // runs INSIDE Showdown (staged as dist/config/custom-formats.js): self-contained, rules bundled in
   "custom-formats": "./framework/battle/custom-formats.ts",
+  // the core's public entry (rules, state, save schema, digest): no host, no Node, no Showdown; see framework/tsconfig.core.json
+  core: "./framework/rules/index.ts",
   // content tooling (build/check/inventory); a Node program, not a library
   "content-cli": "./framework/tools/content-cli.ts",
 };

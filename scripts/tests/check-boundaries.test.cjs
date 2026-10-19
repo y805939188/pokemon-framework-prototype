@@ -150,3 +150,18 @@ test('the core (rules) and the other pure layers may not import any Node built-i
 	}
 	clean({ ...OK, 'tools/n.ts': 'import { createHash } from "node:crypto";\nexport const h = createHash;\n' });
 });
+
+// ---- Node globals and explicit any
+test('Node globals (process, Buffer, __dirname, __filename, global) are rejected outside battle and tools, also in templates and computed keys', () => {
+	for (const layer of ['rules', 'content', 'i18n', 'flow']) {
+		for (const body of ['export const a = process.platform;', 'export const a = Buffer.from("x");', 'export const a = __dirname;', 'export const a = `${process.env.X}`;', 'export const a = (global as unknown as Record<string, unknown>)["x"];']) {
+			bad({ ...OK, [`${layer}/g.ts`]: body + '\n' }, new RegExp(`${layer}/g\\.ts: Node global "(process|Buffer|__dirname|global)" may not be used in layer "${layer}"`));
+		}
+	}
+	clean({ ...OK, 'battle/g.ts': 'export const a = process.platform + __dirname;\n', 'tools/g.ts': 'export const a = Buffer.from("x");\n', 'rules/doc.ts': '// process.env and Buffer in a comment\nexport const a = "process.env Buffer";\n' });
+});
+test('explicit any is rejected in the core, not elsewhere, and unknown is fine', () => {
+	bad({ ...OK, 'rules/a.ts': 'export const f = (x: any) => x;\n' }, /rules\/a\.ts: 1 explicit "any" in layer "rules"/);
+	bad({ ...OK, 'rules/a.ts': 'export const f = (x: Record<string, any>, y: any[]) => [x, y];\n' }, /rules\/a\.ts: 2 explicit "any"/);
+	clean({ ...OK, 'rules/a.ts': 'export const f = (x: unknown) => x;\n', 'battle/b.ts': 'export const f = (x: any) => x;\n', 'flow/c.ts': 'export const f = (x: any) => x;\n' });
+});

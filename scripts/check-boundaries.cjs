@@ -34,6 +34,12 @@ const LAYER_PRIVATE = new Set(['battle/showdown-types.ts', 'battle/showdown-load
 // may name them; flow and everything else use the gateway's queries, operations and opaque checkpoint.
 const GATEWAY_INTERNALS = new Set(['_debugBattle', '_env', '_queue', '_seq', '_closed', '_battle', '_waiters', '_opts']);
 const MAY_USE_GATEWAY_INTERNALS = new Set(['battle', 'tools']);
+// Node's ambient names. Only the battle adapter (it loads the pinned build from disk) and tools may name them; the
+// core and every other layer stay host-free (the core is additionally compiled with no ambient types at all).
+const NODE_GLOBALS = new Set(['process', 'Buffer', '__dirname', '__filename', 'global']);
+const MAY_USE_NODE_GLOBALS = new Set(['battle', 'tools']);
+// Layers whose sources may not write an explicit `any` (it would let a host or engine object cross unseen).
+const ANY_FREE_LAYERS = new Set(['rules', 'app']);
 // custom-formats runs INSIDE Showdown as its own bundle: it may only use plain rules and the Showdown type alias.
 const CUSTOM_FORMATS_MAY = (rel) => rel.startsWith('rules/') || rel === 'battle/showdown-types.ts';
 const HOST_GLOBALS = /\$game[A-Za-z]*|\$data[A-Za-z]*|\b(?:SceneManager|DataManager|StorageManager|Graphics|AudioManager|ConfigManager|PluginManager)\b|\b(?:Window|Scene|Sprite|Game)_[A-Za-z]+|\bwindow\b|\bdocument\b|\bnw\.|\bPIXI\b/;
@@ -65,6 +71,7 @@ function scan(source) {
 	const specs = [];
 	const text = [];
 	const names = new Set(); // every identifier, and string keys of computed member access (gw["_queue"])
+	let anys = 0;
 	(function walk(n) {
 		if (!n || typeof n !== 'object') return;
 		if (Array.isArray(n)) { for (const c of n) walk(c); return; }
@@ -81,13 +88,14 @@ function scan(source) {
 				break;
 			}
 			case 'Identifier': names.add(n.name); break;
+			case 'TSAnyKeyword': anys++; break;
 			case 'MemberExpression': if (n.computed && n.property && n.property.type === 'Literal' && typeof n.property.value === 'string') names.add(n.property.value); break;
 			case 'TemplateElement': text.push([n.start, n.end]); break;
 			case 'Literal': if (typeof n.value === 'string' || n.regex) text.push([n.start, n.end]); break;
 		}
 		for (const k of Object.keys(n)) if (k !== 'type') { const v = n[k]; if (v && typeof v === 'object') walk(v); }
 	})(ast);
-	return { specs, text, names };
+	return { specs, text, names, anys };
 }
 /** The source with strings, template text and regex literals blanked and comments removed; template `${}` code stays. */
 function bareCode(source, ranges) {
@@ -110,11 +118,14 @@ function check(root) {
 		const layer = rel.includes('/') ? rel.split('/')[0] : 'entry';
 		const raw = fs.readFileSync(abs, 'utf8');
 		if (!LAYERS[layer]) { violations.push(`${rel}: unknown layer "${layer}" (add it to LAYERS)`); continue; }
-		let specs, bare, names;
-		try { const sc = scan(raw); specs = sc.specs; names = sc.names; bare = bareCode(raw, sc.text); }
+		let specs, bare, names, anys;
+		try { const sc = scan(raw); specs = sc.specs; names = sc.names; anys = sc.anys; bare = bareCode(raw, sc.text); }
 		catch (e) { if (/needs the parser/.test(e.message)) throw e; violations.push(`${rel}: cannot be parsed (${String(e.message).split('\n')[0]})`); continue; }
 		// ---- gateway internals
 		if (!MAY_USE_GATEWAY_INTERNALS.has(layer)) for (const n of names) if (GATEWAY_INTERNALS.has(n)) violations.push(`${rel}: gateway internal "${n}" may not be used in layer "${layer}" (use the gateway's queries, operations and checkpoint)`);
+		// ---- Node globals, explicit any
+		if (!MAY_USE_NODE_GLOBALS.has(layer)) for (const n of names) if (NODE_GLOBALS.has(n)) violations.push(`${rel}: Node global "${n}" may not be used in layer "${layer}"`);
+		if (ANY_FREE_LAYERS.has(layer) && anys) violations.push(`${rel}: ${anys} explicit "any" in layer "${layer}" (use unknown or a real type)`);
 		// ---- imports
 		for (const spec of specs) {
 			if (spec.startsWith('node:')) {
