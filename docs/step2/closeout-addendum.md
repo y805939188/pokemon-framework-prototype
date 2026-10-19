@@ -1,6 +1,6 @@
 # 第二步补充验收记录（技术原型范围的最后修复）
 
-**状态：修复候选，待独立复核。** 本记录**不是**正式收口：F1–F3 之后的新增改动（下面的 §3）由作者（Claude Code）自己写、自己测，按项目规则不能自我签收；需要一次只针对新增差异的独立复核，通过后才算第二步技术原型范围的正式补充收口。它也**不代表整个第三步验收通过**，更不代表框架功能齐全。
+**状态：已收口（2026-10-19，用户决定）。** 本轮新增改动（§3）由作者（Claude Code）自己写、自己测，随后按用户在聊天中的说明，由**另一个 Codex agent** 做了只针对新增差异的独立复核，用户据此决定收口。**作者没有看到该复核报告，报告位置未记录**；本记录只引用用户的这一说明，不替该报告转述结论，也不含其细节。收口只对“第二步技术原型范围及其后续补充修复”成立，**不代表整个第三步验收通过**，更不代表框架功能齐全。
 
 ## 1. 版本与历史（不改旧证据）
 
@@ -11,7 +11,7 @@
 | 第三步原候选 `step3-candidate` | `89988b21edf75c9a9ab1056a428ecdda40e02a3e` | 继承了第二步的三项桥接缺陷 |
 | F1 / F2 / F3（Codex 的修复，已独立复审并宿主验证） | `92276c7` / `cb3c045` / `7abce72` | 见 `docs/step3/review-fixes.md` |
 | 并入后的 `step3/foundation` | `a761c0ae9eae9a187d9124e9332411e701117590` | CI Run 14 成功 |
-| 本轮新增（分支 `fix/step2-closeout-recovery`） | 见 §3，头提交以 `git log` 为准 | **待独立复核** |
+| 本轮新增（分支 `fix/step2-closeout-recovery`，已并入 `step3/foundation`） | 见 §3；标签 `step2-closeout`（新增，旧标签不动） | 已收口（用户决定，Codex 独立复核，报告未见） |
 
 ## 2. 问题处置一览
 
@@ -20,12 +20,12 @@
 | F1 特殊招式请求被菜单/AI 当成无可用招式 | 已修（`92276c7`），独立复审接受 | `test-move-requests.cjs`；真实 NW.js T1 间接覆盖 |
 | F2 持久 PP 上限未传入引擎 | 已修（`cb3c045`），独立复审接受；**支持范围见 §4** | `test-pp-sync.cjs`；变异实验 |
 | F3 并发道具留下未结算预留 | 已修（`7abce72`），独立复审接受 | `test-session-operations.cjs`；24 场景故障注入 |
-| **F3 边界：回滚本身失败时放行损坏会话（原 P2）** | **本轮已修（待复核）**：会话置为终止状态，保留双错误 | `test-session-failure.cjs`（6）、真实窗口 T11 |
-| `isSelectableMove` 的 `disabled` 分支无回归 | 本轮补（待复核） | `test-move-requests.cjs` 新增 3 项，含真实 Choice 锁招 |
-| 失败重试后 `seq`/消息序列无回归 | 本轮补（待复核）；此前存活的变异体现在被杀 | `test-session-operations.cjs` 新增 1 项 |
-| `tools/harness.ts` 演示 AI 仍是旧 `pp>0` | 本轮修（待复核）：复用运行时谓词；无可选招式时显式抛错 | `test-move-requests.cjs`；冻结金样/矩阵未变 |
+| **F3 边界：回滚本身失败时放行损坏会话（原 P2）** | **本轮已修**：会话置为终止状态，保留双错误 | `test-session-failure.cjs`（6）、真实窗口 T11 |
+| `isSelectableMove` 的 `disabled` 分支无回归 | 本轮补 | `test-move-requests.cjs` 新增 3 项，含真实 Choice 锁招 |
+| 失败重试后 `seq`/消息序列无回归 | 本轮补；此前存活的变异体现在被杀 | `test-session-operations.cjs` 新增 1 项 |
+| `tools/harness.ts` 演示 AI 仍是旧 `pp>0` | 本轮修：复用运行时谓词；无可选招式时显式抛错 | `test-move-requests.cjs`；冻结金样/矩阵未变 |
 
-## 3. 本轮新增改动（作者自测，待独立复核）
+## 3. 本轮新增改动（作者自测；之后经 Codex 独立复核，见顶部状态）
 
 提交（相对 `a761c0a`，逻辑上可单独回退）：
 1. `4c14deb` 回滚失败即封闭会话：`SessionBrokenError`（保留 `original`、`restoreError`）；`_exclusive` 在回滚失败时置 `_broken` 并记录一次 `session.broken` 日志；`_exclusive`/`_action`/`take()`/`result()` 之后一律抛同一个错误。回滚成功时行为不变（仍可重试，`broken` 为 `null`）。不涉及协议 v1（不是新的协议原因码，是异常）。
@@ -34,7 +34,7 @@
 4. `8f74769` 真实窗口场景 T11（失败 + 回滚失败 → 终止、双错误、零提交）。
 5. `d48e43d` 归档 `docs/step3/second-review-report.md`（纯文档）。
 
-复核者请只看 `git diff a761c0a..d48e43d -- src experiments scripts`（9 个文件中的运行时代码只有 `session.ts`、`harness.ts`，其余为测试与场景）。重点：
+复核范围为 `git diff a761c0a..d48e43d -- src experiments scripts`（9 个文件中的运行时代码只有 `session.ts`、`harness.ts`，其余为测试与场景）。重点：
 - 回滚失败后是否所有写入口都被拒绝（含 `cancel`、`decideLearn`、`commitTurn`、`chooseDoubles`、`result()`、`take()`），没有新的扣减/退款；宿主 `finish → result()` 因此无法提交不可信结果；
 - 错误是否保留两条（`message`、`original`、`restoreError`、日志），没有让回滚错误覆盖原错误；
 - 没有靠永久挂锁（`_operation` 仍在 `finally` 释放；封闭靠 `_broken` 状态）；
@@ -60,7 +60,7 @@
 | 完整构建 | `d48e43d` 的验证拷贝 | `run-package-tests-mac.sh` 内部构建通过 |
 | 真实 NW.js 开发树流程 | `d48e43d`（验证拷贝，无工作树改动） | 通过：T1–T11（含 T11）、V1 |
 | 打包套件 | `d48e43d`，ad hoc 签名，`workingTreeChanges: 0` | 通过：包内 T1–T11、V1、S1–S10、SL1；签名封印有效；S1–S10 指纹与 Node 22.21.1 逐个相同；引擎包哈希 `22842be429eee721fcbb649b9c732b82043fa6a022b469907fef30b2faf58218`（包内 = Node 加载，146,851 字节） |
-| CI（GitHub Actions） | 本轮分支的最终提交（文档提交与被测代码提交不同，代码最后一次改动是 `8f74769`） | 以交付消息里读到的结果为准（`scripts/ci-status.sh`）；读不到则不算通过 |
+| CI（GitHub Actions） | 分支头 `2a68fbb`（代码最后一次改动是 `8f74769`，之后只增文档与证据） | Run 15 成功（`scripts/ci-status.sh step3/step2-closeout`）；并入 `step3/foundation` 后的最终提交的 CI 见 `.handoff/STATUS.md` |
 
 **旧证据的资格：** `experiments/step3/evidence/review-fixes/host/` 属于 `7abce72`（引擎包哈希 `94afa975…`），只证明 F1–F3 本身；本轮代码（`session.ts`、`harness.ts`）不同，所以包内与流程结果在 `d48e43d` 上**重新跑过**，不沿用旧结果。冻结协议 JSON 与矩阵指纹基线没有改动，S1–S10 指纹与旧基线逐项相同。
 
@@ -71,5 +71,5 @@
 ## 7. 回退与后续
 
 - 逐项回退（不要 reset）：`git revert 8f74769 4c4b62b 82615db 4c14deb`（按倒序；文档提交可不回退）。F1–F3 的回退见 `docs/step3/review-fixes.md`。
-- 本轮**不合并 `main`、不打 `step3-closed`、不删除修复分支/工作树**；第三步整体仍有自己的验收门槛。
+- 收口方式：`step3/foundation` 以 fast-forward 包含本轮提交，并打新标签 `step2-closeout`（旧 `step2-closed` 不动）。**不合并 `main`、不打 `step3-closed`**：F1–F3 与本轮修复建在第三步的 TypeScript 框架之上，无法脱离 `step3/foundation` 单独进入 `main`；第三步整体仍有自己的验收门槛。
 - 待办分配：F2 的完整直接赋值/Trump Card、包 manifest、基线性能 → 第三步未决项清单（`docs/step3/README.md`）与第四步；其余沿用既有分流。

@@ -76,7 +76,7 @@
 | 8 | 遗留项处置透明、性能无未解释的重大退化 | 部分：处置透明；性能有一处**未解释到底**的小变化 | 引擎动作延迟 +1.5–2 ms（已排除引擎与日志），帧时间/到菜单/内存无变化；见 `evidence/MANIFEST.md` |
 | 9 | CI 针对精确候选提交成功（合并条件） | 见复核包“候选”一节（标签 `step3-candidate`）；读不到的结果不算通过 | `scripts/ci-status.sh` |
 
-本地 Node 套件合计 **117 个测试**（第二步 68 + 边界 14 + 内容 8 + 本地化 7 + 存档 12 + 整合 4 + 差分 4）。**没有声明的**：Windows/Intel；Developer ID 签名与公证；窗口测试在 CI；框架独有内容数据的来源（仍是占位）；成长以外模块的原版运行证据；MZ 存档文件本身的原子性（MZ 的）。
+本地 Node 套件合计 **117 个测试**（第二步 68 + 边界 14 + 内容 8 + 本地化 7 + 存档 12 + 整合 4 + 差分 4）——这是候选 `89988b2` 时的数字；并入 F1–F3 与第二步收尾后为 **20 套件 147 项**（新增套件/用例：`test-move-requests` 8、`test-pp-sync` 5、`test-session-operations` 11、`test-session-failure` 6，见 `docs/step3/review-fixes.md`、`docs/step2/closeout-addendum.md`）。**没有声明的**：Windows/Intel；Developer ID 签名与公证；窗口测试在 CI；框架独有内容数据的来源（仍是占位）；成长以外模块的原版运行证据；MZ 存档文件本身的原子性（MZ 的）。
 
 ## 验证入口
 
@@ -84,4 +84,19 @@
 - 需要窗口、只能在本机跑：`scripts/run-flow-test-mac.sh`、`scripts/run-package-tests-mac.sh`、`scripts/run-package-perf-mac.sh`（见 `docs/PROJECT-GUIDE.md` 第 8 节）。
 - CI 与 TS 迁移的进展见下方各节（随推进补充）。
 
-- 第二步补充收尾（回滚失败封闭会话、守卫测试、F2 支持范围的文字化）：分支 `fix/step2-closeout-recovery`，**待独立复核**，见 `docs/step2/closeout-addendum.md`；不改变上面的第三步验收状态。
+- 第二步补充收尾（回滚失败封闭会话、守卫测试、F2 支持范围的文字化）：已收口并入本分支（标签 `step2-closeout`），见 `docs/step2/closeout-addendum.md`；不改变上面的第三步验收状态。
+
+## 边界债务与去向（第三步收口报告的固定栏目）
+
+这些是**限定偏差**，不是第三步 9 项验收的新增门槛；用户已决定（2026-10-19）它们放进第四步开工前的短架构批次关闭，批次不并入第三步收口。
+
+| 债务 | 现状（实证） | 去向 |
+|---|---|---|
+| 战斗内部对象穿透（v1.0 §八“业务不持有引擎内部对象”） | `flow/session.ts` 三处正常路径调用 `gw._debugBattle()`，检查点读写 `gw._env/_queue/_seq/_closed`；`ShowdownBattle` 实为 `any` | 批次：网关窄查询 + 不透明检查点 token + 检查器禁止这些标识符，再抽只含类型的 `BattleDriver` |
+| 领域依赖 Node | `rules/state.ts` 用 `node:crypto` 做同步 SHA-256 结果身份；边界检查放行 | 批次：注入或内置同步摘要，保留 canonical JSON/SHA-256/旧账本；核心用 `tsc`（`lib: ES2022`、`types: []`）独立编译 |
+| 检查器盲区 | 模板字符串整段被剥离，`${}` 里的宿主/Node 访问不报；固定的 `typescript@7.0.2` 没有 JS 编译器 API，可用已有 `vite.parseAst` | 批次：用 `parseAst` 补模板插值、`process.*` 与上述标识符规则 |
+| 插件 `any` | `PS_BattleFlow.ts` 约 46 行；插件直接读 `s.gw.readState` 两处 | 批次/第六步：类型化应用门面 |
+| 保存阶段 | `PS_SaveState.beforeSave` 不检查战斗中（靠场景约束） | 第四步保存用例加守卫与场景 |
+| 性能 | 冷启动比候选记录慢约 190–200 ms、引擎动作延迟 +1.5–2 ms，原因未判定，且没有同条件基线 | 批次入口先补同条件基线；不能宣称无退化 |
+| 范围 | 首版单打；双打、长尾后置；Windows/Intel 暂缓（用户决定） | 第四步后重估；平台见 `PROJECT-GUIDE.md` |
+

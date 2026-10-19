@@ -2,6 +2,19 @@
 
 候选：分支 `step3/foundation` 上**标签 `step3-candidate` 所指的提交**（复核者先 `git rev-parse step3-candidate^{commit}` 核对，并用 `git diff dabe03a..step3-candidate --stat` 确认证据对应的代码与候选之间只有文档/证据差异）。复核者必须是**非作者的独立会话或另一位 AI**；作者不得自评，也不得用子 agent 凑数。范围是第三步的全部交付，**不重审第八轮历史，也不需要重跑第二步已经验证过的所有东西**。
 
+## 更新（2026-10-19）：被复核的是并入 F1–F3 与第二步收尾之后的版本
+
+候选标签 `step3-candidate`（`89988b2`）仍保留，但**复核请以新标签 `step3-candidate-2` 所指的提交为准**（`git rev-parse step3-candidate-2^{commit}`；它也是 `step3/foundation` 的头，`main` 未动）。相对 `89988b2` 多了：
+- F1/F2/F3 三项桥接缺陷修复（`92276c7`/`cb3c045`/`7abce72`，已独立复审并宿主验证，见 `docs/step3/review-fixes.md`）；
+- 第二步收尾（`SessionBrokenError`、`disabled`/`seq` 回归、`harness.ts` 谓词、F2 范围测试、窗口场景 T11；已由另一个 Codex agent 复核并收口，见 `docs/step2/closeout-addendum.md`，标签 `step2-closeout`）；
+- 本地 Node 套件现为 **20 套件 147 项**；真实窗口场景现为 **T1–T11 + V1**。
+
+对下表的影响：
+- 第 1、2、9 项在**新的精确提交**上重核（CI 用 `scripts/ci-status.sh step3/foundation`，读到的精确 SHA 与 `step3-candidate-2` 对齐才算）。
+- 第 3 项：包内/开发树证据以 `experiments/step3/evidence/closeout/`（`d48e43d`，引擎包哈希 `22842be4…`）和 `…/review-fixes/host/`（`7abce72`）为准；`experiments/step2/evidence/` 是候选 `89988b2` 的旧证据，只作历史。
+- 第 8 项：性能仍有**未解释**的差异（见 `docs/step3/README.md` “边界债务与去向”），不得写成无退化。
+- 复核者不负责短架构批次（核心独立入口、战斗适配封装、假适配器、检查器增强）；它们是用户已决定的第四步前批次，只核对“债务登记是否诚实”。
+
 ## 先读（按顺序，约 20 分钟）
 1. `docs/step3/README.md`（范围、基线、决策、批次结果、遗留处置）
 2. `docs/step3/save-and-ledger.md`、`docs/step3/differential-growth.md`
