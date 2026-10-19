@@ -118,3 +118,27 @@ test('type-position and dynamic imports are still resolved; an unparsable file i
 	bad({ ...OK, 'rules/p.ts': 'export const g = () => import("../battle/gateway.ts");\n' }, /layer "rules" may not import layer "battle"/);
 	bad({ ...OK, 'rules/p.ts': 'export const = ;\n' }, /rules\/p\.ts: cannot be parsed/);
 });
+
+// ---- R2: production flow code may not reach the gateway's internals or the live engine object
+test('flow, rules, content and i18n may not use the gateway internals or _debugBattle (member access, computed key, destructuring)', () => {
+	for (const layer of ['flow', 'rules', 'content', 'i18n']) {
+		const imports = layer === 'flow' ? 'import { g } from "../battle/gateway.ts";\n' : '';
+		for (const body of [
+			'export const f = (gw: any) => gw._debugBattle();',
+			'export const f = (gw: any) => gw._queue.shift();',
+			'export const f = (gw: any) => { gw._seq = 0; };',
+			'export const f = (gw: any) => gw["_closed"];',
+			'export const f = (gw: any) => { const { _env } = gw; return _env; };',
+			'export const f = (gw: any) => `${gw._env.root}`;',
+			'export const f = (gw: any) => gw._battle;',
+		]) bad({ ...OK, [`${layer}/p.ts`]: imports + body + '\n' }, new RegExp(`${layer}/p\\.ts: .*gateway internal`));
+	}
+});
+test('battle and tools may use the internals; mentioning the names in text or comments is fine', () => {
+	clean({
+		...OK,
+		'battle/more.ts': 'export const f = (gw: any) => gw._queue.length + gw._seq;\n',
+		'tools/t.ts': 'export const f = (gw: any) => gw._debugBattle();\n',
+		'flow/doc.ts': '// gw._debugBattle() is for tools; gw._queue too\nexport const d = "gw._seq and _env are private";\nexport const e = `${1} gw._closed`;\n',
+	});
+});

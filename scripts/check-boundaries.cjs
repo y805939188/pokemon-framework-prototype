@@ -30,6 +30,10 @@ const FILE_BUILTINS = { 'battle/showdown-loader.ts': ['node:fs'] };
 const REQUIRE_ALLOWED = new Set(['battle/showdown-loader.ts']);
 // Files that may only be imported from inside their own layer.
 const LAYER_PRIVATE = new Set(['battle/showdown-types.ts', 'battle/showdown-loader.ts', 'battle/custom-formats.ts']);
+// The gateway's private state and its raw engine accessor. Only the battle layer (and tools/tests, which may diagnose)
+// may name them; flow and everything else use the gateway's queries, operations and opaque checkpoint.
+const GATEWAY_INTERNALS = new Set(['_debugBattle', '_env', '_queue', '_seq', '_closed', '_battle', '_waiters', '_opts']);
+const MAY_USE_GATEWAY_INTERNALS = new Set(['battle', 'tools']);
 // custom-formats runs INSIDE Showdown as its own bundle: it may only use plain rules and the Showdown type alias.
 const CUSTOM_FORMATS_MAY = (rel) => rel.startsWith('rules/') || rel === 'battle/showdown-types.ts';
 const HOST_GLOBALS = /\$game[A-Za-z]*|\$data[A-Za-z]*|\b(?:SceneManager|DataManager|StorageManager|Graphics|AudioManager|ConfigManager|PluginManager)\b|\b(?:Window|Scene|Sprite|Game)_[A-Za-z]+|\bwindow\b|\bdocument\b|\bnw\.|\bPIXI\b/;
@@ -60,6 +64,7 @@ function scan(source) {
 	const ast = loadParser()(source, { lang: 'ts' });
 	const specs = [];
 	const text = [];
+	const names = new Set(); // every identifier, and string keys of computed member access (gw["_queue"])
 	(function walk(n) {
 		if (!n || typeof n !== 'object') return;
 		if (Array.isArray(n)) { for (const c of n) walk(c); return; }
@@ -75,12 +80,14 @@ function scan(source) {
 				if (lit) specs.push(lit[1]);
 				break;
 			}
+			case 'Identifier': names.add(n.name); break;
+			case 'MemberExpression': if (n.computed && n.property && n.property.type === 'Literal' && typeof n.property.value === 'string') names.add(n.property.value); break;
 			case 'TemplateElement': text.push([n.start, n.end]); break;
 			case 'Literal': if (typeof n.value === 'string' || n.regex) text.push([n.start, n.end]); break;
 		}
 		for (const k of Object.keys(n)) if (k !== 'type') { const v = n[k]; if (v && typeof v === 'object') walk(v); }
 	})(ast);
-	return { specs, text };
+	return { specs, text, names };
 }
 /** The source with strings, template text and regex literals blanked and comments removed; template `${}` code stays. */
 function bareCode(source, ranges) {
@@ -103,9 +110,11 @@ function check(root) {
 		const layer = rel.includes('/') ? rel.split('/')[0] : 'entry';
 		const raw = fs.readFileSync(abs, 'utf8');
 		if (!LAYERS[layer]) { violations.push(`${rel}: unknown layer "${layer}" (add it to LAYERS)`); continue; }
-		let specs, bare;
-		try { const sc = scan(raw); specs = sc.specs; bare = bareCode(raw, sc.text); }
+		let specs, bare, names;
+		try { const sc = scan(raw); specs = sc.specs; names = sc.names; bare = bareCode(raw, sc.text); }
 		catch (e) { if (/needs the parser/.test(e.message)) throw e; violations.push(`${rel}: cannot be parsed (${String(e.message).split('\n')[0]})`); continue; }
+		// ---- gateway internals
+		if (!MAY_USE_GATEWAY_INTERNALS.has(layer)) for (const n of names) if (GATEWAY_INTERNALS.has(n)) violations.push(`${rel}: gateway internal "${n}" may not be used in layer "${layer}" (use the gateway's queries, operations and checkpoint)`);
 		// ---- imports
 		for (const spec of specs) {
 			if (spec.startsWith('node:')) {
