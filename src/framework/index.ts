@@ -21,3 +21,4 @@ export * as saveSchema from "./rules/save-schema.ts";
 export * as app from "./app/index.ts";
 export * as composition from "./composition.ts";
 export * as fakes from "./tools/fakes.ts";
+export * as scripted from "./tools/scripted-driver.ts";
