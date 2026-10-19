@@ -20,4 +20,33 @@
 - 先红后绿：`node --test experiments/step3/test-pp-sync.cjs`：修复前 0 通过/4 失败，修复后 4 通过。覆盖四档提升、导入/消耗/换人、Leppa 回复后结果提交/文件重载/校验与幂等、学招替换清计数、无效导入不产生部分写入。
 - 相关成长、写回、协议冻结、矩阵、F1 回归共 32 项通过；框架类型/边界检查通过。**矩阵基线和冻结 JSON 未改**，测试记录在 `experiments/step3/evidence/review-fixes/f2-*`。
 
-F3（会话重入）将在独立提交中处理。
+## F3：会话操作互斥与故障恢复
+
+- 根因：两个 async 公共调用可在第一个 await 处交错；后者替换引擎选择，却留下前者的预留。注册/AI/结算异常同样可能留下半个操作。
+- 所有会话写操作共享互斥区。并发行动返回已有协议原因 `choice-rejected`；并发 cancel/学招决策拒绝 promise。已完成的阶段不再接受行动，重复 `commitTurn` 不替下一回合预选 AI。替换暂存选择前先撤销旧选择、退还旧预留。
+- 操作入口保存内存检查点，异常时恢复会话、引擎选择、HP/PP、PRNG、待发消息与成长队列；随后释放互斥，可重试。AI 拒绝/无选择显式失败，替补也等待其 promise 并检查结果，避免忽略拒绝/异常。诊断日志和调用者自定义 AI 的外部副作用不回滚。
+- 仍是协议 v1，没有请求 ID：并发拒绝不等于跨网络重发去重；一次成功结束后，在新请求上的顺序调用仍代表新的行动。内存恢复不是战中存档或 MZ 文件原子性承诺。
+- 先红后绿：初始 9 个故障/并发回归全部失败；修复后这 9 个及追加的替补/部分成长恢复用例共 **10 项通过**。命令：`node --test experiments/step3/test-session-operations.cjs`。包括成功、注册拒绝、注册前/后/执行后异常、AI 抛错/拒绝、替补失败、取消两次、暂存重选、并发/重复提交及双打。
+
+## 自测、复审与回退交接
+
+按 **F1 → F2 → F3** 复审，三个运行时修复不依赖另一项的规则变化；共享测试入口和本交接文档按提交顺序累加，建议按序 cherry-pick，按倒序 revert。
+
+1. F1：`92276c7156eadce529fd5d46eaf6be41d993f059`。
+2. F2：`cb3c04572a84a58497d4fbbe57dacc50a44ccaee`。
+3. F3：添加本节的提交（`git log -1 --format=%H -- src/framework/flow/session.ts` 可取完整 SHA；最终交付消息及共享交接记录也会给出）。
+
+验证均在隔离 worktree，Node **22.21.1** / pnpm **10.20.0**，无新增依赖：
+
+```bash
+export PATH=/Users/dingshinn/.nvm/versions/node/v22.21.1/bin:$PATH
+scripts/test-quick.sh
+pnpm --dir src build
+```
+
+- 最终快速自检：插件/框架类型、导入边界、**19 套件共 136 个测试通过**（原 117 + 新 19）；`final-quick.txt`。
+- 完整引擎/内容/插件构建通过；`final-build.txt`。最终 quick 在完整构建结束后再次顺序运行，避免生成物并行写入影响最终证据。
+- 红/绿 TAP 与构建输出在 `experiments/step3/evidence/review-fixes/`。`f3-before.tap` 为保留全部测试状态的精简摘要；8719 行快照差异的完整原始日志保留在工作区 `.worktrees/step3-review-three-defects-evidence/f3-before.full.tap`，摘要中记录其 SHA256，避免将重复快照大日志入库。矩阵指纹和冻结协议 JSON 均未更新。Showdown 仅复用固定提交的隔离产物，重建本分支引擎包后暂存其 custom-formats；没有写上游缓存或安装目录。
+- **未验证**：新代码的真实 MZ/NW.js 窗口、真实 package-mac、性能和内存；CI 未运行（未推送）。F1 菜单用 VM 检查实际插件源码，构建通过不当作窗口通过。F3 每个操作增加内存检查点，宿主动作延迟应由 Claude 复审时留意；无独立 PASS。
+- 原工作树仍在 `step3/foundation` 的基线，`main` / `step3-candidate` 不变。用户若不接受修复，继续使用原候选即可，不必回写或重置它。若已将修复带入其他分支，用 `git revert <F3完整SHA> <F2完整SHA> <F1完整SHA>` 产生倒序撤销提交，保留历史；不要对 Claude 工作树运行 reset。
+- 本地用于基线红测的 `.worktrees/step3-review-baseline` 是 `git archive` 导出的无 Git 目录，仅 F1 测试源码复制进去；不是额外分支或已验收产物。没有启动 NW.js/游戏进程。

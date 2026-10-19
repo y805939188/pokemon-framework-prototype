@@ -1,0 +1,37 @@
+
+> reactor-pixi8-dev@ typecheck /Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/src
+> pnpm types:prepare && tsc --noEmit && tsc --noEmit -p tsconfig.tools.json && pnpm typecheck:framework
+
+
+> reactor-pixi8-dev@ types:prepare /Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/src
+> node vendor/rpgreactor/types/tools/typecheck.cjs --prepare --compiler-root .
+
+Prepared the TypeScript 7.0.2 DOM declarations for RPGReactor.
+
+> reactor-pixi8-dev@ typecheck:framework /Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/src
+> tsc --noEmit -p framework/tsconfig.json
+
+
+> reactor-pixi8-dev@ typecheck:framework /Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/src
+> tsc --noEmit -p framework/tsconfig.json
+
+boundaries ok: 29 files
+experiments/step2/test-headless.cjs  # pass 6 # fail 0 
+experiments/step2/s2/test-actions.cjs  # pass 17 # fail 0 
+experiments/step2/s3/test-growth.cjs  # pass 12 # fail 0 
+experiments/step2/s3/test-writeback.cjs  # pass 11 # fail 0 
+experiments/step2/s3/test-doubles.cjs  # pass 11 # fail 0 
+experiments/step2/s4/test-describe.cjs  # pass 2 # fail 0 
+experiments/step2/s5/test-matrix.cjs  # pass 1 # fail 0 
+experiments/step2/s5/test-protocol-freeze.cjs  # pass 3 # fail 0 
+experiments/step2/s5/test-engine-contract.cjs  # pass 2 # fail 0 
+scripts/tests/reactor-install.test.cjs  # pass 3 # fail 0 
+scripts/tests/check-boundaries.test.cjs  # pass 14 # fail 0 
+experiments/step3/test-content.cjs  # pass 8 # fail 0 
+experiments/step3/test-i18n.cjs  # pass 7 # fail 0 
+experiments/step3/test-save.cjs  # pass 12 # fail 0 
+experiments/step3/test-integration.cjs  # pass 4 # fail 0 
+experiments/step3/test-growth-differential.cjs  # pass 4 # fail 0 
+experiments/step3/test-move-requests.cjs  # pass 5 # fail 0 
+experiments/step3/test-pp-sync.cjs  # pass 4 # fail 0 
+experiments/step3/test-session-operations.cjs  # pass 10 # fail 0 

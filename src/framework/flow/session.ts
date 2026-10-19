@@ -120,6 +120,8 @@ export class BattleSession {
   _caughtAwarded = false;
   _result?: BattleResult;
   logger?: LogSink;
+  _operation = false;
+  _staged = false;
 
   static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger }: CreateOptions): Promise<BattleSession> {
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
@@ -172,6 +174,61 @@ export class BattleSession {
     try { this.logger({ battleId: this.battleId, level, kind, data }); } catch { /* diagnostics must not affect play */ }
   }
 
+  /** One mutation owns the engine and ledger until its promise settles. Readers still see plain snapshots. */
+  async _exclusive<T>(action: () => Promise<T>): Promise<T> {
+    if (this._operation) throw new Error("battle session operation already in progress");
+    this._operation = true;
+    try {
+      const checkpoint = this._checkpoint();
+      try { return await action(); }
+      catch (error) {
+        await this._restoreCheckpoint(checkpoint);
+        throw error;
+      }
+    } finally { this._operation = false; }
+  }
+
+  /** Protocol-v1 action refusal; no new reason or request-id semantics are introduced. */
+  async _action(action: () => Promise<TurnResult>, replace = true): Promise<TurnResult> {
+    if (this._operation || this.finished || this.pendingLearn) return this._refuse("choice-rejected");
+    return this._exclusive(async () => {
+      if (replace && this._staged) {
+        await this.gw.cancel("p1");
+        for (const entry of this.ledger) if (entry.state === "reserved") this._refund(entry, "cancelled");
+        this._staged = false;
+      }
+      const result = await action();
+      this._staged = result.ok && "staged" in result;
+      return result;
+    });
+  }
+
+  /** In-memory operation rollback, not a battle-time save. Include PRNG, pending choices and undelivered messages. */
+  _checkpoint() {
+    return {
+      battle: this.gw.snapshot(), engineRoot: this.gw._env.root,
+      queue: S.clone(this.gw._queue), seq: this.gw._seq, closed: this.gw._closed,
+      state: S.clone({
+        party: this.party, bag: this.bag, ledger: this.ledger, out: this.out, held: this.held,
+        growthQueue: this.growthQueue, pendingLearn: this.pendingLearn, activeNow: this.activeNow,
+        participants: Object.entries(this.participants).map(([id, members]) => [id, [...members]] as const),
+        ended: this.ended, finished: this.finished, requests: this.requests, grew: this.grew,
+        _caughtAwarded: this._caughtAwarded, _result: this._result, _staged: this._staged,
+      }),
+    };
+  }
+
+  async _restoreCheckpoint(checkpoint: ReturnType<BattleSession["_checkpoint"]>): Promise<void> {
+    const gw = await BattleGateway.restore(checkpoint.battle, { engineRoot: checkpoint.engineRoot });
+    gw._queue = checkpoint.queue; gw._seq = checkpoint.seq; gw._closed = checkpoint.closed;
+    this.gw = gw;
+    const { participants, ...state } = checkpoint.state;
+    Object.assign(this, state);
+    this.participants = Object.fromEntries(participants.map(([id, members]) => [id, new Set(members)]));
+    // JSON omits undefined properties, so explicitly clear these after a failed first assignment.
+    this.requests = state.requests; this._result = state._result;
+  }
+
   static defaultAi(request: Req): string {
     if (request.forceSwitch) {
       const i = request.side.pokemon.findIndex((p: Req) => !p.active && !/ fnt$/.test(p.condition));
@@ -203,25 +260,29 @@ export class BattleSession {
 
   currentRequest(): Req | undefined { return this.requests && this.requests["p1"]; }
 
-  async chooseMove(index: number): Promise<TurnResult> { this._log("info", "choice", { action: "move", index }); return this._turn(async () => this.gw.choose("p1", `move ${index}`)); }
+  async chooseMove(index: number): Promise<TurnResult> { this._log("info", "choice", { action: "move", index }); return this._action(() => this._turn(async () => this.gw.choose("p1", `move ${index}`))); }
   async chooseSwitch(memberId: string): Promise<TurnResult> {
-    this._log("info", "choice", { action: "switch", member: memberId });
-    const i = (this.requests!["p1"]!["side"].pokemon as Req[]).findIndex((p) => p["ident"] === `p1: ${memberId}`);
-    return this._turn(async () => this.gw.choose("p1", `switch ${i + 1}`));
+    return this._action(async () => {
+      this._log("info", "choice", { action: "switch", member: memberId });
+      const i = (this.requests!["p1"]!["side"].pokemon as Req[]).findIndex((p) => p["ident"] === `p1: ${memberId}`);
+      return this._turn(async () => this.gw.choose("p1", `switch ${i + 1}`));
+    });
   }
   async chooseForcedSwitch(memberId: string): Promise<TurnResult> { return this.chooseSwitch(memberId); }
 
   /** Reserve the item (deduct now), register the action; refunded on cancel/no-effect. */
   async useItem(itemId: string, targetId: string, { commit = true }: { commit?: boolean } = {}): Promise<TurnResult> {
-    this._log("info", "choice", { action: "item", item: itemId, target: targetId, commit });
-    if (!ITEM_IDS.has(itemId)) return this._refuse("unknown-item");
-    if ((this.bag[itemId] || 0) < 1) return this._refuse("none-left");
-    const el = this.canUseItem(itemId, targetId);
-    if (!el.ok) return this._refuse(el.reason); // refused before registration: nothing consumed, no turn used
-    const entry = this._reserve("item", itemId, targetId);
-    const ok = await this.gw.act("p1", { kind: "item", item: itemId, target: targetId });
-    if (!ok) { this._refund(entry, "not-registered"); return this._refuse("not-registered"); }
-    return commit ? this._resolveTurn() : { ok: true, staged: true };
+    return this._action(async () => {
+      this._log("info", "choice", { action: "item", item: itemId, target: targetId, commit });
+      if (!ITEM_IDS.has(itemId)) return this._refuse("unknown-item");
+      if ((this.bag[itemId] || 0) < 1) return this._refuse("none-left");
+      const el = this.canUseItem(itemId, targetId);
+      if (!el.ok) return this._refuse(el.reason); // refused before registration: nothing consumed, no turn used
+      const entry = this._reserve("item", itemId, targetId);
+      const ok = await this.gw.act("p1", { kind: "item", item: itemId, target: targetId });
+      if (!ok) { this._refund(entry, "not-registered"); return this._refuse("not-registered"); }
+      return commit ? this._resolveTurn() : { ok: true, staged: true };
+    });
   }
 
   /** Registration-time eligibility of an item for a party member (same rule the menu uses to grey out targets). */
@@ -235,81 +296,94 @@ export class BattleSession {
    * and resolve the turn. Items/balls are reserved in the ledger first and refunded if the choice is refused.
    */
   async chooseDoubles(specs: (DoublesSpec | null)[], { commit = true }: { commit?: boolean } = {}): Promise<TurnResult> {
-    this._log("info", "choice", { action: "doubles", specs: specs.map((x) => (x ? x.kind ?? (x.switch !== undefined ? "switch" : "move") : null)), commit });
-    // validate every spec BEFORE reserving anything: a refusal consumes nothing (WP38 2 / WP28 3.5)
-    let acted = false;
-    for (let i = 0; i < specs.length; i++) {
-      const sp = specs[i];
-      if (sp && sp.kind === "ball") {
-        if (acted) return this._refuse("notfirst"); // a ball must be the first action of the round (WP38 2)
-        const q = this.gw.query("p1", "ball", i);
-        if (!q.allowed) return this._refuse(q.reason ?? "refused");
-      } else if (sp && sp.kind === "run") {
-        const q = this.gw.query("p1", "run", i);
-        if (!q.allowed) return this._refuse(q.reason ?? "refused");
-      } else if (sp && sp.kind === "item") {
-        if (!ITEM_IDS.has(sp.item as string)) return this._refuse("unknown-item");
-        const el = this.canUseItem(sp.item as string, sp.target);
-        if (!el.ok) return this._refuse(el.reason);
+    return this._action(async () => {
+      this._log("info", "choice", { action: "doubles", specs: specs.map((x) => (x ? x.kind ?? (x.switch !== undefined ? "switch" : "move") : null)), commit });
+      // validate every spec BEFORE reserving anything: a refusal consumes nothing (WP38 2 / WP28 3.5)
+      let acted = false;
+      for (let i = 0; i < specs.length; i++) {
+        const sp = specs[i];
+        if (sp && sp.kind === "ball") {
+          if (acted) return this._refuse("notfirst"); // a ball must be the first action of the round (WP38 2)
+          const q = this.gw.query("p1", "ball", i);
+          if (!q.allowed) return this._refuse(q.reason ?? "refused");
+        } else if (sp && sp.kind === "run") {
+          const q = this.gw.query("p1", "run", i);
+          if (!q.allowed) return this._refuse(q.reason ?? "refused");
+        } else if (sp && sp.kind === "item") {
+          if (!ITEM_IDS.has(sp.item as string)) return this._refuse("unknown-item");
+          const el = this.canUseItem(sp.item as string, sp.target);
+          if (!el.ok) return this._refuse(el.reason);
+        }
+        if (sp) acted = true;
       }
-      if (sp) acted = true;
-    }
-    const entries: LedgerEntry[] = [];
-    for (const sp of specs) {
-      if (!sp || !sp.kind || sp.kind === "run") continue;
-      const id = (sp.kind === "item" ? sp.item : sp.ball) as string;
-      if ((this.bag[id] || 0) < 1) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("none-left"); }
-      if (sp.kind === "ball") {
-        const rec = this.foeTeam.find((m) => m.id === sp.target);
-        if (!rec) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("unknown-target"); }
-        sp.catchRate = this.content.species[rec.species]!.catchRate;
-        sp.ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(rec.species) };
+      const entries: LedgerEntry[] = [];
+      for (const sp of specs) {
+        if (!sp || !sp.kind || sp.kind === "run") continue;
+        const id = (sp.kind === "item" ? sp.item : sp.ball) as string;
+        if ((this.bag[id] || 0) < 1) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("none-left"); }
+        if (sp.kind === "ball") {
+          const rec = this.foeTeam.find((m) => m.id === sp.target);
+          if (!rec) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("unknown-target"); }
+          sp.catchRate = this.content.species[rec.species]!.catchRate;
+          sp.ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(rec.species) };
+        }
+        entries.push(this._reserve(sp.kind, id, sp.target));
       }
-      entries.push(this._reserve(sp.kind, id, sp.target));
-    }
-    const ok = await this.gw.chooseSlots("p1", specs);
-    if (!ok) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("choice-rejected"); }
-    return commit ? this._resolveTurn() : { ok: true, staged: true };
+      const ok = await this.gw.chooseSlots("p1", specs);
+      if (!ok) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("choice-rejected"); }
+      return commit ? this._resolveTurn() : { ok: true, staged: true };
+    });
   }
 
   /** Resolve the turn with whatever the player registered (use after a staged action). */
-  async commitTurn(): Promise<TurnResult> { return this._resolveTurn(); }
+  async commitTurn(): Promise<TurnResult> {
+    return this._action(async () => this._staged ? this._resolveTurn() : this._refuse("choice-rejected"), false);
+  }
 
   async throwBall(ballId: string): Promise<TurnResult> {
-    this._log("info", "choice", { action: "ball", ball: ballId });
-    const q = this.gw.query("p1", "ball");
-    if (!q.allowed) return this._refuse(q.reason ?? "refused");
-    if ((this.bag[ballId] || 0) < 1) return this._refuse("none-left");
-    const foeActive = this.gw._debugBattle().getSide("p2").active[0];
-    const foeRec = this.foeTeam.find((m) => m.id === foeActive.name)!;
-    const entry = this._reserve("ball", ballId, foeRec.id);
-    const ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(foeRec.species) };
-    const ok = await this.gw.act("p1", { kind: "ball", ball: ballId, target: foeRec.id, catchRate: this.content.species[foeRec.species]!.catchRate, ctx });
-    if (!ok) { this._refund(entry, "not-registered"); return this._refuse("not-registered"); }
-    return this._resolveTurn();
+    return this._action(async () => {
+      this._log("info", "choice", { action: "ball", ball: ballId });
+      const q = this.gw.query("p1", "ball");
+      if (!q.allowed) return this._refuse(q.reason ?? "refused");
+      if ((this.bag[ballId] || 0) < 1) return this._refuse("none-left");
+      const foeActive = this.gw._debugBattle().getSide("p2").active[0];
+      const foeRec = this.foeTeam.find((m) => m.id === foeActive.name)!;
+      const entry = this._reserve("ball", ballId, foeRec.id);
+      const ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(foeRec.species) };
+      const ok = await this.gw.act("p1", { kind: "ball", ball: ballId, target: foeRec.id, catchRate: this.content.species[foeRec.species]!.catchRate, ctx });
+      if (!ok) { this._refund(entry, "not-registered"); return this._refuse("not-registered"); }
+      return this._resolveTurn();
+    });
   }
 
   async run(): Promise<TurnResult> {
-    this._log("info", "choice", { action: "run" });
-    const q = this.gw.query("p1", "run");
-    if (!q.allowed) return this._refuse(q.reason ?? "refused");
-    await this.gw.act("p1", { kind: "run" });
-    return this._resolveTurn();
+    return this._action(async () => {
+      this._log("info", "choice", { action: "run" });
+      const q = this.gw.query("p1", "run");
+      if (!q.allowed) return this._refuse(q.reason ?? "refused");
+      if (!await this.gw.act("p1", { kind: "run" })) return this._refuse("not-registered");
+      return this._resolveTurn();
+    });
   }
 
   /** Cancel the registered (not yet executed) choice; reserved items return to the bag. */
   async cancel(): Promise<void> {
-    await this.gw.cancel("p1");
-    for (const e of this.ledger.filter((x) => x.state === "reserved")) this._refund(e, "cancelled");
+    return this._exclusive(async () => {
+      await this.gw.cancel("p1");
+      for (const e of this.ledger.filter((x) => x.state === "reserved")) this._refund(e, "cancelled");
+      this._staged = false;
+    });
   }
 
   async decideLearn(slotOrNull: number | null | undefined): Promise<SessionMessage[]> {
-    const p = this.pendingLearn;
-    if (!p) throw new Error("no learn decision pending");
-    this.pendingLearn = null;
-    if (slotOrNull !== null && slotOrNull !== undefined) this._learn(p.memberId, p.move, slotOrNull);
-    await this._continueGrowth();
-    return this.take();
+    return this._exclusive(async () => {
+      const p = this.pendingLearn;
+      if (!p) throw new Error("no learn decision pending");
+      this.pendingLearn = null;
+      if (slotOrNull !== null && slotOrNull !== undefined) this._learn(p.memberId, p.move, slotOrNull);
+      await this._continueGrowth();
+      return this.take();
+    });
   }
 
   /** The BattleResult (protocol v1). Only valid after the battle ended and growth finished. */
@@ -346,7 +420,7 @@ export class BattleSession {
     const foeSide = b.getSide("p2");
     if (foeSide.activeRequest && !foeSide.activeRequest.wait && !foeSide.isChoiceDone()) {
       const c = this.ai(foeSide.activeRequest);
-      if (c) await this.gw.choose("p2", c);
+      if (!c || !await this.gw.choose("p2", c)) throw new Error("foe AI did not provide a legal choice");
     }
     this._ingest();
     await this._continueGrowth();
@@ -431,18 +505,19 @@ export class BattleSession {
         return;
       }
       // growth is settled: now let the foe side fill its own forced replacement, then look again
-      if (!this.ended && this._autoFoeReplacement()) { this._ingest(); continue; }
+      if (!this.ended && await this._autoFoeReplacement()) { this._ingest(); continue; }
       break;
     }
     this._finishTurn();
   }
 
   /** After growth: a defeated foe member is replaced by the foe AI (it is not a player decision). */
-  _autoFoeReplacement(): boolean {
+  async _autoFoeReplacement(): Promise<boolean> {
     const side = this.gw._debugBattle().getSide("p2");
     const req = side.activeRequest;
     if (!req || req.wait || !req.forceSwitch || side.isChoiceDone()) return false;
-    void this.gw.choose("p2", this.ai(req) as string);
+    const choice = this.ai(req);
+    if (!choice || !await this.gw.choose("p2", choice)) throw new Error("foe AI did not provide a legal replacement");
     return true;
   }
 
