@@ -8,6 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { BattleGateway, PROTOCOL_VERSION } from "../battle/gateway.ts";
+import { isSelectableMove } from "../battle/move-requests.ts";
 import { BattleSession } from "../flow/session.ts";
 import * as G from "../rules/growth.ts";
 import { SaveStore } from "./save-store.ts";
@@ -34,8 +35,9 @@ function decide(req: L): string | null {
 		const idx = req.side.pokemon.findIndex((p: L) => !p.active && !/ fnt$/.test(p.condition));
 		return 'switch ' + (idx + 1);
 	}
-	const mv = req.active[0].moves;
-	return 'move ' + (mv.findIndex((m: L) => !m.disabled && m.pp > 0) + 1);
+	const i = req.active[0].moves.findIndex(isSelectableMove);
+	if (i < 0) throw new Error('request has no selectable move');
+	return 'move ' + (i + 1);
 }
 
 /**

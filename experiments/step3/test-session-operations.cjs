@@ -115,3 +115,23 @@ test('a failed foe replacement restores partial growth and can be retried', asyn
     assert.equal((await s.chooseMove(1)).ok, true); assert.ok(s.currentRequest());
   }
 });
+
+// ---- added with the step 2 closeout: a rolled-back and retried operation looks exactly like a clean run
+const strip = messages => JSON.parse(JSON.stringify(messages, (key, value) => (Array.isArray(value) && value.length && value.every(e => e && e.type === 't:') ? [] : value)))
+  .map(m => (m.kind === 'events' ? { ...m, events: m.events.filter(e => e.type !== 't:') } : m));
+
+test('after a rollback and retry the messages, their seq numbers and the gateway counter equal a clean run', async () => {
+  for (const doubles of [false, true]) {
+    const act = s => (doubles ? s.chooseDoubles([{ kind: 'item', item: 'potion', target: 'A-0001' }, { move: 4 }]) : potion(s));
+    const clean = await make({ doubles }); const cleanResult = await act(clean);
+    const hit = await make({ doubles }); const choose = hit.gw.choose.bind(hit.gw);
+    hit.gw.choose = async (...args) => { const ok = await choose(...args); if (args[0] === 'p2') throw new Error('after execution'); return ok; };
+    await assert.rejects(act(hit), /after execution/);
+    const retried = await act(hit);
+    assert.deepEqual(strip(retried.messages), strip(cleanResult.messages));
+    const seqs = result => result.messages.filter(m => 'seq' in m).map(m => m.seq);
+    assert.deepEqual(seqs(retried), seqs(cleanResult));
+    assert.equal(hit.gw._seq, clean.gw._seq, 'the gateway counter continues from the same point');
+    assert.deepEqual(hit.bag, clean.bag); assert.deepEqual(hit.ledger.map(e => e.state), clean.ledger.map(e => e.state));
+  }
+});

@@ -93,3 +93,40 @@ test('default AI handles a real recharge request and a doubles PP-less slot', as
   const response = await d.chooseDoubles([{ move: 4 }, { move: 4 }]);
   assert.equal(response.ok, true); assert.equal(d.gw._debugBattle().turn, 2);
 });
+
+// ---- guards added with the step 2 closeout: the disabled branch, and the scripted demo policy
+const E = require('../../js/engine/build/engine.cjs');
+const selectable = E.moveRequests.isSelectableMove;
+
+test('isSelectableMove: disabled wins over any PP; PP-less requests are selectable unless disabled', () => {
+  assert.equal(selectable({ pp: 5 }), true);
+  assert.equal(selectable({ pp: 5, disabled: true }), false, 'PP left but disabled');
+  assert.equal(selectable({ pp: 5, disabled: 'Disable' }), false, 'a truthy disabled marker also blocks');
+  assert.equal(selectable({}), true, 'PP-less (Struggle/locked/Recharge) request');
+  assert.equal(selectable({ disabled: true }), false, 'PP-less but disabled');
+  assert.equal(selectable({ pp: 0 }), false);
+  assert.equal(selectable({ pp: 0, disabled: false }), false);
+});
+
+test('real disabled moves: a Choice item locks the other moves in the menu and for the default AI', async () => {
+  const game = F.makeGame(); game.party[0].item = 'choiceband';
+  const foe = mon('foe', ['protect', 'tackle']); foe.item = 'choiceband';
+  const s = await make(game, foe);
+  assert.deepEqual(menu(s).map(m => m.enabled), [true, true, true, true]);
+  await s.chooseMove(4); // the other three moves are now disabled although they have PP
+  const moves = s.currentRequest().active[0].moves;
+  assert.deepEqual(moves.map(m => [m.disabled, m.pp > 0]), [[true, true], [true, true], [true, true], [false, true]]);
+  assert.deepEqual(menu(s).map(m => m.enabled), [false, false, false, true]);
+  const foeRequest = s.gw._debugBattle().getSide('p2').activeRequest;
+  assert.equal(foeRequest.active[0].moves[1].disabled, true);
+  assert.equal(BattleSession.defaultAi(foeRequest), 'move 1', 'the AI skips the locked-out move');
+  assert.equal((await s.chooseMove(1)).ok, false, 'choosing a disabled move is still refused by the engine');
+});
+
+test('the scripted demo policy uses the same rule: Struggle, locked and disabled requests', () => {
+  const { decide } = E.harness;
+  const request = moves => ({ active: [{ moves }], side: { pokemon: [] } });
+  assert.equal(decide(request([{ move: 'Struggle', id: 'struggle' }])), 'move 1');
+  assert.equal(decide(request([{ move: 'A', pp: 3, disabled: true }, { move: 'B', pp: 2 }])), 'move 2');
+  assert.equal(decide(request([{ move: 'A', pp: 0 }, { move: 'B', disabled: true }, { move: 'Fly', id: 'fly' }])), 'move 3');
+});
