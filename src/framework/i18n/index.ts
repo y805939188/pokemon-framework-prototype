@@ -6,6 +6,6 @@ import { zh } from "./locales/zh.ts";
 
 export const BUILTIN_LOCALES: Record<string, LocaleTable> = { en, zh };
 export const defaultTranslator = (): Translator => createTranslator(BUILTIN_LOCALES, "en");
-export const translatorFor = (lang: string): Translator => createTranslator(BUILTIN_LOCALES, lang in BUILTIN_LOCALES ? lang : "en");
+export const translatorFor = (lang: string): Translator => createTranslator(BUILTIN_LOCALES, Object.prototype.hasOwnProperty.call(BUILTIN_LOCALES, lang) ? lang : "en");
 export { createTranslator, checkLocale, placeholdersOf } from "./translator.ts";
 export type { LocaleTable, Translator, Params, TextDiagnostics, LocaleCheck } from "./translator.ts";

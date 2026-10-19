@@ -99,3 +99,49 @@ test('a logger that throws cannot affect the battle', async () => {
 	assert.equal((await s.run()).ok, true);
 	assert.equal(s.finished, true);
 });
+
+// ---- R1: keys and language names that match Object.prototype members are ordinary missing keys
+test('keys named like Object.prototype members are missing keys, in English and Chinese; real keys with those names work', () => {
+	const PROTO = ['constructor', 'toString', 'valueOf', 'hasOwnProperty', '__proto__', 'isPrototypeOf'];
+	for (const lang of ['en', 'zh']) {
+		const tr = translatorFor(lang);
+		for (const key of PROTO) {
+			assert.equal(tr.has(key), false, `${lang} has(${key})`);
+			assert.equal(tr.t(key), `[missing:${key}]`, `${lang} t(${key})`);
+			assert.equal(tr.tOr(key, 'caller fallback'), 'caller fallback', `${lang} tOr(${key})`);
+		}
+		assert.deepEqual(tr.diagnostics().missingKeys, [...PROTO].sort(), `${lang}: every miss is diagnosed (tOr records nothing)`);
+	}
+	// an explicit translation under such a key is a legitimate key and must resolve, with parameters
+	const tr = createTranslator({ en: { meta: { name: 'en' }, text: Object.assign(Object.create(null), { constructor: 'Builder {who}', toString: 'text' }) } }, 'en');
+	assert.equal(tr.t('constructor', { who: 'Ann' }), 'Builder Ann'); assert.equal(tr.has('toString'), true);
+	const own = JSON.parse('{"meta":{"name":"en"},"text":{"constructor":"own value","__proto__":"own proto value"}}');
+	const t2 = createTranslator({ en: own }, 'en');
+	assert.equal(t2.t('constructor'), 'own value'); assert.equal(t2.t('__proto__'), 'own proto value');
+});
+
+test('the fallback chain only consults own keys: a prototype name never shadows a real translation in the next language', () => {
+	const tr = createTranslator({ en, zh: { meta: { name: 'zh' }, text: { 'battle.crit': '击中了要害！' } } }, 'zh');
+	assert.equal(tr.t('battle.crit'), '击中了要害！'); assert.equal(tr.t('constructor'), '[missing:constructor]');
+	const tr2 = createTranslator({ en: { meta: { name: 'en' }, text: { constructor: 'fallback text' } }, zh: { meta: { name: 'zh' }, text: {} } }, 'zh');
+	assert.equal(tr2.t('constructor'), 'fallback text', 'the key is real in English; Chinese lacks it');
+});
+
+test('a non-string table value is not a translation, and language names like "constructor" do not break the translator', () => {
+	const bad = { meta: { name: 'bad' }, text: { 'battle.crit': 42, 'x.y': null } };
+	const tr = createTranslator({ en, bad }, 'bad');
+	assert.equal(tr.t('battle.crit'), 'A critical hit!', 'falls through to the next language'); assert.equal(tr.has('x.y'), false);
+	for (const name of ['constructor', 'toString', '__proto__']) {
+		const t = createTranslator({ en }, name);
+		assert.equal(t.t('battle.crit'), 'A critical hit!', name); assert.equal(t.font(), undefined, name); assert.equal(t.has('constructor'), false);
+	}
+	assert.equal(translatorFor('constructor').lang, 'en', 'an unknown language, even with a prototype name, gets English');
+});
+
+test('checkLocale compares own keys only', () => {
+	const base = { meta: { name: 'b' }, text: { a: 'x', constructor: '{n}' } };
+	const other = { meta: { name: 'o' }, text: { a: 'y' } };
+	assert.deepEqual(checkLocale(base, other), { missing: ['constructor'], extra: [], placeholderMismatch: [] }, 'the key exists in the base only, even though every object has a constructor');
+	const o2 = { meta: { name: 'o' }, text: { a: 'y', constructor: '{m}' } };
+	assert.deepEqual(checkLocale(base, o2).placeholderMismatch, [{ key: 'constructor', expected: ['n'], actual: ['m'] }]);
+});

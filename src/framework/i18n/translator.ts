@@ -34,12 +34,22 @@ export function placeholdersOf(text: string): string[] {
   return [...new Set([...text.matchAll(PLACEHOLDER)].map((m) => m[1] as string))].sort();
 }
 
+const hasOwn = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
+/** Only a table's own string values are translations: `constructor`, `toString`, `__proto__` etc. are ordinary missing keys. */
+const textOf = (table: LocaleTable | undefined, key: string): string | undefined => {
+  const text = table?.text;
+  if (!text || !hasOwn(text, key)) return undefined;
+  const v: unknown = text[key];
+  return typeof v === "string" ? v : undefined;
+};
+const tableOf = (tables: Record<string, LocaleTable>, lang: string): LocaleTable | undefined => (hasOwn(tables, lang) ? tables[lang] : undefined);
+
 export function createTranslator(tables: Record<string, LocaleTable>, lang: string, fallback: readonly string[] = ["en"]): Translator {
   const chain = [lang, ...fallback.filter((f) => f !== lang)];
   const missingKeys = new Set<string>();
   const missingParams = new Set<string>();
   const find = (key: string): string | undefined => {
-    for (const l of chain) { const v = tables[l]?.text[key]; if (v !== undefined) return v; }
+    for (const l of chain) { const v = textOf(tableOf(tables, l), key); if (v !== undefined) return v; }
     return undefined;
   };
   const fill = (key: string, text: string, params?: Params): string => text.replace(PLACEHOLDER, (whole, name: string) => {
@@ -59,7 +69,7 @@ export function createTranslator(tables: Record<string, LocaleTable>, lang: stri
       return text === undefined ? fallbackText : fill(key, text, params);
     },
     has: (key) => find(key) !== undefined,
-    font: () => tables[lang]?.meta.font ?? tables[chain[1] ?? lang]?.meta.font,
+    font: () => tableOf(tables, lang)?.meta.font ?? tableOf(tables, chain[1] ?? lang)?.meta.font,
     diagnostics: () => ({ missingKeys: [...missingKeys].sort(), missingParams: [...missingParams].sort() }),
   };
 }
@@ -74,13 +84,15 @@ export interface LocaleCheck {
 }
 
 export function checkLocale(base: LocaleTable, other: LocaleTable): LocaleCheck {
-  const missing = Object.keys(base.text).filter((k) => !(k in other.text)).sort();
-  const extra = Object.keys(other.text).filter((k) => !(k in base.text)).sort();
+  const missing = Object.keys(base.text).filter((k) => !hasOwn(other.text, k)).sort();
+  const extra = Object.keys(other.text).filter((k) => !hasOwn(base.text, k)).sort();
   const placeholderMismatch: LocaleCheck["placeholderMismatch"] = [];
   for (const k of Object.keys(base.text)) {
-    const o = other.text[k];
+    const o = textOf(other, k);
     if (o === undefined) continue;
-    const e = placeholdersOf(base.text[k] as string), a = placeholdersOf(o);
+    const b = textOf(base, k);
+    if (b === undefined) continue;
+    const e = placeholdersOf(b), a = placeholdersOf(o);
     if (e.join() !== a.join()) placeholderMismatch.push({ key: k, expected: e, actual: a });
   }
   return { missing, extra, placeholderMismatch };
