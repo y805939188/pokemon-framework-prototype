@@ -88,15 +88,27 @@
 
 ## 边界债务与去向（第三步收口报告的固定栏目）
 
-这些是**限定偏差**，不是第三步 9 项验收的新增门槛；用户已决定（2026-10-19）它们放进第四步开工前的短架构批次关闭，批次不并入第三步收口。
+这些是**限定偏差**，不是第三步 9 项验收的新增门槛；用户已决定（2026-10-19）它们放进第四步开工前的短架构批次关闭，批次不并入第三步收口。**例外：** 独立验收（Codex，`e0a6be5`）指出其中“战斗内部对象穿透”和“模板插值漏检”违反第三步**原有**要求（A3：内部耦合集中在适配层且由工具强制），不能整体豁免，已在下面的“第三步限定整改”里关闭；表中标注“已关闭”的行不再是债务，只保留后续批次要接着做的部分。
 
 | 债务 | 现状（实证） | 去向 |
 |---|---|---|
-| 战斗内部对象穿透（v1.0 §八“业务不持有引擎内部对象”） | `flow/session.ts` 三处正常路径调用 `gw._debugBattle()`，检查点读写 `gw._env/_queue/_seq/_closed`；`ShowdownBattle` 实为 `any` | 批次：网关窄查询 + 不透明检查点 token + 检查器禁止这些标识符，再抽只含类型的 `BattleDriver` |
+| 战斗内部对象穿透（v1.0 §八“业务不持有引擎内部对象”） | **已关闭（R2）**：`flow/session.ts` 不再调用 `_debugBattle()`，也不碰 `_env/_queue/_seq/_closed`；网关提供值查询、受控操作和不透明检查点；检查器按标识符禁止在 battle/tools 之外使用。`ShowdownBattle` 仍为 `any`，只在 battle 层与 tools 内可达 | 批次：在已有窄查询上抽只含类型的 `BattleDriver` 接口并接假适配器，**不重复整改** |
 | 领域依赖 Node | `rules/state.ts` 用 `node:crypto` 做同步 SHA-256 结果身份；边界检查放行 | 批次：注入或内置同步摘要，保留 canonical JSON/SHA-256/旧账本；核心用 `tsc`（`lib: ES2022`、`types: []`）独立编译 |
-| 检查器盲区 | 模板字符串整段被剥离，`${}` 里的宿主/Node 访问不报；固定的 `typescript@7.0.2` 没有 JS 编译器 API，可用已有 `vite.parseAst` | 批次：用 `parseAst` 补模板插值、`process.*` 与上述标识符规则 |
+| 检查器盲区 | **模板插值部分已关闭（R3）**：改用 Vite 自带的解析器读语法树，`${}` 里的 `require`、宿主引用受检查，字符串/注释/正则文字不再误报；固定的 `typescript@7.0.2` 没有 JS 编译器 API。尚未做：`process.*` 等 Node 全局的进一步限制、核心无 Node 编译 | 批次：超出原白名单的增强规则与 `types: []` 核心编译 |
 | 插件 `any` | `PS_BattleFlow.ts` 约 46 行；插件直接读 `s.gw.readState` 两处 | 批次/第六步：类型化应用门面 |
 | 保存阶段 | `PS_SaveState.beforeSave` 不检查战斗中（靠场景约束） | 第四步保存用例加守卫与场景 |
 | 性能 | 冷启动比候选记录慢约 190–200 ms、引擎动作延迟 +1.5–2 ms，原因未判定，且没有同条件基线 | 批次入口先补同条件基线；不能宣称无退化 |
 | 范围 | 首版单打；双打、长尾后置；Windows/Intel 暂缓（用户决定） | 第四步后重估；平台见 `PROJECT-GUIDE.md` |
 
+## 第三步限定整改（独立验收 `e0a6be5` 后，2026-10-19）
+
+独立验收（Codex，报告 `.independent-reviews/step3-20261019/REPORT.zh.md`，在工作区、不在 git 里）结论“不通过”，4 项 P2，均是第三步**原有要求**的缺口（不是新增架构要求）。整改在分支 `step3/rework-r1-r4`，按提交逻辑拆开，可单独回退：
+
+| 项 | 问题 | 整改 | 提交 | 回归 |
+|---|---|---|---|---|
+| R1 | 缺失 key `constructor`/`toString` 命中对象原型，`has` 为真，`t`/`tOr` 抛 `TypeError`（违反 B2/验收 #5） | 只认自有的字符串值；`has`、`t`、`tOr`、回退链、`font`、`checkLocale`、`translatorFor` 同一语义 | `7631c6a` | `test-i18n.cjs` +4：两语言的原型同名缺失 key、真实同名 key、非字符串值与语言名、`checkLocale` |
+| R3 | 模板插值里的 `require` 同时通过边界检查和严格 TS（违反 A3/验收 #2） | 检查器用语法树识别可执行表达式，只清除字符串/模板文字/正则文字 | `9290648` | `check-boundaries.test.cjs` +5：模板 require、宿主引用、嵌套模板、文字不误报、类型/动态 import 与解析失败；旧检查器上 4 项失败 |
+| R4 | overlay 把 `species/blastoise` 的 `nameKey` 改成 `species.charizard`，编译与组装成功，水箭龟显示成喷火龙（违反 B1） | 在**合并后**的记录上重验唯一性；错误定位到 `overlays.json [i].set.nameKey`，点名冲突实体及来源；互换 key、改到刚空出的 key 仍合法；失败仍删除旧产物 | `00b963c` | `test-content.cjs` +5（含 CLI 删除旧产物） |
+| R2 | 生产 `flow/session.ts` 持有 Showdown 内部对象并读写网关内部状态（违反 A3“内部耦合集中在适配层”） | 网关新增 `activeId`、`awaitingChoice`（返回拷贝）、`drain/discardQueued`、`checkpoint/fromCheckpoint`（冻结、无字段的不透明令牌，无法由数据伪造）；会话保留互斥、双错误、封闭、PRNG/seq/消息顺序；检查器按标识符（含计算键、解构、模板）禁止在 battle/tools 之外使用网关内部 | `bef2474`、`d9a9779` | 新增 `test-gateway-boundary.cjs`（5）；检查器 +2；F3 与 fail-closed 用例原样通过；对真实 `session.ts` 的变异被拒 |
+
+本地：`scripts/test-quick.sh` 21 套件 **168 项**通过（含冻结协议、矩阵、F1–F3、失败封闭）。宿主与打包验证在整改后的代码提交 `d9a9779` 上重做（NW.js 0.117.0、Node 26.7.0；包内 `gitHead` = `d9a9779`、工作树无改动、ad hoc 签名）：开发树 T1–T11 + V1 通过；包内 T1–T11、V1、S1–S10、SL1 通过，签名封印有效，S1–S10 指纹与 Node 及旧基线逐个相同；**引擎包哈希 `3e2267c3c43f96f7bc7d4274b5bd572b7d874a4193ce231849fa7ba583547acc`**（包内 = Node 加载）。`22842be4…` 是整改前的引擎，其宿主证据不适用于现在的运行时。证据：`experiments/step3/evidence/rework/`。性能仍然是：**没有同条件基线，未证明无退化**；冷启动 +190–200 ms、动作 +1.5–2 ms 的差异原因未判定，本次没有测性能。

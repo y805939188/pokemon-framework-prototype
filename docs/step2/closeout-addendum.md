@@ -55,7 +55,7 @@
 
 | 范围 | 提交 | 结果 |
 |---|---|---|
-| `scripts/test-quick.sh`（类型检查、导入边界、20 套件共 147 项） | `d48e43d`（含 8f74769 的 T11 场景源码） | 通过；`experiments/step3/evidence/closeout/test-quick.log` |
+| `scripts/test-quick.sh`（类型检查、导入边界、20 套件共 147 项） | `d48e43d`（含 8f74769 的 T11 场景源码） | 通过（作者当时的 147 项结果）。**该日志没有入库**——`*.log` 被 `.gitignore` 忽略，当时也没有另存，这里不补造；可核的替代证据：独立复核在 `e0a6be5` 上重跑为 147/147，第三步整改后的 quick 日志见 `experiments/step3/evidence/rework/test-quick.txt` |
 | 新测试的先红后绿 | A：`test-session-failure.cjs` 在修复前 5 败 1 过（那 1 项过得过松，已收紧）；B：harness 用例修复前失败；seq 用例对“不恢复 seq/queue”的变异失败、对真实代码通过 | 作者本地运行；无保存的 TAP |
 | 完整构建 | `d48e43d` 的验证拷贝 | `run-package-tests-mac.sh` 内部构建通过 |
 | 真实 NW.js 开发树流程 | `d48e43d`（验证拷贝，无工作树改动） | 通过：T1–T11（含 T11）、V1 |
