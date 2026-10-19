@@ -1,0 +1,20 @@
+[
+  {
+    "id": "showdown",
+    "kind": "showdown",
+    "description": "Battle data (base stats, display names, move names) is read from the pinned Pokemon Showdown build at run time and is never copied into the framework content.",
+    "license": "MIT (code and data files of the smogon/pokemon-showdown repository); the data describes a franchise whose rights belong to its owners, so the MIT grant does not by itself settle redistribution of the game data inside a product",
+    "ref": "https://github.com/smogon/pokemon-showdown at the SHA in scripts/showdown.env",
+    "status": "confirmed",
+    "usedFor": ["species.showdownId", "learnset move names", "base stats at run time"]
+  },
+  {
+    "id": "author-placeholder",
+    "kind": "author-placeholder",
+    "description": "Numbers typed by the project authors to exercise the pipeline and the battle flow (growth curve, base experience, EV yield, catch rate, level-up moves). They are NOT claimed to match any game and must be replaced by a properly sourced dataset before any release.",
+    "license": "project-authored test data; no third-party terms apply, and no claim of equivalence with any commercial game is made",
+    "ref": "docs/step2/2.3-report.md (stand-in values entered by hand at step 2.3)",
+    "status": "placeholder",
+    "usedFor": ["species.growth", "species.baseExp", "species.evYield", "species.catchRate", "species.learnset"]
+  }
+]

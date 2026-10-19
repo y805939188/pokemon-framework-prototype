@@ -13,12 +13,14 @@
 | 步 | 内容 | 状态 |
 |---|---|---|
 | 1 | 提取并整改行为规格，建立去向清单 | 已完成（规格库 `dae6776`） |
-| 2 | 验证战斗接入，确定路线和首版范围 | **已完成并经用户决定（C2）**，见 `docs/step2/README.md` |
-| 3 | 工程与测试基础：模块边界、构建/CI、内容数据、本地化、存档基础、第一条 Ruby/TS 对照测试链 | 未开始 |
+| 2 | 验证战斗接入，确定路线和首版范围 | **已完成并经用户决定（C2）**，补充修复已于 2026-10-19 收口（标签 `step2-closeout`），见 `docs/step2/README.md`、`docs/step2/closeout-addendum.md` |
+| 3 | 工程与测试基础：模块边界、构建/CI、内容数据、本地化、存档基础、第一条 Ruby/TS 对照测试链 | **A/B/C 已实现；首次独立验收（`e0a6be5`）不通过，4 项 P2 已整改（`step3/rework-r1-r4`），待针对整改差异的复核**（`docs/step3/README.md`、复核包 `docs/step3/review-package.md`）；第二步补充收口见 `docs/step2/closeout-addendum.md` |
 | 4 | 最小可玩闭环（获得精灵→遭遇→战斗/捕获→成长→治疗→存档读档） | 未开始 |
 | 5 | 按功能族扩展，每批交付规则、接口、UI、事件入口、测试和示例 | 未开始 |
 | 6 | 作者工具与 Demo（用户会自制符合 MZ 规格的美术资源） | 未开始 |
 | 7 | 平台、存档、性能、分发验收，发布可用版本 | 未开始 |
+
+**后续决定（用户，2026-10-19，聊天）**：Windows/Intel Mac 暂不作为首个发布版本的条件，先把本机 macOS 做好再考虑跨平台；先实现单打，双打和长尾功能等框架基础稳定后迭代加入；第四步前的“短架构批次”（核心独立入口、战斗适配内部封装、应用+假适配器测试、真实 MZ 同契约验证）**不纳入第三步收口**，作为第四步开工前的独立批次；第二步补充修复经另一个 Codex agent 审核后收口。
 
 **C2 决定（用户，2026-10-18）**：继续 Showdown-in-MZ/Reactor 路线；首版只做单打；双打界面和长尾功能（Safari、抢夺、暗影、录像、战中存档、超级进化等）后做，每个先做规格核对；Windows 和 Intel Mac 暂缓，目前只验证 macOS Apple Silicon。用户的其他决定见 `docs/step2/c2-decision.md` 和 `docs/step2/deviations.md`。
 
@@ -62,29 +64,28 @@
 
 **战斗接入路线（第二步已验证）**：Showdown 以固定提交（`scripts/showdown.env`）构建并裁剪后放在 `js/engine/showdown/`（git 忽略）。RPG 行为不改 Showdown 源码，而是用它支持的扩展点：
 
-- `js/engine/rpg/custom-formats.cjs` 经 `build-showdown.sh` 放进 `dist/config/custom-formats.js`，定义 `[Gen 8] RPG Custom Game`（单打/双打）及事件 `RpgAction`。
+- `src/framework/battle/custom-formats.ts`（构建成自包含的 `js/engine/build/custom-formats.cjs`）经 `build-showdown.sh` 放进 `dist/config/custom-formats.js`，定义 `[Gen 8] RPG Custom Game`（单打/双打）及事件 `RpgAction`。
 - 道具、精灵球、逃跑作为引擎队列里的 `event` 动作（优先级 99：换人之后、招式之前）在回合内结算；载荷放在会被快照序列化的 `battle.rpg.pending`；随机数一律走战斗随机入口。
-- 游戏规则层（`js/engine/game/`）负责成长（曲线、经验、EV、升级、学招）、背包台账、持久状态与写回；引擎只被告知结果，并与游戏规则交叉校验。
+- 游戏规则层负责成长（曲线、经验、EV、升级、学招）、背包台账、持久状态与写回；引擎只被告知结果，并与游戏规则交叉校验。
+- **第三步起源码在 `src/framework/`（严格 TS，业务模块之间一律 `import`）**，分层：`rules/`（纯规则与状态/存档 schema）、`content/`（内容 schema 与编译）、`battle/`（Showdown 适配；`showdown-loader.ts` 是**唯一**允许 `require` 的文件，因为 NW.js 里 Showdown 只能 `require`，`import()` 实测失败）、`flow/`（BattleSession、文字描述、日志、内容组装）、`i18n/`（文本 key 与翻译）、`tools/`（夹具、矩阵、harness、存档存储、内容 CLI）。依赖方向由 `scripts/check-boundaries.cjs` 强制（21 个测试证明每条规则都会失败）；它用 Vite 自带的解析器读语法树（所以要先 `pnpm --dir src install`），**网关的内部状态（`_debugBattle`、`_env`、`_queue`、`_seq`、`_closed` 等）只允许 battle 层和 tools 使用**，flow 只用网关的值查询、受控操作和不透明检查点。Vite 把它们构建成 `js/engine/build/engine.cjs`（API）、`custom-formats.cjs`（运行在 Showdown 里，由 `build-showdown.sh` 暂存）和 `content-cli.cjs`；`js/engine/**/*.cjs` 现在只是兼容门面，**不要往里加逻辑**。
 
-所有权：引擎拥有 HP、持久状态异常、PP 和全部战斗临时状态；`BattleSession` 拥有背包台账、参战者、成长与学招、捕获记录；**持久游戏状态在战斗期间不被改动**，只通过 `BattleResult`（协议 v1）一次性、幂等地提交（`applyBattleResult`，按 `battleId`）。写集：`level, exp, hp, status, moves, evs, friendship`（+背包/图鉴/金钱）。协议 v1 已冻结（范围见 `docs/step2/protocol-v1.md`，由 `protocol-v1.frozen.json` 和契约测试守护）。
+所有权：引擎拥有 HP、持久状态异常、PP 和全部战斗临时状态；`BattleSession` 拥有背包台账、参战者、成长与学招、捕获记录；**持久游戏状态在战斗期间不被改动**，只通过 `BattleResult`（协议 v1）一次性、幂等地提交（`applyBattleResult`，按 `battleId`）。写集：`level, exp, hp, status, statusCount, moves, evs, friendship`（+背包/图鉴/金钱）。持久状态文档有自己的版本（schema 2；`docs/step3/save-and-ledger.md`），与协议版本无关。协议 v1 已冻结（范围见 `docs/step2/protocol-v1.md`，由 `protocol-v1.frozen.json` 和契约测试守护）。
 
-MZ 侧：`src/plugins/PS_BattleFlow.ts`（插件命令 `StartBattle`、解释器等待、占位文字战斗场景；游戏状态放在 MZ 存档 `$gameSystem._psGame` 里）、`PS_RuntimeFixes.ts`（修 RPGReactor 在 PixiJS 8 上的两个内存泄漏）、`PS_SaveLocation.ts`（打包后存档放包外）、`PS_BattleSmoke/PS_BattleFlowTest.ts`（冒烟与自动化测试驱动，无参数时不工作）。
+MZ 侧：`src/plugins/PS_BattleFlow.ts`（插件命令 `StartBattle`、解释器等待、占位文字战斗场景；游戏状态放在 MZ 存档 `$gameSystem._psGame` 里）、`PS_RuntimeFixes.ts`（修 RPGReactor 在 PixiJS 8 上的两个内存泄漏）、`PS_SaveLocation.ts`（打包后存档放包外）、`PS_SaveState.ts`（MZ 存档里的状态版本：载入迁移/诊断，存前校验）、`PS_BattleSmoke/PS_BattleFlowTest.ts`（冒烟与自动化测试驱动，无参数时不工作）。
 
 ## 7. 仓库地图
 
 ```
 docs/PROJECT-GUIDE.md        本文件
-docs/step2/                  第二步的全部结论（入口 docs/step2/README.md）
-js/engine/                   运行时代码（CommonJS，打进游戏包）
-  gateway.cjs                Showdown 的薄异步网关（JSON 进出）
-  harness.cjs, matrix.cjs    Node 与包内共用的冒烟/场景矩阵（S1–S10）
-  game/                      成长规则、状态与写回契约、原子存档、BattleSession、文字描述
-  rpg/                       RPG 扩展（custom-formats、规则数值）
-  fixtures/                  测试夹具与黄金基线
-  showdown/                  构建产物（git 忽略，build-showdown.sh 生成）
-src/plugins/                 TypeScript 插件源码（Vite 构建到 js/plugins/，输出被忽略）
-scripts/                     引导、构建、打包、签名、测试、诊断脚本
-experiments/step2/           第二步的测试、探针、证据（evidence/ 见其 MANIFEST.md）
+docs/step2/ docs/step3/      第二、三步的全部结论（入口 docs/step2/README.md、docs/step3/README.md）
+src/framework/               引擎与规则源码（严格 TS；rules content battle flow i18n tools，见第 6 节）
+src/plugins/                 MZ 插件源码（Vite 构建到 js/plugins/，输出被忽略）
+src/vite*.mts                插件与引擎包的构建配置
+content/sample/              内容作者源（JSON）；编译产物 data/framework/content.json（git 忽略）
+js/engine/                   运行时：build/（构建产物，忽略）、*.cjs 兼容门面、fixtures/（JSON 夹具与基线）、showdown/（构建产物，忽略）
+scripts/                     引导、构建、打包、签名、CI 辅助、测试、诊断脚本
+experiments/step2/ step3/    测试、探针、证据（evidence/ 见其 MANIFEST.md；step3/reference/ 是参考观察交付包）
+.github/workflows/ci.yml     CI（headless + plugins 两层；窗口测试不在 CI）
 data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ 素材，素材被本地排除，不提交）
 ```
 
@@ -92,9 +93,10 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 
 | 目的 | 命令 | 代价 |
 |---|---|---|
-| 快速自检（类型检查 + 全部 Node 测试 + 引擎契约检查，无窗口） | `scripts/test-quick.sh` | 便宜（本机实测 7 s），评审和日常首选；任何一个套件失败都会点名 |
-| 构建插件 | `pnpm --dir src build`（类型检查：`pnpm --dir src typecheck`） | 便宜 |
-| 构建/裁剪引擎 | `scripts/build-showdown.sh` | 首次约 1–2 分钟（下载依赖） |
+| 快速自检（插件类型检查 + 框架类型检查 + 导入边界 + 构建引擎包 + 全部 Node 测试，无窗口） | `scripts/test-quick.sh`（无 Reactor 类型包时用 `scripts/test-headless.sh`，CI 第 1 层就是它） | 便宜（本机实测 7 s），评审和日常首选；任何一个套件失败都会点名 |
+| 构建一切（引擎包、内容、插件） | `pnpm --dir src build`（只构建引擎包：`build:engine`；内容：`content:build`/`content:check`/`content:inventory`；类型检查：`typecheck`） | 便宜 |
+| 构建/裁剪 Showdown（并暂存 RPG 扩展） | `pnpm --dir src build:engine` 之后 `scripts/build-showdown.sh` | 首次约 1–2 分钟（下载依赖） |
+| 读取 CI 结果（无凭据，读公开页面） | `scripts/ci-status.sh <分支>` | 读不到就是未验证，不是通过 |
 | 游戏内流程测试（开 NW.js 窗口，真实按键/事件/存档） | `scripts/run-flow-test-mac.sh` | 几分钟，弹窗口 |
 | 打包（不用 MZ 部署） | `scripts/package-mac.sh [--with-tests] [--harden] [--identity ID]` | 约半分钟，约 545 MiB（557,964 KB） |
 | 包内完整测试（流程 + 场景矩阵 + 存档位置 + 签名封印） | `scripts/run-package-tests-mac.sh`（`PF_PACKAGE_ARGS=--harden` 用硬化运行时） | 几分钟，弹窗口 |
@@ -102,7 +104,7 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 
 测试脚本运行时窗口失焦、静音都不影响结果（见 `docs/step2/runtime-issues.md`）；脚本从不写玩家的存档槽（包内存档位置检查只用一个空闲的高位槽并还原；流程测试用 `--ps-save-dir`），也不会杀掉不是自己启动的进程（若已有打包应用在运行会拒绝启动）。
 
-改了 `js/engine/rpg/*.cjs` 之后必须重新 `scripts/build-showdown.sh`（引擎用的是 `dist/config/` 里的拷贝，`test-engine-contract.cjs` 会在两份不同时报错）。故意改变行为后：`node experiments/step2/s5/update-matrix-baseline.cjs`（矩阵指纹基线）与 `node experiments/step2/s5/protocol-freeze.cjs --update`（协议冻结文件）只在有意为之时运行，并在提交里说明。升级 Showdown 固定提交时先跑 `test-engine-contract.cjs`。
+改了 `src/framework/**` 之后必须重新 `pnpm --dir src build:engine`；改了 `battle/custom-formats.ts` 或 `rules/rules.ts` 还要重新 `scripts/build-showdown.sh`（Showdown 里用的是暂存的拷贝，`test-engine-contract.cjs` 会在拷贝与构建产物不同时报错）。故意改变行为后：`node experiments/step2/s5/update-matrix-baseline.cjs`（矩阵指纹基线）与 `node experiments/step2/s5/protocol-freeze.cjs --update`（协议冻结文件）只在有意为之时运行，并在提交里说明。升级 Showdown 固定提交时先跑 `test-engine-contract.cjs`。
 
 ## 9. 环境准备（从零）
 
@@ -111,6 +113,7 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 ```bash
 cd pokemon-framework-prototype
 REACTOR_SOURCE=/Users/dingshinn/Desktop/RPGReactor ./scripts/bootstrap-mac.sh   # Reactor 运行时、MZ 素材、依赖、类型检查、构建、doctor（20 项应全过）
+pnpm --dir src build:engine                                                                  # 引擎包（Showdown 扩展由它暂存）
 ./scripts/build-showdown.sh                                                                 # 固定提交的 Showdown → js/engine/showdown
 pnpm --dir src build                                                                        # 插件
 ./scripts/test-quick.sh                                                                     # 自检
@@ -145,5 +148,5 @@ pnpm --dir src build                                                            
 ## 12. 分支、标签与提交约定
 
 - `main` 是唯一长期分支；新工作开短期分支，合并后删除。远端与本地保持一致。
-- 阶段里程碑用标签保留：`step2.1-accepted`、`step2.2-feasibility`、`step2.3-c1`、`step2.4-mz-flow`、`step2.5-c2`、`step2.runtime-pass`；独立评审的基线标签是 `step2-review-baseline`（指向 `2e5f2e5`，评审报告审查的就是它）；`step2-review-fixes` 是评审修复完成时的状态（`c2a3e29`，在用户决定 D1–D5 落地之前）；**`step2-closed` 是第二步收尾时的最终状态**。评审后的修复与决定见 `docs/step2/review-followups.md`。
+- 阶段里程碑用标签保留：`step2.1-accepted`、`step2.2-feasibility`、`step2.3-c1`、`step2.4-mz-flow`、`step2.5-c2`、`step2.runtime-pass`；独立评审的基线标签是 `step2-review-baseline`（指向 `2e5f2e5`，评审报告审查的就是它）；`step2-review-fixes` 是评审修复完成时的状态（`c2a3e29`，在用户决定 D1–D5 落地之前）；**`step2-closed` 是第二步收尾时的最终状态**；第三步在短期分支 `step3/foundation` 上做，**独立复核通过后**才合并并打 `step3-closed`。评审后的修复与决定见 `docs/step2/review-followups.md`。
 - 提交信息写清做了什么和为什么；AI 协作提交按所用工具要求添加署名行。

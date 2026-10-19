@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: concurrent duplicate item calls accept one, spend one and leave no reservation or missing request
+ok 1 - concurrent duplicate item calls accept one, spend one and leave no reservation or missing request
+  ---
+  duration_ms: 217.412625
+  type: 'test'
+  ...
+# Subtest: replacing a staged selection releases it before checking inventory; replacing it by a move spends nothing
+ok 2 - replacing a staged selection releases it before checking inventory; replacing it by a move spends nothing
+  ---
+  duration_ms: 9.23875
+  type: 'test'
+  ...
+# Subtest: an in-flight item excludes competing moves/cancel; a later cancel is idempotent
+ok 3 - an in-flight item excludes competing moves/cancel; a later cancel is idempotent
+  ---
+  duration_ms: 5.922708
+  type: 'test'
+  ...
+# Subtest: registration refusal and an exception before registration release funds and permit a retry
+ok 4 - registration refusal and an exception before registration release funds and permit a retry
+  ---
+  duration_ms: 5.94575
+  type: 'test'
+  ...
+# Subtest: an exception after registration restores both the engine choice and the session ledger
+ok 5 - an exception after registration restores both the engine choice and the session ledger
+  ---
+  duration_ms: 3.571916
+  type: 'test'
+  ...
+# Subtest: an exception after engine execution rolls back HP/PP/RNG/events and can be retried once
+ok 6 - an exception after engine execution rolls back HP/PP/RNG/events and can be retried once
+  ---
+  duration_ms: 4.804375
+  type: 'test'
+  ...
+# Subtest: AI exceptions and refused AI choices cannot leave a successful-looking unresolved turn
+ok 7 - AI exceptions and refused AI choices cannot leave a successful-looking unresolved turn
+  ---
+  duration_ms: 6.557875
+  type: 'test'
+  ...
+# Subtest: commitTurn resolves a staged action once; concurrent and repeated commits are refused
+ok 8 - commitTurn resolves a staged action once; concurrent and repeated commits are refused
+  ---
+  duration_ms: 3.729334
+  type: 'test'
+  ...
+# Subtest: doubles shares the operation guard and settles each accepted reservation
+ok 9 - doubles shares the operation guard and settles each accepted reservation
+  ---
+  duration_ms: 4.054458
+  type: 'test'
+  ...
+# Subtest: a failed foe replacement restores partial growth and can be retried
+ok 10 - a failed foe replacement restores partial growth and can be retried
+  ---
+  duration_ms: 11.02825
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 332.641625

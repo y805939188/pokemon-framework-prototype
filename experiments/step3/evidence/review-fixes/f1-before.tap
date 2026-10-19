@@ -1,0 +1,106 @@
+TAP version 13
+# (node:75217) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: ordinary menu rejects empty/disabled moves and engine rejects an illegal index without advancing
+ok 1 - ordinary menu rejects empty/disabled moves and engine rejects an illegal index without advancing
+  ---
+  duration_ms: 239.18425
+  type: 'test'
+  ...
+# Subtest: Struggle with no PP fields is selectable, executes and never displays undefined PP
+not ok 2 - Struggle with no PP fields is selectable, executes and never displays undefined PP
+  ---
+  duration_ms: 5.181959
+  type: 'test'
+  location: '/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-baseline/experiments/step3/test-move-requests.cjs:47:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-baseline/experiments/step3/test-move-requests.cjs:51:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: Fly locks the next request to a PP-less move; its second turn completes
+not ok 3 - Fly locks the next request to a PP-less move; its second turn completes
+  ---
+  duration_ms: 6.085708
+  type: 'test'
+  location: '/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-baseline/experiments/step3/test-move-requests.cjs:58:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-baseline/experiments/step3/test-move-requests.cjs:64:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: default singles AI advances a no-PP Struggle request
+not ok 4 - default singles AI advances a no-PP Struggle request
+  ---
+  duration_ms: 1.717
+  type: 'test'
+  location: '/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-baseline/experiments/step3/test-move-requests.cjs:70:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    'move 0' !== 'move 1'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move 1'
+  actual: 'move 0'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-baseline/experiments/step3/test-move-requests.cjs:73:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: default AI handles a real recharge request and a doubles PP-less slot
+not ok 5 - default AI handles a real recharge request and a doubles PP-less slot
+  ---
+  duration_ms: 3.56375
+  type: 'test'
+  location: '/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-baseline/experiments/step3/test-move-requests.cjs:79:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    'move 0' !== 'move 1'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'move 1'
+  actual: 'move 0'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-baseline/experiments/step3/test-move-requests.cjs:87:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 1
+# fail 4
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 313.576917

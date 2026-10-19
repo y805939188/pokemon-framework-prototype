@@ -1,0 +1,102 @@
+/**
+ * Content tooling entry (built to js/engine/build/content-cli.cjs): `build`, `check`, `inventory`.
+ *   build      compile content/<src> into data/framework/content.json (a failed build REMOVES the old output, so a
+ *              stale artifact can never hide broken or missing inputs)
+ *   check      the compiled file exists and is the build of exactly the current inputs
+ *   inventory  compare the sample with the pinned Showdown data and write a machine-readable report
+ * Paths are resolved from the project root, not from the working directory.
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { canonicalJson, checkFresh, compileContent } from "../content/compile.ts";
+import type { CompiledContent, ContentError, ContentInputs } from "../content/schema.ts";
+import { createDexLookup } from "../battle/dex.ts";
+import { assembleContent } from "../flow/content-runtime.ts";
+
+const ROOT = path.resolve(__dirname, "..", "..", ".."); // js/engine/build -> project root
+const arg = (name: string, dflt: string): string => {
+  const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
+  return path.resolve(ROOT, hit ? hit.slice(name.length + 3) : dflt);
+};
+
+function readInputs(dir: string): { inputs: ContentInputs; errors: ContentError[] } {
+  const errors: ContentError[] = [];
+  const read = (file: ContentError["file"]): unknown => {
+    try { return JSON.parse(fs.readFileSync(path.join(dir, file), "utf8")); }
+    catch (e) { errors.push({ file, path: "$", message: `cannot read as JSON: ${(e as Error).message}` }); return undefined; }
+  };
+  const inputs = { manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json") };
+  return { inputs, errors };
+}
+
+const show = (errors: ContentError[]): void => { for (const e of errors) console.error(`${e.file} ${e.path}: ${e.message}`); };
+
+export function build(src: string, out: string): number {
+  const { inputs, errors } = readInputs(src);
+  const r = errors.length ? { ok: false as const, errors } : compileContent(inputs);
+  if (!r.ok) {
+    show(r.errors);
+    try { fs.unlinkSync(out); } catch { /* nothing to remove */ }
+    console.error(`content build FAILED (${r.errors.length} problem(s)); the previous compiled output was removed`);
+    return 1;
+  }
+  const text = canonicalJson(r.data, 2) + "\n";
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== text) fs.writeFileSync(out, text);
+  console.log(`content built: ${r.data.species.length} species, inputs ${r.data.inputsHash.slice(0, 12)} -> ${path.relative(ROOT, out)}`);
+  return 0;
+}
+
+export function check(src: string, out: string): number {
+  const { inputs, errors } = readInputs(src);
+  if (errors.length) { show(errors); return 1; }
+  let compiled: unknown;
+  try { compiled = JSON.parse(fs.readFileSync(out, "utf8")); } catch { compiled = undefined; }
+  const stale = checkFresh(compiled, inputs);
+  if (stale) { show([stale]); return 1; }
+  console.log("compiled content is current");
+  return 0;
+}
+
+type Cmp = "consistent" | "differs" | "framework-only";
+export function inventory(src: string, report: string): number {
+  const { inputs, errors } = readInputs(src);
+  const r = errors.length ? { ok: false as const, errors } : compileContent(inputs);
+  if (!r.ok) { show(r.errors); return 1; }
+  const dex = createDexLookup();
+  const assembled = assembleContent(r.data as CompiledContent, dex);
+  if (assembled.errors.length) { show(assembled.errors); return 1; }
+  const tally: Record<Cmp, number> = { consistent: 0, differs: 0, "framework-only": 0 };
+  const rows = r.data.species.map((sp) => {
+    const sd = dex.levelUpMoves(sp.showdownId) ?? {};
+    const learns = sp.learnset.map((e) => {
+      const theirs = sd[e.move];
+      const c: Cmp = !theirs ? "framework-only" : theirs.includes(e.level) ? "consistent" : "differs";
+      tally[c]++;
+      return { level: e.level, move: e.move, comparison: c, showdownGen8Levels: theirs ?? [] };
+    });
+    return {
+      id: sp.id, showdownId: sp.showdownId, battleMapping: "found" as const,
+      baseStats: "showdown-only (read at run time; not stored in framework content)",
+      frameworkOnlyFields: ["growth", "baseExp", "evYield", "catchRate"],
+      learnset: { authored: sp.learnset.length, showdownGen8LevelUpMoves: Object.keys(sd).length, entries: learns },
+    };
+  });
+  const doc = {
+    schema: 1, contentId: r.data.contentId, inputsHash: r.data.inputsHash, showdownSha: dex.sha(),
+    note: "Field-level inventory only. Equal data is not equal behaviour. Framework-only fields have no Showdown counterpart to compare; the sample learnsets are synthetic placeholders, so 'differs' and 'framework-only' are expected there.",
+    summary: { species: rows.length, learnComparisons: tally },
+    species: rows,
+  };
+  fs.mkdirSync(path.dirname(report), { recursive: true });
+  fs.writeFileSync(report, canonicalJson(doc, 2) + "\n");
+  console.log(`inventory: ${rows.length} species, learn entries ${JSON.stringify(tally)} -> ${path.relative(ROOT, report)}`);
+  return 0;
+}
+
+const cmd = process.argv[2];
+const SRC = arg("src", "content/sample");
+if (cmd === "build") process.exit(build(SRC, arg("out", "data/framework/content.json")));
+else if (cmd === "check") process.exit(check(SRC, arg("out", "data/framework/content.json")));
+else if (cmd === "inventory") process.exit(inventory(SRC, arg("report", "docs/step3/content-inventory.json")));
+else { console.error("usage: content-cli.cjs build|check|inventory [--src=content/sample] [--out=...] [--report=...]"); process.exit(2); }

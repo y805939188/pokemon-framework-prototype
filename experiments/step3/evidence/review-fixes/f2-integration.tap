@@ -1,0 +1,204 @@
+TAP version 13
+# Subtest: curves: anchors and reverse conversion (WP30 3.2)
+ok 1 - curves: anchors and reverse conversion (WP30 3.2)
+  ---
+  duration_ms: 1.058667
+  type: 'test'
+  ...
+# Subtest: battle exp: G11 CATERPIE vector and ordering of floors (WP30 4.2)
+ok 2 - battle exp: G11 CATERPIE vector and ordering of floors (WP30 4.2)
+  ---
+  duration_ms: 0.171625
+  type: 'test'
+  ...
+# Subtest: HP after recalculation (WP19 5.5); fainted-revival is a compat switch, off by default
+ok 3 - HP after recalculation (WP19 5.5); fainted-revival is a compat switch, off by default
+  ---
+  duration_ms: 0.081666
+  type: 'test'
+  ...
+# Subtest: game-rule stats equal Showdown stats for random species/levels/EVs/natures
+ok 4 - game-rule stats equal Showdown stats for random species/levels/EVs/natures
+  ---
+  duration_ms: 221.862833
+  type: 'test'
+  ...
+# Subtest: EV gain clamps per stat and in total (WP30 4.4)
+ok 5 - EV gain clamps per stat and in total (WP30 4.4)
+  ---
+  duration_ms: 0.199542
+  type: 'test'
+  ...
+# Subtest: KO -> exp/EV/level-up -> learn prompt -> next request and next action use the new state
+ok 6 - KO -> exp/EV/level-up -> learn prompt -> next request and next action use the new state
+  ---
+  duration_ms: 16.486416
+  type: 'test'
+  ...
+# Subtest: declining a learn keeps the move set; exp/level changes remain
+ok 7 - declining a learn keeps the move set; exp/level changes remain
+  ---
+  duration_ms: 4.249917
+  type: 'test'
+  ...
+# Subtest: free slot learns immediately without a prompt; partial HP follows the HP rule
+ok 8 - free slot learns immediately without a prompt; partial HP follows the HP rule
+  ---
+  duration_ms: 5.758125
+  type: 'test'
+  ...
+# Subtest: bench members get nothing; fainted participants get nothing; paid once per foe
+ok 9 - bench members get nothing; fainted participants get nothing; paid once per foe
+  ---
+  duration_ms: 5.978125
+  type: 'test'
+  ...
+# Subtest: two participants both receive exp (default rules: no splitting)
+ok 10 - two participants both receive exp (default rules: no splitting)
+  ---
+  duration_ms: 8.485833
+  type: 'test'
+  ...
+# Subtest: review \#2: an EV gain that crosses a multiple of 4 must not break the HP rule (no level-up and with level-up)
+ok 11 - review \#2: an EV gain that crosses a multiple of 4 must not break the HP rule (no level-up and with level-up)
+  ---
+  duration_ms: 4.68025
+  type: 'test'
+  ...
+# Subtest: review \#2: applyExp takes the old max HP from the record BEFORE the EV gain (and recalculates on EV-only gains)
+ok 12 - review \#2: applyExp takes the old max HP from the record BEFORE the EV gain (and recalculates on EV-only gains)
+  ---
+  duration_ms: 0.176417
+  type: 'test'
+  ...
+# Subtest: stable identity: switching changes engine slots, not which persistent member is written
+ok 13 - stable identity: switching changes engine slots, not which persistent member is written
+  ---
+  duration_ms: 246.5185
+  type: 'test'
+  ...
+# Subtest: write set: nothing outside the allowed fields changes; bag deltas and ledger are exact
+ok 14 - write set: nothing outside the allowed fields changes; bag deltas and ledger are exact
+  ---
+  duration_ms: 16.587292
+  type: 'test'
+  ...
+# Subtest: item ledger: cancel refunds once, ineligible use is refused up front, execution-time no-effect refunds once (also at the end), failed throw is spent
+ok 15 - item ledger: cancel refunds once, ineligible use is refused up front, execution-time no-effect refunds once (also at the end), failed throw is spent
+  ---
+  duration_ms: 15.659666
+  type: 'test'
+  ...
+# Subtest: capture: caught member gets a stable id, exp is paid for the capture, dex updated, ball consumed once
+ok 16 - capture: caught member gets a stable id, exp is paid for the capture, dex updated, ball consumed once
+  ---
+  duration_ms: 11.305417
+  type: 'test'
+  ...
+# Subtest: idempotency: same result twice applies once; a different result for the same battleId is refused
+ok 17 - idempotency: same result twice applies once; a different result for the same battleId is refused
+  ---
+  duration_ms: 11.829375
+  type: 'test'
+  ...
+# Subtest: abandoned battle (no result) leaves the save byte-identical
+ok 18 - abandoned battle (no result) leaves the save byte-identical
+  ---
+  duration_ms: 3.765209
+  type: 'test'
+  ...
+# Subtest: failure boundary (simulated throws): old-or-new state at every point, retry applies exactly once
+ok 19 - failure boundary (simulated throws): old-or-new state at every point, retry applies exactly once
+  ---
+  duration_ms: 49.606917
+  type: 'test'
+  ...
+# Subtest: failure boundary (REAL process kill): same guarantees when the process dies mid-commit
+ok 20 - failure boundary (REAL process kill): same guarantees when the process dies mid-commit
+  ---
+  duration_ms: 171.320875
+  type: 'test'
+  ...
+# Subtest: persistent status survives, temporary boosts do not
+ok 21 - persistent status survives, temporary boosts do not
+  ---
+  duration_ms: 3.942208
+  type: 'test'
+  ...
+# Subtest: member ids must survive Showdown nickname handling (<=18 safe chars)
+ok 22 - member ids must survive Showdown nickname handling (<=18 safe chars)
+  ---
+  duration_ms: 1.583333
+  type: 'test'
+  ...
+# Subtest: statusCount is a write-set field: validated, applied, and bad poison is stored as plain poison after a battle
+ok 23 - statusCount is a write-set field: validated, applied, and bad poison is stored as plain poison after a battle
+  ---
+  duration_ms: 1.528292
+  type: 'test'
+  ...
+# Subtest: matrix S1..S10 passes, is reproducible and equals the committed fingerprint baseline
+ok 24 - matrix S1..S10 passes, is reproducible and equals the committed fingerprint baseline
+  ---
+  duration_ms: 337.230666
+  type: 'test'
+  ...
+# Subtest: protocol v1: observed shapes and vocabularies equal the frozen contract
+ok 25 - protocol v1: observed shapes and vocabularies equal the frozen contract
+  ---
+  duration_ms: 256.466542
+  type: 'test'
+  ...
+# Subtest: protocol v1: session exposes every frozen call and nothing public is unfrozen
+ok 26 - protocol v1: session exposes every frozen call and nothing public is unfrozen
+  ---
+  duration_ms: 0.202125
+  type: 'test'
+  ...
+# Subtest: protocol v1: every reason observed in the scenarios is declared, and every declared one was provoked
+ok 27 - protocol v1: every reason observed in the scenarios is declared, and every declared one was provoked
+  ---
+  duration_ms: 21.029291
+  type: 'test'
+  ...
+# (node:86216) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: ordinary menu rejects empty/disabled moves and engine rejects an illegal index without advancing
+ok 28 - ordinary menu rejects empty/disabled moves and engine rejects an illegal index without advancing
+  ---
+  duration_ms: 266.288875
+  type: 'test'
+  ...
+# Subtest: Struggle with no PP fields is selectable, executes and never displays undefined PP
+ok 29 - Struggle with no PP fields is selectable, executes and never displays undefined PP
+  ---
+  duration_ms: 10.342625
+  type: 'test'
+  ...
+# Subtest: Fly locks the next request to a PP-less move; its second turn completes
+ok 30 - Fly locks the next request to a PP-less move; its second turn completes
+  ---
+  duration_ms: 9.188042
+  type: 'test'
+  ...
+# Subtest: default singles AI advances a no-PP Struggle request
+ok 31 - default singles AI advances a no-PP Struggle request
+  ---
+  duration_ms: 7.73825
+  type: 'test'
+  ...
+# Subtest: default AI handles a real recharge request and a doubles PP-less slot
+ok 32 - default AI handles a real recharge request and a doubles PP-less slot
+  ---
+  duration_ms: 8.362334
+  type: 'test'
+  ...
+1..32
+# tests 32
+# suites 0
+# pass 32
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 600.454292

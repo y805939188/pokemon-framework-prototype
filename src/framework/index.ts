@@ -1,0 +1,19 @@
+/** Public entry of the engine bundle (js/engine/build/engine.cjs). Namespaces mirror the module responsibilities. */
+export * as growth from "./rules/growth.ts";
+export * as rules from "./rules/rules.ts";
+export * as state from "./rules/state.ts";
+export * as store from "./tools/save-store.ts";
+export * as gateway from "./battle/gateway.ts";
+export * as moveRequests from "./battle/move-requests.ts";
+export * as describe from "./flow/describe.ts";
+export * as session from "./flow/session.ts";
+export * as fixtures from "./tools/fixtures/game.ts";
+export * as harness from "./tools/harness.ts";
+export * as matrix from "./tools/matrix.ts";
+export * as contentSchema from "./content/schema.ts";
+export * as contentCompile from "./content/compile.ts";
+export * as contentRuntime from "./flow/content-runtime.ts";
+export * as dex from "./battle/dex.ts";
+export * as i18n from "./i18n/index.ts";
+export * as log from "./flow/log.ts";
+export * as saveSchema from "./rules/save-schema.ts";

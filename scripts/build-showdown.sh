@@ -31,8 +31,8 @@ for d in sim data lib config; do
 done
 rsync -a "$SRC/node_modules/ts-chacha20/" "$STAGE/node_modules/ts-chacha20/"
 # RPG extension: Showdown merges dist/config/custom-formats.js into its format list.
-cp "$ROOT/js/engine/rpg/custom-formats.cjs" "$STAGE/dist/config/custom-formats.js"
-cp "$ROOT/js/engine/rpg/rules.cjs" "$STAGE/dist/config/rpg-rules.cjs"
+[[ -f "$ROOT/js/engine/build/custom-formats.cjs" ]] || { echo "engine bundles not built: run pnpm --dir src build:engine first" >&2; exit 1; }
+cp "$ROOT/js/engine/build/custom-formats.cjs" "$STAGE/dist/config/custom-formats.js"
 cp "$SRC/LICENSE" "$STAGE/LICENSE"
 printf '%s\n' "$SHOWDOWN_SHA" > "$STAGE/SOURCE_SHA"
 du -sh "$STAGE"

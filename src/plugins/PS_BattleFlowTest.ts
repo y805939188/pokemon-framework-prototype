@@ -284,12 +284,112 @@
       fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected.json"), JSON.stringify(snap));
       return { saveCode: rc, loadCode: lc };
     });
+
+    await scenario("T9 legacy and unusable saves through MZ's own save/load: schema 1 migrates, newer or damaged states are refused and kept", async () => {
+      fresh();
+      const legacy = clone(game()); legacy.schema = 1;
+      for (const m of legacy.party) delete m.statusCount;
+      legacy.party[1].status = "tox"; legacy.party[2].status = "slp";
+      G.$gameSystem._psGame = legacy;
+      const rc1 = await G.DataManager.saveGame(2);
+      G.$gameSystem._psGame = { diverged: true };
+      const lc1 = await G.DataManager.loadGame(2);
+      assert(!G.$gameSystem._psSaveError, "a schema 1 state loads without error");
+      eq([game().schema, game().party[1].status, game().party[1].statusCount, game().party[2].status, game().party[2].statusCount], [2, "psn", 0, "slp", undefined], "migrated on load");
+      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, 2, true], "migration recorded");
+      // a state written by a newer build, and a damaged one
+      for (const [slot, doc, code] of [[3, { ...clone(game()), schema: 9 }, "unknown-version"], [4, "not a state", "corrupt"]] as [number, any, string][]) {
+        G.$gameSystem._psGame = doc;
+        await G.DataManager.saveGame(slot);
+        G.$gameSystem._psGame = { diverged: true };
+        await G.DataManager.loadGame(slot);
+        eq(G.$gameSystem._psSaveError && G.$gameSystem._psSaveError.code, code, "refused with a diagnosis: " + code);
+        eq(G.$gameSystem._psGame, doc, "the raw document is kept exactly as saved");
+        let threw = ""; try { W.PSFlow.game(); } catch (e) { threw = String(e); }
+        assert(new RegExp(code).test(threw), "battles refuse to run on it: " + threw);
+        await startEvent(1);
+        await waitFor(() => { const o = W.PSFlow.lastOutcome; return !!o && o.aborted === true; }, "the battle aborts instead of running on an unusable state");
+        assert(new RegExp(code).test(W.PSFlow.lastOutcome.error), "the abort says why: " + W.PSFlow.lastOutcome.error);
+        eq(G.$gameSystem._psGame, doc, "still untouched after the refused battle (checked before the harness resets the game)");
+        await recover();
+      }
+      fresh();
+      assert(!G.$gameSystem._psSaveError, "an explicit reset clears the diagnosis");
+      return { saveCodes: [rc1], loadCodes: [lc1] };
+    });
+
+    await scenario("T10 a save that refers to content which no longer exists: the battle is refused with the reference named, the state is untouched", async () => {
+      fresh();
+      game().party[1].species = "Missingno"; game().party[0].moves[0].id = "notamove";
+      const before = clone(game());
+      await startEvent(1);
+      await waitFor(() => { const o = W.PSFlow.lastOutcome; return !!o && o.aborted === true; }, "the battle aborts");
+      const msg = W.PSFlow.lastOutcome.error;
+      assert(/species "Missingno" is not in the content "sample"/.test(msg) && /party\[0\]\.moves\[0\]\.id "notamove" is not a move/.test(msg), "the message names both references: " + msg);
+      eq(game(), before, "state untouched by the refused battle");
+      await recover();
+    });
+
+    await scenario("T11 an operation fails and its rollback fails too: the session is closed with both errors kept, nothing is committed, the event still continues", async () => {
+      fresh(); const before = clone(game());
+      const Gateway = nodeRequire("./js/engine/gateway.cjs").BattleGateway;
+      const restore = Gateway.restore;
+      try {
+        await startEvent(1); await inMode("main");
+        const session = battle()._session;
+        const gwChoose = session.gw.choose.bind(session.gw);
+        session.gw.choose = async (...a: any[]) => { const ok = await gwChoose(...a); if (a[0] === "p2") throw new Error("injected operation failure"); return ok; };
+        Gateway.restore = async () => { throw new Error("injected rollback failure"); };
+        await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower/i);
+        await inMode("end");
+        Gateway.restore = restore;
+        assert(battle()._aborted, "scene shows the aborted ending");
+        const msg = W.PSFlow.lastOutcome.error;
+        assert(/injected operation failure/.test(msg) && /injected rollback failure/.test(msg), "both errors reach the outcome: " + msg);
+        assert(session.broken && session.broken.name === "SessionBrokenError", "the session is closed");
+        let refused = false; try { await session.useItem("potion", "A-0001"); } catch (e: any) { refused = e === session.broken; }
+        assert(refused, "a closed session refuses later actions with the same error");
+        let noResult = false; try { session.result(); } catch (e: any) { noResult = e === session.broken; }
+        assert(noResult, "an untrusted result cannot be read");
+        await press("ok"); await dismissMessages();
+        eq(game(), before, "persistent state identical: nothing was committed");
+        assert(W.PSFlow.lastOutcome.aborted && W.PSFlow.lastOutcome.commit === "none" && G.$gameVariables.value(10) === 0, "aborted outcome, nothing committed, variable 0");
+        assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "flow closed and interpreter released");
+      } finally { Gateway.restore = restore; }
+    });
+
+    await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
+      W.PSFlow.setLanguage("zh");
+      try {
+        fresh();
+        await startEvent(1); await inMode("main");
+        eq(names(), ["战斗", "背包", "精灵", "逃跑"], "main menu in Chinese");
+        const fits = (where: string) => {
+          const b = battle();
+          for (const [label, win] of [["log", b._log], ["status", b._status]] as any[]) for (const line of win._lines) assert(win.textWidth(line) <= win.innerWidth, `${where}: ${label} line too wide (${win.textWidth(line)} > ${win.innerWidth}): ${line}`);
+          for (const it of b._menu._items) assert(b._menu.textWidth(it.name) <= b._menu.innerWidth, `${where}: menu item too wide: ${it.name}`);
+        };
+        fits("main");
+        assert(/PingFang|YaHei|Hiragino/.test(battle()._log.contents.fontFace), "the language's font is applied to the windows: " + battle()._log.contents.fontFace);
+        await choose(/^战斗/); await inMode("moves"); fits("moves"); await press("cancel"); await inMode("main");
+        await choose(/^背包/); await inMode("bag"); assert(names().some((n: string) => /伤药/.test(n)), "bag items come from the text keys"); fits("bag"); await press("cancel"); await inMode("main");
+        await choose(/^精灵/); await inMode("party"); assert(names().some((n: string) => /喷火龙/.test(n)), "species names come from the content's text keys"); fits("party"); await press("cancel"); await inMode("main");
+        await choose(/^逃跑/); await inMode("end"); fits("end");
+        assert(battle()._log._lines.some((l: string) => /成功逃走了/.test(l)), "battle log line in Chinese");
+        const all = [...battle()._log._lines, ...battle()._status._lines];
+        assert(!all.some((l: string) => l.includes("[missing:")), "no unresolved key reached the screen");
+        eq(W.PSFlow.translator().diagnostics(), { missingKeys: [], missingParams: [] }, "translator diagnostics are empty");
+        await press("ok"); await dismissMessages();
+      } finally { W.PSFlow.setLanguage(null); }
+    });
   }
 
   /** S1..S10 engine/session matrix (js/engine/matrix.cjs) inside this runtime; fingerprints are compared with a Node run. */
   async function runMatrixMode() {
     const t0 = performance.now();
-    const rows = await nodeRequire("./js/engine/matrix.cjs").runMatrix();
+    const matrixModule = nodeRequire("./js/engine/matrix.cjs");
+    const rows = await matrixModule.runMatrix();
+    report.engineArtifact = matrixModule.artifactInfo(); // hash of the engine bundle this host actually loaded
     report.matrix = rows;
     report.matrixMs = Math.round(performance.now() - t0);
     for (const r of rows) results.push({ id: `${r.id} (matrix)`, status: r.status, ms: r.ms, fingerprint: r.fingerprint, error: r.error });
@@ -529,6 +629,8 @@
     setTimeout(async () => {
       try { if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else await runAll(); }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
+      try { report.contentIdentity = W.PSFlow.content().meta; } catch (e) { report.contentIdentity = { error: String(e) }; }
+      try { report.logTail = W.PSFlow.logger ? W.PSFlow.logger.tail(60) : null; } catch (e) { report.logTail = { error: String(e) }; } // redacted, bounded session diagnostics
       report.overall = results.every((r) => r.status === "pass") ? "pass" : "fail";
       if (OUT) { fs.mkdirSync(path.dirname(OUT), { recursive: true }); fs.writeFileSync(OUT, JSON.stringify(report, null, 2)); }
       if (argv.includes("--ps-flow-quit")) G.nw.App.quit();

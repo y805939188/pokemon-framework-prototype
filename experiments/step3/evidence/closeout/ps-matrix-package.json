@@ -1,0 +1,166 @@
+{
+  "mode": "matrix",
+  "results": [
+    {
+      "id": "S1 (matrix)",
+      "status": "pass",
+      "ms": 165,
+      "fingerprint": "1d78d0a8ff4b8b542414c4e6ba695fedaef324b118241e576c3e344b7ca5457a"
+    },
+    {
+      "id": "S2 (matrix)",
+      "status": "pass",
+      "ms": 3,
+      "fingerprint": "32142bf740c3d23eca986b638434a3b28e4e885f122fda88af5627766bf28ec2"
+    },
+    {
+      "id": "S3 (matrix)",
+      "status": "pass",
+      "ms": 3,
+      "fingerprint": "9b3b04f4c72625eec6d74d0a59dde5190e4f54376d333252c0ecb3c54656033f"
+    },
+    {
+      "id": "S4 (matrix)",
+      "status": "pass",
+      "ms": 1,
+      "fingerprint": "4bacf1d14b66fec60eb539968b90294b5d9c4954a78139803bda9a7f71398977"
+    },
+    {
+      "id": "S5 (matrix)",
+      "status": "pass",
+      "ms": 3,
+      "fingerprint": "9d70aa3397017a4f6e7f4391acbcdad5cc63e9ccdf3071c3669a646f55080aa4"
+    },
+    {
+      "id": "S6 (matrix)",
+      "status": "pass",
+      "ms": 5,
+      "fingerprint": "737819157254f38f3867f9d3159e227c868b605e9a406d05e1c753b811693da5"
+    },
+    {
+      "id": "S7 (matrix)",
+      "status": "pass",
+      "ms": 5,
+      "fingerprint": "691c3da8c1d62689fb22325f1fed096c798b6496847e3b51f309100610adeade"
+    },
+    {
+      "id": "S8 (matrix)",
+      "status": "pass",
+      "ms": 3,
+      "fingerprint": "3b68ee3715147782cd63a4aaffdbd3c60efe1140966f72cdbda5e0bb0c61a308"
+    },
+    {
+      "id": "S9 (matrix)",
+      "status": "pass",
+      "ms": 18,
+      "fingerprint": "3373e0f0f457e125df76034c2bf47bc75ef3b0596ab9dd7c561ee92e0458011f"
+    },
+    {
+      "id": "S10 (matrix)",
+      "status": "pass",
+      "ms": 8,
+      "fingerprint": "91781116c31992aa8af034e79ef35c08272488e19cfca0881cc6649fe149862f"
+    }
+  ],
+  "focusLog": [],
+  "suppressedAudio": {
+    "playBgm": 1
+  },
+  "refocus": 0,
+  "env": {
+    "nw": "0.117.0",
+    "node": "26.7.0",
+    "chromium": "154.0.8037.58",
+    "v8": "15.4.80.11",
+    "platform": "darwin",
+    "arch": "arm64",
+    "execPath": "<workspace>/.verify/closeout-copy/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
+    "gameDir": "<workspace>/.verify/closeout-copy/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
+    "packageInfo": {
+      "builtAt": "2026-10-19T16:54:56.952Z",
+      "gitHead": "d48e43dfd665baeb74fef4a49cc4b041a0144f8c",
+      "workingTreeChanges": 0,
+      "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+      "engineBundleSha256": "22842be429eee721fcbb649b9c732b82043fa6a022b469907fef30b2faf58218",
+      "contentInputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625",
+      "withTests": true,
+      "signing": "adhoc"
+    }
+  },
+  "engineArtifact": {
+    "file": "engine.cjs",
+    "bytes": 146851,
+    "sha256": "22842be429eee721fcbb649b9c732b82043fa6a022b469907fef30b2faf58218"
+  },
+  "matrix": [
+    {
+      "id": "S1",
+      "status": "pass",
+      "ms": 165,
+      "fingerprint": "1d78d0a8ff4b8b542414c4e6ba695fedaef324b118241e576c3e344b7ca5457a"
+    },
+    {
+      "id": "S2",
+      "status": "pass",
+      "ms": 3,
+      "fingerprint": "32142bf740c3d23eca986b638434a3b28e4e885f122fda88af5627766bf28ec2"
+    },
+    {
+      "id": "S3",
+      "status": "pass",
+      "ms": 3,
+      "fingerprint": "9b3b04f4c72625eec6d74d0a59dde5190e4f54376d333252c0ecb3c54656033f"
+    },
+    {
+      "id": "S4",
+      "status": "pass",
+      "ms": 1,
+      "fingerprint": "4bacf1d14b66fec60eb539968b90294b5d9c4954a78139803bda9a7f71398977"
+    },
+    {
+      "id": "S5",
+      "status": "pass",
+      "ms": 3,
+      "fingerprint": "9d70aa3397017a4f6e7f4391acbcdad5cc63e9ccdf3071c3669a646f55080aa4"
+    },
+    {
+      "id": "S6",
+      "status": "pass",
+      "ms": 5,
+      "fingerprint": "737819157254f38f3867f9d3159e227c868b605e9a406d05e1c753b811693da5"
+    },
+    {
+      "id": "S7",
+      "status": "pass",
+      "ms": 5,
+      "fingerprint": "691c3da8c1d62689fb22325f1fed096c798b6496847e3b51f309100610adeade"
+    },
+    {
+      "id": "S8",
+      "status": "pass",
+      "ms": 3,
+      "fingerprint": "3b68ee3715147782cd63a4aaffdbd3c60efe1140966f72cdbda5e0bb0c61a308"
+    },
+    {
+      "id": "S9",
+      "status": "pass",
+      "ms": 18,
+      "fingerprint": "3373e0f0f457e125df76034c2bf47bc75ef3b0596ab9dd7c561ee92e0458011f"
+    },
+    {
+      "id": "S10",
+      "status": "pass",
+      "ms": 8,
+      "fingerprint": "91781116c31992aa8af034e79ef35c08272488e19cfca0881cc6649fe149862f"
+    }
+  ],
+  "matrixMs": 216,
+  "contentIdentity": {
+    "kind": "sample",
+    "id": "sample",
+    "inputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625"
+  },
+  "logTail": null,
+  "overall": "pass"
+}

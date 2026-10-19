@@ -1,0 +1,951 @@
+{
+  "mode": "all",
+  "results": [
+    {
+      "id": "T1 trainer win: Fight, KO, exp, level-up, learn prompt (real keys), next turn uses new move, return to map",
+      "status": "pass",
+      "ms": 2850,
+      "detail": {
+        "level": 51,
+        "exp": 125131,
+        "hp": 156
+      }
+    },
+    {
+      "id": "T2 trainer battle: Run refused with a reason (nothing consumed), a thrown Ball is spent and blocked by the trainer; cancels consume nothing",
+      "status": "pass",
+      "ms": 4635
+    },
+    {
+      "id": "T3 wild run: faster user escapes, committed as 'ran', state unchanged apart from battle bookkeeping",
+      "status": "pass",
+      "ms": 1218
+    },
+    {
+      "id": "T4 capture: Master Ball from the bag, captured member joins with its stable id",
+      "status": "pass",
+      "ms": 1700
+    },
+    {
+      "id": "T5 item from the bag: Potion on the active member, consumed once and persisted",
+      "status": "pass",
+      "ms": 2047
+    },
+    {
+      "id": "T6 failure exit: engine error mid-battle aborts cleanly, nothing committed, the event still continues",
+      "status": "pass",
+      "ms": 1268
+    },
+    {
+      "id": "T7 save/restore outside battle + idempotent re-commit after restore",
+      "status": "pass",
+      "ms": 1617,
+      "detail": {
+        "saveCode": 0,
+        "loadCode": 0
+      }
+    },
+    {
+      "id": "T9 legacy and unusable saves through MZ's own save/load: schema 1 migrates, newer or damaged states are refused and kept",
+      "status": "pass",
+      "ms": 2230,
+      "detail": {
+        "saveCodes": [
+          0
+        ],
+        "loadCodes": [
+          0
+        ]
+      }
+    },
+    {
+      "id": "T10 a save that refers to content which no longer exists: the battle is refused with the reference named, the state is untouched",
+      "status": "pass",
+      "ms": 1199
+    },
+    {
+      "id": "T11 an operation fails and its rollback fails too: the session is closed with both errors kept, nothing is committed, the event still continues",
+      "status": "pass",
+      "ms": 1335
+    },
+    {
+      "id": "T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window",
+      "status": "pass",
+      "ms": 2368
+    }
+  ],
+  "focusLog": [],
+  "suppressedAudio": {
+    "playBgm": 1,
+    "playStaticSe": 86
+  },
+  "refocus": 0,
+  "env": {
+    "nw": "0.117.0",
+    "node": "26.7.0",
+    "chromium": "154.0.8037.58",
+    "v8": "15.4.80.11",
+    "platform": "darwin",
+    "arch": "arm64",
+    "execPath": "<home>/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.app/Contents/Resources/nwjs-mac/nwjs.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
+    "gameDir": "<workspace>/.verify/closeout-copy",
+    "packageInfo": null
+  },
+  "contentIdentity": {
+    "kind": "sample",
+    "id": "sample",
+    "inputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625"
+  },
+  "logTail": [
+    {
+      "n": 22,
+      "battleId": "trainer-pidgeys#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "request": 2
+        },
+        "finished": false
+      }
+    },
+    {
+      "n": 23,
+      "battleId": "trainer-pidgeys#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "move",
+        "index": 1
+      }
+    },
+    {
+      "n": 24,
+      "battleId": "trainer-pidgeys#1",
+      "level": "info",
+      "kind": "growth",
+      "data": {
+        "member": "A-0001",
+        "foe": "W1-1",
+        "exp": 3,
+        "level": 50,
+        "levelUps": 0
+      }
+    },
+    {
+      "n": 25,
+      "battleId": "trainer-pidgeys#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 17,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 26,
+      "battleId": "trainer-pidgeys#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 18,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 27,
+      "battleId": "trainer-pidgeys#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 2,
+          "growth": 1,
+          "request": 2
+        },
+        "finished": false
+      }
+    },
+    {
+      "n": 28,
+      "battleId": "trainer-pidgeys#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "move",
+        "index": 1
+      }
+    },
+    {
+      "n": 29,
+      "battleId": "trainer-pidgeys#1",
+      "level": "info",
+      "kind": "growth",
+      "data": {
+        "member": "A-0001",
+        "foe": "W1-2",
+        "exp": 3,
+        "level": 50,
+        "levelUps": 0
+      }
+    },
+    {
+      "n": 30,
+      "battleId": "trainer-pidgeys#1",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "win",
+        "winner": "Player",
+        "bag": {
+          "pokeball": -1
+        },
+        "members": 3
+      }
+    },
+    {
+      "n": 31,
+      "battleId": "trainer-pidgeys#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "growth": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 32,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 33,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 34,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "c322d83047dc"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "A-0001",
+          "A-0002",
+          "A-0003"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 35,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "run"
+      }
+    },
+    {
+      "n": 36,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "run",
+        "winner": null,
+        "bag": {},
+        "members": 3
+      }
+    },
+    {
+      "n": 37,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 38,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 39,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 40,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "c322d83047dc"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "A-0001",
+          "A-0002",
+          "A-0003"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 41,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "ball",
+        "ball": "masterball"
+      }
+    },
+    {
+      "n": 42,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "reserve",
+        "kind": "ball",
+        "item": "masterball",
+        "left": 0
+      }
+    },
+    {
+      "n": 43,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "consume",
+        "kind": "ball",
+        "item": "masterball",
+        "outcome": "caught"
+      }
+    },
+    {
+      "n": 44,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "growth",
+      "data": {
+        "member": "A-0001",
+        "foe": "W1-1",
+        "exp": 1162,
+        "level": 50,
+        "levelUps": 0
+      }
+    },
+    {
+      "n": 45,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "caught",
+        "winner": null,
+        "bag": {
+          "masterball": -1
+        },
+        "members": 3
+      }
+    },
+    {
+      "n": 46,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "growth": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 47,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 48,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 49,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "c322d83047dc"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "A-0001",
+          "A-0002",
+          "A-0003"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 50,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "item",
+        "item": "potion",
+        "target": "A-0001",
+        "commit": true
+      }
+    },
+    {
+      "n": 51,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "reserve",
+        "kind": "item",
+        "item": "potion",
+        "left": 2
+      }
+    },
+    {
+      "n": 52,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "consume",
+        "kind": "item",
+        "item": "potion"
+      }
+    },
+    {
+      "n": 53,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 9,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 54,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 10,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 55,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "request": 2
+        },
+        "finished": false
+      }
+    },
+    {
+      "n": 56,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "run"
+      }
+    },
+    {
+      "n": 57,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "run",
+        "winner": null,
+        "bag": {
+          "potion": -1
+        },
+        "members": 3
+      }
+    },
+    {
+      "n": 58,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 59,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 60,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 61,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "c322d83047dc"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "A-0001",
+          "A-0002",
+          "A-0003"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 62,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 63,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 64,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "c322d83047dc"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "A-0001",
+          "A-0002",
+          "A-0003"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 65,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "ball",
+        "ball": "masterball"
+      }
+    },
+    {
+      "n": 66,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "reserve",
+        "kind": "ball",
+        "item": "masterball",
+        "left": 0
+      }
+    },
+    {
+      "n": 67,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "consume",
+        "kind": "ball",
+        "item": "masterball",
+        "outcome": "caught"
+      }
+    },
+    {
+      "n": 68,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "growth",
+      "data": {
+        "member": "A-0001",
+        "foe": "W1-1",
+        "exp": 1162,
+        "level": 50,
+        "levelUps": 0
+      }
+    },
+    {
+      "n": 69,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "caught",
+        "winner": null,
+        "bag": {
+          "masterball": -1
+        },
+        "members": 3
+      }
+    },
+    {
+      "n": 70,
+      "battleId": "wild-snorlax#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "growth": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 71,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 72,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 73,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "c322d83047dc"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "A-0001",
+          "A-0002",
+          "A-0003"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 74,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "move",
+        "index": 1
+      }
+    },
+    {
+      "n": 75,
+      "battleId": "wild-pidgey#1",
+      "level": "error",
+      "kind": "session.broken",
+      "data": {
+        "original": "Error: injected operation failure",
+        "rollback": "Error: injected rollback failure"
+      }
+    },
+    {
+      "n": 76,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 77,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 78,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "c322d83047dc"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "A-0001",
+          "A-0002",
+          "A-0003"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 79,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "run"
+      }
+    },
+    {
+      "n": 80,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "run",
+        "winner": null,
+        "bag": {},
+        "members": 3
+      }
+    },
+    {
+      "n": 81,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    }
+  ],
+  "overall": "pass"
+}

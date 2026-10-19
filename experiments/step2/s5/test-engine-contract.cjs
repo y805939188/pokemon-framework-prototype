@@ -11,10 +11,9 @@ const W = require('../../../js/engine/fixtures/wild-1v1.json');
 
 const ROOT = path.resolve(__dirname, '../../..');
 
-test('staged engine extension files equal their sources (otherwise: run scripts/build-showdown.sh)', () => {
+test('staged engine extension equals its build output (otherwise: pnpm --dir src build:engine, then scripts/build-showdown.sh)', () => {
 	const pairs = [
-		['js/engine/rpg/custom-formats.cjs', 'js/engine/showdown/dist/config/custom-formats.js'],
-		['js/engine/rpg/rules.cjs', 'js/engine/showdown/dist/config/rpg-rules.cjs'],
+		['js/engine/build/custom-formats.cjs', 'js/engine/showdown/dist/config/custom-formats.js'],
 	];
 	for (const [src, staged] of pairs) {
 		assert.ok(fs.existsSync(path.join(ROOT, staged)), `${staged} missing: run scripts/build-showdown.sh`);

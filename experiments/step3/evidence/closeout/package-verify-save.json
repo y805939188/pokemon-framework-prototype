@@ -1,0 +1,49 @@
+{
+  "mode": "verify-save",
+  "results": [
+    {
+      "id": "V1 real restart: the save written by the previous process loads with identical state, duplicates stay no-ops",
+      "status": "pass",
+      "ms": 6,
+      "detail": {
+        "applied": [
+          "wild-snorlax#1"
+        ],
+        "party": 4
+      }
+    }
+  ],
+  "focusLog": [],
+  "suppressedAudio": {
+    "playBgm": 1
+  },
+  "refocus": 0,
+  "env": {
+    "nw": "0.117.0",
+    "node": "26.7.0",
+    "chromium": "154.0.8037.58",
+    "v8": "15.4.80.11",
+    "platform": "darwin",
+    "arch": "arm64",
+    "execPath": "<workspace>/.verify/closeout-copy/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
+    "gameDir": "<workspace>/.verify/closeout-copy/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
+    "packageInfo": {
+      "builtAt": "2026-10-19T16:54:56.952Z",
+      "gitHead": "d48e43dfd665baeb74fef4a49cc4b041a0144f8c",
+      "workingTreeChanges": 0,
+      "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+      "engineBundleSha256": "22842be429eee721fcbb649b9c732b82043fa6a022b469907fef30b2faf58218",
+      "contentInputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625",
+      "withTests": true,
+      "signing": "adhoc"
+    }
+  },
+  "contentIdentity": {
+    "kind": "sample",
+    "id": "sample",
+    "inputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625"
+  },
+  "logTail": null,
+  "overall": "pass"
+}

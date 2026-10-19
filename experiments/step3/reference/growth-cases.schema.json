@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Growth-curve reference observation handoff, schema version 1",
+  "description": "Behaviour data only: numbers, outcome kinds, identifiers. No source code, no source translation, no implementation-structure description. Free text is restricted to short plain-word fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "reference", "cases"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["essentialsVersion", "commit", "rubyVersion", "platform", "generatedAt", "method", "stubBoundary"],
+      "properties": {
+        "essentialsVersion": { "const": "v21.1" },
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "rubyVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(p[0-9]+)?$" },
+        "platform": { "type": "string", "pattern": "^[a-z0-9._-]{3,40}$" },
+        "generatedAt": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$" },
+        "method": { "enum": ["loaded-original-logic", "minimal-host-stub"] },
+        "stubBoundary": { "type": "string", "maxLength": 160, "pattern": "^[A-Za-z0-9 ,.()/-]*$", "description": "Plain words: which host parts were replaced. Empty string when nothing was replaced." }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "specRef", "fn", "curve", "maxLevel", "input", "result", "evidenceType"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^GR-[A-Z0-9-]{3,48}$" },
+          "specRef": { "type": "string", "pattern": "^WP30-[0-9.]{1,8}$" },
+          "fn": { "enum": ["minimumExpForLevel", "maximumExp", "addExp", "levelFromExp"] },
+          "curve": { "enum": ["medium", "fast", "slow", "parabolic", "erratic", "fluctuating"] },
+          "maxLevel": { "type": "integer", "minimum": 1, "maximum": 1000 },
+          "input": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "level": { "$ref": "#/definitions/typedValue" },
+              "exp": { "$ref": "#/definitions/typedValue" },
+              "amount": { "$ref": "#/definitions/typedValue" }
+            }
+          },
+          "result": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["outcome"],
+            "properties": {
+              "outcome": { "enum": ["value", "error-object", "raised"] },
+              "value": { "type": "integer" },
+              "errorClass": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_:]{0,39}$" }
+            }
+          },
+          "evidenceType": { "enum": ["original-run", "stub-env-run"] }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "typedValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["integer", "float", "nil", "string"] },
+        "value": { "type": ["integer", "number", "string", "null"] }
+      }
+    }
+  }
+}

@@ -11,7 +11,7 @@ test('describe: typical battle lines', () => {
 	assert.deepEqual(D.message({ kind: 'events', events: [ev('rpg', 'run', 'p1', 'denied', 'trainer')] }), ["No! There's no running from a trainer battle!"]);
 	assert.deepEqual(D.message({ kind: 'events', events: [ev('rpg', 'run', 'p1', 'ok', '256', '1')] }), ['Got away safely!']);
 	assert.deepEqual(D.message({ kind: 'events', events: [ev('rpg', 'ball', 'p1', 'masterball', 'W-1', 'caught', '4', '0', '255', '-')] }), ['You threw a Master Ball!', 'Gotcha! Pidgey was caught!']);
-	assert.deepEqual(D.message({ kind: 'events', events: [ev('rpg', 'ball', 'p1', 'pokeball', 'W-1', 'escaped', '1', '0', '8', '34243')] }), ['You threw a Poke Ball!', 'Aww! It appeared to be caught!']);
+	assert.deepEqual(D.message({ kind: 'events', events: [ev('rpg', 'ball', 'p1', 'pokeball', 'W-1', 'escaped', '1', '0', '8', '34243')] }), ['You threw a Poké Ball!', 'Aww! It appeared to be caught!']);
 	assert.deepEqual(D.message({ kind: 'events', events: [ev('-boost', 'p1a: A-0001', 'atk', '2')] }), ["Charizard's Attack rose sharply!"]);
 });
 test('describe: growth, learning, end, unknown events', () => {

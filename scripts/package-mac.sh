@@ -33,6 +33,9 @@ done
 [[ -d "$NWAPP" ]] || { echo "NW.js host not found: $NWAPP" >&2; exit 1; }
 [[ -d "$ROOT/js/engine/showdown/dist" ]] || { echo "engine not built: run scripts/build-showdown.sh" >&2; exit 1; }
 [[ -f "$ROOT/js/plugins/PS_BattleFlow.js" ]] || { echo "plugins not built: run pnpm --dir src build" >&2; exit 1; }
+[[ -f "$ROOT/js/engine/build/engine.cjs" ]] || { echo "engine bundle not built: run pnpm --dir src build" >&2; exit 1; }
+# the compiled content must exist and be the build of exactly the current content sources (never package a stale one)
+node "$ROOT/js/engine/build/content-cli.cjs" check || { echo "compiled content missing or stale: run pnpm --dir src build" >&2; exit 1; }
 
 APP="$OUT/$NAME.app"
 NW_RES="$APP/Contents/Resources/app.nw"
@@ -72,11 +75,13 @@ GIT_DIRTY="$(git -C "$ROOT" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
 EXCL=(':(exclude)experiments/step2/evidence' ':(exclude)docs')
 DIFF_SHA="$( { git -C "$ROOT" diff HEAD -- . "${EXCL[@]}"; git -C "$ROOT" ls-files -o --exclude-standard -z -- . "${EXCL[@]}" | (cd "$ROOT" && xargs -0 shasum -a 256 2>/dev/null); } 2>/dev/null | shasum -a 256 | cut -d' ' -f1)"
 ENGINE_SHA="$(cat "$ROOT/js/engine/showdown/SOURCE_SHA" 2>/dev/null || echo unknown)"
+BUNDLE_SHA="$(shasum -a 256 "$ROOT/js/engine/build/engine.cjs" | cut -d' ' -f1)"
+CONTENT_HASH="$(node -p 'require(process.argv[1]).inputsHash' "$ROOT/data/framework/content.json")"
 if [[ "$HARDEN" -eq 0 ]]; then SIGNING="adhoc"; elif [[ "$IDENTITY" == "-" ]]; then SIGNING="adhoc+hardened-runtime"; else SIGNING="identity:$IDENTITY+hardened-runtime"; fi
 node -e '
-  const [out,head,dirty,diff,engine,tests,signing]=process.argv.slice(1);
-  require("fs").writeFileSync(out,JSON.stringify({builtAt:new Date().toISOString(),gitHead:head,workingTreeChanges:Number(dirty),diffSha256:diff,showdownSha:engine,withTests:tests==="1",signing},null,2)+"\n");
-' "$NW_RES/package-info.json" "$GIT_HEAD" "$GIT_DIRTY" "$DIFF_SHA" "$ENGINE_SHA" "$WITH_TESTS" "$SIGNING"
+  const [out,head,dirty,diff,engine,tests,signing,bundle,content]=process.argv.slice(1);
+  require("fs").writeFileSync(out,JSON.stringify({builtAt:new Date().toISOString(),gitHead:head,workingTreeChanges:Number(dirty),diffSha256:diff,showdownSha:engine,engineBundleSha256:bundle,contentInputsHash:content,withTests:tests==="1",signing},null,2)+"\n");
+' "$NW_RES/package-info.json" "$GIT_HEAD" "$GIT_DIRTY" "$DIFF_SHA" "$ENGINE_SHA" "$WITH_TESTS" "$SIGNING" "$BUNDLE_SHA" "$CONTENT_HASH"
 
 # ---- bundle metadata + signature ----
 PLIST="$APP/Contents/Info.plist"

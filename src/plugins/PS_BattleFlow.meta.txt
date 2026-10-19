@@ -2,6 +2,22 @@
  * @target MZ
  * @plugindesc Step 2.4: placeholder text battle scene driven by the Showdown session; map events start battles and wait.
  *
+ * @param contentSource
+ * @text Content source
+ * @desc sample = the compiled content pipeline output (data/framework/content.json); fixture = the synthetic step 2 test content.
+ * @type select
+ * @option sample
+ * @option fixture
+ * @default sample
+ *
+ * @param language
+ * @text Battle screen language
+ * @desc en or zh (Chinese sample). Unknown values use English; keys missing in a language fall back to English.
+ * @type select
+ * @option en
+ * @option zh
+ * @default en
+ *
  * @command StartBattle
  * @text Start Battle
  * @desc Opens the text battle scene and pauses this event until it ends.

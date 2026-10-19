@@ -28,14 +28,22 @@
     "execPath": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
     "gameDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
     "packageInfo": {
-      "builtAt": "2026-10-18T15:35:21.962Z",
-      "gitHead": "0556a68cf8efe744ded45391f9b27490d106b97c",
-      "workingTreeChanges": 17,
+      "builtAt": "2026-10-18T18:08:57.489Z",
+      "gitHead": "2f5b8088f6cf8d69a7f1a1b78d68295eee349339",
+      "workingTreeChanges": 2,
       "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+      "engineBundleSha256": "0f5c76decd77d9011817f842e56312cecfa78fb45cba2a81dc7b41e4eb036122",
+      "contentInputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625",
       "withTests": true,
       "signing": "adhoc+hardened-runtime"
     }
   },
+  "contentIdentity": {
+    "kind": "sample",
+    "id": "sample",
+    "inputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625"
+  },
+  "logTail": null,
   "overall": "pass"
 }

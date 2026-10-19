@@ -4,13 +4,13 @@
     {
       "id": "S1 (matrix)",
       "status": "pass",
-      "ms": 162,
+      "ms": 169,
       "fingerprint": "1d78d0a8ff4b8b542414c4e6ba695fedaef324b118241e576c3e344b7ca5457a"
     },
     {
       "id": "S2 (matrix)",
       "status": "pass",
-      "ms": 3,
+      "ms": 2,
       "fingerprint": "32142bf740c3d23eca986b638434a3b28e4e885f122fda88af5627766bf28ec2"
     },
     {
@@ -22,7 +22,7 @@
     {
       "id": "S4 (matrix)",
       "status": "pass",
-      "ms": 1,
+      "ms": 2,
       "fingerprint": "4bacf1d14b66fec60eb539968b90294b5d9c4954a78139803bda9a7f71398977"
     },
     {
@@ -46,19 +46,19 @@
     {
       "id": "S8 (matrix)",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "3b68ee3715147782cd63a4aaffdbd3c60efe1140966f72cdbda5e0bb0c61a308"
     },
     {
       "id": "S9 (matrix)",
       "status": "pass",
-      "ms": 18,
+      "ms": 15,
       "fingerprint": "3373e0f0f457e125df76034c2bf47bc75ef3b0596ab9dd7c561ee92e0458011f"
     },
     {
       "id": "S10 (matrix)",
       "status": "pass",
-      "ms": 7,
+      "ms": 8,
       "fingerprint": "91781116c31992aa8af034e79ef35c08272488e19cfca0881cc6649fe149862f"
     }
   ],
@@ -77,26 +77,33 @@
     "execPath": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
     "gameDir": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
     "packageInfo": {
-      "builtAt": "2026-10-18T15:35:21.962Z",
-      "gitHead": "0556a68cf8efe744ded45391f9b27490d106b97c",
-      "workingTreeChanges": 17,
+      "builtAt": "2026-10-18T18:08:57.489Z",
+      "gitHead": "2f5b8088f6cf8d69a7f1a1b78d68295eee349339",
+      "workingTreeChanges": 2,
       "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+      "engineBundleSha256": "0f5c76decd77d9011817f842e56312cecfa78fb45cba2a81dc7b41e4eb036122",
+      "contentInputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625",
       "withTests": true,
       "signing": "adhoc+hardened-runtime"
     }
+  },
+  "engineArtifact": {
+    "file": "engine.cjs",
+    "bytes": 140710,
+    "sha256": "0f5c76decd77d9011817f842e56312cecfa78fb45cba2a81dc7b41e4eb036122"
   },
   "matrix": [
     {
       "id": "S1",
       "status": "pass",
-      "ms": 162,
+      "ms": 169,
       "fingerprint": "1d78d0a8ff4b8b542414c4e6ba695fedaef324b118241e576c3e344b7ca5457a"
     },
     {
       "id": "S2",
       "status": "pass",
-      "ms": 3,
+      "ms": 2,
       "fingerprint": "32142bf740c3d23eca986b638434a3b28e4e885f122fda88af5627766bf28ec2"
     },
     {
@@ -108,7 +115,7 @@
     {
       "id": "S4",
       "status": "pass",
-      "ms": 1,
+      "ms": 2,
       "fingerprint": "4bacf1d14b66fec60eb539968b90294b5d9c4954a78139803bda9a7f71398977"
     },
     {
@@ -132,22 +139,28 @@
     {
       "id": "S8",
       "status": "pass",
-      "ms": 2,
+      "ms": 3,
       "fingerprint": "3b68ee3715147782cd63a4aaffdbd3c60efe1140966f72cdbda5e0bb0c61a308"
     },
     {
       "id": "S9",
       "status": "pass",
-      "ms": 18,
+      "ms": 15,
       "fingerprint": "3373e0f0f457e125df76034c2bf47bc75ef3b0596ab9dd7c561ee92e0458011f"
     },
     {
       "id": "S10",
       "status": "pass",
-      "ms": 7,
+      "ms": 8,
       "fingerprint": "91781116c31992aa8af034e79ef35c08272488e19cfca0881cc6649fe149862f"
     }
   ],
-  "matrixMs": 206,
+  "matrixMs": 211,
+  "contentIdentity": {
+    "kind": "sample",
+    "id": "sample",
+    "inputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625"
+  },
+  "logTail": null,
   "overall": "pass"
 }

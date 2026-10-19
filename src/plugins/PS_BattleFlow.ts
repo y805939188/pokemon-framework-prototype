@@ -14,7 +14,7 @@
 
   const NAME = "PS_BattleFlow";
   const W = window as any;
-  const nodeRequire = (globalThis as any).require as ((id: string) => any) | undefined;
+  const nodeRequire = (globalThis as any).require as any; // NW.js Node require (has .resolve)
 
   // ---------------------------------------------------------------- engine access (loaded lazily, runtime-relative)
   let ENGINE: any = null;
@@ -27,6 +27,8 @@
         S: nodeRequire("./js/engine/game/state.cjs"),
         F: nodeRequire("./js/engine/fixtures/game.cjs"),
         D: nodeRequire("./js/engine/game/describe.cjs"),
+        B: nodeRequire("./js/engine/build/engine.cjs"), // the built engine bundle (content pipeline runtime, Showdown dex)
+        root: nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire.resolve("./js/engine/build/engine.cjs"))))),
       };
       W.PSFlow && (W.PSFlow.perf.engineLoadMs = Math.round((performance.now() - tLoad) * 10) / 10);
     }
@@ -43,11 +45,55 @@
     fast: false, // tests: no message pacing
     debug: {} as any, // tests: failure injection
     perf: { engineLoadMs: null as any, battles: [] as any[], cur: null as any }, // measurement hooks (cheap; read by the test driver)
+    /**
+     * The Content the battle session uses. `sample` (default) is the content pipeline's compiled output assembled with
+     * the pinned Showdown data; `fixture` is the synthetic step 2 test content. A missing or unusable compiled file is
+     * an error, never a silent fallback to the fixture.
+     */
+    content(): any {
+      if (!PSFlow._content) {
+        const params = G.PluginManager.parameters(NAME) as Record<string, string>;
+        const E = engine();
+        if ((params.contentSource || "sample") === "fixture") PSFlow._content = E.F.content;
+        else {
+          const file = nodeRequire("path").join(E.root, "data", "framework", "content.json");
+          let json: unknown;
+          try { json = JSON.parse(nodeRequire("fs").readFileSync(file, "utf8")); }
+          catch (e) { throw new Error(`content: cannot read ${file} (run: pnpm --dir src build): ${String(e instanceof Error ? e.message : e)}`); }
+          const { content, errors } = E.B.contentRuntime.assembleContent(E.B.contentRuntime.loadCompiled(json), E.B.dex.createDexLookup());
+          if (errors.length) throw new Error("content: " + errors.map((x: any) => `${x.path}: ${x.message}`).join("; "));
+          PSFlow._content = content;
+        }
+      }
+      return PSFlow._content;
+    },
+    _content: null as any,
+    _dex: null as any,
+    /** Language of the battle screen: set by tests (setLanguage) or by the plugin parameter; unknown languages use English. */
+    lang: null as string | null,
+    _tr: null as any,
+    translator(): any {
+      const params = G.PluginManager.parameters(NAME) as Record<string, string>;
+      const lang = PSFlow.lang || params.language || "en";
+      if (!PSFlow._tr || PSFlow._tr.lang !== lang) PSFlow._tr = engine().B.i18n.translatorFor(lang);
+      return PSFlow._tr;
+    },
+    setLanguage(lang: string | null): void { PSFlow.lang = lang; PSFlow._tr = null; },
+    /** Display name of a species through its content text key (falls back to the Showdown name). */
+    speciesName(species: string): string {
+      const sp = PSFlow.content().species[species];
+      return sp && sp.nameKey ? PSFlow.translator().tOr(sp.nameKey, species) : species;
+    },
+    /** Redacted, bounded diagnostics of every session (flow/log.ts); the flow test attaches its tail to the report. */
+    logger: null as any,
     game(): any {
+      const err = G.$gameSystem._psSaveError;
+      if (err) throw new Error(`the save state is not usable (${err.code}): ${err.message}`); // never battle on, or overwrite, a state we could not read
       if (!G.$gameSystem._psGame) G.$gameSystem._psGame = engine().F.makeGame();
       return G.$gameSystem._psGame;
     },
     resetGame(): void {
+      delete G.$gameSystem._psSaveError; delete G.$gameSystem._psSaveInfo; delete G.$gameSystem._psSaveWarning; // an explicit reset is a deliberate act
       G.$gameSystem._psGame = engine().F.makeGame();
       G.$gameSystem._psBattleSeq = 0;
     },
@@ -58,12 +104,17 @@
       return r.status;
     },
     async begin(): Promise<any> {
-      const { Session, F } = engine();
+      const { Session, F, B } = engine();
+      if (!PSFlow.logger) PSFlow.logger = B.log.createRingLogger(500);
       const req = PSFlow.request;
+      // a save written against older content must be explained, not crash a battle: check its references first
+      if (!PSFlow._dex) PSFlow._dex = B.dex.createDexLookup();
+      const dangling = B.contentRuntime.findDanglingReferences(PSFlow.game(), PSFlow.content(), PSFlow._dex);
+      if (dangling.length) throw new Error("the save refers to content that no longer exists: " + dangling.slice(0, 3).map((d: any) => `${d.path} ${d.message}`).join("; "));
       const team = req.foes.map((f: any, i: number) => F.foeMember(`W${req.seq}-${i + 1}`, f.species, f.level));
       const tCreate = performance.now();
       const session = await Session.create({
-        game: PSFlow.game(), battleId: req.battleId, content: F.content, seed: PSFlow.seed,
+        game: PSFlow.game(), battleId: req.battleId, content: PSFlow.content(), seed: PSFlow.seed, logger: PSFlow.logger.sink,
         foe: { kind: req.kind, team },
       });
       if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round((performance.now() - tCreate) * 10) / 10;
@@ -138,6 +189,18 @@
     this._lines = [];
     this._max = Math.max(1, Math.floor(this.innerHeight / this.lineHeight()));
   };
+  Window_PSText.prototype.resetFontSettings = function () {
+    G.Window_Base.prototype.resetFontSettings.call(this);
+    const font = PSFlow.translator().font();
+    if (font) this.contents.fontFace = font;
+  };
+  /** One line must fit the window: auxiliary lines (status, bag summary) are shortened with an ellipsis, never overflow. */
+  Window_PSText.prototype.fitText = function (text: string) {
+    if (this.textWidth(text) <= this.innerWidth) return text;
+    let t = text;
+    while (t.length > 1 && this.textWidth(t + "…") > this.innerWidth) t = t.slice(0, -1);
+    return t + "…";
+  };
   Window_PSText.prototype.setLines = function (lines: string[]) { this._lines = lines.slice(-this._max); this.refresh(); };
   Window_PSText.prototype.add = function (line: string) { this._lines.push(line); this._lines = this._lines.slice(-this._max); this.refresh(); };
   Window_PSText.prototype.refresh = function () {
@@ -152,6 +215,11 @@
     this._items = [];
     G.Window_Command.prototype.initialize.call(this, rect);
   };
+  Window_PSMenu.prototype.resetFontSettings = function () {
+    G.Window_Command.prototype.resetFontSettings.call(this);
+    const font = PSFlow.translator().font();
+    if (font) this.contents.fontFace = font;
+  };
   Window_PSMenu.prototype.makeCommandList = function () {
     for (const it of this._items) this.addCommand(it.name, it.symbol || "ok", it.enabled !== false, it.ext);
   };
@@ -165,20 +233,12 @@
   Window_PSMenu.prototype.maxCols = function () { return 1; };
 
   // ---------------------------------------------------------------- the scene
-  const REASON: Record<string, string> = {
-    trainer: "No! There's no running from a trainer battle!", trapped: "You can't escape, something is holding you!",
-    ballsdisabled: "Balls can't be used here.", multiplefoes: "There are too many foes to aim at!",
-    noactive: "There is no one to act.", "none-left": "You have none of that left.", "unknown-item": "That item can't be used in battle.",
-    "choice-rejected": "That choice isn't available right now.", "not-registered": "That isn't possible right now.",
-    norun: "There's no running from this battle!", invulnerable: "You can't aim at a target that can't be reached right now!",
-    notfirst: "A Ball has to be the first action of the round.", "item-no-effect": "It won't have any effect.", "unknown-target": "That target isn't in your party.",
-  };
-
-  /** Same reason code, different wording per action (a refused Ball is not a refused Run). */
-  const REASON_FOR: Record<string, Record<string, string>> = {
-    ball: { ballsdisabled: "Balls can't be used in this battle.", multiplefoes: "You can't aim at just one of several foes!" },
-    run: { trainer: "No! There's no running from a trainer battle!", trapped: "You can't escape, something is holding you!", norun: "There's no running from this battle!" },
-  };
+  /** Refusal text: per-action key first (a refused Ball is not a refused Run), then the generic key, then the default. */
+  function refusalText(kind: string | undefined, reason: string): string {
+    const tr = PSFlow.translator();
+    return (kind && tr.has(`refusal.${kind}.${reason}`)) ? tr.t(`refusal.${kind}.${reason}`)
+      : tr.has(`refusal.${reason}`) ? tr.t(`refusal.${reason}`) : tr.t("refusal.default", { reason });
+  }
 
   function Scene_PSBattle(this: any) { this.initialize(...(arguments as any)); }
   W.Scene_PSBattle = Scene_PSBattle;
@@ -209,8 +269,8 @@
     G.Scene_MenuBase.prototype.start.call(this);
     if (this._failure) { this.abort(this._failure); return; }
     const s = this._session;
-    for (const m of [...s.party, ...s.foeTeam]) this._names[m.id] = m.species;
-    this._D = engine().D.make(this._names);
+    for (const m of [...s.party, ...s.foeTeam]) this._names[m.id] = PSFlow.speciesName(m.species);
+    this._D = engine().D.make(this._names, PSFlow.translator());
     this._mode = "messages";
     this.pushMessages(s.take());
     this.refreshStatus();
@@ -248,9 +308,12 @@
   };
   P.refreshStatus = function () {
     const s = this._session; if (!s) return;
+    const tr = PSFlow.translator();
     const line = (side: string, who: string) => s.gw.readState(side).filter((x: any) => x.active).map((x: any) =>
-      `${who}: ${this._names[x.id] || x.id}  Lv${x.level}  HP ${x.hp}/${x.maxhp}${x.status ? "  [" + x.status + "]" : ""}${x.fainted ? "  (fainted)" : ""}`);
-    this._status.setLines([...line("p2", "Foe"), ...line("p1", "You"), `Bag: ${Object.entries(s.bag).map(([k, v]) => `${k} x${v}`).join(", ") || "(empty)"}`]);
+      tr.t("ui.status.line", { who, name: this._names[x.id] || x.id, level: x.level, hp: x.hp, maxhp: x.maxhp,
+        status: x.status ? tr.t("ui.status.tag", { status: x.status }) : "", fainted: x.fainted ? tr.t("ui.status.fainted") : "" }));
+    const bagText = Object.entries(s.bag).map(([k, v]) => `${k} x${v}`).join(", ") || tr.t("ui.status.bag_empty");
+    this._status.setLines([...line("p2", tr.t("ui.who.foe")), ...line("p1", tr.t("ui.who.you")), tr.t("ui.status.bag", { items: bagText })].map((l: string) => this._status.fitText(l)));
   };
 
   // --- menus
@@ -262,20 +325,24 @@
     this._menu.show(); this._menu.activate();
   };
   P.showMain = function () {
+    const tr = PSFlow.translator();
     this.show("main", [
-      { name: "Fight", ext: "fight" }, { name: "Bag", ext: "bag" }, { name: "Pokémon", ext: "party" }, { name: "Run", ext: "run" },
+      { name: tr.t("ui.menu.fight"), ext: "fight" }, { name: tr.t("ui.menu.bag"), ext: "bag" }, { name: tr.t("ui.menu.party"), ext: "party" }, { name: tr.t("ui.menu.run"), ext: "run" },
     ]);
   };
   P.showMoves = function () {
     const req = this._session.currentRequest();
     const moves = req.active[0].moves;
-    this.show("moves", moves.map((m: any, i: number) => ({ name: `${m.move}   PP ${m.pp}/${m.maxpp}`, ext: i + 1, enabled: !m.disabled && m.pp > 0 })));
+    this.show("moves", moves.map((m: any, i: number) => ({
+      name: m.pp === undefined ? m.move : PSFlow.translator().t("ui.moves.line", { move: m.move, pp: m.pp, maxpp: m.maxpp }),
+      ext: i + 1, enabled: engine().B.moveRequests.isSelectableMove(m),
+    })));
   };
   P.showBag = function () {
     const bag = this._session.bag;
-    const names: any = { potion: "Potion", antidote: "Antidote", xattack: "X Attack", pokeball: "Poké Ball", masterball: "Master Ball", superpotion: "Super Potion", fullheal: "Full Heal" };
-    const items = Object.keys(bag).filter((k) => bag[k] > 0).map((k) => ({ name: `${names[k] || k}  x${bag[k]}`, ext: k }));
-    this.show("bag", items.length ? items : [{ name: "(nothing)", ext: null, enabled: false }]);
+    const tr = PSFlow.translator();
+    const items = Object.keys(bag).filter((k) => bag[k] > 0).map((k) => ({ name: tr.t("ui.bag.entry", { name: tr.tOr(`item.name.${k}`, k), count: bag[k] }), ext: k }));
+    this.show("bag", items.length ? items : [{ name: tr.t("ui.bag.nothing"), ext: null, enabled: false }]);
   };
   P.showParty = function (sub: string) {
     this._partySub = sub;
@@ -285,19 +352,21 @@
       const x = live[m.id];
       // an item that could not do anything is refused before it is registered (WP28 3.5): grey the target out
       const can = sub === "item" ? s.canUseItem(this._pendingItem, m.id).ok : !(x.active || x.fainted);
-      return { name: `${m.species}  Lv${x.level}  HP ${x.hp}/${x.maxhp}${x.fainted ? " (fainted)" : ""}${x.active ? " *" : ""}${sub === "item" && !can ? "  (no effect)" : ""}`, ext: m.id, enabled: can };
+      const tr = PSFlow.translator();
+      return { name: tr.t("ui.party.entry", { name: PSFlow.speciesName(m.species), level: x.level, hp: x.hp, maxhp: x.maxhp,
+        fainted: x.fainted ? tr.t("ui.party.fainted") : "", active: x.active ? tr.t("ui.party.active") : "", noEffect: sub === "item" && !can ? tr.t("ui.party.no_effect") : "" }), ext: m.id, enabled: can };
     });
     this.show(sub === "forced" ? "party-forced" : "party", items);
   };
   P.showLearn = function () {
     const p = this._session.pendingLearn;
     const m = this._session.party.find((x: any) => x.id === p.memberId);
-    this.show("learn", [...m.moves.map((mv: any, i: number) => ({ name: `Forget ${mv.id}`, ext: i })), { name: `Don't learn ${p.move.name}`, ext: null }]);
+    this.show("learn", [...m.moves.map((mv: any, i: number) => ({ name: PSFlow.translator().t("ui.learn.forget", { move: mv.id }), ext: i })), { name: PSFlow.translator().t("ui.learn.skip", { move: p.move.name }), ext: null }]);
   };
   P.showEnd = function (aborted: boolean) {
-    if (aborted) this._log.add("The battle was aborted. Nothing was saved.");
+    if (aborted) this._log.add(PSFlow.translator().t("ui.end.aborted"));
     this._aborted = aborted;
-    this.show("end", [{ name: aborted ? "Back to the map" : "Continue", ext: "end" }]);
+    this.show("end", [{ name: PSFlow.translator().t(aborted ? "ui.end.back" : "ui.end.continue"), ext: "end" }]);
   };
 
   P.onMenuCancel = function () {
@@ -344,7 +413,7 @@
       const cur = PSFlow.perf.cur;
       if (cur) cur.actions.push({ kind: kind || "other", ms: Math.round((performance.now() - tAct) * 10) / 10 });
       if (r && r.ok === false) {
-        this._queue.push((kind && REASON_FOR[kind] && REASON_FOR[kind][r.reason]) || REASON[r.reason] || `Not possible (${r.reason}).`);
+        this._queue.push(refusalText(kind, r.reason));
         this._mode = "messages";
         return;
       }

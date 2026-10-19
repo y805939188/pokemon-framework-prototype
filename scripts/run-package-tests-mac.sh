@@ -32,7 +32,7 @@ launch all "$EVID/ps-flow-report.json" "--ps-flow-shots=$EVID"
 "$ROOT/scripts/package-mac.sh" --with-tests ${PF_PACKAGE_ARGS:-} | tail -1
 launch verify-save "$EVID/ps-flow-verify-save.json"
 launch matrix "$EVID/ps-matrix-package.json"
-node -e 'require(process.argv[1]+"/js/engine/matrix.cjs").runMatrix().then(r=>require("fs").writeFileSync(process.argv[2],JSON.stringify({host:"node "+process.version,results:r},null,2)))' "$ROOT" "$EVID/ps-matrix-node.json"
+node -e 'const m=require(process.argv[1]+"/js/engine/matrix.cjs"); m.runMatrix().then(r=>require("fs").writeFileSync(process.argv[2],JSON.stringify({host:"node "+process.version,engineArtifact:m.artifactInfo(),results:r},null,2)))' "$ROOT" "$EVID/ps-matrix-node.json"
 pkill -f "PokemonFrameworkPrototype.app/Contents/MacOS" 2>/dev/null || true
 # default location (no override): a packaged app saves under ~/Library/Application Support/<name>/save.
 # The run writes ONE free high slot (99 downwards) and puts everything back; it never touches slots a player may have.
@@ -56,6 +56,9 @@ for (const f of ["ps-flow-report.json","ps-flow-verify-save.json","ps-matrix-pac
 const pk=JSON.parse(fs.readFileSync(process.argv[1]+"/ps-matrix-package.json","utf8"));
 const nd=JSON.parse(fs.readFileSync(process.argv[1]+"/ps-matrix-node.json","utf8"));
 console.log("matrix in package (nw", pk.env.nw+", node", pk.env.node+") vs", nd.host);
+// the two hosts must have loaded the SAME engine bundle (hash), not just produced equal results
+const ha=pk.engineArtifact&&pk.engineArtifact.sha256, hb=nd.engineArtifact&&nd.engineArtifact.sha256;
+if (!ha || ha!==hb) { console.log("ENGINE ARTIFACT MISMATCH: package", ha, "node", hb); bad++; } else console.log("same engine artifact in both hosts:", ha.slice(0,16)+"...", pk.engineArtifact.bytes, "bytes");
 for (const r of pk.matrix) {
   const n=nd.results.find(x=>x.id===r.id);
   const same = r.status==="pass" && n && n.status==="pass" && r.fingerprint===n.fingerprint;
