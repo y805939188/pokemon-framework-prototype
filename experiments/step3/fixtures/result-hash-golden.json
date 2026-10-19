@@ -1,0 +1,1966 @@
+{
+ "generator": "experiments/step3/gen-result-hash-golden.cjs",
+ "algorithm": "node:crypto SHA-256 over canonical JSON (sorted keys), as in rules/state.ts at 4ce31e1",
+ "entries": [
+  {
+   "name": "wild run",
+   "result": {
+    "protocol": 1,
+    "battleId": "GOLD-run",
+    "outcome": {
+     "kind": "run",
+     "winner": null
+    },
+    "members": {
+     "A-0001": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 153,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "flamethrower",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "airslash",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "dragonpulse",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "roost",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0002": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 154,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "hydropump",
+        "pp": 5,
+        "maxpp": 5
+       },
+       {
+        "id": "icebeam",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "flashcannon",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0003": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 155,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "gigadrain",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "sludgebomb",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "earthquake",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "synthesis",
+        "pp": 5,
+        "maxpp": 5
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     }
+    },
+    "bag": {},
+    "captured": [],
+    "dex": {
+     "seen": [
+      "Pidgey"
+     ],
+     "owned": []
+    }
+   },
+   "hash": "7ea5e3df7578e2e123300b977ac58418fb7664176d279343afebd399b2e2d0ad"
+  },
+  {
+   "name": "caught with master ball",
+   "result": {
+    "protocol": 1,
+    "battleId": "GOLD-caught",
+    "outcome": {
+     "kind": "caught",
+     "winner": null,
+     "target": "W2-1",
+     "ball": "masterball"
+    },
+    "members": {
+     "A-0001": {
+      "level": 50,
+      "exp": 118522,
+      "hp": 153,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "flamethrower",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "airslash",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "dragonpulse",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "roost",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 2,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0002": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 154,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "hydropump",
+        "pp": 5,
+        "maxpp": 5
+       },
+       {
+        "id": "icebeam",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "flashcannon",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0003": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 155,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "gigadrain",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "sludgebomb",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "earthquake",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "synthesis",
+        "pp": 5,
+        "maxpp": 5
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     }
+    },
+    "bag": {
+     "masterball": -1
+    },
+    "captured": [
+     {
+      "id": "W2-1",
+      "species": "Snorlax",
+      "nickname": null,
+      "level": 40,
+      "exp": 80000,
+      "hp": 190,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "item": "",
+      "ability": "Keen Eye",
+      "nature": "hardy",
+      "gender": "M",
+      "ivs": {
+       "hp": 31,
+       "atk": 31,
+       "def": 31,
+       "spa": 31,
+       "spd": 31,
+       "spe": 31
+      },
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "friendship": 70,
+      "ball": "masterball",
+      "ot": "player"
+     }
+    ],
+    "dex": {
+     "seen": [
+      "Snorlax"
+     ],
+     "owned": [
+      "Snorlax"
+     ]
+    }
+   },
+   "hash": "bced35326e84af2f00038c713244391a4f26add0f6763244b86fc9c73dbe2a22"
+  },
+  {
+   "name": "trainer win with potion, level-up, declined move",
+   "result": {
+    "protocol": 1,
+    "battleId": "GOLD-win",
+    "outcome": {
+     "kind": "win",
+     "winner": "Player"
+    },
+    "members": {
+     "A-0001": {
+      "level": 51,
+      "exp": 125128,
+      "hp": 92,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "flamethrower",
+        "pp": 14,
+        "maxpp": 15
+       },
+       {
+        "id": "airslash",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "dragonpulse",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "roost",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 1
+      }
+     },
+     "A-0002": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 154,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "hydropump",
+        "pp": 5,
+        "maxpp": 5
+       },
+       {
+        "id": "icebeam",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "flashcannon",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0003": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 155,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "gigadrain",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "sludgebomb",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "earthquake",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "synthesis",
+        "pp": 5,
+        "maxpp": 5
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     }
+    },
+    "bag": {
+     "potion": -1
+    },
+    "captured": [],
+    "dex": {
+     "seen": [
+      "Pidgey"
+     ],
+     "owned": []
+    }
+   },
+   "hash": "2205ad3a2bb2c72f3ae5bbe20636b5eec050316af1b40cf64d9df14e9ac63243"
+  },
+  {
+   "name": "trainer win, learned a move over slot 0",
+   "result": {
+    "protocol": 1,
+    "battleId": "GOLD-win2",
+    "outcome": {
+     "kind": "win",
+     "winner": "Player"
+    },
+    "members": {
+     "A-0001": {
+      "level": 51,
+      "exp": 125128,
+      "hp": 156,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "slash",
+        "pp": 20,
+        "maxpp": 20
+       },
+       {
+        "id": "airslash",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "dragonpulse",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "roost",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 1
+      }
+     },
+     "A-0002": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 154,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "hydropump",
+        "pp": 5,
+        "maxpp": 5
+       },
+       {
+        "id": "icebeam",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "flashcannon",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0003": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 155,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "gigadrain",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "sludgebomb",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "earthquake",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "synthesis",
+        "pp": 5,
+        "maxpp": 5
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     }
+    },
+    "bag": {},
+    "captured": [],
+    "dex": {
+     "seen": [
+      "Pidgey"
+     ],
+     "owned": []
+    }
+   },
+   "hash": "04165857e0a27ec699d961c1daef12bf165fcd8fe87d6202ef762cdc602e663c"
+  },
+  {
+   "name": "synthetic: unicode nickname",
+   "result": {
+    "protocol": 1,
+    "battleId": "GOLD-unicode nickname",
+    "outcome": {
+     "kind": "caught",
+     "winner": null,
+     "target": "W2-1",
+     "ball": "masterball"
+    },
+    "members": {
+     "A-0001": {
+      "level": 50,
+      "exp": 118522,
+      "hp": 153,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "flamethrower",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "airslash",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "dragonpulse",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "roost",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 2,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0002": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 154,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "hydropump",
+        "pp": 5,
+        "maxpp": 5
+       },
+       {
+        "id": "icebeam",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "flashcannon",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0003": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 155,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "gigadrain",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "sludgebomb",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "earthquake",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "synthesis",
+        "pp": 5,
+        "maxpp": 5
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     }
+    },
+    "bag": {
+     "masterball": -1
+    },
+    "captured": [
+     {
+      "id": "W2-1",
+      "species": "Snorlax",
+      "nickname": "波波と🐦",
+      "level": 40,
+      "exp": 80000,
+      "hp": 190,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "item": "",
+      "ability": "Keen Eye",
+      "nature": "hardy",
+      "gender": "M",
+      "ivs": {
+       "hp": 31,
+       "atk": 31,
+       "def": 31,
+       "spa": 31,
+       "spd": 31,
+       "spe": 31
+      },
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "friendship": 70,
+      "ball": "masterball",
+      "ot": "player"
+     }
+    ],
+    "dex": {
+     "seen": [
+      "Snorlax"
+     ],
+     "owned": [
+      "Snorlax"
+     ]
+    }
+   },
+   "hash": "b10e03f1ef1841ed05507084fb01a686a57f0158a0c974d9e878f9dec053e20c"
+  },
+  {
+   "name": "synthetic: astral characters only",
+   "result": {
+    "protocol": 1,
+    "battleId": "GOLD-astral characters only",
+    "outcome": {
+     "kind": "caught",
+     "winner": null,
+     "target": "W2-1",
+     "ball": "masterball"
+    },
+    "members": {
+     "A-0001": {
+      "level": 50,
+      "exp": 118522,
+      "hp": 153,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "flamethrower",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "airslash",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "dragonpulse",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "roost",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 2,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0002": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 154,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "hydropump",
+        "pp": 5,
+        "maxpp": 5
+       },
+       {
+        "id": "icebeam",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "flashcannon",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0003": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 155,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "gigadrain",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "sludgebomb",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "earthquake",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "synthesis",
+        "pp": 5,
+        "maxpp": 5
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     }
+    },
+    "bag": {
+     "masterball": -1
+    },
+    "captured": [
+     {
+      "id": "W2-1",
+      "species": "Snorlax",
+      "nickname": "😀😀😀",
+      "level": 40,
+      "exp": 80000,
+      "hp": 190,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "item": "",
+      "ability": "Keen Eye",
+      "nature": "hardy",
+      "gender": "M",
+      "ivs": {
+       "hp": 31,
+       "atk": 31,
+       "def": 31,
+       "spa": 31,
+       "spd": 31,
+       "spe": 31
+      },
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "friendship": 70,
+      "ball": "masterball",
+      "ot": "player"
+     }
+    ],
+    "dex": {
+     "seen": [
+      "Snorlax"
+     ],
+     "owned": [
+      "Snorlax"
+     ]
+    }
+   },
+   "hash": "e9f6f5580d8728ae2adb902cc674528d08f83d29d611bfc92416f9ea7bd269c9"
+  },
+  {
+   "name": "synthetic: escapes and quotes",
+   "result": {
+    "protocol": 1,
+    "battleId": "GOLD-escapes and quotes",
+    "outcome": {
+     "kind": "caught",
+     "winner": null,
+     "target": "W2-1",
+     "ball": "masterball"
+    },
+    "members": {
+     "A-0001": {
+      "level": 50,
+      "exp": 118522,
+      "hp": 153,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "flamethrower",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "airslash",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "dragonpulse",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "roost",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 2,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0002": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 154,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "hydropump",
+        "pp": 5,
+        "maxpp": 5
+       },
+       {
+        "id": "icebeam",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "flashcannon",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0003": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 155,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "gigadrain",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "sludgebomb",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "earthquake",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "synthesis",
+        "pp": 5,
+        "maxpp": 5
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     }
+    },
+    "bag": {
+     "masterball": -1
+    },
+    "captured": [
+     {
+      "id": "W2-1",
+      "species": "Snorlax",
+      "nickname": "a\"b\\c\n\t",
+      "level": 40,
+      "exp": 80000,
+      "hp": 190,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "item": "",
+      "ability": "Keen Eye",
+      "nature": "hardy",
+      "gender": "M",
+      "ivs": {
+       "hp": 31,
+       "atk": 31,
+       "def": 31,
+       "spa": 31,
+       "spd": 31,
+       "spe": 31
+      },
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "friendship": 70,
+      "ball": "masterball",
+      "ot": "player"
+     }
+    ],
+    "dex": {
+     "seen": [
+      "Snorlax"
+     ],
+     "owned": [
+      "Snorlax"
+     ]
+    }
+   },
+   "hash": "4b2ba9a3aba322068741e1dc0d8e61a2e9c0a48a9a0185a15d145b7af19114d8"
+  },
+  {
+   "name": "synthetic: empty string",
+   "result": {
+    "protocol": 1,
+    "battleId": "GOLD-empty string",
+    "outcome": {
+     "kind": "caught",
+     "winner": null,
+     "target": "W2-1",
+     "ball": "masterball"
+    },
+    "members": {
+     "A-0001": {
+      "level": 50,
+      "exp": 118522,
+      "hp": 153,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "flamethrower",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "airslash",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "dragonpulse",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "roost",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 2,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0002": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 154,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "hydropump",
+        "pp": 5,
+        "maxpp": 5
+       },
+       {
+        "id": "icebeam",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "flashcannon",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0003": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 155,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "gigadrain",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "sludgebomb",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "earthquake",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "synthesis",
+        "pp": 5,
+        "maxpp": 5
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     }
+    },
+    "bag": {
+     "masterball": -1
+    },
+    "captured": [
+     {
+      "id": "W2-1",
+      "species": "Snorlax",
+      "nickname": "",
+      "level": 40,
+      "exp": 80000,
+      "hp": 190,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "item": "",
+      "ability": "Keen Eye",
+      "nature": "hardy",
+      "gender": "M",
+      "ivs": {
+       "hp": 31,
+       "atk": 31,
+       "def": 31,
+       "spa": 31,
+       "spd": 31,
+       "spe": 31
+      },
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "friendship": 70,
+      "ball": "masterball",
+      "ot": "player"
+     }
+    ],
+    "dex": {
+     "seen": [
+      "Snorlax"
+     ],
+     "owned": [
+      "Snorlax"
+     ]
+    }
+   },
+   "hash": "e64bb9cbf53044ae69845100687465bdc100d5f17af3ec80fc22045f028644d3"
+  },
+  {
+   "name": "synthetic: same result, keys in reverse insertion order",
+   "result": {
+    "dex": {
+     "seen": [
+      "Snorlax"
+     ],
+     "owned": [
+      "Snorlax"
+     ]
+    },
+    "captured": [
+     {
+      "id": "W2-1",
+      "species": "Snorlax",
+      "nickname": null,
+      "level": 40,
+      "exp": 80000,
+      "hp": 190,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "item": "",
+      "ability": "Keen Eye",
+      "nature": "hardy",
+      "gender": "M",
+      "ivs": {
+       "hp": 31,
+       "atk": 31,
+       "def": 31,
+       "spa": 31,
+       "spd": 31,
+       "spe": 31
+      },
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "friendship": 70,
+      "ball": "masterball",
+      "ot": "player"
+     }
+    ],
+    "bag": {
+     "masterball": -1
+    },
+    "members": {
+     "A-0001": {
+      "level": 50,
+      "exp": 118522,
+      "hp": 153,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "flamethrower",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "airslash",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "dragonpulse",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "roost",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 2,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0002": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 154,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "hydropump",
+        "pp": 5,
+        "maxpp": 5
+       },
+       {
+        "id": "icebeam",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "flashcannon",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0003": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 155,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "gigadrain",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "sludgebomb",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "earthquake",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "synthesis",
+        "pp": 5,
+        "maxpp": 5
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     }
+    },
+    "outcome": {
+     "kind": "caught",
+     "winner": null,
+     "target": "W2-1",
+     "ball": "masterball"
+    },
+    "battleId": "GOLD-caught",
+    "protocol": 1
+   },
+   "hash": "bced35326e84af2f00038c713244391a4f26add0f6763244b86fc9c73dbe2a22"
+  },
+  {
+   "name": "synthetic: long document (many bag entries)",
+   "result": {
+    "protocol": 1,
+    "battleId": "GOLD-long",
+    "outcome": {
+     "kind": "caught",
+     "winner": null,
+     "target": "W2-1",
+     "ball": "masterball"
+    },
+    "members": {
+     "A-0001": {
+      "level": 50,
+      "exp": 118522,
+      "hp": 153,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "flamethrower",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "airslash",
+        "pp": 15,
+        "maxpp": 15
+       },
+       {
+        "id": "dragonpulse",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "roost",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 2,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0002": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 154,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "hydropump",
+        "pp": 5,
+        "maxpp": 5
+       },
+       {
+        "id": "icebeam",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "flashcannon",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     },
+     "A-0003": {
+      "level": 50,
+      "exp": 117360,
+      "hp": 155,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "gigadrain",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "sludgebomb",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "earthquake",
+        "pp": 10,
+        "maxpp": 10
+       },
+       {
+        "id": "synthesis",
+        "pp": 5,
+        "maxpp": 5
+       }
+      ],
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      }
+     }
+    },
+    "bag": {
+     "item0": -150,
+     "item1": -149,
+     "item2": -148,
+     "item3": -147,
+     "item4": -146,
+     "item5": -145,
+     "item6": -144,
+     "item7": -143,
+     "item8": -142,
+     "item9": -141,
+     "item10": -140,
+     "item11": -139,
+     "item12": -138,
+     "item13": -137,
+     "item14": -136,
+     "item15": -135,
+     "item16": -134,
+     "item17": -133,
+     "item18": -132,
+     "item19": -131,
+     "item20": -130,
+     "item21": -129,
+     "item22": -128,
+     "item23": -127,
+     "item24": -126,
+     "item25": -125,
+     "item26": -124,
+     "item27": -123,
+     "item28": -122,
+     "item29": -121,
+     "item30": -120,
+     "item31": -119,
+     "item32": -118,
+     "item33": -117,
+     "item34": -116,
+     "item35": -115,
+     "item36": -114,
+     "item37": -113,
+     "item38": -112,
+     "item39": -111,
+     "item40": -110,
+     "item41": -109,
+     "item42": -108,
+     "item43": -107,
+     "item44": -106,
+     "item45": -105,
+     "item46": -104,
+     "item47": -103,
+     "item48": -102,
+     "item49": -101,
+     "item50": -100,
+     "item51": -99,
+     "item52": -98,
+     "item53": -97,
+     "item54": -96,
+     "item55": -95,
+     "item56": -94,
+     "item57": -93,
+     "item58": -92,
+     "item59": -91,
+     "item60": -90,
+     "item61": -89,
+     "item62": -88,
+     "item63": -87,
+     "item64": -86,
+     "item65": -85,
+     "item66": -84,
+     "item67": -83,
+     "item68": -82,
+     "item69": -81,
+     "item70": -80,
+     "item71": -79,
+     "item72": -78,
+     "item73": -77,
+     "item74": -76,
+     "item75": -75,
+     "item76": -74,
+     "item77": -73,
+     "item78": -72,
+     "item79": -71,
+     "item80": -70,
+     "item81": -69,
+     "item82": -68,
+     "item83": -67,
+     "item84": -66,
+     "item85": -65,
+     "item86": -64,
+     "item87": -63,
+     "item88": -62,
+     "item89": -61,
+     "item90": -60,
+     "item91": -59,
+     "item92": -58,
+     "item93": -57,
+     "item94": -56,
+     "item95": -55,
+     "item96": -54,
+     "item97": -53,
+     "item98": -52,
+     "item99": -51,
+     "item100": -50,
+     "item101": -49,
+     "item102": -48,
+     "item103": -47,
+     "item104": -46,
+     "item105": -45,
+     "item106": -44,
+     "item107": -43,
+     "item108": -42,
+     "item109": -41,
+     "item110": -40,
+     "item111": -39,
+     "item112": -38,
+     "item113": -37,
+     "item114": -36,
+     "item115": -35,
+     "item116": -34,
+     "item117": -33,
+     "item118": -32,
+     "item119": -31,
+     "item120": -30,
+     "item121": -29,
+     "item122": -28,
+     "item123": -27,
+     "item124": -26,
+     "item125": -25,
+     "item126": -24,
+     "item127": -23,
+     "item128": -22,
+     "item129": -21,
+     "item130": -20,
+     "item131": -19,
+     "item132": -18,
+     "item133": -17,
+     "item134": -16,
+     "item135": -15,
+     "item136": -14,
+     "item137": -13,
+     "item138": -12,
+     "item139": -11,
+     "item140": -10,
+     "item141": -9,
+     "item142": -8,
+     "item143": -7,
+     "item144": -6,
+     "item145": -5,
+     "item146": -4,
+     "item147": -3,
+     "item148": -2,
+     "item149": -1,
+     "item150": 0,
+     "item151": 1,
+     "item152": 2,
+     "item153": 3,
+     "item154": 4,
+     "item155": 5,
+     "item156": 6,
+     "item157": 7,
+     "item158": 8,
+     "item159": 9,
+     "item160": 10,
+     "item161": 11,
+     "item162": 12,
+     "item163": 13,
+     "item164": 14,
+     "item165": 15,
+     "item166": 16,
+     "item167": 17,
+     "item168": 18,
+     "item169": 19,
+     "item170": 20,
+     "item171": 21,
+     "item172": 22,
+     "item173": 23,
+     "item174": 24,
+     "item175": 25,
+     "item176": 26,
+     "item177": 27,
+     "item178": 28,
+     "item179": 29,
+     "item180": 30,
+     "item181": 31,
+     "item182": 32,
+     "item183": 33,
+     "item184": 34,
+     "item185": 35,
+     "item186": 36,
+     "item187": 37,
+     "item188": 38,
+     "item189": 39,
+     "item190": 40,
+     "item191": 41,
+     "item192": 42,
+     "item193": 43,
+     "item194": 44,
+     "item195": 45,
+     "item196": 46,
+     "item197": 47,
+     "item198": 48,
+     "item199": 49,
+     "item200": 50,
+     "item201": 51,
+     "item202": 52,
+     "item203": 53,
+     "item204": 54,
+     "item205": 55,
+     "item206": 56,
+     "item207": 57,
+     "item208": 58,
+     "item209": 59,
+     "item210": 60,
+     "item211": 61,
+     "item212": 62,
+     "item213": 63,
+     "item214": 64,
+     "item215": 65,
+     "item216": 66,
+     "item217": 67,
+     "item218": 68,
+     "item219": 69,
+     "item220": 70,
+     "item221": 71,
+     "item222": 72,
+     "item223": 73,
+     "item224": 74,
+     "item225": 75,
+     "item226": 76,
+     "item227": 77,
+     "item228": 78,
+     "item229": 79,
+     "item230": 80,
+     "item231": 81,
+     "item232": 82,
+     "item233": 83,
+     "item234": 84,
+     "item235": 85,
+     "item236": 86,
+     "item237": 87,
+     "item238": 88,
+     "item239": 89,
+     "item240": 90,
+     "item241": 91,
+     "item242": 92,
+     "item243": 93,
+     "item244": 94,
+     "item245": 95,
+     "item246": 96,
+     "item247": 97,
+     "item248": 98,
+     "item249": 99,
+     "item250": 100,
+     "item251": 101,
+     "item252": 102,
+     "item253": 103,
+     "item254": 104,
+     "item255": 105,
+     "item256": 106,
+     "item257": 107,
+     "item258": 108,
+     "item259": 109,
+     "item260": 110,
+     "item261": 111,
+     "item262": 112,
+     "item263": 113,
+     "item264": 114,
+     "item265": 115,
+     "item266": 116,
+     "item267": 117,
+     "item268": 118,
+     "item269": 119,
+     "item270": 120,
+     "item271": 121,
+     "item272": 122,
+     "item273": 123,
+     "item274": 124,
+     "item275": 125,
+     "item276": 126,
+     "item277": 127,
+     "item278": 128,
+     "item279": 129,
+     "item280": 130,
+     "item281": 131,
+     "item282": 132,
+     "item283": 133,
+     "item284": 134,
+     "item285": 135,
+     "item286": 136,
+     "item287": 137,
+     "item288": 138,
+     "item289": 139,
+     "item290": 140,
+     "item291": 141,
+     "item292": 142,
+     "item293": 143,
+     "item294": 144,
+     "item295": 145,
+     "item296": 146,
+     "item297": 147,
+     "item298": 148,
+     "item299": 149
+    },
+    "captured": [
+     {
+      "id": "W2-1",
+      "species": "Snorlax",
+      "nickname": null,
+      "level": 40,
+      "exp": 80000,
+      "hp": 190,
+      "status": "",
+      "statusCount": 0,
+      "moves": [
+       {
+        "id": "protect",
+        "pp": 10,
+        "maxpp": 10
+       }
+      ],
+      "item": "",
+      "ability": "Keen Eye",
+      "nature": "hardy",
+      "gender": "M",
+      "ivs": {
+       "hp": 31,
+       "atk": 31,
+       "def": 31,
+       "spa": 31,
+       "spd": 31,
+       "spe": 31
+      },
+      "evs": {
+       "hp": 0,
+       "atk": 0,
+       "def": 0,
+       "spa": 0,
+       "spd": 0,
+       "spe": 0
+      },
+      "friendship": 70,
+      "ball": "masterball",
+      "ot": "player"
+     }
+    ],
+    "dex": {
+     "seen": [
+      "Snorlax"
+     ],
+     "owned": [
+      "Snorlax"
+     ]
+    }
+   },
+   "hash": "34d473ed2ea15d9b144850c873a83e531c34926e8648e9498a9c2d019dff663f"
+  }
+ ]
+}

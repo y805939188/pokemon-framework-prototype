@@ -21,7 +21,7 @@ const LAYERS = {
 };
 // Node built-ins a layer may import. Only tools (tests/fixtures/harness) may use the file system.
 const NODE_BUILTINS = {
-	rules: ['node:crypto'], i18n: [], content: ['node:crypto'], battle: ['node:path'], flow: [],
+	rules: [], i18n: [], content: [], battle: ['node:path'], flow: [],
 	tools: ['node:fs', 'node:os', 'node:path', 'node:crypto'], entry: [],
 };
 // Per-file additions to the layer's built-in list (the loader reads the pinned engine's SOURCE_SHA file).

@@ -142,3 +142,11 @@ test('battle and tools may use the internals; mentioning the names in text or co
 		'flow/doc.ts': '// gw._debugBattle() is for tools; gw._queue too\nexport const d = "gw._seq and _env are private";\nexport const e = `${1} gw._closed`;\n',
 	});
 });
+
+// ---- core independence: no Node built-ins in rules, content, i18n or flow
+test('the core (rules) and the other pure layers may not import any Node built-in, crypto included', () => {
+	for (const layer of ['rules', 'content', 'i18n', 'flow']) {
+		bad({ ...OK, [`${layer}/n.ts`]: 'import { createHash } from "node:crypto";\nexport const h = createHash;\n' }, new RegExp(`${layer}/n\\.ts: layer "${layer}" may not import node:crypto`));
+	}
+	clean({ ...OK, 'tools/n.ts': 'import { createHash } from "node:crypto";\nexport const h = createHash;\n' });
+});

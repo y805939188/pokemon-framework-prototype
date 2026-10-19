@@ -3,7 +3,7 @@
  * Pure functions. A BattleResult is the only thing that crosses from the battle layer into persistent state;
  * `applyBattleResult` is the single write path.
  */
-import { createHash } from "node:crypto";
+import { sha256Hex } from "./sha256.ts";
 import type { Member, MoveSlot, PartialStats, Stats } from "./types.ts";
 
 export const PROTOCOL_VERSION = 1;
@@ -95,7 +95,7 @@ export function newGame({ party, bag = {}, money = 0 }: { party: NewMemberInput[
 export function resultHash(result: BattleResult): string {
   const canon = JSON.stringify(result, (_k, v: unknown) => (v && typeof v === "object" && !Array.isArray(v)
     ? Object.fromEntries(Object.keys(v).sort().map((x) => [x, (v as Record<string, unknown>)[x]])) : v));
-  return createHash("sha256").update(canon).digest("hex");
+  return sha256Hex(canon);
 }
 
 export type ApplyStatus = "applied" | "already-applied";

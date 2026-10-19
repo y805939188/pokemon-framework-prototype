@@ -2,6 +2,7 @@
 export * as growth from "./rules/growth.ts";
 export * as rules from "./rules/rules.ts";
 export * as state from "./rules/state.ts";
+export * as digest from "./rules/sha256.ts";
 export * as store from "./tools/save-store.ts";
 export * as gateway from "./battle/gateway.ts";
 export * as moveRequests from "./battle/move-requests.ts";
