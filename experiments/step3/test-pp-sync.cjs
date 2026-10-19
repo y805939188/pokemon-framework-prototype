@@ -68,3 +68,17 @@ test('invalid current PP or an unrepresentable cap is diagnosed before any seed 
     assert.equal(s.gw.snapshot(), before, 'failed seed must not change HP or PP');
   }
 });
+
+// ---- supported range (step 2 closeout): spec total PP = base + floor(base * ups / 5), ups 0-3; the bridge follows the pinned simulator
+test('the supported range is stated by tests: ups 0-3 accepted, other caps and Trump Card boosts rejected before the battle starts', async () => {
+  const create = move => { const game = F.makeGame(); game.party[0].moves = [move]; return make(game); };
+  await create({ id: 'hydropump', pp: 8, maxpp: 8 });           // 3 PP-Ups
+  await create({ id: 'trumpcard', pp: 5, maxpp: 5 });           // the pinned simulator never boosts it
+  await create({ id: 'struggle', pp: 1, maxpp: 1 });            // total PP <= 1: no boost possible (spec WP28 PPUP rule)
+  for (const move of [
+    { id: 'hydropump', pp: 5, maxpp: 9 },                       // a raw count of 4 is not representable
+    { id: 'hydropump', pp: 1, maxpp: 4 },                       // a negative count is not representable
+    { id: 'trumpcard', pp: 5, maxpp: 6 },                       // spec formula would allow it; the simulator does not
+    { id: 'struggle', pp: 1, maxpp: 2 },
+  ]) await assert.rejects(create(move), /invalid PP maximum/, JSON.stringify(move));
+});
