@@ -23,8 +23,6 @@
       const tLoad = performance.now();
       if (!nodeRequire) throw new Error("Node require() is not available in this runtime");
       ENGINE = {
-        Session: nodeRequire("./js/engine/game/session.cjs").BattleSession,
-        S: nodeRequire("./js/engine/game/state.cjs"),
         F: nodeRequire("./js/engine/fixtures/game.cjs"),
         D: nodeRequire("./js/engine/game/describe.cjs"),
         B: nodeRequire("./js/engine/build/engine.cjs"), // the built engine bundle (content pipeline runtime, Showdown dex)
@@ -33,6 +31,15 @@
       W.PSFlow && (W.PSFlow.perf.engineLoadMs = Math.round((performance.now() - tLoad) * 10) / 10);
     }
     return ENGINE;
+  }
+
+  /** What this plugin uses of the game application (framework/app); the full typed contract is app/game-application.ts. */
+  interface BattleOutcomeView { code: number; battleId: string | null; commit: string; kind?: string; aborted?: true; error?: string; projection?: string; projectionError?: string }
+  interface GameAppView {
+    startBattle(request: unknown): Promise<any>;
+    finishBattle(session: unknown, request: unknown): BattleOutcomeView & { result?: unknown };
+    abortBattle(request: unknown, error: unknown): BattleOutcomeView;
+    commitResult(result: unknown): string;
   }
 
   // ---------------------------------------------------------------- shared flow state / API
@@ -97,49 +104,56 @@
       G.$gameSystem._psGame = engine().F.makeGame();
       G.$gameSystem._psBattleSeq = 0;
     },
-    /** Apply a BattleResult to the persistent state. Safe to call twice. */
-    commit(result: any): string {
-      const r = engine().S.applyBattleResult(PSFlow.game(), result);
-      if (r.status === "applied") G.$gameSystem._psGame = r.state;
-      return r.status;
+    /**
+     * The game application (framework/app) over the MZ ports: the persistent state lives in `$gameSystem._psGame`, the outcome
+     * is projected into the result variable, battles are Showdown-backed sessions. All commit/abort/duplicate logic is the
+     * application's; this plugin only supplies the host side.
+     */
+    app(): GameAppView {
+      if (!PSFlow._app) {
+        const { B } = engine();
+        if (!PSFlow.logger) PSFlow.logger = B.log.createRingLogger(500);
+        if (!PSFlow._dex) PSFlow._dex = B.dex.createDexLookup();
+        PSFlow._app = new B.app.GameApplication({
+          state: { read: () => PSFlow.game(), replace: (next: unknown) => { G.$gameSystem._psGame = next; } },
+          content: () => ({ content: PSFlow.content(), dex: PSFlow._dex }),
+          sessions: B.composition.createBattleSessionFactory({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger.sink }),
+          projection: {
+            project: (outcome: { code: number }) => {
+              if (PSFlow.debug.failProjection) { PSFlow.debug.failProjection = false; throw new Error("injected projection failure"); } // tests
+              const v = PSFlow.request && PSFlow.request.resultVariable;
+              if (v) G.$gameVariables.setValue(v, outcome.code);
+            },
+          },
+        });
+      }
+      return PSFlow._app as GameAppView;
     },
+    _app: null as GameAppView | null,
+    /** Apply a BattleResult to the persistent state. Safe to call twice. */
+    commit(result: any): string { return PSFlow.app().commitResult(result); },
     async begin(): Promise<any> {
-      const { Session, F, B } = engine();
-      if (!PSFlow.logger) PSFlow.logger = B.log.createRingLogger(500);
-      const req = PSFlow.request;
-      // a save written against older content must be explained, not crash a battle: check its references first
-      if (!PSFlow._dex) PSFlow._dex = B.dex.createDexLookup();
-      const dangling = B.contentRuntime.findDanglingReferences(PSFlow.game(), PSFlow.content(), PSFlow._dex);
-      if (dangling.length) throw new Error("the save refers to content that no longer exists: " + dangling.slice(0, 3).map((d: any) => `${d.path} ${d.message}`).join("; "));
-      const team = req.foes.map((f: any, i: number) => F.foeMember(`W${req.seq}-${i + 1}`, f.species, f.level));
       const tCreate = performance.now();
-      const session = await Session.create({
-        game: PSFlow.game(), battleId: req.battleId, content: PSFlow.content(), seed: PSFlow.seed, logger: PSFlow.logger.sink,
-        foe: { kind: req.kind, team },
-      });
+      const session = await PSFlow.app().startBattle(PSFlow.request); // refuses a save that refers to content that no longer exists, then opens the session
       if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round((performance.now() - tCreate) * 10) / 10;
       return session;
     },
     finish(session: any): any {
-      const req = PSFlow.request;
-      const result = session.result();
-      const status = PSFlow.commit(result);
-      PSFlow.lastResult = result;
-      const code = result.outcome.kind === "win" ? (session.ended && session.ended.winner === "Player" ? 1 : 4)
-        : result.outcome.kind === "caught" ? 2 : result.outcome.kind === "run" ? 3 : 4;
-      PSFlow.lastOutcome = { code, battleId: req.battleId, commit: status, kind: result.outcome.kind };
-      PSFlow.close(code);
-      return PSFlow.lastOutcome;
+      const { result, ...outcome } = PSFlow.app().finishBattle(session, PSFlow.request);
+      if (result) PSFlow.lastResult = result;
+      PSFlow.lastOutcome = outcome;
+      PSFlow.close(outcome.code);
+      return outcome;
     },
     abort(error: unknown): void {
-      PSFlow.lastOutcome = { code: 0, battleId: PSFlow.request && PSFlow.request.battleId, commit: "none", aborted: true, error: String(error instanceof Error ? error.message : error) };
+      try { PSFlow.lastOutcome = PSFlow.app().abortBattle(PSFlow.request, error); }
+      catch (e) { PSFlow.lastOutcome = { code: 0, battleId: PSFlow.request && PSFlow.request.battleId, commit: "none", aborted: true, error: String(error instanceof Error ? error.message : error), projection: "failed", projectionError: String(e instanceof Error ? e.message : e) }; }
       PSFlow.close(0);
     },
+    /** Bookkeeping when a battle is over: measurements, and the interpreter stops waiting. The result variable is the application's projection. */
     close(code: number): void {
       const cur = PSFlow.perf.cur;
       if (cur && !cur.totalMs) { cur.totalMs = Math.round((performance.now() - cur.t0) * 10) / 10; cur.code = code; PSFlow.perf.battles.push(cur); }
-      const v = PSFlow.request && PSFlow.request.resultVariable;
-      if (v) G.$gameVariables.setValue(v, code);
       PSFlow.running = false;
     },
   });
@@ -429,12 +443,12 @@
   };
   P.onEnd = function () {
     if (!this._aborted && !this._failure) {
-      try { PSFlow.finish(this._session); } catch (e) { PSFlow.abort(e); }
+      try { PSFlow.finish(this._session); } catch (e) { PSFlow.abort(e); } // finishBattle does not throw; this guards only the plugin's own wiring
     }
     this.popScene();
   };
   P.terminate = function () {
     G.Scene_MenuBase.prototype.terminate.call(this);
-    if (PSFlow.running) PSFlow.close(0); // never leave the interpreter waiting
+    if (PSFlow.running) PSFlow.abort(new Error("the battle scene closed without an outcome")); // never leave the interpreter waiting
   };
 })();

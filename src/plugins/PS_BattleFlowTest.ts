@@ -358,6 +358,29 @@
       } finally { Gateway.restore = restore; }
     });
 
+    await scenario("T12 committed but the host projection fails: the commit stands and is reported, nothing is applied twice, a retry informs the host", async () => {
+      fresh(); const before = clone(game());
+      W.PSFlow.debug.failProjection = true;
+      await startEvent(1); await inMode("main");
+      const session = battle()._session;
+      await choose(/^Run/); await inMode("end"); await press("ok"); await dismissMessages();
+      const o = W.PSFlow.lastOutcome;
+      eq([o.code, o.kind, o.commit, o.projection], [3, "run", "applied", "failed"], "committed, host not informed");
+      assert(/injected projection failure/.test(o.projectionError), "the projection error is reported: " + o.projectionError);
+      assert(!o.aborted, "a failed projection is not an abort");
+      assert(game().appliedBattles[o.battleId], "the result is in the persistent state");
+      eq(G.$gameVariables.value(10), 0, "the host variable was not written");
+      assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "the flow closed and the event continued");
+      const applied = clone(game());
+      eq(W.PSFlow.commit(W.PSFlow.lastResult), "already-applied", "a repeat commit is a no-op");
+      eq(game(), applied, "nothing was applied twice");
+      const retry = W.PSFlow.app().finishBattle(session, W.PSFlow.request);
+      eq([retry.commit, retry.projection, retry.code], ["already-applied", "ok", 3], "the retry only informs the host");
+      eq(G.$gameVariables.value(10), 3, "the host variable now carries the outcome");
+      eq(game(), applied, "still applied once");
+      eq(game().party.map((m: any) => [m.id, m.level, m.hp]), before.party.map((m: any) => [m.id, m.level, m.hp]), "a run changes no member");
+    });
+
     await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
       W.PSFlow.setLanguage("zh");
       try {
