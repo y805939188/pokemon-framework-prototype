@@ -16,12 +16,13 @@ const LAYERS = {
 	i18n: ['i18n'], // pure text tables and resolution; imports nothing
 	battle: ['rules', 'battle'],
 	flow: ['rules', 'content', 'battle', 'flow', 'i18n'],
-	tools: ['rules', 'content', 'battle', 'flow', 'tools', 'i18n'],
-	entry: ['rules', 'content', 'battle', 'flow', 'tools', 'i18n'], // files at the framework root (the public index only re-exports)
+	app: ['rules', 'content', 'flow', 'i18n', 'app'], // use cases: rules + the flow's types and content checks, never the engine adapters
+	tools: ['rules', 'content', 'battle', 'flow', 'app', 'tools', 'i18n'],
+	entry: ['rules', 'content', 'battle', 'flow', 'app', 'tools', 'i18n', 'entry'], // files at the framework root: the public index and the composition root
 };
 // Node built-ins a layer may import. Only tools (tests/fixtures/harness) may use the file system.
 const NODE_BUILTINS = {
-	rules: [], i18n: [], content: [], battle: ['node:path'], flow: [],
+	rules: [], i18n: [], content: [], battle: ['node:path'], flow: [], app: [],
 	tools: ['node:fs', 'node:os', 'node:path', 'node:crypto'], entry: [],
 };
 // Per-file additions to the layer's built-in list (the loader reads the pinned engine's SOURCE_SHA file).

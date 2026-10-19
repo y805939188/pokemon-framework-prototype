@@ -165,3 +165,16 @@ test('explicit any is rejected in the core, not elsewhere, and unknown is fine',
 	bad({ ...OK, 'rules/a.ts': 'export const f = (x: Record<string, any>, y: any[]) => [x, y];\n' }, /rules\/a\.ts: 2 explicit "any"/);
 	clean({ ...OK, 'rules/a.ts': 'export const f = (x: unknown) => x;\n', 'battle/b.ts': 'export const f = (x: any) => x;\n', 'flow/c.ts': 'export const f = (x: any) => x;\n' });
 });
+
+// ---- the application layer
+test('the application layer sees rules, content, flow and i18n, never the engine adapters, tools or the composition root', () => {
+	const flowFile = { 'flow/f.ts': 'export const f = 1;\n', 'tools/t.ts': 'export const t = 1;\n', 'content/c.ts': 'export const c = 1;\n', 'composition.ts': 'export const x = 1;\n' };
+	clean({ ...OK, ...flowFile, 'app/a.ts': 'import { f } from "../flow/f.ts";\nimport { a } from "../rules/a.ts";\nimport { c } from "../content/c.ts";\nexport const v = [f, a, c];\n' });
+	bad({ ...OK, ...flowFile, 'app/a.ts': 'import { g } from "../battle/gateway.ts";\nexport const v = g;\n' }, /layer "app" may not import layer "battle"/);
+	bad({ ...OK, ...flowFile, 'app/a.ts': 'import { t } from "../tools/t.ts";\nexport const v = t;\n' }, /layer "app" may not import layer "tools"/);
+	bad({ ...OK, ...flowFile, 'app/a.ts': 'import { x } from "../composition.ts";\nexport const v = x;\n' }, /layer "app" may not import layer "entry"/);
+	bad({ ...OK, 'app/a.ts': 'import { readFileSync } from "node:fs";\nexport const v = readFileSync;\n' }, /layer "app" may not import node:fs/);
+	bad({ ...OK, 'app/a.ts': 'export const v = (x: any) => x;\n' }, /app\/a\.ts: 1 explicit "any" in layer "app"/);
+	bad({ ...OK, 'app/a.ts': 'export const v = (gw: { _queue: unknown[] }) => gw._queue;\n' }, /app\/a\.ts: gateway internal "_queue" may not be used in layer "app"/);
+	clean({ ...OK, ...flowFile, 'composition.ts': 'import { g } from "./battle/gateway.ts";\nimport { a } from "./app/a.ts";\nexport const x = [g, a];\n', 'app/a.ts': 'export const a = 1;\n' });
+});

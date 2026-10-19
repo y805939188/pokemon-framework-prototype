@@ -18,3 +18,6 @@ export * as dex from "./battle/dex.ts";
 export * as i18n from "./i18n/index.ts";
 export * as log from "./flow/log.ts";
 export * as saveSchema from "./rules/save-schema.ts";
+export * as app from "./app/index.ts";
+export * as composition from "./composition.ts";
+export * as fakes from "./tools/fakes.ts";
