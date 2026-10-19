@@ -1,0 +1,57 @@
+{
+  "mode": "saveloc",
+  "results": [
+    {
+      "id": "SL1 save location: a fresh slot is written by this run (saveGame code 0) and removed again",
+      "status": "pass",
+      "ms": 0
+    }
+  ],
+  "focusLog": [],
+  "suppressedAudio": {
+    "playBgm": 1
+  },
+  "refocus": 0,
+  "env": {
+    "nw": "0.117.0",
+    "node": "26.7.0",
+    "chromium": "154.0.8037.58",
+    "v8": "15.4.80.11",
+    "platform": "darwin",
+    "arch": "arm64",
+    "execPath": "<workspace>/.verify/batch-copy/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
+    "gameDir": "<workspace>/.verify/batch-copy/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
+    "packageInfo": {
+      "builtAt": "2026-10-19T18:54:43.771Z",
+      "gitHead": "cd0fc0b59ab4b1430e2a027da391f368ef93d869",
+      "workingTreeChanges": 0,
+      "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+      "engineBundleSha256": "2a66c938e4ce97a2a4e9a9a078f43bb88dc6b86c5812a45434f2e27fde543076",
+      "contentInputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625",
+      "withTests": true,
+      "signing": "adhoc"
+    }
+  },
+  "saveLocation": {
+    "chosen": {
+      "dir": "<home>/Library/Application Support/PokemonFrameworkPrototype/save/",
+      "why": "packaged app"
+    },
+    "dir": "<home>/Library/Application Support/PokemonFrameworkPrototype/save/",
+    "slot": 99,
+    "occupied": false,
+    "saveCode": 0,
+    "writtenByThisRun": true,
+    "cleanedUp": true,
+    "error": null,
+    "gameDir": "<workspace>/.verify/batch-copy/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw"
+  },
+  "contentIdentity": {
+    "kind": "sample",
+    "id": "sample",
+    "inputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625"
+  },
+  "logTail": null,
+  "overall": "pass"
+}

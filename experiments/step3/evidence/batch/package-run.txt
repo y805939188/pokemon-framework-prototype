@@ -1,0 +1,50 @@
+<workspace>/.verify/batch-copy/build/package/PokemonFrameworkPrototype.app: satisfies its Designated Requirement
+Package: <workspace>/.verify/batch-copy/build/package/PokemonFrameworkPrototype.app
+  app total 558236 KB, app.nw 150028 KB, 1798 files in app.nw, withTests=1
+  gitHead=cd0fc0b59ab4b1430e2a027da391f368ef93d869 (working-tree changes: 0, diff sha256 e3b0c44298fc) showdown=7244fe8e28fa8bc4d0809ae30d183c608b62bb2b signing=adhoc
+  gitHead=cd0fc0b59ab4b1430e2a027da391f368ef93d869 (working-tree changes: 0, diff sha256 e3b0c44298fc) showdown=7244fe8e28fa8bc4d0809ae30d183c608b62bb2b signing=adhoc
+bundle seal still valid after the runs
+ps-flow-report.json pass nw 0.117.0 node 26.7.0
+   pass T1 trainer win: Fight, KO, exp, level-up, learn prompt (real keys), next turn uses new move, return 
+   pass T2 trainer battle: Run refused with a reason (nothing consumed), a thrown Ball is spent and blocked 
+   pass T3 wild run: faster user escapes, committed as 'ran', state unchanged apart from battle bookkeeping
+   pass T4 capture: Master Ball from the bag, captured member joins with its stable id
+   pass T5 item from the bag: Potion on the active member, consumed once and persisted
+   pass T6 failure exit: engine error mid-battle aborts cleanly, nothing committed, the event still continue
+   pass T7 save/restore outside battle + idempotent re-commit after restore
+   pass T9 legacy and unusable saves through MZ's own save/load: schema 1 migrates, newer or damaged states 
+   pass T10 a save that refers to content which no longer exists: the battle is refused with the reference n
+   pass T11 an operation fails and its rollback fails too: the session is closed with both errors kept, noth
+   pass T12 committed but the host projection fails: the commit stands and is reported, nothing is applied t
+   pass T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every dra
+ps-flow-verify-save.json pass nw 0.117.0 node 26.7.0
+   pass V1 real restart: the save written by the previous process loads with identical state, duplicates sta
+ps-matrix-package.json pass nw 0.117.0 node 26.7.0
+   pass S1 (matrix)
+   pass S2 (matrix)
+   pass S3 (matrix)
+   pass S4 (matrix)
+   pass S5 (matrix)
+   pass S6 (matrix)
+   pass S7 (matrix)
+   pass S8 (matrix)
+   pass S9 (matrix)
+   pass S10 (matrix)
+ps-saveloc.json pass nw 0.117.0 node 26.7.0
+   pass SL1 save location: a fresh slot is written by this run (saveGame code 0) and removed again
+matrix in package (nw 0.117.0, node 26.7.0) vs node v22.21.1
+same engine artifact in both hosts: 2a66c938e4ce97a2... 169322 bytes
+   S1 same fingerprint 1d78d0a8ff4b
+   S2 same fingerprint 32142bf740c3
+   S3 same fingerprint 9b3b04f4c726
+   S4 same fingerprint 4bacf1d14b66
+   S5 same fingerprint 9d70aa339701
+   S6 same fingerprint 737819157254
+   S7 same fingerprint 691c3da8c1d6
+   S8 same fingerprint 3b68ee371514
+   S9 same fingerprint 3373e0f0f457
+   S10 same fingerprint 91781116c319
+host: Contents/MacOS/nwjs Helper (Renderer) | package: {"builtAt":"2026-10-19T18:54:43.771Z","gitHead":"cd0fc0b59ab4b1430e2a027da391f368ef93d869","workingTreeChanges":0,"diffSha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","showdownSha":"7244fe8e28fa8bc4d0809ae30d183c608b62bb2b","engineBundleSha256":"2a66c938e4ce97a2a4e9a9a078f43bb88dc6b86c5812a45434f2e27fde543076","contentInputsHash":"c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625","withTests":true,"signing":"adhoc"}
+builds: flow run 2026-10-19T18:53:47.729Z -> replaced -> verify/matrix/saveloc runs 2026-10-19T18:54:43.771Z
+default save location: <home>/Library/Application Support/PokemonFrameworkPrototype/save/ ( packaged app ) slot 99 written by this run: true cleaned up: true
+scripts/run-package-tests-mac.sh $V/batch-evidence-final/package  3.39s user 6.36s system 10% cpu 1:31.74 total
