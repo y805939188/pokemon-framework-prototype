@@ -330,6 +330,34 @@
       await recover();
     });
 
+    await scenario("T11 an operation fails and its rollback fails too: the session is closed with both errors kept, nothing is committed, the event still continues", async () => {
+      fresh(); const before = clone(game());
+      const Gateway = nodeRequire("./js/engine/gateway.cjs").BattleGateway;
+      const restore = Gateway.restore;
+      try {
+        await startEvent(1); await inMode("main");
+        const session = battle()._session;
+        const gwChoose = session.gw.choose.bind(session.gw);
+        session.gw.choose = async (...a: any[]) => { const ok = await gwChoose(...a); if (a[0] === "p2") throw new Error("injected operation failure"); return ok; };
+        Gateway.restore = async () => { throw new Error("injected rollback failure"); };
+        await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower/i);
+        await inMode("end");
+        Gateway.restore = restore;
+        assert(battle()._aborted, "scene shows the aborted ending");
+        const msg = W.PSFlow.lastOutcome.error;
+        assert(/injected operation failure/.test(msg) && /injected rollback failure/.test(msg), "both errors reach the outcome: " + msg);
+        assert(session.broken && session.broken.name === "SessionBrokenError", "the session is closed");
+        let refused = false; try { await session.useItem("potion", "A-0001"); } catch (e: any) { refused = e === session.broken; }
+        assert(refused, "a closed session refuses later actions with the same error");
+        let noResult = false; try { session.result(); } catch (e: any) { noResult = e === session.broken; }
+        assert(noResult, "an untrusted result cannot be read");
+        await press("ok"); await dismissMessages();
+        eq(game(), before, "persistent state identical: nothing was committed");
+        assert(W.PSFlow.lastOutcome.aborted && W.PSFlow.lastOutcome.commit === "none" && G.$gameVariables.value(10) === 0, "aborted outcome, nothing committed, variable 0");
+        assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "flow closed and interpreter released");
+      } finally { Gateway.restore = restore; }
+    });
+
     await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
       W.PSFlow.setLanguage("zh");
       try {
