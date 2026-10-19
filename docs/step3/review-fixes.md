@@ -50,3 +50,10 @@ pnpm --dir src build
 - **未验证**：新代码的真实 MZ/NW.js 窗口、真实 package-mac、性能和内存；CI 未运行（未推送）。F1 菜单用 VM 检查实际插件源码，构建通过不当作窗口通过。F3 每个操作增加内存检查点，宿主动作延迟应由 Claude 复审时留意；无独立 PASS。
 - 原工作树仍在 `step3/foundation` 的基线，`main` / `step3-candidate` 不变。用户若不接受修复，继续使用原候选即可，不必回写或重置它。若已将修复带入其他分支，用 `git revert <F3完整SHA> <F2完整SHA> <F1完整SHA>` 产生倒序撤销提交，保留历史；不要对 Claude 工作树运行 reset。
 - 本地用于基线红测的 `.worktrees/step3-review-baseline` 是 `git archive` 导出的无 Git 目录，仅 F1 测试源码复制进去；不是额外分支或已验收产物。没有启动 NW.js/游戏进程。
+
+## 独立复审与宿主验证（第三步修复，2026-10-19）
+
+- 复审（非修复作者的独立会话）：F1/F2/F3 **接受，无阻塞项**。Node 级：19 套件、18 个变异（13 被杀，5 存活：3 个等价、2 个对应下面的测试缺口）、24 场景故障注入“失败后重试 = 干净运行”逐位一致、检查点约 0.25 ms/次。
+- 宿主验证（NW.js 0.117.0 / Chromium 154 / Node 26.7.0，构建自已提交的 `7abce72`，ad hoc 签名）：开发树流程 T1–T10 + V1 通过；`run-package-tests-mac.sh` 通过（包内 T1–T10、V1、S1–S10 指纹与 Node 相同、SL1、签名封印有效）；引擎包哈希 `94afa975…`（包内 = 开发树 = Node 加载）。原始 JSON 在 `experiments/step3/evidence/review-fixes/host/`（截图和性能原始数据留在仓库外）。
+- 性能：到菜单 534 ms、后续 133 ms、动作延迟 3–5 ms、帧 p50 16.7 ms、24 场后 RSS 1235 MB，与候选同量级；冷启动到插件/地图比候选记录慢约 190–200 ms，**没有同条件基线数据，原因未判定**；基线对照脚本两次因窗口未在前台而失败，未完成。**不能得出“无性能退化”。**
+- 已知遗留（低，不阻塞）：(1) 检查点恢复本身失败时会吞掉原错误并释放锁、留下悬空预留（`session.ts` `_exclusive`）——应把会话置为不可用；(2) 回归缺口：`isSelectableMove` 的 `disabled` 分支、失败重试后 `seq` 连续性没有用例；(3) `src/framework/tools/harness.ts` 的演示 AI 仍是旧的 `pp > 0` 判断；(4) F1/F2/F3 没有专门的宿主场景（由 Node 测试覆盖）；(5) 同条件基线性能与 Transform/Mimic/Sketch 等改写槽位招式的 PP 同步不在范围。
