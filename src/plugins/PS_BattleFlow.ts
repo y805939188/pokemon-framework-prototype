@@ -333,7 +333,10 @@
   P.showMoves = function () {
     const req = this._session.currentRequest();
     const moves = req.active[0].moves;
-    this.show("moves", moves.map((m: any, i: number) => ({ name: PSFlow.translator().t("ui.moves.line", { move: m.move, pp: m.pp, maxpp: m.maxpp }), ext: i + 1, enabled: !m.disabled && m.pp > 0 })));
+    this.show("moves", moves.map((m: any, i: number) => ({
+      name: m.pp === undefined ? m.move : PSFlow.translator().t("ui.moves.line", { move: m.move, pp: m.pp, maxpp: m.maxpp }),
+      ext: i + 1, enabled: engine().B.moveRequests.isSelectableMove(m),
+    })));
   };
   P.showBag = function () {
     const bag = this._session.bag;

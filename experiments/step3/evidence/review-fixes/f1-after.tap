@@ -1,0 +1,42 @@
+TAP version 13
+# (node:75168) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: ordinary menu rejects empty/disabled moves and engine rejects an illegal index without advancing
+ok 1 - ordinary menu rejects empty/disabled moves and engine rejects an illegal index without advancing
+  ---
+  duration_ms: 242.197125
+  type: 'test'
+  ...
+# Subtest: Struggle with no PP fields is selectable, executes and never displays undefined PP
+ok 2 - Struggle with no PP fields is selectable, executes and never displays undefined PP
+  ---
+  duration_ms: 8.388291
+  type: 'test'
+  ...
+# Subtest: Fly locks the next request to a PP-less move; its second turn completes
+ok 3 - Fly locks the next request to a PP-less move; its second turn completes
+  ---
+  duration_ms: 8.094125
+  type: 'test'
+  ...
+# Subtest: default singles AI advances a no-PP Struggle request
+ok 4 - default singles AI advances a no-PP Struggle request
+  ---
+  duration_ms: 5.483042
+  type: 'test'
+  ...
+# Subtest: default AI handles a real recharge request and a doubles PP-less slot
+ok 5 - default AI handles a real recharge request and a doubles PP-less slot
+  ---
+  duration_ms: 8.5215
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 330.519833

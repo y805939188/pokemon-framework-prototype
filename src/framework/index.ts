@@ -4,6 +4,7 @@ export * as rules from "./rules/rules.ts";
 export * as state from "./rules/state.ts";
 export * as store from "./tools/save-store.ts";
 export * as gateway from "./battle/gateway.ts";
+export * as moveRequests from "./battle/move-requests.ts";
 export * as describe from "./flow/describe.ts";
 export * as session from "./flow/session.ts";
 export * as fixtures from "./tools/fixtures/game.ts";

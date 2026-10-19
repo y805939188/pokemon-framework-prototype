@@ -9,6 +9,7 @@
  * happened: session -> engine (applyGrowth) + refreshed requests; (3) battle end: engine -> result.
  */
 import { BattleGateway } from "../battle/gateway.ts";
+import { isSelectableMove } from "../battle/move-requests.ts";
 import type { GatewayMessage, MemberState } from "../battle/gateway.ts";
 import * as G from "../rules/growth.ts";
 import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, itemEligibility } from "../rules/rules.ts";
@@ -176,7 +177,8 @@ export class BattleSession {
       const i = request.side.pokemon.findIndex((p: Req) => !p.active && !/ fnt$/.test(p.condition));
       return "switch " + (i + 1);
     }
-    const i = request.active[0].moves.findIndex((m: Req) => !m.disabled && m.pp > 0);
+    const i = request.active[0].moves.findIndex(isSelectableMove);
+    if (i < 0) throw new Error("battle request has no selectable move");
     return "move " + (i + 1);
   }
 
@@ -189,7 +191,8 @@ export class BattleSession {
     }
     return request.active.map((a: Req, i: number) => {
       if (/ fnt$/.test(request.side.pokemon[i].condition)) return "pass";
-      const mi = a.moves.findIndex((m: Req) => !m.disabled && m.pp > 0);
+      const mi = a.moves.findIndex(isSelectableMove);
+      if (mi < 0) throw new Error("battle request has no selectable move");
       return `move ${mi + 1}` + (needsTarget(a.moves[mi].target) ? " 1" : "");
     }).join(", ");
   }

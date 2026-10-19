@@ -27,6 +27,7 @@ SUITES=(
   experiments/step3/test-save.cjs
   experiments/step3/test-integration.cjs
   experiments/step3/test-growth-differential.cjs
+  experiments/step3/test-move-requests.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do
