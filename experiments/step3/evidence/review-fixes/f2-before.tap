@@ -1,0 +1,93 @@
+TAP version 13
+# Subtest: persistent max PP and all four PP-Up levels survive import, use and switching
+not ok 1 - persistent max PP and all four PP-Up levels survive import, use and switching
+  ---
+  duration_ms: 215.946708
+  type: 'test'
+  location: '/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/experiments/step3/test-pp-sync.cjs:16:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    8 !== 5
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 5
+  actual: 8
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/experiments/step3/test-pp-sync.cjs:20:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: Leppa restoration respects each persistent cap; the result commits and reloads as a valid save
+not ok 2 - Leppa restoration respects each persistent cap; the result commits and reloads as a valid save
+  ---
+  duration_ms: 9.985375
+  type: 'test'
+  location: '/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/experiments/step3/test-pp-sync.cjs:30:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    8 !== 5
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 5
+  actual: 8
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/experiments/step3/test-pp-sync.cjs:38:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: learning resets the replaced move PP-Up count and keeps the new cap after switching
+not ok 3 - learning resets the replaced move PP-Up count and keeps the new cap after switching
+  ---
+  duration_ms: 4.899458
+  type: 'test'
+  location: '/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/experiments/step3/test-pp-sync.cjs:49:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    3 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 3
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/experiments/step3/test-pp-sync.cjs:56:10)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+# Subtest: invalid current PP or an unrepresentable cap is diagnosed before any seed write
+not ok 4 - invalid current PP or an unrepresentable cap is diagnosed before any seed write
+  ---
+  duration_ms: 2.155583
+  type: 'test'
+  location: '/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/experiments/step3/test-pp-sync.cjs:63:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected exception.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  operator: 'throws'
+  stack: |-
+    TestContext.<anonymous> (/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/experiments/step3/test-pp-sync.cjs:67:12)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 0
+# fail 4
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 288.708167

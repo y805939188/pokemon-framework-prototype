@@ -28,6 +28,7 @@ SUITES=(
   experiments/step3/test-integration.cjs
   experiments/step3/test-growth-differential.cjs
   experiments/step3/test-move-requests.cjs
+  experiments/step3/test-pp-sync.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do

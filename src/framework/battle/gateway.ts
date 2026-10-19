@@ -53,7 +53,7 @@ export interface StateRecord {
   hp: number;
   status?: string;
   statusCount?: number;
-  moves?: { id: string; pp: number }[];
+  moves?: { id: string; pp: number; maxpp?: number }[];
 }
 
 export interface MemberState extends MonView {
@@ -239,8 +239,25 @@ export class BattleGateway {
 
   /** Seed persistent dynamic state (hp/status/pp) from game records into the fresh battle. */
   seedState(sideId: string, records: StateRecord[]): void {
-    for (const r of records) {
+    // Resolve every cap before changing any state. Showdown defaults to three PP Ups, whereas persistent
+    // records carry their own total PP. Keep both slot copies and the simulator's PP-Up counters coherent.
+    const prepared = records.map((r) => {
       const p = this._mon(sideId, r.id);
+      const moves = (r.moves ?? []).map((m) => {
+        const index = p.baseMoveSlots.findIndex((slot: { id: string }) => slot.id === m.id);
+        if (index < 0) throw new Error(`unknown PP slot ${r.id}.${m.id}`);
+        const slot = p.baseMoveSlots[index];
+        const maxpp = m.maxpp ?? slot.maxpp; // low-level legacy callers may seed only current PP
+        const move = this._battle.dex.moves.get(m.id);
+        const possible = move.noPPBoosts || move.id === "trumpcard" ? [0] : [0, 1, 2, 3];
+        const ppUps = possible.find((ups) => this._battle.calculatePP(move, ups) === maxpp);
+        if (!Number.isInteger(maxpp) || ppUps === undefined) throw new Error(`invalid PP maximum for ${r.id}.${m.id}: ${maxpp}`);
+        if (!Number.isInteger(m.pp) || m.pp < 0 || m.pp > maxpp) throw new Error(`invalid current PP for ${r.id}.${m.id}: ${m.pp}/${maxpp}`);
+        return { index, id: m.id, pp: m.pp, maxpp, ppUps };
+      });
+      return { r, p, moves };
+    });
+    for (const { r, p, moves } of prepared) {
       p.hp = Math.min(r.hp, p.maxhp);
       if (p.hp <= 0) { p.hp = 0; p.fainted = true; p.status = "fnt"; }
       else if (r.status) {
@@ -257,11 +274,13 @@ export class BattleGateway {
         }
         if (status === "tox") p.statusState.stage = 0;
       }
-      for (const m of r.moves ?? []) {
-        const slot = p.moveSlots.find((x: { id: string }) => x.id === m.id);
-        if (slot) slot.pp = Math.min(m.pp, slot.maxpp);
+      for (const m of moves) {
+        const base = p.baseMoveSlots[m.index];
+        base.pp = m.pp; base.maxpp = m.maxpp;
+        const live = p.moveSlots.find((slot: { id: string }) => slot.id === m.id);
+        if (live) { live.pp = m.pp; live.maxpp = m.maxpp; }
+        p.ppUps[m.index] = m.ppUps;
       }
-      for (const bs of p.baseMoveSlots) { const m = (r.moves ?? []).find((x) => x.id === bs.id); if (m) bs.pp = Math.min(m.pp, bs.maxpp); }
     }
   }
 
@@ -307,8 +326,10 @@ export class BattleGateway {
       const slot = { move: dm.name, id: dm.id, pp: dm.pp, maxpp: dm.pp, target: dm.target, disabled: false, disabledSource: "", used: false };
       if (replaceSlot !== undefined && replaceSlot !== null) {
         p.baseMoveSlots[replaceSlot] = slot; p.moveSlots[replaceSlot] = { ...slot }; p.set.moves[replaceSlot] = dm.name;
+        p.ppUps[replaceSlot] = 0;
       } else {
         p.baseMoveSlots.push(slot); p.moveSlots.push({ ...slot }); p.set.moves.push(dm.name);
+        p.ppUps.push(0);
       }
     }
     return { before, after: { level: p.level, maxhp: p.maxhp, hp: p.hp }, stats };

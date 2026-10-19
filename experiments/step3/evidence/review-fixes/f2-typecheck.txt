@@ -1,0 +1,4 @@
+
+> reactor-pixi8-dev@ typecheck:framework /Users/dingshinn/Desktop/pokemon-framework/.worktrees/step3-review-three-defects/src
+> tsc --noEmit -p framework/tsconfig.json
+
