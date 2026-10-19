@@ -83,3 +83,5 @@
 - 无宿主快速自检：`scripts/test-quick.sh`（类型检查 + Node 套件）。
 - 需要窗口、只能在本机跑：`scripts/run-flow-test-mac.sh`、`scripts/run-package-tests-mac.sh`、`scripts/run-package-perf-mac.sh`（见 `docs/PROJECT-GUIDE.md` 第 8 节）。
 - CI 与 TS 迁移的进展见下方各节（随推进补充）。
+
+- 第二步补充收尾（回滚失败封闭会话、守卫测试、F2 支持范围的文字化）：分支 `fix/step2-closeout-recovery`，**待独立复核**，见 `docs/step2/closeout-addendum.md`；不改变上面的第三步验收状态。

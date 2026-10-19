@@ -57,3 +57,7 @@ pnpm --dir src build
 - 宿主验证（NW.js 0.117.0 / Chromium 154 / Node 26.7.0，构建自已提交的 `7abce72`，ad hoc 签名）：开发树流程 T1–T10 + V1 通过；`run-package-tests-mac.sh` 通过（包内 T1–T10、V1、S1–S10 指纹与 Node 相同、SL1、签名封印有效）；引擎包哈希 `94afa975…`（包内 = 开发树 = Node 加载）。原始 JSON 在 `experiments/step3/evidence/review-fixes/host/`（截图和性能原始数据留在仓库外）。
 - 性能：到菜单 534 ms、后续 133 ms、动作延迟 3–5 ms、帧 p50 16.7 ms、24 场后 RSS 1235 MB，与候选同量级；冷启动到插件/地图比候选记录慢约 190–200 ms，**没有同条件基线数据，原因未判定**；基线对照脚本两次因窗口未在前台而失败，未完成。**不能得出“无性能退化”。**
 - 已知遗留（低，不阻塞）：(1) 检查点恢复本身失败时会吞掉原错误并释放锁、留下悬空预留（`session.ts` `_exclusive`）——应把会话置为不可用；(2) 回归缺口：`isSelectableMove` 的 `disabled` 分支、失败重试后 `seq` 连续性没有用例；(3) `src/framework/tools/harness.ts` 的演示 AI 仍是旧的 `pp > 0` 判断；(4) F1/F2/F3 没有专门的宿主场景（由 Node 测试覆盖）；(5) 同条件基线性能与 Transform/Mimic/Sketch 等改写槽位招式的 PP 同步不在范围。
+
+### 更新（第二步收尾，待独立复核）
+
+上面“已知遗留”的 (1)(2)(3) 已在分支 `fix/step2-closeout-recovery` 处理：回滚失败封闭会话、`disabled`/`seq` 回归、`harness.ts` 复用共享谓词；F2 的支持范围用测试固定。这些是作者自测，**待独立复核**，见 `docs/step2/closeout-addendum.md`。(4)(5) 仍按原样保留。
