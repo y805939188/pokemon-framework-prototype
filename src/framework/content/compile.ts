@@ -150,6 +150,26 @@ export function compileContent(inputs: ContentInputs): CompileResult {
     overlaysApplied++;
   }
 
+  // ---- cross-record invariants again, on the MERGED records: an overlay can create a clash that the base check cannot
+  // see (it ran before the overlays). The final state decides, so swapping two keys is fine; the error is located at
+  // the overlay entry that set the key and names the entities involved.
+  const baseIndex = new Map(species.map((sp, n) => [`species/${sp.id}`, n]));
+  const holders = new Map<string, string[]>();
+  for (const [target, rec] of merged) holders.set(rec.nameKey, [...(holders.get(rec.nameKey) ?? []), target]);
+  const origin = (target: string, field: string): string => {
+    const at = setBy.get(`${target}#${field}`);
+    return at === undefined ? `species.json [${baseIndex.get(target)}]` : `overlays.json [${at}].set.${field}`;
+  };
+  for (const [key, group] of holders) {
+    if (group.length < 2) continue;
+    for (const target of group) {
+      const at = setBy.get(`${target}#nameKey`);
+      if (at === undefined) continue; // a base record: base-only duplicates were reported above
+      const others = group.filter((t) => t !== target).map((t) => `${t} (${origin(t, "nameKey")})`).join(", ");
+      report("overlays.json", `[${at}].set.nameKey`, `text key "${key}" set on ${target} is also the text key of ${others}`);
+    }
+  }
+
   if (errors.length) return { ok: false, errors };
   const data: CompiledContent = {
     schema: SCHEMA_VERSION, contentId, inputsHash: hashInputs(inputs), sources: [...sources].sort((a, b) => a.id.localeCompare(b.id)),

@@ -138,3 +138,60 @@ test('a whole battle played with the sample content equals the same battle with 
 	};
 	assert.deepEqual(await play(sample), await play(F.content));
 });
+
+// ---- R4: cross-record invariants are checked again on the merged records, and located at the overlay
+const withOverlays = overlays => { const i = inputs(); i.overlays = overlays; return compileContent(i); };
+const ov = (target, nameKey, reason = 'test') => ({ target, set: { nameKey }, reason });
+
+test('R4: an overlay that gives a species the text key of another is refused, located at the overlay entry, naming both entities', () => {
+	const r = withOverlays([ov('species/blastoise', 'species.charizard')]);
+	assert.equal(r.ok, false);
+	const hit = r.errors.find(e => e.file === 'overlays.json' && e.path === '[0].set.nameKey');
+	assert.ok(hit, JSON.stringify(r.errors));
+	assert.match(hit.message, /species\.charizard/); assert.match(hit.message, /species\/blastoise/); assert.match(hit.message, /species\/charizard \(species\.json \[0\]\)/);
+	assert.equal(r.errors.filter(e => e.file === 'species.json').length, 0, 'the base records themselves are fine');
+	// the symptom the review found: the compiled sample used to show Blastoise as Charizard; now no document exists
+	assert.equal(r.data, undefined);
+});
+
+test('R4: two overlays on different targets that pick the same new key conflict with each other', () => {
+	const r = withOverlays([ov('species/pidgey', 'species.bird'), ov('species/caterpie', 'species.bird')]);
+	assert.equal(r.ok, false);
+	const paths = r.errors.filter(e => e.file === 'overlays.json').map(e => e.path).sort();
+	assert.deepEqual(paths, ['[0].set.nameKey', '[1].set.nameKey'], 'each overlay is located');
+	const first = r.errors.find(e => e.path === '[0].set.nameKey');
+	assert.match(first.message, /species\/caterpie \(overlays\.json \[1\]\.set\.nameKey\)/); assert.match(first.message, /species\/pidgey/);
+});
+
+test('R4: a valid rename passes, including swapping two keys (the final state is unique) and moving onto a key that was just freed', () => {
+	assert.equal(withOverlays([ov('species/pidgey', 'species.birdie')]).ok, true);
+	const swap = withOverlays([ov('species/pidgey', 'species.caterpie'), ov('species/caterpie', 'species.pidgey')]);
+	assert.equal(swap.ok, true, JSON.stringify(swap.errors));
+	const a = assembleContent(swap.data, E.dex.createDexLookup()); assert.deepEqual(a.errors, []);
+	assert.equal(a.content.species.Pidgey.nameKey, 'species.caterpie'); assert.equal(a.content.species.Caterpie.nameKey, 'species.pidgey');
+	const free = withOverlays([ov('species/pidgey', 'species.birdie'), ov('species/caterpie', 'species.pidgey')]);
+	assert.equal(free.ok, true, JSON.stringify(free.errors));
+	assert.equal(withOverlays([{ target: 'species/pidgey', set: { catchRate: 10 }, reason: 'unrelated field' }]).ok, true);
+});
+
+test('R4: an overlay duplicate does not hide or double-report a plain base duplicate', () => {
+	const i = inputs(); i.species[2].nameKey = i.species[0].nameKey; i.overlays = [ov('species/pidgey', 'species.birdie')];
+	const r = compileContent(i);
+	assert.equal(r.ok, false);
+	assert.equal(r.errors.filter(e => /already used/.test(e.message) && e.file === 'species.json').length, 1);
+	assert.equal(r.errors.filter(e => e.file === 'overlays.json').length, 0);
+});
+
+test('R4: through the CLI a bad overlay fails the build with the overlay location and removes the old output', () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-content-r4-'));
+	try {
+		fs.cpSync(SRC, path.join(dir, 'src'), { recursive: true });
+		const out = path.join(dir, 'out/content.json');
+		const run = (...a) => spawnSync(process.execPath, [CLI, ...a, `--src=${path.join(dir, 'src')}`, `--out=${out}`], { encoding: 'utf8' });
+		assert.equal(run('build').status, 0); assert.equal(fs.existsSync(out), true);
+		fs.writeFileSync(path.join(dir, 'src/overlays.json'), JSON.stringify([ov('species/blastoise', 'species.charizard', 'bad')]));
+		const failed = run('build');
+		assert.equal(failed.status, 1); assert.match(failed.stderr, /overlays\.json \[0\]\.set\.nameKey: .*species\.charizard/);
+		assert.equal(fs.existsSync(out), false, 'the old output must not survive');
+	} finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
