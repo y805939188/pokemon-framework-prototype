@@ -133,8 +133,10 @@
     /** Apply a BattleResult to the persistent state. Safe to call twice. */
     commit(result: any): string { return PSFlow.app().commitResult(result); },
     async begin(): Promise<any> {
+      const app = PSFlow.app();
+      PSFlow.content(); // loaded before the clock starts: "session create" keeps meaning what it meant in the earlier measurements
       const tCreate = performance.now();
-      const session = await PSFlow.app().startBattle(PSFlow.request); // refuses a save that refers to content that no longer exists, then opens the session
+      const session = await app.startBattle(PSFlow.request); // refuses a save that refers to content that no longer exists, then opens the session
       if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round((performance.now() - tCreate) * 10) / 10;
       return session;
     },
