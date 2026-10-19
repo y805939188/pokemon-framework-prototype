@@ -78,3 +78,43 @@ test('import cycles are found', () => {
 test('unresolvable relative imports are reported', () => {
 	bad({ ...OK, 'rules/b.ts': 'import { z } from "./missing.ts";\nexport const b = z;\n' }, /does not resolve/);
 });
+
+// ---- R3: executable code inside template literals is checked; plain text is not
+const clean = (files) => {
+	const dir = tree(files);
+	try { assert.deepEqual(check(dir).violations, []); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+};
+test('a require inside a template interpolation is rejected like a direct require', () => {
+	bad({ ...OK, 'rules/p.ts': 'export const p = `${require("node:fs").existsSync(".")}`;\n' }, /rules\/p\.ts: "require" is only allowed/);
+	bad({ ...OK, 'rules/p.ts': 'export const p = `x ${(0, require)("node:fs")} y`;\n' }, /"require" is only allowed/);
+	bad({ ...OK, 'rules/p.ts': 'export const p = `${createRequire(import.meta.url)}`;\n' }, /"require" is only allowed/);
+});
+test('host globals inside template interpolations are rejected, also in nested templates', () => {
+	bad({ ...OK, 'rules/p.ts': 'export const p = `${(globalThis as any).$gameSystem}`;\n' }, /host\/MZ\/DOM global "\$gameSystem" in layer "rules"/);
+	bad({ ...OK, 'flow/p.ts': 'export const p = `a ${`b ${window.innerWidth}`} c`;\n' }, /host\/MZ\/DOM global "window" in layer "flow"/);
+	bad({ ...OK, 'rules/p.ts': 'export const p = `${`${`${require("node:os")}`}`}`;\n' }, /"require" is only allowed/);
+});
+test('text that merely mentions require, window or import is not code: strings, templates, regex literals and comments', () => {
+	clean({
+		...OK,
+		'rules/p.ts': [
+			'// require("node:fs") and window and $gameSystem in a comment',
+			'/* import x from "../battle/gateway.ts"; require("x") */',
+			'export const a = "require(\\"node:fs\\") window $gameSystem";',
+			"export const b = 'import x from \"../battle/gateway.ts\"';",
+			'export const c = `use require("x") and window; import y from "../battle/gateway.ts"`;',
+			'export const d = /require\\(|window|\\/\\/ not a comment/;',
+			'export const e = `${a.length} chars of text, then window text ${b.length}`;',
+			'',
+		].join('\n'),
+	});
+});
+test('a template literal does not hide the code after it from the import and require checks', () => {
+	bad({ ...OK, 'rules/p.ts': 'export const t = `plain`;\nimport { g } from "../battle/gateway.ts";\nexport const x = g;\n' }, /layer "rules" may not import layer "battle"/);
+	bad({ ...OK, 'rules/p.ts': 'export const t = `plain ${1}`; export const r = require("node:fs");\n' }, /"require" is only allowed/);
+});
+test('type-position and dynamic imports are still resolved; an unparsable file is reported, not skipped', () => {
+	bad({ ...OK, 'rules/p.ts': 'export type G = import("../battle/gateway.ts").X;\n' }, /layer "rules" may not import layer "battle"/);
+	bad({ ...OK, 'rules/p.ts': 'export const g = () => import("../battle/gateway.ts");\n' }, /layer "rules" may not import layer "battle"/);
+	bad({ ...OK, 'rules/p.ts': 'export const = ;\n' }, /rules\/p\.ts: cannot be parsed/);
+});

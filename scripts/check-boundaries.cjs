@@ -44,7 +44,54 @@ function listTs(dir) {
 	return out;
 }
 const stripComments = t => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
-const stripStrings = t => t.replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g, '""');
+
+// Source is read with the parser that ships with Vite (a dev dependency; the pinned TypeScript 7 has no JS compiler
+// API). Parsing, not regular expressions, decides what is text (strings, template text, regex literals) and what is
+// executable code, so `${require(...)}` inside a template is checked like any other expression.
+let parseAst;
+function loadParser() {
+	if (parseAst) return parseAst;
+	try { parseAst = require(require.resolve('vite', { paths: [path.join(__dirname, '..', 'src')] })).parseAst; } catch { /* reported below */ }
+	if (typeof parseAst !== 'function') throw new Error('check-boundaries needs the parser from Vite: run "pnpm --dir src install --frozen-lockfile" first');
+	return parseAst;
+}
+/** Module specifiers (import/export-from/import()/import type) and the source ranges that are NOT executable code. */
+function scan(source) {
+	const ast = loadParser()(source, { lang: 'ts' });
+	const specs = [];
+	const text = [];
+	(function walk(n) {
+		if (!n || typeof n !== 'object') return;
+		if (Array.isArray(n)) { for (const c of n) walk(c); return; }
+		switch (n.type) {
+			case 'ImportDeclaration': case 'ExportAllDeclaration': case 'ExportNamedDeclaration':
+				if (n.source && typeof n.source.value === 'string') specs.push(n.source.value);
+				break;
+			case 'ImportExpression':
+				if (n.source && n.source.type === 'Literal' && typeof n.source.value === 'string') specs.push(n.source.value);
+				break;
+			case 'TSImportType': { // import("./x").T in a type position
+				const lit = JSON.stringify(n.argument ?? n.source ?? null).match(/"value":"([^"]+)"/);
+				if (lit) specs.push(lit[1]);
+				break;
+			}
+			case 'TemplateElement': text.push([n.start, n.end]); break;
+			case 'Literal': if (typeof n.value === 'string' || n.regex) text.push([n.start, n.end]); break;
+		}
+		for (const k of Object.keys(n)) if (k !== 'type') { const v = n[k]; if (v && typeof v === 'object') walk(v); }
+	})(ast);
+	return { specs, text };
+}
+/** The source with strings, template text and regex literals blanked and comments removed; template `${}` code stays. */
+function bareCode(source, ranges) {
+	let out = '', at = 0;
+	for (const [a, b] of [...ranges].sort((x, y) => x[0] - y[0])) {
+		if (a < at) continue; // nested inside an already blanked range
+		out += source.slice(at, a) + source.slice(a, b).replace(/[^\n]/g, ' ');
+		at = b;
+	}
+	return stripComments(out + source.slice(at));
+}
 
 function check(root) {
 	root = path.resolve(root);
@@ -55,13 +102,11 @@ function check(root) {
 	for (const [rel, abs] of rels) {
 		const layer = rel.includes('/') ? rel.split('/')[0] : 'entry';
 		const raw = fs.readFileSync(abs, 'utf8');
-		const code = stripComments(raw);
-		const bare = stripStrings(code);
 		if (!LAYERS[layer]) { violations.push(`${rel}: unknown layer "${layer}" (add it to LAYERS)`); continue; }
+		let specs, bare;
+		try { const sc = scan(raw); specs = sc.specs; bare = bareCode(raw, sc.text); }
+		catch (e) { if (/needs the parser/.test(e.message)) throw e; violations.push(`${rel}: cannot be parsed (${String(e.message).split('\n')[0]})`); continue; }
 		// ---- imports
-		const specs = [];
-		for (const m of code.matchAll(/\b(?:import|export)\s+(?:type\s+)?(?:[^'";]*?\s+from\s+)?["']([^"']+)["']/g)) specs.push(m[1]);
-		for (const m of code.matchAll(/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g)) specs.push(m[1]);
 		for (const spec of specs) {
 			if (spec.startsWith('node:')) {
 				if (!NODE_BUILTINS[layer].includes(spec) && !(FILE_BUILTINS[rel] || []).includes(spec)) violations.push(`${rel}: layer "${layer}" may not import ${spec}`);
