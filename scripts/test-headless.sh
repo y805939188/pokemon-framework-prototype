@@ -31,6 +31,7 @@ SUITES=(
   experiments/step3/test-pp-sync.cjs
   experiments/step3/test-session-operations.cjs
   experiments/step3/test-session-failure.cjs
+  experiments/step3/test-gateway-boundary.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do

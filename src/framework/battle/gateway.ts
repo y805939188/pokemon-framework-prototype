@@ -69,6 +69,14 @@ function parseLine(raw: string): BattleEvent {
   return { type: parts[0] ?? "", args: parts.slice(1), raw };
 }
 
+/**
+ * Opaque in-memory rollback point of one gateway (engine state incl. PRNG, undelivered messages, sequence counter).
+ * It has no readable fields: only `BattleGateway.fromCheckpoint` can open it. Not a save file and not serializable.
+ */
+export class GatewayCheckpoint { constructor() { Object.freeze(this); } }
+interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean }
+const CHECKPOINTS = new WeakMap<GatewayCheckpoint, CheckpointData>();
+
 export class BattleGateway {
   _env: LoadedSim;
   _queue: GatewayMessage[] = [];
@@ -117,6 +125,51 @@ export class BattleGateway {
 
   snapshot(): string {
     return JSON.stringify(this._battle.toJSON());
+  }
+
+  /** An opaque rollback point of everything this gateway owns (see GatewayCheckpoint). */
+  checkpoint(): GatewayCheckpoint {
+    const token = new GatewayCheckpoint();
+    CHECKPOINTS.set(token, {
+      snapshot: this.snapshot(), engineRoot: this._env.root,
+      queue: JSON.parse(JSON.stringify(this._queue)) as GatewayMessage[], seq: this._seq, closed: this._closed,
+    });
+    return token;
+  }
+
+  /** A new gateway in exactly the state of the checkpoint; the token stays valid and can be opened again. */
+  static async fromCheckpoint(token: GatewayCheckpoint): Promise<BattleGateway> {
+    const data = CHECKPOINTS.get(token);
+    if (!data) throw new Error("not a gateway checkpoint");
+    const gw = await BattleGateway.restore(data.snapshot, { engineRoot: data.engineRoot });
+    gw._queue = JSON.parse(JSON.stringify(data.queue)) as GatewayMessage[];
+    gw._seq = data.seq; gw._closed = data.closed;
+    return gw;
+  }
+
+  /** Stable id (the nickname we assigned) of the member currently in a side's slot, or null. */
+  activeId(sideId: string, slot = 0): string | null {
+    const side = this._battle.sides.find((x: { id: string }) => x.id === sideId);
+    const mon = side && side.active[slot];
+    return mon ? String(mon.name) : null;
+  }
+
+  /** A copy of the side's pending move/switch request while it still has to choose, else null. */
+  awaitingChoice(sideId: string): Record<string, any> | null {
+    const side = this._battle.sides.find((x: { id: string }) => x.id === sideId);
+    const req = side && side.activeRequest;
+    if (!req || req.wait || side.isChoiceDone()) return null;
+    return JSON.parse(JSON.stringify(req)) as Record<string, any>;
+  }
+
+  /** Take every queued message (each is handed out once). */
+  drain(): GatewayMessage[] {
+    return this._queue.splice(0);
+  }
+
+  /** Drop queued messages nobody will read (requests are re-issued by refreshRequests). */
+  discardQueued(): void {
+    this._queue.length = 0;
   }
 
   /** Next structured message, or null if the battle has ended and the queue is empty. */
@@ -436,7 +489,7 @@ export class BattleGateway {
     return this._battle.ended;
   }
 
-  /** Diagnostic-only access for experiments. Not part of the protocol. */
+  /** Diagnostic-only access for tools and experiments. Production flow must not use it (scripts/check-boundaries.cjs). */
   _debugBattle(): ShowdownBattle {
     return this._battle;
   }

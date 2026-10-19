@@ -234,8 +234,7 @@ export class BattleSession {
   /** In-memory operation rollback, not a battle-time save. Include PRNG, pending choices and undelivered messages. */
   _checkpoint() {
     return {
-      battle: this.gw.snapshot(), engineRoot: this.gw._env.root,
-      queue: S.clone(this.gw._queue), seq: this.gw._seq, closed: this.gw._closed,
+      engine: this.gw.checkpoint(),
       state: S.clone({
         party: this.party, bag: this.bag, ledger: this.ledger, out: this.out, held: this.held,
         growthQueue: this.growthQueue, pendingLearn: this.pendingLearn, activeNow: this.activeNow,
@@ -247,9 +246,7 @@ export class BattleSession {
   }
 
   async _restoreCheckpoint(checkpoint: ReturnType<BattleSession["_checkpoint"]>): Promise<void> {
-    const gw = await BattleGateway.restore(checkpoint.battle, { engineRoot: checkpoint.engineRoot });
-    gw._queue = checkpoint.queue; gw._seq = checkpoint.seq; gw._closed = checkpoint.closed;
-    this.gw = gw;
+    this.gw = await BattleGateway.fromCheckpoint(checkpoint.engine);
     const { participants, ...state } = checkpoint.state;
     Object.assign(this, state);
     this.participants = Object.fromEntries(participants.map(([id, members]) => [id, new Set(members)]));
@@ -374,8 +371,9 @@ export class BattleSession {
       const q = this.gw.query("p1", "ball");
       if (!q.allowed) return this._refuse(q.reason ?? "refused");
       if ((this.bag[ballId] || 0) < 1) return this._refuse("none-left");
-      const foeActive = this.gw._debugBattle().getSide("p2").active[0];
-      const foeRec = this.foeTeam.find((m) => m.id === foeActive.name)!;
+      const foeId = this.gw.activeId("p2");
+      const foeRec = this.foeTeam.find((m) => m.id === foeId);
+      if (!foeRec) return this._refuse("refused");
       const entry = this._reserve("ball", ballId, foeRec.id);
       const ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(foeRec.species) };
       const ok = await this.gw.act("p1", { kind: "ball", ball: ballId, target: foeRec.id, catchRate: this.content.species[foeRec.species]!.catchRate, ctx });
@@ -445,10 +443,9 @@ export class BattleSession {
 
   async _resolveTurn(): Promise<TurnResult> {
     // auto-choose the foe from its own pending request, then process whatever the engine produced
-    const b = this.gw._debugBattle();
-    const foeSide = b.getSide("p2");
-    if (foeSide.activeRequest && !foeSide.activeRequest.wait && !foeSide.isChoiceDone()) {
-      const c = this.ai(foeSide.activeRequest);
+    const foeRequest = this.gw.awaitingChoice("p2");
+    if (foeRequest) {
+      const c = this.ai(foeRequest);
       if (!c || !await this.gw.choose("p2", c)) throw new Error("foe AI did not provide a legal choice");
     }
     this._ingest();
@@ -461,9 +458,7 @@ export class BattleSession {
   }
 
   _ingest(): void {
-    const gw = this.gw;
-    while (gw._queue.length) {
-      const m = gw._queue.shift()!;
+    for (let batch = this.gw.drain(); batch.length; batch = this.gw.drain()) for (const m of batch) {
       if (m.kind === "events") {
         for (const e of m.events) this._onEvent(e);
         this.out.push(m);
@@ -542,9 +537,8 @@ export class BattleSession {
 
   /** After growth: a defeated foe member is replaced by the foe AI (it is not a player decision). */
   async _autoFoeReplacement(): Promise<boolean> {
-    const side = this.gw._debugBattle().getSide("p2");
-    const req = side.activeRequest;
-    if (!req || req.wait || !req.forceSwitch || side.isChoiceDone()) return false;
+    const req = this.gw.awaitingChoice("p2");
+    if (!req || !req.forceSwitch) return false;
     const choice = this.ai(req);
     if (!choice || !await this.gw.choose("p2", choice)) throw new Error("foe AI did not provide a legal replacement");
     return true;
@@ -599,7 +593,7 @@ export class BattleSession {
       return;
     }
     let reqs = this.held.splice(0).filter((m) => !(m.kind === "request" && m.side === "p2" && m.request["forceSwitch"])); // foe replacements are internal
-    if (this.grew) { this.grew = false; reqs = this.gw.refreshRequests(); this.gw._queue.length = 0; }
+    if (this.grew) { this.grew = false; reqs = this.gw.refreshRequests(); this.gw.discardQueued(); }
     this.requests = {};
     for (const m of reqs) if (m.kind === "request") { this.requests[m.side] = m.request; this.out.push(m); this._log("info", "request", { side: m.side, seq: m.seq, forceSwitch: !!m.request["forceSwitch"], wait: !!m.request["wait"] }); }
   }
