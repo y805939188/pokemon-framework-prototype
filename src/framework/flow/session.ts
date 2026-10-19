@@ -93,6 +93,22 @@ type GrowthTask =
   | { kind: "award"; foeId: string }
   | { kind: "learn"; memberId: string; move: { id: string; name: string; pp: number } };
 
+/**
+ * The operation failed and so did the rollback: the engine and the ledger may disagree, so the session is closed for
+ * good. Both errors are kept; nothing from this session may be settled into the persistent game.
+ */
+export class SessionBrokenError extends Error {
+  readonly original: unknown;
+  readonly restoreError: unknown;
+  constructor(original: unknown, restoreError: unknown) {
+    const text = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+    super(`battle session is unusable: the operation failed (${text(original)}) and its rollback failed (${text(restoreError)})`);
+    this.name = "SessionBrokenError";
+    this.original = original;
+    this.restoreError = restoreError;
+  }
+}
+
 export class BattleSession {
   content!: Content;
   rules!: G.ExpRules;
@@ -122,6 +138,7 @@ export class BattleSession {
   logger?: LogSink;
   _operation = false;
   _staged = false;
+  _broken: SessionBrokenError | null = null;
 
   static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger }: CreateOptions): Promise<BattleSession> {
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
@@ -175,14 +192,24 @@ export class BattleSession {
   }
 
   /** One mutation owns the engine and ledger until its promise settles. Readers still see plain snapshots. */
+  get broken(): SessionBrokenError | null { return this._broken; }
+
+  _assertUsable(): void { if (this._broken) throw this._broken; }
+
   async _exclusive<T>(action: () => Promise<T>): Promise<T> {
+    this._assertUsable();
     if (this._operation) throw new Error("battle session operation already in progress");
     this._operation = true;
     try {
       const checkpoint = this._checkpoint();
       try { return await action(); }
       catch (error) {
-        await this._restoreCheckpoint(checkpoint);
+        try { await this._restoreCheckpoint(checkpoint); }
+        catch (restoreError) {
+          this._broken = new SessionBrokenError(error, restoreError);
+          this._log("error", "session.broken", { original: error instanceof Error ? error.message : String(error), rollback: restoreError instanceof Error ? restoreError.message : String(restoreError) });
+          throw this._broken;
+        }
         throw error;
       }
     } finally { this._operation = false; }
@@ -190,6 +217,7 @@ export class BattleSession {
 
   /** Protocol-v1 action refusal; no new reason or request-id semantics are introduced. */
   async _action(action: () => Promise<TurnResult>, replace = true): Promise<TurnResult> {
+    this._assertUsable();
     if (this._operation || this.finished || this.pendingLearn) return this._refuse("choice-rejected");
     return this._exclusive(async () => {
       if (replace && this._staged) {
@@ -256,7 +284,7 @@ export class BattleSession {
 
   // ------------------------------------------------------------------ public actions
   /** Returns and clears everything the UI should show since the last call. */
-  take(): SessionMessage[] { return this.out.splice(0); }
+  take(): SessionMessage[] { this._assertUsable(); return this.out.splice(0); }
 
   currentRequest(): Req | undefined { return this.requests && this.requests["p1"]; }
 
@@ -388,6 +416,7 @@ export class BattleSession {
 
   /** The BattleResult (protocol v1). Only valid after the battle ended and growth finished. */
   result(): BattleResult {
+    this._assertUsable();
     if (!this.finished) throw new Error("battle not finished");
     return this._result!;
   }
