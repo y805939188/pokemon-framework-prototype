@@ -1,6 +1,6 @@
 # 第三步：工程基础与首条 Ruby／TS 差分链
 
-状态：**批次 A、B、支线 C 均已实现并在本机与 CI 上验证；等待用户安排的独立复核（未合并到 `main`）**（工作分支 `step3/foundation`，起点 `a77b6af` = 第二步收尾 `step2-closed` + 两个文档提交）。执行方案全文在工作区 `.handoff/step3-plan.md`（不在 git 里）；当前进度在 `.handoff/STATUS.md`。本文件只记范围、基线、关键决策、遗留分流和验证入口，随推进更新，不重复方案全文。
+状态：**已收口（2026-10-19，标签 `step3-closed`，记录见 `docs/step3/closure.md`）**。批次 A、B、支线 C 均已实现；首次独立验收 `step3-candidate-2` 不通过、限定整改 R1–R4 后 `step3-candidate-3` 有条件通过并已合并到 `main`。性能尚无同条件基线，未证明无退化。以下是收口前的工作记录。（工作分支 `step3/foundation`，起点 `a77b6af`）。执行方案全文在工作区 `.handoff/step3-plan.md`（不在 git 里）。
 
 ## 范围
 
