@@ -20,6 +20,10 @@ const LAYERS = {
 	tools: ['rules', 'content', 'battle', 'flow', 'app', 'tools', 'i18n'],
 	entry: ['rules', 'content', 'battle', 'flow', 'app', 'tools', 'i18n', 'entry'], // files at the framework root: the public index and the composition root
 };
+const ENTRY_FILES = new Set(['index.ts', 'composition.ts']);
+// The sole flow service app uses is a host-free content check. Keep its imports in the lower pure layers too, so
+// it cannot silently turn into an indirect Showdown/session bridge.
+const APP_FLOW_SERVICE = 'flow/content-runtime.ts';
 // Node built-ins a layer may import. Only tools (tests/fixtures/harness) may use the file system.
 const NODE_BUILTINS = {
 	rules: [], i18n: [], content: [], battle: ['node:path'], flow: [], app: [],
@@ -37,7 +41,9 @@ const GATEWAY_INTERNALS = new Set(['_debugBattle', '_env', '_queue', '_seq', '_c
 const MAY_USE_GATEWAY_INTERNALS = new Set(['battle', 'tools']);
 // Node's ambient names. Only the battle adapter (it loads the pinned build from disk) and tools may name them; the
 // core and every other layer stay host-free (the core is additionally compiled with no ambient types at all).
-const NODE_GLOBALS = new Set(['process', 'Buffer', '__dirname', '__filename', 'global']);
+const NODE_GLOBALS = new Set(['process', 'Buffer', '__dirname', '__filename', 'global', 'globalThis', 'console',
+	'TextEncoder', 'TextDecoder', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate',
+	'clearImmediate', 'structuredClone', 'queueMicrotask', 'fetch']);
 const MAY_USE_NODE_GLOBALS = new Set(['battle', 'tools']);
 // Layers whose sources may not write an explicit `any` (it would let a host or engine object cross unseen).
 const ANY_FREE_LAYERS = new Set(['rules', 'app']);
@@ -72,8 +78,10 @@ function scan(source) {
 	const specs = [];
 	const text = [];
 	const names = new Set(); // every identifier, and string keys of computed member access (gw["_queue"])
+	const globalRefs = new Set(); // identifiers used as names, excluding ordinary property keys and member names
+	let dynamicImports = 0;
 	let anys = 0;
-	(function walk(n) {
+	(function walk(n, parent, key) {
 		if (!n || typeof n !== 'object') return;
 		if (Array.isArray(n)) { for (const c of n) walk(c); return; }
 		switch (n.type) {
@@ -82,21 +90,28 @@ function scan(source) {
 				break;
 			case 'ImportExpression':
 				if (n.source && n.source.type === 'Literal' && typeof n.source.value === 'string') specs.push(n.source.value);
+				else dynamicImports++;
 				break;
 			case 'TSImportType': { // import("./x").T in a type position
 				const lit = JSON.stringify(n.argument ?? n.source ?? null).match(/"value":"([^"]+)"/);
 				if (lit) specs.push(lit[1]);
 				break;
 			}
-			case 'Identifier': names.add(n.name); break;
+			case 'Identifier': {
+				names.add(n.name);
+				const memberName = parent && parent.type === 'MemberExpression' && key === 'property' && !parent.computed;
+				const propertyKey = parent && ['Property', 'PropertyDefinition', 'MethodDefinition', 'TSPropertySignature', 'TSMethodSignature'].includes(parent.type) && key === 'key' && !parent.computed;
+				if (!memberName && !propertyKey) globalRefs.add(n.name);
+				break;
+			}
 			case 'TSAnyKeyword': anys++; break;
 			case 'MemberExpression': if (n.computed && n.property && n.property.type === 'Literal' && typeof n.property.value === 'string') names.add(n.property.value); break;
 			case 'TemplateElement': text.push([n.start, n.end]); break;
 			case 'Literal': if (typeof n.value === 'string' || n.regex) text.push([n.start, n.end]); break;
 		}
-		for (const k of Object.keys(n)) if (k !== 'type') { const v = n[k]; if (v && typeof v === 'object') walk(v); }
+		for (const k of Object.keys(n)) if (k !== 'type') { const v = n[k]; if (v && typeof v === 'object') walk(v, n, k); }
 	})(ast);
-	return { specs, text, names, anys };
+	return { specs, text, names, globalRefs, dynamicImports, anys };
 }
 /** The source with strings, template text and regex literals blanked and comments removed; template `${}` code stays. */
 function bareCode(source, ranges) {
@@ -119,15 +134,17 @@ function check(root) {
 		const layer = rel.includes('/') ? rel.split('/')[0] : 'entry';
 		const raw = fs.readFileSync(abs, 'utf8');
 		if (!LAYERS[layer]) { violations.push(`${rel}: unknown layer "${layer}" (add it to LAYERS)`); continue; }
-		let specs, bare, names, anys;
-		try { const sc = scan(raw); specs = sc.specs; names = sc.names; anys = sc.anys; bare = bareCode(raw, sc.text); }
+		if (layer === 'entry' && !ENTRY_FILES.has(rel)) violations.push(`${rel}: root entry must be index.ts or composition.ts`);
+		let specs, bare, names, globalRefs, dynamicImports, anys;
+		try { const sc = scan(raw); specs = sc.specs; names = sc.names; globalRefs = sc.globalRefs; dynamicImports = sc.dynamicImports; anys = sc.anys; bare = bareCode(raw, sc.text); }
 		catch (e) { if (/needs the parser/.test(e.message)) throw e; violations.push(`${rel}: cannot be parsed (${String(e.message).split('\n')[0]})`); continue; }
 		// ---- gateway internals
 		if (!MAY_USE_GATEWAY_INTERNALS.has(layer)) for (const n of names) if (GATEWAY_INTERNALS.has(n)) violations.push(`${rel}: gateway internal "${n}" may not be used in layer "${layer}" (use the gateway's queries, operations and checkpoint)`);
 		// ---- Node globals, explicit any
-		if (!MAY_USE_NODE_GLOBALS.has(layer)) for (const n of names) if (NODE_GLOBALS.has(n)) violations.push(`${rel}: Node global "${n}" may not be used in layer "${layer}"`);
+		if (!MAY_USE_NODE_GLOBALS.has(layer)) for (const n of globalRefs) if (NODE_GLOBALS.has(n)) violations.push(`${rel}: Node global "${n}" may not be used in layer "${layer}"`);
 		if (ANY_FREE_LAYERS.has(layer) && anys) violations.push(`${rel}: ${anys} explicit "any" in layer "${layer}" (use unknown or a real type)`);
 		// ---- imports
+		if (dynamicImports) violations.push(`${rel}: dynamic import must use a string literal so its boundary can be checked`);
 		for (const spec of specs) {
 			if (spec.startsWith('node:')) {
 				if (!NODE_BUILTINS[layer].includes(spec) && !(FILE_BUILTINS[rel] || []).includes(spec)) violations.push(`${rel}: layer "${layer}" may not import ${spec}`);
@@ -138,6 +155,8 @@ function check(root) {
 			if (!rels.has(target)) { violations.push(`${rel}: import "${spec}" does not resolve to a framework file`); continue; }
 			const tlayer = target.includes('/') ? target.split('/')[0] : 'entry';
 			if (!LAYERS[layer].includes(tlayer)) violations.push(`${rel}: layer "${layer}" may not import layer "${tlayer}" (${target})`);
+			if (layer === 'app' && tlayer === 'flow' && target !== APP_FLOW_SERVICE) violations.push(`${rel}: app may only import ${APP_FLOW_SERVICE} from flow (${target})`);
+			if (rel === APP_FLOW_SERVICE && !['rules', 'content'].includes(tlayer)) violations.push(`${rel}: may only import rules/content (${target})`);
 			if (LAYER_PRIVATE.has(target) && tlayer !== layer) violations.push(`${rel}: ${target} is private to layer "${tlayer}"`);
 			if (rel === 'battle/custom-formats.ts' && !CUSTOM_FORMATS_MAY(target)) violations.push(`${rel}: runs inside Showdown, may not import ${target}`);
 			if (!edges.has(rel)) edges.set(rel, new Set());
