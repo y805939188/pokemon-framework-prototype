@@ -2,6 +2,8 @@
 
 Order of the passes on one machine, nothing else running: base-1, new (trial, not shown), new-2, base-2, new-3. **base** = main `4ce31e1` (code of step3-candidate-3), **new** = `cd0fc0b` (the batch). The two base passes show the run-to-run variation of the machine; a single pass is not proof of anything.
 
+The trial is retained in `perf-summary-new-1.json`, at `e6f799d59191534ed5ef63b27aa862ddecc7184b`. Its first-session-create median was 161 ms because it included content loading. `cd0fc0b` moved loading before the timer; only the two subsequent new passes are tabulated below. The new timer still includes the application state read and dangling-reference check, which were outside that timer in the base. This makes that row slightly less favorable to the new code.
+
 | metric | base-1 | new-2 | base-2 | new-3 |
 |---|---|---|---|---|
 | cold start: launch -> plugins loaded (ms) | 816 [767–4508] | 769 [685–822] | 782 [745–1316] | 941 [770–1004] |
@@ -22,4 +24,4 @@ Order of the passes on one machine, nothing else running: base-1, new (trial, no
 
 Errors: base-1 0, new-2 0, base-2 0, new-3 0.
 
-Reading: the batch moves no metric outside the spread between the two base passes, except that one new pass (new-3) had a slower cold start (941 ms median, range 770–1004) while new-2 did not (769); cold-start rows are the noisiest (the first launch after a build is slower: base-1 had a 4508 ms outlier). This is a same-conditions baseline and comparison, not a proof of no regression: three launches per pass, one machine, no budget thresholds.
+Reading: a few non-cold-start pass medians exceed the larger base median: first-session create by 0.5 ms, item p50 by 0.2 ms, map-ready RSS by 1 MB, and after-24-battle RSS by up to 2 MB. These values remain inside the base passes' within-pass sample ranges. One new pass (new-3) had a slower cold start (941 ms median, range 770–1004) while new-2 did not (769); cold-start rows are the noisiest (the first launch after a build is slower: base-1 had a 4508 ms outlier). The readings show no clear regression signal, but this is a same-conditions baseline and comparison, not a proof of no regression: three launches per pass, one machine, no budget thresholds. These are historical batch measurements, not measurements of the later review fixes.

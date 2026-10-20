@@ -2,15 +2,17 @@
 
 **状态：已实现并自测，待针对本批的独立复核**（分支 `step3/arch-batch`，基于已收口的 `main` = `step3-closed`，`4ce31e1`；被测代码提交 `cd0fc0b`）。它不是第四步：没有新玩法，没有 monorepo 迁移。
 
+2026-10-20 复核后修复候选在 `fix/step3-batch-review-20261020`，详见 [修复报告](batch-review-fixes.md)。下方验证与性能是原批次记录；新运行时的身份、异常路径与复测以修复报告为准。修复仍是作者自测，待非作者复审，未合并、未推送。
+
 ## 短清单与结果
 
 | # | 目标 | 做了什么 | 证明 |
 |---|---|---|---|
 | 1 | 不依赖 MZ、Showdown 内部类型或 Node 环境的领域公共入口 | `rules/index.ts`（growth、rules、state、save-schema、digest、types）；`framework/tsconfig.core.json` 以 `lib: ES2022`、`types: []` 独立编译；`js/engine/build/core.cjs` 由它构建 | 探针副本里 `process`、`Buffer`、`console`、`TextEncoder`、`require`、`setTimeout` 全部编译失败；core 包不含 `require`/`process`/`node:`，在没有这些名字的 `vm` 上下文里加载并复现 engine 的金样与成长曲线（`test-core-independent.cjs`）；检查器禁止 rules/content/i18n/flow/app 使用任何 Node 内建模块、Node 全局名，rules/app 禁止显式 `any` |
 | 2 | 摘要的环境依赖 | `rules/sha256.ts`：可移植、同步的 SHA-256（UTF-8，未配对代理项 → U+FFFD，与平台一致）；`resultHash` 与内容 `inputsHash` 改用它 | 用**原 `node:crypto` 实现**生成的金样（`experiments/step3/fixtures/result-hash-golden.json`：4 个真实结果 + unicode/星号字符/转义/键序/长文档）逐个复现；`inputsHash` `c322d830…` 不变；NIST 向量、长度 0..200、400 个随机串与 `node:crypto` 逐位一致；旧账本条目 `{hash}` 仍识别为 already-applied、同 id 不同内容仍冲突；`custom-formats.cjs` 哈希不变；同步调用形状不变 |
-| 3 | Game Application 应用层 | `app/`：`GameApplication`（`startBattle`、`commitResult`、`finishBattle`、`abortBattle`）+ 端口（状态、会话工厂、内容、投影）；规则留在 core（调用 `applyBattleResult`）；Showdown 与 MZ 在各自接入层；`composition.ts` 是唯一把 Showdown 会话接到应用端口的地方；复用 R2 的窄查询与不透明检查点；新增 `BattleDriver`/`BattleDriverFactory`（只含类型）作为会话与引擎之间的缝 | 应用层只依赖 rules/content/flow/i18n（检查器强制，且禁用网关内部名）；`test-application.cjs`（13） |
+| 3 | Game Application 应用层 | `app/`：`GameApplication`（`startBattle`、`commitResult`、`finishBattle`、`abortBattle`）+ 端口（状态、会话工厂、内容、投影）；规则留在 core（调用 `applyBattleResult`）；Showdown 与 MZ 在各自接入层；`composition.ts` 把 Showdown 会话接到应用端口；复用 R2 的窄查询与不透明检查点；新增 `BattleDriver`/`BattleDriverFactory`（只含类型）作为会话与引擎之间的缝 | 应用层只依赖 rules/content/i18n/自身端口，以及 flow 的 `content-runtime.ts`；后者只能依赖 rules/content，根入口限 `index.ts` / `composition.ts`（复核后收紧，检查器强制，且禁用网关内部名）；`test-application.cjs` 原 13 项，修复后 14 项 |
 | 4 | 假适配器与真实 MZ 验证同一应用契约 | 内存端口（`tools/fakes.ts`）；**脚本化战斗驱动**（`tools/scripted-driver.ts`，无战斗规则，可注入失败）；MZ 插件的 `begin/finish/abort/commit` 现在是应用层的薄包装，MZ 端口 = `$gameSystem._psGame` + 结果变量 | 同一契约的四种形态：内存端口（成功、重复、冲突、违约、未完成/封闭会话、投影失败、状态不可读/拒写、悬空内容）、真实 Showdown 会话（Node）、脚本化驱动（**Showdown 不会被加载**，`test-scripted-driver.cjs` 6）、真实 MZ 窗口（T1–T12，含新场景 T12 投影失败：已提交、已报告、不重复、重试只通知宿主）；变异（投影失败撤销提交 / 提交错误不捕获 / 应用写入所读状态）全部被抓到 |
-| 5 | 收紧本批涉及的类型与机器边界约束；同条件性能基线 | 检查器：`app` 层规则、Node 全局名、核心与应用禁用 `any`、核心无 Node 内建；插件里触及的代码用类型化的应用视图；`typecheck:framework` 同时跑核心编译 | 检查器测试 25 项（含对每条新规则的违规树与“文字不误报”）；性能见下 |
+| 5 | 收紧本批涉及的类型与机器边界约束；同条件性能基线 | 检查器：`app` 层规则、Node 全局名、核心与应用禁用 `any`、核心无 Node 内建；插件里触及的代码用类型化的应用视图；`typecheck:framework` 同时跑核心编译 | 检查器测试原 25 项、复核修复后 31 项（含对新规则的违规树与文字/属性不误报）；性能见下 |
 
 ## 应用契约（语义）
 
@@ -20,7 +22,7 @@
 
 ## 性能（同条件，非证明）
 
-`experiments/step3/evidence/batch/perf-compare.md`：同一台机器、同一脚本、先基线后新版交叉各两遍（每遍 3 次冷启动）。批次的各指标没有越出两遍基线之间的波动；冷启动行噪声最大（一遍新版 941 ms，另一遍 769 ms，基线两遍 816/782 ms）。**这是第一份同条件基线，不是“无退化”的证明**：只有 3 次启动/遍、一台机器、没有预算阈值。此前“冷启动 +190–200 ms、动作 +1.5–2 ms”（相对旧文档里另一次会话的记录）没有在同条件对照里再现；这提示它与当时的机器状态有关，但没有证实，也没有再追究原因。
+`experiments/step3/evidence/batch/perf-compare.md`：同一台机器、同一脚本、先基线后新版交叉各两遍（每遍 3 次冷启动）。有少数非冷启动指标的遍中位数略高于两遍基线中位数的最大值：首场 session create +0.5 ms、item p50 +0.2 ms、地图就绪 RSS +1 MB、24 场后 RSS 最大 +2 MB；它们仍在基线单遍的样本范围内。冷启动行噪声最大（一遍新版 941 ms，另一遍 769 ms，基线两遍 816/782 ms）。这组读数没有明显退化迹象，**但这是第一份同条件基线，不是“无退化”的证明**：只有 3 次启动/遍、一台机器、没有预算阈值。未展示的试跑 `e6f799d` 将内容加载计入首场 session create（161 ms），所以 `cd0fc0b` 把加载移到计时外；新版计时仍含状态读取和悬空引用检查，基线这两项在计时外。此前“冷启动 +190–200 ms、动作 +1.5–2 ms”（相对旧文档里另一次会话的记录）没有在同条件对照里再现；这提示它与当时的机器状态有关，但没有证实，也没有再追究原因。本轮修复未重测性能。
 
 ## 验证（精确提交）
 

@@ -1,0 +1,6 @@
+compiled content is current
+<workspace>/.worktrees/step3-batch-fixes-20261020/build/package/PokemonFrameworkPrototype.app: valid on disk
+<workspace>/.worktrees/step3-batch-fixes-20261020/build/package/PokemonFrameworkPrototype.app: satisfies its Designated Requirement
+Package: <workspace>/.worktrees/step3-batch-fixes-20261020/build/package/PokemonFrameworkPrototype.app
+  app total 558236 KB, app.nw 150028 KB, 1798 files in app.nw, withTests=1
+  gitHead=5d8f7e717f830b96fa1cb388232b53c2b12af24e (working-tree changes: 0, diff sha256 e3b0c44298fc) showdown=7244fe8e28fa8bc4d0809ae30d183c608b62bb2b signing=adhoc

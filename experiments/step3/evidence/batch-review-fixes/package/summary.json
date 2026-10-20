@@ -1,0 +1,23 @@
+[
+  {
+    "mode": "all",
+    "exitCode": 0,
+    "overall": "pass",
+    "results": 14,
+    "failed": []
+  },
+  {
+    "mode": "verify-save",
+    "exitCode": 0,
+    "overall": "pass",
+    "results": 1,
+    "failed": []
+  },
+  {
+    "mode": "matrix",
+    "exitCode": 0,
+    "overall": "pass",
+    "results": 10,
+    "failed": []
+  }
+]

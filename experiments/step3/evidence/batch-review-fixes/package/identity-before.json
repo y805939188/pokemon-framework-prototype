@@ -1,0 +1,22 @@
+{
+  "recordedAt": "2026-10-20T03:54:02.890169+00:00",
+  "phase": "package",
+  "gitHead": "5d8f7e717f830b96fa1cb388232b53c2b12af24e",
+  "workingTreeStatus": "",
+  "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "runtime": "<workspace>/.worktrees/step3-batch-fixes-20261020/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
+  "executable": "<workspace>/.worktrees/step3-batch-fixes-20261020/build/package/PokemonFrameworkPrototype.app/Contents/MacOS/nwjs",
+  "executableSha256": "c5b6915fa262523676d3b8a7ebc4b76f3e2ebc311496087a9ac5abae1cabec6c",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "artifacts": {
+    "js/engine/build/engine.cjs": "ed52a870fadf3cfec95072c7c9ce4d208dea8ed99443013a125fdc60cdc809a1",
+    "js/engine/build/core.cjs": "d80bc987f89d79241a7a2bc25c4a516b19c56a31ce06fc83393e4bcbe25b50cf",
+    "js/engine/build/custom-formats.cjs": "b7a0412ea2cd72d3371ee2fb409f09c7a2de893bb422d9034dafe0f8acf54ec8",
+    "js/engine/showdown/dist/config/custom-formats.js": "b7a0412ea2cd72d3371ee2fb409f09c7a2de893bb422d9034dafe0f8acf54ec8",
+    "js/plugins/PS_BattleFlow.js": "5e700e8ad5e9644c927590a5359c211720c4de66de0136bfce5152b7ed77dbcb",
+    "js/plugins/PS_BattleFlowTest.js": "825d611a7633f9d27584da69317ab317ee0c64325fdf13411dfb8ce77a5b4464",
+    "index.html": "f216aa42bd9d567939e3a887375ff0d7c89568ae46bbc374024b7b76d39cdc91",
+    "js/plugins.js": "d77436896a238125d9f3b2334d43ae8f2c3b0592fa7c0c65c3e900c34e61cb9b"
+  }
+}

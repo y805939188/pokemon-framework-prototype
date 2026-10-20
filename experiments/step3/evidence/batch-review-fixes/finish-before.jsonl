@@ -1,0 +1,2 @@
+{"label":"outcome missing","threw":"Cannot destructure property 'kind' of 'result.outcome' as it is undefined.","outcome":null,"committed":true,"replaced":1,"projected":0}
+{"label":"outcome null","threw":"Cannot destructure property 'kind' of 'result.outcome' as it is null.","outcome":null,"committed":true,"replaced":1,"projected":0}

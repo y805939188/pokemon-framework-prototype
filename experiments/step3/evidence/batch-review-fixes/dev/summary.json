@@ -1,0 +1,50 @@
+[
+  {
+    "mode": "all",
+    "exitCode": 0,
+    "overall": "fail",
+    "results": 14,
+    "failed": [
+      {
+        "id": "T14 invalid result outcome: abort before capture commit; a corrected retry applies exactly once",
+        "status": "fail",
+        "ms": 448,
+        "error": "menu item /masterball/i not found in [Potion  x3 | Antidote  x1 | X Attack  x1 | Pok\u00e9 Ball  x5 | Master Ball  x1] ()",
+        "mapDiag": {
+          "scene": "Scene_PSBattle",
+          "psRunning": true,
+          "waitMode": "psBattle",
+          "interpreterRunning": true,
+          "messageBusy": false,
+          "messageText": [
+            "Back on the map. Result code: \\V[10]"
+          ],
+          "lastOutcome": null,
+          "frame": 1351,
+          "hasFocus": true,
+          "vis": "visible"
+        },
+        "diag": {
+          "mode": "bag",
+          "failure": "null",
+          "log": [
+            "Go! Charizard!",
+            "The foe sent out Pidgey!"
+          ],
+          "status": [
+            "You: Charizard  Lv50  HP 153/153",
+            "Bag: potion x3, antidote x1, xattack x1, pokeball x5, mast\u2026"
+          ],
+          "queue": []
+        }
+      }
+    ]
+  },
+  {
+    "mode": "verify-save",
+    "exitCode": 0,
+    "overall": "pass",
+    "results": 1,
+    "failed": []
+  }
+]

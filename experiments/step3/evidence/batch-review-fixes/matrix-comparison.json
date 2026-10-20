@@ -1,0 +1,70 @@
+{
+  "status": "pass",
+  "node": "node v22.21.1",
+  "nw": "0.117.0",
+  "nwNode": "26.7.0",
+  "engineSha256": "ed52a870fadf3cfec95072c7c9ce4d208dea8ed99443013a125fdc60cdc809a1",
+  "matrix": [
+    {
+      "id": "S1",
+      "status": "pass",
+      "fingerprint": "1d78d0a8ff4b8b542414c4e6ba695fedaef324b118241e576c3e344b7ca5457a"
+    },
+    {
+      "id": "S2",
+      "status": "pass",
+      "fingerprint": "32142bf740c3d23eca986b638434a3b28e4e885f122fda88af5627766bf28ec2"
+    },
+    {
+      "id": "S3",
+      "status": "pass",
+      "fingerprint": "9b3b04f4c72625eec6d74d0a59dde5190e4f54376d333252c0ecb3c54656033f"
+    },
+    {
+      "id": "S4",
+      "status": "pass",
+      "fingerprint": "4bacf1d14b66fec60eb539968b90294b5d9c4954a78139803bda9a7f71398977"
+    },
+    {
+      "id": "S5",
+      "status": "pass",
+      "fingerprint": "9d70aa3397017a4f6e7f4391acbcdad5cc63e9ccdf3071c3669a646f55080aa4"
+    },
+    {
+      "id": "S6",
+      "status": "pass",
+      "fingerprint": "737819157254f38f3867f9d3159e227c868b605e9a406d05e1c753b811693da5"
+    },
+    {
+      "id": "S7",
+      "status": "pass",
+      "fingerprint": "691c3da8c1d62689fb22325f1fed096c798b6496847e3b51f309100610adeade"
+    },
+    {
+      "id": "S8",
+      "status": "pass",
+      "fingerprint": "3b68ee3715147782cd63a4aaffdbd3c60efe1140966f72cdbda5e0bb0c61a308"
+    },
+    {
+      "id": "S9",
+      "status": "pass",
+      "fingerprint": "3373e0f0f457e125df76034c2bf47bc75ef3b0596ab9dd7c561ee92e0458011f"
+    },
+    {
+      "id": "S10",
+      "status": "pass",
+      "fingerprint": "91781116c31992aa8af034e79ef35c08272488e19cfca0881cc6649fe149862f"
+    }
+  ],
+  "packageInfo": {
+    "builtAt": "2026-10-20T03:53:44.098Z",
+    "gitHead": "5d8f7e717f830b96fa1cb388232b53c2b12af24e",
+    "workingTreeChanges": 0,
+    "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+    "engineBundleSha256": "ed52a870fadf3cfec95072c7c9ce4d208dea8ed99443013a125fdc60cdc809a1",
+    "contentInputsHash": "c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625",
+    "withTests": true,
+    "signing": "adhoc"
+  }
+}

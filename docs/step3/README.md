@@ -94,8 +94,8 @@
 |---|---|---|
 | 战斗内部对象穿透（v1.0 §八“业务不持有引擎内部对象”） | **已关闭（R2）**：`flow/session.ts` 不再调用 `_debugBattle()`，也不碰 `_env/_queue/_seq/_closed`；网关提供值查询、受控操作和不透明检查点；检查器按标识符禁止在 battle/tools 之外使用。`ShowdownBattle` 仍为 `any`，只在 battle 层与 tools 内可达 | **短批次已做**：`BattleDriver`/`BattleDriverFactory` 类型缝 + 脚本化驱动假适配器；不重复整改 |
 | 领域依赖 Node | **已关闭（短批次）**：`rules/sha256.ts` 可移植同步 SHA-256，旧账本与内容哈希金样一致；核心 `types: []` 独立编译，裸 `vm` 里运行 | 见 `docs/step3/architecture-batch.md` |
-| 检查器盲区 | **模板插值部分已关闭（R3）**：改用 Vite 自带的解析器读语法树，`${}` 里的 `require`、宿主引用受检查，字符串/注释/正则文字不再误报；固定的 `typescript@7.0.2` 没有 JS 编译器 API。尚未做：`process.*` 等 Node 全局的进一步限制、核心无 Node 编译 | 批次：超出原白名单的增强规则与 `types: []` 核心编译 | **（短批次：Node 全局名、核心/应用层 `any`、应用层规则已补）**
-| 插件 `any` | `PS_BattleFlow.ts` 约 46 行；插件直接读 `s.gw.readState` 两处 | 批次/第六步：类型化应用门面 |
+| 检查器盲区 | **已关闭指定缺口**：R3 用 AST 检查模板插值；短批次补 Node 全局、rules/app 的 `any` 与核心 `types: []` 编译；复核修复补 app 的 flow 白名单及其下层依赖、根入口白名单、常见宿主全局、非字面量动态导入；普通属性名不当作全局名 | 见 [批次复核修复](batch-review-fixes.md)；检查器是保守的静态约束，未承诺任意代码绕过或完整词法绑定分析 |
+| 插件 `any` | **部分完成**：应用视图和端口已类型化；UI/session 壳仍有 `any`，插件的两处 `s.gw.readState` 是值查询 | 第六步继续收紧 UI 类型；本批未重写界面 |
 | 保存阶段 | `PS_SaveState.beforeSave` 不检查战斗中（靠场景约束） | 第四步保存用例加守卫与场景 |
 | 性能 | 冷启动比候选记录慢约 190–200 ms、引擎动作延迟 +1.5–2 ms 的差异：**短批次建立了第一份同条件对照**（基线两遍/新版两遍交叉，`experiments/step3/evidence/batch/perf-compare.md`），差异没有出现在同条件对照里，原因未再追究；**仍不是无退化的证明**（3 次启动/遍、一台机器、无阈值） | 第四步闭环后再定预算 |
 | 范围 | 首版单打；双打、长尾后置；Windows/Intel 暂缓（用户决定） | 第四步后重估；平台见 `PROJECT-GUIDE.md` |
