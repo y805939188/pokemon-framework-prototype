@@ -410,7 +410,7 @@
       G.$gameVariables.setValue(10, 1);
       await startEvent(1); await inMode("main");
       const session = battle()._session;
-      await choose(/^Bag/); await inMode("bag"); await choose(/masterball/i); await inMode("end");
+      await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/i); await inMode("end");
       const readResult = session.result;
       try {
         session.result = function () { const r = clone(readResult.call(this)); delete r.outcome; return r; };
