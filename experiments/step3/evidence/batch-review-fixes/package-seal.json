@@ -1,0 +1,8 @@
+{
+  "command": "codesign --verify --deep --strict <worktree>/build/package/PokemonFrameworkPrototype.app",
+  "exitCode": 0,
+  "stdout": "",
+  "stderr": "",
+  "checkedAfterHostRuns": true,
+  "recordedAt": "2026-10-20T03:58:12.521896+00:00"
+}

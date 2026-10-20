@@ -1,0 +1,193 @@
+TAP version 13
+# Subtest: success: the result is committed once, the persistent state is replaced not mutated, the host is told
+ok 1 - success: the result is committed once, the persistent state is replaced not mutated, the host is told
+  ---
+  duration_ms: 3.763584
+  ...
+# Subtest: duplicate: finishing the same battle again is a no-op for the state; nothing is spent or granted twice
+ok 2 - duplicate: finishing the same battle again is a no-op for the state; nothing is spent or granted twice
+  ---
+  duration_ms: 2.12175
+  ...
+# Subtest: conflict: a different result for an already applied battle is refused, the state stays as it is
+ok 3 - conflict: a different result for an already applied battle is refused, the state stays as it is
+  ---
+  duration_ms: 1.143208
+  ...
+# Subtest: a result that breaks the contract aborts without any partial change (unknown member, bag below zero, wrong protocol)
+ok 4 - a result that breaks the contract aborts without any partial change (unknown member, bag below zero, wrong protocol)
+  ---
+  duration_ms: 1.66975
+  ...
+# Subtest: an unfinished or closed session aborts: no result can be committed from it
+ok 5 - an unfinished or closed session aborts: no result can be committed from it
+  ---
+  duration_ms: 0.634958
+  ...
+# Subtest: committed but the host projection fails: the commit stands, is reported, and a retry neither repeats nor loses it
+ok 6 - committed but the host projection fails: the commit stands, is reported, and a retry neither repeats nor loses it
+  ---
+  duration_ms: 1.318958
+  ...
+# Subtest: an abort whose projection also fails still reports the abort and never throws
+ok 7 - an abort whose projection also fails still reports the abort and never throws
+  ---
+  duration_ms: 0.316041
+  ...
+# Subtest: an invalid outcome is rejected before any commit, including direct commits and retries
+not ok 8 - an invalid outcome is rejected before any commit, including direct commits and retries
+  ---
+  duration_ms: 0.708208
+  location: '<workspace>/.worktrees/step3-batch-fixes-20261020/experiments/step3/test-application.cjs:104:1'
+  failureType: 'testCodeFailure'
+  error: "Cannot destructure property 'kind' of 'result.outcome' as it is undefined."
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    outcomeCode (<workspace>/.worktrees/step3-batch-fixes-20261020/js/engine/build/engine.cjs:4747:10)
+    GameApplication.finishBattle (<workspace>/.worktrees/step3-batch-fixes-20261020/js/engine/build/engine.cjs:4790:10)
+    TestContext.<anonymous> (<workspace>/.worktrees/step3-batch-fixes-20261020/experiments/step3/test-application.cjs:109:27)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:979:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:677:18)
+    Test.postRun (node:internal/test_runner/test:1090:19)
+    Test.run (node:internal/test_runner/test:1018:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:677:7)
+  ...
+# Subtest: an unusable state (a save that could not be read) refuses to start and to finish, and nothing is installed
+ok 9 - an unusable state (a save that could not be read) refuses to start and to finish, and nothing is installed
+  ---
+  duration_ms: 0.7535
+  ...
+# Subtest: a save that refers to content that no longer exists is explained before any session exists
+ok 10 - a save that refers to content that no longer exists is explained before any session exists
+  ---
+  duration_ms: 170.302083
+  ...
+# Subtest: outcome codes: win by the player 1, caught 2, ran 3, anything else 4
+ok 11 - outcome codes: win by the player 1, caught 2, ran 3, anything else 4
+  ---
+  duration_ms: 0.157042
+  ...
+# Subtest: real session: a run is committed once through the application and a repeat does nothing
+ok 12 - real session: a run is committed once through the application and a repeat does nothing
+  ---
+  duration_ms: 20.631125
+  ...
+# Subtest: real session: a won trainer battle with a level-up and an item commits the session working copy as one change
+ok 13 - real session: a won trainer battle with a level-up and an item commits the session working copy as one change
+  ---
+  duration_ms: 9.508666
+  ...
+# Subtest: real session: a session closed by a failed rollback aborts and leaves the persistent state exactly as it was
+ok 14 - real session: a session closed by a failed rollback aborts and leaves the persistent state exactly as it was
+  ---
+  duration_ms: 2.778417
+  ...
+# Subtest: engine initialization fails: abort clears a stale win and releases the interpreter
+not ok 15 - engine initialization fails: abort clears a stale win and releases the interpreter
+  ---
+  duration_ms: 2.722167
+  location: '<workspace>/.worktrees/step3-batch-fixes-20261020/experiments/step3/test-plugin-abort.cjs:41:42'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<workspace>/.worktrees/step3-batch-fixes-20261020/experiments/step3/test-plugin-abort.cjs:46:10)
+    async Test.run (node:internal/test_runner/test:980:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: dex initialization fails: abort clears a stale win and releases the interpreter
+not ok 16 - dex initialization fails: abort clears a stale win and releases the interpreter
+  ---
+  duration_ms: 0.58725
+  location: '<workspace>/.worktrees/step3-batch-fixes-20261020/experiments/step3/test-plugin-abort.cjs:41:42'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<workspace>/.worktrees/step3-batch-fixes-20261020/experiments/step3/test-plugin-abort.cjs:46:10)
+    async Test.run (node:internal/test_runner/test:980:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:677:7)
+  ...
+# Subtest: scene termination uses the same initialization-failure cleanup
+not ok 17 - scene termination uses the same initialization-failure cleanup
+  ---
+  duration_ms: 0.380375
+  location: '<workspace>/.worktrees/step3-batch-fixes-20261020/experiments/step3/test-plugin-abort.cjs:54:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (<workspace>/.worktrees/step3-batch-fixes-20261020/experiments/step3/test-plugin-abort.cjs:57:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:979:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:677:7)
+  ...
+# Subtest: a failing fallback projection is reported separately and still releases the interpreter
+not ok 18 - a failing fallback projection is reported separately and still releases the interpreter
+  ---
+  duration_ms: 0.873167
+  location: '<workspace>/.worktrees/step3-batch-fixes-20261020/experiments/step3/test-plugin-abort.cjs:61:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'start failed',
+        'failed',
+    +   'engine unavailable'
+    -   'variable unavailable'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'start failed'
+    1: 'failed'
+    2: 'variable unavailable'
+  actual:
+    0: 'start failed'
+    1: 'failed'
+    2: 'engine unavailable'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (<workspace>/.worktrees/step3-batch-fixes-20261020/experiments/step3/test-plugin-abort.cjs:65:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:979:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:677:7)
+  ...
+1..18
+# tests 18
+# suites 0
+# pass 13
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 355.743625

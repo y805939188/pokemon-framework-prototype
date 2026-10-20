@@ -1,0 +1,165 @@
+TAP version 13
+# Subtest: a clean tree passes
+ok 1 - a clean tree passes
+  ---
+  duration_ms: 87.325708
+  ...
+# Subtest: the real framework tree is clean
+ok 2 - the real framework tree is clean
+  ---
+  duration_ms: 42.573458
+  ...
+# Subtest: rules may not import battle or flow
+ok 3 - rules may not import battle or flow
+  ---
+  duration_ms: 3.831666
+  ...
+# Subtest: battle may not import flow
+ok 4 - battle may not import flow
+  ---
+  duration_ms: 5.441625
+  ...
+# Subtest: require is only allowed in the Showdown loader
+ok 5 - require is only allowed in the Showdown loader
+  ---
+  duration_ms: 7.146167
+  ...
+# Subtest: the loader may use require
+ok 6 - the loader may use require
+  ---
+  duration_ms: 2.482666
+  ...
+# Subtest: Showdown types stay inside battle
+ok 7 - Showdown types stay inside battle
+  ---
+  duration_ms: 3.511875
+  ...
+# Subtest: custom-formats runs inside Showdown: only rules and the type alias
+ok 8 - custom-formats runs inside Showdown: only rules and the type alias
+  ---
+  duration_ms: 2.933916
+  ...
+# Subtest: only the listed file may add node:fs to the battle layer
+ok 9 - only the listed file may add node:fs to the battle layer
+  ---
+  duration_ms: 5.331084
+  ...
+# Subtest: external packages and wrong node built-ins are refused
+ok 10 - external packages and wrong node built-ins are refused
+  ---
+  duration_ms: 5.433167
+  ...
+# Subtest: host and DOM globals are refused outside tools
+ok 11 - host and DOM globals are refused outside tools
+  ---
+  duration_ms: 5.344292
+  ...
+# Subtest: mentions in comments and strings do not count
+ok 12 - mentions in comments and strings do not count
+  ---
+  duration_ms: 2.514375
+  ...
+# Subtest: import cycles are found
+ok 13 - import cycles are found
+  ---
+  duration_ms: 1.73075
+  ...
+# Subtest: unresolvable relative imports are reported
+ok 14 - unresolvable relative imports are reported
+  ---
+  duration_ms: 2.327333
+  ...
+# Subtest: a require inside a template interpolation is rejected like a direct require
+ok 15 - a require inside a template interpolation is rejected like a direct require
+  ---
+  duration_ms: 5.678334
+  ...
+# Subtest: host globals inside template interpolations are rejected, also in nested templates
+ok 16 - host globals inside template interpolations are rejected, also in nested templates
+  ---
+  duration_ms: 5.848625
+  ...
+# Subtest: text that merely mentions require, window or import is not code: strings, templates, regex literals and comments
+ok 17 - text that merely mentions require, window or import is not code: strings, templates, regex literals and comments
+  ---
+  duration_ms: 2.024375
+  ...
+# Subtest: a template literal does not hide the code after it from the import and require checks
+ok 18 - a template literal does not hide the code after it from the import and require checks
+  ---
+  duration_ms: 3.549584
+  ...
+# Subtest: type-position and dynamic imports are still resolved; an unparsable file is reported, not skipped
+ok 19 - type-position and dynamic imports are still resolved; an unparsable file is reported, not skipped
+  ---
+  duration_ms: 5.745083
+  ...
+# Subtest: flow, rules, content and i18n may not use the gateway internals or _debugBattle (member access, computed key, destructuring)
+ok 20 - flow, rules, content and i18n may not use the gateway internals or _debugBattle (member access, computed key, destructuring)
+  ---
+  duration_ms: 56.640125
+  ...
+# Subtest: battle and tools may use the internals; mentioning the names in text or comments is fine
+ok 21 - battle and tools may use the internals; mentioning the names in text or comments is fine
+  ---
+  duration_ms: 3.019166
+  ...
+# Subtest: the core (rules) and the other pure layers may not import any Node built-in, crypto included
+ok 22 - the core (rules) and the other pure layers may not import any Node built-in, crypto included
+  ---
+  duration_ms: 9.511292
+  ...
+# Subtest: Node globals (process, Buffer, __dirname, __filename, global) are rejected outside battle and tools, also in templates and computed keys
+ok 23 - Node globals (process, Buffer, __dirname, __filename, global) are rejected outside battle and tools, also in templates and computed keys
+  ---
+  duration_ms: 45.089875
+  ...
+# Subtest: explicit any is rejected in the core, not elsewhere, and unknown is fine
+ok 24 - explicit any is rejected in the core, not elsewhere, and unknown is fine
+  ---
+  duration_ms: 6.017041
+  ...
+# Subtest: the application layer sees rules, content, the content runtime and i18n, never the engine adapters, tools or the composition root
+ok 25 - the application layer sees rules, content, the content runtime and i18n, never the engine adapters, tools or the composition root
+  ---
+  duration_ms: 26.627959
+  ...
+# Subtest: app may only reach the host-free content runtime in flow, including re-exports and dynamic imports
+ok 26 - app may only reach the host-free content runtime in flow, including re-exports and dynamic imports
+  ---
+  duration_ms: 11.588333
+  ...
+# Subtest: the content-runtime exception cannot become an indirect engine bridge for app
+ok 27 - the content-runtime exception cannot become an indirect engine bridge for app
+  ---
+  duration_ms: 4.952291
+  ...
+# Subtest: only index.ts and composition.ts are framework root entries
+ok 28 - only index.ts and composition.ts are framework root entries
+  ---
+  duration_ms: 3.841375
+  ...
+# Subtest: host-provided encoders, timers, scheduling and IO globals stay out of the pure layers
+ok 29 - host-provided encoders, timers, scheduling and IO globals stay out of the pure layers
+  ---
+  duration_ms: 126.382666
+  ...
+# Subtest: plain property keys and members do not name ambient globals, while shorthand and computed expressions do
+ok 30 - plain property keys and members do not name ambient globals, while shorthand and computed expressions do
+  ---
+  duration_ms: 7.047042
+  ...
+# Subtest: nonliteral dynamic imports cannot bypass layer and built-in checks
+ok 31 - nonliteral dynamic imports cannot bypass layer and built-in checks
+  ---
+  duration_ms: 6.696291
+  ...
+1..31
+# tests 31
+# suites 0
+# pass 31
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 564.462542

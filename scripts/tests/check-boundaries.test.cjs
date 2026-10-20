@@ -142,3 +142,78 @@ test('battle and tools may use the internals; mentioning the names in text or co
 		'flow/doc.ts': '// gw._debugBattle() is for tools; gw._queue too\nexport const d = "gw._seq and _env are private";\nexport const e = `${1} gw._closed`;\n',
 	});
 });
+
+// ---- core independence: no Node built-ins in rules, content, i18n or flow
+test('the core (rules) and the other pure layers may not import any Node built-in, crypto included', () => {
+	for (const layer of ['rules', 'content', 'i18n', 'flow']) {
+		bad({ ...OK, [`${layer}/n.ts`]: 'import { createHash } from "node:crypto";\nexport const h = createHash;\n' }, new RegExp(`${layer}/n\\.ts: layer "${layer}" may not import node:crypto`));
+	}
+	clean({ ...OK, 'tools/n.ts': 'import { createHash } from "node:crypto";\nexport const h = createHash;\n' });
+});
+
+// ---- Node globals and explicit any
+test('Node globals (process, Buffer, __dirname, __filename, global) are rejected outside battle and tools, also in templates and computed keys', () => {
+	for (const layer of ['rules', 'content', 'i18n', 'flow']) {
+		for (const body of ['export const a = process.platform;', 'export const a = Buffer.from("x");', 'export const a = __dirname;', 'export const a = `${process.env.X}`;', 'export const a = (global as unknown as Record<string, unknown>)["x"];']) {
+			bad({ ...OK, [`${layer}/g.ts`]: body + '\n' }, new RegExp(`${layer}/g\\.ts: Node global "(process|Buffer|__dirname|global)" may not be used in layer "${layer}"`));
+		}
+	}
+	clean({ ...OK, 'battle/g.ts': 'export const a = process.platform + __dirname;\n', 'tools/g.ts': 'export const a = Buffer.from("x");\n', 'rules/doc.ts': '// process.env and Buffer in a comment\nexport const a = "process.env Buffer";\n' });
+});
+test('explicit any is rejected in the core, not elsewhere, and unknown is fine', () => {
+	bad({ ...OK, 'rules/a.ts': 'export const f = (x: any) => x;\n' }, /rules\/a\.ts: 1 explicit "any" in layer "rules"/);
+	bad({ ...OK, 'rules/a.ts': 'export const f = (x: Record<string, any>, y: any[]) => [x, y];\n' }, /rules\/a\.ts: 2 explicit "any"/);
+	clean({ ...OK, 'rules/a.ts': 'export const f = (x: unknown) => x;\n', 'battle/b.ts': 'export const f = (x: any) => x;\n', 'flow/c.ts': 'export const f = (x: any) => x;\n' });
+});
+
+// ---- the application layer
+test('the application layer sees rules, content, the content runtime and i18n, never the engine adapters, tools or the composition root', () => {
+	const flowFile = { 'flow/content-runtime.ts': 'export const f = 1;\n', 'tools/t.ts': 'export const t = 1;\n', 'content/c.ts': 'export const c = 1;\n', 'composition.ts': 'export const x = 1;\n' };
+	clean({ ...OK, ...flowFile, 'app/a.ts': 'import { f } from "../flow/content-runtime.ts";\nimport { a } from "../rules/a.ts";\nimport { c } from "../content/c.ts";\nexport const v = [f, a, c];\n' });
+	bad({ ...OK, ...flowFile, 'app/a.ts': 'import { g } from "../battle/gateway.ts";\nexport const v = g;\n' }, /layer "app" may not import layer "battle"/);
+	bad({ ...OK, ...flowFile, 'app/a.ts': 'import { t } from "../tools/t.ts";\nexport const v = t;\n' }, /layer "app" may not import layer "tools"/);
+	bad({ ...OK, ...flowFile, 'app/a.ts': 'import { x } from "../composition.ts";\nexport const v = x;\n' }, /layer "app" may not import layer "entry"/);
+	bad({ ...OK, 'app/a.ts': 'import { readFileSync } from "node:fs";\nexport const v = readFileSync;\n' }, /layer "app" may not import node:fs/);
+	bad({ ...OK, 'app/a.ts': 'export const v = (x: any) => x;\n' }, /app\/a\.ts: 1 explicit "any" in layer "app"/);
+	bad({ ...OK, 'app/a.ts': 'export const v = (gw: { _queue: unknown[] }) => gw._queue;\n' }, /app\/a\.ts: gateway internal "_queue" may not be used in layer "app"/);
+	clean({ ...OK, ...flowFile, 'composition.ts': 'import { g } from "./battle/gateway.ts";\nimport { a } from "./app/a.ts";\nexport const x = [g, a];\n', 'app/a.ts': 'export const a = 1;\n' });
+});
+
+test('app may only reach the host-free content runtime in flow, including re-exports and dynamic imports', () => {
+	const flow = { 'flow/session.ts': 'export class BattleSession {}\n' };
+	for (const code of ['import { BattleSession } from "../flow/session.ts";', 'export { BattleSession } from "../flow/session.ts";', 'export const load = () => import("../flow/session.ts");']) {
+		bad({ ...OK, ...flow, 'app/a.ts': code }, /app.*may only import flow\/content-runtime\.ts/);
+	}
+	clean({ ...OK, 'flow/content-runtime.ts': 'export const content = 1;', 'app/a.ts': 'import { content } from "../flow/content-runtime.ts"; export const a = content;' });
+});
+
+test('the content-runtime exception cannot become an indirect engine bridge for app', () => {
+	for (const target of ['battle/gateway.ts', 'flow/session.ts']) {
+		bad({ ...OK, 'flow/session.ts': 'export const a = 1;', 'flow/content-runtime.ts': `import * as engine from "../${target}"; export { engine };` }, /flow\/content-runtime\.ts.*may only import rules\/content/);
+	}
+});
+
+test('only index.ts and composition.ts are framework root entries', () => {
+	bad({ ...OK, 'another-root.ts': 'import { g } from "./battle/gateway.ts"; export const engine = g;' }, /another-root\.ts.*root entry.*index\.ts.*composition\.ts/);
+	clean({ ...OK, 'index.ts': 'export { g } from "./battle/gateway.ts";', 'composition.ts': 'import { g } from "./battle/gateway.ts"; export const wire = g;' });
+});
+
+test('host-provided encoders, timers, scheduling and IO globals stay out of the pure layers', () => {
+	for (const layer of ['rules', 'content', 'i18n', 'flow', 'app']) {
+		for (const name of ['TextEncoder', 'TextDecoder', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate', 'clearImmediate', 'structuredClone', 'queueMicrotask', 'fetch', 'console', 'globalThis']) {
+			bad({ ...OK, [`${layer}/a.ts`]: `export const a = ${name};` }, new RegExp(`Node global "${name}"`));
+		}
+	}
+});
+
+test('plain property keys and members do not name ambient globals, while shorthand and computed expressions do', () => {
+	clean({ ...OK, 'app/a.ts': 'export const a = { process: 1, global: 2, TextEncoder: 3 }; export const b = a.process + a["global"]; export type Shape = { process: number; global: number }; export const f = (x: Shape) => x.global; export const method = { process() { return 1; } }; const { process: value } = a; export { value };' });
+	bad({ ...OK, 'app/a.ts': 'export const a = { process };' }, /Node global "process"/);
+	bad({ ...OK, 'app/a.ts': 'export const a = {}[process.platform];' }, /Node global "process"/);
+});
+
+test('nonliteral dynamic imports cannot bypass layer and built-in checks', () => {
+	for (const expr of ['"node:" + name', '`node:${name}`', 'name']) {
+		bad({ ...OK, 'app/a.ts': `export const load = (name: string) => import(${expr});` }, /dynamic import.*string literal/);
+	}
+});

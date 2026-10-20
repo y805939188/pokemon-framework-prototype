@@ -1,0 +1,278 @@
+TAP version 13
+# Subtest: a clean tree passes
+ok 1 - a clean tree passes
+  ---
+  duration_ms: 81.044459
+  ...
+# Subtest: the real framework tree is clean
+ok 2 - the real framework tree is clean
+  ---
+  duration_ms: 41.747709
+  ...
+# Subtest: rules may not import battle or flow
+ok 3 - rules may not import battle or flow
+  ---
+  duration_ms: 4.597333
+  ...
+# Subtest: battle may not import flow
+ok 4 - battle may not import flow
+  ---
+  duration_ms: 4.125375
+  ...
+# Subtest: require is only allowed in the Showdown loader
+ok 5 - require is only allowed in the Showdown loader
+  ---
+  duration_ms: 7.305375
+  ...
+# Subtest: the loader may use require
+ok 6 - the loader may use require
+  ---
+  duration_ms: 2.692583
+  ...
+# Subtest: Showdown types stay inside battle
+ok 7 - Showdown types stay inside battle
+  ---
+  duration_ms: 3.517583
+  ...
+# Subtest: custom-formats runs inside Showdown: only rules and the type alias
+ok 8 - custom-formats runs inside Showdown: only rules and the type alias
+  ---
+  duration_ms: 2.677583
+  ...
+# Subtest: only the listed file may add node:fs to the battle layer
+ok 9 - only the listed file may add node:fs to the battle layer
+  ---
+  duration_ms: 6.197
+  ...
+# Subtest: external packages and wrong node built-ins are refused
+ok 10 - external packages and wrong node built-ins are refused
+  ---
+  duration_ms: 5.24175
+  ...
+# Subtest: host and DOM globals are refused outside tools
+ok 11 - host and DOM globals are refused outside tools
+  ---
+  duration_ms: 5.143875
+  ...
+# Subtest: mentions in comments and strings do not count
+ok 12 - mentions in comments and strings do not count
+  ---
+  duration_ms: 2.603
+  ...
+# Subtest: import cycles are found
+ok 13 - import cycles are found
+  ---
+  duration_ms: 1.618042
+  ...
+# Subtest: unresolvable relative imports are reported
+ok 14 - unresolvable relative imports are reported
+  ---
+  duration_ms: 2.43475
+  ...
+# Subtest: a require inside a template interpolation is rejected like a direct require
+ok 15 - a require inside a template interpolation is rejected like a direct require
+  ---
+  duration_ms: 6.943334
+  ...
+# Subtest: host globals inside template interpolations are rejected, also in nested templates
+ok 16 - host globals inside template interpolations are rejected, also in nested templates
+  ---
+  duration_ms: 7.228375
+  ...
+# Subtest: text that merely mentions require, window or import is not code: strings, templates, regex literals and comments
+ok 17 - text that merely mentions require, window or import is not code: strings, templates, regex literals and comments
+  ---
+  duration_ms: 2.443916
+  ...
+# Subtest: a template literal does not hide the code after it from the import and require checks
+ok 18 - a template literal does not hide the code after it from the import and require checks
+  ---
+  duration_ms: 4.369334
+  ...
+# Subtest: type-position and dynamic imports are still resolved; an unparsable file is reported, not skipped
+ok 19 - type-position and dynamic imports are still resolved; an unparsable file is reported, not skipped
+  ---
+  duration_ms: 7.300667
+  ...
+# Subtest: flow, rules, content and i18n may not use the gateway internals or _debugBattle (member access, computed key, destructuring)
+ok 20 - flow, rules, content and i18n may not use the gateway internals or _debugBattle (member access, computed key, destructuring)
+  ---
+  duration_ms: 58.933959
+  ...
+# Subtest: battle and tools may use the internals; mentioning the names in text or comments is fine
+ok 21 - battle and tools may use the internals; mentioning the names in text or comments is fine
+  ---
+  duration_ms: 2.633208
+  ...
+# Subtest: the core (rules) and the other pure layers may not import any Node built-in, crypto included
+ok 22 - the core (rules) and the other pure layers may not import any Node built-in, crypto included
+  ---
+  duration_ms: 9.077375
+  ...
+# Subtest: Node globals (process, Buffer, __dirname, __filename, global) are rejected outside battle and tools, also in templates and computed keys
+ok 23 - Node globals (process, Buffer, __dirname, __filename, global) are rejected outside battle and tools, also in templates and computed keys
+  ---
+  duration_ms: 39.846375
+  ...
+# Subtest: explicit any is rejected in the core, not elsewhere, and unknown is fine
+ok 24 - explicit any is rejected in the core, not elsewhere, and unknown is fine
+  ---
+  duration_ms: 6.544208
+  ...
+# Subtest: the application layer sees rules, content, flow and i18n, never the engine adapters, tools or the composition root
+ok 25 - the application layer sees rules, content, flow and i18n, never the engine adapters, tools or the composition root
+  ---
+  duration_ms: 23.510292
+  ...
+# Subtest: app may only reach the host-free content runtime in flow, including re-exports and dynamic imports
+not ok 26 - app may only reach the host-free content runtime in flow, including re-exports and dynamic imports
+  ---
+  duration_ms: 2.702042
+  location: '<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:182:1'
+  failureType: 'testCodeFailure'
+  error: 'expected a violation matching /app.*may only import flow\\/content-runtime\\.ts/, got: []'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    bad (<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:23:10)
+    TestContext.<anonymous> (<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:185:3)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:979:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:677:18)
+    Test.postRun (node:internal/test_runner/test:1090:19)
+    Test.run (node:internal/test_runner/test:1018:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:677:7)
+  ...
+# Subtest: the content-runtime exception cannot become an indirect engine bridge for app
+not ok 27 - the content-runtime exception cannot become an indirect engine bridge for app
+  ---
+  duration_ms: 2.079209
+  location: '<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:190:1'
+  failureType: 'testCodeFailure'
+  error: 'expected a violation matching /flow\\/content-runtime\\.ts.*may only import rules\\/content/, got: []'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    bad (<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:23:10)
+    TestContext.<anonymous> (<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:192:3)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:979:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:677:18)
+    Test.postRun (node:internal/test_runner/test:1090:19)
+    Test.run (node:internal/test_runner/test:1018:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:677:7)
+  ...
+# Subtest: only index.ts and composition.ts are framework root entries
+not ok 28 - only index.ts and composition.ts are framework root entries
+  ---
+  duration_ms: 1.616584
+  location: '<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:196:1'
+  failureType: 'testCodeFailure'
+  error: 'expected a violation matching /another-root\\.ts.*root entry.*index\\.ts.*composition\\.ts/, got: []'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    bad (<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:23:10)
+    TestContext.<anonymous> (<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:197:2)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:979:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:677:18)
+    Test.postRun (node:internal/test_runner/test:1090:19)
+    Test.run (node:internal/test_runner/test:1018:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:677:7)
+  ...
+# Subtest: host-provided encoders, timers, scheduling and IO globals stay out of the pure layers
+not ok 29 - host-provided encoders, timers, scheduling and IO globals stay out of the pure layers
+  ---
+  duration_ms: 1.494792
+  location: '<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:201:1'
+  failureType: 'testCodeFailure'
+  error: 'expected a violation matching /Node global "TextEncoder"/, got: []'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    bad (<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:23:10)
+    TestContext.<anonymous> (<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:204:4)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:979:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:677:18)
+    Test.postRun (node:internal/test_runner/test:1090:19)
+    Test.run (node:internal/test_runner/test:1018:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:677:7)
+  ...
+# Subtest: plain property keys and members do not name ambient globals, while shorthand and computed expressions do
+not ok 30 - plain property keys and members do not name ambient globals, while shorthand and computed expressions do
+  ---
+  duration_ms: 2.641375
+  location: '<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:209:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + [
+    +   'app/a.ts: Node global "process" may not be used in layer "app"',
+    +   'app/a.ts: Node global "global" may not be used in layer "app"'
+    + ]
+    - []
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual:
+    0: 'app/a.ts: Node global "process" may not be used in layer "app"'
+    1: 'app/a.ts: Node global "global" may not be used in layer "app"'
+  operator: 'deepStrictEqual'
+  stack: |-
+    clean (<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:85:15)
+    TestContext.<anonymous> (<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:210:2)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:979:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:677:18)
+    Test.postRun (node:internal/test_runner/test:1090:19)
+    Test.run (node:internal/test_runner/test:1018:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:677:7)
+  ...
+# Subtest: nonliteral dynamic imports cannot bypass layer and built-in checks
+not ok 31 - nonliteral dynamic imports cannot bypass layer and built-in checks
+  ---
+  duration_ms: 2.098
+  location: '<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:215:1'
+  failureType: 'testCodeFailure'
+  error: 'expected a violation matching /dynamic import.*string literal/, got: []'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    bad (<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:23:10)
+    TestContext.<anonymous> (<workspace>/.worktrees/step3-batch-fixes-20261020/scripts/tests/check-boundaries.test.cjs:217:3)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:979:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:677:18)
+    Test.postRun (node:internal/test_runner/test:1090:19)
+    Test.run (node:internal/test_runner/test:1018:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:677:7)
+  ...
+1..31
+# tests 31
+# suites 0
+# pass 25
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 406.138083

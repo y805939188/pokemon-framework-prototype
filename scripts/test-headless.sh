@@ -32,6 +32,11 @@ SUITES=(
   experiments/step3/test-session-operations.cjs
   experiments/step3/test-session-failure.cjs
   experiments/step3/test-gateway-boundary.cjs
+  experiments/step3/test-core-digest.cjs
+  experiments/step3/test-core-independent.cjs
+  experiments/step3/test-application.cjs
+  experiments/step3/test-plugin-abort.cjs
+  experiments/step3/test-scripted-driver.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do

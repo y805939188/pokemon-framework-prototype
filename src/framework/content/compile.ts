@@ -2,7 +2,7 @@
  * Pure content compiler: validate authored JSON (every problem is located by file and path), apply overlays with
  * conflict detection, emit one canonical document whose `inputsHash` covers every input. No file system, no Showdown.
  */
-import { createHash } from "node:crypto";
+import { sha256Hex } from "../rules/sha256.ts";
 import {
   CURVES_ALLOWED, OVERRIDABLE, SCHEMA_VERSION, STAT_KEYS_ALLOWED,
 } from "./schema.ts";
@@ -19,7 +19,7 @@ export function canonicalJson(v: unknown, indent = 0): string {
 }
 
 export function hashInputs(inputs: ContentInputs): string {
-  return createHash("sha256").update(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays })).digest("hex");
+  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays }));
 }
 
 const ID = /^[a-z][a-z0-9-]{0,30}$/;

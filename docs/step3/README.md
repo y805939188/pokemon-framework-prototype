@@ -92,12 +92,12 @@
 
 | 债务 | 现状（实证） | 去向 |
 |---|---|---|
-| 战斗内部对象穿透（v1.0 §八“业务不持有引擎内部对象”） | **已关闭（R2）**：`flow/session.ts` 不再调用 `_debugBattle()`，也不碰 `_env/_queue/_seq/_closed`；网关提供值查询、受控操作和不透明检查点；检查器按标识符禁止在 battle/tools 之外使用。`ShowdownBattle` 仍为 `any`，只在 battle 层与 tools 内可达 | 批次：在已有窄查询上抽只含类型的 `BattleDriver` 接口并接假适配器，**不重复整改** |
-| 领域依赖 Node | `rules/state.ts` 用 `node:crypto` 做同步 SHA-256 结果身份；边界检查放行 | 批次：注入或内置同步摘要，保留 canonical JSON/SHA-256/旧账本；核心用 `tsc`（`lib: ES2022`、`types: []`）独立编译 |
-| 检查器盲区 | **模板插值部分已关闭（R3）**：改用 Vite 自带的解析器读语法树，`${}` 里的 `require`、宿主引用受检查，字符串/注释/正则文字不再误报；固定的 `typescript@7.0.2` 没有 JS 编译器 API。尚未做：`process.*` 等 Node 全局的进一步限制、核心无 Node 编译 | 批次：超出原白名单的增强规则与 `types: []` 核心编译 |
-| 插件 `any` | `PS_BattleFlow.ts` 约 46 行；插件直接读 `s.gw.readState` 两处 | 批次/第六步：类型化应用门面 |
+| 战斗内部对象穿透（v1.0 §八“业务不持有引擎内部对象”） | **已关闭（R2）**：`flow/session.ts` 不再调用 `_debugBattle()`，也不碰 `_env/_queue/_seq/_closed`；网关提供值查询、受控操作和不透明检查点；检查器按标识符禁止在 battle/tools 之外使用。`ShowdownBattle` 仍为 `any`，只在 battle 层与 tools 内可达 | **短批次已做**：`BattleDriver`/`BattleDriverFactory` 类型缝 + 脚本化驱动假适配器；不重复整改 |
+| 领域依赖 Node | **已关闭（短批次）**：`rules/sha256.ts` 可移植同步 SHA-256，旧账本与内容哈希金样一致；核心 `types: []` 独立编译，裸 `vm` 里运行 | 见 `docs/step3/architecture-batch.md` |
+| 检查器盲区 | **已关闭指定缺口**：R3 用 AST 检查模板插值；短批次补 Node 全局、rules/app 的 `any` 与核心 `types: []` 编译；复核修复补 app 的 flow 白名单及其下层依赖、根入口白名单、常见宿主全局、非字面量动态导入；普通属性名不当作全局名 | 见 [批次复核修复](batch-review-fixes.md)；检查器是保守的静态约束，未承诺任意代码绕过或完整词法绑定分析 |
+| 插件 `any` | **部分完成**：应用视图和端口已类型化；UI/session 壳仍有 `any`，插件的两处 `s.gw.readState` 是值查询 | 第六步继续收紧 UI 类型；本批未重写界面 |
 | 保存阶段 | `PS_SaveState.beforeSave` 不检查战斗中（靠场景约束） | 第四步保存用例加守卫与场景 |
-| 性能 | 冷启动比候选记录慢约 190–200 ms、引擎动作延迟 +1.5–2 ms，原因未判定，且没有同条件基线 | 批次入口先补同条件基线；不能宣称无退化 |
+| 性能 | 冷启动比候选记录慢约 190–200 ms、引擎动作延迟 +1.5–2 ms 的差异：**短批次建立了第一份同条件对照**（基线两遍/新版两遍交叉，`experiments/step3/evidence/batch/perf-compare.md`），差异没有出现在同条件对照里，原因未再追究；**仍不是无退化的证明**（3 次启动/遍、一台机器、无阈值） | 第四步闭环后再定预算 |
 | 范围 | 首版单打；双打、长尾后置；Windows/Intel 暂缓（用户决定） | 第四步后重估；平台见 `PROJECT-GUIDE.md` |
 
 ## 第三步限定整改（独立验收 `e0a6be5` 后，2026-10-19）
@@ -112,3 +112,5 @@
 | R2 | 生产 `flow/session.ts` 持有 Showdown 内部对象并读写网关内部状态（违反 A3“内部耦合集中在适配层”） | 网关新增 `activeId`、`awaitingChoice`（返回拷贝）、`drain/discardQueued`、`checkpoint/fromCheckpoint`（冻结、无字段的不透明令牌，无法由数据伪造）；会话保留互斥、双错误、封闭、PRNG/seq/消息顺序；检查器按标识符（含计算键、解构、模板）禁止在 battle/tools 之外使用网关内部 | `bef2474`、`d9a9779` | 新增 `test-gateway-boundary.cjs`（5）；检查器 +2；F3 与 fail-closed 用例原样通过；对真实 `session.ts` 的变异被拒 |
 
 本地：`scripts/test-quick.sh` 21 套件 **168 项**通过（含冻结协议、矩阵、F1–F3、失败封闭）。宿主与打包验证在整改后的代码提交 `d9a9779` 上重做（NW.js 0.117.0、Node 26.7.0；包内 `gitHead` = `d9a9779`、工作树无改动、ad hoc 签名）：开发树 T1–T11 + V1 通过；包内 T1–T11、V1、S1–S10、SL1 通过，签名封印有效，S1–S10 指纹与 Node 及旧基线逐个相同；**引擎包哈希 `3e2267c3c43f96f7bc7d4274b5bd572b7d874a4193ce231849fa7ba583547acc`**（包内 = Node 加载）。`22842be4…` 是整改前的引擎，其宿主证据不适用于现在的运行时。证据：`experiments/step3/evidence/rework/`。性能仍然是：**没有同条件基线，未证明无退化**；冷启动 +190–200 ms、动作 +1.5–2 ms 的差异原因未判定，本次没有测性能。
+
+- 第四步前短架构批次（核心独立入口、可移植摘要、应用层、脚本化驱动与同契约验证、检查器收紧、同条件性能对照）：分支 `step3/arch-batch`，**待针对本批的独立复核**，记录见 `docs/step3/architecture-batch.md`。

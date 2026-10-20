@@ -2,6 +2,7 @@
 export * as growth from "./rules/growth.ts";
 export * as rules from "./rules/rules.ts";
 export * as state from "./rules/state.ts";
+export * as digest from "./rules/sha256.ts";
 export * as store from "./tools/save-store.ts";
 export * as gateway from "./battle/gateway.ts";
 export * as moveRequests from "./battle/move-requests.ts";
@@ -17,3 +18,7 @@ export * as dex from "./battle/dex.ts";
 export * as i18n from "./i18n/index.ts";
 export * as log from "./flow/log.ts";
 export * as saveSchema from "./rules/save-schema.ts";
+export * as app from "./app/index.ts";
+export * as composition from "./composition.ts";
+export * as fakes from "./tools/fakes.ts";
+export * as scripted from "./tools/scripted-driver.ts";

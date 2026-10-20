@@ -9,59 +9,13 @@ import { loadFormatExtension, loadSim } from "./showdown-loader.ts";
 import type { LoadedSim } from "./showdown-loader.ts";
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types.ts";
 import type { BattleEvent } from "./protocol.ts";
-import type { MonView } from "../rules/rules.ts";
+import type { BattleDriver, BattleDriverFactory, GatewayMessage, GatewayOptions, MemberState, SlotSpec, StateRecord, Unsequenced } from "./driver.ts";
 import type { PartialStats, Stats } from "../rules/types.ts";
 
 /** Version tag of the engine-level message stream used by the 2.2 harness only; NOT the game protocol (state.ts PROTOCOL_VERSION = 1). */
 export const PROTOCOL_VERSION = 0;
 
-export interface PlayerSpec {
-  name: string;
-  team: unknown[];
-}
-
-export interface GatewayOptions {
-  formatid?: string;
-  seed?: number[] | string;
-  players?: PlayerSpec[];
-  engineRoot?: string;
-  wild?: boolean;
-  noBall?: boolean;
-  noRun?: boolean;
-  restored?: boolean;
-}
-
-export type GatewayMessage =
-  | { kind: "events"; seq: number; events: BattleEvent[] }
-  | { kind: "request"; seq: number; side: string; request: Record<string, any> }
-  | { kind: "error"; seq: number; side: string; message: string; choice?: string; payload?: unknown }
-  | { kind: "end"; seq: number; winner: string | null; turn: number; reason: string; outcome?: Record<string, unknown> };
-
-/** A message before it gets its sequence number. */
-type Unsequenced = GatewayMessage extends infer M ? (M extends GatewayMessage ? Omit<M, "seq"> : never) : never;
-
-export interface SlotSpec {
-  kind?: string;
-  move?: number;
-  target?: number | string;
-  switch?: number;
-  [k: string]: unknown;
-}
-
-export interface StateRecord {
-  id: string;
-  hp: number;
-  status?: string;
-  statusCount?: number;
-  moves?: { id: string; pp: number; maxpp?: number }[];
-}
-
-export interface MemberState extends MonView {
-  level: number;
-  statusCount: number;
-  pp: Record<string, number>;
-  stats: Stats;
-}
+export type { GatewayMessage, GatewayOptions, MemberState, PlayerSpec, SlotSpec, StateRecord } from "./driver.ts";
 
 function parseLine(raw: string): BattleEvent {
   if (!raw.startsWith("|")) return { type: "text", args: [raw], raw };
@@ -77,7 +31,7 @@ export class GatewayCheckpoint { constructor() { Object.freeze(this); } }
 interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean }
 const CHECKPOINTS = new WeakMap<GatewayCheckpoint, CheckpointData>();
 
-export class BattleGateway {
+export class BattleGateway implements BattleDriver {
   _env: LoadedSim;
   _queue: GatewayMessage[] = [];
   _waiters: ((m: GatewayMessage | null) => void)[] = [];
@@ -494,3 +448,15 @@ export class BattleGateway {
     return this._battle;
   }
 }
+
+/** The Showdown implementation of the driver factory: what the game uses unless a test supplies another one. */
+export const showdownDriverFactory: BattleDriverFactory = {
+  create: (options) => BattleGateway.create(options),
+  fromCheckpoint: (token) => BattleGateway.fromCheckpoint(token),
+  async moveNames(formatid, seed) {
+    // a throw-away battle of the same format is the cheapest way to reach the engine's move data; the cost is the one the
+    // session always paid for this check
+    const probe = await BattleGateway.create({ formatid, seed, players: [{ name: "p", team: [{ name: "x", species: "Pidgey", moves: ["Tackle"] }] }, { name: "q", team: [{ name: "y", species: "Pidgey", moves: ["Tackle"] }] }] });
+    return (id: string): string => probe.moveInfo(id).name;
+  },
+};

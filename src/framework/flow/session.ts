@@ -8,7 +8,8 @@
  * Sync points: (1) battle start: persistent -> engine (seedState); (2) between turns when growth
  * happened: session -> engine (applyGrowth) + refreshed requests; (3) battle end: engine -> result.
  */
-import { BattleGateway } from "../battle/gateway.ts";
+import { showdownDriverFactory } from "../battle/gateway.ts";
+import type { BattleDriver, BattleDriverFactory } from "../battle/driver.ts";
 import { isSelectableMove } from "../battle/move-requests.ts";
 import type { GatewayMessage, MemberState } from "../battle/gateway.ts";
 import * as G from "../rules/growth.ts";
@@ -64,6 +65,8 @@ export interface CreateOptions {
   rules?: G.ExpRules;
   /** Optional diagnostics sink (see flow/log.ts); the session never depends on it. */
   logger?: LogSink;
+  /** The battle engine behind the session; Pokemon Showdown unless a test supplies a scripted driver. */
+  driver?: BattleDriverFactory;
 }
 
 export type Refusal = { ok: false; reason: string };
@@ -130,7 +133,8 @@ export class BattleSession {
   ended: Extract<GatewayMessage, { kind: "end" }> | null = null;
   finished = false;
   ai!: FoeAi;
-  gw!: BattleGateway;
+  gw!: BattleDriver;
+  _driver!: BattleDriverFactory;
   requests?: Record<string, Req>;
   grew = false;
   _caughtAwarded = false;
@@ -140,13 +144,12 @@ export class BattleSession {
   _staged = false;
   _broken: SessionBrokenError | null = null;
 
-  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger }: CreateOptions): Promise<BattleSession> {
+  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory }: CreateOptions): Promise<BattleSession> {
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
     for (const m of [...game.party, ...foe.team]) {
       if (!content.species[m.species]) throw new Error(`battle content: species "${m.species}" (member ${m.id}) is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
     }
-    const probe = await BattleGateway.create({ formatid, seed, players: [{ name: "p", team: [{ name: "x", species: "Pidgey", moves: ["Tackle"] }] }, { name: "q", team: [{ name: "y", species: "Pidgey", moves: ["Tackle"] }] }] });
-    const moveName = (id: string): string => probe.moveInfo(id).name;
+    const moveName = await driver.moveNames(formatid, seed);
     for (const m of [...game.party, ...foe.team]) {
       for (const mv of m.moves) { try { moveName(mv.id); } catch { throw new Error(`battle content: move "${mv.id}" of member ${m.id} is not known to the battle engine`); } }
     }
@@ -164,8 +167,9 @@ export class BattleSession {
     s.startDexOwned = game.dex.owned.slice();
     s.doubles = doubles;
     s.logger = logger;
+    s._driver = driver;
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
-    s.gw = await BattleGateway.create({
+    s.gw = await driver.create({
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
       players: [{ name: "Player", team: lead.map((m) => toSet(m, moveName)) }, { name: foe.kind === "wild" ? "Wild" : "Trainer", team: s.foeTeam.map((m) => toSet(m, moveName)) }],
     });
@@ -246,7 +250,7 @@ export class BattleSession {
   }
 
   async _restoreCheckpoint(checkpoint: ReturnType<BattleSession["_checkpoint"]>): Promise<void> {
-    this.gw = await BattleGateway.fromCheckpoint(checkpoint.engine);
+    this.gw = await this._driver.fromCheckpoint(checkpoint.engine);
     const { participants, ...state } = checkpoint.state;
     Object.assign(this, state);
     this.participants = Object.fromEntries(participants.map(([id, members]) => [id, new Set(members)]));

@@ -358,6 +358,80 @@
       } finally { Gateway.restore = restore; }
     });
 
+    await scenario("T12 committed but the host projection fails: the commit stands and is reported, nothing is applied twice, a retry informs the host", async () => {
+      fresh(); const before = clone(game());
+      W.PSFlow.debug.failProjection = true;
+      await startEvent(1); await inMode("main");
+      const session = battle()._session;
+      await choose(/^Run/); await inMode("end"); await press("ok"); await dismissMessages();
+      const o = W.PSFlow.lastOutcome;
+      eq([o.code, o.kind, o.commit, o.projection], [3, "run", "applied", "failed"], "committed, host not informed");
+      assert(/injected projection failure/.test(o.projectionError), "the projection error is reported: " + o.projectionError);
+      assert(!o.aborted, "a failed projection is not an abort");
+      assert(game().appliedBattles[o.battleId], "the result is in the persistent state");
+      eq(G.$gameVariables.value(10), 0, "the host variable was not written");
+      assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "the flow closed and the event continued");
+      const applied = clone(game());
+      eq(W.PSFlow.commit(W.PSFlow.lastResult), "already-applied", "a repeat commit is a no-op");
+      eq(game(), applied, "nothing was applied twice");
+      const retry = W.PSFlow.app().finishBattle(session, W.PSFlow.request);
+      eq([retry.commit, retry.projection, retry.code], ["already-applied", "ok", 3], "the retry only informs the host");
+      eq(G.$gameVariables.value(10), 3, "the host variable now carries the outcome");
+      eq(game(), applied, "still applied once");
+      eq(game().party.map((m: any) => [m.id, m.level, m.hp]), before.party.map((m: any) => [m.id, m.level, m.hp]), "a run changes no member");
+    });
+
+    await scenario("T13 application initialization fails: stale result is cleared, state stays untouched and the event continues", async () => {
+      fresh(); const before = clone(game());
+      const Module = nodeRequire("module"), load = Module._load;
+      W.PSFlow._app = null; W.PSFlow._dex = null;
+      G.$gameVariables.setValue(10, 1); // the previous battle won
+      let injected = 0;
+      try {
+        Module._load = function (id: string, ...args: any[]) {
+          if (/\/showdown\/dist\/sim$/.test(id)) { injected++; throw new Error("injected dex initialization failure"); }
+          return load.call(this, id, ...args);
+        };
+        await startEvent(1); await inMode("end");
+        eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit, W.PSFlow.lastOutcome.aborted, W.PSFlow.lastOutcome.projection], [0, "none", true, "ok"], "initialization failed, abort projection succeeded");
+        assert(injected >= 2 && !W.PSFlow._app, "both begin and abort failed to construct the real application");
+        assert(/injected dex initialization failure/.test(W.PSFlow.lastOutcome.error), "the initialization error is retained");
+        eq(W.PSFlow.lastOutcome.battleId, W.PSFlow.request.battleId, "aborted battle identity retained");
+        eq(G.$gameVariables.value(10), 0, "stale win cleared");
+        await press("ok"); await dismissMessages();
+        eq(game(), before, "nothing committed");
+        assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "interpreter released");
+        return { injected, outcome: clone(W.PSFlow.lastOutcome), resultVariable: G.$gameVariables.value(10) };
+      } finally { Module._load = load; W.PSFlow._app = null; W.PSFlow._dex = null; }
+    });
+
+    await scenario("T14 invalid result outcome: abort before capture commit; a corrected retry applies exactly once", async () => {
+      fresh(); game().bag.masterball = 1; const before = clone(game());
+      G.$gameVariables.setValue(10, 1);
+      await startEvent(1); await inMode("main");
+      const session = battle()._session;
+      await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/i); await inMode("end");
+      const readResult = session.result;
+      try {
+        session.result = function () { const r = clone(readResult.call(this)); delete r.outcome; return r; };
+        await press("ok"); await dismissMessages();
+        const aborted = clone(W.PSFlow.lastOutcome);
+        eq([aborted.battleId, aborted.code, aborted.commit, aborted.aborted], [W.PSFlow.request.battleId, 0, "none", true], "invalid result aborted");
+        assert(/invalid battle outcome/.test(aborted.error), "contract error reported");
+        eq(G.$gameVariables.value(10), 0, "event sees abort");
+        eq(game(), before, "capture, bag and ledger untouched");
+        session.result = readResult;
+        const fixed = W.PSFlow.app().finishBattle(session, W.PSFlow.request), after = clone(game());
+        eq([fixed.code, fixed.commit, fixed.projection], [2, "applied", "ok"], "corrected result committed");
+        eq(after.party.length, before.party.length + 1, "one capture");
+        assert(!after.bag.masterball, "one ball consumed");
+        const repeated = W.PSFlow.app().finishBattle(session, W.PSFlow.request);
+        eq(repeated.commit, "already-applied", "duplicate is a no-op"); eq(game(), after, "no duplicate reward");
+        assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "interpreter released");
+        return { aborted, correctedCommit: fixed.commit, repeatedCommit: repeated.commit };
+      } finally { session.result = readResult; }
+    });
+
     await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
       W.PSFlow.setLanguage("zh");
       try {

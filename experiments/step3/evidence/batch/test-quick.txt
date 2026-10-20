@@ -1,0 +1,43 @@
+
+> reactor-pixi8-dev@ typecheck <workspace>/pokemon-framework-prototype/src
+> pnpm types:prepare && tsc --noEmit && tsc --noEmit -p tsconfig.tools.json && pnpm typecheck:framework
+
+
+> reactor-pixi8-dev@ types:prepare <workspace>/pokemon-framework-prototype/src
+> node vendor/rpgreactor/types/tools/typecheck.cjs --prepare --compiler-root .
+
+Prepared the TypeScript 7.0.2 DOM declarations for RPGReactor.
+
+> reactor-pixi8-dev@ typecheck:framework <workspace>/pokemon-framework-prototype/src
+> tsc --noEmit -p framework/tsconfig.json && tsc --noEmit -p framework/tsconfig.core.json
+
+
+> reactor-pixi8-dev@ typecheck:framework <workspace>/pokemon-framework-prototype/src
+> tsc --noEmit -p framework/tsconfig.json && tsc --noEmit -p framework/tsconfig.core.json
+
+boundaries ok: 38 files
+experiments/step2/test-headless.cjs  # pass 6 # fail 0 
+experiments/step2/s2/test-actions.cjs  # pass 17 # fail 0 
+experiments/step2/s3/test-growth.cjs  # pass 12 # fail 0 
+experiments/step2/s3/test-writeback.cjs  # pass 11 # fail 0 
+experiments/step2/s3/test-doubles.cjs  # pass 11 # fail 0 
+experiments/step2/s4/test-describe.cjs  # pass 2 # fail 0 
+experiments/step2/s5/test-matrix.cjs  # pass 1 # fail 0 
+experiments/step2/s5/test-protocol-freeze.cjs  # pass 3 # fail 0 
+experiments/step2/s5/test-engine-contract.cjs  # pass 2 # fail 0 
+scripts/tests/reactor-install.test.cjs  # pass 3 # fail 0 
+scripts/tests/check-boundaries.test.cjs  # pass 25 # fail 0 
+experiments/step3/test-content.cjs  # pass 13 # fail 0 
+experiments/step3/test-i18n.cjs  # pass 11 # fail 0 
+experiments/step3/test-save.cjs  # pass 12 # fail 0 
+experiments/step3/test-integration.cjs  # pass 4 # fail 0 
+experiments/step3/test-growth-differential.cjs  # pass 4 # fail 0 
+experiments/step3/test-move-requests.cjs  # pass 8 # fail 0 
+experiments/step3/test-pp-sync.cjs  # pass 5 # fail 0 
+experiments/step3/test-session-operations.cjs  # pass 11 # fail 0 
+experiments/step3/test-session-failure.cjs  # pass 6 # fail 0 
+experiments/step3/test-gateway-boundary.cjs  # pass 5 # fail 0 
+experiments/step3/test-core-digest.cjs  # pass 7 # fail 0 
+experiments/step3/test-core-independent.cjs  # pass 3 # fail 0 
+experiments/step3/test-application.cjs  # pass 13 # fail 0 
+experiments/step3/test-scripted-driver.cjs  # pass 6 # fail 0 
