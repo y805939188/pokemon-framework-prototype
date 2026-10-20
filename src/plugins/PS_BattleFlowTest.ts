@@ -1017,10 +1017,17 @@
     const startedAt = Date.now() - 2000; // file mtime granularity
     let code: any = null, error: string | null = null, written = false, cleanedUp = false;
     if (!occupied) {
-      try { code = await G.DataManager.saveGame(slot); } catch (e) { error = String(e); }
+      // MZ writes the global info AFTER the slot and does not wait for it (saveGlobalInfo inside saveGame's then): collect
+      // every write this save starts and wait for all of them, or that late write lands after the restore below (found in
+      // step 4: it left a stale slot entry in the player's global.rmmzsave).
+      const so = G.StorageManager.saveObject; const writes: Promise<any>[] = [];
+      G.StorageManager.saveObject = function (this: any, ...a: any[]) { const p = so.apply(this, a); writes.push(Promise.resolve(p)); return p; };
+      try { code = await G.DataManager.saveGame(slot); await Promise.all(writes); } catch (e) { error = String(e); }
+      finally { G.StorageManager.saveObject = so; }
       written = fs.existsSync(file) && fs.statSync(file).mtimeMs >= startedAt; // written by THIS run, not a leftover
       try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch (e) { /* reported through cleanedUp */ }
       try { if (globalBefore) fs.writeFileSync(globalFile, globalBefore); else if (fs.existsSync(globalFile)) fs.unlinkSync(globalFile); } catch (e) { /* reported through cleanedUp */ }
+      await sleep(1500); // a late write would show up here
       cleanedUp = !fs.existsSync(file) && (globalBefore ? fs.readFileSync(globalFile).equals(globalBefore) : !fs.existsSync(globalFile));
     }
     report.saveLocation = { chosen: G.PSSaveLocation, dir, slot, occupied, saveCode: code, writtenByThisRun: written, cleanedUp, error, gameDir };
