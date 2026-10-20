@@ -90,7 +90,12 @@ const built = f => { const r=JSON.parse(fs.readFileSync(process.argv[1]+"/"+f,"u
 const b1=built("ps-flow-report.json"), b2=["ps-flow-verify-save.json","ps-matrix-package.json","ps-saveloc.json"].map(built);
 if (!b1 || b2.some(b=>!b) || new Set(b2).size!==1 || b2[0]===b1) { console.log("BUILD MISMATCH: reports are not from the expected two builds", b1, b2); bad++; }
 else console.log("builds: flow run", b1, "-> replaced -> verify/matrix/saveloc runs", b2[0]);
+// the code that ran must be the code of this checkout: every runtime artifact recorded in the package equals the build here
+const pi=pk.env.packageInfo||{}; const crypto=require("crypto"); const root=process.argv[2];
+const arts=Object.entries(pi.artifacts||{}); let artBad=0;
+for (const [f,h] of arts) { const here=crypto.createHash("sha256").update(fs.readFileSync(root+"/"+f)).digest("hex"); if (here!==h) { console.log("ARTIFACT DIFFERS FROM THIS CHECKOUT:", f); artBad++; } }
+if (!arts.length) { console.log("PACKAGE HAS NO ARTIFACT LIST"); bad++; } else if (artBad) bad++; else console.log("package artifacts identical to the build in this checkout:", arts.length, "files; gitHead", pi.gitHead, "working-tree changes", pi.workingTreeChanges);
 const sl=JSON.parse(fs.readFileSync(process.argv[1]+"/ps-saveloc.json","utf8")).saveLocation;
 console.log("default save location:", sl.dir, "(", sl.chosen.why, ") slot", sl.slot, "written by this run:", sl.writtenByThisRun, "cleaned up:", sl.cleanedUp);
 if (!sl.dir.includes("Library/Application Support/PokemonFrameworkPrototype/save") || sl.dir.includes(".app/")) { console.log("SAVE LOCATION WRONG"); bad++; }
-process.exit(bad?1:0);' "$EVID"
+process.exit(bad?1:0);' "$EVID" "$ROOT"
