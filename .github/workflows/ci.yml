@@ -4,7 +4,7 @@
 name: ci
 on:
   push:
-    branches: [main, 'step3/**']
+    branches: [main, 'step3/**', 'step4/**']
   pull_request:
 permissions:
   contents: read

@@ -102,7 +102,7 @@ test('an abort whose projection also fails still reports the abort and never thr
 });
 
 test('an invalid outcome is rejected before any commit, including direct commits and retries', () => {
-  for (const invalid of [undefined, null, {}, [], { kind: 3, winner: null }, { kind: '', winner: null }, { kind: 'win', winner: 3 }]) {
+  for (const invalid of [undefined, null, {}, [], { kind: 3, winner: null }, { kind: '', winner: null }, { kind: 'win', winner: 3 }, { kind: 'caught' }]) { // the last one: no winner at all
     const r = result('caught with master ball'); r.outcome = invalid;
     const { state, projection, app } = setup(r); const before = snapshot(state);
     for (let attempt = 0; attempt < 2; attempt++) {
