@@ -23,6 +23,8 @@ export * as memberFactory from "./rules/member-factory.ts";
 export * as grants from "./rules/grants.ts";
 export * as heal from "./rules/heal.ts";
 export * as items from "./rules/items.ts";
+export * as encounter from "./rules/encounter.ts";
+export * as defeat from "./rules/defeat.ts";
 export * as app from "./app/index.ts";
 export * as composition from "./composition.ts";
 export * as fakes from "./tools/fakes.ts";

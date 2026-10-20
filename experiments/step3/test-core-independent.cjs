@@ -29,7 +29,7 @@ test('the core bundle has no host or Node references and loads in a bare context
   const text = fs.readFileSync(CORE, 'utf8');
   for (const re of [/\brequire\s*\(/, /\bprocess\./, /\bBuffer\b/, /__dirname|__filename/, /["']node:/, /\bwindow\.[A-Za-z]|\bdocument\.[A-Za-z]|\$game[A-Z]/]) assert.doesNotMatch(text, re);
   const core = loadCoreInBareContext();
-  assert.deepEqual(Object.keys(core).sort(), ['digest', 'grants', 'growth', 'heal', 'items', 'limits', 'memberFactory', 'rules', 'saveSchema', 'state']);
+  assert.deepEqual(Object.keys(core).sort(), ['defeat', 'digest', 'encounter', 'grants', 'growth', 'heal', 'items', 'limits', 'memberFactory', 'rules', 'saveSchema', 'state']);
 });
 
 test('inside the bare context the core computes exactly what the engine computes', () => {

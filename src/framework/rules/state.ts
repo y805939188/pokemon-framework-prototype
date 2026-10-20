@@ -4,6 +4,8 @@
  * `applyBattleResult` is the single write path.
  */
 import { sha256Hex } from "./sha256.ts";
+import { DEFAULT_LIMITS } from "./limits.ts";
+import type { Limits } from "./limits.ts";
 import type { Member, MoveSlot, PartialStats, Stats } from "./types.ts";
 
 export const PROTOCOL_VERSION = 1;
@@ -109,8 +111,12 @@ export type ApplyStatus = "applied" | "already-applied";
 /**
  * Apply a BattleResult to a game state (pure). Throws on contract violations (unknown member,
  * result for another protocol version, bag going negative) without partial application.
+ * Capacity backstop (step 4, decision D1): a captured member joins the party, else the boxes; when both are full the
+ * WHOLE result is refused (nothing is dropped and nothing half-applied; the ball is disabled before that can happen).
+ * A bag item may not be raised above the per-item cap (results only spend in this build; an amount already above the
+ * cap is kept).
  */
-export function applyBattleResult(state: GameState, result: BattleResult): { state: GameState; status: ApplyStatus } {
+export function applyBattleResult(state: GameState, result: BattleResult, limits: Limits = DEFAULT_LIMITS): { state: GameState; status: ApplyStatus } {
   if (result.protocol !== PROTOCOL_VERSION) throw new Error(`unsupported protocol ${result.protocol}`);
   if (state.schema !== GAME_SCHEMA) throw new Error(`game state has schema ${state.schema}, this build writes schema ${GAME_SCHEMA}: migrate it first (rules/save-schema.ts)`);
   if (!result.battleId) throw new Error("result without battleId");
@@ -132,14 +138,18 @@ export function applyBattleResult(state: GameState, result: BattleResult): { sta
     }
   }
   for (const [item, delta] of Object.entries(result.bag || {})) {
-    const n = (next.bag[item] || 0) + delta;
+    const had = next.bag[item] || 0;
+    const n = had + delta;
     if (n < 0) throw new Error(`bag would go negative for ${item}`);
+    if (delta > 0 && n > limits.bagPerItem) throw new Error(`${item} would be ${n}, above the stage cap of ${limits.bagPerItem} per item`);
     if (n === 0) delete next.bag[item]; else next.bag[item] = n;
   }
   for (const c of result.captured || []) {
     if (next.party.some((x) => x.id === c.id) || next.boxes.some((x) => x.id === c.id)) throw new Error(`captured id ${c.id} already exists`);
     const m = newMember(c);
-    if (next.party.length < 6) next.party.push(m); else next.boxes.push(m);
+    if (next.party.length < limits.party) next.party.push(m);
+    else if (next.boxes.length < limits.boxes) next.boxes.push(m);
+    else throw new Error(`no room for captured member ${c.id}: the party (${next.party.length}) and the boxes (${next.boxes.length}) are full`);
   }
   if (result.dex) {
     for (const k of ["seen", "owned"] as const) for (const sp of result.dex[k] || []) if (!next.dex[k].includes(sp)) next.dex[k].push(sp);
