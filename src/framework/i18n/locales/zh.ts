@@ -106,6 +106,6 @@ export const zh: LocaleTable = {
     "ui.end.back": "回到地图",
     "ui.end.aborted": "对战被中止了，没有保存任何内容。",
     "species.charizard": "喷火龙", "species.blastoise": "水箭龟", "species.venusaur": "妙蛙花", "species.snorlax": "卡比兽",
-    "species.gengar": "耿鬼", "species.pidgey": "波波", "species.caterpie": "绿毛虫",
+    "species.gengar": "耿鬼", "species.pidgey": "波波", "species.caterpie": "绿毛虫", "species.charmander": "小火龙",
   },
 };

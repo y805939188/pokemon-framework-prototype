@@ -72,7 +72,28 @@
       "hp": 2
     },
     "catchRate": 25,
-    "learnset": [],
+    "learnset": [
+      {
+        "level": 1,
+        "move": "tackle"
+      },
+      {
+        "level": 16,
+        "move": "bite"
+      },
+      {
+        "level": 20,
+        "move": "rest"
+      },
+      {
+        "level": 24,
+        "move": "crunch"
+      },
+      {
+        "level": 28,
+        "move": "bodyslam"
+      }
+    ],
     "source": "author-placeholder"
   },
   {
@@ -85,7 +106,28 @@
       "spa": 3
     },
     "catchRate": 45,
-    "learnset": [],
+    "learnset": [
+      {
+        "level": 1,
+        "move": "lick"
+      },
+      {
+        "level": 1,
+        "move": "hypnosis"
+      },
+      {
+        "level": 12,
+        "move": "payback"
+      },
+      {
+        "level": 24,
+        "move": "hex"
+      },
+      {
+        "level": 30,
+        "move": "nightshade"
+      }
+    ],
     "source": "author-placeholder"
   },
   {
@@ -98,7 +140,20 @@
       "spe": 1
     },
     "catchRate": 255,
-    "learnset": [],
+    "learnset": [
+      {
+        "level": 1,
+        "move": "tackle"
+      },
+      {
+        "level": 5,
+        "move": "sandattack"
+      },
+      {
+        "level": 9,
+        "move": "gust"
+      }
+    ],
     "source": "author-placeholder"
   },
   {
@@ -111,7 +166,54 @@
       "hp": 1
     },
     "catchRate": 255,
-    "learnset": [],
+    "learnset": [
+      {
+        "level": 1,
+        "move": "tackle"
+      },
+      {
+        "level": 1,
+        "move": "stringshot"
+      },
+      {
+        "level": 9,
+        "move": "bugbite"
+      }
+    ],
+    "source": "author-placeholder"
+  },
+  {
+    "id": "charmander",
+    "showdownId": "charmander",
+    "nameKey": "species.charmander",
+    "growth": "parabolic",
+    "baseExp": 62,
+    "evYield": {
+      "spe": 1
+    },
+    "catchRate": 45,
+    "learnset": [
+      {
+        "level": 1,
+        "move": "scratch"
+      },
+      {
+        "level": 1,
+        "move": "growl"
+      },
+      {
+        "level": 4,
+        "move": "ember"
+      },
+      {
+        "level": 8,
+        "move": "smokescreen"
+      },
+      {
+        "level": 12,
+        "move": "dragonbreath"
+      }
+    ],
     "source": "author-placeholder"
   }
 ]

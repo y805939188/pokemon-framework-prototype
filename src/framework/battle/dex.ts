@@ -9,11 +9,16 @@ export function createDexLookup(engineRoot?: string): DexLookup {
   return {
     species(id) {
       const s = dex.species.get(id);
-      return s && s.exists ? { name: s.name as string, baseStats: { ...s.baseStats } } : null;
+      if (!s || !s.exists) return null;
+      const slots = s.abilities as Record<string, string | undefined>;
+      const abilities = [slots["0"], slots["1"]].filter((a): a is string => typeof a === "string" && a.length > 0);
+      // single-gender / genderless species name a fixed gender; the others give the female share (WP19 §3.2: out of 256)
+      const gender = s.gender === "M" || s.gender === "F" || s.gender === "N" ? s.gender : Math.round((s.genderRatio as { F: number }).F * 256);
+      return { name: s.name as string, baseStats: { ...s.baseStats }, abilities, gender };
     },
     move(id) {
       const m = dex.moves.get(id);
-      return m && m.exists ? { name: m.name as string } : null;
+      return m && m.exists ? { name: m.name as string, id: m.id as string, pp: m.pp as number } : null;
     },
     levelUpMoves(id) {
       const data = dex.species.getLearnsetData(id);

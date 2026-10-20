@@ -108,6 +108,6 @@ export const en: LocaleTable = {
     "ui.end.aborted": "The battle was aborted. Nothing was saved.",
     // ---- content names (text keys come from content: species.nameKey)
     "species.charizard": "Charizard", "species.blastoise": "Blastoise", "species.venusaur": "Venusaur", "species.snorlax": "Snorlax",
-    "species.gengar": "Gengar", "species.pidgey": "Pidgey", "species.caterpie": "Caterpie",
+    "species.gengar": "Gengar", "species.pidgey": "Pidgey", "species.caterpie": "Caterpie", "species.charmander": "Charmander",
   },
 };

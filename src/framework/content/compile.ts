@@ -3,10 +3,12 @@
  * conflict detection, emit one canonical document whose `inputsHash` covers every input. No file system, no Showdown.
  */
 import { sha256Hex } from "../rules/sha256.ts";
+import { isBagItem } from "../rules/items.ts";
+import { DEFAULT_LIMITS } from "../rules/limits.ts";
 import {
-  CURVES_ALLOWED, OVERRIDABLE, SCHEMA_VERSION, STAT_KEYS_ALLOWED,
+  CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, SCHEMA_VERSION, STAT_KEYS_ALLOWED,
 } from "./schema.ts";
-import type { CompiledContent, ContentError, ContentInputs, Overlay, SourceEntry, SpeciesSource } from "./schema.ts";
+import type { CompiledContent, ContentError, ContentInputs, GrantSource, Overlay, SourceEntry, SpeciesSource } from "./schema.ts";
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -19,7 +21,8 @@ export function canonicalJson(v: unknown, indent = 0): string {
 }
 
 export function hashInputs(inputs: ContentInputs): string {
-  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays }));
+  // grants is undefined for content without grants.json: JSON drops the key, so the hash of older content is unchanged
+  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants }));
 }
 
 const ID = /^[a-z][a-z0-9-]{0,30}$/;
@@ -170,10 +173,42 @@ export function compileContent(inputs: ContentInputs): CompileResult {
     }
   }
 
+  // ---- grants: one-time reward packages; every reference is checked here, so a claim can never point at nothing
+  const grants: GrantSource[] = [];
+  if (inputs.grants !== undefined) {
+    const grantIds = new Set<string>();
+    if (!Array.isArray(inputs.grants)) report("grants.json", "$", "must be an array");
+    else for (const [i, g] of inputs.grants.entries()) {
+      const p = `[${i}]`;
+      if (!isObj(g)) { report("grants.json", p, "must be an object"); continue; }
+      checkKnownKeys(g, ["id", "members", "items", "money", "source"], "grants.json", p, report);
+      if (typeof g["id"] !== "string" || !GRANT_ID.test(g["id"])) report("grants.json", `${p}.id`, "must be an id of 1-12 characters like \"starter\" (lowercase letters, digits, -)");
+      else if (grantIds.has(g["id"])) report("grants.json", `${p}.id`, `duplicate grant id "${g["id"]}"`);
+      else grantIds.add(g["id"]);
+      const members = g["members"];
+      if (!Array.isArray(members) || members.length > DEFAULT_LIMITS.party) report("grants.json", `${p}.members`, `must be an array of at most ${DEFAULT_LIMITS.party} {species, level}`);
+      else for (const [j, m] of members.entries()) {
+        if (!isObj(m) || typeof m["species"] !== "string" || !isInt(m["level"], 1, 100) || Object.keys(m).some((k) => k !== "species" && k !== "level")) { report("grants.json", `${p}.members[${j}]`, "must be {species: <species id>, level: 1..100}"); continue; }
+        if (!ids.has(m["species"])) report("grants.json", `${p}.members[${j}].species`, `"${m["species"]}" is not a species id of species.json`);
+      }
+      const items = g["items"];
+      if (!isObj(items)) report("grants.json", `${p}.items`, "must be an object of item id -> count");
+      else for (const [k, n] of Object.entries(items)) {
+        if (!isBagItem(k)) report("grants.json", `${p}.items.${k}`, `"${k}" is not a bag item this build knows`);
+        if (!isInt(n, 1, DEFAULT_LIMITS.bagPerItem)) report("grants.json", `${p}.items.${k}`, `count must be an integer from 1 to ${DEFAULT_LIMITS.bagPerItem}`);
+      }
+      if (!isInt(g["money"], 0, DEFAULT_LIMITS.money)) report("grants.json", `${p}.money`, `must be an integer from 0 to ${DEFAULT_LIMITS.money}`);
+      if (Array.isArray(members) && !members.length && isObj(items) && !Object.keys(items).length && g["money"] === 0) report("grants.json", p, "a grant must give something");
+      if (typeof g["source"] !== "string" || !sourceIds.has(g["source"])) report("grants.json", `${p}.source`, `must name an entry of sources.json (known: ${[...sourceIds].join(", ") || "none"})`);
+      grants.push(g as unknown as GrantSource);
+    }
+  }
+
   if (errors.length) return { ok: false, errors };
   const data: CompiledContent = {
     schema: SCHEMA_VERSION, contentId, inputsHash: hashInputs(inputs), sources: [...sources].sort((a, b) => a.id.localeCompare(b.id)),
     overlaysApplied, species: [...merged.values()].sort((a, b) => a.id.localeCompare(b.id)),
+    ...(inputs.grants !== undefined ? { grants: [...grants].sort((a, b) => a.id.localeCompare(b.id)) } : {}),
   };
   return { ok: true, data, errors: [] };
 }

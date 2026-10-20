@@ -38,6 +38,7 @@ SUITES=(
   experiments/step3/test-plugin-abort.cjs
   experiments/step3/test-scripted-driver.cjs
   experiments/step4/test-schema3.cjs
+  experiments/step4/test-content4.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do

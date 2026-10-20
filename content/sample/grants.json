@@ -1,0 +1,18 @@
+[
+  {
+    "id": "starter",
+    "members": [
+      {
+        "species": "charmander",
+        "level": 5
+      }
+    ],
+    "items": {
+      "potion": 5,
+      "pokeball": 10,
+      "antidote": 2
+    },
+    "money": 0,
+    "source": "author-placeholder"
+  }
+]

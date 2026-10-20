@@ -53,15 +53,26 @@ export interface Manifest {
   title: string;
 }
 
+/** A one-time reward package as the author writes it (grants.json). Species are content ids, items are bag item ids. */
+export interface GrantSource {
+  id: string;
+  members: { species: string; level: number }[];
+  items: Record<string, number>;
+  money: number;
+  source: string;
+}
+
 export interface ContentInputs {
   manifest: unknown;
   sources: unknown;
   species: unknown;
   overlays: unknown;
+  /** Optional (step 4). An absent file means no grants and leaves the input hash of older content unchanged. */
+  grants?: unknown;
 }
 
 export interface ContentError {
-  file: "manifest.json" | "sources.json" | "species.json" | "overlays.json" | "compiled" | "assembly";
+  file: "manifest.json" | "sources.json" | "species.json" | "overlays.json" | "grants.json" | "compiled" | "assembly";
   path: string;
   message: string;
 }
@@ -73,4 +84,9 @@ export interface CompiledContent {
   sources: SourceEntry[];
   overlaysApplied: number;
   species: SpeciesSource[];
+  /** Absent in documents compiled before step 4 (= no grants). */
+  grants?: GrantSource[];
 }
+
+/** Grant ids stay short: the members they create are named G-<grant id>-<n>, and member ids are limited to 18 characters. */
+export const GRANT_ID = /^[a-z][a-z0-9-]{0,11}$/;

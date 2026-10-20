@@ -25,7 +25,9 @@ function readInputs(dir: string): { inputs: ContentInputs; errors: ContentError[
     try { return JSON.parse(fs.readFileSync(path.join(dir, file), "utf8")); }
     catch (e) { errors.push({ file, path: "$", message: `cannot read as JSON: ${(e as Error).message}` }); return undefined; }
   };
-  const inputs = { manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json") };
+  // grants.json is optional (content written before step 4 has none); every other file is required
+  const grants = fs.existsSync(path.join(dir, "grants.json")) ? read("grants.json") : undefined;
+  const inputs = { manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json"), ...(grants !== undefined ? { grants } : {}) };
   return { inputs, errors };
 }
 
@@ -43,7 +45,7 @@ export function build(src: string, out: string): number {
   const text = canonicalJson(r.data, 2) + "\n";
   fs.mkdirSync(path.dirname(out), { recursive: true });
   if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== text) fs.writeFileSync(out, text);
-  console.log(`content built: ${r.data.species.length} species, inputs ${r.data.inputsHash.slice(0, 12)} -> ${path.relative(ROOT, out)}`);
+  console.log(`content built: ${r.data.species.length} species, ${r.data.grants?.length ?? 0} grants, inputs ${r.data.inputsHash.slice(0, 12)} -> ${path.relative(ROOT, out)}`);
   return 0;
 }
 
