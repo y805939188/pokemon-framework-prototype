@@ -21,7 +21,11 @@ const message = (error: unknown): string => (error instanceof Error ? error.mess
 
 /** How the host numbers an ending. */
 export function outcomeCode(result: BattleResult): number {
-  const { kind, winner } = result.outcome;
+  const outcome = result.outcome;
+  if (!outcome || typeof outcome !== "object" || Array.isArray(outcome) || typeof outcome.kind !== "string" || !outcome.kind || !(outcome.winner === null || typeof outcome.winner === "string")) {
+    throw new Error("invalid battle outcome: expected a nonempty kind and a string or null winner");
+  }
+  const { kind, winner } = outcome;
   return kind === "win" ? (winner === "Player" ? 1 : 4) : kind === "caught" ? 2 : kind === "run" ? 3 : 4;
 }
 
@@ -47,6 +51,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * same battle is refused. Throws on a contract violation and then the state is exactly as it was.
    */
   commitResult(result: BattleResult): ApplyStatus {
+    outcomeCode(result); // validate the part used by the host before any persistent state can be installed
     const applied = applyBattleResult(this.ports.state.read(), result);
     if (applied.status === "applied") this.ports.state.replace(applied.state);
     return applied.status;
@@ -59,14 +64,18 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    */
   finishBattle(handle: S, request: Pick<BattleStartRequest, "battleId"> | null): BattleOutcome & { result?: BattleResult } {
     let result: BattleResult;
-    let status: ApplyStatus;
+    let outcome: BattleOutcome & { result?: BattleResult };
     try {
       result = handle.result();
-      status = this.commitResult(result);
+      // Read and validate every result field needed after commit first. A bad handle must never leave a committed
+      // battle that the caller subsequently mistakes for an abort.
+      const code = outcomeCode(result), kind = result.outcome.kind;
+      const battleId = request ? request.battleId : result.battleId;
+      const status = this.commitResult(result);
+      outcome = { code, battleId, commit: status, kind };
     } catch (error) {
       return this.abortBattle(request, error);
     }
-    const outcome: BattleOutcome & { result?: BattleResult } = { code: outcomeCode(result), battleId: request ? request.battleId : result.battleId, commit: status, kind: result.outcome.kind };
     this.project(outcome);
     outcome.result = result;
     return outcome;

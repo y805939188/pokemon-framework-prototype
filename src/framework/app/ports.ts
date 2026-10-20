@@ -10,7 +10,7 @@ import type { Content, DexLookup } from "../rules/types.ts";
 export interface GameStatePort {
   /** The current state; throws when the state is not usable (e.g. a save that could not be read), so no battle runs on it. */
   read(): GameState;
-  /** Install the next state in one step. Called only with a state the rules produced from `read()`'s result. */
+  /** Install the next state in one step. If this throws, the old state must remain installed. Called only with a state the rules produced from `read()`'s result. */
   replace(next: GameState): void;
 }
 
@@ -54,7 +54,7 @@ export interface BattleOutcome {
   kind?: string;
   aborted?: true;
   error?: string;
-  /** Whether the host was told. "failed" means the state is committed but the host projection threw (see projectionError). */
+  /** Whether the host was told. "failed" means the projection threw; `commit` separately says whether state was committed. */
   projection?: "ok" | "failed";
   projectionError?: string;
 }

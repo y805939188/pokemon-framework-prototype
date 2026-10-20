@@ -95,8 +95,32 @@ test('committed but the host projection fails: the commit stands, is reported, a
 test('an abort whose projection also fails still reports the abort and never throws', () => {
   const { projection, app } = setup(); projection.failures = 1;
   const outcome = app.abortBattle({ battleId: 'x#1' }, new Error('scene closed'));
+  assert.equal(outcome.battleId, 'x#1');
   assert.deepEqual([outcome.code, outcome.commit, outcome.error, outcome.projection], [0, 'none', 'scene closed', 'failed']);
   assert.equal(app.abortBattle(null, 'plain string').error, 'plain string');
+  assert.equal(app.abortBattle(null, 'plain string').battleId, null);
+});
+
+test('an invalid outcome is rejected before any commit, including direct commits and retries', () => {
+  for (const invalid of [undefined, null, {}, [], { kind: 3, winner: null }, { kind: '', winner: null }, { kind: 'win', winner: 3 }]) {
+    const r = result('caught with master ball'); r.outcome = invalid;
+    const { state, projection, app } = setup(r); const before = snapshot(state);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const outcome = app.finishBattle({ result: () => r }, request(r));
+      assert.deepEqual([outcome.battleId, outcome.code, outcome.commit, outcome.aborted, outcome.projection], [r.battleId, 0, 'none', true, 'ok']);
+      assert.match(outcome.error, /invalid battle outcome/);
+      assert.equal(snapshot(state), before, 'no partial capture, bag, reward or ledger entry');
+      assert.equal(state.replaced.length, 0);
+      assert.equal(projection.outcomes.at(-1).code, 0);
+    }
+    assert.throws(() => app.commitResult(r), /invalid battle outcome/);
+    r.outcome = result('caught with master ball').outcome;
+    const first = app.finishBattle({ result: () => r }, request(r));
+    const after = snapshot(state);
+    assert.equal(first.commit, 'applied');
+    assert.equal(app.finishBattle({ result: () => r }, request(r)).commit, 'already-applied');
+    assert.equal(snapshot(state), after); assert.equal(state.replaced.length, 1, 'a corrected result can be committed exactly once');
+  }
 });
 
 test('an unusable state (a save that could not be read) refuses to start and to finish, and nothing is installed', async () => {

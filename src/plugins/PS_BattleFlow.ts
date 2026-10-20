@@ -118,18 +118,18 @@
           state: { read: () => PSFlow.game(), replace: (next: unknown) => { G.$gameSystem._psGame = next; } },
           content: () => ({ content: PSFlow.content(), dex: PSFlow._dex }),
           sessions: B.composition.createBattleSessionFactory({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger.sink }),
-          projection: {
-            project: (outcome: { code: number }) => {
-              if (PSFlow.debug.failProjection) { PSFlow.debug.failProjection = false; throw new Error("injected projection failure"); } // tests
-              const v = PSFlow.request && PSFlow.request.resultVariable;
-              if (v) G.$gameVariables.setValue(v, outcome.code);
-            },
-          },
+          projection: { project: (outcome: { code: number }) => PSFlow.projectOutcome(outcome) },
         });
       }
       return PSFlow._app as GameAppView;
     },
     _app: null as GameAppView | null,
+    /** Host notification also works when the engine/application could not be constructed. */
+    projectOutcome(outcome: { code: number }): void {
+      if (PSFlow.debug.failProjection) { PSFlow.debug.failProjection = false; throw new Error("injected projection failure"); } // tests
+      const v = PSFlow.request && PSFlow.request.resultVariable;
+      if (v) G.$gameVariables.setValue(v, outcome.code);
+    },
     /** Apply a BattleResult to the persistent state. Safe to call twice. */
     commit(result: any): string { return PSFlow.app().commitResult(result); },
     async begin(): Promise<any> {
@@ -149,7 +149,12 @@
     },
     abort(error: unknown): void {
       try { PSFlow.lastOutcome = PSFlow.app().abortBattle(PSFlow.request, error); }
-      catch (e) { PSFlow.lastOutcome = { code: 0, battleId: PSFlow.request && PSFlow.request.battleId, commit: "none", aborted: true, error: String(error instanceof Error ? error.message : error), projection: "failed", projectionError: String(e instanceof Error ? e.message : e) }; }
+      catch {
+        const outcome: BattleOutcomeView = { code: 0, battleId: PSFlow.request ? PSFlow.request.battleId : null, commit: "none", aborted: true, error: String(error instanceof Error ? error.message : error) };
+        try { PSFlow.projectOutcome(outcome); outcome.projection = "ok"; }
+        catch (e) { outcome.projection = "failed"; outcome.projectionError = String(e instanceof Error ? e.message : e); }
+        PSFlow.lastOutcome = outcome;
+      }
       PSFlow.close(0);
     },
     /** Bookkeeping when a battle is over: measurements, and the interpreter stops waiting. The result variable is the application's projection. */
