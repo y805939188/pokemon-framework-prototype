@@ -711,6 +711,27 @@
       return { lines: lines.split("\n").length };
     });
 
+    await scenario("T25 the battle counter is saved with the state: after loading an older save the next catch can reuse a discarded id, but no id is ever duplicated within one save timeline", async () => {
+      await slice(25);
+      const g = game(); for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3)); g.bag.masterball = 5;
+      const catchOne = async () => {
+        await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+        await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); await finishBattle();
+        eq(W.PSFlow.lastOutcome.code, 2, "caught"); return game().boxes[game().boxes.length - 1].id;
+      };
+      const a = await catchOne();
+      await G.DataManager.saveGame(10); const seqSaved = G.$gameSystem._psBattleSeq;
+      const b = await catchOne();
+      await G.DataManager.loadGame(10);
+      eq([G.$gameSystem._psBattleSeq, game().boxes.map((m: any) => m.id)], [seqSaved, [a]], "counter and state rolled back together");
+      await toMapId(5, 8, 9);
+      const c = await catchOne();
+      const ids = [...game().party, ...game().boxes].map((m: any) => m.id);
+      eq(new Set(ids).size, ids.length, "no duplicate id in this timeline: " + ids.join(","));
+      eq(c, b, "the discarded timeline's id is reused, which is safe (it exists in no loaded state)");
+      return { a, b, c, seqSaved };
+    });
+
     await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
       W.PSFlow.setLanguage("zh");
       try {
