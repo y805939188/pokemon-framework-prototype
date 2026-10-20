@@ -9,7 +9,7 @@ import type { Member, MoveSlot, PartialStats, Stats } from "./types.ts";
 export const PROTOCOL_VERSION = 1;
 
 /** Version of the PERSISTENT game state document (rules/save-schema.ts migrates older ones). Not the battle protocol version. */
-export const GAME_SCHEMA = 2;
+export const GAME_SCHEMA = 3;
 
 /** Fields of a persistent member that a battle result may change. Everything else must be untouched. */
 export const MEMBER_WRITE_SET = ["level", "exp", "hp", "status", "statusCount", "moves", "evs", "friendship"] as const;
@@ -30,6 +30,12 @@ export interface GameState {
   money: number;
   dex: Dex;
   appliedBattles: Record<string, { hash: string }>;
+  /** One-time claims (schema 3): a claimed grant id can never be granted again on this save timeline. */
+  claims: Record<string, Claim>;
+}
+
+export interface Claim {
+  kind: "grant";
 }
 
 export interface BattleOutcome {
@@ -88,7 +94,7 @@ export function newMember(o: NewMemberInput): Member {
 }
 
 export function newGame({ party, bag = {}, money = 0 }: { party: NewMemberInput[]; bag?: Record<string, number>; money?: number }): GameState {
-  return { schema: GAME_SCHEMA, party: party.map(newMember), boxes: [], bag: { ...bag }, money, dex: { seen: [], owned: [] }, appliedBattles: {} };
+  return { schema: GAME_SCHEMA, party: party.map(newMember), boxes: [], bag: { ...bag }, money, dex: { seen: [], owned: [] }, appliedBattles: {}, claims: {} };
 }
 
 /** Stable hash of a result, used for idempotency (same battleId + same hash => no-op). */

@@ -38,13 +38,13 @@ test('the real step 2 state (schema 1, captured from a real MZ run) migrates; on
 	const raw = realV1(); const pristine = clone(raw);
 	const r = migrateGame(raw);
 	assert.equal(r.ok, true);
-	assert.deepEqual([r.from, r.to, r.migrated], [1, 2, true]);
+	assert.deepEqual([r.from, r.to, r.migrated], [1, 3, true]);
 	assert.deepEqual(raw, pristine, 'the input document is never mutated');
-	assert.deepEqual(S.diffPaths(raw, r.state), ['schema']);
+	assert.deepEqual(S.diffPaths(raw, r.state).sort(), ['claims', 'schema'], 'schema 3 adds an empty claims ledger');
 	assert.deepEqual(validateGame(r.state), []);
 	assert.equal(S.applyBattleResult(r.state, { protocol: 1, battleId: 'after-migration', outcome: { kind: 'run', winner: null }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] } }).status, 'applied');
 	const again = migrateGame(r.state);
-	assert.deepEqual([again.ok, again.migrated, again.from], [true, false, 2], 'migrating a current document is a no-op');
+	assert.deepEqual([again.ok, again.migrated, again.from], [true, false, 3], 'migrating a current document is a no-op');
 });
 
 test('the oldest prototype shape: counters are added, bad poison becomes plain poison, an unknown sleep counter is reported', () => {
@@ -56,7 +56,7 @@ test('the oldest prototype shape: counters are added, bad poison becomes plain p
 	assert.deepEqual([a.status, a.statusCount], ['', 0]);
 	assert.deepEqual([b.status, b.statusCount], ['psn', 0]);
 	assert.deepEqual([c.status, c.statusCount], ['slp', undefined], 'no number is invented for a sleeper');
-	assert.equal(r.notes.length, 2); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
+	assert.equal(r.notes.length, 3); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
 	assert.deepEqual(validateGame(r.state), []);
 });
 
@@ -113,7 +113,7 @@ test('the store upgrades a legacy file on commit, keeps the original bytes, and 
 	assert.deepEqual(r, { status: 'applied', migratedFrom: 1 });
 	assert.ok(original.equals(fs.readFileSync(f + '.v1.bak')), 'the legacy file is kept byte for byte');
 	const now = new SaveStore(f).load();
-	assert.equal(now.schema, 2); assert.equal(now.party[0].hp, 50); assert.equal(now.bag.potion, 2); assert.ok(now.appliedBattles['B-legacy']);
+	assert.equal(now.schema, 3); assert.equal(now.party[0].hp, 50); assert.equal(now.bag.potion, 2); assert.ok(now.appliedBattles['B-legacy']);
 	assert.equal(new SaveStore(f).commit(resultFor('B-legacy')).status, 'already-applied');
 	assert.equal(new SaveStore(f).load().bag.potion, 2, 'applied once');
 });

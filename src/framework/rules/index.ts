@@ -8,5 +8,6 @@ export * as growth from "./growth.ts";
 export * as rules from "./rules.ts";
 export * as state from "./state.ts";
 export * as saveSchema from "./save-schema.ts";
+export * as limits from "./limits.ts";
 export * as digest from "./sha256.ts";
 export type * from "./types.ts";

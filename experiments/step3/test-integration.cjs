@@ -31,7 +31,7 @@ test('a legacy (schema 1) save plays a whole battle with pipeline content; resul
 	const f = path.join(dir, 'legacy.json'); fs.writeFileSync(f, JSON.stringify(legacy));
 	const store = new E.store.SaveStore(f);
 	const info = store.loadInfo();
-	assert.deepEqual([info.from, info.to], [1, 2]);
+	assert.deepEqual([info.from, info.to], [1, 3]);
 	assert.deepEqual(findDanglingReferences(info.state, content(), E.dex.createDexLookup()), [], 'the legacy save refers only to content that exists');
 	const ring = E.log.createRingLogger();
 	const { s } = await win(info.state, 'INT-1', ring);
@@ -45,7 +45,7 @@ test('a legacy (schema 1) save plays a whole battle with pipeline content; resul
 	assert.equal(store.commit(result).status, 'applied');
 	assert.equal(store.commit(result).status, 'already-applied');
 	assert.deepEqual(ring.entries().filter(e => e.kind === 'end').map(e => e.data.reason), ['win']);
-	assert.equal(store.load().schema, 2);
+	assert.equal(store.load().schema, 3);
 });
 
 test('the same battle is described in both languages from content text keys, with no missing key', async () => {

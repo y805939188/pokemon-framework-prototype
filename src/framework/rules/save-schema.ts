@@ -5,13 +5,14 @@
  *
  * Versions
  *   1  step 2 prototype: members have no statusCount; a badly poisoned member may be stored as status "tox".
- *   2  current: statusCount (sleep = remaining turns, poison = 0 plain), poison stored as plain "psn" (WP20 / WP39).
+ *   2  statusCount (sleep = remaining turns, poison = 0 plain), poison stored as plain "psn" (WP20 / WP39).
+ *   3  current (step 4): `claims`, the one-time grant ledger (claim id -> {kind}).
  * Anything else is refused with a diagnosable error ("unknown-version"/"corrupt"/"invalid") — never silently reset.
  */
 import { GAME_SCHEMA } from "./state.ts";
 import type { GameState } from "./state.ts";
 
-export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2];
+export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3];
 
 export interface Problem { path: string; message: string }
 export interface SaveErrorInfo {
@@ -31,7 +32,9 @@ const isInt = (v: unknown, lo: number, hi = Number.MAX_SAFE_INTEGER): v is numbe
 
 const STATUSES = ["", "psn", "tox", "brn", "par", "slp", "frz"];
 const STAT_KEYS = ["hp", "atk", "def", "spa", "spd", "spe"];
-const TOP_KEYS = ["schema", "party", "boxes", "bag", "money", "dex", "appliedBattles"];
+const TOP_KEYS = ["schema", "party", "boxes", "bag", "money", "dex", "appliedBattles", "claims"];
+const CLAIM_KINDS = ["grant"];
+const CLAIM_ID = /^[A-Za-z0-9#._:-]{1,64}$/;
 const MEMBER_KEYS = ["id", "species", "nickname", "level", "exp", "hp", "status", "statusCount", "moves", "item", "ability", "nature", "gender", "ivs", "evs", "friendship", "ball", "ot"];
 const MEMBER_ID = /^[A-Za-z0-9#._:-]{1,18}$/;
 
@@ -92,6 +95,14 @@ export function validateGame(x: unknown): Problem[] {
   }
   if (!isObj(x["appliedBattles"])) out.push({ path: "$.appliedBattles", message: "must be an object" });
   else for (const [id, v] of Object.entries(x["appliedBattles"])) if (!isObj(v) || typeof v["hash"] !== "string" || !/^[0-9a-f]{64}$/.test(v["hash"])) out.push({ path: `$.appliedBattles["${id}"]`, message: "must be {hash: 64 hex characters}" });
+  if (schema >= 3) {
+    const claims = x["claims"];
+    if (!isObj(claims)) out.push({ path: "$.claims", message: "must be an object (claim id -> {kind})" });
+    else for (const [id, v] of Object.entries(claims)) {
+      if (!CLAIM_ID.test(id)) out.push({ path: `$.claims["${id}"]`, message: "claim id must be 1-64 characters of A-Z a-z 0-9 # . _ : -" });
+      if (!isObj(v) || !CLAIM_KINDS.includes(v["kind"] as string) || Object.keys(v).length !== 1) out.push({ path: `$.claims["${id}"]`, message: `must be {kind: ${CLAIM_KINDS.map((k) => `"${k}"`).join(" | ")}}` });
+    }
+  }
   return out;
 }
 
@@ -112,6 +123,11 @@ const MIGRATIONS: Record<number, Migrator> = {
       }
     }
     doc["schema"] = 2;
+  },
+  2: (doc, notes) => {
+    doc["claims"] = {};
+    notes.push("schema 3: an empty claims ledger was added (nothing had been claimed through it before)");
+    doc["schema"] = 3;
   },
 };
 

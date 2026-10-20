@@ -287,7 +287,7 @@
 
     await scenario("T9 legacy and unusable saves through MZ's own save/load: schema 1 migrates, newer or damaged states are refused and kept", async () => {
       fresh();
-      const legacy = clone(game()); legacy.schema = 1;
+      const legacy = clone(game()); legacy.schema = 1; delete legacy.claims; // a step 2 document had no claims ledger
       for (const m of legacy.party) delete m.statusCount;
       legacy.party[1].status = "tox"; legacy.party[2].status = "slp";
       G.$gameSystem._psGame = legacy;
@@ -295,8 +295,8 @@
       G.$gameSystem._psGame = { diverged: true };
       const lc1 = await G.DataManager.loadGame(2);
       assert(!G.$gameSystem._psSaveError, "a schema 1 state loads without error");
-      eq([game().schema, game().party[1].status, game().party[1].statusCount, game().party[2].status, game().party[2].statusCount], [2, "psn", 0, "slp", undefined], "migrated on load");
-      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, 2, true], "migration recorded");
+      eq([game().schema, game().party[1].status, game().party[1].statusCount, game().party[2].status, game().party[2].statusCount], [3, "psn", 0, "slp", undefined], "migrated on load");
+      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, 3, true], "migration recorded");
       // a state written by a newer build, and a damaged one
       for (const [slot, doc, code] of [[3, { ...clone(game()), schema: 9 }, "unknown-version"], [4, "not a state", "corrupt"]] as [number, any, string][]) {
         G.$gameSystem._psGame = doc;
