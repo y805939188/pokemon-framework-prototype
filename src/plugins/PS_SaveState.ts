@@ -10,6 +10,9 @@
  *          no player data is invented.
  *   save : the state is validated first; a problem is recorded as `_psSaveWarning` and logged, and the save still
  *          goes ahead (refusing would lose the player's progress; the warning is the diagnostic).
+ *          While a battle runs (PSFlow.running) every save is refused, including a direct DataManager.saveGame call (the
+ *          menu and autosave are already off through $gameSystem.disableSave). A refused or failed save is recorded in
+ *          PSState.lastSaveError {code: battle-running | write-failed, message, savefileId, at} and logged.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 (() => {
@@ -22,7 +25,9 @@
   const schema = (): any => nodeRequire("./js/engine/build/engine.cjs").saveSchema;
   const state = (): any => nodeRequire("./js/engine/build/engine.cjs").state;
 
-  const PSState = (W.PSState = {
+  const PSState: any = (W.PSState = {
+    lastSaveError: null as any,
+    lastSave: null as any,
     /** Called after MZ restored a save: migrate or diagnose `_psGame`. */
     afterLoad(): void {
       const sys = G.$gameSystem;
@@ -55,6 +60,21 @@
   G.DataManager.extractSaveContents = function (this: any, contents: any) {
     baseExtract.call(this, contents);
     PSState.afterLoad();
+  };
+  const baseSaveGame = G.DataManager.saveGame;
+  G.DataManager.saveGame = function (this: any, savefileId: number) {
+    const fail = (code: string, e: unknown) => {
+      PSState.lastSaveError = { code, message: String(e instanceof Error ? e.message : e), savefileId, at: Date.now() };
+      console.error("PS_SaveState: save not written:", code, PSState.lastSaveError.message);
+    };
+    if (W.PSFlow && W.PSFlow.running) {
+      const e = new Error("saving is not allowed while a battle is running");
+      fail("battle-running", e);
+      return Promise.reject(e);
+    }
+    let p: any;
+    try { p = baseSaveGame.call(this, savefileId); } catch (e) { fail("write-failed", e); return Promise.reject(e); }
+    return Promise.resolve(p).then((r: any) => { PSState.lastSaveError = null; PSState.lastSave = { savefileId, at: Date.now() }; return r; }, (e: unknown) => { fail("write-failed", e); throw e; });
   };
   const baseMake = G.DataManager.makeSaveContents;
   G.DataManager.makeSaveContents = function (this: any) {

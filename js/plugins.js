@@ -7,6 +7,6 @@ var $plugins =
 {"name":"PS_SaveLocation","status":true,"description":"Keeps save files outside a packaged app bundle (user data folder). Playtest / development keeps using the project save folder.","parameters":{"mode":"auto"}},
 {"name":"PS_BattleSmoke","status":true,"description":"Step 2.1 smoke: runs the Showdown gateway fixture inside the game runtime and writes a JSON report.","parameters":{"runOnBoot":"false"}},
 {"name":"PS_SaveState","status":true,"description":"Step 3: versioned game state inside the MZ save (migrate on load, refuse and keep what cannot be understood).","parameters":{}},
-{"name":"PS_BattleFlow","status":true,"description":"Step 2.4: placeholder text battle scene driven by the Showdown session; map events start battles and wait.","parameters":{}},
+{"name":"PS_BattleFlow","status":true,"description":"Step 2.4: placeholder text battle scene driven by the Showdown session; map events start battles and wait.","parameters":{"homeMapId":"5","homeX":"8","homeY":"9","homeDirection":"2"}},
 {"name":"PS_BattleFlowTest","status":true,"description":"Step 2.4 test driver (inert without --ps-flow-test).","parameters":{}}
 ];

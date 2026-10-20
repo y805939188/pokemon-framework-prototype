@@ -26,6 +26,34 @@
  * @max 999999
  * @default 3000
  *
+ * @param noMoneyLoss
+ * @text No money loss
+ * @desc NO_MONEY_LOSS: a lost or drawn battle costs no money (the party is still healed).
+ * @type boolean
+ * @default false
+ *
+ * @param homeMapId
+ * @text Home map
+ * @desc Where a defeat sends the player (WP61 7.2 "home"). 0 = no home: the party is healed, nobody is moved.
+ * @type number
+ * @default 0
+ *
+ * @param homeX
+ * @text Home X
+ * @type number
+ * @default 0
+ *
+ * @param homeY
+ * @text Home Y
+ * @type number
+ * @default 0
+ *
+ * @param homeDirection
+ * @text Home direction
+ * @desc 2 down, 4 left, 6 right, 8 up
+ * @type number
+ * @default 2
+ *
  * @command StartBattle
  * @text Start Battle
  * @desc Opens the text battle scene and pauses this event until it ends.
@@ -54,6 +82,12 @@
  * @desc Variable that receives 1 win, 2 caught, 3 ran, 4 lost/draw, 0 aborted.
  * @type variable
  * @default 10
+ *
+ * @arg canLose
+ * @text Can lose
+ * @desc false (default): a defeat takes the player home and ends this event. true: the event continues with result 4. Money loss and heal apply either way.
+ * @type boolean
+ * @default false
  *
  * @command ClaimGrant
  * @text Claim Grant
@@ -90,6 +124,10 @@
  * @text Message
  * @type boolean
  * @default true
+ *
+ * @command ShowParty
+ * @text Show Party
+ * @desc Opens the read-only party / bag screen (also in the main menu).
  *
  * @command ResetGame
  * @text Reset to Test Fixture (testing aid)

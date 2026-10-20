@@ -43,6 +43,8 @@
     startNewGame(): { status: string };
     claimGrant(grantId: string): { status: string; grantId: string; reason?: string; error?: string; placed?: { id: string; species: string; level: number; to: string }[]; items?: Record<string, number>; money?: number };
     healParty(): { status: string; reason?: string; error?: string };
+    prepareEncounter(table: unknown, region: number): { ok: boolean; reason?: string; error?: string; foe?: { species: string; level: number } };
+    describeParty(): { members: { id: string; species: string; nameKey?: string; level: number; hp: number; maxhp: number; status: string; moves: { id: string; pp: number; maxpp: number }[] }[]; boxes: number; bag: Record<string, number>; money: number };
   }
 
   // ---------------------------------------------------------------- shared flow state / API
@@ -137,11 +139,24 @@
           sessions: B.composition.createBattleSessionFactory({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger.sink }),
           projection: { project: (outcome: { code: number }) => PSFlow.projectOutcome(outcome) },
           random: (n: number) => PSFlow.random(n),
-        }, { startMoney: PSFlow.param("startMoney", 3000) });
+        }, { startMoney: PSFlow.param("startMoney", 3000), noMoneyLoss: PSFlow.flagParam("noMoneyLoss", false), limits: PSFlow.limits() });
       }
       return PSFlow._app as GameAppView;
     },
     _app: null as GameAppView | null,
+    /** Stage capacities (rules/limits.ts); tests may replace them with `testLimits` (then reset `_app`). */
+    testLimits: null as any,
+    limits(): any { return PSFlow.testLimits || engine().B.limits.DEFAULT_LIMITS; },
+    flagParam(name: string, dflt: boolean): boolean {
+      const raw = (G.PluginManager.parameters(NAME) as Record<string, string>)[name];
+      return raw === undefined || raw === "" ? dflt : raw === "true";
+    },
+    /** The configured home (plugin parameters): where a defeat sends the player back to. Null when not set or not a map. */
+    home(): { mapId: number; x: number; y: number; d: number } | null {
+      const mapId = PSFlow.param("homeMapId", 0);
+      if (!mapId || !G.$dataMapInfos || !G.$dataMapInfos[mapId]) return null;
+      return { mapId, x: PSFlow.param("homeX", 0), y: PSFlow.param("homeY", 0), d: PSFlow.param("homeDirection", 2) };
+    },
     /** A numeric plugin parameter (empty or invalid -> the default). */
     param(name: string, dflt: number): number {
       const raw = (G.PluginManager.parameters(NAME) as Record<string, string>)[name];
@@ -180,6 +195,7 @@
       const app = PSFlow.app();
       PSFlow.content(); // loaded before the clock starts: "session create" keeps meaning what it meant in the earlier measurements
       const tCreate = performance.now();
+      PSFlow.request.storageFull = engine().B.limits.storageFull(PSFlow.game(), PSFlow.limits()); // only for the refusal text (the application decides noBall)
       const session = await app.startBattle(PSFlow.request); // refuses a save that refers to content that no longer exists, then opens the session
       if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round((performance.now() - tCreate) * 10) / 10;
       return session;
@@ -189,6 +205,15 @@
       if (result) PSFlow.lastResult = result;
       PSFlow.lastOutcome = outcome;
       PSFlow.close(outcome.code);
+      // D3: after a committed defeat the host takes the player home (unless the author allowed losing). The money and the
+      // heal were settled in the commit; this is only the trip, it can fail and be retried without settling again.
+      if (outcome.code === 4 && outcome.commit !== "none" && PSFlow.request && !PSFlow.request.canLose) {
+        outcome.blackout = true;
+        const tr = PSFlow.translator();
+        if (outcome.defeat && outcome.defeat.moneyLost) G.$gameMessage.add(tr.t("blackout.money_lost", { money: outcome.defeat.moneyLost }));
+        const ret = PSFlow.returnHome();
+        G.$gameMessage.add(tr.t(ret.status === "requested" ? "blackout.home" : ret.status === "no-home" ? "blackout.no_home" : "blackout.failed"));
+      }
       return outcome;
     },
     abort(error: unknown): void {
@@ -201,11 +226,64 @@
       }
       PSFlow.close(0);
     },
-    /** Bookkeeping when a battle is over: measurements, and the interpreter stops waiting. The result variable is the application's projection. */
+    /** Bookkeeping when a battle is over: measurements, the save permission as it was before, and the interpreter stops waiting. The result variable is the application's projection. */
     close(code: number): void {
       const cur = PSFlow.perf.cur;
       if (cur && !cur.totalMs) { cur.totalMs = Math.round((performance.now() - cur.t0) * 10) / 10; cur.code = code; PSFlow.perf.battles.push(cur); }
+      // restore exactly what was there: an event that had disabled saving keeps it disabled
+      if (PSFlow._saveWasEnabled === true) G.$gameSystem.enableSave();
+      PSFlow._saveWasEnabled = null;
       PSFlow.running = false;
+    },
+    _saveWasEnabled: null as boolean | null,
+    /** The single way a battle opens (StartBattle command and map encounters): the same application path, the same guards. */
+    openBattle(request: any): void {
+      if (PSFlow.running) throw new Error("a battle is already running");
+      PSFlow.request = request;
+      PSFlow.running = true;
+      PSFlow.lastOutcome = null;
+      // no save while a battle runs (menu, autosave and direct DataManager.saveGame all see it)
+      PSFlow._saveWasEnabled = G.$gameSystem.isSaveEnabled();
+      G.$gameSystem.disableSave();
+      PSFlow.perf.cur = { battleId: request.battleId, t0: performance.now(), actions: [] as any[], encounter: !!request.encounter };
+      if (PSFlow.perf.encounterT0 !== undefined && request.encounter) { PSFlow.perf.cur.t0 = PSFlow.perf.encounterT0; }
+      G.SceneManager.push(W.Scene_PSBattle);
+    },
+    nextSeq(): number { G.$gameSystem._psBattleSeq = (G.$gameSystem._psBattleSeq || 0) + 1; return G.$gameSystem._psBattleSeq; },
+    /** The return trip after a defeat. Never settles anything; a failure is kept so `retryReturnHome` can try again. */
+    lastReturn: null as any,
+    pendingReturn: null as any,
+    returnHome(): any {
+      const battleId = PSFlow.request ? PSFlow.request.battleId : null;
+      const home = PSFlow.home();
+      let r: any;
+      if (!home) r = { battleId, status: "no-home" }; // WP61 7.2: no valid home -> the party is healed, no transfer
+      else {
+        try {
+          if (PSFlow.debug.failReturn) { PSFlow.debug.failReturn = false; throw new Error("injected return failure"); } // tests
+          G.$gamePlayer.reserveTransfer(home.mapId, home.x, home.y, home.d, 0);
+          r = { battleId, status: "requested", home };
+        } catch (e) { r = { battleId, status: "failed", home, error: String(e instanceof Error ? e.message : e) }; }
+      }
+      PSFlow.lastReturn = r;
+      PSFlow.pendingReturn = r.status === "failed" ? r : null;
+      return r;
+    },
+    retryReturnHome(): any { return PSFlow.pendingReturn ? PSFlow.returnHome() : { status: "none" }; },
+    /** The encounter table of the current map (map note <PSEncounter:...>), parsed here and only here; null = none. */
+    _encCache: null as any,
+    mapEncounters(): any {
+      const note = G.$dataMap && G.$dataMap.meta ? G.$dataMap.meta.PSEncounter : undefined;
+      if (note === undefined) return null;
+      const key = `${G.$gameMap.mapId()}|${note}`;
+      if (!PSFlow._encCache || PSFlow._encCache.key !== key) PSFlow._encCache = { key, data: parseEncounterNote(String(note)) };
+      return PSFlow._encCache;
+    },
+    lastEncounter: null as any,
+    /** One encounter decision by the application; never throws. */
+    encounter(table: unknown, region: number): any {
+      try { return PSFlow.app().prepareEncounter(table, region); }
+      catch (e) { return { ok: false, reason: "unavailable", error: String(e instanceof Error ? e.message : e) }; }
     },
   });
 
@@ -219,20 +297,53 @@
 
   G.PluginManager.registerCommand(NAME, "StartBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
-    G.$gameSystem._psBattleSeq = (G.$gameSystem._psBattleSeq || 0) + 1;
-    PSFlow.request = {
+    const seq = PSFlow.nextSeq();
+    PSFlow.openBattle({
       kind: args.kind === "trainer" ? "trainer" : "wild",
       foes: parseFoes(args.foes || "Pidgey:5"),
-      seq: G.$gameSystem._psBattleSeq,
-      battleId: `${args.battleId || "battle"}#${G.$gameSystem._psBattleSeq}`,
+      seq,
+      battleId: `${args.battleId || "battle"}#${seq}`,
       resultVariable: Number(args.resultVariable) || 0,
-    };
-    PSFlow.running = true;
-    PSFlow.lastOutcome = null;
-    PSFlow.perf.cur = { battleId: PSFlow.request.battleId, t0: performance.now(), actions: [] as any[] };
-    G.SceneManager.push(W.Scene_PSBattle);
+      canLose: String(args.canLose) === "true",
+    });
     this.setWaitMode("psBattle");
   });
+
+  /**
+   * Map note format (one tag): <PSEncounter:regions=1,2;pidgey,60,2-4;caterpie,40,2-4>
+   * `regions=` (optional, empty = whole map) then one `species,weight,min-max` per slot. Only split into plain data here;
+   * the application validates the values and decides the encounter.
+   */
+  function parseEncounterNote(note: string): { regions: number[]; slots: { species: string; weight: number; minLevel: number; maxLevel: number }[] } {
+    const parts = note.split(";").map((x) => x.trim()).filter(Boolean);
+    let regions: number[] = [];
+    if (parts[0] && /^regions\s*=/.test(parts[0])) regions = parts.shift()!.split("=")[1]!.split(",").map((x) => x.trim()).filter(Boolean).map(Number);
+    const slots = parts.map((p) => {
+      const [species, weight, range] = p.split(",").map((x) => x.trim());
+      const [lo, hi] = String(range ?? "").split("-").map((x) => Number(x.trim()));
+      return { species: species ?? "", weight: Number(weight), minLevel: lo as number, maxLevel: (hi ?? lo) as number };
+    });
+    return { regions, slots };
+  }
+
+  // Map encounters: MZ's own step counter decides WHEN (map "encounter steps"); a map with a PSEncounter note opens the
+  // framework battle instead of an MZ troop battle. Busy (a battle already open) or an event running: nothing happens.
+  const baseExecuteEncounter = G.Game_Player && G.Game_Player.prototype.executeEncounter;
+  if (G.Game_Player) G.Game_Player.prototype.executeEncounter = function (this: any) {
+    const table = PSFlow.mapEncounters();
+    if (!table) return baseExecuteEncounter.call(this);
+    if (PSFlow.running || G.$gameMap.isEventRunning() || this._encounterCount > 0) return false;
+    this.makeEncounterCount();
+    const t0 = performance.now();
+    const plan = PSFlow.encounter(table.data, this.regionId());
+    PSFlow.lastEncounter = { ...plan, region: this.regionId(), x: this.x, y: this.y, mapId: G.$gameMap.mapId() };
+    if (!plan.ok) { if (plan.reason !== "not-here" && plan.reason !== "no-able-member") console.warn("PS_BattleFlow: encounter refused:", plan.reason, plan.error); return false; }
+    const seq = PSFlow.nextSeq();
+    PSFlow.perf.encounterT0 = t0;
+    try { PSFlow.openBattle({ kind: "wild", foes: [plan.foe], seq, battleId: `wild#${seq}`, resultVariable: 0, canLose: false, encounter: true }); }
+    finally { PSFlow.perf.encounterT0 = undefined; }
+    return false; // the framework scene is already pushed; MZ must not open its own battle
+  };
   G.PluginManager.registerCommand(NAME, "ResetGame", () => PSFlow.resetGame());
 
   /** Show lines as one message window and make the event wait for it (only when the author asked for messages). */
@@ -261,6 +372,8 @@
     if (flag(args.message, true)) say(this, [o.status === "refused" ? tr.t("heal.refused") : tr.t("heal.done")]);
   });
 
+  G.PluginManager.registerCommand(NAME, "ShowParty", () => { G.SceneManager.push(W.Scene_PSParty); });
+
   // A new game starts from the formal empty state (never the fixture party).
   if (G.DataManager) {
     const baseSetupNewGame = G.DataManager.setupNewGame;
@@ -276,6 +389,7 @@
     if (this._waitMode === "psBattle") {
       if (PSFlow.running) return true;
       this._waitMode = "";
+      if (PSFlow.lastOutcome && PSFlow.lastOutcome.blackout) this._index = this._list.length; // the player blacked out: the rest of the event does not run
       return false;
     }
     return baseUpdateWaitMode.call(this);
@@ -337,6 +451,7 @@
   /** Refusal text: per-action key first (a refused Ball is not a refused Run), then the generic key, then the default. */
   function refusalText(kind: string | undefined, reason: string): string {
     const tr = PSFlow.translator();
+    if (kind === "ball" && reason === "ballsdisabled" && PSFlow.request && PSFlow.request.storageFull) return tr.t("refusal.ball.storage_full"); // D1
     return (kind && tr.has(`refusal.${kind}.${reason}`)) ? tr.t(`refusal.${kind}.${reason}`)
       : tr.has(`refusal.${reason}`) ? tr.t(`refusal.${reason}`) : tr.t("refusal.default", { reason });
   }
@@ -466,6 +581,16 @@
   };
   P.showEnd = function (aborted: boolean) {
     if (aborted) this._log.add(PSFlow.translator().t("ui.end.aborted"));
+    // D1: a catch with a full party goes to the boxes, which this version cannot open yet: say so, so it never seems lost
+    const s = this._session;
+    if (!aborted && s && s.ended && s.ended.reason === "caught") {
+      try {
+        if (PSFlow.game().party.length >= PSFlow.limits().party) {
+          const target = s.foeTeam.find((m: any) => m.id === (s.ended.outcome && s.ended.outcome.target));
+          this._log.add(this._log.fitText(PSFlow.translator().t("capture.to_box", { name: target ? PSFlow.speciesName(target.species) : "?" })));
+        }
+      } catch { /* the commit below reports any state problem */ }
+    }
     this._aborted = aborted;
     this.show("end", [{ name: PSFlow.translator().t(aborted ? "ui.end.back" : "ui.end.continue"), ext: "end" }]);
   };
@@ -538,4 +663,50 @@
     G.Scene_MenuBase.prototype.terminate.call(this);
     if (PSFlow.running) PSFlow.abort(new Error("the battle scene closed without an outcome")); // never leave the interpreter waiting
   };
+
+  // ---------------------------------------------------------------- read-only party / bag screen (no management in this version)
+  function Scene_PSParty(this: any) { this.initialize(...(arguments as any)); }
+  W.Scene_PSParty = Scene_PSParty;
+  Scene_PSParty.prototype = Object.create(G.Scene_MenuBase.prototype);
+  Scene_PSParty.prototype.constructor = Scene_PSParty;
+  Scene_PSParty.prototype.initialize = function () { G.Scene_MenuBase.prototype.initialize.call(this); this._psParty = true; };
+  Scene_PSParty.prototype.create = function () {
+    G.Scene_MenuBase.prototype.create.call(this);
+    this._text = new (Window_PSText as any)(new G.Rectangle(0, 0, G.Graphics.boxWidth, G.Graphics.boxHeight));
+    this.addWindow(this._text);
+    this._text.setLines(PSFlow.partyLines().map((l: string) => this._text.fitText(l)));
+  };
+  Scene_PSParty.prototype.update = function () {
+    G.Scene_MenuBase.prototype.update.call(this);
+    if (G.Input.isTriggered("cancel") || G.Input.isTriggered("ok") || G.TouchInput.isCancelled()) { G.SoundManager.playCancel(); this.popScene(); }
+  };
+  PSFlow.partyLines = function (): string[] {
+    const tr = PSFlow.translator();
+    let v: any;
+    try { v = PSFlow.app().describeParty(); } catch (e) { return [tr.t("ui.partyview.title"), tr.t("ui.partyview.unusable", { error: String(e instanceof Error ? e.message : e) })]; }
+    const lines = [tr.t("ui.partyview.title")];
+    if (!v.members.length) lines.push(tr.t("ui.partyview.empty"));
+    for (const m of v.members) {
+      lines.push(tr.t("ui.partyview.member", { name: m.nameKey ? tr.tOr(m.nameKey, m.species) : m.species, level: m.level, hp: m.hp, maxhp: m.maxhp, status: m.status ? tr.t("ui.status.tag", { status: m.status }) : "" }));
+      lines.push("   " + m.moves.map((x: any) => tr.t("ui.moves.line", { move: x.id, pp: x.pp, maxpp: x.maxpp })).join(" / "));
+    }
+    lines.push(tr.t("ui.partyview.boxes", { count: v.boxes }));
+    const bag = Object.entries(v.bag).map(([k, n]) => `${tr.tOr(`item.name.${k}`, k)} x${n}`).join(", ");
+    lines.push(tr.t("ui.status.bag", { items: bag || tr.t("ui.status.bag_empty") }));
+    lines.push(tr.t("ui.partyview.money", { money: v.money }));
+    return lines;
+  };
+  // the main menu gets one entry for it
+  if (G.Window_MenuCommand && G.Scene_Menu) {
+    const baseOriginal = G.Window_MenuCommand.prototype.addOriginalCommands;
+    G.Window_MenuCommand.prototype.addOriginalCommands = function (this: any) {
+      baseOriginal.call(this);
+      this.addCommand(PSFlow.translator().t("ui.menu.party_view"), "psParty", true);
+    };
+    const baseCreateCommand = G.Scene_Menu.prototype.createCommandWindow;
+    G.Scene_Menu.prototype.createCommandWindow = function (this: any) {
+      baseCreateCommand.call(this);
+      this._commandWindow.setHandler("psParty", () => G.SceneManager.push(W.Scene_PSParty));
+    };
+  }
 })();

@@ -11,12 +11,13 @@ import { DEFAULT_LIMITS, storageFull } from "../rules/limits.ts";
 import type { Limits } from "../rules/limits.ts";
 import { GrantRefusedError, applyGrant } from "../rules/grants.ts";
 import { healParty } from "../rules/heal.ts";
+import { computeStats } from "../rules/growth.ts";
 import { createMember } from "../rules/member-factory.ts";
 import { appliesAt, pickEncounter, validateEncounterTable } from "../rules/encounter.ts";
 import { isDefeat, settleDefeat } from "../rules/defeat.ts";
 import type { Member } from "../rules/types.ts";
 import { findDanglingReferences, resolveSpecies } from "../flow/content-runtime.ts";
-import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ContentPort, EncounterPlan, GameStatePort, HealOutcome, OutcomeProjection, RandomPort } from "./ports.ts";
+import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ContentPort, EncounterPlan, GameStatePort, HealOutcome, OutcomeProjection, PartyView, RandomPort } from "./ports.ts";
 
 export interface GameApplicationPorts<S extends BattleHandle> {
   state: GameStatePort;
@@ -82,6 +83,20 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (r.status === "already-claimed") return { status: "already-claimed", grantId };
     try { this.ports.state.replace(r.state); } catch (error) { return refused("commit-failed", error); }
     return { status: "applied", grantId, placed: r.placed, items: r.items, money: r.money };
+  }
+
+  /** What a party/bag screen shows. Throws when the state is unusable (the screen then says so). */
+  describeParty(): PartyView {
+    const game = this.ports.state.read();
+    const { content } = this.ports.content();
+    return {
+      members: game.party.map((m) => {
+        const sp = content.species[m.species];
+        const maxhp = sp ? computeStats(sp.base, m.ivs, m.evs, m.level, m.nature).hp : m.hp;
+        return { id: m.id, species: m.species, ...(sp?.nameKey ? { nameKey: sp.nameKey } : {}), level: m.level, hp: m.hp, maxhp, status: m.status, moves: m.moves.map((x) => ({ ...x })) };
+      }),
+      boxes: game.boxes.length, bag: { ...game.bag }, money: game.money,
+    };
   }
 
   /** Heal the party (HP, status, PP). Safe to repeat: an already healed party writes nothing. Never throws. */

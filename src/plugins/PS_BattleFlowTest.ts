@@ -38,6 +38,7 @@
   const path = nodeRequire("path");
   const E = nodeRequire("./js/engine/game/growth.cjs");
   const OUT = arg("ps-flow-out");
+  const ONLY = arg("ps-flow-only"); // e.g. --ps-flow-only=T16,T17 runs just those scenarios (development aid)
   const SHOTS = arg("ps-flow-shots");
 
   let frame = 0;
@@ -128,6 +129,32 @@
     await waitFor(() => scene() && scene()._spriteset && !G.SceneManager.isSceneChanging() && G.$gameMap.mapId() === mapId, `Scene_Map on map ${mapId}`);
     await frames(10);
   }
+  /** Slice setup: a new game on map 5 with the starter claimed (members created with a pinned random). */
+  async function slice(seed = 77) {
+    G.DataManager.setupNewGame();
+    W.PSFlow.rng = seeded(seed); W.PSFlow.seed = [1, 2, 3, 4]; W.PSFlow.fast = true; W.PSFlow.testLimits = null; W.PSFlow._app = null;
+    eq(W.PSFlow.claim("starter").status, "applied", "starter claimed");
+    await toMapId(5, 8, 9);
+  }
+  /** Stand at (x, y), let the step counter run out and take one step in `dir`: MZ's own encounter check runs. */
+  async function stepInto(x: number, y: number, dir: number) {
+    G.$gamePlayer.locate(x, y); await frames(2);
+    assert(G.$gamePlayer.canPass(x, y, dir), `the slice map lets the player step ${dir} from ${x},${y}`);
+    G.$gamePlayer._encounterCount = 1;
+    G.$gamePlayer.moveStraight(dir);
+    await waitFor(() => !G.$gamePlayer.isMoving(), "step done");
+    await frames(6);
+  }
+  const mkMember = (id: string, species: string, level: number, extra: any = {}) => ({ ...nodeRequire("./js/engine/build/engine.cjs").memberFactory.createMember({ id, species, level }, W.PSFlow.content(), seeded(level * 13 + id.length)), ...extra });
+  async function finishBattle() { await inMode("end"); await press("ok"); await dismissMessages(); await waitFor(() => !W.PSFlow.running && !battle(), "back from the battle"); await frames(5); }
+  async function fightUntilEnd(moveRe: RegExp, max = 12) {
+    for (let i = 0; i < max && mode_() !== "end"; i++) {
+      if (mode_() === "learn") { await choose(/Don't learn|不学习/); continue; }
+      await choose(/^Fight/); await inMode("moves"); await choose(moveRe);
+      await waitFor(() => ["main", "end", "learn"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after the move");
+    }
+  }
+
   /** Seeded random(n) for members created outside battles (grants, encounters). */
   function seeded(seed: number) { let st = seed >>> 0; return (n: number) => { st = (Math.imul(st, 1664525) + 1013904223) >>> 0; return Math.floor((st / 4294967296) * n); }; }
   const mzParty = () => ({ gold: G.$gameParty.gold(), items: clone(G.$gameParty._items), weapons: clone(G.$gameParty._weapons), armors: clone(G.$gameParty._armors) });
@@ -146,6 +173,7 @@
   const pv = (G.process && G.process.versions) || {};
   const report: any = { mode, results, focusLog, suppressedAudio, get refocus() { return refocus; }, env: { nw: pv.nw, node: pv.node, chromium: pv.chromium, v8: pv.v8, platform: G.process && G.process.platform, arch: G.process && G.process.arch, execPath: G.process && G.process.execPath, gameDir, packageInfo } };
   async function scenario(id: string, fn: () => Promise<any>) {
+    if (ONLY && !ONLY.split(",").some((p) => id.startsWith(p + " "))) return;
     const t0 = Date.now();
     try { const detail = await fn(); results.push({ id, status: "pass", ms: Date.now() - t0, detail }); }
     catch (e: any) {
@@ -169,14 +197,14 @@
 
   async function toMap() {
     G.DataManager.setupNewGame();
-    W.PSFlow.resetGame(); W.PSFlow.seed = [1, 2, 3, 4]; W.PSFlow.fast = true;
+    W.PSFlow.resetGame(); W.PSFlow.seed = [1, 2, 3, 4]; W.PSFlow.fast = true; W.PSFlow.rng = seeded(1); W.PSFlow.testLimits = null; W.PSFlow._app = null;
     G.$gamePlayer.reserveTransfer(4, 8, 8, 2, 0);
     G.SceneManager.goto(G.Scene_Map);
     await waitFor(() => scene() && scene()._spriteset && !G.SceneManager.isSceneChanging() && G.$gameMap.mapId() === 4, "Scene_Map on map 4");
     await frames(10);
     stamps.mapReadyAt = Date.now(); stamps.mapReadyPerf = Math.round(performance.now());
   }
-  const fresh = () => { W.PSFlow.resetGame(); };
+  const fresh = () => { W.PSFlow.resetGame(); W.PSFlow.rng = seeded(1); }; // foes are created from the content: pin their random draws
 
   async function runAll() {
     await toMap();
@@ -482,7 +510,7 @@
         const rc = await G.DataManager.saveGame(5);
         fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t15.json"), JSON.stringify({ state: g2, mz: mz0 }));
         return { saveCode: rc, starter: g1.party[0] };
-      } finally { W.PSFlow.rng = null; }
+      } finally { W.PSFlow.rng = seeded(1); }
     });
 
     await scenario("T15b a save made before the framework state existed loads as the formal empty state (no invented party), and the starter can be claimed", async () => {
@@ -497,10 +525,196 @@
       eq(W.PSFlow.claim("starter").status, "applied", "the player can still receive the starter");
       await recover();
     });
+    // ================================================================ step 4 batch B: exploration and the battle loop
+    await scenario("T16 encounter host check: region filter, nothing while an event runs, nothing while busy, a real trigger opens the framework battle, no save during it, no immediate re-trigger after it", async () => {
+      await slice(16);
+      const note = G.$dataMap.meta.PSEncounter;
+      assert(typeof note === "string" && /pidgey/.test(note), "the slice map carries the encounter note: " + note);
+      // outside the region: the counter runs out, the application says not-here, nothing opens
+      await stepInto(9, 9, 6);
+      eq([W.PSFlow.lastEncounter && W.PSFlow.lastEncounter.reason, !!battle()], ["not-here", false], "outside region 1 nothing happens");
+      assert(G.$gamePlayer._encounterCount > 0, "the step counter was refilled");
+      // inside the region while an event runs: nothing
+      G.$gamePlayer.locate(4, 9); await frames(2);
+      W.PSFlow.lastEncounter = null;
+      G.$gameMap.event(1).start(); await waitFor(() => G.$gameMessage.isBusy(), "event message");
+      G.$gamePlayer._encounterCount = 0; await frames(40);
+      eq([!!battle(), W.PSFlow.lastEncounter], [false, null], "no encounter while an event runs");
+      G.$gamePlayer._encounterCount = 50; await dismissMessages();
+      // busy (a battle flag already set): silent, no exception, no second scene
+      W.PSFlow.running = true; G.$gamePlayer._encounterCount = 0; await frames(30);
+      const busyBattle = !!battle(); W.PSFlow.running = false; G.$gamePlayer._encounterCount = 50;
+      eq([busyBattle, W.PSFlow.lastEncounter], [false, null], "busy: nothing opens and nothing is decided");
+      // a real trigger
+      const saveBefore = G.$gameSystem.isSaveEnabled();
+      await stepInto(4, 9, 2);
+      await waitFor(() => battle() && battle()._mode !== "boot", "encounter battle scene");
+      const req = W.PSFlow.request;
+      assert(req.encounter && /^wild#\d+$/.test(req.battleId), "an encounter request: " + req.battleId);
+      assert(["Pidgey", "Caterpie"].includes(req.foes[0].species) && req.foes[0].level >= 2 && req.foes[0].level <= 4, "a foe from the table: " + JSON.stringify(req.foes));
+      await inMode("main");
+      const foe = battle()._session.foeTeam[0];
+      assert(foe.id === `W${req.seq}-1` && foe.moves.length > 0 && foe.ivs, "the foe was created from the content");
+      eq([saveBefore, G.$gameSystem.isSaveEnabled()], [true, false], "saving is off during the battle");
+      assert(!G.Window_MenuCommand.prototype.isSaveEnabled.call({}), "the menu save command is disabled");
+      assert(!G.Scene_Base.prototype.isAutosaveEnabled.call(battle()), "autosave is off");
+      let refused: any = null; await G.DataManager.saveGame(9).catch((e: any) => { refused = e; });
+      assert(refused && /battle is running/.test(String(refused)), "a direct save is refused: " + refused);
+      eq(W.PSState.lastSaveError && W.PSState.lastSaveError.code, "battle-running", "and the refusal is diagnosable");
+      await choose(/^Run/); await finishBattle();
+      eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit], [3, "applied"], "ran");
+      eq(G.$gameSystem.isSaveEnabled(), true, "saving is back on");
+      assert(G.$gamePlayer._encounterCount > 0, "a fresh step count was drawn at the trigger");
+      W.PSFlow.lastEncounter = null; await frames(90);
+      eq([!!battle(), W.PSFlow.lastEncounter], [false, null], "standing still after the battle does not re-trigger");
+      return { foe: req.foes[0], battleId: req.battleId };
+    });
+
+    await scenario("T17 encounter win: Ember until the foe faints, level-up to 8 and the level 8 move learned; HP/PP/status/exp written back once", async () => {
+      await slice(17);
+      const m = game().party[0]; m.exp = E.minExp("parabolic", 8) - 1;
+      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await fightUntilEnd(/^Ember|^ember/i);
+      const live = battle()._session.gw.readState("p1").find((x: any) => x.id === "G-starter-1");
+      await finishBattle();
+      const o = W.PSFlow.lastOutcome; eq([o.code, o.commit, o.kind], [1, "applied", "win"], "won");
+      const p = game().party[0];
+      eq([p.level, p.moves.map((x: any) => x.id)], [8, ["scratch", "growl", "ember", "smokescreen"]], "level 8 and Smokescreen learned");
+      eq([p.hp, p.status], [live.hp, live.status || ""], "HP and status from the engine");
+      eq(p.moves[2].pp, live.pp.ember, "Ember PP written back"); assert(p.moves[2].pp < p.moves[2].maxpp, "PP was used");
+      eq(W.PSFlow.commit(W.PSFlow.lastResult), "already-applied", "a repeat commit is a no-op");
+      return { level: p.level, exp: p.exp, hp: p.hp, emberPp: p.moves[2].pp };
+    });
+
+    await scenario("T18 full party: a Potion is used, Poké Balls are thrown until one catches, the catch goes to the boxes with a message, and two catches never share an id", async () => {
+      await slice(18);
+      const g = game();
+      for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3));
+      g.party[0].hp = 5; g.bag.pokeball = 30;
+      const ids: string[] = [];
+      for (let round = 0; round < 2; round++) {
+        await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+        if (round === 0) {
+          await choose(/^Bag/); await inMode("bag"); await choose(/Potion/); await inMode("party"); await choose(/Charmander/); await inMode("main");
+          assert(battle()._log._lines.some((l: string) => /Recovered/.test(l)), "the Potion healed");
+        }
+        for (let i = 0; i < 25 && mode_() !== "end"; i++) { if (mode_() === "party-forced") { await choose(/Caterpie/); await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy, "after the switch"); continue; } await choose(/^Bag/); await inMode("bag"); await choose(/Poké Ball/); await waitFor(() => ["main", "end", "party-forced"].includes(mode_()) && battle()._queue.length === 0 && !battle()._busy, "after the throw"); }
+        await inMode("end");
+        assert(battle()._log._lines.some((l: string) => /sent to the boxes/.test(l)), "the player is told the catch went to the boxes");
+        await press("ok"); await dismissMessages(); await waitFor(() => !W.PSFlow.running && !battle(), "back"); await frames(5);
+        eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit], [2, "applied"], "caught");
+        ids.push(game().boxes[game().boxes.length - 1].id);
+      }
+      eq([game().party.length, game().boxes.length], [6, 2], "party unchanged, two in the boxes");
+      assert(ids[0] !== ids[1] && ids.every((id) => /^W\d+-1$/.test(id)), "distinct stable ids: " + ids.join(","));
+      eq(game().bag.potion, 4, "one potion used");
+      return { ids, balls: game().bag.pokeball };
+    });
+
+    await scenario("T19 party and boxes full: the ball is refused with the reason before anything is spent", async () => {
+      await slice(19);
+      const g = game();
+      for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3));
+      g.boxes.push(mkMember("B-1", "Pidgey", 3));
+      W.PSFlow.testLimits = { party: 6, boxes: 1, bagPerItem: 999, money: 999999 }; W.PSFlow._app = null;
+      const before = clone(game());
+      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await choose(/^Bag/); await inMode("bag"); await choose(/Poké Ball/); await inMode("main");
+      assert(battle()._log._lines.some((l: string) => /party and boxes are full/.test(l)), "the reason is shown");
+      eq(battle()._session.bag.pokeball, before.bag.pokeball, "nothing spent");
+      await choose(/^Run/); await finishBattle();
+      eq([game().party.length, game().boxes.length, game().bag.pokeball], [6, 1, before.bag.pokeball], "nothing stored or spent");
+      W.PSFlow.testLimits = null; W.PSFlow._app = null;
+    });
+
+    await scenario("T20 encounter defeat: money lost (highest level x 8) and the party healed with the commit, the player taken home, nothing left running", async () => {
+      await slice(20);
+      const g = game(); g.party = [mkMember("S-1", "Snorlax", 2, { hp: 1 })]; g.money = 1000;
+      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await choose(/^Fight/); await inMode("moves"); await choose(/tackle/i);
+      await inMode("end"); await press("ok");
+      await dismissMessages();
+      await waitFor(() => G.$gameMap.mapId() === 5 && G.$gamePlayer.x === 8 && G.$gamePlayer.y === 9 && !G.SceneManager.isSceneChanging(), "home");
+      const o = W.PSFlow.lastOutcome;
+      eq([o.code, o.commit, o.blackout, o.defeat], [4, "applied", true, { moneyLost: 16, healed: true }], "defeat settled with the commit");
+      eq(game().money, 984, "money lost once"); assert(game().party[0].hp > 1 && game().party[0].status === "", "healed");
+      eq(W.PSFlow.lastReturn.status, "requested", "the trip home was requested");
+      assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning() && G.$gameSystem.isSaveEnabled(), "nothing running or waiting, saving back on");
+    });
+
+    await scenario("T21 the trip home fails after the commit: the defeat stays settled once, a retry only moves the player", async () => {
+      await slice(21);
+      const g = game(); g.party = [mkMember("S-1", "Snorlax", 2, { hp: 1 })]; g.money = 1000;
+      W.PSFlow.debug.failReturn = true;
+      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await choose(/^Fight/); await inMode("moves"); await choose(/tackle/i);
+      await inMode("end"); await press("ok"); await dismissMessages(); await frames(20);
+      eq([W.PSFlow.lastReturn.status, G.$gamePlayer.x, G.$gamePlayer.y], ["failed", 4, 10], "still where the battle was");
+      eq(game().money, 984, "settled once");
+      const settled = clone(game());
+      const r = W.PSFlow.retryReturnHome(); eq(r.status, "requested", "retry requested");
+      await waitFor(() => G.$gamePlayer.x === 8 && G.$gamePlayer.y === 9 && !G.SceneManager.isSceneChanging(), "home after the retry");
+      eq(game(), settled, "the retry changed nothing in the state");
+      eq(W.PSFlow.retryReturnHome().status, "none", "nothing left to retry");
+    });
+
+    await scenario("T22 an event battle lost with canLose off ends the event and goes home; an event that had disabled saving keeps it disabled", async () => {
+      await toMap(); const g = game(); g.party = [mkMember("S-1", "Snorlax", 2, { hp: 1 })]; g.money = 500;
+      G.$gameSystem.disableSave();
+      G.$gameMessage.clear();
+      await startEvent(1); await inMode("main");
+      await choose(/^Fight/); await inMode("moves"); await choose(/tackle/i);
+      await inMode("end"); await press("ok");
+      await dismissMessages();
+      await waitFor(() => G.$gameMap.mapId() === 5 && !G.SceneManager.isSceneChanging(), "taken home");
+      eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.blackout, game().money], [4, true, 484], "defeat settled and blacked out");
+      assert(!G.$gameMap._interpreter.isRunning(), "the event did not continue after the defeat");
+      eq(G.$gameSystem.isSaveEnabled(), false, "saving stays disabled because the event had disabled it");
+      G.$gameSystem.enableSave();
+      await recover();
+    });
+
+    await scenario("T23 a real save failure is diagnosable and changes nothing; the next good save clears it", async () => {
+      await slice(23);
+      const before = clone(game());
+      const so = G.StorageManager.saveObject;
+      let err: any = null;
+      try {
+        G.StorageManager.saveObject = () => Promise.reject(new Error("injected: disk full"));
+        await G.DataManager.saveGame(8).catch((e: any) => { err = e; });
+      } finally { G.StorageManager.saveObject = so; }
+      assert(err && /disk full/.test(String(err)), "the save rejected");
+      eq([W.PSState.lastSaveError.code, W.PSState.lastSaveError.savefileId], ["write-failed", 8], "diagnosed");
+      eq(game(), before, "state unchanged");
+      await G.DataManager.saveGame(8);
+      eq(W.PSState.lastSaveError, null, "a good save clears the diagnosis");
+    });
+
+    await scenario("T24 the read-only party screen: from the slice sign and from the main menu; it shows party, boxes, bag and money and changes nothing", async () => {
+      await slice(24);
+      game().boxes.push(mkMember("B-1", "Pidgey", 3));
+      const before = clone(game());
+      G.$gameMap.event(3).start(); await frames(3);
+      for (let i = 0; i < 20 && !(scene() && scene()._psParty); i++) { if (G.$gameMessage.isBusy()) await press("ok"); else await frames(5); }
+      await waitFor(() => scene() && scene()._psParty, "party screen from the sign");
+      const lines = scene()._text._lines.join("\n");
+      assert(/Charmander\s+Lv5/.test(lines) && /Boxes: 1/.test(lines) && /Potion x5/.test(lines) && /Money: 3000/.test(lines), "the screen shows the state: " + lines);
+      await press("cancel"); await waitFor(() => scene() && scene()._spriteset, "back on the map"); await dismissMessages();
+      G.SceneManager.push(G.Scene_Menu); await waitFor(() => scene() && scene()._commandWindow, "main menu");
+      const cw = scene()._commandWindow;
+      assert(cw._list.some((c: any) => c.symbol === "psParty"), "the menu has the Party entry");
+      cw.selectSymbol("psParty"); cw.processOk();
+      await waitFor(() => scene() && scene()._psParty, "party screen from the menu");
+      await press("cancel"); await waitFor(() => scene() && scene()._commandWindow, "back in the menu");
+      await press("cancel"); await waitFor(() => scene() && scene()._spriteset, "back on the map");
+      eq(game(), before, "read only");
+      return { lines: lines.split("\n").length };
+    });
+
     await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
       W.PSFlow.setLanguage("zh");
       try {
-        fresh();
+        await toMap(); // the step 4 scenarios end on the slice map; this one uses the battle test map
         await startEvent(1); await inMode("main");
         eq(names(), ["战斗", "背包", "精灵", "逃跑"], "main menu in Chinese");
         const fits = (where: string) => {

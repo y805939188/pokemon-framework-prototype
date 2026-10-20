@@ -80,6 +80,14 @@ export interface ClaimOutcome {
   money?: number;
 }
 
+/** A read-only view of the persistent party, boxes and bag for a host screen (no rule lives in the host). */
+export interface PartyView {
+  members: { id: string; species: string; nameKey?: string; level: number; hp: number; maxhp: number; status: string; moves: { id: string; pp: number; maxpp: number }[] }[];
+  boxes: number;
+  bag: Record<string, number>;
+  money: number;
+}
+
 export interface HealOutcome {
   status: "healed" | "unchanged" | "refused";
   reason?: string;
