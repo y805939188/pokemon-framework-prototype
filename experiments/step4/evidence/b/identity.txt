@@ -2,8 +2,6 @@ commit under test: fa1d1a1bb82da0dd55beb11ac9c7e70999e3b5e0 (working tree clean;
 command: scripts/run-flow-test-mac.sh <evidence dir> (NW.js 0.117.0 / Node 26.7.0 from the installed RPG Maker MZ), Apple Silicon macOS
 headless: scripts/test-quick.sh on the same tree: 32 suites, all '# fail 0'
 artifacts loaded by the run (sha256):
-ps-flow-report.json pass nw 0.117.0 node 26.7.0
-ps-flow-verify-save.json pass nw 0.117.0 node 26.7.0
 1d39606d536e2942a2ca2f5df140e1ef2d04381a64fb642f19e0c9ac95cc8977  js/engine/build/content-cli.cjs
 29c6f751321f5545a4be31d07ac7ce21cfbb59ec4dc858880f80e4f2f60c555a  js/engine/build/core.cjs
 b7a0412ea2cd72d3371ee2fb409f09c7a2de893bb422d9034dafe0f8acf54ec8  js/engine/build/custom-formats.cjs

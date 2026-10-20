@@ -8,5 +8,8 @@ the workspace (`.verify/step4-<batch>/`).
 |---|---|---|---|
 | `a/` | `5fe6abd4934d6c5bbb2eb4658174838c6c4fa23b` (clean tree) | dev tree: T1–T14, T15, T15b, T8 in one process; V1, V2 in a second process (real restart) | all pass |
 | `b/` | `fa1d1a1bb82da0dd55beb11ac9c7e70999e3b5e0` (clean tree; code = `1350f08`) | dev tree: T1–T25 (incl. T15b) and T8 in one process; V1, V2 after a real restart | all 28 pass |
+| `c/` | `d1e71ff2d4c34147fcdd3a9e936a4c00636bc876` (clean tree) | dev tree: T1–T26 (incl. T15b) and T8; V1, V2, V3 after a real restart | all 30 pass |
+
+Packaged-app runs (batch C) are recorded outside the repository (workspace `.verify/step4-c/` and the candidate report), so that the package's `gitHead` can equal the candidate commit.
 
 `identity.txt` in each folder lists the commit and the SHA-256 of every engine/plugin/content artifact the run loaded.

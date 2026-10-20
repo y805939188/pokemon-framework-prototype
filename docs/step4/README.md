@@ -8,7 +8,7 @@
 |---|---|---|---|
 | A 正式状态与领取 | `step4/a-state-grants` | 内容、个体生成、schema 3/迁移、正式新游戏、领取/治疗、插件命令与示例地图、CI、app 编译边界 | 作者自测，待非作者独立复核 |
 | B 探索和战斗闭环 | `step4/b-explore-battle` | 地图遭遇、真实野生个体、入队/入盒与容量、战败结算/回程、只读队伍/背包、保存守卫 | 作者自测，待非作者独立复核 |
-| C 整体与打包验收 | `step4/c-acceptance` | 12 项闭环验收、新包完整套件、性能基线、命令表与限制清单 | 未开始 |
+| C 整体与打包验收 | `step4/c-acceptance` | 12 项闭环验收（[acceptance.md](acceptance.md)）、新包完整套件、性能基线、命令一页表（[commands.md](commands.md)）、限制清单 | 作者自测，待非作者独立复核 |
 
 ## 1. 已确认的决定
 
@@ -87,9 +87,25 @@
 | 战败 | 无徽章状态、无精灵中心记录 | 徽章恒 0；回程只有“家”；全灭统计、`STARTING_OVER_SWITCH`、逃脱点等未实现；回程待重试只在内存中，不进存档 |
 | `StartBattle` 默认战败行为 | 回家并结束事件 | 第四步之前败北只返回 4；需要旧行为时设 `canLose = true` |
 
-## 6. 证据
+## 6. 内容来源与分发限制（逐项，本阶段仅供内部验证）
 
-- 无头：`scripts/test-quick.sh`（第四步新增套件 `experiments/step4/test-*.cjs`）。
+| 内容 | 来源 | 条件/状态 |
+|---|---|---|
+| 战斗数据（物种基础值、特性、性别比例、招式名与 PP、Gen 8 学习表等级） | 固定提交的 Pokémon Showdown（`scripts/showdown.env`），运行时读取，不复制进框架内容 | 代码与数据文件是 MIT；数据描述的是权利属于各权利人的系列作品，MIT **不等于**可以把这些游戏数据随产品再分发 —— 未核实，见 `content/sample/sources.json` |
+| 框架独有数值（成长曲线、基础经验、EV、捕获率、学习表条目、奖励包） | 项目作者手填（`author-placeholder`） | 不声称与任何游戏一致；发布前必须换成有来源的数据集 |
+| 物种显示名（英/中文本 key） | 项目作者录入 | 同上（名称本身的使用条件未核实） |
+| 地图 `Map005`、事件、插件参数 | 本项目新建（地块取自 MZ 自带图块集） | 地图 JSON 入库；地块与角色图像是本机 MZ 安装复制的素材 |
+| MZ 图像/音频/字体（`img/`、`audio/` 等） | 本机 RPG Maker MZ 安装（`.git/info/exclude` 排除，不入库） | 只能按 MZ 许可使用，**不在本仓库分发**；打包产物包含它们，所以本阶段的包只用于内部验证 |
+| RPGReactor 运行时 | 本机检出 `2dc2e10e`（0.98.8） | 自有代码 MIT；随附第三方组件按其 `THIRD_PARTY_NOTICES.md`，本步未逐项核实 |
+| 打包 NW.js | MZ 安装自带 0.117.0 | 本步未改动；签名为 ad-hoc，没有 Developer ID/公证 |
+
+本步没有进行任何新的公开资源分发；仓库是公开的，但入库的只有代码、作者 JSON、地图 JSON 与测试证据。
+
+## 7. 证据
+
+- 无头：`scripts/test-quick.sh`（32 个套件；第四步新增 `experiments/step4/test-{schema3,content4,core4,app4,battle-rules4,app-battle4}.cjs`）。
+- 12 项验收矩阵：[acceptance.md](acceptance.md)。命令一页表：[commands.md](commands.md)。
+- 打包与性能：新包上的完整 `scripts/run-package-tests-mac.sh`（含 SL1、替换包）与 `scripts/run-package-perf-mac.sh`（含“遭遇→进战斗”“存/读档”）的结果、包身份（`gitHead`）与性能基线记录在工作区候选报告 `.handoff/step4-candidate-report.zh.md` 与 `.handoff/STATUS.md`（为了让包内 `gitHead` 等于候选 SHA，这些结果不再回写进仓库）。
 - 真实 MZ（开发树）：`scripts/run-flow-test-mac.sh <证据目录>`；批次 A 场景 T15、T15b、V2；批次 B 场景 T16–T25（T16 是评审要求的遭遇宿主验证：区域过滤、事件中不触发、忙碌不重入、战后不立即循环，外加战斗中保存被拒）；每次都重跑既有 T1–T14、T8、V1。证据与身份见 `experiments/step4/evidence/README.md`。
 
 | 场景 | 内容 |
@@ -104,3 +120,4 @@
 | T23 | 真实保存失败（注入存储错误）可诊断、状态不变；下一次成功保存清除诊断 |
 | T24 | 只读队伍界面：告示牌与主菜单两条入口，内容正确，不改状态 |
 | T25 | `_psBattleSeq` 与状态同存同回滚；同一存档时间线内没有重复 ID |
+| T26 → V3 | 完整游玩（领取、遭遇胜利成长、捕获入队、满队后捕获入盒、护士、移动）后保存；**新进程**读档：队伍/盒子/背包/成长/凭证/金钱/地图位置/战斗序号一致，并继续遭遇一战 |
