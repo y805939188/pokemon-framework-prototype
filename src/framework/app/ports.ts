@@ -10,8 +10,13 @@ import type { Content, DexLookup } from "../rules/types.ts";
 export interface GameStatePort {
   /** The current state; throws when the state is not usable (e.g. a save that could not be read), so no battle runs on it. */
   read(): GameState;
-  /** Install the next state in one step. If this throws, the old state must remain installed. Called only with a state the rules produced from `read()`'s result. */
+  /** Install the next state in one step. If this throws, the old state must remain installed. Called only with a state the rules produced from `read()`'s result (or, for a new game, with the formal empty state). */
   replace(next: GameState): void;
+}
+
+/** Randomness for game rules outside a battle (creating members, encounters): an integer in [0, n). */
+export interface RandomPort {
+  (n: number): number;
 }
 
 /** One battle as the author asks for it (the StartBattle command). */
@@ -42,6 +47,24 @@ export interface ContentPort {
 /** How the host learns the outcome (MZ: write the result variable). A failure here never undoes a committed result. */
 export interface OutcomeProjection {
   project(outcome: BattleOutcome): void;
+}
+
+/** What a one-time grant did. Never thrown: a refusal is a value and then nothing was committed. */
+export interface ClaimOutcome {
+  status: "applied" | "already-claimed" | "refused";
+  grantId: string;
+  /** Why it was refused: a rule refusal (unknown-grant, no-room, bag-full, member-id-taken, creation-failed), state-unusable, no-random or commit-failed. */
+  reason?: string;
+  error?: string;
+  placed?: { id: string; species: string; level: number; to: "party" | "boxes" }[];
+  items?: Record<string, number>;
+  money?: number;
+}
+
+export interface HealOutcome {
+  status: "healed" | "unchanged" | "refused";
+  reason?: string;
+  error?: string;
 }
 
 export interface BattleOutcome {

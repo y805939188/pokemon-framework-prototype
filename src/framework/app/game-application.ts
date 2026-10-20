@@ -5,16 +5,29 @@
  * Outcomes are explicit so a caller can tell the four situations apart:
  *   not committed (aborted) | committed | already committed (duplicate) | committed but the host was not informed.
  */
-import { applyBattleResult } from "../rules/state.ts";
-import type { ApplyStatus, BattleResult } from "../rules/state.ts";
+import { applyBattleResult, newGame } from "../rules/state.ts";
+import type { ApplyStatus, BattleResult, GameState } from "../rules/state.ts";
+import { DEFAULT_LIMITS } from "../rules/limits.ts";
+import type { Limits } from "../rules/limits.ts";
+import { GrantRefusedError, applyGrant } from "../rules/grants.ts";
+import { healParty } from "../rules/heal.ts";
 import { findDanglingReferences } from "../flow/content-runtime.ts";
-import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleStartRequest, ContentPort, GameStatePort, OutcomeProjection } from "./ports.ts";
+import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleStartRequest, ClaimOutcome, ContentPort, GameStatePort, HealOutcome, OutcomeProjection, RandomPort } from "./ports.ts";
 
 export interface GameApplicationPorts<S extends BattleHandle> {
   state: GameStatePort;
   sessions: BattleSessionFactory<S>;
   content: ContentPort;
   projection: OutcomeProjection;
+  /** Needed by the use cases that create members (grants, encounters); without it they refuse with "no-random". */
+  random?: RandomPort;
+}
+
+/** Stage configuration of the application (not ports: plain values the host reads from its settings). */
+export interface GameApplicationOptions {
+  limits?: Limits;
+  /** Money of a new game (WP24 StartMoney; 3000 when omitted). */
+  startMoney?: number;
 }
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -31,8 +44,48 @@ export function outcomeCode(result: BattleResult): number {
 
 export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly ports: GameApplicationPorts<S>;
+  private readonly limits: Limits;
+  private readonly startMoney: number;
 
-  constructor(ports: GameApplicationPorts<S>) { this.ports = ports; }
+  constructor(ports: GameApplicationPorts<S>, options: GameApplicationOptions = {}) {
+    this.ports = ports;
+    this.limits = options.limits ?? DEFAULT_LIMITS;
+    this.startMoney = options.startMoney ?? 3000;
+  }
+
+  /** A new game: the formal empty state (no members; the player receives them through grants). Throws only if the store refuses. */
+  startNewGame(): { status: "started"; state: GameState } {
+    const state = newGame({ party: [], money: this.startMoney });
+    this.ports.state.replace(state);
+    return { status: "started", state };
+  }
+
+  /** Give a content grant once per save timeline. Never throws; a refusal commits nothing (and writes no claim). */
+  claimGrant(grantId: string): ClaimOutcome {
+    const refused = (reason: string, error: unknown): ClaimOutcome => ({ status: "refused", grantId, reason, error: message(error) });
+    let game: GameState;
+    try { game = this.ports.state.read(); } catch (error) { return refused("state-unusable", error); }
+    if (game.claims[grantId]) return { status: "already-claimed", grantId };
+    const random = this.ports.random;
+    if (!random) return refused("no-random", "no random source is configured for this application");
+    let r;
+    try { r = applyGrant(game, grantId, this.ports.content().content, random, this.limits); }
+    catch (error) { return refused(error instanceof GrantRefusedError ? error.reason : "invalid", error); }
+    if (r.status === "already-claimed") return { status: "already-claimed", grantId };
+    try { this.ports.state.replace(r.state); } catch (error) { return refused("commit-failed", error); }
+    return { status: "applied", grantId, placed: r.placed, items: r.items, money: r.money };
+  }
+
+  /** Heal the party (HP, status, PP). Safe to repeat: an already healed party writes nothing. Never throws. */
+  healParty(): HealOutcome {
+    let game: GameState;
+    try { game = this.ports.state.read(); } catch (error) { return { status: "refused", reason: "state-unusable", error: message(error) }; }
+    let next: GameState;
+    try { next = healParty(game, this.ports.content().content); } catch (error) { return { status: "refused", reason: "invalid", error: message(error) }; }
+    if (JSON.stringify(next.party) === JSON.stringify(game.party)) return { status: "unchanged" };
+    try { this.ports.state.replace(next); } catch (error) { return { status: "refused", reason: "commit-failed", error: message(error) }; }
+    return { status: "healed" };
+  }
 
   /**
    * Open a battle. A save written against older content is explained here, with the record and the missing thing,
