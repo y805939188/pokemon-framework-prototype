@@ -115,6 +115,23 @@
     for (let i = 0; i < 40 && (G.$gameMessage.isBusy() || G.$gameMap._interpreter.isRunning()); i++) { if (G.$gameMessage.isBusy()) await press("ok"); else await frames(5); }
     await waitFor(() => !G.$gameMap._interpreter.isRunning() && !G.$gameMessage.isBusy(), "interpreter idle");
   }
+  /** Run a map event that does not open a battle (messages are confirmed with real key presses) until the interpreter is idle. */
+  async function runEvent(id: number) {
+    await waitFor(() => scene() && scene()._spriteset && !G.SceneManager.isSceneChanging(), "map scene");
+    G.$gameMap.event(id).start();
+    await frames(3);
+    await dismissMessages();
+  }
+  async function toMapId(mapId: number, x: number, y: number) {
+    G.$gamePlayer.reserveTransfer(mapId, x, y, 2, 0);
+    G.SceneManager.goto(G.Scene_Map);
+    await waitFor(() => scene() && scene()._spriteset && !G.SceneManager.isSceneChanging() && G.$gameMap.mapId() === mapId, `Scene_Map on map ${mapId}`);
+    await frames(10);
+  }
+  /** Seeded random(n) for members created outside battles (grants, encounters). */
+  function seeded(seed: number) { let st = seed >>> 0; return (n: number) => { st = (Math.imul(st, 1664525) + 1013904223) >>> 0; return Math.floor((st / 4294967296) * n); }; }
+  const mzParty = () => ({ gold: G.$gameParty.gold(), items: clone(G.$gameParty._items), weapons: clone(G.$gameParty._weapons), armors: clone(G.$gameParty._armors) });
+
   async function startEvent(id: number) {
     await waitFor(() => scene() && scene().constructor && scene()._spriteset && !G.SceneManager.isSceneChanging(), "map scene");
     G.$gameMap.event(id).start();
@@ -432,6 +449,54 @@
       } finally { session.result = readResult; }
     });
 
+    await scenario("T15 new game slice: formal empty state (no fixture), the starter grant once, a repeat changes nothing, heal twice, MZ gold/items untouched; saved for the restart check", async () => {
+      G.DataManager.setupNewGame();
+      W.PSFlow.rng = seeded(4242);
+      try {
+        const g0 = clone(game());
+        eq([g0.schema, g0.party.length, g0.boxes.length, g0.bag, g0.money, g0.claims, g0.appliedBattles], [3, 0, 0, {}, 3000, {}, {}], "a new game is the formal empty state");
+        assert(!JSON.stringify(g0).includes("A-000"), "no fixture member in a new game");
+        const mz0 = mzParty();
+        eq([G.$dataSystem.startMapId, G.$dataSystem.startX, G.$dataSystem.startY], [5, 8, 9], "the project starts on the slice map");
+        await toMapId(5, 8, 9);
+        G.$gameVariables.setValue(11, -1);
+        await runEvent(1);
+        eq([W.PSFlow.lastClaim.status, G.$gameVariables.value(11)], ["applied", 1], "starter granted, the event sees 1");
+        const g1 = clone(game());
+        eq(g1.party.map((m: any) => [m.id, m.species, m.level, m.moves.map((x: any) => x.id)]), [["G-starter-1", "Charmander", 5, ["scratch", "growl", "ember"]]], "the starter comes from the content");
+        eq([g1.bag, g1.claims, g1.money], [{ antidote: 2, pokeball: 10, potion: 5 }, { starter: { kind: "grant" } }, 3000], "items and the claim");
+        await runEvent(1);
+        eq([W.PSFlow.lastClaim.status, G.$gameVariables.value(11)], ["already-claimed", 2], "the repeat is reported");
+        eq(game(), g1, "the repeat changes nothing");
+        const m = game().party[0]; m.hp = 1; m.status = "psn"; m.moves[0].pp = 0; // hurt (test only: written straight into the state)
+        G.$gameVariables.setValue(12, -1);
+        await runEvent(2);
+        eq([W.PSFlow.lastHeal.status, G.$gameVariables.value(12)], ["healed", 1], "healed");
+        const h = game().party[0];
+        eq([h.hp, h.status, h.moves[0].pp], [g1.party[0].hp, "", h.moves[0].maxpp], "HP, status and PP restored");
+        const g2 = clone(game());
+        await runEvent(2);
+        eq([W.PSFlow.lastHeal.status, G.$gameVariables.value(12)], ["unchanged", 1], "a second heal is safe");
+        eq(game(), g2, "and changes nothing");
+        eq(mzParty(), mz0, "MZ gold and items are not a second authority: untouched by grants and heals");
+        const rc = await G.DataManager.saveGame(5);
+        fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t15.json"), JSON.stringify({ state: g2, mz: mz0 }));
+        return { saveCode: rc, starter: g1.party[0] };
+      } finally { W.PSFlow.rng = null; }
+    });
+
+    await scenario("T15b a save made before the framework state existed loads as the formal empty state (no invented party), and the starter can be claimed", async () => {
+      G.DataManager.setupNewGame();
+      delete G.$gameSystem._psGame;
+      await G.DataManager.saveGame(6);
+      G.$gameSystem._psGame = { diverged: true };
+      await G.DataManager.loadGame(6);
+      const info = G.$gameSystem._psSaveInfo;
+      eq([info && info.created, game().party.length, game().money, game().claims], ["empty", 0, 0, {}], "empty state created on load and reported");
+      assert(!G.$gameSystem._psSaveError, "not an error");
+      eq(W.PSFlow.claim("starter").status, "applied", "the player can still receive the starter");
+      await recover();
+    });
     await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
       W.PSFlow.setLanguage("zh");
       try {
@@ -686,6 +751,17 @@
   }
 
   async function verifySave() {
+    await scenario("V2 real restart (slice): the new-game save loads identically in a fresh process, the claim stays claimed, MZ gold/items as saved", async () => {
+      const expected = JSON.parse(fs.readFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t15.json"), "utf8"));
+      G.DataManager.setupNewGame();
+      await G.DataManager.loadGame(5);
+      eq(game(), expected.state, "framework state after a fresh process loads the save");
+      eq(mzParty(), expected.mz, "MZ party gold/items as saved");
+      const again = W.PSFlow.claim("starter");
+      eq(again.status, "already-claimed", "the claim survived the restart");
+      eq(game(), expected.state, "nothing granted twice");
+      return { party: game().party.map((m: any) => m.id), claims: Object.keys(game().claims) };
+    });
     await scenario("V1 real restart: the save written by the previous process loads with identical state, duplicates stay no-ops", async () => {
       const expected = JSON.parse(fs.readFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected.json"), "utf8"));
       G.DataManager.setupNewGame();

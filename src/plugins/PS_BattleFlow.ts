@@ -40,6 +40,9 @@
     finishBattle(session: unknown, request: unknown): BattleOutcomeView & { result?: unknown };
     abortBattle(request: unknown, error: unknown): BattleOutcomeView;
     commitResult(result: unknown): string;
+    startNewGame(): { status: string };
+    claimGrant(grantId: string): { status: string; grantId: string; reason?: string; error?: string; placed?: { id: string; species: string; level: number; to: string }[]; items?: Record<string, number>; money?: number };
+    healParty(): { status: string; reason?: string; error?: string };
   }
 
   // ---------------------------------------------------------------- shared flow state / API
@@ -48,6 +51,8 @@
     request: null as any,
     lastOutcome: null as any,
     lastResult: null as any,
+    lastClaim: null as any,
+    lastHeal: null as any,
     seed: undefined as any, // tests pin the engine seed
     fast: false, // tests: no message pacing
     debug: {} as any, // tests: failure injection
@@ -96,9 +101,21 @@
     game(): any {
       const err = G.$gameSystem._psSaveError;
       if (err) throw new Error(`the save state is not usable (${err.code}): ${err.message}`); // never battle on, or overwrite, a state we could not read
-      if (!G.$gameSystem._psGame) G.$gameSystem._psGame = engine().F.makeGame();
+      // Never invent a party: a new game installs the formal empty state (setupNewGame below) and a save without one gets
+      // an empty state on load (PS_SaveState). Reaching this without a state is a host wiring error, not a reason to fake one.
+      if (!G.$gameSystem._psGame) throw new Error(`there is no framework game state${G.$gameSystem._psInitError ? ` (${G.$gameSystem._psInitError})` : ""}: start a new game or load a save`);
       return G.$gameSystem._psGame;
     },
+    /** New game: the application installs the formal empty state (no members; grants give them). */
+    startNewGame(): void {
+      delete G.$gameSystem._psInitError;
+      try { PSFlow.app().startNewGame(); }
+      catch (e) { G.$gameSystem._psInitError = String(e instanceof Error ? e.message : e); console.error("PS_BattleFlow: the new game state could not be created:", e); }
+    },
+    /** Randomness for members created outside a battle (grants, encounters); tests may pin it with `rng`. */
+    rng: null as ((n: number) => number) | null,
+    random(n: number): number { return PSFlow.rng ? PSFlow.rng(n) : Math.floor(Math.random() * n); },
+    /** TEST AID ONLY (plugin command ResetGame, the flow test driver): installs the synthetic step 2 fixture party explicitly. */
     resetGame(): void {
       delete G.$gameSystem._psSaveError; delete G.$gameSystem._psSaveInfo; delete G.$gameSystem._psSaveWarning; // an explicit reset is a deliberate act
       G.$gameSystem._psGame = engine().F.makeGame();
@@ -119,11 +136,38 @@
           content: () => ({ content: PSFlow.content(), dex: PSFlow._dex }),
           sessions: B.composition.createBattleSessionFactory({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger.sink }),
           projection: { project: (outcome: { code: number }) => PSFlow.projectOutcome(outcome) },
-        });
+          random: (n: number) => PSFlow.random(n),
+        }, { startMoney: PSFlow.param("startMoney", 3000) });
       }
       return PSFlow._app as GameAppView;
     },
     _app: null as GameAppView | null,
+    /** A numeric plugin parameter (empty or invalid -> the default). */
+    param(name: string, dflt: number): number {
+      const raw = (G.PluginManager.parameters(NAME) as Record<string, string>)[name];
+      const n = Number(raw);
+      return raw === undefined || raw === "" || !Number.isFinite(n) ? dflt : n;
+    },
+    /** One-time grant (plugin command ClaimGrant). Never throws; the outcome says what happened. */
+    claim(grantId: string): any {
+      try { return PSFlow.app().claimGrant(grantId); }
+      catch (e) { return { status: "refused", grantId, reason: "unavailable", error: String(e instanceof Error ? e.message : e) }; }
+    },
+    heal(): any {
+      try { return PSFlow.app().healParty(); }
+      catch (e) { return { status: "refused", reason: "unavailable", error: String(e instanceof Error ? e.message : e) }; }
+    },
+    /** Player-facing lines for a grant outcome (the event shows them as a message). */
+    claimLines(o: any): string[] {
+      const tr = PSFlow.translator();
+      if (o.status === "already-claimed") return [tr.t("grant.already")];
+      if (o.status !== "applied") return [tr.has(`grant.refused.${o.reason}`) ? tr.t(`grant.refused.${o.reason}`) : tr.t("grant.refused.default", { reason: o.reason || "?" })];
+      const lines: string[] = [];
+      for (const m of o.placed || []) lines.push(tr.t(m.to === "party" ? "grant.member.party" : "grant.member.boxes", { name: PSFlow.speciesName(m.species), level: m.level }));
+      for (const [k, n] of Object.entries(o.items || {})) lines.push(tr.t("grant.item", { item: tr.tOr(`item.name.${k}`, k), count: n as number }));
+      if (o.money) lines.push(tr.t("grant.money", { money: o.money }));
+      return lines;
+    },
     /** Host notification also works when the engine/application could not be constructed. */
     projectOutcome(outcome: { code: number }): void {
       if (PSFlow.debug.failProjection) { PSFlow.debug.failProjection = false; throw new Error("injected projection failure"); } // tests
@@ -190,6 +234,42 @@
     this.setWaitMode("psBattle");
   });
   G.PluginManager.registerCommand(NAME, "ResetGame", () => PSFlow.resetGame());
+
+  /** Show lines as one message window and make the event wait for it (only when the author asked for messages). */
+  function say(interpreter: any, lines: string[]): void {
+    if (!lines.length) return;
+    for (const l of lines) G.$gameMessage.add(l);
+    interpreter.setWaitMode("message");
+  }
+  const flag = (v: unknown, dflt: boolean): boolean => (v === undefined || v === "" ? dflt : String(v) === "true");
+
+  G.PluginManager.registerCommand(NAME, "ClaimGrant", function (this: any, args: any) {
+    const o = PSFlow.claim(String(args.grant || ""));
+    PSFlow.lastClaim = o;
+    const v = Number(args.resultVariable) || 0;
+    if (v) G.$gameVariables.setValue(v, o.status === "applied" ? 1 : o.status === "already-claimed" ? 2 : 0);
+    if (o.status === "refused") console.warn("PS_BattleFlow: grant refused:", o.grantId, o.reason, o.error);
+    if (flag(args.message, true)) say(this, PSFlow.claimLines(o));
+  });
+  G.PluginManager.registerCommand(NAME, "HealParty", function (this: any, args: any) {
+    const o = PSFlow.heal();
+    PSFlow.lastHeal = o;
+    const v = Number(args.resultVariable) || 0;
+    if (v) G.$gameVariables.setValue(v, o.status === "refused" ? 0 : 1);
+    if (o.status === "refused") console.warn("PS_BattleFlow: heal refused:", o.reason, o.error);
+    const tr = PSFlow.translator();
+    if (flag(args.message, true)) say(this, [o.status === "refused" ? tr.t("heal.refused") : tr.t("heal.done")]);
+  });
+
+  // A new game starts from the formal empty state (never the fixture party).
+  if (G.DataManager) {
+    const baseSetupNewGame = G.DataManager.setupNewGame;
+    G.DataManager.setupNewGame = function (this: any, ...a: any[]) {
+      const r = baseSetupNewGame.apply(this, a);
+      PSFlow.startNewGame();
+      return r;
+    };
+  }
 
   const baseUpdateWaitMode = G.Game_Interpreter.prototype.updateWaitMode;
   G.Game_Interpreter.prototype.updateWaitMode = function (this: any) {

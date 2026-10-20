@@ -18,6 +18,14 @@
  * @option zh
  * @default en
  *
+ * @param startMoney
+ * @text Start money
+ * @desc Money of a new game (framework state, not MZ gold). Default 3000.
+ * @type number
+ * @min 0
+ * @max 999999
+ * @default 3000
+ *
  * @command StartBattle
  * @text Start Battle
  * @desc Opens the text battle scene and pauses this event until it ends.
@@ -47,7 +55,43 @@
  * @type variable
  * @default 10
  *
+ * @command ClaimGrant
+ * @text Claim Grant
+ * @desc Gives a content reward package (content/sample/grants.json) once per save. Shows what was received unless Message is off.
+ *
+ * @arg grant
+ * @text Grant
+ * @desc Grant id from the content, e.g. starter
+ * @type string
+ * @default starter
+ *
+ * @arg resultVariable
+ * @text Result Variable
+ * @desc Receives 1 given now, 2 already given before, 0 refused (nothing given).
+ * @type variable
+ * @default 0
+ *
+ * @arg message
+ * @text Message
+ * @type boolean
+ * @default true
+ *
+ * @command HealParty
+ * @text Heal Party
+ * @desc Restores HP, status and PP of every party member. Safe to repeat.
+ *
+ * @arg resultVariable
+ * @text Result Variable
+ * @desc Receives 1 healed (or nothing to heal), 0 refused.
+ * @type variable
+ * @default 0
+ *
+ * @arg message
+ * @text Message
+ * @type boolean
+ * @default true
+ *
  * @command ResetGame
- * @text Reset Prototype Game State
- * @desc Recreates the prototype party/bag inside the save data (testing aid).
+ * @text Reset to Test Fixture (testing aid)
+ * @desc TESTING AID: replaces the framework state with the synthetic step 2 test party (three level 50 members). Not for real games.
  */

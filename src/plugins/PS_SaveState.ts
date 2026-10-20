@@ -5,6 +5,9 @@
  *
  *   load : the state is migrated on a COPY; success replaces it, failure keeps the raw document and records
  *          `_psSaveError` (battles then refuse to start: nothing is reset, nothing is overwritten by a battle result).
+ *          A save with NO framework state (made before the framework state existed, or before any of it was used) gets
+ *          the formal empty state (no members, no items, money 0, nothing claimed) and `_psSaveInfo.created` says so:
+ *          no player data is invented.
  *   save : the state is validated first; a problem is recorded as `_psSaveWarning` and logged, and the save still
  *          goes ahead (refusing would lose the player's progress; the warning is the diagnostic).
  */
@@ -17,13 +20,18 @@
   if (!nodeRequire || !G.DataManager) return;
 
   const schema = (): any => nodeRequire("./js/engine/build/engine.cjs").saveSchema;
+  const state = (): any => nodeRequire("./js/engine/build/engine.cjs").state;
 
   const PSState = (W.PSState = {
     /** Called after MZ restored a save: migrate or diagnose `_psGame`. */
     afterLoad(): void {
       const sys = G.$gameSystem;
       delete sys._psSaveError; delete sys._psSaveInfo; delete sys._psSaveWarning;
-      if (sys._psGame === undefined) return; // a save from before the prototype state existed
+      if (sys._psGame === undefined) {
+        sys._psGame = state().newGame({ party: [], money: 0 });
+        sys._psSaveInfo = { from: null, to: sys._psGame.schema, migrated: false, created: "empty", notes: ["the save had no framework state: an empty one was created (no members, no items, money 0, nothing claimed)"] };
+        return;
+      }
       const r = schema().migrateGame(sys._psGame);
       if (r.ok) {
         if (r.migrated) sys._psGame = r.state;
