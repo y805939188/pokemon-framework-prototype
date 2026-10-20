@@ -39,6 +39,7 @@ test('creation data comes from the pinned Showdown build: natural abilities, gen
   assert.equal(dex.species('voltorb').gender, 'N'); assert.equal(dex.species('chansey').gender, 'F'); assert.equal(dex.species('tauros').gender, 'M');
   assert.deepEqual(content.moves.Scratch, { id: 'scratch', name: 'Scratch', pp: 35 });
   assert.deepEqual(content.moves['Sand Attack'], { id: 'sandattack', name: 'Sand Attack', pp: 15 });
+  assert.equal(content.moves.Rest.pp, 10, 'Gen 8 data (the battle format), not the newest generation (Rest has 5 PP there)');
   for (const s of Object.values(sp)) for (const names of Object.values(s.learnset)) for (const n of names) assert.ok(content.moves[n], n + ' has creation data');
 });
 

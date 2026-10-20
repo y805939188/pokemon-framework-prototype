@@ -42,6 +42,7 @@ SUITES=(
   experiments/step4/test-core4.cjs
   experiments/step4/test-app4.cjs
   experiments/step4/test-battle-rules4.cjs
+  experiments/step4/test-app-battle4.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do

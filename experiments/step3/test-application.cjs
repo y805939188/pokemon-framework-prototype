@@ -10,11 +10,17 @@ const K = E.fakes;
 const F = E.fixtures;
 
 const result = name => JSON.parse(JSON.stringify(golden.entries.find(e => e.name === name).result));
+// Since step 4 the application creates the foes (species + level) from content that carries creation data: the
+// assembled sample (the fixture party's species are in it with the same numbers) and a seeded random.
+const fs = require('node:fs'); const path = require('node:path');
+const SRC = path.resolve(__dirname, '../../content/sample'); const readC = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
+const sample = E.contentRuntime.assembleContent(E.contentCompile.compileContent({ manifest: readC('manifest.json'), sources: readC('sources.json'), species: readC('species.json'), overlays: readC('overlays.json'), grants: readC('grants.json') }).data, E.dex.createDexLookup()).content;
+const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor((s / 4294967296) * n); }; };
 const request = r => ({ battleId: r.battleId, kind: 'wild', foes: [{ species: 'Pidgey', level: 5 }], seq: 1 });
 const snapshot = state => JSON.stringify(state.current());
 function setup(first = result('caught with master ball'), game = F.makeGame()) {
   const state = K.createMemoryState(game), projection = K.createRecordingProjection(), sessions = K.createFakeSessions(first);
-  const app = new GameApplication({ state, sessions, projection, content: () => ({ content: F.content }) });
+  const app = new GameApplication({ state, sessions, projection, content: () => ({ content: sample }), random: lcg(3) });
   return { state, projection, sessions, app };
 }
 
@@ -151,8 +157,8 @@ test('outcome codes: win by the player 1, caught 2, ran 3, anything else 4', () 
 // ---- the same contract with the real adapters (Showdown-backed session) in Node
 const real = () => {
   const state = K.createMemoryState(F.makeGame({ bag: { potion: 3, pokeball: 3 } })), projection = K.createRecordingProjection();
-  const sessions = E.composition.createBattleSessionFactory({ content: () => F.content, seed: () => [1, 2, 3, 4] });
-  return { state, projection, app: new GameApplication({ state, sessions, projection, content: () => ({ content: F.content, dex: E.dex.createDexLookup() }) }) };
+  const sessions = E.composition.createBattleSessionFactory({ content: () => sample, seed: () => [1, 2, 3, 4] });
+  return { state, projection, app: new GameApplication({ state, sessions, projection, content: () => ({ content: sample, dex: E.dex.createDexLookup() }), random: lcg(3) }) };
 };
 const req = (id, foes = [{ species: 'Pidgey', level: 5 }], kind = 'wild') => ({ battleId: id, kind, foes, seq: 1 });
 
@@ -170,8 +176,8 @@ test('real session: a run is committed once through the application and a repeat
 test('real session: a won trainer battle with a level-up and an item commits the session working copy as one change', async () => {
   const game = F.makeGame({ bag: { potion: 3 } }); game.party[0].exp = E.growth.minExp('parabolic', 51) - 1; game.party[0].hp = 70;
   const state = K.createMemoryState(game), projection = K.createRecordingProjection();
-  const sessions = E.composition.createBattleSessionFactory({ content: () => F.content, seed: () => [1, 2, 3, 4] });
-  const app = new GameApplication({ state, sessions, projection, content: () => ({ content: F.content }) });
+  const sessions = E.composition.createBattleSessionFactory({ content: () => sample, seed: () => [1, 2, 3, 4] });
+  const app = new GameApplication({ state, sessions, projection, content: () => ({ content: sample }), random: lcg(3) });
   const r = req('real-win#1', [{ species: 'Pidgey', level: 5 }], 'trainer'); const s = await app.startBattle(r);
   assert.equal((await s.useItem('potion', 'A-0001')).ok, true);
   assert.equal(state.current().bag.potion, 3, 'the persistent bag is untouched while the battle runs (the session works on a copy)');
@@ -185,8 +191,8 @@ test('real session: a won trainer battle with a level-up and an item commits the
 test('real session: a session closed by a failed rollback aborts and leaves the persistent state exactly as it was', async () => {
   const game = F.makeGame({ bag: { potion: 3 } }); game.party[0].hp = 50;
   const state = K.createMemoryState(game), projection = K.createRecordingProjection();
-  const sessions = E.composition.createBattleSessionFactory({ content: () => F.content, seed: () => [1, 2, 3, 4] });
-  const app = new GameApplication({ state, sessions, projection, content: () => ({ content: F.content }) });
+  const sessions = E.composition.createBattleSessionFactory({ content: () => sample, seed: () => [1, 2, 3, 4] });
+  const app = new GameApplication({ state, sessions, projection, content: () => ({ content: sample }), random: lcg(3) });
   const r = req('real-broken#1'); const s = await app.startBattle(r); const before = snapshot(state);
   const act = s.gw.act.bind(s.gw);
   s.gw.act = async (...a) => { await act(...a); throw new Error('operation failed'); }; // fails after the engine accepted the choice ...

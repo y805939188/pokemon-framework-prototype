@@ -4,7 +4,7 @@
  * battle session factory. Types only.
  */
 import type { BattleResult, GameState } from "../rules/state.ts";
-import type { Content, DexLookup } from "../rules/types.ts";
+import type { Content, DexLookup, Member } from "../rules/types.ts";
 
 /** The persistent game state, held by whoever owns the save (MZ: `$gameSystem._psGame`). The application never mutates what `read` returns. */
 export interface GameStatePort {
@@ -19,14 +19,33 @@ export interface RandomPort {
   (n: number): number;
 }
 
-/** One battle as the author asks for it (the StartBattle command). */
+/** One battle as the author (StartBattle) or an encounter asks for it. */
 export interface BattleStartRequest {
   battleId: string;
   kind: "wild" | "trainer";
+  /** Species as content id or persistent name, and level; the application creates the individuals. */
   foes: { species: string; level: number }[];
   /** Monotonic number of this battle in the save; used for stable foe ids. */
   seq: number;
+  /** Author flags of a scripted battle (protocol v1 foe descriptor). */
+  noRun?: boolean;
+  noBall?: boolean;
 }
+
+/** What the application decided before a session exists: the created foes and the effective flags. */
+export interface BattleSetup {
+  foes: Member[];
+  noRun: boolean;
+  /** The author's flag, or forced on because a caught member would have nowhere to go (decision D1). */
+  noBall: boolean;
+  /** The party and the boxes are both full (the reason a ball is disabled, for the host's message). */
+  storageFull: boolean;
+}
+
+/** An encounter the application allows here and now (or why not). */
+export type EncounterPlan =
+  | { ok: true; foe: { species: string; level: number } }
+  | { ok: false; reason: "not-here" | "invalid-table" | "no-able-member" | "state-unusable" | "no-random" | "unknown-species"; error?: string };
 
 /** A running battle as the application sees it: it can say how it ended. The UI drives the concrete session itself. */
 export interface BattleHandle {
@@ -35,8 +54,8 @@ export interface BattleHandle {
 }
 
 export interface BattleSessionFactory<S extends BattleHandle = BattleHandle> {
-  /** Open a battle for `game`; the application has already checked that the save only refers to content that exists. */
-  create(request: BattleStartRequest, game: GameState): Promise<S>;
+  /** Open a battle for `game` against `setup.foes`; the application has already checked the save's content references. */
+  create(request: BattleStartRequest, game: GameState, setup: BattleSetup): Promise<S>;
 }
 
 /** The content a battle uses and, when available, the engine's data to check moves against. */
@@ -77,6 +96,8 @@ export interface BattleOutcome {
   kind?: string;
   aborted?: true;
   error?: string;
+  /** A lost or drawn battle that was just committed: money lost and the party healed in the same state replacement (D3). */
+  defeat?: { moneyLost: number; healed: true };
   /** Whether the host was told. "failed" means the projection threw; `commit` separately says whether state was committed. */
   projection?: "ok" | "failed";
   projectionError?: string;

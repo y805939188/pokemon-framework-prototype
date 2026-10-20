@@ -4,7 +4,7 @@
  */
 import { clone } from "../rules/state.ts";
 import type { BattleResult, GameState } from "../rules/state.ts";
-import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleStartRequest, GameStatePort, OutcomeProjection } from "../app/ports.ts";
+import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, GameStatePort, OutcomeProjection } from "../app/ports.ts";
 
 /** Recursively freeze, so any in-place write by the code under test throws instead of passing silently. */
 export function deepFreeze<T>(value: T): T {
@@ -49,7 +49,7 @@ export function createRecordingProjection(): RecordingProjection {
 }
 
 export interface FakeSessions extends BattleSessionFactory<BattleHandle> {
-  readonly created: { request: BattleStartRequest; game: GameState }[];
+  readonly created: { request: BattleStartRequest; game: GameState; setup: BattleSetup }[];
   /** The result the next handle will report; a function may throw (an unfinished or closed session). */
   next: BattleResult | (() => BattleResult);
 }
@@ -57,8 +57,8 @@ export interface FakeSessions extends BattleSessionFactory<BattleHandle> {
 export function createFakeSessions(first: BattleResult | (() => BattleResult)): FakeSessions {
   const factory: FakeSessions = {
     created: [], next: first,
-    async create(request, game) {
-      factory.created.push({ request, game });
+    async create(request, game, setup) {
+      factory.created.push({ request, game, setup });
       const source = factory.next;
       return { result: () => (typeof source === "function" ? source() : source) };
     },
