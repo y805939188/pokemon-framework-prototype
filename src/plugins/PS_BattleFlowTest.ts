@@ -732,6 +732,29 @@
       return { a, b, c, seqSaved };
     });
 
+    await scenario("T26 play-through for the restart check: new game, starter, a won encounter (growth), a catch into the party, a full party (test setup) and a catch into the boxes, the nurse, a walk; saved", async () => {
+      await slice(26);
+      const m0 = game().party[0]; m0.exp = E.minExp("parabolic", 8) - 1; // test setup: one fight away from level 8
+      game().bag.masterball = 2; // test setup: certain catches
+      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await fightUntilEnd(/^Ember|^ember/i); await finishBattle();
+      eq(W.PSFlow.lastOutcome.code, 1, "won"); eq(game().party[0].level, 8, "grew");
+      await stepInto(4, 9, 8); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); await finishBattle();
+      eq([W.PSFlow.lastOutcome.code, game().party.length], [2, 2], "caught into the party");
+      for (let i = 3; i <= 6; i++) game().party.push(mkMember(`P-${i}`, "Caterpie", 3)); // test setup: a full party
+      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); await finishBattle();
+      eq([W.PSFlow.lastOutcome.code, game().party.length, game().boxes.length], [2, 6, 1], "caught into the boxes");
+      game().party[0].hp = 3; game().party[0].moves[2].pp = 1; // hurt before the nurse
+      await toMapId(5, 10, 5); await runEvent(2); eq(W.PSFlow.lastHeal.status, "healed", "nurse");
+      G.$gamePlayer.locate(12, 6); G.$gamePlayer.setDirection(4); await frames(5);
+      const rc = await G.DataManager.saveGame(11);
+      const expected = { state: clone(game()), mz: mzParty(), map: { mapId: G.$gameMap.mapId(), x: G.$gamePlayer.x, y: G.$gamePlayer.y, d: G.$gamePlayer.direction() }, seq: G.$gameSystem._psBattleSeq };
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t26.json"), JSON.stringify(expected));
+      return { saveCode: rc, party: expected.state.party.map((m: any) => [m.id, m.level]), boxes: expected.state.boxes.map((m: any) => m.id), seq: expected.seq };
+    });
+
     await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
       W.PSFlow.setLanguage("zh");
       try {
@@ -824,6 +847,25 @@
     }
     perf.memory.push(mem(`after ${rounds} rounds (${rounds * 4} battles)`));
     sampling = false;
+    // step 4 timings on the slice map: a map encounter until its first menu, and MZ save / load of a slice save
+    try {
+      const n = Number(arg("ps-perf-step4")) || 6;
+      await slice(31);
+      const enc: number[] = [], saveMs: number[] = [], loadMs: number[] = [];
+      for (let i = 0; i < n; i++) {
+        W.PSFlow.perf.cur = null;
+        await stepInto(4, 9, i % 2 ? 8 : 2); await waitFor(() => battle() && battle()._mode !== "boot", "encounter"); await inMode("main");
+        const cur = W.PSFlow.perf.cur; if (cur && cur.encounter && cur.firstMenuMs !== undefined) enc.push(cur.firstMenuMs);
+        for (let k = 0; k < 6 && mode_() !== "end"; k++) { await choose(/^Run/); await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after run"); }
+        await finishBattle();
+      }
+      for (let i = 0; i < n; i++) {
+        let t = performance.now(); await G.DataManager.saveGame(12); saveMs.push(Math.round((performance.now() - t) * 10) / 10);
+        t = performance.now(); await G.DataManager.loadGame(12); loadMs.push(Math.round((performance.now() - t) * 10) / 10);
+      }
+      const st = (a: number[]) => ({ n: a.length, p50: pct(a, 0.5), max: a.length ? Math.max(...a) : null, samples: a });
+      perf.step4 = { method: "slice map, encounter forced by an exhausted step counter; encounter = executeEncounter -> first battle menu (performance.now); save/load = DataManager.saveGame/loadGame promise round trip, slot 12, test save folder", encounterToFirstMenuMs: st(enc), saveMs: st(saveMs), loadMs: st(loadMs) };
+    } catch (e: any) { perf.errors = (perf.errors || []).concat(`step4 timings: ${e.message}`); }
     const bs: any[] = W.PSFlow.perf.battles;
     perf.engineLoadMs = W.PSFlow.perf.engineLoadMs;
     perf.firstBattle = bs[0] ? { sessionMs: bs[0].sessionMs, firstMenuMs: bs[0].firstMenuMs, totalMs: bs[0].totalMs, label: bs[0].label } : null;
@@ -986,6 +1028,25 @@
   }
 
   async function verifySave() {
+    await scenario("V3 real restart (play-through): party, boxes, bag, growth, claims, money and the map position load identically in a fresh process, and play continues (an encounter, a commit, no duplicate id)", async () => {
+      const expected = JSON.parse(fs.readFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t26.json"), "utf8"));
+      G.DataManager.setupNewGame();
+      await G.DataManager.loadGame(11);
+      eq(game(), expected.state, "framework state (party, boxes, bag, growth, claims, money, ledger)");
+      eq(mzParty(), expected.mz, "MZ gold/items as saved");
+      eq([G.$gameMap.mapId(), G.$gamePlayer.x, G.$gamePlayer.y, G.$gamePlayer.direction(), G.$gameSystem._psBattleSeq], [expected.map.mapId, expected.map.x, expected.map.y, expected.map.d, expected.seq], "map position and battle counter");
+      eq(W.PSFlow.claim("starter").status, "already-claimed", "the starter stays claimed");
+      // continue playing from the loaded save
+      W.PSFlow.rng = seeded(303); W.PSFlow.seed = [1, 2, 3, 4]; W.PSFlow.fast = true;
+      await toMapId(expected.map.mapId, expected.map.x, expected.map.y);
+      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle after loading"); await inMode("main");
+      for (let k = 0; k < 6 && mode_() !== "end"; k++) { await choose(/^Run/); await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after run"); }
+      await finishBattle();
+      eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit], [3, "applied"], "a battle after loading commits");
+      eq(G.$gameSystem._psBattleSeq, expected.seq + 1, "the counter continues from the save");
+      const ids = [...game().party, ...game().boxes].map((m: any) => m.id); eq(new Set(ids).size, ids.length, "no duplicate id");
+      return { seq: G.$gameSystem._psBattleSeq, party: game().party.length, boxes: game().boxes.length };
+    });
     await scenario("V2 real restart (slice): the new-game save loads identically in a fresh process, the claim stays claimed, MZ gold/items as saved", async () => {
       const expected = JSON.parse(fs.readFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t15.json"), "utf8"));
       G.DataManager.setupNewGame();

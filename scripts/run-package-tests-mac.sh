@@ -20,12 +20,30 @@ mkdir -p "$EVID"
 rm -f "$EVID"/ps-flow-*.json "$EVID"/ps-matrix-*.json "$EVID"/ps-saveloc.json "$EVID"/*.png
 rm -rf "$SAVEDIR"
 
+# Exact-PID process handling: only the instance THIS script launched is ever stopped (never pkill -f a pattern).
+main_pids() { pgrep -f "PokemonFrameworkPrototype.app/Contents/MacOS" 2>/dev/null || true; }
+LAST_PID=""
+launch_app() { # args for the game; sets LAST_PID to the main process that `open -n` started
+  local before; before="$(main_pids)"
+  open -n "$APP" --args "$@"
+  LAST_PID=""
+  for _ in $(seq 1 100); do
+    for p in $(main_pids); do grep -qx "$p" <<< "$before" || LAST_PID="$p"; done
+    [[ -n "$LAST_PID" ]] && return 0; sleep 0.2
+  done
+  echo "warning: could not identify the launched app's PID" >&2
+}
+stop_app() { # stop the instance we launched (it normally quits itself with --ps-flow-quit)
+  [[ -n "$LAST_PID" ]] || return 0
+  for _ in $(seq 1 50); do kill -0 "$LAST_PID" 2>/dev/null || { LAST_PID=""; return 0; }; sleep 0.2; done
+  kill "$LAST_PID" 2>/dev/null || true; LAST_PID=""
+}
 wait_for() { for _ in $(seq 1 240); do [[ -f "$1" ]] && return 0; sleep 2; done; return 1; }
 launch() { # mode out [extra args]
   local mode="$1" out="$2"; shift 2
-  open -n "$APP" --args "--mute-audio" "--disable-renderer-backgrounding" "--disable-background-timer-throttling" "--disable-backgrounding-occluded-windows" "--disable-features=CalculateNativeWinOcclusion" "--ps-save-dir=$SAVEDIR" "--ps-flow-test=$mode" "--ps-flow-out=$out" --ps-flow-quit "$@"
-  wait_for "$out" || { echo "timeout waiting for $out" >&2; pkill -f "PokemonFrameworkPrototype.app/Contents/MacOS" || true; exit 1; }
-  sleep 3
+  launch_app "--mute-audio" "--disable-renderer-backgrounding" "--disable-background-timer-throttling" "--disable-backgrounding-occluded-windows" "--disable-features=CalculateNativeWinOcclusion" "--ps-save-dir=$SAVEDIR" "--ps-flow-test=$mode" "--ps-flow-out=$out" --ps-flow-quit "$@"
+  wait_for "$out" || { echo "timeout waiting for $out" >&2; stop_app; exit 1; }
+  sleep 3; stop_app
 }
 launch all "$EVID/ps-flow-report.json" "--ps-flow-shots=$EVID"
 # the save must survive REPLACING the app with a fresh build (it lives outside the bundle)
@@ -33,14 +51,14 @@ launch all "$EVID/ps-flow-report.json" "--ps-flow-shots=$EVID"
 launch verify-save "$EVID/ps-flow-verify-save.json"
 launch matrix "$EVID/ps-matrix-package.json"
 node -e 'const m=require(process.argv[1]+"/js/engine/matrix.cjs"); m.runMatrix().then(r=>require("fs").writeFileSync(process.argv[2],JSON.stringify({host:"node "+process.version,engineArtifact:m.artifactInfo(),results:r},null,2)))' "$ROOT" "$EVID/ps-matrix-node.json"
-pkill -f "PokemonFrameworkPrototype.app/Contents/MacOS" 2>/dev/null || true
+stop_app
 # default location (no override): a packaged app saves under ~/Library/Application Support/<name>/save.
 # The run writes ONE free high slot (99 downwards) and puts everything back; it never touches slots a player may have.
 # If the user folder did not exist before, it is removed again afterwards.
 HAD_USERDIR=0; [[ -d "$USERDIR" ]] && HAD_USERDIR=1
-open -n "$APP" --args "--mute-audio" "--ps-flow-test=saveloc" "--ps-flow-out=$EVID/ps-saveloc.json" --ps-flow-quit
-wait_for "$EVID/ps-saveloc.json" || { echo "timeout (saveloc)" >&2; pkill -f "PokemonFrameworkPrototype.app/Contents/MacOS" 2>/dev/null || true; exit 1; }
-sleep 3; pkill -f "PokemonFrameworkPrototype.app/Contents/MacOS" 2>/dev/null || true
+launch_app "--mute-audio" "--ps-flow-test=saveloc" "--ps-flow-out=$EVID/ps-saveloc.json" --ps-flow-quit
+wait_for "$EVID/ps-saveloc.json" || { echo "timeout (saveloc)" >&2; stop_app; exit 1; }
+sleep 3; stop_app
 if [[ "$HAD_USERDIR" -eq 0 ]]; then rm -rf "$USERDIR"; fi
 # nothing inside the bundle may have been modified by the runs: the ad-hoc seal must still verify
 codesign --verify --deep --strict "$APP" 2>&1 && echo "bundle seal still valid after the runs" || { echo "BUNDLE MODIFIED BY THE RUNS" >&2; exit 1; }
