@@ -1,8 +1,8 @@
 # 第四步前短架构批次（核心独立入口、应用层、假适配器、同契约验证）
 
-**状态：已实现并自测，待针对本批的独立复核**（分支 `step3/arch-batch`，基于已收口的 `main` = `step3-closed`，`4ce31e1`；被测代码提交 `cd0fc0b`）。它不是第四步：没有新玩法，没有 monorepo 迁移。
+**状态：已复核并合入 `main`（2026-10-20，PR #1，合并提交 `5656150`），收尾记录见 [architecture-batch-closure.md](architecture-batch-closure.md)。** 原始记录：分支 `step3/arch-batch`，基于已收口的 `main` = `step3-closed`，`4ce31e1`；被测代码提交 `cd0fc0b`。它不是第四步：没有新玩法，没有 monorepo 迁移。
 
-2026-10-20 复核后修复候选在 `fix/step3-batch-review-20261020`，详见 [修复报告](batch-review-fixes.md)。下方验证与性能是原批次记录；新运行时的身份、异常路径与复测以修复报告为准。修复仍是作者自测，待非作者复审，未合并、未推送。
+2026-10-20 复核后修复候选在 `fix/step3-batch-review-20261020`，详见 [修复报告](batch-review-fixes.md)。下方验证与性能是原批次记录；新运行时的身份、异常路径与复测以修复报告为准。修复已通过非作者复审与 Claude 限定复核，并随本批合入 `main`。
 
 ## 短清单与结果
 

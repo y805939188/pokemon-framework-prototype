@@ -1,5 +1,7 @@
 # 短架构批次复核后的限定修复（作者自测候选）
 
+> **2026-10-20 更新：** 本修复已通过 Codex 独立复审与 Claude 限定复核，随短架构批次经 PR #1 合入 `main`（合并提交 `5656150`）。收尾、CI 与后续 P4 见 [architecture-batch-closure.md](architecture-batch-closure.md)。下文保留作者自测时的原始记录。
+
 2026-10-20，Codex 修复作者。用户已授权接手，Claude 停止。本轮请求配置为 gpt-6.1-sol / xhigh / Standard；环境没有可核验的模型、推理或服务档位回显，**不宣称隐藏配置已验证**。未起子代理。
 
 这是对 `.independent-reviews/step3-batch-opus-20261019/REPORT.zh.md` 六项发现的限定修复，不是独立复审结论，不重开历史全局 review。后续由父会话安排非作者复审，再交用户/Claude 验证。本轮未推送、合并或打/移动标签，未进入第四步。

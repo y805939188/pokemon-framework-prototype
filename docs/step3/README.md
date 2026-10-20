@@ -99,6 +99,7 @@
 | 保存阶段 | `PS_SaveState.beforeSave` 不检查战斗中（靠场景约束） | 第四步保存用例加守卫与场景 |
 | 性能 | 冷启动比候选记录慢约 190–200 ms、引擎动作延迟 +1.5–2 ms 的差异：**短批次建立了第一份同条件对照**（基线两遍/新版两遍交叉，`experiments/step3/evidence/batch/perf-compare.md`），差异没有出现在同条件对照里，原因未再追究；**仍不是无退化的证明**（3 次启动/遍、一台机器、无阈值） | 第四步闭环后再定预算 |
 | 范围 | 首版单打；双打、长尾后置；Windows/Intel 暂缓（用户决定） | 第四步后重估；平台见 `PROJECT-GUIDE.md` |
+| 检查器与回归后续（P4，短批次收尾时登记） | 非核心纯层的宿主名黑名单未列全（`performance`、`crypto`、`localStorage` 等）；同名枚举成员/导出别名被保守误报；缺 `winner` 的拒绝没有固化用例 | 第四步动 app 层时处理，见 [短批次收尾记录](architecture-batch-closure.md) |
 
 ## 第三步限定整改（独立验收 `e0a6be5` 后，2026-10-19）
 
