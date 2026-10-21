@@ -2,14 +2,14 @@
 
 新游戏 → 领取精灵与物品 → 地图遭遇 → 单打战斗/捕获/逃跑/用药 → 成长 → 治疗 → 存档退出读档继续。
 
-范围由用户确认（工作区 `.handoff/step4-implementation-prompt.zh.md`，决定 D1/D2/D3），实施清单在 `.handoff/step4-plan.md`。本文件记录实现后的事实：做了什么、怎么用、按什么规格、怎么验证、有哪些限制。
+范围由用户确认（工作区 `.handoff/step4-implementation-prompt.zh.md`，决定 D1/D2/D3），实施清单在 `.handoff/step4-plan.md`。本文件记录实现后的事实：做了什么、怎么用、按什么规格、怎么验证、有哪些限制。**第四步已于 2026-10-21 收口，经 PR #2 合入 `main`**：提交、复核与验证汇总见 [closure.md](closure.md)。
 
 | 批次 | 分支 | 内容 | 状态 |
 |---|---|---|---|
-| A 正式状态与领取 | `step4/a-state-grants` | 内容、个体生成、schema 3/迁移、正式新游戏、领取/治疗、插件命令与示例地图、CI、app 编译边界 | 作者自测，待非作者独立复核 |
-| B 探索和战斗闭环 | `step4/b-explore-battle` | 地图遭遇、真实野生个体、入队/入盒与容量、战败结算/回程、只读队伍/背包、保存守卫 | 作者自测，待非作者独立复核 |
-| C 整体与打包验收 | `step4/c-acceptance` | 12 项闭环验收（[acceptance.md](acceptance.md)）、新包完整套件、性能基线、命令一页表（[commands.md](commands.md)）、限制清单 | 作者自测，待非作者独立复核 |
-| D 复核整改 | `step4/d-review-fixes` | 两份独立复核确认的问题：事件调用链、合法同名 ID、领取登记图鉴、提交后宿主故障、保存屏蔽所有权；战斗中拒绝领取/治疗；测试补强 | 作者自测，待非作者独立复核 |
+| A 正式状态与领取 | `step4/a-state-grants` | 内容、个体生成、schema 3/迁移、正式新游戏、领取/治疗、插件命令与示例地图、CI、app 编译边界 | 已复核，已合入 `main` |
+| B 探索和战斗闭环 | `step4/b-explore-battle` | 地图遭遇、真实野生个体、入队/入盒与容量、战败结算/回程、只读队伍/背包、保存守卫 | 已复核，已合入 `main` |
+| C 整体与打包验收 | `step4/c-acceptance` | 12 项闭环验收（[acceptance.md](acceptance.md)）、新包完整套件、性能基线、命令一页表（[commands.md](commands.md)）、限制清单 | 已复核，已合入 `main` |
+| D 复核整改 | `step4/d-review-fixes` | 两份独立复核确认的问题：事件调用链、合法同名 ID、领取登记图鉴、提交后宿主故障、保存屏蔽所有权；战斗中拒绝领取/治疗；测试补强 | 已复核，已合入 `main` |
 
 ## 1. 已确认的决定
 
@@ -109,7 +109,7 @@
 
 ## 7. 证据
 
-- 无头：`scripts/test-quick.sh`（33 个套件；第四步新增 `experiments/step4/test-{schema3,content4,core4,app4,battle-rules4,app-battle4,plugin-host4}.cjs`）。`test-plugin-host4` 在 Node VM 的宿主桩里运行构建出的插件；其中两项用本机安装的 Reactor 解释器（`js/reactor_objects.js`）：事件调用链，以及战败结束只作用于等待该战斗编号的解释器；没有该运行时的环境（CI 无头层）会跳过这两项，它们的宿主证据是真实 MZ 场景 T22、T27。
+- 无头：`scripts/test-quick.sh`（33 个套件；第四步新增 `experiments/step4/test-{schema3,content4,core4,app4,battle-rules4,app-battle4,plugin-host4}.cjs`）。`test-plugin-host4` 在 Node VM 的宿主桩里运行构建出的插件；其中两项用本机安装的 Reactor 解释器（`js/reactor_objects.js`）：事件调用链，以及战败结束只作用于等待该战斗编号的解释器；没有该运行时的环境（CI 无头层）会跳过这两项。真实 MZ 场景 T22、T27 覆盖了编号匹配的一支（等待这场战斗的事件链被结束）；“等待另一个战斗编号的解释器不被结束”这一支只由本机的这项测试覆盖。
 - 12 项验收矩阵：[acceptance.md](acceptance.md)。命令一页表：[commands.md](commands.md)。
 - 打包与性能：新包上的完整 `scripts/run-package-tests-mac.sh`（含 SL1、替换包）与 `scripts/run-package-perf-mac.sh`（含“遭遇→进战斗”“存/读档”）的结果、包身份（`gitHead`）与性能基线记录在工作区候选报告 `.handoff/step4-candidate-report.zh.md` 与 `.handoff/STATUS.md`（为了让包内 `gitHead` 等于候选 SHA，这些结果不再回写进仓库）。
 - 真实 MZ（开发树）：`scripts/run-flow-test-mac.sh <证据目录>`；批次 A 场景 T15、T15b、V2；批次 B 场景 T16–T25（T16 是评审要求的遭遇宿主验证：区域过滤、事件中不触发、忙碌不重入、战后不立即循环，外加战斗中保存被拒）；T27–T30（事件调用链、提交后宿主故障、保存屏蔽、特殊战斗编号经存读档）；每次都重跑既有 T1–T14、T8、V1。证据与身份见 `experiments/step4/evidence/README.md`。

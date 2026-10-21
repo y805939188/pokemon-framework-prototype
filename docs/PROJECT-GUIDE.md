@@ -15,7 +15,7 @@
 | 1 | 提取并整改行为规格，建立去向清单 | 已完成（规格库 `dae6776`） |
 | 2 | 验证战斗接入，确定路线和首版范围 | **已完成并经用户决定（C2）**，补充修复已于 2026-10-19 收口（标签 `step2-closeout`），见 `docs/step2/README.md`、`docs/step2/closeout-addendum.md` |
 | 3 | 工程与测试基础：模块边界、构建/CI、内容数据、本地化、存档基础、第一条 Ruby/TS 对照测试链 | **已收口（2026-10-19，标签 `step3-closed`）**：独立验收先不通过、整改后有条件通过，见 `docs/step3/closure.md`；性能尚无同条件基线。第四步前短架构批次（含复核修复）已于 2026-10-20 经 PR #1 合入 `main`，见 `docs/step3/architecture-batch-closure.md` |
-| 4 | 最小可玩闭环（获得精灵→遭遇→战斗/捕获→成长→治疗→存档读档） | **整改候选（作者自测，待非作者独立复核与用户批准合并）**：批次 A/B/C 在分支 `step4/a-state-grants` → `step4/b-explore-battle` → `step4/c-acceptance`，复核整改在其后的 `step4/d-review-fixes`，见 `docs/step4/README.md`、`acceptance.md`、`commands.md`；未合并 `main` |
+| 4 | 最小可玩闭环（获得精灵→遭遇→战斗/捕获→成长→治疗→存档读档） | **已完成（2026-10-21）**：批次 A/B/C 与两轮复核整改经 PR #2 合入 `main`（合并提交 `3e3e655`），收口记录 `docs/step4/closure.md`；见 `docs/step4/README.md`、`acceptance.md`、`commands.md` |
 | 5 | 按功能族扩展，每批交付规则、接口、UI、事件入口、测试和示例 | 未开始 |
 | 6 | 作者工具与 Demo（用户会自制符合 MZ 规格的美术资源） | 未开始 |
 | 7 | 平台、存档、性能、分发验收，发布可用版本 | 未开始 |
