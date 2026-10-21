@@ -493,6 +493,7 @@
         const g1 = clone(game());
         eq(g1.party.map((m: any) => [m.id, m.species, m.level, m.moves.map((x: any) => x.id)]), [["G-starter-1", "Charmander", 5, ["scratch", "growl", "ember"]]], "the starter comes from the content");
         eq([g1.bag, g1.claims, g1.money], [{ antidote: 2, pokeball: 10, potion: 5 }, { starter: { kind: "grant" } }, 3000], "items and the claim");
+        eq(g1.dex, { seen: ["Charmander"], owned: ["Charmander"] }, "the received species is seen and owned");
         await runEvent(1);
         eq([W.PSFlow.lastClaim.status, G.$gameVariables.value(11)], ["already-claimed", 2], "the repeat is reported");
         eq(game(), g1, "the repeat changes nothing");
@@ -520,9 +521,11 @@
       G.$gameSystem._psGame = { diverged: true };
       await G.DataManager.loadGame(6);
       const info = G.$gameSystem._psSaveInfo;
-      eq([info && info.created, game().party.length, game().money, game().claims], ["empty", 0, 0, {}], "empty state created on load and reported");
+      eq(info && info.created, "empty", "reported as created on load");
+      eq(game(), nodeRequire("./js/engine/build/engine.cjs").state.newGame({ party: [], money: 0 }), "the whole formal empty state: no members, boxes, items, money, dex entries, battles or claims");
       assert(!G.$gameSystem._psSaveError, "not an error");
       eq(W.PSFlow.claim("starter").status, "applied", "the player can still receive the starter");
+      eq([game().party.map((m: any) => m.id), game().claims, game().dex.owned], [["G-starter-1"], { starter: { kind: "grant" } }, ["Charmander"]], "received into the empty state");
       await recover();
     });
     // ================================================================ step 4 batch B: exploration and the battle loop
@@ -534,13 +537,16 @@
       await stepInto(9, 9, 6);
       eq([W.PSFlow.lastEncounter && W.PSFlow.lastEncounter.reason, !!battle()], ["not-here", false], "outside region 1 nothing happens");
       assert(G.$gamePlayer._encounterCount > 0, "the step counter was refilled");
-      // inside the region while an event runs: nothing
+      // inside the region while an event runs: nothing. The event only waits (no message): with a message open the map
+      // scene does not check encounters at all, which would hide whether the plugin's own event check works
       G.$gamePlayer.locate(4, 9); await frames(2);
       W.PSFlow.lastEncounter = null;
-      G.$gameMap.event(1).start(); await waitFor(() => G.$gameMessage.isBusy(), "event message");
+      G.$gameMap._interpreter.setup([{ code: 230, indent: 0, parameters: [120] }, { code: 0, indent: 0, parameters: [] }], 0);
+      await frames(2);
+      assert(G.$gameMap.isEventRunning() && !G.$gameMessage.isBusy() && scene().isSceneChangeOk(), "an event runs, no message is open, the map scene checks encounters");
       G.$gamePlayer._encounterCount = 0; await frames(40);
       eq([!!battle(), W.PSFlow.lastEncounter], [false, null], "no encounter while an event runs");
-      G.$gamePlayer._encounterCount = 50; await dismissMessages();
+      G.$gamePlayer._encounterCount = 50; await waitFor(() => !G.$gameMap.isEventRunning(), "the waiting event ends");
       // busy (a battle flag already set): silent, no exception, no second scene
       W.PSFlow.running = true; G.$gamePlayer._encounterCount = 0; await frames(30);
       const busyBattle = !!battle(); W.PSFlow.running = false; G.$gamePlayer._encounterCount = 50;
@@ -662,16 +668,105 @@
       await toMap(); const g = game(); g.party = [mkMember("S-1", "Snorlax", 2, { hp: 1 })]; g.money = 500;
       G.$gameSystem.disableSave();
       G.$gameMessage.clear();
-      await startEvent(1); await inMode("main");
-      await choose(/^Fight/); await inMode("moves"); await choose(/tackle/i);
-      await inMode("end"); await press("ok");
-      await dismissMessages();
-      await waitFor(() => G.$gameMap.mapId() === 5 && !G.SceneManager.isSceneChanging(), "taken home");
+      const shown: string[] = []; const add = G.$gameMessage.add;
+      G.$gameMessage.add = function (this: any, t: string) { shown.push(String(t)); return add.call(this, t); };
+      try {
+        await startEvent(1); await inMode("main");
+        await choose(/^Fight/); await inMode("moves"); await choose(/tackle/i);
+        await inMode("end"); await press("ok");
+        await dismissMessages();
+        await waitFor(() => G.$gameMap.mapId() === 5 && !G.SceneManager.isSceneChanging(), "taken home");
+      } finally { G.$gameMessage.add = add; }
       eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.blackout, game().money], [4, true, 484], "defeat settled and blacked out");
-      assert(!G.$gameMap._interpreter.isRunning(), "the event did not continue after the defeat");
+      assert(shown.length > 0 && !shown.some((t) => /Back on the map/.test(t)), "the event's next command (its message) did not run: " + shown.join(" | "));
+      assert(!G.$gameMap._interpreter.isRunning(), "nothing left running");
       eq(G.$gameSystem.isSaveEnabled(), false, "saving stays disabled because the event had disabled it");
       G.$gameSystem.enableSave();
       await recover();
+    });
+
+    const cmd = (code: number, parameters: any[] = []) => ({ code, indent: 0, parameters });
+    const startCmd = (canLose: boolean, resultVariable = 0) => cmd(357, ["PS_BattleFlow", "StartBattle", "Start battle", { kind: "wild", foes: "Pidgey:30", battleId: "chain", resultVariable: String(resultVariable), canLose: String(canLose) }]);
+    const setVar = (v: number, n: number) => cmd(122, [v, v, 0, 0, n]);
+    /** On the slice map (also the home map): a level 2 Snorlax at 1 HP and 1000 money, standing away from home. */
+    async function loserOnSlice(seed: number) {
+      await slice(seed); const g = game(); g.party = [mkMember("S-1", "Snorlax", 2, { hp: 1 })]; g.money = 1000;
+      G.$gamePlayer.locate(12, 6); G.$gamePlayer._encounterCount = 999; await frames(2);
+      for (const v of [16, 17, 18, 19, 20]) { assert(v < G.$dataSystem.variables.length, `variable ${v} exists`); G.$gameVariables.setValue(v, 0); }
+    }
+    async function loseRunningEvent(list: any[]) {
+      G.$gameMap._interpreter.setup(list, 0);
+      await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await fightUntilEnd(/tackle/i); await inMode("end"); await press("ok");
+      await dismissMessages(); await frames(30);
+    }
+
+    await scenario("T27 a lost battle with canLose off ends its whole calling chain (directly, in a common event, in a common event called by one; home is the same map); with canLose on the caller continues", async () => {
+      const out: any = {};
+      for (const [label, shape, canLose] of [["direct", 0, false], ["one common event", 1, false], ["two common events", 2, false], ["canLose on", 1, true]] as const) {
+        await loserOnSlice(27);
+        G.$dataCommonEvents[98] = { id: 98, name: "probe inner", trigger: 0, switchId: 1, list: [startCmd(canLose), setVar(18, 555), cmd(0)] };
+        G.$dataCommonEvents[99] = { id: 99, name: "probe outer", trigger: 0, switchId: 1, list: [cmd(117, [98]), setVar(19, 666), cmd(0)] };
+        try { await loseRunningEvent(shape === 0 ? [startCmd(canLose), setVar(20, 777), cmd(0)] : [cmd(117, [shape === 1 ? 98 : 99]), setVar(20, 777), cmd(0)]); }
+        finally { delete G.$dataCommonEvents[98]; delete G.$dataCommonEvents[99]; }
+        const o = W.PSFlow.lastOutcome;
+        out[label] = { after: [18, 19, 20].map((v) => G.$gameVariables.value(v)), code: o.code, blackout: !!o.blackout, at: [G.$gameMap.mapId(), G.$gamePlayer.x, G.$gamePlayer.y], money: game().money, running: G.$gameMap._interpreter.isRunning() };
+      }
+      for (const label of ["direct", "one common event", "two common events"]) eq(out[label], { after: [0, 0, 0], code: 4, blackout: true, at: [5, 8, 9], money: 984, running: false }, `${label}: home on the same map, settled once, no command after the battle ran`);
+      eq(out["canLose on"], { after: [555, 0, 777], code: 4, blackout: false, at: [5, 12, 6], money: 984, running: false }, "canLose on: settled, no trip, the calling event goes on");
+      return out;
+    });
+
+    await scenario("T28 a message or translation failure after a committed defeat keeps the committed outcome (code 4, applied, blackout), the trip home and the end of the event; nothing is settled twice; a failed trip stays retryable", async () => {
+      const out: any = {};
+      for (const kind of ["message", "translation", "message and trip"]) {
+        await loserOnSlice(28);
+        const add = G.$gameMessage.add, tr = W.PSFlow.translator; let failed = false;
+        if (kind !== "translation") G.$gameMessage.add = function (this: any, t: string) { if (!failed) { failed = true; throw new Error("injected: message window failure"); } return add.call(this, t); };
+        if (kind === "message and trip") W.PSFlow.debug.failReturn = true;
+        try {
+          G.$gameMap._interpreter.setup([startCmd(false, 16), setVar(20, 777), cmd(0)], 0);
+          await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+          await fightUntilEnd(/tackle/i); await inMode("end");
+          if (kind === "translation") W.PSFlow.translator = () => { throw new Error("injected: translation failure"); };
+          await press("ok"); await frames(5);
+        } finally { G.$gameMessage.add = add; W.PSFlow.translator = tr; W.PSFlow.debug.failReturn = false; }
+        await dismissMessages(); await frames(30);
+        const o = W.PSFlow.lastOutcome;
+        eq([o.code, o.commit, o.blackout, o.defeat], [4, "applied", true, { moneyLost: 16, healed: true }], `${kind}: the committed outcome stands`);
+        eq((o.hostErrors || []).map((e: any) => e.step), ["message"], `${kind}: recorded as a host error after the commit`);
+        eq([G.$gameVariables.value(16), G.$gameVariables.value(20), game().money, Object.keys(game().appliedBattles).length], [4, 0, 984, 1], `${kind}: result variable 4, the event ended, settled once`);
+        assert(game().party[0].hp > 1 && !W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), `${kind}: healed, nothing running`);
+        eq(W.PSFlow.commit(W.PSFlow.lastResult), "already-applied", `${kind}: a repeat commit is a no-op`);
+        if (kind === "message and trip") {
+          eq([W.PSFlow.lastReturn.status, G.$gamePlayer.x, G.$gamePlayer.y], ["failed", 12, 6], "the trip failed and was kept");
+          const settled = clone(game());
+          eq(W.PSFlow.retryReturnHome().status, "requested", "retry requested");
+          await waitFor(() => G.$gamePlayer.x === 8 && G.$gamePlayer.y === 9 && !G.SceneManager.isSceneChanging(), "home after the retry");
+          eq(game(), settled, "the retry changed nothing in the state");
+        } else eq([W.PSFlow.lastReturn.status, G.$gameMap.mapId(), G.$gamePlayer.x, G.$gamePlayer.y], ["requested", 5, 8, 9], `${kind}: taken home`);
+        out[kind] = { hostErrors: o.hostErrors, money: game().money };
+      }
+      return out;
+    });
+
+    await scenario("T29 the battle only masks saving while it runs: a reason another system adds (disable) or removes (enable) during the battle stays in force afterwards, after a normal end and after an abort", async () => {
+      const out: any = {};
+      for (const [label, before, during, end] of [["allowed, disabled meanwhile, ran away", true, "disable", "finish"], ["disabled, enabled meanwhile, aborted", false, "enable", "abort"]] as const) {
+        await slice(29); game().party = [mkMember("R-1", "Charmander", 40)];
+        if (before) G.$gameSystem.enableSave(); else G.$gameSystem.disableSave();
+        G.$gameMap._interpreter.setup([cmd(357, ["PS_BattleFlow", "StartBattle", "Start battle", { kind: "wild", foes: "Pidgey:3", battleId: "save", resultVariable: "0", canLose: "false" }]), cmd(0)], 0);
+        await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+        if (during === "disable") G.$gameSystem.disableSave(); else G.$gameSystem.enableSave(); // another system, meanwhile
+        const inBattle = [G.$gameSystem.isSaveEnabled(), G.Window_MenuCommand.prototype.isSaveEnabled.call({}), G.Scene_Base.prototype.isAutosaveEnabled.call(battle())];
+        if (end === "finish") { await choose(/^Run/); await finishBattle(); }
+        else { W.PSFlow.debug.failNext = "move"; await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower|ember|scratch/i); await inMode("end"); assert(battle()._aborted, "aborted"); await press("ok"); await dismissMessages(); }
+        out[label] = { inBattle, after: G.$gameSystem.isSaveEnabled(), code: W.PSFlow.lastOutcome.code };
+        eq(inBattle, [false, false, false], `${label}: no menu save, no autosave while the battle runs`);
+        eq(G.$gameSystem.isSaveEnabled(), during === "enable", `${label}: afterwards the game's flag as last set decides`);
+        G.$gameSystem.enableSave();
+      }
+      return out;
     });
 
     await scenario("T23 a real save failure is diagnosable and changes nothing; the next good save clears it", async () => {
@@ -1014,6 +1109,7 @@
     const globalFile = path.join(dir, "global.rmmzsave");
     const occupied = fs.existsSync(file);
     const globalBefore = fs.existsSync(globalFile) ? fs.readFileSync(globalFile) : null;
+    const info = G.DataManager._globalInfo; const infoLength = info ? info.length : 0; const infoHad = !!info && slot in info; const infoBefore = info ? info[slot] : undefined;
     const startedAt = Date.now() - 2000; // file mtime granularity
     let code: any = null, error: string | null = null, written = false, cleanedUp = false;
     if (!occupied) {
@@ -1027,6 +1123,7 @@
       written = fs.existsSync(file) && fs.statSync(file).mtimeMs >= startedAt; // written by THIS run, not a leftover
       try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch (e) { /* reported through cleanedUp */ }
       try { if (globalBefore) fs.writeFileSync(globalFile, globalBefore); else if (fs.existsSync(globalFile)) fs.unlinkSync(globalFile); } catch (e) { /* reported through cleanedUp */ }
+      if (info) { if (infoHad) info[slot] = infoBefore; else { delete info[slot]; info.length = infoLength; } } // the in-memory copy as well: a later save in this process writes it
       await sleep(1500); // a late write would show up here
       cleanedUp = !fs.existsSync(file) && (globalBefore ? fs.readFileSync(globalFile).equals(globalBefore) : !fs.existsSync(globalFile));
     }
