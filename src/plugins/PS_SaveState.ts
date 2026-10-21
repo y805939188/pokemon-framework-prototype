@@ -5,6 +5,9 @@
  *
  *   load : the state is migrated on a COPY; success replaces it, failure keeps the raw document and records
  *          `_psSaveError` (battles then refuse to start: nothing is reset, nothing is overwritten by a battle result).
+ *          From schema 3 to 4 the migration needs the game content (Showdown name -> content id + form, decision D5-3);
+ *          content that cannot be loaded, or a species it cannot map, refuses the migration the same way, and saving
+ *          writes the original framework state back unchanged. A battle still open in the application is released.
  *          A save with NO framework state (made before the framework state existed, or before any of it was used) gets
  *          the formal empty state (no members, no items, money 0, nothing claimed) and `_psSaveInfo.created` says so:
  *          no player data is invented.
@@ -33,11 +36,19 @@
       const sys = G.$gameSystem;
       delete sys._psSaveError; delete sys._psSaveInfo; delete sys._psSaveWarning;
       if (sys._psGame === undefined) {
+        if (W.PSFlow) W.PSFlow.stateReplaced();
         sys._psGame = state().newGame({ party: [], money: 0 });
         sys._psSaveInfo = { from: null, to: sys._psGame.schema, migrated: false, created: "empty", notes: ["the save had no framework state: an empty one was created (no members, no items, money 0, nothing claimed)"] };
         return;
       }
-      const r = schema().migrateGame(sys._psGame);
+      let speciesKey: any;
+      let contentError = "";
+      if (typeof sys._psGame === "object" && sys._psGame && typeof sys._psGame.schema === "number" && sys._psGame.schema < 4) {
+        try { speciesKey = W.PSFlow.speciesKeyResolver(); } catch (e) { contentError = String(e instanceof Error ? e.message : e); }
+      }
+      if (W.PSFlow) W.PSFlow.stateReplaced();
+      const r = schema().migrateGame(sys._psGame, speciesKey ? { speciesKey } : {});
+      if (!r.ok && r.error.code === "needs-content" && contentError) r.error.message += ` (the content could not be loaded: ${contentError})`;
       if (r.ok) {
         if (r.migrated) sys._psGame = r.state;
         sys._psSaveInfo = { from: r.from, to: r.to, migrated: r.migrated, notes: r.notes };

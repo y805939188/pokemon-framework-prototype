@@ -29,12 +29,13 @@ async function win(game, id, ring) {
 test('a legacy (schema 1) save plays a whole battle with pipeline content; result, replay, restore-then-retry behave', async () => {
 	const legacy = clone(require('./fixtures/legacy-v1-flow-state.json'));
 	const f = path.join(dir, 'legacy.json'); fs.writeFileSync(f, JSON.stringify(legacy));
-	const store = new E.store.SaveStore(f);
+	// since step 5.0 the migration maps the legacy Showdown names to the pipeline content's ids (D5-3)
+	const store = new E.store.SaveStore(f, {}, E.speciesKey.speciesKeyResolver(content()));
 	const info = store.loadInfo();
-	assert.deepEqual([info.from, info.to], [1, 3]);
+	assert.deepEqual([info.from, info.to], [1, E.state.GAME_SCHEMA]);
 	assert.deepEqual(findDanglingReferences(info.state, content(), E.dex.createDexLookup()), [], 'the legacy save refers only to content that exists');
 	const ring = E.log.createRingLogger();
-	const { s } = await win(info.state, 'INT-1', ring);
+	const { s } = await win(E.speciesKey.battleView(info.state, content()), 'INT-1', ring);
 	assert.equal(s.finished, true);
 	const result = s.result();
 	assert.equal(store.commit(result).status, 'applied');
@@ -45,7 +46,7 @@ test('a legacy (schema 1) save plays a whole battle with pipeline content; resul
 	assert.equal(store.commit(result).status, 'applied');
 	assert.equal(store.commit(result).status, 'already-applied');
 	assert.deepEqual(ring.entries().filter(e => e.kind === 'end').map(e => e.data.reason), ['win']);
-	assert.equal(store.load().schema, 3);
+	assert.equal(store.load().schema, E.state.GAME_SCHEMA);
 });
 
 test('the same battle is described in both languages from content text keys, with no missing key', async () => {
@@ -64,13 +65,17 @@ test('the same battle is described in both languages from content text keys, wit
 
 test('missing and dangling references are explained, not crashed on', async () => {
 	// a species the content does not have, in the party / in the foe team
+	// (a saved state names content ids since step 5.0: the fixture party is stored the way the sample content keys it)
+	const saved = () => { const s = F.makeGame(); s.party = s.party.map(m => E.speciesKey.toPersistentMember(m, content())); return s; };
+	const sg = saved(); sg.party[1].species = 'missingno';
+	assert.deepEqual(findDanglingReferences(sg, content()).map(d => d.path), ['$.party[1].species']);
 	const g = F.makeGame(); g.party[1].species = 'Missingno';
-	assert.deepEqual(findDanglingReferences(g, content()).map(d => d.path), ['$.party[1].species']);
 	await assert.rejects(() => E.session.BattleSession.create({ game: g, battleId: 'INT-3', content: content(), seed: [1, 2, 3, 4], foe: { kind: 'wild', team: [F.foeMember('W1-1', 'Pidgey', 5)] } }), /species "Missingno" \(member A-0002\) is not in the content "sample"/);
 	await assert.rejects(() => E.session.BattleSession.create({ game: F.makeGame(), battleId: 'INT-4', content: content(), seed: [1, 2, 3, 4], foe: { kind: 'wild', team: [{ ...F.foeMember('W1-1', 'Pidgey', 5), species: 'Zzz' }] } }), /species "Zzz" \(member W1-1\)/);
 	// a move the battle engine does not know
+	const sg2 = saved(); sg2.party[0].moves[0].id = 'notamove';
+	assert.deepEqual(findDanglingReferences(sg2, content(), E.dex.createDexLookup()).map(d => d.path), ['$.party[0].moves[0].id']);
 	const g2 = F.makeGame(); g2.party[0].moves[0].id = 'notamove';
-	assert.deepEqual(findDanglingReferences(g2, content(), E.dex.createDexLookup()).map(d => d.path), ['$.party[0].moves[0].id']);
 	await assert.rejects(() => E.session.BattleSession.create({ game: g2, battleId: 'INT-5', content: content(), seed: [1, 2, 3, 4], foe: { kind: 'wild', team: [F.foeMember('W1-1', 'Pidgey', 5)] } }), /move "notamove" of member A-0001/);
 	// content with a missing required field never produces output that could stand in for it
 	const i = inputs(); delete i.species[0].growth;

@@ -10,10 +10,17 @@ export interface MoveSlot {
   maxpp: number;
 }
 
-/** A persistent party/box member. Foe records in a battle carry the same shape with some fields absent. */
+/**
+ * A party/box member. Two identities of the species exist (decision D5-3, step 5.0):
+ *  - persistent (the save, schema 4): `species` is the author's content id and `form` the form number;
+ *  - battle (sessions, protocol v1): `species` is the Showdown species name and there is no `form`.
+ * rules/species-key.ts converts between them; foe records in a battle carry the battle shape with some fields absent.
+ */
 export interface Member {
   id: string;
   species: string;
+  /** Form number of a persistent member (WP03 §3.2, WP21); absent on battle records. */
+  form?: number;
   nickname?: string | null;
   level: number;
   exp: number;
@@ -48,8 +55,16 @@ export interface SpeciesData {
   abilities?: string[];
   /** Gender rule (WP19 §3.2), from the pinned Showdown data. Needed to create an individual. */
   gender?: GenderRule;
-  /** The author's content id of this species (e.g. "pidgey"); the persistent key stays the Showdown name (decision D2). */
+  /** The author's content id of this species (e.g. "pidgey"): with `form`, the persistent key of members (decision D5-3). */
   contentId?: string;
+  /** Form number of this record (0 = the base form). */
+  form?: number;
+}
+
+/** The persistent identity of a species: content id + form number (decision D5-3; WP03 §3.2 "(species, form)"). */
+export interface SpeciesKey {
+  species: string;
+  form: number;
 }
 
 /** A move as content and creation need it: Showdown id, display name and base PP. */
@@ -59,7 +74,7 @@ export interface MoveData {
   pp: number;
 }
 
-/** A one-time reward package (content grants.json): members by Showdown species name, items, money. */
+/** A one-time reward package (content grants.json): members by Showdown species name (battle identity), items, money. */
 export interface Grant {
   id: string;
   members: { species: string; level: number }[];
@@ -72,8 +87,12 @@ export interface Content {
   meta?: ContentMeta;
   /** Every learnset move by its display name (the learnset stores names), with id and PP. Needed to create an individual. */
   moves?: Record<string, MoveData>;
-  /** Author content id -> persistent species key (Showdown name). */
+  /** Author content id -> Showdown name of its base form (form 0). */
   speciesIds?: Record<string, string>;
+  /** Content id -> form number -> Showdown name. Absent in fixture content, whose content ids are the Showdown names. */
+  forms?: Record<string, Record<string, string>>;
+  /** Showdown name -> persistent key (the reverse of `forms`). Absent in fixture content (see `forms`). */
+  speciesKeys?: Record<string, SpeciesKey>;
   grants?: Record<string, Grant>;
 }
 

@@ -41,10 +41,12 @@
     abortBattle(request: unknown, error: unknown): BattleOutcomeView;
     commitResult(result: unknown): string;
     startNewGame(): { status: string };
-    claimGrant(grantId: string): { status: string; grantId: string; reason?: string; error?: string; placed?: { id: string; species: string; level: number; to: string }[]; items?: Record<string, number>; money?: number };
+    claimGrant(grantId: string): { status: string; grantId: string; reason?: string; error?: string; placed?: { id: string; species: string; form: number; level: number; to: string }[]; items?: Record<string, number>; money?: number };
     healParty(): { status: string; reason?: string; error?: string };
     prepareEncounter(table: unknown, region: number): { ok: boolean; reason?: string; error?: string; foe?: { species: string; level: number } };
-    describeParty(): { members: { id: string; species: string; nameKey?: string; level: number; hp: number; maxhp: number; status: string; moves: { id: string; pp: number; maxpp: number }[] }[]; boxes: number; bag: Record<string, number>; money: number };
+    describeParty(): { members: { id: string; species: string; form: number; nameKey?: string; level: number; hp: number; maxhp: number; status: string; moves: { id: string; pp: number; maxpp: number }[] }[]; boxes: number; bag: Record<string, number>; money: number };
+    recordSteps(n?: number): { status: string; steps?: number; reason?: string; error?: string };
+    stateReplacedByHost(): void;
   }
 
   // ---------------------------------------------------------------- shared flow state / API
@@ -93,11 +95,36 @@
       return PSFlow._tr;
     },
     setLanguage(lang: string | null): void { PSFlow.lang = lang; PSFlow._tr = null; },
-    /** Display name of a species through its content text key (falls back to the Showdown name). */
-    speciesName(species: string): string {
-      const sp = PSFlow.content().species[species];
-      return sp && sp.nameKey ? PSFlow.translator().tOr(sp.nameKey, species) : species;
+    /**
+     * Display name of a species through its content text key. Takes a battle name (Showdown, what sessions use) or a
+     * persistent key (content id + form, what the save and grants use); falls back to the name it was given.
+     */
+    speciesName(species: string, form = 0): string {
+      const content = PSFlow.content();
+      const name = content.species[species] ? species : engine().B.speciesKey.battleNameOf(content, { species, form });
+      const sp = name ? content.species[name] : null;
+      return sp && sp.nameKey ? PSFlow.translator().tOr(sp.nameKey, name) : (name || species);
     },
+    /**
+     * Battle name -> persistent key resolver of the current content, for the save migration (PS_SaveState). Throws when
+     * the content cannot be loaded; the caller then refuses the migration and keeps the save as it was.
+     */
+    speciesKeyResolver(): (name: string) => unknown {
+      return engine().B.speciesKey.speciesKeyResolver(PSFlow.content());
+    },
+    /** The host installed another state (load, new game): release a battle still held by the old one (P4-2). */
+    stateReplaced(): void {
+      if (PSFlow._app) PSFlow._app.stateReplacedByHost();
+    },
+    /** Steps the player took (WP06 §4.1). Never throws; a refusal is logged once per reason. */
+    steps(n: number): void {
+      let o: { status: string; reason?: string; error?: string };
+      try { o = PSFlow.app().recordSteps(n); } catch (e) { o = { status: "refused", reason: "unavailable", error: String(e instanceof Error ? e.message : e) }; }
+      PSFlow.lastSteps = o;
+      if (o.status === "refused" && o.reason !== "battle-active" && PSFlow._stepWarned !== o.reason) { PSFlow._stepWarned = o.reason; console.warn("PS_BattleFlow: steps not counted:", o.reason, o.error); }
+    },
+    lastSteps: null as any,
+    _stepWarned: null as any,
     /** Redacted, bounded diagnostics of every session (flow/log.ts); the flow test attaches its tail to the report. */
     logger: null as any,
     game(): any {
@@ -110,6 +137,7 @@
     },
     /** New game: the application installs the formal empty state (no members; grants give them). */
     startNewGame(): void {
+      PSFlow.stateReplaced();
       delete G.$gameSystem._psInitError;
       try { PSFlow.app().startNewGame(); }
       catch (e) { G.$gameSystem._psInitError = String(e instanceof Error ? e.message : e); console.error("PS_BattleFlow: the new game state could not be created:", e); }
@@ -117,10 +145,17 @@
     /** Randomness for members created outside a battle (grants, encounters); tests may pin it with `rng`. */
     rng: null as ((n: number) => number) | null,
     random(n: number): number { return PSFlow.rng ? PSFlow.rng(n) : Math.floor(Math.random() * n); },
-    /** TEST AID ONLY (plugin command ResetGame, the flow test driver): installs the synthetic step 2 fixture party explicitly. */
+    /**
+     * TEST AID ONLY (plugin command ResetGame, the flow test driver): installs the synthetic step 2 fixture party
+     * explicitly, stored the way a save stores it (content id + form of the current content, decision D5-3).
+     */
     resetGame(): void {
       delete G.$gameSystem._psSaveError; delete G.$gameSystem._psSaveInfo; delete G.$gameSystem._psSaveWarning; // an explicit reset is a deliberate act
-      G.$gameSystem._psGame = engine().F.makeGame();
+      PSFlow.stateReplaced();
+      const game = engine().F.makeGame();
+      const content = PSFlow.content();
+      game.party = game.party.map((m: any) => engine().B.speciesKey.toPersistentMember(m, content));
+      G.$gameSystem._psGame = game;
       G.$gameSystem._psBattleSeq = 0;
     },
     /**
@@ -178,7 +213,7 @@
       if (o.status === "already-claimed") return [tr.t("grant.already")];
       if (o.status !== "applied") return [tr.has(`grant.refused.${o.reason}`) ? tr.t(`grant.refused.${o.reason}`) : tr.t("grant.refused.default", { reason: o.reason || "?" })];
       const lines: string[] = [];
-      for (const m of o.placed || []) lines.push(tr.t(m.to === "party" ? "grant.member.party" : "grant.member.boxes", { name: PSFlow.speciesName(m.species), level: m.level }));
+      for (const m of o.placed || []) lines.push(tr.t(m.to === "party" ? "grant.member.party" : "grant.member.boxes", { name: PSFlow.speciesName(m.species, m.form), level: m.level }));
       for (const [k, n] of Object.entries(o.items || {})) lines.push(tr.t("grant.item", { item: tr.tOr(`item.name.${k}`, k), count: n as number }));
       if (o.money) lines.push(tr.t("grant.money", { money: o.money }));
       return lines;
@@ -370,6 +405,14 @@
     return false; // the framework scene is already pushed; MZ must not open its own battle
   };
   G.PluginManager.registerCommand(NAME, "ResetGame", () => PSFlow.resetGame());
+
+  // The global step counter (WP06 §4.1): a step taken on a forced move route or while an event runs is not counted.
+  const baseIncreaseSteps = G.Game_Player && G.Game_Player.prototype.increaseSteps;
+  if (G.Game_Player) G.Game_Player.prototype.increaseSteps = function (this: any) {
+    baseIncreaseSteps.call(this);
+    if (this.isMoveRouteForcing() || G.$gameMap.isEventRunning()) return;
+    PSFlow.steps(1);
+  };
 
   /** Show lines as one message window and make the event wait for it (only when the author asked for messages). */
   function say(interpreter: any, lines: string[]): void {

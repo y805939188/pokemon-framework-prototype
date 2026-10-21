@@ -2,7 +2,8 @@
 import * as G from "../../rules/growth.ts";
 import * as S from "../../rules/state.ts";
 import type { GameState } from "../../rules/state.ts";
-import type { Member, PartialStats } from "../../rules/types.ts";
+import { toPersistentMember } from "../../rules/species-key.ts";
+import type { Content, Member, PartialStats } from "../../rules/types.ts";
 import { fixtureContent as content } from "./content.ts";
 
 export { content };
@@ -20,11 +21,12 @@ export interface MemberOptions {
   item?: string;
 }
 
+/** A persistent party member of the fixture world: the Showdown name is its content id, form 0 (D5-3). */
 export function member(id: string, species: string, level: number, { moves, nature = "timid", evs = {}, expOffset = 0, hp, gender = "M", ability, item = "" }: MemberOptions): S.NewMemberInput {
   const sp = content.species[species]!;
   const stats = G.computeStats(sp.base, { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 }, { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...evs }, level, nature);
   return {
-    id, species, level, exp: G.minExp(sp.growth, level) + expOffset, hp: hp ?? stats.hp, status: "", item, ability: ability || "Blaze", nature, gender,
+    id, species, form: 0, level, exp: G.minExp(sp.growth, level) + expOffset, hp: hp ?? stats.hp, status: "", item, ability: ability || "Blaze", nature, gender,
     evs: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0, ...evs },
     moves: moves.map((m) => ({ id: m, pp: PP[m]!, maxpp: PP[m]! })),
   };
@@ -45,6 +47,14 @@ export function makeGame(over: GameOverrides = {}): GameState {
     bag: { potion: 3, antidote: 1, xattack: 1, pokeball: 5, masterball: 1, ...(over.bag ?? {}) },
     money: 1000,
   });
+}
+
+/**
+ * A fixture game stored the way a save stores it for `target` content (decision D5-3): its members keyed by that
+ * content's ids + form. The fixture world itself needs no conversion (its content ids are the Showdown names).
+ */
+export function savedFor(game: GameState, target: Content): GameState {
+  return { ...game, party: game.party.map((m) => toPersistentMember(m, target)), boxes: game.boxes.map((m) => toPersistentMember(m, target)) };
 }
 
 export interface FoeOptions {

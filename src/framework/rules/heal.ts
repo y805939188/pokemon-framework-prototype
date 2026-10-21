@@ -5,14 +5,14 @@
  * Pure and idempotent: healing a healed party gives an equal state.
  */
 import { computeStats } from "./growth.ts";
-import { own } from "./own.ts";
+import { speciesDataOf } from "./species-key.ts";
 import { clone } from "./state.ts";
 import type { GameState } from "./state.ts";
 import type { Content, Member } from "./types.ts";
 
 export function healMember(m: Member, content: Content): Member {
-  const sp = own(content.species, m.species);
-  if (!sp) throw new Error(`member ${m.id}: species "${m.species}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
+  const sp = speciesDataOf(content, m);
+  if (!sp) throw new Error(`member ${m.id}: species "${m.species}" (form ${m.form ?? 0}) is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
   const maxhp = computeStats(sp.base, m.ivs, m.evs, m.level, m.nature).hp;
   return { ...clone(m), hp: maxhp, status: "", statusCount: 0, moves: m.moves.map((mv) => ({ ...mv, pp: mv.maxpp })) };
 }

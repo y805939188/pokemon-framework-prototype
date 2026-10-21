@@ -61,7 +61,9 @@ test('createMember: the documented random draws, then every field from species +
   assert.deepEqual([m.level, m.exp, m.hp], [5, E.growth.minExp('parabolic', 5), stats.hp], 'exp = minimum of the level, HP full');
   assert.deepEqual(m.moves.map(x => x.id), ['scratch', 'growl', 'ember']);
   assert.deepEqual([m.status, m.statusCount, m.item, m.ball, m.ot, m.friendship, m.nickname], ['', 0, '', 'pokeball', 'player', 70, null]);
-  assert.deepEqual(E.saveSchema.validateGame({ ...S.newGame({ party: [] }), party: [m] }), [], 'a created member is a valid persistent member');
+  // a created member is battle-shaped (Showdown name); stored with its persistent key (D5-3, step 5.0) it is a valid save member
+  assert.equal(m.form, undefined);
+  assert.deepEqual(E.saveSchema.validateGame({ ...S.newGame({ party: [] }), party: [E.speciesKey.toPersistentMember(m, content)] }), [], 'a created member, stored with its key, is a valid persistent member');
 });
 
 test('createMember over many draws: IVs stay in 0..31, every derivation matches its personal id rule', () => {
@@ -98,9 +100,9 @@ test('a grant is applied once: members (party first), items, money, and the clai
   const s0 = fresh(); const before = clone(s0);
   const r = starter(s0);
   assert.equal(r.status, 'applied'); assert.deepEqual(s0, before, 'the input state is not mutated');
-  assert.deepEqual(r.state.party.map(m => [m.id, m.species, m.level]), [['G-starter-1', 'Charmander', 5]]);
+  assert.deepEqual(r.state.party.map(m => [m.id, m.species, m.form, m.level]), [['G-starter-1', 'charmander', 0, 5]], 'stored by content id + form (D5-3, step 5.0)');
   assert.deepEqual(r.state.bag, { potion: 5, pokeball: 10, antidote: 2 }); assert.deepEqual(r.state.claims, { starter: { kind: 'grant' } });
-  assert.deepEqual(r.placed, [{ id: 'G-starter-1', species: 'Charmander', level: 5, to: 'party' }]);
+  assert.deepEqual(r.placed, [{ id: 'G-starter-1', species: 'charmander', form: 0, level: 5, to: 'party' }]);
   assert.deepEqual(E.saveSchema.validateGame(r.state), []);
   const again = starter(r.state);
   assert.equal(again.status, 'already-claimed'); assert.equal(again.state, r.state, 'a repeat returns the same state object: nothing changes');
@@ -138,14 +140,14 @@ test('grant money follows the money cap (WP24: clamped); an existing balance abo
 
 test('a grant registers every received species as seen and owned (WP26 3.2 gifts), once, only when the grant is applied', () => {
   const r = starter(fresh());
-  assert.deepEqual(r.state.dex, { seen: ['Charmander'], owned: ['Charmander'] }, 'the starter is in the dex');
+  assert.deepEqual(r.state.dex, { seen: ['charmander'], owned: ['charmander'] }, 'the starter is in the dex (by content id since step 5.0)');
   assert.equal(starter(r.state).state, r.state, 'a repeat changes nothing, the dex included');
   const flock = { ...content, grants: { flock: { id: 'flock', members: [{ species: 'Pidgey', level: 3 }, { species: 'Pidgey', level: 4 }, { species: 'Caterpie', level: 2 }], items: { potion: 1 }, money: 0 } } };
-  const sighted = fresh(); sighted.dex.seen = ['Pidgey'];
-  assert.deepEqual(applyGrant(sighted, 'flock', flock, lcg(2)).state.dex, { seen: ['Pidgey', 'Caterpie'], owned: ['Pidgey', 'Caterpie'] }, 'one entry per species; an earlier sighting is kept');
+  const sighted = fresh(); sighted.dex.seen = ['pidgey'];
+  assert.deepEqual(applyGrant(sighted, 'flock', flock, lcg(2)).state.dex, { seen: ['pidgey', 'caterpie'], owned: ['pidgey', 'caterpie'] }, 'one entry per species; an earlier sighting is kept');
   const full = fresh(); for (let i = 0; i < 6; i++) full.party.push(createMember({ id: `P-${i}`, species: 'Caterpie', level: 2 }, content, lcg(i)));
   const boxed = starter(full);
-  assert.deepEqual([boxed.placed[0].to, boxed.state.dex.owned], ['boxes', ['Charmander']], 'a member received into the boxes is registered too');
+  assert.deepEqual([boxed.placed[0].to, boxed.state.dex.owned], ['boxes', ['charmander']], 'a member received into the boxes is registered too');
   for (const [label, state, limits, reason] of [
     ['no room', full, { ...E.limits.DEFAULT_LIMITS, boxes: 0 }, 'no-room'],
     ['bag cap', (() => { const s = fresh(); s.bag.potion = 999; return s; })(), E.limits.DEFAULT_LIMITS, 'bag-full'],

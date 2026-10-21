@@ -10,7 +10,13 @@
       "species.showdownId",
       "learnset move names",
       "base stats at run time"
-    ]
+    ],
+    "usageCheck": {
+      "checkedOn": "2026-10-21",
+      "checkedBy": "project process record at step 5.0 (Claude Code), from the terms already registered in this entry; not a legal review",
+      "conditions": "MIT licence covers the repository's code and data files; the data describes a franchise whose rights belong to its owners, which the MIT grant does not settle for redistribution inside a product",
+      "decision": "internal-use"
+    }
   },
   {
     "id": "author-placeholder",

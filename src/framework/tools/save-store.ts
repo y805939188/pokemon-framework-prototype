@@ -14,6 +14,8 @@ import { applyBattleResult } from "../rules/state.ts";
 import type { BattleResult, GameState } from "../rules/state.ts";
 import { migrateGame } from "../rules/save-schema.ts";
 import type { MigrationResult, SaveErrorInfo } from "../rules/save-schema.ts";
+import { identityKeys } from "../rules/species-key.ts";
+import type { SpeciesKeyResolver } from "../rules/species-key.ts";
 
 export type FaultPoint = "start" | "afterBackup" | "beforeSave" | "afterTmpWrite" | "beforeRename" | "afterRename";
 
@@ -32,10 +34,13 @@ export type LoadInfo = Extract<MigrationResult, { ok: true }>;
 export class SaveStore {
   file: string;
   hooks: { at?: (point: FaultPoint) => void };
+  /** Showdown name -> persistent key for older documents and results (D5-3); the default serves fixture worlds, whose content ids are the Showdown names. */
+  speciesKey: SpeciesKeyResolver;
 
-  constructor(file: string, hooks: { at?: (point: FaultPoint) => void } = {}) {
+  constructor(file: string, hooks: { at?: (point: FaultPoint) => void } = {}, speciesKey: SpeciesKeyResolver = identityKeys) {
     this.file = file;
     this.hooks = hooks; // test-only fault injection: hooks.at(point) may throw or exit the process
+    this.speciesKey = speciesKey;
   }
   private _at(point: FaultPoint): void { this.hooks.at?.(point); }
 
@@ -46,7 +51,7 @@ export class SaveStore {
     let raw: unknown;
     try { raw = JSON.parse(fs.readFileSync(this.file, "utf8")); }
     catch (e) { throw new SaveError({ code: "corrupt", message: `cannot read the save file as JSON (${(e as Error).message.slice(0, 120)}); the file was left untouched` }); }
-    const r = migrateGame(raw);
+    const r = migrateGame(raw, { speciesKey: this.speciesKey });
     if (!r.ok) throw new SaveError(r.error);
     return r;
   }
@@ -78,7 +83,7 @@ export class SaveStore {
   commit(result: BattleResult): { status: "applied" | "already-applied"; migratedFrom?: number } {
     this._at("start");
     const info = this.loadInfo();
-    const r = applyBattleResult(info.state, result);
+    const r = applyBattleResult(info.state, result, undefined, this.speciesKey);
     if (info.migrated) { this._backup(info.from); this._at("afterBackup"); }
     if (r.status === "already-applied" && !info.migrated) return { status: r.status };
     this._at("beforeSave");

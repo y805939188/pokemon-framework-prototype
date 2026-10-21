@@ -2,7 +2,8 @@
  * One-time grants (step 4): a content reward package (members, items, money) given at most once per save timeline,
  * recorded in `claims`. Pure. All or nothing: any refusal leaves the state exactly as it was and writes no claim.
  *   members  created by member-factory, named G-<grant id>-<n>; party first, then the boxes (WP38 §6 normal storage);
- *            each received species is registered as seen and owned in the dex (WP26 §3.2 gifts), once
+ *            stored with their persistent key (content id + form, decision D5-3); each received species is registered
+ *            as seen and owned in the dex (WP26 §3.2 gifts), once
  *   items    refused as a whole when one would pass the per-item stage cap (an amount already above it, from an
  *            older save, is kept but cannot grow)
  *   money    clamped to the money cap (WP24); a balance already above it is kept, never reduced
@@ -12,6 +13,7 @@ import type { Limits } from "./limits.ts";
 import { createMember } from "./member-factory.ts";
 import type { Random } from "./member-factory.ts";
 import { own, setOwn } from "./own.ts";
+import { toPersistentMember } from "./species-key.ts";
 import { GAME_SCHEMA, clone } from "./state.ts";
 import type { GameState } from "./state.ts";
 import type { Content } from "./types.ts";
@@ -23,7 +25,8 @@ export class GrantRefusedError extends Error {
   constructor(reason: GrantRefusal, message: string) { super(message); this.name = "GrantRefusedError"; this.reason = reason; }
 }
 
-export interface PlacedMember { id: string; species: string; level: number; to: "party" | "boxes" }
+/** A received member: `species` + `form` are its persistent key (content id + form). */
+export interface PlacedMember { id: string; species: string; form: number; level: number; to: "party" | "boxes" }
 
 export type GrantResult =
   | { status: "applied"; state: GameState; placed: PlacedMember[]; items: Record<string, number>; money: number }
@@ -45,11 +48,11 @@ export function applyGrant(state: GameState, grantId: string, content: Content, 
     const to = next.party.length < limits.party ? "party" : next.boxes.length < limits.boxes ? "boxes" : null;
     if (!to) throw new GrantRefusedError("no-room", `grant "${grantId}": the party and the boxes are full (${grant.members.length} member(s) to receive)`);
     let m;
-    try { m = createMember({ id, species: spec.species, level: spec.level }, content, random); }
+    try { m = toPersistentMember(createMember({ id, species: spec.species, level: spec.level }, content, random), content); }
     catch (e) { throw new GrantRefusedError("creation-failed", `grant "${grantId}": ${e instanceof Error ? e.message : String(e)}`); }
     next[to].push(m);
-    placed.push({ id, species: spec.species, level: spec.level, to });
-    for (const k of ["seen", "owned"] as const) if (!next.dex[k].includes(spec.species)) next.dex[k].push(spec.species);
+    placed.push({ id, species: m.species, form: m.form ?? 0, level: spec.level, to });
+    for (const k of ["seen", "owned"] as const) if (!next.dex[k].includes(m.species)) next.dex[k].push(m.species);
   }
   for (const [item, count] of Object.entries(grant.items)) {
     const have = next.bag[item] ?? 0;

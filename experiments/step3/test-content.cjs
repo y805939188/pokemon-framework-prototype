@@ -100,8 +100,9 @@ test('assembly against the pinned Showdown data reproduces the step 2 fixture co
 	const { content, errors } = assembleContent(compiled, dex);
 	assert.deepEqual(errors, []);
 	// the sample adds one thing the fixture does not have: the text key of each display name
-	// (and, since step 4, the data needed to create an individual: abilities, gender rule, content id)
-	const withoutKeys = Object.fromEntries(Object.entries(content.species).map(([k, v]) => { const { nameKey, abilities, gender, contentId, ...rest } = v; assert.match(nameKey, /^species\.[a-z]+$/); return [k, rest]; }));
+	// (and, since step 4, the data needed to create an individual: abilities, gender rule, content id; since step 5.0
+	// the form number of the record, which with the content id is the persistent key)
+	const withoutKeys = Object.fromEntries(Object.entries(content.species).map(([k, v]) => { const { nameKey, abilities, gender, contentId, form, ...rest } = v; assert.equal(form, 0); assert.match(nameKey, /^species\.[a-z]+$/); return [k, rest]; }));
 	assert.deepEqual(withoutKeys, E.fixtures.content.species, 'sample content == fixture content (same numbers, same Showdown base stats)');
 	assert.equal(content.meta.kind, 'sample'); assert.equal(content.meta.inputsHash, compiled.inputsHash);
 	assert.equal(E.fixtures.content.meta.kind, 'fixture', 'the fixture keeps a distinct identity');

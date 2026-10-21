@@ -9,7 +9,12 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 const { spawnSync } = require('node:child_process');
 const E = require('../../js/engine/build/engine.cjs');
-const { migrateGame, validateGame, ledgerStats } = E.saveSchema;
+const { validateGame, ledgerStats } = E.saveSchema;
+// Since step 5.0 the chain ends at schema 4, whose step from 3 needs the content's species mapping (D5-3). These states
+// come from the step 2 fixture world, whose content ids are the Showdown names: the identity mapping is that content's.
+const migrateGame = (raw, o = { speciesKey: E.speciesKey.identityKeys }) => E.saveSchema.migrateGame(raw, o);
+/** What schemas 3 and 4 add to an older document: the claims ledger, statistics, the step counter, a form per member. */
+const addedByNewerSchemas = s => ['claims', 'schema', 'stats', 'steps', ...['party', 'boxes'].flatMap(k => s[k].map((_, i) => `${k}.${i}.form`))].sort();
 const { SaveStore, SaveError } = E.store;
 const S = E.state;
 const F = E.fixtures;
@@ -38,13 +43,13 @@ test('the real step 2 state (schema 1, captured from a real MZ run) migrates; on
 	const raw = realV1(); const pristine = clone(raw);
 	const r = migrateGame(raw);
 	assert.equal(r.ok, true);
-	assert.deepEqual([r.from, r.to, r.migrated], [1, 3, true]);
+	assert.deepEqual([r.from, r.to, r.migrated], [1, S.GAME_SCHEMA, true]);
 	assert.deepEqual(raw, pristine, 'the input document is never mutated');
-	assert.deepEqual(S.diffPaths(raw, r.state).sort(), ['claims', 'schema'], 'schema 3 adds an empty claims ledger');
+	assert.deepEqual(S.diffPaths(raw, r.state).sort(), addedByNewerSchemas(raw), 'schema 3 adds an empty claims ledger, schema 4 statistics, the step counter and form 0');
 	assert.deepEqual(validateGame(r.state), []);
 	assert.equal(S.applyBattleResult(r.state, { protocol: 1, battleId: 'after-migration', outcome: { kind: 'run', winner: null }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] } }).status, 'applied');
 	const again = migrateGame(r.state);
-	assert.deepEqual([again.ok, again.migrated, again.from], [true, false, 3], 'migrating a current document is a no-op');
+	assert.deepEqual([again.ok, again.migrated, again.from], [true, false, S.GAME_SCHEMA], 'migrating a current document is a no-op');
 });
 
 test('the oldest prototype shape: counters are added, bad poison becomes plain poison, an unknown sleep counter is reported', () => {
@@ -56,7 +61,7 @@ test('the oldest prototype shape: counters are added, bad poison becomes plain p
 	assert.deepEqual([a.status, a.statusCount], ['', 0]);
 	assert.deepEqual([b.status, b.statusCount], ['psn', 0]);
 	assert.deepEqual([c.status, c.statusCount], ['slp', undefined], 'no number is invented for a sleeper');
-	assert.equal(r.notes.length, 3); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
+	assert.equal(r.notes.length, 4); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /schema 4/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
 	assert.deepEqual(validateGame(r.state), []);
 });
 
@@ -113,7 +118,7 @@ test('the store upgrades a legacy file on commit, keeps the original bytes, and 
 	assert.deepEqual(r, { status: 'applied', migratedFrom: 1 });
 	assert.ok(original.equals(fs.readFileSync(f + '.v1.bak')), 'the legacy file is kept byte for byte');
 	const now = new SaveStore(f).load();
-	assert.equal(now.schema, 3); assert.equal(now.party[0].hp, 50); assert.equal(now.bag.potion, 2); assert.ok(now.appliedBattles['B-legacy']);
+	assert.equal(now.schema, S.GAME_SCHEMA); assert.equal(now.party[0].hp, 50); assert.equal(now.bag.potion, 2); assert.ok(now.appliedBattles['B-legacy']);
 	assert.equal(new SaveStore(f).commit(resultFor('B-legacy')).status, 'already-applied');
 	assert.equal(new SaveStore(f).load().bag.potion, 2, 'applied once');
 });

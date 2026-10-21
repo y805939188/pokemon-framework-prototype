@@ -5,8 +5,9 @@
  */
 import type { CompiledContent, ContentError } from "../content/schema.ts";
 import { SCHEMA_VERSION } from "../content/schema.ts";
-import type { Content, DexLookup } from "../rules/types.ts";
-import { own } from "../rules/own.ts";
+import type { Content, DexLookup, Member } from "../rules/types.ts";
+import { own, setOwn } from "../rules/own.ts";
+import { battleNameOf, memberKey } from "../rules/species-key.ts";
 
 /** Shape check of a compiled document read from disk (it was validated when it was compiled). */
 export function loadCompiled(json: unknown): CompiledContent {
@@ -19,11 +20,12 @@ export function loadCompiled(json: unknown): CompiledContent {
 
 export function assembleContent(compiled: CompiledContent, dex: DexLookup): { content: Content; errors: ContentError[] } {
   const errors: ContentError[] = [];
-  const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash }, moves: {}, speciesIds: {}, grants: {} };
+  const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash }, moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {} };
   const short = dex.sha().slice(0, 8);
   const byName = new Map<string, string>();
   for (const sp of compiled.species) {
-    const path = `species/${sp.id}`;
+    const form = sp.form ?? 0;
+    const path = form ? `species/${sp.id}/${form}` : `species/${sp.id}`;
     const found = dex.species(sp.showdownId);
     if (!found) { errors.push({ file: "assembly", path: `${path}.showdownId`, message: `"${sp.showdownId}" is not a species in the pinned Showdown data (${short})` }); continue; }
     const clash = byName.get(found.name);
@@ -40,10 +42,18 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup): { co
     }
     if (!ok) continue;
     content.species[found.name] = {
-      base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset, nameKey: sp.nameKey, contentId: sp.id,
+      base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset, nameKey: sp.nameKey, contentId: sp.id, form,
       ...(found.abilities ? { abilities: [...found.abilities] } : {}), ...(found.gender !== undefined ? { gender: found.gender } : {}),
     };
-    content.speciesIds![sp.id] = found.name;
+    // the persistent key (decision D5-3): content id + form <-> Showdown name, both ways
+    if (form === 0) setOwn(content.speciesIds!, sp.id, found.name);
+    if (!own(content.forms!, sp.id)) setOwn(content.forms!, sp.id, {});
+    setOwn(content.forms![sp.id]!, String(form), found.name);
+    setOwn(content.speciesKeys!, found.name, { species: sp.id, form });
+  }
+  // a form needs its base form: the reference falls back to it (WP03 §3.2), so it must exist
+  for (const [id, forms] of Object.entries(content.forms!)) {
+    if (!own(forms, "0")) errors.push({ file: "assembly", path: `species/${id}`, message: `"${id}" has form(s) ${Object.keys(forms).join(", ")} but no assembled base form 0` });
   }
   for (const g of compiled.grants ?? []) {
     const members: { species: string; level: number }[] = [];
@@ -58,7 +68,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup): { co
   return { content, errors };
 }
 
-/** A species reference written by an author (content id "pidgey", or the persistent Showdown name "Pidgey") -> the persistent key, or null. */
+/** A species reference written by an author (content id "pidgey" = its base form, or a Showdown name "Pidgey") -> the battle name, or null. */
 export function resolveSpecies(content: Content, ref: string): string | null {
   if (own(content.species, ref)) return ref;
   const byId = own(content.speciesIds, ref);
@@ -68,12 +78,13 @@ export function resolveSpecies(content: Content, ref: string): string | null {
 export interface DanglingReference { path: string; message: string }
 
 /**
- * References from a saved state into the current content: species that no longer exist, and (when a Showdown lookup is
- * given) moves the battle engine does not know. Located like every other content error, so a save written against older
- * content is explained instead of crashing a battle.
+ * References from a saved (persistent, schema 4) state into the current content: content ids that no longer exist, and
+ * (when a Showdown lookup is given) moves the battle engine does not know. Located like every other content error, so a
+ * save written against older content is explained instead of crashing a battle. A missing form is not dangling: it
+ * falls back to the base form (WP03 §3.2).
  */
 export function findDanglingReferences(
-  state: { party: { species: string; moves: { id: string }[] }[]; boxes: { species: string; moves: { id: string }[] }[] },
+  state: { party: Pick<Member, "species" | "form" | "moves">[]; boxes: Pick<Member, "species" | "form" | "moves">[] },
   content: Content,
   dex?: DexLookup,
 ): DanglingReference[] {
@@ -81,7 +92,7 @@ export function findDanglingReferences(
   for (const key of ["party", "boxes"] as const) {
     for (const [i, m] of state[key].entries()) {
       const path = `$.${key}[${i}]`;
-      if (!own(content.species, m.species)) out.push({ path: `${path}.species`, message: `"${m.species}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}` });
+      if (battleNameOf(content, memberKey(m)) === null) out.push({ path: `${path}.species`, message: `"${m.species}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}` });
       if (dex) for (const [j, mv] of m.moves.entries()) if (!dex.move(mv.id)) out.push({ path: `${path}.moves[${j}].id`, message: `"${mv.id}" is not a move in the pinned Showdown data` });
     }
   }
