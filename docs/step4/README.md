@@ -14,7 +14,7 @@
 ## 1. 已确认的决定
 
 - **D1 满队捕获/接收**：队伍未满入队；队伍满而盒子未满入盒；队伍和盒子都满才拒绝投球（经冻结协议已有的 `noBall` → `ballsdisabled`，B 批）。领取同样先队伍后盒子，放不下整笔拒绝；领到的每个物种在同一次替换里登记为已见、已拥有（WP26 §3.2，去重）。没有盒子界面：入盒会明确提示“本版暂不能取出”。
-- **D2 持久物种键**：沿用 `Member.species` = 固定 Showdown 版本的物种名。作者内容用小写内容 ID（`charmander`），组装时映射到持久键（`Content.speciesIds`，`resolveSpecies`）；存档不变。内容、凭证与账本字典一律按自有键查找（`rules/own.ts`），所以 `constructor` 这类与对象内置属性同名的合法 ID 照常可用。
+- **D2 持久物种键**：沿用 `Member.species` = 固定 Showdown 版本的物种名。作者内容用小写内容 ID（`charmander`），组装时映射到持久键（`Content.speciesIds`，`resolveSpecies`）；存档不变。内容、凭证与战斗账本字典一律按自有键读写（`rules/own.ts`：读用 `Object.hasOwn`，写成可枚举的自有数据属性），所以 `constructor`、`__proto__` 这类与对象内置属性同名的 ID 照常可用，并随存档、克隆和 JSON 往返保留。
 - **D3 战败**：WP42 §6.1 + WP61 §7.2。败或平（结果码 4）时，扣 `min(余额, 队伍最高等级 × 8)`（本版无徽章状态，徽章恒 0，因子 8；插件参数 `noMoneyLoss` = NO_MONEY_LOSS），并全队完整治疗；这两项与战斗结果**在同一次状态替换里**提交，身份就是该结果的 `battleId` + 结果哈希（`appliedBattles`），所以重复结果 `already-applied` 时不会再扣钱或再治疗；冻结协议和 `BattleResult` 没有新增字段。提交之后，宿主把玩家送回配置的“家”（插件参数 `homeMapId/X/Y/Direction`；未配置则只治疗、不移动，同 WP61 §7.2“无有效家”）；事件战斗随即结束发起它的整条事件调用链：等待这场战斗的解释器，以及逐层调用它的公共事件和事件，都像“中止事件处理”一样停止，链外的解释器不受影响。回程在战败消息之前安排；回程失败（例如转移报错）不撤销提交，记在 `PSFlow.pendingReturn`，`PSFlow.retryReturnHome()` 只做转移、不再结算。提交之后宿主的消息或翻译出错记在 `PSFlow.lastOutcome.hostErrors`，已提交的结果（结果码 4、`commit: applied`、`blackout`、结果变量）保持不变。`StartBattle` 的 `canLose = true` 时不回程、事件拿到结果 4 继续（钱和治疗仍按 WP42 §6.1/§7.1 执行）。
 
 ## 2. 新规则模块与验证方式
@@ -60,12 +60,17 @@
 
 战斗进行期间，`Game_System.isSaveEnabled()` 额外返回 false（菜单存档、自动存档都读它）；游戏自己的保存开关战斗从不写入，所以事件原本禁存、或战斗期间别的系统改了开关，结束后都按那个开关生效。直接调用 `DataManager.saveGame` 在战斗中被拒绝。被拒或写入失败的保存记录在 `PSState.lastSaveError`（`battle-running` / `write-failed`，含槽位与时间），成功保存后清空。`commitResult` 是同步的，没有“提交中”的窗口。
 
+### 战斗进行期间的其它写入
+
+一场战斗从 `GameApplication.startBattle` 读取状态的那一刻（会话还在创建时）起，到它的 `finishBattle` 或同一 `battleId` 的 `abortBattle` 为止，应用层拒绝领取和治疗（`battle-active`），也不开始第二场战斗：会话用开战时的状态副本工作，结果会写回在它上面。会话创建失败只释放它自己；在创建期间被中止的战斗，迟到的会话不会被交出或使用，迟到的失败也不会影响之后开始的战斗。
+
 ## 4. 新游戏与旧存档兼容策略
 
 - 新游戏（`DataManager.setupNewGame`）由应用层装入**正式空状态**：schema 3、无成员、空背包、金钱 = `startMoney`、无凭证。成员只通过领取（或之后的捕获）获得。夹具队伍只能由测试显式选用（`ResetGame` / 测试驱动）。
 - 读档时 `$gameSystem._psGame` 不存在（框架状态出现之前的存档，或从未用过它的存档）：装入正式空状态，**金钱 0**、无凭证，`_psSaveInfo.created = "empty"` 记录这一点；不伪造队伍或物品。
 - schema 1/2 的存档迁移到 3（2→3 只加空的 `claims`），比本版新的 schema 仍拒绝并保持原样。
 - 已有存档里超过阶段容量的数量（某物品 > 999、金钱 > 999999、盒子 > 1200）**不报错、不删减**；只有继续增加会被拒绝（领取整笔拒绝；金钱不再增加但不会被扣到上限）。
+- 领取奖励时，领到的物种在同一次提交里登记为已见、已拥有。第四步早期候选版本的领取不写图鉴，用那个版本领取过奖励的存档（只出现在内部测试中）**按原样保留，不回填**：读档、再次领取（`already-claimed`）都不补登记；之后在战斗中遇见该物种只补“已见”，捕获该物种才补“已拥有”。本切片的野生表没有 Charmander，所以这类旧档里起始精灵的“已拥有”会一直缺失，依赖“已拥有”的规则（例如重复球的倍率）在这类档上按“未拥有”计算。第四步的正式验收使用新游戏建立的新档；旧档不删除、不覆盖、不迁移。
 
 ## 5. 阶段配置与已知限制（批次 A 部分）
 
@@ -107,7 +112,7 @@
 - 无头：`scripts/test-quick.sh`（33 个套件；第四步新增 `experiments/step4/test-{schema3,content4,core4,app4,battle-rules4,app-battle4,plugin-host4}.cjs`）。`test-plugin-host4` 在 Node VM 的宿主桩里运行构建出的插件；其中事件调用链一项用本机安装的 Reactor 解释器（`js/reactor_objects.js`），没有该运行时的环境（CI 无头层）会跳过这一项。
 - 12 项验收矩阵：[acceptance.md](acceptance.md)。命令一页表：[commands.md](commands.md)。
 - 打包与性能：新包上的完整 `scripts/run-package-tests-mac.sh`（含 SL1、替换包）与 `scripts/run-package-perf-mac.sh`（含“遭遇→进战斗”“存/读档”）的结果、包身份（`gitHead`）与性能基线记录在工作区候选报告 `.handoff/step4-candidate-report.zh.md` 与 `.handoff/STATUS.md`（为了让包内 `gitHead` 等于候选 SHA，这些结果不再回写进仓库）。
-- 真实 MZ（开发树）：`scripts/run-flow-test-mac.sh <证据目录>`；批次 A 场景 T15、T15b、V2；批次 B 场景 T16–T25（T16 是评审要求的遭遇宿主验证：区域过滤、事件中不触发、忙碌不重入、战后不立即循环，外加战斗中保存被拒）；T27–T29（事件调用链、提交后宿主故障、保存屏蔽）；每次都重跑既有 T1–T14、T8、V1。证据与身份见 `experiments/step4/evidence/README.md`。
+- 真实 MZ（开发树）：`scripts/run-flow-test-mac.sh <证据目录>`；批次 A 场景 T15、T15b、V2；批次 B 场景 T16–T25（T16 是评审要求的遭遇宿主验证：区域过滤、事件中不触发、忙碌不重入、战后不立即循环，外加战斗中保存被拒）；T27–T30（事件调用链、提交后宿主故障、保存屏蔽、特殊战斗编号经存读档）；每次都重跑既有 T1–T14、T8、V1。证据与身份见 `experiments/step4/evidence/README.md`。
 
 | 场景 | 内容 |
 |---|---|
@@ -124,4 +129,5 @@
 | T27 | 与家同图的战败（`canLose` 关）：直接事件、一层公共事件、两层公共事件里战后的命令都不执行；`canLose` 开时调用方继续 |
 | T28 | 提交后的消息失败、翻译失败、消息与回程都失败：结果码 4/`applied`/`blackout`、结果变量、账本不变，只结算一次，事件结束，回程照常或可重试 |
 | T29 | 开战前允许、战中别处禁存、逃跑结束 → 仍禁存；开战前禁存、战中别处允许、中止结束 → 允许；战斗中菜单/自动存档都不可用 |
+| T30 | 战斗编号 `__proto__` 的结果经 MZ 自己的存档与读档：只生效一次，读档后重复提交不再扣道具 |
 | T26 → V3 | 完整游玩（领取、遭遇胜利成长、捕获入队、满队后捕获入盒、护士、移动）后保存；**新进程**读档：队伍/盒子/背包/成长/凭证/金钱/地图位置/战斗序号一致，并继续遭遇一战 |
