@@ -136,6 +136,41 @@ test('grant money follows the money cap (WP24: clamped); an existing balance abo
   assert.equal(applyGrant(over, 'cash', rich, lcg(1)).state.money, 2000000);
 });
 
+test('a grant registers every received species as seen and owned (WP26 3.2 gifts), once, only when the grant is applied', () => {
+  const r = starter(fresh());
+  assert.deepEqual(r.state.dex, { seen: ['Charmander'], owned: ['Charmander'] }, 'the starter is in the dex');
+  assert.equal(starter(r.state).state, r.state, 'a repeat changes nothing, the dex included');
+  const flock = { ...content, grants: { flock: { id: 'flock', members: [{ species: 'Pidgey', level: 3 }, { species: 'Pidgey', level: 4 }, { species: 'Caterpie', level: 2 }], items: { potion: 1 }, money: 0 } } };
+  const sighted = fresh(); sighted.dex.seen = ['Pidgey'];
+  assert.deepEqual(applyGrant(sighted, 'flock', flock, lcg(2)).state.dex, { seen: ['Pidgey', 'Caterpie'], owned: ['Pidgey', 'Caterpie'] }, 'one entry per species; an earlier sighting is kept');
+  const full = fresh(); for (let i = 0; i < 6; i++) full.party.push(createMember({ id: `P-${i}`, species: 'Caterpie', level: 2 }, content, lcg(i)));
+  const boxed = starter(full);
+  assert.deepEqual([boxed.placed[0].to, boxed.state.dex.owned], ['boxes', ['Charmander']], 'a member received into the boxes is registered too');
+  for (const [label, state, limits, reason] of [
+    ['no room', full, { ...E.limits.DEFAULT_LIMITS, boxes: 0 }, 'no-room'],
+    ['bag cap', (() => { const s = fresh(); s.bag.potion = 999; return s; })(), E.limits.DEFAULT_LIMITS, 'bag-full'],
+  ]) {
+    const before = clone(state);
+    assert.throws(() => applyGrant(state, 'flock', flock, lcg(2), limits), e => e.reason === reason, label);
+    assert.deepEqual(state, before, `${label}: a refused grant registers nothing`);
+  }
+});
+
+test('legal ids that are also Object.prototype names ("constructor") are ordinary keys: first claim applies, a repeat is a repeat, also after a JSON round trip', () => {
+  const ct = { ...content, grants: { constructor: { id: 'constructor', members: [{ species: 'Charmander', level: 5 }], items: { potion: 1 }, money: 0 } } };
+  const first = applyGrant(fresh(), 'constructor', ct, lcg(1));
+  assert.equal(first.status, 'applied'); assert.ok(Object.hasOwn(first.state.claims, 'constructor')); assert.equal(first.state.party[0].id, 'G-constructor-1');
+  assert.deepEqual(E.saveSchema.validateGame(first.state), []);
+  const reloaded = JSON.parse(JSON.stringify(first.state)); // a save/load produces ordinary objects again
+  assert.equal(applyGrant(reloaded, 'constructor', ct, lcg(1)).status, 'already-claimed');
+  assert.throws(() => applyGrant(fresh(), 'toString', content, lcg(1)), e => e.reason === 'unknown-grant', 'an inherited name is not a grant');
+  assert.throws(() => createMember({ id: 'X', species: 'constructor', level: 5 }, content, lcg(1)), /species "constructor" is not in the content/);
+  const run = { protocol: 1, battleId: 'constructor', outcome: { kind: 'run', winner: null }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] } };
+  const applied = S.applyBattleResult(fresh(), run);
+  assert.equal(applied.status, 'applied', 'a battle id equal to an inherited name is applied the first time');
+  assert.equal(S.applyBattleResult(JSON.parse(JSON.stringify(applied.state)), run).status, 'already-applied');
+});
+
 // ---- heal
 test('party heal (WP20 3.2 heal_party): full HP from the stats, status and counter cleared, every move to max PP; boxes untouched; repeat changes nothing', () => {
   const s = starter(fresh()).state;

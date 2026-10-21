@@ -65,9 +65,11 @@ test('claim with a failing store: nothing is installed, and a retry applies exac
   const r = app.claimGrant('starter');
   assert.deepEqual([r.status, r.reason, r.error], ['refused', 'commit-failed', 'store refused']);
   assert.deepEqual(state.current().claims, {}); assert.equal(state.current().party.length, 0);
+  assert.deepEqual(state.current().dex, { seen: [], owned: [] }, 'no dex entry left behind by the failed write');
   state.failReplace = null;
   assert.equal(app.claimGrant('starter').status, 'applied'); assert.equal(app.claimGrant('starter').status, 'already-claimed');
   assert.equal(state.replaced.length, 1); assert.equal(state.current().party.length, 1);
+  assert.deepEqual(state.current().dex, { seen: ['Charmander'], owned: ['Charmander'] }, 'members, items, claim and dex in the same replacement');
 });
 
 test('heal: the party is restored once; healing again is safe and writes nothing', () => {
@@ -82,4 +84,26 @@ test('heal: the party is restored once; healing again is safe and writes nothing
   assert.equal(again.status, 'unchanged'); assert.equal(state.replaced.length, writes + 1);
   state.failRead = new Error('the save state is not usable (unknown-version)');
   assert.deepEqual([app.healParty().status, app.healParty().reason], ['refused', 'state-unusable']);
+});
+
+test('content ids that are also Object.prototype names work end to end: a "constructor" grant and species id compile, assemble, claim once (also after a save round trip) and battle', async () => {
+  const inputs = { manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json'), grants: read('grants.json') };
+  inputs.species.find(sp => sp.id === 'charmander').id = 'constructor';
+  inputs.grants[0].id = 'constructor'; inputs.grants[0].members[0].species = 'constructor';
+  const compiled = E.contentCompile.compileContent(inputs); assert.equal(compiled.ok, true, JSON.stringify(compiled.errors));
+  const a = E.contentRuntime.assembleContent(compiled.data, E.dex.createDexLookup()); assert.deepEqual(a.errors, []);
+  const ct = a.content;
+  assert.equal(E.contentRuntime.resolveSpecies(ct, 'constructor'), 'Charmander', 'the author id resolves to its species');
+  assert.equal(E.contentRuntime.resolveSpecies(ct, 'toString'), null, 'an inherited name resolves to nothing');
+  const mk = initial => { const state = K.createMemoryState(initial); const sessions = K.createFakeSessions(() => { throw new Error('x'); }); return { state, sessions, app: new GameApplication({ state, sessions, projection: K.createRecordingProjection(), content: () => ({ content: ct }), random: lcg(5) }) }; };
+  const w = mk(E.state.newGame({ party: [] }));
+  const first = w.app.claimGrant('constructor');
+  assert.deepEqual([first.status, first.placed.map(p => [p.id, p.species])], ['applied', [['G-constructor-1', 'Charmander']]]);
+  assert.equal(w.app.claimGrant('constructor').status, 'already-claimed');
+  const loaded = mk(JSON.parse(JSON.stringify(w.state.current()))); // a later process reading the save
+  assert.equal(loaded.app.claimGrant('constructor').status, 'already-claimed'); assert.equal(loaded.state.replaced.length, 0);
+  assert.equal(mk(E.state.newGame({ party: [] })).app.claimGrant('toString').reason, 'unknown-grant');
+  await loaded.app.startBattle({ battleId: 'alias#1', seq: 1, kind: 'wild', foes: [{ species: 'constructor', level: 5 }] });
+  assert.equal(loaded.sessions.created[0].setup.foes[0].species, 'Charmander', 'a foe named by the author id is created from its species');
+  assert.deepEqual(E.contentRuntime.findDanglingReferences({ party: [{ species: 'constructor', moves: [] }], boxes: [] }, ct).map(d => d.path), ['$.party[0].species'], 'a saved species key must be an own key of the content');
 });

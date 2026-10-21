@@ -37,6 +37,8 @@ test('creation data comes from the pinned Showdown build: natural abilities, gen
   assert.deepEqual([sp.Pidgey.abilities, sp.Pidgey.gender], [['Keen Eye', 'Tangled Feet'], 128]);
   assert.deepEqual([sp.Caterpie.abilities, sp.Caterpie.gender], [['Shield Dust'], 128]);
   assert.equal(dex.species('voltorb').gender, 'N'); assert.equal(dex.species('chansey').gender, 'F'); assert.equal(dex.species('tauros').gender, 'M');
+  // every ratio of the WP19 3.2 table, including the two where "out of 255" would round differently (191, 223)
+  assert.deepEqual(['bulbasaur', 'growlithe', 'pidgey', 'clefairy', 'pyroar'].map(id => dex.species(id).gender), [32, 64, 128, 192, 224]);
   assert.deepEqual(content.moves.Scratch, { id: 'scratch', name: 'Scratch', pp: 35 });
   assert.deepEqual(content.moves['Sand Attack'], { id: 'sandattack', name: 'Sand Attack', pp: 15 });
   assert.equal(content.moves.Rest.pp, 10, 'Gen 8 data (the battle format), not the newest generation (Rest has 5 PP there)');

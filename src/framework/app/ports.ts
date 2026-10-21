@@ -45,7 +45,7 @@ export interface BattleSetup {
 /** An encounter the application allows here and now (or why not). */
 export type EncounterPlan =
   | { ok: true; foe: { species: string; level: number } }
-  | { ok: false; reason: "not-here" | "invalid-table" | "no-able-member" | "state-unusable" | "no-random" | "unknown-species"; error?: string };
+  | { ok: false; reason: "not-here" | "invalid-table" | "no-able-member" | "state-unusable" | "no-random" | "unknown-species" | "invalid-content"; error?: string };
 
 /** A running battle as the application sees it: it can say how it ended. The UI drives the concrete session itself. */
 export interface BattleHandle {
@@ -72,7 +72,7 @@ export interface OutcomeProjection {
 export interface ClaimOutcome {
   status: "applied" | "already-claimed" | "refused";
   grantId: string;
-  /** Why it was refused: a rule refusal (unknown-grant, no-room, bag-full, member-id-taken, creation-failed), state-unusable, no-random or commit-failed. */
+  /** Why it was refused: a rule refusal (unknown-grant, no-room, bag-full, member-id-taken, creation-failed), battle-active, state-unusable, no-random or commit-failed. */
   reason?: string;
   error?: string;
   placed?: { id: string; species: string; level: number; to: "party" | "boxes" }[];

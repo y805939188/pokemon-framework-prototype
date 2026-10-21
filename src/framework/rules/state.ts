@@ -5,6 +5,7 @@
  */
 import { sha256Hex } from "./sha256.ts";
 import { DEFAULT_LIMITS } from "./limits.ts";
+import { own } from "./own.ts";
 import type { Limits } from "./limits.ts";
 import type { Member, MoveSlot, PartialStats, Stats } from "./types.ts";
 
@@ -121,7 +122,7 @@ export function applyBattleResult(state: GameState, result: BattleResult, limits
   if (state.schema !== GAME_SCHEMA) throw new Error(`game state has schema ${state.schema}, this build writes schema ${GAME_SCHEMA}: migrate it first (rules/save-schema.ts)`);
   if (!result.battleId) throw new Error("result without battleId");
   const h = resultHash(result);
-  const prev = state.appliedBattles[result.battleId];
+  const prev = own(state.appliedBattles, result.battleId);
   if (prev) {
     if (prev.hash === h) return { state, status: "already-applied" };
     throw new Error(`battle ${result.battleId} already applied with a different result`);

@@ -12,6 +12,7 @@
  * gender/nature overrides; the personal id itself is not stored (nothing derives from it later in this build).
  */
 import { computeStats, minExp } from "./growth.ts";
+import { own } from "./own.ts";
 import { newMember } from "./state.ts";
 import type { Content, GenderRule, Member, MoveSlot, SpeciesData } from "./types.ts";
 
@@ -73,7 +74,7 @@ export function createMember(input: CreateMemberInput, content: Content, random:
   const { id, species, level } = input;
   if (typeof id !== "string" || !MEMBER_ID.test(id)) throw new Error(`member id "${id}" must be 1-18 characters of A-Z a-z 0-9 # . _ : -`);
   if (!Number.isInteger(level) || level < 1 || level > 100) throw new RangeError(`level must be an integer from 1 to 100 (got ${String(level)})`);
-  const sp = content.species[species];
+  const sp = own(content.species, species);
   if (!sp) throw new Error(`species "${species}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
   const missing = [...(!sp.abilities || !sp.abilities.length ? ["abilities"] : []), ...(sp.gender === undefined ? ["gender"] : [])];
   if (missing.length) throw new Error(`species "${species}" has no creation data (${missing.join(", ")}) in the content${content.meta ? ` "${content.meta.id}"` : ""}`);

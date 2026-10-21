@@ -6,6 +6,7 @@
 import type { CompiledContent, ContentError } from "../content/schema.ts";
 import { SCHEMA_VERSION } from "../content/schema.ts";
 import type { Content, DexLookup } from "../rules/types.ts";
+import { own } from "../rules/own.ts";
 
 /** Shape check of a compiled document read from disk (it was validated when it was compiled). */
 export function loadCompiled(json: unknown): CompiledContent {
@@ -48,7 +49,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup): { co
     const members: { species: string; level: number }[] = [];
     let ok = true;
     for (const [j, m] of g.members.entries()) {
-      const name = content.speciesIds![m.species];
+      const name = own(content.speciesIds, m.species);
       if (!name) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].species`, message: `"${m.species}" is not an assembled species` }); ok = false; continue; }
       members.push({ species: name, level: m.level });
     }
@@ -59,9 +60,9 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup): { co
 
 /** A species reference written by an author (content id "pidgey", or the persistent Showdown name "Pidgey") -> the persistent key, or null. */
 export function resolveSpecies(content: Content, ref: string): string | null {
-  if (content.species[ref]) return ref;
-  const byId = content.speciesIds?.[ref];
-  return byId && content.species[byId] ? byId : null;
+  if (own(content.species, ref)) return ref;
+  const byId = own(content.speciesIds, ref);
+  return byId !== undefined && own(content.species, byId) ? byId : null;
 }
 
 export interface DanglingReference { path: string; message: string }
@@ -80,7 +81,7 @@ export function findDanglingReferences(
   for (const key of ["party", "boxes"] as const) {
     for (const [i, m] of state[key].entries()) {
       const path = `$.${key}[${i}]`;
-      if (!content.species[m.species]) out.push({ path: `${path}.species`, message: `"${m.species}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}` });
+      if (!own(content.species, m.species)) out.push({ path: `${path}.species`, message: `"${m.species}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}` });
       if (dex) for (const [j, mv] of m.moves.entries()) if (!dex.move(mv.id)) out.push({ path: `${path}.moves[${j}].id`, message: `"${mv.id}" is not a move in the pinned Showdown data` });
     }
   }

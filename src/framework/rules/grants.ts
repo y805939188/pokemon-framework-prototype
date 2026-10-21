@@ -1,7 +1,8 @@
 /**
  * One-time grants (step 4): a content reward package (members, items, money) given at most once per save timeline,
  * recorded in `claims`. Pure. All or nothing: any refusal leaves the state exactly as it was and writes no claim.
- *   members  created by member-factory, named G-<grant id>-<n>; party first, then the boxes (WP38 §6 normal storage)
+ *   members  created by member-factory, named G-<grant id>-<n>; party first, then the boxes (WP38 §6 normal storage);
+ *            each received species is registered as seen and owned in the dex (WP26 §3.2 gifts), once
  *   items    refused as a whole when one would pass the per-item stage cap (an amount already above it, from an
  *            older save, is kept but cannot grow)
  *   money    clamped to the money cap (WP24); a balance already above it is kept, never reduced
@@ -10,6 +11,7 @@ import { DEFAULT_LIMITS } from "./limits.ts";
 import type { Limits } from "./limits.ts";
 import { createMember } from "./member-factory.ts";
 import type { Random } from "./member-factory.ts";
+import { own } from "./own.ts";
 import { GAME_SCHEMA, clone } from "./state.ts";
 import type { GameState } from "./state.ts";
 import type { Content } from "./types.ts";
@@ -31,8 +33,8 @@ export const grantMemberId = (grantId: string, n: number): string => `G-${grantI
 
 export function applyGrant(state: GameState, grantId: string, content: Content, random: Random, limits: Limits = DEFAULT_LIMITS): GrantResult {
   if (state.schema !== GAME_SCHEMA) throw new Error(`game state has schema ${state.schema}, this build writes schema ${GAME_SCHEMA}: migrate it first (rules/save-schema.ts)`);
-  if (state.claims[grantId]) return { status: "already-claimed", state };
-  const grant = content.grants?.[grantId];
+  if (own(state.claims, grantId)) return { status: "already-claimed", state };
+  const grant = own(content.grants, grantId);
   if (!grant) throw new GrantRefusedError("unknown-grant", `grant "${grantId}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
   const next = clone(state);
   const placed: PlacedMember[] = [];
@@ -47,6 +49,7 @@ export function applyGrant(state: GameState, grantId: string, content: Content, 
     catch (e) { throw new GrantRefusedError("creation-failed", `grant "${grantId}": ${e instanceof Error ? e.message : String(e)}`); }
     next[to].push(m);
     placed.push({ id, species: spec.species, level: spec.level, to });
+    for (const k of ["seen", "owned"] as const) if (!next.dex[k].includes(spec.species)) next.dex[k].push(spec.species);
   }
   for (const [item, count] of Object.entries(grant.items)) {
     const have = next.bag[item] ?? 0;

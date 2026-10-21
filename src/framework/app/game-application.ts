@@ -16,6 +16,7 @@ import { createMember } from "../rules/member-factory.ts";
 import { appliesAt, pickEncounter, validateEncounterTable } from "../rules/encounter.ts";
 import { isDefeat, settleDefeat } from "../rules/defeat.ts";
 import type { Member } from "../rules/types.ts";
+import { own } from "../rules/own.ts";
 import { findDanglingReferences, resolveSpecies } from "../flow/content-runtime.ts";
 import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ContentPort, EncounterPlan, GameStatePort, HealOutcome, OutcomeProjection, PartyView, RandomPort } from "./ports.ts";
 
@@ -54,6 +55,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly limits: Limits;
   private readonly startMoney: number;
   private readonly noMoneyLoss: boolean;
+  /**
+   * The battle this application opened and has not finished or aborted yet. Its session works on a copy of the state
+   * taken at the start and commits back over it, so grants and heals are refused meanwhile ("battle-active").
+   */
+  private open: S | null = null;
 
   constructor(ports: GameApplicationPorts<S>, options: GameApplicationOptions = {}) {
     this.ports = ports;
@@ -72,9 +78,10 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   /** Give a content grant once per save timeline. Never throws; a refusal commits nothing (and writes no claim). */
   claimGrant(grantId: string): ClaimOutcome {
     const refused = (reason: string, error: unknown): ClaimOutcome => ({ status: "refused", grantId, reason, error: message(error) });
+    if (this.open) return refused("battle-active", "a battle is open: its result would overwrite the state");
     let game: GameState;
     try { game = this.ports.state.read(); } catch (error) { return refused("state-unusable", error); }
-    if (game.claims[grantId]) return { status: "already-claimed", grantId };
+    if (own(game.claims, grantId)) return { status: "already-claimed", grantId };
     const random = this.ports.random;
     if (!random) return refused("no-random", "no random source is configured for this application");
     let r;
@@ -91,7 +98,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const { content } = this.ports.content();
     return {
       members: game.party.map((m) => {
-        const sp = content.species[m.species];
+        const sp = own(content.species, m.species);
         const maxhp = sp ? computeStats(sp.base, m.ivs, m.evs, m.level, m.nature).hp : m.hp;
         return { id: m.id, species: m.species, ...(sp?.nameKey ? { nameKey: sp.nameKey } : {}), level: m.level, hp: m.hp, maxhp, status: m.status, moves: m.moves.map((x) => ({ ...x })) };
       }),
@@ -101,6 +108,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
 
   /** Heal the party (HP, status, PP). Safe to repeat: an already healed party writes nothing. Never throws. */
   healParty(): HealOutcome {
+    if (this.open) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
     let game: GameState;
     try { game = this.ports.state.read(); } catch (error) { return { status: "refused", reason: "state-unusable", error: message(error) }; }
     let next: GameState;
@@ -134,7 +142,9 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     });
     const full = storageFull(game, this.limits);
     const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full, storageFull: full };
-    return this.ports.sessions.create(request, game, setup);
+    const session = await this.ports.sessions.create(request, game, setup);
+    this.open = session;
+    return session;
   }
 
   /**
@@ -150,10 +160,12 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (!game.party.some((m) => m.hp > 0)) return { ok: false, reason: "no-able-member" };
     const random = this.ports.random;
     if (!random) return { ok: false, reason: "no-random", error: "no random source is configured for this application" };
-    const content = this.ports.content().content;
-    for (const slot of checked.table.slots) if (!resolveSpecies(content, slot.species)) return { ok: false, reason: "unknown-species", error: `"${slot.species}" is not in the content` };
-    const pick = pickEncounter(checked.table, random);
-    return { ok: true, foe: { species: resolveSpecies(content, pick.species)!, level: pick.level } };
+    try {
+      const content = this.ports.content().content;
+      for (const slot of checked.table.slots) if (!resolveSpecies(content, slot.species)) return { ok: false, reason: "unknown-species", error: `"${slot.species}" is not in the content` };
+      const pick = pickEncounter(checked.table, random);
+      return { ok: true, foe: { species: resolveSpecies(content, pick.species)!, level: pick.level } };
+    } catch (error) { return { ok: false, reason: "invalid-content", error: message(error) }; } // an unusable content port or random source
   }
 
   /**
@@ -190,6 +202,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * is committed a failing host projection is reported on the outcome and does not undo or repeat the commit.
    */
   finishBattle(handle: S, request: Pick<BattleStartRequest, "battleId"> | null): BattleOutcome & { result?: BattleResult } {
+    if (this.open === handle) this.open = null;
     let result: BattleResult;
     let outcome: BattleOutcome & { result?: BattleResult };
     try {
@@ -210,6 +223,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
 
   /** End without a result (a failure, a cancelled scene). Nothing is committed. Never throws. */
   abortBattle(request: Pick<BattleStartRequest, "battleId"> | null, error: unknown): BattleOutcome {
+    this.open = null;
     const outcome: BattleOutcome = { code: 0, battleId: request ? request.battleId : null, commit: "none", aborted: true, error: message(error) };
     this.project(outcome);
     return outcome;

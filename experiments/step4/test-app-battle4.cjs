@@ -245,3 +245,30 @@ test('real: a lost wild battle is settled (money, full heal) and committed once'
   assert.equal(state.current().money, 984); assert.ok(m.hp > 1); assert.equal(m.status, '');
   assert.equal(app.finishBattle(s, r).commit, 'already-applied'); assert.equal(state.current().money, 984);
 });
+
+test('while a battle it opened is not finished, the application refuses grants and heals (its result would overwrite them); finish or abort ends that', async () => {
+  const m = mk('A', 'Charmander', 40, { hp: 1 });
+  const { state, app } = realApp(gameOf([m], { bag: {} }));
+  const r = req('live#1', [{ species: 'pidgey', level: 3 }], 'wild', 91);
+  const s = await app.startBattle(r);
+  const before = JSON.stringify(state.current());
+  assert.deepEqual([app.healParty().reason, app.claimGrant('starter').reason], ['battle-active', 'battle-active']);
+  assert.equal(JSON.stringify(state.current()), before, 'nothing written while the battle is open');
+  await s.run(); const o = app.finishBattle(s, r);
+  assert.deepEqual([o.code, o.commit, state.current().party[0].hp], [3, 'applied', 1], 'the battle result is the only write');
+  assert.equal(app.healParty().status, 'healed', 'after the finish the heal is allowed again');
+  assert.equal(app.claimGrant('starter').status, 'applied');
+  const t = await app.startBattle(req('live#2', [{ species: 'pidgey', level: 3 }], 'wild', 92));
+  assert.equal(app.healParty().reason, 'battle-active');
+  app.abortBattle({ battleId: 'live#2' }, new Error('scene closed')); assert.ok(t);
+  assert.equal(app.healParty().status, 'unchanged', 'an abort ends the open battle too');
+});
+
+test('prepareEncounter never throws: an unusable content port or random source is a refusal', () => {
+  const state = K.createMemoryState(gameOf([mk('A', 'Charmander', 5)]));
+  const sessions = K.createFakeSessions(() => { throw new Error('x'); });
+  const badContent = new GameApplication({ state, sessions, projection: K.createRecordingProjection(), content: () => { throw new Error('content unreadable'); }, random: lcg(1) });
+  assert.deepEqual(badContent.prepareEncounter(TABLE, 1), { ok: false, reason: 'invalid-content', error: 'content unreadable' });
+  const badRandom = new GameApplication({ state, sessions, projection: K.createRecordingProjection(), content: () => ({ content }), random: () => 7.5 });
+  const b = badRandom.prepareEncounter(TABLE, 1); assert.deepEqual([b.ok, b.reason], [false, 'invalid-content']); assert.match(b.error, /random\(100\) returned 7\.5/);
+});
