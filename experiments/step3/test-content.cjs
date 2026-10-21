@@ -12,7 +12,9 @@ const { compileContent, checkFresh, hashInputs, canonicalJson } = E.contentCompi
 const { assembleContent, loadCompiled } = E.contentRuntime;
 
 const ROOT = path.resolve(__dirname, '../..');
-const SRC = path.join(ROOT, 'content/sample');
+// The pipeline mechanics are tested on the step 3 sample as it was frozen at step 3 (experiments/step3/fixtures/
+// content-sample-step3); the live sample grows in step 4 and has its own tests (experiments/step4/test-content4.cjs).
+const SRC = path.join(__dirname, 'fixtures/content-sample-step3');
 const CLI = path.join(ROOT, 'js/engine/build/content-cli.cjs');
 const read = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
 const inputs = () => ({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json') });
@@ -98,7 +100,8 @@ test('assembly against the pinned Showdown data reproduces the step 2 fixture co
 	const { content, errors } = assembleContent(compiled, dex);
 	assert.deepEqual(errors, []);
 	// the sample adds one thing the fixture does not have: the text key of each display name
-	const withoutKeys = Object.fromEntries(Object.entries(content.species).map(([k, v]) => { const { nameKey, ...rest } = v; assert.match(nameKey, /^species\.[a-z]+$/); return [k, rest]; }));
+	// (and, since step 4, the data needed to create an individual: abilities, gender rule, content id)
+	const withoutKeys = Object.fromEntries(Object.entries(content.species).map(([k, v]) => { const { nameKey, abilities, gender, contentId, ...rest } = v; assert.match(nameKey, /^species\.[a-z]+$/); return [k, rest]; }));
 	assert.deepEqual(withoutKeys, E.fixtures.content.species, 'sample content == fixture content (same numbers, same Showdown base stats)');
 	assert.equal(content.meta.kind, 'sample'); assert.equal(content.meta.inputsHash, compiled.inputsHash);
 	assert.equal(E.fixtures.content.meta.kind, 'fixture', 'the fixture keeps a distinct identity');

@@ -18,6 +18,42 @@
  * @option zh
  * @default en
  *
+ * @param startMoney
+ * @text Start money
+ * @desc Money of a new game (framework state, not MZ gold). Default 3000.
+ * @type number
+ * @min 0
+ * @max 999999
+ * @default 3000
+ *
+ * @param noMoneyLoss
+ * @text No money loss
+ * @desc NO_MONEY_LOSS: a lost or drawn battle costs no money (the party is still healed).
+ * @type boolean
+ * @default false
+ *
+ * @param homeMapId
+ * @text Home map
+ * @desc Where a defeat sends the player (WP61 7.2 "home"). 0 = no home: the party is healed, nobody is moved.
+ * @type number
+ * @default 0
+ *
+ * @param homeX
+ * @text Home X
+ * @type number
+ * @default 0
+ *
+ * @param homeY
+ * @text Home Y
+ * @type number
+ * @default 0
+ *
+ * @param homeDirection
+ * @text Home direction
+ * @desc 2 down, 4 left, 6 right, 8 up
+ * @type number
+ * @default 2
+ *
  * @command StartBattle
  * @text Start Battle
  * @desc Opens the text battle scene and pauses this event until it ends.
@@ -47,7 +83,53 @@
  * @type variable
  * @default 10
  *
+ * @arg canLose
+ * @text Can lose
+ * @desc false (default): a defeat takes the player home and ends this event. true: the event continues with result 4. Money loss and heal apply either way.
+ * @type boolean
+ * @default false
+ *
+ * @command ClaimGrant
+ * @text Claim Grant
+ * @desc Gives a content reward package (content/sample/grants.json) once per save. Shows what was received unless Message is off.
+ *
+ * @arg grant
+ * @text Grant
+ * @desc Grant id from the content, e.g. starter
+ * @type string
+ * @default starter
+ *
+ * @arg resultVariable
+ * @text Result Variable
+ * @desc Receives 1 given now, 2 already given before, 0 refused (nothing given).
+ * @type variable
+ * @default 0
+ *
+ * @arg message
+ * @text Message
+ * @type boolean
+ * @default true
+ *
+ * @command HealParty
+ * @text Heal Party
+ * @desc Restores HP, status and PP of every party member. Safe to repeat.
+ *
+ * @arg resultVariable
+ * @text Result Variable
+ * @desc Receives 1 healed (or nothing to heal), 0 refused.
+ * @type variable
+ * @default 0
+ *
+ * @arg message
+ * @text Message
+ * @type boolean
+ * @default true
+ *
+ * @command ShowParty
+ * @text Show Party
+ * @desc Opens the read-only party / bag screen (also in the main menu).
+ *
  * @command ResetGame
- * @text Reset Prototype Game State
- * @desc Recreates the prototype party/bag inside the save data (testing aid).
+ * @text Reset to Test Fixture (testing aid)
+ * @desc TESTING AID: replaces the framework state with the synthetic step 2 test party (three level 50 members). Not for real games.
  */

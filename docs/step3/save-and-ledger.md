@@ -9,9 +9,10 @@
 | schema | 来源 | 与当前的差别 |
 |---|---|---|
 | 1 | 第二步原型（含 `step2-closed`） | 成员可能没有 `statusCount`；被击成剧毒的成员可能存成 `status: "tox"` |
-| **2（当前）** | 第三步 | 成员带 `statusCount`（睡眠=剩余回合，中毒=0）；中毒存为普通 `psn`（WP20/WP39：战后中毒计数清零） |
+| 2 | 第三步 | 成员带 `statusCount`（睡眠=剩余回合，中毒=0）；中毒存为普通 `psn`（WP20/WP39：战后中毒计数清零） |
+| **3（当前）** | 第四步 | 加 `claims`（一次性领取凭证：领取 ID → `{kind:"grant"}`）；2→3 只加空凭证账本。见 `docs/step4/README.md` |
 
-**声明支持的旧版本只有 1。** 夹具：`experiments/step3/fixtures/legacy-v1-flow-state.json`（`step2-closed` 时在真实 MZ 运行里捕获的状态）；最老形态（没有 `statusCount`、有 `tox` 和睡眠成员）由测试从它构造。不支持任何其他版本，也不支持“猜”。
+**声明支持的旧版本：1、2（第四步起）。** 夹具：`experiments/step3/fixtures/legacy-v1-flow-state.json`（`step2-closed` 时在真实 MZ 运行里捕获的状态）；最老形态（没有 `statusCount`、有 `tox` 和睡眠成员）由测试从它构造。不支持任何其他版本，也不支持“猜”。
 
 ## 2. 迁移与错误（`migrateGame`）
 

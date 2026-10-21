@@ -1,0 +1,17 @@
+# Step 4 evidence
+
+Reports written by the in-game test driver (`src/plugins/PS_BattleFlowTest.ts`) through `scripts/run-flow-test-mac.sh`; the
+user's home folder is replaced by `~`. Screenshots, the test save folder and the raw logs stay outside the repository in
+the workspace (`.verify/step4-<batch>/`).
+
+| Folder | Code commit under test | What | Result |
+|---|---|---|---|
+| `a/` | `5fe6abd4934d6c5bbb2eb4658174838c6c4fa23b` (clean tree) | dev tree: T1–T14, T15, T15b, T8 in one process; V1, V2 in a second process (real restart) | all pass |
+| `b/` | `fa1d1a1bb82da0dd55beb11ac9c7e70999e3b5e0` (clean tree; code = `1350f08`) | dev tree: T1–T25 (incl. T15b) and T8 in one process; V1, V2 after a real restart | all 28 pass |
+| `c/` | `d1e71ff2d4c34147fcdd3a9e936a4c00636bc876` (clean tree) | dev tree: T1–T26 (incl. T15b) and T8; V1, V2, V3 after a real restart | all 30 pass |
+| `d/` | `2fcae07ada46b586410a848f25a54df4abaa8a19` (clean tree; review fixes) | dev tree: T1–T29 (incl. T15b) and T8; V1, V2, V3 after a real restart | all 33 pass |
+| `e/` | `58cf84fd85215ddb7b48772f72a7fa5f3b8b7f67` (clean tree; second review fixes) | dev tree: T1–T30 (incl. T15b) and T8; V1, V2, V3 after a real restart | all 34 pass |
+
+Packaged-app runs are recorded outside the repository (workspace `.verify/step4-c/`, `.verify/step4-d/`, `.verify/step4-e/` and the candidate/remediation reports), so that the package's `gitHead` can equal the candidate commit.
+
+`identity.txt` in each folder lists the commit and the SHA-256 of every engine/plugin/content artifact the run loaded.

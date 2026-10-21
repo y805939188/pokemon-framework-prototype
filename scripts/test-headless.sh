@@ -37,14 +37,22 @@ SUITES=(
   experiments/step3/test-application.cjs
   experiments/step3/test-plugin-abort.cjs
   experiments/step3/test-scripted-driver.cjs
+  experiments/step4/test-schema3.cjs
+  experiments/step4/test-content4.cjs
+  experiments/step4/test-core4.cjs
+  experiments/step4/test-app4.cjs
+  experiments/step4/test-battle-rules4.cjs
+  experiments/step4/test-app-battle4.cjs
+  experiments/step4/test-plugin-host4.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do
   set +e
-  raw="$(node --test --test-reporter=tap "$s" 2>&1)"
+  raw="$(node --test --test-reporter=tap "$s" 2>&1)"; rc=$?
   set -e
-  out="$(printf '%s\n' "$raw" | grep -E '^# (pass|fail)' | tr '\n' ' ')"
+  out="$(printf '%s\n' "$raw" | grep -E '^# (pass|fail|cancelled)' | tr '\n' ' ')"
   echo "$s  ${out:-NO RESULT (see: node --test $s)}"
-  if [[ "$out" != *"# fail 0"* ]]; then fail=1; printf '%s\n' "$raw" | grep -E '^not ok' | sed 's/^/    /' | head -5; fi
+  # a test that never settles is reported as cancelled with "# fail 0": the exit status and the cancelled count decide too
+  if [[ $rc -ne 0 || "$out" != *"# fail 0"* || "$out" != *"# cancelled 0"* ]]; then fail=1; printf '%s\n' "$raw" | grep -E '^not ok' | sed 's/^/    /' | head -5; fi
 done
 exit $fail

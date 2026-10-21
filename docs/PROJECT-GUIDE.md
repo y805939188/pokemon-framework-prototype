@@ -15,7 +15,7 @@
 | 1 | 提取并整改行为规格，建立去向清单 | 已完成（规格库 `dae6776`） |
 | 2 | 验证战斗接入，确定路线和首版范围 | **已完成并经用户决定（C2）**，补充修复已于 2026-10-19 收口（标签 `step2-closeout`），见 `docs/step2/README.md`、`docs/step2/closeout-addendum.md` |
 | 3 | 工程与测试基础：模块边界、构建/CI、内容数据、本地化、存档基础、第一条 Ruby/TS 对照测试链 | **已收口（2026-10-19，标签 `step3-closed`）**：独立验收先不通过、整改后有条件通过，见 `docs/step3/closure.md`；性能尚无同条件基线。第四步前短架构批次（含复核修复）已于 2026-10-20 经 PR #1 合入 `main`，见 `docs/step3/architecture-batch-closure.md` |
-| 4 | 最小可玩闭环（获得精灵→遭遇→战斗/捕获→成长→治疗→存档读档） | 未开始 |
+| 4 | 最小可玩闭环（获得精灵→遭遇→战斗/捕获→成长→治疗→存档读档） | **整改候选（作者自测，待非作者独立复核与用户批准合并）**：批次 A/B/C 在分支 `step4/a-state-grants` → `step4/b-explore-battle` → `step4/c-acceptance`，复核整改在其后的 `step4/d-review-fixes`，见 `docs/step4/README.md`、`acceptance.md`、`commands.md`；未合并 `main` |
 | 5 | 按功能族扩展，每批交付规则、接口、UI、事件入口、测试和示例 | 未开始 |
 | 6 | 作者工具与 Demo（用户会自制符合 MZ 规格的美术资源） | 未开始 |
 | 7 | 平台、存档、性能、分发验收，发布可用版本 | 未开始 |
@@ -70,7 +70,9 @@
 - **第三步起源码在 `src/framework/`（严格 TS，业务模块之间一律 `import`）**，分层：`rules/`（纯规则与状态/存档 schema）、`content/`（内容 schema 与编译）、`battle/`（Showdown 适配；`showdown-loader.ts` 是**唯一**允许 `require` 的文件，因为 NW.js 里 Showdown 只能 `require`，`import()` 实测失败）、`flow/`（BattleSession、文字描述、日志、内容组装）、`i18n/`（文本 key 与翻译）、`tools/`（夹具、矩阵、harness、存档存储、内容 CLI）。依赖方向由 `scripts/check-boundaries.cjs` 强制（31 个测试证明规则会拒绝违规树，并检查文字/普通属性不误报）；它用 Vite 自带的解析器读语法树（所以要先 `pnpm --dir src install`），**网关的内部状态（`_debugBattle`、`_env`、`_queue`、`_seq`、`_closed` 等）只允许 battle 层和 tools 使用**，flow 只用网关的值查询、受控操作和不透明检查点。Vite 把它们构建成 `js/engine/build/engine.cjs`（API）、`custom-formats.cjs`（运行在 Showdown 里，由 `build-showdown.sh` 暂存）和 `content-cli.cjs`；`js/engine/**/*.cjs` 现在只是兼容门面，**不要往里加逻辑**。
 - **第四步前短架构批次后的分层（`docs/step3/architecture-batch.md`）：** `rules/` 是**核心**，公共入口 `rules/index.ts`（构建为 `js/engine/build/core.cjs`），无 Node、无 DOM、无 Showdown、无显式 `any`，用 `framework/tsconfig.core.json`（`types: []`）单独编译；摘要用 `rules/sha256.ts`（可移植、同步）。`app/` 是应用层：`GameApplication` 只依赖自己拥有的端口（状态、会话工厂、内容、投影），规则调用核心，引擎在 `battle/`、MZ 在插件里。`composition.ts`（entry 层）是把 Showdown 会话接到端口的唯一位置。`battle/driver.ts` 定义 `BattleDriver`/`BattleDriverFactory`（会话与引擎之间的类型缝），`tools/scripted-driver.ts` 与 `tools/fakes.ts` 是测试用的假适配器。插件的 `PSFlow.begin/finish/abort/commit` 是 `GameApplication` 的薄包装；应用初始化失败时，插件仍独立投影中止结果并释放事件等待。应用在持久状态提交前验证 outcome，宿主投影失败不撤销提交。检查器只允许 app 从 flow 引用 `content-runtime.ts`，该服务只依赖 rules/content，根入口限 `index.ts` / `composition.ts`，动态导入必须用可检查的字面量。复核后修复与新证据见 `docs/step3/batch-review-fixes.md`。
 
-所有权：引擎拥有 HP、持久状态异常、PP 和全部战斗临时状态；`BattleSession` 拥有背包台账、参战者、成长与学招、捕获记录；**持久游戏状态在战斗期间不被改动**，只通过 `BattleResult`（协议 v1）一次性、幂等地提交（`applyBattleResult`，按 `battleId`）。写集：`level, exp, hp, status, statusCount, moves, evs, friendship`（+背包/图鉴/金钱）。持久状态文档有自己的版本（schema 2；`docs/step3/save-and-ledger.md`），与协议版本无关。协议 v1 已冻结（范围见 `docs/step2/protocol-v1.md`，由 `protocol-v1.frozen.json` 和契约测试守护）。
+- **第四步新增（`docs/step4/README.md`）：** 核心 `rules/` 加了个体生成 `member-factory.ts`（物种+等级→成员，注入 `random(n)`）、`grants.ts`（一次性领取）、`heal.ts`、`encounter.ts`（WP36 §5.1 抽选）、`defeat.ts`（WP42 §6.1 + WP61 §7.2）、`limits.ts`（阶段容量：队伍 6、盒子 1200 扁平、背包每种 999、金钱 999999）、`items.ts`；持久状态 **schema 3**（`claims` 凭证账本，迁移 1→2→3）。应用层 `GameApplication` 加 `startNewGame`/`claimGrant`/`healParty`/`prepareEncounter`/`describeParty`，并负责**创建野生对手**（`composition.ts` 不再引用夹具）、开战守卫（可战斗成员、满队满盒 `noBall`）和**战败结算与结果同一次替换**。`app/` 也用 `tsconfig.app.json`（lib ES2022、`types: []`，含传递导入）单独编译。内容管线加可选 `grants.json`；`DexLookup` 加性扩展（特性、性别比例、招式 id/PP，读 **Gen 8** 数据）。插件：正式新游戏（`setupNewGame` 不再用夹具，`PSFlow.game()` 不伪造状态）、`ClaimGrant`/`HealParty`/`ShowParty` 命令、地图备注 `<PSEncounter:…>` 覆盖 `executeEncounter`、统一开战入口 `PSFlow.openBattle`、保存屏蔽（战斗进行时 `Game_System.isSaveEnabled` 额外返回 false，从不改写游戏自己的保存开关；战斗中直接保存也拒绝）、战败回家（可重试，不再结算；结束发起战斗的整条事件调用链，含逐层公共事件；提交后的宿主消息故障记在 `lastOutcome.hostErrors`，不改已提交结果）。内容、凭证、账本字典按自有键读写（`rules/own.ts`）；领取的物种登记图鉴；从开战创建会话起到这场战斗结束或中止，应用层拒绝领取、治疗（`battle-active`）和第二场战斗，中止后迟到的会话不被使用。切片地图 `Map005` 是新游戏起点。
+
+所有权：引擎拥有 HP、持久状态异常、PP 和全部战斗临时状态；`BattleSession` 拥有背包台账、参战者、成长与学招、捕获记录；**持久游戏状态在战斗期间不被改动**，只通过 `BattleResult`（协议 v1）一次性、幂等地提交（`applyBattleResult`，按 `battleId`）。写集：`level, exp, hp, status, statusCount, moves, evs, friendship`（+背包/图鉴/金钱）。持久状态文档有自己的版本（schema 3；`docs/step3/save-and-ledger.md`，第四步加 `claims`），与协议版本无关。框架状态是队伍/盒子/背包/金钱/图鉴/凭证/账本的唯一权威；MZ 的 `$gameParty` 金币与物品不参与。协议 v1 已冻结（范围见 `docs/step2/protocol-v1.md`，由 `protocol-v1.frozen.json` 和契约测试守护）。
 
 MZ 侧：`src/plugins/PS_BattleFlow.ts`（插件命令 `StartBattle`、解释器等待、占位文字战斗场景；游戏状态放在 MZ 存档 `$gameSystem._psGame` 里）、`PS_RuntimeFixes.ts`（修 RPGReactor 在 PixiJS 8 上的两个内存泄漏）、`PS_SaveLocation.ts`（打包后存档放包外）、`PS_SaveState.ts`（MZ 存档里的状态版本：载入迁移/诊断，存前校验）、`PS_BattleSmoke/PS_BattleFlowTest.ts`（冒烟与自动化测试驱动，无参数时不工作）。
 
@@ -98,9 +100,9 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 | 构建一切（引擎包、内容、插件） | `pnpm --dir src build`（只构建引擎包：`build:engine`；内容：`content:build`/`content:check`/`content:inventory`；类型检查：`typecheck`） | 便宜 |
 | 构建/裁剪 Showdown（并暂存 RPG 扩展） | `pnpm --dir src build:engine` 之后 `scripts/build-showdown.sh` | 首次约 1–2 分钟（下载依赖） |
 | 读取 CI 结果（无凭据，读公开页面） | `scripts/ci-status.sh <分支>` | 读不到就是未验证，不是通过 |
-| 游戏内流程测试（开 NW.js 窗口，真实按键/事件/存档） | `scripts/run-flow-test-mac.sh` | 几分钟，弹窗口 |
+| 游戏内流程测试（开 NW.js 窗口，真实按键/事件/存档；T1–T26 + 重启 V1–V3） | `scripts/run-flow-test-mac.sh <证据目录>` | 约 4–5 分钟，弹窗口 |
 | 打包（不用 MZ 部署） | `scripts/package-mac.sh [--with-tests] [--harden] [--identity ID]` | 约半分钟，约 545 MiB（557,964 KB） |
-| 包内完整测试（流程 + 场景矩阵 + 存档位置 + 签名封印） | `scripts/run-package-tests-mac.sh`（`PF_PACKAGE_ARGS=--harden` 用硬化运行时） | 几分钟，弹窗口 |
+| 包内完整测试（流程 + 场景矩阵 + 存档位置 + 签名封印） | `scripts/run-package-tests-mac.sh`（`PF_PACKAGE_ARGS=--harden` 用硬化运行时；只结束自己启动的实例，按精确 PID） | 几分钟，弹窗口 |
 | 包内性能与内存测量 | `scripts/run-package-perf-mac.sh [次数]` | 几分钟，弹窗口 |
 
 测试脚本运行时窗口失焦、静音都不影响结果（见 `docs/step2/runtime-issues.md`）；脚本从不写玩家的存档槽（包内存档位置检查只用一个空闲的高位槽并还原；流程测试用 `--ps-save-dir`），也不会杀掉不是自己启动的进程（若已有打包应用在运行会拒绝启动）。
@@ -133,7 +135,10 @@ pnpm --dir src build                                                            
 - macOS 自带 bash 3.2：`set -u` 下空数组展开会报错；`sed -i` 需要 `-i ''`。
 - 引擎使用 `js/engine/showdown/dist/config/` 里的规则拷贝，会话层使用 `js/engine/rpg/` 里的源文件；改了规则没重建会得到混合结果（`test-engine-contract.cjs` 会抓到）。
 - 持久化的异常状态计数是 `statusCount`（睡眠=剩余回合；中毒 0 普通/1 剧毒标志）；战斗结束后中毒计数清零（剧毒按普通中毒存回），睡眠保留剩余回合；没有该字段的旧记录，睡眠会重新抽一个时长。
-- `reason: win` 且 `winner` 不是 `Player` 表示战败（结果里有 `outcome.winner`）。
+- `reason: win` 且 `winner` 不是 `Player` 表示战败（结果里有 `outcome.winner`）。败/平（结果码 4）由应用层在同一次提交里扣钱并治疗（D3），`StartBattle` 默认随后回家并结束发起它的整条事件调用链（`canLose` 可关）。
+- Showdown 的 `Dex` 默认是最新世代；战斗格式是 Gen 8，生成成员用的数据要取 `Dex.forGen(8)`（例如 Rest/Roost 的 PP 两代不同，引擎会拒绝不符的 PP 上限）。
+- 新游戏的框架状态在 `DataManager.setupNewGame` 钩子里建立；`PSFlow.game()` 在没有状态时抛错而不是造一个。测试要用夹具队伍必须显式 `PSFlow.resetGame()`。
+- 第四步之后战斗对手由内容生成，测试要固定 `PSFlow.rng`（生成随机）和 `PSFlow.seed`（引擎种子）才可复现。
 - zsh 里 `echo =====` 会被当成命令展开而报错；脚本用 bash。
 - 内存、泄漏相关改动依赖 PixiJS 内部实现，升级 Pixi/Reactor 后要重跑 100 场战斗内存检查（`docs/step2/runtime-issues.md`）。
 

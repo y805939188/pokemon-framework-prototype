@@ -18,15 +18,33 @@ mkdir -p "$EVID/perf"; rm -f "$EVID"/perf/run*.json
 now_ms() { python3 -c 'import time;print(int(time.time()*1000))'; }
 EXTRA=(); [[ -n "${PF_PERF_ARGS:-}" ]] && read -r -a EXTRA <<< "$PF_PERF_ARGS"
 if pgrep -f "PokemonFrameworkPrototype.app/Contents/MacOS" >/dev/null 2>&1; then echo "PokemonFrameworkPrototype is running: close it first" >&2; exit 1; fi
+# Exact-PID process handling: only the instance THIS script launched is ever stopped (never pkill -f a pattern).
+main_pids() { pgrep -f "PokemonFrameworkPrototype.app/Contents/MacOS" 2>/dev/null || true; }
+LAST_PID=""
+launch_app() { # args for the game; sets LAST_PID to the main process that `open -n` started
+  local before; before="$(main_pids)"
+  open -n "$APP" --args "$@"
+  LAST_PID=""
+  for _ in $(seq 1 100); do
+    for p in $(main_pids); do grep -qx "$p" <<< "$before" || LAST_PID="$p"; done
+    [[ -n "$LAST_PID" ]] && return 0; sleep 0.2
+  done
+  echo "warning: could not identify the launched app's PID" >&2
+}
+stop_app() { # stop the instance we launched (it normally quits itself with --ps-flow-quit)
+  [[ -n "$LAST_PID" ]] || return 0
+  for _ in $(seq 1 50); do kill -0 "$LAST_PID" 2>/dev/null || { LAST_PID=""; return 0; }; sleep 0.2; done
+  kill "$LAST_PID" 2>/dev/null || true; LAST_PID=""
+}
 for i in $(seq 1 "$RUNS"); do
   OUT="$EVID/perf/run$i.json"; rm -rf "$EVID/saves"
   T0="$(now_ms)"
-  open -n "$APP" --args "--mute-audio" "--disable-renderer-backgrounding" "--disable-background-timer-throttling" "--disable-backgrounding-occluded-windows" "--disable-features=CalculateNativeWinOcclusion" "--ps-save-dir=$EVID/saves" "--ps-flow-test=perf" "--ps-flow-out=$OUT" "--ps-t0=$T0" --ps-flow-quit ${EXTRA[@]+"${EXTRA[@]}"}
+  launch_app "--mute-audio" "--disable-renderer-backgrounding" "--disable-background-timer-throttling" "--disable-backgrounding-occluded-windows" "--disable-features=CalculateNativeWinOcclusion" "--ps-save-dir=$EVID/saves" "--ps-flow-test=perf" "--ps-flow-out=$OUT" "--ps-t0=$T0" --ps-flow-quit ${EXTRA[@]+"${EXTRA[@]}"}
   for _ in $(seq 1 300); do [[ -f "$OUT" ]] && break; sleep 2; done
-  [[ -f "$OUT" ]] || { echo "timeout on run $i" >&2; pkill -f "PokemonFrameworkPrototype.app/Contents/MacOS" || true; exit 1; }
-  sleep 3
+  [[ -f "$OUT" ]] || { echo "timeout on run $i" >&2; stop_app; exit 1; }
+  sleep 3; stop_app
 done
-pkill -f "PokemonFrameworkPrototype.app/Contents/MacOS" 2>/dev/null || true
+stop_app
 node -e '
 const fs=require("fs"); const dir=process.argv[1]+"/perf"; const os=require("os");
 const runs=fs.readdirSync(dir).filter(f=>/^run\d+\.json$/.test(f)).sort().map(f=>JSON.parse(fs.readFileSync(dir+"/"+f,"utf8")));
@@ -65,6 +83,12 @@ const sum={
     row("memory: app RSS after 24 battles (MB)",col(p=>p.memory[3].appRssMb)),
     row("memory: JS heap after 4 battles (MB)",col(p=>p.memory[1].jsHeapUsedMb)),
     row("memory: JS heap after 24 battles (MB)",col(p=>p.memory[3].jsHeapUsedMb)),
+    row("step 4: map encounter -> first battle menu, median (ms)",col(p=>p.step4.encounterToFirstMenuMs.p50)),
+    row("step 4: map encounter -> first battle menu, worst (ms)",col(p=>p.step4.encounterToFirstMenuMs.max)),
+    row("step 4: save (DataManager.saveGame), median (ms)",col(p=>p.step4.saveMs.p50)),
+    row("step 4: save, worst (ms)",col(p=>p.step4.saveMs.max)),
+    row("step 4: load (DataManager.loadGame), median (ms)",col(p=>p.step4.loadMs.p50)),
+    row("step 4: load, worst (ms)",col(p=>p.step4.loadMs.max)),
   ],
   errors: runs.flatMap(r=>r.perf.errors||[]),
 };

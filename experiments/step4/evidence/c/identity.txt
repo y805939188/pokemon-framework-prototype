@@ -1,0 +1,15 @@
+commit under test: d1e71ff2d4c34147fcdd3a9e936a4c00636bc876 (working tree clean)
+command: scripts/run-flow-test-mac.sh <evidence dir> (NW.js 0.117.0 / Node 26.7.0 from the installed RPG Maker MZ), Apple Silicon macOS
+headless on the same tree: scripts/test-quick.sh, 32 suites, all '# fail 0'
+artifacts loaded by the run (sha256):
+1d39606d536e2942a2ca2f5df140e1ef2d04381a64fb642f19e0c9ac95cc8977  js/engine/build/content-cli.cjs
+29c6f751321f5545a4be31d07ac7ce21cfbb59ec4dc858880f80e4f2f60c555a  js/engine/build/core.cjs
+b7a0412ea2cd72d3371ee2fb409f09c7a2de893bb422d9034dafe0f8acf54ec8  js/engine/build/custom-formats.cjs
+dc0e4809e0ec9b2e14a2a0bc366b3c182d42ed803889161d1636d15314ea77e9  js/engine/build/engine.cjs
+423cd17d94a4bda1f41288fc3daae890d843a1dfa1a629f6651e251b2d127031  js/plugins/PS_BattleFlow.js
+4107abfcb143a8d5801ef39c569bfbcf18e3a861cc8f3614d4dc23ae19c756b0  js/plugins/PS_BattleFlowTest.js
+fa7a861823d995b47716708639d4e5deadd54e72e79873bc4d6b0c675b89cab1  js/plugins/PS_BattleSmoke.js
+13d8d5c09c79b91afbecef44042266a4fd7d71a7cf0507c530b2c2a32ada21ef  js/plugins/PS_RuntimeFixes.js
+60737918cfb94a07b6ba751a97fcc3750d00570abd1aacdd1153b3ecf552af38  js/plugins/PS_SaveLocation.js
+10f3e8e060662088cb3100bc9aa4288ce38f75abc0bfee43cd49bb20b47b459b  js/plugins/PS_SaveState.js
+992b5fcb19167eebd856203bc6376c19bc15a83c6a0b0a43963b348945651885  data/framework/content.json

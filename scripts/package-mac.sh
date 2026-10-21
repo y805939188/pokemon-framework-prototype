@@ -31,7 +31,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -d "$NWAPP" ]] || { echo "NW.js host not found: $NWAPP" >&2; exit 1; }
+# Build the engine bundles, the compiled content and every plugin from the current source first, so the package never
+# carries runtime files older than its gitHead.
+pnpm --dir "$ROOT/src" build >/dev/null || { echo "build failed: nothing packaged" >&2; exit 1; }
 [[ -d "$ROOT/js/engine/showdown/dist" ]] || { echo "engine not built: run scripts/build-showdown.sh" >&2; exit 1; }
+# Showdown runs the copy of the battle rules staged into it, not the bundle just built: they must be the same file.
+cmp -s "$ROOT/js/engine/build/custom-formats.cjs" "$ROOT/js/engine/showdown/dist/config/custom-formats.js" \
+  || { echo "the Showdown runtime holds other battle rules than this build: run scripts/build-showdown.sh" >&2; exit 1; }
 [[ -f "$ROOT/js/plugins/PS_BattleFlow.js" ]] || { echo "plugins not built: run pnpm --dir src build" >&2; exit 1; }
 [[ -f "$ROOT/js/engine/build/engine.cjs" ]] || { echo "engine bundle not built: run pnpm --dir src build" >&2; exit 1; }
 # the compiled content must exist and be the build of exactly the current content sources (never package a stale one)
@@ -77,11 +83,13 @@ DIFF_SHA="$( { git -C "$ROOT" diff HEAD -- . "${EXCL[@]}"; git -C "$ROOT" ls-fil
 ENGINE_SHA="$(cat "$ROOT/js/engine/showdown/SOURCE_SHA" 2>/dev/null || echo unknown)"
 BUNDLE_SHA="$(shasum -a 256 "$ROOT/js/engine/build/engine.cjs" | cut -d' ' -f1)"
 CONTENT_HASH="$(node -p 'require(process.argv[1]).inputsHash' "$ROOT/data/framework/content.json")"
+# SHA-256 of every runtime artifact actually copied into the package (plugins, engine bundles, the rules Showdown runs, compiled content)
+ARTIFACTS="$(cd "$NW_RES" && shasum -a 256 js/plugins/*.js js/engine/build/*.cjs js/engine/showdown/dist/config/custom-formats.js data/framework/content.json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const o={};for(const l of s.trim().split("\n")){const [h,f]=l.split(/\s+/);o[f]=h}process.stdout.write(JSON.stringify(o))})')"
 if [[ "$HARDEN" -eq 0 ]]; then SIGNING="adhoc"; elif [[ "$IDENTITY" == "-" ]]; then SIGNING="adhoc+hardened-runtime"; else SIGNING="identity:$IDENTITY+hardened-runtime"; fi
 node -e '
-  const [out,head,dirty,diff,engine,tests,signing,bundle,content]=process.argv.slice(1);
-  require("fs").writeFileSync(out,JSON.stringify({builtAt:new Date().toISOString(),gitHead:head,workingTreeChanges:Number(dirty),diffSha256:diff,showdownSha:engine,engineBundleSha256:bundle,contentInputsHash:content,withTests:tests==="1",signing},null,2)+"\n");
-' "$NW_RES/package-info.json" "$GIT_HEAD" "$GIT_DIRTY" "$DIFF_SHA" "$ENGINE_SHA" "$WITH_TESTS" "$SIGNING" "$BUNDLE_SHA" "$CONTENT_HASH"
+  const [out,head,dirty,diff,engine,tests,signing,bundle,content,artifacts]=process.argv.slice(1);
+  require("fs").writeFileSync(out,JSON.stringify({builtAt:new Date().toISOString(),gitHead:head,workingTreeChanges:Number(dirty),diffSha256:diff,showdownSha:engine,engineBundleSha256:bundle,contentInputsHash:content,withTests:tests==="1",signing,artifacts:JSON.parse(artifacts)},null,2)+"\n");
+' "$NW_RES/package-info.json" "$GIT_HEAD" "$GIT_DIRTY" "$DIFF_SHA" "$ENGINE_SHA" "$WITH_TESTS" "$SIGNING" "$BUNDLE_SHA" "$CONTENT_HASH" "$ARTIFACTS"
 
 # ---- bundle metadata + signature ----
 PLIST="$APP/Contents/Info.plist"

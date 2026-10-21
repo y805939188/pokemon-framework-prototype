@@ -9,12 +9,18 @@ const K = E.fakes;
 const { GameApplication } = E.app;
 
 const WIN = { events: ['|move|p1a: A-0001|Flamethrower|p2a: W1-1', '|-damage|p2a: W1-1|0 fnt', '|faint|p2a: W1-1'], damage: { 'W1-1': 9999 }, end: { winner: 'Player', reason: 'win' } };
+// Since step 4 the application creates the foes: the fixture content gets the creation data a Pidgey needs (no
+// Showdown is loaded here, so it is written out) and the random is seeded.
+const content = JSON.parse(JSON.stringify(F.content));
+Object.assign(content.species.Pidgey, { abilities: ['Keen Eye', 'Tangled Feet'], gender: 128, learnset: { 1: ['Tackle'] } });
+content.moves = { Tackle: { id: 'tackle', name: 'Tackle', pp: 35 } };
+const random = () => 0;
 const req = (id, kind = 'trainer') => ({ battleId: id, kind, foes: [{ species: 'Pidgey', level: 5 }], seq: 1 });
 function world(script, game = F.makeGame()) {
   const factory = E.scripted.createScriptedFactory(script);
   const state = K.createMemoryState(game), projection = K.createRecordingProjection();
-  const sessions = E.composition.createBattleSessionFactory({ content: () => F.content, driver: factory });
-  const app = new GameApplication({ state, sessions, projection, content: () => ({ content: F.content }) });
+  const sessions = E.composition.createBattleSessionFactory({ content: () => content, driver: factory });
+  const app = new GameApplication({ state, sessions, projection, content: () => ({ content }), random });
   return { factory, state, projection, app };
 }
 const snapshot = state => JSON.stringify(state.current());
