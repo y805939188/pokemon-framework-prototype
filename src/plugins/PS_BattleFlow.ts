@@ -201,22 +201,41 @@
       return session;
     },
     finish(session: any): any {
-      const { result, ...outcome } = PSFlow.app().finishBattle(session, PSFlow.request);
+      const { result, ...outcome } = PSFlow.app().finishBattle(session, PSFlow.request); // commits at most once; never throws
       if (result) PSFlow.lastResult = result;
-      PSFlow.lastOutcome = outcome;
+      PSFlow.lastOutcome = outcome; // the business outcome is recorded before anything the host shows
       PSFlow.close(outcome.code);
       // D3: after a committed defeat the host takes the player home (unless the author allowed losing). The money and the
-      // heal were settled in the commit; this is only the trip, it can fail and be retried without settling again.
+      // heal were settled in the commit; this is only the trip, it can fail and be retried without settling again. The
+      // trip is requested before the messages, and a failing message is recorded on the outcome without changing it.
       if (outcome.code === 4 && outcome.commit !== "none" && PSFlow.request && !PSFlow.request.canLose) {
         outcome.blackout = true;
-        const tr = PSFlow.translator();
-        if (outcome.defeat && outcome.defeat.moneyLost) G.$gameMessage.add(tr.t("blackout.money_lost", { money: outcome.defeat.moneyLost }));
         const ret = PSFlow.returnHome();
-        G.$gameMessage.add(tr.t(ret.status === "requested" ? "blackout.home" : ret.status === "no-home" ? "blackout.no_home" : "blackout.failed"));
+        PSFlow.afterCommit(outcome, "message", () => {
+          const tr = PSFlow.translator();
+          if (outcome.defeat && outcome.defeat.moneyLost) G.$gameMessage.add(tr.t("blackout.money_lost", { money: outcome.defeat.moneyLost }));
+          G.$gameMessage.add(tr.t(ret.status === "requested" ? "blackout.home" : ret.status === "no-home" ? "blackout.no_home" : "blackout.failed"));
+        });
       }
       return outcome;
     },
+    /** Host work after a commit (messages): a failure is kept in `outcome.hostErrors` and logged; the outcome itself stands. */
+    afterCommit(outcome: any, step: string, fn: () => void): void {
+      try { fn(); }
+      catch (e) {
+        (outcome.hostErrors ||= []).push({ step, error: String(e instanceof Error ? e.message : e) });
+        console.error(`PS_BattleFlow: ${step} failed after the result was committed:`, e);
+      }
+    },
     abort(error: unknown): void {
+      // A result committed for this battle stays the outcome: a later failure (e.g. in the scene's own wiring) is a host
+      // error after the commit, never an abort that would report the committed battle as not committed.
+      const done = PSFlow.lastOutcome;
+      if (done && done.commit && done.commit !== "none" && PSFlow.request && done.battleId === PSFlow.request.battleId) {
+        PSFlow.afterCommit(done, "after-commit", () => { throw error; });
+        PSFlow.close(done.code);
+        return;
+      }
       try { PSFlow.lastOutcome = PSFlow.app().abortBattle(PSFlow.request, error); }
       catch {
         const outcome: BattleOutcomeView = { code: 0, battleId: PSFlow.request ? PSFlow.request.battleId : null, commit: "none", aborted: true, error: String(error instanceof Error ? error.message : error) };
@@ -226,25 +245,21 @@
       }
       PSFlow.close(0);
     },
-    /** Bookkeeping when a battle is over: measurements, the save permission as it was before, and the interpreter stops waiting. The result variable is the application's projection. */
+    /**
+     * Bookkeeping when a battle is over: the interpreter stops waiting, saving is no longer masked by the battle (see
+     * Game_System.isSaveEnabled below), measurements. The result variable is the application's projection.
+     */
     close(code: number): void {
+      PSFlow.running = false;
       const cur = PSFlow.perf.cur;
       if (cur && !cur.totalMs) { cur.totalMs = Math.round((performance.now() - cur.t0) * 10) / 10; cur.code = code; PSFlow.perf.battles.push(cur); }
-      // restore exactly what was there: an event that had disabled saving keeps it disabled
-      if (PSFlow._saveWasEnabled === true) G.$gameSystem.enableSave();
-      PSFlow._saveWasEnabled = null;
-      PSFlow.running = false;
     },
-    _saveWasEnabled: null as boolean | null,
     /** The single way a battle opens (StartBattle command and map encounters): the same application path, the same guards. */
     openBattle(request: any): void {
       if (PSFlow.running) throw new Error("a battle is already running");
       PSFlow.request = request;
       PSFlow.running = true;
-      PSFlow.lastOutcome = null;
-      // no save while a battle runs (menu, autosave and direct DataManager.saveGame all see it)
-      PSFlow._saveWasEnabled = G.$gameSystem.isSaveEnabled();
-      G.$gameSystem.disableSave();
+      PSFlow.lastOutcome = null; // saving is masked while running (Game_System.isSaveEnabled below; direct saves: PS_SaveState)
       PSFlow.perf.cur = { battleId: request.battleId, t0: performance.now(), actions: [] as any[], encounter: !!request.encounter };
       if (PSFlow.perf.encounterT0 !== undefined && request.encounter) { PSFlow.perf.cur.t0 = PSFlow.perf.encounterT0; }
       G.SceneManager.push(W.Scene_PSBattle);
@@ -298,32 +313,42 @@
   G.PluginManager.registerCommand(NAME, "StartBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
     const seq = PSFlow.nextSeq();
+    const battleId = `${args.battleId || "battle"}#${seq}`;
     PSFlow.openBattle({
       kind: args.kind === "trainer" ? "trainer" : "wild",
       foes: parseFoes(args.foes || "Pidgey:5"),
       seq,
-      battleId: `${args.battleId || "battle"}#${seq}`,
+      battleId,
       resultVariable: Number(args.resultVariable) || 0,
       canLose: String(args.canLose) === "true",
     });
+    this._psBattleId = battleId; // this interpreter waits for THIS battle (see updateWaitMode below)
     this.setWaitMode("psBattle");
   });
 
   /**
    * Map note format (one tag): <PSEncounter:regions=1,2;pidgey,60,2-4;caterpie,40,2-4>
-   * `regions=` (optional, empty = whole map) then one `species,weight,min-max` per slot. Only split into plain data here;
-   * the application validates the values and decides the encounter.
+   * `regions=` (optional, empty = whole map) then one `species,weight,min-max` (or `species,weight,level`) per slot.
+   * Only the syntax is checked here (every segment has exactly its fields); the application validates the values and
+   * decides the encounter. A note with a syntax problem gives no table and the problems.
    */
-  function parseEncounterNote(note: string): { regions: number[]; slots: { species: string; weight: number; minLevel: number; maxLevel: number }[] } {
+  function parseEncounterNote(note: string): { table: { regions: number[]; slots: { species: string; weight: number; minLevel: number; maxLevel: number }[] } | null; problems: string[] } {
+    const problems: string[] = [];
     const parts = note.split(";").map((x) => x.trim()).filter(Boolean);
     let regions: number[] = [];
-    if (parts[0] && /^regions\s*=/.test(parts[0])) regions = parts.shift()!.split("=")[1]!.split(",").map((x) => x.trim()).filter(Boolean).map(Number);
+    if (parts[0] && /^regions\s*=/.test(parts[0])) {
+      const r = parts.shift()!.split("=");
+      if (r.length !== 2) problems.push(`"${r.join("=")}": regions takes one "=" and a comma-separated list`);
+      regions = String(r[1] ?? "").split(",").map((x) => x.trim()).filter(Boolean).map(Number);
+    }
     const slots = parts.map((p) => {
-      const [species, weight, range] = p.split(",").map((x) => x.trim());
-      const [lo, hi] = String(range ?? "").split("-").map((x) => Number(x.trim()));
-      return { species: species ?? "", weight: Number(weight), minLevel: lo as number, maxLevel: (hi ?? lo) as number };
+      const fields = p.split(",").map((x) => x.trim());
+      const range = String(fields[2] ?? "").split("-").map((x) => x.trim());
+      if (fields.length !== 3 || range.length > 2) problems.push(`"${p}": a slot is species,weight,min-max`);
+      const [lo, hi] = range.map(Number);
+      return { species: fields[0] ?? "", weight: Number(fields[1]), minLevel: lo as number, maxLevel: (hi ?? lo) as number };
     });
-    return { regions, slots };
+    return { table: problems.length ? null : { regions, slots }, problems };
   }
 
   // Map encounters: MZ's own step counter decides WHEN (map "encounter steps"); a map with a PSEncounter note opens the
@@ -335,7 +360,7 @@
     if (PSFlow.running || G.$gameMap.isEventRunning() || this._encounterCount > 0) return false;
     this.makeEncounterCount();
     const t0 = performance.now();
-    const plan = PSFlow.encounter(table.data, this.regionId());
+    const plan = table.data.table ? PSFlow.encounter(table.data.table, this.regionId()) : { ok: false, reason: "invalid-note", error: table.data.problems.join("; ") };
     PSFlow.lastEncounter = { ...plan, region: this.regionId(), x: this.x, y: this.y, mapId: G.$gameMap.mapId() };
     if (!plan.ok) { if (plan.reason !== "not-here" && plan.reason !== "no-able-member") console.warn("PS_BattleFlow: encounter refused:", plan.reason, plan.error); return false; }
     const seq = PSFlow.nextSeq();
@@ -384,16 +409,41 @@
     };
   }
 
+  // A blackout ends the event that started the battle: the interpreter that waited for it, and every interpreter that
+  // called it (common events run as child interpreters, and a parent carries on when its child ends). Each one stops as
+  // MZ's "Exit Event Processing" does; interpreters outside that calling chain are not touched.
   const baseUpdateWaitMode = G.Game_Interpreter.prototype.updateWaitMode;
   G.Game_Interpreter.prototype.updateWaitMode = function (this: any) {
     if (this._waitMode === "psBattle") {
       if (PSFlow.running) return true;
       this._waitMode = "";
-      if (PSFlow.lastOutcome && PSFlow.lastOutcome.blackout) this._index = this._list.length; // the player blacked out: the rest of the event does not run
+      const o = PSFlow.lastOutcome;
+      if (o && o.blackout && o.battleId === this._psBattleId) { this._index = this._list.length; this._psEndChain = true; }
+      delete this._psBattleId;
       return false;
     }
     return baseUpdateWaitMode.call(this);
   };
+  const baseUpdateChild = G.Game_Interpreter.prototype.updateChild;
+  G.Game_Interpreter.prototype.updateChild = function (this: any) {
+    const child = this._childInterpreter;
+    const busy = baseUpdateChild.call(this);
+    if (!busy && child && child._psEndChain && this._list) { this._index = this._list.length; this._psEndChain = true; }
+    return busy;
+  };
+  const baseClear = G.Game_Interpreter.prototype.clear;
+  G.Game_Interpreter.prototype.clear = function (this: any) {
+    baseClear.call(this);
+    delete this._psEndChain; delete this._psBattleId;
+  };
+
+  // Saving is masked while a battle runs, on top of the game's own flag: the menu and autosave read isSaveEnabled, and the
+  // flag itself (set by events or other systems, also during the battle) is never written by the battle. A direct
+  // DataManager.saveGame is refused separately (PS_SaveState).
+  if (G.Game_System) {
+    const baseIsSaveEnabled = G.Game_System.prototype.isSaveEnabled;
+    G.Game_System.prototype.isSaveEnabled = function (this: any) { return !PSFlow.running && baseIsSaveEnabled.call(this); };
+  }
 
   // ---------------------------------------------------------------- windows (prototype style, like Reactor's own)
   function Window_PSText(this: any, rect: any) { this.initialize(rect); }

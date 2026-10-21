@@ -11,7 +11,7 @@
  *   save : the state is validated first; a problem is recorded as `_psSaveWarning` and logged, and the save still
  *          goes ahead (refusing would lose the player's progress; the warning is the diagnostic).
  *          While a battle runs (PSFlow.running) every save is refused, including a direct DataManager.saveGame call (the
- *          menu and autosave are already off through $gameSystem.disableSave). A refused or failed save is recorded in
+ *          menu and autosave are already off: PS_BattleFlow masks Game_System.isSaveEnabled). A refused or failed save is recorded in
  *          PSState.lastSaveError {code: battle-running | write-failed, message, savefileId, at} and logged.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
