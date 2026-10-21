@@ -56,10 +56,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly startMoney: number;
   private readonly noMoneyLoss: boolean;
   /**
-   * The battle this application opened and has not finished or aborted yet. Its session works on a copy of the state
-   * taken at the start and commits back over it, so grants and heals are refused meanwhile ("battle-active").
+   * The battle operation this application has started and not ended: from the moment startBattle reads the state (the
+   * session is still being created: "pending") until finishBattle of its session or abortBattle of its battleId. The
+   * session works on the state read at the start and commits back over it, so grants and heals are refused meanwhile
+   * ("battle-active"), and a second battle cannot start. Each operation is its own object: a creation that fails, or
+   * completes after its operation was aborted, only ever touches that object, never a later operation.
    */
-  private open: S | null = null;
+  private op: { battleId: string; session: S | null } | null = null;
 
   constructor(ports: GameApplicationPorts<S>, options: GameApplicationOptions = {}) {
     this.ports = ports;
@@ -78,7 +81,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   /** Give a content grant once per save timeline. Never throws; a refusal commits nothing (and writes no claim). */
   claimGrant(grantId: string): ClaimOutcome {
     const refused = (reason: string, error: unknown): ClaimOutcome => ({ status: "refused", grantId, reason, error: message(error) });
-    if (this.open) return refused("battle-active", "a battle is open: its result would overwrite the state");
+    if (this.op) return refused("battle-active", "a battle is open: its result would overwrite the state");
     let game: GameState;
     try { game = this.ports.state.read(); } catch (error) { return refused("state-unusable", error); }
     if (own(game.claims, grantId)) return { status: "already-claimed", grantId };
@@ -108,7 +111,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
 
   /** Heal the party (HP, status, PP). Safe to repeat: an already healed party writes nothing. Never throws. */
   healParty(): HealOutcome {
-    if (this.open) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
+    if (this.op) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
     let game: GameState;
     try { game = this.ports.state.read(); } catch (error) { return { status: "refused", reason: "state-unusable", error: message(error) }; }
     let next: GameState;
@@ -123,8 +126,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * instead of crashing inside a battle. The foes are created here from the content (species + level, member-factory)
    * with ids W<seq>-<n>; a foe that cannot be created, or a party with nobody able to battle, refuses the battle.
    * Balls are disabled when a caught member would have nowhere to go (D1). Throws; nothing has been committed or changed.
+   * Only one battle at a time: while another is open (also while its session is still being created) this throws. When
+   * the battle is aborted before its session exists, a session that arrives later is not kept or returned (rejects).
    */
   async startBattle(request: BattleStartRequest): Promise<S> {
+    if (this.op) throw new Error(`a battle is already open (${this.op.battleId})`);
     const game = this.ports.state.read();
     const { content, dex } = this.ports.content();
     const dangling = findDanglingReferences(game, content, dex);
@@ -142,8 +148,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     });
     const full = storageFull(game, this.limits);
     const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full, storageFull: full };
-    const session = await this.ports.sessions.create(request, game, setup);
-    this.open = session;
+    const op: { battleId: string; session: S | null } = { battleId: request.battleId, session: null };
+    this.op = op; // taken before the first await: nothing can write between reading the state and opening the battle
+    let session: S;
+    try { session = await this.ports.sessions.create(request, game, setup); }
+    catch (error) { if (this.op === op) this.op = null; throw error; }
+    if (this.op !== op) throw new Error(`battle ${request.battleId} was aborted while its session was being created; the late session is not used`);
+    op.session = session;
     return session;
   }
 
@@ -202,7 +213,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * is committed a failing host projection is reported on the outcome and does not undo or repeat the commit.
    */
   finishBattle(handle: S, request: Pick<BattleStartRequest, "battleId"> | null): BattleOutcome & { result?: BattleResult } {
-    if (this.open === handle) this.open = null;
+    if (this.op && this.op.session === handle) this.op = null;
     let result: BattleResult;
     let outcome: BattleOutcome & { result?: BattleResult };
     try {
@@ -221,9 +232,12 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     return outcome;
   }
 
-  /** End without a result (a failure, a cancelled scene). Nothing is committed. Never throws. */
+  /**
+   * End without a result (a failure, a cancelled scene). Nothing is committed. Never throws. Ends the open operation when
+   * it is this battle (same battleId), also while its session is still being created.
+   */
   abortBattle(request: Pick<BattleStartRequest, "battleId"> | null, error: unknown): BattleOutcome {
-    this.open = null;
+    if (this.op && request && this.op.battleId === request.battleId) this.op = null;
     const outcome: BattleOutcome = { code: 0, battleId: request ? request.battleId : null, commit: "none", aborted: true, error: message(error) };
     this.project(outcome);
     return outcome;

@@ -272,3 +272,89 @@ test('prepareEncounter never throws: an unusable content port or random source i
   const badRandom = new GameApplication({ state, sessions, projection: K.createRecordingProjection(), content: () => ({ content }), random: () => 7.5 });
   const b = badRandom.prepareEncounter(TABLE, 1); assert.deepEqual([b.ok, b.reason], [false, 'invalid-content']); assert.match(b.error, /random\(100\) returned 7\.5/);
 });
+
+test('D3 under a battle id that is also "__proto__" or "constructor": a failed store write leaves nothing, then the defeat is settled once, also after a save round trip', () => {
+  for (const id of ['__proto__', 'constructor']) {
+    const { state, app } = fakeApp(gameOf([mk('A', 'Charmander', 9, { hp: 2 })], { money: 1000, bag: { potion: 2 } }));
+    const r = { ...lost(id, { A: { hp: 0 } }), bag: { potion: -1 } };
+    state.failReplace = new Error('store refused');
+    const failed = app.finishBattle({ result: () => r }, { battleId: id });
+    assert.deepEqual([failed.code, failed.commit], [0, 'none'], id);
+    assert.deepEqual([state.current().money, state.current().bag.potion, state.current().party[0].hp, Object.keys(state.current().appliedBattles)], [1000, 2, 2, []], `${id}: nothing left by the failed write`);
+    state.failReplace = null;
+    const o = app.finishBattle({ result: () => r }, { battleId: id });
+    assert.deepEqual([o.commit, o.defeat], ['applied', { moneyLost: 72, healed: true }], id);
+    assert.equal(app.commitResult(r), 'already-applied', id);
+    const reloaded = fakeApp(JSON.parse(JSON.stringify(state.current())));
+    assert.equal(reloaded.app.commitResult(r), 'already-applied', `${id}: still a repeat after a save round trip`);
+    const now = reloaded.state.current();
+    assert.deepEqual([now.money, now.bag.potion, reloaded.state.replaced.length], [928, 1, 0], `${id}: money, item and heal settled once`);
+    assert.ok(Object.hasOwn(now.appliedBattles, id));
+  }
+});
+
+// ---- the battle operation while its session is being created (controlled promises; no engine)
+function controlledSessions() {
+  const calls = [];
+  return { calls, create(request, game, setup) { return new Promise((resolve, reject) => calls.push({ request, game, setup, resolve, reject })); } };
+}
+/** A promise that must settle soon: a regression that leaves it pending fails here instead of being cancelled at exit. */
+const soon = (p, ms = 500) => { let t; return Promise.race([p, new Promise((_, reject) => { t = setTimeout(() => reject(new Error(`still pending after ${ms} ms`)), ms); })]).finally(() => clearTimeout(t)); };
+const handleFor = (battleId, extra = {}) => ({ result: () => ({ protocol: 1, battleId, outcome: { kind: 'run', winner: null }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] }, ...extra }) });
+function pendingApp(game = gameOf([mk('A', 'Charmander', 5, { hp: 1 })])) {
+  const state = K.createMemoryState(game), sessions = controlledSessions();
+  return { state, sessions, app: new GameApplication({ state, sessions, projection: K.createRecordingProjection(), content: () => ({ content }), random: lcg(3) }) };
+}
+
+test('a battle is open from the start of startBattle: while its session is being created grants, heals and a second battle are refused; the result is the only write', async () => {
+  const w = pendingApp();
+  const p = w.app.startBattle(req('p#1'));
+  assert.equal(w.sessions.calls.length, 1);
+  assert.deepEqual([w.app.healParty().reason, w.app.claimGrant('starter').reason], ['battle-active', 'battle-active'], 'pending: refused');
+  await assert.rejects(soon(w.app.startBattle(req('p#2'))), /a battle is already open \(p#1\)/);
+  assert.equal(w.sessions.calls.length, 1, 'no second session requested');
+  w.sessions.calls[0].resolve(handleFor('p#1', { members: { A: { hp: 1 } } }));
+  const h = await p;
+  assert.equal(w.app.healParty().reason, 'battle-active', 'active: refused');
+  assert.deepEqual([w.app.finishBattle(h, req('p#1')).commit, w.state.current().party[0].hp, w.state.replaced.length], ['applied', 1, 1]);
+  assert.equal(w.app.healParty().status, 'healed', 'after the finish: allowed');
+});
+
+test('a failed creation releases its own operation, and the next battle can start', async () => {
+  const w = pendingApp();
+  const p = w.app.startBattle(req('f#1'));
+  w.sessions.calls[0].reject(new Error('engine failed to start'));
+  await assert.rejects(p, /engine failed to start/);
+  assert.equal(w.app.claimGrant('starter').status, 'applied', 'released');
+  const q = w.app.startBattle(req('f#2')); w.sessions.calls[1].resolve(handleFor('f#2'));
+  const h = await q; assert.equal(w.app.abortBattle(req('f#2'), new Error('scene closed')).commit, 'none');
+  assert.equal(w.app.healParty().status, 'healed', 'after an abort: allowed');
+});
+
+test('an abort while the session is being created ends that operation; its late session or late failure is not used and never releases or replaces a later battle', async () => {
+  const w = pendingApp();
+  const p1 = w.app.startBattle(req('a#1'));
+  w.app.abortBattle({ battleId: 'a#1' }, new Error('scene closed while opening'));
+  assert.equal(w.app.healParty().status, 'healed', 'the cancelled operation no longer blocks');
+  const p2 = w.app.startBattle(req('a#2'));
+  w.app.abortBattle({ battleId: 'a#1' }, new Error('late cleanup of the old battle'));
+  assert.equal(w.app.healParty().reason, 'battle-active', "the old battle's abort does not end a#2");
+  w.sessions.calls[0].resolve(handleFor('a#1'));
+  await assert.rejects(p1, /a#1 was aborted while its session was being created/, 'the late session is not handed out');
+  assert.equal(w.app.healParty().reason, 'battle-active', 'and it neither revives a#1 nor releases a#2');
+  w.sessions.calls[1].resolve(handleFor('a#2'));
+  const h2 = await p2;
+  assert.equal(w.app.finishBattle(h2, req('a#2')).commit, 'applied');
+  assert.notEqual(w.app.healParty().reason, 'battle-active');
+  const p3 = w.app.startBattle(req('a#3'));
+  w.app.abortBattle({ battleId: 'a#3' }, new Error('cancelled'));
+  const p4 = w.app.startBattle(req('a#4'));
+  w.sessions.calls[2].reject(new Error('late failure of a#3'));
+  await assert.rejects(p3, /late failure of a#3/);
+  assert.equal(w.app.claimGrant('starter').reason, 'battle-active', "a#3's late failure does not release a#4");
+  w.sessions.calls[3].resolve(handleFor('a#4'));
+  const h4 = await p4;
+  assert.equal(w.app.abortBattle(req('a#4'), new Error('scene closed')).commit, 'none');
+  assert.equal(w.app.claimGrant('starter').status, 'applied', 'released by its own abort');
+  assert.equal(w.state.replaced.length, 3, 'the only writes: the heal after a#1 was cancelled, the finished a#2, the grant'); assert.ok(h4);
+});
