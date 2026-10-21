@@ -171,6 +171,33 @@ test('legal ids that are also Object.prototype names ("constructor") are ordinar
   assert.equal(S.applyBattleResult(JSON.parse(JSON.stringify(applied.state)), run).status, 'already-applied');
 });
 
+test('"__proto__" as a battle id or a claim id is an ordinary own entry: applied once, a repeat (also after a JSON round trip) is a repeat, a different result conflicts; nothing is spent twice', () => {
+  const run = { protocol: 1, battleId: '__proto__', outcome: { kind: 'run', winner: null }, members: {}, bag: { potion: -1 }, captured: [], dex: { seen: [], owned: [] } };
+  const g = fresh(); g.bag.potion = 2;
+  const a = S.applyBattleResult(g, run);
+  assert.deepEqual([a.status, a.state.bag.potion, g.bag.potion], ['applied', 1, 2], 'one potion spent; the input is not touched');
+  assert.ok(Object.hasOwn(a.state.appliedBattles, '__proto__'), 'an own ledger entry');
+  assert.equal(Object.getPrototypeOf(a.state.appliedBattles), Object.prototype, 'the ledger keeps its prototype');
+  const again = S.applyBattleResult(a.state, run);
+  assert.deepEqual([again.status, again.state === a.state], ['already-applied', true]);
+  const saved = JSON.stringify(a.state); assert.match(saved, /"__proto__":\{"hash":"[0-9a-f]{64}"\}/, 'serialized with the rest of the ledger');
+  const loaded = JSON.parse(saved);
+  assert.deepEqual(E.saveSchema.validateGame(loaded), []);
+  const afterLoad = S.applyBattleResult(loaded, run);
+  assert.deepEqual([afterLoad.status, afterLoad.state.bag.potion], ['already-applied', 1], 'after a save round trip the repeat spends nothing');
+  const before = JSON.stringify(loaded);
+  assert.throws(() => S.applyBattleResult(loaded, { ...run, bag: { potion: -2 } }), /already applied with a different result/);
+  assert.equal(JSON.stringify(loaded), before, 'a conflicting result changes nothing');
+  assert.throws(() => S.applyBattleResult(fresh(), { ...run, bag: { potion: -1 } }), /bag would go negative/, 'a refused result...');
+  assert.deepEqual(fresh().appliedBattles, {}, '...records nothing');
+  // the claims ledger takes the same key (a grant id outside the content rules, reachable through the API)
+  const ct = { ...content, grants: JSON.parse('{"__proto__": {"id": "__proto__", "members": [], "items": {"potion": 1}, "money": 0}}') };
+  const claimed = applyGrant(fresh(), '__proto__', ct, lcg(1));
+  assert.deepEqual([claimed.status, Object.hasOwn(claimed.state.claims, '__proto__'), claimed.state.bag.potion], ['applied', true, 1]);
+  assert.deepEqual(E.saveSchema.validateGame(claimed.state), []);
+  assert.equal(applyGrant(JSON.parse(JSON.stringify(claimed.state)), '__proto__', ct, lcg(1)).status, 'already-claimed');
+});
+
 // ---- heal
 test('party heal (WP20 3.2 heal_party): full HP from the stats, status and counter cleared, every move to max PP; boxes untouched; repeat changes nothing', () => {
   const s = starter(fresh()).state;

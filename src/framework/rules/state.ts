@@ -5,7 +5,7 @@
  */
 import { sha256Hex } from "./sha256.ts";
 import { DEFAULT_LIMITS } from "./limits.ts";
-import { own } from "./own.ts";
+import { own, setOwn } from "./own.ts";
 import type { Limits } from "./limits.ts";
 import type { Member, MoveSlot, PartialStats, Stats } from "./types.ts";
 
@@ -156,7 +156,7 @@ export function applyBattleResult(state: GameState, result: BattleResult, limits
     for (const k of ["seen", "owned"] as const) for (const sp of result.dex[k] || []) if (!next.dex[k].includes(sp)) next.dex[k].push(sp);
   }
   if (result.money) next.money = Math.max(0, next.money + result.money);
-  next.appliedBattles[result.battleId] = { hash: h };
+  setOwn(next.appliedBattles, result.battleId, { hash: h });
   return { state: next, status: "applied" };
 }
 

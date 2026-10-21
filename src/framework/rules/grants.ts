@@ -11,7 +11,7 @@ import { DEFAULT_LIMITS } from "./limits.ts";
 import type { Limits } from "./limits.ts";
 import { createMember } from "./member-factory.ts";
 import type { Random } from "./member-factory.ts";
-import { own } from "./own.ts";
+import { own, setOwn } from "./own.ts";
 import { GAME_SCHEMA, clone } from "./state.ts";
 import type { GameState } from "./state.ts";
 import type { Content } from "./types.ts";
@@ -58,6 +58,6 @@ export function applyGrant(state: GameState, grantId: string, content: Content, 
   }
   const before = next.money;
   next.money = before > limits.money ? before : Math.min(before + grant.money, limits.money);
-  next.claims[grantId] = { kind: "grant" };
+  setOwn(next.claims, grantId, { kind: "grant" });
   return { status: "applied", state: next, placed, items: { ...grant.items }, money: next.money - before };
 }
