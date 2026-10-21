@@ -769,6 +769,19 @@
       return out;
     });
 
+    await scenario("T30 a battle id that is also \"__proto__\" is an ordinary ledger entry through MZ's own save and load: applied once, a repeat before and after the load spends nothing", async () => {
+      await slice(30); game().bag.potion = 2;
+      const r = { protocol: 1, battleId: "__proto__", outcome: { kind: "run", winner: null }, members: {}, bag: { potion: -1 }, captured: [], dex: { seen: [], owned: [] } };
+      eq([W.PSFlow.commit(r), W.PSFlow.commit(r), game().bag.potion], ["applied", "already-applied", 1], "applied once");
+      assert(Object.hasOwn(game().appliedBattles, "__proto__"), "an own ledger entry");
+      await G.DataManager.saveGame(12);
+      game().bag.potion = 7; // diverge, so the load is visible
+      await G.DataManager.loadGame(12);
+      assert(!G.$gameSystem._psSaveError && Object.hasOwn(game().appliedBattles, "__proto__"), "the entry came back from the MZ save");
+      eq([W.PSFlow.commit(r), game().bag.potion], ["already-applied", 1], "after the load the repeat spends nothing");
+      await toMapId(5, 8, 9);
+    });
+
     await scenario("T23 a real save failure is diagnosable and changes nothing; the next good save clears it", async () => {
       await slice(23);
       const before = clone(game());
@@ -1125,7 +1138,8 @@
       try { if (globalBefore) fs.writeFileSync(globalFile, globalBefore); else if (fs.existsSync(globalFile)) fs.unlinkSync(globalFile); } catch (e) { /* reported through cleanedUp */ }
       if (info) { if (infoHad) info[slot] = infoBefore; else { delete info[slot]; info.length = infoLength; } } // the in-memory copy as well: a later save in this process writes it
       await sleep(1500); // a late write would show up here
-      cleanedUp = !fs.existsSync(file) && (globalBefore ? fs.readFileSync(globalFile).equals(globalBefore) : !fs.existsSync(globalFile));
+      cleanedUp = !fs.existsSync(file) && (globalBefore ? fs.readFileSync(globalFile).equals(globalBefore) : !fs.existsSync(globalFile))
+        && (!info || (infoHad ? info[slot] === infoBefore : !(slot in info) && info.length === infoLength)); // the in-memory copy too
     }
     report.saveLocation = { chosen: G.PSSaveLocation, dir, slot, occupied, saveCode: code, writtenByThisRun: written, cleanedUp, error, gameDir };
     results.push({ id: "SL1 save location: a fresh slot is written by this run (saveGame code 0) and removed again", status: !occupied && code === 0 && written && cleanedUp ? "pass" : "fail", ms: 0 });

@@ -186,3 +186,24 @@ test('a blackout ends the calling chain of the battle: directly, through one and
   const other = new h.ctx.Game_Interpreter(); other.setup([c(117, [3]), set(6, 1), END], 2); other.update();
   assert.equal(h.vars[6], 1);
 });
+
+test('the end of a lost battle belongs to that battle: an interpreter that waited for another battle id is not ended; clear() removes the marks', { skip: haveReactor ? false : 'Reactor runtime not installed here (js/reactor_objects.js): run scripts/setup-reactor.sh' }, () => {
+  const h = host({ interpreter: true });
+  const waiting = id => { const i = new h.ctx.Game_Interpreter(); i.setup([{ code: 0, indent: 0, parameters: [] }], 1); i._waitMode = 'psBattle'; i._psBattleId = id; return i; };
+  h.flow.running = false; h.flow.lastOutcome = { battleId: 'B#2', blackout: true };
+  const other = waiting('A#1'); other.updateWaitMode();
+  assert.deepEqual(J([other._index, other._psEndChain === undefined, other._psBattleId === undefined]), [0, true, true], 'another battle: not ended, its wait is over');
+  const mine = waiting('B#2'); mine.updateWaitMode();
+  assert.deepEqual(J([mine._index, mine._psEndChain]), [1, true], 'this battle: ended');
+  mine.clear(); assert.deepEqual(J([mine._psEndChain === undefined, mine._psBattleId === undefined]), [true, true]);
+});
+
+test('encounter notes: the syntax is checked in the adapter (fields per segment, one "=" in regions); a malformed note gives no table and says why', () => {
+  const h = host();
+  const parse = note => { h.ctx.$dataMap = { meta: { PSEncounter: note } }; h.flow._encCache = null; return J(h.flow.mapEncounters().data); };
+  assert.deepEqual(parse('regions=1;pidgey,60,2-4;caterpie,40,3'), { table: { regions: [1], slots: [{ species: 'pidgey', weight: 60, minLevel: 2, maxLevel: 4 }, { species: 'caterpie', weight: 40, minLevel: 3, maxLevel: 3 }] }, problems: [] });
+  for (const bad of ['regions=1=2;pidgey,60,2-4', 'pidgey,60,2-4-99', 'pidgey,60,2-4,extra', 'pidgey,60']) {
+    const r = parse(bad);
+    assert.equal(r.table, null, bad); assert.equal(r.problems.length, 1, bad);
+  }
+});
