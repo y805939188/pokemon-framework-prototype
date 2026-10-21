@@ -1,0 +1,53 @@
+{
+ "generatedBy": "experiments/step5/fixtures/gen-step4-saves.cjs",
+ "codeCommit": "c789620a153d8efeb8bc0b39afe3ea92685db8fc",
+ "schema": 3,
+ "engine": "f609ae2d96c37dfb1e8ca90620e7adee04c35025fc3d2f111e6efe79dcb3841b",
+ "content": "37802a10015f93e859f406476e3d84830ec17d06965c7bed1b5d34f8ba5d2aec",
+ "setupSteps": [
+  "bag.masterball = 6 before the catches (balls only; the catches themselves are real battles)",
+  "full.json: bag.potion = 5000 after the catches (an over-cap amount, kept by every schema)"
+ ],
+ "summary": {
+  "full": {
+   "party": [
+    "G-starter-1:Charmander",
+    "W1-1:Pidgey",
+    "W2-1:Caterpie",
+    "W3-1:Pidgey",
+    "W4-1:Caterpie",
+    "W5-1:Pidgey"
+   ],
+   "boxes": [
+    "W6-1:Caterpie"
+   ],
+   "dex": {
+    "seen": [
+     "Charmander",
+     "Pidgey",
+     "Caterpie"
+    ],
+    "owned": [
+     "Charmander",
+     "Pidgey",
+     "Caterpie"
+    ]
+   },
+   "claims": [
+    "starter"
+   ],
+   "battles": 6
+  },
+  "defeat": {
+   "money": 2960,
+   "battles": [
+    "wild#7"
+   ]
+  }
+ },
+ "files": {
+  "full.json": "2c02817d90089479820ffa86e19aa9ab4e7ec76c681928a414b4b91334101ed7",
+  "defeat.json": "b95095bdd8e624887c6069ac98836ba6a4ea40af96a94175847a8470815fdc95",
+  "results.json": "769ca9c2b048f1a4812422af86666e8fca0954e2c830855866660ab6ab067895"
+ }
+}

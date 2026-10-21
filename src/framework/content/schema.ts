@@ -87,10 +87,12 @@ export interface ContentInputs {
   overlays: unknown;
   /** Optional (step 4). An absent file means no grants and leaves the input hash of older content unchanged. */
   grants?: unknown;
+  /** Optional (step 5.0): rule configuration overrides (rules/config.ts, WP02). Absent = the Gen 8 defaults; hash unchanged. */
+  settings?: unknown;
 }
 
 export interface ContentError {
-  file: "manifest.json" | "sources.json" | "species.json" | "overlays.json" | "grants.json" | "compiled" | "assembly";
+  file: "manifest.json" | "sources.json" | "species.json" | "overlays.json" | "grants.json" | "settings.json" | "compiled" | "assembly";
   path: string;
   message: string;
 }
@@ -104,6 +106,8 @@ export interface CompiledContent {
   species: SpeciesSource[];
   /** Absent in documents compiled before step 4 (= no grants). */
   grants?: GrantSource[];
+  /** Rule configuration overrides (validated); absent = the Gen 8 defaults. */
+  settings?: Record<string, number>;
 }
 
 /** Grant ids stay short: the members they create are named G-<grant id>-<n>, and member ids are limited to 18 characters. */

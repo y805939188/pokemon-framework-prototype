@@ -6,6 +6,7 @@ import { sha256Hex } from "../rules/sha256.ts";
 import { isBagItem } from "../rules/items.ts";
 import { DEFAULT_LIMITS } from "../rules/limits.ts";
 import { MAX_FORM } from "../rules/species-key.ts";
+import { checkOverrides } from "../rules/config.ts";
 import {
   CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, SCHEMA_VERSION, SOURCE_KINDS, STAT_KEYS_ALLOWED, USAGE_DECISIONS,
 } from "./schema.ts";
@@ -22,8 +23,8 @@ export function canonicalJson(v: unknown, indent = 0): string {
 }
 
 export function hashInputs(inputs: ContentInputs): string {
-  // grants is undefined for content without grants.json: JSON drops the key, so the hash of older content is unchanged
-  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants }));
+  // grants/settings are undefined for content without those files: JSON drops the key, so older hashes are unchanged
+  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants, settings: inputs.settings }));
 }
 
 const ID = /^[a-z][a-z0-9-]{0,30}$/;
@@ -240,11 +241,15 @@ export function compileContent(inputs: ContentInputs): CompileResult {
     }
   }
 
+  // ---- settings: the rule configuration overrides (WP02 subset, rules/config.ts)
+  if (inputs.settings !== undefined) for (const p of checkOverrides(inputs.settings)) report("settings.json", p.path, p.message);
+
   if (errors.length) return { ok: false, errors };
   const data: CompiledContent = {
     schema: SCHEMA_VERSION, contentId, inputsHash: hashInputs(inputs), sources: [...sources].sort((a, b) => a.id.localeCompare(b.id)),
     overlaysApplied, species: [...merged.values()].sort((a, b) => a.id.localeCompare(b.id) || (a.form ?? 0) - (b.form ?? 0)),
     ...(inputs.grants !== undefined ? { grants: [...grants].sort((a, b) => a.id.localeCompare(b.id)) } : {}),
+    ...(inputs.settings !== undefined ? { settings: { ...(inputs.settings as Record<string, number>) } } : {}),
   };
   return { ok: true, data, errors: [] };
 }

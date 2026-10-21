@@ -179,9 +179,19 @@
       return PSFlow._app as GameAppView;
     },
     _app: null as GameAppView | null,
-    /** Stage capacities (rules/limits.ts); tests may replace them with `testLimits` (then reset `_app`). */
+    /**
+     * Stage capacities (rules/limits.ts) from the content's rule configuration (rules/config.ts, WP02; Gen 8 defaults
+     * when it has none); tests may replace them with `testLimits` (then reset `_app`).
+     */
     testLimits: null as any,
-    limits(): any { return PSFlow.testLimits || engine().B.limits.DEFAULT_LIMITS; },
+    limits(): any {
+      if (PSFlow.testLimits) return PSFlow.testLimits;
+      const { config } = engine().B;
+      let settings: unknown = {};
+      // content that cannot be loaded stops battles and grants on its own (with its error); a new game still gets a state
+      try { settings = PSFlow.content().settings || {}; } catch (e) { console.error("PS_BattleFlow: content not loaded, the Gen 8 default capacities apply:", e); }
+      return config.limitsOf(config.resolveConfig(settings));
+    },
     flagParam(name: string, dflt: boolean): boolean {
       const raw = (G.PluginManager.parameters(NAME) as Record<string, string>)[name];
       return raw === undefined || raw === "" ? dflt : raw === "true";

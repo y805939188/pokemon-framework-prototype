@@ -12,7 +12,7 @@ import { battleNameOf, memberKey } from "../rules/species-key.ts";
 /** Shape check of a compiled document read from disk (it was validated when it was compiled). */
 export function loadCompiled(json: unknown): CompiledContent {
   const o = json as Partial<CompiledContent> | null;
-  if (!o || typeof o !== "object" || o.schema !== SCHEMA_VERSION || !Array.isArray(o.species) || typeof o.inputsHash !== "string" || typeof o.contentId !== "string" || (o.grants !== undefined && !Array.isArray(o.grants))) {
+  if (!o || typeof o !== "object" || o.schema !== SCHEMA_VERSION || !Array.isArray(o.species) || typeof o.inputsHash !== "string" || typeof o.contentId !== "string" || (o.grants !== undefined && !Array.isArray(o.grants)) || (o.settings !== undefined && (typeof o.settings !== "object" || o.settings === null))) {
     throw new Error(`compiled content is not a schema ${SCHEMA_VERSION} document (run the content build)`);
   }
   return o as CompiledContent;
@@ -20,7 +20,7 @@ export function loadCompiled(json: unknown): CompiledContent {
 
 export function assembleContent(compiled: CompiledContent, dex: DexLookup): { content: Content; errors: ContentError[] } {
   const errors: ContentError[] = [];
-  const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash }, moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {} };
+  const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash }, moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {}, ...(compiled.settings ? { settings: { ...compiled.settings } } : {}) };
   const short = dex.sha().slice(0, 8);
   const byName = new Map<string, string>();
   for (const sp of compiled.species) {

@@ -94,6 +94,8 @@ export interface Content {
   /** Showdown name -> persistent key (the reverse of `forms`). Absent in fixture content (see `forms`). */
   speciesKeys?: Record<string, SpeciesKey>;
   grants?: Record<string, Grant>;
+  /** Rule configuration overrides of the content (rules/config.ts); absent = the Gen 8 defaults. */
+  settings?: Record<string, number>;
 }
 
 /** What the content layer needs to know about Showdown's static data (the battle adapter implements it). */

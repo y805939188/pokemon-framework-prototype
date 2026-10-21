@@ -17,5 +17,6 @@ export * as encounter from "./encounter.ts";
 export * as defeat from "./defeat.ts";
 export * as speciesKey from "./species-key.ts";
 export * as stats from "./stats.ts";
+export * as config from "./config.ts";
 export * as digest from "./sha256.ts";
 export type * from "./types.ts";

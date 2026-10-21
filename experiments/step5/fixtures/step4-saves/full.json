@@ -1,0 +1,355 @@
+{
+ "schema": 3,
+ "party": [
+  {
+   "id": "G-starter-1",
+   "species": "Charmander",
+   "nickname": null,
+   "level": 7,
+   "exp": 253,
+   "hp": 23,
+   "status": "",
+   "statusCount": 0,
+   "moves": [
+    {
+     "id": "scratch",
+     "pp": 35,
+     "maxpp": 35
+    },
+    {
+     "id": "growl",
+     "pp": 40,
+     "maxpp": 40
+    },
+    {
+     "id": "ember",
+     "pp": 25,
+     "maxpp": 25
+    }
+   ],
+   "item": "",
+   "ability": "Blaze",
+   "nature": "impish",
+   "gender": "M",
+   "ivs": {
+    "hp": 11,
+    "atk": 2,
+    "def": 22,
+    "spa": 27,
+    "spd": 2,
+    "spe": 22
+   },
+   "evs": {
+    "hp": 3,
+    "atk": 0,
+    "def": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 3
+   },
+   "friendship": 70,
+   "ball": "pokeball",
+   "ot": "player"
+  },
+  {
+   "id": "W1-1",
+   "species": "Pidgey",
+   "nickname": null,
+   "level": 3,
+   "exp": 57,
+   "hp": 16,
+   "status": "",
+   "statusCount": 0,
+   "moves": [
+    {
+     "id": "tackle",
+     "pp": 35,
+     "maxpp": 35
+    }
+   ],
+   "item": "",
+   "ability": "Tangled Feet",
+   "nature": "rash",
+   "gender": "M",
+   "ivs": {
+    "hp": 25,
+    "atk": 8,
+    "def": 11,
+    "spa": 11,
+    "spd": 16,
+    "spe": 20
+   },
+   "evs": {
+    "hp": 0,
+    "atk": 0,
+    "def": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "friendship": 70,
+   "ball": "masterball",
+   "ot": "player"
+  },
+  {
+   "id": "W2-1",
+   "species": "Caterpie",
+   "nickname": null,
+   "level": 2,
+   "exp": 8,
+   "hp": 14,
+   "status": "",
+   "statusCount": 0,
+   "moves": [
+    {
+     "id": "tackle",
+     "pp": 35,
+     "maxpp": 35
+    },
+    {
+     "id": "stringshot",
+     "pp": 40,
+     "maxpp": 40
+    }
+   ],
+   "item": "",
+   "ability": "Shield Dust",
+   "nature": "docile",
+   "gender": "M",
+   "ivs": {
+    "hp": 21,
+    "atk": 12,
+    "def": 4,
+    "spa": 23,
+    "spd": 24,
+    "spe": 1
+   },
+   "evs": {
+    "hp": 0,
+    "atk": 0,
+    "def": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "friendship": 70,
+   "ball": "masterball",
+   "ot": "player"
+  },
+  {
+   "id": "W3-1",
+   "species": "Pidgey",
+   "nickname": null,
+   "level": 4,
+   "exp": 96,
+   "hp": 17,
+   "status": "",
+   "statusCount": 0,
+   "moves": [
+    {
+     "id": "tackle",
+     "pp": 35,
+     "maxpp": 35
+    }
+   ],
+   "item": "",
+   "ability": "Tangled Feet",
+   "nature": "naive",
+   "gender": "F",
+   "ivs": {
+    "hp": 18,
+    "atk": 1,
+    "def": 11,
+    "spa": 29,
+    "spd": 25,
+    "spe": 23
+   },
+   "evs": {
+    "hp": 0,
+    "atk": 0,
+    "def": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "friendship": 70,
+   "ball": "masterball",
+   "ot": "player"
+  },
+  {
+   "id": "W4-1",
+   "species": "Caterpie",
+   "nickname": null,
+   "level": 3,
+   "exp": 27,
+   "hp": 16,
+   "status": "",
+   "statusCount": 0,
+   "moves": [
+    {
+     "id": "tackle",
+     "pp": 35,
+     "maxpp": 35
+    },
+    {
+     "id": "stringshot",
+     "pp": 40,
+     "maxpp": 40
+    }
+   ],
+   "item": "",
+   "ability": "Shield Dust",
+   "nature": "quiet",
+   "gender": "F",
+   "ivs": {
+    "hp": 11,
+    "atk": 24,
+    "def": 1,
+    "spa": 6,
+    "spd": 27,
+    "spe": 5
+   },
+   "evs": {
+    "hp": 0,
+    "atk": 0,
+    "def": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "friendship": 70,
+   "ball": "masterball",
+   "ot": "player"
+  },
+  {
+   "id": "W5-1",
+   "species": "Pidgey",
+   "nickname": null,
+   "level": 2,
+   "exp": 9,
+   "hp": 14,
+   "status": "",
+   "statusCount": 0,
+   "moves": [
+    {
+     "id": "tackle",
+     "pp": 35,
+     "maxpp": 35
+    }
+   ],
+   "item": "",
+   "ability": "Tangled Feet",
+   "nature": "bashful",
+   "gender": "F",
+   "ivs": {
+    "hp": 24,
+    "atk": 30,
+    "def": 23,
+    "spa": 4,
+    "spd": 14,
+    "spe": 18
+   },
+   "evs": {
+    "hp": 0,
+    "atk": 0,
+    "def": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "friendship": 70,
+   "ball": "masterball",
+   "ot": "player"
+  }
+ ],
+ "boxes": [
+  {
+   "id": "W6-1",
+   "species": "Caterpie",
+   "nickname": null,
+   "level": 4,
+   "exp": 64,
+   "hp": 17,
+   "status": "",
+   "statusCount": 0,
+   "moves": [
+    {
+     "id": "tackle",
+     "pp": 35,
+     "maxpp": 35
+    },
+    {
+     "id": "stringshot",
+     "pp": 40,
+     "maxpp": 40
+    }
+   ],
+   "item": "",
+   "ability": "Shield Dust",
+   "nature": "jolly",
+   "gender": "M",
+   "ivs": {
+    "hp": 8,
+    "atk": 19,
+    "def": 14,
+    "spa": 1,
+    "spd": 24,
+    "spe": 4
+   },
+   "evs": {
+    "hp": 0,
+    "atk": 0,
+    "def": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "friendship": 70,
+   "ball": "masterball",
+   "ot": "player"
+  }
+ ],
+ "bag": {
+  "potion": 5000,
+  "pokeball": 10,
+  "antidote": 2
+ },
+ "money": 3000,
+ "dex": {
+  "seen": [
+   "Charmander",
+   "Pidgey",
+   "Caterpie"
+  ],
+  "owned": [
+   "Charmander",
+   "Pidgey",
+   "Caterpie"
+  ]
+ },
+ "appliedBattles": {
+  "wild#1": {
+   "hash": "4210d94fa183ed4ec0d15f69bde1cc69be1f46d1cf98caabf557afc5117c430b"
+  },
+  "wild#2": {
+   "hash": "c19c2b80e21cf27a7a254052d1486e5e3b2e71d76ef71ecd54a7d2553540ad14"
+  },
+  "wild#3": {
+   "hash": "268a21c62a7621f7edddbd54a3e97d1c8ff5b9240823251aa9eaaf5e06e198e8"
+  },
+  "wild#4": {
+   "hash": "48024ea4f00ee796b33d3dc86d8e3b0a1e22dacf597302d7f176be9c010e6608"
+  },
+  "wild#5": {
+   "hash": "e819e87c38c3597c98bafdc7af4ae7d9a7e0144e7cc1ee70f3116298ec12e949"
+  },
+  "wild#6": {
+   "hash": "8d72561326b5b74aaf91b36327c6aaed55bb4c2647847bce89f7e3994d1d5ce2"
+  }
+ },
+ "claims": {
+  "starter": {
+   "kind": "grant"
+  }
+ }
+}

@@ -1,0 +1,81 @@
+{
+ "schema": 3,
+ "party": [
+  {
+   "id": "G-starter-1",
+   "species": "Charmander",
+   "nickname": null,
+   "level": 5,
+   "exp": 135,
+   "hp": 19,
+   "status": "",
+   "statusCount": 0,
+   "moves": [
+    {
+     "id": "scratch",
+     "pp": 35,
+     "maxpp": 35
+    },
+    {
+     "id": "growl",
+     "pp": 40,
+     "maxpp": 40
+    },
+    {
+     "id": "ember",
+     "pp": 25,
+     "maxpp": 25
+    }
+   ],
+   "item": "",
+   "ability": "Blaze",
+   "nature": "rash",
+   "gender": "M",
+   "ivs": {
+    "hp": 7,
+    "atk": 27,
+    "def": 22,
+    "spa": 11,
+    "spd": 15,
+    "spe": 7
+   },
+   "evs": {
+    "hp": 0,
+    "atk": 0,
+    "def": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+   },
+   "friendship": 70,
+   "ball": "pokeball",
+   "ot": "player"
+  }
+ ],
+ "boxes": [],
+ "bag": {
+  "potion": 5,
+  "pokeball": 10,
+  "antidote": 2
+ },
+ "money": 2960,
+ "dex": {
+  "seen": [
+   "Charmander",
+   "Snorlax"
+  ],
+  "owned": [
+   "Charmander"
+  ]
+ },
+ "appliedBattles": {
+  "wild#7": {
+   "hash": "312652fcfed1f5510a48d241c4898ac954e02e821db86160077e689c9dc24d85"
+  }
+ },
+ "claims": {
+  "starter": {
+   "kind": "grant"
+  }
+ }
+}

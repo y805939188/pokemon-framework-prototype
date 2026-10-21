@@ -46,6 +46,9 @@ SUITES=(
   experiments/step4/test-plugin-host4.cjs
   experiments/step5/test-species-key5.cjs
   experiments/step5/test-app5.cjs
+  experiments/step5/test-migration5.cjs
+  experiments/step5/test-content5.cjs
+  experiments/step5/test-plugin-host5.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do
