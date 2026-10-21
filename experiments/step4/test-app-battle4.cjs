@@ -318,6 +318,17 @@ test('a battle is open from the start of startBattle: while its session is being
   assert.equal(w.app.healParty().reason, 'battle-active', 'active: refused');
   assert.deepEqual([w.app.finishBattle(h, req('p#1')).commit, w.state.current().party[0].hp, w.state.replaced.length], ['applied', 1, 1]);
   assert.equal(w.app.healParty().status, 'healed', 'after the finish: allowed');
+  // a later battle is ended only by its own session or its own battle id
+  const q = w.app.startBattle(req('p#3'));
+  assert.equal(w.app.finishBattle(h, req('p#1')).commit, 'already-applied', 'a stale finish of the old session commits nothing');
+  w.app.abortBattle(null, new Error('no battle named')); w.app.abortBattle({ battleId: 'other#9' }, new Error('another battle'));
+  assert.equal(w.app.healParty().reason, 'battle-active', 'pending p#3: a stale finish, a null abort or another id do not release it');
+  w.sessions.calls[1].resolve(handleFor('p#3'));
+  const h3 = await q;
+  w.app.finishBattle(h, req('p#1')); w.app.abortBattle(null, new Error('no battle named'));
+  assert.equal(w.app.healParty().reason, 'battle-active', 'active p#3: still not released by them');
+  assert.equal(w.app.finishBattle(h3, req('p#3')).commit, 'applied');
+  assert.equal(w.app.healParty().status, 'unchanged', 'released by its own finish');
 });
 
 test('a failed creation releases its own operation, and the next battle can start', async () => {

@@ -109,7 +109,7 @@
 
 ## 7. 证据
 
-- 无头：`scripts/test-quick.sh`（33 个套件；第四步新增 `experiments/step4/test-{schema3,content4,core4,app4,battle-rules4,app-battle4,plugin-host4}.cjs`）。`test-plugin-host4` 在 Node VM 的宿主桩里运行构建出的插件；其中事件调用链一项用本机安装的 Reactor 解释器（`js/reactor_objects.js`），没有该运行时的环境（CI 无头层）会跳过这一项。
+- 无头：`scripts/test-quick.sh`（33 个套件；第四步新增 `experiments/step4/test-{schema3,content4,core4,app4,battle-rules4,app-battle4,plugin-host4}.cjs`）。`test-plugin-host4` 在 Node VM 的宿主桩里运行构建出的插件；其中两项用本机安装的 Reactor 解释器（`js/reactor_objects.js`）：事件调用链，以及战败结束只作用于等待该战斗编号的解释器；没有该运行时的环境（CI 无头层）会跳过这两项，它们的宿主证据是真实 MZ 场景 T22、T27。
 - 12 项验收矩阵：[acceptance.md](acceptance.md)。命令一页表：[commands.md](commands.md)。
 - 打包与性能：新包上的完整 `scripts/run-package-tests-mac.sh`（含 SL1、替换包）与 `scripts/run-package-perf-mac.sh`（含“遭遇→进战斗”“存/读档”）的结果、包身份（`gitHead`）与性能基线记录在工作区候选报告 `.handoff/step4-candidate-report.zh.md` 与 `.handoff/STATUS.md`（为了让包内 `gitHead` 等于候选 SHA，这些结果不再回写进仓库）。
 - 真实 MZ（开发树）：`scripts/run-flow-test-mac.sh <证据目录>`；批次 A 场景 T15、T15b、V2；批次 B 场景 T16–T25（T16 是评审要求的遭遇宿主验证：区域过滤、事件中不触发、忙碌不重入、战后不立即循环，外加战斗中保存被拒）；T27–T30（事件调用链、提交后宿主故障、保存屏蔽、特殊战斗编号经存读档）；每次都重跑既有 T1–T14、T8、V1。证据与身份见 `experiments/step4/evidence/README.md`。
