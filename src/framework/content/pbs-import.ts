@@ -15,6 +15,8 @@
  * Section ids: only base species sections are read. The raw id must be a symbol (letters, digits, underscore, not
  * starting with a digit: WP03 §5.1 type `m`) BEFORE it is turned into a content id, so a form section such as
  * "[PORYGON,2]" (forms: 5.1) or a mistyped id such as "[PIKA!CHU]" is refused at its line, never read as another species.
+ * Move tokens are checked as symbols before lowercase/underscore conversion; illegal characters are never deleted.
+ * A syntax or quote error marks its whole section invalid, even when later properties are valid.
  * Enumerations (growth rates, stats, field lists) are looked up as own keys only ("constructor" is not a growth rate).
  */
 import type { CurveId, PartialStats, StatKey } from "../rules/types.ts";
@@ -71,7 +73,7 @@ const int = (v: string | undefined, lo: number, hi: number): number | null => (v
 
 export function importPbsSpecies(text: string, sourceId: string): PbsImport {
   const errors: PbsProblem[] = [];
-  const sections: { name: string; line: number; props: Map<string, { value: string; line: number }>; overridden: Set<string> }[] = [];
+  const sections: { name: string; line: number; invalid: boolean; props: Map<string, { value: string; line: number }>; overridden: Set<string> }[] = [];
   let cur: (typeof sections)[number] | null = null;
   for (const [i, raw] of text.split(/\r?\n/).entries()) {
     const line = i + 1;
@@ -83,15 +85,15 @@ export function importPbsSpecies(text: string, sourceId: string): PbsImport {
       if (name.includes(",")) { errors.push({ line, path: `[${name}]`, message: `"[${name}]" is a form section (species, form): forms are not part of this import subset (5.1, pokemon_forms.txt); not imported` }); cur = null; continue; }
       if (!SYMBOL.test(name)) { errors.push({ line, path: `[${name}]`, message: `section id "${name}" is not a symbol (letters, digits and underscore, not starting with a digit: WP03 §5.1); not imported` }); cur = null; continue; }
       if (sections.some((s) => s.name === name)) { errors.push({ line, path: `[${name}]`, message: `section "${name}" is used twice` }); cur = null; continue; }
-      cur = { name, line, props: new Map(), overridden: new Set() };
+      cur = { name, line, invalid: false, props: new Map(), overridden: new Set() };
       sections.push(cur);
       continue;
     }
     if (!cur) { if (!sections.length && !errors.length) errors.push({ line, path: "$", message: "missing initial section (a property needs a [SECTION] first)" }); continue; } // lines of a refused section are skipped with it
     const eq = body.indexOf("=");
-    if (eq <= 0) { errors.push({ line, path: `[${cur.name}]`, message: body === "" ? "invalid property line: an indented comment is not a comment for this reader (WP04 §4.2)" : `invalid property syntax "${body.slice(0, 40)}" (expected Key = Value)` }); continue; }
+    if (eq <= 0) { cur.invalid = true; errors.push({ line, path: `[${cur.name}]`, message: body === "" ? "invalid property line: an indented comment is not a comment for this reader (WP04 §4.2)" : `invalid property syntax "${body.slice(0, 40)}" (expected Key = Value)` }); continue; }
     const key = body.slice(0, eq).trim(), value = body.slice(eq + 1).trim();
-    if (value.includes('"')) { errors.push({ line, path: `[${cur.name}].${key}`, message: "quoted values are outside this import subset" }); continue; }
+    if (value.includes('"')) { cur.invalid = true; errors.push({ line, path: `[${cur.name}].${key}`, message: "quoted values are outside this import subset" }); continue; }
     if (cur.props.has(key)) cur.overridden.add(key); // a repeated property: the later value wins (WP04 §4.2)
     cur.props.set(key, { value, line });
   }
@@ -115,7 +117,7 @@ export function importPbsSpecies(text: string, sourceId: string): PbsImport {
     }
     const value = (k: string): string | undefined => s.props.get(k)?.value;
     const csv = (k: string): string[] => (value(k) ?? "").split(",").map((x) => x.trim()).filter((x) => x !== "");
-    let ok = true;
+    let ok = !s.invalid;
     const growthText = value("GrowthRate");
     const growth = growthText !== undefined ? own(GROWTH, growthText) : undefined;
     if (!growth) { ok = false; fail("GrowthRate", growthText === undefined ? "missing: the framework needs a growth rate and the spec records no default for it" : `"${growthText}" is not a growth rate (${Object.keys(GROWTH).join(", ")})`); }
@@ -127,7 +129,7 @@ export function importPbsSpecies(text: string, sourceId: string): PbsImport {
     const evYield: PartialStats = {};
     const ev = csv("EVs");
     if (value("EVs") === undefined) { ok = false; fail("EVs", "missing: the framework needs the EV yield and the spec records no default for it"); }
-    else if (ev.length % 2) { ok = false; fail("EVs", "must be pairs of STAT,amount (WP03 §5.3 named pairs)"); }
+    else if (!ev.length || ev.length % 2) { ok = false; fail("EVs", "must be one or more pairs of STAT,amount (WP03 §5.3 named pairs)"); }
     else for (let j = 0; j < ev.length; j += 2) {
       const stat = own(STAT, ev[j]!), n = int(ev[j + 1], 1, 255);
       if (!stat || n === null) { ok = false; fail("EVs", `pair ${j / 2 + 1} "${ev[j]},${ev[j + 1]}" must be a stat (${Object.keys(STAT).join(", ")}) and a positive amount`); continue; }
@@ -139,7 +141,8 @@ export function importPbsSpecies(text: string, sourceId: string): PbsImport {
     if (value("Moves") === undefined || !mv.length) { ok = false; fail("Moves", "missing: a species needs level-up moves to be created"); }
     else if (mv.length % 2) { ok = false; fail("Moves", "must be pairs of level,MOVE"); }
     else for (let j = 0; j < mv.length; j += 2) {
-      const level = int(mv[j], 1, 100), move = (mv[j + 1] ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const level = int(mv[j], 1, 100), token = mv[j + 1] ?? "";
+      const move = SYMBOL.test(token) ? token.toLowerCase().replace(/_/g, "") : "";
       if (level === null || !move) { ok = false; fail("Moves", `pair ${j / 2 + 1} "${mv[j]},${mv[j + 1]}" must be a level 1..100 and a move id`); continue; }
       if (learnset.some((e) => e.level === level && e.move === move)) { report.overridden.push(`Moves ${level},${move} (repeated)`); continue; }
       learnset.push({ level, move });

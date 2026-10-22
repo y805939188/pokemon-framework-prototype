@@ -3,15 +3,19 @@ import type { DexLookup } from "../rules/types.ts";
 import { loadSim, readEngineSha } from "./showdown-loader.ts";
 
 export function createDexLookup(engineRoot?: string): DexLookup {
-  const { sim, root } = loadSim(engineRoot);
-  const dex = sim.Dex;
-  // Battles run the [Gen 8] format, so the data a member is created from must be Gen 8's too (the base dex is the newest
-  // generation: e.g. Rest and Roost have 5 PP there and 10 in Gen 8, and the engine refuses a mismatching PP maximum).
-  const gen8 = dex.forGen(8);
-  const sha = readEngineSha(root);
+  // Constructing the port must consume no external data. Content assembly checks the complete source registry before
+  // its first lookup (including sha); only then may a method initialize Showdown and its generation data.
+  const load = () => {
+    const { sim, root } = loadSim(engineRoot);
+    const dex = sim.Dex;
+    // Battles run Gen 8: e.g. Rest/Roost have 10 PP here, versus 5 in the newest base dex.
+    return { dex, gen8: dex.forGen(8), sha: readEngineSha(root) };
+  };
+  let loaded: ReturnType<typeof load> | undefined;
+  const use = () => (loaded ??= load());
   return {
     species(id) {
-      const s = gen8.species.get(id);
+      const s = use().gen8.species.get(id);
       if (!s || !s.exists) return null;
       const slots = s.abilities as Record<string, string | undefined>;
       const abilities = [slots["0"], slots["1"]].filter((a): a is string => typeof a === "string" && a.length > 0);
@@ -20,11 +24,11 @@ export function createDexLookup(engineRoot?: string): DexLookup {
       return { name: s.name as string, baseStats: { ...s.baseStats }, abilities, gender };
     },
     move(id) {
-      const m = gen8.moves.get(id);
+      const m = use().gen8.moves.get(id);
       return m && m.exists ? { name: m.name as string, id: m.id as string, pp: m.pp as number } : null;
     },
     levelUpMoves(id) {
-      const data = dex.species.getLearnsetData(id);
+      const data = use().dex.species.getLearnsetData(id);
       if (!data || !data.exists || !data.learnset) return null;
       const out: Record<string, number[]> = {};
       for (const [moveId, sources] of Object.entries(data.learnset as Record<string, string[]>)) {
@@ -33,6 +37,6 @@ export function createDexLookup(engineRoot?: string): DexLookup {
       }
       return out;
     },
-    sha: () => sha,
+    sha: () => use().sha,
   };
 }

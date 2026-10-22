@@ -262,3 +262,56 @@ test('F11: the application reads the time from the injected clock; the plugin wi
   h.flow.clock = () => 1234567890123;
   assert.equal(h.flow.app().now(), 1234567890123, 'a pinned clock');
 });
+
+for (const id of ['old#1', 'different#2']) test(`R01: default and explicit finish reject a replaced session while ${id} keeps both save locks`, async () => {
+  const h = host(E.state.newGame({ party: [], money: 0 })); h.flow.claim('starter');
+  const old = await openedBattle(h); await old.session.run();
+  h.load(J(step4('defeat.json')));
+  const next = await openedBattle(h, id, 2);
+  const before = JSON.stringify(h.sys._psGame), outcome = h.flow.lastOutcome, result = h.flow.lastResult;
+  const vars = []; h.ctx.$gameVariables.setValue = (k, v) => vars.push([k, v]);
+  for (const finish of [() => h.flow.finish(old.session), () => h.flow.finish(old.session, next.op), () => h.flow.finish(old.session, old.op)]) {
+    assert.equal(finish().commit, 'none');
+    assert.deepEqual([h.flow.running, h.flow._op === next.op, h.sys.isSaveEnabled()], [true, true, false]);
+    assert.equal(h.flow.app().healParty().reason, 'battle-active', 'application and host still agree');
+    assert.equal(h.flow.lastOutcome, outcome); assert.equal(h.flow.lastResult, result);
+    assert.equal(JSON.stringify(h.sys._psGame), before); assert.deepEqual(vars, []);
+    await assert.rejects(h.ctx.DataManager.saveGame(17), /battle is running/);
+    assert.deepEqual(h.writes, [], 'zero underlying saves after every rejected late call');
+  }
+  await next.session.run();
+  const done = h.flow.finish(next.session); // retain the supported one-argument API
+  assert.deepEqual([done.code, done.commit, h.flow.running, h.sys.isSaveEnabled()], [3, 'applied', false, true]);
+  assert.deepEqual(vars, [[7, 3]]);
+  const settled = JSON.stringify(h.sys._psGame);
+  assert.equal(h.flow.finish(next.session).commit, 'already-applied');
+  assert.equal(JSON.stringify(h.sys._psGame), settled);
+  await h.ctx.DataManager.saveGame(17); assert.deepEqual(h.writes, [17]);
+});
+
+for (const replacement of ['load', 'new-game', 'none']) test(`R02: failed defeat return belongs to its timeline (${replacement})`, async () => {
+  const m = E.memberFactory.createMember({ id: 'S-1', species: 'Snorlax', level: 2 }, content, lcg(3)); m.hp = 1;
+  const h = host(E.state.newGame({ party: [E.speciesKey.toPersistentMember(m, content)], money: 1000 }));
+  h.ctx.PluginManager.parameters = () => ({ homeMapId: '5', homeX: '8', homeY: '9' }); h.ctx.$dataMapInfos[5] = {};
+  const transfers = []; h.ctx.$gamePlayer.reserveTransfer = (...a) => transfers.push(a);
+  h.flow.seed = [1, 2, 3, 4];
+  h.flow.openBattle({ kind: 'wild', foes: [{ species: 'pidgey', level: 30 }], seq: 1, battleId: 'lost#1' });
+  const session = await h.flow.begin(); await session.chooseMove(1);
+  h.flow.debug.failReturn = true;
+  const lost = h.flow.finish(session);
+  assert.deepEqual([lost.code, lost.commit, h.flow.pendingReturn.status, h.sys._psGame.money], [4, 'applied', 'failed', 984]);
+  assert.ok(h.sys._psGame.party[0].hp > 1, 'defeat already healed the party');
+  const diagnostic = h.flow.lastReturn;
+  if (replacement === 'load') h.load(J(step4('defeat.json')));
+  if (replacement === 'new-game') h.ctx.DataManager.setupNewGame();
+  const before = JSON.stringify(h.sys._psGame);
+  if (replacement !== 'none') {
+    assert.equal(h.flow.pendingReturn, null); assert.equal(h.flow.request, null);
+    assert.equal(h.flow.lastReturn, diagnostic, 'historical diagnostic can remain, executable request cannot');
+  }
+  assert.equal(h.flow.retryReturnHome().status, replacement === 'none' ? 'requested' : 'none');
+  assert.deepEqual(transfers, replacement === 'none' ? [[5, 8, 9, 2, 0]] : []);
+  assert.equal(h.flow.retryReturnHome().status, 'none');
+  assert.equal(transfers.length, replacement === 'none' ? 1 : 0);
+  assert.equal(JSON.stringify(h.sys._psGame), before, 'retry never settles money/heal again');
+});

@@ -956,6 +956,65 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       return { battles: Object.keys(game().appliedBattles).length };
     });
 
+    await scenario("T34 R01 old decided session: default/mismatched finish cannot unlock a new battle or write a save (same and different ids)", async () => {
+      const rows = [];
+      for (const sameId of [true, false]) {
+        await toMap(); fresh(); await G.DataManager.saveGame(20);
+        await startEvent(1); await inMode("main"); await choose(/^Run/); await inMode("end");
+        const old = { session: battle()._session, op: W.PSFlow._op };
+        await G.DataManager.loadGame(20);
+        G.SceneManager.goto(G.Scene_Map);
+        await waitFor(() => scene() && scene()._spriteset && !battle() && !G.SceneManager.isSceneChanging(), "map after replacing the old decided battle");
+        await frames(10);
+        if (!sameId) G.$gameSystem._psBattleSeq += 100;
+        await startEvent(1); await inMode("main");
+        const next = W.PSFlow._op, before = clone(game()), outcome = W.PSFlow.lastOutcome, result = W.PSFlow.lastResult;
+        eq(old.op.request.battleId === next.request.battleId, sameId, "requested identity case");
+        const resultVariable = next.request.resultVariable, projected = G.$gameVariables.value(resultVariable);
+        let writes = 0; const saveObject = G.StorageManager.saveObject;
+        G.StorageManager.saveObject = function (this: any, ...a: any[]) { writes++; return saveObject.apply(this, a); };
+        try {
+          for (const finish of [() => W.PSFlow.finish(old.session), () => W.PSFlow.finish(old.session, next), () => W.PSFlow.finish(old.session, old.op)]) {
+            eq(finish().commit, "none", "old session refused");
+            assert(W.PSFlow.running && W.PSFlow._op === next && !G.$gameSystem.isSaveEnabled(), "new host operation/save mask intact");
+            eq(W.PSFlow.app().healParty().reason, "battle-active", "application still locked too");
+            assert(W.PSFlow.lastOutcome === outcome && W.PSFlow.lastResult === result, "no outcome overwritten");
+            eq(game(), before, "no state overwritten"); eq(G.$gameVariables.value(resultVariable), projected, "no projection");
+            let error = ""; try { await G.DataManager.saveGame(22); } catch (e) { error = String(e); }
+            assert(/battle is running/.test(error), "direct save rejected"); eq(writes, 0, "zero underlying save writes");
+          }
+        } finally { G.StorageManager.saveObject = saveObject; }
+        await choose(/^Run/); await finishBattle();
+        eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit, W.PSFlow.running, G.$gameSystem.isSaveEnabled()], [3, "applied", false, true], "current battle finishes normally");
+        rows.push({ sameId, writes, commit: W.PSFlow.lastOutcome.commit });
+      }
+      return rows;
+    });
+
+    await scenario("T35 R02 failed defeat return: load/new game cancel the old request, retry causes zero transfers", async () => {
+      const rows = [];
+      for (const replacement of ["load", "new-game"]) {
+        await slice(35); await G.DataManager.saveGame(21);
+        game().party = [mkMember("S-1", "Snorlax", 2, { hp: 1 })]; game().money = 1000;
+        W.PSFlow.debug.failReturn = true;
+        await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+        await choose(/^Fight/); await inMode("moves"); await choose(/tackle/i); await finishBattle(); await frames(20);
+        eq([W.PSFlow.lastOutcome.code, W.PSFlow.pendingReturn.status, game().money], [4, "failed", 984], "defeat settled, trip failed");
+        const diagnostic = W.PSFlow.lastReturn;
+        if (replacement === "load") await G.DataManager.loadGame(21); else G.DataManager.setupNewGame();
+        eq([W.PSFlow.pendingReturn, W.PSFlow.request], [null, null], "no executable old work");
+        assert(W.PSFlow.lastReturn === diagnostic, "historical diagnostic retained");
+        const before = clone(game()); let transfers = 0;
+        const reserve = G.$gamePlayer.reserveTransfer;
+        G.$gamePlayer.reserveTransfer = function (this: any, ...a: any[]) { transfers++; return reserve.apply(this, a); };
+        try { eq(W.PSFlow.retryReturnHome().status, "none", "old trip invalidated"); eq(W.PSFlow.retryReturnHome().status, "none", "repeated retry stays empty"); }
+        finally { G.$gamePlayer.reserveTransfer = reserve; }
+        eq(transfers, 0, "zero transfers in new timeline"); eq(game(), before, "no additional money/heal settlement");
+        rows.push({ replacement, transfers, retry: "none" });
+      }
+      return rows;
+    });
+
     await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
       W.PSFlow.setLanguage("zh");
       try {

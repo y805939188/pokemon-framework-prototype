@@ -124,10 +124,13 @@
       if (PSFlow._app) PSFlow._app.stateReplacedByHost();
       const old = PSFlow._op;
       PSFlow._op = null;
+      // An ended battle can still have a failed trip home. A new timeline must never retry that old host effect.
+      // lastReturn remains a diagnostic; pendingReturn and request are the executable work.
+      PSFlow.pendingReturn = null;
+      PSFlow.request = null;
       if (old && PSFlow.running) {
         PSFlow.running = false;
         PSFlow.lastOutcome = { code: 0, battleId: old.request.battleId, commit: "none", aborted: true, replaced: true, error: "the game state was replaced while this battle was open (a save was loaded or a new game started); nothing was committed" };
-        PSFlow.request = null;
       }
     },
     /** The host battle operation in progress or last ended (openBattle creates it; a state replacement forgets it). */
@@ -275,9 +278,11 @@
       if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round((performance.now() - tCreate) * 10) / 10;
       return session;
     },
-    /** End the battle of `op` (default: the current operation) with its session's result. */
+    /** End the battle of `op` (default: the current operation), only with the session begin() assigned to it. */
     finish(session: any, op: any = PSFlow._op): any {
       if (!op || op !== PSFlow._op) return PSFlow.stale("finish", op);
+      // The default token is not proof of ownership: a late caller can hold a session from before a load/new game.
+      if (!session || op.session !== session) return PSFlow.stale("finish", op);
       const { result, ...outcome } = PSFlow.app().finishBattle(session, op.request); // commits at most once; never throws
       if (result) PSFlow.lastResult = result;
       PSFlow.lastOutcome = outcome; // the business outcome is recorded before anything the host shows
