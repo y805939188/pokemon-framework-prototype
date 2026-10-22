@@ -348,3 +348,11 @@ test('M04: present bad legacy metadata keeps raw hash and blocks menu plus every
     for(const slot of [1,3,17])await assert.rejects(h.ctx.DataManager.saveGame(slot),/not usable/);assert.deepEqual(h.writes,[]);assert.equal(hash(h.sys._psGame),before);
   }
 });
+
+test('P51-21/F: an unusable save opens the contained failure scene; begin/abort reports diagnosis without crashing the map interpreter',async()=>{
+ const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.load({...h.sys._psGame,schema:9});const before=JSON.stringify(h.sys._psGame),request={kind:'wild',foes:[{species:'pidgey',level:3}],seq:1,battleId:'unusable-host#1',resultVariable:7};
+ assert.doesNotThrow(()=>h.flow.openBattle(request));assert.equal(h.flow.running,true);let failure;try{await h.flow.begin();}catch(e){failure=e;}assert.match(String(failure),/unknown-version/);h.flow.abort(failure,h.flow._op);assert.equal(h.flow.lastOutcome.aborted,true);assert.match(h.flow.lastOutcome.error,/unknown-version/);assert.equal(h.flow.running,false);assert.equal(JSON.stringify(h.sys._psGame),before);assert.equal(h.sys.isSaveEnabled(),false,'unusable save remains blocked after battle root closes');
+});
+test('P51-12/F: player-facing battle entry contains a closed held-item refusal, writes result0 and opens no scene/data',()=>{
+ const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';let loads=0;const messages=[],values=[];h.flow.content=()=>{loads++;throw Error('must not load content')};h.ctx.$gameMessage.add=s=>messages.push(s);h.ctx.$gameVariables.setValue=(id,value)=>values.push([id,value]);const request={battleId:'player-held#1',kind:'wild',foes:[{species:'pidgey',level:3}],seq:1,resultVariable:12};assert.equal(h.flow.tryOpenBattle(request),false);assert.equal(loads,0);assert.equal(h.flow.running,false);assert.equal(h.flow._op,null);assert.match(h.flow.lastOutcome.error,/held-item-battle-disabled/);assert.deepEqual(values,[[12,0]]);assert.equal(messages.length,1);
+});

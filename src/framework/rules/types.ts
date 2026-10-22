@@ -142,12 +142,14 @@ export interface Content {
 
 /** What the content layer needs to know about Showdown's static data (the battle adapter implements it). */
 export interface DexLookup {
-  species(showdownId: string): { name: string; baseSpecies: string; baseStats: Stats; abilities?: (string | null)[]; hiddenAbilities?: (string | null)[]; gender?: GenderRule } | null;
+  species(showdownId: string): { name: string; baseSpecies: string; types?: string[]; baseStats: Stats; abilities?: (string | null)[]; hiddenAbilities?: (string | null)[]; gender?: GenderRule } | null;
   move(showdownId: string): { name: string; id?: string; pp?: number } | null;
   /** Gen 8 level-up learn levels per move id (Showdown's learnset data), or null for an unknown species. */
   levelUpMoves(showdownId: string): Record<string, number[]> | null;
   /** The pinned Showdown build the answers come from (recorded into reports). */
   sha(): string;
+  abilityInfo?(id: string): { name: string; description: string } | null;
+  moveDetails?(id: string): { name: string; type: string; category: string; power: number | null; accuracy: number; description: string } | null;
   /** Controlled held-item sources only; never queried before source/capability checks. */
   heldItem?(id: string): { holdable: boolean; mail: boolean } | null;
 }

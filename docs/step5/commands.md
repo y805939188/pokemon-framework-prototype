@@ -1,6 +1,6 @@
 # 第五步命令与作者入口（5.0 起）
 
-第四步的命令表（[../step4/commands.md](../step4/commands.md)）继续有效。下面列 5.0 起新增或改变的部分；5.1 尚在 M 中途复核，正式 UI 和最终验收未完成。
+第四步的命令表（[../step4/commands.md](../step4/commands.md)）继续有效。下面列5.0起新增或改变的部分；5.1的M中途复核已通过，正式管理UI已进入作者候选，最终固定SHA验收与J独立复核结果见候选记录。
 
 ## 内容
 
@@ -70,3 +70,29 @@
 强制接收预演无合法换出目标时，setup为`noBall=true`并给`forced-party-no-target`；战斗可以正常进行，但投球拒绝且不扣球。无目标的已知前置条件不会推迟到成功捕获后再要求UI解决。若外部代码在战斗开始后破坏权威数据，按原恢复合同保持pending和模板，不偷偷丢弃/送盒。
 
 旧档新增白名单元数据只在缺失时默认；显式null坏类型、firstMoves/ribbons字符串等会返回invalid并保持原档。`SaveStore.load/commit`是正常受保护读取/战果入口；低层`save(state)`不执行读取原档保护，外部调用者须自行验证目标及状态，不能把MZ全槽保存门泛化为任意外部写文件保证。
+
+## 5.1 F/H 作者入口（候选；最终验收未完成）
+
+在 `PS_BattleFlow` 后启用 `PS_Management`。标准菜单的队伍入口和旧 `ShowParty` 命令进入可管理界面。地图5新增电脑示例；队伍为空时菜单入口禁用。界面使用本项目绘制的文字卡片/色块和MZ窗口皮肤作为占位，未声称有宝可梦正式美术。
+
+| 入口 | 参数/结果 | 责任 |
+|---|---|---|
+| `PS_Management:ShowStorage` | 无；PC选择整理/取出/寄放 | 40×30固定，满队禁取出、最后可用禁寄放 |
+| `PS_Management:ShowSummary` | `id`稳定成员ID | 摘要5页、蛋1页，读取副本，命令返回到调用场景 |
+| `PS_Management:ReceiveGift` | `request`为JSON，例 `{"kind":"normal","member":{"species":"PIDGEY","level":5}}` | 正常接收询问命名，pending时事件等待；仅队/静默/外来模式见应用合同 |
+| `PS_Management:RecoverAll` | 无 | 按depositHeal配置恢复，不偷改HealParty职责 |
+| `PSManagement.selectMember(qualifier, callback)` | qualifier在打开时按成员副本缓存；callback收到`{id,index}`或null | 选择确认前仍按当前身份/位置复核；自定义事件负责消费结果 |
+| `PSManagement.hasBoxLink = () => …` | 开发者只读判据，默认false | AND：持有Box Link、开关35关、当前地图未DisableBoxLink；缺上下文关，快速调序期间关。正式取得来源到5.2 |
+| `PSManagement.retryReceiving()` | 成功打开true，无pending/已有根场景false | UI异常后重建；不通过失焦/超时猜测“用户取消” |
+
+输入：方向键、Enter/Z确认、Esc/X返回、Shift快捷调序/暂持、A/PageUp与S/PageDown切盒、Ctrl在队伍打开合规Box Link、在盒子打开检索。摘要Shift标记，招式/缎带页确认进入详情后选择交换。标记有独立确定/取消，ACTION对缺槽只清除不补槽。昵称10个Unicode码点，盒名12；IME组合输入不提交半成品。昵称询问否保留旧名；输入接受空值/Esc清空昵称；盒名空值/Esc保留旧盒名。
+
+暂持成员只存在管理会话的移动意图中；当前权威存档仍保有原位置。切盒/改名/墙纸/标记/持物立即各自保存，取消只撤销本次移动。正常退出前必须放下；明确确认取消移动可恢复。宿主换档会废弃旧UI、输入和代次，旧回调不允许弹出/解锁新操作。
+
+`app.previewReceiving(token,decisions,completedCount)`只预演已完成接收选择，供多成员奖励依序呈现正确队伍和目标引用；不写状态/领取凭证。完整决定提交后一次原子安装。捕获结果缺完整个体模板直接`no-template`，旧无交互公开调用缺接收决定返回`pending`；这两个是已评审的兼容收窄，不能返回成功或在测试里跳过。正常捕获结束从战斗场景直接交接接收，保持同一操作/保存锁，不重建第二场战斗。
+
+加载分层：`DataManager.loadGame`/SaveStore恢复数据和迁移，**不负责**选择UI场景。标准MZ Scene_Load执行完整场景切换。自定义事件直接调用loadGame成功后，必须按自己的流程清理旧场景并goto Scene_Map、onAfterLoad；不应对旧UI继续发送输入。此分层是设计边界，不能把直接数据恢复无自动切换当作缺陷。
+
+只有真实场景中断`scene-aborted`，或真实构建异常、一次重建仍失败`rebuild-failed`，才请求应用兜底；失焦、测试超时不触发。下一健康地图展示实际接收目标盒名后才ack通知。若仍无合法强制入队计划，保持pending/保存锁，不丢成员。实验来源及实验带物战斗仍为两个默认关的非持久开发者开关，界面显著提示战后写回未完成。提案见 [持物契约](5.1-held-item-contract.md)。
+
+示例工程在System配置中保留开关35 `PS: Disable Box Link`，默认关。自定义工程若未定义该开关，Box Link上下文视为缺失，入口关闭；不能把MZ对越界开关返回false当成有效的“关闭”配置。该预留不改其他开关，也不提供Box Link物品来源。

@@ -11,6 +11,8 @@ import { allMembers, boxedMembers, locateMember } from "../rules/storage.ts";
 import { DEFAULT_LIMITS, storageFull } from "../rules/limits.ts";
 import type { Limits } from "../rules/limits.ts";
 import { GrantRefusedError, applyGrant } from "../rules/grants.ts";
+import { managementSnapshot, individualView, searchStorage } from "./management-query.ts";
+import type { IndividualView, ManagementSnapshot, StorageMatch, StorageSearch } from "./management-query.ts";
 import { ManagementSession } from "./management.ts";
 import type { ManagementOutcome, ManagementRequest } from "./management.ts";
 import { developmentCapabilities } from "../rules/config.ts";
@@ -319,6 +321,28 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   /** Root management sessions may contain independent edits and one pending movement chain. */
+  get stateGeneration(): number { return this.generation; }
+  managementSnapshot(token?: string): ManagementSnapshot {
+    const game = this.ports.state.read(), virtual = token ? this.management.snapshot(token) : { collection: game, held: null };
+    return managementSnapshot(game, virtual.collection, virtual.held, this.generation, this.limits, this.capabilities.allowHeldItemSources);
+  }
+  /** Decision preview for a receiving UI. Replays completed choices without writing any save record. */
+  previewReceiving(token: string, decisions: Record<string, ReceivingDecision>, completed: number): ManagementSnapshot {
+    const reception=this.reception;if(!reception||reception.context.token!==token||reception.context.generation!==this.generation)throw new Error('stale-operation');
+    if(!Number.isInteger(completed)||completed<0||completed>reception.members.length)throw new Error('invalid-preview-count');
+    const game=this.ports.state.read(),collection=receiveMembers(game,reception.members.slice(0,completed),decisions,{limits:this.limits,content:this.ports.content().content,profile:reception.context.profile??this.profile,depositHeal:this.depositHeal}).state;
+    return managementSnapshot(collection,collection,null,this.generation,this.limits,this.capabilities.allowHeldItemSources);
+  }
+  describeIndividual(id: string): IndividualView {
+    const game = this.ports.state.read(), member = locateMember(game, id)?.member ?? this.reception?.members.find(m => m.id === id);
+    if (!member) throw new Error("stale-source");
+    const { content, dex } = this.ports.content(); return individualView(member, game, content, dex);
+  }
+  searchStorage(search: StorageSearch, displayName: (member: Member) => string): StorageMatch[] { return searchStorage(this.ports.state.read(), search, displayName); }
+  holdableBagItems(): { id: string; count: number }[] {
+    if (!this.capabilities.allowHeldItemSources) throw new Error("held-item-source-disabled");
+    return Object.entries(this.ports.state.read().bag).filter(([id, count]) => { const item = this.describeHeldItem(id); return count > 0 && item?.holdable && !item.mail; }).map(([id, count]) => ({ id, count }));
+  }
   beginManagement(): string { if (this.op || this.reception) throw new Error("operation-active"); return this.management.begin(); }
   manage(token: string, requestId: string, request: ManagementRequest): ManagementOutcome {
     if (this.op) return { status: "refused", reason: "battle-active" };

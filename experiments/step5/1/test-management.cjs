@@ -75,3 +75,15 @@ test('P51-12: direct session boundary refuses held members before driver/data wo
 test('P51-11: taking a trusted legacy item with a prototype-like ID uses own bag keys, no loss/prototype mutation',()=>{
  const x=setup();const game=clone(x.state.current());game.party[0].item='__proto__';x.state.replace(game);const token=x.app.beginManagement();assert.equal(x.app.manage(token,'take-proto',{kind:'take-item',source:ref(game,game.party[0].id)}).status,'applied');const bag=x.state.current().bag;assert.equal(Object.hasOwn(bag,'__proto__'),true);assert.equal(bag.__proto__,1);assert.equal(Object.getPrototypeOf(bag),Object.prototype);assert.equal(x.state.current().party[0].item,'');
 });
+
+test('P51-11/F: eggs reject new holders and a stale frozen item reference cannot redirect a swap',()=>run((x,t,exec)=>{
+ const state=clone(x.state.current());state.party[1].isEgg=true;x.state.replace(state);const egg=ref(state,state.party[1].id),source=ref(state,state.party[0].id);
+ assert.equal(exec({kind:'give-item',source:egg,item:'oranberry'}).reason,'egg');assert.equal(exec({kind:'swap-items',source,target:egg}).reason,'egg');
+ assert.equal(exec({kind:'swap-items',source,target:ref(state,'BOX1'),expectedSourceItem:'gone',expectedTargetItem:'leftovers'}).reason,'stale-item');assert.deepEqual(x.state.current(),state);
+}));
+test('P51-16/F: ribbon swap with empty display slot compacts without persistent holes; moves still require a real target',()=>run((x,t,exec)=>{
+ const source=ref(x.state.current(),x.game.party[0].id);assert.equal(exec({kind:'sort-ribbons',source,from:0,to:11}).status,'applied');assert.deepEqual(x.state.current().party[0].ribbons,['R2','R1']);assert.equal(exec({kind:'sort-moves',source,from:0,to:11}).reason,'invalid-index');
+}));
+test('P51-12/F: experimental moving revalidates holdability and mail instead of creating a new holder for an unsupported legacy item',()=>run((x,t,exec)=>{
+ const game=clone(x.state.current());game.party[0].item='not-an-item';x.state.replace(game);const source=ref(game,game.party[0].id),target=ref(game,'BOX1');const before=clone(game);assert.equal(exec({kind:'swap-items',source,target}).reason,'invalid-held-item');assert.deepEqual(x.state.current(),before);assert.equal(exec({kind:'take-item',source}).status,'applied','trusted existing item can still be removed safely');assert.equal(x.state.current().bag['not-an-item'],1);
+}));

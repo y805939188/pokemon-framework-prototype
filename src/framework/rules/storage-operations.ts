@@ -128,6 +128,7 @@ export interface ItemDescriptor { holdable: boolean; mail?: boolean }
 export function giveItem<T extends MemberCollection & { bag: Record<string, number> }>(state: T, ref: MemberReference, item: string, context: { limits: Limits; sourceAllowed: boolean; describe: (id: string) => ItemDescriptor | null }): T {
   if (!context.sourceAllowed) return refuse("held-item-source-disabled");
   const member = referenced(state, ref);
+  if (member.isEgg) return refuse("egg");
   const descriptor = context.describe(item);
   if (!item || !descriptor?.holdable || descriptor.mail) return refuse("invalid-held-item");
   if (member.mail) return refuse("mail");
@@ -153,6 +154,7 @@ export function takeItem<T extends MemberCollection & { bag: Record<string, numb
 export function swapItems<T extends MemberCollection>(state: T, source: MemberReference, target: MemberReference, sourceAllowed: boolean): T {
   if (!sourceAllowed) return refuse("held-item-source-disabled");
   const a = referenced(state, source), b = referenced(state, target);
+  if (a.isEgg || b.isEgg) return refuse("egg");
   if (a.mail || b.mail) return refuse("mail");
   if (source.id === target.id) return state;
   const next = clone(state), one = locateMember(next, source.id)!.member, two = locateMember(next, target.id)!.member;

@@ -13,3 +13,5 @@
 | 5.6 菜单、标题与存档流程 | — | — | 未开始 |
 
 文档：[5.0.md](5.0.md)（实施记录）、[5.0-closure.md](5.0-closure.md)（收口记录）、[commands.md](commands.md)（新增作者入口与命令）、[distribution.md](distribution.md)（分发清单骨架）。
+
+5.1作者候选：批准计划r2及M独立复验后推进F–I，见[实施合同](5.1.md)、[完整候选与证据入口](5.1-candidate.md)、[持物P-2提案](5.1-held-item-contract.md)。最终J与用户merge闸门仍独立，未合main。

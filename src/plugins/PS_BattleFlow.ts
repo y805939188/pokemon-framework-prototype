@@ -364,7 +364,9 @@ import { developmentCapabilities } from "../framework/rules/config";
     },
     /** The single way a battle opens (StartBattle command and map encounters): the same application path, the same guards. */
     openBattle(request: any): void {
-      PSFlow.assertBattleAllowed();
+      // The held-item guard precedes external data for a usable save. An unusable/missing save is diagnosed by
+      // begin() inside the scene's contained initialization path, rather than crashing the map interpreter here.
+      if(!G.$gameSystem._psSaveError&&G.$gameSystem._psGame)PSFlow.assertBattleAllowed();
       if (PSFlow.running) throw new Error("a battle is already running");
       PSFlow._op = { request, session: null }; // this operation's identity: its scene and calls carry it (stateReplaced ends it)
       PSFlow.request = request;
@@ -373,6 +375,16 @@ import { developmentCapabilities } from "../framework/rules/config";
       PSFlow.perf.cur = { battleId: request.battleId, t0: performance.now(), actions: [] as any[], encounter: !!request.encounter };
       if (PSFlow.perf.encounterT0 !== undefined && request.encounter) { PSFlow.perf.cur.t0 = PSFlow.perf.encounterT0; }
       G.SceneManager.push(W.Scene_PSBattle);
+    },
+    /** Player-facing entries contain a closed held-item gate; direct developer openBattle keeps its throwing contract. */
+    tryOpenBattle(request: any): boolean {
+      const previous=PSFlow._op;
+      try{PSFlow.openBattle(request);return true;}
+      catch(error){
+        if(PSFlow._op!==previous&&PSFlow._op?.request===request)PSFlow.abort(error,PSFlow._op);
+        else if(!PSFlow.running){const outcome={code:0,battleId:request.battleId,commit:'none',aborted:true,error:String(error instanceof Error?error.message:error)};PSFlow.lastOutcome=outcome;if(request.resultVariable)G.$gameVariables.setValue(request.resultVariable,0);G.$gameMessage.add(PSFlow.translator().t('management.refused',{reason:outcome.error}));}
+        return false;
+      }
     },
     nextSeq(): number { G.$gameSystem._psBattleSeq = (G.$gameSystem._psBattleSeq || 0) + 1; return G.$gameSystem._psBattleSeq; },
     /** The return trip after a defeat. Never settles anything; a failure is kept so `retryReturnHome` can try again. */
@@ -424,7 +436,7 @@ import { developmentCapabilities } from "../framework/rules/config";
     if (PSFlow.running) throw new Error("a battle is already running");
     const seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || "battle"}#${seq}`;
-    PSFlow.openBattle({
+    const opened=PSFlow.tryOpenBattle({
       kind: args.kind === "trainer" ? "trainer" : "wild",
       foes: parseFoes(args.foes || "Pidgey:5"),
       seq,
@@ -433,6 +445,7 @@ import { developmentCapabilities } from "../framework/rules/config";
       canLose: String(args.canLose) === "true",
       forceParty: String(args.forceParty) === "true",
     });
+    if(!opened){if(G.$gameMessage.isBusy())this.setWaitMode('message');return;}
     this._psBattleId = battleId; // this interpreter waits for THIS battle (see updateWaitMode below)
     this.setWaitMode("psBattle");
   });
@@ -476,7 +489,7 @@ import { developmentCapabilities } from "../framework/rules/config";
     if (!plan.ok) { if (plan.reason !== "not-here" && plan.reason !== "no-able-member") console.warn("PS_BattleFlow: encounter refused:", plan.reason, plan.error); return false; }
     const seq = PSFlow.nextSeq();
     PSFlow.perf.encounterT0 = t0;
-    try { PSFlow.openBattle({ kind: "wild", foes: [plan.foe], seq, battleId: `wild#${seq}`, resultVariable: 0, canLose: false, encounter: true }); }
+    try { if(!PSFlow.tryOpenBattle({ kind: "wild", foes: [plan.foe], seq, battleId: `wild#${seq}`, resultVariable: 0, canLose: false, encounter: true }))PSFlow.lastEncounter={...PSFlow.lastEncounter,ok:false,reason:'battle-refused',error:PSFlow.lastOutcome?.error}; }
     finally { PSFlow.perf.encounterT0 = undefined; }
     return false; // the framework scene is already pushed; MZ must not open its own battle
   };
@@ -502,6 +515,11 @@ import { developmentCapabilities } from "../framework/rules/config";
     const o = PSFlow.claim(String(args.grant || ""));
     PSFlow.lastClaim = o;
     const v = Number(args.resultVariable) || 0;
+    if(o.status==='pending'&&W.PSManagement){
+      this.setWaitMode('psReceiving');
+      W.PSManagement.openReceiving((result:any)=>{PSFlow.lastClaim=result;if(v)G.$gameVariables.setValue(v,result?.status==='applied'?1:result?.status==='already-claimed'?2:0);if(flag(args.message,true))for(const line of PSFlow.claimLines(result))G.$gameMessage.add(line);});
+      return;
+    }
     if (v) G.$gameVariables.setValue(v, o.status === "applied" ? 1 : o.status === "already-claimed" ? 2 : 0);
     if (o.status === "refused") console.warn("PS_BattleFlow: grant refused:", o.grantId, o.reason, o.error);
     if (flag(args.message, true)) say(this, PSFlow.claimLines(o));
@@ -659,6 +677,7 @@ import { developmentCapabilities } from "../framework/rules/config";
     this._D = engine().D.make(this._names, PSFlow.translator());
     this._mode = "messages";
     this.pushMessages(s.take());
+    if(developmentCapabilities(PSFlow.developerCapabilities).allowExperimentalHeldItemBattle&&s.party.some((m:any)=>!!m.item))this._log.add(PSFlow.translator().t("management.experimental"));
     this.refreshStatus();
   };
   P.update = function () {
@@ -828,14 +847,14 @@ import { developmentCapabilities } from "../framework/rules/config";
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // bare API callers refer to the current operation
     if (op !== PSFlow._op) { PSFlow.stale("finish", op); return; }
     if (!this._aborted && !this._failure) {
-      try { PSFlow.finish(this._session, this._psOp); } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
+      try { const outcome=PSFlow.finish(this._session, this._psOp);if(outcome?.pending&&W.PSManagement){this._menu.deactivate();this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
     }
     this.popScene();
   };
   P.terminate = function () {
     G.Scene_MenuBase.prototype.terminate.call(this);
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // (a scene always has one; a bare caller means the current one)
-    if (PSFlow.running && op === PSFlow._op) PSFlow.abort(new Error("the battle scene closed without an outcome"), op); // never leave the interpreter waiting; a later battle is not ours to end
+    if (PSFlow.running && op === PSFlow._op && !(this._receivingTransferred&&PSFlow.app().pendingReceiving)) PSFlow.abort(new Error("the battle scene closed without an outcome"), op); // transferred reception keeps the same operation and save lock
   };
 
   // ---------------------------------------------------------------- read-only party / bag screen (no management in this version)
@@ -875,7 +894,8 @@ import { developmentCapabilities } from "../framework/rules/config";
     const baseOriginal = G.Window_MenuCommand.prototype.addOriginalCommands;
     G.Window_MenuCommand.prototype.addOriginalCommands = function (this: any) {
       baseOriginal.call(this);
-      this.addCommand(PSFlow.translator().t("ui.menu.party_view"), "psParty", true);
+      let enabled=false;try{enabled=PSFlow.app().describeParty().members.length>0;}catch{}
+      this.addCommand(PSFlow.translator().t("ui.menu.party_view"), "psParty", enabled);
     };
     const baseCreateCommand = G.Scene_Menu.prototype.createCommandWindow;
     G.Scene_Menu.prototype.createCommandWindow = function (this: any) {

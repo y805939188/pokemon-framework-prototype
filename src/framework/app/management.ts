@@ -25,7 +25,7 @@ export type ManagementRequest =
  | { kind:'unlock-wallpaper'; wallpaper:number; unlocked:boolean }
  | { kind:'give-item'; source:MemberReference; item:string }
  | { kind:'take-item'; source:MemberReference }
- | { kind:'swap-items'; source:MemberReference; target:MemberReference };
+ | { kind:'swap-items'; source:MemberReference; target:MemberReference; expectedSourceItem?:string; expectedTargetItem?:string };
 export interface ManagementOutcome { status:'applied'|'unchanged'|'held'|'cancelled'|'refused'; reason?:string; error?:string; heldId?:string|null }
 export interface ManagementOptions { limits:Limits; depositHeal:boolean; sourceAllowed:boolean; describeItem:(id:string)=>ItemDescriptor|null }
 
@@ -43,6 +43,12 @@ export class ManagementSession {
   invalidate():void {this.token=null;this.held=null;this.receipts.clear();}
   begin():string {if(this.token)throw new Error('management-active');this.token=`management:${++this.seq}`;this.receipts.clear();return this.token;}
   end(token:string):ManagementOutcome {if(token!==this.token)return {status:'refused',reason:'stale-operation'};if(this.held)return {status:'refused',reason:'member-held'};this.invalidate();return {status:'unchanged'};}
+  snapshot(token:string):{collection:GameState;held:import('../rules/types.ts').Member|null} {
+    if(token!==this.token)throw new ManagementRefused('stale-operation');
+    const game=this.state.read();
+    if(!this.held)return {collection:clone(game),held:null};
+    const replay=replayHeld(game,this.held,this.context());return {collection:replay.state,held:replay.held};
+  }
   private context():MovementContext {return {limits:this.options.limits,content:this.content(),depositHeal:this.options.depositHeal};}
   heldReference(token:string):MemberReference|null {
     if(token!==this.token||!this.held)return null;
@@ -84,12 +90,18 @@ export class ManagementSession {
       case 'release':if(this.held)throw new ManagementRefused('member-held');if(!request.confirmed)return {status:'cancelled'};next=releaseMember(game,request.source);break;
       case 'take-item':next=takeItem(game,request.source,this.options.limits);break;
       case 'give-item':next=giveItem(game,request.source,request.item,{limits:this.options.limits,sourceAllowed:this.options.sourceAllowed,describe:this.options.describeItem});break;
-      case 'swap-items':next=swapItems(game,request.source,request.target,this.options.sourceAllowed);break;
+      case 'swap-items': {
+        const source=referenced(game,request.source),target=referenced(game,request.target);
+        if((request.expectedSourceItem!==undefined&&source.item!==request.expectedSourceItem)||(request.expectedTargetItem!==undefined&&target.item!==request.expectedTargetItem))throw new ManagementRefused('stale-item');
+        for(const item of [source.item,target.item])if(item){const descriptor=this.options.describeItem(item);if(!descriptor?.holdable||descriptor.mail)throw new ManagementRefused('invalid-held-item');}
+        next=swapItems(game,request.source,request.target,this.options.sourceAllowed);break;
+      }
       case 'nickname':case 'markings':case 'sort-moves':case 'sort-ribbons': {
         referenced(game,request.source);next=clone(game);const member=locateMember(next,request.source.id)!.member;
         if(request.kind==='nickname') {if(request.nickname!==null&&(typeof request.nickname!=='string'||Array.from(request.nickname).length>10))throw new ManagementRefused('invalid-name');member.nickname=request.nickname||null;}
         else if(request.kind==='markings') {if(request.markings.length>6||request.markings.some(n=>!Number.isSafeInteger(n)||n<0))throw new ManagementRefused('invalid-markings');member.markings=[...request.markings];}
-        else {const list=request.kind==='sort-moves'?member.moves:member.ribbons!;if(![request.from,request.to].every(n=>Number.isInteger(n)&&n>=0&&n<list.length))throw new ManagementRefused('invalid-index');[list[request.from],list[request.to]]=[list[request.to]!,list[request.from]!];}
+        else if(request.kind==='sort-moves'){const list=member.moves;if(![request.from,request.to].every(n=>Number.isInteger(n)&&n>=0&&n<list.length))throw new ManagementRefused('invalid-index');[list[request.from],list[request.to]]=[list[request.to]!,list[request.from]!];}
+        else {const list=member.ribbons!;if(!Number.isInteger(request.from)||request.from<0||request.from>=list.length||!Number.isInteger(request.to)||request.to<0||request.to>=Math.max(12,Math.ceil(list.length/4)*4))throw new ManagementRefused('invalid-index');if(request.to<list.length)[list[request.from],list[request.to]]=[list[request.to]!,list[request.from]!];else list.push(...list.splice(request.from,1));}
         break;
       }
       case 'current-box':case 'box-name':case 'wallpaper': {

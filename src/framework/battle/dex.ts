@@ -21,7 +21,7 @@ export function createDexLookup(engineRoot?: string): DexLookup {
       const abilities = [slots["0"] ?? null, slots["1"] ?? null];
       // single-gender / genderless species name a fixed gender; the others give the female share (WP19 §3.2: out of 256)
       const gender = s.gender === "M" || s.gender === "F" || s.gender === "N" ? s.gender : Math.round((s.genderRatio as { F: number }).F * 256);
-      return { name: s.name as string, baseSpecies: s.baseSpecies as string, baseStats: { ...s.baseStats }, abilities, hiddenAbilities: [slots["H"] ?? null], gender };
+      return { name: s.name as string, baseSpecies: s.baseSpecies as string, types: [...s.types], baseStats: { ...s.baseStats }, abilities, hiddenAbilities: [slots["H"] ?? null], gender };
     },
     move(id) {
       const m = use().gen8.moves.get(id);
@@ -37,6 +37,8 @@ export function createDexLookup(engineRoot?: string): DexLookup {
       }
       return out;
     },
+    abilityInfo(id) { const dex = use().gen8, ability = dex.abilities.get(id), text = ability?.exists ? dex.text.get(ability) : null; return text ? { name: ability.name, description: text.shortDesc || text.desc || "" } : null; },
+    moveDetails(id) { const dex = use().gen8, move = dex.moves.get(id), text = move?.exists ? dex.text.get(move) : null; return text ? { name: move.name, type: move.type, category: move.category, power: move.basePowerCallback ? null : move.basePower, accuracy: move.accuracy === true ? 0 : move.accuracy, description: text.shortDesc || text.desc || "" } : null; },
     heldItem(id) { const item = use().gen8.items.get(id); return item && item.exists ? { holdable: true, mail: item.isMail === true } : null; },
     sha: () => use().sha,
   };
