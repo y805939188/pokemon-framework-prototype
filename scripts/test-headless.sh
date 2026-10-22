@@ -49,6 +49,8 @@ SUITES=(
   experiments/step5/test-migration5.cjs
   experiments/step5/test-content5.cjs
   experiments/step5/test-plugin-host5.cjs
+  experiments/step5/test-store5.cjs
+  experiments/step5/test-perf-budget5.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do

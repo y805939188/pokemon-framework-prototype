@@ -5,6 +5,7 @@
  */
 import type { CompiledContent, ContentError } from "../content/schema.ts";
 import { SCHEMA_VERSION } from "../content/schema.ts";
+import { showdownDependencyProblem } from "../content/compile.ts";
 import type { Content, DexLookup, Member } from "../rules/types.ts";
 import { own, setOwn } from "../rules/own.ts";
 import { battleNameOf, memberKey } from "../rules/species-key.ts";
@@ -22,6 +23,9 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup): { co
   const errors: ContentError[] = [];
   const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash }, moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {}, ...(compiled.settings ? { settings: { ...compiled.settings } } : {}) };
   const short = dex.sha().slice(0, 8);
+  // the pre-use gate again at the point of use: a compiled document may be older than the gate, or edited by hand
+  const dep = showdownDependencyProblem(Array.isArray(compiled.sources) ? compiled.sources : []);
+  if (dep) return { content, errors: [{ file: "assembly", path: "sources", message: dep }] };
   const byName = new Map<string, string>();
   for (const sp of compiled.species) {
     const form = sp.form ?? 0;

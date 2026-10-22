@@ -901,9 +901,22 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       eq(G.$gameSystem._psSaveError && G.$gameSystem._psSaveError.code, "unmapped-species", "refused with the reason");
       eq(G.$gameSystem._psSaveError.problems.map((p: any) => p.path), ["$.boxes[0].species"], "the place is named");
       eq(G.$gameSystem._psGame, bad, "the original framework state is kept exactly");
-      await G.DataManager.saveGame(15); await G.DataManager.loadGame(15);
-      eq(G.$gameSystem._psGame, bad, "saving it again writes it back unchanged");
+      // while that state is unusable no save is written at all (review F01): not to this slot, not to another one
+      const file15 = path.join(G.StorageManager.fileDirectoryPath(), "file15.rmmzsave");
+      const bytes15 = fs.readFileSync(file15);
+      const so = G.StorageManager.saveObject; let writes = 0;
+      G.StorageManager.saveObject = (...a: any[]) => { writes++; return so.apply(G.StorageManager, a); };
+      const refusal: any[] = [];
+      try {
+        for (const slot of [15, 18]) { let e: any = null; await G.DataManager.saveGame(slot).catch((x: any) => { e = x; }); refusal.push([slot, String(e && e.message), W.PSState.lastSaveError && W.PSState.lastSaveError.code, W.PSState.lastSaveError && W.PSState.lastSaveError.savefileId]); }
+      } finally { G.StorageManager.saveObject = so; }
+      assert(refusal.every(([slot, m, code, id]) => code === "state-unusable" && id === slot && new RegExp(`slot ${slot} is refused.*unmapped-species`).test(m)), "every save is refused with the slot and the reason: " + JSON.stringify(refusal));
+      eq(writes, 0, "MZ wrote nothing");
+      assert(fs.readFileSync(file15).equals(bytes15), "the save file the state came from is byte for byte unchanged");
+      assert(!fs.existsSync(path.join(G.StorageManager.fileDirectoryPath(), "file18.rmmzsave")), "no other slot was written");
+      eq(G.$gameSystem.isSaveEnabled(), false, "the save menu is masked while the state is unusable");
       fresh();
+      eq(G.$gameSystem.isSaveEnabled(), true, "an explicit reset clears the error, saving is possible again");
       return { party: g.party.length, boxes: g.boxes.length, battles: Object.keys(g.appliedBattles).length };
     });
 
@@ -916,6 +929,29 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       await G.DataManager.saveGame(16); game().steps = 0; await G.DataManager.loadGame(16);
       eq(game().steps, steps, "saved and loaded with the state");
       return { steps };
+    });
+
+    await scenario("T33 a save is loaded while an event battle is open (P4-2, review F02): the host operation ends (not running, saving allowed), the old scene's late end changes nothing, and the next battle runs and commits normally", async () => {
+      await toMap(); fresh();
+      await G.DataManager.saveGame(19); // a good save to load in the middle of the battle
+      const loaded = clone(game());
+      await startEvent(1); await inMode("main"); // the wild battle event of this map, its scene open and waiting for input
+      assert(W.PSFlow.running && !G.$gameSystem.isSaveEnabled(), "the battle runs and masks saving");
+      await G.DataManager.loadGame(19); // a load installs another state while the battle scene is still the current scene
+      eq([W.PSFlow.running, G.$gameSystem.isSaveEnabled(), W.PSFlow.lastOutcome && W.PSFlow.lastOutcome.replaced], [false, true, true], "the host operation ended with the old state");
+      eq(game(), loaded, "the loaded state is installed untouched");
+      G.SceneManager.goto(G.Scene_Map); // as the load screen does: the old battle scene ends now
+      await waitFor(() => scene() && scene()._spriteset && !battle() && !G.SceneManager.isSceneChanging(), "back on the map");
+      await frames(10);
+      eq(game(), loaded, "the old scene's end committed nothing");
+      // the next battle: opens, runs and commits as usual; nothing of the old one reaches it
+      W.PSFlow.lastStale = null;
+      await startEvent(1); await inMode("main");
+      await choose(/^Run/);
+      await inMode("end"); await press("ok"); await dismissMessages();
+      eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit, W.PSFlow.running], [3, "applied", false], "the next battle commits");
+      eq(W.PSFlow.lastStale, null, "no late call of the old battle reached it");
+      return { battles: Object.keys(game().appliedBattles).length };
     });
 
     await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
@@ -1030,6 +1066,9 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       const st = (a: number[]) => ({ n: a.length, p50: pct(a, 0.5), max: a.length ? Math.max(...a) : null, samples: a });
       perf.step4 = { method: "slice map, encounter forced by an exhausted step counter; encounter = executeEncounter -> first battle menu (performance.now); save/load = DataManager.saveGame/loadGame promise round trip, slot 12, test save folder", encounterToFirstMenuMs: st(enc), saveMs: st(saveMs), loadMs: st(loadMs) };
     } catch (e: any) { perf.errors = (perf.errors || []).concat(`step4 timings: ${e.message}`); }
+    // the battles measured so far are the ones the step 4 baseline had (the rounds and the step 4 encounters): the
+    // comparable metrics below are computed over exactly these, the full-save battles that follow form their own group
+    const comparableN = W.PSFlow.perf.battles.length;
     // step 5.0 timings (plan §3 5.0 item 7): full boxes, a large bag and opening the party screen, on the structures of
     // this build (flat boxes, one count per item, the read-only party screen); the 5.1/5.2 structures are measured later
     try {
@@ -1064,7 +1103,10 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
         saveMs: st(saveMs), loadMs: st(loadMs), battleViewMs: st(viewMs), encounterToFirstMenuMs: st(enc), partyScreenOpenMs: st(menuMs),
       };
     } catch (e: any) { perf.errors = (perf.errors || []).concat(`step5 timings: ${e.message}`); }
-    const bs: any[] = W.PSFlow.perf.battles;
+    const all: any[] = W.PSFlow.perf.battles;
+    const bs: any[] = all.slice(0, comparableN); // same composition as the step 4 baseline (review F09)
+    perf.battleGroups = { comparable: comparableN, fullSave: all.length - comparableN };
+    perf.battleLog = all.map((b: any, i: number) => ({ i, group: i < comparableN ? "comparable" : "full-save", label: b.label, encounter: b.encounter, sessionMs: b.sessionMs, firstMenuMs: b.firstMenuMs, totalMs: b.totalMs, code: b.code, actions: b.actions }));
     perf.engineLoadMs = W.PSFlow.perf.engineLoadMs;
     perf.firstBattle = bs[0] ? { sessionMs: bs[0].sessionMs, firstMenuMs: bs[0].firstMenuMs, totalMs: bs[0].totalMs, label: bs[0].label } : null;
     const later = bs.slice(1);
@@ -1082,7 +1124,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     perf.laterBattles.firstMenuMsMedianFocused = med(fb.map((b) => b.firstMenuMs)); perf.laterBattles.firstMenuMsMaxFocused = fb.length ? Math.max(...fb.map((b) => b.firstMenuMs)) : null;
     perf.firstBattle.blurred = bs[0] ? bs[0].blurred : null;
     perf.focus = { blurEvents: focusLog.filter((e) => e.ev === "blur").length, framesSkippedUnfocused: skippedUnfocused };
-    perf.battles = bs.length;
+    perf.battles = all.length;
     perf.window = { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio, refocusCount: refocus };
     report.perf = perf;
     results.push({ id: "P1 perf run", status: perf.errors ? "fail" : "pass", ms: 0, error: perf.errors && perf.errors.join("; ") });

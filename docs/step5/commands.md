@@ -17,7 +17,7 @@
 - **旧存档迁移**：schema 3 及更早的存档在读档时迁移，需要当前内容的物种映射。
   - **内容读不了**：`_psSaveError.code` = `needs-content`。
   - **有物种映射不到**：`unmapped-species`，`problems` 列出每个位置。
-  - **原始状态保留**：两种情况都原样保留原始框架状态，再存档时写回的也是原样。
+  - **原始状态保留**：两种情况都原样保留原始框架状态，并拒绝之后的任何存档（`state-unusable`，写明槽号），原存档文件不被覆盖。新游戏或读入可用的存档后解除。
 
 ## 插件
 
@@ -31,6 +31,7 @@
 |---|---|
 | 核心计时（满盒子、大背包，无窗口） | `node experiments/step5/perf-core5.cjs [次数]` |
 | 反向验证 | `node experiments/step5/probes/unfix5.cjs [id...] > out.json` |
+| 无头 SaveStore（工具/测试） | `new SaveStore(file, hooks, speciesKeyResolver(content))`；夹具世界显式传 `identityKeys`。不给映射时旧档和带物种名的结果都被拒绝 |
 | 重新生成第四步迁移样本 | `node experiments/step5/fixtures/gen-step4-saves.cjs --root <c789620 检出，已构建引擎和 Showdown>` |
 | 包内性能（含 5.0 的满盒子/大背包/打开队伍界面） | `scripts/run-package-perf-mac.sh 3 <证据目录>`（弹窗口） |
 | 100 场内存 | `PF_PERF_ARGS="--ps-perf-rounds=25 --js-flags=--expose-gc" scripts/run-package-perf-mac.sh 1 <证据目录>`（弹窗口） |

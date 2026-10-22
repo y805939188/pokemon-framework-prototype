@@ -11,6 +11,8 @@ const { spawnSync } = require('child_process');
 const G = require('../../../js/engine/game/growth.cjs');
 const S = require('../../../js/engine/game/state.cjs');
 const { SaveStore } = require('../../../js/engine/game/store.cjs');
+// the fixture world (content ids = Showdown names) is chosen explicitly: the store guesses no species keys (step 5.0 review F03)
+const { identityKeys } = require('../../../js/engine/build/engine.cjs').speciesKey;
 const { BattleSession } = require('../../../js/engine/game/session.cjs');
 const { content, makeGame, foeMember } = require('./fixtures.cjs');
 
@@ -45,7 +47,7 @@ test('stable identity: switching changes engine slots, not which persistent memb
 	// the engine's party order differs from the persistent one, yet results are keyed by id
 	const orderInEngine = s.gw._debugBattle().getSide('p1').pokemon.map(p => p.name);
 	assert.notDeepEqual(orderInEngine, game.party.map(m => m.id));
-	const dir = tmp(); const store = new SaveStore(saveGame(dir, game));
+	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys);
 	store.commit(result);
 	const after = store.load();
 	assert.deepEqual(after.party.map(m => m.id), game.party.map(m => m.id), 'persistent order and ids unchanged');
@@ -62,7 +64,7 @@ test('write set: nothing outside the allowed fields changes; bag deltas and ledg
 	assert.equal(s.bag.potion, 2, 'deducted on use');
 	const result = await playOut(s);
 	assert.equal(result.bag.potion, -1);
-	const dir = tmp(); const store = new SaveStore(saveGame(dir, game));
+	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys);
 	const before = store.load(); store.commit(result); const after = store.load();
 	const changed = S.diffPaths(before, after);
 	const allowed = [/^party\.\d\.(level|exp|hp|status|statusCount|moves|evs|friendship)(\.|$)/, /^bag\./, /^dex\./, /^appliedBattles\./, /^money$/];
@@ -133,7 +135,7 @@ test('capture: caught member gets a stable id, exp is paid for the capture, dex 
 	assert.ok(result.members['A-0001'].exp > before, 'exp for the capture (setting on) is paid to the participant');
 	assert.equal(result.bag.masterball, -1);
 	assert.deepEqual(result.dex.owned, ['Snorlax']);
-	const dir = tmp(); const store = new SaveStore(saveGame(dir, game));
+	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys);
 	store.commit(result);
 	const after = store.load();
 	assert.equal(after.party.length, 4); assert.equal(after.party[3].id, 'W-0001');
@@ -148,7 +150,7 @@ test('idempotency: same result twice applies once; a different result for the sa
 	const game = makeGame(); game.party[0].hp = 70;
 	const s = await session(game); s.take(); await s.useItem('potion', 'A-0001');
 	const result = await playOut(s);
-	const dir = tmp(); const store = new SaveStore(saveGame(dir, game));
+	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys);
 	assert.equal(store.commit(result).status, 'applied');
 	const once = store.load();
 	assert.equal(store.commit(JSON.parse(JSON.stringify(result))).status, 'already-applied');
@@ -190,15 +192,15 @@ test('failure boundary (simulated throws): old-or-new state at every point, retr
 	const { game, result } = await makeResult();
 	for (const point of POINTS) {
 		const dir = tmp(); const f = saveGame(dir, game);
-		const crashing = new SaveStore(f, { at: p => { if (p === point) throw new Error('injected ' + point); } });
+		const crashing = new SaveStore(f, { at: p => { if (p === point) throw new Error('injected ' + point); } }, identityKeys);
 		assert.throws(() => crashing.commit(result), /injected/);
-		const recovered = new SaveStore(f).load();
+		const recovered = new SaveStore(f, {}, identityKeys).load();
 		const isNew = !!recovered.appliedBattles['B-crash'];
 		assert.equal(isNew, COMMITTED_AFTER.has(point), `state after throw at ${point}`);
 		assert.ok(!fs.existsSync(f + '.tmp'), 'interrupted temp file cleaned on load');
-		const retry = new SaveStore(f).commit(result);
+		const retry = new SaveStore(f, {}, identityKeys).commit(result);
 		assert.equal(retry.status, isNew ? 'already-applied' : 'applied');
-		const fin = new SaveStore(f).load();
+		const fin = new SaveStore(f, {}, identityKeys).load();
 		assert.equal(fin.bag.potion, 2, `potion deducted once after retry (${point})`);
 		assert.equal(Object.keys(fin.appliedBattles).length, 1);
 	}
@@ -211,10 +213,10 @@ test('failure boundary (REAL process kill): same guarantees when the process die
 		fs.writeFileSync(rf, JSON.stringify(result));
 		const child = spawnSync(process.execPath, [path.join(__dirname, 'crash-child.cjs'), f, rf], { env: { ...process.env, CRASH_AT: point }, encoding: 'utf8' });
 		assert.equal(child.signal, 'SIGKILL', `child must really die at ${point}`);
-		const recovered = new SaveStore(f).load();
+		const recovered = new SaveStore(f, {}, identityKeys).load();
 		assert.equal(!!recovered.appliedBattles['B-crash'], COMMITTED_AFTER.has(point), `state after kill at ${point}`);
-		new SaveStore(f).commit(result);
-		const fin = new SaveStore(f).load();
+		new SaveStore(f, {}, identityKeys).commit(result);
+		const fin = new SaveStore(f, {}, identityKeys).load();
 		assert.equal(fin.bag.potion, 2); assert.equal(Object.keys(fin.appliedBattles).length, 1);
 	}
 });

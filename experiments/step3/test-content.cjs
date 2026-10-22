@@ -16,7 +16,11 @@ const ROOT = path.resolve(__dirname, '../..');
 // content-sample-step3); the live sample grows in step 4 and has its own tests (experiments/step4/test-content4.cjs).
 const SRC = path.join(__dirname, 'fixtures/content-sample-step3');
 const CLI = path.join(ROOT, 'js/engine/build/content-cli.cjs');
-const read = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
+// Since step 5.0 the Showdown data every record depends on must pass the pre-use gate; the frozen step 3 registry
+// predates it, so these tests add the recorded check in memory (and to their temporary copies); the files stay frozen.
+const SHOWDOWN_CHECK = { checkedOn: '2026-10-21', checkedBy: 'test (step 3 fixture, check added in memory)', conditions: 'as registered in content/sample/sources.json', decision: 'internal-use' };
+const withCheck = sources => sources.map(s => (s.kind === 'showdown' ? { ...s, usageCheck: SHOWDOWN_CHECK } : s));
+const read = f => { const v = JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8')); return f === 'sources.json' ? withCheck(v) : v; };
 const inputs = () => ({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json') });
 const bad = (mutate, file, pathRe, msgRe) => {
 	const i = inputs(); mutate(i);
@@ -76,6 +80,7 @@ test('the CLI: build writes deterministic output; a failed build REMOVES the old
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-content-'));
 	try {
 		fs.cpSync(SRC, path.join(dir, 'src'), { recursive: true });
+		fs.writeFileSync(path.join(dir, 'src/sources.json'), JSON.stringify(read('sources.json')));
 		const out = path.join(dir, 'out/content.json');
 		const run = (...a) => spawnSync(process.execPath, [CLI, ...a, `--src=${path.join(dir, 'src')}`, `--out=${out}`], { encoding: 'utf8' });
 		assert.equal(run('build').status, 0);
@@ -190,6 +195,7 @@ test('R4: through the CLI a bad overlay fails the build with the overlay locatio
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-content-r4-'));
 	try {
 		fs.cpSync(SRC, path.join(dir, 'src'), { recursive: true });
+		fs.writeFileSync(path.join(dir, 'src/sources.json'), JSON.stringify(read('sources.json')));
 		const out = path.join(dir, 'out/content.json');
 		const run = (...a) => spawnSync(process.execPath, [CLI, ...a, `--src=${path.join(dir, 'src')}`, `--out=${out}`], { encoding: 'utf8' });
 		assert.equal(run('build').status, 0); assert.equal(fs.existsSync(out), true);

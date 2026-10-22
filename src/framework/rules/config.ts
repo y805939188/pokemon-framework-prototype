@@ -12,6 +12,7 @@
  * None of the five is derived from the generation (WP02 §5), so a literal override needs no detaching rule here. Pure.
  */
 import type { Limits } from "./limits.ts";
+import { own } from "./own.ts";
 
 export interface RuleConfig {
   MECHANICS_GENERATION: number;
@@ -41,7 +42,7 @@ export function checkOverrides(overrides: unknown): ConfigProblem[] {
   if (typeof overrides !== "object" || overrides === null || Array.isArray(overrides)) return [{ path: "$", message: "must be an object of setting name -> value" }];
   const out: ConfigProblem[] = [];
   for (const [k, v] of Object.entries(overrides)) {
-    const range = (RANGES as Record<string, [number, number, string?] | undefined>)[k];
+    const range = own(RANGES as Record<string, [number, number, string?]>, k); // own keys only: "constructor" is not a setting
     if (!range) { out.push({ path: `$.${k}`, message: `unknown or unsupported setting (this build reads: ${Object.keys(RANGES).join(", ")})` }); continue; }
     const [lo, hi, why] = range;
     if (typeof v !== "number" || !Number.isInteger(v) || v < lo || v > hi) out.push({ path: `$.${k}`, message: why ?? `must be an integer from ${lo} to ${hi}` });

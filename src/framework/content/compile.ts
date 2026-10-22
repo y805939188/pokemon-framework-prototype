@@ -70,6 +70,62 @@ const FIELD_CHECK: Record<string, (v: unknown) => string | null> = {
 
 export type CompileResult = { ok: true; data: CompiledContent; errors: [] } | { ok: false; errors: ContentError[] };
 
+/** Located problems of a pre-use check record (DETAILED-PLAN §280, D5-2); empty = complete. */
+export function usageCheckProblems(u: unknown, path: string): { path: string; message: string }[] {
+  if (!isObj(u)) return [{ path, message: "must be {checkedOn, checkedBy, conditions, decision}" }];
+  const out: { path: string; message: string }[] = [];
+  for (const k of Object.keys(u)) if (!["checkedOn", "checkedBy", "conditions", "decision"].includes(k)) out.push({ path: `${path}.${k}`, message: `unknown field "${k}" (allowed: checkedOn, checkedBy, conditions, decision)` });
+  if (typeof u["checkedOn"] !== "string" || !DATE.test(u["checkedOn"])) out.push({ path: `${path}.checkedOn`, message: "must be a date YYYY-MM-DD" });
+  for (const k of ["checkedBy", "conditions"]) if (typeof u[k] !== "string" || !u[k]) out.push({ path: `${path}.${k}`, message: "must be a non-empty string" });
+  if (!(USAGE_DECISIONS as readonly string[]).includes(u["decision"] as string)) out.push({ path: `${path}.decision`, message: `must be ${USAGE_DECISIONS.join("|")}` });
+  return out;
+}
+
+/** Validate sources.json (every problem reported with its path); returns the entries, for the pre-use gate. */
+export function checkSources(raw: unknown, report: (file: "sources.json", path: string, message: string) => void): SourceEntry[] {
+  const sources: SourceEntry[] = [];
+  const seen = new Set<string>();
+  if (!Array.isArray(raw)) { report("sources.json", "$", "must be an array"); return sources; }
+  for (const [i, s] of raw.entries()) {
+    const p = `[${i}]`;
+    if (!isObj(s)) { report("sources.json", p, "must be an object"); continue; }
+    for (const k of Object.keys(s)) if (!["id", "kind", "description", "license", "ref", "status", "usedFor", "usageCheck"].includes(k)) report("sources.json", `${p}.${k}`, `unknown field "${k}" (allowed: id, kind, description, license, ref, status, usedFor, usageCheck)`);
+    if (typeof s["id"] !== "string" || !ID.test(s["id"])) report("sources.json", `${p}.id`, "must be an id");
+    else if (seen.has(s["id"])) report("sources.json", `${p}.id`, `duplicate source id "${s["id"]}"`);
+    else seen.add(s["id"]);
+    if (!(SOURCE_KINDS as readonly string[]).includes(s["kind"] as string)) report("sources.json", `${p}.kind`, `must be ${SOURCE_KINDS.join("|")}`);
+    if (!["confirmed", "placeholder", "pending"].includes(s["status"] as string)) report("sources.json", `${p}.status`, "must be confirmed|placeholder|pending");
+    for (const k of ["description", "license", "ref"]) if (typeof s[k] !== "string" || !s[k]) report("sources.json", `${p}.${k}`, "must be a non-empty string");
+    if (!Array.isArray(s["usedFor"]) || s["usedFor"].some((x) => typeof x !== "string")) report("sources.json", `${p}.usedFor`, "must be an array of strings");
+    if (s["usageCheck"] !== undefined) for (const pr of usageCheckProblems(s["usageCheck"], `${p}.usageCheck`)) report("sources.json", pr.path, pr.message);
+    sources.push(s as unknown as SourceEntry);
+  }
+  return sources;
+}
+
+/**
+ * The pre-use gate (DETAILED-PLAN §280, D5-2): may data of source `id` be used? null = yes. A record may only use a
+ * source whose terms were checked first (a complete usageCheck that is not "not-allowed"); an explicit author
+ * placeholder is exempt (it is the project's own stand-in data).
+ */
+export function preUseProblem(sources: readonly SourceEntry[], id: unknown): string | null {
+  const src = sources.find((x) => x.id === id);
+  if (!src) return `must name an entry of sources.json (known: ${sources.map((x) => x.id).join(", ") || "none"})`;
+  if (src.kind === "author-placeholder" && src.status === "placeholder") return null;
+  if (src.usageCheck === undefined) return `source "${src.id}" has no recorded pre-use check (usageCheck): its data may not be used yet`;
+  if (usageCheckProblems(src.usageCheck, "usageCheck").length) return `source "${src.id}" has an incomplete pre-use check (usageCheck needs checkedOn, checkedBy, conditions and a decision): its data may not be used yet`;
+  if (src.usageCheck.decision === "not-allowed") return `source "${src.id}" was checked and may not be used (${src.usageCheck.conditions})`;
+  return null;
+}
+
+/** Species and moves are read from the pinned Showdown build: that source must be registered and pass the gate. */
+export function showdownDependencyProblem(sources: readonly SourceEntry[]): string | null {
+  const sd = sources.filter((x) => x.kind === "showdown");
+  if (!sd.length) return "the content's species and moves are read from the pinned Showdown build, but sources.json registers no source of kind \"showdown\" (register it with its pre-use check)";
+  const ok = sd.find((x) => preUseProblem(sources, x.id) === null);
+  return ok ? null : `the content's species and moves are read from the pinned Showdown build: ${preUseProblem(sources, sd[0]!.id)}`;
+}
+
 export function compileContent(inputs: ContentInputs): CompileResult {
   const errors: ContentError[] = [];
   const report: Report = (file, path, message) => { errors.push({ file, path, message }); };
@@ -86,43 +142,15 @@ export function compileContent(inputs: ContentInputs): CompileResult {
     if (typeof m["title"] !== "string" || !m["title"]) report("manifest.json", "$.title", "must be a non-empty string");
   }
 
-  // ---- sources registry
-  const sources: SourceEntry[] = [];
-  const sourceIds = new Set<string>();
-  if (!Array.isArray(inputs.sources)) report("sources.json", "$", "must be an array");
-  else for (const [i, s] of inputs.sources.entries()) {
-    const p = `[${i}]`;
-    if (!isObj(s)) { report("sources.json", p, "must be an object"); continue; }
-    checkKnownKeys(s, ["id", "kind", "description", "license", "ref", "status", "usedFor", "usageCheck"], "sources.json", p, report);
-    if (typeof s["id"] !== "string" || !ID.test(s["id"])) report("sources.json", `${p}.id`, "must be an id");
-    else if (sourceIds.has(s["id"])) report("sources.json", `${p}.id`, `duplicate source id "${s["id"]}"`);
-    else sourceIds.add(s["id"]);
-    if (!(SOURCE_KINDS as readonly string[]).includes(s["kind"] as string)) report("sources.json", `${p}.kind`, `must be ${SOURCE_KINDS.join("|")}`);
-    if (!["confirmed", "placeholder", "pending"].includes(s["status"] as string)) report("sources.json", `${p}.status`, "must be confirmed|placeholder|pending");
-    for (const k of ["description", "license", "ref"]) if (typeof s[k] !== "string" || !s[k]) report("sources.json", `${p}.${k}`, "must be a non-empty string");
-    if (!Array.isArray(s["usedFor"]) || s["usedFor"].some((x) => typeof x !== "string")) report("sources.json", `${p}.usedFor`, "must be an array of strings");
-    const u = s["usageCheck"];
-    if (u !== undefined) {
-      if (!isObj(u)) report("sources.json", `${p}.usageCheck`, "must be {checkedOn, checkedBy, conditions, decision}");
-      else {
-        checkKnownKeys(u, ["checkedOn", "checkedBy", "conditions", "decision"], "sources.json", `${p}.usageCheck`, report);
-        if (typeof u["checkedOn"] !== "string" || !DATE.test(u["checkedOn"])) report("sources.json", `${p}.usageCheck.checkedOn`, "must be a date YYYY-MM-DD");
-        for (const k of ["checkedBy", "conditions"]) if (typeof u[k] !== "string" || !u[k]) report("sources.json", `${p}.usageCheck.${k}`, "must be a non-empty string");
-        if (!(USAGE_DECISIONS as readonly string[]).includes(u["decision"] as string)) report("sources.json", `${p}.usageCheck.decision`, `must be ${USAGE_DECISIONS.join("|")}`);
-      }
-    }
-    sources.push(s as unknown as SourceEntry);
+  // ---- sources registry, and the pre-use gate of its entries (checkSources / preUseProblem below)
+  const sources = checkSources(inputs.sources, report);
+  const usable = (id: unknown): string | null => preUseProblem(sources, id);
+  // every species record is resolved against the pinned Showdown data: that dependency passes the same gate, whatever
+  // source the record's own fields name (an author placeholder covers its numbers, not the Showdown data under them)
+  if (Array.isArray(inputs.species) && inputs.species.length) {
+    const dep = showdownDependencyProblem(sources);
+    if (dep) report("sources.json", "$", dep);
   }
-  // pre-use gate (DETAILED-PLAN §280, D5-2): a record may only use a source whose terms were checked first; an explicit
-  // author placeholder is exempt (it is the project's own stand-in data)
-  const usable = (id: unknown): string | null => {
-    const src = sources.find((x) => x.id === id);
-    if (!src) return `must name an entry of sources.json (known: ${[...sourceIds].join(", ") || "none"})`;
-    if (src.kind === "author-placeholder" && src.status === "placeholder") return null;
-    if (!src.usageCheck) return `source "${src.id}" has no recorded pre-use check (usageCheck): its data may not be used yet`;
-    if (src.usageCheck.decision === "not-allowed") return `source "${src.id}" was checked and may not be used (${src.usageCheck.conditions})`;
-    return null;
-  };
 
   // ---- species
   const species: SpeciesSource[] = [];

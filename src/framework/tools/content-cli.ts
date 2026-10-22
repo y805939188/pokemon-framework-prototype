@@ -12,7 +12,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { canonicalJson, checkFresh, compileContent } from "../content/compile.ts";
+import { canonicalJson, checkFresh, checkSources, compileContent, preUseProblem } from "../content/compile.ts";
 import { importPbsSpecies } from "../content/pbs-import.ts";
 import type { CompiledContent, ContentError, ContentInputs } from "../content/schema.ts";
 import { createDexLookup } from "../battle/dex.ts";
@@ -41,7 +41,10 @@ const show = (errors: ContentError[]): void => { for (const e of errors) console
 
 export function build(src: string, out: string): number {
   const { inputs, errors } = readInputs(src);
-  const r = errors.length ? { ok: false as const, errors } : compileContent(inputs);
+  let r: ReturnType<typeof compileContent>;
+  // a compiler exception is a failed build too: the old output must not stay behind as if it were current
+  try { r = errors.length ? { ok: false as const, errors } : compileContent(inputs); }
+  catch (e) { r = { ok: false, errors: [{ file: "compiled", path: "$", message: `the compiler failed: ${(e as Error).message}` }] }; }
   if (!r.ok) {
     show(r.errors);
     try { fs.unlinkSync(out); } catch { /* nothing to remove */ }
@@ -105,12 +108,12 @@ export function inventory(src: string, report: string): number {
 export function importPbs(src: string, file: string, sourceId: string, report: string): number {
   const { inputs, errors } = readInputs(src);
   if (errors.length) { show(errors); return 1; }
-  const entry = Array.isArray(inputs.sources) ? (inputs.sources as { id?: unknown; kind?: unknown; usageCheck?: { decision?: unknown } }[]).find((x) => x.id === sourceId) : undefined;
-  if (!entry) { console.error(`sources.json: no source "${sourceId}": register the data's source before importing it`); return 1; }
-  if (!entry.usageCheck || entry.usageCheck.decision === "not-allowed" || !["use-allowed", "internal-use"].includes(String(entry.usageCheck.decision))) {
-    console.error(`sources.json ${sourceId}: no recorded pre-use check that allows this data (usageCheck); nothing was imported`);
-    return 1;
-  }
+  // the same registry validation and pre-use gate as the compiler, BEFORE the data is read (DETAILED-PLAN §280, D5-2)
+  const problems: ContentError[] = [];
+  const sources = checkSources(inputs.sources, (file, p, message) => { problems.push({ file, path: p, message }); });
+  if (problems.length) { show(problems); console.error("sources.json has problems: nothing was imported"); return 1; }
+  const gate = preUseProblem(sources, sourceId);
+  if (gate) { console.error(`sources.json ${sourceId}: ${gate}; nothing was imported`); return 1; }
   let text: string;
   try { text = fs.readFileSync(file, "utf8"); } catch (e) { console.error(`cannot read ${file}: ${(e as Error).message}`); return 1; }
   const r = importPbsSpecies(text, sourceId);

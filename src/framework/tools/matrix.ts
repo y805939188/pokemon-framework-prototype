@@ -16,6 +16,7 @@ import { BattleSession } from "../flow/session.ts";
 import * as G from "../rules/growth.ts";
 import * as S from "../rules/state.ts";
 import { SaveStore } from "./save-store.ts";
+import { identityKeys } from "../rules/species-key.ts"; // the fixture world: content ids are the Showdown names
 import * as F from "./fixtures/game.ts";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -184,19 +185,19 @@ const SCENARIOS: Record<string, () => Promise<L>> = {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-mx-'));
 		try {
 			const file = path.join(dir, 'save.json'); fs.writeFileSync(file, JSON.stringify(game));
-			const crashing = new SaveStore(file, { at: (p: L) => { if (p === 'afterTmpWrite') throw new Error('injected'); } });
+			const crashing = new SaveStore(file, { at: (p: L) => { if (p === 'afterTmpWrite') throw new Error('injected'); } }, identityKeys);
 			let threw = false; try { crashing.commit(result); } catch (e) { threw = true; }
 			ensure(threw, 'injected failure surfaced');
-			const mid = new SaveStore(file).load();
+			const mid = new SaveStore(file, {}, identityKeys).load();
 			ensure(!mid.appliedBattles[result.battleId], 'old state after the failure');
-			eq(new SaveStore(file).commit(result).status, 'applied', 'retry applies');
-			eq(new SaveStore(file).commit(result).status, 'already-applied', 'second submit no-op');
-			const after = new SaveStore(file).load();
+			eq(new SaveStore(file, {}, identityKeys).commit(result).status, 'applied', 'retry applies');
+			eq(new SaveStore(file, {}, identityKeys).commit(result).status, 'already-applied', 'second submit no-op');
+			const after = new SaveStore(file, {}, identityKeys).load();
 			eq(after.party.map((m: L) => m.id), game.party.map((m: L) => m.id), 'persistent order unchanged');
 			const changed = S.diffPaths(game, after);
 			const allowed = [/^party\.\d\.(level|exp|hp|status|statusCount|moves|evs|friendship)(\.|$)/, /^bag\./, /^dex\./, /^appliedBattles\./, /^money$/];
 			for (const p of changed) ensure(allowed.some((re: L) => re.test(p)), 'unexpected change at ' + p);
-			let tamper = false; try { const t = JSON.parse(JSON.stringify(result)); t.members['A-0001'].exp += 1; new SaveStore(file).commit(t); } catch (e) { tamper = /different result/.test((e as Error).message); }
+			let tamper = false; try { const t = JSON.parse(JSON.stringify(result)); t.members['A-0001'].exp += 1; new SaveStore(file, {}, identityKeys).commit(t); } catch (e) { tamper = /different result/.test((e as Error).message); }
 			ensure(tamper, 'tampered result refused');
 			return { changed, bag: after.bag, party: after.party.map((m: L) => [m.id, m.level, m.exp, m.hp]), lines: lines(msgs) };
 		} finally { fs.rmSync(dir, { recursive: true, force: true }); }

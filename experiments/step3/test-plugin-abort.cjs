@@ -28,13 +28,13 @@ function host(failure, failVariable = false) {
   };
   req.resolve = p => p;
   const ctx = { Error, performance, require: req,
-    PluginManager: { registerCommand() {}, parameters: () => ({}) }, Game_Interpreter: Ctor(), Window_Base: Ctor(), Window_Command: Ctor(), Scene_MenuBase: Ctor(),
+    PluginManager: { registerCommand() {}, parameters: () => ({}) }, Game_Interpreter: Ctor(), Window_Base: Ctor(), Window_Command: Ctor(), Scene_MenuBase: Ctor(), SceneManager: { push() {} },
     $gameSystem: { _psGame: game }, $gameVariables: { setValue(k, v) { if (failVariable) throw new Error('variable unavailable'); vars[k] = v; }, value: k => vars[k] } };
   ctx.window = ctx;
   vm.createContext(ctx); vm.runInContext(plugin, ctx);
   const flow = ctx.PSFlow;
-  flow.request = { battleId: 'b#2', kind: 'wild', foes: [{ species: 'Pidgey', level: 5 }], seq: 2, resultVariable: 10 };
-  flow.running = true;
+  // a battle opened the way the plugin opens one (since step 5.0 the open battle has its operation identity)
+  flow.openBattle({ battleId: 'b#2', kind: 'wild', foes: [{ species: 'Pidgey', level: 5 }], seq: 2, resultVariable: 10 });
   return { ctx, flow, vars, game };
 }
 

@@ -14,10 +14,13 @@ if (!summaryFile) { console.error('usage: perf-budget.cjs <perf-summary.json> [-
 const budget = JSON.parse(fs.readFileSync(path.join(__dirname, '../docs/step5/perf-budget.json'), 'utf8'));
 const summary = JSON.parse(fs.readFileSync(summaryFile, 'utf8'));
 const byLabel = Object.fromEntries(summary.rows.map(r => [r.label, r]));
+// the baseline's rows were computed over its 30 battles; rows over another set of battles are not the same measurement
+const comparable = byLabel['battles behind the comparable rows (the step 4 baseline: 30)'];
+const sameBattles = !!comparable && comparable.median === budget.baseline.comparableBattles && (comparable.samples || []).every(x => x === budget.baseline.comparableBattles);
 const rows = budget.rows.map(b => {
   const m = byLabel[b.label];
   const median = m ? m.median : null;
-  const status = median === null || median === undefined ? 'not measured' : median > b.warnAbove ? 'WARN' : 'within';
+  const status = median === null || median === undefined ? 'not measured' : b.battleSet && !sameBattles ? 'not comparable (computed over other battles than the baseline)' : median > b.warnAbove ? 'WARN' : 'within';
   return { label: b.label, baselineMedian: b.baselineMedian, warnAbove: b.warnAbove, median, status };
 });
 let memory = { label: budget.memory100.label, warnAbove: budget.memory100.warnAbove, baselineGrowth: budget.memory100.baseline.growth, status: 'not measured' };
@@ -32,5 +35,6 @@ if (mfile) {
 const report = { budget: 'docs/step5/perf-budget.json', summary: summaryFile, gitHead: summary.env && summary.env.gitHead, baselineGitHead: budget.baseline.gitHead, rows, memory, warnings: rows.filter(r => r.status === 'WARN').length + (memory.status === 'WARN' ? 1 : 0) };
 for (const r of rows) console.log(`${r.status.padEnd(12)} ${String(r.median).padStart(8)} (warn above ${r.warnAbove}; baseline ${r.baselineMedian})  ${r.label}`);
 console.log(`${memory.status.padEnd(12)} ${String(memory.growth ?? '-').padStart(8)} (warn above ${memory.warnAbove}; baseline ${memory.baselineGrowth})  ${memory.label}`);
+if (!sameBattles) console.log(`note: the battle rows did not cover the baseline's ${budget.baseline.comparableBattles} battles (${comparable ? JSON.stringify(comparable.samples) : 'no such row'}): they are not compared`);
 console.log(`warnings: ${report.warnings} (warnings do not block, D5-8)`);
 if (opt('out')) fs.writeFileSync(opt('out'), JSON.stringify(report, null, 1) + '\n');

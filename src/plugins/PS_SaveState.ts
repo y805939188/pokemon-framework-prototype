@@ -6,16 +6,19 @@
  *   load : the state is migrated on a COPY; success replaces it, failure keeps the raw document and records
  *          `_psSaveError` (battles then refuse to start: nothing is reset, nothing is overwritten by a battle result).
  *          From schema 3 to 4 the migration needs the game content (Showdown name -> content id + form, decision D5-3);
- *          content that cannot be loaded, or a species it cannot map, refuses the migration the same way, and saving
- *          writes the original framework state back unchanged. A battle still open in the application is released.
+ *          content that cannot be loaded, or a species it cannot map, refuses the migration the same way. A battle still
+ *          open in the application, and the host's battle operation, are released.
  *          A save with NO framework state (made before the framework state existed, or before any of it was used) gets
  *          the formal empty state (no members, no items, money 0, nothing claimed) and `_psSaveInfo.created` says so:
  *          no player data is invented.
- *   save : the state is validated first; a problem is recorded as `_psSaveWarning` and logged, and the save still
- *          goes ahead (refusing would lose the player's progress; the warning is the diagnostic).
+ *   save : while the loaded framework state is unusable (`_psSaveError`), every save is refused BEFORE MZ writes
+ *          anything (code state-unusable, with the slot): the save file the state came from, and every other slot, stay
+ *          exactly as they are, and the save menu is masked (Game_System.isSaveEnabled). A new game or a good load
+ *          clears the error. Otherwise the state is validated first; a problem is recorded as `_psSaveWarning` and
+ *          logged, and the save still goes ahead (refusing would lose the player's progress; the warning is the diagnostic).
  *          While a battle runs (PSFlow.running) every save is refused, including a direct DataManager.saveGame call (the
  *          menu and autosave are already off: PS_BattleFlow masks Game_System.isSaveEnabled). A refused or failed save is recorded in
- *          PSState.lastSaveError {code: battle-running | write-failed, message, savefileId, at} and logged.
+ *          PSState.lastSaveError {code: state-unusable | battle-running | write-failed, message, savefileId, at} and logged.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 (() => {
@@ -60,7 +63,7 @@
     /** Called right before MZ builds the save contents. */
     beforeSave(): void {
       const sys = G.$gameSystem;
-      if (!sys || sys._psGame === undefined || sys._psSaveError) return; // an unusable state is saved as it is
+      if (!sys || sys._psGame === undefined || sys._psSaveError) return; // an unusable state never gets this far (saveGame refuses)
       const problems = schema().validateGame(sys._psGame);
       if (problems.length) { sys._psSaveWarning = { problems: problems.slice(0, 10) }; console.warn("PS_SaveState: saving a state that fails validation:", problems[0]); }
       else delete sys._psSaveWarning;
@@ -78,6 +81,14 @@
       PSState.lastSaveError = { code, message: String(e instanceof Error ? e.message : e), savefileId, at: Date.now() };
       console.error("PS_SaveState: save not written:", code, PSState.lastSaveError.message);
     };
+    const unusable = G.$gameSystem && G.$gameSystem._psSaveError;
+    if (unusable) {
+      // migration failed or the document was not understood: writing now would replace the original save file (or
+      // another slot) with a state this build could not read; nothing is written, the player keeps the original
+      const e = new Error(`saving to slot ${savefileId} is refused: the framework state of the loaded save is not usable (${unusable.code}: ${unusable.message}); nothing was written`);
+      fail("state-unusable", e);
+      return Promise.reject(e);
+    }
     if (W.PSFlow && W.PSFlow.running) {
       const e = new Error("saving is not allowed while a battle is running");
       fail("battle-running", e);
@@ -87,6 +98,11 @@
     try { p = baseSaveGame.call(this, savefileId); } catch (e) { fail("write-failed", e); return Promise.reject(e); }
     return Promise.resolve(p).then((r: any) => { PSState.lastSaveError = null; PSState.lastSave = { savefileId, at: Date.now() }; return r; }, (e: unknown) => { fail("write-failed", e); throw e; });
   };
+  // the save menu and autosave follow the same rule (the game's own save permission is never written)
+  if (G.Game_System && G.Game_System.prototype && G.Game_System.prototype.isSaveEnabled) {
+    const baseIsSaveEnabled = G.Game_System.prototype.isSaveEnabled;
+    G.Game_System.prototype.isSaveEnabled = function (this: any) { return !this._psSaveError && baseIsSaveEnabled.call(this); };
+  }
   const baseMake = G.DataManager.makeSaveContents;
   G.DataManager.makeSaveContents = function (this: any) {
     PSState.beforeSave();

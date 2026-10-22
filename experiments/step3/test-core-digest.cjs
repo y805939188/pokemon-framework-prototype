@@ -61,6 +61,7 @@ test('the compiled-content input hash is unchanged by the portable implementatio
   const fs = require('node:fs'); const path = require('node:path');
   // the step 3 sample as it was when the portable digest replaced node:crypto (the live sample has grown since)
   const SRC = path.resolve(__dirname, 'fixtures/content-sample-step3'); const read = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
-  const r = E.contentCompile.compileContent({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json') });
-  assert.equal(r.data.inputsHash, 'c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625');
+  // (hashed directly: since step 5.0 these frozen inputs no longer pass the pre-use gate, whose Showdown check they predate)
+  const inputs = { manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json') };
+  assert.equal(E.contentCompile.hashInputs(inputs), 'c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625');
 });

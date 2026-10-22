@@ -39,7 +39,7 @@ test('Leppa restoration respects each persistent cap; the result commits and rel
     await s.run(); assert.equal(s.finished, true);
     assert.deepEqual(s.result().members['A-0001'].moves[0], { id: 'hydropump', pp: 5 + ups, maxpp: 5 + ups });
     const file = path.join(dir, `${ups}.json`); fs.writeFileSync(file, JSON.stringify(game));
-    const store = new E.store.SaveStore(file);
+    const store = new E.store.SaveStore(file, {}, E.speciesKey.identityKeys); // fixture world, chosen explicitly
     assert.equal(store.commit(s.result()).status, 'applied');
     assert.deepEqual(E.saveSchema.validateGame(store.load()), []);
     assert.equal(store.commit(s.result()).status, 'already-applied');

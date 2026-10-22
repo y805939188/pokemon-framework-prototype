@@ -16,6 +16,8 @@ const migrateGame = (raw, o = { speciesKey: E.speciesKey.identityKeys }) => E.sa
 /** What schemas 3 and 4 add to an older document: the claims ledger, statistics, the step counter, a form per member. */
 const addedByNewerSchemas = s => ['claims', 'schema', 'stats', 'steps', ...['party', 'boxes'].flatMap(k => s[k].map((_, i) => `${k}.${i}.form`))].sort();
 const { SaveStore, SaveError } = E.store;
+// the fixture world (content ids = Showdown names) is chosen explicitly: the store guesses no species keys (step 5.0 review F03)
+const store = (f, hooks = {}) => new SaveStore(f, hooks, E.speciesKey.identityKeys);
 const S = E.state;
 const F = E.fixtures;
 
@@ -111,16 +113,16 @@ test('the store upgrades a legacy file on commit, keeps the original bytes, and 
 	const dir = dirOf(); const f = path.join(dir, 'save.json');
 	fs.writeFileSync(f, JSON.stringify(realV1()));
 	const original = fs.readFileSync(f);
-	const info = new SaveStore(f).loadInfo();
+	const info = store(f).loadInfo();
 	assert.deepEqual([info.from, info.migrated], [1, true]);
 	assert.ok(original.equals(fs.readFileSync(f)), 'reading migrates in memory only');
-	const r = new SaveStore(f).commit(resultFor('B-legacy'));
+	const r = store(f).commit(resultFor('B-legacy'));
 	assert.deepEqual(r, { status: 'applied', migratedFrom: 1 });
 	assert.ok(original.equals(fs.readFileSync(f + '.v1.bak')), 'the legacy file is kept byte for byte');
-	const now = new SaveStore(f).load();
+	const now = store(f).load();
 	assert.equal(now.schema, S.GAME_SCHEMA); assert.equal(now.party[0].hp, 50); assert.equal(now.bag.potion, 2); assert.ok(now.appliedBattles['B-legacy']);
-	assert.equal(new SaveStore(f).commit(resultFor('B-legacy')).status, 'already-applied');
-	assert.equal(new SaveStore(f).load().bag.potion, 2, 'applied once');
+	assert.equal(store(f).commit(resultFor('B-legacy')).status, 'already-applied');
+	assert.equal(store(f).load().bag.potion, 2, 'applied once');
 });
 
 test('the store never overwrites a save it cannot read', () => {
@@ -133,7 +135,7 @@ test('the store never overwrites a save it cannot read', () => {
 	];
 	for (const [name, bytes, code] of attempts) {
 		const f = path.join(dir, name + '.json'); fs.writeFileSync(f, bytes);
-		assert.throws(() => new SaveStore(f).commit(resultFor('B-x')), e => e instanceof SaveError && e.info.code === code, name);
+		assert.throws(() => store(f).commit(resultFor('B-x')), e => e instanceof SaveError && e.info.code === code, name);
 		assert.ok(bytes.equals(fs.readFileSync(f)), `${name}: file untouched`);
 		assert.ok(!fs.existsSync(f + '.tmp') && !fs.existsSync(f + '.v1.bak'), `${name}: nothing else written`);
 	}
@@ -146,14 +148,14 @@ test('REAL process kill while upgrading a legacy file: old or new at every point
 		const original = fs.readFileSync(f);
 		const child = spawnSync(process.execPath, [path.join(__dirname, 'crash-child-legacy.cjs'), f, rf], { env: { ...process.env, CRASH_AT: point }, encoding: 'utf8' });
 		assert.equal(child.signal, 'SIGKILL', `the child really dies at ${point}`);
-		const info = new SaveStore(f).loadInfo(); // never throws: either the legacy file or the new one
+		const info = store(f).loadInfo(); // never throws: either the legacy file or the new one
 		const committed = point === 'afterRename';
 		assert.deepEqual([info.migrated, !!info.state.appliedBattles['B-kill']], committed ? [false, true] : [true, false], `state after kill at ${point}`);
 		if (!committed) assert.ok(original.equals(fs.readFileSync(f)), `legacy bytes intact after kill at ${point}`);
 		assert.ok(!fs.existsSync(f + '.tmp'), 'an interrupted temp file is discarded on load');
-		const retry = new SaveStore(f).commit(resultFor('B-kill'));
+		const retry = store(f).commit(resultFor('B-kill'));
 		assert.equal(retry.status, committed ? 'already-applied' : 'applied');
-		const fin = new SaveStore(f).load();
+		const fin = store(f).load();
 		assert.equal(fin.bag.potion, 2, `deducted exactly once (${point})`); assert.equal(Object.keys(fin.appliedBattles).length, 1 + Object.keys(oldestV1().appliedBattles).length);
 	}
 });

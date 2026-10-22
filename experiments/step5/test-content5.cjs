@@ -158,3 +158,93 @@ test('FR-000388/389 rule configuration (WP02 subset): Gen 8 defaults, validated 
   const bad = compileContent({ ...inputs(), settings: { MAX_PARTY_SIZE: 9 } });
   assert.equal(bad.ok, false); assert.deepEqual([bad.errors[0].file, bad.errors[0].path], ['settings.json', '$.MAX_PARTY_SIZE']);
 });
+
+// ---- review of 1960b92 (2026-10-22): F04 section ids, F05 one pre-use gate (CLI, compiler, Showdown), F06 own keys
+const REC = 'GrowthRate = Medium\nBaseExp = 50\nEVs = SPEED,1\nMoves = 1,TACKLE\n';
+
+test('F04: a form section or a section id that is not a symbol is refused at its line, never read as another species', () => {
+  for (const [section, re] of [['PORYGON,2', /form section.*not part of this import subset/], ['PIKA!CHU', /is not a symbol/], ['1ABC', /is not a symbol/], ['RAT TATA', /is not a symbol/]]) {
+    const r = importPbsSpecies(`[${section}]\n${REC}[RATTATA]\n${REC}`, 'x');
+    assert.equal(r.ok, false, section);
+    assert.ok(r.errors.some(e => e.line === 1 && re.test(e.message)), `${section}: ${JSON.stringify(r.errors)}`);
+    assert.deepEqual(r.species.map(s => s.id), ['rattata'], `${section}: nothing invented; the next valid section is still read`);
+    assert.equal(r.errors.length, 1, `${section}: the refused section's own lines are skipped with it`);
+  }
+  const mime = importPbsSpecies(`[MR_MIME]\n${REC}`, 'x');
+  assert.deepEqual(mime.species.map(s => [s.id, s.showdownId]), [['mr-mime', 'mrmime']], 'an underscore is part of a symbol: a hyphen in the content id, dropped in the Showdown id');
+});
+
+test('F05: the CLI applies the full registry validation before it reads the PBS file: an incomplete check (decision only) refuses, nothing is read or written', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-pbs-f05-'));
+  try {
+    for (const f of ['manifest.json', 'species.json', 'overlays.json', 'grants.json']) fs.copyFileSync(path.join(SRC, f), path.join(dir, f));
+    const cli = (file) => spawnSync(process.execPath, [path.join(ROOT, 'js/engine/build/content-cli.cjs'), 'import-pbs', `--src=${dir}`, `--file=${file}`, '--source=author-pbs', `--report=${path.join(dir, 'out.json')}`], { encoding: 'utf8' });
+    const missingFile = path.join(dir, 'does-not-exist.txt');
+    for (const [usageCheck, re] of [[{ decision: 'use-allowed' }, /usageCheck\.checkedOn.*YYYY-MM-DD/s], [{ ...CHECK, checkedBy: '' }, /usageCheck\.checkedBy/], [{ ...CHECK, conditions: undefined }, /usageCheck\.conditions/]]) {
+      fs.writeFileSync(path.join(dir, 'sources.json'), JSON.stringify([...read('sources.json'), authorData(JSON.parse(JSON.stringify(usageCheck)))]));
+      const r = cli(missingFile);
+      assert.equal(r.status, 1); assert.match(r.stderr, re); assert.match(r.stderr, /nothing was imported/);
+      assert.doesNotMatch(r.stderr, /cannot read/, 'refused before the PBS file is even opened');
+      assert.equal(fs.existsSync(path.join(dir, 'out.json')), false, 'no report');
+    }
+    fs.writeFileSync(path.join(dir, 'sources.json'), JSON.stringify([...read('sources.json'), authorData({ ...CHECK, decision: 'not-allowed' })]));
+    const denied = cli(missingFile);
+    assert.equal(denied.status, 1); assert.match(denied.stderr, /was checked and may not be used/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('F05: the Showdown data the content is read against passes the same gate (missing entry, missing or incomplete check, not-allowed): compiler and assembly refuse', () => {
+  const variants = [
+    ['no showdown entry', i => { i.sources = i.sources.filter(s => s.kind !== 'showdown'); }, /registers no source of kind "showdown"/],
+    ['no check', i => { delete i.sources.find(s => s.kind === 'showdown').usageCheck; }, /source "showdown" has no recorded pre-use check/],
+    ['not-allowed', i => { i.sources.find(s => s.kind === 'showdown').usageCheck = { ...CHECK, decision: 'not-allowed', conditions: 'denied for the test' }; }, /may not be used \(denied for the test\)/],
+  ];
+  for (const [label, mutate, re] of variants) {
+    const i = inputs(); mutate(i);
+    const r = compileContent(i);
+    assert.equal(r.ok, false, label);
+    assert.ok(r.errors.some(e => e.file === 'sources.json' && e.path === '$' && re.test(e.message)), `${label}: ${JSON.stringify(r.errors)}`);
+  }
+  const incomplete = inputs(); incomplete.sources.find(s => s.kind === 'showdown').usageCheck = { decision: 'internal-use' };
+  assert.equal(compileContent(incomplete).ok, false, 'an incomplete check record is refused (located in sources.json)');
+  // the placeholder exemption covers the records' own numbers, not the Showdown data under them
+  assert.ok(inputs().species.every(s => s.source === 'author-placeholder'));
+  // a compiled document edited (or produced) without the check is refused where the data is used
+  const ok = compileContent(inputs()); assert.equal(ok.ok, true);
+  const edited = JSON.parse(JSON.stringify(ok.data)); edited.sources.find(s => s.kind === 'showdown').usageCheck.decision = 'not-allowed';
+  const a = E.contentRuntime.assembleContent(edited, E.dex.createDexLookup());
+  assert.deepEqual([a.errors[0].file, a.errors[0].path, Object.keys(a.content.species).length], ['assembly', 'sources', 0]);
+  assert.match(a.errors[0].message, /may not be used/);
+});
+
+test('F06: setting names and PBS enumerations are own keys only: "constructor", "toString", "__proto__" get located errors, never a crash or a lost field', () => {
+  for (const key of ['constructor', 'toString', '__proto__']) {
+    const problems = E.config.checkOverrides(JSON.parse(`{"${key}": 1}`));
+    assert.deepEqual(problems.map(p => p.path), [`$.${key}`], key); assert.match(problems[0].message, /unknown or unsupported setting/);
+    const c = compileContent({ ...inputs(), settings: JSON.parse(`{"${key}": 1}`) });
+    assert.equal(c.ok, false); assert.deepEqual([c.errors[0].file, c.errors[0].path], ['settings.json', `$.${key}`]);
+  }
+  const growth = importPbsSpecies('[RATTATA]\n' + REC.replace('Medium', 'constructor'), 'x');
+  assert.equal(growth.ok, false); assert.match(growth.errors[0].message, /"constructor" is not a growth rate/);
+  const stat = importPbsSpecies('[RATTATA]\n' + REC.replace('SPEED,1', 'constructor,1'), 'x');
+  assert.equal(stat.ok, false); assert.match(stat.errors[0].message, /must be a stat/);
+  const later = importPbsSpecies('[RATTATA]\n' + REC + 'constructor = 3\ntoString = 4\n', 'x');
+  assert.equal(later.ok, true); assert.deepEqual(later.records[0].later, []); assert.deepEqual(later.records[0].ignored, ['constructor', 'toString'], 'unknown keys, not later-batch fields');
+  // every produced record survives serialization complete and compiles
+  const roundTrip = JSON.parse(JSON.stringify(importPbsSpecies(PBS, 'author-pbs').species));
+  for (const sp of roundTrip) for (const f of ['id', 'showdownId', 'nameKey', 'growth', 'baseExp', 'evYield', 'catchRate', 'learnset', 'source']) assert.ok(sp[f] !== undefined, `${sp.id}.${f}`);
+});
+
+test('F06: a build that fails (also on such a setting) removes the previous output, so a stale file never passes for current', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-build-f06-'));
+  try {
+    fs.cpSync(SRC, path.join(dir, 'src'), { recursive: true });
+    const out = path.join(dir, 'out/content.json');
+    const run = () => spawnSync(process.execPath, [path.join(ROOT, 'js/engine/build/content-cli.cjs'), 'build', `--src=${path.join(dir, 'src')}`, `--out=${out}`], { encoding: 'utf8' });
+    assert.equal(run().status, 0); assert.ok(fs.existsSync(out));
+    fs.writeFileSync(path.join(dir, 'src/settings.json'), '{"constructor": 1}');
+    const failed = run();
+    assert.equal(failed.status, 1); assert.match(failed.stderr, /settings\.json \$\.constructor/); assert.doesNotMatch(failed.stderr, /TypeError/);
+    assert.equal(fs.existsSync(out), false, 'the old output was removed');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

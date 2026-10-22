@@ -106,8 +106,12 @@ export function newMember(o: NewMemberInput): Member {
   };
 }
 
+/**
+ * A new persistent game state. Its members are persistent: `species` is a content id, and a member given without a
+ * form gets the base form 0 here (only here: `newMember` also builds battle records, which carry no form).
+ */
 export function newGame({ party, bag = {}, money = 0 }: { party: NewMemberInput[]; bag?: Record<string, number>; money?: number }): GameState {
-  return { schema: GAME_SCHEMA, party: party.map(newMember), boxes: [], bag: { ...bag }, money, dex: { seen: [], owned: [] }, appliedBattles: {}, claims: {}, stats: newStats(), steps: 0 };
+  return { schema: GAME_SCHEMA, party: party.map((m) => newMember({ ...m, form: m.form ?? 0 })), boxes: [], bag: { ...bag }, money, dex: { seen: [], owned: [] }, appliedBattles: {}, claims: {}, stats: newStats(), steps: 0 };
 }
 
 /** Stable hash of a result, used for idempotency (same battleId + same hash => no-op). */

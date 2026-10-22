@@ -191,3 +191,39 @@ test('replay ledger across the migration: a result committed before schema 4 is 
   assert.deepEqual([again.status, again.state === m.state], ['already-applied', true], 'the same result is a repeat after the migration');
   assert.throws(() => S.applyBattleResult(m.state, { ...result, bag: { potion: -2 } }, undefined, K.speciesKeyResolver(sample)), /already applied with a different result/);
 });
+
+// ---- review of 1960b92 (2026-10-22): F07 the identity boundary of growth, F08 newGame's persistent members
+test('F07: applyExp takes battle records (session growth unchanged); a persistent member goes through applyExpPersistent and keeps its key', () => {
+  const battle = E.memberFactory.createMember({ id: 'G-1', species: 'Charmander', level: 5 }, sample, () => 0);
+  const saved = K.toPersistentMember(battle, sample);
+  const amount = E.growth.minExp('medium', 9) - battle.exp; // enough for a few levels (Charmander's sample curve)
+  const viaBattle = E.growth.applyExp(battle, amount, sample);
+  const viaSaved = E.growth.applyExpPersistent(saved, amount, sample);
+  assert.deepEqual([viaSaved.member.species, viaSaved.member.form], ['charmander', 0], 'the result keeps the persistent identity');
+  assert.deepEqual({ ...viaSaved.member, species: 'Charmander', form: undefined }, { ...viaBattle.member, form: undefined }, 'the same growth as the battle path');
+  assert.deepEqual(viaSaved.log, viaBattle.log);
+  assert.throws(() => E.growth.applyExp(saved, 1, sample), /applyExp takes a battle record.*applyExpPersistent/);
+});
+
+test('F07: applyExpPersistent resolves the form (and falls back to the base form for one the content lacks)', () => {
+  const i = withForms(); i.species[i.species.length - 1].growth = 'fast'; // the Alolan form grows on another curve
+  const ct = assemble(i).content;
+  const base = K.toPersistentMember(E.memberFactory.createMember({ id: 'V-0', species: 'Vulpix', level: 5 }, ct, () => 0), ct);
+  const alola = { ...base, id: 'V-1', form: 1 }, missing = { ...base, id: 'V-7', form: 7 };
+  const amount = 2000;
+  const lv = m => E.growth.applyExpPersistent(m, amount, ct).member;
+  assert.equal(lv(alola).level, E.growth.levelForExp('fast', base.exp + amount), 'form 1 uses its own record (fast curve)');
+  assert.equal(lv(base).level, E.growth.levelForExp('medium', base.exp + amount));
+  assert.equal(lv(missing).level, lv(base).level, 'a form the content lacks falls back to the base form (WP03 §3.2)');
+  assert.deepEqual([lv(alola).form, lv(missing).form], [1, 7], 'the stored form is kept');
+});
+
+test('F08: newGame gives a member without a form the base form 0 (valid schema 4); battle records and results stay without one', () => {
+  const battle = E.memberFactory.createMember({ id: 'A-1', species: 'Charmander', level: 5 }, sample, () => 0);
+  const { form: _f, ...noForm } = K.toPersistentMember(battle, sample);
+  const g = S.newGame({ party: [noForm] });
+  assert.deepEqual([g.party[0].species, g.party[0].form], ['charmander', 0]);
+  assert.deepEqual(validateGame(g), []);
+  assert.equal(S.newGame({ party: [{ ...noForm, form: 2 }] }).party[0].form, 2, 'a given form is kept');
+  assert.equal('form' in S.newMember(battle), false, 'newMember (also used for captured records, protocol v1) adds no form');
+});

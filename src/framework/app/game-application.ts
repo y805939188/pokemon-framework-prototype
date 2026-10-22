@@ -21,7 +21,7 @@ import type { GameStats, StatCounter } from "../rules/stats.ts";
 import type { Member } from "../rules/types.ts";
 import { own } from "../rules/own.ts";
 import { findDanglingReferences, resolveSpecies } from "../flow/content-runtime.ts";
-import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ContentPort, EncounterPlan, GameStatePort, HealOutcome, OutcomeProjection, PartyView, RandomPort, StepsOutcome } from "./ports.ts";
+import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ClockPort, ContentPort, EncounterPlan, GameStatePort, HealOutcome, OutcomeProjection, PartyView, RandomPort, StepsOutcome } from "./ports.ts";
 
 export interface GameApplicationPorts<S extends BattleHandle> {
   state: GameStatePort;
@@ -30,6 +30,8 @@ export interface GameApplicationPorts<S extends BattleHandle> {
   projection: OutcomeProjection;
   /** Needed by the use cases that create members (grants, encounters); without it they refuse with "no-random". */
   random?: RandomPort;
+  /** The host's wall clock (WP06 §3), for the use cases that need the time; see `now()`. */
+  clock?: ClockPort;
 }
 
 /** Stage configuration of the application (not ports: plain values the host reads from its settings). */
@@ -86,10 +88,12 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    */
   private op: { battleId: string; session: S | null; facts: BattleFacts } | null = null;
   /**
-   * Sessions whose state was replaced by the host while they were open (a save loaded, a new game): their result
-   * belongs to a state that no longer exists, so finishing them commits nothing (final review P4-2).
+   * State generation: raised whenever the host installs a state the application did not produce (a save loaded, a new
+   * game). Every session remembers the generation it was opened in; a session of an earlier generation (open or already
+   * finished) belongs to a state that no longer exists, so finishing it commits nothing (final review P4-2).
    */
-  private readonly detached = new WeakSet<object>();
+  private generation = 0;
+  private readonly bornIn = new WeakMap<object, number>();
 
   constructor(ports: GameApplicationPorts<S>, options: GameApplicationOptions = {}) {
     this.ports = ports;
@@ -148,6 +152,20 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     return { status: "healed" };
   }
 
+  /**
+   * The current wall-clock time from the injected clock (milliseconds since the Unix epoch). The single way the
+   * application reads time: use cases that need it (time conditions 5.3, time of day 5.5, play time 5.6) take it from
+   * here and hand it to the rules as an argument. Throws when no clock is configured or it answers something that is
+   * not a finite number of milliseconds.
+   */
+  now(): number {
+    const clock = this.ports.clock;
+    if (!clock) throw new Error("no clock is configured for this application");
+    const t = clock();
+    if (typeof t !== "number" || !Number.isFinite(t) || t < 0) throw new Error(`the clock answered ${String(t)}, not a time in milliseconds`);
+    return t;
+  }
+
   /** Count steps the player took (WP06 §4.1: the global counter, wrapping at 2^31). The host applies the guards of that step. */
   recordSteps(n = 1): StepsOutcome {
     if (this.op) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
@@ -165,7 +183,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * refused for good, final review P4-2), and its session, should it still finish, commits nothing.
    */
   stateReplacedByHost(): void {
-    if (this.op && this.op.session) this.detached.add(this.op.session);
+    this.generation++;
     this.op = null;
   }
 
@@ -204,6 +222,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     catch (error) { if (this.op === op) this.op = null; throw error; }
     if (this.op !== op) throw new Error(`battle ${request.battleId} was aborted while its session was being created; the late session is not used`);
     op.session = session;
+    if (typeof session === "object" && session !== null) this.bornIn.set(session, this.generation);
     return session;
   }
 
@@ -265,7 +284,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * is committed a failing host projection is reported on the outcome and does not undo or repeat the commit.
    */
   finishBattle(handle: S, request: Pick<BattleStartRequest, "battleId"> | null): BattleOutcome & { result?: BattleResult } {
-    if (this.detached.has(handle)) {
+    const born = typeof handle === "object" && handle !== null ? this.bornIn.get(handle) : undefined;
+    if (born !== undefined && born !== this.generation) {
       // the state this battle read is gone: no commit, no projection into the new state, and no lock to release
       return { code: 0, battleId: request ? request.battleId : null, commit: "none", aborted: true, error: "the game state was replaced while this battle was open (a save was loaded or a new game started); its result is not committed" };
     }

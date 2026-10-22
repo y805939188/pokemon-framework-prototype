@@ -19,6 +19,14 @@ export interface RandomPort {
   (n: number): number;
 }
 
+/**
+ * The host's wall clock (WP06 §3 "现实时间"): milliseconds since the Unix epoch. Injected like the random source so
+ * that rules never read the host clock (they receive the time as an argument) and tests can pin it.
+ */
+export interface ClockPort {
+  (): number;
+}
+
 /** One battle as the author (StartBattle) or an encounter asks for it. */
 export interface BattleStartRequest {
   battleId: string;

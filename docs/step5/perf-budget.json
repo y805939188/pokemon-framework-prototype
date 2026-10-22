@@ -5,7 +5,9 @@
   "gitHead": "3ba2be9fb746807608418fd29cde9f3acbb6cf3c",
   "runs": 3,
   "machine": "Apple M1 Max, 32 GB, macOS kernel 25.6.0, NW.js 0.117.0",
-  "method": "scripts/run-package-perf-mac.sh 3 (3 launches, 24 battles each, window focused, fast messages)"
+  "method": "scripts/run-package-perf-mac.sh 3 (3 launches, 24 battles each, window focused, fast messages)",
+  "comparableBattles": 30,
+  "battleNote": "the baseline's battle rows cover 30 battles per run (24 in the rounds + 6 step 4 encounters); a run compares only the same 30 (review F09)"
  },
  "factor": 1.2,
  "rows": [
@@ -22,37 +24,44 @@
   {
    "label": "later battles: session create, median (ms)",
    "baselineMedian": 2,
-   "warnAbove": 2.4
+   "warnAbove": 2.4,
+   "battleSet": true
   },
   {
    "label": "later battles: event start -> first menu, median (ms)",
    "baselineMedian": 132.7,
-   "warnAbove": 159.24
+   "warnAbove": 159.24,
+   "battleSet": true
   },
   {
    "label": "later battles: event start -> first menu, worst, window focused throughout (ms)",
    "baselineMedian": 135.7,
-   "warnAbove": 162.84
+   "warnAbove": 162.84,
+   "battleSet": true
   },
   {
    "label": "action latency p50 move (ms)",
    "baselineMedian": 5.9,
-   "warnAbove": 7.08
+   "warnAbove": 7.08,
+   "battleSet": true
   },
   {
    "label": "action latency p50 run (ms)",
    "baselineMedian": 2.9,
-   "warnAbove": 3.48
+   "warnAbove": 3.48,
+   "battleSet": true
   },
   {
    "label": "action latency p50 item (ms)",
    "baselineMedian": 5.6,
-   "warnAbove": 6.72
+   "warnAbove": 6.72,
+   "battleSet": true
   },
   {
    "label": "action latency p50 ball (ms)",
    "baselineMedian": 3.7,
-   "warnAbove": 4.44
+   "warnAbove": 4.44,
+   "battleSet": true
   },
   {
    "label": "frames in battle scene: p95 (ms)",
@@ -94,6 +103,6 @@
    "growth": 2
   },
   "warnAbove": 2.4,
-  "note": "a 2 MB baseline growth puts the +20% threshold inside measurement noise; the rule is applied as decided and the actual numbers are reported"
+  "note": "a 2 MB baseline growth puts the +20% threshold inside measurement noise; the rule is applied as decided and the actual numbers are reported. The baseline is the step 2 hardened package (e666bba), a run is an ad-hoc signed package of a later build: not strictly the same conditions, and a run within or above it neither proves nor locates a leak"
  }
 }

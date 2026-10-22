@@ -148,3 +148,23 @@ test('P4-2 while the session is still being created: the late session is not use
   await assert.rejects(start, /aborted while its session was being created/);
   assert.equal(w.app.claimGrant('starter').status, 'applied', 'the operation was released');
 });
+
+// ---- review of 1960b92 (2026-10-22): F11 the injected time source (prompt §4.4, WP06 §3; r8 FR-000425 subset)
+test('F11: the application reads the wall clock only through its injected clock port; none configured or a bad answer is refused', () => {
+  const mk = clock => new GameApplication({ state: K.createMemoryState(game()), sessions: K.createFakeSessions(() => { throw new Error('x'); }), projection: K.createRecordingProjection(), content: () => ({ content }), ...(clock ? { clock } : {}) });
+  assert.equal(mk(() => 1700000000000).now(), 1700000000000);
+  let t = 5; const ticking = mk(() => t++);
+  assert.deepEqual([ticking.now(), ticking.now()], [5, 6], 'read at every call, never cached');
+  assert.throws(() => mk(null).now(), /no clock is configured/);
+  for (const bad of [NaN, -1, Infinity, '12']) assert.throws(() => mk(() => bad).now(), /not a time in milliseconds/, String(bad));
+});
+
+test('F11: the core and the application never read the host clock or randomness themselves (they get them injected)', () => {
+  const root = path.resolve(__dirname, '../../src/framework');
+  const offenders = [];
+  for (const dir of ['rules', 'app']) for (const f of fs.readdirSync(path.join(root, dir)).filter(n => n.endsWith('.ts'))) {
+    const text = fs.readFileSync(path.join(root, dir, f), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    for (const re of [/\bDate\.now\s*\(/, /\bnew\s+Date\s*\(/, /\bMath\.random\s*\(/, /\bperformance\.now\s*\(/, /\bprocess\.hrtime/]) if (re.test(text)) offenders.push(`${dir}/${f}: ${re}`);
+  }
+  assert.deepEqual(offenders, []);
+});

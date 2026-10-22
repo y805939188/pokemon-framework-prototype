@@ -12,8 +12,13 @@
  * section); "[ID]" opens a section; "Key = Value" is a property; a property before any section is an error; a repeated
  * property overrides the earlier one; a section id used twice is refused. Quoted CSV values are outside this subset and
  * refused (the reference's position-dependent quote rule is not implemented). Pure: text in, records and report out.
+ * Section ids: only base species sections are read. The raw id must be a symbol (letters, digits, underscore, not
+ * starting with a digit: WP03 §5.1 type `m`) BEFORE it is turned into a content id, so a form section such as
+ * "[PORYGON,2]" (forms: 5.1) or a mistyped id such as "[PIKA!CHU]" is refused at its line, never read as another species.
+ * Enumerations (growth rates, stats, field lists) are looked up as own keys only ("constructor" is not a growth rate).
  */
 import type { CurveId, PartialStats, StatKey } from "../rules/types.ts";
+import { own } from "../rules/own.ts";
 import type { LearnEntry, SpeciesSource } from "./schema.ts";
 
 export interface PbsProblem { line: number; path: string; message: string }
@@ -50,11 +55,16 @@ const LATER: Record<string, string> = {
 };
 const SECTION = /^\[\s*(.*?)\s*\]$/;
 const ID = /^[a-z][a-z0-9-]{0,30}$/;
+/** A symbol identity as the reference's section names (WP03 §5.1 `m`): letters, digits, underscore; no leading digit. */
+const SYMBOL = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-/** Section id (e.g. "PIDGEY") -> content id and Showdown id: lowercase, letters and digits only. */
-export const deriveIds = (section: string): { id: string; showdownId: string } => {
-  const s = section.toLowerCase().replace(/[^a-z0-9]/g, "");
-  return { id: s, showdownId: s };
+/**
+ * Base section id (a symbol, e.g. "PIDGEY", "MR_MIME") -> content id (lowercase, "_" -> "-") and Showdown id
+ * (lowercase letters and digits, the form Showdown's ids take). Null when the id is not a symbol: nothing is guessed.
+ */
+export const deriveIds = (section: string): { id: string; showdownId: string } | null => {
+  if (!SYMBOL.test(section)) return null;
+  return { id: section.toLowerCase().replace(/_/g, "-"), showdownId: section.toLowerCase().replace(/_/g, "") };
 };
 
 const int = (v: string | undefined, lo: number, hi: number): number | null => (v !== undefined && /^\d+$/.test(v) && Number(v) >= lo && Number(v) <= hi ? Number(v) : null);
@@ -70,12 +80,14 @@ export function importPbsSpecies(text: string, sourceId: string): PbsImport {
     const sec = SECTION.exec(body);
     if (sec) {
       const name = sec[1]!;
+      if (name.includes(",")) { errors.push({ line, path: `[${name}]`, message: `"[${name}]" is a form section (species, form): forms are not part of this import subset (5.1, pokemon_forms.txt); not imported` }); cur = null; continue; }
+      if (!SYMBOL.test(name)) { errors.push({ line, path: `[${name}]`, message: `section id "${name}" is not a symbol (letters, digits and underscore, not starting with a digit: WP03 §5.1); not imported` }); cur = null; continue; }
       if (sections.some((s) => s.name === name)) { errors.push({ line, path: `[${name}]`, message: `section "${name}" is used twice` }); cur = null; continue; }
       cur = { name, line, props: new Map(), overridden: new Set() };
       sections.push(cur);
       continue;
     }
-    if (!cur) { errors.push({ line, path: "$", message: sections.length || errors.length ? "line outside a usable section" : "missing initial section (a property needs a [SECTION] first)" }); continue; }
+    if (!cur) { if (!sections.length && !errors.length) errors.push({ line, path: "$", message: "missing initial section (a property needs a [SECTION] first)" }); continue; } // lines of a refused section are skipped with it
     const eq = body.indexOf("=");
     if (eq <= 0) { errors.push({ line, path: `[${cur.name}]`, message: body === "" ? "invalid property line: an indented comment is not a comment for this reader (WP04 §4.2)" : `invalid property syntax "${body.slice(0, 40)}" (expected Key = Value)` }); continue; }
     const key = body.slice(0, eq).trim(), value = body.slice(eq + 1).trim();
@@ -88,7 +100,7 @@ export function importPbsSpecies(text: string, sourceId: string): PbsImport {
   const records: PbsRecordReport[] = [];
   const ids = new Set<string>();
   for (const s of sections) {
-    const { id, showdownId } = deriveIds(s.name);
+    const { id, showdownId } = deriveIds(s.name)!; // the section id was checked when the section opened
     const at = (k: string): number => s.props.get(k)?.line ?? s.line;
     const fail = (k: string, message: string): void => { errors.push({ line: at(k), path: `[${s.name}].${k}`, message }); };
     if (!ID.test(id)) { fail("$", `section id "${s.name}" does not give a usable content id ("${id}")`); continue; }
@@ -98,14 +110,14 @@ export function importPbsSpecies(text: string, sourceId: string): PbsImport {
     for (const k of s.props.keys()) {
       if (IMPORTED.includes(k)) continue;
       if (SHOWDOWN.includes(k)) report.showdown.push(k);
-      else if (LATER[k]) report.later.push({ field: k, batch: LATER[k]! });
+      else if (own(LATER, k) !== undefined) report.later.push({ field: k, batch: own(LATER, k)! });
       else report.ignored.push(k);
     }
     const value = (k: string): string | undefined => s.props.get(k)?.value;
     const csv = (k: string): string[] => (value(k) ?? "").split(",").map((x) => x.trim()).filter((x) => x !== "");
     let ok = true;
     const growthText = value("GrowthRate");
-    const growth = growthText !== undefined ? GROWTH[growthText] : undefined;
+    const growth = growthText !== undefined ? own(GROWTH, growthText) : undefined;
     if (!growth) { ok = false; fail("GrowthRate", growthText === undefined ? "missing: the framework needs a growth rate and the spec records no default for it" : `"${growthText}" is not a growth rate (${Object.keys(GROWTH).join(", ")})`); }
     const baseExp = int(value("BaseExp"), 1, 1000);
     if (baseExp === null) { ok = false; fail("BaseExp", value("BaseExp") === undefined ? "missing: the framework needs a base experience and the spec records no default for it" : "must be an integer from 1 to 1000"); }
@@ -117,7 +129,7 @@ export function importPbsSpecies(text: string, sourceId: string): PbsImport {
     if (value("EVs") === undefined) { ok = false; fail("EVs", "missing: the framework needs the EV yield and the spec records no default for it"); }
     else if (ev.length % 2) { ok = false; fail("EVs", "must be pairs of STAT,amount (WP03 §5.3 named pairs)"); }
     else for (let j = 0; j < ev.length; j += 2) {
-      const stat = STAT[ev[j]!], n = int(ev[j + 1], 1, 255);
+      const stat = own(STAT, ev[j]!), n = int(ev[j + 1], 1, 255);
       if (!stat || n === null) { ok = false; fail("EVs", `pair ${j / 2 + 1} "${ev[j]},${ev[j + 1]}" must be a stat (${Object.keys(STAT).join(", ")}) and a positive amount`); continue; }
       if (evYield[stat] !== undefined) { ok = false; fail("EVs", `${ev[j]} is named twice`); continue; }
       evYield[stat] = n;

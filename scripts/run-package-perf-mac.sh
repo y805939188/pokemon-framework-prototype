@@ -96,6 +96,8 @@ const sum={
     row("step 5.0 full save: party screen open, median (ms)",col(p=>p.step5.partyScreenOpenMs.p50)),
     row("memory: app RSS after the last round (MB)",col(p=>p.memory[p.memory.length-1].appRssMb)),
     row("battles in the rounds (4 per round; the last memory sample follows them)",col(p=>p.rounds*4)),
+    row("battles behind the comparable rows (the step 4 baseline: 30)",col(p=>p.battleGroups?p.battleGroups.comparable:null)),
+    row("step 5.0 full save: battle session create, median (ms)",col(p=>{const s=(p.battleLog||[]).filter(b=>b.group==="full-save").map(b=>b.sessionMs).filter(x=>x!=null).sort((a,b)=>a-b);return s.length?s[Math.floor(s.length/2)]:null})),
   ],
   errors: runs.flatMap(r=>r.perf.errors||[]),
 };

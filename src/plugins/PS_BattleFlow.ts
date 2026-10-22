@@ -46,6 +46,7 @@
     prepareEncounter(table: unknown, region: number): { ok: boolean; reason?: string; error?: string; foe?: { species: string; level: number } };
     describeParty(): { members: { id: string; species: string; form: number; nameKey?: string; level: number; hp: number; maxhp: number; status: string; moves: { id: string; pp: number; maxpp: number }[] }[]; boxes: number; bag: Record<string, number>; money: number };
     recordSteps(n?: number): { status: string; steps?: number; reason?: string; error?: string };
+    now(): number;
     stateReplacedByHost(): void;
   }
 
@@ -101,8 +102,9 @@
      */
     speciesName(species: string, form = 0): string {
       const content = PSFlow.content();
-      const name = content.species[species] ? species : engine().B.speciesKey.battleNameOf(content, { species, form });
-      const sp = name ? content.species[name] : null;
+      const own = (o: any, k: string) => (o && Object.hasOwn(o, k) ? o[k] : undefined); // "constructor" is a legal content id
+      const name = own(content.species, species) ? species : engine().B.speciesKey.battleNameOf(content, { species, form });
+      const sp = name ? own(content.species, name) : undefined;
       return sp && sp.nameKey ? PSFlow.translator().tOr(sp.nameKey, name) : (name || species);
     },
     /**
@@ -112,9 +114,30 @@
     speciesKeyResolver(): (name: string) => unknown {
       return engine().B.speciesKey.speciesKeyResolver(PSFlow.content());
     },
-    /** The host installed another state (load, new game): release a battle still held by the old one (P4-2). */
+    /**
+     * The host installed another state (a save was loaded, a new game was set up): whatever battle operation the old
+     * state had is over (P4-2). The application releases its lock and ignores that battle's session from now on; the
+     * host side ends the operation too (not running, saving no longer masked, the waiting interpreter released) and
+     * forgets it, so a late finish/abort/close of the old scene can neither close nor project into a later battle.
+     */
     stateReplaced(): void {
       if (PSFlow._app) PSFlow._app.stateReplacedByHost();
+      const old = PSFlow._op;
+      PSFlow._op = null;
+      if (old && PSFlow.running) {
+        PSFlow.running = false;
+        PSFlow.lastOutcome = { code: 0, battleId: old.request.battleId, commit: "none", aborted: true, replaced: true, error: "the game state was replaced while this battle was open (a save was loaded or a new game started); nothing was committed" };
+        PSFlow.request = null;
+      }
+    },
+    /** The host battle operation in progress or last ended (openBattle creates it; a state replacement forgets it). */
+    _op: null as any,
+    /** A call from an operation that is no longer the current one: recorded, nothing else happens. */
+    lastStale: null as any,
+    stale(what: string, op: any, error?: unknown): BattleOutcomeView {
+      const battleId = op && op.request ? op.request.battleId : null;
+      PSFlow.lastStale = { what, battleId, error: error === undefined ? undefined : String(error instanceof Error ? error.message : error), at: Date.now() };
+      return { code: 0, battleId, commit: "none", aborted: true, error: `${what} of a battle that is no longer current (the game state was replaced); ignored` };
     },
     /** Steps the player took (WP06 §4.1). Never throws; a refusal is logged once per reason. */
     steps(n: number): void {
@@ -145,6 +168,9 @@
     /** Randomness for members created outside a battle (grants, encounters); tests may pin it with `rng`. */
     rng: null as ((n: number) => number) | null,
     random(n: number): number { return PSFlow.rng ? PSFlow.rng(n) : Math.floor(Math.random() * n); },
+    /** The wall clock the application reads (milliseconds since the epoch); tests may pin it with `clock`. */
+    clock: null as (() => number) | null,
+    now(): number { return PSFlow.clock ? PSFlow.clock() : Date.now(); },
     /**
      * TEST AID ONLY (plugin command ResetGame, the flow test driver): installs the synthetic step 2 fixture party
      * explicitly, stored the way a save stores it (content id + form of the current content, decision D5-3).
@@ -174,6 +200,7 @@
           sessions: B.composition.createBattleSessionFactory({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger.sink }),
           projection: { project: (outcome: { code: number }) => PSFlow.projectOutcome(outcome) },
           random: (n: number) => PSFlow.random(n),
+          clock: () => PSFlow.now(),
         }, { startMoney: PSFlow.param("startMoney", 3000), noMoneyLoss: PSFlow.flagParam("noMoneyLoss", false), limits: PSFlow.limits() });
       }
       return PSFlow._app as GameAppView;
@@ -237,23 +264,28 @@
     /** Apply a BattleResult to the persistent state. Safe to call twice. */
     commit(result: any): string { return PSFlow.app().commitResult(result); },
     async begin(): Promise<any> {
+      const op = PSFlow._op;
+      if (!op) throw new Error("no battle was opened (openBattle)");
       const app = PSFlow.app();
       PSFlow.content(); // loaded before the clock starts: "session create" keeps meaning what it meant in the earlier measurements
       const tCreate = performance.now();
-      PSFlow.request.storageFull = engine().B.limits.storageFull(PSFlow.game(), PSFlow.limits()); // only for the refusal text (the application decides noBall)
-      const session = await app.startBattle(PSFlow.request); // refuses a save that refers to content that no longer exists, then opens the session
+      op.request.storageFull = engine().B.limits.storageFull(PSFlow.game(), PSFlow.limits()); // only for the refusal text (the application decides noBall)
+      const session = await app.startBattle(op.request); // refuses a save that refers to content that no longer exists, then opens the session
+      op.session = session;
       if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round((performance.now() - tCreate) * 10) / 10;
       return session;
     },
-    finish(session: any): any {
-      const { result, ...outcome } = PSFlow.app().finishBattle(session, PSFlow.request); // commits at most once; never throws
+    /** End the battle of `op` (default: the current operation) with its session's result. */
+    finish(session: any, op: any = PSFlow._op): any {
+      if (!op || op !== PSFlow._op) return PSFlow.stale("finish", op);
+      const { result, ...outcome } = PSFlow.app().finishBattle(session, op.request); // commits at most once; never throws
       if (result) PSFlow.lastResult = result;
       PSFlow.lastOutcome = outcome; // the business outcome is recorded before anything the host shows
-      PSFlow.close(outcome.code);
+      PSFlow.close(outcome.code, op);
       // D3: after a committed defeat the host takes the player home (unless the author allowed losing). The money and the
       // heal were settled in the commit; this is only the trip, it can fail and be retried without settling again. The
       // trip is requested before the messages, and a failing message is recorded on the outcome without changing it.
-      if (outcome.code === 4 && outcome.commit !== "none" && PSFlow.request && !PSFlow.request.canLose) {
+      if (outcome.code === 4 && outcome.commit !== "none" && !op.request.canLose) {
         outcome.blackout = true;
         const ret = PSFlow.returnHome();
         PSFlow.afterCommit(outcome, "message", () => {
@@ -272,29 +304,32 @@
         console.error(`PS_BattleFlow: ${step} failed after the result was committed:`, e);
       }
     },
-    abort(error: unknown): void {
+    /** End the battle of `op` (default: the current operation) without a result. Never throws. */
+    abort(error: unknown, op: any = PSFlow._op): void {
+      if (!op || op !== PSFlow._op) { PSFlow.stale("abort", op, error); return; }
       // A result committed for this battle stays the outcome: a later failure (e.g. in the scene's own wiring) is a host
       // error after the commit, never an abort that would report the committed battle as not committed.
       const done = PSFlow.lastOutcome;
-      if (done && done.commit && done.commit !== "none" && PSFlow.request && done.battleId === PSFlow.request.battleId) {
+      if (done && done.commit && done.commit !== "none" && done.battleId === op.request.battleId) {
         PSFlow.afterCommit(done, "after-commit", () => { throw error; });
-        PSFlow.close(done.code);
+        PSFlow.close(done.code, op);
         return;
       }
-      try { PSFlow.lastOutcome = PSFlow.app().abortBattle(PSFlow.request, error); }
+      try { PSFlow.lastOutcome = PSFlow.app().abortBattle(op.request, error); }
       catch {
-        const outcome: BattleOutcomeView = { code: 0, battleId: PSFlow.request ? PSFlow.request.battleId : null, commit: "none", aborted: true, error: String(error instanceof Error ? error.message : error) };
+        const outcome: BattleOutcomeView = { code: 0, battleId: op.request.battleId, commit: "none", aborted: true, error: String(error instanceof Error ? error.message : error) };
         try { PSFlow.projectOutcome(outcome); outcome.projection = "ok"; }
         catch (e) { outcome.projection = "failed"; outcome.projectionError = String(e instanceof Error ? e.message : e); }
         PSFlow.lastOutcome = outcome;
       }
-      PSFlow.close(0);
+      PSFlow.close(0, op);
     },
     /**
      * Bookkeeping when a battle is over: the interpreter stops waiting, saving is no longer masked by the battle (see
      * Game_System.isSaveEnabled below), measurements. The result variable is the application's projection.
      */
-    close(code: number): void {
+    close(code: number, op: any = PSFlow._op): void {
+      if (op !== PSFlow._op) { PSFlow.stale("close", op); return; }
       PSFlow.running = false;
       const cur = PSFlow.perf.cur;
       if (cur && !cur.totalMs) { cur.totalMs = Math.round((performance.now() - cur.t0) * 10) / 10; cur.code = code; PSFlow.perf.battles.push(cur); }
@@ -302,6 +337,7 @@
     /** The single way a battle opens (StartBattle command and map encounters): the same application path, the same guards. */
     openBattle(request: any): void {
       if (PSFlow.running) throw new Error("a battle is already running");
+      PSFlow._op = { request, session: null }; // this operation's identity: its scene and calls carry it (stateReplaced ends it)
       PSFlow.request = request;
       PSFlow.running = true;
       PSFlow.lastOutcome = null; // saving is masked while running (Game_System.isSaveEnabled below; direct saves: PS_SaveState)
@@ -568,6 +604,7 @@
   P.initialize = function () {
     G.Scene_MenuBase.prototype.initialize.call(this);
     this._psBattle = true; // marker for the test driver (constructor identity is wrapped by pixi_compat)
+    this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
     this._ready = false; this._failure = null; this._queue = []; this._wait = 0; this._mode = "boot"; this._busy = false;
     this._session = null; this._D = null; this._names = {};
   };
@@ -750,7 +787,7 @@
     }).catch((e: unknown) => { this._busy = false; this._failure = e; this.abort(e); });
   };
   P.abort = function (e: unknown) {
-    PSFlow.abort(e);
+    PSFlow.abort(e, this._psOp);
     this._failure = e;
     this._queue.length = 0;
     this._mode = "messages";
@@ -758,13 +795,14 @@
   };
   P.onEnd = function () {
     if (!this._aborted && !this._failure) {
-      try { PSFlow.finish(this._session); } catch (e) { PSFlow.abort(e); } // finishBattle does not throw; this guards only the plugin's own wiring
+      try { PSFlow.finish(this._session, this._psOp); } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
     }
     this.popScene();
   };
   P.terminate = function () {
     G.Scene_MenuBase.prototype.terminate.call(this);
-    if (PSFlow.running) PSFlow.abort(new Error("the battle scene closed without an outcome")); // never leave the interpreter waiting
+    const op = this._psOp === undefined ? PSFlow._op : this._psOp; // (a scene always has one; a bare caller means the current one)
+    if (PSFlow.running && op === PSFlow._op) PSFlow.abort(new Error("the battle scene closed without an outcome"), op); // never leave the interpreter waiting; a later battle is not ours to end
   };
 
   // ---------------------------------------------------------------- read-only party / bag screen (no management in this version)
