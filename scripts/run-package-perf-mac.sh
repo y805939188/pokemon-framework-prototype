@@ -89,6 +89,13 @@ const sum={
     row("step 4: save, worst (ms)",col(p=>p.step4.saveMs.max)),
     row("step 4: load (DataManager.loadGame), median (ms)",col(p=>p.step4.loadMs.p50)),
     row("step 4: load, worst (ms)",col(p=>p.step4.loadMs.max)),
+    row("step 5.0 full save: save, median (ms)",col(p=>p.step5.saveMs.p50)),
+    row("step 5.0 full save: load, median (ms)",col(p=>p.step5.loadMs.p50)),
+    row("step 5.0 full save: battle view, median (ms)",col(p=>p.step5.battleViewMs.p50)),
+    row("step 5.0 full save: map encounter -> first battle menu, median (ms)",col(p=>p.step5.encounterToFirstMenuMs.p50)),
+    row("step 5.0 full save: party screen open, median (ms)",col(p=>p.step5.partyScreenOpenMs.p50)),
+    row("memory: app RSS after the last round (MB)",col(p=>p.memory[p.memory.length-1].appRssMb)),
+    row("battles in the rounds (4 per round; the last memory sample follows them)",col(p=>p.rounds*4)),
   ],
   errors: runs.flatMap(r=>r.perf.errors||[]),
 };

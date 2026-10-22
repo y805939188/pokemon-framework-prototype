@@ -1009,6 +1009,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       if (rounds > 6 && (r + 1) % 5 === 0 && r + 1 < rounds) perf.memory.push(mem(`after ${r + 1} rounds (${(r + 1) * 4} battles)`));
     }
     perf.memory.push(mem(`after ${rounds} rounds (${rounds * 4} battles)`));
+    perf.rounds = rounds; // the last memory sample is taken here, before the step 4 / step 5 timing battles
     sampling = false;
     // step 4 timings on the slice map: a map encounter until its first menu, and MZ save / load of a slice save
     try {

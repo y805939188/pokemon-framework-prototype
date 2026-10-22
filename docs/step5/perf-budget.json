@@ -1,0 +1,99 @@
+{
+ "decision": "D5-8 (user, 2026-10-21): warning threshold = the step 4 baseline median of the same measurement + 20%; memory is judged by the growth over a 100-battle run; warnings only, nothing is blocked. A row without a comparable baseline is reported, never called 'no regression'.",
+ "baseline": {
+  "source": "step 4 package perf run (.verify/step4-c/perf/perf-summary.json in the workspace)",
+  "gitHead": "3ba2be9fb746807608418fd29cde9f3acbb6cf3c",
+  "runs": 3,
+  "machine": "Apple M1 Max, 32 GB, macOS kernel 25.6.0, NW.js 0.117.0",
+  "method": "scripts/run-package-perf-mac.sh 3 (3 launches, 24 battles each, window focused, fast messages)"
+ },
+ "factor": 1.2,
+ "rows": [
+  {
+   "label": "cold start: launch -> map ready (ms)",
+   "baselineMedian": 2041,
+   "warnAbove": 2449.2
+  },
+  {
+   "label": "first battle: event start -> first menu (ms)",
+   "baselineMedian": 433.1,
+   "warnAbove": 519.72
+  },
+  {
+   "label": "later battles: session create, median (ms)",
+   "baselineMedian": 2,
+   "warnAbove": 2.4
+  },
+  {
+   "label": "later battles: event start -> first menu, median (ms)",
+   "baselineMedian": 132.7,
+   "warnAbove": 159.24
+  },
+  {
+   "label": "later battles: event start -> first menu, worst, window focused throughout (ms)",
+   "baselineMedian": 135.7,
+   "warnAbove": 162.84
+  },
+  {
+   "label": "action latency p50 move (ms)",
+   "baselineMedian": 5.9,
+   "warnAbove": 7.08
+  },
+  {
+   "label": "action latency p50 run (ms)",
+   "baselineMedian": 2.9,
+   "warnAbove": 3.48
+  },
+  {
+   "label": "action latency p50 item (ms)",
+   "baselineMedian": 5.6,
+   "warnAbove": 6.72
+  },
+  {
+   "label": "action latency p50 ball (ms)",
+   "baselineMedian": 3.7,
+   "warnAbove": 4.44
+  },
+  {
+   "label": "frames in battle scene: p95 (ms)",
+   "baselineMedian": 18.5,
+   "warnAbove": 22.2
+  },
+  {
+   "label": "frames on map (idle/event): p95 (ms)",
+   "baselineMedian": 18.7,
+   "warnAbove": 22.44
+  },
+  {
+   "label": "memory: app RSS after 24 battles (MB)",
+   "baselineMedian": 1238,
+   "warnAbove": 1485.6
+  },
+  {
+   "label": "step 4: map encounter -> first battle menu, median (ms)",
+   "baselineMedian": 82.4,
+   "warnAbove": 98.88
+  },
+  {
+   "label": "step 4: save (DataManager.saveGame), median (ms)",
+   "baselineMedian": 2.1,
+   "warnAbove": 2.52
+  },
+  {
+   "label": "step 4: load (DataManager.loadGame), median (ms)",
+   "baselineMedian": 2.3,
+   "warnAbove": 2.76
+  }
+ ],
+ "memory100": {
+  "label": "memory: app RSS growth from 4 to 100 battles (MB)",
+  "baseline": {
+   "source": "docs/step2/runtime-issues.md (stored evidence/memory-100/after, hardened package from e666bba, 25 rounds x 4 kinds, --js-flags=--expose-gc, one launch)",
+   "rssAfter4": 1227,
+   "rssAfter100": 1229,
+   "growth": 2
+  },
+  "warnAbove": 2.4,
+  "note": "a 2 MB baseline growth puts the +20% threshold inside measurement noise; the rule is applied as decided and the actual numbers are reported"
+ }
+}
