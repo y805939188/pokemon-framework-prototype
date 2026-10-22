@@ -18,9 +18,18 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
  type OpenRequest={kind:'party'|'pc'|'summary'|'selector'|'receiving';id?:string;qualifier?:(m:Member)=>boolean;done?:(result:any)=>void};
  const KEY:Record<string,Action|Direction>={Enter:'use',Space:'use',KeyZ:'use',Escape:'back',KeyX:'back',Numpad0:'back',ShiftLeft:'action',ShiftRight:'action',ControlLeft:'special',ControlRight:'special',KeyA:'jumpup',PageUp:'jumpup',KeyS:'jumpdown',PageDown:'jumpdown',ArrowUp:'up',ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down'};
  const ALIAS:Record<Action|Direction,string>={use:'ok',back:'cancel',action:'shift',special:'control',jumpup:'pageup',jumpdown:'pagedown',up:'up',left:'left',right:'right',down:'down'};
+ const LEGACY_KEY:Record<number,Action|Direction>={13:'use',32:'use',90:'use',27:'back',88:'back',96:'back',16:'action',17:'special',33:'jumpup',65:'jumpup',34:'jumpdown',83:'jumpdown',38:'up',37:'left',39:'right',40:'down'};
+ const eventKey=(e:any):Action|Direction|undefined=>KEY[e.code]||LEGACY_KEY[e.keyCode];
  // A/S are adapter bindings for the specification's abstract JUMPUP/JUMPDOWN actions.
  G.Input.keyMapper[65]='pageup';G.Input.keyMapper[83]='pagedown';
  let nextRequest:OpenRequest|null=null,sequence=0,current:any=null;
+ // Native inputs stop propagation before MZ sees their initial keydown. Keep that consumed action blocked
+ // until the real keyup, including after the input or its entire scene has been removed.
+ const nativeConsumed=new Map<string,Action|Direction>();
+ const nativeKey=(e:any):string=>e.code||(['Enter','Escape'].includes(e.key)?e.key:e.keyCode===13?'Enter':e.keyCode===27?'Escape':'');
+ for(const method of ['isTriggered','isRepeated']){const original=G.Input[method];G.Input[method]=function(button:string){const key=button==='ok'?'use':['cancel','menu','escape'].includes(button)?'back':undefined;if(key)for(const consumed of nativeConsumed.values())if(consumed===key)return false;return original.call(this,button);};}
+ document.addEventListener('keyup',(e:any)=>{nativeConsumed.delete(nativeKey(e));});
+ window.addEventListener('blur',()=>{nativeConsumed.clear();if(current){current.physical.clear();for(const key of Object.keys(ALIAS))current.latch.release(key);}});
  const debugFrames:any[]=[];
  function record(data:any){debugFrames.push(data);if(debugFrames.length>256)debugFrames.shift();}
  function open(request:OpenRequest):boolean {if(current||nextRequest)return false;nextRequest=request;G.SceneManager.push(Scene_PSManagement);return true;}
@@ -38,8 +47,8 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
   scene:any;window:any;request:OpenRequest;application:any;token='';generation:number;ready=false;started=false;closed=false;frame=0;serial=0;
   renderedText:string[]=[];snapshot!:ManagementSnapshot;stack:View[]=[];latch=new InputLatch();physical=new Set<Action|Direction>();input:any=null;composition=false;error='';qualified=new Set<string>();
   reception:any=null;decisions:Record<string,ReceivingDecision>={};receiveIndex=0;readonly=false;completion:any=null;
-  onKeyDown=(e:any)=>{const key=KEY[e.code]||({13:'use',27:'back',16:'action',17:'special',33:'jumpup',34:'jumpdown',38:'up',37:'left',39:'right',40:'down'}as Record<number,Action|Direction>)[e.keyCode];if(key)this.physical.add(key);};
-  onKeyUp=(e:any)=>{const key=KEY[e.code]||({13:'use',27:'back',16:'action',17:'special',33:'jumpup',34:'jumpdown',38:'up',37:'left',39:'right',40:'down'}as Record<number,Action|Direction>)[e.keyCode];if(key){this.physical.delete(key);this.latch.release(key);}};
+  onKeyDown=(e:any)=>{const key=eventKey(e);if(key)this.physical.add(key);};
+  onKeyUp=(e:any)=>{const key=eventKey(e);if(key){this.physical.delete(key);this.latch.release(key);}};
   constructor(scene:any,request:OpenRequest){this.scene=scene;this.request=request;this.application=app();this.generation=this.application.stateGeneration;this.token='ui:'+this.generation+':'+(++sequence);}
   valid(){return !this.closed&&this.application===app()&&this.generation===this.application.stateGeneration&&current===this;}
   top():View{return this.stack[this.stack.length-1]!;}
@@ -91,7 +100,7 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
    Object.assign(element.style,{position:'fixed',left:'15%',top:'40%',width:'70%',fontSize:'24px',zIndex:'99999',background:'#fff',color:'#111',padding:'12px'});document.body.appendChild(element);
    const token=this.token,finish=(text:string|null)=>{if(!this.valid()||this.token!==token||this.top()!==view||this.composition)return;this.removeInput();this.dismiss();done(text===null?null:Array.from(text).slice(0,max).join(''));};
    element.addEventListener('compositionstart',()=>{if(this.valid())this.composition=true;});element.addEventListener('compositionend',()=>{if(this.valid())this.composition=false;});
-   element.addEventListener('keydown',(e:any)=>{e.stopPropagation();if(e.isComposing||this.composition||e.keyCode===229)return;if(e.key==='Enter'){e.preventDefault();finish(element.value);}else if(e.key==='Escape'){e.preventDefault();finish(escapeEmpty?'':null);}});element.focus();
+   element.addEventListener('keydown',(e:any)=>{e.stopPropagation();if(!this.valid()||e.isComposing||this.composition||e.keyCode===229)return;if(e.key==='Enter'||e.key==='Escape'){const key=e.key==='Enter'?'use':'back';nativeConsumed.set(nativeKey(e),key);this.physical.add(key);e.preventDefault();finish(e.key==='Enter'?element.value:escapeEmpty?'':null);}});element.focus();
   }
   removeInput(){this.input?.remove();this.input=null;this.composition=false;}
   summary(ids:(string|null)[],index:number,held=false){this.push({kind:'summary',cursor:index,ids,page:0,held,detail:null,selected:null,detailCursor:0});}
@@ -147,7 +156,7 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
     {key:'party-view',label:tr('party'),run:()=>this.push({kind:'party',cursor:0,receiveView:true})}],0,()=>{if(profile.mode===2){G.SoundManager.playBuzzer();this.draw();}else this.receiveChoice(m.id,{kind:'box'});});
   }
   receiveChoice(id:string,placement:ReceivingDecision['placement']){this.decisions[id]={...this.decisions[id],placement};this.receiveIndex++;this.nextReceive();}
-  resolveReceive(){const token=this.reception.token,result=flow().resolveReceiving(token,this.decisions);if(!this.valid())return;if(pending(result)||result.status==='refused'){this.stack=[];this.menu(tr('saveFailed'),[{key:'retry',label:tr('recover'),run:()=>this.resolveReceive()}]);this.fail(result.reason||result.error||'pending');return;}this.completion=result;this.close(result);}
+  resolveReceive(){const token=this.reception.token,result=flow().resolveReceiving(token,this.decisions);if(!this.valid())return;if(pending(result)||result.status==='refused'){this.stack=[];this.menu(tr('saveFailed'),[{key:'retry',label:tr('recover'),run:()=>this.resolveReceive()}]);this.fail(result.reason||result.error||'pending');return;}const ids=this.reception.members.map((m:Member)=>m.id);for(const decision of Object.values(this.decisions))if(decision.placement?.kind==='replace')ids.push(decision.placement.target.id);try{flow().notifyReceived?.(ids,result.battleId??token);}catch(e){console.error(NAME,'committed placement message failed',e);}this.completion=result;this.close(result);}
   update(){
    if(!this.valid()){if(!this.closed){this.closed=true;this.removeInput();this.scene._invalid=true;}return;}
    if(this.top()?.kind==='text')return;

@@ -128,6 +128,7 @@ import { developmentCapabilities } from "../framework/rules/config";
      */
     stateReplaced(): void {
       if (PSFlow._app) PSFlow._app.stateReplacedByHost();
+      PSFlow._receiveNoticeHistory.clear();PSFlow.lastReceivingNotice=null;
       const old = PSFlow._op;
       PSFlow._op = null;
       // An ended battle can still have a failed trip home. A new timeline must never retry that old host effect.
@@ -302,6 +303,7 @@ import { developmentCapabilities } from "../framework/rules/config";
       if (op.hostCompleted) return outcome;
       op.hostCompleted = true; // duplicate receive callbacks never repeat transfer/message side effects
       PSFlow.close(outcome.code, op);
+      if(outcome.code===2&&outcome.commit!=='none'&&result?.captured?.length)PSFlow.afterCommit(outcome,'receiving-message',()=>PSFlow.notifyReceived(result.captured.map((m:any)=>m.id),outcome.battleId));
       // D3: after a committed defeat the host takes the player home (unless the author allowed losing). The money and the
       // heal were settled in the commit; this is only the trip, it can fail and be retried without settling again. The
       // trip is requested before the messages, and a failing message is recorded on the outcome without changing it.
@@ -315,6 +317,19 @@ import { developmentCapabilities } from "../framework/rules/config";
         });
       }
       return outcome;
+    },
+    _receiveNoticeHistory: new Map<string,Set<string>>(),
+    lastReceivingNotice: null as any,
+    /** Actual destinations after commit, never a prediction. History is bounded and reset on load/new game. */
+    notifyReceived(ids:string[],key:string):void {
+      const a:any=PSFlow.app(),snapshot=a.managementSnapshot(),recovered=new Set(a.receivingNotifications.flatMap((n:any)=>n.placements.map((p:any)=>p.id)));
+      let seen=PSFlow._receiveNoticeHistory.get(key);if(!seen){seen=new Set<string>();PSFlow._receiveNoticeHistory.set(key,seen);if(PSFlow._receiveNoticeHistory.size>32)PSFlow._receiveNoticeHistory.delete(PSFlow._receiveNoticeHistory.keys().next().value);}
+      const placements:any[]=[],messages:string[]=[];
+      for(const id of ids){if(seen.has(id)||recovered.has(id)||!Object.hasOwn(snapshot.references,id))continue;const position=snapshot.references[id].position,member=position.kind==='party'?snapshot.party[position.index]:snapshot.storage.boxes[position.box].slots[position.slot];if(!member)continue;
+        const dest=position.kind==='party'?PSFlow.translator().t('management.party'):snapshot.storage.boxes[position.box].name||PSFlow.translator().t('management.box',{n:position.box+1});
+        const text=PSFlow.translator().t('management.received',{dest:(member.nickname||PSFlow.speciesName(member.species,member.form))+' → '+dest});G.$gameMessage.add(text);seen.add(id);placements.push({id,position,to:position.kind==='party'?'party':'boxes',destination:dest});messages.push(text);
+      }
+      if(placements.length)PSFlow.lastReceivingNotice={key,placements,messages};
     },
     resolveReceiving(token: string, decisions: unknown = {}, signal?: string): any {
       const op = PSFlow._op;
