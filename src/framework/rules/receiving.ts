@@ -3,7 +3,8 @@ import { clone } from "./value.ts";
 import { allMembers, boxedMembers, firstFreeBox, memberAt, placeInBox } from "./storage.ts";
 import type { MemberCollection, MemberPosition } from "./storage.ts";
 import { able, ableCount, checkStore, referenced } from "./storage-operations.ts";
-import type { MemberReference } from "./storage-operations.ts";
+import { own } from "./own.ts";
+import type { ItemDescriptor, MemberReference } from "./storage-operations.ts";
 import { healMember } from "./heal.ts";
 import type { Content, Member } from "./types.ts";
 import type { Limits } from "./limits.ts";
@@ -33,6 +34,29 @@ export function requireTemplate(member: Member | undefined, id: string): asserts
     || typeof member.ownerCompatibilityDefault !== "boolean" || typeof member.shiny !== "boolean" || typeof member.superShiny !== "boolean" || !Array.isArray(member.firstMoves) || !Array.isArray(member.markings) || !Array.isArray(member.ribbons)
     || typeof member.cannotStore !== "boolean" || typeof member.cannotRelease !== "boolean" || typeof member.isEgg !== "boolean" || member.mail === undefined || typeof member.readyToEvolve !== "boolean") {
     throw new ReceivingRefused("no-template", `captured member ${id} requires its complete original individual template`, id);
+  }
+}
+
+/** Nonpersistent authority supplied by the caller; absence always closes the source. */
+export interface HeldItemSource {
+  allowed: boolean;
+  /** The adapter must check its source permission BEFORE reading external item data. */
+  describe: (id: string) => ItemDescriptor | null;
+}
+
+/** Both public and pure result consumers call this before content work or installing captured members. */
+export function assertCapturedHeldSources(capturedMembers: readonly Member[], templates: Readonly<Record<string, Member>>, source?: HeldItemSource): void {
+  for (const captured of capturedMembers) {
+    const template = own(templates, captured.id);
+    requireTemplate(template, captured.id);
+    const items = [...new Set([captured.item, template.item].filter((item) => !!item))];
+    if (!items.length && !captured.mail && !template.mail) continue;
+    if (!source?.allowed) throw new ReceivingRefused("held-item-source-disabled");
+    if (captured.mail || template.mail) throw new ReceivingRefused("mail-not-supported");
+    for (const item of items) {
+      const descriptor = source.describe(item);
+      if (!descriptor?.holdable || descriptor.mail) throw new ReceivingRefused("invalid-held-item");
+    }
   }
 }
 
@@ -102,4 +126,10 @@ export function fallbackDecisions(state: MemberCollection, members: readonly Mem
     virtual = receiveMembers(virtual, [member], decisions, context).state;
   }
   return decisions;
+}
+
+/** Preflight uses the same complete replacement/box/last-able guards as actual force-party recovery. */
+export function hasForcedPartyPlan(state: MemberCollection, member: Member, context: ReceivingContext): boolean {
+  try { fallbackDecisions(state, [member], { ...context, profile: { ...context.profile, mode: 2 } }, {}); return true; }
+  catch { return false; }
 }

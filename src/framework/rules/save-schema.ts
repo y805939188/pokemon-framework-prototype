@@ -81,9 +81,16 @@ function validateMember(m: unknown, path: string, out: Problem[], schema: number
   }
   statBlock(m["ivs"], 0, 31, `${path}.ivs`, out);
   statBlock(m["evs"], 0, 252, `${path}.evs`, out);
-  if (schema >= 5) {
-    if (!isInt(m["personalID"], 0, 0xffffffff)) out.push({ path: `${path}.personalID`, message: "must be uint32" });
-    validateOwner(m["owner"], `${path}.owner`, out);
+  validateIndividualFields(m, path, out, schema >= 5);
+
+}
+
+/** Old schemas may omit metadata, but an explicitly present bad field is never a default request. */
+function validateIndividualFields(m: Obj, path: string, out: Problem[], required: boolean): void {
+  const present = (key: string): boolean => required || Object.hasOwn(m, key);
+  if (present("personalID") && !isInt(m["personalID"], 0, 0xffffffff)) out.push({ path: `${path}.personalID`, message: "must be uint32" });
+  if (present("owner")) validateOwner(m["owner"], `${path}.owner`, out);
+  if (present("origin")) {
     const origin = m["origin"];
     if (!isObj(origin)) out.push({ path: `${path}.origin`, message: "must be an origin record" });
     else {
@@ -91,14 +98,13 @@ function validateMember(m: unknown, path: string, out: Problem[], schema: number
       for (const k of ["method", "map", "receivedAt", "hatchedAt"]) if (origin[k] !== null && !isInt(origin[k], 0)) out.push({ path: `${path}.origin.${k}`, message: "must be a nonnegative safe integer or null (unknown)" });
       if (!isInt(origin["level"], 1, 100) || !isInt(origin["hatchedMap"], 0) || typeof origin["text"] !== "string" || typeof origin["compatibilityDefault"] !== "boolean") out.push({ path: `${path}.origin`, message: "invalid level/hatchedMap/text/compatibilityDefault" });
     }
-    for (const k of ["abilityIndex", "effectiveAbilityIndex"]) if (m[k] !== null && !isInt(m[k], 0)) out.push({ path: `${path}.${k}`, message: "must be a nonnegative safe slot or null" });
-    for (const k of ["ownerCompatibilityDefault", "shiny", "superShiny", "cannotStore", "cannotRelease", "isEgg", "readyToEvolve"]) if (typeof m[k] !== "boolean") out.push({ path: `${path}.${k}`, message: "must be boolean" });
-    for (const k of ["firstMoves", "ribbons"]) if (!Array.isArray(m[k]) || (m[k] as unknown[]).some((v) => typeof v !== "string" || !v.length) || (k === "firstMoves" && (m[k] as unknown[]).length > 4)) out.push({ path: `${path}.${k}`, message: "must be an ordered string list (firstMoves at most four)" });
-    const marks = m["markings"];
-    if (!Array.isArray(marks) || marks.length > 6 || marks.some((v) => !isInt(v, 0))) out.push({ path: `${path}.markings`, message: "must be up to six nonnegative integer markings" });
-    if (m["mail"] !== null && typeof m["mail"] !== "string") out.push({ path: `${path}.mail`, message: "must be string or null" });
   }
-
+  for (const k of ["abilityIndex", "effectiveAbilityIndex"]) if (present(k) && m[k] !== null && !isInt(m[k], 0)) out.push({ path: `${path}.${k}`, message: "must be a nonnegative safe slot or null" });
+  for (const k of ["ownerCompatibilityDefault", "shiny", "superShiny", "cannotStore", "cannotRelease", "isEgg", "readyToEvolve"]) if (present(k) && typeof m[k] !== "boolean") out.push({ path: `${path}.${k}`, message: "must be boolean" });
+  for (const k of ["firstMoves", "ribbons"]) if (present(k) && (!Array.isArray(m[k]) || (m[k] as unknown[]).some((v) => typeof v !== "string" || !v.length) || (k === "firstMoves" && (m[k] as unknown[]).length > 4))) out.push({ path: `${path}.${k}`, message: "must be an ordered string list (firstMoves at most four)" });
+  const marks = m["markings"];
+  if (present("markings") && (!Array.isArray(marks) || marks.length > 6 || marks.some((v) => !isInt(v, 0)))) out.push({ path: `${path}.markings`, message: "must be up to six nonnegative integer markings" });
+  if (present("mail") && m["mail"] !== null && typeof m["mail"] !== "string") out.push({ path: `${path}.mail`, message: "must be string or null" });
 }
 
 function knownKeys(o: Obj, allowed: readonly string[], path: string, out: Problem[]): void {

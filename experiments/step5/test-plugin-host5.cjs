@@ -339,3 +339,12 @@ test('P51-14: real Showdown capture waits in host operation until decisions; dup
 test('P51-12: closed held battle gate rejects before loading content or opening a scene',async()=>{
   const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';let loads=0;h.flow.content=()=>{loads++;throw Error('must not load content');};const request={battleId:'held#1',kind:'wild',seq:1,foes:[{species:'pidgey',level:3}]};assert.throws(()=>h.flow.openBattle(request),/held-item-battle-disabled/);assert.equal(loads,0);assert.equal(h.flow.running,false);assert.equal(h.flow._op,null);
 });
+
+test('M04: present bad legacy metadata keeps raw hash and blocks menu plus every direct host save', async()=>{
+  const H=require('./1/legacy-test-support.cjs'); const hash=x=>require('node:crypto').createHash('sha256').update(JSON.stringify(x)).digest('hex');
+  for(const [field,value] of [['firstMoves','cut'],['ribbons','Champion'],['shiny',null],['owner',null],['markings',null],['origin',null]]){
+    const raw=H.legacyGame(E.fixtures.savedFor(E.fixtures.makeGame(),content),4);raw.party[0][field]=value;const before=hash(raw),h=host(raw);h.load();
+    assert.equal(h.sys._psSaveError.code,'invalid',field);assert.equal(hash(h.sys._psGame),before,field);assert.equal(h.sys.isSaveEnabled(),false);
+    for(const slot of [1,3,17])await assert.rejects(h.ctx.DataManager.saveGame(slot),/not usable/);assert.deepEqual(h.writes,[]);assert.equal(hash(h.sys._psGame),before);
+  }
+});

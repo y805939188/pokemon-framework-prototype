@@ -38,11 +38,11 @@ function remove(state: MemberCollection, position: MemberPosition): void {
   if (position.kind === "party") state.party.splice(position.index, 1);
   else state.storage.boxes[position.box]!.slots[position.slot] = null;
 }
-function write(state: MemberCollection, position: MemberPosition, member: Member, context: MovementContext): void {
+function write(state: MemberCollection, position: MemberPosition, member: Member, context: MovementContext, partyLimit = context.limits.party): void {
   if (!validPosition(position)) refuse("position-out-of-bounds");
   if (position.kind === "party") {
     if (position.index > state.party.length) refuse("party-hole");
-    if (position.index === state.party.length && state.party.length >= context.limits.party) refuse("party-full");
+    if (position.index === state.party.length && state.party.length >= partyLimit) refuse("party-full");
     state.party[position.index] = member;
   } else {
     checkStore(member);
@@ -57,14 +57,15 @@ export function moveMember<T extends MemberCollection>(state: T, from: MemberRef
   if ((target?.id ?? null) !== targetId) refuse("stale-target");
   if (samePosition(from.position, to)) return state;
   const next = clone(state);
+  const partyLimit = Math.max(context.limits.party, state.party.length); // legacy over-p parties may keep, not add, members
   if (target) {
-    write(next, from.position, clone(target), context);
-    write(next, to, clone(source), context);
+    write(next, from.position, clone(target), context, partyLimit);
+    write(next, to, clone(source), context, partyLimit);
   } else {
     // Party-to-party empty destination is a move to the end; account for removal's compaction.
     remove(next, from.position);
     const destination = to.kind === "party" && from.position.kind === "party" && to.index > from.position.index ? { ...to, index: to.index - 1 } : to;
-    write(next, destination, clone(source), context);
+    write(next, destination, clone(source), context, partyLimit);
   }
   if (ableCount(state.party) > 0 && ableCount(next.party) === 0) refuse("last-able");
   return next;
@@ -91,7 +92,7 @@ export function replayHeld<T extends MemberCollection>(state: T, intent: HeldInt
     const target = memberAt(next, step.target);
     if ((target?.id ?? null) !== step.expectedId) refuse("stale-target");
     if (step.target.kind === "party" && target && able(target) && ableCount(next.party) <= 1 && !able(held)) refuse("last-able");
-    write(next, step.target, held, context);
+    write(next, step.target, held, context, Math.max(context.limits.party, state.party.length));
     held = target;
   }
   return { state: next, held };
@@ -117,7 +118,7 @@ export function heldDestination(state: MemberCollection, intent: HeldIntent, des
   const replay = replayHeld(state, intent, context);
   if (!replay.held) return refuse("nothing-held");
   if (destination === "party") {
-    if (replay.state.party.length >= context.limits.party) return refuse("party-full");
+    if (replay.state.party.length >= Math.max(context.limits.party, state.party.length)) return refuse("party-full");
     return { kind: "party", index: replay.state.party.length };
   }
   return firstFreeBox(replay.state.storage) ?? refuse("boxes-full");

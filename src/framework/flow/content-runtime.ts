@@ -50,6 +50,9 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
   if (errors.length) return { content, errors };
   // Empty author content needs no external battle data, including the lazy Dex's identity lookup.
   const short = compiled.species.length ? dex.sha().slice(0, 8) : null;
+  // Provenance fact of this assembled runtime content, never a capability or save setting.
+  if (content.meta && showdownDependencyProblem(sources) === null) content.meta.showdownSourceChecked = true;
+  const baseHappiness = new Map(compiled.species.filter((sp) => (sp.form ?? 0) === 0).map((sp) => [sp.id, sp.happiness]));
   const byName = new Map<string, string>();
   for (const sp of compiled.species) {
     const form = sp.form ?? 0;
@@ -69,9 +72,10 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
       if (typeof mv.id === "string" && typeof mv.pp === "number") content.moves![mv.name] = { id: mv.id, name: mv.name, pp: mv.pp };
     }
     if (!ok) continue;
+    const happiness = sp.happiness ?? baseHappiness.get(sp.id);
     content.species[found.name] = {
       base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset, nameKey: sp.nameKey, contentId: sp.id, form,
-      ...(found.abilities ? { abilities: [...found.abilities] } : {}), ...(found.hiddenAbilities ? { hiddenAbilities: [...found.hiddenAbilities] } : {}), ...(sp.happiness !== undefined ? { happiness: sp.happiness } : {}), ...(found.gender !== undefined ? { gender: found.gender } : {}),
+      ...(found.abilities ? { abilities: [...found.abilities] } : {}), ...(found.hiddenAbilities ? { hiddenAbilities: [...found.hiddenAbilities] } : {}), ...(happiness !== undefined ? { happiness } : {}), ...(found.gender !== undefined ? { gender: found.gender } : {}),
     };
     // the persistent key (decision D5-3): content id + form <-> Showdown name, both ways
     if (form === 0) setOwn(content.speciesIds!, sp.id, found.name);

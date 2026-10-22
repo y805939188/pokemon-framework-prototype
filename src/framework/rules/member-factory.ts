@@ -88,7 +88,8 @@ export function createMember(input: CreateMemberInput, content: Content, random:
   const ivs = { hp: draw(random, 32), atk: draw(random, 32), def: draw(random, 32), spa: draw(random, 32), spd: draw(random, 32), spe: draw(random, 32) };
   const nature = input.nature ?? NATURE_ORDER[pid % 25]!;
   const contentId = sp.contentId ?? species;
-  const form = input.form ?? (sp.form || creationForm(contentId, nature, input.context?.playerId ?? owner.id, random, input.context));
+  // `species` is the assembled rule/battle identity; contentId is only the author form-table key.
+  const form = input.form ?? (sp.form || creationForm(species, nature, input.context?.playerId ?? owner.id, random, input.context));
   let finalName = species;
   if (form !== (sp.form ?? 0)) {
     const record = own(content.forms, contentId);
@@ -96,6 +97,8 @@ export function createMember(input: CreateMemberInput, content: Content, random:
     if (!name || !own(content.species, name)) throw new Error(`species "${contentId}" form ${form}: missing creation form in the content`);
     finalName = name; sp = content.species[name]!;
   }
+  const baseName = own(own(content.forms, contentId), "0") ?? own(content.speciesIds, contentId);
+  const inheritedHappiness = baseName ? own(content.species, baseName)?.happiness : undefined;
   const derived = deriveIndividual(pid, { ...sp, gender: sp.gender ?? "N" }, input.abilityIndex);
   const gender = typeof sp.gender === "string" ? sp.gender : input.gender ?? derived.gender;
   const ability = input.ability ?? derived.ability;
@@ -105,7 +108,7 @@ export function createMember(input: CreateMemberInput, content: Content, random:
   const stats = computeStats(sp.base, ivs, evs, level, nature);
   return newMember({
     id, species: finalName, form, level, exp: minExp(sp.growth, level), hp: stats.hp, status: "", statusCount: 0, moves, item: "", ability, nature, gender,
-    ivs, evs, friendship: sp.happiness ?? 70, ball: input.ball ?? "pokeball",
+    ivs, evs, friendship: sp.happiness ?? inheritedHappiness ?? 70, ball: input.ball ?? "pokeball",
     personalID: pid, owner, ownerCompatibilityDefault: false, abilityIndex: derived.abilityIndex, effectiveAbilityIndex: derived.effectiveAbilityIndex,
     shiny: input.shiny ?? (input.superShiny === true ? true : colors.shiny), superShiny: input.superShiny ?? colors.superShiny,
     origin: { method: input.context?.fateful ? 4 : 0, map: input.context?.map ?? 0, text: "", level, receivedAt: input.context?.receivedAt ?? null, hatchedMap: 0, hatchedAt: null, compatibilityDefault: false },

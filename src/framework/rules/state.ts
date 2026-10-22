@@ -5,8 +5,8 @@
  */
 import { clone } from "./value.ts";
 export { clone } from "./value.ts";
-import { receiveMembers, requireTemplate } from "./receiving.ts";
-import type { ReceivingDecision, ReceivingProfile } from "./receiving.ts";
+import { assertCapturedHeldSources, receiveMembers, requireTemplate } from "./receiving.ts";
+import type { HeldItemSource, ReceivingDecision, ReceivingProfile } from "./receiving.ts";
 import { sha256Hex } from "./sha256.ts";
 import { DEFAULT_LIMITS } from "./limits.ts";
 import { own, setOwn } from "./own.ts";
@@ -161,6 +161,7 @@ export interface BattleCommitOptions {
   content?: Content;
   nextMemberOrdinal?: string;
   depositHeal?: boolean;
+  heldItemSource?: HeldItemSource;
 }
 
 export function capturedTemplates(result: BattleResult, templates: Readonly<Record<string, Member>>, keys: SpeciesKeyResolver): Member[] {
@@ -191,7 +192,7 @@ export function applyBattleResult(state: GameState, result: BattleResult, limits
   if (result.protocol !== PROTOCOL_VERSION) throw new Error(`unsupported protocol ${result.protocol}`);
   if (state.schema !== GAME_SCHEMA) throw new Error(`game state has schema ${state.schema}, this build writes schema ${GAME_SCHEMA}: migrate it first (rules/save-schema.ts)`);
   if (!result.battleId) throw new Error("result without battleId");
-  for (const member of result.captured ?? []) requireTemplate(own(options.templates, member.id), member.id);
+  assertCapturedHeldSources(result.captured ?? [], options.templates ?? {}, options.heldItemSource);
   const h = resultHash(result);
   const prev = own(state.appliedBattles, result.battleId);
   if (prev) {

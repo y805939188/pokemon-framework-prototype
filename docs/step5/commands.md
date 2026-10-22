@@ -61,3 +61,12 @@
 旧盒成员超过 1200 时返回 `capacity-exceeded`，含来源版本、partyCount、boxMemberCount、limit=1200 和首个超额路径；原档及内存原文保留，宿主阻断所有槽覆盖保存。该档本期不能继续游玩，没有恢复工具；5.0 也没有整理/导出能力，不能建议回旧版取出。恢复/导出工具仅是未来候选。不要自动扩容、截断或写溢出区；建议用户自行保留原文件，不新增自动备份写入路径。
 
 缺少旧资料按兼容默认补齐，可信性格/性别/特性不重抽、缺异色 false、PID 确定且稳定。未知历史来源显示未知；旧 Owner 显示旧 ot 名（缺失才 player）+00000，并标注兼容默认，不能当历史事实。新的实体 ID 为 M+base36 序号；PID 可碰撞，不能代替实体 ID。冻结夹具/协议仍保持原字节，真实流程断言使用实际返回的 ID。
+
+
+### M 复核后的消费边界补充
+
+捕获来源检查覆盖公开commit、finish、pending恢复与纯`applyBattleResult`；默认关闭时，在读取content或Dex之前拒绝新持物。公共commit options不能覆写应用构造时的能力。纯核心受控调用须显式提供`heldItemSource:{allowed:true,describe}`，describe是先核对来源许可、再返回holdable/mail描述的端口，不是任意物品都允许的兜底。应用默认Dex适配器仅消费由组装器标注`meta.showdownSourceChecked`的运行时内容；该标注是本次来源核对事实，不是实验开关，不写GameState或compiled文档。自定义`describeHeldItem`同样承担其来源使用前检查。来源开启仍不隐式打开入战能力。
+
+强制接收预演无合法换出目标时，setup为`noBall=true`并给`forced-party-no-target`；战斗可以正常进行，但投球拒绝且不扣球。无目标的已知前置条件不会推迟到成功捕获后再要求UI解决。若外部代码在战斗开始后破坏权威数据，按原恢复合同保持pending和模板，不偷偷丢弃/送盒。
+
+旧档新增白名单元数据只在缺失时默认；显式null坏类型、firstMoves/ribbons字符串等会返回invalid并保持原档。`SaveStore.load/commit`是正常受保护读取/战果入口；低层`save(state)`不执行读取原档保护，外部调用者须自行验证目标及状态，不能把MZ全槽保存门泛化为任意外部写文件保证。

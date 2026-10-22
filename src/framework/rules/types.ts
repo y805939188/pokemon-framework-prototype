@@ -155,4 +155,6 @@ export interface ContentMeta {
   kind: "fixture" | "sample";
   id: string;
   inputsHash?: string;
+  /** Runtime assembly checked the Showdown source; not a developer capability or persistent state. */
+  showdownSourceChecked?: true;
 }

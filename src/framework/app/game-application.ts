@@ -26,7 +26,7 @@ import { addSteps, bumpStat } from "../rules/stats.ts";
 import type { GameStats, StatCounter } from "../rules/stats.ts";
 import type { Member } from "../rules/types.ts";
 import { advanceMemberOrdinal, allocateMemberId, ownerLanguage } from "../rules/member-identity.ts";
-import { fallbackDecisions, receiveMembers, ReceivingRefused, requireTemplate } from "../rules/receiving.ts";
+import { assertCapturedHeldSources, hasForcedPartyPlan, fallbackDecisions, receiveMembers, ReceivingRefused, requireTemplate } from "../rules/receiving.ts";
 import type { ReceivingDecision, ReceivingProfile, ReceivedPlacement } from "../rules/receiving.ts";
 import { validateGame } from "../rules/save-schema.ts";
 import { own, setOwn } from "../rules/own.ts";
@@ -58,6 +58,7 @@ export interface GameApplicationOptions {
   playerName?: string;
   playerGender?: 0 | 1 | 2;
   playerLocale?: string;
+  /** Developer-owned lookup must verify its source permission before data use; it does not enable the capability. */
   describeHeldItem?: (id: string) => ItemDescriptor | null;
 }
 
@@ -146,7 +147,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.profile = { ...(options.receivingProfile ?? { mode: 0, naming: 0 }) };
     if (![0, 1, 2].includes(this.profile.mode) || !Number.isSafeInteger(this.profile.naming) || this.profile.naming < 0) throw new Error("invalid receiving profile");
     this.playerDefaults = { name: options.playerName ?? "player", gender: options.playerGender ?? 2, locale: options.playerLocale ?? "en" };
-    this.describeHeldItem = options.describeHeldItem ?? ((id) => this.ports.content().dex?.heldItem?.(id) ?? null);
+    this.describeHeldItem = options.describeHeldItem ?? ((id) => {
+      const { content, dex } = this.ports.content();
+      if (!content.meta?.showdownSourceChecked) throw new ReceivingRefused("held-item-source-unchecked");
+      return dex?.heldItem?.(id) ?? null;
+    });
     this.management = new ManagementSession(ports.state, () => ports.content().content, { limits: this.limits, depositHeal: this.depositHeal, sourceAllowed: this.capabilities.allowHeldItemSources, describeItem: this.describeHeldItem });
   }
 
@@ -404,7 +409,9 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     });
     const context = this.newReceptionContext({ templates, decisions: {}, profile: request.forceParty ? { ...this.profile, mode: 2 } : this.profile, nextMemberOrdinal: ordinal });
     const full = storageFull(game, this.limits);
-    const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full, storageFull: full, ...(game.party.some((m) => !!m.item) ? { experimentalHeldBattle: true, diagnostics: ["战后持物写回未完成"] } : {}) };
+    const forcedNoRoom = context.profile?.mode === 2 && !Object.values(templates).every((member) => hasForcedPartyPlan(game, member, { limits: this.limits, content, profile: context.profile!, depositHeal: this.depositHeal }));
+    const diagnostics = [...(forcedNoRoom ? ["forced-party-no-target"] : []), ...(game.party.some((m) => !!m.item) ? ["战后持物写回未完成"] : [])];
+    const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full, ...(diagnostics.length ? { diagnostics } : {}), ...(game.party.some((m) => !!m.item) ? { experimentalHeldBattle: true } : {}) };
     const view = battleView(game, content);
     view.party = view.party.filter((m) => !m.isEgg); // the session speaks Showdown names (protocol v1); the save keeps content ids
     const op: { battleId: string; session: S | null; facts: BattleFacts } = { battleId: request.battleId, session: null, facts: { kind: request.kind, canLose: !!request.canLose, experimentalHeld: game.party.some((m) => !!m.item) } };
@@ -468,9 +475,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * identified by the result's battleId + hash in appliedBattles, so a repeat (already-applied) never settles again.
    */
   private commit(result: BattleResult, facts?: BattleFacts, options: BattleCommitOptions = {}): { status: ApplyStatus; defeat?: { moneyLost: number; healed: true } } {
-    const code = outcomeCode(result); // validate the part used by the host before any persistent state can be installed
+    const code = outcomeCode(result); // pure validation precedes any source lookup or persistent installation
+    const heldItemSource = { allowed: this.capabilities.allowHeldItemSources, describe: this.describeHeldItem };
+    assertCapturedHeldSources(result.captured ?? [], options.templates ?? {}, heldItemSource);
     const { content } = this.ports.content();
-    const applied = applyBattleResult(this.ports.state.read(), result, this.limits, speciesKeyResolver(content), { ...options, content, depositHeal: this.depositHeal });
+    const applied = applyBattleResult(this.ports.state.read(), result, this.limits, speciesKeyResolver(content), { ...options, content, depositHeal: this.depositHeal, heldItemSource });
     if (applied.status !== "applied") return { status: applied.status };
     let next = applied.state;
     let defeat: { moneyLost: number; healed: true } | undefined;

@@ -64,12 +64,13 @@ export class ManagementSession {
     return outcome;
   }
   private apply(request:ManagementRequest):ManagementOutcome {
+    // Cancellation discards only an in-memory intention; failed world/content ports cannot prevent exit.
+    if(request.kind==='cancel-held'){this.held=null;return {status:'cancelled'};}
     if((request.kind==='give-item'||request.kind==='swap-items')&&!this.options.sourceAllowed)throw new ManagementRefused('held-item-source-disabled');
     const game=this.state.read();let next:GameState=game;
     const context=this.context();
     switch(request.kind){
       case 'pick-up':if(this.held)throw new ManagementRefused('member-held');this.held=pickUp(game,request.source);return {status:'held',heldId:request.source.id};
-      case 'cancel-held':this.held=null;return {status:'cancelled'};
       case 'place-held':case 'store-held':case 'withdraw-held': {
         if(!this.held)throw new ManagementRefused('nothing-held');
         const target=request.kind==='place-held'?request.target:heldDestination(game,this.held,request.kind==='store-held'?'box':'party',context);
