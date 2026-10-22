@@ -1,28 +1,18 @@
-/**
- * Creating an individual from species + level (step 4): the minimum of WP18 §4.1/§4.2 and WP36 §6 step 1 that the
- * playable slice needs. Pure; every random draw goes through the injected `random(n)` (an integer in [0, n)).
- *
- * Draw order (fixed, so a scripted random reproduces a member): personal id high 16 bits, low 16 bits, then the six
- * IVs in the order hp, atk, def, spa, spd, spe (each 0..31, WP19 §5.2).
- * Derived from the personal id (WP19): nature = id mod 25 in the registered order (§3.5); gender = low 8 bits < female
- * chance -> female, fixed for single-gender/genderless species (§3.2); ability = natural slot (id & 1), slot 0 when
- * slot 1 is empty (§3.4). Level -> exp is the level's minimum (WP30), HP is full, EVs 0, no held item, Poké Ball,
- * friendship 70 (the content has no happiness field; WP18 §4.1 uses 70 when it is omitted), moves = WP20 §5.1.
- * Not in this slice (WP36 §6 steps 2-5, recorded as deferred): wild held items, shiny rerolls, Pokérus, ability-based
- * gender/nature overrides; the personal id itself is not stored (nothing derives from it later in this build).
- */
+/** WP18/19 individual creation. Random order: PID high/low, six IVs hp/atk/def/spa/spd/spe,
+ * then the optional WP21 B-family form draw. Identity allocation never consumes this RNG.
+ * Context supplies time/owner/environment; no clock or host data is read here. */
 import { computeStats, minExp } from "./growth.ts";
 import { own } from "./own.ts";
 import { newMember } from "./state.ts";
-import type { Content, GenderRule, Member, MoveSlot, SpeciesData } from "./types.ts";
+import { creationForm } from "./creation-form.ts";
+import type { CreationEnvironment } from "./creation-form.ts";
+import { COMPATIBLE_PLAYER, deriveIndividual, NATURE_ORDER, shinyFromPersonalId, uint32 } from "./member-identity.ts";
+import type { Content, GenderRule, Member, MoveSlot, Owner, SpeciesData } from "./types.ts";
 
 /** An integer in [0, n). Tests inject a scripted or seeded one; the MZ host uses its own generator. */
 export type Random = (n: number) => number;
 
-export const NATURE_ORDER: readonly string[] = [
-  "hardy", "lonely", "brave", "adamant", "naughty", "bold", "docile", "relaxed", "impish", "lax", "timid", "hasty", "serious",
-  "jolly", "naive", "modest", "mild", "quiet", "bashful", "rash", "calm", "gentle", "sassy", "careful", "quirky",
-];
+export { NATURE_ORDER } from "./member-identity.ts";
 
 const MEMBER_ID = /^[A-Za-z0-9#._:-]{1,18}$/;
 
@@ -38,11 +28,8 @@ export function personalId(random: Random): number {
   return draw(random, 65536) * 65536 + draw(random, 65536);
 }
 
-export function deriveFromPersonalId(pid: number, species: { gender: GenderRule; abilities: readonly string[] }): { nature: string; gender: string; ability: string } {
-  const nature = NATURE_ORDER[pid % 25]!;
-  const g = species.gender;
-  const gender = typeof g === "number" ? ((pid & 0xff) < g ? "F" : "M") : g;
-  const ability = species.abilities[pid & 1] ?? species.abilities[0]!;
+export function deriveFromPersonalId(pid: number, species: { gender: GenderRule; abilities: readonly (string | null)[] }): { nature: string; gender: string; ability: string } {
+  const { nature, gender, ability } = deriveIndividual(pid, { ...species, abilities: [...species.abilities] });
   return { nature, gender, ability };
 }
 
@@ -68,24 +55,60 @@ export interface CreateMemberInput {
   level: number;
   ball?: string;
   ot?: string;
+  owner?: Owner;
+  /** Explicit 0 suppresses creation recheck, as does an explicit nonzero form. */
+  form?: number;
+  context?: CreationEnvironment & { playerId?: number; map?: number; receivedAt?: number; fateful?: boolean };
+  nature?: string;
+  gender?: string;
+  ability?: string;
+  abilityIndex?: number;
+  shiny?: boolean;
+  superShiny?: boolean;
 }
 
 export function createMember(input: CreateMemberInput, content: Content, random: Random): Member {
   const { id, species, level } = input;
   if (typeof id !== "string" || !MEMBER_ID.test(id)) throw new Error(`member id "${id}" must be 1-18 characters of A-Z a-z 0-9 # . _ : -`);
   if (!Number.isInteger(level) || level < 1 || level > 100) throw new RangeError(`level must be an integer from 1 to 100 (got ${String(level)})`);
-  const sp = own(content.species, species);
+  let sp = own(content.species, species);
   if (!sp) throw new Error(`species "${species}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
   const missing = [...(!sp.abilities || !sp.abilities.length ? ["abilities"] : []), ...(sp.gender === undefined ? ["gender"] : [])];
   if (missing.length) throw new Error(`species "${species}" has no creation data (${missing.join(", ")}) in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
-  const moves = initialMoves(sp, level, content);
+  if (sp.happiness !== undefined && (!Number.isSafeInteger(sp.happiness) || sp.happiness < 0)) throw new Error("initial friendship must be a nonnegative safe integer");
+  const owner = { ...(input.owner ?? { ...COMPATIBLE_PLAYER, name: input.ot ?? "player" }) };
+  uint32(owner.id);
+  if (typeof owner.name !== "string" || ![0, 1, 2].includes(owner.gender) || !Number.isSafeInteger(owner.language) || owner.language < 0) throw new Error("invalid owner");
+  if (input.context?.receivedAt !== undefined && (!Number.isSafeInteger(input.context.receivedAt) || input.context.receivedAt < 0)) throw new Error("receivedAt must be integer seconds >= 0");
+  if (input.context?.map !== undefined && (!Number.isSafeInteger(input.context.map) || input.context.map < 0)) throw new Error("map must be a nonnegative integer");
+  if (input.nature !== undefined && !NATURE_ORDER.includes(input.nature)) throw new Error("unknown nature");
+  if (input.gender !== undefined && !["M", "F", "N"].includes(input.gender)) throw new Error("unknown gender");
+  if (input.form !== undefined && (!Number.isInteger(input.form) || input.form < 0 || input.form > 999)) throw new Error("invalid form");
   const pid = personalId(random);
   const ivs = { hp: draw(random, 32), atk: draw(random, 32), def: draw(random, 32), spa: draw(random, 32), spd: draw(random, 32), spe: draw(random, 32) };
-  const { nature, gender, ability } = deriveFromPersonalId(pid, { gender: sp.gender!, abilities: sp.abilities! });
+  const nature = input.nature ?? NATURE_ORDER[pid % 25]!;
+  const contentId = sp.contentId ?? species;
+  const form = input.form ?? (sp.form || creationForm(contentId, nature, input.context?.playerId ?? owner.id, random, input.context));
+  let finalName = species;
+  if (form !== (sp.form ?? 0)) {
+    const record = own(content.forms, contentId);
+    const name = record ? own(record, String(form)) : undefined;
+    if (!name || !own(content.species, name)) throw new Error(`species "${contentId}" form ${form}: missing creation form in the content`);
+    finalName = name; sp = content.species[name]!;
+  }
+  const derived = deriveIndividual(pid, { ...sp, gender: sp.gender ?? "N" }, input.abilityIndex);
+  const gender = typeof sp.gender === "string" ? sp.gender : input.gender ?? derived.gender;
+  const ability = input.ability ?? derived.ability;
+  const moves = initialMoves(sp, level, content);
+  const colors = shinyFromPersonalId(pid, owner.id);
   const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
   const stats = computeStats(sp.base, ivs, evs, level, nature);
   return newMember({
-    id, species, level, exp: minExp(sp.growth, level), hp: stats.hp, status: "", statusCount: 0, moves, item: "", ability, nature, gender,
-    ivs, evs, friendship: 70, ball: input.ball ?? "pokeball", ot: input.ot ?? "player",
+    id, species: finalName, form, level, exp: minExp(sp.growth, level), hp: stats.hp, status: "", statusCount: 0, moves, item: "", ability, nature, gender,
+    ivs, evs, friendship: sp.happiness ?? 70, ball: input.ball ?? "pokeball",
+    personalID: pid, owner, ownerCompatibilityDefault: false, abilityIndex: derived.abilityIndex, effectiveAbilityIndex: derived.effectiveAbilityIndex,
+    shiny: input.shiny ?? (input.superShiny === true ? true : colors.shiny), superShiny: input.superShiny ?? colors.superShiny,
+    origin: { method: input.context?.fateful ? 4 : 0, map: input.context?.map ?? 0, text: "", level, receivedAt: input.context?.receivedAt ?? null, hatchedMap: 0, hatchedAt: null, compatibilityDefault: false },
+    firstMoves: [], markings: [], ribbons: [], cannotStore: false, cannotRelease: false, isEgg: false, mail: null, readyToEvolve: false,
   });
 }

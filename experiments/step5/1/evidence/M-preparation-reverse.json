@@ -1,0 +1,1005 @@
+{
+ "at": "2026-10-22T19:01:44.354Z",
+ "head": "4b0c724b100768bd8107e8261ba9c56dc8f61063",
+ "dirty": " M experiments/step2/s3/test-writeback.cjs\n M experiments/step3/crash-child-legacy.cjs\n M experiments/step3/test-application.cjs\n M experiments/step3/test-content.cjs\n M experiments/step3/test-core-independent.cjs\n M experiments/step3/test-integration.cjs\n M experiments/step3/test-move-requests.cjs\n M experiments/step3/test-pp-sync.cjs\n M experiments/step3/test-save.cjs\n M experiments/step3/test-scripted-driver.cjs\n M experiments/step4/test-app-battle4.cjs\n M experiments/step4/test-app4.cjs\n M experiments/step4/test-battle-rules4.cjs\n M experiments/step4/test-content4.cjs\n M experiments/step4/test-core4.cjs\n M experiments/step4/test-schema3.cjs\n M experiments/step5/probes/unfix5.cjs\n M experiments/step5/test-app5.cjs\n M experiments/step5/test-cold-source5.cjs\n M experiments/step5/test-content5.cjs\n M experiments/step5/test-migration5.cjs\n M experiments/step5/test-pbs-review5.cjs\n M experiments/step5/test-plugin-host5.cjs\n M experiments/step5/test-species-key5.cjs\n M experiments/step5/test-store5.cjs\n M scripts/test-headless.sh\n M src/framework/app/game-application.ts\n M src/framework/app/index.ts\n M src/framework/app/ports.ts\n M src/framework/battle/dex.ts\n M src/framework/composition.ts\n M src/framework/content/compile.ts\n M src/framework/content/pbs-import.ts\n M src/framework/content/schema.ts\n M src/framework/flow/content-runtime.ts\n M src/framework/flow/session.ts\n M src/framework/index.ts\n M src/framework/rules/config.ts\n M src/framework/rules/grants.ts\n M src/framework/rules/heal.ts\n M src/framework/rules/index.ts\n M src/framework/rules/limits.ts\n M src/framework/rules/member-factory.ts\n M src/framework/rules/save-schema.ts\n M src/framework/rules/species-key.ts\n M src/framework/rules/state.ts\n M src/framework/rules/types.ts\n M src/framework/tools/fixtures/game.ts\n M src/framework/tools/save-store.ts\n M src/plugins/PS_BattleFlow.ts\n M src/plugins/PS_BattleFlowTest.ts\n M src/plugins/PS_SaveState.ts\n M src/tsconfig.json\n?? docs/step5/5.1-coverage.md\n?? docs/step5/5.1.md\n?? experiments/step5/1/\n?? src/framework/app/management.ts\n?? src/framework/rules/creation-form.ts\n?? src/framework/rules/member-identity.ts\n?? src/framework/rules/receiving.ts\n?? src/framework/rules/storage-operations.ts\n?? src/framework/rules/storage.ts\n?? src/framework/rules/value.ts\n",
+ "probes": [
+  {
+   "id": "migr-partial",
+   "what": "the 3 -> 4 migration skips unmappable names instead of refusing the whole save",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-species-key5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "3 -> 4 refuses as a whole when the content cannot map a name: every place is listed, nothing is changed"
+     ]
+    },
+    {
+     "test": "test-migration5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "P-1 unmappable: the same step 4 save against content without one of its species is refused whole, with every place"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "migr-no-content",
+   "what": "without the content mapping the migration keeps Showdown names (identity) instead of refusing",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-species-key5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "3 -> 4 needs the content: without the mapping it refuses (needs-content) and the input is untouched"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "apply-identity",
+   "what": "the application commits without the content mapping (captures stored by Showdown name)",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-app5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "the session factory gets the battle view (Showdown names); the commit stores the capture by content id + form",
+      "FR-000420 battle statistics (WP53 §183 split): wild win or catch = won; run, loss or draw = lost; trainer win = won, los"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "no-battle-view",
+   "what": "sessions get the stored state (content ids) instead of the battle view",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-app5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "the session factory gets the battle view (Showdown names); the commit stores the capture by content id + form"
+     ]
+    },
+    {
+     "test": "test-application.cjs",
+     "status": 1,
+     "fail": 4,
+     "cancelled": 0,
+     "failing": [
+      "success: the result is committed once, the persistent state is replaced not mutated, the host is told",
+      "real session: a run is committed once through the application and a repeat does nothing",
+      "real session: a won trainer battle with a level-up and an item commits the session working copy as one change",
+      "real session: a session closed by a failed rollback aborts and leaves the persistent state exactly as it was"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "hash-mapped",
+   "what": "the ledger hashes the result after mapping (pre-schema-4 ledger entries no longer recognised)",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-migration5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "P-1 replay: every result the step 4 saves committed is still a repeat after the migration (core)",
+      "P-1 replay through the application: an old result is already-applied, settles nothing again and counts no statistic"
+     ]
+    },
+    {
+     "test": "test-species-key5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "a result is written back through the content mapping: captured member and dex by content id + form; an unmapped name ref",
+      "replay ledger across the migration: a result committed before schema 4 is still recognised afterwards (applied once)"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p42-no-release",
+   "what": "stateReplacedByHost does not release the open operation",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-app5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "P4-2: the host installs another state while a battle is open: the operation is released, and that battle commits nothing",
+      "P4-2 while the session is still being created: the late session is not used and the new state is not touched"
+     ]
+    },
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 5,
+     "cancelled": 0,
+     "failing": [
+      "P4-2: loading a save (or starting a new game) releases a battle the application still held",
+      "F02: openBattle -> begin -> a save is loaded: the host operation ends (not running, saving allowed), the next battle ope",
+      "F02: late finish / abort / close of the replaced battle neither commit, nor close, nor project into the next battle",
+      "R01: default and explicit finish reject a replaced session while old\\#1 keeps both save locks",
+      "R01: default and explicit finish reject a replaced session while different\\#2 keeps both save locks"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "p42-late-commit",
+   "what": "a session of a replaced state still commits when it finishes (no generation check)",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-app5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "P4-2: the host installs another state while a battle is open: the operation is released, and that battle commits nothing"
+     ]
+    },
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 0,
+     "fail": 0,
+     "cancelled": 0,
+     "failing": []
+    }
+   ]
+  },
+  {
+   "id": "stats-canlose",
+   "what": "a defeat the author allowed (canLose) is counted as a blackout",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-app5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "WP61 §7: a defeat the author allowed (canLose) is not a blackout, but its money loss is counted"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "stats-split",
+   "what": "a wild catch is counted as lost (the WP53 1/4 vs 2/3/5 split broken)",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-app5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "FR-000420 battle statistics (WP53 §183 split): wild win or catch = won; run, loss or draw = lost; trainer win = won, los"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "steps-saturate",
+   "what": "the step counter saturates at 2^31 - 1 instead of wrapping to 0",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-app5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "FR-000426 the step counter: counted, wraps at 2^31 (WP06 §4.1), refused while a battle is open or the state is unusable"
+     ]
+    },
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "WP06 §4.1 step counter: a normal step counts; a forced move route or a running event does not"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "steps-guard",
+   "what": "steps on a forced move route or while an event runs are counted",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "WP06 §4.1 step counter: a normal step counts; a forced move route or a running event does not"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "gate-open",
+   "what": "a record may use a source with no recorded pre-use check",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-content5.cjs",
+     "status": 1,
+     "fail": 5,
+     "cancelled": 0,
+     "failing": [
+      "pre-use gate: a record may only use a source whose terms were checked first; an explicit author placeholder is exempt",
+      "PBS import: the imported records compile with the content (checked source) and assemble against the pinned Showdown data",
+      "PBS import CLI: refused without a checked source (nothing written); with one it writes the report",
+      "F05: the Showdown data the content is read against passes the same gate (missing entry, missing or incomplete check, not",
+      "F05: assembly validates the complete registry and every consumed source before any Dex call"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "load-no-content",
+   "what": "PS_SaveState migrates without giving the content mapping",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 9,
+     "cancelled": 0,
+     "failing": [
+      "a save written by the step 4 code loads: migrated to schema 4 with the content mapping, reported in _psSaveInfo",
+      "content that cannot be loaded, or a species it cannot map: the migration is refused and the original state stays as load",
+      "P4-2: loading a save (or starting a new game) releases a battle the application still held",
+      "F01: while the loaded state is unusable every save is refused before MZ writes anything (slot named); a good load clears",
+      "F02: openBattle -> begin -> a save is loaded: the host operation ends (not running, saving allowed), the next battle ope",
+      "F02: late finish / abort / close of the replaced battle neither commit, nor close, nor project into the next battle",
+      "R01: default and explicit finish reject a replaced session while old\\#1 keeps both save locks",
+      "R01: default and explicit finish reject a replaced session while different\\#2 keeps both save locks",
+      "P51-07: schema4 1201 capacity failure keeps raw state and blocks all host save slots"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "load-no-release",
+   "what": "loading a save does not release a battle the application held",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "experiments/step5/test-plugin-host5.cjs"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "form-fallback",
+   "what": "a form the content lacks is dangling instead of falling back to the base form (WP03 §3.2)",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-species-key5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "WP03 §3.2: a form the content does not define falls back to the base form; an unknown id is null",
+      "F07: applyExpPersistent resolves the form (and falls back to the base form for one the content lacks)"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "config-range",
+   "what": "a party size above 6 is accepted",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-content5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "FR-000388/389 rule configuration (WP02 subset): Gen 8 defaults, validated overrides through settings.json, the capacitie"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F01-save-unusable",
+   "what": "a save goes through while the loaded framework state is unusable",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "F01: while the loaded state is unusable every save is refused before MZ writes anything (slot named); a good load clears",
+      "P51-07: schema4 1201 capacity failure keeps raw state and blocks all host save slots"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F02-host-running",
+   "what": "a state replacement leaves the host battle operation running",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 4,
+     "cancelled": 0,
+     "failing": [
+      "F02: openBattle -> begin -> a save is loaded: the host operation ends (not running, saving allowed), the next battle ope",
+      "F02: late finish / abort / close of the replaced battle neither commit, nor close, nor project into the next battle",
+      "R01: default and explicit finish reject a replaced session while old\\#1 keeps both save locks",
+      "R01: default and explicit finish reject a replaced session while different\\#2 keeps both save locks"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F02-stale-finish",
+   "what": "a finish of a replaced battle operation reaches the current one",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 3,
+     "cancelled": 0,
+     "failing": [
+      "F02: late finish / abort / close of the replaced battle neither commit, nor close, nor project into the next battle",
+      "R01: default and explicit finish reject a replaced session while old\\#1 keeps both save locks",
+      "R01: default and explicit finish reject a replaced session while different\\#2 keeps both save locks"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F02-stale-abort",
+   "what": "an abort of a replaced battle operation reaches the current one",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "F02: late finish / abort / close of the replaced battle neither commit, nor close, nor project into the next battle"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F02-stale-scene-pop",
+   "what": "the old scene ends by popping the current host scene",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "F02: late finish / abort / close of the replaced battle neither commit, nor close, nor project into the next battle"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F05-runtime-source-gate",
+   "what": "runtime consumption skips the complete registry and record source gate",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-content5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "F05: the Showdown data the content is read against passes the same gate (missing entry, missing or incomplete check, not",
+      "F05: assembly validates the complete registry and every consumed source before any Dex call"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F03-store-identity",
+   "what": "SaveStore guesses the identity mapping when given none",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-store5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "a store given no mapping refuses a result that names a species (captures, dex) and writes nothing; one without species a"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F04-strip-section",
+   "what": "a PBS section id is stripped to letters and digits instead of being checked",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-content5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "F04: a form section or a section id that is not a symbol is refused at its line, never read as another species"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F05-showdown-gate",
+   "what": "the Showdown dependency is not gated",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-content5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "F05: the Showdown data the content is read against passes the same gate (missing entry, missing or incomplete check, not",
+      "F05: assembly validates the complete registry and every consumed source before any Dex call"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F05-cli-decision-only",
+   "what": "the CLI accepts a check record with only a decision",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-content5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "F05: the CLI applies the full registry validation before it reads the PBS file: an incomplete check (decision only) refu"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F06-config-inherited",
+   "what": "setting names are looked up on a plain object (inherited names too)",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-content5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "F06: setting names and PBS enumerations are own keys only: \"constructor\", \"toString\", \"__proto__\" get located errors, ne",
+      "F06: a build that fails (also on such a setting) removes the previous output, so a stale file never passes for current"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F06-pbs-inherited",
+   "what": "a PBS growth rate is looked up on a plain object (inherited names too)",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-content5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "F06: setting names and PBS enumerations are own keys only: \"constructor\", \"toString\", \"__proto__\" get located errors, ne"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F06-build-keeps-old",
+   "what": "an exceptional build returns failure but leaves the old compiled output",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-content5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "F06: output write errors remove the previous build and report the failure"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F07-persistent-growth",
+   "what": "applyExpPersistent hands the persistent member to applyExp unconverted",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-species-key5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "F07: applyExp takes battle records (session growth unchanged); a persistent member goes through applyExpPersistent and k",
+      "F07: applyExpPersistent resolves the form (and falls back to the base form for one the content lacks)"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F08-newgame-form",
+   "what": "newGame leaves a member without a form",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-species-key5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "F08: newGame gives a member without a form the base form 0 (valid schema 4); battle records and results stay without one"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F09-mixed-battles",
+   "what": "the budget check compares battle rows over any set of battles",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-perf-budget5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "over another set of battles (e.g. 36 with the full-save battles mixed in, or no record) the battle rows are not compared"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F10-truthy-name",
+   "what": "speciesName takes an inherited property for a species",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "F10: a content id that is also an Object.prototype name (\"constructor\") is shown by its translated name, also in the gra"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "F11-clock-unchecked",
+   "what": "now() passes on whatever the clock answers",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-app5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "F11: the application reads the wall clock only through its injected clock port; none configured or a bad answer is refus"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "R01-session-owner",
+   "what": "default finish accepts a session belonging to a replaced operation",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "R01: default and explicit finish reject a replaced session while old\\#1 keeps both save locks",
+      "R01: default and explicit finish reject a replaced session while different\\#2 keeps both save locks"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "R02-old-return",
+   "what": "state replacement retains executable return work from an ended defeat",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 3,
+     "cancelled": 0,
+     "failing": [
+      "F02: openBattle -> begin -> a save is loaded: the host operation ends (not running, saving allowed), the next battle ope",
+      "R02: failed defeat return belongs to its timeline (load)",
+      "R02: failed defeat return belongs to its timeline (new-game)"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "R03-eager-dex",
+   "what": "Dex construction initializes data before content source checks",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-cold-source5.cjs",
+     "status": 1,
+     "fail": 50,
+     "cancelled": 0,
+     "failing": [
+      "R03 cold source gate: valid/constructor",
+      "R03 cold source gate: denied/content",
+      "R03 cold source gate: denied/app",
+      "R03 cold source gate: denied/claim",
+      "R03 cold source gate: denied/begin",
+      "R03 cold source gate: missing/content",
+      "R03 cold source gate: missing/app",
+      "R03 cold source gate: missing/claim",
+      "R03 cold source gate: missing/begin",
+      "R03 cold source gate: malformed/content",
+      "R03 cold source gate: malformed/app",
+      "R03 cold source gate: malformed/claim",
+      "R03 cold source gate: malformed/begin",
+      "R03 consumption matrix: empty/valid/assemble",
+      "R03 consumption matrix: empty/valid/content",
+      "R03 consumption matrix: empty/valid/app",
+      "R03 consumption matrix: empty/valid/inventory",
+      "R03 consumption matrix: empty/denied/assemble",
+      "R03 consumption matrix: empty/denied/content",
+      "R03 consumption matrix: empty/denied/app",
+      "R03 consumption matrix: empty/denied/inventory",
+      "R03 consumption matrix: empty/unregistered/assemble",
+      "R03 consumption matrix: empty/unregistered/content",
+      "R03 consumption matrix: empty/unregistered/app",
+      "R03 consumption matrix: empty/unregistered/inventory",
+      "R03 consumption matrix: empty/no-check/assemble",
+      "R03 consumption matrix: empty/no-check/content",
+      "R03 consumption matrix: empty/no-check/app",
+      "R03 consumption matrix: empty/no-check/inventory",
+      "R03 consumption matrix: empty/malformed/assemble",
+      "R03 consumption matrix: empty/malformed/content",
+      "R03 consumption matrix: empty/malformed/app",
+      "R03 consumption matrix: nonempty/denied/assemble",
+      "R03 consumption matrix: nonempty/denied/content",
+      "R03 consumption matrix: nonempty/denied/app",
+      "R03 consumption matrix: nonempty/unregistered/assemble",
+      "R03 consumption matrix: nonempty/unregistered/content",
+      "R03 consumption matrix: nonempty/unregistered/app",
+      "R03 consumption matrix: nonempty/no-check/assemble",
+      "R03 consumption matrix: nonempty/no-check/content",
+      "R03 consumption matrix: nonempty/no-check/app",
+      "R03 consumption matrix: nonempty/malformed/assemble",
+      "R03 consumption matrix: nonempty/malformed/content",
+      "R03 consumption matrix: nonempty/malformed/app",
+      "R03 consumption matrix: empty/valid/old-party",
+      "R03 consumption matrix: empty/denied/old-party",
+      "R03 consumption matrix: empty/unregistered/old-party",
+      "R03 consumption matrix: empty/no-check/old-party",
+      "R03 consumption matrix: empty/malformed/old-party",
+      "R03 consumption matrix: empty/unregistered/preserve"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "R03-empty-assembly-sha",
+   "what": "empty assembly reads the lazy external identity without source permission",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-cold-source5.cjs",
+     "status": 1,
+     "fail": 21,
+     "cancelled": 0,
+     "failing": [
+      "R03 consumption matrix: empty/valid/assemble",
+      "R03 consumption matrix: empty/valid/content",
+      "R03 consumption matrix: empty/valid/app",
+      "R03 consumption matrix: empty/valid/inventory",
+      "R03 consumption matrix: empty/denied/assemble",
+      "R03 consumption matrix: empty/denied/content",
+      "R03 consumption matrix: empty/denied/app",
+      "R03 consumption matrix: empty/denied/inventory",
+      "R03 consumption matrix: empty/unregistered/assemble",
+      "R03 consumption matrix: empty/unregistered/content",
+      "R03 consumption matrix: empty/unregistered/app",
+      "R03 consumption matrix: empty/unregistered/inventory",
+      "R03 consumption matrix: empty/no-check/assemble",
+      "R03 consumption matrix: empty/no-check/content",
+      "R03 consumption matrix: empty/no-check/app",
+      "R03 consumption matrix: empty/no-check/inventory",
+      "R03 consumption matrix: empty/valid/old-party",
+      "R03 consumption matrix: empty/denied/old-party",
+      "R03 consumption matrix: empty/unregistered/old-party",
+      "R03 consumption matrix: empty/no-check/old-party",
+      "R03 consumption matrix: empty/unregistered/preserve"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "R03-empty-inventory-sha",
+   "what": "empty inventory reads and claims external data it has not authorized",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-cold-source5.cjs",
+     "status": 1,
+     "fail": 4,
+     "cancelled": 0,
+     "failing": [
+      "R03 consumption matrix: empty/valid/inventory",
+      "R03 consumption matrix: empty/denied/inventory",
+      "R03 consumption matrix: empty/unregistered/inventory",
+      "R03 consumption matrix: empty/no-check/inventory"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "R03-empty-old-moves",
+   "what": "diagnosis queries external moves for a saved member absent from the current content",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-cold-source5.cjs",
+     "status": 1,
+     "fail": 4,
+     "cancelled": 0,
+     "failing": [
+      "R03 consumption matrix: empty/valid/old-party",
+      "R03 consumption matrix: empty/denied/old-party",
+      "R03 consumption matrix: empty/unregistered/old-party",
+      "R03 consumption matrix: empty/no-check/old-party"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "R04-strip-move",
+   "what": "illegal move symbols are silently cleaned to legal ids",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-pbs-review5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "R04: an invalid raw move token is rejected at Moves, never cleaned into another move",
+      "R04/R05 CLI: failed imports write a report containing only valid records and preserve the diagnostic line"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "R04-empty-ev",
+   "what": "explicit empty EV pairs are accepted",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-pbs-review5.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "R04: explicit empty EVs must contain a required pair and cannot become an empty yield",
+      "R04/R05 CLI: failed imports write a report containing only valid records and preserve the diagnostic line"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "R05-parse-error-record",
+   "what": "records with syntax errors still enter the mergeable species list",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-pbs-review5.cjs",
+     "status": 1,
+     "fail": 5,
+     "cancelled": 0,
+     "failing": [
+      "R05: property syntax invalidates complete B, preserves A/C, and later valid fields cannot clear it",
+      "R05: quoted value invalidates complete B, preserves A/C, and later valid fields cannot clear it",
+      "R05: indented comment invalidates complete B, preserves A/C, and later valid fields cannot clear it",
+      "R05: several parse errors retain their own locations and a valid property override does not repair the section",
+      "R04/R05 CLI: failed imports write a report containing only valid records and preserve the diagnostic line"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P51-capacity",
+   "what": "1201 old boxed members bypass the migration refusal",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-migration-storage.cjs",
+     "status": 1,
+     "fail": 2,
+     "cancelled": 0,
+     "failing": [
+      "P51-06/07: 0/29/30/31/1199/1200 map exactly; 1201 refuses entire migration with full diagnostic",
+      "P51-07: failed 1201 load/commit keeps every store slot byte-for-byte and writes no backup"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P51-slot-bounds",
+   "what": "box slot 30 is accepted and can extend the fixed array",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-migration-storage.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "P51-06/08: fixed slots have one authority, current box first, then 0; holes never compact"
+     ]
+    },
+    {
+     "test": "test-management.cjs",
+     "status": 0,
+     "fail": 0,
+     "cancelled": 0,
+     "failing": []
+    }
+   ]
+  },
+  {
+   "id": "P51-held-snapshot",
+   "what": "held movement commits an old whole-state snapshot and overwrites independent edits",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-management.cjs",
+     "status": 1,
+     "fail": 3,
+     "cancelled": 0,
+     "failing": [
+      "P51-10a: held intent retains independent box/member/item/move/ribbon edits on place",
+      "P51-10a: held intent retains independent box/member/item/move/ribbon edits on stale",
+      "P51-10: exchange chains commit once, preserve latest records, cancellation writes no old snapshot"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P51-no-template-fallback",
+   "what": "a missing capture template is reconstructed from raw v1 data instead of refused",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-receiving.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "P51-14: public missing-template refusal precedes replay ledger; explicit templates without decisions returns pending"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P51-receive-host-lock",
+   "what": "pending reception closes the host battle operation before committing",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "P51-14: real Showdown capture waits in host operation until decisions; duplicate resolve writes once"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P51-held-default-battle",
+   "what": "the app accepts held members with the experimental battle capability closed",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-management.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "P51-12: independent runtime capabilities, no capability in state, battle gate precedes content/session load"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P51-empty-held-source",
+   "what": "empty content with an enabled held source consumes Showdown before checking its dependency",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-held-sources.cjs",
+     "status": 1,
+     "fail": 3,
+     "cancelled": 0,
+     "failing": [
+      "P51-12/F05: empty held source denied refuses before external data load",
+      "P51-12/F05: empty held source missing refuses before external data load",
+      "P51-12/F05: empty held source unregistered refuses before external data load"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "P51-save-held",
+   "what": "direct MZ saves accept a held management intent",
+   "verdict": "caught",
+   "results": [
+    {
+     "test": "test-plugin-host5.cjs",
+     "status": 1,
+     "fail": 1,
+     "cancelled": 0,
+     "failing": [
+      "P51-10a/21/22: held management masks menu/direct saves; cancel preserves committed edits; load invalidates old token"
+     ]
+    }
+   ]
+  }
+ ]
+}

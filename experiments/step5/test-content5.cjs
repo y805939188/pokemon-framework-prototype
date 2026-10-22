@@ -79,7 +79,7 @@ test('PBS import: framework fields carried over; battle data, later fields and u
   ]);
   const [rat, spe] = r.records;
   assert.deepEqual(rat.showdown, ['Name', 'Types', 'BaseStats'], 'Showdown provides these at run time');
-  assert.deepEqual(rat.later.map(x => x.field), ['Evolutions', 'WildItemCommon', 'Happiness']);
+  assert.deepEqual(rat.later.map(x => x.field), ['Evolutions', 'WildItemCommon']);
   assert.match(rat.later.find(x => x.field === 'Evolutions').batch, /5\.3/);
   assert.deepEqual(rat.ignored, ['SomethingNew'], 'outside the schema: not consumed, no error (WP04 §4.2)');
   assert.deepEqual(spe.overridden, ['GrowthRate'], 'a repeated property: the later value wins (WP04 §4.2)');
@@ -140,9 +140,10 @@ test('FR-000388/389 rule configuration (WP02 subset): Gen 8 defaults, validated 
   const C = E.config;
   assert.deepEqual(C.resolveConfig(), { MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999 });
   assert.deepEqual(C.limitsOf(C.resolveConfig()), E.limits.DEFAULT_LIMITS, 'the defaults give the step 4 capacities (40 x 30 boxes)');
-  assert.deepEqual(C.limitsOf(C.resolveConfig({ NUM_STORAGE_BOXES: 2, MAX_PARTY_SIZE: 3 })), { party: 3, boxes: 60, bagPerItem: 999, money: 999999 });
+  assert.deepEqual(C.limitsOf(C.resolveConfig({ NUM_STORAGE_BOXES: 40, MAX_PARTY_SIZE: 3 })), { party: 3, boxes: 1200, bagPerItem: 999, money: 999999 });
   const has = (o, pathRe, msgRe) => assert.ok(C.checkOverrides(o).some(p => pathRe.test(p.path) && msgRe.test(p.message)), JSON.stringify(C.checkOverrides(o)));
   has({ MECHANICS_GENERATION: 7 }, /MECHANICS_GENERATION/, /generation 8 only/);
+  has({ NUM_STORAGE_BOXES: 2 }, /NUM_STORAGE_BOXES/, /supports NUM_STORAGE_BOXES=40 only/);
   has({ MAX_PARTY_SIZE: 7 }, /MAX_PARTY_SIZE/, /1 to 6/);
   has({ MAX_MONEY: -1 }, /MAX_MONEY/, /integer from 0/);
   has({ BAG_MAX_PER_SLOT: 1.5 }, /BAG_MAX_PER_SLOT/, /integer/);
@@ -151,12 +152,12 @@ test('FR-000388/389 rule configuration (WP02 subset): Gen 8 defaults, validated 
   assert.throws(() => C.resolveConfig({ MAX_PARTY_SIZE: 0 }), /rule configuration: \$\.MAX_PARTY_SIZE/);
   // through the content pipeline: located in settings.json, carried to the assembled content, hash unchanged without it
   const base = inputs();
-  const withSettings = { ...inputs(), settings: { NUM_STORAGE_BOXES: 2 } };
+  const withSettings = { ...inputs(), settings: { NUM_STORAGE_BOXES: 40 } };
   const c = compileContent(withSettings); assert.equal(c.ok, true, JSON.stringify(c.errors));
-  assert.deepEqual(c.data.settings, { NUM_STORAGE_BOXES: 2 });
+  assert.deepEqual(c.data.settings, { NUM_STORAGE_BOXES: 40 });
   assert.notEqual(c.data.inputsHash, compileContent(base).data.inputsHash);
   assert.equal(compileContent(base).data.settings, undefined);
-  assert.deepEqual(E.contentRuntime.assembleContent(c.data, E.dex.createDexLookup()).content.settings, { NUM_STORAGE_BOXES: 2 });
+  assert.deepEqual(E.contentRuntime.assembleContent(c.data, E.dex.createDexLookup()).content.settings, { NUM_STORAGE_BOXES: 40 });
   const bad = compileContent({ ...inputs(), settings: { MAX_PARTY_SIZE: 9 } });
   assert.equal(bad.ok, false); assert.deepEqual([bad.errors[0].file, bad.errors[0].path], ['settings.json', '$.MAX_PARTY_SIZE']);
 });

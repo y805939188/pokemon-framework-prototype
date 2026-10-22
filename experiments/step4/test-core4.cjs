@@ -52,7 +52,7 @@ test('initial moves (WP20 5.1 reset_moves): level <= current, in order, de-dupli
 
 test('createMember: the documented random draws, then every field from species + level', () => {
   const random = scripted([0x1234, 0x5678, 31, 0, 15, 30, 1, 2]);
-  const m = createMember({ id: 'G-starter-1', species: 'Charmander', level: 5 }, content, random);
+  const m = createMember({ id: 'M1', species: 'Charmander', level: 5 }, content, random);
   assert.deepEqual(random.calls.map(c => c[0]), [65536, 65536, 32, 32, 32, 32, 32, 32], 'personal id (high, low 16 bits), then six IVs');
   assert.deepEqual(m.ivs, { hp: 31, atk: 0, def: 15, spa: 30, spd: 1, spe: 2 });
   assert.deepEqual(m.evs, { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 });
@@ -60,9 +60,9 @@ test('createMember: the documented random draws, then every field from species +
   const stats = E.growth.computeStats(content.species.Charmander.base, m.ivs, m.evs, 5, 'gentle');
   assert.deepEqual([m.level, m.exp, m.hp], [5, E.growth.minExp('parabolic', 5), stats.hp], 'exp = minimum of the level, HP full');
   assert.deepEqual(m.moves.map(x => x.id), ['scratch', 'growl', 'ember']);
-  assert.deepEqual([m.status, m.statusCount, m.item, m.ball, m.ot, m.friendship, m.nickname], ['', 0, '', 'pokeball', 'player', 70, null]);
+  assert.deepEqual([m.status, m.statusCount, m.item, m.ball, m.owner.name, m.friendship, m.nickname], ['', 0, '', 'pokeball', 'player', 70, null]);
   // a created member is battle-shaped (Showdown name); stored with its persistent key (D5-3, step 5.0) it is a valid save member
-  assert.equal(m.form, undefined);
+  assert.equal(m.form, 0);
   assert.deepEqual(E.saveSchema.validateGame({ ...S.newGame({ party: [] }), party: [E.speciesKey.toPersistentMember(m, content)] }), [], 'a created member, stored with its key, is a valid persistent member');
 });
 
@@ -100,9 +100,9 @@ test('a grant is applied once: members (party first), items, money, and the clai
   const s0 = fresh(); const before = clone(s0);
   const r = starter(s0);
   assert.equal(r.status, 'applied'); assert.deepEqual(s0, before, 'the input state is not mutated');
-  assert.deepEqual(r.state.party.map(m => [m.id, m.species, m.form, m.level]), [['G-starter-1', 'charmander', 0, 5]], 'stored by content id + form (D5-3, step 5.0)');
+  assert.deepEqual(r.state.party.map(m => [m.id, m.species, m.form, m.level]), [['M1', 'charmander', 0, 5]], 'stored by content id + form (D5-3, step 5.0)');
   assert.deepEqual(r.state.bag, { potion: 5, pokeball: 10, antidote: 2 }); assert.deepEqual(r.state.claims, { starter: { kind: 'grant' } });
-  assert.deepEqual(r.placed, [{ id: 'G-starter-1', species: 'charmander', form: 0, level: 5, to: 'party' }]);
+  assert.deepEqual(r.placed, [{ id: 'M1', species: 'charmander', form: 0, level: 5, to: 'party' }]);
   assert.deepEqual(E.saveSchema.validateGame(r.state), []);
   const again = starter(r.state);
   assert.equal(again.status, 'already-claimed'); assert.equal(again.state, r.state, 'a repeat returns the same state object: nothing changes');
@@ -113,7 +113,7 @@ test('grant receiving order and capacity: party, then boxes, refused as a whole 
   const full = fresh(); for (let i = 0; i < 6; i++) full.party.push(createMember({ id: `P-${i}`, species: 'Caterpie', level: 2 }, content, lcg(i)));
   const r = applyGrant(full, 'flock', pidgeys, lcg(3), { ...E.limits.DEFAULT_LIMITS, boxes: 2 });
   assert.deepEqual(r.placed.map(p => p.to), ['boxes', 'boxes'], 'a full party sends grant members to the boxes (D1)');
-  const halfFull = clone(full); halfFull.boxes.push(clone(full.party[0])); halfFull.boxes[0].id = 'B-0';
+  const halfFull = clone(full); E.storage.placeInBox(halfFull.storage, clone(full.party[0])); E.storage.boxedMembers(halfFull)[0].id = 'B-0';
   for (const [label, state, limits, reason] of [
     ['not enough box room', halfFull, { ...E.limits.DEFAULT_LIMITS, boxes: 2 }, 'no-room'],
     ['bag above the per-item cap', (() => { const s = fresh(); s.bag.potion = 998; return s; })(), E.limits.DEFAULT_LIMITS, 'bag-full'],
@@ -124,8 +124,8 @@ test('grant receiving order and capacity: party, then boxes, refused as a whole 
     assert.deepEqual(state, before, label + ': nothing changed, no claim written');
   }
   assert.throws(() => applyGrant(fresh(), 'nope', content, lcg(1)), e => e.reason === 'unknown-grant');
-  const taken = fresh(); taken.party.push({ ...createMember({ id: 'G-starter-1', species: 'Pidgey', level: 3 }, content, lcg(1)) });
-  assert.throws(() => starter(taken), e => e.reason === 'member-id-taken');
+  const taken = fresh(); taken.party.push({ ...createMember({ id: 'M1', species: 'Pidgey', level: 3 }, content, lcg(1)) });
+  const avoided = starter(taken); assert.equal(avoided.placed[0].id, 'M2'); assert.equal(avoided.state.party[0].id, 'M1', 'new ordinal skips a taken ID without overwriting it');
   const old = clone(fresh()); old.schema = 2; delete old.claims;
   assert.throws(() => starter(old), /migrate it first/);
 });
@@ -161,7 +161,7 @@ test('a grant registers every received species as seen and owned (WP26 3.2 gifts
 test('legal ids that are also Object.prototype names ("constructor") are ordinary keys: first claim applies, a repeat is a repeat, also after a JSON round trip', () => {
   const ct = { ...content, grants: { constructor: { id: 'constructor', members: [{ species: 'Charmander', level: 5 }], items: { potion: 1 }, money: 0 } } };
   const first = applyGrant(fresh(), 'constructor', ct, lcg(1));
-  assert.equal(first.status, 'applied'); assert.ok(Object.hasOwn(first.state.claims, 'constructor')); assert.equal(first.state.party[0].id, 'G-constructor-1');
+  assert.equal(first.status, 'applied'); assert.ok(Object.hasOwn(first.state.claims, 'constructor')); assert.equal(first.state.party[0].id, 'M1');
   assert.deepEqual(E.saveSchema.validateGame(first.state), []);
   const reloaded = JSON.parse(JSON.stringify(first.state)); // a save/load produces ordinary objects again
   assert.equal(applyGrant(reloaded, 'constructor', ct, lcg(1)).status, 'already-claimed');
@@ -205,12 +205,12 @@ test('party heal (WP20 3.2 heal_party): full HP from the stats, status and count
   const s = starter(fresh()).state;
   const hurt = clone(s); const m = hurt.party[0];
   m.hp = 1; m.status = 'slp'; m.statusCount = 2; m.moves[0].pp = 0; m.moves[2].pp = 3;
-  hurt.boxes.push({ ...clone(m), id: 'B-1' });
+  E.storage.placeInBox(hurt.storage, { ...clone(m), id: 'B-1' });
   const healed = healParty(hurt, content);
   const max = E.growth.computeStats(content.species.Charmander.base, m.ivs, m.evs, m.level, m.nature).hp;
   assert.deepEqual([healed.party[0].hp, healed.party[0].status, healed.party[0].statusCount], [max, '', 0]);
   assert.deepEqual(healed.party[0].moves.map(x => x.pp), healed.party[0].moves.map(x => x.maxpp));
-  assert.deepEqual(healed.boxes, hurt.boxes, 'boxes are not part of the party heal');
+  assert.deepEqual(healed.storage, hurt.storage, 'boxes are not part of the party heal');
   assert.deepEqual(S.diffPaths(hurt, healed).sort(), ['party.0.hp', 'party.0.moves.0.pp', 'party.0.moves.2.pp', 'party.0.status', 'party.0.statusCount']);
   assert.deepEqual(healParty(healed, content), healed, 'healing a healed party is a no-op');
   assert.equal(healMember({ ...m, hp: 0 }, content).hp, max, 'a fainted member is healed as well');

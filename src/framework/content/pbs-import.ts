@@ -46,10 +46,10 @@ export interface PbsImport {
 
 const GROWTH: Record<string, CurveId> = { Medium: "medium", Fast: "fast", Slow: "slow", Parabolic: "parabolic", Erratic: "erratic", Fluctuating: "fluctuating" };
 const STAT: Record<string, StatKey> = { HP: "hp", ATTACK: "atk", DEFENSE: "def", SPECIAL_ATTACK: "spa", SPECIAL_DEFENSE: "spd", SPEED: "spe" };
-const IMPORTED = ["GrowthRate", "BaseExp", "EVs", "CatchRate", "Moves"];
+const IMPORTED = ["GrowthRate", "BaseExp", "EVs", "CatchRate", "Happiness", "Moves"];
 const SHOWDOWN = ["Name", "Types", "BaseStats", "Abilities", "HiddenAbilities", "GenderRatio", "Height", "Weight"];
 const LATER: Record<string, string> = {
-  FormName: "5.1 forms", Happiness: "5.1/5.3 friendship", TutorMoves: "5.3 teaching", EggMoves: "after the first version (breeding)",
+  FormName: "5.1 forms", TutorMoves: "5.3 teaching", EggMoves: "after the first version (breeding)",
   Evolutions: "5.3 evolution", Pokedex: "5.3 dex", Category: "5.3 dex", Color: "5.3 dex", Shape: "5.3 dex", Habitat: "5.3 dex",
   Generation: "5.3 dex", Flags: "5.3", Incense: "after the first version (breeding)", Offspring: "after the first version (breeding)",
   EggGroups: "after the first version (breeding)", HatchSteps: "after the first version (breeding)",
@@ -126,6 +126,8 @@ export function importPbsSpecies(text: string, sourceId: string): PbsImport {
     let catchRate = 255;
     if (value("CatchRate") === undefined) report.defaults.push("CatchRate = 255 (WP03 §4.3 class default)");
     else { const c = int(value("CatchRate"), 0, 255); if (c === null) { ok = false; fail("CatchRate", "must be an integer from 0 to 255"); } else catchRate = c; }
+    const happiness = value("Happiness") === undefined ? 70 : int(value("Happiness"), 0, Number.MAX_SAFE_INTEGER);
+    if (happiness === null) { ok = false; fail("Happiness", "must be a nonnegative safe integer (no creation clamp at 255)"); }
     const evYield: PartialStats = {};
     const ev = csv("EVs");
     if (value("EVs") === undefined) { ok = false; fail("EVs", "missing: the framework needs the EV yield and the spec records no default for it"); }
@@ -148,7 +150,7 @@ export function importPbsSpecies(text: string, sourceId: string): PbsImport {
       learnset.push({ level, move });
     }
     records.push(report);
-    if (ok) species.push({ id, showdownId, nameKey: `species.${id.replace(/-/g, "_")}`, growth: growth!, baseExp: baseExp!, evYield, catchRate, learnset, source: sourceId });
+    if (ok) species.push({ id, showdownId, nameKey: `species.${id.replace(/-/g, "_")}`, growth: growth!, baseExp: baseExp!, evYield, catchRate, happiness: happiness!, learnset, source: sourceId });
   }
   return { ok: errors.length === 0, species, records, errors };
 }

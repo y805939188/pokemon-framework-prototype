@@ -44,7 +44,7 @@ test('R04: legal symbols keep underscore conversion, EV enum mapping, and the Ca
   assert.equal(r.ok, true, JSON.stringify(r.errors));
   assert.deepEqual(r.species, [{
     id: 'mr-mime', showdownId: 'mrmime', nameKey: 'species.mr_mime', growth: 'parabolic', baseExp: 51,
-    evYield: { spa: 2, spe: 1 }, catchRate: 255,
+    evYield: { spa: 2, spe: 1 }, catchRate: 255, happiness: 70,
     learnset: [{ level: 1, move: 'quickattack' }, { level: 7, move: 'tackle' }], source: 'author-placeholder',
   }]);
   assert.deepEqual(r.records[0].defaults, ['CatchRate = 255 (WP03 §4.3 class default)']);

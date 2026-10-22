@@ -52,12 +52,13 @@ export interface SpeciesSource {
   baseExp: number;
   evYield: PartialStats;
   catchRate: number;
+  happiness?: number;
   learnset: LearnEntry[];
   source: string;
 }
 
-export type OverridableField = "nameKey" | "growth" | "baseExp" | "evYield" | "catchRate" | "learnset";
-export const OVERRIDABLE: readonly OverridableField[] = ["nameKey", "growth", "baseExp", "evYield", "catchRate", "learnset"];
+export type OverridableField = "nameKey" | "growth" | "baseExp" | "evYield" | "catchRate" | "happiness" | "learnset";
+export const OVERRIDABLE: readonly OverridableField[] = ["nameKey", "growth", "baseExp", "evYield", "catchRate", "happiness", "learnset"];
 
 export interface Overlay {
   target: string;
@@ -74,7 +75,7 @@ export interface Manifest {
 /** A one-time reward package as the author writes it (grants.json). Species are content ids, items are bag item ids. */
 export interface GrantSource {
   id: string;
-  members: { species: string; level: number }[];
+  members: { species: string; level: number; form?: number; item?: string }[];
   items: Record<string, number>;
   money: number;
   source: string;

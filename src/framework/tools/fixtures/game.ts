@@ -54,7 +54,7 @@ export function makeGame(over: GameOverrides = {}): GameState {
  * content's ids + form. The fixture world itself needs no conversion (its content ids are the Showdown names).
  */
 export function savedFor(game: GameState, target: Content): GameState {
-  return { ...game, party: game.party.map((m) => toPersistentMember(m, target)), boxes: game.boxes.map((m) => toPersistentMember(m, target)) };
+  return { ...game, party: game.party.map((m) => toPersistentMember(m, target)), storage: { ...game.storage, boxes: game.storage.boxes.map((b) => ({ ...b, slots: b.slots.map((m) => m ? toPersistentMember(m, target) : null) })) } };
 }
 
 export interface FoeOptions {

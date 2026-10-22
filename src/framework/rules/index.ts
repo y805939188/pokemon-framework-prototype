@@ -20,3 +20,12 @@ export * as stats from "./stats.ts";
 export * as config from "./config.ts";
 export * as digest from "./sha256.ts";
 export type * from "./types.ts";
+
+export * as memberIdentity from "./member-identity.ts";
+export * as creationForms from "./creation-form.ts";
+
+export * as storage from "./storage.ts";
+
+export * as storageOperations from "./storage-operations.ts";
+
+export * as receiving from "./receiving.ts";

@@ -8,7 +8,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const E = require('../../js/engine/build/engine.cjs');
-const { GameApplication } = E.app;
+const H = require('../step5/1/legacy-test-support.cjs');
+const GameApplication = H.AutomaticApplication;
 const K = E.fakes;
 const S = E.state;
 
@@ -20,7 +21,7 @@ const clone = x => JSON.parse(JSON.stringify(x));
 const mk = (id, species, level, extra = {}) => ({ ...E.memberFactory.createMember({ id, species, level }, content, lcg(level * 7 + id.length)), ...extra });
 // a save stores members by content id + form since step 5.0 (D5-3): created (battle-shaped) members are stored that way
 const saved = m => E.speciesKey.toPersistentMember(m, content);
-const gameOf = (party, { bag = { pokeball: 5, potion: 2 }, money = 3000, boxes = [] } = {}) => { const g = S.newGame({ party: [] }); g.party = party.map(saved); g.bag = bag; g.money = money; g.boxes = boxes.map(saved); return g; };
+const gameOf = (party, { bag = { pokeball: 5, potion: 2 }, money = 3000, boxes = [] } = {}) => { const g = S.newGame({ party: [] }); g.party = party.map(saved); g.bag = bag; g.money = money; H.setBoxed(g, boxes.map(saved)); g.nextMemberOrdinal = E.memberIdentity.initialOrdinal(E.storage.allMembers(g).map(m => m.id)); return g; };
 const req = (id, foes = [{ species: 'pidgey', level: 3 }], kind = 'wild', seq = 1) => ({ battleId: id, kind, foes, seq });
 
 function fakeApp(game, { first, limits, noMoneyLoss, random = lcg(9) } = {}) {
@@ -34,7 +35,7 @@ test('startBattle creates the foes from the content: ids W<seq>-<n>, creation ru
   const before = JSON.stringify(state.current());
   await app.startBattle(req('wild#4', [{ species: 'pidgey', level: 3 }, { species: 'Caterpie', level: 4 }], 'wild', 4));
   const { setup } = sessions.created[0];
-  assert.deepEqual(setup.foes.map(f => [f.id, f.species, f.level, f.moves.map(m => m.id)]), [['W4-1', 'Pidgey', 3, ['tackle']], ['W4-2', 'Caterpie', 4, ['tackle', 'stringshot']]]);
+  assert.deepEqual(setup.foes.map(f => [f.id, f.species, f.level, f.moves.map(m => m.id)]), [['M2', 'Pidgey', 3, ['tackle']], ['M3', 'Caterpie', 4, ['tackle', 'stringshot']]]);
   for (const f of setup.foes) { assert.equal(f.form, undefined, 'a foe is a battle record'); assert.deepEqual(E.saveSchema.validateGame({ ...gameOf([]), party: [saved(f)] }), []); assert.ok(Object.values(f.ivs).every(v => v >= 0 && v <= 31)); }
   assert.deepEqual([setup.noRun, setup.noBall, setup.storageFull], [false, false, false]);
   assert.equal(JSON.stringify(state.current()), before);
@@ -101,7 +102,7 @@ test('a defeat whose store write fails installs nothing; the retry settles exact
   state.failReplace = new Error('store refused');
   const r = lost('wild#8');
   const o = app.finishBattle({ result: () => r }, { battleId: 'wild#8' });
-  assert.deepEqual([o.code, o.commit, o.aborted], [0, 'none', true]); assert.equal(state.current().money, 500); assert.equal(state.current().party[0].hp, 2);
+  assert.deepEqual([o.code, o.commit, o.pending], [4, 'none', true]); assert.equal(state.current().money, 500); assert.equal(state.current().party[0].hp, 2);
   state.failReplace = null;
   assert.equal(app.finishBattle({ result: () => r }, { battleId: 'wild#8' }).defeat.moneyLost, 72);
   assert.equal(app.finishBattle({ result: () => r }, { battleId: 'wild#8' }).commit, 'already-applied');
@@ -113,8 +114,7 @@ test('the capacity backstop: a capture that cannot be stored aborts the whole re
   const { state, app } = fakeApp(gameOf(party), { limits: { ...E.limits.DEFAULT_LIMITS, boxes: 0 } });
   const before = JSON.stringify(state.current());
   const r = { protocol: 1, battleId: 'c#1', outcome: { kind: 'caught', winner: null, target: 'W1-1', ball: 'pokeball' }, members: {}, bag: { pokeball: -1 }, captured: [mk('W1-1', 'Pidgey', 3)], dex: { seen: ['Pidgey'], owned: ['Pidgey'] } };
-  const o = app.finishBattle({ result: () => r }, { battleId: 'c#1' });
-  assert.deepEqual([o.code, o.commit, o.aborted], [0, 'none', true]); assert.match(o.error, /no room for captured member W1-1/);
+  assert.throws(() => app.commitResult(r, { templates: { 'W1-1': saved(r.captured[0]) }, profile: { mode: 1, naming: 1 } }), e => e.reason === 'boxes-full');
   assert.equal(JSON.stringify(state.current()), before);
 });
 
@@ -227,7 +227,7 @@ test('real: a full party sends a catch to the boxes; with the boxes full too the
   const s = await roomy.app.startBattle(req('box#1', [{ species: 'pidgey', level: 3 }], 'wild', 61));
   await s.throwBall('masterball');
   roomy.app.finishBattle(s, req('box#1'));
-  assert.deepEqual([roomy.state.current().party.length, roomy.state.current().boxes.map(m => m.id)], [6, ['W61-1']]);
+  assert.deepEqual([roomy.state.current().party.length, E.storage.boxedMembers(roomy.state.current()).map(m => m.id)], [6, [s.foeTeam[0].id]]);
   const full = realApp(gameOf(clone(party), { bag: { masterball: 1 }, boxes: [mk('B0', 'Pidgey', 2)] }), { limits: { ...E.limits.DEFAULT_LIMITS, boxes: 1 } });
   const t = await full.app.startBattle(req('box#2', [{ species: 'pidgey', level: 3 }], 'wild', 62));
   assert.deepEqual(await t.throwBall('masterball'), { ok: false, reason: 'ballsdisabled' });
@@ -281,7 +281,7 @@ test('D3 under a battle id that is also "__proto__" or "constructor": a failed s
     const r = { ...lost(id, { A: { hp: 0 } }), bag: { potion: -1 } };
     state.failReplace = new Error('store refused');
     const failed = app.finishBattle({ result: () => r }, { battleId: id });
-    assert.deepEqual([failed.code, failed.commit], [0, 'none'], id);
+    assert.deepEqual([failed.code, failed.commit, failed.pending], [4, 'none', true], id);
     assert.deepEqual([state.current().money, state.current().bag.potion, state.current().party[0].hp, Object.keys(state.current().appliedBattles)], [1000, 2, 2, []], `${id}: nothing left by the failed write`);
     state.failReplace = null;
     const o = app.finishBattle({ result: () => r }, { battleId: id });
@@ -322,7 +322,7 @@ test('a battle is open from the start of startBattle: while its session is being
   assert.equal(w.app.healParty().status, 'healed', 'after the finish: allowed');
   // a later battle is ended only by its own session or its own battle id
   const q = w.app.startBattle(req('p#3'));
-  assert.equal(w.app.finishBattle(h, req('p#1')).commit, 'already-applied', 'a stale finish of the old session commits nothing');
+  assert.equal(w.app.finishBattle(h, req('p#1')).commit, 'none', 'a stale finish of the old session commits nothing');
   w.app.abortBattle(null, new Error('no battle named')); w.app.abortBattle({ battleId: 'other#9' }, new Error('another battle'));
   assert.equal(w.app.healParty().reason, 'battle-active', 'pending p#3: a stale finish, a null abort or another id do not release it');
   w.sessions.calls[1].resolve(handleFor('p#3'));

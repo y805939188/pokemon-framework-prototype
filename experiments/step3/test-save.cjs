@@ -9,15 +9,16 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 const { spawnSync } = require('node:child_process');
 const E = require('../../js/engine/build/engine.cjs');
+const H = require('../step5/1/legacy-test-support.cjs');
 const { validateGame, ledgerStats } = E.saveSchema;
 // Since step 5.0 the chain ends at schema 4, whose step from 3 needs the content's species mapping (D5-3). These states
 // come from the step 2 fixture world, whose content ids are the Showdown names: the identity mapping is that content's.
-const migrateGame = (raw, o = { speciesKey: E.speciesKey.identityKeys }) => E.saveSchema.migrateGame(raw, o);
+const migrateGame = (raw, o = { speciesKey: E.speciesKey.identityKeys, content: E.fixtures.content }) => E.saveSchema.migrateGame(raw, o);
 /** What schemas 3 and 4 add to an older document: the claims ledger, statistics, the step counter, a form per member. */
 const addedByNewerSchemas = s => ['claims', 'schema', 'stats', 'steps', ...['party', 'boxes'].flatMap(k => s[k].map((_, i) => `${k}.${i}.form`))].sort();
 const { SaveStore, SaveError } = E.store;
 // the fixture world (content ids = Showdown names) is chosen explicitly: the store guesses no species keys (step 5.0 review F03)
-const store = (f, hooks = {}) => new SaveStore(f, hooks, E.speciesKey.identityKeys);
+const store = (f, hooks = {}) => new SaveStore(f, hooks, E.speciesKey.identityKeys, E.fixtures.content);
 const S = E.state;
 const F = E.fixtures;
 
@@ -47,7 +48,7 @@ test('the real step 2 state (schema 1, captured from a real MZ run) migrates; on
 	assert.equal(r.ok, true);
 	assert.deepEqual([r.from, r.to, r.migrated], [1, S.GAME_SCHEMA, true]);
 	assert.deepEqual(raw, pristine, 'the input document is never mutated');
-	assert.deepEqual(S.diffPaths(raw, r.state).sort(), addedByNewerSchemas(raw), 'schema 3 adds an empty claims ledger, schema 4 statistics, the step counter and form 0');
+	assert.deepEqual(S.diffPaths(raw, H.legacyGame(r.state, 4)).sort(), addedByNewerSchemas(raw), 'schema 3 adds an empty claims ledger, schema 4 statistics, the step counter and form 0');
 	assert.deepEqual(validateGame(r.state), []);
 	assert.equal(S.applyBattleResult(r.state, { protocol: 1, battleId: 'after-migration', outcome: { kind: 'run', winner: null }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] } }).status, 'applied');
 	const again = migrateGame(r.state);
@@ -63,7 +64,7 @@ test('the oldest prototype shape: counters are added, bad poison becomes plain p
 	assert.deepEqual([a.status, a.statusCount], ['', 0]);
 	assert.deepEqual([b.status, b.statusCount], ['psn', 0]);
 	assert.deepEqual([c.status, c.statusCount], ['slp', undefined], 'no number is invented for a sleeper');
-	assert.equal(r.notes.length, 4); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /schema 4/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
+	assert.equal(r.notes.length, 5); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /schema 4/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
 	assert.deepEqual(validateGame(r.state), []);
 });
 

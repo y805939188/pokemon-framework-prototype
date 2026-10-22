@@ -10,6 +10,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const E = require('../../js/engine/build/engine.cjs');
 const S = E.state;
+const H = require('./1/legacy-test-support.cjs');
 const clone = x => JSON.parse(JSON.stringify(x));
 
 const DIR = path.join(__dirname, 'fixtures/step4-saves');
@@ -30,19 +31,19 @@ test('the samples are what the step 4 code wrote (schema 3, valid then, manifest
 });
 
 for (const f of ['full.json', 'defeat.json']) {
-  test(`P-1 ${f}: migrates to schema 4; only the species key, form, dex, version and the new fields change`, () => {
+  test(`P-1 ${f}: migrates through schema 4 to 5; legacy projection: only the species key, form, dex, version and the new fields change`, () => {
     const raw = load(f), before = clone(raw);
-    const r = E.saveSchema.migrateGame(raw, { speciesKey: keys });
+    const r = E.saveSchema.migrateGame(raw, { speciesKey: keys, content });
     assert.equal(r.ok, true, JSON.stringify(r.error));
     assert.deepEqual(raw, before, 'the original document is untouched');
     assert.deepEqual(E.saveSchema.validateGame(r.state), []);
     const allowed = /^(schema|stats|steps|(party|boxes)\.\d+\.(species|form)|dex\.(seen|owned)\.\d+)$/;
-    const changed = S.diffPaths(raw, r.state);
+    const changed = S.diffPaths(raw, H.legacyGame(r.state, 4));
     assert.deepEqual(changed.filter(p => !allowed.test(p)), [], 'nothing else changes');
     for (const list of ['party', 'boxes']) raw[list].forEach((m, i) => {
       const k = E.speciesKey.keyOfBattleName(content, m.species);
-      assert.deepEqual([r.state[list][i].species, r.state[list][i].form], [k.species, k.form], `${list}[${i}] ${m.species}`);
-      const { species: _a, form: _b, ...rest } = r.state[list][i]; const { species: _c, ...old } = m;
+      assert.deepEqual([H.legacyGame(r.state, 4)[list][i].species, H.legacyGame(r.state, 4)[list][i].form], [k.species, k.form], `${list}[${i}] ${m.species}`);
+      const { species: _a, form: _b, ...rest } = H.legacyGame(r.state, 4)[list][i]; const { species: _c, ...old } = m;
       assert.deepEqual(rest, old, `${list}[${i}]: every other field kept`);
     });
     assert.deepEqual(r.state.dex.owned, raw.dex.owned.map(n => keys(n).species));
@@ -51,23 +52,23 @@ for (const f of ['full.json', 'defeat.json']) {
 }
 
 test('P-1 replay: every result the step 4 saves committed is still a repeat after the migration (core)', () => {
-  const full = E.saveSchema.migrateGame(load('full.json'), { speciesKey: keys }).state;
-  const defeat = E.saveSchema.migrateGame(load('defeat.json'), { speciesKey: keys }).state;
+  const full = E.saveSchema.migrateGame(load('full.json'), { speciesKey: keys, content }).state;
+  const defeat = E.saveSchema.migrateGame(load('defeat.json'), { speciesKey: keys, content }).state;
   let n = 0;
   for (const [id, r] of Object.entries(results)) {
     const g = full.appliedBattles[id] ? full : defeat;
-    const again = S.applyBattleResult(g, r, undefined, keys);
+    const again = S.applyBattleResult(g, r, undefined, keys, H.templatesFor(g, r));
     assert.deepEqual([again.status, again.state === g], ['already-applied', true], id); n++;
-    assert.throws(() => S.applyBattleResult(g, { ...r, money: 1 }, undefined, keys), /already applied with a different result/, `${id}: a different result for it is refused`);
+    assert.throws(() => S.applyBattleResult(g, { ...r, money: 1 }, undefined, keys, H.templatesFor(g, r)), /already applied with a different result/, `${id}: a different result for it is refused`);
   }
   assert.equal(n, Object.keys(results).length); assert.ok(n >= 7);
 });
 
 test('P-1 replay through the application: an old result is already-applied, settles nothing again and counts no statistic', async () => {
-  const migrated = E.saveSchema.migrateGame(load('defeat.json'), { speciesKey: keys }).state;
+  const migrated = E.saveSchema.migrateGame(load('defeat.json'), { speciesKey: keys, content }).state;
   const [id, r] = Object.entries(results).find(([bid]) => migrated.appliedBattles[bid]);
   const state = E.fakes.createMemoryState(migrated), sessions = E.fakes.createFakeSessions(r);
-  const app = new E.app.GameApplication({ state, sessions, projection: E.fakes.createRecordingProjection(), content: () => ({ content }), random: () => 0 });
+  const app = new E.app.GameApplication({ state, sessions, projection: E.fakes.createRecordingProjection(), content: () => ({ content }), random: () => 0, clock: () => 1234567890000 });
   const req = { battleId: id, kind: 'wild', foes: [{ species: 'pidgey', level: 3 }], seq: 99 };
   const h = await app.startBattle(req);
   const o = app.finishBattle(h, req);
@@ -80,7 +81,7 @@ test('P-1 unmappable: the same step 4 save against content without one of its sp
   const smaller = clone(content);
   for (const t of ['forms', 'speciesKeys']) delete smaller[t]['Caterpie'], delete smaller[t]['caterpie'];
   const raw = load('full.json'), before = clone(raw);
-  const r = E.saveSchema.migrateGame(raw, { speciesKey: E.speciesKey.speciesKeyResolver(smaller) });
+  const r = E.saveSchema.migrateGame(raw, { speciesKey: E.speciesKey.speciesKeyResolver(smaller), content: smaller });
   assert.deepEqual([r.ok, r.error.code], [false, 'unmapped-species']);
   const where = r.error.problems.map(p => p.path);
   assert.deepEqual(where, [...raw.party.flatMap((m, i) => m.species === 'Caterpie' ? [`$.party[${i}].species`] : []), ...raw.boxes.flatMap((m, i) => m.species === 'Caterpie' ? [`$.boxes[${i}].species`] : []), `$.dex.seen[${raw.dex.seen.indexOf('Caterpie')}]`, `$.dex.owned[${raw.dex.owned.indexOf('Caterpie')}]`]);

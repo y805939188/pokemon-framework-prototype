@@ -5,10 +5,19 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { stripTypeScriptTypes } = require('node:module');
+const os = require('node:os');
+const { spawnSync } = require('node:child_process');
 const { BattleSession } = require('../../js/engine/game/session.cjs');
 const F = require('../../js/engine/fixtures/game.cjs');
 const ROOT = path.resolve(__dirname, '../..');
+let pluginDirectory, pluginText;
+test.before(() => {
+  pluginDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-menu-source-'));
+  const built = spawnSync('pnpm', ['--dir', 'src', 'exec', 'vite', 'build', '--outDir', pluginDirectory], {cwd:ROOT, env:{...process.env,RR_PLUGIN:'PS_BattleFlow'}, encoding:'utf8'});
+  assert.equal(built.status,0,built.stdout+built.stderr);
+  pluginText = fs.readFileSync(path.join(pluginDirectory,'PS_BattleFlow.js'),'utf8');
+});
+test.after(() => { if(pluginDirectory)fs.rmSync(pluginDirectory,{recursive:true,force:true}); });
 
 function menu(session) {
   function Base() {}
@@ -18,7 +27,7 @@ function menu(session) {
     PluginManager: { registerCommand() {} }, Window_Base: Base, Window_Command: Base,
     Scene_MenuBase: Base, Game_Interpreter: Base };
   vm.createContext(ctx);
-  vm.runInContext(stripTypeScriptTypes(fs.readFileSync(path.join(ROOT, 'src/plugins/PS_BattleFlow.ts'), 'utf8')), ctx);
+  vm.runInContext(pluginText, ctx);
   ctx.window.PSFlow.translator = () => ({ t: (_key, v) => `${v.move} PP ${v.pp}/${v.maxpp}` });
   const scene = Object.create(ctx.window.Scene_PSBattle.prototype);
   scene._session = session;
@@ -28,7 +37,7 @@ function menu(session) {
   return items;
 }
 async function make(game, foe, options = {}) {
-  const session = await BattleSession.create({ game, content: F.content, battleId: 'move-request', seed: [1, 2, 3, 4],
+  const session = await BattleSession.create({ game, experimentalHeldBattle: true, content: F.content, battleId: 'move-request', seed: [1, 2, 3, 4],
     foe: { kind: 'trainer', team: [foe] }, ...options });
   session.take(); return session;
 }

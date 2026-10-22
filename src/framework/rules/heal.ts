@@ -6,19 +6,27 @@
  */
 import { computeStats } from "./growth.ts";
 import { speciesDataOf } from "./species-key.ts";
-import { clone } from "./state.ts";
-import type { GameState } from "./state.ts";
+import { clone } from "./value.ts";
+import type { MemberCollection } from "./storage.ts";
 import type { Content, Member } from "./types.ts";
 
-export function healMember(m: Member, content: Content): Member {
+export function healMember(m: Member, content: Content, options: { preserveReadyToEvolve?: boolean } = {}): Member {
+  if (m.isEgg) return clone(m);
   const sp = speciesDataOf(content, m);
   if (!sp) throw new Error(`member ${m.id}: species "${m.species}" (form ${m.form ?? 0}) is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
   const maxhp = computeStats(sp.base, m.ivs, m.evs, m.level, m.nature).hp;
-  return { ...clone(m), hp: maxhp, status: "", statusCount: 0, moves: m.moves.map((mv) => ({ ...mv, pp: mv.maxpp })) };
+  return { ...clone(m), ...(m.readyToEvolve !== undefined && !options.preserveReadyToEvolve ? { readyToEvolve: false } : {}), hp: maxhp, status: "", statusCount: 0, moves: m.moves.map((mv) => ({ ...mv, pp: mv.maxpp })) };
 }
 
-export function healParty(state: GameState, content: Content): GameState {
+export function healParty<T extends { party: Member[] }>(state: T, content: Content): T {
   const next = clone(state);
   next.party = state.party.map((m) => healMember(m, content));
+  return next;
+}
+
+/** WP61 §7.3: Gen8 default deposit healing is off, so RecoverAll explicitly includes the boxes. */
+export function recoverAll<T extends MemberCollection>(state: T, content: Content, depositHeal = false): T {
+  const next = healParty(state, content);
+  if (!depositHeal) for (const box of next.storage.boxes) box.slots = box.slots.map((m) => m ? healMember(m, content) : null);
   return next;
 }

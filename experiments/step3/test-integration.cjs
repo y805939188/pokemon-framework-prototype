@@ -30,7 +30,7 @@ test('a legacy (schema 1) save plays a whole battle with pipeline content; resul
 	const legacy = clone(require('./fixtures/legacy-v1-flow-state.json'));
 	const f = path.join(dir, 'legacy.json'); fs.writeFileSync(f, JSON.stringify(legacy));
 	// since step 5.0 the migration maps the legacy Showdown names to the pipeline content's ids (D5-3)
-	const store = new E.store.SaveStore(f, {}, E.speciesKey.speciesKeyResolver(content()));
+	const store = new E.store.SaveStore(f, {}, E.speciesKey.speciesKeyResolver(content()), content());
 	const info = store.loadInfo();
 	assert.deepEqual([info.from, info.to], [1, E.state.GAME_SCHEMA]);
 	assert.deepEqual(findDanglingReferences(info.state, content(), E.dex.createDexLookup()), [], 'the legacy save refers only to content that exists');

@@ -18,10 +18,10 @@ export function createDexLookup(engineRoot?: string): DexLookup {
       const s = use().gen8.species.get(id);
       if (!s || !s.exists) return null;
       const slots = s.abilities as Record<string, string | undefined>;
-      const abilities = [slots["0"], slots["1"]].filter((a): a is string => typeof a === "string" && a.length > 0);
+      const abilities = [slots["0"] ?? null, slots["1"] ?? null];
       // single-gender / genderless species name a fixed gender; the others give the female share (WP19 §3.2: out of 256)
       const gender = s.gender === "M" || s.gender === "F" || s.gender === "N" ? s.gender : Math.round((s.genderRatio as { F: number }).F * 256);
-      return { name: s.name as string, baseStats: { ...s.baseStats }, abilities, gender };
+      return { name: s.name as string, baseStats: { ...s.baseStats }, abilities, hiddenAbilities: [slots["H"] ?? null], gender };
     },
     move(id) {
       const m = use().gen8.moves.get(id);
@@ -37,6 +37,7 @@ export function createDexLookup(engineRoot?: string): DexLookup {
       }
       return out;
     },
+    heldItem(id) { const item = use().gen8.items.get(id); return item && item.exists ? { holdable: true, mail: item.isMail === true } : null; },
     sha: () => use().sha,
   };
 }

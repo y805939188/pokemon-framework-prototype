@@ -5,7 +5,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const E = require('../../js/engine/build/engine.cjs');
 const golden = require('./fixtures/result-hash-golden.json');
-const { GameApplication, outcomeCode } = E.app;
+const { outcomeCode } = E.app;
+const H = require('../step5/1/legacy-test-support.cjs');
+const GameApplication = H.AutomaticApplication;
 const K = E.fakes;
 const F = E.fixtures;
 
@@ -16,12 +18,18 @@ const fs = require('node:fs'); const path = require('node:path');
 const SRC = path.resolve(__dirname, '../../content/sample'); const readC = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
 const sample = E.contentRuntime.assembleContent(E.contentCompile.compileContent({ manifest: readC('manifest.json'), sources: readC('sources.json'), species: readC('species.json'), overlays: readC('overlays.json'), grants: readC('grants.json') }).data, E.dex.createDexLookup()).content;
 const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor((s / 4294967296) * n); }; };
-const request = r => ({ battleId: r.battleId, kind: 'wild', foes: [{ species: 'Pidgey', level: 5 }], seq: 1 });
+const request = r => ({ battleId: r.battleId, kind: 'wild', foes: [{ species: r.captured?.[0]?.species ?? 'Pidgey', level: r.captured?.[0]?.level ?? 5 }], seq: 1 });
 const snapshot = state => JSON.stringify(state.current());
 // the save keys members by the sample content's ids since step 5.0 (D5-3); sessions still see Showdown names
 const saved = () => F.savedFor(F.makeGame(), sample);
 function setup(first = result('caught with master ball'), game = saved()) {
   const state = K.createMemoryState(game), projection = K.createRecordingProjection(), sessions = K.createFakeSessions(first);
+  const baseCreate = sessions.create;
+  sessions.create = async (req, game, setup) => {
+    // Golden result files stay frozen. This per-test clone follows the newly allocated setup IDs.
+    if (first && typeof first === 'object') for (const [i, caught] of (first.captured ?? []).entries()) { const id = setup.foes[i].id; first.outcome.target = id; caught.id = id; }
+    return baseCreate(req, game, setup);
+  };
   const app = new GameApplication({ state, sessions, projection, content: () => ({ content: sample }), random: lcg(3) });
   return { state, projection, sessions, app };
 }
@@ -51,7 +59,8 @@ test('duplicate: finishing the same battle again is a no-op for the state; nothi
   const again = app.finishBattle(handle, request(r));
   assert.equal(again.commit, 'already-applied'); assert.equal(again.code, 2);
   assert.equal(state.replaced.length, 1, 'the state was replaced exactly once'); assert.equal(snapshot(state), afterFirst);
-  assert.equal(app.commitResult(r), 'already-applied');
+  assert.equal(app.commitResult(r), 'no-template');
+  assert.equal(app.commitResult(r, H.templatesFor(state.current(), r)), 'already-applied');
 });
 
 test('conflict: a different result for an already applied battle is refused, the state stays as it is', async () => {
@@ -111,7 +120,7 @@ test('an abort whose projection also fails still reports the abort and never thr
   assert.equal(app.abortBattle(null, 'plain string').battleId, null);
 });
 
-test('an invalid outcome is rejected before any commit, including direct commits and retries', () => {
+test('an invalid outcome is rejected before any commit, including direct commits and retries', async () => {
   for (const invalid of [undefined, null, {}, [], { kind: 3, winner: null }, { kind: '', winner: null }, { kind: 'win', winner: 3 }, { kind: 'caught' }]) { // the last one: no winner at all
     const r = result('caught with master ball'); r.outcome = invalid;
     const { state, projection, app } = setup(r); const before = snapshot(state);
@@ -125,10 +134,11 @@ test('an invalid outcome is rejected before any commit, including direct commits
     }
     assert.throws(() => app.commitResult(r), /invalid battle outcome/);
     r.outcome = result('caught with master ball').outcome;
-    const first = app.finishBattle({ result: () => r }, request(r));
+    const correctedHandle = await app.startBattle(request(r));
+    const first = app.finishBattle(correctedHandle, request(r));
     const after = snapshot(state);
     assert.equal(first.commit, 'applied');
-    assert.equal(app.finishBattle({ result: () => r }, request(r)).commit, 'already-applied');
+    assert.equal(app.finishBattle(correctedHandle, request(r)).commit, 'already-applied');
     assert.equal(snapshot(state), after); assert.equal(state.replaced.length, 1, 'a corrected result can be committed exactly once');
   }
 });
@@ -141,7 +151,7 @@ test('an unusable state (a save that could not be read) refuses to start and to 
   assert.deepEqual([outcome.commit, outcome.aborted], ['none', true]); assert.match(outcome.error, /not usable/); assert.equal(state.replaced.length, 0);
   state.failRead = null; state.failReplace = new Error('store refused');
   const refused = app.finishBattle({ result: () => r }, request(r));
-  assert.deepEqual([refused.commit, refused.aborted, refused.error], ['none', true, 'store refused']);
+  assert.deepEqual([refused.commit, refused.pending, refused.error], ['none', true, 'commit-failed: store refused']);
 });
 
 test('a save that refers to content that no longer exists is explained before any session exists', async () => {

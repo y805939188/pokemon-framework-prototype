@@ -7,6 +7,7 @@
  * Not here: art, animation, full menu system, doubles UI.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { developmentCapabilities } from "../framework/rules/config";
 
 (() => {
   "use strict";
@@ -34,12 +35,14 @@
   }
 
   /** What this plugin uses of the game application (framework/app); the full typed contract is app/game-application.ts. */
-  interface BattleOutcomeView { code: number; battleId: string | null; commit: string; kind?: string; aborted?: true; error?: string; projection?: string; projectionError?: string }
+  interface BattleOutcomeView { code: number; battleId: string | null; commit: string; kind?: string; aborted?: true; error?: string; projection?: string; projectionError?: string; pending?: boolean }
   interface GameAppView {
     startBattle(request: unknown): Promise<any>;
     finishBattle(session: unknown, request: unknown): BattleOutcomeView & { result?: unknown };
     abortBattle(request: unknown, error: unknown): BattleOutcomeView;
-    commitResult(result: unknown): string;
+    commitResult(result: unknown, options?: unknown): string;
+    readonly saveBlocked: boolean;
+    resolveReceiving(token: string, decisions?: unknown, signal?: unknown): any;
     startNewGame(): { status: string };
     claimGrant(grantId: string): { status: string; grantId: string; reason?: string; error?: string; placed?: { id: string; species: string; form: number; level: number; to: string }[]; items?: Record<string, number>; money?: number };
     healParty(): { status: string; reason?: string; error?: string };
@@ -52,6 +55,9 @@
 
   // ---------------------------------------------------------------- shared flow state / API
   const PSFlow: any = (W.PSFlow = {
+    developerCapabilities: {}, // explicit developer/test injection only; never plugin settings or save data
+    operationPending(): boolean { return PSFlow.running || !!PSFlow._app?.saveBlocked; },
+    assertBattleAllowed(): void { const capabilities = developmentCapabilities(PSFlow.developerCapabilities); if (!capabilities.allowExperimentalHeldItemBattle && (PSFlow.game().party || []).some((m: any) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成"); },
     running: false, // a battle scene is open (the interpreter waits on this)
     request: null as any,
     lastOutcome: null as any,
@@ -77,7 +83,7 @@
           let json: unknown;
           try { json = JSON.parse(nodeRequire("fs").readFileSync(file, "utf8")); }
           catch (e) { throw new Error(`content: cannot read ${file} (run: pnpm --dir src build): ${String(e instanceof Error ? e.message : e)}`); }
-          const { content, errors } = E.B.contentRuntime.assembleContent(E.B.contentRuntime.loadCompiled(json), E.B.dex.createDexLookup());
+          const { content, errors } = E.B.contentRuntime.assembleContent(E.B.contentRuntime.loadCompiled(json), E.B.dex.createDexLookup(), PSFlow.developerCapabilities);
           if (errors.length) throw new Error("content: " + errors.map((x: any) => `${x.path}: ${x.message}`).join("; "));
           PSFlow._content = content;
         }
@@ -204,7 +210,8 @@
           projection: { project: (outcome: { code: number }) => PSFlow.projectOutcome(outcome) },
           random: (n: number) => PSFlow.random(n),
           clock: () => PSFlow.now(),
-        }, { startMoney: PSFlow.param("startMoney", 3000), noMoneyLoss: PSFlow.flagParam("noMoneyLoss", false), limits: PSFlow.limits() });
+          creationContext: () => ({ map: G.$gameMap?.mapId?.() ?? 0, ...(PSFlow.creationEnvironment?.() ?? {}) }),
+        }, { startMoney: PSFlow.param("startMoney", 3000), noMoneyLoss: PSFlow.flagParam("noMoneyLoss", false), limits: PSFlow.limits(), capabilities: PSFlow.developerCapabilities, receivingProfile: PSFlow.receiveOptions ?? { mode: 0, naming: 0 }, playerLocale: G.navigator?.language ?? "en", playerName: G.$gameParty?.leader?.()?.name?.() || "player" });
       }
       return PSFlow._app as GameAppView;
     },
@@ -265,10 +272,11 @@
       if (v) G.$gameVariables.setValue(v, outcome.code);
     },
     /** Apply a BattleResult to the persistent state. Safe to call twice. */
-    commit(result: any): string { return PSFlow.app().commitResult(result); },
+    commit(result: any, options: unknown = {}): string { return PSFlow.app().commitResult(result, options); },
     async begin(): Promise<any> {
       const op = PSFlow._op;
       if (!op) throw new Error("no battle was opened (openBattle)");
+      PSFlow.assertBattleAllowed();
       const app = PSFlow.app();
       PSFlow.content(); // loaded before the clock starts: "session create" keeps meaning what it meant in the earlier measurements
       const tCreate = performance.now();
@@ -284,8 +292,15 @@
       // The default token is not proof of ownership: a late caller can hold a session from before a load/new game.
       if (!session || op.session !== session) return PSFlow.stale("finish", op);
       const { result, ...outcome } = PSFlow.app().finishBattle(session, op.request); // commits at most once; never throws
+      return PSFlow.completeBattleOutcome(outcome, result, op);
+    },
+    completeBattleOutcome(outcome: any, result: any, op: any): any {
+      if (op !== PSFlow._op) return PSFlow.stale("receive", op);
       if (result) PSFlow.lastResult = result;
       PSFlow.lastOutcome = outcome; // the business outcome is recorded before anything the host shows
+      if (outcome.pending) return outcome; // root operation/save lock stays held until decisions commit
+      if (op.hostCompleted) return outcome;
+      op.hostCompleted = true; // duplicate receive callbacks never repeat transfer/message side effects
       PSFlow.close(outcome.code, op);
       // D3: after a committed defeat the host takes the player home (unless the author allowed losing). The money and the
       // heal were settled in the commit; this is only the trip, it can fail and be retried without settling again. The
@@ -300,6 +315,14 @@
         });
       }
       return outcome;
+    },
+    resolveReceiving(token: string, decisions: unknown = {}, signal?: string): any {
+      const op = PSFlow._op;
+      const returned = PSFlow.app().resolveReceiving(token, decisions, signal);
+      if (returned && "code" in returned && op === PSFlow._op) {
+        const { result, ...outcome } = returned; return PSFlow.completeBattleOutcome(outcome, result, op);
+      }
+      return returned;
     },
     /** Host work after a commit (messages): a failure is kept in `outcome.hostErrors` and logged; the outcome itself stands. */
     afterCommit(outcome: any, step: string, fn: () => void): void {
@@ -341,6 +364,7 @@
     },
     /** The single way a battle opens (StartBattle command and map encounters): the same application path, the same guards. */
     openBattle(request: any): void {
+      PSFlow.assertBattleAllowed();
       if (PSFlow.running) throw new Error("a battle is already running");
       PSFlow._op = { request, session: null }; // this operation's identity: its scene and calls carry it (stateReplaced ends it)
       PSFlow.request = request;
@@ -407,6 +431,7 @@
       battleId,
       resultVariable: Number(args.resultVariable) || 0,
       canLose: String(args.canLose) === "true",
+      forceParty: String(args.forceParty) === "true",
     });
     this._psBattleId = battleId; // this interpreter waits for THIS battle (see updateWaitMode below)
     this.setWaitMode("psBattle");
@@ -536,7 +561,7 @@
   // DataManager.saveGame is refused separately (PS_SaveState).
   if (G.Game_System) {
     const baseIsSaveEnabled = G.Game_System.prototype.isSaveEnabled;
-    G.Game_System.prototype.isSaveEnabled = function (this: any) { return !PSFlow.running && baseIsSaveEnabled.call(this); };
+    G.Game_System.prototype.isSaveEnabled = function (this: any) { return !PSFlow.operationPending() && baseIsSaveEnabled.call(this); };
   }
 
   // ---------------------------------------------------------------- windows (prototype style, like Reactor's own)

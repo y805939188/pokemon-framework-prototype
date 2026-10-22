@@ -136,6 +136,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
   }
   /** Slice setup: a new game on map 5 with the starter claimed (members created with a pinned random). */
   async function slice(seed = 77) {
+    W.PSFlow.receiveOptions = { mode: 1, naming: 1 }; W.PSFlow.rng = seeded(seed);
     G.DataManager.setupNewGame();
     W.PSFlow.rng = seeded(seed); W.PSFlow.seed = [1, 2, 3, 4]; W.PSFlow.fast = true; W.PSFlow.testLimits = null; W.PSFlow._app = null;
     eq(W.PSFlow.claim("starter").status, "applied", "starter claimed");
@@ -174,6 +175,11 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     await waitFor(() => battle() && battle()._mode !== "boot", "battle scene");
   }
   const game = (): any => W.PSFlow.game();
+  const api = (): any => nodeRequire("./js/engine/build/engine.cjs");
+  const boxed = (g = game()): any[] => api().storage.boxedMembers(g);
+  const setBoxed = (g: any, members: any[]): void => { g.storage = api().storage.newStorage(); members.forEach((m, i) => { if (i >= 1200) throw new Error("test setup exceeds fixed storage"); g.storage.boxes[Math.floor(i / 30)].slots[i % 30] = m; }); };
+  const replayTemplates = (g: any, result: any): any => ({ templates: Object.fromEntries(result.captured.map((m: any) => { const found = api().storage.locateMember(g, m.id); if (!found) throw new Error(`missing original template ${m.id}`); return [m.id, clone(found.member)]; })), profile: { mode: 1, naming: 1 } });
+  const legacyDocument = (g: any, schema: number): any => { const member = (m: any): any => { const old = api().state.protocolMember(api().speciesKey.toBattleMember(m, W.PSFlow.content())); if (schema >= 4) old.form = m.form ?? 0; return old; }; return { schema, party: g.party.map(member), boxes: boxed(g).map(member), bag: clone(g.bag), money: g.money, dex: api().speciesKey.battleView(g, W.PSFlow.content()).dex, appliedBattles: clone(g.appliedBattles) }; };
   const clone = (x: any) => JSON.parse(JSON.stringify(x));
   const results: any[] = [];
   const gameDir = path.dirname(path.dirname(path.dirname(path.dirname(nodeRequire.resolve("./js/engine/game/session.cjs")))));
@@ -213,7 +219,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     await frames(10);
     stamps.mapReadyAt = Date.now(); stamps.mapReadyPerf = Math.round(performance.now());
   }
-  const fresh = () => { W.PSFlow.resetGame(); W.PSFlow.rng = seeded(1); }; // foes are created from the content: pin their random draws
+  const fresh = () => { W.PSFlow.receiveOptions = { mode: 1, naming: 1 }; W.PSFlow.resetGame(); W.PSFlow.rng = seeded(1); }; // foes are created from the content: pin their random draws
 
   async function runAll() {
     await toMap();
@@ -293,7 +299,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       await inMode("end"); await press("ok"); await dismissMessages();
       const o = W.PSFlow.lastOutcome; eq([o.code, o.kind, o.commit], [2, "caught", "applied"], "caught");
       const g = game();
-      assert(g.party.length === 4 && /^W\d+-1$/.test(g.party[3].id), "stable id of the caught member: " + (g.party[3] && g.party[3].id));
+      assert(g.party.length === 4 && /^M[0-9a-z]{1,17}$/.test(g.party[3].id), "stable id of the caught member: " + (g.party[3] && g.party[3].id));
       assert(!g.bag.masterball, "master ball consumed once");
       assert(g.dex.owned.includes("snorlax"), "dex updated (content id)");
     });
@@ -333,7 +339,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       game().money = 123456; G.$gameSystem._psGame.party.pop(); // diverge in memory
       const lc = await G.DataManager.loadGame(1);
       eq(game(), snap, "state restored from the MZ save equals the saved state");
-      eq(W.PSFlow.commit(lastResult), "already-applied", "re-committing the same result after restore is a no-op");
+      eq(W.PSFlow.commit(lastResult, replayTemplates(game(), lastResult)), "already-applied", "re-committing the same result after restore is a no-op");
       eq(game(), snap, "state unchanged by the duplicate commit");
       fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected.json"), JSON.stringify(snap));
       return { saveCode: rc, loadCode: lc };
@@ -342,8 +348,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     await scenario("T9 legacy and unusable saves through MZ's own save/load: schema 1 migrates, newer or damaged states are refused and kept", async () => {
       fresh();
       // a step 2 document: no claims ledger, Showdown names, no form/statistics/steps (those came with schemas 3 and 4)
-      const legacy = clone(game()); legacy.schema = 1; delete legacy.claims; delete legacy.stats; delete legacy.steps;
-      legacy.party = legacy.party.map((m: any) => nodeRequire("./js/engine/build/engine.cjs").speciesKey.toBattleMember(m, W.PSFlow.content()));
+      const legacy = legacyDocument(game(), 1);
       for (const m of legacy.party) delete m.statusCount;
       legacy.party[1].status = "tox"; legacy.party[2].status = "slp";
       G.$gameSystem._psGame = legacy;
@@ -351,9 +356,9 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       G.$gameSystem._psGame = { diverged: true };
       const lc1 = await G.DataManager.loadGame(2);
       assert(!G.$gameSystem._psSaveError, "a schema 1 state loads without error");
-      eq([game().schema, game().party[1].status, game().party[1].statusCount, game().party[2].status, game().party[2].statusCount], [4, "psn", 0, "slp", undefined], "migrated on load");
+      eq([game().schema, game().party[1].status, game().party[1].statusCount, game().party[2].status, game().party[2].statusCount], [5, "psn", 0, "slp", undefined], "migrated on load");
       eq(game().party.map((m: any) => [m.species, m.form]), [["charizard", 0], ["blastoise", 0], ["venusaur", 0]], "Showdown names mapped to content id + form through the content (D5-3)");
-      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, 4, true], "migration recorded");
+      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, 5, true], "migration recorded");
       // a state written by a newer build, and a damaged one
       for (const [slot, doc, code] of [[3, { ...clone(game()), schema: 9 }, "unknown-version"], [4, "not a state", "corrupt"]] as [number, any, string][]) {
         G.$gameSystem._psGame = doc;
@@ -506,7 +511,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       W.PSFlow.rng = seeded(4242);
       try {
         const g0 = clone(game());
-        eq([g0.schema, g0.party.length, g0.boxes.length, g0.bag, g0.money, g0.claims, g0.appliedBattles, g0.steps], [4, 0, 0, {}, 3000, {}, {}, 0], "a new game is the formal empty state");
+        eq([g0.schema, g0.party.length, boxed(g0).length, g0.bag, g0.money, g0.claims, g0.appliedBattles, g0.steps], [5, 0, 0, {}, 3000, {}, {}, 0], "a new game is the formal empty state");
         assert(!JSON.stringify(g0).includes("A-000"), "no fixture member in a new game");
         const mz0 = mzParty();
         eq([G.$dataSystem.startMapId, G.$dataSystem.startX, G.$dataSystem.startY], [5, 8, 9], "the project starts on the slice map");
@@ -515,7 +520,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
         await runEvent(1);
         eq([W.PSFlow.lastClaim.status, G.$gameVariables.value(11)], ["applied", 1], "starter granted, the event sees 1");
         const g1 = clone(game());
-        eq(g1.party.map((m: any) => [m.id, m.species, m.form, m.level, m.moves.map((x: any) => x.id)]), [["G-starter-1", "charmander", 0, 5, ["scratch", "growl", "ember"]]], "the starter comes from the content (stored by content id + form)");
+        eq(g1.party.map((m: any) => [m.id, m.species, m.form, m.level, m.moves.map((x: any) => x.id)]), [["M1", "charmander", 0, 5, ["scratch", "growl", "ember"]]], "the starter comes from the content (stored by content id + form)");
         eq([g1.bag, g1.claims, g1.money], [{ antidote: 2, pokeball: 10, potion: 5 }, { starter: { kind: "grant" } }, 3000], "items and the claim");
         eq(g1.dex, { seen: ["charmander"], owned: ["charmander"] }, "the received species is seen and owned");
         await runEvent(1);
@@ -549,7 +554,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       eq(game(), nodeRequire("./js/engine/build/engine.cjs").state.newGame({ party: [], money: 0 }), "the whole formal empty state: no members, boxes, items, money, dex entries, battles or claims");
       assert(!G.$gameSystem._psSaveError, "not an error");
       eq(W.PSFlow.claim("starter").status, "applied", "the player can still receive the starter");
-      eq([game().party.map((m: any) => m.id), game().claims, game().dex.owned], [["G-starter-1"], { starter: { kind: "grant" } }, ["charmander"]], "received into the empty state");
+      eq([game().party.map((m: any) => m.id), game().claims, game().dex.owned], [["M1"], { starter: { kind: "grant" } }, ["charmander"]], "received into the empty state");
       await recover();
     });
     // ================================================================ step 4 batch B: exploration and the battle loop
@@ -605,7 +610,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       const m = game().party[0]; m.exp = E.minExp("parabolic", 8) - 1;
       await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await fightUntilEnd(/^Ember|^ember/i);
-      const live = battle()._session.gw.readState("p1").find((x: any) => x.id === "G-starter-1");
+      const live = battle()._session.gw.readState("p1").find((x: any) => x.id === "M1");
       await finishBattle();
       const o = W.PSFlow.lastOutcome; eq([o.code, o.commit, o.kind], [1, "applied", "win"], "won");
       const p = game().party[0];
@@ -633,10 +638,10 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
         assert(battle()._log._lines.some((l: string) => /sent to the boxes/.test(l)), "the player is told the catch went to the boxes");
         await press("ok"); await dismissMessages(); await waitFor(() => !W.PSFlow.running && !battle(), "back"); await frames(5);
         eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit], [2, "applied"], "caught");
-        ids.push(game().boxes[game().boxes.length - 1].id);
+        ids.push(boxed()[boxed().length - 1].id);
       }
-      eq([game().party.length, game().boxes.length], [6, 2], "party unchanged, two in the boxes");
-      assert(ids[0] !== ids[1] && ids.every((id) => /^W\d+-1$/.test(id)), "distinct stable ids: " + ids.join(","));
+      eq([game().party.length, boxed().length], [6, 2], "party unchanged, two in the boxes");
+      assert(ids[0] !== ids[1] && ids.every((id) => /^M[0-9a-z]{1,17}$/.test(id)), "distinct stable ids: " + ids.join(","));
       eq(game().bag.potion, 4, "one potion used");
       return { ids, balls: game().bag.pokeball };
     });
@@ -645,7 +650,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       await slice(19);
       const g = game();
       for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3));
-      g.boxes.push(mkMember("B-1", "Pidgey", 3));
+      api().storage.placeInBox(g.storage, mkMember("B-1", "Pidgey", 3));
       W.PSFlow.testLimits = { party: 6, boxes: 1, bagPerItem: 999, money: 999999 }; W.PSFlow._app = null;
       const before = clone(game());
       await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
@@ -653,7 +658,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       assert(battle()._log._lines.some((l: string) => /party and boxes are full/.test(l)), "the reason is shown");
       eq(battle()._session.bag.pokeball, before.bag.pokeball, "nothing spent");
       await choose(/^Run/); await finishBattle();
-      eq([game().party.length, game().boxes.length, game().bag.pokeball], [6, 1, before.bag.pokeball], "nothing stored or spent");
+      eq([game().party.length, boxed().length, game().bag.pokeball], [6, 1, before.bag.pokeball], "nothing stored or spent");
       W.PSFlow.testLimits = null; W.PSFlow._app = null;
     });
 
@@ -824,7 +829,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
 
     await scenario("T24 the read-only party screen: from the slice sign and from the main menu; it shows party, boxes, bag and money and changes nothing", async () => {
       await slice(24);
-      game().boxes.push(mkMember("B-1", "Pidgey", 3));
+      api().storage.placeInBox(game().storage, mkMember("B-1", "Pidgey", 3));
       const before = clone(game());
       G.$gameMap.event(3).start(); await frames(3);
       for (let i = 0; i < 20 && !(scene() && scene()._psParty); i++) { if (G.$gameMessage.isBusy()) await press("ok"); else await frames(5); }
@@ -849,16 +854,16 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       const catchOne = async () => {
         await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
         await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); await finishBattle();
-        eq(W.PSFlow.lastOutcome.code, 2, "caught"); return game().boxes[game().boxes.length - 1].id;
+        eq(W.PSFlow.lastOutcome.code, 2, "caught"); return boxed()[boxed().length - 1].id;
       };
       const a = await catchOne();
       await G.DataManager.saveGame(10); const seqSaved = G.$gameSystem._psBattleSeq;
       const b = await catchOne();
       await G.DataManager.loadGame(10);
-      eq([G.$gameSystem._psBattleSeq, game().boxes.map((m: any) => m.id)], [seqSaved, [a]], "counter and state rolled back together");
+      eq([G.$gameSystem._psBattleSeq, boxed().map((m: any) => m.id)], [seqSaved, [a]], "counter and state rolled back together");
       await toMapId(5, 8, 9);
       const c = await catchOne();
-      const ids = [...game().party, ...game().boxes].map((m: any) => m.id);
+      const ids = [...game().party, ...boxed()].map((m: any) => m.id);
       eq(new Set(ids).size, ids.length, "no duplicate id in this timeline: " + ids.join(","));
       eq(c, b, "the discarded timeline's id is reused, which is safe (it exists in no loaded state)");
       return { a, b, c, seqSaved };
@@ -877,14 +882,14 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       for (let i = 3; i <= 6; i++) game().party.push(mkMember(`P-${i}`, "Caterpie", 3)); // test setup: a full party
       await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); await finishBattle();
-      eq([W.PSFlow.lastOutcome.code, game().party.length, game().boxes.length], [2, 6, 1], "caught into the boxes");
+      eq([W.PSFlow.lastOutcome.code, game().party.length, boxed().length], [2, 6, 1], "caught into the boxes");
       game().party[0].hp = 3; game().party[0].moves[2].pp = 1; // hurt before the nurse
       await toMapId(5, 10, 5); await runEvent(2); eq(W.PSFlow.lastHeal.status, "healed", "nurse");
       G.$gamePlayer.locate(12, 6); G.$gamePlayer.setDirection(4); await frames(5);
       const rc = await G.DataManager.saveGame(11);
       const expected = { state: clone(game()), mz: mzParty(), map: { mapId: G.$gameMap.mapId(), x: G.$gamePlayer.x, y: G.$gamePlayer.y, d: G.$gamePlayer.direction() }, seq: G.$gameSystem._psBattleSeq };
       fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t26.json"), JSON.stringify(expected));
-      return { saveCode: rc, party: expected.state.party.map((m: any) => [m.id, m.level]), boxes: expected.state.boxes.map((m: any) => m.id), seq: expected.seq };
+      return { saveCode: rc, party: expected.state.party.map((m: any) => [m.id, m.level]), boxes: boxed(expected.state).map((m: any) => m.id), seq: expected.seq };
     });
 
     await scenario("T31 a save written by the step 4 code (schema 3, P-1 sample) through MZ's own save/load: migrated to schema 4 field by field with the content mapping and saved again; an unmappable one is refused and kept", async () => {
@@ -896,11 +901,11 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       G.$gameSystem._psGame = { diverged: true };
       await G.DataManager.loadGame(13);
       assert(!G.$gameSystem._psSaveError, "loads: " + JSON.stringify(G.$gameSystem._psSaveError));
-      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [3, 4, true], "migrated from schema 3");
+      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [3, 5, true], "migrated from schema 3");
       const g = clone(game());
       const keyOf = (n: string) => B.speciesKey.keyOfBattleName(W.PSFlow.content(), n);
       eq(g.party.map((m: any) => [m.id, m.species, m.form]), sample.party.map((m: any) => [m.id, keyOf(m.species).species, 0]), "party by content id + form");
-      eq(g.boxes.map((m: any) => [m.id, m.species]), sample.boxes.map((m: any) => [m.id, keyOf(m.species).species]), "boxes too");
+      eq(boxed(g).map((m: any) => [m.id, m.species]), sample.boxes.map((m: any) => [m.id, keyOf(m.species).species]), "boxes too");
       eq([g.claims, g.appliedBattles, g.bag, g.money, g.dex.owned], [sample.claims, sample.appliedBattles, sample.bag, sample.money, sample.dex.owned.map((n: string) => keyOf(n).species)], "claims, ledger, bag (5000 above the cap), money kept; dex mapped");
       eq(B.saveSchema.validateGame(g), [], "a valid schema 4 state");
       eq(W.PSFlow.claim("starter").status, "already-claimed", "the claim survived");
@@ -931,7 +936,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       eq(G.$gameSystem.isSaveEnabled(), false, "the save menu is masked while the state is unusable");
       fresh();
       eq(G.$gameSystem.isSaveEnabled(), true, "an explicit reset clears the error, saving is possible again");
-      return { party: g.party.length, boxes: g.boxes.length, battles: Object.keys(g.appliedBattles).length };
+      return { party: g.party.length, boxes: boxed(g).length, battles: Object.keys(g.appliedBattles).length };
     });
 
     await scenario("T32 the step counter (WP06 §4.1): steps on the map count, MZ's own step count still runs, and the counter is saved with the state", async () => {
@@ -1151,7 +1156,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       const g = game();
       for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3));
       const box = mkMember("BX-0", "Pidgey", 3);
-      g.boxes = Array.from({ length: W.PSFlow.limits().boxes }, (_, i) => ({ ...clone(box), id: `BX-${i}` })); // test setup: every box slot used
+      setBoxed(g, Array.from({ length: W.PSFlow.limits().boxes }, (_, i) => ({ ...clone(box), id: `BX-${i}` }))); // test setup: every box slot used
       for (const item of B.items.BAG_ITEMS) g.bag[item] = 999; // test setup: every known bag item at the cap
       const enc: number[] = [], saveMs: number[] = [], loadMs: number[] = [], menuMs: number[] = [], viewMs: number[] = [];
       for (let i = 0; i < n; i++) {
@@ -1172,7 +1177,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       }
       const st = (a: number[]) => ({ n: a.length, p50: pct(a, 0.5), max: a.length ? Math.max(...a) : null, samples: a });
       perf.step5 = {
-        method: `slice map; party 6, boxes ${game().boxes.length} (all slots used), bag ${Object.keys(game().bag).length} items x 999 (test setup); save/load = DataManager round trip, slot 17; battleView = the battle view of that state; encounter = executeEncounter -> first menu; party screen = SceneManager.push(Scene_PSParty) until the screen is up`,
+        method: `slice map; party 6, boxes ${boxed().length} (all slots used), bag ${Object.keys(game().bag).length} items x 999 (test setup); save/load = DataManager round trip, slot 17; battleView = the battle view of that state; encounter = executeEncounter -> first menu; party screen = SceneManager.push(Scene_PSParty) until the screen is up`,
         saveMs: st(saveMs), loadMs: st(loadMs), battleViewMs: st(viewMs), encounterToFirstMenuMs: st(enc), partyScreenOpenMs: st(menuMs),
       };
     } catch (e: any) { perf.errors = (perf.errors || []).concat(`step5 timings: ${e.message}`); }
@@ -1376,8 +1381,8 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       await finishBattle();
       eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit], [3, "applied"], "a battle after loading commits");
       eq(G.$gameSystem._psBattleSeq, expected.seq + 1, "the counter continues from the save");
-      const ids = [...game().party, ...game().boxes].map((m: any) => m.id); eq(new Set(ids).size, ids.length, "no duplicate id");
-      return { seq: G.$gameSystem._psBattleSeq, party: game().party.length, boxes: game().boxes.length };
+      const ids = [...game().party, ...boxed()].map((m: any) => m.id); eq(new Set(ids).size, ids.length, "no duplicate id");
+      return { seq: G.$gameSystem._psBattleSeq, party: game().party.length, boxes: boxed().length };
     });
     await scenario("V2 real restart (slice): the new-game save loads identically in a fresh process, the claim stays claimed, MZ gold/items as saved", async () => {
       const expected = JSON.parse(fs.readFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t15.json"), "utf8"));

@@ -40,6 +40,8 @@ const ITEM_IDS = new Set([...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEM
 function toSet(m: Member, moveName: (id: string) => string): Record<string, unknown> {
   return {
     name: m.id, species: m.species, item: m.item || "", ability: m.ability, nature: m.nature, gender: m.gender,
+    // Engine calculation domain only; persistent friendship is never read back from this bounded field.
+    happiness: Math.min(255, Math.max(0, m.friendship ?? 70)), shiny: m.shiny ?? false,
     level: m.level, evs: { ...m.evs }, ivs: { ...m.ivs }, moves: m.moves.map((x) => moveName(x.id)),
   };
 }
@@ -60,6 +62,8 @@ export interface CreateOptions {
   content: Content;
   seed?: number[] | string;
   doubles?: boolean;
+  /** Explicit controlled test/developer path; held-item write-back is incomplete. Never a player/save setting. */
+  experimentalHeldBattle?: boolean;
   formatid?: string;
   ai?: FoeAi;
   rules?: G.ExpRules;
@@ -144,7 +148,8 @@ export class BattleSession {
   _staged = false;
   _broken: SessionBrokenError | null = null;
 
-  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory }: CreateOptions): Promise<BattleSession> {
+  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false }: CreateOptions): Promise<BattleSession> {
+    if (!experimentalHeldBattle && [...game.party, ...foe.team].some((m) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成");
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
     for (const m of [...game.party, ...foe.team]) {
       if (!content.species[m.species]) throw new Error(`battle content: species "${m.species}" (member ${m.id}) is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
@@ -158,7 +163,7 @@ export class BattleSession {
     for (const m of [...game.party, ...foe.team]) {
       if (!/^[A-Za-z0-9#._:-]{1,18}$/.test(m.id)) throw new Error(`member id "${m.id}" is not usable as a battle id (1-18 chars of A-Z a-z 0-9 # . _ : -)`);
     }
-    const party = S.clone(game.party).slice(0, 6);
+    const party = S.clone(game.party).filter((m) => !m.isEgg).slice(0, 6);
     const lead = [...party.filter((m) => m.hp > 0), ...party.filter((m) => m.hp <= 0)];
     const s = new BattleSession();
     s.content = content; s.rules = rules || G.DEFAULT_RULES; s.battleId = battleId; s.foe = foe;
@@ -625,7 +630,7 @@ export class BattleSession {
       const c = this.foeTeam.find((m) => m.id === outcomeInfo!.target)!;
       const eng = this.gw.readState("p2").find((x) => x.id === c.id)!;
       const curve = this.content.species[c.species]!.growth;
-      result.captured.push(S.newMember({
+      result.captured.push(S.protocolMember({
         ...c, exp: G.minExp(curve, c.level), hp: eng.hp, ...persistentStatus(eng.status, eng.statusCount),
         moves: c.moves.map((mv) => ({ id: mv.id, pp: eng.pp[mv.id] ?? mv.pp, maxpp: mv.maxpp })), ball: outcomeInfo!.ball,
       }));

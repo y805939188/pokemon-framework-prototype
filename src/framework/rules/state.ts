@@ -3,20 +3,27 @@
  * Pure functions. A BattleResult is the only thing that crosses from the battle layer into persistent state;
  * `applyBattleResult` is the single write path.
  */
+import { clone } from "./value.ts";
+export { clone } from "./value.ts";
+import { receiveMembers, requireTemplate } from "./receiving.ts";
+import type { ReceivingDecision, ReceivingProfile } from "./receiving.ts";
 import { sha256Hex } from "./sha256.ts";
 import { DEFAULT_LIMITS } from "./limits.ts";
 import { own, setOwn } from "./own.ts";
 import { identityKeys } from "./species-key.ts";
 import type { SpeciesKeyResolver } from "./species-key.ts";
+import { advanceMemberOrdinal, completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity.ts";
+import { allMembers, boxedMembers, newStorage, placeInBox } from "./storage.ts";
+import type { Storage } from "./storage.ts";
 import { newStats } from "./stats.ts";
 import type { GameStats } from "./stats.ts";
 import type { Limits } from "./limits.ts";
-import type { Member, MoveSlot, PartialStats, Stats } from "./types.ts";
+import type { Content, Member, MemberOrigin, MoveSlot, Owner, PartialStats, Stats } from "./types.ts";
 
 export const PROTOCOL_VERSION = 1;
 
 /** Version of the PERSISTENT game state document (rules/save-schema.ts migrates older ones). Not the battle protocol version. */
-export const GAME_SCHEMA = 4;
+export const GAME_SCHEMA = 5;
 
 /** Fields of a persistent member that a battle result may change. Everything else must be untouched. */
 export const MEMBER_WRITE_SET = ["level", "exp", "hp", "status", "statusCount", "moves", "evs", "friendship"] as const;
@@ -32,7 +39,9 @@ export interface Dex {
 export interface GameState {
   schema: number;
   party: Member[];
-  boxes: Member[];
+  storage: Storage;
+  player: Owner;
+  nextMemberOrdinal: string;
   bag: Record<string, number>;
   money: number;
   dex: Dex;
@@ -67,10 +76,6 @@ export interface BattleResult {
   money?: number;
 }
 
-export function clone<T>(x: T): T {
-  return JSON.parse(JSON.stringify(x)) as T;
-}
-
 export interface NewMemberInput {
   id: string;
   species: string;
@@ -92,6 +97,22 @@ export interface NewMemberInput {
   friendship?: number;
   ball?: string;
   ot?: string;
+  personalID?: number;
+  owner?: Owner;
+  ownerCompatibilityDefault?: boolean;
+  origin?: MemberOrigin;
+  abilityIndex?: number | null;
+  effectiveAbilityIndex?: number | null;
+  shiny?: boolean;
+  superShiny?: boolean;
+  firstMoves?: string[];
+  markings?: number[];
+  ribbons?: string[];
+  cannotStore?: boolean;
+  cannotRelease?: boolean;
+  isEgg?: boolean;
+  mail?: string | null;
+  readyToEvolve?: boolean;
 }
 
 export function newMember(o: NewMemberInput): Member {
@@ -102,16 +123,27 @@ export function newMember(o: NewMemberInput): Member {
     item: o.item || "", ability: o.ability, nature: o.nature, gender: o.gender,
     ivs: six(31, o.ivs),
     evs: six(0, o.evs),
-    friendship: o.friendship ?? 70, ball: o.ball || "pokeball", ot: o.ot || "player",
+    friendship: o.friendship ?? 70, ball: o.ball || "pokeball", ...(o.owner ? { owner: { ...o.owner } } : { ot: o.ot || "player" }),
+    ...Object.fromEntries((["personalID", "ownerCompatibilityDefault", "origin", "abilityIndex", "effectiveAbilityIndex", "shiny", "superShiny", "firstMoves", "markings", "ribbons", "cannotStore", "cannotRelease", "isEgg", "mail", "readyToEvolve"] as const)
+      .filter((key) => o[key] !== undefined).map((key) => [key, clone(o[key])])),
   };
+}
+
+/** Frozen v1 captured-member projection: no schema-5 metadata may cross this result boundary. */
+export function protocolMember(member: Member): Member {
+  return newMember({ id: member.id, species: member.species, nickname: member.nickname, level: member.level,
+    exp: member.exp, hp: member.hp, status: member.status, statusCount: member.statusCount, moves: member.moves,
+    item: member.item, ability: member.ability, nature: member.nature, gender: member.gender,
+    ivs: member.ivs, evs: member.evs, friendship: member.friendship, ball: member.ball, ot: member.owner?.name ?? member.ot });
 }
 
 /**
  * A new persistent game state. Its members are persistent: `species` is a content id, and a member given without a
  * form gets the base form 0 here (only here: `newMember` also builds battle records, which carry no form).
  */
-export function newGame({ party, bag = {}, money = 0 }: { party: NewMemberInput[]; bag?: Record<string, number>; money?: number }): GameState {
-  return { schema: GAME_SCHEMA, party: party.map((m) => newMember({ ...m, form: m.form ?? 0 })), boxes: [], bag: { ...bag }, money, dex: { seen: [], owned: [] }, appliedBattles: {}, claims: {}, stats: newStats(), steps: 0 };
+export function newGame({ party, bag = {}, money = 0, player = { ...COMPATIBLE_PLAYER } }: { party: NewMemberInput[]; bag?: Record<string, number>; money?: number; player?: Owner }): GameState {
+  const members = party.map((m) => completeIndividual(newMember({ ...m, form: m.form ?? 0 }), {}));
+  return { schema: GAME_SCHEMA, party: members, storage: newStorage(), player: { ...player }, nextMemberOrdinal: initialOrdinal(members.map((m) => m.id)), bag: { ...bag }, money, dex: { seen: [], owned: [] }, appliedBattles: {}, claims: {}, stats: newStats(), steps: 0 };
 }
 
 /** Stable hash of a result, used for idempotency (same battleId + same hash => no-op). */
@@ -122,6 +154,26 @@ export function resultHash(result: BattleResult): string {
 }
 
 export type ApplyStatus = "applied" | "already-applied";
+export interface BattleCommitOptions {
+  templates?: Readonly<Record<string, Member>>;
+  decisions?: Readonly<Record<string, ReceivingDecision>>;
+  profile?: ReceivingProfile;
+  content?: Content;
+  nextMemberOrdinal?: string;
+  depositHeal?: boolean;
+}
+
+export function capturedTemplates(result: BattleResult, templates: Readonly<Record<string, Member>>, keys: SpeciesKeyResolver): Member[] {
+  const received: Member[] = [];
+  for (const c of result.captured || []) {
+    const template = own(templates, c.id);
+    requireTemplate(template, c.id);
+    const k = keys(c.species);
+    if (!k || k.species !== template.species || k.form !== (template.form ?? 0)) throw new Error(`captured member ${c.id}: "${c.species}" has no matching persistent key in its original template`);
+    received.push({ ...clone(template), hp: c.hp, status: c.status, statusCount: c.statusCount ?? 0, moves: clone(c.moves), ball: c.ball ?? template.ball, friendship: c.friendship ?? template.friendship });
+  }
+  return received;
+}
 
 /**
  * Apply a BattleResult to a game state (pure). Throws on contract violations (unknown member,
@@ -135,10 +187,11 @@ export type ApplyStatus = "applied" | "already-applied";
  * replay ledger written before schema 4 still recognises the same result. A name without a key refuses the whole
  * result. Without `keys` the battle name is the content id (fixture worlds); the game application always passes them.
  */
-export function applyBattleResult(state: GameState, result: BattleResult, limits: Limits = DEFAULT_LIMITS, keys: SpeciesKeyResolver = identityKeys): { state: GameState; status: ApplyStatus } {
+export function applyBattleResult(state: GameState, result: BattleResult, limits: Limits = DEFAULT_LIMITS, keys: SpeciesKeyResolver = identityKeys, options: BattleCommitOptions = {}): { state: GameState; status: ApplyStatus } {
   if (result.protocol !== PROTOCOL_VERSION) throw new Error(`unsupported protocol ${result.protocol}`);
   if (state.schema !== GAME_SCHEMA) throw new Error(`game state has schema ${state.schema}, this build writes schema ${GAME_SCHEMA}: migrate it first (rules/save-schema.ts)`);
   if (!result.battleId) throw new Error("result without battleId");
+  for (const member of result.captured ?? []) requireTemplate(own(options.templates, member.id), member.id);
   const h = resultHash(result);
   const prev = own(state.appliedBattles, result.battleId);
   if (prev) {
@@ -163,14 +216,11 @@ export function applyBattleResult(state: GameState, result: BattleResult, limits
     if (delta > 0 && n > limits.bagPerItem) throw new Error(`${item} would be ${n}, above the stage cap of ${limits.bagPerItem} per item`);
     if (n === 0) delete next.bag[item]; else next.bag[item] = n;
   }
-  for (const c of result.captured || []) {
-    if (next.party.some((x) => x.id === c.id) || next.boxes.some((x) => x.id === c.id)) throw new Error(`captured id ${c.id} already exists`);
-    const k = keys(c.species);
-    if (!k) throw new Error(`captured member ${c.id}: "${c.species}" has no persistent species key in the content`);
-    const m: Member = { ...newMember(c), species: k.species, form: k.form };
-    if (next.party.length < limits.party) next.party.push(m);
-    else if (next.boxes.length < limits.boxes) next.boxes.push(m);
-    else throw new Error(`no room for captured member ${c.id}: the party (${next.party.length}) and the boxes (${next.boxes.length}) are full`);
+  const received = capturedTemplates(result, options.templates ?? {}, keys);
+  if (received.length) {
+    const planned = receiveMembers(next, received, options.decisions ?? {}, { limits, content: options.content ?? { species: {} }, profile: options.profile ?? { mode: 0, naming: 0 }, depositHeal: options.depositHeal ?? false });
+    next.party = planned.state.party; next.storage = planned.state.storage;
+    next.nextMemberOrdinal = advanceMemberOrdinal(state.nextMemberOrdinal, received.map((m) => m.id), options.nextMemberOrdinal ?? state.nextMemberOrdinal);
   }
   if (result.dex) {
     for (const list of ["seen", "owned"] as const) for (const name of result.dex[list] || []) {

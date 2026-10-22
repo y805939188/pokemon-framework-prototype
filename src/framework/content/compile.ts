@@ -6,7 +6,7 @@ import { sha256Hex } from "../rules/sha256.ts";
 import { isBagItem } from "../rules/items.ts";
 import { DEFAULT_LIMITS } from "../rules/limits.ts";
 import { MAX_FORM } from "../rules/species-key.ts";
-import { checkOverrides } from "../rules/config.ts";
+import { checkOverrides, developmentCapabilities } from "../rules/config.ts";
 import {
   CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, SCHEMA_VERSION, SOURCE_KINDS, STAT_KEYS_ALLOWED, USAGE_DECISIONS,
 } from "./schema.ts";
@@ -46,6 +46,7 @@ const FIELD_CHECK: Record<string, (v: unknown) => string | null> = {
   nameKey: (v) => typeof v === "string" && NAME_KEY.test(v) ? null : "must be a text key like \"species.pidgey\" (lowercase letters, digits, _ and .)",
   growth: (v) => typeof v === "string" && (CURVES_ALLOWED as readonly string[]).includes(v) ? null : `must be one of ${CURVES_ALLOWED.join("|")}`,
   baseExp: (v) => isInt(v, 1, 1000) ? null : "must be an integer from 1 to 1000",
+  happiness: (v) => isInt(v, 0, Number.MAX_SAFE_INTEGER) ? null : "must be a nonnegative safe integer (creation does not clamp at 255)",
   catchRate: (v) => isInt(v, 0, 255) ? null : "must be an integer from 0 to 255",
   evYield: (v) => {
     if (!isObj(v)) return "must be an object like {\"spe\": 1}";
@@ -127,7 +128,8 @@ export function showdownDependencyProblem(sources: readonly SourceEntry[]): stri
   return problem ? `the content's species and moves are read from the pinned Showdown build: ${problem}` : null;
 }
 
-export function compileContent(inputs: ContentInputs): CompileResult {
+export function compileContent(inputs: ContentInputs, developerCapabilities: unknown = {}): CompileResult {
+  const capabilities = developmentCapabilities(developerCapabilities);
   const errors: ContentError[] = [];
   const report: Report = (file, path, message) => { errors.push({ file, path, message }); };
 
@@ -162,7 +164,7 @@ export function compileContent(inputs: ContentInputs): CompileResult {
   else for (const [i, s] of inputs.species.entries()) {
     const p = `[${i}]`;
     if (!isObj(s)) { report("species.json", p, "must be an object"); continue; }
-    checkKnownKeys(s, ["id", "form", "showdownId", "nameKey", "growth", "baseExp", "evYield", "catchRate", "learnset", "source"], "species.json", p, report);
+    checkKnownKeys(s, ["id", "form", "showdownId", "nameKey", "growth", "baseExp", "evYield", "catchRate", "happiness", "learnset", "source"], "species.json", p, report);
     const form = s["form"] === undefined ? 0 : s["form"];
     if (!isInt(form, 0, MAX_FORM)) report("species.json", `${p}.form`, `must be an integer from 0 to ${MAX_FORM} (0 = the base form)`);
     const label = typeof s["id"] === "string" ? `${p} (${s["id"]}${form ? ` form ${String(form)}` : ""})` : p;
@@ -173,6 +175,7 @@ export function compileContent(inputs: ContentInputs): CompileResult {
       else { keys.add(key); if (!form) ids.add(s["id"]); }
     }
     if (typeof s["showdownId"] !== "string" || !SHOWDOWN_ID.test(s["showdownId"])) report("species.json", `${p}.showdownId`, "must be a Showdown species id (lowercase letters and digits)");
+    if (s["happiness"] !== undefined) { const issue = FIELD_CHECK["happiness"]!(s["happiness"]); if (issue) report("species.json", `${p}.happiness`, issue); }
     for (const f of ["nameKey", "growth", "baseExp", "catchRate", "evYield", "learnset"] as const) {
       if (!(f in s)) { report("species.json", `${p}.${f}`, `missing required field "${f}" in ${label}`); continue; }
       const problem = FIELD_CHECK[f]!(s[f]);
@@ -253,7 +256,10 @@ export function compileContent(inputs: ContentInputs): CompileResult {
       const members = g["members"];
       if (!Array.isArray(members) || members.length > DEFAULT_LIMITS.party) report("grants.json", `${p}.members`, `must be an array of at most ${DEFAULT_LIMITS.party} {species, level}`);
       else for (const [j, m] of members.entries()) {
-        if (!isObj(m) || typeof m["species"] !== "string" || !isInt(m["level"], 1, 100) || Object.keys(m).some((k) => k !== "species" && k !== "level")) { report("grants.json", `${p}.members[${j}]`, "must be {species: <species id>, level: 1..100}"); continue; }
+        if (!isObj(m) || typeof m["species"] !== "string" || !isInt(m["level"], 1, 100) || Object.keys(m).some((k) => !["species", "level", "form", "item"].includes(k))) { report("grants.json", `${p}.members[${j}]`, "must be {species: <species id>, level: 1..100}"); continue; }
+        if (m["form"] !== undefined && (!isInt(m["form"], 0, MAX_FORM) || !keys.has(recordKey(m["species"], m["form"] as number)))) report("grants.json", `${p}.members[${j}].form`, "must name an existing exact form");
+        if (m["item"] !== undefined && (typeof m["item"] !== "string" || (m["item"] !== "" && !SHOWDOWN_ID.test(m["item"])))) report("grants.json", `${p}.members[${j}].item`, "must be a held item id");
+        if (m["item"] && !capabilities.allowHeldItemSources) report("grants.json", `${p}.members[${j}].item`, "held-item-source-disabled: controlled developer injection required; not a player setting");
         if (!ids.has(m["species"])) report("grants.json", `${p}.members[${j}].species`, `"${m["species"]}" is not a species id of species.json`);
       }
       const items = g["items"];

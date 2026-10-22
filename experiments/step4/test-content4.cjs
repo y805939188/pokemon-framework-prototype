@@ -33,9 +33,9 @@ test('the live sample compiles and assembles: 8 species, one grant, every refere
 test('creation data comes from the pinned Showdown build: natural abilities, gender rule out of 256, move id and PP', () => {
   const { content } = assembleContent(compileContent(inputs()).data, dex);
   const sp = content.species;
-  assert.deepEqual([sp.Charmander.abilities, sp.Charmander.gender], [['Blaze'], 32]); // 7/8 male = female chance 32 (WP19 3.2)
+  assert.deepEqual([sp.Charmander.abilities, sp.Charmander.gender], [['Blaze', null], 32]); // 7/8 male = female chance 32 (WP19 3.2)
   assert.deepEqual([sp.Pidgey.abilities, sp.Pidgey.gender], [['Keen Eye', 'Tangled Feet'], 128]);
-  assert.deepEqual([sp.Caterpie.abilities, sp.Caterpie.gender], [['Shield Dust'], 128]);
+  assert.deepEqual([sp.Caterpie.abilities, sp.Caterpie.gender], [['Shield Dust', null], 128]);
   assert.equal(dex.species('voltorb').gender, 'N'); assert.equal(dex.species('chansey').gender, 'F'); assert.equal(dex.species('tauros').gender, 'M');
   // every ratio of the WP19 3.2 table, including the two where "out of 255" would round differently (191, 223)
   assert.deepEqual(['bulbasaur', 'growlithe', 'pidgey', 'clefairy', 'pyroar'].map(id => dex.species(id).gender), [32, 64, 128, 192, 224]);

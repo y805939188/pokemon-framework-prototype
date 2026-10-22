@@ -64,7 +64,7 @@ function host(game) {
   vm.runInContext(plugins.PS_SaveState, ctx, { filename: 'PS_SaveState.js (built)' });
   vm.runInContext(plugins.PS_BattleFlow, ctx, { filename: 'PS_BattleFlow.js (built)' });
   const flow = ctx.PSFlow;
-  flow._content = content; flow._dex = E.dex.createDexLookup(); flow.rng = lcg(1);
+  flow.receiveOptions = { mode: 1, naming: 1 }; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.rng = lcg(1);
   const load = (next) => { if (next !== undefined) sys._psGame = next; ctx.DataManager.extractSaveContents({}); };
   return { ctx, flow, sys, map, errors, warnings, writes, load, player: new Game_Player() };
 }
@@ -74,7 +74,7 @@ test('a save written by the step 4 code loads: migrated to schema 4 with the con
   const h = host(J(raw));
   h.load();
   assert.equal(h.sys._psSaveError, undefined, JSON.stringify(h.sys._psSaveError));
-  assert.deepEqual(J(h.sys._psSaveInfo).from, 3); assert.equal(h.sys._psSaveInfo.to, 4); assert.equal(h.sys._psSaveInfo.migrated, true);
+  assert.deepEqual(J(h.sys._psSaveInfo).from, 3); assert.equal(h.sys._psSaveInfo.to, 5); assert.equal(h.sys._psSaveInfo.migrated, true);
   const g = J(h.sys._psGame);
   assert.deepEqual(g.party.map(m => [m.species, m.form]), raw.party.map(m => [E.speciesKey.keyOfBattleName(content, m.species).species, 0]));
   assert.deepEqual(E.saveSchema.validateGame(g), []);
@@ -98,13 +98,13 @@ test('content that cannot be loaded, or a species it cannot map: the migration i
   assert.equal(JSON.stringify(b.sys._psGame), b0);
 });
 
-test('a schema 4 save needs no content to load; a save without framework state gets the empty one', () => {
+test('a schema 5 save needs no content to load; a save without framework state gets the empty one', () => {
   const h = host(E.state.newGame({ party: [], money: 7 }));
   h.flow.speciesKeyResolver = () => { throw new Error('must not be asked'); };
   h.load();
   assert.deepEqual([h.sys._psSaveError, h.sys._psSaveInfo.migrated, h.sys._psGame.money], [undefined, false, 7]);
   const e = host(undefined); e.load();
-  assert.deepEqual([e.sys._psGame.schema, e.sys._psSaveInfo.created], [4, 'empty']);
+  assert.deepEqual([e.sys._psGame.schema, e.sys._psSaveInfo.created], [5, 'empty']);
 });
 
 test('P4-2: loading a save (or starting a new game) releases a battle the application still held', async () => {
@@ -314,4 +314,28 @@ for (const replacement of ['load', 'new-game', 'none']) test(`R02: failed defeat
   assert.equal(h.flow.retryReturnHome().status, 'none');
   assert.equal(transfers.length, replacement === 'none' ? 1 : 0);
   assert.equal(JSON.stringify(h.sys._psGame), before, 'retry never settles money/heal again');
+});
+
+// 5.1 intermediate C/D/E host boundaries; actual UI presentation belongs to F after M review.
+test('P51-07: schema4 1201 capacity failure keeps raw state and blocks all host save slots', async()=>{
+  const H=require('./1/legacy-test-support.cjs');const raw=H.legacyGame(E.fixtures.savedFor(E.fixtures.makeGame(),content),4);
+  raw.boxes=Array.from({length:1201},(_,i)=>({...J(raw.party[0]),id:`B-${i}`}));const before=JSON.stringify(raw);const h=host(raw);h.load();
+  assert.equal(h.sys._psSaveError.code,'capacity-exceeded');assert.deepEqual([h.sys._psSaveError.found,h.sys._psSaveError.boxMemberCount,h.sys._psSaveError.limit,h.sys._psSaveError.recovery],[4,1201,1200,'none-in-5.1']);assert.equal(JSON.stringify(h.sys._psGame),before);
+  for(const slot of [1,2,17])await assert.rejects(h.ctx.DataManager.saveGame(slot),/not usable/);assert.deepEqual(h.writes,[]);assert.equal(h.sys.isSaveEnabled(),false);
+});
+test('P51-10a/21/22: held management masks menu/direct saves; cancel preserves committed edits; load invalidates old token',async()=>{
+  const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));const app=h.flow.app(),token=app.beginManagement();const id=h.sys._psGame.party[0].id;
+  assert.equal(app.manage(token,'pick',{kind:'pick-up',source:{id,position:{kind:'party',index:0}}}).status,'held');assert.equal(h.sys.isSaveEnabled(),false);
+  await assert.rejects(h.ctx.DataManager.saveGame(3),/not allowed/);assert.deepEqual(h.writes,[]);
+  assert.equal(app.manage(token,'mark',{kind:'markings',source:{id,position:{kind:'party',index:0}},markings:[2]}).status,'applied');assert.equal(app.manage(token,'cancel',{kind:'cancel-held'}).status,'cancelled');assert.equal(h.sys.isSaveEnabled(),true);assert.deepEqual(J(h.sys._psGame.party[0].markings),[2]);
+  assert.equal(app.manage(token,'again',{kind:'pick-up',source:{id,position:{kind:'party',index:0}}}).status,'held');h.load();assert.equal(h.sys.isSaveEnabled(),true);assert.equal(app.manage(token,'old-place',{kind:'place-held',target:{kind:'box',box:0,slot:0},expectedTargetId:null}).reason,'stale-operation');
+  const fresh=app.beginManagement();app.manage(fresh,'new-pick',{kind:'pick-up',source:{id,position:{kind:'party',index:0}}});assert.equal(app.manage(token,'old-cancel',{kind:'cancel-held'}).reason,'stale-operation');assert.equal(h.sys.isSaveEnabled(),false);app.manage(fresh,'new-cancel',{kind:'cancel-held'});app.endManagement(fresh);await h.ctx.DataManager.saveGame(3);assert.deepEqual(h.writes,[3]);
+});
+test('P51-14: real Showdown capture waits in host operation until decisions; duplicate resolve writes once',async()=>{
+  const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.flow.receiveOptions={mode:0,naming:0};h.flow.seed=[1,2,3,4];const request={battleId:'host-receive#1',kind:'wild',seq:1,foes:[{species:'pidgey',level:3}],resultVariable:16};h.flow.openBattle(request);const session=await h.flow.begin();assert.equal((await session.throwBall('masterball')).ok,true);const result=session.result();const before=JSON.stringify(h.sys._psGame);
+  const pending=h.flow.finish(session);assert.equal(pending.pending,true);assert.equal(h.flow.running,true);assert.equal(h.sys.isSaveEnabled(),false);assert.equal(JSON.stringify(h.sys._psGame),before);await assert.rejects(h.ctx.DataManager.saveGame(5),/battle is running/);
+  const id=result.captured[0].id;const done=h.flow.resolveReceiving(pending.receivingToken,{[id]:{nickname:{kind:'keep'}}});assert.equal(done.commit,'applied');assert.equal(h.flow.running,false);assert.equal(h.sys.isSaveEnabled(),true);const committed=JSON.stringify(h.sys._psGame);assert.equal(h.flow.resolveReceiving(pending.receivingToken,{}).commit,'applied');assert.equal(JSON.stringify(h.sys._psGame),committed);assert.equal(h.sys._psGame.appliedBattles[request.battleId].hash,E.state.resultHash(result));assert.deepEqual(h.writes,[]);
+});
+test('P51-12: closed held battle gate rejects before loading content or opening a scene',async()=>{
+  const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';let loads=0;h.flow.content=()=>{loads++;throw Error('must not load content');};const request={battleId:'held#1',kind:'wild',seq:1,foes:[{species:'pidgey',level:3}]};assert.throws(()=>h.flow.openBattle(request),/held-item-battle-disabled/);assert.equal(loads,0);assert.equal(h.flow.running,false);assert.equal(h.flow._op,null);
 });
