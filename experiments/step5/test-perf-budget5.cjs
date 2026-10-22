@@ -15,9 +15,17 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-budget5-'));
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 const row = (label, median, samples = [median, median, median]) => ({ label, median, range: [Math.min(...samples), Math.max(...samples)], samples });
 const COMPARABLE = 'battles behind the comparable rows (the step 4 baseline: 30)';
-function check(rows, memoryRows) {
+function check(rows, memoryRows, overrideBudget) {
   const s = path.join(dir, `s${Math.random()}.json`); fs.writeFileSync(s, JSON.stringify({ env: { gitHead: 'x' }, rows }));
-  const args = [path.join(ROOT, 'scripts/perf-budget.cjs'), s, `--out=${s}.report.json`];
+  let script = path.join(ROOT, 'scripts/perf-budget.cjs');
+  if (overrideBudget) {
+    const fixture = fs.mkdtempSync(path.join(dir, 'budget-'));
+    fs.mkdirSync(path.join(fixture, 'scripts')); fs.mkdirSync(path.join(fixture, 'docs/step5'), { recursive: true });
+    fs.copyFileSync(script, path.join(fixture, 'scripts/perf-budget.cjs'));
+    fs.writeFileSync(path.join(fixture, 'docs/step5/perf-budget.json'), JSON.stringify(overrideBudget));
+    script = path.join(fixture, 'scripts/perf-budget.cjs');
+  }
+  const args = [script, s, `--out=${s}.report.json`];
   if (memoryRows) { const m = `${s}.m.json`; fs.writeFileSync(m, JSON.stringify({ rows: memoryRows })); args.push(`--memory100=${m}`); }
   const r = spawnSync(process.execPath, args, { encoding: 'utf8' });
   assert.equal(r.status, 0, 'warnings never block'); return JSON.parse(fs.readFileSync(`${s}.report.json`, 'utf8'));
@@ -39,8 +47,12 @@ test('over the baseline\'s 30 battles every row is compared: within at the basel
   const above = check([...baselineRows(1.25), row(COMPARABLE, 30)]);
   assert.ok(above.rows.every(r => r.status === (r.baselineMedian == null ? 'not measured' : 'WARN')));
   assert.equal(above.warnings, budget.rows.filter(b => b.baselineMedian != null).length);
-  const absent = check([...budget.rows.filter(b => b.baselineMedian == null).map(b => row(b.label, 10)), row(COMPARABLE, 30)]);
-  for (const r of absent.rows.filter(r => r.median === 10)) assert.equal(r.status, 'no comparable baseline');
+  // Keep the missing-baseline case explicit even after a later real run supplies all baseline rows.
+  const missing = structuredClone(budget);
+  missing.rows[0].baselineMedian = null; missing.rows[0].warnAbove = null;
+  const absent = check([row(missing.rows[0].label, 10), row(COMPARABLE, 30)], undefined, missing);
+  assert.equal(absent.rows[0].median, 10);
+  assert.equal(absent.rows[0].status, 'no comparable baseline');
 });
 
 test('over another set of battles (e.g. 36 with the full-save battles mixed in, or no record) the battle rows are not compared; the others are', () => {

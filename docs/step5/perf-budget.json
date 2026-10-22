@@ -1,130 +1,128 @@
 {
  "decision": "D5-8 (user, 2026-10-21): warning threshold = the step 4 baseline median of the same measurement + 20%; memory is judged by the growth over a 100-battle run; warnings only, nothing is blocked. A row without a comparable baseline is reported, never called 'no regression'.",
  "baseline": {
-  "source": "experiments/step5/evidence/5.0/remediation/baseline/perf-summary.json (raw perf-run1..3.json)",
+  "source": "experiments/step5/evidence/5.0/remediation/foreground-baseline/perf-summary.json (raw perf-run1..3.json)",
   "gitHead": "c789620a153d8efeb8bc0b39afe3ea92685db8fc",
   "runs": 3,
   "machine": "Apple M1 Max, 32 GB, macOS kernel 25.6.0, NW.js 0.117.0 / Chromium 154.0.8037.58",
-  "method": "Fresh ad-hoc package, 3 launches, 24 round battles + 6 map encounters; fast messages, isolated saves, no other test/build running. Window 816x624, DPR 2, no frontmost focus; unfocused frame sampling is excluded.",
+  "method": "Fresh ad-hoc package, 3 launches, 24 round battles + 6 map encounters; fast messages, isolated saves, no other test/build running. Window 816x624, DPR 2, frontmost throughout: zero skipped unfocused frames and positive battle/map frame samples in every run.",
   "comparableBattles": 30,
   "battleNote": "Only these 30 battles feed comparable battle/action rows. Full-save scenarios are separate. The historical 3ba2be9 measurements at DPR 1 are retained as historicalMedian only.",
-  "focusedRowsAvailable": false
+  "focusedRowsAvailable": true,
+  "priorBackgroundSource": "experiments/step5/evidence/5.0/remediation/baseline/ (historical; not used for the foreground candidate comparison)"
  },
  "factor": 1.2,
  "rows": [
   {
    "label": "cold start: launch -> map ready (ms)",
-   "baselineMedian": 2020,
-   "warnAbove": 2424.0,
+   "baselineMedian": 2090,
+   "warnAbove": 2508.0,
    "historicalMedian": 2041
   },
   {
    "label": "first battle: event start -> first menu (ms)",
-   "baselineMedian": 433.2,
-   "warnAbove": 519.84,
+   "baselineMedian": 434.4,
+   "warnAbove": 521.28,
    "historicalMedian": 433.1
   },
   {
    "label": "later battles: session create, median (ms)",
-   "baselineMedian": 2.3,
-   "warnAbove": 2.76,
+   "baselineMedian": 1.5,
+   "warnAbove": 1.8,
    "battleSet": true,
    "historicalMedian": 2
   },
   {
    "label": "later battles: event start -> first menu, median (ms)",
-   "baselineMedian": 132.3,
-   "warnAbove": 158.76,
+   "baselineMedian": 132.5,
+   "warnAbove": 159.0,
    "battleSet": true,
    "historicalMedian": 132.7
   },
   {
    "label": "later battles: event start -> first menu, worst, window focused throughout (ms)",
-   "baselineMedian": null,
-   "warnAbove": null,
+   "baselineMedian": 135.1,
+   "warnAbove": 162.12,
    "battleSet": true,
-   "historicalMedian": 135.7,
-   "unavailableReason": "No focused frames were sampled in any baseline run; no blur event does not prove focus."
+   "historicalMedian": 135.7
   },
   {
    "label": "action latency p50 move (ms)",
-   "baselineMedian": 4.2,
-   "warnAbove": 5.04,
+   "baselineMedian": 4.3,
+   "warnAbove": 5.16,
    "battleSet": true,
    "historicalMedian": 5.9
   },
   {
    "label": "action latency p50 run (ms)",
-   "baselineMedian": 2.3,
-   "warnAbove": 2.76,
+   "baselineMedian": 3.1,
+   "warnAbove": 3.72,
    "battleSet": true,
    "historicalMedian": 2.9
   },
   {
    "label": "action latency p50 item (ms)",
-   "baselineMedian": 4.1,
-   "warnAbove": 4.92,
+   "baselineMedian": 4.3,
+   "warnAbove": 5.16,
    "battleSet": true,
    "historicalMedian": 5.6
   },
   {
    "label": "action latency p50 ball (ms)",
-   "baselineMedian": 3,
-   "warnAbove": 3.6,
+   "baselineMedian": 3.8,
+   "warnAbove": 4.56,
    "battleSet": true,
    "historicalMedian": 3.7
   },
   {
    "label": "frames in battle scene: p95 (ms)",
-   "baselineMedian": null,
-   "warnAbove": null,
-   "historicalMedian": 18.5,
-   "unavailableReason": "No focused frames were sampled in any baseline run; no blur event does not prove focus."
+   "baselineMedian": 18.4,
+   "warnAbove": 22.08,
+   "historicalMedian": 18.5
   },
   {
    "label": "frames on map (idle/event): p95 (ms)",
-   "baselineMedian": null,
-   "warnAbove": null,
-   "historicalMedian": 18.7,
-   "unavailableReason": "No focused frames were sampled in any baseline run; no blur event does not prove focus."
+   "baselineMedian": 18.5,
+   "warnAbove": 22.2,
+   "historicalMedian": 18.7
   },
   {
    "label": "memory: app RSS after 24 battles (MB)",
-   "baselineMedian": 1236,
-   "warnAbove": 1483.2,
+   "baselineMedian": 1228,
+   "warnAbove": 1473.6,
    "historicalMedian": 1238
   },
   {
    "label": "step 4: map encounter -> first battle menu, median (ms)",
-   "baselineMedian": 82.5,
-   "warnAbove": 99.0,
+   "baselineMedian": 83.8,
+   "warnAbove": 100.56,
    "historicalMedian": 82.4
   },
   {
    "label": "step 4: save (DataManager.saveGame), median (ms)",
-   "baselineMedian": 2.1,
-   "warnAbove": 2.52,
+   "baselineMedian": 2.6,
+   "warnAbove": 3.12,
    "historicalMedian": 2.1
   },
   {
    "label": "step 4: load (DataManager.loadGame), median (ms)",
-   "baselineMedian": 2.6,
-   "warnAbove": 3.12,
+   "baselineMedian": 3,
+   "warnAbove": 3.6,
    "historicalMedian": 2.3
   }
  ],
  "memory100": {
   "label": "memory: app RSS growth from 4 to 100 battles (MB)",
   "baseline": {
-   "source": "experiments/step5/evidence/5.0/remediation/baseline/memory100-run1.json",
+   "source": "experiments/step5/evidence/5.0/remediation/foreground-baseline/memory100-run1.json",
    "gitHead": "c789620a153d8efeb8bc0b39afe3ea92685db8fc",
-   "rssAfter4": 1222,
-   "rssAfter100": 1238,
-   "growth": 16,
+   "rssAfter4": 1223,
+   "rssAfter100": 1229,
+   "growth": 6,
    "runs": 1,
-   "method": "Same fresh ad-hoc baseline package; 25 rounds x 4 kinds, --js-flags=--expose-gc, every sample gcForced=true; DPR 2, no frontmost focus."
+   "method": "Same fresh ad-hoc foreground baseline package; 25 rounds x 4 kinds, --js-flags=--expose-gc, every sample gcForced=true; DPR 2, zero skipped unfocused frames and positive battle/map frame samples."
   },
-  "warnAbove": 19.2,
+  "warnAbove": 7.2,
   "note": "Current fourth-step baseline replaces the second-step hardened historical reference. One 100-battle run and rounded MB samples cannot establish or rule out a leak; report the curve and warn only."
  }
 }
