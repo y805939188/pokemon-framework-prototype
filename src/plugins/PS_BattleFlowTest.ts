@@ -1029,6 +1029,40 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       const st = (a: number[]) => ({ n: a.length, p50: pct(a, 0.5), max: a.length ? Math.max(...a) : null, samples: a });
       perf.step4 = { method: "slice map, encounter forced by an exhausted step counter; encounter = executeEncounter -> first battle menu (performance.now); save/load = DataManager.saveGame/loadGame promise round trip, slot 12, test save folder", encounterToFirstMenuMs: st(enc), saveMs: st(saveMs), loadMs: st(loadMs) };
     } catch (e: any) { perf.errors = (perf.errors || []).concat(`step4 timings: ${e.message}`); }
+    // step 5.0 timings (plan §3 5.0 item 7): full boxes, a large bag and opening the party screen, on the structures of
+    // this build (flat boxes, one count per item, the read-only party screen); the 5.1/5.2 structures are measured later
+    try {
+      const n = Number(arg("ps-perf-step5")) || 6;
+      const B = nodeRequire("./js/engine/build/engine.cjs");
+      await slice(51);
+      const g = game();
+      for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3));
+      const box = mkMember("BX-0", "Pidgey", 3);
+      g.boxes = Array.from({ length: W.PSFlow.limits().boxes }, (_, i) => ({ ...clone(box), id: `BX-${i}` })); // test setup: every box slot used
+      for (const item of B.items.BAG_ITEMS) g.bag[item] = 999; // test setup: every known bag item at the cap
+      const enc: number[] = [], saveMs: number[] = [], loadMs: number[] = [], menuMs: number[] = [], viewMs: number[] = [];
+      for (let i = 0; i < n; i++) {
+        let t = performance.now(); await G.DataManager.saveGame(17); saveMs.push(Math.round((performance.now() - t) * 10) / 10);
+        t = performance.now(); await G.DataManager.loadGame(17); loadMs.push(Math.round((performance.now() - t) * 10) / 10);
+        t = performance.now(); B.speciesKey.battleView(game(), W.PSFlow.content()); viewMs.push(Math.round((performance.now() - t) * 100) / 100);
+      }
+      await toMapId(5, 8, 9);
+      for (let i = 0; i < n; i++) {
+        W.PSFlow.perf.cur = null;
+        await stepInto(4, 9, i % 2 ? 8 : 2); await waitFor(() => battle() && battle()._mode !== "boot", "encounter"); await inMode("main");
+        const cur = W.PSFlow.perf.cur; if (cur && cur.encounter && cur.firstMenuMs !== undefined) enc.push(cur.firstMenuMs);
+        for (let k = 0; k < 6 && mode_() !== "end"; k++) { await choose(/^Run/); await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after run"); }
+        await finishBattle();
+        const t = performance.now(); G.SceneManager.push(W.Scene_PSParty);
+        await waitFor(() => scene() && scene()._psParty && !G.SceneManager.isSceneChanging(), "party screen"); menuMs.push(Math.round((performance.now() - t) * 10) / 10);
+        await press("cancel"); await waitFor(() => scene() && scene()._spriteset && !G.SceneManager.isSceneChanging(), "back on the map");
+      }
+      const st = (a: number[]) => ({ n: a.length, p50: pct(a, 0.5), max: a.length ? Math.max(...a) : null, samples: a });
+      perf.step5 = {
+        method: `slice map; party 6, boxes ${game().boxes.length} (all slots used), bag ${Object.keys(game().bag).length} items x 999 (test setup); save/load = DataManager round trip, slot 17; battleView = the battle view of that state; encounter = executeEncounter -> first menu; party screen = SceneManager.push(Scene_PSParty) until the screen is up`,
+        saveMs: st(saveMs), loadMs: st(loadMs), battleViewMs: st(viewMs), encounterToFirstMenuMs: st(enc), partyScreenOpenMs: st(menuMs),
+      };
+    } catch (e: any) { perf.errors = (perf.errors || []).concat(`step5 timings: ${e.message}`); }
     const bs: any[] = W.PSFlow.perf.battles;
     perf.engineLoadMs = W.PSFlow.perf.engineLoadMs;
     perf.firstBattle = bs[0] ? { sessionMs: bs[0].sessionMs, firstMenuMs: bs[0].firstMenuMs, totalMs: bs[0].totalMs, label: bs[0].label } : null;
