@@ -5,7 +5,7 @@
  */
 import type { CompiledContent, ContentError } from "../content/schema.ts";
 import { SCHEMA_VERSION } from "../content/schema.ts";
-import { showdownDependencyProblem } from "../content/compile.ts";
+import { checkSources, preUseProblem, showdownDependencyProblem } from "../content/compile.ts";
 import type { Content, DexLookup, Member } from "../rules/types.ts";
 import { own, setOwn } from "../rules/own.ts";
 import { battleNameOf, memberKey } from "../rules/species-key.ts";
@@ -22,10 +22,24 @@ export function loadCompiled(json: unknown): CompiledContent {
 export function assembleContent(compiled: CompiledContent, dex: DexLookup): { content: Content; errors: ContentError[] } {
   const errors: ContentError[] = [];
   const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash }, moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {}, ...(compiled.settings ? { settings: { ...compiled.settings } } : {}) };
+  // A compiled document may be older than the gate, or edited by hand. Validate the whole registry and every source
+  // whose data will be consumed before even querying the Dex; a placeholder's exemption covers only its own fields.
+  const sources = checkSources(compiled.sources, (file, path, message) => { errors.push({ file, path, message }); });
+  if (errors.length) return { content, errors };
+  if (compiled.species.length) {
+    const dep = showdownDependencyProblem(sources);
+    if (dep) errors.push({ file: "assembly", path: "sources", message: dep });
+  }
+  for (const sp of compiled.species) {
+    const problem = preUseProblem(sources, sp.source);
+    if (problem) errors.push({ file: "assembly", path: `species/${sp.id}${sp.form ? `/${sp.form}` : ""}.source`, message: problem });
+  }
+  for (const grant of compiled.grants ?? []) {
+    const problem = preUseProblem(sources, grant.source);
+    if (problem) errors.push({ file: "assembly", path: `grants/${grant.id}.source`, message: problem });
+  }
+  if (errors.length) return { content, errors };
   const short = dex.sha().slice(0, 8);
-  // the pre-use gate again at the point of use: a compiled document may be older than the gate, or edited by hand
-  const dep = showdownDependencyProblem(Array.isArray(compiled.sources) ? compiled.sources : []);
-  if (dep) return { content, errors: [{ file: "assembly", path: "sources", message: dep }] };
   const byName = new Map<string, string>();
   for (const sp of compiled.species) {
     const form = sp.form ?? 0;

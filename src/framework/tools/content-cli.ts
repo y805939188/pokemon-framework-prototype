@@ -40,22 +40,31 @@ function readInputs(dir: string): { inputs: ContentInputs; errors: ContentError[
 const show = (errors: ContentError[]): void => { for (const e of errors) console.error(`${e.file} ${e.path}: ${e.message}`); };
 
 export function build(src: string, out: string): number {
-  const { inputs, errors } = readInputs(src);
-  let r: ReturnType<typeof compileContent>;
-  // a compiler exception is a failed build too: the old output must not stay behind as if it were current
-  try { r = errors.length ? { ok: false as const, errors } : compileContent(inputs); }
-  catch (e) { r = { ok: false, errors: [{ file: "compiled", path: "$", message: `the compiler failed: ${(e as Error).message}` }] }; }
-  if (!r.ok) {
-    show(r.errors);
-    try { fs.unlinkSync(out); } catch { /* nothing to remove */ }
-    console.error(`content build FAILED (${r.errors.length} problem(s)); the previous compiled output was removed`);
+  const fail = (errors: ContentError[]): number => {
+    show(errors);
+    try { fs.unlinkSync(out); }
+    catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
+        console.error(`content build FAILED (${errors.length} problem(s)); cannot remove the previous compiled output ${out}: ${(e as Error).message}`);
+        return 1;
+      }
+    }
+    console.error(`content build FAILED (${errors.length} problem(s)); no previous compiled output remains`);
     return 1;
+  };
+  // Input, compiler, serialization and output failures all invalidate the previous artifact.
+  try {
+    const { inputs, errors } = readInputs(src);
+    const r = errors.length ? { ok: false as const, errors } : compileContent(inputs);
+    if (!r.ok) return fail(r.errors);
+    const text = canonicalJson(r.data, 2) + "\n";
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== text) fs.writeFileSync(out, text);
+    console.log(`content built: ${r.data.species.length} species, ${r.data.grants?.length ?? 0} grants, inputs ${r.data.inputsHash.slice(0, 12)} -> ${path.relative(ROOT, out)}`);
+    return 0;
+  } catch (e) {
+    return fail([{ file: "compiled", path: "$", message: `content build failed: ${(e as Error).message}` }]);
   }
-  const text = canonicalJson(r.data, 2) + "\n";
-  fs.mkdirSync(path.dirname(out), { recursive: true });
-  if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== text) fs.writeFileSync(out, text);
-  console.log(`content built: ${r.data.species.length} species, ${r.data.grants?.length ?? 0} grants, inputs ${r.data.inputsHash.slice(0, 12)} -> ${path.relative(ROOT, out)}`);
-  return 0;
 }
 
 export function check(src: string, out: string): number {

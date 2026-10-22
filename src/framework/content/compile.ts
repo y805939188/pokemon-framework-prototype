@@ -106,24 +106,25 @@ export function checkSources(raw: unknown, report: (file: "sources.json", path: 
 /**
  * The pre-use gate (DETAILED-PLAN §280, D5-2): may data of source `id` be used? null = yes. A record may only use a
  * source whose terms were checked first (a complete usageCheck that is not "not-allowed"); an explicit author
- * placeholder is exempt (it is the project's own stand-in data).
+ * placeholder without a check is exempt (it is the project's own stand-in data). An explicit denial still applies.
  */
 export function preUseProblem(sources: readonly SourceEntry[], id: unknown): string | null {
   const src = sources.find((x) => x.id === id);
   if (!src) return `must name an entry of sources.json (known: ${sources.map((x) => x.id).join(", ") || "none"})`;
-  if (src.kind === "author-placeholder" && src.status === "placeholder") return null;
+  if (src.kind === "author-placeholder" && src.status === "placeholder" && src.usageCheck === undefined) return null;
   if (src.usageCheck === undefined) return `source "${src.id}" has no recorded pre-use check (usageCheck): its data may not be used yet`;
   if (usageCheckProblems(src.usageCheck, "usageCheck").length) return `source "${src.id}" has an incomplete pre-use check (usageCheck needs checkedOn, checkedBy, conditions and a decision): its data may not be used yet`;
   if (src.usageCheck.decision === "not-allowed") return `source "${src.id}" was checked and may not be used (${src.usageCheck.conditions})`;
   return null;
 }
 
-/** Species and moves are read from the pinned Showdown build: that source must be registered and pass the gate. */
+/** Species and moves are read from one pinned Showdown build: its source must be unambiguous and pass the gate. */
 export function showdownDependencyProblem(sources: readonly SourceEntry[]): string | null {
   const sd = sources.filter((x) => x.kind === "showdown");
   if (!sd.length) return "the content's species and moves are read from the pinned Showdown build, but sources.json registers no source of kind \"showdown\" (register it with its pre-use check)";
-  const ok = sd.find((x) => preUseProblem(sources, x.id) === null);
-  return ok ? null : `the content's species and moves are read from the pinned Showdown build: ${preUseProblem(sources, sd[0]!.id)}`;
+  if (sd.length > 1) return `the pinned Showdown source is ambiguous (${sd.map((x) => x.id).join(", ")}): register exactly one source of kind "showdown" for the build in use`;
+  const problem = preUseProblem(sources, sd[0]!.id);
+  return problem ? `the content's species and moves are read from the pinned Showdown build: ${problem}` : null;
 }
 
 export function compileContent(inputs: ContentInputs): CompileResult {

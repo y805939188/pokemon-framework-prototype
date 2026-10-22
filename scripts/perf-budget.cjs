@@ -20,7 +20,7 @@ const sameBattles = !!comparable && comparable.median === budget.baseline.compar
 const rows = budget.rows.map(b => {
   const m = byLabel[b.label];
   const median = m ? m.median : null;
-  const status = median === null || median === undefined ? 'not measured' : b.battleSet && !sameBattles ? 'not comparable (computed over other battles than the baseline)' : median > b.warnAbove ? 'WARN' : 'within';
+  const status = median === null || median === undefined ? 'not measured' : b.baselineMedian == null || b.warnAbove == null ? 'no comparable baseline' : b.battleSet && !sameBattles ? 'not comparable (computed over other battles than the baseline)' : median > b.warnAbove ? 'WARN' : 'within';
   return { label: b.label, baselineMedian: b.baselineMedian, warnAbove: b.warnAbove, median, status };
 });
 let memory = { label: budget.memory100.label, warnAbove: budget.memory100.warnAbove, baselineGrowth: budget.memory100.baseline.growth, status: 'not measured' };

@@ -794,6 +794,9 @@
     this.refreshStatus && this._session && this.refreshStatus();
   };
   P.onEnd = function () {
+    // A delayed callback from an old scene must not pop the current scene's global SceneManager stack.
+    const op = this._psOp === undefined ? PSFlow._op : this._psOp; // bare API callers refer to the current operation
+    if (op !== PSFlow._op) { PSFlow.stale("finish", op); return; }
     if (!this._aborted && !this._failure) {
       try { PSFlow.finish(this._session, this._psOp); } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
     }

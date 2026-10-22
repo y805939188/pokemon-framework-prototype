@@ -22,33 +22,42 @@ function check(rows, memoryRows) {
   const r = spawnSync(process.execPath, args, { encoding: 'utf8' });
   assert.equal(r.status, 0, 'warnings never block'); return JSON.parse(fs.readFileSync(`${s}.report.json`, 'utf8'));
 }
-const baselineRows = factor => budget.rows.map(b => row(b.label, +(b.baselineMedian * factor).toFixed(2)));
+const baselineRows = factor => budget.rows.map(b => row(b.label, b.baselineMedian == null ? null : +(b.baselineMedian * factor).toFixed(2)));
 
-test('every row has a baseline and a threshold of baseline x 1.2; the battle-derived rows are marked', () => {
+test('measured baselines have threshold x 1.2; unavailable baselines cannot silently turn into zero', () => {
   assert.equal(budget.factor, 1.2); assert.equal(budget.baseline.comparableBattles, 30);
-  for (const b of budget.rows) assert.equal(b.warnAbove, +(b.baselineMedian * 1.2).toFixed(2), b.label);
+  for (const b of budget.rows) {
+    assert.equal(b.warnAbove, b.baselineMedian == null ? null : +(b.baselineMedian * 1.2).toFixed(2), b.label);
+    if (b.baselineMedian == null) assert.ok(b.unavailableReason, b.label);
+  }
   assert.deepEqual(budget.rows.filter(b => b.battleSet).map(b => b.label.split(':')[0]).sort(), ['action latency p50 ball (ms)', 'action latency p50 item (ms)', 'action latency p50 move (ms)', 'action latency p50 run (ms)', 'later battles', 'later battles', 'later battles'].sort());
 });
 
 test('over the baseline\'s 30 battles every row is compared: within at the baseline, WARN above +20%', () => {
   const at = check([...baselineRows(1), row(COMPARABLE, 30)]);
-  assert.ok(at.rows.every(r => r.status === 'within'), JSON.stringify(at.rows.filter(r => r.status !== 'within')));
+  assert.ok(at.rows.every(r => r.status === (r.baselineMedian == null ? 'not measured' : 'within')), JSON.stringify(at.rows));
   const above = check([...baselineRows(1.25), row(COMPARABLE, 30)]);
-  assert.ok(above.rows.every(r => r.status === 'WARN')); assert.equal(above.warnings, budget.rows.length);
+  assert.ok(above.rows.every(r => r.status === (r.baselineMedian == null ? 'not measured' : 'WARN')));
+  assert.equal(above.warnings, budget.rows.filter(b => b.baselineMedian != null).length);
+  const absent = check([...budget.rows.filter(b => b.baselineMedian == null).map(b => row(b.label, 10)), row(COMPARABLE, 30)]);
+  for (const r of absent.rows.filter(r => r.median === 10)) assert.equal(r.status, 'no comparable baseline');
 });
 
 test('over another set of battles (e.g. 36 with the full-save battles mixed in, or no record) the battle rows are not compared; the others are', () => {
   for (const extra of [[row(COMPARABLE, 36)], [row(COMPARABLE, 30, [30, 36, 30])], []]) {
     const r = check([...baselineRows(1.25), ...extra]);
-    for (const x of r.rows) assert.equal(x.status, budget.rows.find(b => b.label === x.label).battleSet ? 'not comparable (computed over other battles than the baseline)' : 'WARN', x.label);
+    for (const x of r.rows) assert.equal(x.status, x.baselineMedian == null ? 'not measured' : budget.rows.find(b => b.label === x.label).battleSet ? 'not comparable (computed over other battles than the baseline)' : 'WARN', x.label);
   }
 });
 
-test('the 100-battle memory growth is compared only on a 100-battle run, warn above 2.4 MB', () => {
+test('the 100-battle memory growth uses the current fourth-step baseline and only a 100-battle run', () => {
   const mem = (after4, last, battles) => [row('memory: app RSS after 4 battles (MB)', after4, [after4]), row('memory: app RSS after the last round (MB)', last, [last]), row('battles in the rounds (4 per round; the last memory sample follows them)', battles, [battles])];
-  assert.equal(check(baselineRows(1), mem(1240, 1242, 100)).memory.status, 'within');
-  const warn = check(baselineRows(1), mem(1240, 1243, 100)).memory;
-  assert.deepEqual([warn.status, warn.growth], ['WARN', 3]);
+  const growth = budget.memory100.baseline.growth;
+  assert.equal(budget.memory100.warnAbove, +(growth * 1.2).toFixed(2));
+  assert.equal(check(baselineRows(1), mem(1240, 1240 + growth, 100)).memory.status, 'within');
+  const above = Math.floor(budget.memory100.warnAbove) + 1;
+  const warn = check(baselineRows(1), mem(1240, 1240 + above, 100)).memory;
+  assert.deepEqual([warn.status, warn.growth], ['WARN', above]);
   assert.match(check(baselineRows(1), mem(1240, 1243, 24)).memory.status, /not comparable/);
   assert.equal(check(baselineRows(1)).memory.status, 'not measured');
 });

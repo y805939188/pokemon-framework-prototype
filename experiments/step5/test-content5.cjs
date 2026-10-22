@@ -35,6 +35,8 @@ test('pre-use gate: a record may only use a source whose terms were checked firs
   assert.equal(compileContent(checked).ok, true);
   const listedOnly = inputs(); listedOnly.sources.push(authorData(null));
   assert.equal(compileContent(listedOnly).ok, true, 'a registered, still unchecked source may be listed; it just cannot be used');
+  const deniedPlaceholder = inputs(); deniedPlaceholder.sources.find(s => s.id === 'author-placeholder').usageCheck = { ...CHECK, decision: 'not-allowed' };
+  assert.ok(errorsOf(deniedPlaceholder).some(e => e.file === 'species.json' && /was checked and may not be used/.test(e.message)), 'the author-placeholder label cannot override an explicit denial');
 });
 
 test('pre-use gate: a malformed check record is located; the registry keeps its other rules', () => {
@@ -190,6 +192,11 @@ test('F05: the CLI applies the full registry validation before it reads the PBS 
     fs.writeFileSync(path.join(dir, 'sources.json'), JSON.stringify([...read('sources.json'), authorData({ ...CHECK, decision: 'not-allowed' })]));
     const denied = cli(missingFile);
     assert.equal(denied.status, 1); assert.match(denied.stderr, /was checked and may not be used/);
+    fs.writeFileSync(path.join(dir, 'sources.json'), JSON.stringify([...read('sources.json'), { ...authorData({ ...CHECK, decision: 'not-allowed' }), kind: 'author-placeholder', status: 'placeholder' }]));
+    const deniedPlaceholder = cli(missingFile);
+    assert.equal(deniedPlaceholder.status, 1); assert.match(deniedPlaceholder.stderr, /was checked and may not be used/);
+    assert.doesNotMatch(deniedPlaceholder.stderr, /cannot read/, 'an explicit denial applies even to a placeholder, before opening PBS');
+    assert.equal(fs.existsSync(path.join(dir, 'out.json')), false);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -198,6 +205,8 @@ test('F05: the Showdown data the content is read against passes the same gate (m
     ['no showdown entry', i => { i.sources = i.sources.filter(s => s.kind !== 'showdown'); }, /registers no source of kind "showdown"/],
     ['no check', i => { delete i.sources.find(s => s.kind === 'showdown').usageCheck; }, /source "showdown" has no recorded pre-use check/],
     ['not-allowed', i => { i.sources.find(s => s.kind === 'showdown').usageCheck = { ...CHECK, decision: 'not-allowed', conditions: 'denied for the test' }; }, /may not be used \(denied for the test\)/],
+    ['two allowed dependencies', i => { i.sources.push({ ...i.sources.find(s => s.kind === 'showdown'), id: 'other-showdown', usageCheck: CHECK }); }, /Showdown source is ambiguous/],
+    ['allowed entry alongside denied dependency', i => { i.sources.find(s => s.kind === 'showdown').usageCheck.decision = 'not-allowed'; i.sources.push({ ...i.sources.find(s => s.kind === 'showdown'), id: 'other-showdown', usageCheck: CHECK }); }, /Showdown source is ambiguous/],
   ];
   for (const [label, mutate, re] of variants) {
     const i = inputs(); mutate(i);
@@ -223,13 +232,15 @@ test('F06: setting names and PBS enumerations are own keys only: "constructor", 
     assert.deepEqual(problems.map(p => p.path), [`$.${key}`], key); assert.match(problems[0].message, /unknown or unsupported setting/);
     const c = compileContent({ ...inputs(), settings: JSON.parse(`{"${key}": 1}`) });
     assert.equal(c.ok, false); assert.deepEqual([c.errors[0].file, c.errors[0].path], ['settings.json', `$.${key}`]);
+    const growth = importPbsSpecies('[RATTATA]\n' + REC.replace('Medium', key), 'x');
+    assert.equal(growth.ok, false); assert.match(growth.errors[0].message, /is not a growth rate/);
+    assert.equal(growth.errors[0].path, '[RATTATA].GrowthRate');
+    const stat = importPbsSpecies('[RATTATA]\n' + REC.replace('SPEED,1', `${key},1`), 'x');
+    assert.equal(stat.ok, false); assert.match(stat.errors[0].message, /must be a stat/);
+    assert.equal(stat.errors[0].path, '[RATTATA].EVs');
   }
-  const growth = importPbsSpecies('[RATTATA]\n' + REC.replace('Medium', 'constructor'), 'x');
-  assert.equal(growth.ok, false); assert.match(growth.errors[0].message, /"constructor" is not a growth rate/);
-  const stat = importPbsSpecies('[RATTATA]\n' + REC.replace('SPEED,1', 'constructor,1'), 'x');
-  assert.equal(stat.ok, false); assert.match(stat.errors[0].message, /must be a stat/);
-  const later = importPbsSpecies('[RATTATA]\n' + REC + 'constructor = 3\ntoString = 4\n', 'x');
-  assert.equal(later.ok, true); assert.deepEqual(later.records[0].later, []); assert.deepEqual(later.records[0].ignored, ['constructor', 'toString'], 'unknown keys, not later-batch fields');
+  const later = importPbsSpecies('[RATTATA]\n' + REC + 'constructor = 3\ntoString = 4\n__proto__ = 5\n', 'x');
+  assert.equal(later.ok, true); assert.deepEqual(later.records[0].later, []); assert.deepEqual(later.records[0].ignored, ['constructor', 'toString', '__proto__'], 'unknown keys, not later-batch fields');
   // every produced record survives serialization complete and compiles
   const roundTrip = JSON.parse(JSON.stringify(importPbsSpecies(PBS, 'author-pbs').species));
   for (const sp of roundTrip) for (const f of ['id', 'showdownId', 'nameKey', 'growth', 'baseExp', 'evYield', 'catchRate', 'learnset', 'source']) assert.ok(sp[f] !== undefined, `${sp.id}.${f}`);
@@ -246,5 +257,51 @@ test('F06: a build that fails (also on such a setting) removes the previous outp
     const failed = run();
     assert.equal(failed.status, 1); assert.match(failed.stderr, /settings\.json \$\.constructor/); assert.doesNotMatch(failed.stderr, /TypeError/);
     assert.equal(fs.existsSync(out), false, 'the old output was removed');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('F05: assembly validates the complete registry and every consumed source before any Dex call', () => {
+  const compiled = compileContent(inputs()); assert.equal(compiled.ok, true);
+  const variants = [
+    ['malformed entry', d => { d.sources.push(null); }, 'sources.json', /must be an object/],
+    ['missing description', d => { delete d.sources.find(s => s.kind === 'showdown').description; }, 'sources.json', /non-empty string/],
+    ['invalid status', d => { d.sources.find(s => s.kind === 'showdown').status = 'allowed'; }, 'sources.json', /confirmed\|placeholder\|pending/],
+    ['duplicate registration', d => { d.sources.push({ ...d.sources.find(s => s.kind === 'showdown') }); }, 'sources.json', /duplicate source id/],
+    ['incomplete dependency check', d => { d.sources.find(s => s.kind === 'showdown').usageCheck = { decision: 'internal-use' }; }, 'sources.json', /YYYY-MM-DD/],
+    ['missing dependency', d => { d.sources = d.sources.filter(s => s.kind !== 'showdown'); }, 'assembly', /registers no source/],
+    ['denied dependency', d => { d.sources.find(s => s.kind === 'showdown').usageCheck.decision = 'not-allowed'; }, 'assembly', /may not be used/],
+    ['ambiguous dependency', d => { d.sources.push({ ...d.sources.find(s => s.kind === 'showdown'), id: 'other-showdown', usageCheck: CHECK }); }, 'assembly', /Showdown source is ambiguous/],
+    ['denied placeholder', d => { d.sources.find(s => s.id === 'author-placeholder').usageCheck = { ...CHECK, decision: 'not-allowed' }; }, 'assembly', /may not be used/],
+    ['unknown species source', d => { d.species[0].source = 'not-registered'; }, 'assembly', /must name an entry/],
+    ['unchecked species source', d => { d.sources.push(authorData(null)); d.species[0].source = 'author-pbs'; }, 'assembly', /no recorded pre-use check/],
+    ['denied grant source', d => { d.sources.push(authorData({ ...CHECK, decision: 'not-allowed' })); d.grants[0].source = 'author-pbs'; }, 'assembly', /may not be used/],
+  ];
+  for (const [label, mutate, file, re] of variants) {
+    const d = JSON.parse(JSON.stringify(compiled.data)); mutate(d);
+    const calls = [];
+    const dex = Object.fromEntries(['sha', 'species', 'move', 'levelUpMoves'].map(k => [k, () => { calls.push(k); return k === 'sha' ? 'test-sha' : null; }]));
+    const result = E.contentRuntime.assembleContent(d, dex);
+    assert.ok(result.errors.some(e => e.file === file && re.test(e.message)), `${label}: ${JSON.stringify(result.errors)}`);
+    assert.deepEqual(calls, [], `${label}: refuse before any dependency query`);
+    assert.deepEqual(Object.keys(result.content.species), [], `${label}: no partial content`);
+  }
+});
+
+test('F06: output write errors remove the previous build and report the failure', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-build-write-f06-'));
+  try {
+    const src = path.join(dir, 'src'), out = path.join(dir, 'content.json');
+    fs.cpSync(SRC, src, { recursive: true });
+    const cliArgs = [path.join(ROOT, 'js/engine/build/content-cli.cjs'), 'build', `--src=${src}`, `--out=${out}`];
+    assert.equal(spawnSync(process.execPath, cliArgs, { encoding: 'utf8' }).status, 0);
+    fs.writeFileSync(path.join(src, 'settings.json'), '{"MAX_MONEY":12345}');
+    // Simulate a disk write failure only for the output, after the successful earlier build.
+    const preload = path.join(dir, 'fail-output.cjs');
+    fs.writeFileSync(preload, `const fs = require('node:fs'); const write = fs.writeFileSync; fs.writeFileSync = function(file, ...args) { if (file === ${JSON.stringify(out)}) throw Object.assign(new Error('injected output write failure'), { code: 'EIO' }); return write.call(this, file, ...args); };`);
+    const failed = spawnSync(process.execPath, ['--require', preload, ...cliArgs], { encoding: 'utf8' });
+    assert.equal(failed.status, 1);
+    assert.match(failed.stderr, /content build FAILED/);
+    assert.match(failed.stderr, /injected output write failure/);
+    assert.equal(fs.existsSync(out), false, 'the old output cannot stand in for this failed build');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

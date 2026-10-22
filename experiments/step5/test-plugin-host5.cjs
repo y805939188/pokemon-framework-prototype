@@ -203,9 +203,13 @@ test('F02: late finish / abort / close of the replaced battle neither commit, no
   const stateAfterLoad = JSON.stringify(h.sys._psGame);
   const next = await openedBattle(h, 'old#1', 1); // a later battle, even under the same id (the loaded save's counter)
   const vars = []; h.ctx.$gameVariables.setValue = (k, v) => vars.push([k, v]);
+  let popped = 0; old.scene.popScene = () => { popped++; };
   // the old scene ends: its finish, its abort and its terminate must not reach the next battle
   h.ctx.Scene_PSBattle.prototype.onEnd.call(old.scene);
   assert.match(h.flow.lastStale.what, /finish/);
+  assert.equal(popped, 0, 'a late end must not pop the current scene from the host stack');
+  h.flow.finish(old.session, old.op); // the direct host API also needs its own guard
+  assert.equal(h.flow.lastStale.what, 'finish');
   h.ctx.Scene_PSBattle.prototype.abort.call({ ...old.scene, _queue: [], refreshStatus() {} }, new Error('old scene failed'));
   assert.equal(h.flow.lastStale.what, 'abort');
   h.ctx.Scene_PSBattle.prototype.terminate.call(old.scene);

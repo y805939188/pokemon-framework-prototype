@@ -46,6 +46,8 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
 
   let frame = 0;
   const focusLog: any[] = [];
+  // A test can start without ever gaining focus; absence of a blur event does not mean it was focused.
+  focusLog.push({ ev: document.hasFocus() ? "focus" : "blur", initial: true, frame: 0, t: Math.round(performance.now()), hasFocus: document.hasFocus(), vis: document.visibilityState });
   for (const ev of ["blur", "focus"]) window.addEventListener(ev, () => focusLog.push({ ev, frame, t: Math.round(performance.now()), hasFocus: document.hasFocus(), vis: document.visibilityState }));
   document.addEventListener("visibilitychange", () => focusLog.push({ ev: "visibility", frame, vis: document.visibilityState }));
   const baseUpdate = G.SceneManager.update;
@@ -1118,12 +1120,13 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     // battles that overlap a blur..focus interval are throttled by Chromium: keep them out of the "focused" statistics
     const blurIv: [number, number][] = []; let bAt: number | null = null;
     for (const e of focusLog) { if (e.ev === "blur") bAt = e.t; else if (e.ev === "focus" && bAt !== null) { blurIv.push([bAt, e.t]); bAt = null; } }
+    if (bAt !== null) blurIv.push([bAt, performance.now()]);
     for (const b of bs) { const s0 = b.t0, e0 = b.t0 + (b.totalMs || 0); b.blurred = blurIv.some(([x, y]) => x < e0 && y > s0); }
     const fb = bs.slice(1).filter((b) => !b.blurred);
     perf.laterBattles.unblurredN = fb.length; perf.laterBattles.blurredN = bs.slice(1).length - fb.length;
     perf.laterBattles.firstMenuMsMedianFocused = med(fb.map((b) => b.firstMenuMs)); perf.laterBattles.firstMenuMsMaxFocused = fb.length ? Math.max(...fb.map((b) => b.firstMenuMs)) : null;
     perf.firstBattle.blurred = bs[0] ? bs[0].blurred : null;
-    perf.focus = { blurEvents: focusLog.filter((e) => e.ev === "blur").length, framesSkippedUnfocused: skippedUnfocused };
+    perf.focus = { initiallyFocused: focusLog[0]?.hasFocus, blurEvents: focusLog.filter((e) => e.ev === "blur" && !e.initial).length, framesSkippedUnfocused: skippedUnfocused };
     perf.battles = all.length;
     perf.window = { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio, refocusCount: refocus };
     report.perf = perf;

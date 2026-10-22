@@ -1,0 +1,1080 @@
+{
+  "mode": "perf",
+  "results": [
+    {
+      "id": "P1 perf run",
+      "status": "pass",
+      "ms": 0
+    }
+  ],
+  "focusLog": [],
+  "suppressedAudio": {
+    "playBgm": 1,
+    "playStaticSe": 180
+  },
+  "refocus": 324,
+  "env": {
+    "nw": "0.117.0",
+    "node": "26.7.0",
+    "chromium": "154.0.8037.58",
+    "v8": "15.4.80.11",
+    "platform": "darwin",
+    "arch": "arm64",
+    "execPath": "/private/tmp/pf-step50-baseline-20261022-codex/build/package/PokemonFrameworkPrototype.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
+    "gameDir": "/private/tmp/pf-step50-baseline-20261022-codex/build/package/PokemonFrameworkPrototype.app/Contents/Resources/app.nw",
+    "packageInfo": {
+      "builtAt": "2026-10-22T09:57:00.537Z",
+      "gitHead": "c789620a153d8efeb8bc0b39afe3ea92685db8fc",
+      "workingTreeChanges": 0,
+      "diffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "showdownSha": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+      "engineBundleSha256": "f609ae2d96c37dfb1e8ca90620e7adee04c35025fc3d2f111e6efe79dcb3841b",
+      "contentInputsHash": "37802a10015f93e859f406476e3d84830ec17d06965c7bed1b5d34f8ba5d2aec",
+      "withTests": true,
+      "signing": "adhoc",
+      "artifacts": {
+        "js/plugins/AltMenuScreen.js": "6c062238c55ea09303c20419fa8a69c31e533a544c5414495fddd551c562ebe1",
+        "js/plugins/AltSaveScreen.js": "ba98b8c4a554e08a00cd895f0b8de909781ecb9209092c2272913d055d354eaa",
+        "js/plugins/ButtonPicture.js": "e0465802bb656960ebe914d52c800c86f27612e02285156adea681c2bc463479",
+        "js/plugins/PS_BattleFlow.js": "e717b58f01fd232ec26c4a064feb51b827744d9c0c21e2be9b0c3bf74bbd7591",
+        "js/plugins/PS_BattleFlowTest.js": "5989257d59f5607a8a2713b34a1fa9bcfce31727587955d99db92d03be66a7c9",
+        "js/plugins/PS_BattleSmoke.js": "fa7a861823d995b47716708639d4e5deadd54e72e79873bc4d6b0c675b89cab1",
+        "js/plugins/PS_RuntimeFixes.js": "13d8d5c09c79b91afbecef44042266a4fd7d71a7cf0507c530b2c2a32ada21ef",
+        "js/plugins/PS_SaveLocation.js": "60737918cfb94a07b6ba751a97fcc3750d00570abd1aacdd1153b3ecf552af38",
+        "js/plugins/PS_SaveState.js": "ec5d722cd2b2ee56860079e096ca6f2b672368f23b70a9445f07adb5f7582a4f",
+        "js/plugins/RR_Pixi8Particles.js": "99e8c17f3621804def083ed4ad66492992bb6a8fa3777e4f4e46f49ce70d9df8",
+        "js/plugins/TextPicture.js": "4ec28b5df38b26c358b0b0b618f13800f2ed232c5a44daf7afaeeecd2ae33908",
+        "js/engine/build/content-cli.cjs": "a59bbf5faf5d5040e3ebed321efd445cd8a2e9214ea6a5f5f1e3d1af11055699",
+        "js/engine/build/core.cjs": "61a6e337a3fb5f5e570464eadbb9edaec034c503c3aa1adb9d242b96cfaffb28",
+        "js/engine/build/custom-formats.cjs": "b7a0412ea2cd72d3371ee2fb409f09c7a2de893bb422d9034dafe0f8acf54ec8",
+        "js/engine/build/engine.cjs": "f609ae2d96c37dfb1e8ca90620e7adee04c35025fc3d2f111e6efe79dcb3841b",
+        "js/engine/showdown/dist/config/custom-formats.js": "b7a0412ea2cd72d3371ee2fb409f09c7a2de893bb422d9034dafe0f8acf54ec8",
+        "data/framework/content.json": "992b5fcb19167eebd856203bc6376c19bc15a83c6a0b0a43963b348945651885"
+      }
+    }
+  },
+  "perf": {
+    "method": {
+      "t0": "shell epoch ms just before launch",
+      "timers": "performance.now()/Date.now() in the renderer",
+      "frames": "SceneManager.update deltas, window focused, fast=true (no message pacing)"
+    },
+    "stamps": {
+      "pluginLoadedAt": 1792663251330,
+      "pluginLoadedPerf": 149,
+      "mapReadyAt": 1792663252491,
+      "mapReadyPerf": 1310
+    },
+    "memory": [
+      {
+        "label": "map ready (before any battle)",
+        "gcForced": false,
+        "nodeRssMb": 364,
+        "nodeHeapUsedMb": 46,
+        "jsHeapUsedMb": 65,
+        "appRssMb": 1197
+      },
+      {
+        "label": "after first round (4 battles)",
+        "gcForced": false,
+        "nodeRssMb": 396,
+        "nodeHeapUsedMb": 48,
+        "jsHeapUsedMb": 65,
+        "appRssMb": 1228
+      },
+      {
+        "label": "after 3 rounds (12 battles)",
+        "gcForced": false,
+        "nodeRssMb": 404,
+        "nodeHeapUsedMb": 47,
+        "jsHeapUsedMb": 65,
+        "appRssMb": 1233
+      },
+      {
+        "label": "after 6 rounds (24 battles)",
+        "gcForced": false,
+        "nodeRssMb": 408,
+        "nodeHeapUsedMb": 50,
+        "jsHeapUsedMb": 65,
+        "appRssMb": 1237
+      }
+    ],
+    "coldStart": {
+      "launchToPluginMs": 840,
+      "launchToMapReadyMs": 2001
+    },
+    "step4": {
+      "method": "slice map, encounter forced by an exhausted step counter; encounter = executeEncounter -> first battle menu (performance.now); save/load = DataManager.saveGame/loadGame promise round trip, slot 12, test save folder",
+      "encounterToFirstMenuMs": {
+        "n": 6,
+        "p50": 83.9,
+        "max": 84.7,
+        "samples": [
+          81.2,
+          82.5,
+          84.5,
+          83.9,
+          84.7,
+          83.9
+        ]
+      },
+      "saveMs": {
+        "n": 6,
+        "p50": 2.1,
+        "max": 2.4,
+        "samples": [
+          2.4,
+          2.4,
+          2.1,
+          1.7,
+          1.7,
+          1.6
+        ]
+      },
+      "loadMs": {
+        "n": 6,
+        "p50": 2.6,
+        "max": 7.1,
+        "samples": [
+          7.1,
+          3.6,
+          2.3,
+          1.9,
+          2.6,
+          2.3
+        ]
+      }
+    },
+    "engineLoadMs": 0.5,
+    "firstBattle": {
+      "sessionMs": 14.4,
+      "firstMenuMs": 431.6,
+      "totalMs": 919.2,
+      "label": "run",
+      "blurred": false
+    },
+    "laterBattles": {
+      "n": 29,
+      "sessionMsMedian": 2.1,
+      "firstMenuMsMedian": 132.1,
+      "firstMenuMsMax": 134.5,
+      "unblurredN": 29,
+      "blurredN": 0,
+      "firstMenuMsMedianFocused": 132.1,
+      "firstMenuMsMaxFocused": 134.5
+    },
+    "actionMs": {
+      "run": {
+        "n": 18,
+        "p50": 2.3,
+        "p95": 7.1,
+        "max": 7.1
+      },
+      "move": {
+        "n": 6,
+        "p50": 4.2,
+        "p95": 10.3,
+        "max": 10.3
+      },
+      "item": {
+        "n": 6,
+        "p50": 4.6,
+        "p95": 6.5,
+        "max": 6.5
+      },
+      "ball": {
+        "n": 6,
+        "p50": 3.1,
+        "p95": 3.7,
+        "max": 3.7
+      }
+    },
+    "frames": {
+      "battleScene": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "max": null,
+        "over33": 0,
+        "over50": 0,
+        "over100": 0
+      },
+      "mapScene": {
+        "n": 0,
+        "p50": null,
+        "p95": null,
+        "p99": null,
+        "max": null,
+        "over33": 0,
+        "over50": 0,
+        "over100": 0
+      }
+    },
+    "focus": {
+      "blurEvents": 0,
+      "framesSkippedUnfocused": 2336
+    },
+    "battles": 30,
+    "window": {
+      "w": 816,
+      "h": 624,
+      "dpr": 2,
+      "refocusCount": 324
+    }
+  },
+  "contentIdentity": {
+    "kind": "sample",
+    "id": "sample",
+    "inputsHash": "37802a10015f93e859f406476e3d84830ec17d06965c7bed1b5d34f8ba5d2aec"
+  },
+  "logTail": [
+    {
+      "n": 180,
+      "battleId": "wild-pidgey#22",
+      "level": "info",
+      "kind": "growth",
+      "data": {
+        "member": "A-0001",
+        "foe": "W22-1",
+        "exp": 3,
+        "level": 50,
+        "levelUps": 0
+      }
+    },
+    {
+      "n": 181,
+      "battleId": "wild-pidgey#22",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "win",
+        "winner": "Player",
+        "bag": {},
+        "members": 3
+      }
+    },
+    {
+      "n": 182,
+      "battleId": "wild-pidgey#22",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "growth": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 183,
+      "battleId": "wild-pidgey#23",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 184,
+      "battleId": "wild-pidgey#23",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 185,
+      "battleId": "wild-pidgey#23",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "37802a10015f"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "A-0001",
+          "A-0002",
+          "A-0003"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 186,
+      "battleId": "wild-pidgey#23",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "item",
+        "item": "potion",
+        "target": "A-0001",
+        "commit": true
+      }
+    },
+    {
+      "n": 187,
+      "battleId": "wild-pidgey#23",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "reserve",
+        "kind": "item",
+        "item": "potion",
+        "left": 4
+      }
+    },
+    {
+      "n": 188,
+      "battleId": "wild-pidgey#23",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "consume",
+        "kind": "item",
+        "item": "potion"
+      }
+    },
+    {
+      "n": 189,
+      "battleId": "wild-pidgey#23",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 9,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 190,
+      "battleId": "wild-pidgey#23",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 10,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 191,
+      "battleId": "wild-pidgey#23",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "request": 2
+        },
+        "finished": false
+      }
+    },
+    {
+      "n": 192,
+      "battleId": "wild-pidgey#23",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "run"
+      }
+    },
+    {
+      "n": 193,
+      "battleId": "wild-pidgey#23",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "run",
+        "winner": null,
+        "bag": {
+          "potion": -1
+        },
+        "members": 3
+      }
+    },
+    {
+      "n": 194,
+      "battleId": "wild-pidgey#23",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 195,
+      "battleId": "wild-pidgey#24",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 196,
+      "battleId": "wild-pidgey#24",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 197,
+      "battleId": "wild-pidgey#24",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "37802a10015f"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "A-0001",
+          "A-0002",
+          "A-0003"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 198,
+      "battleId": "wild-pidgey#24",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "ball",
+        "ball": "masterball"
+      }
+    },
+    {
+      "n": 199,
+      "battleId": "wild-pidgey#24",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "reserve",
+        "kind": "ball",
+        "item": "masterball",
+        "left": 4
+      }
+    },
+    {
+      "n": 200,
+      "battleId": "wild-pidgey#24",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "consume",
+        "kind": "ball",
+        "item": "masterball",
+        "outcome": "caught"
+      }
+    },
+    {
+      "n": 201,
+      "battleId": "wild-pidgey#24",
+      "level": "info",
+      "kind": "growth",
+      "data": {
+        "member": "A-0001",
+        "foe": "W24-1",
+        "exp": 3,
+        "level": 50,
+        "levelUps": 0
+      }
+    },
+    {
+      "n": 202,
+      "battleId": "wild-pidgey#24",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "caught",
+        "winner": null,
+        "bag": {
+          "masterball": -1
+        },
+        "members": 3
+      }
+    },
+    {
+      "n": 203,
+      "battleId": "wild-pidgey#24",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "growth": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 204,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 205,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 206,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "37802a10015f"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 207,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "run"
+      }
+    },
+    {
+      "n": 208,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "run",
+        "winner": null,
+        "bag": {},
+        "members": 1
+      }
+    },
+    {
+      "n": 209,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 210,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 211,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 212,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "37802a10015f"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 213,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "run"
+      }
+    },
+    {
+      "n": 214,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "run",
+        "winner": null,
+        "bag": {},
+        "members": 1
+      }
+    },
+    {
+      "n": 215,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 216,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 217,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 218,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "37802a10015f"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 219,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "run"
+      }
+    },
+    {
+      "n": 220,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "run",
+        "winner": null,
+        "bag": {},
+        "members": 1
+      }
+    },
+    {
+      "n": 221,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 222,
+      "battleId": "wild#4",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 223,
+      "battleId": "wild#4",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 224,
+      "battleId": "wild#4",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "37802a10015f"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 225,
+      "battleId": "wild#4",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "run"
+      }
+    },
+    {
+      "n": 226,
+      "battleId": "wild#4",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "run",
+        "winner": null,
+        "bag": {},
+        "members": 1
+      }
+    },
+    {
+      "n": 227,
+      "battleId": "wild#4",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 228,
+      "battleId": "wild#5",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 229,
+      "battleId": "wild#5",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 230,
+      "battleId": "wild#5",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "37802a10015f"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 231,
+      "battleId": "wild#5",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "run"
+      }
+    },
+    {
+      "n": 232,
+      "battleId": "wild#5",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "run",
+        "winner": null,
+        "bag": {},
+        "members": 1
+      }
+    },
+    {
+      "n": 233,
+      "battleId": "wild#5",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 234,
+      "battleId": "wild#6",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 235,
+      "battleId": "wild#6",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 236,
+      "battleId": "wild#6",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "37802a10015f"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 237,
+      "battleId": "wild#6",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "run"
+      }
+    },
+    {
+      "n": 238,
+      "battleId": "wild#6",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "run",
+        "winner": null,
+        "bag": {},
+        "members": 1
+      }
+    },
+    {
+      "n": 239,
+      "battleId": "wild#6",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    }
+  ],
+  "overall": "pass"
+}
