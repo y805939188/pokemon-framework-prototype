@@ -52,7 +52,8 @@ test('encounter tables: regions decide where a table applies; malformed tables a
 });
 
 const member = (id, species, level, extra = {}) => ({ ...E.memberFactory.createMember({ id, species, level }, content, lcg(level)), ...extra });
-const gameWith = (party, money) => { const g = S.newGame({ party: [] }); g.party = party; g.money = money; return g; };
+// a save stores members by content id + form since step 5.0 (D5-3): created (battle-shaped) members are stored that way
+const gameWith = (party, money) => { const g = S.newGame({ party: [] }); g.party = party.map(m => E.speciesKey.toPersistentMember(m, content)); g.money = money; return g; };
 
 test('defeat money loss (WP42 6.1): highest party level x badge factor, at most the balance; badges 0 in this build', () => {
   assert.deepEqual(BADGE_FACTORS, [8, 16, 24, 36, 48, 64, 80, 100, 120]);

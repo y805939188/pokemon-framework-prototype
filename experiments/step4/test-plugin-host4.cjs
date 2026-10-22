@@ -38,7 +38,7 @@ test.after(() => { if (dir) fs.rmSync(dir, { recursive: true, force: true }); })
 /** A loser's state: one member at 1 HP, 500 money. */
 function losingGame() {
   const m = E.memberFactory.createMember({ id: 'S-1', species: 'Snorlax', level: 2 }, content, lcg(3)); m.hp = 1;
-  return E.state.newGame({ party: [m], money: 500 });
+  return E.state.newGame({ party: [E.speciesKey.toPersistentMember(m, content)], money: 500 }); // stored by content id + form (D5-3)
 }
 const lost = battleId => ({ protocol: 1, battleId, outcome: { kind: 'win', winner: 'Wild' }, members: { 'S-1': { hp: 0 } }, bag: {}, captured: [], dex: { seen: ['Pidgey'], owned: [] } });
 const ran = battleId => ({ protocol: 1, battleId, outcome: { kind: 'run', winner: null }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] } });
@@ -87,7 +87,9 @@ function host({ interpreter = false, saveEnabled = true, failMessage = false, ga
 /** Start a battle the way the plugin does (the scene is a stub) and end it with `result` through the scene's onEnd. */
 function battle(h, { canLose = false, resultVariable = 0, result = lost } = {}) {
   h.flow.openBattle({ kind: 'wild', foes: [{ species: 'Pidgey', level: 30 }], seq: 1, battleId: 'b#1', resultVariable, canLose });
-  return () => h.ctx.Scene_PSBattle.prototype.onEnd.call({ _session: { result: () => result('b#1') }, popScene() {} });
+  // This host-only fixture substitutes for begin(): give the synthetic session the same ownership begin records.
+  const session = h.flow._op.session = { result: () => result('b#1') };
+  return () => h.ctx.Scene_PSBattle.prototype.onEnd.call({ _session: session, popScene() {} });
 }
 
 // ---- N4: the save permission
@@ -167,7 +169,8 @@ test('a blackout ends the calling chain of the battle: directly, through one and
     root.setup(shape === 0 ? [startBattle(canLose), set(3, 777), END] : [c(117, [shape]), set(3, 777), END], 1);
     root.update();
     assert.equal(h.flow.running, true, 'the battle is open and the event waits');
-    h.ctx.Scene_PSBattle.prototype.onEnd.call({ _session: { result: () => lost(h.flow.request.battleId) }, popScene() {} });
+    const session = h.flow._op.session = { result: () => lost(h.flow.request.battleId) };
+    h.ctx.Scene_PSBattle.prototype.onEnd.call({ _session: session, popScene() {} });
     root.update();
     return { h, root, after: [h.vars[1] || 0, h.vars[2] || 0, h.vars[3] || 0], running: root.isRunning(), blackout: !!h.flow.lastOutcome.blackout, money: h.game().money };
   }

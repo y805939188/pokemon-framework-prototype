@@ -16,7 +16,11 @@ const ROOT = path.resolve(__dirname, '../..');
 // content-sample-step3); the live sample grows in step 4 and has its own tests (experiments/step4/test-content4.cjs).
 const SRC = path.join(__dirname, 'fixtures/content-sample-step3');
 const CLI = path.join(ROOT, 'js/engine/build/content-cli.cjs');
-const read = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
+// Since step 5.0 the Showdown data every record depends on must pass the pre-use gate; the frozen step 3 registry
+// predates it, so these tests add the recorded check in memory (and to their temporary copies); the files stay frozen.
+const SHOWDOWN_CHECK = { checkedOn: '2026-10-21', checkedBy: 'test (step 3 fixture, check added in memory)', conditions: 'as registered in content/sample/sources.json', decision: 'internal-use' };
+const withCheck = sources => sources.map(s => (s.kind === 'showdown' ? { ...s, usageCheck: SHOWDOWN_CHECK } : s));
+const read = f => { const v = JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8')); return f === 'sources.json' ? withCheck(v) : v; };
 const inputs = () => ({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json') });
 const bad = (mutate, file, pathRe, msgRe) => {
 	const i = inputs(); mutate(i);
@@ -76,6 +80,7 @@ test('the CLI: build writes deterministic output; a failed build REMOVES the old
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-content-'));
 	try {
 		fs.cpSync(SRC, path.join(dir, 'src'), { recursive: true });
+		fs.writeFileSync(path.join(dir, 'src/sources.json'), JSON.stringify(read('sources.json')));
 		const out = path.join(dir, 'out/content.json');
 		const run = (...a) => spawnSync(process.execPath, [CLI, ...a, `--src=${path.join(dir, 'src')}`, `--out=${out}`], { encoding: 'utf8' });
 		assert.equal(run('build').status, 0);
@@ -100,8 +105,9 @@ test('assembly against the pinned Showdown data reproduces the step 2 fixture co
 	const { content, errors } = assembleContent(compiled, dex);
 	assert.deepEqual(errors, []);
 	// the sample adds one thing the fixture does not have: the text key of each display name
-	// (and, since step 4, the data needed to create an individual: abilities, gender rule, content id)
-	const withoutKeys = Object.fromEntries(Object.entries(content.species).map(([k, v]) => { const { nameKey, abilities, gender, contentId, ...rest } = v; assert.match(nameKey, /^species\.[a-z]+$/); return [k, rest]; }));
+	// (and, since step 4, the data needed to create an individual: abilities, gender rule, content id; since step 5.0
+	// the form number of the record, which with the content id is the persistent key)
+	const withoutKeys = Object.fromEntries(Object.entries(content.species).map(([k, v]) => { const { nameKey, abilities, gender, contentId, form, ...rest } = v; assert.equal(form, 0); assert.match(nameKey, /^species\.[a-z]+$/); return [k, rest]; }));
 	assert.deepEqual(withoutKeys, E.fixtures.content.species, 'sample content == fixture content (same numbers, same Showdown base stats)');
 	assert.equal(content.meta.kind, 'sample'); assert.equal(content.meta.inputsHash, compiled.inputsHash);
 	assert.equal(E.fixtures.content.meta.kind, 'fixture', 'the fixture keeps a distinct identity');
@@ -189,6 +195,7 @@ test('R4: through the CLI a bad overlay fails the build with the overlay locatio
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-content-r4-'));
 	try {
 		fs.cpSync(SRC, path.join(dir, 'src'), { recursive: true });
+		fs.writeFileSync(path.join(dir, 'src/sources.json'), JSON.stringify(read('sources.json')));
 		const out = path.join(dir, 'out/content.json');
 		const run = (...a) => spawnSync(process.execPath, [CLI, ...a, `--src=${path.join(dir, 'src')}`, `--out=${out}`], { encoding: 'utf8' });
 		assert.equal(run('build').status, 0); assert.equal(fs.existsSync(out), true);

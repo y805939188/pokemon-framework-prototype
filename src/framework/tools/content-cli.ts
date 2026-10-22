@@ -1,14 +1,19 @@
 /**
- * Content tooling entry (built to js/engine/build/content-cli.cjs): `build`, `check`, `inventory`.
+ * Content tooling entry (built to js/engine/build/content-cli.cjs): `build`, `check`, `inventory`, `import-pbs`.
  *   build      compile content/<src> into data/framework/content.json (a failed build REMOVES the old output, so a
  *              stale artifact can never hide broken or missing inputs)
  *   check      the compiled file exists and is the build of exactly the current inputs
  *   inventory  compare the sample with the pinned Showdown data and write a machine-readable report
+ *   import-pbs read an author-provided PBS species file (content/pbs-import.ts subset) into species records plus a
+ *              report of every field not carried over; refused unless the named source of the content has a recorded
+ *              pre-use check that allows its use (DETAILED-PLAN §280, D5-2). Writes the report file only: the author
+ *              merges the records into species.json.
  * Paths are resolved from the project root, not from the working directory.
  */
 import fs from "node:fs";
 import path from "node:path";
-import { canonicalJson, checkFresh, compileContent } from "../content/compile.ts";
+import { canonicalJson, checkFresh, checkSources, compileContent, preUseProblem } from "../content/compile.ts";
+import { importPbsSpecies } from "../content/pbs-import.ts";
 import type { CompiledContent, ContentError, ContentInputs } from "../content/schema.ts";
 import { createDexLookup } from "../battle/dex.ts";
 import { assembleContent } from "../flow/content-runtime.ts";
@@ -25,28 +30,41 @@ function readInputs(dir: string): { inputs: ContentInputs; errors: ContentError[
     try { return JSON.parse(fs.readFileSync(path.join(dir, file), "utf8")); }
     catch (e) { errors.push({ file, path: "$", message: `cannot read as JSON: ${(e as Error).message}` }); return undefined; }
   };
-  // grants.json is optional (content written before step 4 has none); every other file is required
+  // grants.json (step 4) and settings.json (step 5.0) are optional; every other file is required
   const grants = fs.existsSync(path.join(dir, "grants.json")) ? read("grants.json") : undefined;
-  const inputs = { manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json"), ...(grants !== undefined ? { grants } : {}) };
+  const settings = fs.existsSync(path.join(dir, "settings.json")) ? read("settings.json") : undefined;
+  const inputs = { manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json"), ...(grants !== undefined ? { grants } : {}), ...(settings !== undefined ? { settings } : {}) };
   return { inputs, errors };
 }
 
 const show = (errors: ContentError[]): void => { for (const e of errors) console.error(`${e.file} ${e.path}: ${e.message}`); };
 
 export function build(src: string, out: string): number {
-  const { inputs, errors } = readInputs(src);
-  const r = errors.length ? { ok: false as const, errors } : compileContent(inputs);
-  if (!r.ok) {
-    show(r.errors);
-    try { fs.unlinkSync(out); } catch { /* nothing to remove */ }
-    console.error(`content build FAILED (${r.errors.length} problem(s)); the previous compiled output was removed`);
+  const fail = (errors: ContentError[]): number => {
+    show(errors);
+    try { fs.unlinkSync(out); }
+    catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
+        console.error(`content build FAILED (${errors.length} problem(s)); cannot remove the previous compiled output ${out}: ${(e as Error).message}`);
+        return 1;
+      }
+    }
+    console.error(`content build FAILED (${errors.length} problem(s)); no previous compiled output remains`);
     return 1;
+  };
+  // Input, compiler, serialization and output failures all invalidate the previous artifact.
+  try {
+    const { inputs, errors } = readInputs(src);
+    const r = errors.length ? { ok: false as const, errors } : compileContent(inputs);
+    if (!r.ok) return fail(r.errors);
+    const text = canonicalJson(r.data, 2) + "\n";
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== text) fs.writeFileSync(out, text);
+    console.log(`content built: ${r.data.species.length} species, ${r.data.grants?.length ?? 0} grants, inputs ${r.data.inputsHash.slice(0, 12)} -> ${path.relative(ROOT, out)}`);
+    return 0;
+  } catch (e) {
+    return fail([{ file: "compiled", path: "$", message: `content build failed: ${(e as Error).message}` }]);
   }
-  const text = canonicalJson(r.data, 2) + "\n";
-  fs.mkdirSync(path.dirname(out), { recursive: true });
-  if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== text) fs.writeFileSync(out, text);
-  console.log(`content built: ${r.data.species.length} species, ${r.data.grants?.length ?? 0} grants, inputs ${r.data.inputsHash.slice(0, 12)} -> ${path.relative(ROOT, out)}`);
-  return 0;
 }
 
 export function check(src: string, out: string): number {
@@ -85,7 +103,7 @@ export function inventory(src: string, report: string): number {
     };
   });
   const doc = {
-    schema: 1, contentId: r.data.contentId, inputsHash: r.data.inputsHash, showdownSha: dex.sha(),
+    schema: 1, contentId: r.data.contentId, inputsHash: r.data.inputsHash, showdownSha: rows.length ? dex.sha() : null,
     note: "Field-level inventory only. Equal data is not equal behaviour. Framework-only fields have no Showdown counterpart to compare; the sample learnsets are synthetic placeholders, so 'differs' and 'framework-only' are expected there.",
     summary: { species: rows.length, learnComparisons: tally },
     species: rows,
@@ -96,9 +114,32 @@ export function inventory(src: string, report: string): number {
   return 0;
 }
 
+export function importPbs(src: string, file: string, sourceId: string, report: string): number {
+  const { inputs, errors } = readInputs(src);
+  if (errors.length) { show(errors); return 1; }
+  // the same registry validation and pre-use gate as the compiler, BEFORE the data is read (DETAILED-PLAN §280, D5-2)
+  const problems: ContentError[] = [];
+  const sources = checkSources(inputs.sources, (file, p, message) => { problems.push({ file, path: p, message }); });
+  if (problems.length) { show(problems); console.error("sources.json has problems: nothing was imported"); return 1; }
+  const gate = preUseProblem(sources, sourceId);
+  if (gate) { console.error(`sources.json ${sourceId}: ${gate}; nothing was imported`); return 1; }
+  let text: string;
+  try { text = fs.readFileSync(file, "utf8"); } catch (e) { console.error(`cannot read ${file}: ${(e as Error).message}`); return 1; }
+  const r = importPbsSpecies(text, sourceId);
+  for (const e of r.errors) console.error(`${path.basename(file)}:${e.line} ${e.path}: ${e.message}`);
+  fs.mkdirSync(path.dirname(report), { recursive: true });
+  fs.writeFileSync(report, canonicalJson({ schema: 1, file: path.basename(file), source: sourceId, ok: r.ok, species: r.species, records: r.records, errors: r.errors }, 2) + "\n");
+  console.log(`import-pbs: ${r.species.length} species record(s), ${r.errors.length} problem(s) -> ${path.relative(ROOT, report)}`);
+  return r.ok ? 0 : 1;
+}
+
 const cmd = process.argv[2];
 const SRC = arg("src", "content/sample");
 if (cmd === "build") process.exit(build(SRC, arg("out", "data/framework/content.json")));
 else if (cmd === "check") process.exit(check(SRC, arg("out", "data/framework/content.json")));
 else if (cmd === "inventory") process.exit(inventory(SRC, arg("report", "docs/step3/content-inventory.json")));
-else { console.error("usage: content-cli.cjs build|check|inventory [--src=content/sample] [--out=...] [--report=...]"); process.exit(2); }
+else if (cmd === "import-pbs") {
+  const source = process.argv.find((a) => a.startsWith("--source="))?.slice(9) ?? "";
+  process.exit(importPbs(SRC, arg("file", "pokemon.txt"), source, arg("report", "build/pbs-import.json")));
+}
+else { console.error("usage: content-cli.cjs build|check|inventory|import-pbs [--src=content/sample] [--out=...] [--report=...] [--file=pokemon.txt --source=<id>]"); process.exit(2); }

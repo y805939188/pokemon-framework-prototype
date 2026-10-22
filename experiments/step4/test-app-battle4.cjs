@@ -18,7 +18,9 @@ const content = E.contentRuntime.assembleContent(E.contentCompile.compileContent
 const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor((s / 4294967296) * n); }; };
 const clone = x => JSON.parse(JSON.stringify(x));
 const mk = (id, species, level, extra = {}) => ({ ...E.memberFactory.createMember({ id, species, level }, content, lcg(level * 7 + id.length)), ...extra });
-const gameOf = (party, { bag = { pokeball: 5, potion: 2 }, money = 3000, boxes = [] } = {}) => { const g = S.newGame({ party: [] }); g.party = party; g.bag = bag; g.money = money; g.boxes = boxes; return g; };
+// a save stores members by content id + form since step 5.0 (D5-3): created (battle-shaped) members are stored that way
+const saved = m => E.speciesKey.toPersistentMember(m, content);
+const gameOf = (party, { bag = { pokeball: 5, potion: 2 }, money = 3000, boxes = [] } = {}) => { const g = S.newGame({ party: [] }); g.party = party.map(saved); g.bag = bag; g.money = money; g.boxes = boxes.map(saved); return g; };
 const req = (id, foes = [{ species: 'pidgey', level: 3 }], kind = 'wild', seq = 1) => ({ battleId: id, kind, foes, seq });
 
 function fakeApp(game, { first, limits, noMoneyLoss, random = lcg(9) } = {}) {
@@ -33,7 +35,7 @@ test('startBattle creates the foes from the content: ids W<seq>-<n>, creation ru
   await app.startBattle(req('wild#4', [{ species: 'pidgey', level: 3 }, { species: 'Caterpie', level: 4 }], 'wild', 4));
   const { setup } = sessions.created[0];
   assert.deepEqual(setup.foes.map(f => [f.id, f.species, f.level, f.moves.map(m => m.id)]), [['W4-1', 'Pidgey', 3, ['tackle']], ['W4-2', 'Caterpie', 4, ['tackle', 'stringshot']]]);
-  for (const f of setup.foes) { assert.deepEqual(E.saveSchema.validateGame({ ...gameOf([]), party: [f] }), []); assert.ok(Object.values(f.ivs).every(v => v >= 0 && v <= 31)); }
+  for (const f of setup.foes) { assert.equal(f.form, undefined, 'a foe is a battle record'); assert.deepEqual(E.saveSchema.validateGame({ ...gameOf([]), party: [saved(f)] }), []); assert.ok(Object.values(f.ivs).every(v => v >= 0 && v <= 31)); }
   assert.deepEqual([setup.noRun, setup.noBall, setup.storageFull], [false, false, false]);
   assert.equal(JSON.stringify(state.current()), before);
   const again = fakeApp(gameOf([mk('G-starter-1', 'Charmander', 5)]));
@@ -152,7 +154,7 @@ test('real: a won wild battle writes back HP, PP, status, exp, a level-up and a 
   assert.deepEqual(m.moves.map(x => x.id), ['scratch', 'growl', 'ember', 'smokescreen'], 'the level 8 move is learned into the free slot (same learnset as creation)');
   assert.equal(m.hp, live.hp, 'HP from the engine'); assert.equal(m.status, live.status || '');
   assert.equal(m.moves[2].pp, live.pp.ember, 'used PP written back'); assert.ok(m.moves[2].pp < m.moves[2].maxpp);
-  assert.ok(state.current().dex.seen.includes('Pidgey'));
+  assert.ok(state.current().dex.seen.includes('pidgey'), 'the dex records the content id (D5-3, step 5.0)');
   const after = JSON.stringify(state.current());
   assert.equal(app.finishBattle(s, r).commit, 'already-applied'); assert.equal(JSON.stringify(state.current()), after);
 });
@@ -211,8 +213,8 @@ test('real: a ball can fail and succeed; the caught member is the created foe; u
     const now = w.state.current();
     assert.equal(now.bag.pokeball, 6 - thrown); assert.equal(now.bag.potion, undefined, 'the potion was used once');
     const c = now.party[1];
-    assert.deepEqual([c.id, c.species, c.level, c.nature, c.ability, c.gender, c.ivs, c.ball], [foe.id, 'Pidgey', 3, foe.nature, foe.ability, foe.gender, foe.ivs, 'pokeball']);
-    assert.ok(now.dex.owned.includes('Pidgey'));
+    assert.deepEqual([c.id, c.species, c.form, c.level, c.nature, c.ability, c.gender, c.ivs, c.ball], [foe.id, 'pidgey', 0, 3, foe.nature, foe.ability, foe.gender, foe.ivs, 'pokeball'], 'stored by content id + form (D5-3, step 5.0)');
+    assert.ok(now.dex.owned.includes('pidgey'));
     assert.equal(w.app.finishBattle(s, r).commit, 'already-applied'); assert.equal(w.state.current().party.length, 2, 'not received twice');
     return;
   }

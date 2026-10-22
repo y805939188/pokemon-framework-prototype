@@ -8,12 +8,18 @@
  * old file or the complete new file (both readable), a leftover temp file is discarded on load, and a re-submitted
  * result is applied at most once. Not claimed: power loss beyond fsync+rename, multi-file saves, battle-in-progress
  * saves. Node-only (uses fs); the MZ runtime saves through MZ's own save files (see the PS_SaveState plugin).
+ *
+ * Species keys (D5-3): the store knows no content. Give it the content's mapping (`speciesKeyResolver(content)`), or,
+ * for a fixture world whose content ids are the Showdown names, choose `identityKeys` explicitly. Without one, a
+ * document older than schema 4 is refused ("needs-content", the file untouched) and a result that names a species
+ * (a capture, the dex) is refused: nothing is guessed.
  */
 import fs from "node:fs";
 import { applyBattleResult } from "../rules/state.ts";
 import type { BattleResult, GameState } from "../rules/state.ts";
 import { migrateGame } from "../rules/save-schema.ts";
 import type { MigrationResult, SaveErrorInfo } from "../rules/save-schema.ts";
+import type { SpeciesKeyResolver } from "../rules/species-key.ts";
 
 export type FaultPoint = "start" | "afterBackup" | "beforeSave" | "afterTmpWrite" | "beforeRename" | "afterRename";
 
@@ -32,10 +38,13 @@ export type LoadInfo = Extract<MigrationResult, { ok: true }>;
 export class SaveStore {
   file: string;
   hooks: { at?: (point: FaultPoint) => void };
+  /** Showdown name -> persistent key for older documents and results (D5-3); none = refuse instead of guessing. */
+  speciesKey: SpeciesKeyResolver | undefined;
 
-  constructor(file: string, hooks: { at?: (point: FaultPoint) => void } = {}) {
+  constructor(file: string, hooks: { at?: (point: FaultPoint) => void } = {}, speciesKey?: SpeciesKeyResolver) {
     this.file = file;
     this.hooks = hooks; // test-only fault injection: hooks.at(point) may throw or exit the process
+    this.speciesKey = speciesKey;
   }
   private _at(point: FaultPoint): void { this.hooks.at?.(point); }
 
@@ -46,7 +55,7 @@ export class SaveStore {
     let raw: unknown;
     try { raw = JSON.parse(fs.readFileSync(this.file, "utf8")); }
     catch (e) { throw new SaveError({ code: "corrupt", message: `cannot read the save file as JSON (${(e as Error).message.slice(0, 120)}); the file was left untouched` }); }
-    const r = migrateGame(raw);
+    const r = migrateGame(raw, this.speciesKey ? { speciesKey: this.speciesKey } : {});
     if (!r.ok) throw new SaveError(r.error);
     return r;
   }
@@ -78,7 +87,9 @@ export class SaveStore {
   commit(result: BattleResult): { status: "applied" | "already-applied"; migratedFrom?: number } {
     this._at("start");
     const info = this.loadInfo();
-    const r = applyBattleResult(info.state, result);
+    const names = [...(result.captured || []).map((c) => c.species), ...(result.dex?.seen || []), ...(result.dex?.owned || [])];
+    if (!this.speciesKey && names.length) throw new Error(`this result names species (${[...new Set(names)].slice(0, 3).join(", ")}) and the store was given no species mapping: pass the content's resolver (or identityKeys for a fixture world); nothing was written`);
+    const r = applyBattleResult(info.state, result, undefined, this.speciesKey ?? (() => null));
     if (info.migrated) { this._backup(info.from); this._at("afterBackup"); }
     if (r.status === "already-applied" && !info.migrated) return { status: r.status };
     this._at("beforeSave");

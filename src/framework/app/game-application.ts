@@ -15,10 +15,13 @@ import { computeStats } from "../rules/growth.ts";
 import { createMember } from "../rules/member-factory.ts";
 import { appliesAt, pickEncounter, validateEncounterTable } from "../rules/encounter.ts";
 import { isDefeat, settleDefeat } from "../rules/defeat.ts";
+import { battleView, speciesDataOf, speciesKeyResolver } from "../rules/species-key.ts";
+import { addSteps, bumpStat } from "../rules/stats.ts";
+import type { GameStats, StatCounter } from "../rules/stats.ts";
 import type { Member } from "../rules/types.ts";
 import { own } from "../rules/own.ts";
 import { findDanglingReferences, resolveSpecies } from "../flow/content-runtime.ts";
-import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ContentPort, EncounterPlan, GameStatePort, HealOutcome, OutcomeProjection, PartyView, RandomPort } from "./ports.ts";
+import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ClockPort, ContentPort, EncounterPlan, GameStatePort, HealOutcome, OutcomeProjection, PartyView, RandomPort, StepsOutcome } from "./ports.ts";
 
 export interface GameApplicationPorts<S extends BattleHandle> {
   state: GameStatePort;
@@ -27,6 +30,8 @@ export interface GameApplicationPorts<S extends BattleHandle> {
   projection: OutcomeProjection;
   /** Needed by the use cases that create members (grants, encounters); without it they refuse with "no-random". */
   random?: RandomPort;
+  /** The host's wall clock (WP06 §3), for the use cases that need the time; see `now()`. */
+  clock?: ClockPort;
 }
 
 /** Stage configuration of the application (not ports: plain values the host reads from its settings). */
@@ -50,6 +55,25 @@ export function outcomeCode(result: BattleResult): number {
   return kind === "win" ? (winner === "Player" ? 1 : 4) : kind === "caught" ? 2 : kind === "run" ? 3 : 4;
 }
 
+/** What a commit needs to know about the battle beyond its result: for the statistics (WP06 §4.2, WP53 §183, WP61 §7). */
+interface BattleFacts { kind: "wild" | "trainer"; canLose: boolean }
+
+/**
+ * Battle statistics of one committed result (host code: 1 win, 2 caught, 3 ran, 4 lost or drawn). Wild: a win or a
+ * catch is won, a run, loss or draw is lost (the reference's 1/4 vs 2/3/5 split). Trainer: a win is won, a loss or draw
+ * is lost. A defeat adds the money lost, and counts a blackout unless the author let the player lose this battle.
+ */
+function battleStats(stats: GameStats, facts: BattleFacts, code: number, defeat: { moneyLost: number } | undefined): GameStats {
+  const won = facts.kind === "wild" ? code === 1 || code === 2 : code === 1;
+  const key: StatCounter = `${facts.kind}_battles_${won ? "won" : "lost"}`;
+  let next = bumpStat(stats, key);
+  if (defeat) {
+    next = bumpStat(next, "battle_money_lost", defeat.moneyLost);
+    if (!facts.canLose) next = bumpStat(next, "blacked_out_count");
+  }
+  return next;
+}
+
 export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly ports: GameApplicationPorts<S>;
   private readonly limits: Limits;
@@ -62,7 +86,14 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * ("battle-active"), and a second battle cannot start. Each operation is its own object: a creation that fails, or
    * completes after its operation was aborted, only ever touches that object, never a later operation.
    */
-  private op: { battleId: string; session: S | null } | null = null;
+  private op: { battleId: string; session: S | null; facts: BattleFacts } | null = null;
+  /**
+   * State generation: raised whenever the host installs a state the application did not produce (a save loaded, a new
+   * game). Every session remembers the generation it was opened in; a session of an earlier generation (open or already
+   * finished) belongs to a state that no longer exists, so finishing it commits nothing (final review P4-2).
+   */
+  private generation = 0;
+  private readonly bornIn = new WeakMap<object, number>();
 
   constructor(ports: GameApplicationPorts<S>, options: GameApplicationOptions = {}) {
     this.ports = ports;
@@ -101,9 +132,9 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const { content } = this.ports.content();
     return {
       members: game.party.map((m) => {
-        const sp = own(content.species, m.species);
+        const sp = speciesDataOf(content, m);
         const maxhp = sp ? computeStats(sp.base, m.ivs, m.evs, m.level, m.nature).hp : m.hp;
-        return { id: m.id, species: m.species, ...(sp?.nameKey ? { nameKey: sp.nameKey } : {}), level: m.level, hp: m.hp, maxhp, status: m.status, moves: m.moves.map((x) => ({ ...x })) };
+        return { id: m.id, species: m.species, form: m.form ?? 0, ...(sp?.nameKey ? { nameKey: sp.nameKey } : {}), level: m.level, hp: m.hp, maxhp, status: m.status, moves: m.moves.map((x) => ({ ...x })) };
       }),
       boxes: game.boxes.length, bag: { ...game.bag }, money: game.money,
     };
@@ -119,6 +150,41 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (JSON.stringify(next.party) === JSON.stringify(game.party)) return { status: "unchanged" };
     try { this.ports.state.replace(next); } catch (error) { return { status: "refused", reason: "commit-failed", error: message(error) }; }
     return { status: "healed" };
+  }
+
+  /**
+   * The current wall-clock time from the injected clock (milliseconds since the Unix epoch). The single way the
+   * application reads time: use cases that need it (time conditions 5.3, time of day 5.5, play time 5.6) take it from
+   * here and hand it to the rules as an argument. Throws when no clock is configured or it answers something that is
+   * not a finite number of milliseconds.
+   */
+  now(): number {
+    const clock = this.ports.clock;
+    if (!clock) throw new Error("no clock is configured for this application");
+    const t = clock();
+    if (typeof t !== "number" || !Number.isFinite(t) || t < 0) throw new Error(`the clock answered ${String(t)}, not a time in milliseconds`);
+    return t;
+  }
+
+  /** Count steps the player took (WP06 §4.1: the global counter, wrapping at 2^31). The host applies the guards of that step. */
+  recordSteps(n = 1): StepsOutcome {
+    if (this.op) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
+    let game: GameState;
+    try { game = this.ports.state.read(); } catch (error) { return { status: "refused", reason: "state-unusable", error: message(error) }; }
+    let steps: number;
+    try { steps = addSteps(game.steps, n); } catch (error) { return { status: "refused", reason: "invalid", error: message(error) }; }
+    try { this.ports.state.replace({ ...game, steps }); } catch (error) { return { status: "refused", reason: "commit-failed", error: message(error) }; }
+    return { status: "counted", steps };
+  }
+
+  /**
+   * The host installed a state the application did not produce (a save was loaded, a new game was set up). A battle
+   * still open belongs to the replaced state: its operation is released (otherwise grants, heals and battles would stay
+   * refused for good, final review P4-2), and its session, should it still finish, commits nothing.
+   */
+  stateReplacedByHost(): void {
+    this.generation++;
+    this.op = null;
   }
 
   /**
@@ -148,13 +214,15 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     });
     const full = storageFull(game, this.limits);
     const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full, storageFull: full };
-    const op: { battleId: string; session: S | null } = { battleId: request.battleId, session: null };
+    const view = battleView(game, content); // the session speaks Showdown names (protocol v1); the save keeps content ids
+    const op: { battleId: string; session: S | null; facts: BattleFacts } = { battleId: request.battleId, session: null, facts: { kind: request.kind, canLose: !!request.canLose } };
     this.op = op; // taken before the first await: nothing can write between reading the state and opening the battle
     let session: S;
-    try { session = await this.ports.sessions.create(request, game, setup); }
+    try { session = await this.ports.sessions.create(request, view, setup); }
     catch (error) { if (this.op === op) this.op = null; throw error; }
     if (this.op !== op) throw new Error(`battle ${request.battleId} was aborted while its session was being created; the late session is not used`);
     op.session = session;
+    if (typeof session === "object" && session !== null) this.bornIn.set(session, this.generation);
     return session;
   }
 
@@ -181,28 +249,31 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
 
   /**
    * Apply a result to the persistent state. Safe to call twice: the same result is a no-op, a different result for the
-   * same battle is refused. Throws on a contract violation and then the state is exactly as it was.
+   * same battle is refused. Throws on a contract violation and then the state is exactly as it was. Without a battle
+   * operation the application does not know the battle's kind, so no battle statistics are counted (finishBattle does).
    */
   commitResult(result: BattleResult): ApplyStatus {
     return this.commit(result).status;
   }
 
   /**
-   * One state replacement per result: the result, and for a lost or drawn battle the defeat settlement (money loss and
-   * party heal, D3). Both are identified by the result's battleId + hash in appliedBattles, so a repeat (already-applied)
-   * never settles again.
+   * One state replacement per result: the result (species mapped to persistent keys through the content, D5-3), for a
+   * lost or drawn battle the defeat settlement (money loss and party heal, D3), and the battle statistics. All are
+   * identified by the result's battleId + hash in appliedBattles, so a repeat (already-applied) never settles again.
    */
-  private commit(result: BattleResult): { status: ApplyStatus; defeat?: { moneyLost: number; healed: true } } {
-    outcomeCode(result); // validate the part used by the host before any persistent state can be installed
-    const applied = applyBattleResult(this.ports.state.read(), result, this.limits);
+  private commit(result: BattleResult, facts?: BattleFacts): { status: ApplyStatus; defeat?: { moneyLost: number; healed: true } } {
+    const code = outcomeCode(result); // validate the part used by the host before any persistent state can be installed
+    const { content } = this.ports.content();
+    const applied = applyBattleResult(this.ports.state.read(), result, this.limits, speciesKeyResolver(content));
     if (applied.status !== "applied") return { status: applied.status };
     let next = applied.state;
     let defeat: { moneyLost: number; healed: true } | undefined;
     if (isDefeat(result)) {
-      const settled = settleDefeat(next, this.ports.content().content, { noMoneyLoss: this.noMoneyLoss });
+      const settled = settleDefeat(next, content, { noMoneyLoss: this.noMoneyLoss });
       next = settled.state;
       defeat = { moneyLost: settled.moneyLost, healed: true };
     }
+    if (facts) next = { ...next, stats: battleStats(next.stats, facts, code, defeat) };
     this.ports.state.replace(next);
     return defeat ? { status: "applied", defeat } : { status: "applied" };
   }
@@ -213,6 +284,12 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * is committed a failing host projection is reported on the outcome and does not undo or repeat the commit.
    */
   finishBattle(handle: S, request: Pick<BattleStartRequest, "battleId"> | null): BattleOutcome & { result?: BattleResult } {
+    const born = typeof handle === "object" && handle !== null ? this.bornIn.get(handle) : undefined;
+    if (born !== undefined && born !== this.generation) {
+      // the state this battle read is gone: no commit, no projection into the new state, and no lock to release
+      return { code: 0, battleId: request ? request.battleId : null, commit: "none", aborted: true, error: "the game state was replaced while this battle was open (a save was loaded or a new game started); its result is not committed" };
+    }
+    const facts = this.op && this.op.session === handle ? this.op.facts : undefined;
     if (this.op && this.op.session === handle) this.op = null;
     let result: BattleResult;
     let outcome: BattleOutcome & { result?: BattleResult };
@@ -222,7 +299,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       // battle that the caller subsequently mistakes for an abort.
       const code = outcomeCode(result), kind = result.outcome.kind;
       const battleId = request ? request.battleId : result.battleId;
-      const committed = this.commit(result);
+      const committed = this.commit(result, facts);
       outcome = { code, battleId, commit: committed.status, kind, ...(committed.defeat ? { defeat: committed.defeat } : {}) };
     } catch (error) {
       return this.abortBattle(request, error);

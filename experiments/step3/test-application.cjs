@@ -18,7 +18,9 @@ const sample = E.contentRuntime.assembleContent(E.contentCompile.compileContent(
 const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor((s / 4294967296) * n); }; };
 const request = r => ({ battleId: r.battleId, kind: 'wild', foes: [{ species: 'Pidgey', level: 5 }], seq: 1 });
 const snapshot = state => JSON.stringify(state.current());
-function setup(first = result('caught with master ball'), game = F.makeGame()) {
+// the save keys members by the sample content's ids since step 5.0 (D5-3); sessions still see Showdown names
+const saved = () => F.savedFor(F.makeGame(), sample);
+function setup(first = result('caught with master ball'), game = saved()) {
   const state = K.createMemoryState(game), projection = K.createRecordingProjection(), sessions = K.createFakeSessions(first);
   const app = new GameApplication({ state, sessions, projection, content: () => ({ content: sample }), random: lcg(3) });
   return { state, projection, sessions, app };
@@ -28,7 +30,9 @@ test('success: the result is committed once, the persistent state is replaced no
   const r = result('caught with master ball'); const { state, projection, sessions, app } = setup(r);
   const before = state.current(), beforeJson = snapshot(state);
   const handle = await app.startBattle(request(r));
-  assert.equal(sessions.created.length, 1); assert.equal(sessions.created[0].game, before, 'the factory sees the state, read-only');
+  assert.equal(sessions.created.length, 1);
+  assert.deepEqual(sessions.created[0].game, E.speciesKey.battleView(before, sample), 'the factory sees the battle view of the state (Showdown names), never the stored object');
+  assert.notEqual(sessions.created[0].game, before);
   assert.equal(snapshot(state), beforeJson, 'starting a battle changes nothing');
   const outcome = app.finishBattle(handle, request(r));
   assert.deepEqual([outcome.code, outcome.commit, outcome.kind, outcome.projection, outcome.aborted], [2, 'applied', 'caught', 'ok', undefined]);
@@ -156,7 +160,7 @@ test('outcome codes: win by the player 1, caught 2, ran 3, anything else 4', () 
 
 // ---- the same contract with the real adapters (Showdown-backed session) in Node
 const real = () => {
-  const state = K.createMemoryState(F.makeGame({ bag: { potion: 3, pokeball: 3 } })), projection = K.createRecordingProjection();
+  const state = K.createMemoryState(F.savedFor(F.makeGame({ bag: { potion: 3, pokeball: 3 } }), sample)), projection = K.createRecordingProjection();
   const sessions = E.composition.createBattleSessionFactory({ content: () => sample, seed: () => [1, 2, 3, 4] });
   return { state, projection, app: new GameApplication({ state, sessions, projection, content: () => ({ content: sample, dex: E.dex.createDexLookup() }), random: lcg(3) }) };
 };
@@ -174,7 +178,7 @@ test('real session: a run is committed once through the application and a repeat
 });
 
 test('real session: a won trainer battle with a level-up and an item commits the session working copy as one change', async () => {
-  const game = F.makeGame({ bag: { potion: 3 } }); game.party[0].exp = E.growth.minExp('parabolic', 51) - 1; game.party[0].hp = 70;
+  const game = F.savedFor(F.makeGame({ bag: { potion: 3 } }), sample); game.party[0].exp = E.growth.minExp('parabolic', 51) - 1; game.party[0].hp = 70;
   const state = K.createMemoryState(game), projection = K.createRecordingProjection();
   const sessions = E.composition.createBattleSessionFactory({ content: () => sample, seed: () => [1, 2, 3, 4] });
   const app = new GameApplication({ state, sessions, projection, content: () => ({ content: sample }), random: lcg(3) });
@@ -189,7 +193,7 @@ test('real session: a won trainer battle with a level-up and an item commits the
 });
 
 test('real session: a session closed by a failed rollback aborts and leaves the persistent state exactly as it was', async () => {
-  const game = F.makeGame({ bag: { potion: 3 } }); game.party[0].hp = 50;
+  const game = F.savedFor(F.makeGame({ bag: { potion: 3 } }), sample); game.party[0].hp = 50;
   const state = K.createMemoryState(game), projection = K.createRecordingProjection();
   const sessions = E.composition.createBattleSessionFactory({ content: () => sample, seed: () => [1, 2, 3, 4] });
   const app = new GameApplication({ state, sessions, projection, content: () => ({ content: sample }), random: lcg(3) });

@@ -1,0 +1,1009 @@
+{
+ "wild#1": {
+  "protocol": 1,
+  "battleId": "wild#1",
+  "outcome": {
+   "kind": "caught",
+   "winner": null,
+   "target": "W1-1",
+   "ball": "masterball"
+  },
+  "members": {
+   "G-starter-1": {
+    "level": 5,
+    "exp": 158,
+    "hp": 19,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "scratch",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "growl",
+      "pp": 40,
+      "maxpp": 40
+     },
+     {
+      "id": "ember",
+      "pp": 25,
+      "maxpp": 25
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 1
+    }
+   }
+  },
+  "bag": {
+   "masterball": -1
+  },
+  "captured": [
+   {
+    "id": "W1-1",
+    "species": "Pidgey",
+    "nickname": null,
+    "level": 3,
+    "exp": 57,
+    "hp": 16,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     }
+    ],
+    "item": "",
+    "ability": "Tangled Feet",
+    "nature": "rash",
+    "gender": "M",
+    "ivs": {
+     "hp": 25,
+     "atk": 8,
+     "def": 11,
+     "spa": 11,
+     "spd": 16,
+     "spe": 20
+    },
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    },
+    "friendship": 70,
+    "ball": "masterball",
+    "ot": "player"
+   }
+  ],
+  "dex": {
+   "seen": [
+    "Pidgey"
+   ],
+   "owned": [
+    "Pidgey"
+   ]
+  }
+ },
+ "wild#2": {
+  "protocol": 1,
+  "battleId": "wild#2",
+  "outcome": {
+   "kind": "caught",
+   "winner": null,
+   "target": "W2-1",
+   "ball": "masterball"
+  },
+  "members": {
+   "G-starter-1": {
+    "level": 5,
+    "exp": 168,
+    "hp": 19,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "scratch",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "growl",
+      "pp": 40,
+      "maxpp": 40
+     },
+     {
+      "id": "ember",
+      "pp": 25,
+      "maxpp": 25
+     }
+    ],
+    "evs": {
+     "hp": 1,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 1
+    }
+   },
+   "W1-1": {
+    "level": 3,
+    "exp": 57,
+    "hp": 16,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   }
+  },
+  "bag": {
+   "masterball": -1
+  },
+  "captured": [
+   {
+    "id": "W2-1",
+    "species": "Caterpie",
+    "nickname": null,
+    "level": 2,
+    "exp": 8,
+    "hp": 14,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "stringshot",
+      "pp": 40,
+      "maxpp": 40
+     }
+    ],
+    "item": "",
+    "ability": "Shield Dust",
+    "nature": "docile",
+    "gender": "M",
+    "ivs": {
+     "hp": 21,
+     "atk": 12,
+     "def": 4,
+     "spa": 23,
+     "spd": 24,
+     "spe": 1
+    },
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    },
+    "friendship": 70,
+    "ball": "masterball",
+    "ot": "player"
+   }
+  ],
+  "dex": {
+   "seen": [
+    "Caterpie"
+   ],
+   "owned": [
+    "Caterpie"
+   ]
+  }
+ },
+ "wild#3": {
+  "protocol": 1,
+  "battleId": "wild#3",
+  "outcome": {
+   "kind": "caught",
+   "winner": null,
+   "target": "W3-1",
+   "ball": "masterball"
+  },
+  "members": {
+   "G-starter-1": {
+    "level": 6,
+    "exp": 203,
+    "hp": 21,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "scratch",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "growl",
+      "pp": 40,
+      "maxpp": 40
+     },
+     {
+      "id": "ember",
+      "pp": 25,
+      "maxpp": 25
+     }
+    ],
+    "evs": {
+     "hp": 1,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 2
+    }
+   },
+   "W1-1": {
+    "level": 3,
+    "exp": 57,
+    "hp": 16,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   },
+   "W2-1": {
+    "level": 2,
+    "exp": 8,
+    "hp": 14,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "stringshot",
+      "pp": 40,
+      "maxpp": 40
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   }
+  },
+  "bag": {
+   "masterball": -1
+  },
+  "captured": [
+   {
+    "id": "W3-1",
+    "species": "Pidgey",
+    "nickname": null,
+    "level": 4,
+    "exp": 96,
+    "hp": 17,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     }
+    ],
+    "item": "",
+    "ability": "Tangled Feet",
+    "nature": "naive",
+    "gender": "F",
+    "ivs": {
+     "hp": 18,
+     "atk": 1,
+     "def": 11,
+     "spa": 29,
+     "spd": 25,
+     "spe": 23
+    },
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    },
+    "friendship": 70,
+    "ball": "masterball",
+    "ot": "player"
+   }
+  ],
+  "dex": {
+   "seen": [
+    "Pidgey"
+   ],
+   "owned": [
+    "Pidgey"
+   ]
+  }
+ },
+ "wild#4": {
+  "protocol": 1,
+  "battleId": "wild#4",
+  "outcome": {
+   "kind": "caught",
+   "winner": null,
+   "target": "W4-1",
+   "ball": "masterball"
+  },
+  "members": {
+   "G-starter-1": {
+    "level": 6,
+    "exp": 218,
+    "hp": 21,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "scratch",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "growl",
+      "pp": 40,
+      "maxpp": 40
+     },
+     {
+      "id": "ember",
+      "pp": 25,
+      "maxpp": 25
+     }
+    ],
+    "evs": {
+     "hp": 2,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 2
+    }
+   },
+   "W1-1": {
+    "level": 3,
+    "exp": 57,
+    "hp": 16,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   },
+   "W2-1": {
+    "level": 2,
+    "exp": 8,
+    "hp": 14,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "stringshot",
+      "pp": 40,
+      "maxpp": 40
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   },
+   "W3-1": {
+    "level": 4,
+    "exp": 96,
+    "hp": 17,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   }
+  },
+  "bag": {
+   "masterball": -1
+  },
+  "captured": [
+   {
+    "id": "W4-1",
+    "species": "Caterpie",
+    "nickname": null,
+    "level": 3,
+    "exp": 27,
+    "hp": 16,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "stringshot",
+      "pp": 40,
+      "maxpp": 40
+     }
+    ],
+    "item": "",
+    "ability": "Shield Dust",
+    "nature": "quiet",
+    "gender": "F",
+    "ivs": {
+     "hp": 11,
+     "atk": 24,
+     "def": 1,
+     "spa": 6,
+     "spd": 27,
+     "spe": 5
+    },
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    },
+    "friendship": 70,
+    "ball": "masterball",
+    "ot": "player"
+   }
+  ],
+  "dex": {
+   "seen": [
+    "Caterpie"
+   ],
+   "owned": [
+    "Caterpie"
+   ]
+  }
+ },
+ "wild#5": {
+  "protocol": 1,
+  "battleId": "wild#5",
+  "outcome": {
+   "kind": "caught",
+   "winner": null,
+   "target": "W5-1",
+   "ball": "masterball"
+  },
+  "members": {
+   "G-starter-1": {
+    "level": 6,
+    "exp": 229,
+    "hp": 21,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "scratch",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "growl",
+      "pp": 40,
+      "maxpp": 40
+     },
+     {
+      "id": "ember",
+      "pp": 25,
+      "maxpp": 25
+     }
+    ],
+    "evs": {
+     "hp": 2,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 3
+    }
+   },
+   "W1-1": {
+    "level": 3,
+    "exp": 57,
+    "hp": 16,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   },
+   "W2-1": {
+    "level": 2,
+    "exp": 8,
+    "hp": 14,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "stringshot",
+      "pp": 40,
+      "maxpp": 40
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   },
+   "W3-1": {
+    "level": 4,
+    "exp": 96,
+    "hp": 17,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   },
+   "W4-1": {
+    "level": 3,
+    "exp": 27,
+    "hp": 16,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "stringshot",
+      "pp": 40,
+      "maxpp": 40
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   }
+  },
+  "bag": {
+   "masterball": -1
+  },
+  "captured": [
+   {
+    "id": "W5-1",
+    "species": "Pidgey",
+    "nickname": null,
+    "level": 2,
+    "exp": 9,
+    "hp": 14,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     }
+    ],
+    "item": "",
+    "ability": "Tangled Feet",
+    "nature": "bashful",
+    "gender": "F",
+    "ivs": {
+     "hp": 24,
+     "atk": 30,
+     "def": 23,
+     "spa": 4,
+     "spd": 14,
+     "spe": 18
+    },
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    },
+    "friendship": 70,
+    "ball": "masterball",
+    "ot": "player"
+   }
+  ],
+  "dex": {
+   "seen": [
+    "Pidgey"
+   ],
+   "owned": [
+    "Pidgey"
+   ]
+  }
+ },
+ "wild#6": {
+  "protocol": 1,
+  "battleId": "wild#6",
+  "outcome": {
+   "kind": "caught",
+   "winner": null,
+   "target": "W6-1",
+   "ball": "masterball"
+  },
+  "members": {
+   "G-starter-1": {
+    "level": 7,
+    "exp": 253,
+    "hp": 23,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "scratch",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "growl",
+      "pp": 40,
+      "maxpp": 40
+     },
+     {
+      "id": "ember",
+      "pp": 25,
+      "maxpp": 25
+     }
+    ],
+    "evs": {
+     "hp": 3,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 3
+    }
+   },
+   "W1-1": {
+    "level": 3,
+    "exp": 57,
+    "hp": 16,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   },
+   "W2-1": {
+    "level": 2,
+    "exp": 8,
+    "hp": 14,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "stringshot",
+      "pp": 40,
+      "maxpp": 40
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   },
+   "W3-1": {
+    "level": 4,
+    "exp": 96,
+    "hp": 17,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   },
+   "W4-1": {
+    "level": 3,
+    "exp": 27,
+    "hp": 16,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "stringshot",
+      "pp": 40,
+      "maxpp": 40
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   },
+   "W5-1": {
+    "level": 2,
+    "exp": 9,
+    "hp": 14,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   }
+  },
+  "bag": {
+   "masterball": -1
+  },
+  "captured": [
+   {
+    "id": "W6-1",
+    "species": "Caterpie",
+    "nickname": null,
+    "level": 4,
+    "exp": 64,
+    "hp": 17,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "stringshot",
+      "pp": 40,
+      "maxpp": 40
+     }
+    ],
+    "item": "",
+    "ability": "Shield Dust",
+    "nature": "jolly",
+    "gender": "M",
+    "ivs": {
+     "hp": 8,
+     "atk": 19,
+     "def": 14,
+     "spa": 1,
+     "spd": 24,
+     "spe": 4
+    },
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    },
+    "friendship": 70,
+    "ball": "masterball",
+    "ot": "player"
+   }
+  ],
+  "dex": {
+   "seen": [
+    "Caterpie"
+   ],
+   "owned": [
+    "Caterpie"
+   ]
+  }
+ },
+ "wild#7": {
+  "protocol": 1,
+  "battleId": "wild#7",
+  "outcome": {
+   "kind": "win",
+   "winner": "Wild"
+  },
+  "members": {
+   "G-starter-1": {
+    "level": 5,
+    "exp": 135,
+    "hp": 0,
+    "status": "",
+    "statusCount": 0,
+    "moves": [
+     {
+      "id": "scratch",
+      "pp": 35,
+      "maxpp": 35
+     },
+     {
+      "id": "growl",
+      "pp": 40,
+      "maxpp": 40
+     },
+     {
+      "id": "ember",
+      "pp": 25,
+      "maxpp": 25
+     }
+    ],
+    "evs": {
+     "hp": 0,
+     "atk": 0,
+     "def": 0,
+     "spa": 0,
+     "spd": 0,
+     "spe": 0
+    }
+   }
+  },
+  "bag": {},
+  "captured": [],
+  "dex": {
+   "seen": [
+    "Snorlax"
+   ],
+   "owned": []
+  }
+ }
+}

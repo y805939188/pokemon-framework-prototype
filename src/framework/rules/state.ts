@@ -6,13 +6,17 @@
 import { sha256Hex } from "./sha256.ts";
 import { DEFAULT_LIMITS } from "./limits.ts";
 import { own, setOwn } from "./own.ts";
+import { identityKeys } from "./species-key.ts";
+import type { SpeciesKeyResolver } from "./species-key.ts";
+import { newStats } from "./stats.ts";
+import type { GameStats } from "./stats.ts";
 import type { Limits } from "./limits.ts";
 import type { Member, MoveSlot, PartialStats, Stats } from "./types.ts";
 
 export const PROTOCOL_VERSION = 1;
 
 /** Version of the PERSISTENT game state document (rules/save-schema.ts migrates older ones). Not the battle protocol version. */
-export const GAME_SCHEMA = 3;
+export const GAME_SCHEMA = 4;
 
 /** Fields of a persistent member that a battle result may change. Everything else must be untouched. */
 export const MEMBER_WRITE_SET = ["level", "exp", "hp", "status", "statusCount", "moves", "evs", "friendship"] as const;
@@ -35,6 +39,10 @@ export interface GameState {
   appliedBattles: Record<string, { hash: string }>;
   /** One-time claims (schema 3): a claimed grant id can never be granted again on this save timeline. */
   claims: Record<string, Claim>;
+  /** Statistics record (schema 4; WP06 §4.2, 74 fields). */
+  stats: GameStats;
+  /** Global step counter (schema 4; WP06 §4.1, wraps at 2^31). */
+  steps: number;
 }
 
 export interface Claim {
@@ -66,6 +74,8 @@ export function clone<T>(x: T): T {
 export interface NewMemberInput {
   id: string;
   species: string;
+  /** Persistent members carry a form; battle records (e.g. a result's captured member, protocol v1) do not. */
+  form?: number;
   nickname?: string | null;
   level: number;
   exp: number;
@@ -87,7 +97,7 @@ export interface NewMemberInput {
 export function newMember(o: NewMemberInput): Member {
   const six = (v: number, over?: PartialStats): Stats => ({ hp: v, atk: v, def: v, spa: v, spd: v, spe: v, ...over });
   return {
-    id: o.id, species: o.species, nickname: o.nickname ?? null, level: o.level, exp: o.exp, hp: o.hp, status: o.status || "", statusCount: o.statusCount ?? 0,
+    id: o.id, species: o.species, ...(o.form !== undefined ? { form: o.form } : {}), nickname: o.nickname ?? null, level: o.level, exp: o.exp, hp: o.hp, status: o.status || "", statusCount: o.statusCount ?? 0,
     moves: o.moves.map((m) => ({ id: m.id, pp: m.pp, maxpp: m.maxpp })),
     item: o.item || "", ability: o.ability, nature: o.nature, gender: o.gender,
     ivs: six(31, o.ivs),
@@ -96,8 +106,12 @@ export function newMember(o: NewMemberInput): Member {
   };
 }
 
+/**
+ * A new persistent game state. Its members are persistent: `species` is a content id, and a member given without a
+ * form gets the base form 0 here (only here: `newMember` also builds battle records, which carry no form).
+ */
 export function newGame({ party, bag = {}, money = 0 }: { party: NewMemberInput[]; bag?: Record<string, number>; money?: number }): GameState {
-  return { schema: GAME_SCHEMA, party: party.map(newMember), boxes: [], bag: { ...bag }, money, dex: { seen: [], owned: [] }, appliedBattles: {}, claims: {} };
+  return { schema: GAME_SCHEMA, party: party.map((m) => newMember({ ...m, form: m.form ?? 0 })), boxes: [], bag: { ...bag }, money, dex: { seen: [], owned: [] }, appliedBattles: {}, claims: {}, stats: newStats(), steps: 0 };
 }
 
 /** Stable hash of a result, used for idempotency (same battleId + same hash => no-op). */
@@ -116,8 +130,12 @@ export type ApplyStatus = "applied" | "already-applied";
  * WHOLE result is refused (nothing is dropped and nothing half-applied; the ball is disabled before that can happen).
  * A bag item may not be raised above the per-item cap (results only spend in this build; an amount already above the
  * cap is kept).
+ * Species (decision D5-3): the result speaks battle names (protocol v1); `keys` turns a captured member and the dex
+ * entries into persistent keys (content id + form). The idempotency hash is taken over the result AS RECEIVED, so the
+ * replay ledger written before schema 4 still recognises the same result. A name without a key refuses the whole
+ * result. Without `keys` the battle name is the content id (fixture worlds); the game application always passes them.
  */
-export function applyBattleResult(state: GameState, result: BattleResult, limits: Limits = DEFAULT_LIMITS): { state: GameState; status: ApplyStatus } {
+export function applyBattleResult(state: GameState, result: BattleResult, limits: Limits = DEFAULT_LIMITS, keys: SpeciesKeyResolver = identityKeys): { state: GameState; status: ApplyStatus } {
   if (result.protocol !== PROTOCOL_VERSION) throw new Error(`unsupported protocol ${result.protocol}`);
   if (state.schema !== GAME_SCHEMA) throw new Error(`game state has schema ${state.schema}, this build writes schema ${GAME_SCHEMA}: migrate it first (rules/save-schema.ts)`);
   if (!result.battleId) throw new Error("result without battleId");
@@ -147,13 +165,19 @@ export function applyBattleResult(state: GameState, result: BattleResult, limits
   }
   for (const c of result.captured || []) {
     if (next.party.some((x) => x.id === c.id) || next.boxes.some((x) => x.id === c.id)) throw new Error(`captured id ${c.id} already exists`);
-    const m = newMember(c);
+    const k = keys(c.species);
+    if (!k) throw new Error(`captured member ${c.id}: "${c.species}" has no persistent species key in the content`);
+    const m: Member = { ...newMember(c), species: k.species, form: k.form };
     if (next.party.length < limits.party) next.party.push(m);
     else if (next.boxes.length < limits.boxes) next.boxes.push(m);
     else throw new Error(`no room for captured member ${c.id}: the party (${next.party.length}) and the boxes (${next.boxes.length}) are full`);
   }
   if (result.dex) {
-    for (const k of ["seen", "owned"] as const) for (const sp of result.dex[k] || []) if (!next.dex[k].includes(sp)) next.dex[k].push(sp);
+    for (const list of ["seen", "owned"] as const) for (const name of result.dex[list] || []) {
+      const k = keys(name);
+      if (!k) throw new Error(`dex ${list}: "${name}" has no persistent species key in the content`);
+      if (!next.dex[list].includes(k.species)) next.dex[list].push(k.species);
+    }
   }
   if (result.money) next.money = Math.max(0, next.money + result.money);
   setOwn(next.appliedBattles, result.battleId, { hash: h });

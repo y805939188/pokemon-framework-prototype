@@ -5,6 +5,7 @@
  * The engine is only told the outcome (battle/gateway applyGrowth) and cross-checked against it.
  */
 import type { Content, CurveId, Member, PartialStats, StatKey, Stats } from "./types.ts";
+import { toBattleMember } from "./species-key.ts";
 
 export const MAX_LEVEL = 100;
 
@@ -188,15 +189,19 @@ export interface ApplyExpResult {
 }
 
 /**
- * Apply an exp gain to a persistent member record (pure: returns a new record plus the change log).
- * `content` supplies base stats, growth curve and learnset for the species.
+ * Apply an exp gain to a member record (pure: returns a new record plus the change log).
+ * IDENTITY (decision D5-3): `member` and `prior` are BATTLE records, whose species is the Showdown name (what a
+ * session holds; the session's growth and protocol v1 are unchanged). For a persistent member (content id + form)
+ * use `applyExpPersistent`, which converts at this boundary. `content` supplies base stats, growth curve and learnset.
  * `member` is the record AFTER this battle's EV gain; `prior` is the record BEFORE it (default: the same
  * record). The "old max HP" of the recalculation must come from `prior` (WP19 5.5: the stored values before
  * the recalculation), otherwise an EV gain that crosses a multiple of 4 shifts the HP rule by one point.
  */
 export function applyExp(member: Member, amount: number, content: Content, prior: Member = member): ApplyExpResult {
-  const sp = content.species[member.species];
-  if (!sp) throw new Error(`unknown species ${member.species}`);
+  const sp = Object.hasOwn(content.species, member.species) ? content.species[member.species] : undefined;
+  if (!sp) throw new Error(member.form !== undefined
+    ? `unknown battle species "${member.species}" (form ${member.form}): applyExp takes a battle record (Showdown name); for a persistent member use applyExpPersistent`
+    : `unknown species ${member.species}`);
   const curve = sp.growth;
   const maxE = maxExp(curve);
   const before = { level: prior.level, exp: prior.exp, hp: prior.hp, stats: computeStats(sp.base, prior.ivs, prior.evs, prior.level, prior.nature) };
@@ -219,4 +224,13 @@ export function applyExp(member: Member, amount: number, content: Content, prior
   const after = { level: cur.level, exp: cur.exp, stats: computeStats(sp.base, cur.ivs, cur.evs, cur.level, cur.nature) };
   if (newLevel === prior.level && after.stats.hp !== before.stats.hp) cur = { ...cur, hp: hpAfterRecalc(cur.hp, before.stats.hp, after.stats.hp) };
   return { member: cur, log, before, after: { ...after, hp: cur.hp } };
+}
+
+/**
+ * `applyExp` for a PERSISTENT member (content id + form, D5-3): the species data come from the content mapping (a form
+ * the content lacks falls back to the base form, WP03 §3.2) and the returned member keeps its persistent identity.
+ */
+export function applyExpPersistent(member: Member, amount: number, content: Content, prior: Member = member): ApplyExpResult {
+  const r = applyExp(toBattleMember(member, content), amount, content, toBattleMember(prior, content));
+  return { ...r, member: { ...r.member, species: member.species, form: member.form ?? 0 } };
 }

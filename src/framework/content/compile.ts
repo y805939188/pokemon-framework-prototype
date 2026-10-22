@@ -5,8 +5,10 @@
 import { sha256Hex } from "../rules/sha256.ts";
 import { isBagItem } from "../rules/items.ts";
 import { DEFAULT_LIMITS } from "../rules/limits.ts";
+import { MAX_FORM } from "../rules/species-key.ts";
+import { checkOverrides } from "../rules/config.ts";
 import {
-  CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, SCHEMA_VERSION, STAT_KEYS_ALLOWED,
+  CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, SCHEMA_VERSION, SOURCE_KINDS, STAT_KEYS_ALLOWED, USAGE_DECISIONS,
 } from "./schema.ts";
 import type { CompiledContent, ContentError, ContentInputs, GrantSource, Overlay, SourceEntry, SpeciesSource } from "./schema.ts";
 
@@ -21,13 +23,17 @@ export function canonicalJson(v: unknown, indent = 0): string {
 }
 
 export function hashInputs(inputs: ContentInputs): string {
-  // grants is undefined for content without grants.json: JSON drops the key, so the hash of older content is unchanged
-  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants }));
+  // grants/settings are undefined for content without those files: JSON drops the key, so older hashes are unchanged
+  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants, settings: inputs.settings }));
 }
 
 const ID = /^[a-z][a-z0-9-]{0,30}$/;
 const SHOWDOWN_ID = /^[a-z0-9]{1,40}$/;
 const NAME_KEY = /^[a-z][a-z0-9_.]{1,60}$/;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Overlay/target key of a species record: "species/<id>" for the base form, "species/<id>/<form>" otherwise. */
+const recordKey = (id: string, form: number): string => (form ? `species/${id}/${form}` : `species/${id}`);
 
 type Report = (file: ContentError["file"], path: string, message: string) => void;
 
@@ -64,6 +70,63 @@ const FIELD_CHECK: Record<string, (v: unknown) => string | null> = {
 
 export type CompileResult = { ok: true; data: CompiledContent; errors: [] } | { ok: false; errors: ContentError[] };
 
+/** Located problems of a pre-use check record (DETAILED-PLAN §280, D5-2); empty = complete. */
+export function usageCheckProblems(u: unknown, path: string): { path: string; message: string }[] {
+  if (!isObj(u)) return [{ path, message: "must be {checkedOn, checkedBy, conditions, decision}" }];
+  const out: { path: string; message: string }[] = [];
+  for (const k of Object.keys(u)) if (!["checkedOn", "checkedBy", "conditions", "decision"].includes(k)) out.push({ path: `${path}.${k}`, message: `unknown field "${k}" (allowed: checkedOn, checkedBy, conditions, decision)` });
+  if (typeof u["checkedOn"] !== "string" || !DATE.test(u["checkedOn"])) out.push({ path: `${path}.checkedOn`, message: "must be a date YYYY-MM-DD" });
+  for (const k of ["checkedBy", "conditions"]) if (typeof u[k] !== "string" || !u[k]) out.push({ path: `${path}.${k}`, message: "must be a non-empty string" });
+  if (!(USAGE_DECISIONS as readonly string[]).includes(u["decision"] as string)) out.push({ path: `${path}.decision`, message: `must be ${USAGE_DECISIONS.join("|")}` });
+  return out;
+}
+
+/** Validate sources.json (every problem reported with its path); returns the entries, for the pre-use gate. */
+export function checkSources(raw: unknown, report: (file: "sources.json", path: string, message: string) => void): SourceEntry[] {
+  const sources: SourceEntry[] = [];
+  const seen = new Set<string>();
+  if (!Array.isArray(raw)) { report("sources.json", "$", "must be an array"); return sources; }
+  for (const [i, s] of raw.entries()) {
+    const p = `[${i}]`;
+    if (!isObj(s)) { report("sources.json", p, "must be an object"); continue; }
+    for (const k of Object.keys(s)) if (!["id", "kind", "description", "license", "ref", "status", "usedFor", "usageCheck"].includes(k)) report("sources.json", `${p}.${k}`, `unknown field "${k}" (allowed: id, kind, description, license, ref, status, usedFor, usageCheck)`);
+    if (typeof s["id"] !== "string" || !ID.test(s["id"])) report("sources.json", `${p}.id`, "must be an id");
+    else if (seen.has(s["id"])) report("sources.json", `${p}.id`, `duplicate source id "${s["id"]}"`);
+    else seen.add(s["id"]);
+    if (!(SOURCE_KINDS as readonly string[]).includes(s["kind"] as string)) report("sources.json", `${p}.kind`, `must be ${SOURCE_KINDS.join("|")}`);
+    if (!["confirmed", "placeholder", "pending"].includes(s["status"] as string)) report("sources.json", `${p}.status`, "must be confirmed|placeholder|pending");
+    for (const k of ["description", "license", "ref"]) if (typeof s[k] !== "string" || !s[k]) report("sources.json", `${p}.${k}`, "must be a non-empty string");
+    if (!Array.isArray(s["usedFor"]) || s["usedFor"].some((x) => typeof x !== "string")) report("sources.json", `${p}.usedFor`, "must be an array of strings");
+    if (s["usageCheck"] !== undefined) for (const pr of usageCheckProblems(s["usageCheck"], `${p}.usageCheck`)) report("sources.json", pr.path, pr.message);
+    sources.push(s as unknown as SourceEntry);
+  }
+  return sources;
+}
+
+/**
+ * The pre-use gate (DETAILED-PLAN §280, D5-2): may data of source `id` be used? null = yes. A record may only use a
+ * source whose terms were checked first (a complete usageCheck that is not "not-allowed"); an explicit author
+ * placeholder without a check is exempt (it is the project's own stand-in data). An explicit denial still applies.
+ */
+export function preUseProblem(sources: readonly SourceEntry[], id: unknown): string | null {
+  const src = sources.find((x) => x.id === id);
+  if (!src) return `must name an entry of sources.json (known: ${sources.map((x) => x.id).join(", ") || "none"})`;
+  if (src.kind === "author-placeholder" && src.status === "placeholder" && src.usageCheck === undefined) return null;
+  if (src.usageCheck === undefined) return `source "${src.id}" has no recorded pre-use check (usageCheck): its data may not be used yet`;
+  if (usageCheckProblems(src.usageCheck, "usageCheck").length) return `source "${src.id}" has an incomplete pre-use check (usageCheck needs checkedOn, checkedBy, conditions and a decision): its data may not be used yet`;
+  if (src.usageCheck.decision === "not-allowed") return `source "${src.id}" was checked and may not be used (${src.usageCheck.conditions})`;
+  return null;
+}
+
+/** Species and moves are read from one pinned Showdown build: its source must be unambiguous and pass the gate. */
+export function showdownDependencyProblem(sources: readonly SourceEntry[]): string | null {
+  const sd = sources.filter((x) => x.kind === "showdown");
+  if (!sd.length) return "the content's species and moves are read from the pinned Showdown build, but sources.json registers no source of kind \"showdown\" (register it with its pre-use check)";
+  if (sd.length > 1) return `the pinned Showdown source is ambiguous (${sd.map((x) => x.id).join(", ")}): register exactly one source of kind "showdown" for the build in use`;
+  const problem = preUseProblem(sources, sd[0]!.id);
+  return problem ? `the content's species and moves are read from the pinned Showdown build: ${problem}` : null;
+}
+
 export function compileContent(inputs: ContentInputs): CompileResult {
   const errors: ContentError[] = [];
   const report: Report = (file, path, message) => { errors.push({ file, path, message }); };
@@ -80,37 +143,35 @@ export function compileContent(inputs: ContentInputs): CompileResult {
     if (typeof m["title"] !== "string" || !m["title"]) report("manifest.json", "$.title", "must be a non-empty string");
   }
 
-  // ---- sources registry
-  const sources: SourceEntry[] = [];
-  const sourceIds = new Set<string>();
-  if (!Array.isArray(inputs.sources)) report("sources.json", "$", "must be an array");
-  else for (const [i, s] of inputs.sources.entries()) {
-    const p = `[${i}]`;
-    if (!isObj(s)) { report("sources.json", p, "must be an object"); continue; }
-    checkKnownKeys(s, ["id", "kind", "description", "license", "ref", "status", "usedFor"], "sources.json", p, report);
-    if (typeof s["id"] !== "string" || !ID.test(s["id"])) report("sources.json", `${p}.id`, "must be an id");
-    else if (sourceIds.has(s["id"])) report("sources.json", `${p}.id`, `duplicate source id "${s["id"]}"`);
-    else sourceIds.add(s["id"]);
-    if (!["showdown", "author-placeholder", "spec-derived"].includes(s["kind"] as string)) report("sources.json", `${p}.kind`, "must be showdown|author-placeholder|spec-derived");
-    if (!["confirmed", "placeholder", "pending"].includes(s["status"] as string)) report("sources.json", `${p}.status`, "must be confirmed|placeholder|pending");
-    for (const k of ["description", "license", "ref"]) if (typeof s[k] !== "string" || !s[k]) report("sources.json", `${p}.${k}`, "must be a non-empty string");
-    if (!Array.isArray(s["usedFor"]) || s["usedFor"].some((x) => typeof x !== "string")) report("sources.json", `${p}.usedFor`, "must be an array of strings");
-    sources.push(s as unknown as SourceEntry);
+  // ---- sources registry, and the pre-use gate of its entries (checkSources / preUseProblem below)
+  const sources = checkSources(inputs.sources, report);
+  const usable = (id: unknown): string | null => preUseProblem(sources, id);
+  // every species record is resolved against the pinned Showdown data: that dependency passes the same gate, whatever
+  // source the record's own fields name (an author placeholder covers its numbers, not the Showdown data under them)
+  if (Array.isArray(inputs.species) && inputs.species.length) {
+    const dep = showdownDependencyProblem(sources);
+    if (dep) report("sources.json", "$", dep);
   }
 
   // ---- species
   const species: SpeciesSource[] = [];
-  const ids = new Set<string>();
+  const ids = new Set<string>(); // content ids with a base form
+  const keys = new Set<string>();
   const nameKeys = new Map<string, string>();
   if (!Array.isArray(inputs.species)) report("species.json", "$", "must be an array");
   else for (const [i, s] of inputs.species.entries()) {
     const p = `[${i}]`;
     if (!isObj(s)) { report("species.json", p, "must be an object"); continue; }
-    checkKnownKeys(s, ["id", "showdownId", "nameKey", "growth", "baseExp", "evYield", "catchRate", "learnset", "source"], "species.json", p, report);
-    const label = typeof s["id"] === "string" ? `${p} (${s["id"]})` : p;
+    checkKnownKeys(s, ["id", "form", "showdownId", "nameKey", "growth", "baseExp", "evYield", "catchRate", "learnset", "source"], "species.json", p, report);
+    const form = s["form"] === undefined ? 0 : s["form"];
+    if (!isInt(form, 0, MAX_FORM)) report("species.json", `${p}.form`, `must be an integer from 0 to ${MAX_FORM} (0 = the base form)`);
+    const label = typeof s["id"] === "string" ? `${p} (${s["id"]}${form ? ` form ${String(form)}` : ""})` : p;
     if (typeof s["id"] !== "string" || !ID.test(s["id"])) report("species.json", `${p}.id`, "must be an id like \"pidgey\"");
-    else if (ids.has(s["id"])) report("species.json", `${p}.id`, `duplicate species id "${s["id"]}"`);
-    else ids.add(s["id"]);
+    else if (isInt(form, 0, MAX_FORM)) {
+      const key = recordKey(s["id"], form);
+      if (keys.has(key)) report("species.json", `${p}.id`, form ? `duplicate form ${form} of species "${s["id"]}"` : `duplicate species id "${s["id"]}"`);
+      else { keys.add(key); if (!form) ids.add(s["id"]); }
+    }
     if (typeof s["showdownId"] !== "string" || !SHOWDOWN_ID.test(s["showdownId"])) report("species.json", `${p}.showdownId`, "must be a Showdown species id (lowercase letters and digits)");
     for (const f of ["nameKey", "growth", "baseExp", "catchRate", "evYield", "learnset"] as const) {
       if (!(f in s)) { report("species.json", `${p}.${f}`, `missing required field "${f}" in ${label}`); continue; }
@@ -122,13 +183,17 @@ export function compileContent(inputs: ContentInputs): CompileResult {
       if (prev !== undefined) report("species.json", `${p}.nameKey`, `text key "${s["nameKey"]}" is already used by ${prev}`);
       else nameKeys.set(s["nameKey"], label);
     }
-    if (typeof s["source"] !== "string" || !sourceIds.has(s["source"])) report("species.json", `${p}.source`, `must name an entry of sources.json (known: ${[...sourceIds].join(", ") || "none"})`);
+    const sourceProblem = usable(s["source"]);
+    if (sourceProblem) report("species.json", `${p}.source`, sourceProblem);
     species.push(s as unknown as SpeciesSource);
+  }
+  for (const [i, s] of species.entries()) {
+    if (isObj(s) && typeof s.id === "string" && isInt(s.form, 1, MAX_FORM) && !ids.has(s.id)) report("species.json", `[${i}].form`, `form ${s.form} of "${s.id}" has no base form 0 record (a missing form falls back to it, WP03 §3.2)`);
   }
 
   // ---- overlays: author patches on top of the base records, never silently conflicting
   let overlaysApplied = 0;
-  const merged = new Map<string, SpeciesSource>(species.map((sp) => [`species/${sp.id}`, JSON.parse(JSON.stringify(sp)) as SpeciesSource]));
+  const merged = new Map<string, SpeciesSource>(species.map((sp) => [recordKey(sp.id, sp.form ?? 0), JSON.parse(JSON.stringify(sp)) as SpeciesSource]));
   const setBy = new Map<string, number>();
   if (!Array.isArray(inputs.overlays)) report("overlays.json", "$", "must be an array");
   else for (const [i, o] of inputs.overlays.entries()) {
@@ -137,7 +202,7 @@ export function compileContent(inputs: ContentInputs): CompileResult {
     checkKnownKeys(o, ["target", "set", "reason"], "overlays.json", p, report);
     if (typeof o["reason"] !== "string" || !o["reason"]) report("overlays.json", `${p}.reason`, "an overlay must say why (non-empty reason)");
     const target = typeof o["target"] === "string" ? merged.get(o["target"]) : undefined;
-    if (!target) { report("overlays.json", `${p}.target`, `target ${JSON.stringify(o["target"])} does not exist (expected "species/<id>")`); continue; }
+    if (!target) { report("overlays.json", `${p}.target`, `target ${JSON.stringify(o["target"])} does not exist (expected "species/<id>", or "species/<id>/<form>" for a form)`); continue; }
     if (!isObj(o["set"]) || !Object.keys(o["set"]).length) { report("overlays.json", `${p}.set`, "must be a non-empty object of fields to replace"); continue; }
     let ok = true;
     for (const [f, v] of Object.entries(o["set"])) {
@@ -156,7 +221,7 @@ export function compileContent(inputs: ContentInputs): CompileResult {
   // ---- cross-record invariants again, on the MERGED records: an overlay can create a clash that the base check cannot
   // see (it ran before the overlays). The final state decides, so swapping two keys is fine; the error is located at
   // the overlay entry that set the key and names the entities involved.
-  const baseIndex = new Map(species.map((sp, n) => [`species/${sp.id}`, n]));
+  const baseIndex = new Map(species.map((sp, n) => [recordKey(sp.id, sp.form ?? 0), n]));
   const holders = new Map<string, string[]>();
   for (const [target, rec] of merged) holders.set(rec.nameKey, [...(holders.get(rec.nameKey) ?? []), target]);
   const origin = (target: string, field: string): string => {
@@ -199,16 +264,21 @@ export function compileContent(inputs: ContentInputs): CompileResult {
       }
       if (!isInt(g["money"], 0, DEFAULT_LIMITS.money)) report("grants.json", `${p}.money`, `must be an integer from 0 to ${DEFAULT_LIMITS.money}`);
       if (Array.isArray(members) && !members.length && isObj(items) && !Object.keys(items).length && g["money"] === 0) report("grants.json", p, "a grant must give something");
-      if (typeof g["source"] !== "string" || !sourceIds.has(g["source"])) report("grants.json", `${p}.source`, `must name an entry of sources.json (known: ${[...sourceIds].join(", ") || "none"})`);
+      const grantSource = usable(g["source"]);
+      if (grantSource) report("grants.json", `${p}.source`, grantSource);
       grants.push(g as unknown as GrantSource);
     }
   }
 
+  // ---- settings: the rule configuration overrides (WP02 subset, rules/config.ts)
+  if (inputs.settings !== undefined) for (const p of checkOverrides(inputs.settings)) report("settings.json", p.path, p.message);
+
   if (errors.length) return { ok: false, errors };
   const data: CompiledContent = {
     schema: SCHEMA_VERSION, contentId, inputsHash: hashInputs(inputs), sources: [...sources].sort((a, b) => a.id.localeCompare(b.id)),
-    overlaysApplied, species: [...merged.values()].sort((a, b) => a.id.localeCompare(b.id)),
+    overlaysApplied, species: [...merged.values()].sort((a, b) => a.id.localeCompare(b.id) || (a.form ?? 0) - (b.form ?? 0)),
     ...(inputs.grants !== undefined ? { grants: [...grants].sort((a, b) => a.id.localeCompare(b.id)) } : {}),
+    ...(inputs.settings !== undefined ? { settings: { ...(inputs.settings as Record<string, number>) } } : {}),
   };
   return { ok: true, data, errors: [] };
 }

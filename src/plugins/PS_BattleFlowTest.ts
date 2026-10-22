@@ -4,6 +4,9 @@
  * (Game_Event.start) and uses the real MZ save/load. Inert without the flag.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// the step 4 (schema 3) save written by the step 4 code (step 5.0 checkpoint P-1), for T31
+import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
+
 (() => {
   "use strict";
   const G: any = globalThis;
@@ -43,6 +46,8 @@
 
   let frame = 0;
   const focusLog: any[] = [];
+  // A test can start without ever gaining focus; absence of a blur event does not mean it was focused.
+  focusLog.push({ ev: document.hasFocus() ? "focus" : "blur", initial: true, frame: 0, t: Math.round(performance.now()), hasFocus: document.hasFocus(), vis: document.visibilityState });
   for (const ev of ["blur", "focus"]) window.addEventListener(ev, () => focusLog.push({ ev, frame, t: Math.round(performance.now()), hasFocus: document.hasFocus(), vis: document.visibilityState }));
   document.addEventListener("visibilitychange", () => focusLog.push({ ev: "visibility", frame, vis: document.visibilityState }));
   const baseUpdate = G.SceneManager.update;
@@ -145,7 +150,11 @@
     await waitFor(() => !G.$gamePlayer.isMoving(), "step done");
     await frames(6);
   }
-  const mkMember = (id: string, species: string, level: number, extra: any = {}) => ({ ...nodeRequire("./js/engine/build/engine.cjs").memberFactory.createMember({ id, species, level }, W.PSFlow.content(), seeded(level * 13 + id.length)), ...extra });
+  /** A member created from the content and stored the way the save stores it (content id + form, D5-3). */
+  const mkMember = (id: string, species: string, level: number, extra: any = {}) => {
+    const B = nodeRequire("./js/engine/build/engine.cjs");
+    return { ...B.speciesKey.toPersistentMember(B.memberFactory.createMember({ id, species, level }, W.PSFlow.content(), seeded(level * 13 + id.length)), W.PSFlow.content()), ...extra };
+  };
   async function finishBattle() { await inMode("end"); await press("ok"); await dismissMessages(); await waitFor(() => !W.PSFlow.running && !battle(), "back from the battle"); await frames(5); }
   async function fightUntilEnd(moveRe: RegExp, max = 12) {
     for (let i = 0; i < max && mode_() !== "end"; i++) {
@@ -286,7 +295,7 @@
       const g = game();
       assert(g.party.length === 4 && /^W\d+-1$/.test(g.party[3].id), "stable id of the caught member: " + (g.party[3] && g.party[3].id));
       assert(!g.bag.masterball, "master ball consumed once");
-      assert(g.dex.owned.includes("Snorlax"), "dex updated");
+      assert(g.dex.owned.includes("snorlax"), "dex updated (content id)");
     });
 
     await scenario("T5 item from the bag: Potion on the active member, consumed once and persisted", async () => {
@@ -332,7 +341,9 @@
 
     await scenario("T9 legacy and unusable saves through MZ's own save/load: schema 1 migrates, newer or damaged states are refused and kept", async () => {
       fresh();
-      const legacy = clone(game()); legacy.schema = 1; delete legacy.claims; // a step 2 document had no claims ledger
+      // a step 2 document: no claims ledger, Showdown names, no form/statistics/steps (those came with schemas 3 and 4)
+      const legacy = clone(game()); legacy.schema = 1; delete legacy.claims; delete legacy.stats; delete legacy.steps;
+      legacy.party = legacy.party.map((m: any) => nodeRequire("./js/engine/build/engine.cjs").speciesKey.toBattleMember(m, W.PSFlow.content()));
       for (const m of legacy.party) delete m.statusCount;
       legacy.party[1].status = "tox"; legacy.party[2].status = "slp";
       G.$gameSystem._psGame = legacy;
@@ -340,8 +351,9 @@
       G.$gameSystem._psGame = { diverged: true };
       const lc1 = await G.DataManager.loadGame(2);
       assert(!G.$gameSystem._psSaveError, "a schema 1 state loads without error");
-      eq([game().schema, game().party[1].status, game().party[1].statusCount, game().party[2].status, game().party[2].statusCount], [3, "psn", 0, "slp", undefined], "migrated on load");
-      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, 3, true], "migration recorded");
+      eq([game().schema, game().party[1].status, game().party[1].statusCount, game().party[2].status, game().party[2].statusCount], [4, "psn", 0, "slp", undefined], "migrated on load");
+      eq(game().party.map((m: any) => [m.species, m.form]), [["charizard", 0], ["blastoise", 0], ["venusaur", 0]], "Showdown names mapped to content id + form through the content (D5-3)");
+      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, 4, true], "migration recorded");
       // a state written by a newer build, and a damaged one
       for (const [slot, doc, code] of [[3, { ...clone(game()), schema: 9 }, "unknown-version"], [4, "not a state", "corrupt"]] as [number, any, string][]) {
         G.$gameSystem._psGame = doc;
@@ -426,28 +438,40 @@
       eq(game().party.map((m: any) => [m.id, m.level, m.hp]), before.party.map((m: any) => [m.id, m.level, m.hp]), "a run changes no member");
     });
 
-    await scenario("T13 application initialization fails: stale result is cleared, state stays untouched and the event continues", async () => {
-      fresh(); const before = clone(game());
-      const Module = nodeRequire("module"), load = Module._load;
-      W.PSFlow._app = null; W.PSFlow._dex = null;
-      G.$gameVariables.setValue(10, 1); // the previous battle won
-      let injected = 0;
-      try {
-        Module._load = function (id: string, ...args: any[]) {
-          if (/\/showdown\/dist\/sim$/.test(id)) { injected++; throw new Error("injected dex initialization failure"); }
-          return load.call(this, id, ...args);
-        };
-        await startEvent(1); await inMode("end");
-        eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit, W.PSFlow.lastOutcome.aborted, W.PSFlow.lastOutcome.projection], [0, "none", true, "ok"], "initialization failed, abort projection succeeded");
-        assert(injected >= 2 && !W.PSFlow._app, "both begin and abort failed to construct the real application");
-        assert(/injected dex initialization failure/.test(W.PSFlow.lastOutcome.error), "the initialization error is retained");
-        eq(W.PSFlow.lastOutcome.battleId, W.PSFlow.request.battleId, "aborted battle identity retained");
-        eq(G.$gameVariables.value(10), 0, "stale win cleared");
-        await press("ok"); await dismissMessages();
-        eq(game(), before, "nothing committed");
-        assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "interpreter released");
-        return { injected, outcome: clone(W.PSFlow.lastOutcome), resultVariable: G.$gameVariables.value(10) };
-      } finally { Module._load = load; W.PSFlow._app = null; W.PSFlow._dex = null; }
+    await scenario("T13 application construction or lazy Dex initialization fails: stale result cleared, state untouched, event continues", async () => {
+      const rows = [];
+      for (const failure of ["application", "dex"]) {
+        fresh(); const before = clone(game());
+        const Module = nodeRequire("module"), load = Module._load, limits = W.PSFlow.limits;
+        W.PSFlow._app = null; W.PSFlow._dex = null;
+        G.$gameVariables.setValue(10, 1); // the previous battle won
+        let injected = 0;
+        const message = `injected ${failure} initialization failure`;
+        try {
+          if (failure === "application") {
+            // Configuration is evaluated while constructing the application, before _app is assigned.
+            W.PSFlow.limits = () => { injected++; throw new Error(message); };
+          } else {
+            // The port is now lazy: the application exists before the first Showdown use can fail.
+            Module._load = function (id: string, ...args: any[]) {
+              if (/\/showdown\/dist\/sim$/.test(id)) { injected++; throw new Error(message); }
+              return load.call(this, id, ...args);
+            };
+          }
+          await startEvent(1); await inMode("end");
+          eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit, W.PSFlow.lastOutcome.aborted, W.PSFlow.lastOutcome.projection], [0, "none", true, "ok"], "initialization failed, abort projection succeeded");
+          if (failure === "application") assert(injected >= 2 && !W.PSFlow._app, "both begin and abort failed to construct the application; independent host projection still worked");
+          else assert(injected >= 1 && W.PSFlow._app, "the application exists but lazy Dex use failed");
+          assert(W.PSFlow.lastOutcome.error.includes(message), "the initialization error is retained");
+          eq(W.PSFlow.lastOutcome.battleId, W.PSFlow.request.battleId, "aborted battle identity retained");
+          eq(G.$gameVariables.value(10), 0, "stale win cleared");
+          await press("ok"); await dismissMessages();
+          eq(game(), before, "nothing committed");
+          assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "interpreter released");
+          rows.push({ failure, injected, outcome: clone(W.PSFlow.lastOutcome), resultVariable: G.$gameVariables.value(10) });
+        } finally { Module._load = load; W.PSFlow.limits = limits; W.PSFlow._app = null; W.PSFlow._dex = null; }
+      }
+      return rows;
     });
 
     await scenario("T14 invalid result outcome: abort before capture commit; a corrected retry applies exactly once", async () => {
@@ -482,7 +506,7 @@
       W.PSFlow.rng = seeded(4242);
       try {
         const g0 = clone(game());
-        eq([g0.schema, g0.party.length, g0.boxes.length, g0.bag, g0.money, g0.claims, g0.appliedBattles], [3, 0, 0, {}, 3000, {}, {}], "a new game is the formal empty state");
+        eq([g0.schema, g0.party.length, g0.boxes.length, g0.bag, g0.money, g0.claims, g0.appliedBattles, g0.steps], [4, 0, 0, {}, 3000, {}, {}, 0], "a new game is the formal empty state");
         assert(!JSON.stringify(g0).includes("A-000"), "no fixture member in a new game");
         const mz0 = mzParty();
         eq([G.$dataSystem.startMapId, G.$dataSystem.startX, G.$dataSystem.startY], [5, 8, 9], "the project starts on the slice map");
@@ -491,9 +515,9 @@
         await runEvent(1);
         eq([W.PSFlow.lastClaim.status, G.$gameVariables.value(11)], ["applied", 1], "starter granted, the event sees 1");
         const g1 = clone(game());
-        eq(g1.party.map((m: any) => [m.id, m.species, m.level, m.moves.map((x: any) => x.id)]), [["G-starter-1", "Charmander", 5, ["scratch", "growl", "ember"]]], "the starter comes from the content");
+        eq(g1.party.map((m: any) => [m.id, m.species, m.form, m.level, m.moves.map((x: any) => x.id)]), [["G-starter-1", "charmander", 0, 5, ["scratch", "growl", "ember"]]], "the starter comes from the content (stored by content id + form)");
         eq([g1.bag, g1.claims, g1.money], [{ antidote: 2, pokeball: 10, potion: 5 }, { starter: { kind: "grant" } }, 3000], "items and the claim");
-        eq(g1.dex, { seen: ["Charmander"], owned: ["Charmander"] }, "the received species is seen and owned");
+        eq(g1.dex, { seen: ["charmander"], owned: ["charmander"] }, "the received species is seen and owned");
         await runEvent(1);
         eq([W.PSFlow.lastClaim.status, G.$gameVariables.value(11)], ["already-claimed", 2], "the repeat is reported");
         eq(game(), g1, "the repeat changes nothing");
@@ -525,7 +549,7 @@
       eq(game(), nodeRequire("./js/engine/build/engine.cjs").state.newGame({ party: [], money: 0 }), "the whole formal empty state: no members, boxes, items, money, dex entries, battles or claims");
       assert(!G.$gameSystem._psSaveError, "not an error");
       eq(W.PSFlow.claim("starter").status, "applied", "the player can still receive the starter");
-      eq([game().party.map((m: any) => m.id), game().claims, game().dex.owned], [["G-starter-1"], { starter: { kind: "grant" } }, ["Charmander"]], "received into the empty state");
+      eq([game().party.map((m: any) => m.id), game().claims, game().dex.owned], [["G-starter-1"], { starter: { kind: "grant" } }, ["charmander"]], "received into the empty state");
       await recover();
     });
     // ================================================================ step 4 batch B: exploration and the battle loop
@@ -863,6 +887,146 @@
       return { saveCode: rc, party: expected.state.party.map((m: any) => [m.id, m.level]), boxes: expected.state.boxes.map((m: any) => m.id), seq: expected.seq };
     });
 
+    await scenario("T31 a save written by the step 4 code (schema 3, P-1 sample) through MZ's own save/load: migrated to schema 4 field by field with the content mapping and saved again; an unmappable one is refused and kept", async () => {
+      const sample = clone(STEP4_FULL); // bundled into this test plugin: the package has no experiments/ folder
+      const B = nodeRequire("./js/engine/build/engine.cjs");
+      await slice(31);
+      G.$gameSystem._psGame = clone(sample); // the framework part of a step 4 save, inside an MZ save written by this build
+      await G.DataManager.saveGame(13);
+      G.$gameSystem._psGame = { diverged: true };
+      await G.DataManager.loadGame(13);
+      assert(!G.$gameSystem._psSaveError, "loads: " + JSON.stringify(G.$gameSystem._psSaveError));
+      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [3, 4, true], "migrated from schema 3");
+      const g = clone(game());
+      const keyOf = (n: string) => B.speciesKey.keyOfBattleName(W.PSFlow.content(), n);
+      eq(g.party.map((m: any) => [m.id, m.species, m.form]), sample.party.map((m: any) => [m.id, keyOf(m.species).species, 0]), "party by content id + form");
+      eq(g.boxes.map((m: any) => [m.id, m.species]), sample.boxes.map((m: any) => [m.id, keyOf(m.species).species]), "boxes too");
+      eq([g.claims, g.appliedBattles, g.bag, g.money, g.dex.owned], [sample.claims, sample.appliedBattles, sample.bag, sample.money, sample.dex.owned.map((n: string) => keyOf(n).species)], "claims, ledger, bag (5000 above the cap), money kept; dex mapped");
+      eq(B.saveSchema.validateGame(g), [], "a valid schema 4 state");
+      eq(W.PSFlow.claim("starter").status, "already-claimed", "the claim survived");
+      await G.DataManager.saveGame(14);
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t31.json"), JSON.stringify({ state: g }));
+      // the same step 4 save naming a species the content does not have: refused as a whole, kept as it was
+      const bad = clone(sample); bad.boxes[0].species = "Mew";
+      G.$gameSystem._psGame = clone(bad);
+      await G.DataManager.saveGame(15);
+      G.$gameSystem._psGame = { diverged: true };
+      await G.DataManager.loadGame(15);
+      eq(G.$gameSystem._psSaveError && G.$gameSystem._psSaveError.code, "unmapped-species", "refused with the reason");
+      eq(G.$gameSystem._psSaveError.problems.map((p: any) => p.path), ["$.boxes[0].species"], "the place is named");
+      eq(G.$gameSystem._psGame, bad, "the original framework state is kept exactly");
+      // while that state is unusable no save is written at all (review F01): not to this slot, not to another one
+      const file15 = path.join(G.StorageManager.fileDirectoryPath(), "file15.rmmzsave");
+      const bytes15 = fs.readFileSync(file15);
+      const so = G.StorageManager.saveObject; let writes = 0;
+      G.StorageManager.saveObject = (...a: any[]) => { writes++; return so.apply(G.StorageManager, a); };
+      const refusal: any[] = [];
+      try {
+        for (const slot of [15, 18]) { let e: any = null; await G.DataManager.saveGame(slot).catch((x: any) => { e = x; }); refusal.push([slot, String(e && e.message), W.PSState.lastSaveError && W.PSState.lastSaveError.code, W.PSState.lastSaveError && W.PSState.lastSaveError.savefileId]); }
+      } finally { G.StorageManager.saveObject = so; }
+      assert(refusal.every(([slot, m, code, id]) => code === "state-unusable" && id === slot && new RegExp(`slot ${slot} is refused.*unmapped-species`).test(m)), "every save is refused with the slot and the reason: " + JSON.stringify(refusal));
+      eq(writes, 0, "MZ wrote nothing");
+      assert(fs.readFileSync(file15).equals(bytes15), "the save file the state came from is byte for byte unchanged");
+      assert(!fs.existsSync(path.join(G.StorageManager.fileDirectoryPath(), "file18.rmmzsave")), "no other slot was written");
+      eq(G.$gameSystem.isSaveEnabled(), false, "the save menu is masked while the state is unusable");
+      fresh();
+      eq(G.$gameSystem.isSaveEnabled(), true, "an explicit reset clears the error, saving is possible again");
+      return { party: g.party.length, boxes: g.boxes.length, battles: Object.keys(g.appliedBattles).length };
+    });
+
+    await scenario("T32 the step counter (WP06 §4.1): steps on the map count, MZ's own step count still runs, and the counter is saved with the state", async () => {
+      await slice(32);
+      const before = game().steps, mzBefore = G.$gameParty.steps();
+      for (const dir of [6, 4, 6, 4]) { G.$gamePlayer._encounterCount = 99; G.$gamePlayer.moveStraight(dir); await waitFor(() => !G.$gamePlayer.isMoving(), "step"); await frames(2); }
+      eq([game().steps - before, G.$gameParty.steps() - mzBefore], [4, 4], "four steps counted by both");
+      const steps = game().steps;
+      await G.DataManager.saveGame(16); game().steps = 0; await G.DataManager.loadGame(16);
+      eq(game().steps, steps, "saved and loaded with the state");
+      return { steps };
+    });
+
+    await scenario("T33 a save is loaded while an event battle is open (P4-2, review F02): the host operation ends (not running, saving allowed), the old scene's late end changes nothing, and the next battle runs and commits normally", async () => {
+      await toMap(); fresh();
+      await G.DataManager.saveGame(19); // a good save to load in the middle of the battle
+      const loaded = clone(game());
+      await startEvent(1); await inMode("main"); // the wild battle event of this map, its scene open and waiting for input
+      assert(W.PSFlow.running && !G.$gameSystem.isSaveEnabled(), "the battle runs and masks saving");
+      await G.DataManager.loadGame(19); // a load installs another state while the battle scene is still the current scene
+      eq([W.PSFlow.running, G.$gameSystem.isSaveEnabled(), W.PSFlow.lastOutcome && W.PSFlow.lastOutcome.replaced], [false, true, true], "the host operation ended with the old state");
+      eq(game(), loaded, "the loaded state is installed untouched");
+      G.SceneManager.goto(G.Scene_Map); // as the load screen does: the old battle scene ends now
+      await waitFor(() => scene() && scene()._spriteset && !battle() && !G.SceneManager.isSceneChanging(), "back on the map");
+      await frames(10);
+      eq(game(), loaded, "the old scene's end committed nothing");
+      // the next battle: opens, runs and commits as usual; nothing of the old one reaches it
+      W.PSFlow.lastStale = null;
+      await startEvent(1); await inMode("main");
+      await choose(/^Run/);
+      await inMode("end"); await press("ok"); await dismissMessages();
+      eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit, W.PSFlow.running], [3, "applied", false], "the next battle commits");
+      eq(W.PSFlow.lastStale, null, "no late call of the old battle reached it");
+      return { battles: Object.keys(game().appliedBattles).length };
+    });
+
+    await scenario("T34 R01 old decided session: default/mismatched finish cannot unlock a new battle or write a save (same and different ids)", async () => {
+      const rows = [];
+      for (const sameId of [true, false]) {
+        await toMap(); fresh(); await G.DataManager.saveGame(20);
+        await startEvent(1); await inMode("main"); await choose(/^Run/); await inMode("end");
+        const old = { session: battle()._session, op: W.PSFlow._op };
+        await G.DataManager.loadGame(20);
+        G.SceneManager.goto(G.Scene_Map);
+        await waitFor(() => scene() && scene()._spriteset && !battle() && !G.SceneManager.isSceneChanging(), "map after replacing the old decided battle");
+        await frames(10);
+        if (!sameId) G.$gameSystem._psBattleSeq += 100;
+        await startEvent(1); await inMode("main");
+        const next = W.PSFlow._op, before = clone(game()), outcome = W.PSFlow.lastOutcome, result = W.PSFlow.lastResult;
+        eq(old.op.request.battleId === next.request.battleId, sameId, "requested identity case");
+        const resultVariable = next.request.resultVariable, projected = G.$gameVariables.value(resultVariable);
+        let writes = 0; const saveObject = G.StorageManager.saveObject;
+        G.StorageManager.saveObject = function (this: any, ...a: any[]) { writes++; return saveObject.apply(this, a); };
+        try {
+          for (const finish of [() => W.PSFlow.finish(old.session), () => W.PSFlow.finish(old.session, next), () => W.PSFlow.finish(old.session, old.op)]) {
+            eq(finish().commit, "none", "old session refused");
+            assert(W.PSFlow.running && W.PSFlow._op === next && !G.$gameSystem.isSaveEnabled(), "new host operation/save mask intact");
+            eq(W.PSFlow.app().healParty().reason, "battle-active", "application still locked too");
+            assert(W.PSFlow.lastOutcome === outcome && W.PSFlow.lastResult === result, "no outcome overwritten");
+            eq(game(), before, "no state overwritten"); eq(G.$gameVariables.value(resultVariable), projected, "no projection");
+            let error = ""; try { await G.DataManager.saveGame(22); } catch (e) { error = String(e); }
+            assert(/battle is running/.test(error), "direct save rejected"); eq(writes, 0, "zero underlying save writes");
+          }
+        } finally { G.StorageManager.saveObject = saveObject; }
+        await choose(/^Run/); await finishBattle();
+        eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit, W.PSFlow.running, G.$gameSystem.isSaveEnabled()], [3, "applied", false, true], "current battle finishes normally");
+        rows.push({ sameId, writes, commit: W.PSFlow.lastOutcome.commit });
+      }
+      return rows;
+    });
+
+    await scenario("T35 R02 failed defeat return: load/new game cancel the old request, retry causes zero transfers", async () => {
+      const rows = [];
+      for (const replacement of ["load", "new-game"]) {
+        await slice(35); await G.DataManager.saveGame(21);
+        game().party = [mkMember("S-1", "Snorlax", 2, { hp: 1 })]; game().money = 1000;
+        W.PSFlow.debug.failReturn = true;
+        await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+        await choose(/^Fight/); await inMode("moves"); await choose(/tackle/i); await finishBattle(); await frames(20);
+        eq([W.PSFlow.lastOutcome.code, W.PSFlow.pendingReturn.status, game().money], [4, "failed", 984], "defeat settled, trip failed");
+        const diagnostic = W.PSFlow.lastReturn;
+        if (replacement === "load") await G.DataManager.loadGame(21); else G.DataManager.setupNewGame();
+        eq([W.PSFlow.pendingReturn, W.PSFlow.request], [null, null], "no executable old work");
+        assert(W.PSFlow.lastReturn === diagnostic, "historical diagnostic retained");
+        const before = clone(game()); let transfers = 0;
+        const reserve = G.$gamePlayer.reserveTransfer;
+        G.$gamePlayer.reserveTransfer = function (this: any, ...a: any[]) { transfers++; return reserve.apply(this, a); };
+        try { eq(W.PSFlow.retryReturnHome().status, "none", "old trip invalidated"); eq(W.PSFlow.retryReturnHome().status, "none", "repeated retry stays empty"); }
+        finally { G.$gamePlayer.reserveTransfer = reserve; }
+        eq(transfers, 0, "zero transfers in new timeline"); eq(game(), before, "no additional money/heal settlement");
+        rows.push({ replacement, transfers, retry: "none" });
+      }
+      return rows;
+    });
+
     await scenario("T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window", async () => {
       W.PSFlow.setLanguage("zh");
       try {
@@ -954,6 +1118,7 @@
       if (rounds > 6 && (r + 1) % 5 === 0 && r + 1 < rounds) perf.memory.push(mem(`after ${r + 1} rounds (${(r + 1) * 4} battles)`));
     }
     perf.memory.push(mem(`after ${rounds} rounds (${rounds * 4} battles)`));
+    perf.rounds = rounds; // the last memory sample is taken here, before the step 4 / step 5 timing battles
     sampling = false;
     // step 4 timings on the slice map: a map encounter until its first menu, and MZ save / load of a slice save
     try {
@@ -974,7 +1139,47 @@
       const st = (a: number[]) => ({ n: a.length, p50: pct(a, 0.5), max: a.length ? Math.max(...a) : null, samples: a });
       perf.step4 = { method: "slice map, encounter forced by an exhausted step counter; encounter = executeEncounter -> first battle menu (performance.now); save/load = DataManager.saveGame/loadGame promise round trip, slot 12, test save folder", encounterToFirstMenuMs: st(enc), saveMs: st(saveMs), loadMs: st(loadMs) };
     } catch (e: any) { perf.errors = (perf.errors || []).concat(`step4 timings: ${e.message}`); }
-    const bs: any[] = W.PSFlow.perf.battles;
+    // the battles measured so far are the ones the step 4 baseline had (the rounds and the step 4 encounters): the
+    // comparable metrics below are computed over exactly these, the full-save battles that follow form their own group
+    const comparableN = W.PSFlow.perf.battles.length;
+    // step 5.0 timings (plan §3 5.0 item 7): full boxes, a large bag and opening the party screen, on the structures of
+    // this build (flat boxes, one count per item, the read-only party screen); the 5.1/5.2 structures are measured later
+    try {
+      const n = Number(arg("ps-perf-step5")) || 6;
+      const B = nodeRequire("./js/engine/build/engine.cjs");
+      await slice(51);
+      const g = game();
+      for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3));
+      const box = mkMember("BX-0", "Pidgey", 3);
+      g.boxes = Array.from({ length: W.PSFlow.limits().boxes }, (_, i) => ({ ...clone(box), id: `BX-${i}` })); // test setup: every box slot used
+      for (const item of B.items.BAG_ITEMS) g.bag[item] = 999; // test setup: every known bag item at the cap
+      const enc: number[] = [], saveMs: number[] = [], loadMs: number[] = [], menuMs: number[] = [], viewMs: number[] = [];
+      for (let i = 0; i < n; i++) {
+        let t = performance.now(); await G.DataManager.saveGame(17); saveMs.push(Math.round((performance.now() - t) * 10) / 10);
+        t = performance.now(); await G.DataManager.loadGame(17); loadMs.push(Math.round((performance.now() - t) * 10) / 10);
+        t = performance.now(); B.speciesKey.battleView(game(), W.PSFlow.content()); viewMs.push(Math.round((performance.now() - t) * 100) / 100);
+      }
+      await toMapId(5, 8, 9);
+      for (let i = 0; i < n; i++) {
+        W.PSFlow.perf.cur = null;
+        await stepInto(4, 9, i % 2 ? 8 : 2); await waitFor(() => battle() && battle()._mode !== "boot", "encounter"); await inMode("main");
+        const cur = W.PSFlow.perf.cur; if (cur && cur.encounter && cur.firstMenuMs !== undefined) enc.push(cur.firstMenuMs);
+        for (let k = 0; k < 6 && mode_() !== "end"; k++) { await choose(/^Run/); await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after run"); }
+        await finishBattle();
+        const t = performance.now(); G.SceneManager.push(W.Scene_PSParty);
+        await waitFor(() => scene() && scene()._psParty && !G.SceneManager.isSceneChanging(), "party screen"); menuMs.push(Math.round((performance.now() - t) * 10) / 10);
+        await press("cancel"); await waitFor(() => scene() && scene()._spriteset && !G.SceneManager.isSceneChanging(), "back on the map");
+      }
+      const st = (a: number[]) => ({ n: a.length, p50: pct(a, 0.5), max: a.length ? Math.max(...a) : null, samples: a });
+      perf.step5 = {
+        method: `slice map; party 6, boxes ${game().boxes.length} (all slots used), bag ${Object.keys(game().bag).length} items x 999 (test setup); save/load = DataManager round trip, slot 17; battleView = the battle view of that state; encounter = executeEncounter -> first menu; party screen = SceneManager.push(Scene_PSParty) until the screen is up`,
+        saveMs: st(saveMs), loadMs: st(loadMs), battleViewMs: st(viewMs), encounterToFirstMenuMs: st(enc), partyScreenOpenMs: st(menuMs),
+      };
+    } catch (e: any) { perf.errors = (perf.errors || []).concat(`step5 timings: ${e.message}`); }
+    const all: any[] = W.PSFlow.perf.battles;
+    const bs: any[] = all.slice(0, comparableN); // same composition as the step 4 baseline (review F09)
+    perf.battleGroups = { comparable: comparableN, fullSave: all.length - comparableN };
+    perf.battleLog = all.map((b: any, i: number) => ({ i, group: i < comparableN ? "comparable" : "full-save", label: b.label, encounter: b.encounter, sessionMs: b.sessionMs, firstMenuMs: b.firstMenuMs, totalMs: b.totalMs, code: b.code, actions: b.actions }));
     perf.engineLoadMs = W.PSFlow.perf.engineLoadMs;
     perf.firstBattle = bs[0] ? { sessionMs: bs[0].sessionMs, firstMenuMs: bs[0].firstMenuMs, totalMs: bs[0].totalMs, label: bs[0].label } : null;
     const later = bs.slice(1);
@@ -986,13 +1191,14 @@
     // battles that overlap a blur..focus interval are throttled by Chromium: keep them out of the "focused" statistics
     const blurIv: [number, number][] = []; let bAt: number | null = null;
     for (const e of focusLog) { if (e.ev === "blur") bAt = e.t; else if (e.ev === "focus" && bAt !== null) { blurIv.push([bAt, e.t]); bAt = null; } }
+    if (bAt !== null) blurIv.push([bAt, performance.now()]);
     for (const b of bs) { const s0 = b.t0, e0 = b.t0 + (b.totalMs || 0); b.blurred = blurIv.some(([x, y]) => x < e0 && y > s0); }
     const fb = bs.slice(1).filter((b) => !b.blurred);
     perf.laterBattles.unblurredN = fb.length; perf.laterBattles.blurredN = bs.slice(1).length - fb.length;
     perf.laterBattles.firstMenuMsMedianFocused = med(fb.map((b) => b.firstMenuMs)); perf.laterBattles.firstMenuMsMaxFocused = fb.length ? Math.max(...fb.map((b) => b.firstMenuMs)) : null;
     perf.firstBattle.blurred = bs[0] ? bs[0].blurred : null;
-    perf.focus = { blurEvents: focusLog.filter((e) => e.ev === "blur").length, framesSkippedUnfocused: skippedUnfocused };
-    perf.battles = bs.length;
+    perf.focus = { initiallyFocused: focusLog[0]?.hasFocus, blurEvents: focusLog.filter((e) => e.ev === "blur" && !e.initial).length, framesSkippedUnfocused: skippedUnfocused };
+    perf.battles = all.length;
     perf.window = { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio, refocusCount: refocus };
     report.perf = perf;
     results.push({ id: "P1 perf run", status: perf.errors ? "fail" : "pass", ms: 0, error: perf.errors && perf.errors.join("; ") });
@@ -1146,6 +1352,14 @@
   }
 
   async function verifySave() {
+    await scenario("V4 real restart: the step 4 save migrated and saved by the previous process loads as schema 4, without migrating again", async () => {
+      const expected = JSON.parse(fs.readFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t31.json"), "utf8"));
+      G.DataManager.setupNewGame();
+      await G.DataManager.loadGame(14);
+      eq([G.$gameSystem._psSaveError, G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.migrated], [undefined, 4, false], "a schema 4 save");
+      eq(game(), expected.state, "the migrated state, identical");
+      return { party: game().party.length };
+    });
     await scenario("V3 real restart (play-through): party, boxes, bag, growth, claims, money and the map position load identically in a fresh process, and play continues (an encounter, a commit, no duplicate id)", async () => {
       const expected = JSON.parse(fs.readFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t26.json"), "utf8"));
       G.DataManager.setupNewGame();
@@ -1187,11 +1401,74 @@
     });
   }
 
+  /** A cold real-host check: empty content uses no external battle data, including for an old saved party. */
+  async function runEmptySource() {
+    const B = nodeRequire("./js/engine/build/engine.cjs");
+    const dataModules = () => Object.keys(nodeRequire.cache).filter((p) => p.includes("/showdown/dist/data/"));
+    eq(dataModules().length, 0, "cold MZ host before source consumption");
+    const contentFile = path.join(gameDir, "data/framework/content.json");
+    const realRead = fs.readFileSync;
+    const original = JSON.parse(realRead(contentFile, "utf8"));
+    let document = original;
+    let writes = 0;
+    const realSave = G.StorageManager.saveObject;
+    fs.readFileSync = function (file: any, ...args: any[]) { return String(file) === contentFile ? JSON.stringify(document) : realRead.call(this, file, ...args); };
+    G.StorageManager.saveObject = function () { writes++; throw new Error("unexpected storage write in source test"); };
+    try {
+      for (const sourceMode of ["valid", "denied", "unregistered", "no-check", "malformed"]) {
+        document = clone(original); document.species = []; document.grants = [];
+        const sd = document.sources.find((s: any) => s.kind === "showdown");
+        if (sourceMode === "denied") sd.usageCheck.decision = "not-allowed";
+        if (sourceMode === "unregistered") document.sources = document.sources.filter((s: any) => s !== sd);
+        if (sourceMode === "no-check") delete sd.usageCheck;
+        if (sourceMode === "malformed") sd.usageCheck = { decision: "internal-use" };
+        W.PSFlow.stateReplaced(); W.PSFlow._app = null; W.PSFlow._content = null; W.PSFlow._dex = null;
+        G.DataManager.setupNewGame();
+        const before = clone(game());
+        let error: string | undefined;
+        try {
+          W.PSFlow.app();
+          const content = W.PSFlow.content();
+          eq(content.meta.id, original.contentId, "the actual author content, not an empty fallback");
+          eq(Object.keys(content.species), [], "empty species");
+        } catch (e: any) { error = String(e.message); }
+        eq(!!error, sourceMode === "malformed", "only structurally valid empty documents are usable");
+        eq(game(), before, "content/app does not replace state");
+        let oldPartyError: string | undefined;
+        if (!error) {
+          G.$gameSystem._psGame = B.state.newGame({ party: STEP4_FULL.party.map((m: any) => ({ ...m, species: m.species.toLowerCase(), form: 0 })), money: 0 });
+          const oldState = clone(game());
+          W.PSFlow.openBattle({ kind: "wild", foes: [{ species: "pidgey", level: 3 }], seq: 1, battleId: "empty-source-old" });
+          try { await W.PSFlow.begin(); } catch (e: any) { oldPartyError = String(e.message); }
+          assert(!!oldPartyError && oldPartyError.includes("not in the content"), "old party refuses without a move query");
+          eq(game(), oldState, "a refused old party stays intact");
+          W.PSFlow.stateReplaced();
+        }
+        eq(dataModules().length, 0, "still cold after empty content/app/old-party"); eq(writes, 0, "no storage writes");
+        results.push({ id: "ES " + sourceMode, status: "pass", detail: { before: 0, after: dataModules().length, writes, stateUnchanged: true, error, oldPartyError } });
+      }
+      document = original; W.PSFlow._app = null; W.PSFlow._content = null; W.PSFlow._dex = null;
+      const content = W.PSFlow.content();
+      eq(Object.keys(content.species).length, original.species.length, "lawful nonempty content still assembles");
+      assert(dataModules().length > 0, "positive control actually loaded engine data");
+      results.push({ id: "ES lawful nonempty control", status: "pass", detail: { before: 0, after: dataModules().length, writes } });
+    } finally { fs.readFileSync = realRead; G.StorageManager.saveObject = realSave; }
+  }
+
   const startAt = G.Scene_Boot.prototype.start;
   G.Scene_Boot.prototype.start = function (this: any) {
-    startAt.call(this);
+    if (mode === "empty-source") {
+      // Reactor's boot calls setupNewGame before the delayed driver runs. Supply the empty author document before
+      // that real lifecycle starts; otherwise the normal sample has already lawfully warmed Showdown's cache.
+      const file = path.join(gameDir, "data/framework/content.json");
+      const read = fs.readFileSync;
+      const empty = JSON.parse(read(file, "utf8"));
+      empty.species = []; empty.grants = []; empty.sources = empty.sources.filter((s: any) => s.kind !== "showdown");
+      fs.readFileSync = function (f: any, ...args: any[]) { return String(f) === file ? JSON.stringify(empty) : read.call(this, f, ...args); };
+      try { startAt.call(this); } finally { fs.readFileSync = read; }
+    } else startAt.call(this);
     setTimeout(async () => {
-      try { if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else await runAll(); }
+      try { if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else await runAll(); }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       try { report.contentIdentity = W.PSFlow.content().meta; } catch (e) { report.contentIdentity = { error: String(e) }; }
       try { report.logTail = W.PSFlow.logger ? W.PSFlow.logger.tail(60) : null; } catch (e) { report.logTail = { error: String(e) }; } // redacted, bounded session diagnostics

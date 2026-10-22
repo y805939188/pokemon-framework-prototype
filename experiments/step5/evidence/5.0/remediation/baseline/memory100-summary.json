@@ -1,0 +1,459 @@
+{
+  "env": {
+    "host": "local",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M1 Max",
+    "mem_gb": 32,
+    "os": "25.6.0",
+    "nw": "0.117.0",
+    "node": "26.7.0",
+    "chromium": "154.0.8037.58",
+    "gitHead": "c789620a153d8efeb8bc0b39afe3ea92685db8fc",
+    "runs": 1,
+    "window": {
+      "w": 816,
+      "h": 624,
+      "dpr": 2,
+      "refocusCount": 1255
+    }
+  },
+  "method": {
+    "t0": "shell epoch ms just before launch",
+    "timers": "performance.now()/Date.now() in the renderer",
+    "frames": "SceneManager.update deltas, window focused, fast=true (no message pacing)"
+  },
+  "rows": [
+    {
+      "label": "cold start: launch -> plugins loaded (ms)",
+      "median": 784,
+      "range": [
+        784,
+        784
+      ],
+      "samples": [
+        784
+      ]
+    },
+    {
+      "label": "cold start: launch -> map ready (ms)",
+      "median": 1983,
+      "range": [
+        1983,
+        1983
+      ],
+      "samples": [
+        1983
+      ]
+    },
+    {
+      "label": "engine modules load, first battle only (ms)",
+      "median": 0.4,
+      "range": [
+        0.4,
+        0.4
+      ],
+      "samples": [
+        0.4
+      ]
+    },
+    {
+      "label": "first battle: session create (ms)",
+      "median": 13.6,
+      "range": [
+        13.6,
+        13.6
+      ],
+      "samples": [
+        13.6
+      ]
+    },
+    {
+      "label": "first battle: event start -> first menu (ms)",
+      "median": 432.9,
+      "range": [
+        432.9,
+        432.9
+      ],
+      "samples": [
+        432.9
+      ]
+    },
+    {
+      "label": "later battles: session create, median (ms)",
+      "median": 1.9,
+      "range": [
+        1.9,
+        1.9
+      ],
+      "samples": [
+        1.9
+      ]
+    },
+    {
+      "label": "later battles: event start -> first menu, median (ms)",
+      "median": 132.7,
+      "range": [
+        132.7,
+        132.7
+      ],
+      "samples": [
+        132.7
+      ]
+    },
+    {
+      "label": "later battles: event start -> first menu, worst, all (ms)",
+      "median": 134.7,
+      "range": [
+        134.7,
+        134.7
+      ],
+      "samples": [
+        134.7
+      ]
+    },
+    {
+      "label": "later battles: event start -> first menu, worst, window focused throughout (ms)",
+      "median": 134.7,
+      "range": [
+        134.7,
+        134.7
+      ],
+      "samples": [
+        134.7
+      ]
+    },
+    {
+      "label": "later battles overlapping a focus loss (count of 23)",
+      "median": 0,
+      "range": [
+        0,
+        0
+      ],
+      "samples": [
+        0
+      ]
+    },
+    {
+      "label": "focus-loss events during the run",
+      "median": 0,
+      "range": [
+        0,
+        0
+      ],
+      "samples": [
+        0
+      ]
+    },
+    {
+      "label": "frames skipped while unfocused",
+      "median": 9177,
+      "range": [
+        9177,
+        9177
+      ],
+      "samples": [
+        9177
+      ]
+    },
+    {
+      "label": "action latency p50 move (ms)",
+      "median": 3.4,
+      "range": [
+        3.4,
+        3.4
+      ],
+      "samples": [
+        3.4
+      ]
+    },
+    {
+      "label": "action latency p50 run (ms)",
+      "median": 2.4,
+      "range": [
+        2.4,
+        2.4
+      ],
+      "samples": [
+        2.4
+      ]
+    },
+    {
+      "label": "action latency p50 item (ms)",
+      "median": 3.2,
+      "range": [
+        3.2,
+        3.2
+      ],
+      "samples": [
+        3.2
+      ]
+    },
+    {
+      "label": "action latency p50 ball (ms)",
+      "median": 2.6,
+      "range": [
+        2.6,
+        2.6
+      ],
+      "samples": [
+        2.6
+      ]
+    },
+    {
+      "label": "action latency p50 switch (ms)",
+      "median": null,
+      "range": null,
+      "samples": [
+        null
+      ]
+    },
+    {
+      "label": "action latency p50 learn (ms)",
+      "median": null,
+      "range": null,
+      "samples": [
+        null
+      ]
+    },
+    {
+      "label": "action latency max move (ms)",
+      "median": 7.5,
+      "range": [
+        7.5,
+        7.5
+      ],
+      "samples": [
+        7.5
+      ]
+    },
+    {
+      "label": "action latency max run (ms)",
+      "median": 5.8,
+      "range": [
+        5.8,
+        5.8
+      ],
+      "samples": [
+        5.8
+      ]
+    },
+    {
+      "label": "action latency max item (ms)",
+      "median": 7.7,
+      "range": [
+        7.7,
+        7.7
+      ],
+      "samples": [
+        7.7
+      ]
+    },
+    {
+      "label": "action latency max ball (ms)",
+      "median": 4.8,
+      "range": [
+        4.8,
+        4.8
+      ],
+      "samples": [
+        4.8
+      ]
+    },
+    {
+      "label": "frames in battle scene: p50 (ms)",
+      "median": null,
+      "range": null,
+      "samples": [
+        null
+      ]
+    },
+    {
+      "label": "frames in battle scene: p95 (ms)",
+      "median": null,
+      "range": null,
+      "samples": [
+        null
+      ]
+    },
+    {
+      "label": "frames in battle scene: max (ms)",
+      "median": null,
+      "range": null,
+      "samples": [
+        null
+      ]
+    },
+    {
+      "label": "frames in battle scene: count >50ms",
+      "median": 0,
+      "range": [
+        0,
+        0
+      ],
+      "samples": [
+        0
+      ]
+    },
+    {
+      "label": "frames in battle scene: count >100ms",
+      "median": 0,
+      "range": [
+        0,
+        0
+      ],
+      "samples": [
+        0
+      ]
+    },
+    {
+      "label": "frames on map (idle/event): p95 (ms)",
+      "median": null,
+      "range": null,
+      "samples": [
+        null
+      ]
+    },
+    {
+      "label": "frames on map: max (ms)",
+      "median": null,
+      "range": null,
+      "samples": [
+        null
+      ]
+    },
+    {
+      "label": "memory: app RSS at map ready (MB)",
+      "median": 1196,
+      "range": [
+        1196,
+        1196
+      ],
+      "samples": [
+        1196
+      ]
+    },
+    {
+      "label": "memory: app RSS after 4 battles (MB)",
+      "median": 1222,
+      "range": [
+        1222,
+        1222
+      ],
+      "samples": [
+        1222
+      ]
+    },
+    {
+      "label": "memory: app RSS after 12 battles (MB)",
+      "median": 1230,
+      "range": [
+        1230,
+        1230
+      ],
+      "samples": [
+        1230
+      ]
+    },
+    {
+      "label": "memory: app RSS after 24 battles (MB)",
+      "median": 1227,
+      "range": [
+        1227,
+        1227
+      ],
+      "samples": [
+        1227
+      ]
+    },
+    {
+      "label": "memory: JS heap after 4 battles (MB)",
+      "median": 51,
+      "range": [
+        51,
+        51
+      ],
+      "samples": [
+        51
+      ]
+    },
+    {
+      "label": "memory: JS heap after 24 battles (MB)",
+      "median": 51,
+      "range": [
+        51,
+        51
+      ],
+      "samples": [
+        51
+      ]
+    },
+    {
+      "label": "step 4: map encounter -> first battle menu, median (ms)",
+      "median": 82.6,
+      "range": [
+        82.6,
+        82.6
+      ],
+      "samples": [
+        82.6
+      ]
+    },
+    {
+      "label": "step 4: map encounter -> first battle menu, worst (ms)",
+      "median": 83.1,
+      "range": [
+        83.1,
+        83.1
+      ],
+      "samples": [
+        83.1
+      ]
+    },
+    {
+      "label": "step 4: save (DataManager.saveGame), median (ms)",
+      "median": 2.2,
+      "range": [
+        2.2,
+        2.2
+      ],
+      "samples": [
+        2.2
+      ]
+    },
+    {
+      "label": "step 4: save, worst (ms)",
+      "median": 2.5,
+      "range": [
+        2.5,
+        2.5
+      ],
+      "samples": [
+        2.5
+      ]
+    },
+    {
+      "label": "step 4: load (DataManager.loadGame), median (ms)",
+      "median": 3.4,
+      "range": [
+        3.4,
+        3.4
+      ],
+      "samples": [
+        3.4
+      ]
+    },
+    {
+      "label": "step 4: load, worst (ms)",
+      "median": 7.6,
+      "range": [
+        7.6,
+        7.6
+      ],
+      "samples": [
+        7.6
+      ]
+    }
+  ],
+  "errors": []
+}

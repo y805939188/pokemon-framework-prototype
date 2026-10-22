@@ -44,15 +44,26 @@ SUITES=(
   experiments/step4/test-battle-rules4.cjs
   experiments/step4/test-app-battle4.cjs
   experiments/step4/test-plugin-host4.cjs
+  experiments/step5/test-species-key5.cjs
+  experiments/step5/test-app5.cjs
+  experiments/step5/test-migration5.cjs
+  experiments/step5/test-content5.cjs
+  experiments/step5/test-plugin-host5.cjs
+  experiments/step5/test-cold-source5.cjs
+  experiments/step5/test-pbs-review5.cjs
+  experiments/step5/test-store5.cjs
+  experiments/step5/test-perf-budget5.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do
   set +e
   raw="$(node --test --test-reporter=tap "$s" 2>&1)"; rc=$?
   set -e
-  out="$(printf '%s\n' "$raw" | grep -E '^# (pass|fail|cancelled)' | tr '\n' ' ')"
+  out="$(printf '%s\n' "$raw" | grep -E '^# (pass|fail|cancelled|skipped)' | tr '\n' ' ')"
   echo "$s  ${out:-NO RESULT (see: node --test $s)}"
   # a test that never settles is reported as cancelled with "# fail 0": the exit status and the cancelled count decide too
   if [[ $rc -ne 0 || "$out" != *"# fail 0"* || "$out" != *"# cancelled 0"* ]]; then fail=1; printf '%s\n' "$raw" | grep -E '^not ok' | sed 's/^/    /' | head -5; fi
+  # PF_NO_SKIP=1 (CI since step 5.0, D5-9): a skipped test is a failure too, so "the runtime was missing" cannot pass
+  if [[ "${PF_NO_SKIP:-}" == "1" && "$out" == *"# skipped "* && "$out" != *"# skipped 0"* ]]; then fail=1; echo "    skipped tests are not allowed here (PF_NO_SKIP=1)"; fi
 done
 exit $fail

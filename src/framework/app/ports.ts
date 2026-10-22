@@ -19,6 +19,14 @@ export interface RandomPort {
   (n: number): number;
 }
 
+/**
+ * The host's wall clock (WP06 §3 "现实时间"): milliseconds since the Unix epoch. Injected like the random source so
+ * that rules never read the host clock (they receive the time as an argument) and tests can pin it.
+ */
+export interface ClockPort {
+  (): number;
+}
+
 /** One battle as the author (StartBattle) or an encounter asks for it. */
 export interface BattleStartRequest {
   battleId: string;
@@ -30,6 +38,8 @@ export interface BattleStartRequest {
   /** Author flags of a scripted battle (protocol v1 foe descriptor). */
   noRun?: boolean;
   noBall?: boolean;
+  /** The author lets the player lose this battle (story battle): a defeat then is not a blackout (WP61 §7, statistics). */
+  canLose?: boolean;
 }
 
 /** What the application decided before a session exists: the created foes and the effective flags. */
@@ -54,7 +64,10 @@ export interface BattleHandle {
 }
 
 export interface BattleSessionFactory<S extends BattleHandle = BattleHandle> {
-  /** Open a battle for `game` against `setup.foes`; the application has already checked the save's content references. */
+  /**
+   * Open a battle for `game` against `setup.foes`; the application has already checked the save's content references.
+   * `game` is the battle view of the persistent state (rules/species-key.ts battleView): species are Showdown names.
+   */
   create(request: BattleStartRequest, game: GameState, setup: BattleSetup): Promise<S>;
 }
 
@@ -75,14 +88,16 @@ export interface ClaimOutcome {
   /** Why it was refused: a rule refusal (unknown-grant, no-room, bag-full, member-id-taken, creation-failed), battle-active, state-unusable, no-random or commit-failed. */
   reason?: string;
   error?: string;
-  placed?: { id: string; species: string; level: number; to: "party" | "boxes" }[];
+  /** Received members by persistent key (content id + form). */
+  placed?: { id: string; species: string; form: number; level: number; to: "party" | "boxes" }[];
   items?: Record<string, number>;
   money?: number;
 }
 
 /** A read-only view of the persistent party, boxes and bag for a host screen (no rule lives in the host). */
 export interface PartyView {
-  members: { id: string; species: string; nameKey?: string; level: number; hp: number; maxhp: number; status: string; moves: { id: string; pp: number; maxpp: number }[] }[];
+  /** `species` + `form`: the persistent key (content id + form). */
+  members: { id: string; species: string; form: number; nameKey?: string; level: number; hp: number; maxhp: number; status: string; moves: { id: string; pp: number; maxpp: number }[] }[];
   boxes: number;
   bag: Record<string, number>;
   money: number;
@@ -90,6 +105,14 @@ export interface PartyView {
 
 export interface HealOutcome {
   status: "healed" | "unchanged" | "refused";
+  reason?: string;
+  error?: string;
+}
+
+/** Steps the player took (WP06 §4.1). Refused while a battle is open or the state is unusable; never throws. */
+export interface StepsOutcome {
+  status: "counted" | "refused";
+  steps?: number;
   reason?: string;
   error?: string;
 }

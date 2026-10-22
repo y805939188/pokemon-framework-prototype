@@ -1,10 +1,11 @@
 # CI layers (docs/step3/README.md): 1 = headless Node suites, 2 = plugin type check and build with Reactor's
-# declaration bundle. NOT covered here (needs MZ's NW.js and window): in-game flow, packaged-app suite, performance;
+# declaration bundle. Since step 5.0 (decision D5-9) layer 1 also installs the Reactor runtime of the pinned commit,
+# so the host-stub suites that run Reactor's own interpreter are not skipped (PF_NO_SKIP makes a skip a failure). NOT covered here (needs MZ's NW.js and window): in-game flow, packaged-app suite, performance;
 # those run locally (scripts/run-*-mac.sh) and must be reported as not run in CI.
 name: ci
 on:
   push:
-    branches: [main, 'step3/**', 'step4/**']
+    branches: [main, 'step3/**', 'step4/**', 'step5/**']
   pull_request:
 permissions:
   contents: read
@@ -17,12 +18,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0 (node24; v4 ran on the deprecated Node 20)
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0 (node24)
         with:
           node-version: '22.21.1'
       - name: Enable the pinned pnpm (src/package.json packageManager; the repo root has none, so corepack would take the latest)
         run: ./scripts/ci-run.sh pnpm-setup bash -c 'corepack enable && corepack prepare "$(node -p "require(\"./src/package.json\").packageManager")" --activate && pnpm --version'
+      - name: Reactor runtime from the pinned commit (only into this checkout; D5-9)
+        env:
+          REACTOR_SOURCE: download
+          RMMZ_TEMPLATE_CACHE: ${{ runner.temp }}/reactor
+        run: ./scripts/ci-run.sh reactor-setup ./scripts/setup-reactor.sh --install
       - name: Install dependencies (lockfile)
         run: ./scripts/ci-run.sh pnpm-install pnpm --dir src install --frozen-lockfile
       - name: Build the engine bundles (the Showdown extension is staged from them)
@@ -31,15 +37,17 @@ jobs:
         env:
           SHOWDOWN_SRC: ${{ runner.temp }}/showdown-src
         run: ./scripts/ci-run.sh build-showdown ./scripts/build-showdown.sh
-      - name: Headless checks (framework type check, import boundaries, Node suites)
+      - name: Headless checks (framework type check, import boundaries, Node suites; no test may be skipped)
+        env:
+          PF_NO_SKIP: '1'
         run: ./scripts/ci-run.sh headless-suites ./scripts/test-headless.sh
   plugins:
     name: plugins (Reactor types at the pinned commit, type check, build)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0 (node24; v4 ran on the deprecated Node 20)
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0 (node24)
         with:
           node-version: '22.21.1'
       - name: Enable the pinned pnpm (src/package.json packageManager; the repo root has none, so corepack would take the latest)
