@@ -26,9 +26,10 @@ run() { # mode out [extra args]
 }
 run all "$EVID/ps-flow-report.json" "--ps-flow-shots=$EVID"
 run verify-save "$EVID/ps-flow-verify-save.json"
+run empty-source "$EVID/ps-flow-empty-source.json"
 node -e '
 const fs=require("fs");let bad=0;
-for (const f of ["ps-flow-report.json","ps-flow-verify-save.json"]) {
+for (const f of ["ps-flow-report.json","ps-flow-verify-save.json","ps-flow-empty-source.json"]) {
   const r=JSON.parse(fs.readFileSync(process.argv[1]+"/"+f,"utf8"));
   console.log(f, r.overall, "nw", r.env.nw, "node", r.env.node);
   for (const x of r.results) { console.log("  ", x.status, x.id.slice(0,100)); if (x.status!=="pass") bad++; }

@@ -39,7 +39,8 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup): { co
     if (problem) errors.push({ file: "assembly", path: `grants/${grant.id}.source`, message: problem });
   }
   if (errors.length) return { content, errors };
-  const short = dex.sha().slice(0, 8);
+  // Empty author content needs no external battle data, including the lazy Dex's identity lookup.
+  const short = compiled.species.length ? dex.sha().slice(0, 8) : null;
   const byName = new Map<string, string>();
   for (const sp of compiled.species) {
     const form = sp.form ?? 0;
@@ -110,7 +111,11 @@ export function findDanglingReferences(
   for (const key of ["party", "boxes"] as const) {
     for (const [i, m] of state[key].entries()) {
       const path = `$.${key}[${i}]`;
-      if (battleNameOf(content, memberKey(m)) === null) out.push({ path: `${path}.species`, message: `"${m.species}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}` });
+      if (battleNameOf(content, memberKey(m)) === null) {
+        out.push({ path: `${path}.species`, message: `"${m.species}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}` });
+        // This member is already unusable. An empty catalog has not authorized any external move data.
+        continue;
+      }
       if (dex) for (const [j, mv] of m.moves.entries()) if (!dex.move(mv.id)) out.push({ path: `${path}.moves[${j}].id`, message: `"${mv.id}" is not a move in the pinned Showdown data` });
     }
   }

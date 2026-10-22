@@ -7,10 +7,15 @@ const path = require('node:path');
 const os = require('node:os');
 const vm = require('node:vm');
 const { spawnSync } = require('node:child_process');
-const ROOT = path.resolve(__dirname, '../..');
-const E = require('../../js/engine/build/engine.cjs');
+// Override only for checking the exact artifacts of a freshly built package.
+const ROOT = process.env.PF_COLD_SOURCE_ROOT || path.resolve(__dirname, '../..');
+const E = require(path.join(ROOT, 'js/engine/build/engine.cjs'));
 const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s,1664525)+1013904223) >>> 0; return Math.floor(s / 4294967296 * n); }; };
 let plugins, compiled;
+const dataModules = () => Object.keys(require.cache).filter(k => k.includes('/showdown/dist/data/'));
+function readPlugins(dir) {
+  return Object.fromEntries(['PS_SaveState','PS_BattleFlow'].map(n => [n, fs.readFileSync(path.join(dir, process.env.PF_COLD_SOURCE_ROOT ? n+'.js' : n+'/'+n+'.js'), 'utf8')]));
+}
 function host(game) {
   const Ctor = () => { function C() {} C.prototype = { initialize() {}, terminate() {} }; return C; };
   const errors = [], warnings = [], writes = [];
@@ -49,7 +54,7 @@ function host(game) {
 }
 
 async function child(mode, entry, pluginDir) {
-  const read = f => JSON.parse(fs.readFileSync(path.join(ROOT, 'content/sample', f + '.json'), 'utf8'));
+  const read = f => JSON.parse(fs.readFileSync(path.join(__dirname, '../../content/sample', f + '.json'), 'utf8'));
   const dataModules = () => Object.keys(require.cache).filter(k => k.includes('/showdown/dist/data/'));
   assert.equal(dataModules().length, 0, 'loading the framework alone is cold');
   if (entry === 'constructor') {
@@ -66,7 +71,7 @@ async function child(mode, entry, pluginDir) {
   if (mode === 'denied') sd.usageCheck.decision = 'not-allowed';
   if (mode === 'missing') delete sd.usageCheck;
   if (mode === 'malformed') sd.usageCheck = { decision: 'internal-use' };
-  plugins = Object.fromEntries(['PS_SaveState','PS_BattleFlow'].map(n => [n, fs.readFileSync(path.join(pluginDir, n, n+'.js'), 'utf8')]));
+  plugins = readPlugins(pluginDir);
   const h = host(E.state.newGame({ party: [], money: 0 }));
   const before = JSON.stringify(h.sys._psGame);
   let result, error;
@@ -95,21 +100,113 @@ async function child(mode, entry, pluginDir) {
   }
   return { mode, entry, before: 0, after: dataModules().length, error, status: result && result.status };
 }
+function changeSource(sources, mode) {
+  const sd = sources.find(s => s.kind === 'showdown');
+  if (mode === 'denied') sd.usageCheck.decision = 'not-allowed';
+  if (mode === 'no-check') delete sd.usageCheck;
+  if (mode === 'malformed') sd.usageCheck = { decision: 'internal-use' };
+  if (mode === 'unregistered') sources.splice(sources.indexOf(sd), 1);
+}
+async function matrixChild(shape, mode, entry, pluginDir) {
+  assert.equal(dataModules().length, 0);
+  // Authoring inputs live with this test, also when the runtime under test comes from the package.
+  const sourceRoot = path.resolve(__dirname, '../../content/sample');
+  const source = Object.fromEntries(['manifest','sources','species','overlays','grants'].map(k => [k, JSON.parse(fs.readFileSync(path.join(sourceRoot, k+'.json'), 'utf8'))]));
+  if (shape === 'empty') { source.species = []; source.grants = []; source.overlays = []; }
+  if (entry === 'preserve') {
+    source.settings = { NUM_STORAGE_BOXES: 2 };
+    source.grants = [{ id: 'supplies', members: [], items: { potion: 1 }, money: 7, source: 'author-placeholder' }];
+  }
+  const built = E.contentCompile.compileContent(source); assert.equal(built.ok, true);
+  // Exercise consumption of an edited on-disk document separately from authoring validation.
+  compiled = JSON.parse(JSON.stringify(built.data)); changeSource(compiled.sources, mode);
+  changeSource(source.sources, mode);
+  const accepted = mode !== 'malformed' && (shape === 'empty' || mode === 'valid');
+  assert.equal(E.contentCompile.compileContent(source).ok, accepted);
+  assert.equal(dataModules().length, 0, 'compilation never loads external data');
+  if (entry === 'inventory' || entry === 'build') {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-source-cli5-'));
+    for (const [name, data] of Object.entries(source)) fs.writeFileSync(path.join(dir, name+'.json'), JSON.stringify(data));
+    const output = path.join(dir, 'result.json');
+    process.argv = [process.execPath, path.join(ROOT, 'js/engine/build/content-cli.cjs'), entry, '--src='+dir, '--out='+output, '--report='+output];
+    process.on('exit', code => {
+      try {
+        assert.equal(code, accepted ? 0 : 1); assert.equal(fs.existsSync(output), accepted);
+        assert.equal(dataModules().length > 0, accepted && shape !== 'empty' && entry === 'inventory');
+        if (accepted && entry === 'inventory') {
+          const report = JSON.parse(fs.readFileSync(output, 'utf8'));
+          assert.equal(report.summary.species, source.species.length);
+          if (shape === 'empty') assert.equal(report.showdownSha, null, 'no engine source was consumed');
+          else assert.ok(report.showdownSha);
+        }
+        console.log(JSON.stringify({shape, mode, entry, before:0, after:dataModules().length, exit:code, output:accepted}));
+        process.exitCode = 0; // the expected CLI refusal was verified, not a test failure
+      } catch (e) { console.error(e); process.exitCode = 1; }
+      finally { fs.rmSync(dir, {recursive:true, force:true}); }
+    });
+    require(path.join(ROOT, 'js/engine/build/content-cli.cjs'));
+    return;
+  }
+  plugins = readPlugins(pluginDir);
+  let party = [];
+  if (entry === 'old-party') {
+    const saved = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/step4-saves/defeat.json'), 'utf8'));
+    party = saved.party.map(m => ({...m, species:'charmander', form:0}));
+  }
+  const h = host(E.state.newGame({party, money:0}));
+  const before = JSON.stringify(h.sys._psGame);
+  let result, error;
+  try {
+    if (entry === 'assemble') result = E.contentRuntime.assembleContent(E.contentRuntime.loadCompiled(compiled), E.dex.createDexLookup());
+    if (entry === 'content' || entry === 'preserve') result = h.flow.content();
+    if (entry === 'app') { h.flow.app(); result = h.flow.content(); }
+    if (entry === 'old-party') {
+      h.flow.openBattle({kind:'wild', foes:[{species:'pidgey',level:3}], seq:1, battleId:'empty-old#1'});
+      result = await h.flow.begin();
+    }
+  } catch (e) { error = String(e.message); }
+  if (entry === 'old-party') assert.ok(error, 'the missing species blocks a battle, without a move lookup');
+  else if (entry === 'assemble') assert.equal(result.errors.length === 0, accepted);
+  else assert.equal(error === undefined, accepted);
+  assert.equal(dataModules().length > 0, accepted && shape !== 'empty');
+  if (accepted && entry !== 'old-party') {
+    const content = entry === 'assemble' ? result.content : result;
+    assert.equal(content.meta.id, built.data.contentId);
+    assert.equal(content.meta.inputsHash, built.data.inputsHash);
+    assert.equal(Object.keys(content.species).length, built.data.species.length);
+    if (entry === 'preserve') {
+      assert.deepEqual(JSON.parse(JSON.stringify(content.settings)), source.settings);
+      assert.deepEqual(JSON.parse(JSON.stringify(content.grants.supplies)), {id:'supplies',members:[],items:{potion:1},money:7});
+    }
+  }
+  assert.equal(JSON.stringify(h.sys._psGame), before); assert.deepEqual(h.writes, []);
+  return {shape, mode, entry, before:0, after:dataModules().length, accepted, error, stateUnchanged:true, saves:0};
+}
 if (process.argv[2] === '--cold-child') {
   child(...process.argv.slice(3)).then(r => console.log(JSON.stringify(r))).catch(e => { console.error(e); process.exitCode = 1; });
+} else if (process.argv[2] === '--matrix-child') {
+  matrixChild(...process.argv.slice(3)).then(r => console.log(JSON.stringify(r))).catch(e => { console.error(e); process.exitCode = 1; });
 } else {
   let dir;
   test.before(() => {
+    if (process.env.PF_COLD_SOURCE_ROOT) { dir = path.join(ROOT, 'js/plugins'); return; }
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-cold-source5-'));
     for (const name of ['PS_SaveState','PS_BattleFlow']) {
       const r = spawnSync('pnpm', ['--dir','src','exec','vite','build','--outDir',path.join(dir,name)], {cwd:ROOT, env:{...process.env, RR_PLUGIN:name}, encoding:'utf8'});
       assert.equal(r.status, 0, r.stdout+r.stderr);
     }
   });
-  test.after(() => { if (dir) fs.rmSync(dir,{recursive:true,force:true}); });
+  test.after(() => { if (dir && !process.env.PF_COLD_SOURCE_ROOT) fs.rmSync(dir,{recursive:true,force:true}); });
   const cases = [['valid','constructor'], ...['denied','missing','malformed','valid'].flatMap(m => ['content','app','claim','begin'].map(e => [m,e]))];
   for (const [mode, entry] of cases) test(`R03 cold source gate: ${mode}/${entry}`, t => {
     const r = spawnSync(process.execPath,[__filename,'--cold-child',mode,entry,dir], {cwd:ROOT,encoding:'utf8'});
+    assert.equal(r.status, 0, r.stdout+r.stderr); t.diagnostic(r.stdout.trim());
+  });
+  const modes = ['valid','denied','unregistered','no-check','malformed'];
+  const matrix = ['empty','nonempty'].flatMap(s => modes.flatMap(m => ['assemble','content','app','inventory','build'].map(e => [s,m,e])));
+  matrix.push(...modes.map(m => ['empty',m,'old-party']), ['empty','unregistered','preserve']);
+  for (const [shape, mode, entry] of matrix) test(`R03 consumption matrix: ${shape}/${mode}/${entry}`, t => {
+    const r = spawnSync(process.execPath,[__filename,'--matrix-child',shape,mode,entry,dir], {cwd:ROOT,encoding:'utf8'});
     assert.equal(r.status, 0, r.stdout+r.stderr); t.diagnostic(r.stdout.trim());
   });
 }

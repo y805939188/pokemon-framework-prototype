@@ -103,7 +103,7 @@ export function inventory(src: string, report: string): number {
     };
   });
   const doc = {
-    schema: 1, contentId: r.data.contentId, inputsHash: r.data.inputsHash, showdownSha: dex.sha(),
+    schema: 1, contentId: r.data.contentId, inputsHash: r.data.inputsHash, showdownSha: rows.length ? dex.sha() : null,
     note: "Field-level inventory only. Equal data is not equal behaviour. Framework-only fields have no Showdown counterpart to compare; the sample learnsets are synthetic placeholders, so 'differs' and 'framework-only' are expected there.",
     summary: { species: rows.length, learnComparisons: tally },
     species: rows,

@@ -1401,11 +1401,74 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     });
   }
 
+  /** A cold real-host check: empty content uses no external battle data, including for an old saved party. */
+  async function runEmptySource() {
+    const B = nodeRequire("./js/engine/build/engine.cjs");
+    const dataModules = () => Object.keys(nodeRequire.cache).filter((p) => p.includes("/showdown/dist/data/"));
+    eq(dataModules().length, 0, "cold MZ host before source consumption");
+    const contentFile = path.join(gameDir, "data/framework/content.json");
+    const realRead = fs.readFileSync;
+    const original = JSON.parse(realRead(contentFile, "utf8"));
+    let document = original;
+    let writes = 0;
+    const realSave = G.StorageManager.saveObject;
+    fs.readFileSync = function (file: any, ...args: any[]) { return String(file) === contentFile ? JSON.stringify(document) : realRead.call(this, file, ...args); };
+    G.StorageManager.saveObject = function () { writes++; throw new Error("unexpected storage write in source test"); };
+    try {
+      for (const sourceMode of ["valid", "denied", "unregistered", "no-check", "malformed"]) {
+        document = clone(original); document.species = []; document.grants = [];
+        const sd = document.sources.find((s: any) => s.kind === "showdown");
+        if (sourceMode === "denied") sd.usageCheck.decision = "not-allowed";
+        if (sourceMode === "unregistered") document.sources = document.sources.filter((s: any) => s !== sd);
+        if (sourceMode === "no-check") delete sd.usageCheck;
+        if (sourceMode === "malformed") sd.usageCheck = { decision: "internal-use" };
+        W.PSFlow.stateReplaced(); W.PSFlow._app = null; W.PSFlow._content = null; W.PSFlow._dex = null;
+        G.DataManager.setupNewGame();
+        const before = clone(game());
+        let error: string | undefined;
+        try {
+          W.PSFlow.app();
+          const content = W.PSFlow.content();
+          eq(content.meta.id, original.contentId, "the actual author content, not an empty fallback");
+          eq(Object.keys(content.species), [], "empty species");
+        } catch (e: any) { error = String(e.message); }
+        eq(!!error, sourceMode === "malformed", "only structurally valid empty documents are usable");
+        eq(game(), before, "content/app does not replace state");
+        let oldPartyError: string | undefined;
+        if (!error) {
+          G.$gameSystem._psGame = B.state.newGame({ party: STEP4_FULL.party.map((m: any) => ({ ...m, species: m.species.toLowerCase(), form: 0 })), money: 0 });
+          const oldState = clone(game());
+          W.PSFlow.openBattle({ kind: "wild", foes: [{ species: "pidgey", level: 3 }], seq: 1, battleId: "empty-source-old" });
+          try { await W.PSFlow.begin(); } catch (e: any) { oldPartyError = String(e.message); }
+          assert(!!oldPartyError && oldPartyError.includes("not in the content"), "old party refuses without a move query");
+          eq(game(), oldState, "a refused old party stays intact");
+          W.PSFlow.stateReplaced();
+        }
+        eq(dataModules().length, 0, "still cold after empty content/app/old-party"); eq(writes, 0, "no storage writes");
+        results.push({ id: "ES " + sourceMode, status: "pass", detail: { before: 0, after: dataModules().length, writes, stateUnchanged: true, error, oldPartyError } });
+      }
+      document = original; W.PSFlow._app = null; W.PSFlow._content = null; W.PSFlow._dex = null;
+      const content = W.PSFlow.content();
+      eq(Object.keys(content.species).length, original.species.length, "lawful nonempty content still assembles");
+      assert(dataModules().length > 0, "positive control actually loaded engine data");
+      results.push({ id: "ES lawful nonempty control", status: "pass", detail: { before: 0, after: dataModules().length, writes } });
+    } finally { fs.readFileSync = realRead; G.StorageManager.saveObject = realSave; }
+  }
+
   const startAt = G.Scene_Boot.prototype.start;
   G.Scene_Boot.prototype.start = function (this: any) {
-    startAt.call(this);
+    if (mode === "empty-source") {
+      // Reactor's boot calls setupNewGame before the delayed driver runs. Supply the empty author document before
+      // that real lifecycle starts; otherwise the normal sample has already lawfully warmed Showdown's cache.
+      const file = path.join(gameDir, "data/framework/content.json");
+      const read = fs.readFileSync;
+      const empty = JSON.parse(read(file, "utf8"));
+      empty.species = []; empty.grants = []; empty.sources = empty.sources.filter((s: any) => s.kind !== "showdown");
+      fs.readFileSync = function (f: any, ...args: any[]) { return String(f) === file ? JSON.stringify(empty) : read.call(this, f, ...args); };
+      try { startAt.call(this); } finally { fs.readFileSync = read; }
+    } else startAt.call(this);
     setTimeout(async () => {
-      try { if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else await runAll(); }
+      try { if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else await runAll(); }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       try { report.contentIdentity = W.PSFlow.content().meta; } catch (e) { report.contentIdentity = { error: String(e) }; }
       try { report.logTail = W.PSFlow.logger ? W.PSFlow.logger.tail(60) : null; } catch (e) { report.logTail = { error: String(e) }; } // redacted, bounded session diagnostics

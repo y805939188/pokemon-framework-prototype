@@ -49,6 +49,7 @@ launch all "$EVID/ps-flow-report.json" "--ps-flow-shots=$EVID"
 # the save must survive REPLACING the app with a fresh build (it lives outside the bundle)
 "$ROOT/scripts/package-mac.sh" --with-tests ${PF_PACKAGE_ARGS:-} | tail -1
 launch verify-save "$EVID/ps-flow-verify-save.json"
+launch empty-source "$EVID/ps-flow-empty-source.json"
 launch matrix "$EVID/ps-matrix-package.json"
 node -e 'const m=require(process.argv[1]+"/js/engine/matrix.cjs"); m.runMatrix().then(r=>require("fs").writeFileSync(process.argv[2],JSON.stringify({host:"node "+process.version,engineArtifact:m.artifactInfo(),results:r},null,2)))' "$ROOT" "$EVID/ps-matrix-node.json"
 stop_app
@@ -64,7 +65,7 @@ if [[ "$HAD_USERDIR" -eq 0 ]]; then rm -rf "$USERDIR"; fi
 codesign --verify --deep --strict "$APP" 2>&1 && echo "bundle seal still valid after the runs" || { echo "BUNDLE MODIFIED BY THE RUNS" >&2; exit 1; }
 node -e '
 const fs=require("fs");let bad=0;
-for (const f of ["ps-flow-report.json","ps-flow-verify-save.json","ps-matrix-package.json","ps-saveloc.json"]) {
+for (const f of ["ps-flow-report.json","ps-flow-verify-save.json","ps-flow-empty-source.json","ps-matrix-package.json","ps-saveloc.json"]) {
   const r=JSON.parse(fs.readFileSync(process.argv[1]+"/"+f,"utf8"));
   console.log(f, r.overall, "nw", r.env.nw, "node", r.env.node);
   for (const x of r.results) { console.log("  ", x.status, x.id.slice(0,100)); if (x.status!=="pass") bad++; }
@@ -85,9 +86,9 @@ for (const r of pk.matrix) {
 }
 if (!pk.env.execPath.includes("PokemonFrameworkPrototype.app")) { console.log("NOT RUN FROM THE PACKAGE:", pk.env.execPath); bad++; }
 console.log("host:", pk.env.execPath.replace(/.*Contents\//,"Contents/"), "| package:", JSON.stringify(pk.env.packageInfo));
-// every report must come from the build under test: the first run used build #1, the three later runs build #2 (the app was replaced in between)
+// every report must come from the build under test: the first run used build #1, the four later runs build #2 (the app was replaced in between)
 const built = f => { const r=JSON.parse(fs.readFileSync(process.argv[1]+"/"+f,"utf8")); return r.env.packageInfo && r.env.packageInfo.builtAt; };
-const b1=built("ps-flow-report.json"), b2=["ps-flow-verify-save.json","ps-matrix-package.json","ps-saveloc.json"].map(built);
+const b1=built("ps-flow-report.json"), b2=["ps-flow-verify-save.json","ps-flow-empty-source.json","ps-matrix-package.json","ps-saveloc.json"].map(built);
 if (!b1 || b2.some(b=>!b) || new Set(b2).size!==1 || b2[0]===b1) { console.log("BUILD MISMATCH: reports are not from the expected two builds", b1, b2); bad++; }
 else console.log("builds: flow run", b1, "-> replaced -> verify/matrix/saveloc runs", b2[0]);
 // the code that ran must be the code of this checkout: every runtime artifact recorded in the package equals the build here
