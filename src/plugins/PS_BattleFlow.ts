@@ -770,13 +770,13 @@ import { developmentCapabilities } from "../framework/rules/config";
   };
   P.showEnd = function (aborted: boolean) {
     if (aborted) this._log.add(PSFlow.translator().t("ui.end.aborted"));
-    // D1: a catch with a full party goes to the boxes, which this version cannot open yet: say so, so it never seems lost
+    // Full-party reception still has a destination choice. Do not announce a box before that choice commits.
     const s = this._session;
     if (!aborted && s && s.ended && s.ended.reason === "caught") {
       try {
         if (PSFlow.game().party.length >= PSFlow.limits().party) {
           const target = s.foeTeam.find((m: any) => m.id === (s.ended.outcome && s.ended.outcome.target));
-          this._log.add(this._log.fitText(PSFlow.translator().t("capture.to_box", { name: target ? PSFlow.speciesName(target.species) : "?" })));
+          this._log.add(this._log.fitText(PSFlow.translator().t("management.receiving", { name: target ? PSFlow.speciesName(target.species) : "?" })));
         }
       } catch { /* the commit below reports any state problem */ }
     }

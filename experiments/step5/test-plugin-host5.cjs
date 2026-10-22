@@ -356,3 +356,9 @@ test('P51-21/F: an unusable save opens the contained failure scene; begin/abort 
 test('P51-12/F: player-facing battle entry contains a closed held-item refusal, writes result0 and opens no scene/data',()=>{
  const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';let loads=0;const messages=[],values=[];h.flow.content=()=>{loads++;throw Error('must not load content')};h.ctx.$gameMessage.add=s=>messages.push(s);h.ctx.$gameVariables.setValue=(id,value)=>values.push([id,value]);const request={battleId:'player-held#1',kind:'wild',foes:[{species:'pidgey',level:3}],seq:1,resultVariable:12};assert.equal(h.flow.tryOpenBattle(request),false);assert.equal(loads,0);assert.equal(h.flow.running,false);assert.equal(h.flow._op,null);assert.match(h.flow.lastOutcome.error,/held-item-battle-disabled/);assert.deepEqual(values,[[12,0]]);assert.equal(messages.length,1);
 });
+
+
+test('P51-14/F: full-party caught ending does not claim a box destination before the receiving decision',()=>{
+ const game=E.fixtures.savedFor(E.fixtures.makeGame(),content);while(game.party.length<6){const m=J(game.party[0]);m.id='END-FILL-'+game.party.length;game.party.push(m);}const h=host(game),lines=[];
+ const scene={_session:{ended:{reason:'caught',outcome:{target:'CAUGHT'}},foeTeam:[{id:'CAUGHT',species:'Pidgey'}]},_log:{add:s=>lines.push(s),fitText:s=>s},show(){}};h.ctx.Scene_PSBattle.prototype.showEnd.call(scene,false);assert.equal(lines.length,1);assert.match(lines[0],/Receive/);assert.doesNotMatch(lines[0],/sent to the boxes|cannot be opened/);
+});
