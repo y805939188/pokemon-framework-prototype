@@ -1,0 +1,17 @@
+commit under test: b3177c9b1b07e941c111bda498ee0f23481dcac1 (working tree clean when the run started; the only change since is this evidence folder)
+command: scripts/run-flow-test-mac.sh <evidence dir> (NW.js 0.117.0 / Node 26.7.0 from the installed RPG Maker MZ), Apple Silicon macOS
+result: T1-T32 (incl. T15b) and T8 in one process, 33/33 pass; V1-V4 after a real restart, 4/4 pass
+headless on the same tree: scripts/test-quick.sh, 38 suites, all '# fail 0 # cancelled 0'
+screenshots, the test save folder and the raw log: workspace .verify/step5-5.0/flow-b3177c9/
+artifacts of this commit's build (sha256):
+c5a274d2811bedc3d2ae554e049632a1324f7811b33e33ac46715006eda5f041  js/engine/build/content-cli.cjs
+d9f65b67e1bd0efbc3f3f7c00735bb65fe7ebdf6173ee7586ac671182b1df644  js/engine/build/core.cjs
+b7a0412ea2cd72d3371ee2fb409f09c7a2de893bb422d9034dafe0f8acf54ec8  js/engine/build/custom-formats.cjs
+cd0354b40d7630054f54735f26e16ed40470da18387895ab199476fb865c665b  js/engine/build/engine.cjs
+c43e7f6f08fa3e9b637e8163af4b20c1a067940415c9ebd673f147df24a5f188  js/plugins/PS_BattleFlow.js
+42178860138bdb20f786c4ec8ee8cb50c6dca96753a6e9f9d1c6023d41479686  js/plugins/PS_BattleFlowTest.js
+fa7a861823d995b47716708639d4e5deadd54e72e79873bc4d6b0c675b89cab1  js/plugins/PS_BattleSmoke.js
+13d8d5c09c79b91afbecef44042266a4fd7d71a7cf0507c530b2c2a32ada21ef  js/plugins/PS_RuntimeFixes.js
+60737918cfb94a07b6ba751a97fcc3750d00570abd1aacdd1153b3ecf552af38  js/plugins/PS_SaveLocation.js
+8415a81049ca4a492f76c033f900826e2de53da0a7bbaaaab58ba0313cb6c45e  js/plugins/PS_SaveState.js
+a820c65e33c2caf4e028314740d17eaeb7c33565fc5d1e2e990fcfe8e0af83b9  data/framework/content.json

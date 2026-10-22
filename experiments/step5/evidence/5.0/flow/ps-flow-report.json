@@ -1,0 +1,1360 @@
+{
+  "mode": "all",
+  "results": [
+    {
+      "id": "T1 trainer win: Fight, KO, exp, level-up, learn prompt (real keys), next turn uses new move, return to map",
+      "status": "pass",
+      "ms": 2685,
+      "detail": {
+        "level": 51,
+        "exp": 125131,
+        "hp": 156
+      }
+    },
+    {
+      "id": "T2 trainer battle: Run refused with a reason (nothing consumed), a thrown Ball is spent and blocked by the trainer; cancels consume nothing",
+      "status": "pass",
+      "ms": 4633
+    },
+    {
+      "id": "T3 wild run: faster user escapes, committed as 'ran', state unchanged apart from battle bookkeeping",
+      "status": "pass",
+      "ms": 1217
+    },
+    {
+      "id": "T4 capture: Master Ball from the bag, captured member joins with its stable id",
+      "status": "pass",
+      "ms": 1681
+    },
+    {
+      "id": "T5 item from the bag: Potion on the active member, consumed once and persisted",
+      "status": "pass",
+      "ms": 2052
+    },
+    {
+      "id": "T6 failure exit: engine error mid-battle aborts cleanly, nothing committed, the event still continues",
+      "status": "pass",
+      "ms": 1250
+    },
+    {
+      "id": "T7 save/restore outside battle + idempotent re-commit after restore",
+      "status": "pass",
+      "ms": 1617,
+      "detail": {
+        "saveCode": 0,
+        "loadCode": 0
+      }
+    },
+    {
+      "id": "T9 legacy and unusable saves through MZ's own save/load: schema 1 migrates, newer or damaged states are refused and kept",
+      "status": "pass",
+      "ms": 2248,
+      "detail": {
+        "saveCodes": [
+          0
+        ],
+        "loadCodes": [
+          0
+        ]
+      }
+    },
+    {
+      "id": "T10 a save that refers to content which no longer exists: the battle is refused with the reference named, the state is untouched",
+      "status": "pass",
+      "ms": 1200
+    },
+    {
+      "id": "T11 an operation fails and its rollback fails too: the session is closed with both errors kept, nothing is committed, the event still continues",
+      "status": "pass",
+      "ms": 1334
+    },
+    {
+      "id": "T12 committed but the host projection fails: the commit stands and is reported, nothing is applied twice, a retry informs the host",
+      "status": "pass",
+      "ms": 1219
+    },
+    {
+      "id": "T13 application initialization fails: stale result is cleared, state stays untouched and the event continues",
+      "status": "pass",
+      "ms": 697,
+      "detail": {
+        "injected": 2,
+        "outcome": {
+          "code": 0,
+          "battleId": "wild-pidgey#1",
+          "commit": "none",
+          "aborted": true,
+          "error": "injected dex initialization failure",
+          "projection": "ok"
+        },
+        "resultVariable": 0
+      }
+    },
+    {
+      "id": "T14 invalid result outcome: abort before capture commit; a corrected retry applies exactly once",
+      "status": "pass",
+      "ms": 1583,
+      "detail": {
+        "aborted": {
+          "code": 0,
+          "battleId": "wild-pidgey#1",
+          "commit": "none",
+          "aborted": true,
+          "error": "invalid battle outcome: expected a nonempty kind and a string or null winner",
+          "projection": "ok"
+        },
+        "correctedCommit": "applied",
+        "repeatedCommit": "already-applied"
+      }
+    },
+    {
+      "id": "T15 new game slice: formal empty state (no fixture), the starter grant once, a repeat changes nothing, heal twice, MZ gold/items untouched; saved for the restart check",
+      "status": "pass",
+      "ms": 4137,
+      "detail": {
+        "saveCode": 0,
+        "starter": {
+          "id": "G-starter-1",
+          "species": "charmander",
+          "nickname": null,
+          "level": 5,
+          "exp": 135,
+          "hp": 19,
+          "status": "",
+          "statusCount": 0,
+          "moves": [
+            {
+              "id": "scratch",
+              "pp": 35,
+              "maxpp": 35
+            },
+            {
+              "id": "growl",
+              "pp": 40,
+              "maxpp": 40
+            },
+            {
+              "id": "ember",
+              "pp": 25,
+              "maxpp": 25
+            }
+          ],
+          "item": "",
+          "ability": "Blaze",
+          "nature": "naughty",
+          "gender": "M",
+          "ivs": {
+            "hp": 11,
+            "atk": 22,
+            "def": 17,
+            "spa": 13,
+            "spd": 25,
+            "spe": 30
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "friendship": 70,
+          "ball": "pokeball",
+          "ot": "player",
+          "form": 0
+        }
+      }
+    },
+    {
+      "id": "T15b a save made before the framework state existed loads as the formal empty state (no invented party), and the starter can be claimed",
+      "status": "pass",
+      "ms": 611
+    },
+    {
+      "id": "T16 encounter host check: region filter, nothing while an event runs, nothing while busy, a real trigger opens the framework battle, no save during it, no immediate re-trigger after it",
+      "status": "pass",
+      "ms": 6119,
+      "detail": {
+        "foe": {
+          "species": "Caterpie",
+          "level": 3
+        },
+        "battleId": "wild#1"
+      }
+    },
+    {
+      "id": "T17 encounter win: Ember until the foe faints, level-up to 8 and the level 8 move learned; HP/PP/status/exp written back once",
+      "status": "pass",
+      "ms": 2399,
+      "detail": {
+        "level": 8,
+        "exp": 336,
+        "hp": 22,
+        "emberPp": 23
+      }
+    },
+    {
+      "id": "T18 full party: a Potion is used, Poké Balls are thrown until one catches, the catch goes to the boxes with a message, and two catches never share an id",
+      "status": "pass",
+      "ms": 8900,
+      "detail": {
+        "ids": [
+          "W1-1",
+          "W2-1"
+        ],
+        "balls": 20
+      }
+    },
+    {
+      "id": "T19 party and boxes full: the ball is refused with the reason before anything is spent",
+      "status": "pass",
+      "ms": 2249
+    },
+    {
+      "id": "T20 encounter defeat: money lost (highest level x 8) and the party healed with the commit, the player taken home, nothing left running",
+      "status": "pass",
+      "ms": 1970
+    },
+    {
+      "id": "T21 the trip home fails after the commit: the defeat stays settled once, a retry only moves the player",
+      "status": "pass",
+      "ms": 2775
+    },
+    {
+      "id": "T22 an event battle lost with canLose off ends the event and goes home; an event that had disabled saving keeps it disabled",
+      "status": "pass",
+      "ms": 2471
+    },
+    {
+      "id": "T27 a lost battle with canLose off ends its whole calling chain (directly, in a common event, in a common event called by one; home is the same map); with canLose on the caller continues",
+      "status": "pass",
+      "ms": 9054,
+      "detail": {
+        "direct": {
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "code": 4,
+          "blackout": true,
+          "at": [
+            5,
+            8,
+            9
+          ],
+          "money": 984,
+          "running": false
+        },
+        "one common event": {
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "code": 4,
+          "blackout": true,
+          "at": [
+            5,
+            8,
+            9
+          ],
+          "money": 984,
+          "running": false
+        },
+        "two common events": {
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "code": 4,
+          "blackout": true,
+          "at": [
+            5,
+            8,
+            9
+          ],
+          "money": 984,
+          "running": false
+        },
+        "canLose on": {
+          "after": [
+            555,
+            0,
+            777
+          ],
+          "code": 4,
+          "blackout": false,
+          "at": [
+            5,
+            12,
+            6
+          ],
+          "money": 984,
+          "running": false
+        }
+      }
+    },
+    {
+      "id": "T28 a message or translation failure after a committed defeat keeps the committed outcome (code 4, applied, blackout), the trip home and the end of the event; nothing is settled twice; a failed trip stays retryable",
+      "status": "pass",
+      "ms": 6577,
+      "detail": {
+        "message": {
+          "hostErrors": [
+            {
+              "step": "message",
+              "error": "injected: message window failure"
+            }
+          ],
+          "money": 984
+        },
+        "translation": {
+          "hostErrors": [
+            {
+              "step": "message",
+              "error": "injected: translation failure"
+            }
+          ],
+          "money": 984
+        },
+        "message and trip": {
+          "hostErrors": [
+            {
+              "step": "message",
+              "error": "injected: message window failure"
+            }
+          ],
+          "money": 984
+        }
+      }
+    },
+    {
+      "id": "T29 the battle only masks saving while it runs: a reason another system adds (disable) or removes (enable) during the battle stays in force afterwards, after a normal end and after an abort",
+      "status": "pass",
+      "ms": 3071,
+      "detail": {
+        "allowed, disabled meanwhile, ran away": {
+          "inBattle": [
+            false,
+            false,
+            false
+          ],
+          "after": false,
+          "code": 3
+        },
+        "disabled, enabled meanwhile, aborted": {
+          "inBattle": [
+            false,
+            false,
+            false
+          ],
+          "after": true,
+          "code": 0
+        }
+      }
+    },
+    {
+      "id": "T30 a battle id that is also \"__proto__\" is an ordinary ledger entry through MZ's own save and load: applied once, a repeat before and after the load spends nothing",
+      "status": "pass",
+      "ms": 1233
+    },
+    {
+      "id": "T23 a real save failure is diagnosable and changes nothing; the next good save clears it",
+      "status": "pass",
+      "ms": 620
+    },
+    {
+      "id": "T24 the read-only party screen: from the slice sign and from the main menu; it shows party, boxes, bag and money and changes nothing",
+      "status": "pass",
+      "ms": 1581,
+      "detail": {
+        "lines": 6
+      }
+    },
+    {
+      "id": "T25 the battle counter is saved with the state: after loading an older save the next catch can reuse a discarded id, but no id is ever duplicated within one save timeline",
+      "status": "pass",
+      "ms": 5281,
+      "detail": {
+        "a": "W1-1",
+        "b": "W2-1",
+        "c": "W2-1",
+        "seqSaved": 1
+      }
+    },
+    {
+      "id": "T26 play-through for the restart check: new game, starter, a won encounter (growth), a catch into the party, a full party (test setup) and a catch into the boxes, the nurse, a walk; saved",
+      "status": "pass",
+      "ms": 6054,
+      "detail": {
+        "saveCode": 0,
+        "party": [
+          [
+            "G-starter-1",
+            8
+          ],
+          [
+            "W2-1",
+            4
+          ],
+          [
+            "P-3",
+            3
+          ],
+          [
+            "P-4",
+            3
+          ],
+          [
+            "P-5",
+            3
+          ],
+          [
+            "P-6",
+            3
+          ]
+        ],
+        "boxes": [
+          "W3-1"
+        ],
+        "seq": 3
+      }
+    },
+    {
+      "id": "T31 a save written by the step 4 code (schema 3, P-1 sample) through MZ's own save/load: migrated to schema 4 field by field with the content mapping and saved again; an unmappable one is refused and kept",
+      "status": "pass",
+      "ms": 629,
+      "detail": {
+        "party": 6,
+        "boxes": 1,
+        "battles": 6
+      }
+    },
+    {
+      "id": "T32 the step counter (WP06 §4.1): steps on the map count, MZ's own step count still runs, and the counter is saved with the state",
+      "status": "pass",
+      "ms": 1806,
+      "detail": {
+        "steps": 4
+      }
+    },
+    {
+      "id": "T8 second language (Chinese sample): the real scene shows Chinese text, no key is missing, every drawn line fits its window",
+      "status": "pass",
+      "ms": 3127
+    }
+  ],
+  "focusLog": [],
+  "suppressedAudio": {
+    "playBgm": 1,
+    "playStaticSe": 255
+  },
+  "refocus": 0,
+  "env": {
+    "nw": "0.117.0",
+    "node": "26.7.0",
+    "chromium": "154.0.8037.58",
+    "v8": "15.4.80.11",
+    "platform": "darwin",
+    "arch": "arm64",
+    "execPath": "~/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.app/Contents/Resources/nwjs-mac/nwjs.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
+    "gameDir": "~/Desktop/pokemon-framework/.worktrees/step5-0-foundation",
+    "packageInfo": null
+  },
+  "contentIdentity": {
+    "kind": "sample",
+    "id": "sample",
+    "inputsHash": "f6a301c71621b491a5f49bb804b9caf5b60ba4008481a105a73d9c707d43bce8"
+  },
+  "logTail": [
+    {
+      "n": 259,
+      "battleId": "save#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 260,
+      "battleId": "save#1",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "f6a301c71621"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "R-1"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 261,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 262,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 263,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "f6a301c71621"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1",
+          "P-2",
+          "P-3",
+          "P-4",
+          "P-5",
+          "P-6"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 264,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "ball",
+        "ball": "masterball"
+      }
+    },
+    {
+      "n": 265,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "reserve",
+        "kind": "ball",
+        "item": "masterball",
+        "left": 4
+      }
+    },
+    {
+      "n": 266,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "consume",
+        "kind": "ball",
+        "item": "masterball",
+        "outcome": "caught"
+      }
+    },
+    {
+      "n": 267,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "growth",
+      "data": {
+        "member": "G-starter-1",
+        "foe": "W1-1",
+        "exp": 13,
+        "level": 5,
+        "levelUps": 0
+      }
+    },
+    {
+      "n": 268,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "caught",
+        "winner": null,
+        "bag": {
+          "masterball": -1
+        },
+        "members": 6
+      }
+    },
+    {
+      "n": 269,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "growth": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 270,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 271,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 272,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "f6a301c71621"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1",
+          "P-2",
+          "P-3",
+          "P-4",
+          "P-5",
+          "P-6"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 273,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "ball",
+        "ball": "masterball"
+      }
+    },
+    {
+      "n": 274,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "reserve",
+        "kind": "ball",
+        "item": "masterball",
+        "left": 3
+      }
+    },
+    {
+      "n": 275,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "consume",
+        "kind": "ball",
+        "item": "masterball",
+        "outcome": "caught"
+      }
+    },
+    {
+      "n": 276,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "growth",
+      "data": {
+        "member": "G-starter-1",
+        "foe": "W2-1",
+        "exp": 28,
+        "level": 5,
+        "levelUps": 0
+      }
+    },
+    {
+      "n": 277,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "caught",
+        "winner": null,
+        "bag": {
+          "masterball": -1
+        },
+        "members": 6
+      }
+    },
+    {
+      "n": 278,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "growth": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 279,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 280,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 281,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "f6a301c71621"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1",
+          "P-2",
+          "P-3",
+          "P-4",
+          "P-5",
+          "P-6"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 282,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "ball",
+        "ball": "masterball"
+      }
+    },
+    {
+      "n": 283,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "reserve",
+        "kind": "ball",
+        "item": "masterball",
+        "left": 3
+      }
+    },
+    {
+      "n": 284,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "consume",
+        "kind": "ball",
+        "item": "masterball",
+        "outcome": "caught"
+      }
+    },
+    {
+      "n": 285,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "growth",
+      "data": {
+        "member": "G-starter-1",
+        "foe": "W2-1",
+        "exp": 18,
+        "level": 5,
+        "levelUps": 0
+      }
+    },
+    {
+      "n": 286,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "caught",
+        "winner": null,
+        "bag": {
+          "masterball": -1
+        },
+        "members": 6
+      }
+    },
+    {
+      "n": 287,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "growth": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 288,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 289,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 290,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "f6a301c71621"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 291,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "move",
+        "index": 3
+      }
+    },
+    {
+      "n": 292,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "growth",
+      "data": {
+        "member": "G-starter-1",
+        "foe": "W1-1",
+        "exp": 10,
+        "level": 8,
+        "levelUps": 3
+      }
+    },
+    {
+      "n": 293,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "win",
+        "winner": "Player",
+        "bag": {},
+        "members": 1
+      }
+    },
+    {
+      "n": 294,
+      "battleId": "wild#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "growth": 1,
+          "learned": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 295,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 296,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 297,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "f6a301c71621"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 298,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "ball",
+        "ball": "masterball"
+      }
+    },
+    {
+      "n": 299,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "reserve",
+        "kind": "ball",
+        "item": "masterball",
+        "left": 1
+      }
+    },
+    {
+      "n": 300,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "consume",
+        "kind": "ball",
+        "item": "masterball",
+        "outcome": "caught"
+      }
+    },
+    {
+      "n": 301,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "growth",
+      "data": {
+        "member": "G-starter-1",
+        "foe": "W2-1",
+        "exp": 25,
+        "level": 8,
+        "levelUps": 0
+      }
+    },
+    {
+      "n": 302,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "caught",
+        "winner": null,
+        "bag": {
+          "masterball": -1
+        },
+        "members": 1
+      }
+    },
+    {
+      "n": 303,
+      "battleId": "wild#2",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "growth": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 304,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 305,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 306,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "f6a301c71621"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1",
+          "W2-1",
+          "P-3",
+          "P-4",
+          "P-5",
+          "P-6"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 307,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "ball",
+        "ball": "masterball"
+      }
+    },
+    {
+      "n": 308,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "reserve",
+        "kind": "ball",
+        "item": "masterball",
+        "left": 0
+      }
+    },
+    {
+      "n": 309,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "ledger",
+      "data": {
+        "op": "consume",
+        "kind": "ball",
+        "item": "masterball",
+        "outcome": "caught"
+      }
+    },
+    {
+      "n": 310,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "growth",
+      "data": {
+        "member": "G-starter-1",
+        "foe": "W3-1",
+        "exp": 9,
+        "level": 8,
+        "levelUps": 0
+      }
+    },
+    {
+      "n": 311,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "caught",
+        "winner": null,
+        "bag": {
+          "masterball": -1
+        },
+        "members": 6
+      }
+    },
+    {
+      "n": 312,
+      "battleId": "wild#3",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "growth": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    },
+    {
+      "n": 313,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 314,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 315,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "f6a301c71621"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "A-0001",
+          "A-0002",
+          "A-0003"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 316,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "run"
+      }
+    },
+    {
+      "n": 317,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "run",
+        "winner": null,
+        "bag": {},
+        "members": 3
+      }
+    },
+    {
+      "n": 318,
+      "battleId": "wild-pidgey#1",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    }
+  ],
+  "overall": "pass"
+}

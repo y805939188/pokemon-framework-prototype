@@ -1,0 +1,163 @@
+{
+  "mode": "verify-save",
+  "results": [
+    {
+      "id": "V4 real restart: the step 4 save migrated and saved by the previous process loads as schema 4, without migrating again",
+      "status": "pass",
+      "ms": 9,
+      "detail": {
+        "party": 6
+      }
+    },
+    {
+      "id": "V3 real restart (play-through): party, boxes, bag, growth, claims, money and the map position load identically in a fresh process, and play continues (an encounter, a commit, no duplicate id)",
+      "status": "pass",
+      "ms": 1250,
+      "detail": {
+        "seq": 4,
+        "party": 6,
+        "boxes": 1
+      }
+    },
+    {
+      "id": "V2 real restart (slice): the new-game save loads identically in a fresh process, the claim stays claimed, MZ gold/items as saved",
+      "status": "pass",
+      "ms": 4,
+      "detail": {
+        "party": [
+          "G-starter-1"
+        ],
+        "claims": [
+          "starter"
+        ]
+      }
+    },
+    {
+      "id": "V1 real restart: the save written by the previous process loads with identical state, duplicates stay no-ops",
+      "status": "pass",
+      "ms": 3,
+      "detail": {
+        "applied": [
+          "wild-snorlax#1"
+        ],
+        "party": 4
+      }
+    }
+  ],
+  "focusLog": [],
+  "suppressedAudio": {
+    "playBgm": 1,
+    "playStaticSe": 5
+  },
+  "refocus": 0,
+  "env": {
+    "nw": "0.117.0",
+    "node": "26.7.0",
+    "chromium": "154.0.8037.58",
+    "v8": "15.4.80.11",
+    "platform": "darwin",
+    "arch": "arm64",
+    "execPath": "~/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.app/Contents/Resources/nwjs-mac/nwjs.app/Contents/Frameworks/nwjs Framework.framework/Versions/154.0.8037.58/Helpers/nwjs Helper (Renderer).app/Contents/MacOS/nwjs Helper (Renderer)",
+    "gameDir": "~/Desktop/pokemon-framework/.worktrees/step5-0-foundation",
+    "packageInfo": null
+  },
+  "contentIdentity": {
+    "kind": "sample",
+    "id": "sample",
+    "inputsHash": "f6a301c71621b491a5f49bb804b9caf5b60ba4008481a105a73d9c707d43bce8"
+  },
+  "logTail": [
+    {
+      "n": 0,
+      "battleId": "wild#4",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p1",
+        "seq": 6,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 1,
+      "battleId": "wild#4",
+      "level": "info",
+      "kind": "request",
+      "data": {
+        "side": "p2",
+        "seq": 7,
+        "forceSwitch": false,
+        "wait": false
+      }
+    },
+    {
+      "n": 2,
+      "battleId": "wild#4",
+      "level": "info",
+      "kind": "session.create",
+      "data": {
+        "content": {
+          "kind": "sample",
+          "id": "sample",
+          "hash": "f6a301c71621"
+        },
+        "format": "gen8rpgcustomgame",
+        "doubles": false,
+        "foe": {
+          "kind": "wild",
+          "members": 1
+        },
+        "party": [
+          "G-starter-1",
+          "W2-1",
+          "P-3",
+          "P-4",
+          "P-5",
+          "P-6"
+        ],
+        "seed": [
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    {
+      "n": 3,
+      "battleId": "wild#4",
+      "level": "info",
+      "kind": "choice",
+      "data": {
+        "action": "run"
+      }
+    },
+    {
+      "n": 4,
+      "battleId": "wild#4",
+      "level": "info",
+      "kind": "end",
+      "data": {
+        "reason": "run",
+        "winner": null,
+        "bag": {},
+        "members": 6
+      }
+    },
+    {
+      "n": 5,
+      "battleId": "wild#4",
+      "level": "info",
+      "kind": "turn",
+      "data": {
+        "messages": {
+          "events": 1,
+          "end": 1
+        },
+        "finished": true
+      }
+    }
+  ],
+  "overall": "pass"
+}
