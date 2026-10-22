@@ -202,4 +202,26 @@ if (process.argv[2] === '--cold-held') {
     const session = await app.startBattle({ battleId: 'actual-no-target', kind: 'wild', seq: 1, forceParty: true, foes: [{ species: 'pidgey', level: 3 }] });
     assert.deepEqual(await session.throwBall('masterball'), { ok: false, reason: 'ballsdisabled' }); assert.equal(state.current().bag.masterball, 2); assert.equal(state.replaced.length, 0); app.abortBattle({ battleId: 'actual-no-target' }, 'test ended');
   });
+  test('M01: real Minior-Meteor base identity reaches creation through the full pipeline at both draw boundaries', () => {
+    const c = assemble([{ ...base, id: 'meteor', showdownId: 'miniormeteor' }, { ...base, id: 'meteor', form: 7, showdownId: 'minior' }, { ...base, id: 'meteor', form: 13, showdownId: 'miniorviolet' }]);
+    for (const [roll, form, species] of [[0, 7, 'Minior'], [6, 13, 'Minior-Violet']]) {
+      const draws = []; const m = E.memberFactory.createMember({ id: 'M3', species: 'Minior-Meteor', level: 5 }, c, n => { draws.push(n); return draws.length === 9 ? roll : 0; });
+      assert.equal(m.form, form); assert.equal(m.species, species); assert.deepEqual(draws, [65536, 65536, 32, 32, 32, 32, 32, 32, 7]);
+      assert.deepEqual(E.speciesKey.memberKey(E.speciesKey.toPersistentMember(m, c)), { species: 'meteor', form });
+    }
+    assert.equal(c.species['Minior-Meteor'].ruleSpecies, 'Minior');
+    for (const input of [{ species: 'Minior-Meteor', form: 0 }, { species: 'Minior-Meteor', form: 7 }, { species: 'Minior' }, { species: 'Minior-Violet' }]) {
+      let draws = 0; const m = E.memberFactory.createMember({ id: 'S', level: 5, ...input }, c, () => { draws++; return 0; });
+      assert.equal(draws, 8, JSON.stringify(input)); assert.equal(m.form, input.form ?? (input.species === 'Minior' ? 7 : 13));
+    }
+  });
+  test('M01: Minior missing target forms refuse after exactly nine draws, independent of author ID', () => {
+    for (const [id, roll, missing] of [['meteor', 0, 7], ['unown', 6, 13]]) {
+      const records = [{ ...base, id, showdownId: 'miniormeteor' }, { ...base, id, form: 7, showdownId: 'minior' }, { ...base, id, form: 13, showdownId: 'miniorviolet' }].filter(sp => sp.form !== missing);
+      const c = assemble(records); let draws = 0;
+      assert.throws(() => E.memberFactory.createMember({ id: 'M4', species: 'Minior-Meteor', level: 5 }, c, () => ++draws === 9 ? roll : 0), new RegExp('form ' + missing + ': missing creation form'));
+      assert.equal(draws, 9);
+    }
+  });
+
 }

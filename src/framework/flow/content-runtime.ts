@@ -74,7 +74,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     if (!ok) continue;
     const happiness = sp.happiness ?? baseHappiness.get(sp.id);
     content.species[found.name] = {
-      base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset, nameKey: sp.nameKey, contentId: sp.id, form,
+      base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset, nameKey: sp.nameKey, contentId: sp.id, form, ruleSpecies: found.baseSpecies ?? found.name,
       ...(found.abilities ? { abilities: [...found.abilities] } : {}), ...(found.hiddenAbilities ? { hiddenAbilities: [...found.hiddenAbilities] } : {}), ...(happiness !== undefined ? { happiness } : {}), ...(found.gender !== undefined ? { gender: found.gender } : {}),
     };
     // the persistent key (decision D5-3): content id + form <-> Showdown name, both ways

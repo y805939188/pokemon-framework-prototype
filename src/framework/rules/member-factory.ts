@@ -88,8 +88,8 @@ export function createMember(input: CreateMemberInput, content: Content, random:
   const ivs = { hp: draw(random, 32), atk: draw(random, 32), def: draw(random, 32), spa: draw(random, 32), spd: draw(random, 32), spe: draw(random, 32) };
   const nature = input.nature ?? NATURE_ORDER[pid % 25]!;
   const contentId = sp.contentId ?? species;
-  // `species` is the assembled rule/battle identity; contentId is only the author form-table key.
-  const form = input.form ?? (sp.form || creationForm(species, nature, input.context?.playerId ?? owner.id, random, input.context));
+  // Rule family, battle form name and author ID are separate. Legacy fixtures may use a canonical base name.
+  const form = input.form ?? (sp.form || creationForm(sp.ruleSpecies ?? species, nature, input.context?.playerId ?? owner.id, random, input.context));
   let finalName = species;
   if (form !== (sp.form ?? 0)) {
     const record = own(content.forms, contentId);

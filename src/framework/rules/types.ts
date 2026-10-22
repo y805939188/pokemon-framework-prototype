@@ -97,6 +97,8 @@ export interface SpeciesData {
   gender?: GenderRule;
   /** The author's content id of this species (e.g. "pidgey"): with `form`, the persistent key of members (decision D5-3). */
   contentId?: string;
+  /** Stable rule family from the data adapter (baseSpecies), independent of author ID and battle form name. */
+  ruleSpecies?: string;
   /** Form number of this record (0 = the base form). */
   form?: number;
 }
@@ -140,7 +142,7 @@ export interface Content {
 
 /** What the content layer needs to know about Showdown's static data (the battle adapter implements it). */
 export interface DexLookup {
-  species(showdownId: string): { name: string; baseStats: Stats; abilities?: (string | null)[]; hiddenAbilities?: (string | null)[]; gender?: GenderRule } | null;
+  species(showdownId: string): { name: string; baseSpecies: string; baseStats: Stats; abilities?: (string | null)[]; hiddenAbilities?: (string | null)[]; gender?: GenderRule } | null;
   move(showdownId: string): { name: string; id?: string; pp?: number } | null;
   /** Gen 8 level-up learn levels per move id (Showdown's learnset data), or null for an unknown species. */
   levelUpMoves(showdownId: string): Record<string, number[]> | null;

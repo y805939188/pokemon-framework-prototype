@@ -21,7 +21,7 @@ export function createDexLookup(engineRoot?: string): DexLookup {
       const abilities = [slots["0"] ?? null, slots["1"] ?? null];
       // single-gender / genderless species name a fixed gender; the others give the female share (WP19 §3.2: out of 256)
       const gender = s.gender === "M" || s.gender === "F" || s.gender === "N" ? s.gender : Math.round((s.genderRatio as { F: number }).F * 256);
-      return { name: s.name as string, baseStats: { ...s.baseStats }, abilities, hiddenAbilities: [slots["H"] ?? null], gender };
+      return { name: s.name as string, baseSpecies: s.baseSpecies as string, baseStats: { ...s.baseStats }, abilities, hiddenAbilities: [slots["H"] ?? null], gender };
     },
     move(id) {
       const m = use().gen8.moves.get(id);
