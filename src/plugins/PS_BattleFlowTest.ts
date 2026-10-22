@@ -438,28 +438,40 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       eq(game().party.map((m: any) => [m.id, m.level, m.hp]), before.party.map((m: any) => [m.id, m.level, m.hp]), "a run changes no member");
     });
 
-    await scenario("T13 application initialization fails: stale result is cleared, state stays untouched and the event continues", async () => {
-      fresh(); const before = clone(game());
-      const Module = nodeRequire("module"), load = Module._load;
-      W.PSFlow._app = null; W.PSFlow._dex = null;
-      G.$gameVariables.setValue(10, 1); // the previous battle won
-      let injected = 0;
-      try {
-        Module._load = function (id: string, ...args: any[]) {
-          if (/\/showdown\/dist\/sim$/.test(id)) { injected++; throw new Error("injected dex initialization failure"); }
-          return load.call(this, id, ...args);
-        };
-        await startEvent(1); await inMode("end");
-        eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit, W.PSFlow.lastOutcome.aborted, W.PSFlow.lastOutcome.projection], [0, "none", true, "ok"], "initialization failed, abort projection succeeded");
-        assert(injected >= 2 && !W.PSFlow._app, "both begin and abort failed to construct the real application");
-        assert(/injected dex initialization failure/.test(W.PSFlow.lastOutcome.error), "the initialization error is retained");
-        eq(W.PSFlow.lastOutcome.battleId, W.PSFlow.request.battleId, "aborted battle identity retained");
-        eq(G.$gameVariables.value(10), 0, "stale win cleared");
-        await press("ok"); await dismissMessages();
-        eq(game(), before, "nothing committed");
-        assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "interpreter released");
-        return { injected, outcome: clone(W.PSFlow.lastOutcome), resultVariable: G.$gameVariables.value(10) };
-      } finally { Module._load = load; W.PSFlow._app = null; W.PSFlow._dex = null; }
+    await scenario("T13 application construction or lazy Dex initialization fails: stale result cleared, state untouched, event continues", async () => {
+      const rows = [];
+      for (const failure of ["application", "dex"]) {
+        fresh(); const before = clone(game());
+        const Module = nodeRequire("module"), load = Module._load, limits = W.PSFlow.limits;
+        W.PSFlow._app = null; W.PSFlow._dex = null;
+        G.$gameVariables.setValue(10, 1); // the previous battle won
+        let injected = 0;
+        const message = `injected ${failure} initialization failure`;
+        try {
+          if (failure === "application") {
+            // Configuration is evaluated while constructing the application, before _app is assigned.
+            W.PSFlow.limits = () => { injected++; throw new Error(message); };
+          } else {
+            // The port is now lazy: the application exists before the first Showdown use can fail.
+            Module._load = function (id: string, ...args: any[]) {
+              if (/\/showdown\/dist\/sim$/.test(id)) { injected++; throw new Error(message); }
+              return load.call(this, id, ...args);
+            };
+          }
+          await startEvent(1); await inMode("end");
+          eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit, W.PSFlow.lastOutcome.aborted, W.PSFlow.lastOutcome.projection], [0, "none", true, "ok"], "initialization failed, abort projection succeeded");
+          if (failure === "application") assert(injected >= 2 && !W.PSFlow._app, "both begin and abort failed to construct the application; independent host projection still worked");
+          else assert(injected >= 1 && W.PSFlow._app, "the application exists but lazy Dex use failed");
+          assert(W.PSFlow.lastOutcome.error.includes(message), "the initialization error is retained");
+          eq(W.PSFlow.lastOutcome.battleId, W.PSFlow.request.battleId, "aborted battle identity retained");
+          eq(G.$gameVariables.value(10), 0, "stale win cleared");
+          await press("ok"); await dismissMessages();
+          eq(game(), before, "nothing committed");
+          assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "interpreter released");
+          rows.push({ failure, injected, outcome: clone(W.PSFlow.lastOutcome), resultVariable: G.$gameVariables.value(10) });
+        } finally { Module._load = load; W.PSFlow.limits = limits; W.PSFlow._app = null; W.PSFlow._dex = null; }
+      }
+      return rows;
     });
 
     await scenario("T14 invalid result outcome: abort before capture commit; a corrected retry applies exactly once", async () => {
