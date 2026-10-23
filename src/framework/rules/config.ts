@@ -22,6 +22,7 @@ export interface RuleConfig {
   BAG_MAX_PER_SLOT: number;
   BAG_POCKET_SLOTS: number[];
   BAG_AUTO_SORT: boolean[];
+  AFFECTION_EFFECTS: boolean;
   MORE_BONUS_PREMIER_BALLS: boolean;
   USE_MULTIPLE_STAT_ITEMS_AT_ONCE: boolean;
   NO_VITAMIN_EV_CAP: boolean;
@@ -35,7 +36,7 @@ export const BOX_SIZE = 30;
 
 export const GEN8_DEFAULTS: Readonly<RuleConfig> = Object.freeze({ MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999,
   BAG_POCKET_SLOTS: Object.freeze([-1,-1,-1,-1,-1,-1,-1,-1]) as unknown as number[], BAG_AUTO_SORT: Object.freeze([false,false,false,true,true,false,false,false]) as unknown as boolean[],
-  MORE_BONUS_PREMIER_BALLS: true, USE_MULTIPLE_STAT_ITEMS_AT_ONCE: true, NO_VITAMIN_EV_CAP: true,
+  AFFECTION_EFFECTS: false, MORE_BONUS_PREMIER_BALLS: true, USE_MULTIPLE_STAT_ITEMS_AT_ONCE: true, NO_VITAMIN_EV_CAP: true,
   REBALANCED_HEALING_ITEM_AMOUNTS: true, RAGE_CANDY_BAR_CURES_STATUS_PROBLEMS: true, TAUGHT_MACHINES_KEEP_OLD_PP: false });
 
 const RANGES: Partial<Record<keyof RuleConfig, [number, number, string?]>> = {

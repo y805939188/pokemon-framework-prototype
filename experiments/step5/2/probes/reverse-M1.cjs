@@ -25,7 +25,7 @@ add('money-clamp',f+'rules/economy.ts','return Math.min(cap,Math.max(0,value));'
 add('badge-first-time',f+'rules/economy.ts','if(!before&&owned)','if(owned)','transactions');
 add('parent-suspension',f+'app/management.ts','this.child=true;','this.child=false;','transactions');
 add('BoxLink-inventory',f+'app/inventory-session.ts',"return Object.values(catalog).some(item=>hasFlag(item,'BoxLink')&&(own(counts,item.id)??0)>0);",'return false;','transactions');
-add('rare-q1-port',f+'app/inventory-session.ts',"||item.effect?.family==='rare-candy'&&quantity!==1",'', 'transactions');
+add('rare-q1-port',f+'app/inventory-session.ts',"if(family==='rare-candy'&&quantity!==1)throw new Error('invalid-quantity');","if(family==='rare-candy'&&quantity!==1)return {ready:true,eligible:'eligible',reason:'ready'};", 'transactions');
 add('sort-cancel-order',f+'app/inventory-session.ts',"next.inventory.pockets[sort.pocket-1]=sort.order.map((original,current)=>({original,slot:rows[current]!})).sort((a,b)=>a.original-b.original).map(row=>row.slot);",'', 'transactions');
 add('item-source-gate',f+'content/item-input.ts',"const sourceProblem = usable(raw.source);","const sourceProblem = null;",'content');
 add('shop-override-validation',f+'content/item-input.ts',"if (raw.overrides !== undefined &&", "if (false &&",'content');

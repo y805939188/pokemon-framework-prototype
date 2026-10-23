@@ -1,7 +1,8 @@
+import type {ItemWorldContext} from '../rules/item-effects.ts';
 import { moneyCap, changeMoney } from "../rules/economy.ts";
 import { InventorySession } from "./inventory-session.ts";
 import type { InventoryRequest, InventoryParent, InventoryOutcome } from "./inventory-session.ts";
-import { badgeCount } from "../rules/economy.ts";
+import { badgeCount, hasBadge } from "../rules/economy.ts";
 import { assertInventoryMapped, addItems, aggregateBag, inventoryPolicy } from "../rules/inventory.ts";
 import { catalogOf } from "../rules/item-catalog.ts";
 import { computedNature } from "../rules/member-metadata.ts";
@@ -52,6 +53,8 @@ export interface GameApplicationPorts<S extends BattleHandle> {
   /** The host's wall clock (WP06 §3), for the use cases that need the time; see `now()`. */
   clock?: ClockPort;
   creationContext?: () => CreationContext;
+  itemWorld?:()=>ItemWorldContext;
+  variables?:{count:()=>number;write:(id:number,value:string)=>void};
 }
 
 /** Stage configuration of the application (not ports: plain values the host reads from its settings). */
@@ -164,7 +167,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       return dex?.heldItem?.(id) ?? null;
     });
     this.management = new ManagementSession(this.ports.state, () => this.ports.content().content, { limits: this.limits, depositHeal: this.depositHeal, sourceAllowed: this.capabilities.allowHeldItemSources, describeItem: this.describeHeldItem });
-    this.inventory = new InventorySession(this.ports.state,()=>this.ports.content().content,{limits:this.limits,generation:()=>this.generation,install:next=>this.install(next),
+    this.inventory = new InventorySession(this.ports.state,()=>this.ports.content().content,{world:ports.itemWorld,variables:ports.variables,limits:this.limits,generation:()=>this.generation,install:next=>this.install(next),
       enter:parent=>{if(this.op||this.reception)throw new Error('operation-active');if(parent)this.management.reserveChild(parent.token);else if(this.management.active)throw new Error('management-active');},
       leave:parent=>{if(parent)this.management.releaseChild(parent.token);}});
   }
@@ -178,6 +181,17 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   moveInventorySort(token:string,to:number):InventoryOutcome { return this.inventory.moveSort(token,to); }
   endInventorySort(token:string,cancel=false):InventoryOutcome { return this.inventory.endSort(token,cancel); }
   queryItemUse(token:string,itemId:string,quantity=1,memberId?:string) { return this.inventory.queryUse(token,itemId,quantity,memberId); }
+  beginMoneyShop(input:Parameters<InventorySession['configureShop']>[1]):string {const token=this.inventory.begin('shop');try{this.inventory.configureShop(token,input);return token;}catch(error){this.inventory.end(token);throw error;}}
+  shopView(token:string){return this.inventory.shopView(token);}
+  shopQuote(token:string,itemId:string,selling=false){return this.inventory.quote(token,itemId,selling);}
+  setShopPrices(token:string,itemId:string,buy:number,sell?:number):void{this.inventory.setPrices(token,itemId,buy,sell);}
+  clearShopPrices(token:string):void{this.inventory.clearPrices(token);}
+  beginItemSelection(...args:Parameters<InventorySession['beginSelection']>){return this.inventory.beginSelection(...args);}
+  itemSelectionView(...args:Parameters<InventorySession['selectionView']>){return this.inventory.selectionView(...args);}
+  browseItemSelection(...args:Parameters<InventorySession['selectionBrowse']>){return this.inventory.selectionBrowse(...args);}
+  finishItemSelection(...args:Parameters<InventorySession['finishSelection']>){return this.inventory.finishSelection(...args);}
+  tossItems(...args:Parameters<InventorySession['toss']>){return this.inventory.toss(...args);}
+  queryBadges(index?:number):{count:number;owned?:boolean}{const game=this.ports.state.read();return {count:badgeCount(game.badges),...(index===undefined?{}:{owned:hasBadge(game.badges,index)})};}
   hasBoxLink():boolean {return this.inventory.hasBoxLink();}
 
   /** A new game: the formal empty state (no members; the player receives them through grants). Throws only if the store refuses. */

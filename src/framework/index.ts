@@ -52,3 +52,6 @@ export * as semantic from "./rules/semantic.ts";
 export * as memberMetadata from "./rules/member-metadata.ts";
 
 export * as economy from "./rules/economy.ts";
+
+export * as itemEffects from './rules/item-effects.ts';
+export * as shop from './rules/shop.ts';

@@ -37,3 +37,6 @@ export * as semantic from "./semantic.ts";
 export * as memberMetadata from "./member-metadata.ts";
 
 export * as economy from "./economy.ts";
+
+export * as itemEffects from './item-effects.ts';
+export * as shop from './shop.ts';

@@ -3,6 +3,7 @@ import { ITEM_ID, importantItem, legacyCatalog } from '../rules/item-catalog.ts'
 import type { FieldUse, ItemCatalog, ItemDefinition, ShopDefinition } from '../rules/item-catalog.ts';
 import { setOwn } from '../rules/own.ts';
 import type { ContentError } from './schema.ts';
+import { fieldEffectProblem } from '../rules/item-families.ts';
 
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const integer = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
@@ -37,6 +38,7 @@ export function checkItemInputs(rawItems: unknown, rawShops: unknown, usable: (i
     if (raw.effect !== undefined) {
       const e = raw.effect;
       if (!object(e) || typeof e.family !== 'string' || !e.family || !object(e.parameters) || Object.keys(e).some(k => !['family','parameters'].includes(k)) || Object.values(e.parameters).some(v => !['string','number','boolean'].includes(typeof v) || typeof v === 'number' && !Number.isSafeInteger(v))) problem('items.json', `${p}.effect`, 'must be {family,parameters} with plain scalar parameters');
+      else {const invalid=fieldEffectProblem(e as unknown as NonNullable<ItemDefinition['effect']>);if(invalid)problem('items.json',`${p}.effect.parameters`,invalid);}
     }
     if (errors.length !== before) continue;
     const item: ItemDefinition = { id: id as string, name: raw.name as string ?? 'Unnamed', namePlural: raw.namePlural as string ?? 'Unnamed', pocket: raw.pocket as number ?? 1,

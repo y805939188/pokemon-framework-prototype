@@ -1,4 +1,5 @@
 /** Item identity belongs to content; battle IDs, prices and display names are independent. */
+import { FIELD_EFFECTS } from './item-families.ts';
 import { BAG_ITEMS, BALLS } from './items.ts';
 import { own, setOwn } from './own.ts';
 
@@ -47,6 +48,12 @@ export function legacyCatalog(): ItemCatalog {
   for (const [id,pocket] of [['leftovers',1],['choiceband',1],['oranberry',5],['sitrusberry',5]] as const) {
     setOwn<ItemDefinition>(catalog,id,{id,name:'Unnamed',namePlural:'Unnamed',pocket,order:Object.keys(catalog).length,price:0,sellPrice:0,flags:pocket===5?['Berry']:[],fieldUse:'none',battleUse:'none',legacyIds:[id],consumable:true,source:'framework-legacy'});
   }
+  for (const [id,effect] of Object.entries(FIELD_EFFECTS)) {
+    const previous=own(catalog,id),berry=id.endsWith('berry');
+    setOwn<ItemDefinition>(catalog,id,{id,name:'Unnamed',namePlural:'Unnamed',pocket:berry?5:2,order:Object.keys(catalog).length,price:0,sellPrice:0,flags:berry?['Berry']:[],battleUse:'none',legacyIds:[id],consumable:true,source:'framework-spec-derived',...previous,fieldUse:effect.family==='sacred-ash'?'direct':'member',effect:JSON.parse(JSON.stringify(effect)) as ItemDefinition['effect']});
+  }
+  setOwn<ItemDefinition>(catalog,'premierball',{id:'premierball',name:'Unnamed',namePlural:'Unnamed',pocket:3,order:Object.keys(catalog).length,price:0,sellPrice:0,flags:['PokeBall','PremierBall'],fieldUse:'none',battleUse:'none',legacyIds:['premierball'],consumable:true,source:'framework-spec-derived'});
+  setOwn<ItemDefinition>(catalog,'box-link',{id:'box-link',name:'Unnamed',namePlural:'Unnamed',pocket:8,order:Object.keys(catalog).length,price:0,sellPrice:0,flags:['KeyItem','BoxLink'],fieldUse:'none',battleUse:'none',legacyIds:[],consumable:false,source:'framework-spec-derived'});
   return catalog;
 }
 const LEGACY = legacyCatalog();

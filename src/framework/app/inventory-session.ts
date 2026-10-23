@@ -1,8 +1,12 @@
 /** Process-local operation ownership, selection revisions and bounded completed receipts. No persistent journal. */
+import {planItemUse,itemReadiness,itemUseLimit} from '../rules/item-effects.ts';
+import type {ItemAnswers,ItemIntent,ItemWorldContext} from '../rules/item-effects.ts';
+import {planShop,filterShopStock,shopQuote,updatePrice,assertMutableStock} from '../rules/shop.ts';
+import type {ShopContext,ShopIntent} from '../rules/shop.ts';
 import { clone } from '../rules/value.ts';
 import { semanticFingerprint } from '../rules/semantic.ts';
-import { addItems, aggregateBag, inventoryPolicy, moveInventorySlot, removeItems } from '../rules/inventory.ts';
-import { catalogOf, hasFlag, itemOf } from '../rules/item-catalog.ts';
+import { addItems, aggregateBag, inventoryPolicy, moveInventorySlot, positiveQuantity, removeItems } from '../rules/inventory.ts';
+import { catalogOf, hasFlag, importantItem, itemOf } from '../rules/item-catalog.ts';
 import { changeMoney, moneyCap, setBadge } from '../rules/economy.ts';
 import { own, setOwn } from '../rules/own.ts';
 import type { GameState } from '../rules/state.ts';
@@ -18,10 +22,12 @@ export type InventoryRequest =
   | {kind:'remove-items';itemId:string;quantity:number;ticket?:InventoryTicket}
   | {kind:'change-money';amount:number}
   | {kind:'set-badge';index:number;owned:boolean}
-  | {kind:'browse';pocket:number;index:number};
-export interface InventoryOutcome { status:'committed'|'duplicate'|'unchanged'|'refused';requestId?:string;reason?:string;error?:string;presentation?:'ok'|'failed';result?:Record<string,unknown> }
-interface Context { token:string;generation:number;contentRevision:string;kind:'bag'|'item'|'shop';parent?:InventoryParent }
-interface Options { limits:Limits;generation:()=>number;enter:(parent?:InventoryParent)=>void;leave:(parent?:InventoryParent)=>void;install:(next:GameState)=>void }
+  | {kind:'browse';pocket:number;index:number}
+  | ({kind:'use-item';answers?:ItemAnswers;ticket?:InventoryTicket}&ItemIntent)
+  | ShopIntent;
+export interface InventoryOutcome { status:'committed'|'duplicate'|'unchanged'|'refused'|'pending'|'cancelled'|'selected';requestId?:string;reason?:string;error?:string;presentation?:'ok'|'failed';result?:Record<string,unknown> }
+interface Context { token:string;generation:number;contentRevision:string;kind:'bag'|'item'|'shop';parent?:InventoryParent;parentPartyIndex?:number }
+interface Options { world?:()=>ItemWorldContext;variables?:{count:()=>number;write:(id:number,value:string)=>void};limits:Limits;generation:()=>number;enter:(parent?:InventoryParent)=>void;leave:(parent?:InventoryParent)=>void;install:(next:GameState)=>void }
 const message=(error:unknown):string=>error instanceof Error?error.message:String(error);
 const reason=(error:unknown):string=>typeof error==='object'&&error!==null&&'reason'in error?String(error.reason):message(error);
 
@@ -32,16 +38,24 @@ export class InventorySession {
   private context:Context|null=null;
   private sorting:{pocket:number;start:number;cursor:number;order:number[];revision:string}|null=null;
   private filtering=false;
+  private readingProjection=false;
+  private shop:ShopContext|null=null;
+  private pendingUse:{requestId:string;fingerprint:string;revision:string;world:string;learning:boolean}|null=null;
+  private effectRevision=0n;
+  private observedEffect='';
+  private selectionSequence=0n;
+  private selection:{id:string;filter?:((item:ItemDefinition)=>boolean);variableId?:number;lastPocket:number;indices:number[]}|null=null;
+  private tossPending:{token:string;requestId:string}|null=null;
   private sequence=0n;
   private revision=0n;
   private observedInventory='';
   private readonly receipts=new Map<string,{fingerprint:string;outcome:InventoryOutcome}>();
   constructor(state:GameStatePort,content:()=>Content,options:Options){this.state=state;this.content=content;this.options=options;}
   get active():boolean{return this.context!==null;}
-  get saveBlocked():boolean{return this.context?.kind==='item';}
+  get saveBlocked():boolean{return this.context?.kind==='item'||!!this.pendingUse||!!this.tossPending;}
   private contentRevision(content:Content):string{return semanticFingerprint(clone(content));}
-  stateChanged(next:GameState):void{const value=JSON.stringify(next.inventory.pockets);if(value!==this.observedInventory){this.revision++;this.observedInventory=value;}}
-  invalidate():void{const parent=this.context?.parent;this.context=null;this.sorting=null;this.filtering=false;this.receipts.clear();this.options.leave(parent);}
+  stateChanged(next:GameState):void{const effect=JSON.stringify([next.party,next.inventory.pockets]);if(effect!==this.observedEffect){this.effectRevision++;this.observedEffect=effect;}const value=JSON.stringify(next.inventory.pockets);if(value!==this.observedInventory){this.revision++;this.observedInventory=value;}}
+  invalidate():void{const parent=this.context?.parent;this.context=null;this.shop=null;this.pendingUse=null;this.selection=null;this.tossPending=null;this.sorting=null;this.filtering=false;this.receipts.clear();this.options.leave(parent);}
   begin(kind:'bag'|'item'|'shop'='bag',parent?:InventoryParent):string{
     if(this.context)throw new Error('inventory-operation-active');
     if(!['bag','item','shop'].includes(kind)||parent&&kind!=='item')throw new Error('invalid-operation-context');
@@ -52,10 +66,11 @@ export class InventorySession {
       for(const pocket of game.inventory.pockets)for(const slot of pocket)if(!itemOf(catalogOf(content),slot.itemId))throw new Error('unmapped-item');
       const revision=this.contentRevision(content);this.stateChanged(game);
       const token=`inventory:${this.options.generation()}:${++this.sequence}`;
-      this.context={token,generation:this.options.generation(),contentRevision:revision,kind,...(parent?{parent:clone(parent)}:{})};this.receipts.clear();return token;
+      this.context={token,generation:this.options.generation(),contentRevision:revision,kind,...(parent?{parent:clone(parent),parentPartyIndex:game.party.findIndex(m=>m.id===parent.memberId)}:{})};this.receipts.clear();return token;
     } catch(error) {this.options.leave(parent);throw error;}
   }
   end(token:string):InventoryOutcome{
+    if(this.readingProjection)return {status:'refused',reason:'projection-active'};
     if(this.context?.token!==token)return {status:'refused',reason:'stale-operation'};
     if(this.sorting){const cancelled=this.endSort(token,true);if(cancelled.status==='refused'){this.invalidate();return cancelled;}}
     this.invalidate();return {status:'unchanged'};
@@ -66,17 +81,22 @@ export class InventorySession {
     const content=this.content();
     if(context.contentRevision!==this.contentRevision(content)){this.invalidate();throw new Error('stale-content');}
     const game=this.state.read();this.stateChanged(game);
-    if(context.parent&&!game.party.some(member=>member.id===context.parent!.memberId&&!member.isEgg))throw new Error('stale-target');
+    if(context.parent&&(game.party[context.parentPartyIndex!]?.id!==context.parent.memberId||game.party[context.parentPartyIndex!]?.isEgg))throw new Error('stale-target');
     return {game,content,context};
   }
   snapshot(token:string,filter?:(item:ItemDefinition)=>boolean):{pockets:{item:ItemDefinition;quantity:number;index:number}[][];lastPocket:number;indices:number[];revision:string}{
+    if(this.readingProjection)throw new Error('projection-active');
     const {game,content}=this.current(token),catalog=catalogOf(content);
     this.filtering=!!filter;
-    const pockets=game.inventory.pockets.map(pocket=>pocket.flatMap((slot,index)=>{
+    this.readingProjection=true;
+    try{const pockets=game.inventory.pockets.map(pocket=>pocket.flatMap((slot,index)=>{
       const item=itemOf(catalog,slot.itemId);if(!item)throw new Error('unmapped-item');
-      return !filter||filter(clone(item))?[{item:clone(item),quantity:slot.quantity,index}]:[];
+      const matches=filter?filter(clone(item)):true;if(typeof matches!=='boolean')throw new Error('invalid-filter-result');
+      return matches?[{item:clone(item),quantity:slot.quantity,index}]:[];
     }));
+    this.current(token);
     return clone({pockets,lastPocket:game.inventory.lastPocket,indices:game.inventory.indices,revision:String(this.revision)});
+    }finally{this.readingProjection=false;}
   }
   ticket(token:string,pocket:number,index:number):InventoryTicket{
     const {game,context}=this.current(token);
@@ -91,6 +111,7 @@ export class InventorySession {
   execute(token:string,requestId:string,request:InventoryRequest,present?:(outcome:InventoryOutcome)=>void):InventoryOutcome{
     let data:ReturnType<InventorySession['current']>,fingerprint:string;
     try{
+      if(this.readingProjection)throw new Error('projection-active');
       data=this.current(token);
       if(typeof requestId!=='string'||!requestId||requestId.length>64)throw new Error('invalid-request-id');
       fingerprint=semanticFingerprint(request);
@@ -100,9 +121,22 @@ export class InventorySession {
     if(this.receipts.size>=256)return {status:'refused',reason:'session-request-limit'};
     const {game,content,context}=data;let next=clone(game),result:Record<string,unknown>;
     try{
-      if(this.sorting&&['add-items','remove-items','browse'].includes(request.kind))throw new Error('sorting-active');
-      if(context.kind==='item')throw new Error('item-effect-not-ready'); // E installs effects after M1; never a generic write callback.
+      if(this.selection||this.tossPending)throw new Error('operation-pending');
+      if(this.pendingUse&&(request.kind!=='use-item'||this.pendingUse.requestId!==requestId))throw new Error('item-pending');
+      if(this.sorting&&['add-items','remove-items','browse','use-item','buy','sell'].includes(request.kind))throw new Error('sorting-active');
+      if(context.kind==='item'&&request.kind!=='use-item')throw new Error('item-context-only');
       switch(request.kind){
+        case 'use-item':{
+          if(context.kind==='shop')throw new Error('wrong-operation');if(request.ticket)this.checkTicket(token,request.ticket);if(request.ticket&&request.ticket.itemId!==request.itemId)throw new Error('stale-slot');if(context.parent&&request.memberId!==undefined&&request.memberId!==context.parent.memberId)throw new Error('invalid-target');
+          const {answers,...base}=request,world=clone(this.options.world?.()??{}),identity=semanticFingerprint(base),revision=String(this.effectRevision),worldRevision=semanticFingerprint(world);
+          if(JSON.stringify(this.current(token).game)!==JSON.stringify(game))throw new Error('stale-item-selection');
+          if(this.pendingUse&&(this.pendingUse.fingerprint!==identity||this.pendingUse.revision!==revision||this.pendingUse.world!==worldRevision)){this.pendingUse=null;throw new Error('stale-item-selection');}
+          if(this.pendingUse?.learning&&(answers?.cancelled===true||answers?.confirmed===false))throw new Error('learning-choice-required');
+          const planned=planItemUse(game,content,{itemId:request.itemId,quantity:request.quantity,...(context.parent?.memberId??request.memberId?{memberId:context.parent?.memberId??request.memberId}:{})},answers,world);
+          if(planned.status==='pending'){this.pendingUse={requestId,fingerprint:identity,revision,world:worldRevision,learning:planned.selection.kind==='learn'||planned.selection.kind==='give-up'};return {status:'pending',requestId,result:{selection:clone(planned.selection)}};}
+          if(planned.status==='cancelled'){this.pendingUse=null;return {status:'cancelled',requestId};}next=planned.state;result={...planned.result};break;
+        }
+        case 'buy':case 'sell':{if(context.kind!=='shop'||!this.shop)throw new Error('shop-not-open');const planned=planShop(game,content,this.shop,request,this.options.limits);if(planned.status==='cancelled')return {status:'cancelled',requestId};if(planned.status==='pending')return {status:'pending',requestId,result:{quote:planned.quote}};next=planned.state;result=planned.result;break;}
         case 'add-items':{
           if(request.claimId!==undefined&&(!/^[A-Za-z0-9#._:-]{1,64}$/.test(request.claimId)))throw new Error('invalid-claim-id');
           if(request.claimId&&own(game.claims,request.claimId)){next=game;result={claim:'already-claimed'};break;}
@@ -123,20 +157,60 @@ export class InventorySession {
         default:throw new Error('unknown-inventory-request');
       }
     }catch(error){return {status:'refused',reason:reason(error),error:message(error)};}
+    // Validate the caller-owned stock before installing resources. No fallible catalog work follows replace.
+    let filteredStock:string[]|undefined;
+    try{if(this.shop){assertMutableStock(this.shop.stock);filteredStock=[...this.shop.stock];filterShopStock(next,content,filteredStock);}}
+    catch(error){return {status:'refused',reason:reason(error),error:message(error)};}
     const changed=JSON.stringify(next)!==JSON.stringify(game);
     if(changed)try{this.options.install(next);}catch(error){return {status:'refused',reason:'commit-failed',error:message(error)};}
+    this.pendingUse=null;
     const outcome:InventoryOutcome={status:changed?'committed':'unchanged',requestId,result};
     this.receipts.set(requestId,{fingerprint,outcome:clone(outcome)});
+    // The session takes ownership of an ordinary mutable array; invalid/frozen arrays are rejected at entry.
+    if(this.shop&&filteredStock)try{this.shop.stock.splice(0,this.shop.stock.length,...filteredStock);}catch(error){return {...outcome,presentation:'failed',error:`stock-update-failed: ${message(error)}`};}
     return this.present(outcome,present);
   }
   private present(outcome:InventoryOutcome,present?: (outcome:InventoryOutcome)=>void):InventoryOutcome{
     try{present?.(clone(outcome));return {...clone(outcome),presentation:'ok'};}catch(error){return {...clone(outcome),presentation:'failed',error:message(error)};}
   }
+  configureShop(token:string,input:{shopId?:string;stock?:string[];allowSell?:boolean}):void {
+    const {game,content,context}=this.current(token);if(context.kind!=='shop')throw new Error('wrong-operation');if(this.shop)throw new Error('shop-already-open');
+    if(!input||typeof input!=='object'||Array.isArray(input)||input.allowSell!==undefined&&typeof input.allowSell!=='boolean'||input.shopId!==undefined&&(typeof input.shopId!=='string'||!input.shopId||input.stock!==undefined))throw new Error('invalid-shop');
+    const definition=input.shopId?own(content.shops,input.shopId):undefined;if(input.shopId&&!definition)throw new Error('unknown-shop');
+    const stock=definition?[...definition.stock]:input.stock;assertMutableStock(stock);if(stock.some(id=>typeof id!=='string'||!itemOf(catalogOf(content),id)))throw new Error('invalid-stock');
+    const shop:ShopContext={stock,allowSell:input.allowSell??definition?.allowSell??true,overrides:clone(definition?.overrides??{}),revision:0};filterShopStock(game,content,shop.stock);this.shop=shop;
+  }
+  shopView(token:string):{stock:string[];allowSell:boolean;revision:number}{const {game,content}=this.current(token);if(!this.shop)throw new Error('shop-not-open');filterShopStock(game,content,this.shop.stock);return clone({stock:this.shop.stock,allowSell:this.shop.allowSell,revision:this.shop.revision});}
+  quote(token:string,itemId:string,selling=false){const {game,content}=this.current(token);if(!this.shop)throw new Error('shop-not-open');return shopQuote(game,content,this.shop,itemId,selling,this.options.limits);}
+  setPrices(token:string,itemId:string,buy:number,sell?:number):void {const {content}=this.current(token);if(!this.shop)throw new Error('shop-not-open');if(!itemOf(catalogOf(content),itemId))throw new Error('unknown-item');setOwn(this.shop.overrides,itemId,updatePrice(own(this.shop.overrides,itemId),buy,sell));this.shop.revision++;}
+  clearPrices(token:string):void{this.current(token);if(!this.shop)throw new Error('shop-not-open');this.shop.overrides={};this.shop.revision++;}
+  beginSelection(token:string,filter?:(item:ItemDefinition)=>boolean,variableId?:number):string {
+    const {game,context}=this.current(token);if(context.kind!=='bag'||this.selection||this.pendingUse||this.sorting||this.tossPending||this.readingProjection)throw new Error('selection-unavailable');
+    if(filter!==undefined&&typeof filter!=='function')throw new Error('invalid-filter');
+    if(variableId!==undefined&&(!this.options.variables||!Number.isInteger(variableId)||variableId<1||variableId>this.options.variables.count()))throw new Error('invalid-variable');
+    this.snapshot(token,filter);const id=`${token}:select:${++this.selectionSequence}`;this.selection={id,filter,variableId,lastPocket:filter?1:game.inventory.lastPocket,indices:filter?Array(8).fill(0) as number[]:[...game.inventory.indices]};return id;
+  }
+  selectionView(token:string,selectionId:string){if(this.selection?.id!==selectionId)throw new Error('stale-selection');const view=this.snapshot(token,this.selection.filter);return {...view,lastPocket:this.selection.lastPocket,indices:[...this.selection.indices]};}
+  selectionBrowse(token:string,selectionId:string,pocket:number,index:number):void {if(this.readingProjection)throw new Error('projection-active');const view=this.selectionView(token,selectionId);if(!Number.isInteger(pocket)||pocket<1||pocket>8||!Number.isInteger(index)||index<0||index>view.pockets[pocket-1]!.length)throw new Error('invalid-cursor');this.selection!.lastPocket=pocket;this.selection!.indices[pocket-1]=index;}
+  finishSelection(token:string,selectionId:string,requestId:string,itemId:string|null):InventoryOutcome {
+    try{if(this.readingProjection)throw new Error('projection-active');this.current(token);if(typeof requestId!=='string'||!requestId||requestId.length>64)throw new Error('invalid-request-id');const fingerprint=semanticFingerprint({kind:'select-item',selectionId,itemId}),old=this.receipts.get(requestId);if(old)return old.fingerprint===fingerprint?{...clone(old.outcome),status:'duplicate'}:{status:'refused',reason:'request-conflict'};
+      if(this.receipts.size>=256)throw new Error('session-request-limit');const selection=this.selection;if(selection?.id!==selectionId)throw new Error('stale-selection');const view=this.selectionView(token,selectionId);if(itemId!==null&&!view.pockets.flat().some(row=>row.item.id===itemId&&row.quantity>0))throw new Error('invalid-selection');
+      if(selection.variableId!==undefined){if(!this.options.variables||selection.variableId>this.options.variables.count())throw new Error('invalid-variable');this.options.variables.write(selection.variableId,itemId??'');this.current(token);if(this.selection!==selection)throw new Error('stale-selection');}
+      const outcome:InventoryOutcome={status:itemId===null?'cancelled':'selected',result:{status:itemId===null?'cancelled':'selected',itemId:itemId??''}};this.receipts.set(requestId,{fingerprint,outcome:clone(outcome)});this.selection=null;this.filtering=false;return outcome;
+    }catch(error){return {status:'refused',reason:reason(error),error:message(error)};}
+  }
+  async toss(token:string,requestId:string,itemId:string,quantity:number,ticket:InventoryTicket,confirmed:boolean,before:(details:{itemId:string;quantity:number})=>void|Promise<void>,present?:(outcome:InventoryOutcome)=>void):Promise<InventoryOutcome>{
+    const request:InventoryRequest={kind:'remove-items',itemId,quantity,ticket};
+    try{const {game,content,context}=this.current(token);if(context.kind!=='bag'||this.selection||this.pendingUse||this.sorting||this.tossPending||this.readingProjection)throw new Error('operation-pending');if(typeof confirmed!=='boolean')throw new Error('invalid-confirmation');if(!confirmed)return {status:'cancelled'};if(typeof requestId!=='string'||!requestId||requestId.length>64)throw new Error('invalid-request-id');const old=this.receipts.get(requestId);if(old)return this.execute(token,requestId,request,present);if(this.receipts.size>=256)throw new Error('session-request-limit');const item=itemOf(catalogOf(content),itemId);if(!item||importantItem(item))throw new Error('cannot-toss');this.checkTicket(token,ticket);if(ticket.itemId!==itemId)throw new Error('stale-slot');positiveQuantity(quantity);removeItems(game.inventory,itemId,quantity,catalogOf(content));const pending={token,requestId};this.tossPending=pending;
+      try{await before({itemId,quantity});}catch(error){return {status:'refused',reason:'pre-message-failed',error:message(error)};}finally{if(this.tossPending===pending)this.tossPending=null;}
+      return this.execute(token,requestId,request,present);
+    }catch(error){return {status:'refused',reason:reason(error),error:message(error)};}
+  }
   /** Runtime sorting intent contains a permutation, never a saved game snapshot. */
   beginSort(token:string,pocket:number,index:number,filtered=false):InventoryOutcome {
     try {
       const {game,content,context}=this.current(token);
-      if(context.kind!=='bag'||filtered||this.filtering||this.sorting)throw new Error('sorting-disabled');
+      if(context.kind!=='bag'||filtered||this.filtering||this.sorting||this.pendingUse||this.selection||this.tossPending||this.readingProjection)throw new Error('sorting-disabled');
       moveInventorySlot(game.inventory,pocket,index,index,inventoryPolicy(content,this.options.limits));
       this.sorting={pocket,start:index,cursor:index,order:game.inventory.pockets[pocket-1]!.map((_,i)=>i),revision:String(this.revision)};
       return {status:'unchanged',result:{pocket,index}};
@@ -144,6 +218,7 @@ export class InventorySession {
   }
   moveSort(token:string,to:number):InventoryOutcome {
     try {
+      if(this.readingProjection)throw new Error('projection-active');
       const {game,content}=this.current(token),sort=this.sorting;
       if(!sort||sort.revision!==String(this.revision))throw new Error('stale-sort');
       const next=clone(game);
@@ -156,6 +231,7 @@ export class InventorySession {
   }
   endSort(token:string,cancel=false):InventoryOutcome {
     try {
+      if(this.readingProjection)throw new Error('projection-active');
       const {game}=this.current(token),sort=this.sorting;
       if(!sort||sort.revision!==String(this.revision)){this.sorting=null;throw new Error('stale-sort');}
       if(cancel){
@@ -171,14 +247,25 @@ export class InventorySession {
     const game=this.state.read(),catalog=catalogOf(this.content()),counts=aggregateBag(game.inventory);
     return Object.values(catalog).some(item=>hasFlag(item,'BoxLink')&&(own(counts,item.id)??0)>0);
   }
-  queryUse(token:string,itemId:string,quantity:number,memberId?:string):{ready:false;eligible:'unknown'|'ineligible';reason:string}{
+  queryUse(token:string,itemId:string,quantity:number,memberId?:string):{ready:boolean;eligible:'eligible'|'unknown'|'ineligible';reason:string;maximum?:number}{
+    let ready=false;
     try{
-      const {game,content,context}=this.current(token),item=itemOf(catalogOf(content),itemId);
-      if(!item)throw new Error('unknown-item');
-      if(!Number.isSafeInteger(quantity)||quantity<1||item.effect?.family==='rare-candy'&&quantity!==1)throw new Error('invalid-quantity');
-      const id=context.parent?.memberId??memberId;
-      if(id!==undefined&&!game.party.some(m=>m.id===id&&!m.isEgg))throw new Error('invalid-target');
-      return {ready:false,eligible:'unknown',reason:'not-ready'};
-    }catch(error){return {ready:false,eligible:'ineligible',reason:reason(error)};}
+      const {game,content,context}=this.current(token);
+      if(!itemReadiness(content,itemId))return {ready:false,eligible:'unknown',reason:'not-ready'};
+      ready=true;positiveQuantity(quantity);
+      const family=itemOf(catalogOf(content),itemId)!.effect!.family;
+      if(family==='rare-candy'&&quantity!==1)throw new Error('invalid-quantity');
+      if(context.parent&&memberId!==undefined&&memberId!==context.parent.memberId)throw new Error('invalid-target');
+      const target=context.parent?.memberId??memberId;
+      if(!target&&family!=='sacred-ash')return {ready:true,eligible:'unknown',reason:'target-required'};
+      const world=clone(this.options.world?.()??{}),intent={itemId,quantity,...(target?{memberId:target}:{})};
+      const maximum=itemUseLimit(game,content,intent,world),planned=planItemUse(game,content,intent,{confirmed:true},world);
+      if(planned.status==='pending'&&planned.selection.kind==='move'){
+        const moves=game.party.find(m=>m.id===target)?.moves??[];
+        const canUse=moves.some((_,moveIndex)=>{try{return planItemUse(game,content,intent,{confirmed:true,moveIndex},world).status==='ready';}catch{return false;}});
+        if(!canUse)return {ready:true,eligible:'ineligible',reason:'no-effect',maximum};
+      }
+      return {ready:true,eligible:'eligible',reason:planned.status==='pending'?'selection-required':'ready',maximum};
+    }catch(error){const why=reason(error);return {ready:ready&&why!=='evolution-not-ready',eligible:ready&&why!=='evolution-not-ready'?'ineligible':'unknown',reason:why};}
   }
 }

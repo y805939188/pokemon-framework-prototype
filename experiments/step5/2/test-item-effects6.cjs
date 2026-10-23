@@ -1,0 +1,109 @@
+'use strict';
+// Formal-spec-derived expected values over synthetic author records, not a run of the reference program.
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const {E,clone,setup,maxHp,plan,count}=require('./ef-support.cjs');
+const zero={hp:0,atk:0,def:0,spa:0,spd:0,spe:0};
+const refusal=(fn,reason)=>assert.throws(fn,e=>e.reason===reason||e.message===reason);
+
+for(const [id,on,off]of [['potion',20,20],['berryjuice',20,20],['sweetheart',20,20],['superpotion',60,50],['hyperpotion',120,200],['freshwater',30,50],['sodapop',50,60],['lemonade',70,80],['moomoomilk',100,100],['oranberry',10,10],['energypowder',60,50],['energyroot',120,200]])test('P52-12 healing amount/config/identity '+id,()=>{
+ for(const [flag,amount]of [[true,on],[false,off]]){
+  const x=setup({bag:{[id]:2},settings:{REBALANCED_HEALING_ITEM_AMOUNTS:flag},edit:g=>{g.party[0].hp=1;}}),before=clone(x.game),r=plan(x,id);
+  assert.equal(r.status,'ready');assert.equal(r.state.party[0].hp,Math.min(maxHp(x.game.party[0],x.content),1+amount));assert.equal(r.result.actualHp,r.state.party[0].hp-1);assert.equal(count(r.state,id,x.content),1);assert.deepEqual(x.game,before);
+ }
+});
+test('P52-12 Sitrus floors live max101/105; wrong/empty/full/fainted do not consume',()=>{
+ for(const [base,max,after]of [[26,101,26],[30,105,27]]){const x=setup({bag:{sitrusberry:1},edit:(g,c)=>{c.species.Charizard.base.hp=base;g.party[0].hp=1;}});assert.equal(maxHp(x.game.party[0],x.content),max);assert.equal(plan(x,'sitrusberry').state.party[0].hp,after);}
+ const x=setup({bag:{potion:1}});refusal(()=>plan(x,'potion'),'no-effect');x.game.party[0].hp=0;refusal(()=>plan(x,'potion'),'no-effect');refusal(()=>plan(x,'potion',2),'quantity-exceeds-limit');refusal(()=>plan(x,'unknown'),'unknown-item');assert.equal(plan(x,'potion',1,{cancelled:true}).status,'cancelled');assert.equal(count(x.game,'potion',x.content),1);
+});
+for(const [id,status]of [['antidote','psn'],['pechaberry','psn'],['burnheal','brn'],['rawstberry','brn'],['paralyzeheal','par'],['parlyzheal','par'],['cheriberry','par'],['awakening','slp'],['chestoberry','slp'],['blueflute','slp'],['iceheal','frz'],['aspearberry','frz']])test('P52-12 status identity '+id,()=>{
+ const x=setup({bag:{[id]:2},edit:g=>{g.party[0].status=status;g.party[0].statusCount=3;}}),r=plan(x,id);assert.equal(r.state.party[0].status,'');assert.equal(r.state.party[0].statusCount,0);assert.equal(r.state.party[0].hp,x.game.party[0].hp);x.game.party[0].status=status==='psn'?'brn':'psn';refusal(()=>plan(x,id),'no-effect');x.game.party[0].hp=0;refusal(()=>plan(x,id),'no-effect');
+});
+for(const id of ['fullheal','lavacookie','oldgateau','casteliacone','lumiosegalette','shaloursable','bigmalasada','pewtercrunchies','lumberry','healpowder','ragecandybar'])test('P52-12 full status family '+id,()=>{
+ const x=setup({bag:{[id]:1},edit:g=>{g.party[0].status='tox';g.party[0].statusCount=2;}});assert.equal(plan(x,id).state.party[0].status,'');x.game.party[0].status='';refusal(()=>plan(x,id),'no-effect');
+});
+test('P52-12 full restore, revives, ash and rage alternate family',()=>{
+ let x=setup({bag:{fullrestore:1},edit:g=>{g.party[0].status='brn';}});assert.equal(plan(x,'fullrestore').state.party[0].status,'');x.game.party[0].status='';refusal(()=>plan(x,'fullrestore'),'no-effect');
+ for(const id of ['revive','maxrevive','maxhoney','revivalherb']){x=setup({bag:{[id]:1},edit:g=>{g.party[0].hp=0;g.party[0].status='psn';g.party[0].statusCount=2;}});const r=plan(x,id),m=r.state.party[0];assert.equal(m.hp,id==='revive'?Math.max(1,Math.floor(maxHp(m,x.content)/2)):maxHp(m,x.content));assert.equal(m.status,'');assert.equal(m.statusCount,0);assert.equal(m.friendship,id==='revivalherb'?55:70);x.game.party[0].hp=1;refusal(()=>plan(x,id),'no-effect');}
+ x=setup({bag:{sacredash:1},edit:g=>{g.party[0].hp=0;g.party[0].moves[0].pp=0;g.party[1].hp=0;g.party[2].hp=1;}});const r=plan(x,'sacredash');assert.equal(r.state.party[0].hp,maxHp(r.state.party[0],x.content));assert.equal(r.state.party[0].moves[0].pp,15);assert.equal(r.state.party[1].hp,maxHp(r.state.party[1],x.content));assert.equal(r.state.party[2].hp,1);assert.equal(count(r.state,'sacredash',x.content),0);
+ x=setup({bag:{ragecandybar:1},settings:{RAGE_CANDY_BAR_CURES_STATUS_PROBLEMS:false},edit:g=>{g.party[0].hp=1;g.party[0].status='brn';}});assert.equal(plan(x,'ragecandybar').state.party[0].hp,21);assert.equal(plan(x,'ragecandybar').state.party[0].status,'brn');
+});
+for(const id of ['ether','leppaberry','maxether','elixir','maxelixir'])test('P52-13 PP restoration fainted '+id,()=>{
+ const x=setup({bag:{[id]:1},edit:g=>{g.party[0].hp=0;g.party[0].moves[0].pp=1;g.party[0].moves[1].pp=2;}}),before=clone(x.game),single=!id.includes('elixir'),r=plan(x,id,1,{moveIndex:0}),m=r.state.party[0];
+ assert.equal(m.hp,0);assert.equal(m.moves[0].pp,id.startsWith('max')?15:11);assert.equal(m.moves[1].pp,single?2:id.startsWith('max')?15:12);assert.equal(count(r.state,id,x.content),0);assert.deepEqual(x.game,before);assert.equal(plan(x,id,1,{cancelled:true}).status,'cancelled');if(single)assert.equal(plan(x,id).selection.kind,'move');
+});
+test('P52-13 PP Up/Max metadata current PP, count cap, single PP and no-effect',()=>{
+ const x=setup({bag:{ppup:5,ppmax:1,ether:1}});let game=x.game;for(let i=1;i<=3;i++){const r=E.itemEffects.planItemUse(game,x.content,{itemId:'ppup',quantity:1,memberId:game.party[0].id},{moveIndex:0});game=r.state;assert.equal(game.party[0].moves[0].ppUps,i);assert.equal(game.party[0].moves[0].maxpp,15+i*3);assert.equal(game.party[0].moves[0].pp,15);}refusal(()=>E.itemEffects.planItemUse(game,x.content,{itemId:'ppup',quantity:1,memberId:game.party[0].id},{moveIndex:0}),'no-effect');assert.equal(plan(x,'ppmax',1,{moveIndex:0}).state.party[0].moves[0].maxpp,24);
+ x.content.moves.flamethrower.pp=1;x.game.party[0].moves[0]={id:'flamethrower',pp:1,maxpp:1,ppUps:0};refusal(()=>plan(x,'ppup',1,{moveIndex:0}),'no-effect');refusal(()=>plan(x,'ether',1,{moveIndex:0}),'no-effect');refusal(()=>plan(x,'ether',1,{moveIndex:99}),'invalid-move');
+});
+for(const [stat,vit,feather,berry]of [['hp','hpup','health','pomeg'],['atk','protein','muscle','kelpsy'],['def','iron','resist','qualot'],['spa','calcium','genius','hondew'],['spd','zinc','clever','grepa'],['spe','carbos','swift','tamato']])test('P52-14/15 six semantic mappings '+stat,()=>{
+ for(const [id,q,delta]of [[vit,2,20],[feather+'feather',2,2],[feather+'wing',2,2],[berry+'berry',2,-20]]){const x=setup({bag:{[id]:3},edit:g=>{g.party[0].evs={...zero,[stat]:30};}}),r=plan(x,id,q),m=r.state.party[0];assert.equal(m.evs[stat],30+delta);for(const k of Object.keys(zero).filter(k=>k!==stat))assert.equal(m.evs[k],0);assert.equal(count(r.state,id,x.content),1);}
+});
+test('P52-14 incremental caps preserve trusted255; Gen7 threshold and quantity switch',()=>{
+ const x=setup({bag:{protein:10},edit:g=>{g.party[0].evs={...zero,hp:255,atk:250};}});assert.equal(E.itemEffects.itemUseLimit(x.game,x.content,{itemId:'protein',quantity:1,memberId:x.game.party[0].id}),1);const r=plan(x,'protein');assert.equal(r.state.party[0].evs.atk,252);assert.equal(r.state.party[0].evs.hp,255);refusal(()=>plan(x,'protein',2),'quantity-exceeds-limit');
+ const y=setup({bag:{protein:10},settings:{NO_VITAMIN_EV_CAP:false},edit:g=>{g.party[0].evs={...zero,atk:95};}});assert.equal(plan(y,'protein').state.party[0].evs.atk,100);y.game.party[0].evs.atk=100;refusal(()=>plan(y,'protein'),'no-effect');
+ const z=setup({bag:{protein:5},settings:{USE_MULTIPLE_STAT_ITEMS_AT_ONCE:false}});refusal(()=>plan(z,'protein',2),'quantity-exceeds-limit');
+});
+test('P52-14/15 HP EV delta positive, negative, zero; other stats never revive',()=>{
+ for(const [id,ev,hp,expected]of [['hpup',0,0,1],['protein',0,0,0],['pomegberry',250,0,0],['pomegberry',250,1,1]]){const x=setup({bag:{[id]:1},edit:g=>{g.party[0].evs={...zero,hp:ev};g.party[0].hp=hp;}});assert.equal(plan(x,id).state.party[0].hp,expected);}
+ const x=setup({bag:{hpup:1},edit:(g,c)=>{c.species.Charizard.base.hp=1;g.party[0].hp=0;}});assert.equal(plan(x,'hpup').state.party[0].hp,0);
+});
+test('P52-15 berries multi25/config, simulated max and friendship modifier order',()=>{
+ const x=setup({bag:{pomegberry:25},edit:g=>{g.party[0].evs={...zero,hp:250};g.party[0].friendship=255;}});const intent={itemId:'pomegberry',quantity:25,memberId:x.game.party[0].id};assert.equal(E.itemEffects.itemUseLimit(x.game,x.content,intent),25);const r=plan(x,'pomegberry',25);assert.equal(r.state.party[0].evs.hp,0);assert.equal(r.state.party[0].friendship,255);assert.equal(count(r.state,'pomegberry',x.content),0);x.content.settings.USE_MULTIPLE_STAT_ITEMS_AT_ONCE=false;assert.equal(plan(x,'pomegberry').state.party[0].evs.hp,240);refusal(()=>plan(x,'pomegberry',25),'quantity-exceeds-limit');x.game.party[0].evs.hp=0;refusal(()=>plan(x,'pomegberry'),'no-effect');
+ const y=setup({bag:{protein:1},world:{mapId:7},edit:g=>{const m=g.party[0];m.friendship=99;m.origin.map=7;m.ball='luxuryball';m.item='soothebell';}});assert.equal(plan(y,'protein').state.party[0].friendship,109); // floor((5+1+1)*1.5)=10
+ const m=clone(y.game.party[0]);m.friendship=178;y.content.settings.AFFECTION_EFFECTS=true;E.itemEffects.changeFriendship(m,'vitamin',y.content,y.world);assert.equal(m.friendship,179);E.itemEffects.changeFriendship(m,'evberry',y.content,y.world);assert.equal(m.friendship,189);m.friendship=200;E.itemEffects.changeFriendship(m,'powder',y.content,y.world);assert.equal(m.friendship,190);
+});
+test('P52-16 fixed Lonely/Brave mint stats, original identity and battle view',()=>{
+ for(const [id,expected]of [['lonelymint',[120,75,62,85,85,65]],['bravemint',[120,75,69,85,85,58]]]){
+  const x=setup({bag:{[id]:1},edit:(g,c)=>{c.species.Charizard.base={hp:45,atk:49,def:49,spa:65,spd:65,spe:45};g.party[0].nature='hardy';g.party[0].hp=70;}}),before=clone(x.game.party[0]);assert.equal(plan(x,id).selection.kind,'confirm');assert.equal(plan(x,id,1,{confirmed:false}).status,'cancelled');const m=plan(x,id,1,{confirmed:true}).state.party[0];assert.equal(m.nature,'hardy');assert.equal(m.hp,70);assert.equal(m.personalID,before.personalID);assert.deepEqual(m.owner,before.owner);assert.deepEqual(Object.values(E.growth.computeStats(x.content.species.Charizard.base,m.ivs,m.evs,m.level,E.memberMetadata.computedNature(m))),expected);assert.equal(E.speciesKey.battleView({...x.game,party:[m]},x.content).party[0].nature,id.replace('mint',''));
+ }
+});
+test('P52-17 capsule and patch candidate message differs from actual resolver',()=>{
+ const x=setup({bag:{abilitycapsule:2,abilitypatch:2}});assert.equal(plan(x,'abilitycapsule').selection.kind,'confirm');let r=plan(x,'abilitycapsule',1,{confirmed:true});assert.equal(r.state.party[0].abilityIndex,1);assert.equal(r.result.abilityChange.candidate,'Solar Power');r=plan(x,'abilitypatch',1,{confirmed:true});assert.equal(r.state.party[0].abilityIndex,2);assert.equal(r.result.abilityChange.resolved,'Hidden Power');
+ x.content.species.Charizard.hiddenAbilities=[];x.content.species.Charizard.abilities.push('Third Natural');x.game.party[0].personalID=0;r=plan(x,'abilitypatch',1,{confirmed:true});assert.equal(r.result.abilityChange.candidate,'Third Natural');assert.equal(r.result.abilityChange.resolved,'Blaze');assert.equal(r.result.abilityChange.effectiveIndex,0);
+ x.content.species.Charizard.hiddenAbilities=['Last Hidden'];assert.equal(plan(x,'abilitypatch',1,{confirmed:true}).result.abilityChange.candidate,'Last Hidden');x.content.species.Charizard.abilities.pop();x.content.species.Charizard.hiddenAbilities=[null,'Only Index3'];refusal(()=>plan(x,'abilitypatch',1,{confirmed:true}),'no-effect');x.content.species.Charizard.ruleSpecies='Zygarde';refusal(()=>plan(x,'abilitycapsule',1,{confirmed:true}),'no-effect');
+});
+test('P52-18/46 rare q1 exact L/EXP/h99, q2/q3 all config reject zero state/RNG',()=>{
+ for(const enabled of [false,true]){const x=setup({bag:{rarecandy:5},settings:{USE_MULTIPLE_STAT_ITEMS_AT_ONCE:enabled},edit:(g,c)=>{c.species.Charizard.growth='medium';Object.assign(g.party[0],{level:10,exp:1000,hp:1,friendship:99});}}),before=clone(x.game),r=plan(x,'rarecandy');assert.equal(r.state.party[0].level,11);assert.equal(r.state.party[0].exp,1331);assert.equal(r.state.party[0].friendship,104);assert.equal(count(r.state,'rarecandy',x.content),4);assert.deepEqual(r.state.stats,x.game.stats);for(const q of [2,3,0,-1,1.5,NaN,Infinity]){refusal(()=>plan(x,'rarecandy',q),'invalid-quantity');refusal(()=>plan(x,'rarecandy',q,{cancelled:true}),'invalid-quantity');}assert.deepEqual(x.game,before);assert.equal(x.draws,0);}
+});
+for(const [id,u]of [['expcandyxs',100],['expcandys',800],['expcandym',3000],['expcandyl',10000],['expcandyxl',30000]])test('P52-18 XP unit and qty combined '+id,()=>{
+ const x=setup({bag:{[id]:5},edit:(g,c)=>{c.species.Charizard.growth='medium';Object.assign(g.party[0],{level:10,exp:1000,hp:1,friendship:99});}}),r=plan(x,id,3);assert.equal(r.state.party[0].exp,1000+u*3);assert.equal(r.state.party[0].level,E.growth.levelForExp('medium',1000+u*3));assert.equal(r.state.party[0].friendship,110);assert.equal(r.result.expGained,u*3);assert.equal(count(r.state,id,x.content),2);assert.deepEqual(r.state.stats,x.game.stats);
+});
+test('P52-18 HP B ordinary delta and baseHP1 rare-only exception; max and shadow/egg/hyper',()=>{
+ for(const id of ['rarecandy','expcandyxs']){let x=setup({bag:{[id]:1},edit:(g,c)=>{c.species.Charizard.growth='medium';Object.assign(g.party[0],{level:10,exp:1330,hp:0});}}),r=plan(x,id);assert.equal(r.state.party[0].hp,maxHp(r.state.party[0],x.content)-maxHp(x.game.party[0],x.content));x.content.species.Charizard.base.hp=1;assert.equal(plan(x,id).state.party[0].hp,id==='rarecandy'?1:0);
+  x.game.party[0].level=100;x.game.party[0].exp=1000000;refusal(()=>plan(x,id),id==='rarecandy'?'evolution-not-ready':'max-level');x.game.party[0].level=10;x.game.party[0].exp=1000;x.world.shadowIds=[x.game.party[0].id];refusal(()=>plan(x,id),'shadow');x.world.shadowIds=[];x.world.hyperIds=[x.game.party[0].id];refusal(()=>plan(x,id),'hyper-mode');x.world.hyperIds=[];x.game.party[0].isEgg=true;refusal(()=>plan(x,id),'egg');}
+});
+test('P52-45 complete cross-level queue, current moves, HM reselect/decline, fresh PP and metadata',()=>{
+ const x=setup({bag:{expcandyl:2},edit:(g,c)=>{const m=g.party[0];c.species.Charizard.growth='medium';c.species.Charizard.learnset={11:['Slash','Flamethrower'],12:['Outrage'],13:['Slash']};Object.assign(m,{level:10,exp:1000,hp:1});m.moves[0]={id:'flamethrower',pp:8,maxpp:21,ppUps:2};}});
+ assert.equal(plan(x,'expcandyl').selection.move.id,'slash');x.world.hmMoves=['flamethrower'];let r=plan(x,'expcandyl',1,{learning:[{kind:'replace',slot:0}]});assert.equal(r.selection.reason,'hm-protected');r=plan(x,'expcandyl',1,{learning:[{kind:'decline'}]});assert.equal(r.selection.kind,'give-up');r=plan(x,'expcandyl',1,{learning:[{kind:'decline',giveUp:false}]});assert.equal(r.selection.kind,'learn');
+ r=plan(x,'expcandyl',1,{learning:[{kind:'replace',slot:1},{kind:'decline',giveUp:true}]});assert.equal(r.status,'ready');assert.deepEqual(r.result.learned,['slash']);assert.deepEqual(r.result.skipped,['outrage']);assert.deepEqual(r.state.party[0].moves[1],{id:'slash',pp:20,maxpp:20,ppUps:0});assert.deepEqual(r.state.party[0].moves[0],x.game.party[0].moves[0]);assert.equal(count(r.state,'expcandyl',x.content),1);assert.equal(r.state.party[0].firstMoves.join(),x.game.party[0].firstMoves.join());
+ const y=setup({bag:{rarecandy:1},edit:(g,c)=>{c.species.Charizard.learnset={51:['Slash','Outrage']};g.party[0].moves=g.party[0].moves.slice(0,2);}});const empty=plan(y,'rarecandy');assert.equal(empty.status,'ready');assert.deepEqual(empty.state.party[0].moves.slice(2),[{id:'slash',pp:20,maxpp:20,ppUps:0},{id:'outrage',pp:10,maxpp:10,ppUps:0}]);
+});
+test('P52-19/29 invalid answers and unknown machine/evolution ports cannot consume',()=>{
+ const x=setup({bag:{potion:1},edit:g=>{g.party[0].hp=1;}});for(const answers of [null,[],{confirmed:'yes'},{moveIndex:NaN},{learning:[{kind:'replace',slot:0.5}]},{learning:[{kind:'decline',giveUp:1}]},{unknown:true}])refusal(()=>plan(x,'potion',1,answers),'invalid-answers');
+ for(const fieldUse of ['tm','hm','tr']){x.content.items.machine={...x.content.items.potion,id:'machine',fieldUse,move:'slash',effect:{family:'machine',parameters:{}}};x.game.inventory=E.inventory.addItems(x.game.inventory,'machine',1,x.content.items,E.inventory.inventoryPolicy());assert.equal(E.itemEffects.itemReadiness(x.content,'machine'),false);refusal(()=>plan(x,'machine'),'not-ready');}
+ x.content.items.stone={...x.content.items.potion,id:'stone',effect:{family:'evolution',parameters:{}}};assert.equal(E.itemEffects.itemReadiness(x.content,'stone'),false);assert.equal(count(x.game,'potion',x.content),1);
+});
+test('P52-13 PP zero/full, nonconsumable and important effective consumption rules',()=>{
+ const x=setup({bag:{ether:1,elixir:1,potion:1},edit:g=>{g.party[0].hp=1;}});refusal(()=>plan(x,'ether',1,{moveIndex:0}),'no-effect');refusal(()=>plan(x,'elixir'),'no-effect');x.content.moves.flamethrower.pp=0;x.game.party[0].moves[0]={id:'flamethrower',pp:0,maxpp:0,ppUps:0};refusal(()=>plan(x,'ether',1,{moveIndex:0}),'no-effect');x.content.items.potion.consumable=false;assert.equal(count(plan(x,'potion').state,'potion',x.content),1);x.content.items.potion.consumable=true;x.content.items.potion.flags=['KeyItem'];assert.equal(count(plan(x,'potion').state,'potion',x.content),1);
+});
+test('P52-14/15 trusted out-of-domain friendship and EV stay intact on refused effects',()=>{
+ const x=setup({bag:{protein:1,pomegberry:1},edit:g=>{g.party[0].friendship=256;g.party[0].evs.atk=255;}}),before=clone(x.game);refusal(()=>plan(x,'protein'),'no-effect');refusal(()=>plan(x,'pomegberry'),'friendship-out-of-domain');assert.deepEqual(x.game,before);
+});
+test('P52-32 known effect parameters validate in JSON/compiled gates before Dex, opaque future family stays not-ready',()=>{
+ const source={id:'local',kind:'author-placeholder',status:'placeholder',description:'synthetic EF',license:'test',ref:'test',usedFor:['items']},input={manifest:{schema:1,id:'ef-content',title:'EF'},sources:[source],species:[],overlays:[],items:[{id:'healer',source:'local',fieldUse:'member',effect:{family:'hp',parameters:{amount:20}}}]};
+ const valid=E.contentCompile.compileContent(input);assert.equal(valid.ok,true);for(const effect of [{family:'hp',parameters:{amount:0}},{family:'hp',parameters:{full:'false'}},{family:'pp-up',parameters:{max:'false'}},{family:'vitamin',parameters:{stat:'speed'}},{family:'mint',parameters:{nature:'unknown'}},{family:'exp-candy',parameters:{exp:-1}}]){
+  const bad=clone(input);bad.items[0].effect=effect;const r=E.contentCompile.compileContent(bad);assert.equal(r.ok,false);assert.ok(r.errors.some(e=>e.path==='$[0].effect.parameters'));const compiled=clone(valid.data);compiled.items[0].effect=effect;let reads=0;const loaded=E.contentRuntime.assembleContent(compiled,new Proxy({},{get(){reads++;throw Error('cold Dex');}}));assert.ok(loaded.errors.some(e=>e.path==='$[0].effect.parameters'));assert.equal(reads,0);
+ }
+ const opaque=clone(input);opaque.items[0].effect={family:'future-evolution',parameters:{rule:'later'}};assert.equal(E.contentCompile.compileContent(opaque).ok,true);
+ const x=setup({bag:{ppup:1}});x.content.items.ppup.effect.parameters={max:'false'};refusal(()=>plan(x,'ppup',1,{moveIndex:0}),'invalid-effect-parameter');
+});
+test('P52-18/46 level99 ceiling, five-unit quantity boundary, single-setting friendship and HP delta constants',()=>{
+ const x=setup({bag:{expcandyxs:300,rarecandy:2},edit:(g,c)=>{c.species.Charizard.growth='medium';Object.assign(g.party[0],{level:99,exp:970299,hp:0,friendship:99});}}),intent={itemId:'expcandyxs',quantity:298,memberId:x.game.party[0].id};assert.equal(E.itemEffects.itemUseLimit(x.game,x.content,intent),298);const r=plan(x,'expcandyxs',298);assert.equal(r.state.party[0].level,100);assert.equal(r.state.party[0].exp,1000000);assert.equal(count(r.state,'expcandyxs',x.content),2);refusal(()=>plan(x,'expcandyxs',299),'quantity-exceeds-limit');const rare=plan(x,'rarecandy');assert.equal(rare.state.party[0].level,100);assert.equal(rare.state.party[0].exp,1000000);assert.equal(rare.state.party[0].friendship,104);x.content.settings.USE_MULTIPLE_STAT_ITEMS_AT_ONCE=false;refusal(()=>plan(x,'expcandyxs',2),'quantity-exceeds-limit');
+ const y=setup({bag:{rarecandy:1},edit:g=>{g.party[0].hp=0;}});assert.equal(maxHp(y.game.party[0],y.content),153);assert.equal(plan(y,'rarecandy').state.party[0].hp,3);
+});
+test('P52-15 berry dose simulation includes map/luxury/bell and then applies all doses once',()=>{
+ const x=setup({bag:{kelpsyberry:100},world:{mapId:3},edit:g=>{Object.assign(g.party[0],{friendship:99,ball:'luxuryball',item:'soothebell'});g.party[0].origin.map=3;}}),intent={itemId:'kelpsyberry',quantity:18,memberId:x.game.party[0].id};assert.equal(E.itemEffects.itemUseLimit(x.game,x.content,intent,x.world),18);const r=plan(x,'kelpsyberry',18);assert.equal(r.state.party[0].friendship,255);assert.equal(count(r.state,'kelpsyberry',x.content),82);refusal(()=>plan(x,'kelpsyberry',19),'quantity-exceeds-limit');
+});
+test('P52-12/17 exact quantity families reject multi-use on an otherwise eligible target; capsule reverses normal slots',()=>{
+ const x=setup({bag:{potion:3,abilitycapsule:3},edit:g=>{g.party[0].hp=1;}}),before=clone(x.game);refusal(()=>plan(x,'potion',2),'quantity-exceeds-limit');assert.deepEqual(x.game,before);const first=plan(x,'abilitycapsule',1,{confirmed:true});x.game=first.state;const second=plan(x,'abilitycapsule',1,{confirmed:true});assert.equal(second.state.party[0].abilityIndex,0);assert.equal(second.state.party[0].ability,'Blaze');x.game.party[0].abilityIndex=2;refusal(()=>plan(x,'abilitycapsule',1,{confirmed:true}),'no-effect');
+});
