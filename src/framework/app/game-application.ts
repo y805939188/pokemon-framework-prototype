@@ -374,6 +374,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
   endManagement(token: string): ManagementOutcome { return this.management.end(token); }
   heldMemberReference(token: string): MemberReference | null { return this.management.heldReference(token); }
+  get encounterBlocked(): boolean { return !!this.op || !!this.reception || this.management.active || this.inventory.active; }
   get saveBlocked(): boolean { return !!this.op || !!this.reception || this.management.saveBlocked || this.inventory.saveBlocked; }
   recoverAll(): HealOutcome {
     if (this.op || this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: this.op ? "battle-active" : "management-active" };
@@ -479,6 +480,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * Never throws: "not-here" when the table does not apply at the region, and no encounter when nobody can battle.
    */
   prepareEncounter(table: unknown, region: number): EncounterPlan {
+    if (this.encounterBlocked) return { ok: false, reason: "operation-active" };
     const checked = validateEncounterTable(table);
     if (!checked.table) return { ok: false, reason: "invalid-table", error: checked.problems.map((p) => `${p.path} ${p.message}`).join("; ") };
     if (!appliesAt(checked.table, region)) return { ok: false, reason: "not-here" };

@@ -28,7 +28,7 @@ test('P52-28/44 FR656: parent child ownership, save lock, real party target, sta
  assert.throws(()=>x.app.beginInventoryOperation('item',{token:parent,memberId:'in-box'}));assert.equal(x.draws,0);
 });
 test('P52-28/32 FR193: roots reject other writes and battles before consuming content',async()=>{
- const x=setup(),t=x.app.beginInventoryOperation(),before=x.calls;assert.equal(x.app.claimGrant('starter').status,'refused');assert.equal(x.app.healParty().status,'refused');assert.throws(()=>x.app.beginManagement());assert.throws(()=>x.app.commitResult({}));await assert.rejects(x.app.startBattle({battleId:'no',kind:'wild',foes:[],seq:1}));assert.equal(x.calls,before);assert.equal(x.state.replaced.length,0);x.app.endInventoryOperation(t);
+ const x=setup(),t=x.app.beginInventoryOperation(),before=x.calls;assert.equal(x.app.claimGrant('starter').status,'refused');assert.equal(x.app.healParty().status,'refused');assert.throws(()=>x.app.beginManagement());assert.throws(()=>x.app.commitResult({}));await assert.rejects(x.app.startBattle({battleId:'no',kind:'wild',foes:[],seq:1}));assert.equal(x.app.prepareEncounter({regions:[],slots:[{species:'Pidgey',weight:1,minLevel:3,maxLevel:3}]},0).reason,'operation-active');assert.equal(x.draws,0);assert.equal(x.calls,before);assert.equal(x.state.replaced.length,0);x.app.endInventoryOperation(t);
 });
 test('P52-30/43 FR654: content and host generations invalidate late requests; BoxLink follows actual inventory',()=>{
  const x=setup(),t=x.app.beginInventoryOperation();assert.equal(x.app.hasBoxLink(),false);run(x,t,'link',{kind:'add-items',itemId:'box-link',quantity:1});assert.equal(x.app.hasBoxLink(),true);run(x,t,'unlink',{kind:'remove-items',itemId:'box-link',quantity:1});assert.equal(x.app.hasBoxLink(),false);

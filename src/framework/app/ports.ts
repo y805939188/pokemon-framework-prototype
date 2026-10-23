@@ -59,7 +59,7 @@ export interface BattleSetup {
 /** An encounter the application allows here and now (or why not). */
 export type EncounterPlan =
   | { ok: true; foe: { species: string; level: number } }
-  | { ok: false; reason: "held-item-battle-disabled" | "not-here" | "invalid-table" | "no-able-member" | "state-unusable" | "no-random" | "unknown-species" | "invalid-content"; error?: string };
+  | { ok: false; reason: "operation-active" | "held-item-battle-disabled" | "not-here" | "invalid-table" | "no-able-member" | "state-unusable" | "no-random" | "unknown-species" | "invalid-content"; error?: string };
 
 /** A running battle as the application sees it: it can say how it ended. The UI drives the concrete session itself. */
 export interface BattleHandle {

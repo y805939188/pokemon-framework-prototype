@@ -42,6 +42,7 @@ import { developmentCapabilities } from "../framework/rules/config";
     abortBattle(request: unknown, error: unknown): BattleOutcomeView;
     commitResult(result: unknown, options?: unknown): string;
     readonly saveBlocked: boolean;
+    readonly encounterBlocked: boolean;
     resolveReceiving(token: string, decisions?: unknown, signal?: unknown): any;
     startNewGame(): { status: string };
     claimGrant(grantId: string): { status: string; grantId: string; reason?: string; error?: string; placed?: { id: string; species: string; form: number; level: number; to: string }[]; items?: Record<string, number>; money?: number };
@@ -497,7 +498,7 @@ import { developmentCapabilities } from "../framework/rules/config";
   if (G.Game_Player) G.Game_Player.prototype.executeEncounter = function (this: any) {
     const table = PSFlow.mapEncounters();
     if (!table) return baseExecuteEncounter.call(this);
-    if (PSFlow.running || G.$gameMap.isEventRunning() || this._encounterCount > 0) return false;
+    if (PSFlow.running || PSFlow._app?.encounterBlocked || G.$gameMap.isEventRunning() || this._encounterCount > 0) return false;
     // Cold host gate: app() loads content, so reject before constructing it or drawing any random value.
     const gateGame=G.$gameSystem?._psGame, gateMap=G.$gameMap, gateCapability=JSON.stringify(PSFlow.developerCapabilities??{});
     const heldKey=(gateGame?.party??[]).map((m:any)=>[m.id,m.item??'']);
