@@ -21,3 +21,28 @@ function project(plan,placements,alreadyApplied=false){
  return {status:'proposed',writes};
 }
 module.exports={propose,project};
+
+/** Stateful FAKE receipt owner. The injected install must atomically accept or reject its full proposal. */
+function createFakeReceiver(){
+ const receipts=new Map();
+ return {apply(result,install){
+  const fingerprint=JSON.stringify(result),old=receipts.get(result.battleId);
+  if(old){if(old!==fingerprint)throw Error('result-conflict');return {status:'duplicate'};}
+  const plan=propose(result.initial,result.events,result.context),eligible=new Set(Object.keys(plan.initial));
+  for(const captured of result.captured??[]){
+   if(!captured.id||Object.hasOwn(plan.current,captured.id)||typeof captured.current!=='string')throw Error('invalid-capture-identity');
+   // Explicit terminal current item is an input to this proposal, never inferred from a missing engine request.
+   plan.current[captured.id]=captured.current;plan.restore[captured.id]=captured.current;eligible.add(captured.id);
+  }
+  const seen=new Set(),writes={};
+  for(const placement of result.placements){
+   if(seen.has(placement.id)||!Object.hasOwn(plan.current,placement.id)||!['party','box'].includes(placement.to))throw Error('invalid-placement');seen.add(placement.id);
+   if(placement.to==='box'){writes[placement.id]=plan.current[placement.id];eligible.delete(placement.id);}else writes[placement.id]=plan.restore[placement.id];
+  }
+  if(seen.size!==Object.keys(plan.current).length)throw Error('incomplete-placement');
+  const proposal={writes,restoreEligible:[...eligible],bag:{...(result.bag??{})}};
+  install(structuredClone(proposal)); // failure leaves no receipt; retry rebuilds the same proposal
+  receipts.set(result.battleId,fingerprint);return {status:'applied',...proposal};
+ },get receiptCount(){return receipts.size}};
+}
+module.exports.createFakeReceiver=createFakeReceiver;

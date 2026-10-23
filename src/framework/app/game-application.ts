@@ -459,6 +459,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (!appliesAt(checked.table, region)) return { ok: false, reason: "not-here" };
     let game: GameState;
     try { game = this.ports.state.read(); } catch (error) { return { ok: false, reason: "state-unusable", error: message(error) }; }
+    if (!this.capabilities.allowExperimentalHeldItemBattle && game.party.some((m) => !!m.item)) return { ok: false, reason: "held-item-battle-disabled" };
     if (!game.party.some((m) => !m.isEgg && m.hp > 0)) return { ok: false, reason: "no-able-member" };
     const random = this.ports.random;
     if (!random) return { ok: false, reason: "no-random", error: "no random source is configured for this application" };
@@ -477,9 +478,9 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    */
   commitResult(result: BattleResult, options: BattleCommitOptions = {}): CommitResultStatus {
     if (this.management.active) throw new Error("management-active");
-    if (this.op && this.op.battleId !== result.battleId) throw new Error("another battle is active");
+    if (this.op) throw new Error("battle-active: use finishBattle for the active session");
     if (this.reception) throw new Error("receiving-active: use its receiving token");
-    const context = this.op?.session ? this.battleContexts.get(this.op.session) ?? this.newReceptionContext(options) : this.newReceptionContext(options);
+    const context = this.newReceptionContext(options);
     return this.commitResultWithContext(clone(result), context);
   }
   private commitResultWithContext(result: BattleResult, context: ReceptionContext): CommitResultStatus {

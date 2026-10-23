@@ -26,10 +26,14 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
  // Native inputs stop propagation before MZ sees their initial keydown. Keep that consumed action blocked
  // until the real keyup, including after the input or its entire scene has been removed.
  const nativeConsumed=new Map<string,Action|Direction>();
+ // Only actual DOM keys enter this registry. Service/gamepad state is sampled separately each frame.
+ const keyboardKeys=new Map<string,Action|Direction>();
+ const physicalCode=(e:any)=>e.code||String(e.keyCode??e.key);
+ document.addEventListener('keydown',(e:any)=>{const key=eventKey(e);if(key)keyboardKeys.set(physicalCode(e),key);});
  const nativeKey=(e:any):string=>e.code||(['Enter','Escape'].includes(e.key)?e.key:e.keyCode===13?'Enter':e.keyCode===27?'Escape':'');
  for(const method of ['isTriggered','isRepeated']){const original=G.Input[method];G.Input[method]=function(button:string){const key=button==='ok'?'use':['cancel','menu','escape'].includes(button)?'back':undefined;if(key)for(const consumed of nativeConsumed.values())if(consumed===key)return false;return original.call(this,button);};}
- document.addEventListener('keyup',(e:any)=>{nativeConsumed.delete(nativeKey(e));});
- window.addEventListener('blur',()=>{nativeConsumed.clear();if(current){current.physical.clear();for(const key of Object.keys(ALIAS))current.latch.release(key);}});
+ document.addEventListener('keyup',(e:any)=>{nativeConsumed.delete(nativeKey(e));keyboardKeys.delete(physicalCode(e));});
+ window.addEventListener('blur',()=>{nativeConsumed.clear();keyboardKeys.clear();if(current){current.physical.clear();for(const key of Object.keys(ALIAS))current.latch.release(key);}});
  const debugFrames:any[]=[];
  function record(data:any){debugFrames.push(data);if(debugFrames.length>256)debugFrames.shift();}
  function open(request:OpenRequest):boolean {if(current||nextRequest)return false;nextRequest=request;G.SceneManager.push(Scene_PSManagement);return true;}
@@ -46,17 +50,18 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
  class Controller {
   scene:any;window:any;request:OpenRequest;application:any;token='';generation:number;ready=false;started=false;closed=false;frame=0;serial=0;
   renderedText:string[]=[];snapshot!:ManagementSnapshot;stack:View[]=[];latch=new InputLatch();physical=new Set<Action|Direction>();input:any=null;composition=false;error='';qualified=new Set<string>();
+  storageQuick=false;
   reception:any=null;decisions:Record<string,ReceivingDecision>={};receiveIndex=0;readonly=false;completion:any=null;
   onKeyDown=(e:any)=>{const key=eventKey(e);if(key)this.physical.add(key);};
-  onKeyUp=(e:any)=>{const key=eventKey(e);if(key){this.physical.delete(key);this.latch.release(key);}};
+  onKeyUp=(e:any)=>{const key=eventKey(e);if(key&&!Array.from(keyboardKeys.values()).includes(key)&&!Array.from(nativeConsumed.values()).includes(key)){this.physical.delete(key);this.latch.release(key);}};
   constructor(scene:any,request:OpenRequest){this.scene=scene;this.request=request;this.application=app();this.generation=this.application.stateGeneration;this.token='ui:'+this.generation+':'+(++sequence);}
-  valid(){return !this.closed&&this.application===app()&&this.generation===this.application.stateGeneration&&current===this;}
+  valid(){try{return !this.closed&&this.application===app()&&this.generation===this.application.stateGeneration&&current===this;}catch{return false;}}
   top():View{return this.stack[this.stack.length-1]!;}
   refresh(){this.snapshot=this.reception&&app().pendingReceiving?.token===this.reception.token?app().previewReceiving(this.reception.token,this.decisions,this.receiveIndex):app().managementSnapshot(this.readonly?undefined:this.managementToken);for(const view of this.stack)if(view.kind==='party'&&view.cursor!==6&&view.cursor>=this.snapshot.party.length)view.cursor=this.snapshot.party.length?this.snapshot.party.length-1:6;this.draw();}
   managementToken='';
   start(win:any){
-   this.window=win;this.started=true;current=this;
-   for(const key of Object.keys(ALIAS)as(Action|Direction)[])if(G.Input.isPressed(ALIAS[key]))this.physical.add(key);
+   this.window=win;this.started=false;current=this;
+   for(const key of keyboardKeys.values())this.physical.add(key);
    document.addEventListener('keydown',this.onKeyDown);document.addEventListener('keyup',this.onKeyUp);
    if(this.request.kind==='receiving'){
     this.readonly=true;this.reception=app().pendingReceiving;if(!this.reception){this.close(null);return;}
@@ -68,11 +73,17 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
     if(this.request.kind==='summary'){const id=this.request.id!,m=this.find(id);if(!m)throw Error('unknown-member');this.stack=[];this.summary([id],0);}
     if(this.request.kind==='pc')this.pc();
    }
-   this.boundary();this.draw();
+   this.boundary();this.draw();this.started=true;
   }
-  boundary(){this.ready=false;this.frame=G.Graphics.frameCount??this.frame;this.latch.arm(Object.fromEntries([...this.physical].map(k=>[k,true])));G.Input.clear();G.TouchInput.clear();record({token:this.token,event:'boundary',frame:this.frame,view:this.top()?.kind,pressed:[...this.physical]});}
+  resetInitialization(){
+   this.ready=false;this.started=false;this.stack=[];this.removeInput();
+   document.removeEventListener('keydown',this.onKeyDown);document.removeEventListener('keyup',this.onKeyUp);
+   if(this.managementToken&&this.generation===this.application.stateGeneration){this.application.manage(this.managementToken,'cleanup-'+(++this.serial),{kind:'cancel-held'});this.application.endManagement(this.managementToken);}
+   this.managementToken='';
+  }
+  boundary(){this.ready=false;this.frame=G.Graphics.frameCount??this.frame;this.latch.arm(Object.fromEntries((Object.keys(ALIAS)as(Action|Direction)[]).map(k=>[k,this.physical.has(k)||G.Input.isPressed(ALIAS[k])])));G.Input.clear();G.TouchInput.clear();record({token:this.token,event:'boundary',frame:this.frame,view:this.top()?.kind,pressed:[...this.physical]});}
   push(view:View){this.stack.push(view);this.error='';this.boundary();this.draw();}
-  back(){if(this.stack.length>1){this.stack.pop();this.error='';this.boundary();this.refresh();}else this.close(null);}
+  back(){if(this.stack.length>1){const previous=this.stack.pop()!;this.error='';this.boundary();this.refresh();if(previous.kind==='summary'&&!previous.held){const parent=this.top(),id=previous.ids[previous.cursor],ref=this.snapshot.references[id];if(ref?.position.kind==='box'&&parent.kind==='box'){parent.box=ref.position.box;parent.cursor=ref.position.slot;}else if(ref?.position.kind==='party'&&['party','panel'].includes(parent.kind))parent.cursor=ref.position.index;this.draw();}}else this.close(null);}
   dismiss(){if(this.stack.length>1)this.back();else {this.stack.pop();this.error='';this.boundary();}}
   find(id:string):Member|null{return this.snapshot.held?.id===id?this.snapshot.held:this.snapshot.party.find(m=>m.id===id)??this.snapshot.storage.boxes.flatMap(b=>b.slots).find(m=>m?.id===id)??this.reception?.members.find((m:Member)=>m.id===id)??null;}
   reference(id:string):MemberReference {const ref=this.snapshot.references[id];if(!ref)throw Error('stale-source');return structuredClone(ref);}
@@ -113,7 +124,7 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
     if(v.kind!=='party')items.push({key:'transfer',label:tr(v.kind==='panel'?'store':'withdraw'),run:()=>{this.back();if(held)this.operate({kind:v.kind==='panel'?'store-held':'withdraw-held'});else {let target:MemberPosition|undefined;if(v.kind==='panel'){for(let b=0;b<40&&!target;b++){const slot=this.snapshot.storage.boxes[(this.snapshot.storage.currentBox+b)%40]!.slots.findIndex(x=>!x);if(slot>=0)target={kind:'box',box:(this.snapshot.storage.currentBox+b)%40,slot};}}else target={kind:'party',index:this.snapshot.party.length};if(target)this.operate({kind:'move',source:source(),target,expectedTargetId:null});else this.fail('boxes-full');}}});
     items.push({key:'item',label:tr('item'),enabled:!m.isEgg,run:()=>{this.back();this.itemMenu(id);}},
      {key:'mark',label:tr('mark'),run:()=>{this.back();this.marking(id,false);}});
-    if(v.kind!=='party')items.push({key:'release',label:tr('release'),enabled:!m.isEgg&&!m.mail&&!m.cannotRelease,run:()=>{this.back();this.confirm(tr('confirmRelease',{name:memberName(m)}),()=>this.confirm(tr('confirmRelease2',{name:memberName(m)}),()=>{this.operate(held?{kind:'release-held',confirmed:true}:{kind:'release',source:source(),confirmed:true});}));}});
+    if(v.kind!=='party')items.push({key:'release',label:tr('release'),enabled:!m.isEgg&&!m.mail&&!m.cannotRelease,run:()=>{this.back();this.refresh();const target=this.find(id);if(!held&&this.snapshot.references[id]?.position.kind==='party'&&target&&!target.isEgg&&target.hp>0&&!this.snapshot.party.some(other=>other.id!==id&&!other.isEgg&&other.hp>0)){this.fail(tr('lastAble'));return;}this.confirm(tr('confirmRelease',{name:memberName(m)}),()=>this.confirm(tr('confirmRelease2',{name:memberName(m)}),()=>{this.operate(held?{kind:'release-held',confirmed:true}:{kind:'release',source:source(),confirmed:true});}));}});
    }
    items.push({key:'cancel',label:tr('cancel'),run:()=>this.back()});this.menu(memberName(m),items);
   }
@@ -159,14 +170,14 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
   resolveReceive(){const token=this.reception.token,result=flow().resolveReceiving(token,this.decisions);if(!this.valid())return;if(pending(result)||result.status==='refused'){this.stack=[];this.menu(tr('saveFailed'),[{key:'retry',label:tr('recover'),run:()=>this.resolveReceive()}]);this.fail(result.reason||result.error||'pending');return;}const ids=this.reception.members.map((m:Member)=>m.id);for(const decision of Object.values(this.decisions))if(decision.placement?.kind==='replace')ids.push(decision.placement.target.id);try{flow().notifyReceived?.(ids,result.battleId??token);}catch(e){console.error(NAME,'committed placement message failed',e);}this.completion=result;this.close(result);}
   update(){
    if(!this.valid()){if(!this.closed){this.closed=true;this.removeInput();this.scene._invalid=true;}return;}
-   if(this.top()?.kind==='text')return;
+   if(!this.top()||!this.started||this.top()?.kind==='text')return;
    const frame=G.Graphics.frameCount??++this.frame;if(!this.ready){if(frame>this.frame&&!G.SceneManager.isSceneChanging()){this.ready=true;record({token:this.token,event:'ready',frame,view:this.top()?.kind});}return;}
    const sample:InputFrame={repeated:{},triggered:{},pressed:{}};
    for(const key of Object.keys(ALIAS)as(Action|Direction)[]){sample.pressed[key]=this.physical.has(key)||G.Input.isPressed(ALIAS[key]);if(['up','left','right','down'].includes(key))sample.repeated[key as Direction]=G.Input.isRepeated(ALIAS[key]);else sample.triggered[key as Action]=G.Input.isTriggered(ALIAS[key]);}
    if(G.TouchInput.isCancelled())sample.triggered.back=true;
    const v=this.top(),intent=inputIntent(this.latch.filter(sample),v.kind==='box'?'box':v.kind==='panel'?'panel':v.kind==='marks'?v.summary?'mark-summary':'mark-storage':'ordinary',v.mode==='organize');
    if(!intent.direction&&!intent.action)return;record({token:this.token,event:'input',frame,view:v.kind,cursor:v.cursor,...intent});
-   try{if(intent.direction)this.direction(intent.direction);if(this.top()===v&&this.ready&&intent.action)this.action(intent.action);this.draw();}catch(e){this.fail(String(e));}
+   try{if(intent.direction)this.direction(intent.direction);if(this.top()===v&&this.ready&&intent.action)this.action(intent.action);this.draw();}catch(e){try{this.fail(String(e));}catch(drawError){this.scene.rebuildFailed(drawError);}}
   }
   direction(dir:Direction){const v=this.top();
    if(v.kind==='menu'||v.kind==='results'){const n=v.kind==='menu'?v.items.length:v.matches.length;v.cursor=n?(v.cursor+(dir==='up'||dir==='left'?-1:1)+n)%n:0;}
@@ -200,12 +211,13 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
    }
    if(v.kind==='box'||v.kind==='panel'){
     if(action==='jumpup'||action==='jumpdown'){if(v.kind==='box')this.switchBox(action==='jumpup'?-1:1);return;}
-    if(action==='special'){if(v.kind==='box')this.searchMenu({});return;}
+    if(action==='special'){if(v.kind==='box')v.cursor=-1;return;}
+    if(action==='action'&&v.mode==='organize'){this.storageQuick=!this.storageQuick;this.boundary();return;}
     if(action==='back'){if(this.snapshot.held){this.confirm(tr('cancelHeld'),()=>this.operate({kind:'cancel-held'}));return;}if(v.itemSource){v.itemSource=null;return;}if(v.kind==='panel'&&v.mode==='organize'){this.back();return;}this.confirm(tr('continue'),()=>{},true,()=>this.exitStorage());return;}
     if(v.kind==='box'&&v.cursor<0){if(action==='use'){if(v.cursor===-1)this.boxMenu();else if(v.cursor===-2)this.push({kind:'panel',cursor:0,mode:v.mode,box:v.box});else if(this.snapshot.held)this.fail(tr('heldBlock'));else this.confirm(tr('exit'),()=>this.exitStorage());}return;}
     if(v.kind==='panel'&&v.cursor===6){if(action==='use')this.back();return;}
     const position:MemberPosition=v.kind==='box'?{kind:'box',box:v.box,slot:v.cursor}:{kind:'party',index:v.cursor};const m=v.kind==='box'?this.snapshot.storage.boxes[v.box]!.slots[v.cursor]:this.snapshot.party[v.cursor];
-    if(action==='action'&&v.mode==='organize'){if(this.snapshot.held)this.operate({kind:'place-held',target:position,expectedTargetId:m?.id??null});else if(m)this.operate({kind:'pick-up',source:this.reference(m.id)});return;}
+    if(action==='use'&&v.mode==='organize'&&this.storageQuick&&!v.itemSource){if(this.snapshot.held)this.operate({kind:'place-held',target:position,expectedTargetId:m?.id??null});else if(m)this.operate({kind:'pick-up',source:this.reference(m.id)});return;}
     if(action!=='use')return;if(v.itemSource&&m){this.itemTarget(v,m);return;}
     if(this.snapshot.held){const held=this.snapshot.held;this.menu(tr('held',{name:memberName(held)}),[
      {key:'place',label:tr('store'),run:()=>{this.back();this.operate({kind:'place-held',target:position,expectedTargetId:m?.id??null});}},
@@ -238,13 +250,13 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
    if(G.SceneManager._scene===this.scene)this.scene.popScene();
   }
   dispose(){document.removeEventListener('keydown',this.onKeyDown);document.removeEventListener('keyup',this.onKeyUp);this.removeInput();
-   if(!this.closed&&this.application===app()&&this.generation===this.application.stateGeneration){if(this.managementToken){this.application.manage(this.managementToken,'cleanup-'+(++this.serial),{kind:'cancel-held'});this.application.endManagement(this.managementToken);}else if(this.reception&&this.application.pendingReceiving?.token===this.reception.token){const result=flow().resolveReceiving(this.reception.token,this.decisions,'scene-aborted');this.completion=result;if(!pending(result)&&result.status!=='refused'){this.scene._result=result;this.scene._done=this.request.done;}}}
+   if(!this.closed&&this.application===flow()._app&&this.generation===this.application.stateGeneration){if(this.managementToken){this.application.manage(this.managementToken,'cleanup-'+(++this.serial),{kind:'cancel-held'});this.application.endManagement(this.managementToken);}else if(this.reception&&this.application.pendingReceiving?.token===this.reception.token){const result=flow().resolveReceiving(this.reception.token,this.decisions,'scene-aborted');this.completion=result;if(!pending(result)&&result.status!=='refused'){this.scene._result=result;this.scene._done=this.request.done;}}}
    this.closed=true;if(current===this)current=null;
   }
   draw(){
    if(!this.window||!this.top())return;const win=this.window,b=win.contents,v=this.top(),w=b.width,h=b.height; b.clear();b.fontFace=flow().translator().font()||'sans-serif';b.fontSize=20;
    this.renderedText=[];const text=(s:any,x:number,y:number,width=w-x,color='#fff')=>{this.renderedText.push(String(s??''));b.textColor=color;b.drawText(String(s??''),x,y,width,28,'left');};
-   const cell=(x:number,y:number,cw:number,ch:number,label:string,selected=false,color='#24334b')=>{b.fillRect(x,y,cw,ch,selected?'#587da2':color);text(label,x+7,y+5,cw-14);};
+   const cell=(x:number,y:number,cw:number,ch:number,label:string,selected=false,color='#24334b')=>{b.fillRect(x,y,cw,ch,selected?(this.storageQuick&&['box','panel'].includes(v.kind)?'#896f3e':'#587da2'):color);text(label,x+7,y+5,cw-14);};
    const title=v.title||tr(v.kind==='panel'?'party':v.kind==='box'?v.mode:v.kind==='marks'?'mark':v.kind==='results'?'search':v.kind==='text'?'name':v.kind==='summary'?'summary':'party');text(title,4,0);
    if(v.kind==='menu'){const start=Math.max(0,v.cursor-12);for(let i=start;i<Math.min(v.items.length,start+14);i++){const it=v.items[i];cell(12,38+(i-start)*31,w-24,29,(it.enabled===false?'× ':'')+it.label,i===v.cursor,it.enabled===false?'#333':'#24334b');}}
    else if(v.kind==='party'||v.kind==='panel'){
@@ -266,8 +278,8 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
    const row=(label:string,value:any,n:number,color?:string)=>text(label+': '+value,8,88+n*30,w-16,color);const paragraph=(value:string,y:number,maxLines:number)=>{const old=this.window.contents.fontSize;this.window.contents.fontSize=17;let line='',n=0;for(const ch of Array.from(value)){if(this.window.textWidth(line+ch)>w-24&&line){text(line,8,y+n*23,w-16);line='';n++;if(n>=maxLines)break;}line+=ch;}if(n<maxLines&&line)text(line,8,y+n*23,w-16);this.window.contents.fontSize=old;};
    if(m.isEgg){row(tr('egg'),tr('unknown'),0);row(tr('owner'),m.owner?.name||tr('unknown'),1);row(tr('id'),view.publicId,2);row(tr('origin'),m.origin?.text||tr('unknown'),3);return;}
    if(v.page===0){row(tr('name'),flow().speciesName(m.species,m.form),0);row(tr('type'),view.types.join(' / ')||tr('unknown'),1);row(tr('owner'),m.owner?.name||tr('unknown'),2,m.owner?.gender===0?'#aabfff':m.owner?.gender===1?'#ffb0b0':undefined);row(tr('id'),view.publicId,3);row(tr('item'),m.item||tr('none'),4);row(tr('form'),m.form,5);row(tr('ball'),m.ball,6);row(tr('exp'),m.exp+' / '+(view.nextLevelExp===null?'—':Math.max(0,view.nextLevelExp-m.exp)),7);if(m.ownerCompatibilityDefault)row('',tr('compat'),8,'#ffe29a');if(view.nextLevelExp!==null&&view.currentLevelExp!==null){const ratio=Math.min(1,Math.max(0,(m.exp-view.currentLevelExp)/(view.nextLevelExp-view.currentLevelExp)));this.window.contents.fillRect(8,375,128,8,'#222');this.window.contents.fillRect(8,375,Math.floor(128*ratio/2)*2,8,'#66bdff');}}
-   else if(v.page===1){row(tr('nature'),tr('nature.'+m.nature),0);row(tr('origin'),m.origin?.text||String(m.origin?.map??tr('unknown')),1);row(tr('level'),m.origin?.level??tr('unknown'),2);row(tr('date'),m.origin?.receivedAt==null?tr('unknown'):new Date(m.origin.receivedAt*1000).toISOString().slice(0,10),3);row(tr('hatch'),m.origin?.hatchedAt==null?tr('unknown'):new Date(m.origin.hatchedAt*1000).toISOString().slice(0,10),4);row(tr('friendship'),m.friendship,5);row(tr('characteristic'),tr('characteristic.'+view.characteristic.stat+'.'+view.characteristic.variant),6);row(tr('method'),m.origin?.method??tr('unknown'),7);}
-   else if(v.page===2){for(const [i,key]of['hp','atk','def','spa','spd','spe'].entries()){const k=key as keyof typeof view.modifiers;row(tr(key),key==='hp'?`${m.hp}/${view.stats?.hp??'?'}`:view.stats?.[k]??'?',i,(view.modifiers[k]??1)>1?'#ffb0b0':(view.modifiers[k]??1)<1?'#aabfff':undefined);}row(tr('ability'),view.ability.name,6);paragraph(view.ability.description||tr('unavailable'),290,3);row(tr('exp'),m.exp+' / '+(view.nextLevelExp??'—'),10);}
+   else if(v.page===1){row(tr('nature'),tr('nature.'+m.nature.toLowerCase()),0);row(tr('origin'),m.origin?.text||String(m.origin?.map??tr('unknown')),1);row(tr('level'),m.origin?.level??tr('unknown'),2);row(tr('date'),m.origin?.receivedAt==null?tr('unknown'):new Date(m.origin.receivedAt*1000).toISOString().slice(0,10),3);row(tr('hatch'),m.origin?.hatchedAt==null?tr('unknown'):new Date(m.origin.hatchedAt*1000).toISOString().slice(0,10),4);row(tr('friendship'),m.friendship,5);row(tr('characteristic'),tr('characteristic.'+view.characteristic.stat+'.'+view.characteristic.variant),6);row(tr('method'),m.origin?.method??tr('unknown'),7);}
+   else if(v.page===2){for(const [i,key]of['hp','atk','def','spa','spd','spe'].entries()){const k=key as keyof typeof view.modifiers;row(tr(key),key==='hp'?`${m.hp}/${view.stats?.hp??'?'}`:view.stats?.[k]??'?',i,key!=='hp'&&(view.modifiers?.[k]??100)>100?'#ffb0b0':key!=='hp'&&(view.modifiers?.[k]??100)<100?'#aabfff':undefined);}row(tr('ability'),view.ability.name,6);paragraph(view.ability.description||tr('unavailable'),290,3);row(tr('exp'),m.exp+' / '+(view.nextLevelExp??'—'),10);}
    else if(v.page===3){if(!m.moves.length)row(tr('moves'),tr('none'),0);for(const [i,move]of view.moves.entries()){cell(6,76+i*48,w-12,44,move.name+'  '+move.pp+'/'+move.maxpp+' PP',v.detail==='moves'&&v.detailCursor===i);if(v.selected===i)text('↔',w-35,78+i*48,30,'#ffe29a');}const move=view.moves[v.detailCursor];if(move){row(tr('type'),move.type+' / '+move.category,7);row(tr('power'),(move.power??'—')+'   '+tr('accuracy')+': '+(move.accuracy||'—'),8);paragraph(move.description||tr('unavailable'),350,6);}}
    else {const ribbons=m.ribbons??[],start=Math.floor(v.detailCursor/12)*12;for(let i=0;i<12;i++){const n=start+i;cell((i%4)*w/4+3,80+Math.floor(i/4)*70,w/4-6,63,ribbons[n]||'·',v.detail==='ribbons'&&v.detailCursor===n);if(v.selected===n)text('↔',(i%4)*w/4+8,105+Math.floor(i/4)*70,30);}row(tr('ribbons'),ribbons.length,8);}
    if(view.diagnostics.length)text(tr('unavailable'),4,390,w-8,'#ffb5b5');
@@ -281,16 +293,29 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
  const P=Scene_PSManagement.prototype;
  P.initialize=function(){G.Scene_MenuBase.prototype.initialize.call(this);this._psParty=true;this._psManagement=true;this._request=nextRequest||{kind:'party'};nextRequest=null;};
  P.createPresentation=function(){G.Scene_MenuBase.prototype.create.call(this);this._window=new(Window_PSManagement as any)(new G.Rectangle(0,0,G.Graphics.boxWidth,G.Graphics.boxHeight));this.addWindow(this._window);};
- P.create=function(){this._controller=new Controller(this,this._request);try{this.createPresentation();}catch(e){this._creationFailure=e;}};
- P.rebuildFailed=function(error:unknown){console.error(NAME,'presentation rebuild failed',error);this._initialFailure=true;const c=this._controller;if(c.application===app()&&c.generation===app().stateGeneration&&c.request.kind==='receiving'){const reception=app().pendingReceiving;if(reception){const out=flow().resolveReceiving(reception.token,c.decisions,'rebuild-failed');if(!pending(out)&&out.status!=='refused'){c.closed=true;this._result=out;this._done=c.request.done;this.popScene();}}}};
- P.start=function(){G.Scene_MenuBase.prototype.start.call(this);if(this._creationFailure){try{this.createPresentation();}catch(e){this.rebuildFailed(e);return;}}try{this._controller.start(this._window);}catch(e){console.error(NAME,e);this._initialFailure=true;
-   // A real construction/resource failure gets one presentation rebuild. Timeout/focus loss never enters this path.
-   try{if(!this._controller.started)this._controller.start(this._window);else {this._controller.draw();this._controller.boundary();}this._initialFailure=false;}
-   catch(rebuildError){this.rebuildFailed(rebuildError);}
- }};
- P.update=function(){G.Scene_MenuBase.prototype.update.call(this);if(this._invalid){if(G.SceneManager._scene===this)this.popScene();return;}if(this._initialFailure){if(G.Input.isTriggered('cancel'))this.popScene();return;}this._controller.update();};
+ P.create=function(){try{this._controller=new Controller(this,this._request);}catch(e){this._creationFailure=e;}try{this.createPresentation();}catch(e){this._creationFailure=e;}};
+ P.rebuildFailed=function(error:unknown){
+  console.error(NAME,'management initialization/presentation failed',error);this._initialFailure=true;
+  const c=this._controller;if(c){c.resetInitialization();
+   if(c.application===flow()._app&&c.generation===c.application.stateGeneration&&c.request.kind==='receiving'){
+    const reception=c.application.pendingReceiving;if(reception){const out=flow().resolveReceiving(reception.token,c.decisions,'rebuild-failed');if(!pending(out)&&out.status!=='refused'){c.closed=true;this._result=out;this._done=c.request.done;this.popScene();return;}}
+   }
+  }
+  // This fallback must not read the unusable save or redraw the failed summary.
+  const message=tr('refused',{reason:String(error)})+'  '+tr('back');
+  try{if(this._window?.contents){const b=this._window.contents,width=b.width-16;b.clear();b.fontSize=20;b.textColor='#fff';let line='',y=48;
+   for(const char of Array.from(message)){if(this._window.textWidth(line+char)>width&&line){b.drawText(line,8,y,width,28,'left');line='';y+=30;}line+=char;}if(line)b.drawText(line,8,y,width,28,'left');
+  }else G.$gameMessage.add(message);}catch{console.error(NAME,message);}
+ };
+ P.start=function(){G.Scene_MenuBase.prototype.start.call(this);
+  const attempts=this._creationFailure?1:2;for(let attempt=0;attempt<attempts;attempt++){
+   try{if(!this._controller)this._controller=new Controller(this,this._request);if(!this._window)this.createPresentation();this._controller.start(this._window);this._initialFailure=false;return;}
+   catch(error){console.error(NAME,error);this._controller?.resetInitialization();if(attempt===attempts-1){this.rebuildFailed(error);return;}}
+  }
+ };
+ P.update=function(){G.Scene_MenuBase.prototype.update.call(this);if(this._invalid){if(G.SceneManager._scene===this)this.popScene();return;}if(this._initialFailure){if(G.Input.isTriggered('cancel')||G.Input.isTriggered('ok'))this.popScene();return;}try{this._controller?.update();}catch(error){this.rebuildFailed(error);}};
  P.popScene=function(){if(this._controller&&!this._controller.closed&&!this._invalid&&!this._initialFailure){if(this._controller.input){this._controller.input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));}else {this._controller.action('back');this._controller.draw();}return;}G.Scene_MenuBase.prototype.popScene.call(this);};
- P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);this._controller?.dispose();const done=this._done,result=this._result;if(done&&this._controller.application===app()&&this._controller.generation===app().stateGeneration){this._done=null;done(result);}};
+ P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);this._controller?.dispose();const done=this._done,result=this._result;if(done&&this._controller.application===flow()._app&&this._controller.generation===this._controller.application.stateGeneration){this._done=null;done(result);}};
  W.Scene_PSManagement=Scene_PSManagement;W.Scene_PSParty=Scene_PSManagement;
  G.PluginManager.registerCommand('PS_BattleFlow','ShowParty',function(){ui.openParty();});
  G.PluginManager.registerCommand(NAME,'ShowStorage',function(){ui.openStorage();});
@@ -301,5 +326,5 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
  G.Game_Interpreter.prototype.updateWaitMode=function(){if(this._waitMode==='psReceiving'){if(app().pendingReceiving)return true;this._waitMode='';return false;}return wait.call(this);};
  // A recovered placement is acknowledged only after its visible host notification has been queued.
  const mapStart=G.Scene_Map.prototype.start;
- G.Scene_Map.prototype.start=function(){mapStart.call(this);if(!flow()._app)return;for(const notice of app().receivingNotifications){try{const snap=app().managementSnapshot();const dest=notice.placements.map((p:any)=>p.to==='party'?tr('party'):boxTitle(snap,p.box)).join(', ');G.$gameMessage.add(tr('recovered',{dest}));app().acknowledgeReceivingNotification(notice.token);}catch(e){console.error(NAME,e);break;}}};
+ G.Scene_Map.prototype.start=function(){mapStart.call(this);if(!flow()._app)return;for(const notice of flow()._app.receivingNotifications){try{const snap=app().managementSnapshot();const dest=notice.placements.map((p:any)=>p.to==='party'?tr('party'):boxTitle(snap,p.box)).join(', ');G.$gameMessage.add(tr('recovered',{dest}));app().acknowledgeReceivingNotification(notice.token);}catch(e){console.error(NAME,e);break;}}};
 })();

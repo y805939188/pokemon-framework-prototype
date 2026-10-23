@@ -14,6 +14,7 @@
  * ("needs-content"), and a name the content cannot map refuses the WHOLE migration ("unmapped-species", every place
  * listed). Either way the input document is untouched, so the caller keeps the original save.
  */
+import { NATURES } from "./growth.ts";
 import { GAME_SCHEMA } from "./state.ts";
 import type { GameState } from "./state.ts";
 import { MAX_FORM, speciesDataOf } from "./species-key.ts";
@@ -65,6 +66,8 @@ function validateMember(m: unknown, path: string, out: Problem[], schema: number
   for (const k of Object.keys(m)) if (!(schema >= 5 ? [...MEMBER_KEYS.filter((k) => k !== "ot"), ...INDIVIDUAL_KEYS] : [...MEMBER_KEYS, ...INDIVIDUAL_KEYS]).includes(k)) out.push({ path: `${path}.${k}`, message: "unknown field (battle-only or temporary state does not belong in a save)" });
   if (typeof m["id"] !== "string" || !MEMBER_ID.test(m["id"])) out.push({ path: `${path}.id`, message: "must be 1-18 characters of A-Z a-z 0-9 # . _ : -" });
   for (const k of ["species", "item", "ability", "nature", "gender", "ball", ...(schema >= 5 ? [] : ["ot"])]) if (!(schema < 5 && ["ability", "nature", "gender", "ot"].includes(k) && m[k] === undefined) && typeof m[k] !== "string") out.push({ path: `${path}.${k}`, message: "must be a string" });
+  if (typeof m["nature"] === "string" && !Object.hasOwn(NATURES, m["nature"].toLowerCase())) out.push({ path: `${path}.nature`, message: "must name a registered nature (case-insensitive)" });
+  if (typeof m["gender"] === "string" && !["M", "F", "N"].includes(m["gender"])) out.push({ path: `${path}.gender`, message: "must be M, F or N" });
   if (m["nickname"] !== null && m["nickname"] !== undefined && typeof m["nickname"] !== "string") out.push({ path: `${path}.nickname`, message: "must be a string or null" });
   if (!isInt(m["level"], 1, 100)) out.push({ path: `${path}.level`, message: "must be an integer from 1 to 100" });
   if (!isInt(m["exp"], 0)) out.push({ path: `${path}.exp`, message: "must be an integer >= 0" });

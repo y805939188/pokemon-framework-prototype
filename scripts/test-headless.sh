@@ -62,6 +62,7 @@ SUITES=(
   experiments/step5/1/test-management-queries.cjs
   experiments/step5/1/test-management-ui.cjs
   experiments/step5/1/test-management-input.cjs
+  experiments/step5/1/test-J-remediation.cjs
   experiments/step5/1/test-held-contract.cjs
 )
 fail=0

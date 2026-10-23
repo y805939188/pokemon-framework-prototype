@@ -3,7 +3,7 @@ import { clone } from '../rules/value.ts';
 import { allMembers, locateMember } from '../rules/storage.ts';
 import type { MemberCollection, MemberPosition } from '../rules/storage.ts';
 import type { GameState } from '../rules/state.ts';
-import { computeStats, minExp, NATURES } from '../rules/growth.ts';
+import { computeStats, minExp, natureModifiers } from '../rules/growth.ts';
 import { characteristic, publicIdText } from '../rules/member-identity.ts';
 import { battleNameOf, memberKey, speciesDataOf } from '../rules/species-key.ts';
 import type { Content, DexLookup, Member, Owner, Stats } from '../rules/types.ts';
@@ -47,7 +47,7 @@ export function individualView(member: Member, game: GameState, content: Content
   const statics = battleName ? allowedDex?.species(battleName) : null;
   return clone({ member, position: locateMember(game, member.id)?.position ?? null, ...(species?.nameKey ? { nameKey: species.nameKey } : {}), battleName,
     stats: species ? computeStats(species.base, member.ivs, member.evs, member.level, member.nature) : null,
-    modifiers: NATURES[member.nature] ?? {}, currentLevelExp: species ? minExp(species.growth,member.level) : null, nextLevelExp: species && member.level < 100 ? minExp(species.growth, member.level + 1) : null,
+    modifiers: natureModifiers(member.nature), currentLevelExp: species ? minExp(species.growth,member.level) : null, nextLevelExp: species && member.level < 100 ? minExp(species.growth, member.level + 1) : null,
     publicId: publicIdText(member.owner?.id ?? 0), characteristic: characteristic(member.personalID ?? 0, member.ivs ?? {}), types: statics?.types ?? [],
     ability: allowedDex?.abilityInfo?.(member.ability) ?? { name: member.ability, description: '' },
     moves: member.moves.map(move => ({ ...move, ...(allowedDex?.moveDetails?.(move.id) ?? { name: move.id, type: '', category: '', power: null, accuracy: 0, description: '' }) })),
@@ -62,7 +62,7 @@ export function searchStorage(game: MemberCollection, search: StorageSearch, dis
   const text = fold(search.text?.trim() ?? ''), out: StorageMatch[] = [];
   for (const [box, record] of game.storage.boxes.entries()) for (const [slot, member] of record.slots.entries()) {
     if (!member || (search.form != null && member.form !== search.form) || !(search.markings ?? []).every(m => (member.markings?.[m.index] ?? 0) === m.value)) continue;
-    if (text && ![member.nickname ?? '', member.species, displayName(member)].some(s => fold(s).includes(text))) continue;
+    if (text && ![member.nickname ?? '', member.species, displayName(clone(member))].some(s => fold(s).includes(text))) continue;
     out.push({ id: member.id, position: { kind: 'box', box, slot }, member: clone(member) });
   }
   return out;

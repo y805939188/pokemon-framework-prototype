@@ -497,6 +497,9 @@ import { developmentCapabilities } from "../framework/rules/config";
     const table = PSFlow.mapEncounters();
     if (!table) return baseExecuteEncounter.call(this);
     if (PSFlow.running || G.$gameMap.isEventRunning() || this._encounterCount > 0) return false;
+    // Cold host gate: app() loads content, so reject before constructing it or drawing any random value.
+    try { if(!G.$gameSystem._psSaveError&&G.$gameSystem._psGame)PSFlow.assertBattleAllowed(); }
+    catch(error){PSFlow.lastEncounter={ok:false,reason:'held-item-battle-disabled',error:String(error)};return false;}
     this.makeEncounterCount();
     const t0 = performance.now();
     const plan = table.data.table ? PSFlow.encounter(table.data.table, this.regionId()) : { ok: false, reason: "invalid-note", error: table.data.problems.join("; ") };
