@@ -103,7 +103,7 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
     {key:'deposit',label:tr('deposit'),enabled:able>1,run:()=>this.storage('deposit')},
     {key:'close',label:tr('close'),run:()=>this.close(null)}],0,()=>this.close(null));
   }
-  storage(mode:string){this.push({kind:mode==='deposit'?'panel':'box',cursor:0,mode,box:this.snapshot.storage.currentBox});}
+  storage(mode:string){this.storageQuick=false;this.push({kind:mode==='deposit'?'panel':'box',cursor:0,mode,box:this.snapshot.storage.currentBox});}
   boxLink(){const v=this.top();return boxLinkAvailable(ui.hasBoxLink?.(),G.$gameSwitches&&G.$dataSystem?.switches?.length>35?!!G.$gameSwitches.value(35):undefined,G.$dataMap?.meta?!!G.$dataMap.meta.DisableBoxLink:undefined,v.quick===true);}
   nameInput(title:string,value:string,max:number,escapeEmpty:boolean,done:(value:string|null)=>void){
    const view:View={kind:'text',cursor:0,title,max,done,escapeEmpty};this.push(view);
@@ -292,7 +292,7 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
  Scene_PSManagement.prototype=Object.create(G.Scene_MenuBase.prototype);Scene_PSManagement.prototype.constructor=Scene_PSManagement;
  const P=Scene_PSManagement.prototype;
  P.initialize=function(){G.Scene_MenuBase.prototype.initialize.call(this);this._psParty=true;this._psManagement=true;this._request=nextRequest||{kind:'party'};nextRequest=null;};
- P.createPresentation=function(){G.Scene_MenuBase.prototype.create.call(this);this._window=new(Window_PSManagement as any)(new G.Rectangle(0,0,G.Graphics.boxWidth,G.Graphics.boxHeight));this.addWindow(this._window);};
+ P.createPresentation=function(){G.Scene_MenuBase.prototype.create.call(this);const win=new(Window_PSManagement as any)(new G.Rectangle(0,0,G.Graphics.boxWidth,G.Graphics.boxHeight));try{this.addWindow(win);}catch(error){win.parent?.removeChild(win);win.destroy?.();throw error;}this._window=win;};
  P.create=function(){try{this._controller=new Controller(this,this._request);}catch(e){this._creationFailure=e;}try{this.createPresentation();}catch(e){this._creationFailure=e;}};
  P.rebuildFailed=function(error:unknown){
   console.error(NAME,'management initialization/presentation failed',error);this._initialFailure=true;
