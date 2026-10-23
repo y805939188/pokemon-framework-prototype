@@ -15,7 +15,7 @@ add('legacy-PP-ambiguity',f+'rules/save-schema.ts',"if (base===undefined || move
 add('move-identity',f+'rules/member-metadata.ts',"const match = unused.find(entry => !used.has(entry.i) && entry.move.id === move.id);","const match = unused.find(entry => !used.has(entry.i));",'migration');
 add('calculation-nature',f+'rules/species-key.ts','nature: computedNature(m)','nature: m.nature','migration');
 add('growth-nature-roundtrip',f+'rules/growth.ts','nature: member.nature, statNature: member.statNature ?? null','nature: r.member.nature, statNature: null','migration');
-add('store-validator',f+'tools/save-store.ts','if (problems.length) throw new SaveError({ code: "invalid", message: "invalid current state; original file untouched", problems });','', 'migration');
+add('store-validator',f+'tools/save-store.ts','if (!checked.ok) throw new SaveError(checked.error);','', 'migration');
 add('canonical-intent',f+'app/inventory-session.ts','fingerprint=semanticFingerprint(request);','fingerprint=JSON.stringify(request);','transactions');
 add('duplicate-installs-twice',f+'app/inventory-session.ts',"if(old){if(old.fingerprint!==fingerprint)","if(false&&old){if(old.fingerprint!==fingerprint)",'transactions');
 add('receipt-before-install',f+'app/inventory-session.ts','    if(changed)try{this.options.install(next);}',"    this.receipts.set(requestId,{fingerprint,outcome:{status:'committed',requestId,result}});\n    if(changed)try{this.options.install(next);}",'transactions');
@@ -34,6 +34,20 @@ add('encounter-map-invalidation','src/plugins/PS_BattleFlow.ts','JSON.stringify(
 add('fake-semantic-fingerprint','experiments/step5/1/probes/held-contract-model.cjs',"require('../../../../js/engine/build/engine.cjs').semantic.semanticFingerprint(result)",'JSON.stringify(result)',['experiments/step5/1/test-held-contract.cjs']);
 add('host-root-encounter-preflight','src/plugins/PS_BattleFlow.ts',' || PSFlow._app?.encounterBlocked','',['experiments/step5/test-plugin-host5.cjs']);
 add('app-root-encounter-preflight',f+'app/game-application.ts','    if (this.encounterBlocked) return { ok: false, reason: "operation-active" };','', 'transactions');
+const remediation=['experiments/step5/2/test-M1-remediation.cjs'];
+add('M1-01-relearn-reset',f+'rules/member-metadata.ts','    if (base !== undefined && move.maxpp === base && totalPp(base, ppUps) !== base) ppUps = 0;','',remediation);
+add('M1-02-field-enum-type',f+'content/item-input.ts',"typeof raw.fieldUse !== 'string' || !['none','member','direct','field','tm','hm','tr'].includes(raw.fieldUse)","!['none','member','direct','field','tm','hm','tr'].includes(String(raw.fieldUse))",remediation);
+add('M1-02-battle-enum-type',f+'content/item-input.ts',"typeof raw.battleUse !== 'string' || !['none','member','move','active','foe','direct','ball'].includes(raw.battleUse)","!['none','member','move','active','foe','direct','ball'].includes(String(raw.battleUse))",remediation);
+add('M1-03-offered-quantity',f+'rules/inventory.ts','const n = itemQuantity(inventory, id, catalog);','const n = own(aggregateBag(inventory),id) ?? 0;',remediation);
+add('M1-04-store-content-check',f+'tools/save-store.ts','const checked = migrateGame(state, { ...(this.content ? { content: this.content } : {}) });','const checked = migrateGame(state);',remediation);
+add('M1-05-defeat-wallet',f+'rules/defeat.ts','healed.money = changeMoney(state.money, -moneyLost, moneyCap(content, options.moneyLimit ?? DEFAULT_LIMITS.money));','healed.money = state.money - moneyLost;',remediation);
+add('M1-06-status-assertion','src/plugins/PS_BattleFlowTest.ts','[api().state.GAME_SCHEMA, "psn", 0, "slp", undefined]','[5, "psn", 0, "slp", undefined]',remediation);
+add('M1-06-migration-assertion','src/plugins/PS_BattleFlowTest.ts','[1, api().state.GAME_SCHEMA, true]','[1, 5, true]',remediation);
+add('M1-06-newgame-assertion','src/plugins/PS_BattleFlowTest.ts','[api().state.GAME_SCHEMA, 0, 0, {}, 3000, {}, {}, 0]','[5, 0, 0, {}, 3000, {}, {}, 0]',remediation);
+add('M1-06-reload-assertion','src/plugins/PS_BattleFlowTest.ts','[undefined, api().state.GAME_SCHEMA, false]','[undefined, 5, false]',remediation);
+add('M1-06-T31-assertion','src/plugins/PS_BattleFlowTest.ts','[3, api().state.GAME_SCHEMA, true]','[3, 5, true]',remediation);
+add('M1-05-no-loss-guard',f+'rules/defeat.ts','if (!options.noMoneyLoss && state.party.length) healed.money','if (true) healed.money',remediation);
+add('M1-05-actual-loss-stat',f+'rules/defeat.ts','moneyLost: state.money - healed.money','moneyLost',remediation);
 const run=(command,args,timeout=180000)=>spawnSync(command,args,{cwd:root,encoding:'utf8',timeout,maxBuffer:16*1024*1024});
 const build=()=>run('pnpm',['--dir','src','build:engine']);
 function test(file,tag){const r=run(process.execPath,['--test','--test-reporter=tap',file]);fs.writeFileSync(path.join(outDir,tag+'.tap'),r.stdout+r.stderr);return {file,exit:r.status,fail:Number(r.stdout.match(/^# fail (\d+)/m)?.[1]??NaN),cancelled:Number(r.stdout.match(/^# cancelled (\d+)/m)?.[1]??NaN),skipped:Number(r.stdout.match(/^# skipped (\d+)/m)?.[1]??NaN),failing:[...r.stdout.matchAll(/^not ok \d+ - (.*)$/gm)].map(m=>m[1]),error:r.error?.message};}

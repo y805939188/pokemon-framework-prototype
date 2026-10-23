@@ -11,7 +11,10 @@ export function mergeBattleMoves(previous: readonly MoveSlot[], incoming: readon
     const match = unused.find(entry => !used.has(entry.i) && entry.move.id === move.id);
     if (match) used.add(match.i);
     const base = content ? baseMovePp(content, move.id) : undefined;
-    const ppUps = match?.move.ppUps ?? 0;
+    let ppUps = match?.move.ppUps ?? 0;
+    // A move may be forgotten and learned again under the same ID in one battle. Its base cap
+    // identifies a fresh record; other cap changes cannot be inferred from the frozen v1 result.
+    if (base !== undefined && move.maxpp === base && totalPp(base, ppUps) !== base) ppUps = 0;
     const expected = base === undefined ? match?.move.maxpp : totalPp(base, ppUps);
     if (expected === undefined || move.maxpp !== expected) throw new Error(`ambiguous-move-pp: ${move.id}`);
     return { id: move.id, pp: move.pp, maxpp: move.maxpp, ppUps };

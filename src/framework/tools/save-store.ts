@@ -18,7 +18,7 @@ import fs from "node:fs";
 import { applyBattleResult } from "../rules/state.ts";
 import type { BattleCommitOptions, BattleResult, GameState } from "../rules/state.ts";
 import type { Content } from "../rules/types.ts";
-import { validateGame, migrateGame } from "../rules/save-schema.ts";
+import { migrateGame } from "../rules/save-schema.ts";
 import type { MigrationResult, SaveErrorInfo } from "../rules/save-schema.ts";
 import type { SpeciesKeyResolver } from "../rules/species-key.ts";
 
@@ -66,8 +66,9 @@ export class SaveStore {
   load(): GameState { return this.loadInfo().state; }
 
   save(state: GameState): void {
-    const problems = validateGame(state);
-    if (problems.length) throw new SaveError({ code: "invalid", message: "invalid current state; original file untouched", problems });
+    const checked = migrateGame(state, { ...(this.content ? { content: this.content } : {}) });
+    if (!checked.ok) throw new SaveError(checked.error);
+    if (checked.migrated) throw new SaveError({ code: "invalid", message: "save requires a current state; migrate explicitly before saving; original file untouched" });
     const tmp = this.file + ".tmp";
     const fd = fs.openSync(tmp, "w");
     try {

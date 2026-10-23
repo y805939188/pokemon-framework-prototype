@@ -360,9 +360,9 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       G.$gameSystem._psGame = { diverged: true };
       const lc1 = await G.DataManager.loadGame(2);
       assert(!G.$gameSystem._psSaveError, "a schema 1 state loads without error");
-      eq([game().schema, game().party[1].status, game().party[1].statusCount, game().party[2].status, game().party[2].statusCount], [5, "psn", 0, "slp", undefined], "migrated on load");
+      eq([game().schema, game().party[1].status, game().party[1].statusCount, game().party[2].status, game().party[2].statusCount], [api().state.GAME_SCHEMA, "psn", 0, "slp", undefined], "migrated on load");
       eq(game().party.map((m: any) => [m.species, m.form]), [["charizard", 0], ["blastoise", 0], ["venusaur", 0]], "Showdown names mapped to content id + form through the content (D5-3)");
-      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, 5, true], "migration recorded");
+      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, api().state.GAME_SCHEMA, true], "migration recorded");
       // a state written by a newer build, and a damaged one
       for (const [slot, doc, code] of [[3, { ...clone(game()), schema: 9 }, "unknown-version"], [4, "not a state", "corrupt"]] as [number, any, string][]) {
         G.$gameSystem._psGame = doc;
@@ -515,7 +515,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       W.PSFlow.rng = seeded(4242);
       try {
         const g0 = clone(game());
-        eq([g0.schema, g0.party.length, boxed(g0).length, I6.bagOf(g0), g0.money, g0.claims, g0.appliedBattles, g0.steps], [5, 0, 0, {}, 3000, {}, {}, 0], "a new game is the formal empty state");
+        eq([g0.schema, g0.party.length, boxed(g0).length, I6.bagOf(g0), g0.money, g0.claims, g0.appliedBattles, g0.steps], [api().state.GAME_SCHEMA, 0, 0, {}, 3000, {}, {}, 0], "a new game is the formal empty state");
         assert(!JSON.stringify(g0).includes("A-000"), "no fixture member in a new game");
         const mz0 = mzParty();
         eq([G.$dataSystem.startMapId, G.$dataSystem.startX, G.$dataSystem.startY], [5, 8, 9], "the project starts on the slice map");
@@ -898,7 +898,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       return { saveCode: rc, party: expected.state.party.map((m: any) => [m.id, m.level]), boxes: boxed(expected.state).map((m: any) => m.id), seq: expected.seq };
     });
 
-    await scenario("T31 a save written by the step 4 code (schema 3, P-1 sample) through MZ's own save/load: migrated to schema 5 field by field with the content mapping and saved again; an unmappable one is refused and kept", async () => {
+    await scenario("T31 a save written by the step 4 code (schema 3, P-1 sample) through MZ's own save/load: migrated to schema 6 field by field with the content mapping and saved again; an unmappable one is refused and kept", async () => {
       const sample = clone(STEP4_FULL); // bundled into this test plugin: the package has no experiments/ folder
       const B = nodeRequire("./js/engine/build/engine.cjs");
       await slice(31);
@@ -907,13 +907,13 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       G.$gameSystem._psGame = { diverged: true };
       await G.DataManager.loadGame(13);
       assert(!G.$gameSystem._psSaveError, "loads: " + JSON.stringify(G.$gameSystem._psSaveError));
-      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [3, 5, true], "migrated from schema 3");
+      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [3, api().state.GAME_SCHEMA, true], "migrated from schema 3");
       const g = clone(game());
       const keyOf = (n: string) => B.speciesKey.keyOfBattleName(W.PSFlow.content(), n);
       eq(g.party.map((m: any) => [m.id, m.species, m.form]), sample.party.map((m: any) => [m.id, keyOf(m.species).species, 0]), "party by content id + form");
       eq(boxed(g).map((m: any) => [m.id, m.species]), sample.boxes.map((m: any) => [m.id, keyOf(m.species).species]), "boxes too");
       eq([g.claims, g.appliedBattles, I6.bagOf(g), g.money, g.dex.owned], [sample.claims, sample.appliedBattles, I6.bagOf(sample), sample.money, sample.dex.owned.map((n: string) => keyOf(n).species)], "claims, ledger, bag (5000 above the cap), money kept; dex mapped");
-      eq(B.saveSchema.validateGame(g), [], "a valid schema 5 state");
+      eq(B.saveSchema.validateGame(g), [], "a valid schema 6 state");
       eq(W.PSFlow.claim("starter").status, "already-claimed", "the claim survived");
       await G.DataManager.saveGame(14);
       fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t31.json"), JSON.stringify({ state: g }));
@@ -1485,11 +1485,11 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
   }
 
   async function verifySave() {
-    await scenario("V4 real restart: the step 4 save migrated and saved by the previous process loads as schema 5, without migrating again", async () => {
+    await scenario("V4 real restart: the step 4 save migrated and saved by the previous process loads as schema 6, without migrating again", async () => {
       const expected = JSON.parse(fs.readFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t31.json"), "utf8"));
       G.DataManager.setupNewGame();
       await G.DataManager.loadGame(14);
-      eq([G.$gameSystem._psSaveError, G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.migrated], [undefined, 5, false], "a schema 5 save");
+      eq([G.$gameSystem._psSaveError, G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.migrated], [undefined, api().state.GAME_SCHEMA, false], "a schema 6 save");
       eq(game(), expected.state, "the migrated state, identical");
       return { party: game().party.length };
     });

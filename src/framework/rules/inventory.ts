@@ -104,9 +104,10 @@ export function inventoryFromBag(bag: Record<string, number>, catalog: ItemCatal
 /** Only explicit battle identities enter a session. Ordinary field/key items never become battle actions. */
 export function battleBag(inventory: Inventory, catalog: ItemCatalog): Record<string, number> {
   const out: Record<string, number> = {};
-  for (const [id, n] of Object.entries(aggregateBag(inventory))) {
+  for (const id of Object.keys(aggregateBag(inventory))) {
     const item = requireItem(catalog, id);
-    if (item.battleId) setOwn(out, item.battleId, safeAdd(own(out, item.battleId) ?? 0, n));
+    const n = itemQuantity(inventory, id, catalog);
+    if (item.battleId && n > 0) setOwn(out, item.battleId, safeAdd(own(out, item.battleId) ?? 0, n));
   }
   return out;
 }

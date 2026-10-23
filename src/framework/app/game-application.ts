@@ -536,7 +536,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     let next = applied.state;
     let defeat: { moneyLost: number; healed: true } | undefined;
     if (isDefeat(result)) {
-      const settled = settleDefeat(next, content, { noMoneyLoss: this.noMoneyLoss, badges: badgeCount(next.badges) });
+      const settled = settleDefeat(next, content, { noMoneyLoss: this.noMoneyLoss, badges: badgeCount(next.badges), moneyLimit: this.limits.money });
       next = settled.state;
       defeat = { moneyLost: settled.moneyLost, healed: true };
     }

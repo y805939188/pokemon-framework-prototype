@@ -26,11 +26,11 @@ export function checkItemInputs(rawItems: unknown, rawShops: unknown, usable: (i
     if (raw.pocket !== undefined && (!integer(raw.pocket) || raw.pocket < 1 || raw.pocket > 8)) problem('items.json', `${p}.pocket`, 'must be 1..8');
     for (const key of ['order','price','sellPrice']) if (raw[key] !== undefined && !integer(raw[key])) problem('items.json', `${p}.${key}`, 'must be a nonnegative safe integer');
     if (raw.flags !== undefined && !strings(raw.flags)) problem('items.json', `${p}.flags`, 'must be string flags');
-    if (raw.fieldUse !== undefined && !['none','member','direct','field','tm','hm','tr'].includes(String(raw.fieldUse))) problem('items.json', `${p}.fieldUse`, 'unknown field use');
-    if (raw.battleUse !== undefined && !['none','member','move','active','foe','direct','ball'].includes(String(raw.battleUse))) problem('items.json', `${p}.battleUse`, 'unknown battle use');
+    if (raw.fieldUse !== undefined && (typeof raw.fieldUse !== 'string' || !['none','member','direct','field','tm','hm','tr'].includes(raw.fieldUse))) problem('items.json', `${p}.fieldUse`, 'must be a registered field use string');
+    if (raw.battleUse !== undefined && (typeof raw.battleUse !== 'string' || !['none','member','move','active','foe','direct','ball'].includes(raw.battleUse))) problem('items.json', `${p}.battleUse`, 'must be a registered battle use string');
     for (const key of ['consumable','showQuantity']) if (raw[key] !== undefined && typeof raw[key] !== 'boolean') problem('items.json', `${p}.${key}`, 'must be boolean');
     for (const key of ['move','battleId']) if (raw[key] !== undefined && (typeof raw[key] !== 'string' || !ITEM_ID.test(raw[key]))) problem('items.json', `${p}.${key}`, 'must be a stable data id');
-    if (['tm','hm','tr'].includes(String(raw.fieldUse)) && typeof raw.move !== 'string') problem('items.json', `${p}.move`, 'machines require an explicit move identity');
+    if (typeof raw.fieldUse === 'string' && ['tm','hm','tr'].includes(raw.fieldUse) && typeof raw.move !== 'string') problem('items.json', `${p}.move`, 'machines require an explicit move identity');
     if (typeof raw.battleId === 'string') { if (battleIds.has(raw.battleId)) problem('items.json', `${p}.battleId`, 'ambiguous battle id'); battleIds.add(raw.battleId); }
     if (raw.legacyIds !== undefined && (!strings(raw.legacyIds) || raw.legacyIds.some(id => !ITEM_ID.test(id)))) problem('items.json', `${p}.legacyIds`, 'must be stable legacy ids');
     if (strings(raw.legacyIds)) for (const legacy of raw.legacyIds) { if (legacyIds.has(legacy)) problem('items.json', `${p}.legacyIds`, 'ambiguous legacy id'); legacyIds.add(legacy); }
