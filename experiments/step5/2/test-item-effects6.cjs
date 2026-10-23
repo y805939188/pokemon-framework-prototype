@@ -19,7 +19,7 @@ for(const [id,status]of [['antidote','psn'],['pechaberry','psn'],['burnheal','br
  const x=setup({bag:{[id]:2},edit:g=>{g.party[0].status=status;g.party[0].statusCount=3;}}),r=plan(x,id);assert.equal(r.state.party[0].status,'');assert.equal(r.state.party[0].statusCount,0);assert.equal(r.state.party[0].hp,x.game.party[0].hp);x.game.party[0].status=status==='psn'?'brn':'psn';refusal(()=>plan(x,id),'no-effect');x.game.party[0].hp=0;refusal(()=>plan(x,id),'no-effect');
 });
 for(const id of ['fullheal','lavacookie','oldgateau','casteliacone','lumiosegalette','shaloursable','bigmalasada','pewtercrunchies','lumberry','healpowder','ragecandybar'])test('P52-12 full status family '+id,()=>{
- const x=setup({bag:{[id]:1},edit:g=>{g.party[0].status='tox';g.party[0].statusCount=2;}});assert.equal(plan(x,id).state.party[0].status,'');x.game.party[0].status='';refusal(()=>plan(x,id),'no-effect');
+ const x=setup({bag:{[id]:1},edit:g=>{g.party[0].status='psn';g.party[0].statusCount=2;}});assert.equal(plan(x,id).state.party[0].status,'');x.game.party[0].status='';refusal(()=>plan(x,id),'no-effect');
 });
 test('P52-12 full restore, revives, ash and rage alternate family',()=>{
  let x=setup({bag:{fullrestore:1},edit:g=>{g.party[0].status='brn';}});assert.equal(plan(x,'fullrestore').state.party[0].status,'');x.game.party[0].status='';refusal(()=>plan(x,'fullrestore'),'no-effect');
@@ -54,7 +54,7 @@ test('P52-15 berries multi25/config, simulated max and friendship modifier order
 });
 test('P52-16 fixed Lonely/Brave mint stats, original identity and battle view',()=>{
  for(const [id,expected]of [['lonelymint',[120,75,62,85,85,65]],['bravemint',[120,75,69,85,85,58]]]){
-  const x=setup({bag:{[id]:1},edit:(g,c)=>{c.species.Charizard.base={hp:45,atk:49,def:49,spa:65,spd:65,spe:45};g.party[0].nature='hardy';g.party[0].hp=70;}}),before=clone(x.game.party[0]);assert.equal(plan(x,id).selection.kind,'confirm');assert.equal(plan(x,id,1,{confirmed:false}).status,'cancelled');const m=plan(x,id,1,{confirmed:true}).state.party[0];assert.equal(m.nature,'hardy');assert.equal(m.hp,70);assert.equal(m.personalID,before.personalID);assert.deepEqual(m.owner,before.owner);assert.deepEqual(Object.values(E.growth.computeStats(x.content.species.Charizard.base,m.ivs,m.evs,m.level,E.memberMetadata.computedNature(m))),expected);assert.equal(E.speciesKey.battleView({...x.game,party:[m]},x.content).party[0].nature,id.replace('mint',''));
+  const x=setup({bag:{[id]:1},edit:(g,c)=>{c.species.Bulbasaur={...c.species.Charizard,base:{hp:45,atk:49,def:49,spa:65,spd:65,spe:45},abilities:['Overgrow'],hiddenAbilities:['Chlorophyll']};Object.assign(g.party[0],{species:'Bulbasaur',ability:'Overgrow',nature:'hardy',hp:70,ivs:{hp:31,atk:31,def:31,spa:31,spd:31,spe:31}});}}),before=clone(x.game.party[0]);assert.equal(plan(x,id).selection.kind,'confirm');assert.equal(plan(x,id,1,{confirmed:false}).status,'cancelled');const m=plan(x,id,1,{confirmed:true}).state.party[0];assert.equal(m.nature,'hardy');assert.equal(m.hp,70);assert.equal(m.personalID,before.personalID);assert.deepEqual(m.owner,before.owner);assert.deepEqual(Object.values(E.growth.computeStats(E.speciesKey.speciesDataOf(x.content,m).base,m.ivs,m.evs,m.level,E.memberMetadata.computedNature(m))),expected);assert.equal(E.speciesKey.battleView({...x.game,party:[m]},x.content).party[0].nature,id.replace('mint',''));
  }
 });
 test('P52-17 capsule and patch candidate message differs from actual resolver',()=>{

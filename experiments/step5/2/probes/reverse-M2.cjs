@@ -45,6 +45,8 @@ shop('sale-actual-income',"bumpStat(next.stats,'money_earned_at_marts',next.mone
 add('caller-stock-alias','app/inventory-session.ts','const stock=definition?[...definition.stock]:input.stock;','const stock=definition?[...definition.stock]:input.stock?[...input.stock]:undefined;','shop');
 add('stock-validated-before-install','app/inventory-session.ts','try{if(this.shop){assertMutableStock(this.shop.stock);filteredStock=[...this.shop.stock];filterShopStock(next,content,filteredStock);}}','try{}','shop');
 add('known-effect-cold-gate','content/item-input.ts','const invalid=fieldEffectProblem(e as unknown as NonNullable<ItemDefinition[\'effect\']>);','const invalid=null;','item-effects');
+add('Premier-keeps-battle-identity','rules/item-catalog.ts',"{...premier,flags:[...premier.flags,'PremierBall']}","{...premier,battleId:undefined,battleUse:'none',flags:[...premier.flags,'PremierBall']}",'shop');
+add('Berry-keeps-battle-identity','rules/item-catalog.ts',"source:'framework-legacy',...previous,pocket,flags:","source:'framework-legacy',pocket,flags:",'shop');
 const run=(cmd,args)=>spawnSync(cmd,args,{cwd:root,encoding:'utf8',timeout:180000,maxBuffer:20*1024*1024});
 const build=()=>run('pnpm',['--dir','src','build:engine']);
 const tap=(file,name)=>{const r=run(process.execPath,['--test','--test-reporter=tap',file]);fs.writeFileSync(path.join(out,name+'.tap'),r.stdout+r.stderr);return {file,exit:r.status,fail:Number(r.stdout.match(/^# fail (\d+)/m)?.[1]??NaN),cancelled:Number(r.stdout.match(/^# cancelled (\d+)/m)?.[1]??NaN),skipped:Number(r.stdout.match(/^# skipped (\d+)/m)?.[1]??NaN),failing:[...r.stdout.matchAll(/^not ok \d+ - (.*)$/gm)].map(m=>m[1]),error:r.error?.message};};

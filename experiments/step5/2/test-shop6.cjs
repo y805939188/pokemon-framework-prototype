@@ -57,3 +57,6 @@ test('P52-21 stock frozen before install rejects; stock host failure after insta
 test('P52-25 catalog canonical ball identity does not require opening battle-use mapping',()=>{
  const x=setup({settings:{MORE_BONUS_PREMIER_BALLS:false}});delete x.content.items.pokeball.battleId;x.content.items.pokeball.battleUse='none';x.content.items.premierball.flags=['PokeBall'];assert.equal(buy(x,shop(x,['pokeball']),'pokeball',25).result.bonus,1);assert.equal(E.inventory.battleBag(buy(x,shop(x,['pokeball']),'pokeball',25).state.inventory,x.content.items).pokeball,undefined);
 });
+test('P52-25/39 legacy battle mappings survive field catalog enrichment including Premier',()=>{
+ const catalog=E.itemCatalog.legacyCatalog();for(const id of E.items.BAG_ITEMS){assert.equal(catalog[id].battleId,id,id);assert.notEqual(catalog[id].battleUse,'none',id);}assert.equal(E.itemCatalog.hasFlag(catalog.premierball,'PremierBall'),true);assert.equal(E.inventory.battleBag(E.inventory.inventoryFromBag({premierball:1},catalog),catalog).premierball,1);
+});
