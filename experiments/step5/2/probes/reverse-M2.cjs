@@ -35,7 +35,7 @@ app('selection-cancel-variable',"this.options.variables.write(selection.variable
 app('selection-no-resource-write',"this.selection!.indices[pocket-1]=index;","this.selection!.indices[pocket-1]=index;const next=clone(this.state.read());next.inventory.lastPocket=pocket;this.options.install(next);");
 app('selection-late-host-owner',"this.options.variables.write(selection.variableId,itemId??'');this.current(token);if(this.selection!==selection)throw new Error('stale-selection');","this.options.variables.write(selection.variableId,itemId??'');");
 app('predicate-write-reentry',"if(this.readingProjection)throw new Error('projection-active');\n      data=this.current(token);","data=this.current(token);");
-app('toss-message-before-delete',"try{await before({itemId,quantity});}","try{this.execute(token,requestId,request,present);await before({itemId,quantity});}");
+app('toss-message-before-delete',"try{await before({itemId,quantity});}","try{this.tossPending=null;this.execute(token,requestId,request,present);await before({itemId,quantity});}");
 shop('event-sell-times2','next.sell=sell*2;','next.sell=sell;');
 shop('important-latest-ownership','||importantItem(item)&&itemQuantity(game.inventory,id,catalog)>0','');
 shop('gift-count-floor','generous?Math.floor(intent.quantity/10)','generous?1');
