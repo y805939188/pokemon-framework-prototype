@@ -17,7 +17,7 @@ function host(options={}){
  const ready=()=>{tick();tick();assert.equal(G.PSManagement.current()?.ready,true)};
  const down=()=>press('down'),use=()=>press('ok'),back=()=>press('cancel');
  const choose=key=>{ready();let n=0;while(G.PSManagement.current().view.items[G.PSManagement.current().view.cursor]?.key!==key&&n++<50)down();assert.equal(G.PSManagement.current().view.items[G.PSManagement.current().view.cursor]?.key,key);use();};
- const releaseNative=key=>{for(const fn of listeners.keyup??[])fn({key,code:key,keyCode:key==='Enter'?13:27})};
+ const releaseNative=key=>{input.pressed.delete(['Enter','KeyZ','Space'].includes(key)?'ok':'cancel');for(const fn of listeners.keyup??[])fn({key,code:key,keyCode:key==='Enter'?13:27})};
  return {G,app,state,input,listeners,windowEvents,manager,document,tick,press,ready,choose,down,use,back,releaseNative};
 }
 test('P51-18/T24: real built scene does not accept inputs until start/layout boundary; rapid held trigger cannot select next view',()=>{
@@ -70,7 +70,7 @@ for(const key of ['ok','cancel','down'])test(`J01: gamepad ${key} held across en
  sample(false);h.press(key);if(key==='ok')assert.equal(h.G.PSManagement.current().view.kind,'menu');if(key==='cancel')assert.equal(h.manager.popped,1);if(key==='down')assert.equal(h.G.PSManagement.current().view.cursor,2);
 });
 test('J01: two physical aliases require both releases; blur clears both registries without editing the save',()=>{
- const h=host(),fire=(name,code,keyCode)=>{for(const f of h.listeners[name])f({code,keyCode})};fire('keydown','Enter',13);fire('keydown','KeyZ',90);h.input.pressed.add('ok');h.G.PSManagement.openParty();h.ready();fire('keyup','KeyZ',90);h.use();assert.equal(h.G.PSManagement.current().view.kind,'party');fire('keyup','Enter',13);h.use();assert.equal(h.G.PSManagement.current().view.kind,'menu');const before=JSON.stringify(h.state.current());for(const f of h.windowEvents.blur)f();assert.equal(JSON.stringify(h.state.current()),before);
+ const h=host(),fire=(name,code,keyCode)=>{for(const f of h.listeners[name])f({code,keyCode})};fire('keydown','Enter',13);fire('keydown','KeyZ',90);h.input.pressed.add('ok');h.G.PSManagement.openParty();h.ready();fire('keyup','KeyZ',90);h.use();assert.equal(h.G.PSManagement.current().view.kind,'party');fire('keyup','Enter',13);h.tick();h.use();assert.equal(h.G.PSManagement.current().view.kind,'menu');const before=JSON.stringify(h.state.current());for(const f of h.windowEvents.blur)f();assert.equal(JSON.stringify(h.state.current()),before);
 });
 for(const phase of ['begin','snapshot','draw'])for(const persistent of [false,true])test(`J02: ${phase} ${persistent?'persistent':'transient'} failure cannot leave empty-ready stack or management owner`,()=>{
  const h=host();let calls=0;
@@ -122,4 +122,26 @@ for(const failures of [1,2])test(`J02: window attachment fails ${failures} times
 });
 test('J06: leaving organizer resets quick mode before entering another storage mode',()=>{
  const h=host();h.G.PSManagement.openStorage();h.choose('organize');h.ready();h.press('shift');h.ready();assert.equal(h.manager._scene._controller.storageQuick,true);h.back();h.choose('no');h.choose('deposit');h.ready();assert.equal(h.manager._scene._controller.storageQuick,false);
+});
+
+for(const order of ['keyboard-first','gamepad-first','both-held','gamepad-only'])test(`RJ01: merged direction barrier ${order} waits for all sources across entry and summary`,()=>{
+ const h=host(),key=type=>{for(const fn of h.listeners[type])fn({code:'ArrowDown',keyCode:40})};
+ const sample=(down,repeat=false)=>{h.input.pressed[down?'add':'delete']('down');if(repeat)h.input.repeat.add('down');h.tick()};
+ for(const summary of [false,true]){
+  if(order!=='gamepad-only')key('keydown');h.input.pressed.add('down');
+  if(summary){h.manager._scene._controller.summary(h.state.current().party.map(m=>m.id),0);}else h.G.PSManagement.openParty();
+  sample(true);sample(true);sample(true,true);assert.equal(h.G.PSManagement.current().view.cursor,0);
+  if(order==='keyboard-first')key('keyup');if(order==='gamepad-first')sample(false);
+  for(let i=0;i<25;i++)sample(order!=='gamepad-first',true);
+  assert.equal(h.G.PSManagement.current().view.cursor,0,'remaining source must retain barrier');
+  key('keyup');sample(false);sample(false);sample(true,true);assert.equal(h.G.PSManagement.current().view.cursor,summary?1:2,'all released, new pad press works');sample(false);
+ }
+});
+test('RJ02: withdraw party button only prompts without writes; organize panel and deposit still work',()=>{
+ for(const mode of ['withdraw','organize','deposit']){
+  const h=host(),before=JSON.stringify(h.state.current()),writes=h.state.replaced.length;h.G.PSManagement.openStorage();h.choose(mode);h.ready();
+  if(mode!=='deposit'){h.press('control');h.press('up');assert.equal(h.G.PSManagement.current().view.cursor,-2);h.use();h.ready();}
+  if(mode==='withdraw'){assert.equal(h.G.PSManagement.current().view.kind,'box');assert.equal(h.G.PSManagement.current().view.cursor,-2);assert.ok(h.G.PSManagement.current().text.some(t=>t.includes('Which one will you take?')));h.use();assert.equal(h.G.PSManagement.current().view.kind,'box');assert.equal(JSON.stringify(h.state.current()),before);assert.equal(h.state.replaced.length,writes);}
+  else {assert.equal(h.G.PSManagement.current().view.kind,'panel');h.use();h.choose('transfer');assert.equal(h.state.current().party.length,2);}
+ }
 });

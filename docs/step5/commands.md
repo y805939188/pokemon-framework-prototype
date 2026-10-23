@@ -102,3 +102,6 @@
 原生文字输入会消费最初的Enter/Esc，而MZ看不到该keydown；适配层显式屏蔽这个物理键直到keyup，覆盖输入节点或整个场景已移除的情况，防止浏览器repeat误选下一项。每场景输入监听器清理；插件有且仅有一个常驻keyup监听器和一个blur监听器，不保留旧场景。blur只清输入缓冲，不提交、取消或兜底接收。
 
 J 整改兼容收窄：`commitResult` 在会话创建中或战斗运行中均拒绝（`battle-active`），本战只由 `finishBattle`/接收流程提交。无活动战斗的显式手工提交仍支持。旧档性格接受登记的25种名称及既有大小写拼写（保持原值），性别仅M/F/N；明确未知/空字符串拒绝，缺失默认只适用于旧schema。只读检索的显示名回调接收隔离副本。管理初始化失败完整重试一次，仍失败显示可退出诊断，释放自身管理令牌；T1仍保留原档和全槽保存阻断。
+
+
+RJ01–RJ03 定向回归：`node --test experiments/step5/1/test-management-ui.cjs experiments/step5/1/test-held-contract.cjs`；反向使用 `node experiments/step5/probes/unfix5.cjs RJ01-mixed-source-release RJ02-withdraw-panel RJ03-fake-safe-id-write`。真实 U51-18/19 随完整开发树/新包套件执行；输入设备为实际 Reactor 轮询的虚拟 navigator 控制器，不是实体手柄。

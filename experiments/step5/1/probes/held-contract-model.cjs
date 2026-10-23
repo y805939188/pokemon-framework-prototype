@@ -1,5 +1,6 @@
 'use strict';
 /** PROPOSAL ONLY. Fake vectors for a future adapter; never imported by runtime or protocol v1. */
+const setOwn=(map,id,value)=>Object.defineProperty(map,id,{value,writable:true,enumerable:true,configurable:true});
 function propose(initial,events,context={wild:false}){
  const ids=Object.keys(initial),current={...initial},restore={...initial},history=[];
  const known=new Set(ids),seen=new Set();
@@ -7,9 +8,9 @@ function propose(initial,events,context={wild:false}){
   if(e.previous!==current[e.id])throw Error('stale-item');
   if(!['consumed','flung','knocked-off','wild-acquired','transferred'].includes(e.reason))throw Error('unknown-item-reason');
   if(e.reason==='wild-acquired'&&!context.wild)throw Error('not-wild-acquisition');
-  current[e.id]=e.current;
-  if(e.reason==='consumed'||e.reason==='flung'){if(e.current!=='')throw Error('invalid-loss');if(restore[e.id]===e.previous)restore[e.id]='';}
-  if(e.reason==='wild-acquired')restore[e.id]=e.current;
+  setOwn(current,e.id,e.current);
+  if(e.reason==='consumed'||e.reason==='flung'){if(e.current!=='')throw Error('invalid-loss');if(restore[e.id]===e.previous)setOwn(restore,e.id,'');}
+  if(e.reason==='wild-acquired')setOwn(restore,e.id,e.current);
   if(e.reason==='transferred')throw Error('transfer-permanence-unresolved'); // never guess RPG permanence from a Showdown swap
   history.push({...e});
  }
@@ -17,7 +18,7 @@ function propose(initial,events,context={wild:false}){
 }
 function project(plan,placements,alreadyApplied=false){
  if(alreadyApplied)return {status:'duplicate'};
- const writes={};for(const p of placements){if(!Object.hasOwn(plan.current,p.id))throw Error('unknown-member');writes[p.id]=p.to==='box'?plan.current[p.id]:plan.restore[p.id];}
+ const writes={};for(const p of placements){if(!Object.hasOwn(plan.current,p.id))throw Error('unknown-member');setOwn(writes,p.id,p.to==='box'?plan.current[p.id]:plan.restore[p.id]);}
  return {status:'proposed',writes};
 }
 module.exports={propose,project};
@@ -32,12 +33,12 @@ function createFakeReceiver(){
   for(const captured of result.captured??[]){
    if(!captured.id||Object.hasOwn(plan.current,captured.id)||typeof captured.current!=='string')throw Error('invalid-capture-identity');
    // Explicit terminal current item is an input to this proposal, never inferred from a missing engine request.
-   plan.current[captured.id]=captured.current;plan.restore[captured.id]=captured.current;eligible.add(captured.id);
+   setOwn(plan.current,captured.id,captured.current);setOwn(plan.restore,captured.id,captured.current);eligible.add(captured.id);
   }
   const seen=new Set(),writes={};
   for(const placement of result.placements){
    if(seen.has(placement.id)||!Object.hasOwn(plan.current,placement.id)||!['party','box'].includes(placement.to))throw Error('invalid-placement');seen.add(placement.id);
-   if(placement.to==='box'){writes[placement.id]=plan.current[placement.id];eligible.delete(placement.id);}else writes[placement.id]=plan.restore[placement.id];
+   if(placement.to==='box'){setOwn(writes,placement.id,plan.current[placement.id]);eligible.delete(placement.id);}else setOwn(writes,placement.id,plan.restore[placement.id]);
   }
   if(seen.size!==Object.keys(plan.current).length)throw Error('incomplete-placement');
   const proposal={writes,restoreEligible:[...eligible],bag:{...(result.bag??{})}};

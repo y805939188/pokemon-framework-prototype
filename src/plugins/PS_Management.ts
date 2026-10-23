@@ -53,7 +53,8 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
   storageQuick=false;
   reception:any=null;decisions:Record<string,ReceivingDecision>={};receiveIndex=0;readonly=false;completion:any=null;
   onKeyDown=(e:any)=>{const key=eventKey(e);if(key)this.physical.add(key);};
-  onKeyUp=(e:any)=>{const key=eventKey(e);if(key&&!Array.from(keyboardKeys.values()).includes(key)&&!Array.from(nativeConsumed.values()).includes(key)){this.physical.delete(key);this.latch.release(key);}};
+  // keyup clears only its DOM source. The next merged frame releases the latch after gamepad polling.
+  onKeyUp=(e:any)=>{const key=eventKey(e);if(key&&!Array.from(keyboardKeys.values()).includes(key)&&!Array.from(nativeConsumed.values()).includes(key)){this.physical.delete(key);}};
   constructor(scene:any,request:OpenRequest){this.scene=scene;this.request=request;this.application=app();this.generation=this.application.stateGeneration;this.token='ui:'+this.generation+':'+(++sequence);}
   valid(){try{return !this.closed&&this.application===app()&&this.generation===this.application.stateGeneration&&current===this;}catch{return false;}}
   top():View{return this.stack[this.stack.length-1]!;}
@@ -214,7 +215,7 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
     if(action==='special'){if(v.kind==='box')v.cursor=-1;return;}
     if(action==='action'&&v.mode==='organize'){this.storageQuick=!this.storageQuick;this.boundary();return;}
     if(action==='back'){if(this.snapshot.held){this.confirm(tr('cancelHeld'),()=>this.operate({kind:'cancel-held'}));return;}if(v.itemSource){v.itemSource=null;return;}if(v.kind==='panel'&&v.mode==='organize'){this.back();return;}this.confirm(tr('continue'),()=>{},true,()=>this.exitStorage());return;}
-    if(v.kind==='box'&&v.cursor<0){if(action==='use'){if(v.cursor===-1)this.boxMenu();else if(v.cursor===-2)this.push({kind:'panel',cursor:0,mode:v.mode,box:v.box});else if(this.snapshot.held)this.fail(tr('heldBlock'));else this.confirm(tr('exit'),()=>this.exitStorage());}return;}
+    if(v.kind==='box'&&v.cursor<0){if(action==='use'){if(v.cursor===-1)this.boxMenu();else if(v.cursor===-2){if(v.mode==='organize')this.push({kind:'panel',cursor:0,mode:v.mode,box:v.box});else this.error=tr('withdrawPrompt');}else if(this.snapshot.held)this.fail(tr('heldBlock'));else this.confirm(tr('exit'),()=>this.exitStorage());}return;}
     if(v.kind==='panel'&&v.cursor===6){if(action==='use')this.back();return;}
     const position:MemberPosition=v.kind==='box'?{kind:'box',box:v.box,slot:v.cursor}:{kind:'party',index:v.cursor};const m=v.kind==='box'?this.snapshot.storage.boxes[v.box]!.slots[v.cursor]:this.snapshot.party[v.cursor];
     if(action==='use'&&v.mode==='organize'&&this.storageQuick&&!v.itemSource){if(this.snapshot.held)this.operate({kind:'place-held',target:position,expectedTargetId:m?.id??null});else if(m)this.operate({kind:'pick-up',source:this.reference(m.id)});return;}

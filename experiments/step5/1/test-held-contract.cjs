@@ -26,3 +26,16 @@ test('J10/fake: missing terminal item, reused capture identity and duplicate/mis
  const base={battleId:'bad',initial:{A:'leftovers'},events:[],captured:[{id:'NEW',current:''}],placements:[{id:'A',to:'party'},{id:'NEW',to:'box'}]};
  for(const change of [r=>delete r.captured[0].current,r=>r.captured[0].id='A',r=>r.placements[1].id='A',r=>r.placements.pop(),r=>r.placements[1].id='UNKNOWN',r=>r.placements[1].to='overflow']){const r=structuredClone(base);change(r);const receiver=createFakeReceiver();let installed=0;assert.throws(()=>receiver.apply(r,()=>installed++));assert.equal(installed,0);assert.equal(receiver.receiptCount,0)}
 });
+
+for(const id of ['NORMAL','constructor','__proto__'])for(const kind of ['initial','captured'])for(const to of ['party','box'])test(`RJ03/fake: ${id} ${kind} to ${to}, full own write, failed install retry and duplicate/conflict`,()=>{
+ const initial=kind==='initial'?{[id]:'leftovers'}:{},result={battleId:'id-boundary',initial,events:kind==='initial'?[event(id,'leftovers','','knocked-off')]:[],captured:kind==='captured'?[{id,current:'leftovers'}]:[],placements:[{id,to}]},before=JSON.stringify(result),receiver=createFakeReceiver();let installs=0,installed;
+ assert.throws(()=>receiver.apply(result,()=>{throw Error('before-install')}),/before-install/);assert.equal(receiver.receiptCount,0);
+ const out=receiver.apply(result,p=>{installs++;installed=p});assert.equal(out.status,'applied');assert.deepEqual(Object.keys(installed.writes),[id]);assert.equal(Object.hasOwn(installed.writes,id),true);assert.equal(installed.writes[id],kind==='initial'&&to==='box'?'':'leftovers');assert.deepEqual(out.restoreEligible,to==='party'?[id]:[]);assert.equal(receiver.receiptCount,1);
+ assert.equal(receiver.apply(result,()=>installs++).status,'duplicate');assert.throws(()=>receiver.apply({...result,bag:{potion:1}},()=>installs++),/result-conflict/);assert.equal(installs,1);assert.equal(JSON.stringify(result),before);
+});
+test('RJ03/project: prototype-named IDs preserve current and restoration through consumption/acquisition and JSON round trip',()=>{
+ for(const id of ['NORMAL','constructor','__proto__'])for(const reason of ['consumed','flung','knocked-off','wild-acquired']){
+  const acquired=reason==='wild-acquired',plan=propose({[id]:acquired?'':'leftovers'},[event(id,acquired?'':'leftovers',acquired?'ironball':'',reason)],{wild:true});
+  for(const to of ['party','box']){const out=project(plan,[{id,to}]);assert.deepEqual(Object.keys(out.writes),[id]);assert.equal(out.writes[id],acquired?'ironball':reason==='knocked-off'&&to==='party'?'leftovers':'');assert.equal(JSON.parse(JSON.stringify(out)).writes[id],out.writes[id]);}
+ }
+});

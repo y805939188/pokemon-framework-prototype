@@ -100,6 +100,10 @@ const U = [
   {"id": "J11-map-preflight", "what": "J regression: J11-map-preflight", "edits": [["src/plugins/PS_BattleFlow.ts", "try { if(!G.$gameSystem._psSaveError&&G.$gameSystem._psGame)PSFlow.assertBattleAllowed(); }", "try { /* missing cold preflight */ }"]], "tests": ["experiments/step5/test-plugin-host5.cjs"]},
   {"id": "J11-app-preflight", "what": "J regression: J11-app-preflight", "edits": [["src/framework/app/game-application.ts", "    if (!this.capabilities.allowExperimentalHeldItemBattle && game.party.some((m) => !!m.item)) return { ok: false, reason: \"held-item-battle-disabled\" };", ""]], "tests": ["experiments/step5/1/test-J-remediation.cjs"]},
   {"id": "J02-window-attachment", "what": "an unattached window is incorrectly treated as a complete presentation", "edits": [["src/plugins/PS_Management.ts", "try{this.addWindow(win);}", "this._window=win;try{this.addWindow(win);}"]], "tests": ["experiments/step5/1/test-management-ui.cjs"]},
+  {"id": "RJ01-mixed-source-release", "what": "Keyboard keyup must not release a held gamepad action", "edits": [["src/plugins/PS_Management.ts", "{this.physical.delete(key);}};", "{this.physical.delete(key);this.latch.release(key);}};"]], "tests": ["experiments/step5/1/test-management-ui.cjs"]},
+  {"id": "RJ02-withdraw-panel", "what": "Withdraw party button must stay in the box selector", "edits": [["src/plugins/PS_Management.ts", "if(v.mode==='organize')this.push({kind:'panel',cursor:0,mode:v.mode,box:v.box});else this.error=tr('withdrawPrompt');", "this.push({kind:'panel',cursor:0,mode:v.mode,box:v.box});"]], "tests": ["experiments/step5/1/test-management-ui.cjs"]},
+  {"id": "RJ03-fake-safe-id-write", "what": "Legal prototype named IDs require own writes in fake plans and installation", "edits": [["experiments/step5/1/probes/held-contract-model.cjs", "Object.defineProperty(map,id,{value,writable:true,enumerable:true,configurable:true})", "(map[id]=value)"]], "tests": ["experiments/step5/1/test-held-contract.cjs"]},
+
 ];
 const sh = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts });
 const want = process.argv.slice(2), out = [];
