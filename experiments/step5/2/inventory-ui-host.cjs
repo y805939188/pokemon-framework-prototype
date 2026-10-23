@@ -9,12 +9,12 @@ function host(options={}){
  // JSON-equivalent plain objects; no behavior/status/port faults are stubbed or rewritten.
  const app=new Proxy(x.app,{get(target,key){const v=target[key];if(typeof v!=='function')return v;return(...args)=>{if(key==='inventoryRequest'||key==='manage')args[2]=clone(args[2]);return v.apply(target,args);};}});
  const listeners={},events={},commands={},messages=[],vars={},input={trigger:new Set(),repeat:new Set(),pressed:new Set(),keyMapper:{},isTriggered(k){return this.trigger.has(k)},isRepeated(k){return this.repeat.has(k)},isPressed(k){return this.pressed.has(k)},clear(){this.trigger.clear();this.repeat.clear();this.pressed.clear()}};
- let windowFailures=options.windowFailures??0,attachFailures=options.attachFailures??0,destroyed=0,drawFault=null;
+ const drawCalls=[];let windowFailures=options.windowFailures??0,attachFailures=options.attachFailures??0,destroyed=0,drawFault=null;
  function Base(){}for(const m of ['initialize','create','start','update','terminate'])Base.prototype[m]=function(){};
  Base.prototype.isStarted=()=>true;Base.prototype.clear=function(){this._waitMode='';};
  Base.prototype.addWindow=function(win){if(attachFailures-->0)throw Error('injected window attachment');win.parent={removeChild(){}};};Base.prototype.setWaitMode=function(mode){this._waitMode=mode;};Base.prototype.updateWaitMode=()=>false;
  Base.prototype.popScene=function(){this.terminate();manager.popped++;if(manager._scene===this)manager._scene=new Base();};
- function Win(){this.initialize(...arguments)}Win.prototype.initialize=function(){if(windowFailures-->0)throw Error('injected inventory window');this.contents={width:792,height:576,clear(){},fillRect(){},drawText(text){if(drawFault?.(text))throw Error('injected presentation failure');}};};Win.prototype.activate=function(){};Win.prototype.textWidth=s=>String(s).length*10;Win.prototype.destroy=function(){destroyed++;};
+ function Win(){this.initialize(...arguments)}Win.prototype.initialize=function(){if(windowFailures-->0)throw Error('injected inventory window');this.contents={width:792,height:576,clear(){drawCalls.length=0;},fillRect(...args){drawCalls.push({op:'fillRect',args});},drawText(...args){if(drawFault?.(args[0]))throw Error('injected presentation failure');drawCalls.push({op:'drawText',args});}};};Win.prototype.activate=function(){};Win.prototype.textWidth=s=>String(s).length*10;Win.prototype.destroy=function(){destroyed++;};
  const manager={_scene:null,popped:0,isSceneChanging:()=>false,push(C){this._scene?.terminate();this._scene=new C();this._scene.create();this._scene.start();},goto(C){this.push(C)},updateScene(){this._scene?.update();}};
  function MenuCommand(){this._list=[];this.handlers={};this.addOriginalCommands();}MenuCommand.prototype.addOriginalCommands=function(){};MenuCommand.prototype.addCommand=function(name,symbol,enabled){this._list.push({name,symbol,enabled});};MenuCommand.prototype.setHandler=function(symbol,fn){this.handlers[symbol]=fn;};MenuCommand.prototype.activate=function(){this.activated=true;};
  function Menu(){this.initialize();}Menu.prototype=Object.create(Base.prototype);Menu.prototype.create=function(){this.createCommandWindow();};Menu.prototype.createCommandWindow=function(){this._commandWindow=new MenuCommand();};
@@ -31,6 +31,6 @@ function host(options={}){
  const pocket=n=>{ready();let tries=0;while(view()?.pocket!==n&&tries++<8)press('right');};
  const command=(name,args={})=>{const interpreter=new Base();commands['PS_Inventory:'+name].call(interpreter,args);return interpreter;};
  const dom=(kind,code)=>{for(const f of listeners[kind]??[])f({code,key:code==='Enter'?'Enter':code==='Escape'?'Escape':code,keyCode:code==='Enter'?13:code==='Escape'?27:0});};
- return {...x,app,G,input,manager,listeners,events,messages,vars,tick,press,ready,view,choose,managementChoose,pocket,command,dom,setDrawFault(f){drawFault=f;},get destroyed(){return destroyed;}};
+ return {...x,app,G,input,drawCalls,manager,listeners,events,messages,vars,tick,press,ready,view,choose,managementChoose,pocket,command,dom,setDrawFault(f){drawFault=f;},get destroyed(){return destroyed;}};
 }
 module.exports={host,build,disposeBuild,E,clone};
