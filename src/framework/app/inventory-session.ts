@@ -40,7 +40,7 @@ export class InventorySession {
   private filtering=false;
   private readingProjection=false;
   private shop:ShopContext|null=null;
-  private pendingUse:{requestId:string;fingerprint:string;revision:string;world:string;learning:boolean}|null=null;
+  private pendingUse:{requestId:string;fingerprint:string;revision:string;world:string;learning:boolean;stale:boolean}|null=null;
   private effectRevision=0n;
   private observedEffect='';
   private selectionSequence=0n;
@@ -130,10 +130,13 @@ export class InventorySession {
           if(context.kind==='shop')throw new Error('wrong-operation');if(request.ticket)this.checkTicket(token,request.ticket);if(request.ticket&&request.ticket.itemId!==request.itemId)throw new Error('stale-slot');if(context.parent&&request.memberId!==undefined&&request.memberId!==context.parent.memberId)throw new Error('invalid-target');
           const {answers,...base}=request,world=clone(this.options.world?.()??{}),identity=semanticFingerprint(base),revision=String(this.effectRevision),worldRevision=semanticFingerprint(world);
           if(JSON.stringify(this.current(token).game)!==JSON.stringify(game))throw new Error('stale-item-selection');
-          if(this.pendingUse&&(this.pendingUse.fingerprint!==identity||this.pendingUse.revision!==revision||this.pendingUse.world!==worldRevision)){this.pendingUse=null;throw new Error('stale-item-selection');}
+          // A changed base intent cannot cancel its existing learning owner. Related edits retire
+          // this selection permanently until the operation closes, even if world values later return (ABA).
+          if(this.pendingUse&&(this.pendingUse.stale||this.pendingUse.revision!==revision||this.pendingUse.world!==worldRevision)){this.pendingUse.stale=true;throw new Error('stale-item-selection');}
+          if(this.pendingUse&&this.pendingUse.fingerprint!==identity)throw new Error('stale-item-selection');
           if(this.pendingUse?.learning&&(answers?.cancelled===true||answers?.confirmed===false))throw new Error('learning-choice-required');
           const planned=planItemUse(game,content,{itemId:request.itemId,quantity:request.quantity,...(context.parent?.memberId??request.memberId?{memberId:context.parent?.memberId??request.memberId}:{})},answers,world);
-          if(planned.status==='pending'){this.pendingUse={requestId,fingerprint:identity,revision,world:worldRevision,learning:planned.selection.kind==='learn'||planned.selection.kind==='give-up'};return {status:'pending',requestId,result:{selection:clone(planned.selection)}};}
+          if(planned.status==='pending'){this.pendingUse={requestId,fingerprint:identity,revision,world:worldRevision,learning:planned.selection.kind==='learn'||planned.selection.kind==='give-up',stale:false};return {status:'pending',requestId,result:{selection:clone(planned.selection)}};}
           if(planned.status==='cancelled'){this.pendingUse=null;return {status:'cancelled',requestId};}next=planned.state;result={...planned.result};break;
         }
         case 'buy':case 'sell':{if(context.kind!=='shop'||!this.shop)throw new Error('shop-not-open');const planned=planShop(game,content,this.shop,request,this.options.limits);if(planned.status==='cancelled')return {status:'cancelled',requestId};if(planned.status==='pending')return {status:'pending',requestId,result:{quote:planned.quote}};next=planned.state;result=planned.result;break;}

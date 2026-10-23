@@ -80,7 +80,7 @@ export function planItemUse(game:GameState,c:Content,intent:ItemIntent,answers:I
   let active=family;if(active==='rage-candy')active=config.RAGE_CANDY_BAR_CURES_STATUS_PROBLEMS?'status':'hp';
   if(active==='hp'||active==='full-restore'){
    if(m.hp<=0||active==='hp'&&m.hp>=oldMax||active==='full-restore'&&m.hp>=oldMax&&!m.status)return refuse('no-effect');
-   const amount=active==='full-restore'||p.full?oldMax:p.fraction?Math.floor(oldMax/integer(p.fraction)):family==='rage-candy'?20:integer(config.REBALANCED_HEALING_ITEM_AMOUNTS?p.amount:p.oldAmount??p.amount);m.hp=Math.min(oldMax,m.hp+amount);if(active==='full-restore'){m.status='';m.statusCount=0;}
+   const amount=active==='full-restore'||p.full?oldMax:p.fraction?Math.floor(oldMax/integer(p.fraction)):family==='rage-candy'?20:integer(config.REBALANCED_HEALING_ITEM_AMOUNTS?p.amount:p.oldAmount??p.amount);m.hp=Math.min(oldMax,m.hp+amount);if(active==='hp'&&m.hp===oldHp)return refuse('no-effect');if(active==='full-restore'){m.status='';m.statusCount=0;}
   }else if(active==='status'){
    if(m.hp<=0||!m.status||p.status!==undefined&&m.status!==p.status)return refuse('no-effect');m.status='';m.statusCount=0;
   }else if(active==='revive'){

@@ -49,6 +49,15 @@ add('stock-validated-before-install','app/inventory-session.ts','try{if(this.sho
 add('known-effect-cold-gate','content/item-input.ts','const invalid=fieldEffectProblem(e as unknown as NonNullable<ItemDefinition[\'effect\']>);','const invalid=null;','item-effects');
 add('Premier-keeps-battle-identity','rules/item-catalog.ts',"{...premier,flags:[...premier.flags,'PremierBall']}","{...premier,battleId:undefined,battleUse:'none',flags:[...premier.flags,'PremierBall']}",'shop');
 add('Berry-keeps-battle-identity','rules/item-catalog.ts',"source:'framework-legacy',...previous,pocket,flags:","source:'framework-legacy',pocket,flags:",'shop');
+const remediation=(id,file,before,after)=>cases.push({id,file:f+file,before,after,test:'experiments/step5/2/test-M2-remediation.cjs'});
+const retired="if(this.pendingUse&&(this.pendingUse.stale||this.pendingUse.revision!==revision||this.pendingUse.world!==worldRevision)){this.pendingUse.stale=true;throw new Error('stale-item-selection');}";
+const fixedIntent="if(this.pendingUse&&this.pendingUse.fingerprint!==identity)throw new Error('stale-item-selection');";
+remediation('M2-01-repeated-stale-resurrection','app/inventory-session.ts',retired,retired.replace('this.pendingUse.stale=true;','this.pendingUse=null;'));
+remediation('M2-01-base-intent-unlock','app/inventory-session.ts',fixedIntent,"if(this.pendingUse&&this.pendingUse.fingerprint!==identity){this.pendingUse=null;throw new Error('stale-item-selection');}");
+remediation('M2-01-world-ABA-retirement','app/inventory-session.ts','this.pendingUse.stale=true;','');
+remediation('M2-01-related-edit-before-base-check','app/inventory-session.ts',retired+'\n          '+fixedIntent,fixedIntent+'\n          '+retired);
+remediation('M2-02-zero-heal-no-consumption','rules/item-effects.ts',"if(active==='hp'&&m.hp===oldHp)return refuse('no-effect');",'');
+remediation('M2-02-status-only-full-restore','rules/item-effects.ts',"if(active==='hp'&&m.hp===oldHp)return refuse('no-effect');","if(m.hp===oldHp)return refuse('no-effect');");
 const run=(cmd,args)=>spawnSync(cmd,args,{cwd:root,encoding:'utf8',timeout:180000,maxBuffer:20*1024*1024});
 const build=()=>run('pnpm',['--dir','src','build:engine']);
 const tap=(file,name)=>{const r=run(process.execPath,['--test','--test-reporter=tap',file]);fs.writeFileSync(path.join(out,name+'.tap'),r.stdout+r.stderr);return {file,exit:r.status,fail:Number(r.stdout.match(/^# fail (\d+)/m)?.[1]??NaN),cancelled:Number(r.stdout.match(/^# cancelled (\d+)/m)?.[1]??NaN),skipped:Number(r.stdout.match(/^# skipped (\d+)/m)?.[1]??NaN),failing:[...r.stdout.matchAll(/^not ok \d+ - (.*)$/gm)].map(m=>m[1]),error:r.error?.message};};
