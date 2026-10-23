@@ -23,13 +23,14 @@ const result = (battleId, kind, winner = null, extra = {}) => ({ protocol: 1, ba
 
 function app(initial = game(), options = {}) {
   const state = K.createMemoryState(initial), sessions = K.createFakeSessions(() => { throw new Error('unfinished'); }), projection = K.createRecordingProjection();
-  return { state, sessions, projection, app: new GameApplication({ state, sessions, projection, content: () => ({ content }), random: lcg(9) }, options) };
+  return { state, sessions, projection, app: new GameApplication({ state, sessions, projection, content: () => ({ content }), random: lcg(9), clock: () => 1234567890000 }, { receivingProfile: { mode: 1, naming: 1 }, ...options }) };
 }
 /** One battle through the application: start (kind, canLose), finish with `r`. */
 async function battle(w, r, { kind = 'wild', canLose = false } = {}) {
   w.sessions.next = r;
   const req = { battleId: r.battleId, kind, foes: [{ species: 'pidgey', level: 3 }], seq: 1, canLose };
   const h = await w.app.startBattle(req);
+  for (const [i, caught] of r.captured.entries()) { caught.id = w.sessions.created.at(-1).setup.foes[i].id; r.outcome.target = caught.id; }
   return { h, req, o: w.app.finishBattle(h, req) };
 }
 const statsOf = w => w.state.current().stats;
@@ -46,7 +47,7 @@ test('the session factory gets the battle view (Showdown names); the commit stor
   assert.equal(w.sessions.created[0].game.party[0].species, 'Charmander', 'the session reads Showdown names');
   assert.equal('form' in w.sessions.created[0].game.party[0], false);
   const now = w.state.current();
-  assert.deepEqual(now.party.map(m => [m.id, m.species, m.form]), [['A-1', 'charmander', 0], ['W1-1', 'pidgey', 0]]);
+  assert.deepEqual(now.party.map(m => [m.id, m.species, m.form]), [['A-1', 'charmander', 0], ['M1', 'pidgey', 0]]);
   assert.deepEqual(now.dex, { seen: ['pidgey'], owned: ['pidgey'] });
   assert.deepEqual(E.saveSchema.validateGame(now), []);
 });
@@ -86,8 +87,9 @@ test('statistics are part of the one commit: a repeat counts nothing, a failed w
   assert.deepEqual([statsOf(w).wild_battles_lost, statsOf(w).blacked_out_count, w.state.replaced.length], [1, 1, 1]);
   const f = app(); f.state.failReplace = new Error('store refused');
   const failed = await battle(f, result('fail#1', 'win', 'Player'));
-  assert.deepEqual([failed.o.commit, failed.o.aborted, f.state.current().stats.wild_battles_won], ['none', true, 0]);
+  assert.deepEqual([failed.o.commit, failed.o.pending, f.state.current().stats.wild_battles_won], ['none', true, 0]);
   f.state.failReplace = null;
+  f.app.abortBattle(failed.req, new Error("explicitly abandon pending session before testing a standalone commit"));
   assert.equal(f.app.commitResult(result('fail#1', 'win', 'Player')), 'applied', 'the retry commits the result ...');
   assert.equal(f.state.current().stats.wild_battles_won, 0, '... but a direct commit knows no battle kind and counts no battle');
 });

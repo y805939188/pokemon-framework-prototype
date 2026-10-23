@@ -127,7 +127,7 @@
  *
  * @command ShowParty
  * @text Show Party
- * @desc Opens the read-only party / bag screen (also in the main menu).
+ * @desc Opens party management and summaries (also in the main menu; PS_Management).
  *
  * @command ResetGame
  * @text Reset to Test Fixture (testing aid)

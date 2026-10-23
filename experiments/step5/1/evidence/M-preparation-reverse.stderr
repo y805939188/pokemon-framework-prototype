@@ -1,0 +1,51 @@
+migr-partial caught  <- test-species-key5.cjs fail=1, test-migration5.cjs fail=1
+migr-no-content caught  <- test-species-key5.cjs fail=1
+apply-identity caught  <- test-app5.cjs fail=2
+no-battle-view caught  <- test-app5.cjs fail=1, test-application.cjs fail=4
+hash-mapped caught  <- test-migration5.cjs fail=2, test-species-key5.cjs fail=2
+p42-no-release caught  <- test-app5.cjs fail=2, test-plugin-host5.cjs fail=5
+p42-late-commit caught  <- test-app5.cjs fail=1, test-plugin-host5.cjs fail=0
+stats-canlose caught  <- test-app5.cjs fail=1
+stats-split caught  <- test-app5.cjs fail=1
+steps-saturate caught  <- test-app5.cjs fail=1, test-plugin-host5.cjs fail=1
+steps-guard caught  <- test-plugin-host5.cjs fail=1
+gate-open caught  <- test-content5.cjs fail=5
+load-no-content caught  <- test-plugin-host5.cjs fail=9
+load-no-release caught  <- test-plugin-host5.cjs fail=1
+form-fallback caught  <- test-species-key5.cjs fail=2
+config-range caught  <- test-content5.cjs fail=1
+F01-save-unusable caught  <- test-plugin-host5.cjs fail=2
+F02-host-running caught  <- test-plugin-host5.cjs fail=4
+F02-stale-finish caught  <- test-plugin-host5.cjs fail=3
+F02-stale-abort caught  <- test-plugin-host5.cjs fail=1
+F02-stale-scene-pop caught  <- test-plugin-host5.cjs fail=1
+F05-runtime-source-gate caught  <- test-content5.cjs fail=2
+F03-store-identity caught  <- test-store5.cjs fail=1
+F04-strip-section caught  <- test-content5.cjs fail=1
+F05-showdown-gate caught  <- test-content5.cjs fail=2
+F05-cli-decision-only caught  <- test-content5.cjs fail=1
+F06-config-inherited caught  <- test-content5.cjs fail=2
+F06-pbs-inherited caught  <- test-content5.cjs fail=1
+F06-build-keeps-old caught  <- test-content5.cjs fail=1
+F07-persistent-growth caught  <- test-species-key5.cjs fail=2
+F08-newgame-form caught  <- test-species-key5.cjs fail=1
+F09-mixed-battles caught  <- test-perf-budget5.cjs fail=1
+F10-truthy-name caught  <- test-plugin-host5.cjs fail=1
+F11-clock-unchecked caught  <- test-app5.cjs fail=1
+R01-session-owner caught  <- test-plugin-host5.cjs fail=2
+R02-old-return caught  <- test-plugin-host5.cjs fail=3
+R03-eager-dex caught  <- test-cold-source5.cjs fail=50
+R03-empty-assembly-sha caught  <- test-cold-source5.cjs fail=21
+R03-empty-inventory-sha caught  <- test-cold-source5.cjs fail=4
+R03-empty-old-moves caught  <- test-cold-source5.cjs fail=4
+R04-strip-move caught  <- test-pbs-review5.cjs fail=2
+R04-empty-ev caught  <- test-pbs-review5.cjs fail=2
+R05-parse-error-record caught  <- test-pbs-review5.cjs fail=5
+P51-capacity caught  <- test-migration-storage.cjs fail=2
+P51-slot-bounds caught  <- test-migration-storage.cjs fail=1, test-management.cjs fail=0
+P51-held-snapshot caught  <- test-management.cjs fail=3
+P51-no-template-fallback caught  <- test-receiving.cjs fail=1
+P51-receive-host-lock caught  <- test-plugin-host5.cjs fail=1
+P51-held-default-battle caught  <- test-management.cjs fail=1
+P51-empty-held-source caught  <- test-held-sources.cjs fail=3
+P51-save-held caught  <- test-plugin-host5.cjs fail=1

@@ -8,7 +8,7 @@ const E = require('../../js/engine/build/engine.cjs');
 const { BattleSession } = E.session;
 const F = E.fixtures;
 async function make(game, team) {
-  const s = await BattleSession.create({ game, content: F.content, battleId: 'pp-sync', seed: [1, 2, 3, 4],
+  const s = await BattleSession.create({ experimentalHeldBattle: true, game, content: F.content, battleId: 'pp-sync', seed: [1, 2, 3, 4],
     foe: { kind: 'wild', team: team || [F.foeMember('foe', 'Snorlax', 40, { moves: ['protect'] })] } });
   s.take(); return s;
 }

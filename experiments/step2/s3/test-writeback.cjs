@@ -122,6 +122,8 @@ test('item ledger: cancel refunds once, ineligible use is refused up front, exec
 
 test('capture: caught member gets a stable id, exp is paid for the capture, dex updated, ball consumed once', async () => {
 	const game = makeGame();
+	const template = require('../../../js/engine/build/engine.cjs').state.newGame({party:[foeMember('W-0001', 'Snorlax', 40, {moves:['protect']})]}).party[0];
+	const receiveOptions = {templates:{'W-0001':template},profile:{mode:1,naming:1}};
 	const s = await session(game, { battleId: 'B-cap', foe: { kind: 'wild', team: [foeMember('W-0001', 'Snorlax', 40, { moves: ['protect'] })] } }); s.take();
 	const before = s.party[0].exp;
 	const t = await s.throwBall('masterball'); assert.ok(t.ok);
@@ -136,13 +138,13 @@ test('capture: caught member gets a stable id, exp is paid for the capture, dex 
 	assert.equal(result.bag.masterball, -1);
 	assert.deepEqual(result.dex.owned, ['Snorlax']);
 	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys);
-	store.commit(result);
+	store.commit(result, receiveOptions);
 	const after = store.load();
 	assert.equal(after.party.length, 4); assert.equal(after.party[3].id, 'W-0001');
 	assert.ok(!after.bag.masterball);
 	assert.ok(after.dex.owned.includes('Snorlax'));
 	// duplicate submit does nothing more
-	assert.equal(store.commit(result).status, 'already-applied');
+	assert.equal(store.commit(result, receiveOptions).status, 'already-applied');
 	assert.deepEqual(store.load(), after);
 });
 

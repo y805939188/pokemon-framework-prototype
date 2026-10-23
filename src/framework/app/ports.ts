@@ -40,10 +40,14 @@ export interface BattleStartRequest {
   noBall?: boolean;
   /** The author lets the player lose this battle (story battle): a defeat then is not a blackout (WP61 §7, statistics). */
   canLose?: boolean;
+  /** Scripted battle rule, explicit priority over the player receive preference. */
+  forceParty?: boolean;
 }
 
 /** What the application decided before a session exists: the created foes and the effective flags. */
 export interface BattleSetup {
+  experimentalHeldBattle?: boolean;
+  diagnostics?: string[];
   foes: Member[];
   noRun: boolean;
   /** The author's flag, or forced on because a caught member would have nowhere to go (decision D1). */
@@ -55,7 +59,7 @@ export interface BattleSetup {
 /** An encounter the application allows here and now (or why not). */
 export type EncounterPlan =
   | { ok: true; foe: { species: string; level: number } }
-  | { ok: false; reason: "not-here" | "invalid-table" | "no-able-member" | "state-unusable" | "no-random" | "unknown-species" | "invalid-content"; error?: string };
+  | { ok: false; reason: "held-item-battle-disabled" | "not-here" | "invalid-table" | "no-able-member" | "state-unusable" | "no-random" | "unknown-species" | "invalid-content"; error?: string };
 
 /** A running battle as the application sees it: it can say how it ended. The UI drives the concrete session itself. */
 export interface BattleHandle {
@@ -83,7 +87,9 @@ export interface OutcomeProjection {
 
 /** What a one-time grant did. Never thrown: a refusal is a value and then nothing was committed. */
 export interface ClaimOutcome {
-  status: "applied" | "already-claimed" | "refused";
+  status: "applied" | "already-claimed" | "refused" | "pending";
+  token?: string;
+  pendingMember?: string;
   grantId: string;
   /** Why it was refused: a rule refusal (unknown-grant, no-room, bag-full, member-id-taken, creation-failed), battle-active, state-unusable, no-random or commit-failed. */
   reason?: string;
@@ -118,6 +124,10 @@ export interface StepsOutcome {
 }
 
 export interface BattleOutcome {
+  pending?: true;
+  receivingToken?: string;
+  pendingMember?: string;
+  diagnostics?: string[];
   /** 0 aborted, 1 win, 2 caught, 3 ran, 4 anything else (lost, tie). */
   code: number;
   battleId: string | null;
@@ -132,4 +142,20 @@ export interface BattleOutcome {
   /** Whether the host was told. "failed" means the projection threw; `commit` separately says whether state was committed. */
   projection?: "ok" | "failed";
   projectionError?: string;
+}
+
+export interface CreationContext { map?: number; environment?: string | null; timeOfDay?: "day" | "dusk" | "night" }
+
+export interface GiftRequest {
+  kind: "normal" | "silent" | "party" | "party-silent" | "foreign";
+  member: { species: string; level?: number; form?: number; item?: string } | { existing: Member };
+  foreignOwner?: { name?: string; gender?: 0 | 1 | 2; language?: number };
+  nickname?: string;
+}
+export interface GiftOutcome {
+  status: "applied" | "pending" | "refused";
+  token?: string;
+  reason?: string;
+  error?: string;
+  placed?: { id: string; to: "party" | "boxes" }[];
 }

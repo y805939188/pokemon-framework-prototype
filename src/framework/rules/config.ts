@@ -31,7 +31,7 @@ const RANGES: Record<keyof RuleConfig, [number, number, string?]> = {
   MECHANICS_GENERATION: [8, 8, "this build supports mechanics generation 8 only (the battle format is Gen 8)"],
   MAX_MONEY: [0, 2147483647],
   MAX_PARTY_SIZE: [1, 6, "a party holds 1 to 6 members (one battle side)"],
-  NUM_STORAGE_BOXES: [1, 1000],
+  NUM_STORAGE_BOXES: [40, 40, "5.1 supports NUM_STORAGE_BOXES=40 only (5.0 supported 1–1000); change author content explicitly, never truncate an old save"],
   BAG_MAX_PER_SLOT: [1, 9999],
 };
 
@@ -45,7 +45,7 @@ export function checkOverrides(overrides: unknown): ConfigProblem[] {
     const range = own(RANGES as Record<string, [number, number, string?]>, k); // own keys only: "constructor" is not a setting
     if (!range) { out.push({ path: `$.${k}`, message: `unknown or unsupported setting (this build reads: ${Object.keys(RANGES).join(", ")})` }); continue; }
     const [lo, hi, why] = range;
-    if (typeof v !== "number" || !Number.isInteger(v) || v < lo || v > hi) out.push({ path: `$.${k}`, message: why ?? `must be an integer from ${lo} to ${hi}` });
+    if (typeof v !== "number" || !Number.isInteger(v) || v < lo || v > hi) out.push({ path: `$.${k}`, message: why ? `${why}; actual value: ${String(v)}` : `must be an integer from ${lo} to ${hi}` });
   }
   return out;
 }
@@ -60,4 +60,13 @@ export function resolveConfig(overrides: unknown = {}): RuleConfig {
 /** The stage capacities (rules/limits.ts) a profile gives. */
 export function limitsOf(config: RuleConfig): Limits {
   return { party: config.MAX_PARTY_SIZE, boxes: config.NUM_STORAGE_BOXES * BOX_SIZE, bagPerItem: config.BAG_MAX_PER_SLOT, money: config.MAX_MONEY };
+}
+
+/** Controlled developer/test injection only: never read from settings.json or a save. */
+export interface DevelopmentCapabilities { allowHeldItemSources: boolean; allowExperimentalHeldItemBattle: boolean }
+export function developmentCapabilities(raw: unknown = {}): DevelopmentCapabilities {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error("development capabilities must be an object");
+  const record = raw as Record<string, unknown>;
+  for (const [key, value] of Object.entries(record)) if (!["allowHeldItemSources", "allowExperimentalHeldItemBattle"].includes(key) || typeof value !== "boolean") throw new Error(`invalid development capability ${key}`);
+  return { allowHeldItemSources: false, allowExperimentalHeldItemBattle: false, ...record } as DevelopmentCapabilities;
 }

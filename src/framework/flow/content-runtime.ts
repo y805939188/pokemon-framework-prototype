@@ -4,9 +4,12 @@
  * reported with the record and field it comes from; nothing is repaired silently.
  */
 import type { CompiledContent, ContentError } from "../content/schema.ts";
+import { checkOverrides, developmentCapabilities } from "../rules/config.ts";
 import { SCHEMA_VERSION } from "../content/schema.ts";
 import { checkSources, preUseProblem, showdownDependencyProblem } from "../content/compile.ts";
 import type { Content, DexLookup, Member } from "../rules/types.ts";
+import { allMembers, locateMember } from "../rules/storage.ts";
+import type { MemberCollection } from "../rules/storage.ts";
 import { own, setOwn } from "../rules/own.ts";
 import { battleNameOf, memberKey } from "../rules/species-key.ts";
 
@@ -16,17 +19,21 @@ export function loadCompiled(json: unknown): CompiledContent {
   if (!o || typeof o !== "object" || o.schema !== SCHEMA_VERSION || !Array.isArray(o.species) || typeof o.inputsHash !== "string" || typeof o.contentId !== "string" || (o.grants !== undefined && !Array.isArray(o.grants)) || (o.settings !== undefined && (typeof o.settings !== "object" || o.settings === null))) {
     throw new Error(`compiled content is not a schema ${SCHEMA_VERSION} document (run the content build)`);
   }
+  const problems = checkOverrides(o.settings ?? {});
+  if (problems.length) throw new Error(`compiled settings: ${problems.map((p) => `${p.path} ${p.message}`).join("; ")}`);
   return o as CompiledContent;
 }
 
-export function assembleContent(compiled: CompiledContent, dex: DexLookup): { content: Content; errors: ContentError[] } {
+export function assembleContent(compiled: CompiledContent, dex: DexLookup, developerCapabilities: unknown = {}): { content: Content; errors: ContentError[] } {
   const errors: ContentError[] = [];
+  const capabilities = developmentCapabilities(developerCapabilities);
   const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash }, moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {}, ...(compiled.settings ? { settings: { ...compiled.settings } } : {}) };
   // A compiled document may be older than the gate, or edited by hand. Validate the whole registry and every source
   // whose data will be consumed before even querying the Dex; a placeholder's exemption covers only its own fields.
+  for (const p of checkOverrides(compiled.settings ?? {})) errors.push({ file: "settings.json", path: p.path, message: p.message });
   const sources = checkSources(compiled.sources, (file, path, message) => { errors.push({ file, path, message }); });
   if (errors.length) return { content, errors };
-  if (compiled.species.length) {
+  if (compiled.species.length || (compiled.grants ?? []).some((g) => g.members.some((m) => !!m.item))) {
     const dep = showdownDependencyProblem(sources);
     if (dep) errors.push({ file: "assembly", path: "sources", message: dep });
   }
@@ -34,13 +41,18 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup): { co
     const problem = preUseProblem(sources, sp.source);
     if (problem) errors.push({ file: "assembly", path: `species/${sp.id}${sp.form ? `/${sp.form}` : ""}.source`, message: problem });
   }
+  for (const sp of compiled.species) if (sp.happiness !== undefined && (!Number.isSafeInteger(sp.happiness) || sp.happiness < 0)) errors.push({ file: "assembly", path: `species/${sp.id}.happiness`, message: "must be a nonnegative safe integer" });
   for (const grant of compiled.grants ?? []) {
+    for (const [i, member] of grant.members.entries()) if (member.item && !capabilities.allowHeldItemSources) errors.push({ file: "assembly", path: `grants/${grant.id}.members[${i}].item`, message: "held-item-source-disabled" });
     const problem = preUseProblem(sources, grant.source);
     if (problem) errors.push({ file: "assembly", path: `grants/${grant.id}.source`, message: problem });
   }
   if (errors.length) return { content, errors };
   // Empty author content needs no external battle data, including the lazy Dex's identity lookup.
   const short = compiled.species.length ? dex.sha().slice(0, 8) : null;
+  // Provenance fact of this assembled runtime content, never a capability or save setting.
+  if (content.meta && showdownDependencyProblem(sources) === null) content.meta.showdownSourceChecked = true;
+  const baseHappiness = new Map(compiled.species.filter((sp) => (sp.form ?? 0) === 0).map((sp) => [sp.id, sp.happiness]));
   const byName = new Map<string, string>();
   for (const sp of compiled.species) {
     const form = sp.form ?? 0;
@@ -60,9 +72,10 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup): { co
       if (typeof mv.id === "string" && typeof mv.pp === "number") content.moves![mv.name] = { id: mv.id, name: mv.name, pp: mv.pp };
     }
     if (!ok) continue;
+    const happiness = sp.happiness ?? baseHappiness.get(sp.id);
     content.species[found.name] = {
-      base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset, nameKey: sp.nameKey, contentId: sp.id, form,
-      ...(found.abilities ? { abilities: [...found.abilities] } : {}), ...(found.gender !== undefined ? { gender: found.gender } : {}),
+      base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset, nameKey: sp.nameKey, contentId: sp.id, form, ruleSpecies: found.baseSpecies ?? found.name,
+      ...(found.abilities ? { abilities: [...found.abilities] } : {}), ...(found.hiddenAbilities ? { hiddenAbilities: [...found.hiddenAbilities] } : {}), ...(happiness !== undefined ? { happiness } : {}), ...(found.gender !== undefined ? { gender: found.gender } : {}),
     };
     // the persistent key (decision D5-3): content id + form <-> Showdown name, both ways
     if (form === 0) setOwn(content.speciesIds!, sp.id, found.name);
@@ -75,12 +88,14 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup): { co
     if (!own(forms, "0")) errors.push({ file: "assembly", path: `species/${id}`, message: `"${id}" has form(s) ${Object.keys(forms).join(", ")} but no assembled base form 0` });
   }
   for (const g of compiled.grants ?? []) {
-    const members: { species: string; level: number }[] = [];
+    const members: { species: string; level: number; form?: number; item?: string }[] = [];
     let ok = true;
     for (const [j, m] of g.members.entries()) {
+      if (m.item) { const item = dex.heldItem?.(m.item); if (!item?.holdable || item.mail) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].item`, message: `unsupported held item ${m.item}` }); ok = false; continue; } }
+      if (m.form !== undefined && !compiled.species.some((sp) => sp.id === m.species && (sp.form ?? 0) === m.form)) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].form`, message: "missing exact form" }); ok = false; continue; }
       const name = own(content.speciesIds, m.species);
       if (!name) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].species`, message: `"${m.species}" is not an assembled species` }); ok = false; continue; }
-      members.push({ species: name, level: m.level });
+      members.push({ species: name, level: m.level, ...(m.form !== undefined ? { form: m.form } : {}), ...(m.item !== undefined ? { item: m.item } : {}) });
     }
     if (ok) content.grants![g.id] = { id: g.id, members, items: { ...g.items }, money: g.money };
   }
@@ -103,14 +118,14 @@ export interface DanglingReference { path: string; message: string }
  * falls back to the base form (WP03 §3.2).
  */
 export function findDanglingReferences(
-  state: { party: Pick<Member, "species" | "form" | "moves">[]; boxes: Pick<Member, "species" | "form" | "moves">[] },
+  state: MemberCollection,
   content: Content,
   dex?: DexLookup,
 ): DanglingReference[] {
   const out: DanglingReference[] = [];
-  for (const key of ["party", "boxes"] as const) {
-    for (const [i, m] of state[key].entries()) {
-      const path = `$.${key}[${i}]`;
+  for (const m of allMembers(state)) {
+      const position = locateMember(state, m.id)!.position;
+      const path = position.kind === "party" ? `$.party[${position.index}]` : `$.storage.boxes[${position.box}].slots[${position.slot}]`;
       if (battleNameOf(content, memberKey(m)) === null) {
         out.push({ path: `${path}.species`, message: `"${m.species}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}` });
         // This member is already unusable. An empty catalog has not authorized any external move data.
@@ -118,6 +133,5 @@ export function findDanglingReferences(
       }
       if (dex) for (const [j, mv] of m.moves.entries()) if (!dex.move(mv.id)) out.push({ path: `${path}.moves[${j}].id`, message: `"${mv.id}" is not a move in the pinned Showdown data` });
     }
-  }
   return out;
 }

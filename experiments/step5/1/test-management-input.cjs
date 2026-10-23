@@ -1,0 +1,13 @@
+'use strict';const test=require('node:test'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
+test('P51-16/18: actual pure host input model preserves priority, box/panel boundaries, sparse marks, ribbon focus and physical release',()=>{
+ const script=`import * as M from './src/plugins/management/model.ts';import assert from 'node:assert/strict';
+ const frame={repeated:{up:true,left:true,down:true},triggered:{jumpup:true,back:true,use:true,action:true},pressed:{}};
+ assert.deepEqual(M.inputIntent(frame,'box'),{direction:'up',action:'jumpup'});assert.deepEqual(M.inputIntent(frame,'panel'),{direction:'up',action:'action'});assert.deepEqual(M.inputIntent(frame,'panel',false),{direction:'up',action:'back'});assert.deepEqual(M.inputIntent(frame,'mark-summary'),{action:'back'});assert.deepEqual(M.inputIntent(frame,'mark-storage'),{direction:'up',action:'back'});
+ for(let i=0;i<30;i++){assert.deepEqual(M.boxCursor(i,'up'),{cursor:i<6?-1:i-6,boxDelta:0});assert.deepEqual(M.boxCursor(i,'down'),{cursor:i>=24?(i%6<3?-2:-3):i+6,boxDelta:0});assert.equal(Math.floor(M.boxCursor(i,'left').cursor/6),Math.floor(i/6));assert.equal(Math.floor(M.boxCursor(i,'right').cursor/6),Math.floor(i/6));}
+ assert.deepEqual(M.boxCursor(-1,'right'),{cursor:-1,boxDelta:1});assert.equal(M.boxCursor(-1,'down').cursor,2);assert.equal(M.boxCursor(-2,'up').cursor,25);assert.equal(M.boxCursor(-3,'up').cursor,28);assert.equal(M.panelCursor(6,'up'),5);assert.equal(M.panelCursor(6,'down'),0);assert.equal(M.panelCursor(0,'left'),6);
+ assert.equal(M.partyCursor(0,'down',[0,1,4]),4);assert.equal(M.summaryCursor(1,'up',[0,1,5]),0);assert.equal(M.summaryCursor(5,'down',[0,1,5]),5);assert.equal(M.ribbonCursor(0,'up',0),8);assert.equal(M.ribbonCursor(0,'left',13),3);
+ const original=[];assert.deepEqual(M.editMark(original,5,true),[]);assert.deepEqual(original,[]);assert.deepEqual(M.editMark(original,5,false),[0,0,0,0,0,1]);
+ for(const has of [true,false,undefined])for(const sw of [true,false,undefined])for(const map of [true,false,undefined])assert.equal(M.boxLinkAvailable(has,sw,map),has===true&&sw===false&&map===false);assert.equal(M.boxLinkAvailable(true,false,false,true),false);
+ const latch=new M.InputLatch();latch.arm({use:true});assert.equal(latch.filter({pressed:{use:true},triggered:{use:true},repeated:{}}).triggered.use,undefined);latch.release('use');assert.equal(latch.filter({pressed:{use:true},triggered:{use:true},repeated:{}}).triggered.use,true);
+ `;execFileSync(process.execPath,['--experimental-strip-types','--input-type=module','-e',script],{cwd:process.cwd(),stdio:'pipe'});
+});

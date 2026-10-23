@@ -45,12 +45,13 @@
         return;
       }
       let speciesKey: any;
+      let content: any;
       let contentError = "";
-      if (typeof sys._psGame === "object" && sys._psGame && typeof sys._psGame.schema === "number" && sys._psGame.schema < 4) {
-        try { speciesKey = W.PSFlow.speciesKeyResolver(); } catch (e) { contentError = String(e instanceof Error ? e.message : e); }
+      if (typeof sys._psGame === "object" && sys._psGame && typeof sys._psGame.schema === "number" && sys._psGame.schema < 5) {
+        try { content = W.PSFlow.content(); speciesKey = W.PSFlow.speciesKeyResolver(); } catch (e) { contentError = String(e instanceof Error ? e.message : e); }
       }
       if (W.PSFlow) W.PSFlow.stateReplaced();
-      const r = schema().migrateGame(sys._psGame, speciesKey ? { speciesKey } : {});
+      const r = schema().migrateGame(sys._psGame, { ...(speciesKey ? { speciesKey } : {}), ...(content ? { content } : {}) });
       if (!r.ok && r.error.code === "needs-content" && contentError) r.error.message += ` (the content could not be loaded: ${contentError})`;
       if (r.ok) {
         if (r.migrated) sys._psGame = r.state;
@@ -89,9 +90,9 @@
       fail("state-unusable", e);
       return Promise.reject(e);
     }
-    if (W.PSFlow && W.PSFlow.running) {
+    if (W.PSFlow && (W.PSFlow.running || W.PSFlow.operationPending?.())) {
       const e = new Error("saving is not allowed while a battle is running");
-      fail("battle-running", e);
+      fail(W.PSFlow.running ? "battle-running" : "operation-pending", e);
       return Promise.reject(e);
     }
     let p: any;

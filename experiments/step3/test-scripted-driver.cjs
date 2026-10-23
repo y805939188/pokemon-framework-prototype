@@ -6,9 +6,9 @@ const assert = require('node:assert/strict');
 const E = require('../../js/engine/build/engine.cjs');
 const F = E.fixtures;
 const K = E.fakes;
-const { GameApplication } = E.app;
+const GameApplication = require('../step5/1/legacy-test-support.cjs').AutomaticApplication;
 
-const WIN = { events: ['|move|p1a: A-0001|Flamethrower|p2a: W1-1', '|-damage|p2a: W1-1|0 fnt', '|faint|p2a: W1-1'], damage: { 'W1-1': 9999 }, end: { winner: 'Player', reason: 'win' } };
+const WIN = { events: ['|move|p1a: A-0001|Flamethrower|p2a: M4', '|-damage|p2a: M4|0 fnt', '|faint|p2a: M4'], damage: { 'M4': 9999 }, end: { winner: 'Player', reason: 'win' } };
 // Since step 4 the application creates the foes: the fixture content gets the creation data a Pidgey needs (no
 // Showdown is loaded here, so it is written out) and the random is seeded.
 const content = JSON.parse(JSON.stringify(F.content));
@@ -42,7 +42,7 @@ test('a won battle runs end to end on the scripted engine and commits once; a re
 
 test('an item used in battle is reserved, consumed by the engine line, and spent exactly once in the committed result', async () => {
   const game = F.makeGame({ bag: { potion: 3 } }); game.party[0].hp = 70;
-  const { state, app } = world({ maxhp: { 'A-0001': 153 }, turns: [{ events: ['|rpg|item|p1|potion|A-0001|ok|20', ...WIN.events], damage: { 'A-0001': -20, 'W1-1': 9999 }, end: WIN.end }] }, game);
+  const { state, app } = world({ maxhp: { 'A-0001': 153 }, turns: [{ events: ['|rpg|item|p1|potion|A-0001|ok|20', ...WIN.events], damage: { 'A-0001': -20, 'M4': 9999 }, end: WIN.end }] }, game);
   const r = req('scripted-item#1'); const s = await app.startBattle(r);
   assert.equal((await s.useItem('potion', 'A-0001')).ok, true);
   assert.equal(state.current().bag.potion, 3, 'the persistent bag is not touched while the battle runs');

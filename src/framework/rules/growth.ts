@@ -93,11 +93,16 @@ export const NATURES: Record<string, PartialStats> = {
   modest: { spa: 110, atk: 90 }, mild: { spa: 110, def: 90 }, quiet: { spa: 110, spe: 90 }, rash: { spa: 110, spd: 90 },
   calm: { spd: 110, atk: 90 }, gentle: { spd: 110, def: 90 }, sassy: { spd: 110, spe: 90 }, careful: { spd: 110, spa: 90 },
 };
+/** Compatibility spelling is case-insensitive; unknown/prototype keys never resolve to data. */
+export function natureModifiers(nature: string): PartialStats {
+  const key = String(nature).toLowerCase();
+  return Object.hasOwn(NATURES, key) ? NATURES[key]! : {};
+}
 export const STAT_KEYS: readonly StatKey[] = ["hp", "atk", "def", "spa", "spd", "spe"];
 
 export function computeStats(base: Stats, ivs: PartialStats | undefined, evs: PartialStats | undefined, level: number, nature: string): Stats {
   const out = {} as Stats;
-  const mods = NATURES[String(nature).toLowerCase()] ?? {};
+  const mods = natureModifiers(nature);
   for (const k of STAT_KEYS) {
     const inner = Math.floor(((2 * base[k] + (ivs?.[k] ?? 31) + Math.floor((evs?.[k] ?? 0) / 4)) * level) / 100);
     if (k === "hp") out.hp = base.hp === 1 ? 1 : inner + level + 10;

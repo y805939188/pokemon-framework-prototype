@@ -22,7 +22,7 @@ export function createBattleSessionFactory(options: BattleSessionFactoryOptions)
   return {
     // the application has created the foes (rules/member-factory) and decided the flags; this only wires the engine
     create: (request, game, setup) => BattleSession.create({
-      game, battleId: request.battleId, content: options.content(),
+      game, battleId: request.battleId, content: options.content(), experimentalHeldBattle: setup.experimentalHeldBattle ?? false,
       ...(options.seed ? { seed: options.seed() } : {}),
       ...(options.logger ? { logger: options.logger() } : {}),
       ...(options.driver ? { driver: options.driver } : {}),

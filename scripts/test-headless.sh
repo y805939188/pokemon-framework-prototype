@@ -53,6 +53,17 @@ SUITES=(
   experiments/step5/test-pbs-review5.cjs
   experiments/step5/test-store5.cjs
   experiments/step5/test-perf-budget5.cjs
+  experiments/step5/1/test-individual.cjs
+  experiments/step5/1/test-migration-storage.cjs
+  experiments/step5/1/test-management.cjs
+  experiments/step5/1/test-receiving.cjs
+  experiments/step5/1/test-held-sources.cjs
+  experiments/step5/1/test-M-remediation.cjs
+  experiments/step5/1/test-management-queries.cjs
+  experiments/step5/1/test-management-ui.cjs
+  experiments/step5/1/test-management-input.cjs
+  experiments/step5/1/test-J-remediation.cjs
+  experiments/step5/1/test-held-contract.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do

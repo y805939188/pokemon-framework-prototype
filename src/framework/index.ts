@@ -33,3 +33,12 @@ export * as app from "./app/index.ts";
 export * as composition from "./composition.ts";
 export * as fakes from "./tools/fakes.ts";
 export * as scripted from "./tools/scripted-driver.ts";
+
+export * as memberIdentity from "./rules/member-identity.ts";
+export * as creationForms from "./rules/creation-form.ts";
+
+export * as storage from "./rules/storage.ts";
+
+export * as storageOperations from "./rules/storage-operations.ts";
+
+export * as receiving from "./rules/receiving.ts";

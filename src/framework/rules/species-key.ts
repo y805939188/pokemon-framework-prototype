@@ -5,6 +5,8 @@
  * The content layer owns the mapping (`Content.forms` and its reverse `Content.speciesKeys`, built by the runtime
  * assembly). Fixture content has no mapping table: its content ids ARE the Showdown names (form 0). Pure.
  */
+import { clone } from "./value.ts";
+import type { Storage } from "./storage.ts";
 import { own } from "./own.ts";
 import type { Content, Member, SpeciesData, SpeciesKey } from "./types.ts";
 
@@ -58,7 +60,7 @@ const where = (content: Pick<Content, "meta">): string => (content.meta ? ` "${c
 export function toBattleMember(m: Member, content: Pick<Content, "species" | "forms" | "speciesKeys" | "meta">): Member {
   const name = battleNameOf(content, memberKey(m));
   if (name === null) throw new Error(`member ${m.id}: species "${m.species}" (form ${m.form ?? 0}) is not in the content${where(content)}`);
-  const out: Member = { ...m, species: name };
+  const out: Member = { ...clone(m), species: name };
   delete out.form;
   return out;
 }
@@ -67,7 +69,7 @@ export function toBattleMember(m: Member, content: Pick<Content, "species" | "fo
 export function toPersistentMember(m: Member, content: Pick<Content, "species" | "forms" | "speciesKeys" | "meta">): Member {
   const k = keyOfBattleName(content, m.species);
   if (!k) throw new Error(`member ${m.id}: "${m.species}" has no persistent species key in the content${where(content)}`);
-  return { ...m, species: k.species, form: k.form };
+  return { ...clone(m), species: k.species, form: k.form };
 }
 
 /** Battle name -> persistent key; what the save migration and the result write-back are given. */
@@ -82,12 +84,12 @@ export const identityKeys: SpeciesKeyResolver = (name) => ({ species: name, form
  * The persistent state as a battle session reads it: members with battle names, and the dex as battle names of every
  * form of each recorded species (the engine checks "owned" per Showdown species, e.g. the Repeat Ball). Never stored.
  */
-export function battleView<T extends { party: Member[]; boxes: Member[]; dex: { seen: string[]; owned: string[] } }>(state: T, content: Pick<Content, "species" | "forms" | "speciesKeys" | "meta">): T {
+export function battleView<T extends { party: Member[]; storage: Storage; dex: { seen: string[]; owned: string[] } }>(state: T, content: Pick<Content, "species" | "forms" | "speciesKeys" | "meta">): T {
   const names = (ids: string[]): string[] => [...new Set(ids.flatMap((id) => battleNamesOfSpecies(content, id)))];
   return {
     ...state,
     party: state.party.map((m) => toBattleMember(m, content)),
-    boxes: state.boxes.map((m) => toBattleMember(m, content)),
+    storage: { ...state.storage, boxes: state.storage.boxes.map((b) => ({ ...b, slots: b.slots.map((m) => m ? toBattleMember(m, content) : null) })) },
     dex: { seen: names(state.dex.seen), owned: names(state.dex.owned) },
   };
 }

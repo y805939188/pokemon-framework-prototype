@@ -47,7 +47,7 @@ function host(game) {
   vm.createContext(ctx);
   vm.runInContext(plugins.PS_SaveState, ctx, { filename: 'PS_SaveState.js (built)' });
   vm.runInContext(plugins.PS_BattleFlow, ctx, { filename: 'PS_BattleFlow.js (built)' });
-  const flow = ctx.PSFlow;
+  const flow = ctx.PSFlow; flow.receiveOptions = { mode: 1, naming: 1 };
   flow._content = null; flow._dex = null; flow.rng = lcg(1);
   const load = (next) => { if (next !== undefined) sys._psGame = next; ctx.DataManager.extractSaveContents({}); };
   return { ctx, flow, sys, map, errors, warnings, writes, load, player: new Game_Player() };
@@ -114,7 +114,7 @@ async function matrixChild(shape, mode, entry, pluginDir) {
   const source = Object.fromEntries(['manifest','sources','species','overlays','grants'].map(k => [k, JSON.parse(fs.readFileSync(path.join(sourceRoot, k+'.json'), 'utf8'))]));
   if (shape === 'empty') { source.species = []; source.grants = []; source.overlays = []; }
   if (entry === 'preserve') {
-    source.settings = { NUM_STORAGE_BOXES: 2 };
+    source.settings = { NUM_STORAGE_BOXES: 40 };
     source.grants = [{ id: 'supplies', members: [], items: { potion: 1 }, money: 7, source: 'author-placeholder' }];
   }
   const built = E.contentCompile.compileContent(source); assert.equal(built.ok, true);

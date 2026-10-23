@@ -16,7 +16,8 @@
  */
 import fs from "node:fs";
 import { applyBattleResult } from "../rules/state.ts";
-import type { BattleResult, GameState } from "../rules/state.ts";
+import type { BattleCommitOptions, BattleResult, GameState } from "../rules/state.ts";
+import type { Content } from "../rules/types.ts";
 import { migrateGame } from "../rules/save-schema.ts";
 import type { MigrationResult, SaveErrorInfo } from "../rules/save-schema.ts";
 import type { SpeciesKeyResolver } from "../rules/species-key.ts";
@@ -40,11 +41,13 @@ export class SaveStore {
   hooks: { at?: (point: FaultPoint) => void };
   /** Showdown name -> persistent key for older documents and results (D5-3); none = refuse instead of guessing. */
   speciesKey: SpeciesKeyResolver | undefined;
+  content: Content | undefined;
 
-  constructor(file: string, hooks: { at?: (point: FaultPoint) => void } = {}, speciesKey?: SpeciesKeyResolver) {
+  constructor(file: string, hooks: { at?: (point: FaultPoint) => void } = {}, speciesKey?: SpeciesKeyResolver, content?: Content) {
     this.file = file;
     this.hooks = hooks; // test-only fault injection: hooks.at(point) may throw or exit the process
     this.speciesKey = speciesKey;
+    this.content = content;
   }
   private _at(point: FaultPoint): void { this.hooks.at?.(point); }
 
@@ -55,7 +58,7 @@ export class SaveStore {
     let raw: unknown;
     try { raw = JSON.parse(fs.readFileSync(this.file, "utf8")); }
     catch (e) { throw new SaveError({ code: "corrupt", message: `cannot read the save file as JSON (${(e as Error).message.slice(0, 120)}); the file was left untouched` }); }
-    const r = migrateGame(raw, this.speciesKey ? { speciesKey: this.speciesKey } : {});
+    const r = migrateGame(raw, { ...(this.speciesKey ? { speciesKey: this.speciesKey } : {}), ...(this.content ? { content: this.content } : {}) });
     if (!r.ok) throw new SaveError(r.error);
     return r;
   }
@@ -84,12 +87,12 @@ export class SaveStore {
   }
 
   /** Apply a battle result durably and idempotently. Returns {status}. */
-  commit(result: BattleResult): { status: "applied" | "already-applied"; migratedFrom?: number } {
+  commit(result: BattleResult, options: BattleCommitOptions = {}): { status: "applied" | "already-applied"; migratedFrom?: number } {
     this._at("start");
     const info = this.loadInfo();
     const names = [...(result.captured || []).map((c) => c.species), ...(result.dex?.seen || []), ...(result.dex?.owned || [])];
     if (!this.speciesKey && names.length) throw new Error(`this result names species (${[...new Set(names)].slice(0, 3).join(", ")}) and the store was given no species mapping: pass the content's resolver (or identityKeys for a fixture world); nothing was written`);
-    const r = applyBattleResult(info.state, result, undefined, this.speciesKey ?? (() => null));
+    const r = applyBattleResult(info.state, result, undefined, this.speciesKey ?? (() => null), { ...options, ...(this.content ? { content: this.content } : {}) });
     if (info.migrated) { this._backup(info.from); this._at("afterBackup"); }
     if (r.status === "already-applied" && !info.migrated) return { status: r.status };
     this._at("beforeSave");

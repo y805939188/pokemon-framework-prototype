@@ -65,19 +65,21 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     }
     return baseUpdate.apply(this, a);
   };
+  // Persist the original MZ exception before its fatal screen stops scene frames. Do not swallow it.
+  for(const name of ['catchException','onError']){const original=G.SceneManager[name];if(typeof original==='function')G.SceneManager[name]=function(...args:any[]){if(OUT){try{fs.writeFileSync(OUT+'.fatal.json',JSON.stringify({at:Date.now(),frame,handler:name,errors:args.map(x=>({message:String(x?.message??x),stack:x?.stack})),scene:G.SceneManager._scene?.constructor?.name,flowOutcome:W.PSFlow?.lastOutcome},null,2));}catch{}}return original.apply(this,args);};}
   const t0Arg = arg("ps-t0");
   const t0 = t0Arg ? Number(t0Arg) : undefined; // epoch ms taken by the launching shell just before `open`
   const stamps: any = { pluginLoadedAt: Date.now(), pluginLoadedPerf: Math.round(performance.now()) };
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  async function frames(n: number) { const t = frame + n; while (frame < t) await sleep(4); }
+  async function frames(n: number) { const t = frame + n,deadline=Date.now()+10000+n*40; while (frame < t) { if(Date.now()>deadline)throw new Error(`scene loop stopped while waiting ${n} frames (frame=${frame})`);await sleep(4); } }
   async function waitFor(cond: () => boolean, label: string, max = 2400) {
-    const t = frame + max;
-    while (!cond()) { if (frame > t) throw new Error(`timeout waiting for ${label} (mode=${scene() && scene()._mode})`); await sleep(4); }
+    const t = frame + max,deadline=Date.now()+Math.ceil(max*1000/60)+5000;
+    while (!cond()) { if (frame > t||Date.now()>deadline) throw new Error(`timeout waiting for ${label} (mode=${scene() && scene()._mode})`); await sleep(4); }
   }
   const scene = (): any => G.SceneManager._scene;
   const battle = (): any => { const s = scene(); return s && s._psBattle ? s : null; };
-  const KEY: Record<string, number> = { ok: 13, cancel: 27, down: 40, up: 38 };
+  const KEY: Record<string, number> = { ok: 13, cancel: 27, down: 40, up: 38, left:37, right:39, shift:16, control:17, pageup:33, pagedown:34 };
   /** A window that lost focus is throttled by Chromium and ignores input, which made scripted runs flaky
    *  (observed: blur at frame 94 for ~800 frames). Take focus back before every key press. */
   let refocus = 0;
@@ -136,6 +138,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
   }
   /** Slice setup: a new game on map 5 with the starter claimed (members created with a pinned random). */
   async function slice(seed = 77) {
+    W.PSFlow.receiveOptions = { mode: 1, naming: 1 }; W.PSFlow.rng = seeded(seed);
     G.DataManager.setupNewGame();
     W.PSFlow.rng = seeded(seed); W.PSFlow.seed = [1, 2, 3, 4]; W.PSFlow.fast = true; W.PSFlow.testLimits = null; W.PSFlow._app = null;
     eq(W.PSFlow.claim("starter").status, "applied", "starter claimed");
@@ -174,6 +177,11 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     await waitFor(() => battle() && battle()._mode !== "boot", "battle scene");
   }
   const game = (): any => W.PSFlow.game();
+  const api = (): any => nodeRequire("./js/engine/build/engine.cjs");
+  const boxed = (g = game()): any[] => api().storage.boxedMembers(g);
+  const setBoxed = (g: any, members: any[]): void => { g.storage = api().storage.newStorage(); members.forEach((m, i) => { if (i >= 1200) throw new Error("test setup exceeds fixed storage"); g.storage.boxes[Math.floor(i / 30)].slots[i % 30] = m; }); };
+  const replayTemplates = (g: any, result: any): any => ({ templates: Object.fromEntries(result.captured.map((m: any) => { const found = api().storage.locateMember(g, m.id); if (!found) throw new Error(`missing original template ${m.id}`); return [m.id, clone(found.member)]; })), profile: { mode: 1, naming: 1 } });
+  const legacyDocument = (g: any, schema: number): any => { const member = (m: any): any => { const old = api().state.protocolMember(api().speciesKey.toBattleMember(m, W.PSFlow.content())); if (schema >= 4) old.form = m.form ?? 0; return old; }; return { schema, party: g.party.map(member), boxes: boxed(g).map(member), bag: clone(g.bag), money: g.money, dex: api().speciesKey.battleView(g, W.PSFlow.content()).dex, appliedBattles: clone(g.appliedBattles) }; };
   const clone = (x: any) => JSON.parse(JSON.stringify(x));
   const results: any[] = [];
   const gameDir = path.dirname(path.dirname(path.dirname(path.dirname(nodeRequire.resolve("./js/engine/game/session.cjs")))));
@@ -189,10 +197,11 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       const b = battle();
       const itp = G.$gameMap && G.$gameMap._interpreter;
       const mapDiag = { scene: scene() && scene().constructor && scene().constructor.name, psRunning: W.PSFlow.running, waitMode: itp && itp._waitMode, interpreterRunning: itp && itp.isRunning(), messageBusy: G.$gameMessage && G.$gameMessage.isBusy(), messageText: G.$gameMessage && G.$gameMessage._texts, lastOutcome: W.PSFlow.lastOutcome, frame, hasFocus: document.hasFocus(), vis: document.visibilityState };
-      results.push({ id, status: "fail", ms: Date.now() - t0, error: String(e && e.message || e), mapDiag, diag: b ? { mode: b._mode, failure: String(b._failure), log: b._log._lines, status: b._status._lines, queue: b._queue.slice(0, 5) } : null });
+      results.push({ id, status: "fail", ms: Date.now() - t0, error: String(e && e.message || e), mapDiag, managementDiag: W.PSManagement?.current(), diag: b ? { mode: b._mode, failure: String(b._failure), log: b._log._lines, status: b._status._lines, queue: b._queue.slice(0, 5) } : null });
       await shot("fail-" + id.split(" ")[0]);
       try { await recover(); } catch (e2) { results.push({ id: id + " (recover)", status: "fail", error: String(e2) }); }
     }
+    if(OUT)fs.writeFileSync(OUT+'.progress.json',JSON.stringify({at:Date.now(),results,management:W.PSManagement?.current()},null,2));
   }
   /** after a failed scenario: leave any battle scene and return to a clean map so later scenarios are independent */
   async function recover() {
@@ -213,7 +222,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     await frames(10);
     stamps.mapReadyAt = Date.now(); stamps.mapReadyPerf = Math.round(performance.now());
   }
-  const fresh = () => { W.PSFlow.resetGame(); W.PSFlow.rng = seeded(1); }; // foes are created from the content: pin their random draws
+  const fresh = () => { W.PSFlow.receiveOptions = { mode: 1, naming: 1 }; W.PSFlow.resetGame(); W.PSFlow._app=null; W.PSFlow.rng = seeded(1); }; // foes are created from the content: pin their random draws
 
   async function runAll() {
     await toMap();
@@ -293,7 +302,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       await inMode("end"); await press("ok"); await dismissMessages();
       const o = W.PSFlow.lastOutcome; eq([o.code, o.kind, o.commit], [2, "caught", "applied"], "caught");
       const g = game();
-      assert(g.party.length === 4 && /^W\d+-1$/.test(g.party[3].id), "stable id of the caught member: " + (g.party[3] && g.party[3].id));
+      assert(g.party.length === 4 && /^M[0-9a-z]{1,17}$/.test(g.party[3].id), "stable id of the caught member: " + (g.party[3] && g.party[3].id));
       assert(!g.bag.masterball, "master ball consumed once");
       assert(g.dex.owned.includes("snorlax"), "dex updated (content id)");
     });
@@ -333,7 +342,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       game().money = 123456; G.$gameSystem._psGame.party.pop(); // diverge in memory
       const lc = await G.DataManager.loadGame(1);
       eq(game(), snap, "state restored from the MZ save equals the saved state");
-      eq(W.PSFlow.commit(lastResult), "already-applied", "re-committing the same result after restore is a no-op");
+      eq(W.PSFlow.commit(lastResult, replayTemplates(game(), lastResult)), "already-applied", "re-committing the same result after restore is a no-op");
       eq(game(), snap, "state unchanged by the duplicate commit");
       fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected.json"), JSON.stringify(snap));
       return { saveCode: rc, loadCode: lc };
@@ -342,8 +351,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     await scenario("T9 legacy and unusable saves through MZ's own save/load: schema 1 migrates, newer or damaged states are refused and kept", async () => {
       fresh();
       // a step 2 document: no claims ledger, Showdown names, no form/statistics/steps (those came with schemas 3 and 4)
-      const legacy = clone(game()); legacy.schema = 1; delete legacy.claims; delete legacy.stats; delete legacy.steps;
-      legacy.party = legacy.party.map((m: any) => nodeRequire("./js/engine/build/engine.cjs").speciesKey.toBattleMember(m, W.PSFlow.content()));
+      const legacy = legacyDocument(game(), 1);
       for (const m of legacy.party) delete m.statusCount;
       legacy.party[1].status = "tox"; legacy.party[2].status = "slp";
       G.$gameSystem._psGame = legacy;
@@ -351,9 +359,9 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       G.$gameSystem._psGame = { diverged: true };
       const lc1 = await G.DataManager.loadGame(2);
       assert(!G.$gameSystem._psSaveError, "a schema 1 state loads without error");
-      eq([game().schema, game().party[1].status, game().party[1].statusCount, game().party[2].status, game().party[2].statusCount], [4, "psn", 0, "slp", undefined], "migrated on load");
+      eq([game().schema, game().party[1].status, game().party[1].statusCount, game().party[2].status, game().party[2].statusCount], [5, "psn", 0, "slp", undefined], "migrated on load");
       eq(game().party.map((m: any) => [m.species, m.form]), [["charizard", 0], ["blastoise", 0], ["venusaur", 0]], "Showdown names mapped to content id + form through the content (D5-3)");
-      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, 4, true], "migration recorded");
+      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, 5, true], "migration recorded");
       // a state written by a newer build, and a damaged one
       for (const [slot, doc, code] of [[3, { ...clone(game()), schema: 9 }, "unknown-version"], [4, "not a state", "corrupt"]] as [number, any, string][]) {
         G.$gameSystem._psGame = doc;
@@ -506,7 +514,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       W.PSFlow.rng = seeded(4242);
       try {
         const g0 = clone(game());
-        eq([g0.schema, g0.party.length, g0.boxes.length, g0.bag, g0.money, g0.claims, g0.appliedBattles, g0.steps], [4, 0, 0, {}, 3000, {}, {}, 0], "a new game is the formal empty state");
+        eq([g0.schema, g0.party.length, boxed(g0).length, g0.bag, g0.money, g0.claims, g0.appliedBattles, g0.steps], [5, 0, 0, {}, 3000, {}, {}, 0], "a new game is the formal empty state");
         assert(!JSON.stringify(g0).includes("A-000"), "no fixture member in a new game");
         const mz0 = mzParty();
         eq([G.$dataSystem.startMapId, G.$dataSystem.startX, G.$dataSystem.startY], [5, 8, 9], "the project starts on the slice map");
@@ -515,7 +523,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
         await runEvent(1);
         eq([W.PSFlow.lastClaim.status, G.$gameVariables.value(11)], ["applied", 1], "starter granted, the event sees 1");
         const g1 = clone(game());
-        eq(g1.party.map((m: any) => [m.id, m.species, m.form, m.level, m.moves.map((x: any) => x.id)]), [["G-starter-1", "charmander", 0, 5, ["scratch", "growl", "ember"]]], "the starter comes from the content (stored by content id + form)");
+        eq(g1.party.map((m: any) => [m.id, m.species, m.form, m.level, m.moves.map((x: any) => x.id)]), [["M1", "charmander", 0, 5, ["scratch", "growl", "ember"]]], "the starter comes from the content (stored by content id + form)");
         eq([g1.bag, g1.claims, g1.money], [{ antidote: 2, pokeball: 10, potion: 5 }, { starter: { kind: "grant" } }, 3000], "items and the claim");
         eq(g1.dex, { seen: ["charmander"], owned: ["charmander"] }, "the received species is seen and owned");
         await runEvent(1);
@@ -549,7 +557,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       eq(game(), nodeRequire("./js/engine/build/engine.cjs").state.newGame({ party: [], money: 0 }), "the whole formal empty state: no members, boxes, items, money, dex entries, battles or claims");
       assert(!G.$gameSystem._psSaveError, "not an error");
       eq(W.PSFlow.claim("starter").status, "applied", "the player can still receive the starter");
-      eq([game().party.map((m: any) => m.id), game().claims, game().dex.owned], [["G-starter-1"], { starter: { kind: "grant" } }, ["charmander"]], "received into the empty state");
+      eq([game().party.map((m: any) => m.id), game().claims, game().dex.owned], [["M1"], { starter: { kind: "grant" } }, ["charmander"]], "received into the empty state");
       await recover();
     });
     // ================================================================ step 4 batch B: exploration and the battle loop
@@ -584,7 +592,8 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       assert(["Pidgey", "Caterpie"].includes(req.foes[0].species) && req.foes[0].level >= 2 && req.foes[0].level <= 4, "a foe from the table: " + JSON.stringify(req.foes));
       await inMode("main");
       const foe = battle()._session.foeTeam[0];
-      assert(foe.id === `W${req.seq}-1` && foe.moves.length > 0 && foe.ivs, "the foe was created from the content");
+      const expectedId=api().memberIdentity.allocateMemberId(game().nextMemberOrdinal,new Set([...game().party,...boxed()].map((m:any)=>m.id))).id;
+      assert(foe.id===expectedId&&/^M[0-9a-z]{1,17}$/.test(foe.id)&&foe.moves.length>0&&foe.ivs&&foe.personalID!==undefined,"the foe was created from content with the next stable individual ID");
       eq([saveBefore, G.$gameSystem.isSaveEnabled()], [true, false], "saving is off during the battle");
       assert(!G.Window_MenuCommand.prototype.isSaveEnabled.call({}), "the menu save command is disabled");
       assert(!G.Scene_Base.prototype.isAutosaveEnabled.call(battle()), "autosave is off");
@@ -605,7 +614,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       const m = game().party[0]; m.exp = E.minExp("parabolic", 8) - 1;
       await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await fightUntilEnd(/^Ember|^ember/i);
-      const live = battle()._session.gw.readState("p1").find((x: any) => x.id === "G-starter-1");
+      const live = battle()._session.gw.readState("p1").find((x: any) => x.id === "M1");
       await finishBattle();
       const o = W.PSFlow.lastOutcome; eq([o.code, o.commit, o.kind], [1, "applied", "win"], "won");
       const p = game().party[0];
@@ -630,13 +639,13 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
         }
         for (let i = 0; i < 25 && mode_() !== "end"; i++) { if (mode_() === "party-forced") { await choose(/Caterpie/); await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy, "after the switch"); continue; } await choose(/^Bag/); await inMode("bag"); await choose(/Poké Ball/); await waitFor(() => ["main", "end", "party-forced"].includes(mode_()) && battle()._queue.length === 0 && !battle()._busy, "after the throw"); }
         await inMode("end");
-        assert(battle()._log._lines.some((l: string) => /sent to the boxes/.test(l)), "the player is told the catch went to the boxes");
-        await press("ok"); await dismissMessages(); await waitFor(() => !W.PSFlow.running && !battle(), "back"); await frames(5);
+        assert(!battle()._log._lines.some((l:string)=>/was sent to the boxes/.test(l)),"no destination is announced before commit");
+        await press("ok");await waitFor(()=>!W.PSFlow.running&&!battle(),"automatic reception committed");const notice=W.PSFlow.lastReceivingNotice;assert(notice&&notice.placements.some((p:any)=>p.to==="boxes")&&notice.messages.some((line:string)=>G.$gameMessage._texts.includes(line)),"actual destination is shown after commit");await dismissMessages(); await waitFor(() => !W.PSFlow.running && !battle(), "back"); await frames(5);
         eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit], [2, "applied"], "caught");
-        ids.push(game().boxes[game().boxes.length - 1].id);
+        ids.push(boxed()[boxed().length - 1].id);
       }
-      eq([game().party.length, game().boxes.length], [6, 2], "party unchanged, two in the boxes");
-      assert(ids[0] !== ids[1] && ids.every((id) => /^W\d+-1$/.test(id)), "distinct stable ids: " + ids.join(","));
+      eq([game().party.length, boxed().length], [6, 2], "party unchanged, two in the boxes");
+      assert(ids[0] !== ids[1] && ids.every((id) => /^M[0-9a-z]{1,17}$/.test(id)), "distinct stable ids: " + ids.join(","));
       eq(game().bag.potion, 4, "one potion used");
       return { ids, balls: game().bag.pokeball };
     });
@@ -645,7 +654,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       await slice(19);
       const g = game();
       for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3));
-      g.boxes.push(mkMember("B-1", "Pidgey", 3));
+      api().storage.placeInBox(g.storage, mkMember("B-1", "Pidgey", 3));
       W.PSFlow.testLimits = { party: 6, boxes: 1, bagPerItem: 999, money: 999999 }; W.PSFlow._app = null;
       const before = clone(game());
       await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
@@ -653,7 +662,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       assert(battle()._log._lines.some((l: string) => /party and boxes are full/.test(l)), "the reason is shown");
       eq(battle()._session.bag.pokeball, before.bag.pokeball, "nothing spent");
       await choose(/^Run/); await finishBattle();
-      eq([game().party.length, game().boxes.length, game().bag.pokeball], [6, 1, before.bag.pokeball], "nothing stored or spent");
+      eq([game().party.length, boxed().length, game().bag.pokeball], [6, 1, before.bag.pokeball], "nothing stored or spent");
       W.PSFlow.testLimits = null; W.PSFlow._app = null;
     });
 
@@ -824,19 +833,20 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
 
     await scenario("T24 the read-only party screen: from the slice sign and from the main menu; it shows party, boxes, bag and money and changes nothing", async () => {
       await slice(24);
-      game().boxes.push(mkMember("B-1", "Pidgey", 3));
+      api().storage.placeInBox(game().storage, mkMember("B-1", "Pidgey", 3));
       const before = clone(game());
       G.$gameMap.event(3).start(); await frames(3);
       for (let i = 0; i < 20 && !(scene() && scene()._psParty); i++) { if (G.$gameMessage.isBusy()) await press("ok"); else await frames(5); }
       await waitFor(() => scene() && scene()._psParty, "party screen from the sign");
-      const lines = scene()._text._lines.join("\n");
-      assert(/Charmander\s+Lv5/.test(lines) && /Boxes: 1/.test(lines) && /Potion x5/.test(lines) && /Money: 3000/.test(lines), "the screen shows the state: " + lines);
+      await uiReady("party");
+      const lines = management().text.join("\n");
+      assert(/Charmander/.test(lines) && /Lv.5/.test(lines) && /Box 1/.test(lines) && /Potion ×5/.test(lines) && /Money: 3000/.test(lines), "the screen shows the state: " + lines);
       await press("cancel"); await waitFor(() => scene() && scene()._spriteset, "back on the map"); await dismissMessages();
       G.SceneManager.push(G.Scene_Menu); await waitFor(() => scene() && scene()._commandWindow, "main menu");
       const cw = scene()._commandWindow;
       assert(cw._list.some((c: any) => c.symbol === "psParty"), "the menu has the Party entry");
       cw.selectSymbol("psParty"); cw.processOk();
-      await waitFor(() => scene() && scene()._psParty, "party screen from the menu");
+      await uiReady("party");
       await press("cancel"); await waitFor(() => scene() && scene()._commandWindow, "back in the menu");
       await press("cancel"); await waitFor(() => scene() && scene()._spriteset, "back on the map");
       eq(game(), before, "read only");
@@ -849,16 +859,16 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       const catchOne = async () => {
         await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
         await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); await finishBattle();
-        eq(W.PSFlow.lastOutcome.code, 2, "caught"); return game().boxes[game().boxes.length - 1].id;
+        eq(W.PSFlow.lastOutcome.code, 2, "caught"); return boxed()[boxed().length - 1].id;
       };
       const a = await catchOne();
       await G.DataManager.saveGame(10); const seqSaved = G.$gameSystem._psBattleSeq;
       const b = await catchOne();
       await G.DataManager.loadGame(10);
-      eq([G.$gameSystem._psBattleSeq, game().boxes.map((m: any) => m.id)], [seqSaved, [a]], "counter and state rolled back together");
+      eq([G.$gameSystem._psBattleSeq, boxed().map((m: any) => m.id)], [seqSaved, [a]], "counter and state rolled back together");
       await toMapId(5, 8, 9);
       const c = await catchOne();
-      const ids = [...game().party, ...game().boxes].map((m: any) => m.id);
+      const ids = [...game().party, ...boxed()].map((m: any) => m.id);
       eq(new Set(ids).size, ids.length, "no duplicate id in this timeline: " + ids.join(","));
       eq(c, b, "the discarded timeline's id is reused, which is safe (it exists in no loaded state)");
       return { a, b, c, seqSaved };
@@ -877,17 +887,17 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       for (let i = 3; i <= 6; i++) game().party.push(mkMember(`P-${i}`, "Caterpie", 3)); // test setup: a full party
       await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); await finishBattle();
-      eq([W.PSFlow.lastOutcome.code, game().party.length, game().boxes.length], [2, 6, 1], "caught into the boxes");
+      eq([W.PSFlow.lastOutcome.code, game().party.length, boxed().length], [2, 6, 1], "caught into the boxes");
       game().party[0].hp = 3; game().party[0].moves[2].pp = 1; // hurt before the nurse
       await toMapId(5, 10, 5); await runEvent(2); eq(W.PSFlow.lastHeal.status, "healed", "nurse");
       G.$gamePlayer.locate(12, 6); G.$gamePlayer.setDirection(4); await frames(5);
       const rc = await G.DataManager.saveGame(11);
       const expected = { state: clone(game()), mz: mzParty(), map: { mapId: G.$gameMap.mapId(), x: G.$gamePlayer.x, y: G.$gamePlayer.y, d: G.$gamePlayer.direction() }, seq: G.$gameSystem._psBattleSeq };
       fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t26.json"), JSON.stringify(expected));
-      return { saveCode: rc, party: expected.state.party.map((m: any) => [m.id, m.level]), boxes: expected.state.boxes.map((m: any) => m.id), seq: expected.seq };
+      return { saveCode: rc, party: expected.state.party.map((m: any) => [m.id, m.level]), boxes: boxed(expected.state).map((m: any) => m.id), seq: expected.seq };
     });
 
-    await scenario("T31 a save written by the step 4 code (schema 3, P-1 sample) through MZ's own save/load: migrated to schema 4 field by field with the content mapping and saved again; an unmappable one is refused and kept", async () => {
+    await scenario("T31 a save written by the step 4 code (schema 3, P-1 sample) through MZ's own save/load: migrated to schema 5 field by field with the content mapping and saved again; an unmappable one is refused and kept", async () => {
       const sample = clone(STEP4_FULL); // bundled into this test plugin: the package has no experiments/ folder
       const B = nodeRequire("./js/engine/build/engine.cjs");
       await slice(31);
@@ -896,13 +906,13 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       G.$gameSystem._psGame = { diverged: true };
       await G.DataManager.loadGame(13);
       assert(!G.$gameSystem._psSaveError, "loads: " + JSON.stringify(G.$gameSystem._psSaveError));
-      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [3, 4, true], "migrated from schema 3");
+      eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [3, 5, true], "migrated from schema 3");
       const g = clone(game());
       const keyOf = (n: string) => B.speciesKey.keyOfBattleName(W.PSFlow.content(), n);
       eq(g.party.map((m: any) => [m.id, m.species, m.form]), sample.party.map((m: any) => [m.id, keyOf(m.species).species, 0]), "party by content id + form");
-      eq(g.boxes.map((m: any) => [m.id, m.species]), sample.boxes.map((m: any) => [m.id, keyOf(m.species).species]), "boxes too");
+      eq(boxed(g).map((m: any) => [m.id, m.species]), sample.boxes.map((m: any) => [m.id, keyOf(m.species).species]), "boxes too");
       eq([g.claims, g.appliedBattles, g.bag, g.money, g.dex.owned], [sample.claims, sample.appliedBattles, sample.bag, sample.money, sample.dex.owned.map((n: string) => keyOf(n).species)], "claims, ledger, bag (5000 above the cap), money kept; dex mapped");
-      eq(B.saveSchema.validateGame(g), [], "a valid schema 4 state");
+      eq(B.saveSchema.validateGame(g), [], "a valid schema 5 state");
       eq(W.PSFlow.claim("starter").status, "already-claimed", "the claim survived");
       await G.DataManager.saveGame(14);
       fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t31.json"), JSON.stringify({ state: g }));
@@ -931,7 +941,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       eq(G.$gameSystem.isSaveEnabled(), false, "the save menu is masked while the state is unusable");
       fresh();
       eq(G.$gameSystem.isSaveEnabled(), true, "an explicit reset clears the error, saving is possible again");
-      return { party: g.party.length, boxes: g.boxes.length, battles: Object.keys(g.appliedBattles).length };
+      return { party: g.party.length, boxes: boxed(g).length, battles: Object.keys(g.appliedBattles).length };
     });
 
     await scenario("T32 the step counter (WP06 §4.1): steps on the map count, MZ's own step count still runs, and the counter is saved with the state", async () => {
@@ -1054,6 +1064,106 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
   }
 
   /** S1..S10 engine/session matrix (js/engine/matrix.cjs) inside this runtime; fingerprints are compared with a Node run. */
+  const management = (): any => W.PSManagement?.current();
+  async function uiReady(kind?:string) { await waitFor(()=>!!management()?.ready&&(!kind||management().view.kind===kind)&&!G.SceneManager.isSceneChanging(),'management ready '+(kind||'')); }
+  async function uiChoose(key:string){await uiReady('menu');let guard=0;while(management().view.items[management().view.cursor]?.key!==key&&guard++<60)await press('down');eq(management().view.items[management().view.cursor]?.key,key,'management menu target');await press('ok');}
+  function nativeSubmit(input:HTMLInputElement,key:'Enter'|'Escape',release=true){input.dispatchEvent(new KeyboardEvent('keydown',{key,code:key,keyCode:key==='Enter'?13:27,bubbles:true}));if(release)document.dispatchEvent(new KeyboardEvent('keyup',{key,code:key,keyCode:key==='Enter'?13:27,bubbles:true}));}
+  async function uiClosed(){await waitFor(()=>!management()&&!!scene()?._spriteset&&!G.SceneManager.isSceneChanging(),'management closed to map');await dismissMessages();}
+  async function runManagementUI(){
+   await scenario('U51-01 party, five summary pages, PP/order, sparse marks and cancel preserve authority',async()=>{
+    await toMap();fresh();const before=clone(game());W.PSManagement.openParty();await uiReady('party');await shot('U51-party');await press('ok');await uiChoose('summary');await uiReady('summary');
+    assert(management().text.some((s:string)=>s.includes('Original Trainer')),'owner displayed');for(let i=0;i<4;i++){await press('right');eq(management().view.page,i+1,'summary page');}await shot('U51-summary-ribbons');
+    await press('left');await press('ok');eq(management().view.detail,'moves','move detail');await press('ok');await press('down');await press('ok');eq(game().party[0].moves[0].id,before.party[0].moves[1].id,'whole move/PP objects swapped immediately');
+    await press('cancel');await press('shift');await uiReady('marks');await press('shift');eq(management().view.marks,[],'missing mark action clear does not add slots');await press('cancel');await uiReady('summary');await press('cancel');await uiReady('party');await press('cancel');await uiClosed();eq(game().party.map((m:any)=>m.id),before.party.map((m:any)=>m.id),'stable identities');
+   });
+   await scenario('U51-02 box rename followed by held movement cancellation preserves the independent name edit',async()=>{
+    await toMap();fresh();await toMapId(5,8,9);G.$gameMap.event(4).start();await uiChoose('organize');await uiReady('box');await press('up');await press('ok');await uiChoose('name');
+    const input=document.querySelector('input') as HTMLInputElement;assert(input,'native box input');input.value='青色盒子';nativeSubmit(input,'Enter');await uiReady('box');eq(game().storage.boxes[0].name,'青色盒子','box name');
+    await press('down');await press('down');await press('down');await press('down');await press('down');await press('down');await press('ok');await uiReady('panel');await press('shift');await uiReady('panel');assert(!management().heldId,'ACTION only toggles quick mode');await press('ok');await uiReady('panel');assert(management().heldId,'member held');assert(W.PSFlow.operationPending(),'save blocked by held member');await press('cancel');await uiChoose('yes');await uiReady('panel');assert(!management().heldId,'only held intention cancelled');eq(game().storage.boxes[0].name,'青色盒子','independent edit retained');await press('cancel');await uiReady('box');await press('cancel');await uiChoose('no');await uiReady('menu');await uiChoose('close');await uiClosed();
+   });
+   await scenario('U51-03 nickname IME/empty/No and full-party reception summary/box commit exactly once',async()=>{
+    await toMap();fresh();W.PSFlow.receiveOptions={mode:0,naming:0};W.PSFlow._app=null;const B=api(),before=game().party.length;
+    let gift=mkMember('UI-GIFT','Pidgey',5,{nickname:'原名'});let result=W.PSFlow.app().receiveGift({kind:'normal',member:{existing:gift}});eq(result.status,'pending','normal receiving pending');W.PSManagement.openReceiving();await uiChoose('yes');
+    let input=document.querySelector('input') as HTMLInputElement;input.value='组合中';input.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',isComposing:true,bubbles:true}));eq(management().view.kind,'text','composition not submitted');input.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}));nativeSubmit(input,'Escape');await uiClosed();eq(game().party[before].nickname,null,'accepted empty clears nickname');
+    while(game().party.length<6)game().party.push(mkMember('UI-FILL-'+game().party.length,'Pidgey',5));gift=mkMember('UI-BOX','Pidgey',6,{nickname:'保留'});result=W.PSFlow.app().receiveGift({kind:'normal',member:{existing:gift}});eq(result.status,'pending','full party pending');W.PSManagement.openReceiving();await uiChoose('no');await uiChoose('summary');await uiReady('summary');await press('cancel');await uiChoose('party-view');await uiReady('party');await press('cancel');await uiChoose('box');await uiClosed();eq(B.storage.locateMember(game(),'UI-BOX').position.kind,'box','sent to actual box');eq(B.storage.locateMember(game(),'UI-BOX').member.nickname,'保留','No keeps old nickname');assert(!W.PSFlow.app().saveBlocked,'reception released save lock');
+   });
+   await scenario('U51-04 fixed1200 storage: live save/load, text/form/mark search, last-slot focus and 40 wrap',async()=>{
+    await toMap();fresh();const B=api(),base=mkMember('UI-BASE','Pidgey',3);setBoxed(game(),Array.from({length:1200},(_,i)=>({...clone(base),id:'UI-BOX-'+i,nickname:i===1199?'蓝色朋友':null,markings:i===1199?[2]:[]})));const ids=boxed().map((m:any)=>m.id);await G.DataManager.saveGame(19);await G.DataManager.loadGame(19);eq(boxed().map((m:any)=>m.id),ids,'1200 save/load stable identities');
+    const matches=W.PSFlow.app().searchStorage({text:'蓝色',form:0,markings:[{index:0,value:2}]},(m:any)=>W.PSFlow.speciesName(m.species,m.form));eq(matches.map((x:any)=>x.position),[{kind:'box',box:39,slot:29}],'localized last-slot search');W.PSManagement.openStorage();await uiChoose('organize');await uiReady('box');await press('pageup');await uiReady('box');eq(management().view.box,39,'back wraps to box40');await shot('U51-1200-box40');await press('pagedown');await uiReady('box');eq(management().view.box,0,'forward wraps');await press('control');await press('ok');await uiChoose('search');await uiChoose('text');const input=document.querySelector('input') as HTMLInputElement;input.value='蓝色';nativeSubmit(input,'Enter');await uiChoose('find');await uiReady('results');eq(management().view.matches.length,1,'search UI keeps one stable hit');await press('ok');await uiReady('box');eq([management().view.box,management().view.cursor],[39,29],'search opens exact stable position');await press('cancel');await uiChoose('no');await uiChoose('close');await uiClosed();eq(boxed().length,1200,'no lost member');
+   });
+   await scenario('U51-05 100 real UI open/cancel/reenter cycles use ready barriers, keep state and release roots',async()=>{
+    await toMap();fresh();const before=clone(game()),times:number[]=[];for(let i=0;i<100;i++){const t=performance.now();assert(W.PSManagement.openParty(),'open cycle '+i);await uiReady('party');times.push(performance.now()-t);await press('cancel');await uiClosed();}eq(game(),before,'100 UI cycles no state edits');report.managementLifecycle={cycles:100,openMs:times,inputTail:management()?.frames??null};
+   });
+   await scenario('U51-06 stale native callback after host replacement cannot edit or close a new operation; Chinese UI has no missing key',async()=>{
+    await toMap();fresh();W.PSFlow.setLanguage('zh');W.PSManagement.openStorage();await uiChoose('organize');await uiReady('box');await press('up');await press('ok');await uiChoose('name');const input=document.querySelector('input') as HTMLInputElement;input.value='迟到';W.PSFlow.app().stateReplacedByHost();const before=clone(game());nativeSubmit(input,'Enter');await frames(4);eq(game(),before,'stale input no write');await uiClosed();W.PSManagement.openParty();await uiReady('party');assert(management().text.some((s:string)=>s.includes('队伍')),'Chinese management labels');assert(!management().text.some((s:string)=>s.includes('[missing:')),'no missing translated key');await shot('U51-party-zh');await press('cancel');await uiClosed();W.PSFlow.setLanguage('en');
+   });
+   await scenario('U51-07 captured full-template pending transfers battle to reception and returns directly to map without restart/abort',async()=>{
+    await toMap();fresh();while(game().party.length<6)game().party.push(mkMember('CAP-FILL-'+game().party.length,'Pidgey',3));const storedId=game().party[0].id;W.PSFlow.receiveOptions={mode:0,naming:0};W.PSFlow._app=null;game().bag.masterball=2;await startEvent(1);await inMode('main');await choose(/^Bag/);await inMode('bag');await choose(/Master Ball/);await inMode('end');assert(!battle()._log._lines.some((line:string)=>line.includes('was sent to the boxes')),'no destination claim before full-party decision');await press('ok');await uiReady('menu');assert(W.PSFlow.running,'battle root stays open while receiving');await uiChoose('no');await uiChoose('party');await uiReady('party');await press('ok');await uiClosed();eq(api().storage.locateMember(game(),storedId).position.kind,'box','selected old member stored after full-party capture');eq(game().party[0].id,W.PSFlow.lastResult.captured[0].id,'caught stable identity joins the chosen party slot');assert(!W.PSFlow.running,'battle root closes after receipt');eq(W.PSFlow.lastOutcome.code,2,'caught outcome retained');assert(!W.PSFlow.lastOutcome.aborted,'reception transfer did not abort caught battle');
+   });
+   await scenario('U51-08 forced party receiving cannot cancel or send to box; replacing deposits the chosen stable ID',async()=>{
+    await toMap();fresh();while(game().party.length<6)game().party.push(mkMember('FORCE-FILL-'+game().party.length,'Pidgey',5));W.PSFlow.receiveOptions={mode:2,naming:1};W.PSFlow._app=null;const original=game().party[0].id,result=W.PSFlow.app().receiveGift({kind:'normal',member:{existing:mkMember('FORCE-NEW','Pidgey',5)}});eq(result.status,'pending','force pending');W.PSManagement.openReceiving();await uiReady('menu');assert(!management().view.items.some((x:any)=>x.key==='box'),'force has no box option');await press('cancel');await uiReady('menu');assert(W.PSFlow.operationPending(),'cancel cannot unlock force receiving');await uiChoose('party');await uiReady('party');await press('cancel');await uiChoose('party');await uiReady('party');await press('ok');await uiClosed();eq(game().party[0].id,'FORCE-NEW','new identity occupies chosen party slot');eq(api().storage.locateMember(game(),original).position.kind,'box','chosen old member stored');
+   });
+   await scenario('U51-09 source-off UI permits taking existing item; selector caches qualifier and returns stable identity; Box Link requires three gates',async()=>{
+    await toMap();fresh();game().party[0].item='leftovers';const id=game().party[0].id;W.PSManagement.openParty();await uiReady('party');await press('ok');await uiChoose('item');await uiReady('menu');assert(management().view.items.find((x:any)=>x.key==='give').enabled===false,'source off give disabled');await uiChoose('take');await uiReady('party');eq(game().party[0].item,'','taken item');eq(game().bag.leftovers,1,'returned exactly once');
+    W.PSManagement.hasBoxLink=()=>true;G.$gameSwitches.setValue(35,true);await press('control');eq(management().view.kind,'party','switch disables link');G.$gameSwitches.setValue(35,false);await press('control');await uiReady('box');await press('cancel');await uiChoose('no');await uiReady('party');await press('cancel');await uiClosed();W.PSManagement.hasBoxLink=()=>false;
+    let calls=0,selected:any='pending';assert(W.PSManagement.selectMember((m:any)=>{calls++;return m.id===id;},(x:any)=>{selected=x;}),'selector open');await uiReady('party');eq(calls,game().party.length,'qualifier cached once per member');await press('ok');await uiClosed();eq(selected,{id,index:0},'selector stable ID/index');eq(calls,game().party.length,'not repeatedly called by rendering');
+   });
+   await scenario('U51-10 closed held-item player battle is a visible refusal without fatal map exception; taking it restores battle eligibility',async()=>{
+    await toMap();fresh();game().party[0].item='leftovers';const before=clone(game());G.$gameMap.event(1).start();await frames(12);assert(!battle()&&!W.PSFlow.running,'held battle refused without a scene');assert(/held-item-battle-disabled/.test(W.PSFlow.lastOutcome?.error),'clear held diagnosis');eq(game(),before,'no state or item consumed');await dismissMessages();
+    W.PSManagement.openParty();await uiReady('party');await press('ok');await uiChoose('item');await uiChoose('take');await uiReady('party');await press('cancel');await uiClosed();await startEvent(1);await inMode('main');await choose(/^Run/);await finishBattle();
+   });
+   await scenario('U51-11 real management window resource fails twice then explicit recovery commits once and presents destination notice',async()=>{
+    await toMap();fresh();W.PSFlow.receiveOptions={mode:0,naming:0};W.PSFlow._app=null;const id='UI-RESOURCE-GIFT',result=W.PSFlow.app().receiveGift({kind:'normal',member:{existing:mkMember(id,'Pidgey',3)}});eq(result.status,'pending','gift pending');const original=G.Window_Base.prototype.initialize;let failures=2;
+    G.Window_Base.prototype.initialize=function(...args:any[]){if(scene()?._psManagement&&failures-->0)throw Error('injected management window resource failure');return original.apply(this,args);};
+    try{W.PSManagement.openReceiving();await uiClosed();eq(failures,0,'one construction and one rebuild failed');eq(game().party.filter((m:any)=>m.id===id).length,1,'gift installed once');assert(!W.PSFlow.app().saveBlocked,'recovery unlocks after commit');await dismissMessages();eq(W.PSFlow.app().receivingNotifications.length,0,'healthy map presented and acknowledged destination');}finally{G.Window_Base.prototype.initialize=original;}
+   });
+   await scenario('U51-12 native nickname Enter hold/repeat cannot activate placement before release, then actual committed destination is presented',async()=>{
+    await toMap();fresh();while(game().party.length<6)game().party.push(mkMember('NATIVE-FILL-'+game().party.length,'Pidgey',3));W.PSFlow.receiveOptions={mode:0,naming:0};W.PSFlow._app=null;const id='NATIVE-REAL-GIFT';eq(W.PSFlow.app().receiveGift({kind:'normal',member:{existing:mkMember(id,'Pidgey',3)}}).status,'pending','native receive pending');W.PSManagement.openReceiving();await uiChoose('yes');const input=document.querySelector('input')as HTMLInputElement;input.value='Hold';nativeSubmit(input,'Enter',false);await uiReady('menu');
+    document.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,repeat:true,bubbles:true}));await frames(4);eq(management().view.kind,'menu','held native Enter did not choose Add to party');assert(W.PSFlow.app().pendingReceiving,'no premature commit');document.dispatchEvent(new KeyboardEvent('keyup',{key:'Enter',code:'Enter',keyCode:13,bubbles:true}));await uiChoose('box');await uiClosed();eq(api().storage.locateMember(game(),id).position.kind,'box','explicit choice committed');assert(W.PSFlow.lastReceivingNotice?.placements.some((p:any)=>p.id===id&&p.to==='boxes'),'actual destination diagnostic');
+   });
+   await scenario('U51-13 author gift/summary/recover commands execute through the real interpreter and standard Scene_Load restores data plus map',async()=>{
+    await toMap();fresh();await toMapId(5,8,9);const before=game().party.length;W.PSFlow.receiveOptions={mode:0,naming:0};W.PSFlow._app=null;
+    const command=(name:string,args:any)=>{G.$gameMap._interpreter.setup([{code:357,indent:0,parameters:['PS_Management',name,name,args]},{code:0,indent:0,parameters:[]}],0);};
+    command('ReceiveGift',{request:JSON.stringify({kind:'normal',member:{species:'pidgey',level:3}})});await uiReady('menu');assert(G.$gameMap._interpreter._waitMode==='psReceiving','normal gift command waits for receiving');await uiChoose('no');await uiClosed();eq(game().party.length,before+1,'gift command installed one member');const id=game().party[game().party.length-1].id;
+    command('ShowSummary',{id});await uiReady('summary');eq(management().view.ids,[id],'summary command targets stable ID');await press('cancel');await uiClosed();
+    game().party[0].hp=1;const stored=mkMember('AUTHOR-RECOVER','Pidgey',3,{hp:1});api().storage.placeInBox(game().storage,stored);command('RecoverAll',{});await frames(6);await dismissMessages();assert(game().party[0].hp>1&&api().storage.locateMember(game(),stored.id).member.hp>1,'recover command heals configured party and boxes');
+    await G.DataManager.saveGame(16);const expected=clone(game());game().money=0;G.SceneManager.push(G.Scene_Load);await waitFor(()=>scene()?.isStarted?.()&&scene()?.isActive?.()&&scene()?._listWindow?.active&&scene().mode?.()==='load'&&!G.SceneManager.isSceneChanging(),'standard load menu interactive');scene()._listWindow.selectSavefile(16);assert(scene()._listWindow.index()>=0&&scene()._listWindow.index()<scene()._listWindow.maxItems(),'selected save is inside the actual MZ load list');await press('ok');await waitFor(()=>!!scene()?._spriteset&&!G.SceneManager.isSceneChanging(),'standard Scene_Load returned to map');await frames(4);eq(game(),expected,'standard load restored framework data');assert(!W.PSFlow.operationPending(),'standard load leaves no stale management root');
+   });
+   await scenario('U51-14 J02 transient snapshot retry and T1 unusable event entries remain contained and exit to map',async()=>{
+    await toMap();fresh();const app=W.PSFlow.app(),read=app.managementSnapshot.bind(app);let calls=0;app.managementSnapshot=(...args:any[])=>{if(calls++===0)throw Error('J02 transient snapshot');return read(...args);};W.PSManagement.openParty();await uiReady('party');assert(calls>=2,'initialization actually retried snapshot');await press('cancel');await uiClosed();delete app.managementSnapshot;const token=app.beginManagement();app.endManagement(token);
+    const healthy=clone(game()),raw:any={...healthy,schema:4,boxes:Array.from({length:1201},(_,i)=>({...api().state.protocolMember(healthy.party[0]),form:healthy.party[0].form,id:'T1-'+i}))};raw.party=healthy.party.map((m:any)=>({...api().state.protocolMember(m),form:m.form}));delete raw.storage;delete raw.player;delete raw.nextMemberOrdinal;const bytes=JSON.stringify(raw);G.$gameSystem._psGame=raw;const contents=G.DataManager.makeSaveContents();G.DataManager.extractSaveContents(contents);eq(G.$gameSystem._psSaveError.code,'capacity-exceeded','actual migration rejected');
+    for(const name of ['ShowStorage','ShowParty','ShowSummary']){const plugin=name==='ShowParty'?'PS_BattleFlow':'PS_Management';G.$gameMap._interpreter.setup([{code:357,indent:0,parameters:[plugin,name,name,{id:healthy.party[0].id}]},{code:0,indent:0,parameters:[]}],0);await waitFor(()=>scene()?._psManagement&&scene()?._initialFailure&&!G.SceneManager.isSceneChanging(),'contained unavailable management '+name);await frames(3);assert(!management()?.ready,'failed scene never ready');await shot('J02-'+name);await press('cancel');await uiClosed();eq(JSON.stringify(G.$gameSystem._psGame),bytes,'unusable original unchanged');assert(!G.$gameSystem.isSaveEnabled(),'all saves remain blocked');}
+    await toMap();fresh();
+   });
+   await scenario('U51-15 J01 actual Reactor gamepad polling releases held USE BACK and direction without DOM events',async()=>{
+    await toMap();fresh();const descriptor=Object.getOwnPropertyDescriptor(navigator,'getGamepads'),original=navigator.getGamepads;const buttons=Array.from({length:16},()=>({pressed:false,value:0})),pad={index:0,connected:true,buttons,axes:[0,0]};Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[pad]});
+    try{for(const button of [0,1,13]){G.Input.clear();buttons[button]!.pressed=true;G.Input._pollGamepads();W.PSManagement.openParty();await uiReady('party');await frames(4);eq(management().view.kind,'party','held service input did not act');eq(management().view.cursor,0,'held direction stayed blocked');buttons[button]!.pressed=false;await frames(3);buttons[button]!.pressed=true;await frames(3);buttons[button]!.pressed=false;await frames(3);if(button===0){await uiReady('menu');await press('cancel');await uiReady('party');await press('cancel');}else if(button===13){eq(management().view.cursor,2,'released direction works');await press('cancel');}await uiClosed();}}
+    finally{for(const b of buttons)b.pressed=false;if(descriptor)Object.defineProperty(navigator,'getGamepads',descriptor);else{delete (navigator as any).getGamepads;if(navigator.getGamepads!==original)Object.defineProperty(navigator,'getGamepads',{configurable:true,value:original});}G.Input.clear();}
+   });
+   await scenario('U51-16 J06/J07 actual organizer toggle, header shortcut, sparse summary return and quick placement',async()=>{
+    await toMap();fresh();const a=mkMember('JBOX0','Pidgey',3),b=mkMember('JBOX29','Pidgey',3);game().storage.boxes[0].slots[0]=a;game().storage.boxes[0].slots[29]=b;W.PSManagement.openStorage();await uiChoose('organize');await uiReady('box');await press('ok');await uiChoose('summary');await uiReady('summary');await press('down');eq(management().view.ids[management().view.cursor],b.id,'summary selected last sparse slot');await press('cancel');await uiReady('box');eq(management().view.cursor,29,'parent cursor follows summary');const before=clone(game());await press('shift');await uiReady('box');assert(!management().heldId,'toggle alone does not take member');eq(game(),before,'toggle performs no state write');await press('ok');await uiReady('box');eq(management().heldId,b.id,'USE takes in quick mode');await press('left');await press('ok');await uiReady('box');assert(!management().heldId,'USE places at empty slot');eq(game().storage.boxes[0].slots[28].id,b.id,'quick placement committed');await press('shift');await uiReady('box');await press('control');eq(management().view.cursor,-1,'SPECIAL returns header');await press('ok');await uiChoose('search');await uiReady('menu');assert(management().view.items.some((x:any)=>x.key==='find'),'search remains command entry');await press('cancel');await uiReady('box');await press('cancel');await uiChoose('no');await uiChoose('close');await uiClosed();
+   });
+   await scenario('U51-17 J08/J09 nature stat colors and last-able release guard before confirmation',async()=>{
+    await toMap();fresh();game().party[0].nature='adamant';W.PSManagement.openSummary(game().party[0].id);await uiReady('summary');await press('right');await press('right');const c=scene()._controller,b=c.window.contents,draw=b.drawText,colors:any[]=[];b.drawText=function(text:string,...args:any[]){colors.push({text,color:this.textColor});return draw.call(this,text,...args);};try{c.draw();}finally{b.drawText=draw;}eq(colors.find(x=>x.text.startsWith('Attack:')).color,'#ffb0b0','raised red');eq(colors.find(x=>x.text.startsWith('Sp. Atk:')).color,'#aabfff','lowered blue');await shot('J08-summary-colors');await press('cancel');await uiClosed();game().party.forEach((m:any,i:number)=>m.hp=i?0:1);W.PSManagement.openStorage();await uiChoose('organize');await uiReady('box');await press('control');await press('up');await press('ok');await uiReady('panel');await press('ok');await uiChoose('release');await uiReady('panel');assert(management().text.some((t:string)=>t.includes('last able')),'refusal visible before any confirmation');await press('cancel');await uiReady('box');await press('cancel');await uiChoose('no');await uiChoose('close');await uiClosed();
+   });
+   await scenario('U51-18 RJ01 mixed keyboard and actual Reactor gamepad sources release in either order',async()=>{
+    await toMap();fresh();const descriptor=Object.getOwnPropertyDescriptor(navigator,'getGamepads'),original=navigator.getGamepads,buttons=Array.from({length:16},()=>({pressed:false,value:0}));Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[{index:0,connected:true,buttons,axes:[0,0]}]});
+    const key=(type:string)=>document.dispatchEvent(new KeyboardEvent(type,{key:'ArrowDown',code:'ArrowDown',keyCode:40,bubbles:true}));
+    try{for(const order of ['keyboard-first','gamepad-first','both-held']){G.Input.clear();buttons[13]!.pressed=true;key('keydown');G.Input._pollGamepads();W.PSManagement.openParty();await uiReady('party');await frames(4);eq(management().view.cursor,0,'entry barrier');if(order==='keyboard-first')key('keyup');if(order==='gamepad-first')buttons[13]!.pressed=false;await frames(30);eq(management().view.cursor,0,'remaining source still blocked '+order);buttons[13]!.pressed=false;key('keyup');await frames(3);buttons[13]!.pressed=true;await frames(3);buttons[13]!.pressed=false;await frames(3);eq(management().view.cursor,2,'full release permits new press '+order);await press('cancel');await uiClosed();}}
+    finally{key('keyup');buttons[13]!.pressed=false;if(descriptor)Object.defineProperty(navigator,'getGamepads',descriptor);else{delete (navigator as any).getGamepads;if(navigator.getGamepads!==original)Object.defineProperty(navigator,'getGamepads',{configurable:true,value:original});}G.Input.clear();}
+   });
+   await scenario('U51-19 RJ02 withdraw party button prompts without changes, organize and deposit retain panel movement',async()=>{
+    for(const mode of ['withdraw','organize','deposit']){await toMap();fresh();W.PSManagement.openStorage();await uiChoose(mode);await uiReady(mode==='deposit'?'panel':'box');const before=clone(game());if(mode!=='deposit'){await press('control');await press('up');eq(management().view.cursor,-2,'party button');await press('ok');}
+     if(mode==='withdraw'){await uiReady('box');eq(management().view.cursor,-2,'withdraw retains cursor');assert(management().text.some((t:string)=>t.includes('Which one will you take?')),'withdraw prompt visible');eq(game(),before,'no state change');await press('ok');eq(game(),before,'repeat choice no state change');}
+     else{await uiReady('panel');await press('ok');await uiChoose('transfer');await uiReady('panel');eq(game().party.length,before.party.length-1,'deposit remains available');if(mode==='organize'){await press('cancel');await uiReady('box');}}
+     await press('cancel');await uiChoose('no');await uiChoose('close');await uiClosed();}
+   });
+   await scenario('U51-20 RJ01 native release on first ready frame permits immediate fresh USE',async()=>{
+    await toMap();fresh();W.PSManagement.openStorage();await uiChoose('organize');await uiReady('box');await press('control');await press('ok');await uiChoose('name');const input=document.querySelector('input') as HTMLInputElement;input.value='Ready release';nativeSubmit(input,'Enter');await uiReady('box');await press('ok');await uiChoose('wallpaper');await uiChoose('5');await uiReady('box');eq(game().storage.boxes[0].wallpaper,5,'fresh USE immediately after native completion accepted');await press('cancel');await uiChoose('no');await uiChoose('close');await uiClosed();
+   });
+   W.PSFlow.receiveOptions={mode:1,naming:1};W.PSFlow._app=null;
+  }
+
   async function runMatrixMode() {
     const t0 = performance.now();
     const matrixModule = nodeRequire("./js/engine/matrix.cjs");
@@ -1084,6 +1194,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
   const med = (a: number[]) => pct(a, 0.5);
 
   async function runPerf() {
+    W.PSFlow.receiveOptions={mode:1,naming:1};
     const perf: any = { method: { t0: "shell epoch ms just before launch", timers: "performance.now()/Date.now() in the renderer", frames: "SceneManager.update deltas, window focused, fast=true (no message pacing)" }, stamps, memory: [] as any[] };
     if (t0) { perf.coldStart = { launchToPluginMs: stamps.pluginLoadedAt - t0 }; }
     await toMap();
@@ -1100,7 +1211,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     const fightKo = async () => { await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower/i); await frames(5); await waitFor(() => ["end", "main", "learn"].includes(mode_()), "after KO"); };
     const potionRun = async () => { await choose(/^Bag/); await inMode("bag"); await choose(/Potion/); await inMode("party"); await choose(/Charizard/); await inMode("main"); await choose(/^Run/); };
     const ball = async () => { await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); };
-    await G.DataManager.setupNewGame(); W.PSFlow.resetGame(); W.PSFlow.fast = true; W.PSFlow.seed = undefined;
+    await G.DataManager.setupNewGame(); W.PSFlow.resetGame(); W.PSFlow._app=null; W.PSFlow.fast = true; W.PSFlow.seed = undefined;
     G.$gamePlayer.reserveTransfer(4, 8, 8, 2, 0); G.SceneManager.goto(G.Scene_Map); await frames(30);
     W.PSFlow.seed = [1, 2, 3, 4];
     const kindsList: [string, number, () => Promise<void>][] = [["run", 1, run], ["fight-ko", 1, fightKo], ["potion+run", 1, potionRun], ["master-ball", 1, ball]];
@@ -1151,7 +1262,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       const g = game();
       for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3));
       const box = mkMember("BX-0", "Pidgey", 3);
-      g.boxes = Array.from({ length: W.PSFlow.limits().boxes }, (_, i) => ({ ...clone(box), id: `BX-${i}` })); // test setup: every box slot used
+      setBoxed(g, Array.from({ length: W.PSFlow.limits().boxes }, (_, i) => ({ ...clone(box), id: `BX-${i}` }))); // test setup: every box slot used
       for (const item of B.items.BAG_ITEMS) g.bag[item] = 999; // test setup: every known bag item at the cap
       const enc: number[] = [], saveMs: number[] = [], loadMs: number[] = [], menuMs: number[] = [], viewMs: number[] = [];
       for (let i = 0; i < n; i++) {
@@ -1167,12 +1278,12 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
         for (let k = 0; k < 6 && mode_() !== "end"; k++) { await choose(/^Run/); await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after run"); }
         await finishBattle();
         const t = performance.now(); G.SceneManager.push(W.Scene_PSParty);
-        await waitFor(() => scene() && scene()._psParty && !G.SceneManager.isSceneChanging(), "party screen"); menuMs.push(Math.round((performance.now() - t) * 10) / 10);
+        await uiReady("party"); menuMs.push(Math.round((performance.now() - t) * 10) / 10);
         await press("cancel"); await waitFor(() => scene() && scene()._spriteset && !G.SceneManager.isSceneChanging(), "back on the map");
       }
       const st = (a: number[]) => ({ n: a.length, p50: pct(a, 0.5), max: a.length ? Math.max(...a) : null, samples: a });
       perf.step5 = {
-        method: `slice map; party 6, boxes ${game().boxes.length} (all slots used), bag ${Object.keys(game().bag).length} items x 999 (test setup); save/load = DataManager round trip, slot 17; battleView = the battle view of that state; encounter = executeEncounter -> first menu; party screen = SceneManager.push(Scene_PSParty) until the screen is up`,
+        method: `slice map; party 6, boxes ${boxed().length} (all slots used), bag ${Object.keys(game().bag).length} items x 999 (test setup); save/load = DataManager round trip, slot 17; battleView = the battle view of that state; encounter = executeEncounter -> first menu; party screen = SceneManager.push(Scene_PSParty) until explicit management ready (5.0 object-exists endpoint is not directly comparable)`,
         saveMs: st(saveMs), loadMs: st(loadMs), battleViewMs: st(viewMs), encounterToFirstMenuMs: st(enc), partyScreenOpenMs: st(menuMs),
       };
     } catch (e: any) { perf.errors = (perf.errors || []).concat(`step5 timings: ${e.message}`); }
@@ -1200,6 +1311,27 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     perf.focus = { initiallyFocused: focusLog[0]?.hasFocus, blurEvents: focusLog.filter((e) => e.ev === "blur" && !e.initial).length, framesSkippedUnfocused: skippedUnfocused };
     perf.battles = all.length;
     perf.window = { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio, refocusCount: refocus };
+    // New 5.1 measurements are separate from every historical comparable row above.
+    if(argv.includes('--ps-perf-management')){
+      sampling=false;lastFrameAt=0;
+      try{
+        const B=api(),corpus=boxed().map(clone),measurements:any[]=[];
+        for(const count of [0,30,1200]){
+          setBoxed(game(),corpus.slice(0,count));const samples:any={count,saveMs:[],loadMs:[],migration4to5Ms:[],searchMs:[],boxSwitchMs:[]};
+          for(let i=0;i<6;i++){
+            let t=performance.now();await G.DataManager.saveGame(18);samples.saveMs.push(performance.now()-t);
+            t=performance.now();await G.DataManager.loadGame(18);samples.loadMs.push(performance.now()-t);
+            t=performance.now();const matches=W.PSFlow.app().searchStorage({},(m:any)=>W.PSFlow.speciesName(m.species,m.form));samples.searchMs.push(performance.now()-t);eq(matches.length,count,'performance search count');
+          }
+          const current=clone(game()),legacy:any={...clone(current),schema:4,party:current.party.map((m:any)=>({...B.state.protocolMember(m),form:m.form})),boxes:boxed(current).map((m:any)=>({...B.state.protocolMember(m),form:m.form}))};delete legacy.storage;delete legacy.player;delete legacy.nextMemberOrdinal;
+          for(let i=0;i<3;i++){G.$gameSystem._psGame=clone(legacy);await G.DataManager.saveGame(18);const t=performance.now();await G.DataManager.loadGame(18);samples.migration4to5Ms.push(performance.now()-t);eq([G.$gameSystem._psSaveInfo.from,G.$gameSystem._psSaveInfo.to,G.$gameSystem._psSaveInfo.migrated],[4,5,true],'actual timed legacy migration');eq(boxed().length,count,'migration count');}
+          W.PSManagement.openStorage();await uiChoose('organize');await uiReady('box');for(let i=0;i<6;i++){const t=performance.now();await press('pagedown');await uiReady('box');samples.boxSwitchMs.push(performance.now()-t);}await press('cancel');await uiChoose('no');await uiChoose('close');await uiClosed();measurements.push(samples);
+        }
+        const uiMemory=[mem('5.1 UI warmed (before 100 opens)')],openMs:number[]=[];
+        for(let i=0;i<100;i++){const t=performance.now();W.PSManagement.openParty();await uiReady('party');openMs.push(performance.now()-t);await press('cancel');await uiClosed();if((i+1)%25===0)uiMemory.push(mem('after '+(i+1)+' management opens'));}
+        perf.management={method:'NEW 5.1 only, excluded from historical battle/frame rows; isolated MZ slots18; 0/30/1200 boxed members; 6 save/current-load/search samples, 3 real schema4->5 loads, 6 ready-barrier box-switch samples per size; full1200 state, 100 party scene lifecycles after warmup. No invented pass threshold.',measurements,uiLifecycle:{count:100,openMs,memory:uiMemory},noApprovedBudget:true};
+      }catch(e:any){perf.errors=(perf.errors||[]).concat('5.1 management measurements: '+e.message);}
+    }
     report.perf = perf;
     results.push({ id: "P1 perf run", status: perf.errors ? "fail" : "pass", ms: 0, error: perf.errors && perf.errors.join("; ") });
   }
@@ -1352,11 +1484,11 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
   }
 
   async function verifySave() {
-    await scenario("V4 real restart: the step 4 save migrated and saved by the previous process loads as schema 4, without migrating again", async () => {
+    await scenario("V4 real restart: the step 4 save migrated and saved by the previous process loads as schema 5, without migrating again", async () => {
       const expected = JSON.parse(fs.readFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t31.json"), "utf8"));
       G.DataManager.setupNewGame();
       await G.DataManager.loadGame(14);
-      eq([G.$gameSystem._psSaveError, G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.migrated], [undefined, 4, false], "a schema 4 save");
+      eq([G.$gameSystem._psSaveError, G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.migrated], [undefined, 5, false], "a schema 5 save");
       eq(game(), expected.state, "the migrated state, identical");
       return { party: game().party.length };
     });
@@ -1376,8 +1508,8 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       await finishBattle();
       eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit], [3, "applied"], "a battle after loading commits");
       eq(G.$gameSystem._psBattleSeq, expected.seq + 1, "the counter continues from the save");
-      const ids = [...game().party, ...game().boxes].map((m: any) => m.id); eq(new Set(ids).size, ids.length, "no duplicate id");
-      return { seq: G.$gameSystem._psBattleSeq, party: game().party.length, boxes: game().boxes.length };
+      const ids = [...game().party, ...boxed()].map((m: any) => m.id); eq(new Set(ids).size, ids.length, "no duplicate id");
+      return { seq: G.$gameSystem._psBattleSeq, party: game().party.length, boxes: boxed().length };
     });
     await scenario("V2 real restart (slice): the new-game save loads identically in a fresh process, the claim stays claimed, MZ gold/items as saved", async () => {
       const expected = JSON.parse(fs.readFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t15.json"), "utf8"));
@@ -1468,7 +1600,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       try { startAt.call(this); } finally { fs.readFileSync = read; }
     } else startAt.call(this);
     setTimeout(async () => {
-      try { if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else await runAll(); }
+      try { if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else { await runAll(); await runManagementUI(); } }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       try { report.contentIdentity = W.PSFlow.content().meta; } catch (e) { report.contentIdentity = { error: String(e) }; }
       try { report.logTail = W.PSFlow.logger ? W.PSFlow.logger.tail(60) : null; } catch (e) { report.logTail = { error: String(e) }; } // redacted, bounded session diagnostics

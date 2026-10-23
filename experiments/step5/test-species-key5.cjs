@@ -9,6 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const E = require('../../js/engine/build/engine.cjs');
+const H = require('./1/legacy-test-support.cjs');
 const K = E.speciesKey;
 const S = E.state;
 const { migrateGame, validateGame } = E.saveSchema;
@@ -58,17 +59,18 @@ test('fixture content (no key tables): its content ids are the Showdown names, f
 
 test('members convert both ways; the battle view gives sessions Showdown names and every form of each recorded species', () => {
   const battle = E.memberFactory.createMember({ id: 'W1-1', species: 'Vulpix-Alola', level: 5 }, formed, () => 0);
-  assert.equal(battle.form, undefined);
+  assert.equal(battle.form, 1);
   const saved = K.toPersistentMember(battle, formed);
   assert.deepEqual([saved.species, saved.form], ['vulpix', 1]);
-  assert.deepEqual(K.toBattleMember(saved, formed), battle, 'a round trip gives the battle record back');
+  const projected = clone(battle); delete projected.form;
+  assert.deepEqual(K.toBattleMember(saved, formed), projected, 'a round trip gives the battle record back');
   assert.throws(() => K.toPersistentMember({ ...battle, species: 'Mew' }, formed), /has no persistent species key/);
   assert.throws(() => K.toBattleMember({ ...saved, species: 'mew' }, formed), /species "mew" \(form 1\) is not in the content/);
-  const g = S.newGame({ party: [] }); g.party = [saved]; g.boxes = [{ ...saved, id: 'B-1', form: 0 }]; g.dex = { seen: ['vulpix', 'charmander'], owned: ['vulpix'] };
+  const g = S.newGame({ party: [] }); g.party = [saved]; H.setBoxed(g, [{ ...saved, id: 'B-1', form: 0 }]); g.dex = { seen: ['vulpix', 'charmander'], owned: ['vulpix'] };
   const before = clone(g);
   const v = K.battleView(g, formed);
   assert.deepEqual(g, before, 'the stored state is not touched');
-  assert.deepEqual([v.party[0].species, v.boxes[0].species, 'form' in v.party[0]], ['Vulpix-Alola', 'Vulpix', false]);
+  assert.deepEqual([v.party[0].species, E.storage.boxedMembers(v)[0].species, 'form' in v.party[0]], ['Vulpix-Alola', 'Vulpix', false]);
   assert.deepEqual(v.dex, { seen: ['Vulpix', 'Vulpix-Alola', 'Charmander'], owned: ['Vulpix', 'Vulpix-Alola'] });
 });
 
@@ -95,13 +97,14 @@ test('a result is written back through the content mapping: captured member and 
   const g = S.newGame({ party: [] });
   const caught = E.memberFactory.createMember({ id: 'W1-1', species: 'Vulpix-Alola', level: 5 }, formed, () => 0);
   const result = { protocol: 1, battleId: 'cap#1', outcome: { kind: 'caught', winner: null, target: 'W1-1', ball: 'pokeball' }, members: {}, bag: {}, captured: [caught], dex: { seen: ['Vulpix-Alola'], owned: ['Vulpix-Alola'] } };
-  const r = S.applyBattleResult(g, result, undefined, K.speciesKeyResolver(formed));
+  const reception = { templates: { [caught.id]: K.toPersistentMember(caught, formed) }, profile: { mode: 1, naming: 1 } };
+  const r = S.applyBattleResult(g, result, undefined, K.speciesKeyResolver(formed), reception);
   assert.deepEqual([r.state.party[0].species, r.state.party[0].form, r.state.dex], ['vulpix', 1, { seen: ['vulpix'], owned: ['vulpix'] }]);
   assert.deepEqual(validateGame(r.state), []);
   assert.equal(r.state.appliedBattles['cap#1'].hash, S.resultHash(result), 'the ledger hashes the result as received (battle names)');
   const before = clone(g);
-  assert.throws(() => S.applyBattleResult(g, { ...result, battleId: 'cap#2', dex: { seen: ['Mew'], owned: [] } }, undefined, K.speciesKeyResolver(formed)), /dex seen: "Mew" has no persistent species key/);
-  assert.throws(() => S.applyBattleResult(g, { ...result, battleId: 'cap#3', captured: [{ ...caught, species: 'Mew' }] }, undefined, K.speciesKeyResolver(formed)), /captured member W1-1: "Mew"/);
+  assert.throws(() => S.applyBattleResult(g, { ...result, battleId: 'cap#2', dex: { seen: ['Mew'], owned: [] } }, undefined, K.speciesKeyResolver(formed), reception), /dex seen: "Mew" has no persistent species key/);
+  assert.throws(() => S.applyBattleResult(g, { ...result, battleId: 'cap#3', captured: [{ ...caught, species: 'Mew' }] }, undefined, K.speciesKeyResolver(formed), reception), /captured member W1-1: "Mew"/);
   assert.deepEqual(g, before, 'a refused result changes nothing');
 });
 
@@ -127,8 +130,8 @@ test('schema 4 validation: form per member, statistics record (74 fields) and st
 const v3 = () => {
   const m = E.memberFactory.createMember({ id: 'G-starter-1', species: 'Charmander', level: 5 }, sample, () => 0);
   const box = E.memberFactory.createMember({ id: 'W2-1', species: 'Pidgey', level: 3 }, sample, () => 1);
-  const g = S.newGame({ party: [] }); g.schema = 3; delete g.stats; delete g.steps;
-  g.party = [m]; g.boxes = [box]; g.dex = { seen: ['Charmander', 'Pidgey'], owned: ['Charmander', 'Pidgey'] }; g.claims = { starter: { kind: 'grant' } };
+  const g = H.legacyGame(S.newGame({ party: [] }), 3);
+  g.party = [H.legacyMember(m, 3)]; g.boxes = [H.legacyMember(box, 3)]; g.dex = { seen: ['Charmander', 'Pidgey'], owned: ['Charmander', 'Pidgey'] }; g.claims = { starter: { kind: 'grant' } };
   g.appliedBattles = { 'wild#2': { hash: 'a'.repeat(64) } }; g.bag = { potion: 5000 }; g.money = 2500;
   return g;
 };
@@ -143,14 +146,14 @@ test('3 -> 4 needs the content: without the mapping it refuses (needs-content) a
 
 test('3 -> 4 maps every member and the dex to content id + form, adds statistics and steps, keeps everything else', () => {
   const raw = v3(), before = clone(raw);
-  const r = migrateGame(raw, { speciesKey: K.speciesKeyResolver(sample) });
+  const r = migrateGame(raw, { speciesKey: K.speciesKeyResolver(sample), content: sample });
   assert.equal(r.ok, true, JSON.stringify(r.error));
-  assert.deepEqual([r.from, r.to, r.migrated], [3, 4, true]);
+  assert.deepEqual([r.from, r.to, r.migrated], [3, 5, true]);
   assert.deepEqual(raw, before, 'the input document is never mutated');
-  assert.deepEqual([r.state.party[0].species, r.state.party[0].form, r.state.boxes[0].species, r.state.boxes[0].form], ['charmander', 0, 'pidgey', 0]);
+  assert.deepEqual([r.state.party[0].species, r.state.party[0].form, E.storage.boxedMembers(r.state)[0].species, E.storage.boxedMembers(r.state)[0].form], ['charmander', 0, 'pidgey', 0]);
   assert.deepEqual(r.state.dex, { seen: ['charmander', 'pidgey'], owned: ['charmander', 'pidgey'] });
   assert.deepEqual([r.state.stats, r.state.steps], [E.stats.newStats(), 0]);
-  const changed = S.diffPaths(raw, r.state).sort();
+  const changed = S.diffPaths(raw, H.legacyGame(r.state, 4)).sort();
   assert.deepEqual(changed, ['boxes.0.form', 'boxes.0.species', 'dex.owned.0', 'dex.owned.1', 'dex.seen.0', 'dex.seen.1', 'party.0.form', 'party.0.species', 'schema', 'stats', 'steps'], 'claims, ledger, bag (5000 above the cap), money untouched');
   assert.match(r.notes.join('|'), /schema 4: 2 member\(s\) and the dex moved/);
   assert.deepEqual(validateGame(r.state), []);
@@ -161,7 +164,7 @@ test('3 -> 4 with forms: a Showdown form name maps to the content id and its for
   const raw = v3();
   raw.party.push({ ...clone(raw.party[0]), id: 'A-2', species: 'Vulpix-Alola' }, { ...clone(raw.party[0]), id: 'A-3', species: 'Vulpix' });
   raw.dex.seen.push('Vulpix-Alola', 'Vulpix');
-  const r = migrateGame(raw, { speciesKey: K.speciesKeyResolver(formed) });
+  const r = migrateGame(raw, { speciesKey: K.speciesKeyResolver(formed), content: formed });
   assert.equal(r.ok, true, JSON.stringify(r.error));
   assert.deepEqual(r.state.party.map(m => [m.species, m.form]), [['charmander', 0], ['vulpix', 1], ['vulpix', 0]]);
   assert.deepEqual(r.state.dex.seen, ['charmander', 'pidgey', 'vulpix']);
@@ -170,7 +173,7 @@ test('3 -> 4 with forms: a Showdown form name maps to the content id and its for
 test('3 -> 4 refuses as a whole when the content cannot map a name: every place is listed, nothing is changed', () => {
   const raw = v3(); raw.boxes[0].species = 'Mew'; raw.dex.owned.push('Missingno');
   const before = clone(raw);
-  const r = migrateGame(raw, { speciesKey: K.speciesKeyResolver(sample) });
+  const r = migrateGame(raw, { speciesKey: K.speciesKeyResolver(sample), content: sample });
   assert.deepEqual([r.ok, r.error.code], [false, 'unmapped-species']);
   assert.deepEqual(r.error.problems.map(p => p.path), ['$.boxes[0].species', '$.dex.owned[2]']);
   assert.match(r.error.problems[0].message, /"Mew" \(member W2-1\) is not a species of the current content/);
@@ -183,13 +186,13 @@ test('replay ledger across the migration: a result committed before schema 4 is 
   const caught = E.memberFactory.createMember({ id: 'W3-1', species: 'Pidgey', level: 4 }, sample, () => 2);
   const result = { protocol: 1, battleId: 'wild#3', outcome: { kind: 'caught', winner: null, target: 'W3-1', ball: 'pokeball' }, members: { 'G-starter-1': { hp: 10 } }, bag: { potion: -1 }, captured: [caught], dex: { seen: ['Pidgey'], owned: ['Pidgey'] } };
   // what a step 4 build did: schema 3, battle names stored, the hash of the result as received in the ledger
-  const committed3 = { ...clone(g3), party: [...clone(g3.party), clone({ ...caught })], bag: { potion: 4999 }, appliedBattles: { 'wild#3': { hash: S.resultHash(result) } } };
+  const committed3 = { ...clone(g3), party: [...clone(g3.party), H.legacyMember(caught, 3)], bag: { potion: 4999 }, appliedBattles: { 'wild#3': { hash: S.resultHash(result) } } };
   committed3.party[0].hp = 10;
-  const m = migrateGame(committed3, { speciesKey: K.speciesKeyResolver(sample) });
+  const m = migrateGame(committed3, { speciesKey: K.speciesKeyResolver(sample), content: sample });
   assert.equal(m.ok, true, JSON.stringify(m.error));
-  const again = S.applyBattleResult(m.state, result, undefined, K.speciesKeyResolver(sample));
+  const again = S.applyBattleResult(m.state, result, undefined, K.speciesKeyResolver(sample), H.templatesFor(m.state, result));
   assert.deepEqual([again.status, again.state === m.state], ['already-applied', true], 'the same result is a repeat after the migration');
-  assert.throws(() => S.applyBattleResult(m.state, { ...result, bag: { potion: -2 } }, undefined, K.speciesKeyResolver(sample)), /already applied with a different result/);
+  assert.throws(() => S.applyBattleResult(m.state, { ...result, bag: { potion: -2 } }, undefined, K.speciesKeyResolver(sample), H.templatesFor(m.state, result)), /already applied with a different result/);
 });
 
 // ---- review of 1960b92 (2026-10-22): F07 the identity boundary of growth, F08 newGame's persistent members
@@ -225,5 +228,5 @@ test('F08: newGame gives a member without a form the base form 0 (valid schema 4
   assert.deepEqual([g.party[0].species, g.party[0].form], ['charmander', 0]);
   assert.deepEqual(validateGame(g), []);
   assert.equal(S.newGame({ party: [{ ...noForm, form: 2 }] }).party[0].form, 2, 'a given form is kept');
-  assert.equal('form' in S.newMember(battle), false, 'newMember (also used for captured records, protocol v1) adds no form');
+  assert.equal('form' in S.protocolMember(battle), false, 'newMember (also used for captured records, protocol v1) adds no form');
 });

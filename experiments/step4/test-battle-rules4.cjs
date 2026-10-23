@@ -87,12 +87,15 @@ const caughtResult = (id, battleId = 'cap#1') => ({ protocol: 1, battleId, outco
 test('a capture goes to the party, then to the boxes; with both full the whole result is refused, nothing dropped or half-applied', () => {
   const L = { ...E.limits.DEFAULT_LIMITS, boxes: 1 };
   const g = gameWith(Array.from({ length: 6 }, (_, i) => member(`P${i}`, 'Caterpie', 2)), 0); g.bag = { pokeball: 3 };
-  const one = S.applyBattleResult(g, caughtResult('W1-1'), L);
-  assert.deepEqual([one.state.party.length, one.state.boxes.map(m => m.id)], [6, ['W1-1']]);
+  const first = caughtResult('W1-1'), second = caughtResult('W2-1', 'cap#2');
+  const receiving = r => ({templates: {[r.captured[0].id]: E.speciesKey.toPersistentMember(r.captured[0], content)}, profile:{mode:1,naming:1}});
+  const keys = E.speciesKey.speciesKeyResolver(content);
+  const one = S.applyBattleResult(g, first, L, keys, receiving(first));
+  assert.deepEqual([one.state.party.length, E.storage.boxedMembers(one.state).map(m => m.id)], [6, ['W1-1']]);
   const before = clone(one.state);
-  assert.throws(() => S.applyBattleResult(one.state, caughtResult('W2-1', 'cap#2'), L), /no room for captured member W2-1: the party \(6\) and the boxes \(1\) are full/);
+  assert.throws(() => S.applyBattleResult(one.state, second, L, keys, receiving(second)), e => e.reason === 'boxes-full');
   assert.deepEqual(one.state, before, 'the bag, dex and ledger are untouched as well');
-  assert.equal(S.applyBattleResult(g, caughtResult('W1-1'), L).status, 'applied', 'the default limits apply when none are given');
+  assert.equal(S.applyBattleResult(g, first, L, keys, receiving(first)).status, 'applied', 'the default limits apply when none are given');
 });
 
 test('a result may not raise a bag item above the per-item cap (an amount already above it is kept, results only spend)', () => {
