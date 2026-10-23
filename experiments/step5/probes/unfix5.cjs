@@ -6,6 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '../../..');
+// 5.2 UI extension is opt-in; keep the original cases and all historical logs intact.
+if(process.argv[2]==='--step52-ui'){const r=spawnSync(process.execPath,[path.join(__dirname,'../2/probes/reverse-GH.cjs'),...process.argv.slice(3)],{cwd:ROOT,stdio:'inherit'});process.exit(r.status??1);}
 const FW = 'src/framework';
 const T = f => `experiments/step5/${f}.cjs`;
 const U = [

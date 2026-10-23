@@ -9,5 +9,6 @@ var $plugins =
 {"name":"PS_SaveState","status":true,"description":"Step 3: versioned game state inside the MZ save (migrate on load, refuse and keep what cannot be understood).","parameters":{}},
 {"name":"PS_BattleFlow","status":true,"description":"Step 2.4: placeholder text battle scene driven by the Showdown session; map events start battles and wait.","parameters":{"homeMapId":"5","homeX":"8","homeY":"9","homeDirection":"2"}},
 {"name":"PS_Management","status":true,"description":"Party, individual summary, storage and receiving.","parameters":{}},
+{"name":"PS_Inventory","status":true,"description":"Bag, item use, money shop and author events.","parameters":{}},
 {"name":"PS_BattleFlowTest","status":true,"description":"Step 2.4 test driver (inert without --ps-flow-test).","parameters":{}}
 ];

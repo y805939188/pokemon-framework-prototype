@@ -193,6 +193,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   tossItems(...args:Parameters<InventorySession['toss']>){return this.inventory.toss(...args);}
   queryBadges(index?:number):{count:number;owned?:boolean}{const game=this.ports.state.read();return {count:badgeCount(game.badges),...(index===undefined?{}:{owned:hasBadge(game.badges,index)})};}
   hasBoxLink():boolean {return this.inventory.hasBoxLink();}
+  heldItemSourcesEnabled():boolean {return this.capabilities.allowHeldItemSources;}
 
   /** A new game: the formal empty state (no members; the player receives them through grants). Throws only if the store refuses. */
   startNewGame(): { status: "started"; state: GameState } {

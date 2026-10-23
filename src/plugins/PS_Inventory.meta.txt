@@ -1,0 +1,87 @@
+/*:
+ * @target MZ
+ * @plugindesc Bag, party item use, selection and money shops.
+ * @author pokemon-framework
+ * @help
+ * Requires PS_BattleFlow and PS_Management before this plugin.
+ * Uses framework inventory, never MZ party items/gold. Indices are zero based.
+ * Interactive commands wait for their own operation and return structured status.
+ * @command ShowBag
+ * @text ShowBag
+ * @command SelectItem
+ * @text SelectItem
+ * @arg itemIds
+ * @type string
+ * @default
+ * @arg variableId
+ * @type string
+ * @default
+ * @command OpenShop
+ * @text OpenShop
+ * @arg shopId
+ * @type string
+ * @default
+ * @arg stock
+ * @type string
+ * @default []
+ * @arg allowSell
+ * @type boolean
+ * @default true
+ * @arg prices
+ * @type string
+ * @default
+ * @command UseItemOnMember
+ * @text UseItemOnMember
+ * @arg itemId
+ * @type string
+ * @default potion
+ * @arg memberId
+ * @type string
+ * @default
+ * @arg quantity
+ * @type number
+ * @default 1
+ * @command GiveItems
+ * @text GiveItems
+ * @arg itemId
+ * @type string
+ * @default potion
+ * @arg quantity
+ * @type number
+ * @default 1
+ * @arg claimId
+ * @type string
+ * @default
+ * @command RemoveItems
+ * @text RemoveItems
+ * @arg itemId
+ * @type string
+ * @default potion
+ * @arg quantity
+ * @type number
+ * @default 1
+ * @command ChangeMoney
+ * @text ChangeMoney
+ * @arg amount
+ * @type number
+ * @min -9007199254740991
+ * @max 9007199254740991
+ * @decimals 0
+ * @default 0
+ * @command SetBadge
+ * @text SetBadge
+ * @arg index
+ * @type number
+ * @default 0
+ * @arg owned
+ * @type boolean
+ * @default true
+ * @command QueryBadge
+ * @text QueryBadge
+ * @arg index
+ * @type string
+ * @default
+ * @arg variableId
+ * @type string
+ * @default
+ */
