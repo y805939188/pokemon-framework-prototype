@@ -16,7 +16,7 @@
 | 2 | 验证战斗接入，确定路线和首版范围 | **已完成并经用户决定（C2）**，补充修复已于 2026-10-19 收口（标签 `step2-closeout`），见 `docs/step2/README.md`、`docs/step2/closeout-addendum.md` |
 | 3 | 工程与测试基础：模块边界、构建/CI、内容数据、本地化、存档基础、第一条 Ruby/TS 对照测试链 | **已收口（2026-10-19，标签 `step3-closed`）**：独立验收先不通过、整改后有条件通过，见 `docs/step3/closure.md`；性能尚无同条件基线。第四步前短架构批次（含复核修复）已于 2026-10-20 经 PR #1 合入 `main`，见 `docs/step3/architecture-batch-closure.md` |
 | 4 | 最小可玩闭环（获得精灵→遭遇→战斗/捕获→成长→治疗→存档读档） | **已完成（2026-10-21）**：批次 A/B/C 与两轮复核整改经 PR #2 合入 `main`（合并提交 `3e3e655`），收口记录 `docs/step4/closure.md`；见 `docs/step4/README.md`、`acceptance.md`、`commands.md` |
-| 5 | 按功能族扩展，每批交付规则、接口、UI、事件入口、测试和示例 | **进行中**：计划 r3 经用户批准（工作区 `.handoff/step5-plan.zh.md`，7 批）。**5.0 基础整固已完成（2026-10-22）**：经 PR #3 合入 `main`（合并提交 `5dc86f6`），收口记录 `docs/step5/5.0-closure.md`。非阻塞遗留：包内 T24 首轮超时一次，根因未证实；最终候选没有新的计时和 100 场测量，沿用历史 WARN 与内存记录。5.1 已经双审、精确候选与 main 双层 CI 及用户条件合并授权后经 PR #4 常规合入 `c5c51a6`。5.2 r3 独立入口复核通过，A/B/C/D M1六项已由原独立任务复验PASS；E/F规则与应用候选在制，EF-DEC-01高初值出售统计待用户决定，正式G/H未执行，停M2；未push/merge，见 `docs/step5/5.2-EF-contract.md`。见 `docs/step5/README.md` |
+| 5 | 按功能族扩展，每批交付规则、接口、UI、事件入口、测试和示例 | **进行中**：计划 r3 经用户批准（工作区 `.handoff/step5-plan.zh.md`，7 批）。**5.0 基础整固已完成（2026-10-22）**：经 PR #3 合入 `main`（合并提交 `5dc86f6`），收口记录 `docs/step5/5.0-closure.md`。非阻塞遗留：包内 T24 首轮超时一次，根因未证实；最终候选没有新的计时和 100 场测量，沿用历史 WARN 与内存记录。5.1 已经双审、精确候选与 main 双层 CI 及用户条件合并授权后经 PR #4 常规合入 `c5c51a6`。5.2 r3 独立入口复核通过，A/B/C/D M1六项已由原独立任务复验PASS；E/F规则与应用已有作者候选，EF-DEC-01方案①已批准并实现，正式G/H未执行，停M2待独立结论；未push/merge，见 `docs/step5/5.2-EF-contract.md`。见 `docs/step5/README.md` |
 | 6 | 作者工具与 Demo（用户会自制符合 MZ 规格的美术资源） | 未开始 |
 | 7 | 平台、存档、性能、分发验收，发布可用版本 | 未开始 |
 

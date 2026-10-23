@@ -41,7 +41,9 @@ shop('important-latest-ownership','||importantItem(item)&&itemQuantity(game.inve
 shop('gift-count-floor','generous?Math.floor(intent.quantity/10)','generous?1');
 shop('gift-capacity-after-main','capacityFor(next.inventory,premier.id','capacityFor(game.inventory,premier.id');
 shop('free-wallet-write','next.money=changeMoney(game.money,-total,moneyCap(c,limits.money));','next.money=total===0?game.money:changeMoney(game.money,-total,moneyCap(c,limits.money));');
-shop('sale-actual-income',"bumpStat(next.stats,'money_earned_at_marts',next.money-game.money)","bumpStat(next.stats,'money_earned_at_marts',total)");
+shop('sale-actual-income',"bumpStat(next.stats,'money_earned_at_marts',Math.max(0,next.money-game.money))","bumpStat(next.stats,'money_earned_at_marts',total)");
+shop('sale-nonnegative-income',"bumpStat(next.stats,'money_earned_at_marts',Math.max(0,next.money-game.money))","bumpStat(next.stats,'money_earned_at_marts',next.money-game.money)");
+shop('sale-approved-overcap-transaction',"next.stats=bumpStat(next.stats,'money_earned_at_marts',Math.max(0,next.money-game.money));","if(next.money<game.money)return reject('income-policy-decision-required');next.stats=bumpStat(next.stats,'money_earned_at_marts',Math.max(0,next.money-game.money));");
 add('caller-stock-alias','app/inventory-session.ts','const stock=definition?[...definition.stock]:input.stock;','const stock=definition?[...definition.stock]:input.stock?[...input.stock]:undefined;','shop');
 add('stock-validated-before-install','app/inventory-session.ts','try{if(this.shop){assertMutableStock(this.shop.stock);filteredStock=[...this.shop.stock];filterShopStock(next,content,filteredStock);}}','try{}','shop');
 add('known-effect-cold-gate','content/item-input.ts','const invalid=fieldEffectProblem(e as unknown as NonNullable<ItemDefinition[\'effect\']>);','const invalid=null;','item-effects');
