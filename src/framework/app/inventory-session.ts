@@ -54,6 +54,13 @@ export class InventorySession {
   get active():boolean{return this.context!==null;}
   get saveBlocked():boolean{return this.context?.kind==='item'||!!this.pendingUse||!!this.tossPending;}
   private contentRevision(content:Content):string{return semanticFingerprint(clone(content));}
+  private itemWorld():ItemWorldContext {
+    const world=clone(this.options.world?.()??{});
+    // Every actual world observation, including a read-only eligibility query, retires
+    // the old authority on change. Observing the original values again cannot renew it.
+    if(this.pendingUse&&this.pendingUse.world!==semanticFingerprint(world))this.pendingUse.stale=true;
+    return world;
+  }
   stateChanged(next:GameState):void{const effect=JSON.stringify([next.party,next.inventory.pockets]);if(effect!==this.observedEffect){this.effectRevision++;this.observedEffect=effect;}const value=JSON.stringify(next.inventory.pockets);if(value!==this.observedInventory){this.revision++;this.observedInventory=value;}}
   invalidate():void{const parent=this.context?.parent;this.context=null;this.shop=null;this.pendingUse=null;this.selection=null;this.tossPending=null;this.sorting=null;this.filtering=false;this.receipts.clear();this.options.leave(parent);}
   begin(kind:'bag'|'item'|'shop'='bag',parent?:InventoryParent):string{
@@ -128,7 +135,7 @@ export class InventorySession {
       switch(request.kind){
         case 'use-item':{
           if(context.kind==='shop')throw new Error('wrong-operation');if(request.ticket)this.checkTicket(token,request.ticket);if(request.ticket&&request.ticket.itemId!==request.itemId)throw new Error('stale-slot');if(context.parent&&request.memberId!==undefined&&request.memberId!==context.parent.memberId)throw new Error('invalid-target');
-          const {answers,...base}=request,world=clone(this.options.world?.()??{}),identity=semanticFingerprint(base),revision=String(this.effectRevision),worldRevision=semanticFingerprint(world);
+          const {answers,...base}=request,world=this.itemWorld(),identity=semanticFingerprint(base),revision=String(this.effectRevision),worldRevision=semanticFingerprint(world);
           if(JSON.stringify(this.current(token).game)!==JSON.stringify(game))throw new Error('stale-item-selection');
           // A changed base intent cannot cancel its existing learning owner. Related edits retire
           // this selection permanently until the operation closes, even if world values later return (ABA).
@@ -261,7 +268,7 @@ export class InventorySession {
       if(context.parent&&memberId!==undefined&&memberId!==context.parent.memberId)throw new Error('invalid-target');
       const target=context.parent?.memberId??memberId;
       if(!target&&family!=='sacred-ash')return {ready:true,eligible:'unknown',reason:'target-required'};
-      const world=clone(this.options.world?.()??{}),intent={itemId,quantity,...(target?{memberId:target}:{})};
+      const world=this.itemWorld(),intent={itemId,quantity,...(target?{memberId:target}:{})};
       const maximum=itemUseLimit(game,content,intent,world),planned=planItemUse(game,content,intent,{confirmed:true},world);
       if(planned.status==='pending'&&planned.selection.kind==='move'){
         const moves=game.party.find(m=>m.id===target)?.moves??[];

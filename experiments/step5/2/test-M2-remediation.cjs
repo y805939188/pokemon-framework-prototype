@@ -4,7 +4,35 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const {E,clone,setup,plan,count,maxHp}=require('./ef-support.cjs');
 const intent=x=>({kind:'use-item',itemId:'rarecandy',quantity:1,memberId:x.game.party[0].id});
 const answered=(base,slot=0)=>({...base,answers:{learning:[{kind:'replace',slot}]}});
-function learning(){return setup({bag:{rarecandy:1,potion:1},world:{mapId:7},edit:(g,c)=>{c.species.Charizard.learnset={51:['Slash']};g.party[0].hp=1;}});}
+function learning(ports={}){return setup({bag:{rarecandy:1,potion:1},world:{mapId:7},edit:(g,c)=>{c.species.Charizard.learnset={51:['Slash']};g.party[0].hp=1;},...ports});}
+for(const field of ['mapId','shadowIds','hyperIds','hmMoves'])test(`M2-01/r2/P52-29/44 query-observed ${field} ABA permanently retires old learning authority`,()=>{
+ const reads=[];let world;const x=learning({itemWorld:()=>{reads.push(clone(world));return world;}});world=x.world;
+ const t=x.app.beginInventoryOperation(),base=intent(x),before=clone(x.state.current());assert.equal(x.app.inventoryRequest(t,'observed',base).status,'pending');
+ world[field]=field==='mapId'?8:field==='hmMoves'?['flamethrower']:[base.memberId];
+ x.app.queryItemUse(t,'rarecandy',1,base.memberId);assert.deepEqual(reads.at(-1),world);assert.equal(x.state.replaced.length,0);
+ if(field==='mapId')world.mapId=7;else delete world[field];let feedback=0;
+ for(const request of [answered(base),answered(base),base,{...base,answers:{cancelled:true}},{...base,quantity:2}]){
+  const r=x.app.inventoryRequest(t,'observed',request,()=>feedback++);assert.equal(r.status,'refused');assert.equal(r.reason,'stale-item-selection');assert.deepEqual(x.state.current(),before);assert.equal(x.state.replaced.length,0);assert.equal(x.app.saveBlocked,true);
+ }
+ assert.deepEqual(reads.slice(0,3),[{mapId:7},{mapId:7,...{[field]:field==='mapId'?8:field==='hmMoves'?['flamethrower']:[base.memberId]}},{mapId:7}]);
+ assert.equal(feedback,0);assert.equal(x.draws,0);assert.equal(x.app.inventoryRequest(t,'other',{kind:'change-money',amount:1}).reason,'item-pending');assert.equal(x.app.endInventoryOperation(t).status,'unchanged');assert.equal(x.app.saveBlocked,false);
+});
+test('M2-01/r2/P52-29/30 query and snapshot observations retain party and inventory ABA protection',()=>{
+ for(const entry of ['query-party','snapshot-inventory','ticket-inventory']){
+  const x=learning(),t=x.app.beginInventoryOperation(),base=intent(x),original=clone(x.state.current());x.app.inventoryRequest(t,'state-aba',base);const changed=clone(original);
+  if(entry==='query-party')[changed.party[0].moves[0],changed.party[0].moves[1]]=[changed.party[0].moves[1],changed.party[0].moves[0]];else changed.inventory.pockets.flat().find(s=>s.itemId==='potion').quantity++;
+  x.state.replace(changed);if(entry==='query-party')x.app.queryItemUse(t,'rarecandy',1,base.memberId);else if(entry==='snapshot-inventory')x.app.inventorySnapshot(t);else {const p=changed.inventory.pockets.findIndex(p=>p.length);x.app.inventoryTicket(t,p+1,0);}
+  x.state.replace(original);const writes=x.state.replaced.length;for(let i=0;i<2;i++)assert.equal(x.app.inventoryRequest(t,'state-aba',answered(base)).reason,'stale-item-selection');assert.deepEqual(x.state.current(),original);assert.equal(x.state.replaced.length,writes);assert.equal(x.app.saveBlocked,true);x.app.endInventoryOperation(t);
+ }
+});
+test('M2-01/r2/P52-30/44 unchanged queries and a fresh operation retain valid learning and atomic retry',()=>{
+ const x=learning(),base=intent(x),old=x.app.beginInventoryOperation();x.app.inventoryRequest(old,'old',base);x.world.mapId=8;x.app.queryItemUse(old,'potion',1,base.memberId);x.world.mapId=7;assert.equal(x.app.inventoryRequest(old,'old',answered(base)).reason,'stale-item-selection');x.app.endInventoryOperation(old);
+ const t=x.app.beginInventoryOperation();x.world.hmMoves=['flamethrower'];assert.equal(x.app.queryItemUse(t,'rarecandy',1,base.memberId).eligible,'eligible');assert.equal(x.app.inventoryRequest(t,'fresh',base).status,'pending');assert.equal(x.app.queryItemUse(t,'rarecandy',1,base.memberId).eligible,'eligible');assert.equal(x.app.inventoryRequest(old,'old',answered(base)).reason,'stale-operation');
+ const protectedAnswer=x.app.inventoryRequest(t,'fresh',answered(base));assert.equal(protectedAnswer.status,'pending');assert.equal(protectedAnswer.result.selection.reason,'hm-protected');assert.equal(protectedAnswer.result.selection.answerIndex,0);assert.equal(x.app.saveBlocked,true);assert.equal(x.state.replaced.length,0);
+ const before=clone(x.state.current()),request=answered(base,1);x.state.failReplace=Error('r2 atomic install failure');assert.equal(x.app.inventoryRequest(t,'fresh',request).reason,'commit-failed');assert.deepEqual(x.state.current(),before);assert.equal(x.app.saveBlocked,true);x.state.failReplace=null;
+ assert.equal(x.app.inventoryRequest(t,'fresh',request).status,'committed');assert.equal(x.app.inventoryRequest(t,'fresh',request).status,'duplicate');assert.equal(x.state.replaced.length,1);assert.equal(count(x.state.current(),'rarecandy',x.content),0);assert.deepEqual(x.state.current().party[0].moves.map(m=>m.id),['flamethrower','slash','dragonpulse','roost']);assert.equal(x.draws,0);x.app.endInventoryOperation(t);
+ const y=learning(),u=y.app.beginInventoryOperation(),untouched=intent(y);y.app.inventoryRequest(u,'unobserved',untouched);y.world.mapId=8;y.world.mapId=7;assert.equal(y.app.inventoryRequest(u,'unobserved',answered(untouched)).status,'committed');assert.equal(y.state.replaced.length,1);y.app.endInventoryOperation(u);
+});
 test('M2-01/P52-29/30/45 party edit cannot turn repeated old learning callbacks into fresh authority',()=>{
  const x=learning(),t=x.app.beginInventoryOperation(),base=intent(x);const shown=x.app.inventoryRequest(t,'retained',base);assert.deepEqual(shown.result.selection.moves.map(m=>m.id),['flamethrower','airslash','dragonpulse','roost']);
  const latest=clone(x.state.current());[latest.party[0].moves[0],latest.party[0].moves[1]]=[latest.party[0].moves[1],latest.party[0].moves[0]];x.state.replace(latest);const writes=x.state.replaced.length;

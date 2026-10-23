@@ -29,7 +29,6 @@ effect('learning-fresh-record',"const fresh={id:move.id,pp:move.pp,maxpp:move.pp
 effect('learning-all-levels','level<=m.level;level++','level<=oldLevel+1;level++');
 effect('learning-current-records','if(m.moves.some(x=>x.id===move.id))continue;','if(game.party.find(x=>x.id===m.id)!.moves.some(x=>x.id===move.id))continue;');
 app('pending-party-revision','||this.pendingUse.revision!==revision','');
-app('pending-world-revision','||this.pendingUse.world!==worldRevision','');
 app('learning-cannot-cancel-all',"if(this.pendingUse?.learning&&(answers?.cancelled===true||answers?.confirmed===false))throw new Error('learning-choice-required');",'');
 app('selection-cancel-variable',"this.options.variables.write(selection.variableId,itemId??'')","this.options.variables.write(selection.variableId,itemId??'0')");
 app('selection-no-resource-write',"this.selection!.indices[pocket-1]=index;","this.selection!.indices[pocket-1]=index;const next=clone(this.state.read());next.inventory.lastPocket=pocket;this.options.install(next);");
@@ -54,8 +53,15 @@ const retired="if(this.pendingUse&&(this.pendingUse.stale||this.pendingUse.revis
 const fixedIntent="if(this.pendingUse&&this.pendingUse.fingerprint!==identity)throw new Error('stale-item-selection');";
 remediation('M2-01-repeated-stale-resurrection','app/inventory-session.ts',retired,retired.replace('this.pendingUse.stale=true;','this.pendingUse=null;'));
 remediation('M2-01-base-intent-unlock','app/inventory-session.ts',fixedIntent,"if(this.pendingUse&&this.pendingUse.fingerprint!==identity){this.pendingUse=null;throw new Error('stale-item-selection');}");
-remediation('M2-01-world-ABA-retirement','app/inventory-session.ts','this.pendingUse.stale=true;','');
-remediation('M2-01-related-edit-before-base-check','app/inventory-session.ts',retired+'\n          '+fixedIntent,fixedIntent+'\n          '+retired);
+const observedWorld="if(this.pendingUse&&this.pendingUse.world!==semanticFingerprint(world))this.pendingUse.stale=true;";
+remediation('pending-world-revision','app/inventory-session.ts',observedWorld,'');
+remediation('M2-01-world-ABA-retirement','app/inventory-session.ts',observedWorld,'if(this.pendingUse)this.pendingUse.stale=this.pendingUse.world!==semanticFingerprint(world);');
+const useContext='const {answers,...base}=request,world=this.itemWorld(),identity=semanticFingerprint(base),revision=String(this.effectRevision),worldRevision=semanticFingerprint(world);';
+remediation('M2-01-related-edit-before-base-check','app/inventory-session.ts',useContext,'const {answers,...base}=request,identity=semanticFingerprint(base);'+fixedIntent+'const world=this.itemWorld(),revision=String(this.effectRevision),worldRevision=semanticFingerprint(world);');
+remediation('M2-01-query-bypasses-observer','app/inventory-session.ts','const world=this.itemWorld(),intent=','const world=clone(this.options.world?.()??{}),intent=');
+remediation('M2-01-observer-only-map','app/inventory-session.ts',observedWorld,"if(this.pendingUse&&Object.keys(world).every(key=>key==='mapId')&&this.pendingUse.world!==semanticFingerprint(world))this.pendingUse.stale=true;");
+remediation('M2-01-observer-unlocks-owner','app/inventory-session.ts',observedWorld,'if(this.pendingUse&&this.pendingUse.world!==semanticFingerprint(world))this.pendingUse=null;');
+remediation('M2-01-ignore-observed-retirement','app/inventory-session.ts','this.pendingUse.stale||','');
 remediation('M2-02-zero-heal-no-consumption','rules/item-effects.ts',"if(active==='hp'&&m.hp===oldHp)return refuse('no-effect');",'');
 remediation('M2-02-status-only-full-restore','rules/item-effects.ts',"if(active==='hp'&&m.hp===oldHp)return refuse('no-effect');","if(m.hp===oldHp)return refuse('no-effect');");
 const run=(cmd,args)=>spawnSync(cmd,args,{cwd:root,encoding:'utf8',timeout:180000,maxBuffer:20*1024*1024});
