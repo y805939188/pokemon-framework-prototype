@@ -104,6 +104,7 @@ const U = [
   {"id": "RJ02-withdraw-panel", "what": "Withdraw party button must stay in the box selector", "edits": [["src/plugins/PS_Management.ts", "if(v.mode==='organize')this.push({kind:'panel',cursor:0,mode:v.mode,box:v.box});else this.error=tr('withdrawPrompt');", "this.push({kind:'panel',cursor:0,mode:v.mode,box:v.box});"]], "tests": ["experiments/step5/1/test-management-ui.cjs"]},
   {"id": "RJ03-fake-safe-id-write", "what": "Legal prototype named IDs require own writes in fake plans and installation", "edits": [["experiments/step5/1/probes/held-contract-model.cjs", "Object.defineProperty(map,id,{value,writable:true,enumerable:true,configurable:true})", "(map[id]=value)"]], "tests": ["experiments/step5/1/test-held-contract.cjs"]},
 
+  {"id": "RJ01-ready-release-sample", "what": "Ready frame must observe releases without handling actions", "edits": [["src/plugins/PS_Management.ts", "const filtered=this.latch.filter(sample);", "const filtered=this.ready?this.latch.filter(sample):sample;"]], "tests": ["experiments/step5/1/test-management-ui.cjs"]},
 ];
 const sh = (cmd, args, opts = {}) => spawnSync(cmd, args, { cwd: ROOT, encoding: 'utf8', ...opts });
 const want = process.argv.slice(2), out = [];

@@ -172,11 +172,13 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
   update(){
    if(!this.valid()){if(!this.closed){this.closed=true;this.removeInput();this.scene._invalid=true;}return;}
    if(!this.top()||!this.started||this.top()?.kind==='text')return;
-   const frame=G.Graphics.frameCount??++this.frame;if(!this.ready){if(frame>this.frame&&!G.SceneManager.isSceneChanging()){this.ready=true;record({token:this.token,event:'ready',frame,view:this.top()?.kind});}return;}
+   const frame=G.Graphics.frameCount??++this.frame;if(!this.ready&&(frame<=this.frame||G.SceneManager.isSceneChanging()))return;
    const sample:InputFrame={repeated:{},triggered:{},pressed:{}};
    for(const key of Object.keys(ALIAS)as(Action|Direction)[]){sample.pressed[key]=this.physical.has(key)||G.Input.isPressed(ALIAS[key]);if(['up','left','right','down'].includes(key))sample.repeated[key as Direction]=G.Input.isRepeated(ALIAS[key]);else sample.triggered[key as Action]=G.Input.isTriggered(ALIAS[key]);}
    if(G.TouchInput.isCancelled())sample.triggered.back=true;
-   const v=this.top(),intent=inputIntent(this.latch.filter(sample),v.kind==='box'?'box':v.kind==='panel'?'panel':v.kind==='marks'?v.summary?'mark-summary':'mark-storage':'ordinary',v.mode==='organize');
+   const filtered=this.latch.filter(sample); // Observe release on the first ready frame, but never act on it.
+   if(!this.ready){this.ready=true;record({token:this.token,event:'ready',frame,view:this.top()?.kind});return;}
+   const v=this.top(),intent=inputIntent(filtered,v.kind==='box'?'box':v.kind==='panel'?'panel':v.kind==='marks'?v.summary?'mark-summary':'mark-storage':'ordinary',v.mode==='organize');
    if(!intent.direction&&!intent.action)return;record({token:this.token,event:'input',frame,view:v.kind,cursor:v.cursor,...intent});
    try{if(intent.direction)this.direction(intent.direction);if(this.top()===v&&this.ready&&intent.action)this.action(intent.action);this.draw();}catch(e){try{this.fail(String(e));}catch(drawError){this.scene.rebuildFailed(drawError);}}
   }

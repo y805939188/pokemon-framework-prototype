@@ -1158,6 +1158,9 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
      else{await uiReady('panel');await press('ok');await uiChoose('transfer');await uiReady('panel');eq(game().party.length,before.party.length-1,'deposit remains available');if(mode==='organize'){await press('cancel');await uiReady('box');}}
      await press('cancel');await uiChoose('no');await uiChoose('close');await uiClosed();}
    });
+   await scenario('U51-20 RJ01 native release on first ready frame permits immediate fresh USE',async()=>{
+    await toMap();fresh();W.PSManagement.openStorage();await uiChoose('organize');await uiReady('box');await press('control');await press('ok');await uiChoose('name');const input=document.querySelector('input') as HTMLInputElement;input.value='Ready release';nativeSubmit(input,'Enter');await uiReady('box');await press('ok');await uiChoose('wallpaper');await uiChoose('5');await uiReady('box');eq(game().storage.boxes[0].wallpaper,5,'fresh USE immediately after native completion accepted');await press('cancel');await uiChoose('no');await uiChoose('close');await uiClosed();
+   });
    W.PSFlow.receiveOptions={mode:1,naming:1};W.PSFlow._app=null;
   }
 

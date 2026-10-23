@@ -145,3 +145,7 @@ test('RJ02: withdraw party button only prompts without writes; organize panel an
   else {assert.equal(h.G.PSManagement.current().view.kind,'panel');h.use();h.choose('transfer');assert.equal(h.state.current().party.length,2);}
  }
 });
+
+test('RJ01: first ready frame observes native key release before an immediate fresh press, without accepting held input',()=>{
+ const h=host();h.G.PSManagement.openStorage();h.choose('organize');h.ready();h.press('control');h.use();h.choose('name');const c=h.manager._scene._controller;c.input.value='Ready release';c.input.events.keydown({key:'Enter',code:'Enter',keyCode:13,preventDefault(){},stopPropagation(){}});h.releaseNative('Enter');h.tick();assert.equal(h.G.PSManagement.current().ready,true);h.use();assert.equal(h.G.PSManagement.current().view.kind,'menu','next press immediately after ready opens box menu');
+});
