@@ -138,7 +138,7 @@ test('PBS import CLI: refused without a checked source (nothing written); with o
 
 test('FR-000388/389 rule configuration (WP02 subset): Gen 8 defaults, validated overrides through settings.json, the capacities they give', () => {
   const C = E.config;
-  assert.deepEqual(C.resolveConfig(), { MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999 });
+  const cfg=C.resolveConfig();assert.deepEqual(Object.fromEntries(["MECHANICS_GENERATION","MAX_MONEY","MAX_PARTY_SIZE","NUM_STORAGE_BOXES","BAG_MAX_PER_SLOT"].map(k=>[k,cfg[k]])), { MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999 });
   assert.deepEqual(C.limitsOf(C.resolveConfig()), E.limits.DEFAULT_LIMITS, 'the defaults give the step 4 capacities (40 x 30 boxes)');
   assert.deepEqual(C.limitsOf(C.resolveConfig({ NUM_STORAGE_BOXES: 40, MAX_PARTY_SIZE: 3 })), { party: 3, boxes: 1200, bagPerItem: 999, money: 999999 });
   const has = (o, pathRe, msgRe) => assert.ok(C.checkOverrides(o).some(p => pathRe.test(p.path) && msgRe.test(p.message)), JSON.stringify(C.checkOverrides(o)));

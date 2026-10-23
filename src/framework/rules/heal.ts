@@ -1,3 +1,4 @@
+import { computedNature } from "./member-metadata.ts";
 /**
  * Full heal (WP20 §3.2 heal / heal_party, WP61 §7.3): HP to the maximum from the current stats, status and its counter
  * cleared, every move back to its maximum PP. Nothing else changes (friendship, moves, EVs, origin). The party heal does
@@ -14,7 +15,7 @@ export function healMember(m: Member, content: Content, options: { preserveReady
   if (m.isEgg) return clone(m);
   const sp = speciesDataOf(content, m);
   if (!sp) throw new Error(`member ${m.id}: species "${m.species}" (form ${m.form ?? 0}) is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
-  const maxhp = computeStats(sp.base, m.ivs, m.evs, m.level, m.nature).hp;
+  const maxhp = computeStats(sp.base, m.ivs, m.evs, m.level, computedNature(m)).hp;
   return { ...clone(m), ...(m.readyToEvolve !== undefined && !options.preserveReadyToEvolve ? { readyToEvolve: false } : {}), hp: maxhp, status: "", statusCount: 0, moves: m.moves.map((mv) => ({ ...mv, pp: mv.maxpp })) };
 }
 

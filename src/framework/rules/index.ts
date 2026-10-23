@@ -29,3 +29,11 @@ export * as storage from "./storage.ts";
 export * as storageOperations from "./storage-operations.ts";
 
 export * as receiving from "./receiving.ts";
+
+export * as inventory from "./inventory.ts";
+export * as itemCatalog from "./item-catalog.ts";
+
+export * as semantic from "./semantic.ts";
+export * as memberMetadata from "./member-metadata.ts";
+
+export * as economy from "./economy.ts";

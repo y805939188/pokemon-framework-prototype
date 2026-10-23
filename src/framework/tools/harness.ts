@@ -1,3 +1,4 @@
+import { aggregateBag } from "../rules/inventory.ts";
 /**
  * Scripted smoke harness shared by Node (headless) and the NW.js plugin so both
  * environments execute exactly the same checks against the same fixture.
@@ -199,13 +200,13 @@ const CHECKS = {
 		const result = s.result();
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-smoke-'));
 		const file = path.join(dir, 'save.json'); fs.writeFileSync(file, JSON.stringify(game));
-		const store = new SaveStore(file, {}, identityKeys);
+		const store = new SaveStore(file, {}, identityKeys, F.content);
 		ensure(store.commit(result).status === 'applied', 'first commit applies');
 		ensure(store.commit(result).status === 'already-applied', 'second commit is a no-op');
 		const saved = store.load();
-		ensure(saved.party[0].level === 51 && saved.bag.potion === 2, 'level and bag written exactly once');
+		ensure(saved.party[0].level === 51 && aggregateBag(saved.inventory).potion === 2, 'level and bag written exactly once');
 		fs.rmSync(dir, { recursive: true, force: true });
-		return { level: saved.party[0].level, potion: saved.bag.potion, moves: saved.party[0].moves.map((m: L) => m.id) };
+		return { level: saved.party[0].level, potion: aggregateBag(saved.inventory).potion, moves: saved.party[0].moves.map((m: L) => m.id) };
 	},
 };
 

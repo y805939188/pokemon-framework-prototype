@@ -47,7 +47,7 @@
       let speciesKey: any;
       let content: any;
       let contentError = "";
-      if (typeof sys._psGame === "object" && sys._psGame && typeof sys._psGame.schema === "number" && sys._psGame.schema < 5) {
+      if (typeof sys._psGame === "object" && sys._psGame && typeof sys._psGame.schema === "number" && sys._psGame.schema < 6) {
         try { content = W.PSFlow.content(); speciesKey = W.PSFlow.speciesKeyResolver(); } catch (e) { contentError = String(e instanceof Error ? e.message : e); }
       }
       if (W.PSFlow) W.PSFlow.stateReplaced();

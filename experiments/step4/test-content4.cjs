@@ -60,7 +60,7 @@ test('grants.json refusals are located', () => {
   refused(i => { i.grants[0].members[0].species = 'mew'; }, /^\[0\]\.members\[0\]\.species$/, /not a species id/);
   refused(i => { i.grants[0].members[0].level = 0; }, /^\[0\]\.members\[0\]$/, /level: 1\.\.100/);
   refused(i => { i.grants[0].items.rarecandy = 1; }, /^\[0\]\.items\.rarecandy$/, /not a bag item/);
-  refused(i => { i.grants[0].items.potion = 1000; }, /^\[0\]\.items\.potion$/, /1 to 999/);
+  refused(i => { i.grants[0].items.potion = Number.MAX_SAFE_INTEGER + 1; }, /^\[0\]\.items\.potion$/, /safe/);
   refused(i => { i.grants[0].money = 1000000; }, /^\[0\]\.money$/, /0 to 999999/);
   refused(i => { i.grants[0].id = 'thirteenchars'; }, /^\[0\]\.id$/, /1-12 characters/);
   refused(i => { i.grants.push({ ...i.grants[0] }); }, /^\[1\]\.id$/, /duplicate grant id/);

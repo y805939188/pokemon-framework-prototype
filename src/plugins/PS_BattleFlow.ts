@@ -492,14 +492,20 @@ import { developmentCapabilities } from "../framework/rules/config";
 
   // Map encounters: MZ's own step counter decides WHEN (map "encounter steps"); a map with a PSEncounter note opens the
   // framework battle instead of an MZ troop battle. Busy (a battle already open) or an event running: nothing happens.
+  let heldEncounterGate: {game:unknown; map:unknown; key:string; capability:unknown} | null = null;
   const baseExecuteEncounter = G.Game_Player && G.Game_Player.prototype.executeEncounter;
   if (G.Game_Player) G.Game_Player.prototype.executeEncounter = function (this: any) {
     const table = PSFlow.mapEncounters();
     if (!table) return baseExecuteEncounter.call(this);
     if (PSFlow.running || G.$gameMap.isEventRunning() || this._encounterCount > 0) return false;
     // Cold host gate: app() loads content, so reject before constructing it or drawing any random value.
+    const gateGame=G.$gameSystem?._psGame, gateMap=G.$gameMap, gateCapability=JSON.stringify(PSFlow.developerCapabilities??{});
+    const heldKey=(gateGame?.party??[]).map((m:any)=>[m.id,m.item??'']);
+    const gateKey=JSON.stringify([G.$gameMap?.mapId?.(),heldKey]);
+    if(heldEncounterGate&&heldEncounterGate.game===gateGame&&heldEncounterGate.map===gateMap&&heldEncounterGate.key===gateKey&&heldEncounterGate.capability===gateCapability)return false;
+    heldEncounterGate=null;
     try { if(!G.$gameSystem._psSaveError&&G.$gameSystem._psGame)PSFlow.assertBattleAllowed(); }
-    catch(error){PSFlow.lastEncounter={ok:false,reason:'held-item-battle-disabled',error:String(error)};return false;}
+    catch(error){heldEncounterGate={game:gateGame,map:gateMap,key:gateKey,capability:gateCapability};PSFlow.lastEncounter={ok:false,reason:'held-item-battle-disabled',error:String(error)};return false;}
     this.makeEncounterCount();
     const t0 = performance.now();
     const plan = table.data.table ? PSFlow.encounter(table.data.table, this.regionId()) : { ok: false, reason: "invalid-note", error: table.data.problems.join("; ") };

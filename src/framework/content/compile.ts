@@ -3,7 +3,7 @@
  * conflict detection, emit one canonical document whose `inputsHash` covers every input. No file system, no Showdown.
  */
 import { sha256Hex } from "../rules/sha256.ts";
-import { isBagItem } from "../rules/items.ts";
+import { checkItemInputs } from "./item-input.ts";
 import { DEFAULT_LIMITS } from "../rules/limits.ts";
 import { MAX_FORM } from "../rules/species-key.ts";
 import { checkOverrides, developmentCapabilities } from "../rules/config.ts";
@@ -24,7 +24,7 @@ export function canonicalJson(v: unknown, indent = 0): string {
 
 export function hashInputs(inputs: ContentInputs): string {
   // grants/settings are undefined for content without those files: JSON drops the key, so older hashes are unchanged
-  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants, settings: inputs.settings }));
+  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants, settings: inputs.settings, items: inputs.items, shops: inputs.shops }));
 }
 
 const ID = /^[a-z][a-z0-9-]{0,30}$/;
@@ -155,6 +155,9 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
     if (dep) report("sources.json", "$", dep);
   }
 
+  const itemInputs = checkItemInputs(inputs.items, inputs.shops, usable);
+  errors.push(...itemInputs.errors);
+
   // ---- species
   const species: SpeciesSource[] = [];
   const ids = new Set<string>(); // content ids with a base form
@@ -265,8 +268,8 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
       const items = g["items"];
       if (!isObj(items)) report("grants.json", `${p}.items`, "must be an object of item id -> count");
       else for (const [k, n] of Object.entries(items)) {
-        if (!isBagItem(k)) report("grants.json", `${p}.items.${k}`, `"${k}" is not a bag item this build knows`);
-        if (!isInt(n, 1, DEFAULT_LIMITS.bagPerItem)) report("grants.json", `${p}.items.${k}`, `count must be an integer from 1 to ${DEFAULT_LIMITS.bagPerItem}`);
+        if (!Object.hasOwn(itemInputs.catalog, k)) report("grants.json", `${p}.items.${k}`, `"${k}" is not a bag item this build knows`);
+        if (!isInt(n, 1, Number.MAX_SAFE_INTEGER)) report("grants.json", `${p}.items.${k}`, `count must be a positive safe integer`);
       }
       if (!isInt(g["money"], 0, DEFAULT_LIMITS.money)) report("grants.json", `${p}.money`, `must be an integer from 0 to ${DEFAULT_LIMITS.money}`);
       if (Array.isArray(members) && !members.length && isObj(items) && !Object.keys(items).length && g["money"] === 0) report("grants.json", p, "a grant must give something");
@@ -283,8 +286,10 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
   const data: CompiledContent = {
     schema: SCHEMA_VERSION, contentId, inputsHash: hashInputs(inputs), sources: [...sources].sort((a, b) => a.id.localeCompare(b.id)),
     overlaysApplied, species: [...merged.values()].sort((a, b) => a.id.localeCompare(b.id) || (a.form ?? 0) - (b.form ?? 0)),
+    ...(inputs.items !== undefined ? { items: itemInputs.items } : {}),
+    ...(inputs.shops !== undefined ? { shops: itemInputs.shops } : {}),
     ...(inputs.grants !== undefined ? { grants: [...grants].sort((a, b) => a.id.localeCompare(b.id)) } : {}),
-    ...(inputs.settings !== undefined ? { settings: { ...(inputs.settings as Record<string, number>) } } : {}),
+    ...(inputs.settings !== undefined ? { settings: { ...(inputs.settings as import("../rules/config.ts").RuleOverrides) } } : {}),
   };
   return { ok: true, data, errors: [] };
 }

@@ -181,7 +181,8 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
   const boxed = (g = game()): any[] => api().storage.boxedMembers(g);
   const setBoxed = (g: any, members: any[]): void => { g.storage = api().storage.newStorage(); members.forEach((m, i) => { if (i >= 1200) throw new Error("test setup exceeds fixed storage"); g.storage.boxes[Math.floor(i / 30)].slots[i % 30] = m; }); };
   const replayTemplates = (g: any, result: any): any => ({ templates: Object.fromEntries(result.captured.map((m: any) => { const found = api().storage.locateMember(g, m.id); if (!found) throw new Error(`missing original template ${m.id}`); return [m.id, clone(found.member)]; })), profile: { mode: 1, naming: 1 } });
-  const legacyDocument = (g: any, schema: number): any => { const member = (m: any): any => { const old = api().state.protocolMember(api().speciesKey.toBattleMember(m, W.PSFlow.content())); if (schema >= 4) old.form = m.form ?? 0; return old; }; return { schema, party: g.party.map(member), boxes: boxed(g).map(member), bag: clone(g.bag), money: g.money, dex: api().speciesKey.battleView(g, W.PSFlow.content()).dex, appliedBattles: clone(g.appliedBattles) }; };
+  const I6 = {bagOf:(game:any):any=>game.inventory?api().inventory.aggregateBag(game.inventory):game.bag,setBag:(game:any,bag:any):any=>{game.inventory=api().inventory.inventoryFromBag(bag,api().itemCatalog.catalogOf(W.PSFlow.content()));return bag;},setItemCount:(game:any,id:string,n:number):number=>{const bag=I6.bagOf(game);if(n===0)delete bag[id];else bag[id]=n;I6.setBag(game,bag);return n;}};
+  const legacyDocument = (g: any, schema: number): any => { const member = (m: any): any => { const old = api().state.protocolMember(api().speciesKey.toBattleMember(m, W.PSFlow.content())); if (schema >= 4) old.form = m.form ?? 0; return old; }; return { schema, party: g.party.map(member), boxes: boxed(g).map(member), bag: clone(I6.bagOf(g)), money: g.money, dex: api().speciesKey.battleView(g, W.PSFlow.content()).dex, appliedBattles: clone(g.appliedBattles) }; };
   const clone = (x: any) => JSON.parse(JSON.stringify(x));
   const results: any[] = [];
   const gameDir = path.dirname(path.dirname(path.dirname(path.dirname(nodeRequire.resolve("./js/engine/game/session.cjs")))));
@@ -265,14 +266,14 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       await choose(/Poké Ball/); await inMode("main");
       assert(battle()._log._lines.some((l: string) => /blocked the Ball/i.test(l)), "the trainer blocks the thrown ball (WP38 2 / CP16), with its own message");
       assert(battle()._log._lines.filter((l: string) => /no running from a trainer/i.test(l)).length === 1, "the run message appears only for the Run attempt");
-      assert(battle()._session.bag.pokeball === 4, "the blocked ball is spent (the run refusal consumed nothing)");
+      assert(I6.bagOf(battle()._session).pokeball === 4, "the blocked ball is spent (the run refusal consumed nothing)");
       await choose(/^Fight/); await inMode("moves"); await press("cancel"); await inMode("main");
       await choose(/^Bag/); await inMode("bag"); await choose(/Potion/); await inMode("party");
       const targets = battle()._menu._items;
       assert(targets.find((i: any) => /Blastoise/.test(i.name)).enabled === false, "a full-HP member is greyed out as a Potion target (refused before registration)");
       await press("cancel"); await inMode("bag");
       await press("cancel"); await inMode("main");
-      eq(battle()._session.bag, { ...before.bag, pokeball: before.bag.pokeball - 1 }, "bag untouched by the cancels; only the thrown ball is spent");
+      eq(I6.bagOf(battle()._session), { ...I6.bagOf(before), pokeball: I6.bagOf(before).pokeball - 1 }, "bag untouched by the cancels; only the thrown ball is spent");
       await choose(/^Pokémon/); await inMode("party");
       const items = battle()._menu._items;
       assert(items[0].enabled === false, "the active member cannot be switched to itself");
@@ -281,7 +282,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       for (let i = 0; i < 2; i++) { await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower/i); await frames(5); await waitFor(() => mode_() === "main" || mode_() === "end" || mode_() === "learn", "after attack"); if (mode_() === "learn") { await choose(/Don't learn/); } await frames(5); if (mode_() === "end") break; await inMode("main"); }
       await inMode("end"); await press("ok"); await dismissMessages();
       eq(W.PSFlow.lastOutcome.commit, "applied", "finished and committed");
-      eq(game().bag, { ...before.bag, pokeball: before.bag.pokeball - 1 }, "committed bag: only the ball that the trainer blocked is spent");
+      eq(I6.bagOf(game()), { ...I6.bagOf(before), pokeball: I6.bagOf(before).pokeball - 1 }, "committed bag: only the ball that the trainer blocked is spent");
     });
 
     await scenario("T3 wild run: faster user escapes, committed as 'ran', state unchanged apart from battle bookkeeping", async () => {
@@ -291,7 +292,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       await inMode("end"); await press("ok"); await dismissMessages();
       const o = W.PSFlow.lastOutcome; eq([o.code, o.kind], [3, "run"], "ran");
       eq(game().party.map((m: any) => [m.id, m.level, m.hp]), before.party.map((m: any) => [m.id, m.level, m.hp]), "party unchanged");
-      eq(game().bag, before.bag, "bag unchanged");
+      eq(I6.bagOf(game()), I6.bagOf(before), "bag unchanged");
     });
 
     await scenario("T4 capture: Master Ball from the bag, captured member joins with its stable id", async () => {
@@ -303,7 +304,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       const o = W.PSFlow.lastOutcome; eq([o.code, o.kind, o.commit], [2, "caught", "applied"], "caught");
       const g = game();
       assert(g.party.length === 4 && /^M[0-9a-z]{1,17}$/.test(g.party[3].id), "stable id of the caught member: " + (g.party[3] && g.party[3].id));
-      assert(!g.bag.masterball, "master ball consumed once");
+      assert(!I6.bagOf(g).masterball, "master ball consumed once");
       assert(g.dex.owned.includes("snorlax"), "dex updated (content id)");
     });
 
@@ -316,7 +317,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       assert(battle()._log._lines.some((l: string) => /Recovered 20 HP/.test(l)), "heal text");
       await choose(/^Run/); await inMode("end"); await press("ok"); await dismissMessages();
       const g = game();
-      assert(g.bag.potion === 2, "one potion consumed");
+      assert(I6.bagOf(g).potion === 2, "one potion consumed");
       assert(g.party[0].hp >= 70 && g.party[0].hp <= 80, "healed HP persisted (60 + 20 minus a scratch): " + g.party[0].hp);
     });
 
@@ -483,7 +484,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     });
 
     await scenario("T14 invalid result outcome: abort before capture commit; a corrected retry applies exactly once", async () => {
-      fresh(); game().bag.masterball = 1; const before = clone(game());
+      fresh(); I6.setItemCount(game(), "masterball", 1); const before = clone(game());
       G.$gameVariables.setValue(10, 1);
       await startEvent(1); await inMode("main");
       const session = battle()._session;
@@ -501,7 +502,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
         const fixed = W.PSFlow.app().finishBattle(session, W.PSFlow.request), after = clone(game());
         eq([fixed.code, fixed.commit, fixed.projection], [2, "applied", "ok"], "corrected result committed");
         eq(after.party.length, before.party.length + 1, "one capture");
-        assert(!after.bag.masterball, "one ball consumed");
+        assert(!I6.bagOf(after).masterball, "one ball consumed");
         const repeated = W.PSFlow.app().finishBattle(session, W.PSFlow.request);
         eq(repeated.commit, "already-applied", "duplicate is a no-op"); eq(game(), after, "no duplicate reward");
         assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "interpreter released");
@@ -514,7 +515,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       W.PSFlow.rng = seeded(4242);
       try {
         const g0 = clone(game());
-        eq([g0.schema, g0.party.length, boxed(g0).length, g0.bag, g0.money, g0.claims, g0.appliedBattles, g0.steps], [5, 0, 0, {}, 3000, {}, {}, 0], "a new game is the formal empty state");
+        eq([g0.schema, g0.party.length, boxed(g0).length, I6.bagOf(g0), g0.money, g0.claims, g0.appliedBattles, g0.steps], [5, 0, 0, {}, 3000, {}, {}, 0], "a new game is the formal empty state");
         assert(!JSON.stringify(g0).includes("A-000"), "no fixture member in a new game");
         const mz0 = mzParty();
         eq([G.$dataSystem.startMapId, G.$dataSystem.startX, G.$dataSystem.startY], [5, 8, 9], "the project starts on the slice map");
@@ -524,7 +525,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
         eq([W.PSFlow.lastClaim.status, G.$gameVariables.value(11)], ["applied", 1], "starter granted, the event sees 1");
         const g1 = clone(game());
         eq(g1.party.map((m: any) => [m.id, m.species, m.form, m.level, m.moves.map((x: any) => x.id)]), [["M1", "charmander", 0, 5, ["scratch", "growl", "ember"]]], "the starter comes from the content (stored by content id + form)");
-        eq([g1.bag, g1.claims, g1.money], [{ antidote: 2, pokeball: 10, potion: 5 }, { starter: { kind: "grant" } }, 3000], "items and the claim");
+        eq([I6.bagOf(g1), g1.claims, g1.money], [{ antidote: 2, pokeball: 10, potion: 5 }, { starter: { kind: "grant" } }, 3000], "items and the claim");
         eq(g1.dex, { seen: ["charmander"], owned: ["charmander"] }, "the received species is seen and owned");
         await runEvent(1);
         eq([W.PSFlow.lastClaim.status, G.$gameVariables.value(11)], ["already-claimed", 2], "the repeat is reported");
@@ -629,7 +630,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       await slice(18);
       const g = game();
       for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3));
-      g.party[0].hp = 5; g.bag.pokeball = 30;
+      g.party[0].hp = 5; I6.setItemCount(g, "pokeball", 30);
       const ids: string[] = [];
       for (let round = 0; round < 2; round++) {
         await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
@@ -646,8 +647,8 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       }
       eq([game().party.length, boxed().length], [6, 2], "party unchanged, two in the boxes");
       assert(ids[0] !== ids[1] && ids.every((id) => /^M[0-9a-z]{1,17}$/.test(id)), "distinct stable ids: " + ids.join(","));
-      eq(game().bag.potion, 4, "one potion used");
-      return { ids, balls: game().bag.pokeball };
+      eq(I6.bagOf(game()).potion, 4, "one potion used");
+      return { ids, balls: I6.bagOf(game()).pokeball };
     });
 
     await scenario("T19 party and boxes full: the ball is refused with the reason before anything is spent", async () => {
@@ -660,9 +661,9 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await choose(/^Bag/); await inMode("bag"); await choose(/Poké Ball/); await inMode("main");
       assert(battle()._log._lines.some((l: string) => /party and boxes are full/.test(l)), "the reason is shown");
-      eq(battle()._session.bag.pokeball, before.bag.pokeball, "nothing spent");
+      eq(I6.bagOf(battle()._session).pokeball, I6.bagOf(before).pokeball, "nothing spent");
       await choose(/^Run/); await finishBattle();
-      eq([game().party.length, boxed().length, game().bag.pokeball], [6, 1, before.bag.pokeball], "nothing stored or spent");
+      eq([game().party.length, boxed().length, I6.bagOf(game()).pokeball], [6, 1, I6.bagOf(before).pokeball], "nothing stored or spent");
       W.PSFlow.testLimits = null; W.PSFlow._app = null;
     });
 
@@ -803,15 +804,15 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     });
 
     await scenario("T30 a battle id that is also \"__proto__\" is an ordinary ledger entry through MZ's own save and load: applied once, a repeat before and after the load spends nothing", async () => {
-      await slice(30); game().bag.potion = 2;
+      await slice(30); I6.setItemCount(game(), "potion", 2);
       const r = { protocol: 1, battleId: "__proto__", outcome: { kind: "run", winner: null }, members: {}, bag: { potion: -1 }, captured: [], dex: { seen: [], owned: [] } };
-      eq([W.PSFlow.commit(r), W.PSFlow.commit(r), game().bag.potion], ["applied", "already-applied", 1], "applied once");
+      eq([W.PSFlow.commit(r), W.PSFlow.commit(r), I6.bagOf(game()).potion], ["applied", "already-applied", 1], "applied once");
       assert(Object.hasOwn(game().appliedBattles, "__proto__"), "an own ledger entry");
       await G.DataManager.saveGame(12);
-      game().bag.potion = 7; // diverge, so the load is visible
+      I6.setItemCount(game(), "potion", 7); // diverge, so the load is visible
       await G.DataManager.loadGame(12);
       assert(!G.$gameSystem._psSaveError && Object.hasOwn(game().appliedBattles, "__proto__"), "the entry came back from the MZ save");
-      eq([W.PSFlow.commit(r), game().bag.potion], ["already-applied", 1], "after the load the repeat spends nothing");
+      eq([W.PSFlow.commit(r), I6.bagOf(game()).potion], ["already-applied", 1], "after the load the repeat spends nothing");
       await toMapId(5, 8, 9);
     });
 
@@ -855,7 +856,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
 
     await scenario("T25 the battle counter is saved with the state: after loading an older save the next catch can reuse a discarded id, but no id is ever duplicated within one save timeline", async () => {
       await slice(25);
-      const g = game(); for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3)); g.bag.masterball = 5;
+      const g = game(); for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3)); I6.setItemCount(g, "masterball", 5);
       const catchOne = async () => {
         await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
         await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); await finishBattle();
@@ -877,7 +878,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     await scenario("T26 play-through for the restart check: new game, starter, a won encounter (growth), a catch into the party, a full party (test setup) and a catch into the boxes, the nurse, a walk; saved", async () => {
       await slice(26);
       const m0 = game().party[0]; m0.exp = E.minExp("parabolic", 8) - 1; // test setup: one fight away from level 8
-      game().bag.masterball = 2; // test setup: certain catches
+      I6.setItemCount(game(), "masterball", 2); // test setup: certain catches
       await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await fightUntilEnd(/^Ember|^ember/i); await finishBattle();
       eq(W.PSFlow.lastOutcome.code, 1, "won"); eq(game().party[0].level, 8, "grew");
@@ -911,7 +912,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       const keyOf = (n: string) => B.speciesKey.keyOfBattleName(W.PSFlow.content(), n);
       eq(g.party.map((m: any) => [m.id, m.species, m.form]), sample.party.map((m: any) => [m.id, keyOf(m.species).species, 0]), "party by content id + form");
       eq(boxed(g).map((m: any) => [m.id, m.species]), sample.boxes.map((m: any) => [m.id, keyOf(m.species).species]), "boxes too");
-      eq([g.claims, g.appliedBattles, g.bag, g.money, g.dex.owned], [sample.claims, sample.appliedBattles, sample.bag, sample.money, sample.dex.owned.map((n: string) => keyOf(n).species)], "claims, ledger, bag (5000 above the cap), money kept; dex mapped");
+      eq([g.claims, g.appliedBattles, I6.bagOf(g), g.money, g.dex.owned], [sample.claims, sample.appliedBattles, I6.bagOf(sample), sample.money, sample.dex.owned.map((n: string) => keyOf(n).species)], "claims, ledger, bag (5000 above the cap), money kept; dex mapped");
       eq(B.saveSchema.validateGame(g), [], "a valid schema 5 state");
       eq(W.PSFlow.claim("starter").status, "already-claimed", "the claim survived");
       await G.DataManager.saveGame(14);
@@ -1098,13 +1099,13 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     await toMap();fresh();W.PSFlow.setLanguage('zh');W.PSManagement.openStorage();await uiChoose('organize');await uiReady('box');await press('up');await press('ok');await uiChoose('name');const input=document.querySelector('input') as HTMLInputElement;input.value='迟到';W.PSFlow.app().stateReplacedByHost();const before=clone(game());nativeSubmit(input,'Enter');await frames(4);eq(game(),before,'stale input no write');await uiClosed();W.PSManagement.openParty();await uiReady('party');assert(management().text.some((s:string)=>s.includes('队伍')),'Chinese management labels');assert(!management().text.some((s:string)=>s.includes('[missing:')),'no missing translated key');await shot('U51-party-zh');await press('cancel');await uiClosed();W.PSFlow.setLanguage('en');
    });
    await scenario('U51-07 captured full-template pending transfers battle to reception and returns directly to map without restart/abort',async()=>{
-    await toMap();fresh();while(game().party.length<6)game().party.push(mkMember('CAP-FILL-'+game().party.length,'Pidgey',3));const storedId=game().party[0].id;W.PSFlow.receiveOptions={mode:0,naming:0};W.PSFlow._app=null;game().bag.masterball=2;await startEvent(1);await inMode('main');await choose(/^Bag/);await inMode('bag');await choose(/Master Ball/);await inMode('end');assert(!battle()._log._lines.some((line:string)=>line.includes('was sent to the boxes')),'no destination claim before full-party decision');await press('ok');await uiReady('menu');assert(W.PSFlow.running,'battle root stays open while receiving');await uiChoose('no');await uiChoose('party');await uiReady('party');await press('ok');await uiClosed();eq(api().storage.locateMember(game(),storedId).position.kind,'box','selected old member stored after full-party capture');eq(game().party[0].id,W.PSFlow.lastResult.captured[0].id,'caught stable identity joins the chosen party slot');assert(!W.PSFlow.running,'battle root closes after receipt');eq(W.PSFlow.lastOutcome.code,2,'caught outcome retained');assert(!W.PSFlow.lastOutcome.aborted,'reception transfer did not abort caught battle');
+    await toMap();fresh();while(game().party.length<6)game().party.push(mkMember('CAP-FILL-'+game().party.length,'Pidgey',3));const storedId=game().party[0].id;W.PSFlow.receiveOptions={mode:0,naming:0};W.PSFlow._app=null;I6.setItemCount(game(), "masterball", 2);await startEvent(1);await inMode('main');await choose(/^Bag/);await inMode('bag');await choose(/Master Ball/);await inMode('end');assert(!battle()._log._lines.some((line:string)=>line.includes('was sent to the boxes')),'no destination claim before full-party decision');await press('ok');await uiReady('menu');assert(W.PSFlow.running,'battle root stays open while receiving');await uiChoose('no');await uiChoose('party');await uiReady('party');await press('ok');await uiClosed();eq(api().storage.locateMember(game(),storedId).position.kind,'box','selected old member stored after full-party capture');eq(game().party[0].id,W.PSFlow.lastResult.captured[0].id,'caught stable identity joins the chosen party slot');assert(!W.PSFlow.running,'battle root closes after receipt');eq(W.PSFlow.lastOutcome.code,2,'caught outcome retained');assert(!W.PSFlow.lastOutcome.aborted,'reception transfer did not abort caught battle');
    });
    await scenario('U51-08 forced party receiving cannot cancel or send to box; replacing deposits the chosen stable ID',async()=>{
     await toMap();fresh();while(game().party.length<6)game().party.push(mkMember('FORCE-FILL-'+game().party.length,'Pidgey',5));W.PSFlow.receiveOptions={mode:2,naming:1};W.PSFlow._app=null;const original=game().party[0].id,result=W.PSFlow.app().receiveGift({kind:'normal',member:{existing:mkMember('FORCE-NEW','Pidgey',5)}});eq(result.status,'pending','force pending');W.PSManagement.openReceiving();await uiReady('menu');assert(!management().view.items.some((x:any)=>x.key==='box'),'force has no box option');await press('cancel');await uiReady('menu');assert(W.PSFlow.operationPending(),'cancel cannot unlock force receiving');await uiChoose('party');await uiReady('party');await press('cancel');await uiChoose('party');await uiReady('party');await press('ok');await uiClosed();eq(game().party[0].id,'FORCE-NEW','new identity occupies chosen party slot');eq(api().storage.locateMember(game(),original).position.kind,'box','chosen old member stored');
    });
    await scenario('U51-09 source-off UI permits taking existing item; selector caches qualifier and returns stable identity; Box Link requires three gates',async()=>{
-    await toMap();fresh();game().party[0].item='leftovers';const id=game().party[0].id;W.PSManagement.openParty();await uiReady('party');await press('ok');await uiChoose('item');await uiReady('menu');assert(management().view.items.find((x:any)=>x.key==='give').enabled===false,'source off give disabled');await uiChoose('take');await uiReady('party');eq(game().party[0].item,'','taken item');eq(game().bag.leftovers,1,'returned exactly once');
+    await toMap();fresh();game().party[0].item='leftovers';const id=game().party[0].id;W.PSManagement.openParty();await uiReady('party');await press('ok');await uiChoose('item');await uiReady('menu');assert(management().view.items.find((x:any)=>x.key==='give').enabled===false,'source off give disabled');await uiChoose('take');await uiReady('party');eq(game().party[0].item,'','taken item');eq(I6.bagOf(game()).leftovers,1,'returned exactly once');
     W.PSManagement.hasBoxLink=()=>true;G.$gameSwitches.setValue(35,true);await press('control');eq(management().view.kind,'party','switch disables link');G.$gameSwitches.setValue(35,false);await press('control');await uiReady('box');await press('cancel');await uiChoose('no');await uiReady('party');await press('cancel');await uiClosed();W.PSManagement.hasBoxLink=()=>false;
     let calls=0,selected:any='pending';assert(W.PSManagement.selectMember((m:any)=>{calls++;return m.id===id;},(x:any)=>{selected=x;}),'selector open');await uiReady('party');eq(calls,game().party.length,'qualifier cached once per member');await press('ok');await uiClosed();eq(selected,{id,index:0},'selector stable ID/index');eq(calls,game().party.length,'not repeatedly called by rendering');
    });
@@ -1218,7 +1219,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
     const rounds = Number(arg("ps-perf-rounds")) || 6;
     for (let r = 0; r < rounds; r++) {
       for (const [name, ev, fn] of kindsList) {
-        game().bag.masterball = 5; game().bag.potion = 5; game().party[0].hp = 100; game().party[0].moves.forEach((m: any) => { m.pp = m.maxpp; }); game().party.length = Math.min(game().party.length, 3);
+        I6.setItemCount(game(), "masterball", 5); I6.setItemCount(game(), "potion", 5); game().party[0].hp = 100; game().party[0].moves.forEach((m: any) => { m.pp = m.maxpp; }); game().party.length = Math.min(game().party.length, 3);
         W.PSFlow.perf.cur = null;
         try { await script(ev, fn); } catch (e: any) { perf.errors = (perf.errors || []).concat(`${name}#${r}: ${e.message}`); await recover(); }
         const b = W.PSFlow.perf.battles[W.PSFlow.perf.battles.length - 1];
@@ -1263,7 +1264,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3));
       const box = mkMember("BX-0", "Pidgey", 3);
       setBoxed(g, Array.from({ length: W.PSFlow.limits().boxes }, (_, i) => ({ ...clone(box), id: `BX-${i}` }))); // test setup: every box slot used
-      for (const item of B.items.BAG_ITEMS) g.bag[item] = 999; // test setup: every known bag item at the cap
+      for (const item of B.items.BAG_ITEMS) I6.setItemCount(g, item, 999); // test setup: every known bag item at the cap
       const enc: number[] = [], saveMs: number[] = [], loadMs: number[] = [], menuMs: number[] = [], viewMs: number[] = [];
       for (let i = 0; i < n; i++) {
         let t = performance.now(); await G.DataManager.saveGame(17); saveMs.push(Math.round((performance.now() - t) * 10) / 10);
@@ -1283,7 +1284,7 @@ import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
       }
       const st = (a: number[]) => ({ n: a.length, p50: pct(a, 0.5), max: a.length ? Math.max(...a) : null, samples: a });
       perf.step5 = {
-        method: `slice map; party 6, boxes ${boxed().length} (all slots used), bag ${Object.keys(game().bag).length} items x 999 (test setup); save/load = DataManager round trip, slot 17; battleView = the battle view of that state; encounter = executeEncounter -> first menu; party screen = SceneManager.push(Scene_PSParty) until explicit management ready (5.0 object-exists endpoint is not directly comparable)`,
+        method: `slice map; party 6, boxes ${boxed().length} (all slots used), bag ${Object.keys(I6.bagOf(game())).length} items x 999 (test setup); save/load = DataManager round trip, slot 17; battleView = the battle view of that state; encounter = executeEncounter -> first menu; party screen = SceneManager.push(Scene_PSParty) until explicit management ready (5.0 object-exists endpoint is not directly comparable)`,
         saveMs: st(saveMs), loadMs: st(loadMs), battleViewMs: st(viewMs), encounterToFirstMenuMs: st(enc), partyScreenOpenMs: st(menuMs),
       };
     } catch (e: any) { perf.errors = (perf.errors || []).concat(`step5 timings: ${e.message}`); }

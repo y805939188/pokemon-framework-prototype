@@ -1,0 +1,57 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const E=require('../../../js/engine/build/engine.cjs'),F=E.fixtures,I=E.inventory,clone=x=>structuredClone(x);
+function setup(){const game=F.makeGame(),state=E.fakes.createMemoryState(game),sessions=E.fakes.createFakeSessions({protocol:1,battleId:'x',outcome:{kind:'run',winner:null},members:{},bag:{},captured:[],dex:{seen:[],owned:[]}});let calls=0,draws=0;const content=clone(F.content);content.items['box-link']={...content.items.potion,id:'box-link',pocket:8,flags:['KeyItem','BoxLink'],legacyIds:[],source:'test'};delete content.items['box-link'].battleId;content.items.rare={...content.items.potion,id:'rare',effect:{family:'rare-candy',parameters:{}},legacyIds:[]};delete content.items.rare.battleId;const app=new E.app.GameApplication({state,sessions,projection:E.fakes.createRecordingProjection(),content:()=>{calls++;return {content};},random:n=>{draws++;return 0;},clock:()=>1000});return {app,state,content,game,sessions,get calls(){return calls;},get draws(){return draws;}};}
+const run=(x,t,id,r,p)=>x.app.inventoryRequest(t,id,r,p);
+test('P52-29/30 FR193: canonical duplicate, semantic conflict, own IDs and no persistent receipts',()=>{
+ const x=setup(),t=x.app.beginInventoryOperation(),r={kind:'add-items',itemId:'potion',quantity:1500};assert.equal(run(x,t,'__proto__',r).status,'committed');const writes=x.state.replaced.length;
+ assert.equal(run(x,t,'__proto__',{quantity:1500,itemId:'potion',kind:'add-items'}).status,'duplicate');assert.equal(run(x,t,'__proto__',{...r,quantity:1}).reason,'request-conflict');assert.equal(x.state.replaced.length,writes);assert.equal(I.aggregateBag(x.state.current().inventory).potion,1503);assert.equal('receipts'in x.state.current(),false);assert.equal('bag'in x.state.current(),false);
+});
+test('P52-29/30 FR194: replacement failure allows same request retry; committed presentation failure never repeats',()=>{
+ const x=setup(),t=x.app.beginInventoryOperation();x.state.failReplace=Error('replace fault');const before=clone(x.state.current());assert.equal(run(x,t,'once',{kind:'change-money',amount:100}).reason,'commit-failed');assert.deepEqual(x.state.current(),before);
+ x.state.failReplace=null;const r=run(x,t,'once',{kind:'change-money',amount:100},()=>{throw Error('feedback fault');});assert.equal(r.status,'committed');assert.equal(r.presentation,'failed');assert.equal(x.state.current().money,1100);assert.equal(x.state.replaced.length,1);
+ let shown;assert.equal(run(x,t,'once',{amount:100,kind:'change-money'},r=>{shown=r;shown.result.money=999;}).status,'duplicate');assert.equal(x.state.replaced.length,1);assert.equal(x.state.current().money,1100);
+});
+test('P52-29 FR180: ABA rejects old slot tickets; cursor changes keep resource revision',()=>{
+ const x=setup(),t=x.app.beginInventoryOperation(),ticket=x.app.inventoryTicket(t,2,0);
+ run(x,t,'cursor',{kind:'browse',pocket:2,index:0});assert.equal(run(x,t,'same',{kind:'remove-items',itemId:'potion',quantity:1,ticket}).status,'committed');
+ const a=x.app.inventoryTicket(t,2,0);run(x,t,'remove',{kind:'remove-items',itemId:'potion',quantity:1});run(x,t,'add',{kind:'add-items',itemId:'potion',quantity:1});const snapshot=clone(x.state.current());assert.equal(run(x,t,'old',{kind:'remove-items',itemId:'potion',quantity:1,ticket:a}).reason,'stale-slot');assert.deepEqual(x.state.current(),snapshot);
+});
+test('P52-29/30: 256 retained receipts, duplicates still work, limit cannot trap the operation',()=>{
+ const x=setup(),t=x.app.beginInventoryOperation();for(let i=0;i<256;i++)assert.equal(run(x,t,'r'+i,{kind:'change-money',amount:1}).status,'committed');assert.equal(run(x,t,'r0',{kind:'change-money',amount:1}).status,'duplicate');assert.equal(run(x,t,'full',{kind:'change-money',amount:1}).reason,'session-request-limit');assert.equal(x.app.endInventoryOperation(t).status,'unchanged');
+ const next=x.app.beginInventoryOperation();assert.equal(run(x,t,'r0',{kind:'change-money',amount:1}).reason,'stale-operation');assert.equal(run(x,next,'r0',{kind:'change-money',amount:1}).status,'committed');
+});
+test('P52-28/44 FR656: parent child ownership, save lock, real party target, stale tokens never unlock a new parent',()=>{
+ const x=setup(),parent=x.app.beginManagement();const child=x.app.beginInventoryOperation('item',{token:parent,memberId:x.game.party[0].id});assert.equal(x.app.saveBlocked,true);assert.equal(x.app.manage(parent,'blocked',{kind:'nickname',source:{id:x.game.party[0].id,position:{kind:'party',index:0}},nickname:'new'}).reason,'child-operation-active');assert.equal(x.app.endManagement(parent).reason,'child-operation-active');
+ assert.equal(x.app.queryItemUse(child,'rare',2).reason,'invalid-quantity');assert.equal(x.app.queryItemUse(child,'rare',1).ready,false);assert.equal(x.state.replaced.length,0);assert.equal(x.app.endInventoryOperation(child).status,'unchanged');assert.equal(x.app.saveBlocked,false);assert.equal(x.app.endManagement(parent).status,'unchanged');
+ const p2=x.app.beginManagement(),c2=x.app.beginInventoryOperation('item',{token:p2,memberId:x.game.party[0].id});assert.equal(x.app.endInventoryOperation(child).reason,'stale-operation');assert.equal(x.app.endManagement(p2).reason,'child-operation-active');x.app.endInventoryOperation(c2);x.app.endManagement(p2);
+ assert.throws(()=>x.app.beginInventoryOperation('item',{token:parent,memberId:'in-box'}));assert.equal(x.draws,0);
+});
+test('P52-28/32 FR193: roots reject other writes and battles before consuming content',async()=>{
+ const x=setup(),t=x.app.beginInventoryOperation(),before=x.calls;assert.equal(x.app.claimGrant('starter').status,'refused');assert.equal(x.app.healParty().status,'refused');assert.throws(()=>x.app.beginManagement());assert.throws(()=>x.app.commitResult({}));await assert.rejects(x.app.startBattle({battleId:'no',kind:'wild',foes:[],seq:1}));assert.equal(x.calls,before);assert.equal(x.state.replaced.length,0);x.app.endInventoryOperation(t);
+});
+test('P52-30/43 FR654: content and host generations invalidate late requests; BoxLink follows actual inventory',()=>{
+ const x=setup(),t=x.app.beginInventoryOperation();assert.equal(x.app.hasBoxLink(),false);run(x,t,'link',{kind:'add-items',itemId:'box-link',quantity:1});assert.equal(x.app.hasBoxLink(),true);run(x,t,'unlink',{kind:'remove-items',itemId:'box-link',quantity:1});assert.equal(x.app.hasBoxLink(),false);
+ x.content.items.potion.price=10;assert.equal(run(x,t,'stale',{kind:'change-money',amount:1}).reason,'stale-content');const next=x.app.beginInventoryOperation();x.app.stateReplacedByHost();assert.equal(run(x,next,'late',{kind:'change-money',amount:1}).reason,'stale-operation');
+});
+test('P52-26/27 FR153/159: safe money domain and badge times/count/bit semantics',()=>{
+ assert.equal(E.economy.writeMoney(1000000,999999),999999);assert.equal(E.economy.changeMoney(10,-100,999999),0);for(const n of [NaN,Infinity,1.5])assert.throws(()=>E.economy.writeMoney(n,999999));assert.throws(()=>E.economy.changeMoney(Number.MAX_SAFE_INTEGER,1,999999));
+ const x=setup(),t=x.app.beginInventoryOperation();let g=clone(x.state.current());g.money=1000000;x.state.replace(g);assert.equal(run(x,t,'zero',{kind:'change-money',amount:0}).status,'committed');assert.equal(x.state.current().money,999999);
+ const set=(id,time,owned)=>{const g=clone(x.state.current());g.stats.play_time=time;x.state.replace(g);return run(x,t,id,{kind:'set-badge',index:0,owned});};set('first',10,true);set('repeat',20,true);assert.equal(x.state.current().stats.times_to_get_badges[0],10);set('remove',30,false);assert.equal(x.state.current().stats.times_to_get_badges[0],10);set('again',40,true);assert.equal(x.state.current().stats.times_to_get_badges[0],40);
+ for(let i=1;i<10;i++)run(x,t,'b'+i,{kind:'set-badge',index:i,owned:true});assert.equal(E.economy.badgeCount(x.state.current().badges),10);assert.equal(E.economy.hasBadge(x.state.current().badges,9),true);
+ for(let n=0;n<=9;n++){const state={...x.game,badges:Array(n).fill(true),money:100000};assert.equal(E.defeat.defeatMoneyLoss(state),50*E.defeat.BADGE_FACTORS[Math.min(n,8)]);assert.equal(E.defeat.defeatMoneyLoss(state,{noMoneyLoss:true}),0);}
+});
+test('P52-11: sorting writes each move; BACK restores only order/live cursor, keeps last saved index and latest edits',()=>{
+ const x=setup(),t=x.app.beginInventoryOperation(),before=clone(x.state.current().inventory.pockets[1]);assert.equal(x.app.beginInventorySort(t,2,0,true).reason,'sorting-disabled');assert.equal(x.app.beginInventorySort(t,4,0).reason,'sorting-disabled');
+ assert.equal(x.app.beginInventorySort(t,2,0).status,'unchanged');assert.equal(x.app.moveInventorySort(t,1).status,'committed');assert.equal(x.state.replaced.length,1);assert.equal(run(x,t,'resource',{kind:'add-items',itemId:'potion',quantity:1}).reason,'sorting-active');
+ run(x,t,'cash',{kind:'change-money',amount:7});const end=x.app.endInventorySort(t,true);assert.equal(end.result.index,0);assert.deepEqual(x.state.current().inventory.pockets[1],before);assert.equal(x.state.current().inventory.indices[1],1);assert.equal(x.state.current().money,1007);
+ const stable=x.app.inventoryTicket(t,2,0);assert.equal(x.app.beginInventorySort(t,2,0).status,'unchanged');x.app.moveInventorySort(t,1);const changed=clone(x.state.current());changed.inventory.pockets[1][0].quantity++;x.state.replace(changed);assert.equal(x.app.endInventorySort(t,true).reason,'stale-sort');assert.deepEqual(x.state.current(),changed);assert.equal(run(x,t,'stale',{kind:'remove-items',itemId:'potion',quantity:1,ticket:stable}).reason,'stale-slot');
+});
+test('P52-01/32: authored slot and money overrides reach the application without global settings mutation',()=>{
+ const x=setup();x.content.settings={BAG_MAX_PER_SLOT:2,MAX_MONEY:100,BAG_POCKET_SLOTS:[-1,2,-1,-1,-1,-1,-1,-1]};const t=x.app.beginInventoryOperation();const before=clone(x.state.current());assert.equal(run(x,t,'full',{kind:'add-items',itemId:'potion',quantity:1}).reason,'inventory-full');assert.deepEqual(x.state.current(),before);assert.equal(run(x,t,'cap',{kind:'change-money',amount:0}).result.money,100);
+});
+test('P52-11/28/30: filtered views cannot sort; failed cancellation retries and failed close still releases its owner',()=>{
+ const x=setup(),t=x.app.beginInventoryOperation();const snap=x.app.inventorySnapshot(t,item=>{item.flags.push('BoxLink');return true;});assert.equal(x.app.beginInventorySort(t,2,0).reason,'sorting-disabled');assert.equal(x.app.hasBoxLink(),false);snap.pockets[1][0].quantity=0;assert.equal(I.aggregateBag(x.state.current().inventory).potion,3);
+ x.app.inventorySnapshot(t);x.app.beginInventorySort(t,2,0);x.app.moveInventorySort(t,1);x.state.failReplace=Error('cancel install failed');assert.equal(x.app.endInventorySort(t,true).status,'refused');x.state.failReplace=null;assert.equal(x.app.endInventorySort(t,true).status,'committed');assert.equal(x.state.current().inventory.pockets[1][0].itemId,'potion');
+ x.app.beginInventorySort(t,2,0);x.app.moveInventorySort(t,1);x.state.failReplace=Error('close install failed');assert.equal(x.app.endInventoryOperation(t).status,'refused');x.state.failReplace=null;const next=x.app.beginInventoryOperation();assert.notEqual(next,t);x.app.endInventoryOperation(next);
+});

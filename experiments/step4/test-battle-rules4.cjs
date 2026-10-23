@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../step5/2/test-support.cjs");
 // Step 4 / B, core rules: wild encounter selection (WP36 5.1), defeat settlement (WP42 6.1 money loss, WP61 7.2 full
 // heal) and the capacity backstop of applyBattleResult (D1: a capture never lands outside party/boxes and is never
 // dropped). Verification: spec-driven vectors and invariants; no reference (Ruby) run exists for these modules.
@@ -86,7 +87,7 @@ const caughtResult = (id, battleId = 'cap#1') => ({ protocol: 1, battleId, outco
 
 test('a capture goes to the party, then to the boxes; with both full the whole result is refused, nothing dropped or half-applied', () => {
   const L = { ...E.limits.DEFAULT_LIMITS, boxes: 1 };
-  const g = gameWith(Array.from({ length: 6 }, (_, i) => member(`P${i}`, 'Caterpie', 2)), 0); g.bag = { pokeball: 3 };
+  const g = gameWith(Array.from({ length: 6 }, (_, i) => member(`P${i}`, 'Caterpie', 2)), 0); I6.setBag(g, { pokeball: 3 });
   const first = caughtResult('W1-1'), second = caughtResult('W2-1', 'cap#2');
   const receiving = r => ({templates: {[r.captured[0].id]: E.speciesKey.toPersistentMember(r.captured[0], content)}, profile:{mode:1,naming:1}});
   const keys = E.speciesKey.speciesKeyResolver(content);
@@ -98,11 +99,13 @@ test('a capture goes to the party, then to the boxes; with both full the whole r
   assert.equal(S.applyBattleResult(g, first, L, keys, receiving(first)).status, 'applied', 'the default limits apply when none are given');
 });
 
-test('a result may not raise a bag item above the per-item cap (an amount already above it is kept, results only spend)', () => {
-  const g = gameWith([member('A', 'Charmander', 5)], 0); g.bag = { potion: 999 };
+test('battle additions split slots and respect explicit finite capacity; trusted high quantities can be spent', () => {
+  const g = gameWith([member('A', 'Charmander', 5)], 0); I6.setBag(g, { potion: 999 });
   const plus = { protocol: 1, battleId: 'bag#1', outcome: { kind: 'run', winner: null }, members: {}, bag: { potion: 1 }, captured: [], dex: { seen: [], owned: [] } };
-  assert.throws(() => S.applyBattleResult(g, plus), /potion would be 1000, above the stage cap of 999/);
-  const over = clone(g); over.bag.potion = 5000;
+  assert.equal(I6.bagOf(S.applyBattleResult(g, plus).state).potion,1000);
+  const finite={...content,settings:{...content.settings,BAG_POCKET_SLOTS:[-1,1,-1,-1,-1,-1,-1,-1]}};
+  const before=clone(g);assert.throws(()=>S.applyBattleResult(g,plus,undefined,undefined,{content:finite}),/inventory-full/);assert.deepEqual(g,before);
+  const over = clone(g); I6.setItemCount(over, "potion", 5000);
   const spend = { ...plus, battleId: 'bag#2', bag: { potion: -1 } };
-  assert.equal(S.applyBattleResult(over, spend).state.bag.potion, 4999);
+  assert.equal(I6.bagOf(S.applyBattleResult(over, spend).state).potion, 4999);
 });

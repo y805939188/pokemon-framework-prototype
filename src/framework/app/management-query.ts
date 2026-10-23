@@ -1,3 +1,5 @@
+import { aggregateBag } from "../rules/inventory.ts";
+import { computedNature } from "../rules/member-metadata.ts";
 /** Read models for the management host. Copies only: the save remains the sole authority. */
 import { clone } from '../rules/value.ts';
 import { allMembers, locateMember } from '../rules/storage.ts';
@@ -37,7 +39,7 @@ export interface IndividualView {
   diagnostics: string[];
 }
 export function managementSnapshot(game: GameState, collection: MemberCollection, held: Member | null, generation: number, limits: Limits, sourceAllowed: boolean): ManagementSnapshot {
-  return clone({ generation, party: collection.party, storage: collection.storage, held, player: game.player, bag: game.bag, money: game.money, limits, heldSourcesEnabled: sourceAllowed,
+  return clone({ generation, party: collection.party, storage: collection.storage, held, player: game.player, bag: aggregateBag(game.inventory), money: game.money, limits, heldSourcesEnabled: sourceAllowed,
     references: Object.fromEntries(allMembers(game).map(m => [m.id, { id: m.id, position: locateMember(game, m.id)!.position }])) });
 }
 export function individualView(member: Member, game: GameState, content: Content, dex?: DexLookup): IndividualView {
@@ -46,8 +48,8 @@ export function individualView(member: Member, game: GameState, content: Content
   const allowedDex = species && content.meta?.showdownSourceChecked ? dex : undefined;
   const statics = battleName ? allowedDex?.species(battleName) : null;
   return clone({ member, position: locateMember(game, member.id)?.position ?? null, ...(species?.nameKey ? { nameKey: species.nameKey } : {}), battleName,
-    stats: species ? computeStats(species.base, member.ivs, member.evs, member.level, member.nature) : null,
-    modifiers: natureModifiers(member.nature), currentLevelExp: species ? minExp(species.growth,member.level) : null, nextLevelExp: species && member.level < 100 ? minExp(species.growth, member.level + 1) : null,
+    stats: species ? computeStats(species.base, member.ivs, member.evs, member.level, computedNature(member)) : null,
+    modifiers: natureModifiers(computedNature(member)), currentLevelExp: species ? minExp(species.growth,member.level) : null, nextLevelExp: species && member.level < 100 ? minExp(species.growth, member.level + 1) : null,
     publicId: publicIdText(member.owner?.id ?? 0), characteristic: characteristic(member.personalID ?? 0, member.ivs ?? {}), types: statics?.types ?? [],
     ability: allowedDex?.abilityInfo?.(member.ability) ?? { name: member.ability, description: '' },
     moves: member.moves.map(move => ({ ...move, ...(allowedDex?.moveDetails?.(move.id) ?? { name: move.id, type: '', category: '', power: null, accuracy: 0, description: '' }) })),

@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../../step5/2/test-support.cjs");
 // 2.3 gate, part 2: stable identity, write set, ledger, idempotent durable commit, failure boundaries.
 // Simulated throws and REAL process kills are reported separately; atomicity is only claimed for the
 // single-file write-temp-then-rename store implemented in js/engine/game/store.cjs.
@@ -47,7 +48,7 @@ test('stable identity: switching changes engine slots, not which persistent memb
 	// the engine's party order differs from the persistent one, yet results are keyed by id
 	const orderInEngine = s.gw._debugBattle().getSide('p1').pokemon.map(p => p.name);
 	assert.notDeepEqual(orderInEngine, game.party.map(m => m.id));
-	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys);
+	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys, content);
 	store.commit(result);
 	const after = store.load();
 	assert.deepEqual(after.party.map(m => m.id), game.party.map(m => m.id), 'persistent order and ids unchanged');
@@ -61,15 +62,15 @@ test('write set: nothing outside the allowed fields changes; bag deltas and ledg
 	const game = makeGame(); game.party[0].hp = 70;
 	const s = await session(game); s.take();
 	const used = await s.useItem('potion', 'A-0001'); assert.ok(used.ok);
-	assert.equal(s.bag.potion, 2, 'deducted on use');
+	assert.equal(I6.bagOf(s).potion, 2, 'deducted on use');
 	const result = await playOut(s);
-	assert.equal(result.bag.potion, -1);
-	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys);
+	assert.equal(I6.bagOf(result).potion, -1);
+	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys, content);
 	const before = store.load(); store.commit(result); const after = store.load();
 	const changed = S.diffPaths(before, after);
-	const allowed = [/^party\.\d\.(level|exp|hp|status|statusCount|moves|evs|friendship)(\.|$)/, /^bag\./, /^dex\./, /^appliedBattles\./, /^money$/];
+	const allowed = [/^party\.\d\.(level|exp|hp|status|statusCount|moves|evs|friendship)(\.|$)/, /^inventory\.pockets\./, /^dex\./, /^appliedBattles\./, /^money$/];
 	for (const p of changed) assert.ok(allowed.some(re => re.test(p)), `unexpected change at ${p}`);
-	assert.equal(after.bag.potion, 2);
+	assert.equal(I6.bagOf(after).potion, 2);
 	for (const m of after.party) for (const k of ['nickname', 'item', 'ability', 'nature', 'gender', 'ivs', 'ball', 'ot', 'species', 'id']) {
 		assert.deepEqual(m[k], before.party.find(x => x.id === m.id)[k], `${m.id}.${k} must stay untouched`);
 	}
@@ -83,15 +84,15 @@ test('item ledger: cancel refunds once, ineligible use is refused up front, exec
 	// staged then cancelled: the reserved item goes back, nothing was applied
 	const s1 = await session(damaged(), { foe: wildSnorlax() }); s1.take();
 	const staged = await s1.useItem('potion', 'A-0001', { commit: false });
-	assert.ok(staged.staged); assert.equal(s1.bag.potion, 2, 'reserved at registration');
+	assert.ok(staged.staged); assert.equal(I6.bagOf(s1).potion, 2, 'reserved at registration');
 	await s1.cancel();
-	assert.equal(s1.bag.potion, 3, 'cancel returns the item'); assert.equal(s1.ledger[0].why, 'cancelled');
-	await s1.cancel(); assert.equal(s1.bag.potion, 3, 'a second cancel cannot refund twice');
+	assert.equal(I6.bagOf(s1).potion, 3, 'cancel returns the item'); assert.equal(s1.ledger[0].why, 'cancelled');
+	await s1.cancel(); assert.equal(I6.bagOf(s1).potion, 3, 'a second cancel cannot refund twice');
 	const next = await s1.chooseMove(1); assert.ok(next.ok); // after a cancel the same turn can still be played normally
 	// WP28 3.5: an item that cannot work is refused BEFORE registration: stays in the menu, nothing consumed, no turn used
 	const s2 = await session(makeGame(), { foe: wildSnorlax() }); s2.take();
 	assert.deepEqual(await s2.useItem('potion', 'A-0001'), { ok: false, reason: 'item-no-effect' });
-	assert.equal(s2.bag.potion, 3); assert.equal(s2.ledger.length, 0); assert.deepEqual(s2.take(), [], 'no turn was played');
+	assert.equal(I6.bagOf(s2).potion, 3); assert.equal(s2.ledger.length, 0); assert.deepEqual(s2.take(), [], 'no turn was played');
 	assert.deepEqual(await s2.useItem('antidote', 'A-0001'), { ok: false, reason: 'item-no-effect' }, 'wrong/no status');
 	assert.deepEqual(await s2.useItem('potion', 'Z-9999'), { ok: false, reason: 'unknown-target' });
 	// execution-time no-effect (state changed after registration): refunded once, and NOT again at the end of the battle
@@ -100,10 +101,10 @@ test('item ledger: cancel refunds once, ineligible use is refused up front, exec
 	assert.ok((await s3.useItem('potion', 'A-0001', { commit: false })).staged);
 	const mon = s3.gw._debugBattle().getSide('p1').pokemon.find(p => p.name === 'A-0001'); mon.hp = mon.maxhp; // healed by something else meanwhile
 	const r3 = await s3.commitTurn(); assert.ok(r3.ok);
-	assert.equal(s3.ledger[0].state, 'refunded'); assert.equal(s3.ledger[0].why, 'noeffect'); assert.equal(s3.bag.potion, 3);
+	assert.equal(s3.ledger[0].state, 'refunded'); assert.equal(s3.ledger[0].why, 'noeffect'); assert.equal(I6.bagOf(s3).potion, 3);
 	await playOut(s3);
-	assert.equal(s3.result().bag.potion, undefined, 'WP42 6.0 anomaly NOT reproduced: the bag delta for the refunded potion is 0 after the whole battle');
-	assert.equal(s3.bag.potion, 3);
+	assert.equal(I6.bagOf(s3.result()).potion, undefined, 'WP42 6.0 anomaly NOT reproduced: the bag delta for the refunded potion is 0 after the whole battle');
+	assert.equal(I6.bagOf(s3).potion, 3);
 	// unknown / none left are refused up front and consume nothing
 	const s4 = await session(damaged(), { foe: wildSnorlax() }); s4.take();
 	assert.deepEqual(await s4.useItem('rarecandy', 'A-0001'), { ok: false, reason: 'unknown-item' });
@@ -117,7 +118,7 @@ test('item ledger: cancel refunds once, ineligible use is refused up front, exec
 		if (t.ok && !w.finished) spent = w;
 	}
 	assert.ok(spent, 'some seed fails the throw');
-	assert.equal(spent.bag.pokeball, 4, 'ball spent, never refunded');
+	assert.equal(I6.bagOf(spent).pokeball, 4, 'ball spent, never refunded');
 });
 
 test('capture: caught member gets a stable id, exp is paid for the capture, dex updated, ball consumed once', async () => {
@@ -135,13 +136,13 @@ test('capture: caught member gets a stable id, exp is paid for the capture, dex 
 	assert.equal(c.id, 'W-0001'); assert.equal(c.species, 'Snorlax'); assert.equal(c.ball, 'masterball');
 	assert.equal(c.exp, G.minExp('slow', 40), 'fresh exp for the caught level');
 	assert.ok(result.members['A-0001'].exp > before, 'exp for the capture (setting on) is paid to the participant');
-	assert.equal(result.bag.masterball, -1);
+	assert.equal(I6.bagOf(result).masterball, -1);
 	assert.deepEqual(result.dex.owned, ['Snorlax']);
-	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys);
+	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys, content);
 	store.commit(result, receiveOptions);
 	const after = store.load();
 	assert.equal(after.party.length, 4); assert.equal(after.party[3].id, 'W-0001');
-	assert.ok(!after.bag.masterball);
+	assert.ok(!I6.bagOf(after).masterball);
 	assert.ok(after.dex.owned.includes('Snorlax'));
 	// duplicate submit does nothing more
 	assert.equal(store.commit(result, receiveOptions).status, 'already-applied');
@@ -152,12 +153,12 @@ test('idempotency: same result twice applies once; a different result for the sa
 	const game = makeGame(); game.party[0].hp = 70;
 	const s = await session(game); s.take(); await s.useItem('potion', 'A-0001');
 	const result = await playOut(s);
-	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys);
+	const dir = tmp(); const store = new SaveStore(saveGame(dir, game), {}, identityKeys, content);
 	assert.equal(store.commit(result).status, 'applied');
 	const once = store.load();
 	assert.equal(store.commit(JSON.parse(JSON.stringify(result))).status, 'already-applied');
 	assert.deepEqual(store.load(), once);
-	assert.equal(once.bag.potion, 2, 'potion deducted exactly once');
+	assert.equal(I6.bagOf(once).potion, 2, 'potion deducted exactly once');
 	const tampered = JSON.parse(JSON.stringify(result)); tampered.members['A-0001'].exp += 1;
 	assert.throws(() => store.commit(tampered), /different result/);
 	assert.deepEqual(store.load(), once);
@@ -167,7 +168,7 @@ test('idempotency: same result twice applies once; a different result for the sa
 	const badField = { ...result, battleId: 'B-bad2', members: { 'A-0001': { nickname: 'hax' } } };
 	assert.throws(() => store.commit(badField), /outside the write set/);
 	const neg = { ...result, battleId: 'B-bad3', bag: { potion: -99 } };
-	assert.throws(() => store.commit(neg), /negative/);
+	assert.throws(() => store.commit(neg), /not-enough-items/);
 	assert.deepEqual(store.load(), once);
 });
 
@@ -179,7 +180,7 @@ test('abandoned battle (no result) leaves the save byte-identical', async () => 
 	const mid = await session(game); mid.take();
 	assert.throws(() => mid.result(), /not finished/, 'no result exists before the battle ends');
 	assert.ok(bytes.equals(fs.readFileSync(f)), 'nothing persisted before commit');
-	assert.deepEqual(game.bag, makeGame().bag, 'input game object is never mutated by the session');
+	assert.deepEqual(I6.bagOf(game), I6.bagOf(makeGame()), 'input game object is never mutated by the session');
 });
 
 async function makeResult() {
@@ -194,16 +195,16 @@ test('failure boundary (simulated throws): old-or-new state at every point, retr
 	const { game, result } = await makeResult();
 	for (const point of POINTS) {
 		const dir = tmp(); const f = saveGame(dir, game);
-		const crashing = new SaveStore(f, { at: p => { if (p === point) throw new Error('injected ' + point); } }, identityKeys);
+		const crashing = new SaveStore(f, { at: p => { if (p === point) throw new Error('injected ' + point); } }, identityKeys, content);
 		assert.throws(() => crashing.commit(result), /injected/);
-		const recovered = new SaveStore(f, {}, identityKeys).load();
+		const recovered = new SaveStore(f, {}, identityKeys, content).load();
 		const isNew = !!recovered.appliedBattles['B-crash'];
 		assert.equal(isNew, COMMITTED_AFTER.has(point), `state after throw at ${point}`);
 		assert.ok(!fs.existsSync(f + '.tmp'), 'interrupted temp file cleaned on load');
-		const retry = new SaveStore(f, {}, identityKeys).commit(result);
+		const retry = new SaveStore(f, {}, identityKeys, content).commit(result);
 		assert.equal(retry.status, isNew ? 'already-applied' : 'applied');
-		const fin = new SaveStore(f, {}, identityKeys).load();
-		assert.equal(fin.bag.potion, 2, `potion deducted once after retry (${point})`);
+		const fin = new SaveStore(f, {}, identityKeys, content).load();
+		assert.equal(I6.bagOf(fin).potion, 2, `potion deducted once after retry (${point})`);
 		assert.equal(Object.keys(fin.appliedBattles).length, 1);
 	}
 });
@@ -215,11 +216,11 @@ test('failure boundary (REAL process kill): same guarantees when the process die
 		fs.writeFileSync(rf, JSON.stringify(result));
 		const child = spawnSync(process.execPath, [path.join(__dirname, 'crash-child.cjs'), f, rf], { env: { ...process.env, CRASH_AT: point }, encoding: 'utf8' });
 		assert.equal(child.signal, 'SIGKILL', `child must really die at ${point}`);
-		const recovered = new SaveStore(f, {}, identityKeys).load();
+		const recovered = new SaveStore(f, {}, identityKeys, content).load();
 		assert.equal(!!recovered.appliedBattles['B-crash'], COMMITTED_AFTER.has(point), `state after kill at ${point}`);
-		new SaveStore(f, {}, identityKeys).commit(result);
-		const fin = new SaveStore(f, {}, identityKeys).load();
-		assert.equal(fin.bag.potion, 2); assert.equal(Object.keys(fin.appliedBattles).length, 1);
+		new SaveStore(f, {}, identityKeys, content).commit(result);
+		const fin = new SaveStore(f, {}, identityKeys, content).load();
+		assert.equal(I6.bagOf(fin).potion, 2); assert.equal(Object.keys(fin.appliedBattles).length, 1);
 	}
 });
 
@@ -235,7 +236,7 @@ test('persistent status survives, temporary boosts do not', async () => {
 	assert.deepEqual([res.members['A-0001'].status, res.members['A-0001'].statusCount], ['psn', 0]);
 	assert.ok(!('boosts' in res.members['A-0001']));
 	assert.equal(res.outcome.kind, 'run');
-	assert.equal(res.bag.xattack, -1);
+	assert.equal(I6.bagOf(res).xattack, -1);
 });
 
 test('member ids must survive Showdown nickname handling (<=18 safe chars)', async () => {

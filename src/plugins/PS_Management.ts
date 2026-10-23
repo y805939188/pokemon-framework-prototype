@@ -44,7 +44,7 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
   openReceiving:(done?:(result:any)=>void)=>open({kind:'receiving',done}),
   replaceBattleWithReceiving:()=>{if(current||nextRequest)return false;nextRequest={kind:'receiving'};G.SceneManager.goto(Scene_PSManagement);return true;},
   current:()=>current&&!current.closed&&current.top()?{token:current.token,generation:current.generation,ready:current.ready,text:[...current.renderedText],view:{...current.top(),items:current.top().items?.map((x:MenuItem)=>({key:x.key,label:x.label,enabled:x.enabled}))},heldId:current.snapshot?.held?.id??null,frames:[...debugFrames]}:null,
-  hasBoxLink:()=>false, // explicit developer predicate; item acquisition belongs to 5.2
+  hasBoxLink:()=>app().hasBoxLink?.()??false, // default reads authoritative inventory; explicit developer override stays process-local
   retryReceiving:()=>{if(!app().pendingReceiving)return false;return open({kind:'receiving'});},
  };
  class Controller {

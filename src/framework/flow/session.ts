@@ -1,3 +1,5 @@
+import { battleBag } from "../rules/inventory.ts";
+import { catalogOf } from "../rules/item-catalog.ts";
 /**
  * BattleSession: the game-side owner of one battle.
  *
@@ -168,7 +170,7 @@ export class BattleSession {
     const s = new BattleSession();
     s.content = content; s.rules = rules || G.DEFAULT_RULES; s.battleId = battleId; s.foe = foe;
     s.party = party; s.foeTeam = S.clone(foe.team);
-    s.startBag = S.clone(game.bag); s.bag = S.clone(game.bag);
+    s.startBag = battleBag(game.inventory, catalogOf(content)); s.bag = S.clone(s.startBag);
     s.startDexOwned = game.dex.owned.slice();
     s.doubles = doubles;
     s.logger = logger;
@@ -613,7 +615,7 @@ export class BattleSession {
     for (const e of this.ledger) if (e.state === "reserved") this._refund(e, "unexecuted");
     this._syncWorkingFromEngine();
     const members: BattleResult["members"] = {};
-    for (const m of this.party) members[m.id] = { level: m.level, exp: m.exp, hp: m.hp, ...persistentStatus(m.status, m.statusCount), moves: m.moves, evs: m.evs! };
+    for (const m of this.party) members[m.id] = { level: m.level, exp: m.exp, hp: m.hp, ...persistentStatus(m.status, m.statusCount), moves: m.moves.map(({id,pp,maxpp}) => ({id,pp,maxpp})), evs: m.evs! };
     const bag: Record<string, number> = {};
     for (const k of new Set([...Object.keys(this.startBag), ...Object.keys(this.bag)])) {
       const d = (this.bag[k] || 0) - (this.startBag[k] || 0);

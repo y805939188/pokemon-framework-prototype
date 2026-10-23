@@ -1,3 +1,4 @@
+import { badgeCount } from "./economy.ts";
 /**
  * Defeat settlement (decision D3): a lost or drawn battle costs money and fully heals the party.
  *   money  WP42 §6.1 / WP24 §4.4: highest level of the player's own party x the badge factor (8, 16, 24, 36, 48, 64, 80,
@@ -24,7 +25,7 @@ export function isDefeat(result: Pick<BattleResult, "outcome">): boolean {
   return (kind === "win" && winner !== "Player") || kind === "tie";
 }
 
-export function defeatMoneyLoss(state: Pick<GameState, "party" | "money">, { badges = 0, noMoneyLoss = false }: DefeatOptions = {}): number {
+export function defeatMoneyLoss(state: Pick<GameState, "party" | "money"> & {badges?:boolean[]}, { badges = badgeCount(state.badges ?? []), noMoneyLoss = false }: DefeatOptions = {}): number {
   if (noMoneyLoss || !state.party.length) return 0;
   const top = Math.max(...state.party.map((m) => m.level));
   const factor = BADGE_FACTORS[Math.min(Math.max(badges, 0), BADGE_FACTORS.length - 1)]!;

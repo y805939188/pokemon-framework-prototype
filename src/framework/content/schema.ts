@@ -90,10 +90,12 @@ export interface ContentInputs {
   grants?: unknown;
   /** Optional (step 5.0): rule configuration overrides (rules/config.ts, WP02). Absent = the Gen 8 defaults; hash unchanged. */
   settings?: unknown;
+  items?: unknown;
+  shops?: unknown;
 }
 
 export interface ContentError {
-  file: "manifest.json" | "sources.json" | "species.json" | "overlays.json" | "grants.json" | "settings.json" | "compiled" | "assembly";
+  file: "manifest.json" | "sources.json" | "species.json" | "overlays.json" | "grants.json" | "settings.json" | "items.json" | "shops.json" | "compiled" | "assembly";
   path: string;
   message: string;
 }
@@ -108,7 +110,9 @@ export interface CompiledContent {
   /** Absent in documents compiled before step 4 (= no grants). */
   grants?: GrantSource[];
   /** Rule configuration overrides (validated); absent = the Gen 8 defaults. */
-  settings?: Record<string, number>;
+  settings?: import("../rules/config.ts").RuleOverrides;
+  items?: import('../rules/item-catalog.ts').ItemDefinition[];
+  shops?: import('../rules/item-catalog.ts').ShopDefinition[];
 }
 
 /** Grant ids stay short: the members they create are named G-<grant id>-<n>, and member ids are limited to 18 characters. */

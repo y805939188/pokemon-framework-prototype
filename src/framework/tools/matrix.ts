@@ -1,3 +1,4 @@
+import { aggregateBag } from "../rules/inventory.ts";
 /**
  * Step 2 scenario matrix S1..S10 as one runnable module (no test framework): the same code runs under
  * Node (headless) and inside the packaged NW.js app, and every scenario returns a fingerprint of its
@@ -23,6 +24,9 @@ import * as F from "./fixtures/game.ts";
 // Scenario code drives the session through plain JSON messages; message payloads are loosely typed on purpose.
 type L = any;
 
+// Historical fingerprints include JSON key iteration order. Project only these fixed-input reports to the
+// original fixture bag order, while the runtime inventory and battle delta retain their real ordering.
+const historicalBag = (bag:Record<string,number>) => Object.fromEntries([...new Set(['potion','antidote','xattack','pokeball','masterball',...Object.keys(bag)])].filter(id=>Object.hasOwn(bag,id)).map(id=>[id,bag[id]]));
 const sha = (x: L) => crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const ensure = (c: L, m: L) => { if (!c) throw new Error('assert: ' + m); };
 const eq = (a: L, b: L, m: L) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`assert eq ${m}: ${JSON.stringify(a)} vs ${JSON.stringify(b)}`); };
@@ -51,7 +55,7 @@ async function playOut(s: L, max = 30): Promise<L[]> {
 	ensure(s.finished, 'battle should finish');
 	return all;
 }
-const finishState = (game: L, result: L) => { const r = S.applyBattleResult(game, result); return r.state; };
+const finishState = (game: L, result: L) => { const r = S.applyBattleResult(game, result, undefined, identityKeys, {content:F.content}); return r.state; };
 
 const SCENARIOS: Record<string, () => Promise<L>> = {
 	async S1() { // ordinary win with exp
@@ -157,7 +161,7 @@ const SCENARIOS: Record<string, () => Promise<L>> = {
 		const st = await s.useItem('potion', 'A-0001', { commit: false }); ensure(st.staged, 'staged');
 		eq(s.bag.potion, 1, 'reserved'); await s.cancel(); eq(s.bag.potion, 2, 'cancel refunds'); await s.cancel(); eq(s.bag.potion, 2, 'no double refund');
 		eq((await s.useItem('xattack', 'A-0001')).reason, 'none-left', 'used up');
-		return { bag: s.bag, lines: lines(s.take()) };
+		return { bag: historicalBag(s.bag), lines: lines(s.take()) };
 	},
 	async S8() { // growth inside battle: level-up, learn prompt, next request/action use new state
 		const game = F.makeGame(); game.party[0].exp = G.minExp('parabolic', 51) - 1;
@@ -185,21 +189,23 @@ const SCENARIOS: Record<string, () => Promise<L>> = {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-mx-'));
 		try {
 			const file = path.join(dir, 'save.json'); fs.writeFileSync(file, JSON.stringify(game));
-			const crashing = new SaveStore(file, { at: (p: L) => { if (p === 'afterTmpWrite') throw new Error('injected'); } }, identityKeys);
+			const crashing = new SaveStore(file, { at: (p: L) => { if (p === 'afterTmpWrite') throw new Error('injected'); } }, identityKeys, F.content);
 			let threw = false; try { crashing.commit(result); } catch (e) { threw = true; }
 			ensure(threw, 'injected failure surfaced');
-			const mid = new SaveStore(file, {}, identityKeys).load();
+			const mid = new SaveStore(file, {}, identityKeys, F.content).load();
 			ensure(!mid.appliedBattles[result.battleId], 'old state after the failure');
-			eq(new SaveStore(file, {}, identityKeys).commit(result).status, 'applied', 'retry applies');
-			eq(new SaveStore(file, {}, identityKeys).commit(result).status, 'already-applied', 'second submit no-op');
-			const after = new SaveStore(file, {}, identityKeys).load();
+			eq(new SaveStore(file, {}, identityKeys, F.content).commit(result).status, 'applied', 'retry applies');
+			eq(new SaveStore(file, {}, identityKeys, F.content).commit(result).status, 'already-applied', 'second submit no-op');
+			const after = new SaveStore(file, {}, identityKeys, F.content).load();
 			eq(after.party.map((m: L) => m.id), game.party.map((m: L) => m.id), 'persistent order unchanged');
 			const changed = S.diffPaths(game, after);
-			const allowed = [/^party\.\d\.(level|exp|hp|status|statusCount|moves|evs|friendship)(\.|$)/, /^bag\./, /^dex\./, /^appliedBattles\./, /^money$/];
+			const allowed = [/^party\.\d\.(level|exp|hp|status|statusCount|moves|evs|friendship)(\.|$)/, /^inventory\.pockets\./, /^dex\./, /^appliedBattles\./, /^money$/];
 			for (const p of changed) ensure(allowed.some((re: L) => re.test(p)), 'unexpected change at ' + p);
-			let tamper = false; try { const t = JSON.parse(JSON.stringify(result)); t.members['A-0001'].exp += 1; new SaveStore(file, {}, identityKeys).commit(t); } catch (e) { tamper = /different result/.test((e as Error).message); }
+			let tamper = false; try { const t = JSON.parse(JSON.stringify(result)); t.members['A-0001'].exp += 1; new SaveStore(file, {}, identityKeys, F.content).commit(t); } catch (e) { tamper = /different result/.test((e as Error).message); }
 			ensure(tamper, 'tampered result refused');
-			return { changed, bag: after.bag, party: after.party.map((m: L) => [m.id, m.level, m.exp, m.hp]), lines: lines(msgs) };
+			// Preserve the frozen historical report in its v1 bag projection; validate current paths above.
+			const legacy = (s: S.GameState) => Object.fromEntries(Object.entries(s).map(([key,value])=>key==='inventory'?['bag',historicalBag(aggregateBag(s.inventory))]:[key,value]));
+			return { changed: S.diffPaths(legacy(game),legacy(after)), bag: historicalBag(aggregateBag(after.inventory)), party: after.party.map((m: L) => [m.id, m.level, m.exp, m.hp]), lines: lines(msgs) };
 		} finally { fs.rmSync(dir, { recursive: true, force: true }); }
 	},
 	async S10() { // key doubles combinations

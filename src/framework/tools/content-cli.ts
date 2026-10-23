@@ -13,6 +13,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { canonicalJson, checkFresh, checkSources, compileContent, preUseProblem } from "../content/compile.ts";
+import { importPbsItems } from "../content/pbs-items.ts";
+import { checkItemInputs } from "../content/item-input.ts";
 import { importPbsSpecies } from "../content/pbs-import.ts";
 import type { CompiledContent, ContentError, ContentInputs } from "../content/schema.ts";
 import { createDexLookup } from "../battle/dex.ts";
@@ -33,7 +35,9 @@ function readInputs(dir: string): { inputs: ContentInputs; errors: ContentError[
   // grants.json (step 4) and settings.json (step 5.0) are optional; every other file is required
   const grants = fs.existsSync(path.join(dir, "grants.json")) ? read("grants.json") : undefined;
   const settings = fs.existsSync(path.join(dir, "settings.json")) ? read("settings.json") : undefined;
-  const inputs = { manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json"), ...(grants !== undefined ? { grants } : {}), ...(settings !== undefined ? { settings } : {}) };
+  const items = fs.existsSync(path.join(dir, "items.json")) ? read("items.json") : undefined;
+  const shops = fs.existsSync(path.join(dir, "shops.json")) ? read("shops.json") : undefined;
+  const inputs = { ...(items !== undefined ? {items} : {}), ...(shops !== undefined ? {shops} : {}), manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json"), ...(grants !== undefined ? { grants } : {}), ...(settings !== undefined ? { settings } : {}) };
   return { inputs, errors };
 }
 
@@ -114,7 +118,7 @@ export function inventory(src: string, report: string): number {
   return 0;
 }
 
-export function importPbs(src: string, file: string, sourceId: string, report: string): number {
+export function importPbs(src: string, file: string, sourceId: string, report: string, itemMode = false): number {
   const { inputs, errors } = readInputs(src);
   if (errors.length) { show(errors); return 1; }
   // the same registry validation and pre-use gate as the compiler, BEFORE the data is read (DETAILED-PLAN §280, D5-2)
@@ -125,6 +129,13 @@ export function importPbs(src: string, file: string, sourceId: string, report: s
   if (gate) { console.error(`sources.json ${sourceId}: ${gate}; nothing was imported`); return 1; }
   let text: string;
   try { text = fs.readFileSync(file, "utf8"); } catch (e) { console.error(`cannot read ${file}: ${(e as Error).message}`); return 1; }
+  if (itemMode) {
+    const r = importPbsItems(text, sourceId), checked = checkItemInputs(r.items, undefined, id => preUseProblem(sources,id));
+    const ok = r.ok && checked.errors.length === 0;
+    fs.mkdirSync(path.dirname(report), {recursive:true});
+    fs.writeFileSync(report, canonicalJson({schema:1,source:sourceId,...r,ok,items:checked.items,contentErrors:checked.errors},2)+'\n');
+    return ok ? 0 : 1;
+  }
   const r = importPbsSpecies(text, sourceId);
   for (const e of r.errors) console.error(`${path.basename(file)}:${e.line} ${e.path}: ${e.message}`);
   fs.mkdirSync(path.dirname(report), { recursive: true });
@@ -138,8 +149,8 @@ const SRC = arg("src", "content/sample");
 if (cmd === "build") process.exit(build(SRC, arg("out", "data/framework/content.json")));
 else if (cmd === "check") process.exit(check(SRC, arg("out", "data/framework/content.json")));
 else if (cmd === "inventory") process.exit(inventory(SRC, arg("report", "docs/step3/content-inventory.json")));
-else if (cmd === "import-pbs") {
+else if (cmd === "import-pbs" || cmd === "import-pbs-items") {
   const source = process.argv.find((a) => a.startsWith("--source="))?.slice(9) ?? "";
-  process.exit(importPbs(SRC, arg("file", "pokemon.txt"), source, arg("report", "build/pbs-import.json")));
+  process.exit(importPbs(SRC, arg("file", "pokemon.txt"), source, arg("report", "build/pbs-import.json"), cmd === "import-pbs-items"));
 }
 else { console.error("usage: content-cli.cjs build|check|inventory|import-pbs [--src=content/sample] [--out=...] [--report=...] [--file=pokemon.txt --source=<id>]"); process.exit(2); }

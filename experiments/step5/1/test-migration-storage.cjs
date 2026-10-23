@@ -10,7 +10,7 @@ const legacy4=()=>{const raw=legacy3();raw.schema=4;raw.stats=E.stats.newStats()
 const migrate=raw=>{const r=E.saveSchema.migrateGame(raw,opts);assert.equal(r.ok,true,JSON.stringify(r.error));return r.state;};
 
 test('P51-06/08: fixed slots have one authority, current box first, then 0; holes never compact',()=>{
- const g=S.newGame({party:[]});assert.equal(g.schema,5);assert.equal('boxes'in g,false);assert.equal(g.storage.boxes.length,40);
+ const g=S.newGame({party:[]});assert.equal(g.schema,6);assert.equal('boxes'in g,false);assert.equal(g.storage.boxes.length,40);
  assert.ok(g.storage.boxes.every(b=>b.slots.length===30&&b.slots.every(m=>m===null)));
  const m=migrate(legacy4()).party[0];g.storage.currentBox=39;const p=T.placeInBox(g.storage,m);assert.deepEqual(p,{kind:'box',box:39,slot:0});
  assert.equal(T.locateMember(g,m.id).position.box,39);g.storage.boxes[39].slots.fill(m);assert.deepEqual(T.firstFreeBox(g.storage),{kind:'box',box:0,slot:0});
@@ -28,9 +28,9 @@ test('P51-06/07: 0/29/30/31/1199/1200 map exactly; 1201 refuses entire migration
 test('P51-07/08: all declared old schemas migrate deterministically, trusted values survive and raw remains unchanged',()=>{
  for(const version of [1,2,3,4]){
   const raw=version===4?legacy4():legacy3();raw.schema=version;if(version<3)delete raw.claims;if(version===1)for(const m of [...raw.party,...raw.boxes])delete m.statusCount;
-  const before=clone(raw);const one=migrate(raw),two=migrate(raw);assert.deepEqual(one,two);assert.deepEqual(raw,before);assert.equal(one.schema,5);
+  const before=clone(raw);const one=migrate(raw),two=migrate(raw);assert.deepEqual(one,two);assert.deepEqual(raw,before);assert.equal(one.schema,6);
   const old=[...raw.party,...raw.boxes],fresh=T.allMembers(one);assert.deepEqual(old.map(m=>m.id),fresh.map(m=>m.id));
-  old.forEach((m,i)=>{for(const key of ['nature','gender','ability','ivs','evs','moves','friendship','hp','ball','nickname'])assert.deepEqual(fresh[i][key],m[key],key);assert.equal(fresh[i].owner.name,m.ot);assert.equal(fresh[i].shiny,false);assert.equal(fresh[i].origin.receivedAt,null);});
+  old.forEach((m,i)=>{for(const key of ['nature','gender','ability','ivs','evs','moves','friendship','hp','ball','nickname'])assert.deepEqual(key==='moves'?fresh[i][key].map(({ppUps,...move})=>move):fresh[i][key],m[key],key);assert.equal(fresh[i].owner.name,m.ot);assert.equal(fresh[i].shiny,false);assert.equal(fresh[i].origin.receivedAt,null);});
   assert.deepEqual(E.saveSchema.migrateGame(one).state,one);assert.equal(E.saveSchema.migrateGame(one).migrated,false);
  }
 });

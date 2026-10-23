@@ -44,7 +44,8 @@ export function makeGame(over: GameOverrides = {}): GameState {
       member("A-0002", "Blastoise", 50, { moves: ["hydropump", "icebeam", "flashcannon", "protect"], nature: "modest", ability: "Torrent" }),
       member("A-0003", "Venusaur", 50, { moves: ["gigadrain", "sludgebomb", "earthquake", "synthesis"], nature: "modest", ability: "Overgrow" }),
     ],
-    bag: { potion: 3, antidote: 1, xattack: 1, pokeball: 5, masterball: 1, ...(over.bag ?? {}) },
+    content,
+    bag: Object.fromEntries(Object.entries({ potion: 3, antidote: 1, xattack: 1, pokeball: 5, masterball: 1, ...(over.bag ?? {}) }).filter(([,n])=>n>0)),
     money: 1000,
   });
 }

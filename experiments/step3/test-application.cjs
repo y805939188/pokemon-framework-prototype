@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../step5/2/test-support.cjs");
 // The game application over in-memory ports (success, refusal, failure, duplicate, state ownership) and over the real
 // Showdown-backed session. The same contract is exercised in the real MZ host by the flow test scenarios T1-T12.
 const test = require('node:test');
@@ -45,7 +46,7 @@ test('success: the result is committed once, the persistent state is replaced no
   const outcome = app.finishBattle(handle, request(r));
   assert.deepEqual([outcome.code, outcome.commit, outcome.kind, outcome.projection, outcome.aborted], [2, 'applied', 'caught', 'ok', undefined]);
   assert.equal(state.replaced.length, 1); assert.notEqual(state.current(), before); assert.equal(snapshot({ current: () => before }), beforeJson, 'the previous state object is untouched');
-  assert.equal(state.current().party.length, 4, 'the captured member joined'); assert.equal(state.current().bag.masterball, undefined);
+  assert.equal(state.current().party.length, 4, 'the captured member joined'); assert.equal(I6.bagOf(state.current()).masterball, undefined);
   assert.equal(state.current().appliedBattles[r.battleId].hash, E.state.resultHash(r));
   assert.deepEqual(projection.outcomes.map(o => [o.code, o.commit]), [[2, 'applied']]);
   assert.deepEqual(outcome.result, r);
@@ -78,7 +79,7 @@ test('conflict: a different result for an already applied battle is refused, the
 test('a result that breaks the contract aborts without any partial change (unknown member, bag below zero, wrong protocol)', () => {
   for (const [label, mutate, message] of [
     ['unknown member', r => { r.members['A-9999'] = { level: 5 }; }, /unknown member/],
-    ['bag below zero', r => { r.bag = { potion: -50 }; }, /bag would go negative/],
+    ['bag below zero', r => { I6.setBag(r, { potion: -50 }); }, /not-enough-items/],
     ['wrong protocol', r => { r.protocol = 99; }, /unsupported protocol/],
     ['write outside the write set', r => { r.members['A-0001'].species = 'Mew'; }, /outside the write set/],
   ]) {
@@ -194,12 +195,12 @@ test('real session: a won trainer battle with a level-up and an item commits the
   const app = new GameApplication({ state, sessions, projection, content: () => ({ content: sample }), random: lcg(3) });
   const r = req('real-win#1', [{ species: 'Pidgey', level: 5 }], 'trainer'); const s = await app.startBattle(r);
   assert.equal((await s.useItem('potion', 'A-0001')).ok, true);
-  assert.equal(state.current().bag.potion, 3, 'the persistent bag is untouched while the battle runs (the session works on a copy)');
+  assert.equal(I6.bagOf(state.current()).potion, 3, 'the persistent bag is untouched while the battle runs (the session works on a copy)');
   assert.equal(state.current().party[0].level, 50);
   for (let i = 0; i < 8 && !s.finished; i++) { if (s.pendingLearn) { await s.decideLearn(null); continue; } await s.chooseMove(1); }
   const outcome = app.finishBattle(s, r);
   assert.deepEqual([outcome.code, outcome.commit, outcome.kind], [1, 'applied', 'win']);
-  assert.equal(state.current().party[0].level, 51); assert.equal(state.current().bag.potion, 2); assert.equal(state.replaced.length, 1);
+  assert.equal(state.current().party[0].level, 51); assert.equal(I6.bagOf(state.current()).potion, 2); assert.equal(state.replaced.length, 1);
 });
 
 test('real session: a session closed by a failed rollback aborts and leaves the persistent state exactly as it was', async () => {

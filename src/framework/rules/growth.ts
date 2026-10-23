@@ -209,7 +209,7 @@ export function applyExp(member: Member, amount: number, content: Content, prior
     : `unknown species ${member.species}`);
   const curve = sp.growth;
   const maxE = maxExp(curve);
-  const before = { level: prior.level, exp: prior.exp, hp: prior.hp, stats: computeStats(sp.base, prior.ivs, prior.evs, prior.level, prior.nature) };
+  const before = { level: prior.level, exp: prior.exp, hp: prior.hp, stats: computeStats(sp.base, prior.ivs, prior.evs, prior.level, prior.statNature ?? prior.nature) };
   const exp = Math.min(Math.max(prior.exp + amount, 0), maxE);
   const delta = exp - prior.exp;
   const log: ExpLog = { gained: delta, levels: [], learned: [], pendingMoves: [] };
@@ -218,7 +218,7 @@ export function applyExp(member: Member, amount: number, content: Content, prior
   let cur: Member = { ...member, exp };
   let oldStats = before.stats;
   for (let L = prior.level + 1; L <= newLevel; L++) {
-    const stats = computeStats(sp.base, cur.ivs, cur.evs, L, cur.nature);
+    const stats = computeStats(sp.base, cur.ivs, cur.evs, L, cur.statNature ?? cur.nature);
     cur = { ...cur, level: L, hp: hpAfterRecalc(cur.hp, oldStats.hp, stats.hp) };
     log.levels.push({ level: L, maxhp: stats.hp, hp: cur.hp, stats });
     for (const mv of sp.learnset[L] ?? []) log.pendingMoves.push({ level: L, move: mv });
@@ -226,7 +226,7 @@ export function applyExp(member: Member, amount: number, content: Content, prior
   }
   // no level change (or no exp at all): stats are still recalculated against the same level because the EVs
   // changed, and current HP follows the same rule
-  const after = { level: cur.level, exp: cur.exp, stats: computeStats(sp.base, cur.ivs, cur.evs, cur.level, cur.nature) };
+  const after = { level: cur.level, exp: cur.exp, stats: computeStats(sp.base, cur.ivs, cur.evs, cur.level, cur.statNature ?? cur.nature) };
   if (newLevel === prior.level && after.stats.hp !== before.stats.hp) cur = { ...cur, hp: hpAfterRecalc(cur.hp, before.stats.hp, after.stats.hp) };
   return { member: cur, log, before, after: { ...after, hp: cur.hp } };
 }
@@ -237,5 +237,5 @@ export function applyExp(member: Member, amount: number, content: Content, prior
  */
 export function applyExpPersistent(member: Member, amount: number, content: Content, prior: Member = member): ApplyExpResult {
   const r = applyExp(toBattleMember(member, content), amount, content, toBattleMember(prior, content));
-  return { ...r, member: { ...r.member, species: member.species, form: member.form ?? 0 } };
+  return { ...r, member: { ...r.member, species: member.species, form: member.form ?? 0, nature: member.nature, statNature: member.statNature ?? null } };
 }

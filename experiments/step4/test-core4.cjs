@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../step5/2/test-support.cjs");
 // Step 4 / A, core rules (no engine, no host): creating an individual from species + level (WP18 4.1/4.2, WP19
 // 3.2-3.5/5.2, WP20 5.1), one-time grants (D1 receiving order, stage capacities), and the party heal (WP20 3.2).
 // Verification: spec-driven vectors and invariants; no reference (Ruby) run exists for these modules.
@@ -101,7 +102,7 @@ test('a grant is applied once: members (party first), items, money, and the clai
   const r = starter(s0);
   assert.equal(r.status, 'applied'); assert.deepEqual(s0, before, 'the input state is not mutated');
   assert.deepEqual(r.state.party.map(m => [m.id, m.species, m.form, m.level]), [['M1', 'charmander', 0, 5]], 'stored by content id + form (D5-3, step 5.0)');
-  assert.deepEqual(r.state.bag, { potion: 5, pokeball: 10, antidote: 2 }); assert.deepEqual(r.state.claims, { starter: { kind: 'grant' } });
+  assert.deepEqual(I6.bagOf(r.state), { potion: 5, pokeball: 10, antidote: 2 }); assert.deepEqual(r.state.claims, { starter: { kind: 'grant' } });
   assert.deepEqual(r.placed, [{ id: 'M1', species: 'charmander', form: 0, level: 5, to: 'party' }]);
   assert.deepEqual(E.saveSchema.validateGame(r.state), []);
   const again = starter(r.state);
@@ -109,15 +110,15 @@ test('a grant is applied once: members (party first), items, money, and the clai
 });
 
 test('grant receiving order and capacity: party, then boxes, refused as a whole when anything does not fit', () => {
-  const pidgeys = { ...content, grants: { flock: { id: 'flock', members: [{ species: 'Pidgey', level: 3 }, { species: 'Pidgey', level: 4 }], items: { potion: 2 }, money: 100 } } };
+  const pidgeys = { ...content, settings: {...content.settings,BAG_POCKET_SLOTS:[-1,1,-1,-1,-1,-1,-1,-1]}, grants: { flock: { id: 'flock', members: [{ species: 'Pidgey', level: 3 }, { species: 'Pidgey', level: 4 }], items: { potion: 2 }, money: 100 } } };
   const full = fresh(); for (let i = 0; i < 6; i++) full.party.push(createMember({ id: `P-${i}`, species: 'Caterpie', level: 2 }, content, lcg(i)));
   const r = applyGrant(full, 'flock', pidgeys, lcg(3), { ...E.limits.DEFAULT_LIMITS, boxes: 2 });
   assert.deepEqual(r.placed.map(p => p.to), ['boxes', 'boxes'], 'a full party sends grant members to the boxes (D1)');
   const halfFull = clone(full); E.storage.placeInBox(halfFull.storage, clone(full.party[0])); E.storage.boxedMembers(halfFull)[0].id = 'B-0';
   for (const [label, state, limits, reason] of [
     ['not enough box room', halfFull, { ...E.limits.DEFAULT_LIMITS, boxes: 2 }, 'no-room'],
-    ['bag above the per-item cap', (() => { const s = fresh(); s.bag.potion = 998; return s; })(), E.limits.DEFAULT_LIMITS, 'bag-full'],
-    ['already above the cap (old save)', (() => { const s = fresh(); s.bag.potion = 5000; return s; })(), E.limits.DEFAULT_LIMITS, 'bag-full'],
+    ['bag above the per-item cap', (() => { const s = fresh(); I6.setItemCount(s, "potion", 998); return s; })(), E.limits.DEFAULT_LIMITS, 'bag-full'],
+    ['already above the cap (old save)', (() => { const s = fresh(); I6.setItemCount(s, "potion", 5000); return s; })(), E.limits.DEFAULT_LIMITS, 'bag-full'],
   ]) {
     const before = clone(state);
     assert.throws(() => applyGrant(state, 'flock', pidgeys, lcg(3), limits), e => e instanceof GrantRefusedError && e.reason === reason, label);
@@ -130,19 +131,19 @@ test('grant receiving order and capacity: party, then boxes, refused as a whole 
   assert.throws(() => starter(old), /migrate it first/);
 });
 
-test('grant money follows the money cap (WP24: clamped); an existing balance above the cap is kept, never reduced', () => {
+test('grant money follows the money cap (WP24: clamped); an explicit write clamps even an existing over-cap balance', () => {
   const rich = { ...content, grants: { cash: { id: 'cash', members: [], items: {}, money: 500 } } };
   const s = fresh(); s.money = 999800;
   assert.equal(applyGrant(s, 'cash', rich, lcg(1)).state.money, 999999);
   const over = fresh(); over.money = 2000000;
-  assert.equal(applyGrant(over, 'cash', rich, lcg(1)).state.money, 2000000);
+  assert.equal(applyGrant(over, 'cash', rich, lcg(1)).state.money, 999999);
 });
 
 test('a grant registers every received species as seen and owned (WP26 3.2 gifts), once, only when the grant is applied', () => {
   const r = starter(fresh());
   assert.deepEqual(r.state.dex, { seen: ['charmander'], owned: ['charmander'] }, 'the starter is in the dex (by content id since step 5.0)');
   assert.equal(starter(r.state).state, r.state, 'a repeat changes nothing, the dex included');
-  const flock = { ...content, grants: { flock: { id: 'flock', members: [{ species: 'Pidgey', level: 3 }, { species: 'Pidgey', level: 4 }, { species: 'Caterpie', level: 2 }], items: { potion: 1 }, money: 0 } } };
+  const flock = { ...content, settings: {...content.settings,BAG_POCKET_SLOTS:[-1,1,-1,-1,-1,-1,-1,-1]}, grants: { flock: { id: 'flock', members: [{ species: 'Pidgey', level: 3 }, { species: 'Pidgey', level: 4 }, { species: 'Caterpie', level: 2 }], items: { potion: 1 }, money: 0 } } };
   const sighted = fresh(); sighted.dex.seen = ['pidgey'];
   assert.deepEqual(applyGrant(sighted, 'flock', flock, lcg(2)).state.dex, { seen: ['pidgey', 'caterpie'], owned: ['pidgey', 'caterpie'] }, 'one entry per species; an earlier sighting is kept');
   const full = fresh(); for (let i = 0; i < 6; i++) full.party.push(createMember({ id: `P-${i}`, species: 'Caterpie', level: 2 }, content, lcg(i)));
@@ -150,7 +151,7 @@ test('a grant registers every received species as seen and owned (WP26 3.2 gifts
   assert.deepEqual([boxed.placed[0].to, boxed.state.dex.owned], ['boxes', ['charmander']], 'a member received into the boxes is registered too');
   for (const [label, state, limits, reason] of [
     ['no room', full, { ...E.limits.DEFAULT_LIMITS, boxes: 0 }, 'no-room'],
-    ['bag cap', (() => { const s = fresh(); s.bag.potion = 999; return s; })(), E.limits.DEFAULT_LIMITS, 'bag-full'],
+    ['bag cap', (() => { const s = fresh(); I6.setItemCount(s, "potion", 999); return s; })(), E.limits.DEFAULT_LIMITS, 'bag-full'],
   ]) {
     const before = clone(state);
     assert.throws(() => applyGrant(state, 'flock', flock, lcg(2), limits), e => e.reason === reason, label);
@@ -175,9 +176,9 @@ test('legal ids that are also Object.prototype names ("constructor") are ordinar
 
 test('"__proto__" as a battle id or a claim id is an ordinary own entry: applied once, a repeat (also after a JSON round trip) is a repeat, a different result conflicts; nothing is spent twice', () => {
   const run = { protocol: 1, battleId: '__proto__', outcome: { kind: 'run', winner: null }, members: {}, bag: { potion: -1 }, captured: [], dex: { seen: [], owned: [] } };
-  const g = fresh(); g.bag.potion = 2;
+  const g = fresh(); I6.setItemCount(g, "potion", 2);
   const a = S.applyBattleResult(g, run);
-  assert.deepEqual([a.status, a.state.bag.potion, g.bag.potion], ['applied', 1, 2], 'one potion spent; the input is not touched');
+  assert.deepEqual([a.status, I6.bagOf(a.state).potion, I6.bagOf(g).potion], ['applied', 1, 2], 'one potion spent; the input is not touched');
   assert.ok(Object.hasOwn(a.state.appliedBattles, '__proto__'), 'an own ledger entry');
   assert.equal(Object.getPrototypeOf(a.state.appliedBattles), Object.prototype, 'the ledger keeps its prototype');
   const again = S.applyBattleResult(a.state, run);
@@ -186,16 +187,16 @@ test('"__proto__" as a battle id or a claim id is an ordinary own entry: applied
   const loaded = JSON.parse(saved);
   assert.deepEqual(E.saveSchema.validateGame(loaded), []);
   const afterLoad = S.applyBattleResult(loaded, run);
-  assert.deepEqual([afterLoad.status, afterLoad.state.bag.potion], ['already-applied', 1], 'after a save round trip the repeat spends nothing');
+  assert.deepEqual([afterLoad.status, I6.bagOf(afterLoad.state).potion], ['already-applied', 1], 'after a save round trip the repeat spends nothing');
   const before = JSON.stringify(loaded);
   assert.throws(() => S.applyBattleResult(loaded, { ...run, bag: { potion: -2 } }), /already applied with a different result/);
   assert.equal(JSON.stringify(loaded), before, 'a conflicting result changes nothing');
-  assert.throws(() => S.applyBattleResult(fresh(), { ...run, bag: { potion: -1 } }), /bag would go negative/, 'a refused result...');
+  assert.throws(() => S.applyBattleResult(fresh(), { ...run, bag: { potion: -1 } }), /not-enough-items/, 'a refused result...');
   assert.deepEqual(fresh().appliedBattles, {}, '...records nothing');
   // the claims ledger takes the same key (a grant id outside the content rules, reachable through the API)
   const ct = { ...content, grants: JSON.parse('{"__proto__": {"id": "__proto__", "members": [], "items": {"potion": 1}, "money": 0}}') };
   const claimed = applyGrant(fresh(), '__proto__', ct, lcg(1));
-  assert.deepEqual([claimed.status, Object.hasOwn(claimed.state.claims, '__proto__'), claimed.state.bag.potion], ['applied', true, 1]);
+  assert.deepEqual([claimed.status, Object.hasOwn(claimed.state.claims, '__proto__'), I6.bagOf(claimed.state).potion], ['applied', true, 1]);
   assert.deepEqual(E.saveSchema.validateGame(claimed.state), []);
   assert.equal(applyGrant(JSON.parse(JSON.stringify(claimed.state)), '__proto__', ct, lcg(1)).status, 'already-claimed');
 });
