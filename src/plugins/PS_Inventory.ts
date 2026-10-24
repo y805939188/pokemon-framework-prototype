@@ -67,7 +67,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    this.choose(name(row.item),[
     {key:'use',label:tr('use'),enabled:ready,run:()=>this.target(row.item.id)},
     ...(!this.request.parent&&holdableItem(row.item)&&this.application.heldItemSourcesEnabled()?[{key:'give',label:tr('give'),run:()=>this.give(row)}]:[]),
-    ...(!this.request.parent&&!importantItem(row.item)?[{key:'toss',label:tr('toss'),run:()=>this.toss(row)}]:[]),
+    ...(!this.request.parent&&!importantItem(row.item)?[{key:'toss',label:tr('toss'),enabled:this.application.queryInventoryItemQuantity(this.token,row.item.id)>0,run:()=>this.toss(row)}]:[]),
     {key:'close',label:tr('back'),run:()=>this.bagView()}],()=>this.bagView());
    if(!ready){this.error=tr('notReady');this.draw();}
   }
@@ -112,7 +112,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    this.choose(tr('learn',{move:s.move.name||s.move.id}),[...s.moves.map((m:any,i:number)=>({key:String(i),label:`${m.id} ${m.pp}/${m.maxpp} PP`,run:()=>learn({kind:'replace',slot:i})})),{key:'new',label:tr('keep',{move:s.move.name||s.move.id}),run:()=>learn({kind:'decline'})}],()=>learn({kind:'decline'}));
    if(s.reason){this.error=detail({reason:s.reason});this.draw();}
   }
-  toss(row:any){this.flushBrowse();const ticket=this.selectedTicket??this.application.inventoryTicket(this.token,row.pocket,row.index);this.quantity(this.total(row.item.id),false,q=>{if(!q){this.bagView();return;}this.confirm(tr('confirmToss',{quantity:q,item:name(row.item)}),()=>{
+  toss(row:any){this.flushBrowse();const ticket=this.selectedTicket??this.application.inventoryTicket(this.token,row.pocket,row.index);this.quantity(this.application.queryInventoryItemQuantity(this.token,row.item.id),false,q=>{if(!q){this.bagView();return;}this.confirm(tr('confirmToss',{quantity:q,item:name(row.item)}),()=>{
    this.busy=true;const id=this.id();this.application.tossItems(this.token,id,row.item.id,q,ticket,true,()=>new Promise<void>(resolve=>{this.cancelWait=resolve;this.message(tr('tossing',{quantity:q,item:name(row.item)}),()=>{this.cancelWait=null;resolve();});})).then((r:InventoryOutcome)=>{this.busy=false;if(!this.valid())return;if(r.status==='refused')this.fail(r);else{this.presentationOutcome=r;this.message(tr('done'),()=>this.bagView());}}).catch((e:unknown)=>{this.busy=false;if(this.valid())this.fatal(e);});
   },()=>this.bagView());});}
   shopText(key:'greetingKey'|'farewellKey',fallback:string){const definition=this.request.shop?.shopId?flow().content().shops?.[this.request.shop.shopId]:undefined;return flow().translator().tOr(definition?.[key]??'inventory.'+fallback,tr(fallback));}

@@ -70,7 +70,7 @@ export function planItemUse(game:GameState,c:Content,intent:ItemIntent,answers:I
  const catalog=catalogOf(c),item=itemOf(catalog,intent.itemId);if(!item)return refuse('unknown-item');if(!itemReadiness(c,item.id))return refuse('not-ready');positiveQuantity(intent.quantity);
  const family=item.effect!.family,p=item.effect!.parameters,q=intent.quantity;if(family==='rare-candy'&&q!==1)return refuse('invalid-quantity');
  if(answers.cancelled||answers.confirmed===false)return {status:'cancelled'};
- if(q>itemUseLimit(game,c,intent,world))return refuse('quantity-exceeds-limit');if(itemQuantity(game.inventory,item.id,catalog)<q)return refuse('not-enough-items');
+ if(itemQuantity(game.inventory,item.id,catalog)<q)return refuse('not-enough-items');if(q>itemUseLimit(game,c,intent,world))return refuse('quantity-exceeds-limit');
  const next=clone(game),learned:string[]=[],skipped:string[]=[];let actualHp=0;const details:Pick<ItemResult,'expGained'|'oldLevel'|'newLevel'|'abilityChange'>={};
  if(family==='sacred-ash'){
   let changed=false;next.party=next.party.map(m=>{if(m.isEgg||m.hp!==0)return m;changed=true;const healed=healMember(m,c);actualHp+=healed.hp;return healed;});if(!changed)return refuse('no-effect');

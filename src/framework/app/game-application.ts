@@ -175,6 +175,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   beginInventoryOperation(kind:'bag'|'item'|'shop'='bag',parent?:InventoryParent):string { return this.inventory.begin(kind,parent); }
   endInventoryOperation(token:string):InventoryOutcome { return this.inventory.end(token); }
   inventorySnapshot(token:string,filter?:Parameters<InventorySession['snapshot']>[1]) { return this.inventory.snapshot(token,filter); }
+  queryInventoryItemQuantity(token:string,itemId:string):number { return this.inventory.quantity(token,itemId); }
   inventoryTicket(token:string,pocket:number,index:number) { return this.inventory.ticket(token,pocket,index); }
   inventoryRequest(token:string,requestId:string,request:InventoryRequest,present?:(outcome:InventoryOutcome)=>void):InventoryOutcome { return this.inventory.execute(token,requestId,request,present); }
   beginInventorySort(token:string,pocket:number,index:number,filtered=false):InventoryOutcome { return this.inventory.beginSort(token,pocket,index,filtered); }

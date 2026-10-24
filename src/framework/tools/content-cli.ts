@@ -1,8 +1,9 @@
 /**
- * Content tooling entry (built to js/engine/build/content-cli.cjs): `build`, `check`, `inventory`, `import-pbs`.
+ * Content tooling entry (built to js/engine/build/content-cli.cjs): `build`, `check`, `check-item-pockets`, `inventory`, `import-pbs`.
  *   build      compile content/<src> into data/framework/content.json (a failed build REMOVES the old output, so a
  *              stale artifact can never hide broken or missing inputs)
  *   check      the compiled file exists and is the build of exactly the current inputs
+ *   check-item-pockets --previous-items=<published-items.json> is an optional read-only warning; no save is loaded or changed.
  *   inventory  compare the sample with the pinned Showdown data and write a machine-readable report
  *   import-pbs read an author-provided PBS species file (content/pbs-import.ts subset) into species records plus a
  *              report of every field not carried over; refused unless the named source of the content has a recorded
@@ -118,6 +119,26 @@ export function inventory(src: string, report: string): number {
   return 0;
 }
 
+/** Optional read-only compatibility warning; never loads, rewrites or migrates player saves. */
+export function checkItemPockets(src:string,previousFile:string):number {
+  const {inputs,errors}=readInputs(src);
+  const compiled=errors.length?{ok:false as const,errors}:compileContent(inputs);
+  if(!compiled.ok){show(compiled.errors);return 1;}
+  let previous:unknown;
+  try{previous=JSON.parse(fs.readFileSync(previousFile,"utf8"));}catch(error){console.error(`previous items: cannot read JSON: ${(error as Error).message}`);return 1;}
+  if(!Array.isArray(previous)){console.error("previous items: supply an explicit published items.json array; historical fallback pockets cannot be inferred");return 1;}
+  // This is old metadata, not an import into current gameplay. Current inputs still pass the full source gate above.
+  const old=checkItemInputs(previous,undefined,()=>null),current=checkItemInputs(compiled.data.items,undefined,()=>null);
+  if(old.errors.length){for(const e of old.errors)console.error(`previous items ${e.path}: ${e.message}`);return 1;}
+  const warnings:{code:string;itemId:string;previousPocket:number;currentPocket:number;path:string;message:string}[]=[];
+  for(const item of old.items){
+    const now=Object.hasOwn(current.catalog,item.id)?current.catalog[item.id]:undefined;
+    if(now&&now.pocket!==item.pocket){const message="Existing save rows keep their old pocket; current consumption reads only the current default pocket. Keep published item pockets stable pending an explicitly approved compatibility policy. No save was changed.";warnings.push({code:'item-pocket-changed',itemId:item.id,previousPocket:item.pocket,currentPocket:now.pocket,path:`items.json id=${item.id}.pocket`,message});console.error(`WARNING item-pocket-changed ${item.id}: ${item.pocket} -> ${now.pocket}. ${message}`);}
+  }
+  console.log(JSON.stringify({kind:'item-pocket-compatibility',currentInputsHash:compiled.data.inputsHash,warnings,saveModified:false,note:"Read-only comparison of IDs present in both catalogs. No save inspection, rejection, relocation, sorting, truncation or migration. An explicit previous catalog is required; no warning does not prove save compatibility."},null,2));
+  return 0;
+}
+
 export function importPbs(src: string, file: string, sourceId: string, report: string, itemMode = false): number {
   const { inputs, errors } = readInputs(src);
   if (errors.length) { show(errors); return 1; }
@@ -148,9 +169,14 @@ const cmd = process.argv[2];
 const SRC = arg("src", "content/sample");
 if (cmd === "build") process.exit(build(SRC, arg("out", "data/framework/content.json")));
 else if (cmd === "check") process.exit(check(SRC, arg("out", "data/framework/content.json")));
+else if (cmd === "check-item-pockets") {
+  const previous=process.argv.find(a=>a.startsWith("--previous-items="))?.slice(17);
+  if(!previous){console.error("usage: check-item-pockets --previous-items=<published-items.json> [--src=content/sample]");process.exit(2);}
+  process.exit(checkItemPockets(SRC,path.resolve(ROOT,previous)));
+}
 else if (cmd === "inventory") process.exit(inventory(SRC, arg("report", "docs/step3/content-inventory.json")));
 else if (cmd === "import-pbs" || cmd === "import-pbs-items") {
   const source = process.argv.find((a) => a.startsWith("--source="))?.slice(9) ?? "";
   process.exit(importPbs(SRC, arg("file", "pokemon.txt"), source, arg("report", "build/pbs-import.json"), cmd === "import-pbs-items"));
 }
-else { console.error("usage: content-cli.cjs build|check|inventory|import-pbs [--src=content/sample] [--out=...] [--report=...] [--file=pokemon.txt --source=<id>]"); process.exit(2); }
+else { console.error("usage: content-cli.cjs build|check|check-item-pockets|inventory|import-pbs [--src=content/sample] [--out=...] [--report=...] [--file=pokemon.txt --source=<id>]"); process.exit(2); }

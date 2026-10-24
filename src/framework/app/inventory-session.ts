@@ -5,7 +5,7 @@ import {planShop,filterShopStock,shopQuote,updatePrice,assertMutableStock} from 
 import type {ShopContext,ShopIntent} from '../rules/shop.ts';
 import { clone } from '../rules/value.ts';
 import { semanticFingerprint } from '../rules/semantic.ts';
-import { addItems, aggregateBag, inventoryPolicy, moveInventorySlot, positiveQuantity, removeItems } from '../rules/inventory.ts';
+import { addItems, aggregateBag, inventoryPolicy, moveInventorySlot, positiveQuantity, removeItems, itemQuantity } from '../rules/inventory.ts';
 import { catalogOf, hasFlag, importantItem, itemOf } from '../rules/item-catalog.ts';
 import { changeMoney, moneyCap, setBadge } from '../rules/economy.ts';
 import { own, setOwn } from '../rules/own.ts';
@@ -105,6 +105,7 @@ export class InventorySession {
     return clone({pockets,lastPocket:game.inventory.lastPocket,indices:game.inventory.indices,revision:String(this.revision)});
     }finally{this.readingProjection=false;}
   }
+  quantity(token:string,itemId:string):number { const {game,content}=this.current(token);return itemQuantity(game.inventory,itemId,catalogOf(content)); }
   ticket(token:string,pocket:number,index:number):InventoryTicket{
     const {game,context}=this.current(token);
     if(!Number.isInteger(pocket)||pocket<1||pocket>8||!Number.isInteger(index)||index<0)throw new Error('invalid-slot');
@@ -269,7 +270,7 @@ export class InventorySession {
       const target=context.parent?.memberId??memberId;
       if(!target&&family!=='sacred-ash')return {ready:true,eligible:'unknown',reason:'target-required'};
       const world=this.itemWorld(),intent={itemId,quantity,...(target?{memberId:target}:{})};
-      const maximum=itemUseLimit(game,content,intent,world),planned=planItemUse(game,content,intent,{confirmed:true},world);
+      const planned=planItemUse(game,content,intent,{confirmed:true},world),maximum=itemUseLimit(game,content,intent,world);
       if(planned.status==='pending'&&planned.selection.kind==='move'){
         const moves=game.party.find(m=>m.id===target)?.moves??[];
         const canUse=moves.some((_,moveIndex)=>{try{return planItemUse(game,content,intent,{confirmed:true,moveIndex},world).status==='ready';}catch{return false;}});

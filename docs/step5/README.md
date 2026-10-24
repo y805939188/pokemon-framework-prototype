@@ -15,3 +15,5 @@
 文档：[5.0.md](5.0.md)（实施记录）、[5.0-closure.md](5.0-closure.md)（收口记录）、[commands.md](commands.md)（新增作者入口与命令）、[distribution.md](distribution.md)（分发清单骨架）。
 
 5.1作者候选：批准计划r2及M独立复验后推进F–I，见[实施合同](5.1.md)、[完整候选与证据入口](5.1-candidate.md)、[持物P-2提案](5.1-held-item-contract.md)。5.1最终双审及用户条件合并门已完成，PR #4常规合并c5c51a6；原候选历史保留。5.2遵守新的M1/M2与专项push/merge门，不能沿用5.1授权。
+
+5.2 Claude J2在84ca代码/自动化PASS；后续数量、原因及只读兼容诊断作者整改与原证据文字更正见[5.2-J2-remediation.md](5.2-J2-remediation.md)，新候选待独立复验，真实H仍阻塞。
