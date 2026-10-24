@@ -74,6 +74,7 @@ SUITES=(
   experiments/step5/2/test-item-workflows6.cjs
   experiments/step5/2/test-M2-remediation.cjs
   experiments/step5/2/test-J2-remediation.cjs
+  experiments/step5/2/test-D-remediation.cjs
   experiments/step5/2/test-inventory-ui.cjs
 )
 fail=0
