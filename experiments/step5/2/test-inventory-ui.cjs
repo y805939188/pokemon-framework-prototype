@@ -36,6 +36,50 @@ test('P52-08/30 shared discard quantity cancel/No and asynchronous pre-message p
 test('P52-11 sorting moves immediately, Back restores order, auto/filtered/close row cannot start',()=>{
  const h=host();h.G.PSInventory.showBag();h.pocket(2);const order=clone(h.state.current().inventory.pockets[1]);h.press('shift');assert.equal(h.view().sorting,true);h.ready();h.press('down');assert.notDeepEqual(h.state.current().inventory.pockets[1],order);h.press('cancel');h.ready();assert.deepEqual(h.state.current().inventory.pockets[1],order);h.pocket(4);h.press('shift');assert.equal(h.view().sorting,false);h.press('cancel');
 });
+function sortHost(pocket=2,index=1){return host({edit:(g,c)=>{
+ g.inventory=E.inventory.inventoryFromBag({leftovers:1,choiceband:2,antidote:2,potion:3,superpotion:4,pokeball:20},c.items);
+ g.inventory.lastPocket=pocket;g.inventory.indices[pocket-1]=index;
+}});}
+function moveSort(h,to){h.press('shift');h.ready();assert.equal(h.view().sorting,true);for(let n=0;h.view().view.cursor!==to&&n<10;n++)h.press(h.view().view.cursor>to?'up':'down');assert.equal(h.view().view.cursor,to);}
+test('CUA-F01 P52-11 cancel restores the live row but close/reopen retains the last saved index',()=>{
+ for(const [pocket,start,end]of [[2,1,0],[2,0,2],[1,0,1]]){
+  const h=sortHost(pocket,start),before=clone(h.state.current()),order=before.inventory.pockets[pocket-1];h.G.PSInventory.showBag();h.ready();moveSort(h,end);
+  assert.equal(h.state.current().inventory.indices[pocket-1],end);h.press('cancel');h.ready();
+  assert.equal(h.view().sorting,false);assert.equal(h.view().view.cursor,start,'cancel must select the original item, not the saved index');
+  assert.deepEqual(h.state.current().inventory.pockets, before.inventory.pockets);assert.equal(h.state.current().inventory.indices[pocket-1],end);
+  const expected=clone(before);expected.inventory.indices[pocket-1]=end;assert.deepEqual(h.state.current(),expected,'only the last moved browse index survives cancellation');
+  h.press('ok');h.ready();assert.equal(h.view().view.title,h.G.PSFlow.translator().tOr('item.name.'+order[start].itemId,h.content.items[order[start].itemId].name));
+  h.press('cancel');h.ready();assert.equal(h.view().view.cursor,start,'an item menu roundtrip must retain the restored live cursor');
+  h.press('cancel');assert.equal(h.G.PSInventory.current(),null);assert.equal(h.state.current().inventory.indices[pocket-1],end);
+  h.G.PSInventory.showBag();h.ready();assert.equal(h.view().pocket,pocket);assert.equal(h.view().view.cursor,end,'a new bag reads the saved final move index');h.press('cancel');
+ }
+});
+test('CUA-F01 P52-11 ordinary navigation replaces the restored cursor without leaving a stale override',()=>{
+ const h=sortHost(2,0);h.G.PSInventory.showBag();h.ready();moveSort(h,2);h.press('cancel');h.ready();assert.equal(h.view().view.cursor,0);
+ h.press('down');assert.equal(h.view().view.cursor,1);h.press('ok');h.ready();h.press('cancel');h.ready();assert.equal(h.view().view.cursor,1);
+ h.press('cancel');assert.equal(h.state.current().inventory.indices[1],1);h.G.PSInventory.showBag();h.ready();assert.equal(h.view().view.cursor,1);h.press('cancel');
+});
+test('CUA-F01 P52-11 pocket switches keep the last moved index and independent pocket cursors',()=>{
+ const h=sortHost(2,1),before=clone(h.state.current());h.G.PSInventory.showBag();h.ready();moveSort(h,0);h.press('cancel');h.ready();assert.equal(h.view().view.cursor,1);
+ h.press('right');assert.equal(h.view().pocket,3);assert.equal(h.view().view.cursor,0);h.press('down');assert.equal(h.view().view.cursor,1);
+ h.press('left');assert.equal(h.view().pocket,2);assert.equal(h.view().view.cursor,0,'returning to a pocket reads its saved cursor');h.press('cancel');
+ assert.deepEqual(h.state.current().inventory.pockets,before.inventory.pockets);assert.equal(h.state.current().inventory.indices[1],0);assert.equal(h.state.current().inventory.indices[2],1);
+ assert.equal(h.state.current().inventory.indices[0],before.inventory.indices[0]);h.G.PSInventory.showBag();h.ready();assert.equal(h.view().view.cursor,0);h.press('cancel');
+});
+test('CUA-F01 P52-11 both confirmation buttons retain the moved order and cursor; idle cancellation is unchanged',()=>{
+ for(const confirm of ['ok','shift']){
+  const h=sortHost(2,1);h.G.PSInventory.showBag();h.ready();const order=clone(h.state.current().inventory.pockets[1]);moveSort(h,0);const moved=clone(h.state.current().inventory.pockets[1]);assert.notDeepEqual(moved,order);
+  h.press(confirm);h.ready();assert.equal(h.view().sorting,false);assert.equal(h.view().view.cursor,0);assert.deepEqual(h.state.current().inventory.pockets[1],moved);h.press('cancel');
+  h.G.PSInventory.showBag();h.ready();assert.equal(h.view().view.cursor,0);h.press('cancel');
+ }
+ const h=sortHost(2,1),before=clone(h.state.current());h.G.PSInventory.showBag();h.ready();h.press('shift');h.ready();h.press('cancel');h.ready();assert.equal(h.view().view.cursor,1);assert.deepEqual(h.state.current(),before);h.press('cancel');
+});
+test('CUA-F01 P52-11 cancel release barrier and a second sort preserve live/saved cursor separation',()=>{
+ const h=sortHost(2,1);h.G.PSInventory.showBag();h.ready();moveSort(h,0);
+ h.dom('keydown','Escape');h.tick();h.ready();h.input.trigger.add('cancel');h.tick();assert.ok(h.view());assert.equal(h.view().view.cursor,1);
+ h.dom('keyup','Escape');h.tick();h.press('shift');h.ready();h.press('ok');h.ready();assert.equal(h.view().view.cursor,1);assert.equal(h.state.current().inventory.indices[1],0);
+ h.press('ok');h.ready();h.press('cancel');h.ready();assert.equal(h.view().view.cursor,1);h.press('cancel');assert.equal(h.state.current().inventory.indices[1],0);
+});
 test('P52-33/34/44 real built management embeds party Use without releasing parent or opening boxed use',()=>{
  const h=host();h.G.PSManagement.openParty();h.ready();h.press('ok');h.managementChoose('item');h.managementChoose('use');h.ready();assert.ok(h.G.PSInventory.current());assert.equal(h.G.PSManagement.current().view.kind,'party');assert.equal(h.app.saveBlocked,true);h.pocket(2);h.press('ok');h.choose('use');h.ready();assert.equal(E.inventory.aggregateBag(h.state.current().inventory).potion,2);h.press('ok');h.ready();h.press('cancel');h.ready();assert.equal(h.G.PSInventory.current(),null);assert.equal(h.G.PSManagement.current().view.kind,'party');h.press('cancel');assert.equal(h.app.saveBlocked,false);
 });

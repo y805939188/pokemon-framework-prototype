@@ -31,6 +31,8 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
   readonly application:any;readonly generation:number;readonly handle:Handle;readonly request:Request;
   token='';selection='';giveToken='';selectedTicket:InventoryTicket|null=null;closed=false;ready=false;frame=0;serial=0;window:any;view!:View;error='';text:string[]=[];latch=new InputLatch();
   pocket=1;indices:number[]=Array(8).fill(0);visited=new Set<number>();bag:any;sorting=false;busy=false;operation:any=null;presentationOutcome:InventoryOutcome|null=null;afterMessage:(()=>void)|null=null;cancelWait:(()=>void)|null=null;lastPhase='';
+  // Sort cancellation restores the live row, while indices retain the last moved saved position.
+  restoredSortCursor:number|null=null;
   constructor(request:Request,h:Handle,readonly finish:(o:InventoryOutcome)=>void){this.request=request;this.handle=h;this.application=h.application;this.generation=h.generation;}
   valid(){try{return !this.closed&&!this.handle.done&&active===this&&this.application===app()&&this.generation===this.application.stateGeneration;}catch{return false;}}
   get saveBlocked(){return !!this.selectedTicket||!!this.operation||!!this.giveToken||this.busy||this.view?.kind==='quantity'||this.view?.pending===true;}
@@ -50,7 +52,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
   boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;const pressed=this.sample().pressed;this.latch.arm(pressed);G.Input.clear();G.TouchInput.clear();record({event:'boundary',token:this.handle.id,frame:this.frame,view:this.view?.kind,pressed});}
   set(v:View){this.view=v;this.error='';this.boundary();this.draw();}
   refreshBag(){const bag=this.selection?this.application.itemSelectionView(this.token,this.selection):this.application.inventorySnapshot(this.token,this.request.parent?(it:ItemDefinition)=>this.application.queryItemUse(this.token,it.id,1,this.request.parent!.memberId).ready:undefined);this.bag={...bag,pockets:bag.pockets.map((rows:Omit<InventoryRow,'pocket'>[],pocket:number)=>rows.map(row=>({...row,pocket:pocket+1})))};}
-  bagView(){this.selectedTicket=null;this.refreshBag();const filtered=!!this.selection&&!!this.request.filter||!!this.request.parent;if(filtered&&!this.bag.pockets[this.pocket-1]?.length)this.pocket=nextPocket(this.pocket,1,this.bag.pockets.map((p:any[])=>p.length),true);this.indices[this.pocket-1]=Math.min(this.indices[this.pocket-1]??0,this.bag.pockets[this.pocket-1].length);this.set({kind:'bag',cursor:this.indices[this.pocket-1]!,filtered});}
+  bagView(){this.selectedTicket=null;this.refreshBag();const filtered=!!this.selection&&!!this.request.filter||!!this.request.parent;if(filtered&&!this.bag.pockets[this.pocket-1]?.length)this.pocket=nextPocket(this.pocket,1,this.bag.pockets.map((p:any[])=>p.length),true);this.indices[this.pocket-1]=Math.min(this.indices[this.pocket-1]??0,this.bag.pockets[this.pocket-1].length);this.set({kind:'bag',cursor:Math.min(this.restoredSortCursor??this.indices[this.pocket-1]!,this.bag.pockets[this.pocket-1].length),filtered});}
   flushBrowse(){if(this.selection||this.request.parent||this.request.kind==='use'||this.request.kind==='shop')return;for(const p of new Set([...this.visited].filter(p=>p!==this.pocket).concat(this.pocket))){const r=this.application.inventoryRequest(this.token,this.id(),{kind:'browse',pocket:p,index:Math.min(this.indices[p-1]??0,this.bag.pockets[p-1].length)});if(r.status==='refused')throw Error(why(r));}this.visited.clear();}
   rows(){return this.bag.pockets[this.pocket-1] as InventoryRow[];}
   choose(title:string,items:Choice[],back:()=>void,cursor=0){this.set({kind:'menu',title,items,cursor,back});}
@@ -139,9 +141,9 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
   direction(dir:'up'|'down'|'left'|'right'){
    const v=this.view;if(v.kind==='bag'){
     if(this.sorting){if(dir==='left'||dir==='right')return;const to=Math.max(0,Math.min(this.rows().length-1,v.cursor+(dir==='up'?-1:1))),r=this.application.moveInventorySort(this.token,to);if(r.status==='refused'){this.fail(r,()=>this.close(r));return;}this.indices[this.pocket-1]=to;this.refreshBag();v.cursor=to;}
-    else if(dir==='left'||dir==='right'){this.indices[this.pocket-1]=v.cursor;this.visited.add(this.pocket);this.pocket=nextPocket(this.pocket,dir==='left'?-1:1,this.bag.pockets.map((p:any[])=>p.length),v.filtered);v.cursor=Math.min(this.indices[this.pocket-1]??0,this.rows().length);}
+    else if(dir==='left'||dir==='right'){if(this.restoredSortCursor===null)this.indices[this.pocket-1]=v.cursor;this.visited.add(this.pocket);this.pocket=nextPocket(this.pocket,dir==='left'?-1:1,this.bag.pockets.map((p:any[])=>p.length),v.filtered);v.cursor=Math.min(this.indices[this.pocket-1]??0,this.rows().length);}
     else v.cursor=(v.cursor+(dir==='up'?-1:1)+this.rows().length+1)%(this.rows().length+1);
-    this.indices[this.pocket-1]=v.cursor;if(this.selection)this.application.browseItemSelection(this.token,this.selection,this.pocket,v.cursor);
+    this.restoredSortCursor=null;this.indices[this.pocket-1]=v.cursor;if(this.selection)this.application.browseItemSelection(this.token,this.selection,this.pocket,v.cursor);
    }else if(v.items?.length)v.cursor=(v.cursor+(dir==='up'||dir==='left'?-1:1)+v.items.length)%v.items.length;
    this.draw();
   }
@@ -151,7 +153,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    if(this.selection){this.finishSelection(row.item.id);return;}this.itemMenu(row);
   }else {const it=v.items?.[v.cursor];if(it?.enabled===false){G.SoundManager.playBuzzer();return;}it?.run();}}
   back(){const v=this.view;if(v.kind==='message'){this.use();return;}if(v.kind==='bag'){
-   if(this.sorting){const r=this.application.endInventorySort(this.token,true);this.sorting=false;if(r.status==='refused')this.fail(r);else this.bagView();return;}
+   if(this.sorting){const r=this.application.endInventorySort(this.token,true);this.sorting=false;if(r.status==='refused')this.fail(r);else{this.restoredSortCursor=r.result.index;this.bagView();}return;}
    if(this.selection)this.finishSelection(null);else{this.flushBrowse();this.close({status:'cancelled'});}return;
   }v.back?.();}
   close(result:InventoryOutcome,invalid=false){
