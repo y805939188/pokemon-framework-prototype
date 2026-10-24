@@ -41,6 +41,34 @@ function sortHost(pocket=2,index=1){return host({edit:(g,c)=>{
  g.inventory.lastPocket=pocket;g.inventory.indices[pocket-1]=index;
 }});}
 function moveSort(h,to){h.press('shift');h.ready();assert.equal(h.view().sorting,true);for(let n=0;h.view().view.cursor!==to&&n<10;n++)h.press(h.view().view.cursor>to?'up':'down');assert.equal(h.view().view.cursor,to);}
+test('CUA-F01 P52-11 entry zero or one row and Close ignore ACTION without opening a domain sort',()=>{
+ for(const [pocket,id]of [[1,'leftovers'],[2,'potion'],[8,'box-link']])for(const quantity of [0,1,999]){
+  const h=host({edit:(g,c)=>{g.inventory=E.inventory.inventoryFromBag(quantity?{[id]:quantity}:{},c.items);g.inventory.lastPocket=pocket;}}),before=clone(h.state.current());
+  let calls=0;const begin=h.app.beginInventorySort;h.app.beginInventorySort=(...args)=>{calls++;return begin(...args);};h.G.PSInventory.showBag();h.ready();const writes=h.state.replaced.length;
+  for(let n=0;n<2;n++){h.press('shift');h.ready();assert.equal(h.view().sorting,false);assert.equal(h.view().view.kind,'bag');assert.equal(calls,0);assert.equal(h.state.replaced.length,writes);assert.deepEqual(h.state.current(),before);}
+  h.press('cancel');assert.equal(h.app.saveBlocked,false);
+ }
+ const h=sortHost(2,0);h.G.PSInventory.showBag();h.ready();for(let n=0;n<3;n++)h.press('down');assert.equal(h.view().view.cursor,3);h.press('shift');assert.equal(h.view().sorting,false);h.press('cancel');
+});
+test('CUA-F01 P52-11 entry auto pockets filtered selection parent and shop cannot sort',()=>{
+ for(const pocket of [2,4,5]){
+  const h=host({edit:g=>{g.inventory.pockets[pocket-1]=[{itemId:'potion',quantity:1},{itemId:'antidote',quantity:2}];g.inventory.lastPocket=pocket;},setup:{settings:{BAG_AUTO_SORT:[false,true,false,true,true,false,false,false]}}});
+  h.G.PSInventory.showBag();h.ready();const before=clone(h.state.current()),writes=h.state.replaced.length;h.press('shift');h.ready();assert.equal(h.view().sorting,false);assert.equal(h.state.replaced.length,writes);assert.deepEqual(h.state.current(),before);if(h.view().view.kind==='message'){h.press('ok');h.ready();}h.press('cancel');
+ }
+ for(const filter of [undefined,()=>true]){const h=sortHost();h.G.PSInventory.selectItem(filter);h.pocket(2);h.press('shift');assert.equal(h.view().sorting,false);h.press('cancel');}
+ const h=sortHost();h.G.PSManagement.openParty();h.ready();h.press('ok');h.managementChoose('item');h.managementChoose('use');h.ready();h.pocket(2);h.press('shift');assert.equal(h.view().sorting,false);h.press('cancel');h.ready();assert.equal(h.G.PSInventory.current(),null);h.press('cancel');assert.equal(h.app.saveBlocked,false);
+ const s=sortHost();s.G.PSInventory.openShop({stock:['potion']});s.ready();s.press('shift');assert.equal(s.view().sorting,false);s.press('cancel');
+});
+test('CUA-F01 P52-11 entry counts slots not unique IDs or quantity and preserves all finish paths',()=>{
+ for(const finish of ['cancel','ok','shift']){
+  const h=host({edit:g=>{g.inventory.pockets[1]=[{itemId:'potion',quantity:1},{itemId:'potion',quantity:2}];g.inventory.lastPocket=2;}}),before=clone(h.state.current().inventory.pockets);
+  h.G.PSInventory.showBag();h.ready();moveSort(h,1);assert.deepEqual(h.state.current().inventory.pockets[1].map(r=>r.quantity),[2,1]);h.press(finish);h.ready();assert.equal(h.view().sorting,false);assert.deepEqual(h.state.current().inventory.pockets,finish==='cancel'?before:[...before.slice(0,1),[...before[1]].reverse(),...before.slice(2)]);assert.equal(h.view().view.cursor,finish==='cancel'?0:1);h.press('cancel');h.G.PSInventory.showBag();h.ready();assert.equal(h.view().view.cursor,1);h.press('cancel');
+ }
+});
+test('CUA-F01 P52-11 entry active sorting releases on technical close or generation replacement',()=>{
+ const h=sortHost(2,0),before=clone(h.state.current().inventory.pockets);h.G.PSInventory.showBag();h.ready();moveSort(h,2);h.manager._scene.terminate();h.tick();assert.equal(h.G.PSInventory.current(),null);assert.deepEqual(h.state.current().inventory.pockets,before);assert.equal(h.state.current().inventory.indices[1],2);h.G.PSInventory.showBag();h.ready();assert.equal(h.view().view.cursor,2);h.press('cancel');
+ const g=sortHost(2,0);g.G.PSInventory.showBag();g.ready();moveSort(g,1);const replacement=clone(g.state.current());replacement.money=4321;g.app.stateReplacedByHost();g.state.replace(replacement);g.tick();assert.equal(g.G.PSInventory.current(),null);assert.deepEqual(g.state.current(),replacement);assert.equal(g.app.saveBlocked,false);
+});
 test('CUA-F01 P52-11 cancel restores the live row but close/reopen retains the last saved index',()=>{
  for(const [pocket,start,end]of [[2,1,0],[2,0,2],[1,0,1]]){
   const h=sortHost(pocket,start),before=clone(h.state.current()),order=before.inventory.pockets[pocket-1];h.G.PSInventory.showBag();h.ready();moveSort(h,end);

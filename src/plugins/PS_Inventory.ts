@@ -133,7 +133,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
     if(v.kind==='quantity'){const q=quantityStep(v.value,v.maximum,f,v.shop);v.value=q.value;if(q.done)v.done(q.value);else this.draw();return;}
     if(f.triggered.back){this.back();return;}
     if(f.triggered.use){this.use();return;}
-    if(v.kind==='bag'&&f.triggered.action){if(!this.selection&&!this.request.parent&&v.cursor<this.rows().length){const r=this.sorting?this.application.endInventorySort(this.token):this.application.beginInventorySort(this.token,this.pocket,v.cursor);if(r.status==='refused')this.fail(r);else{this.sorting=!this.sorting;this.boundary();this.draw();}}return;}
+    if(v.kind==='bag'&&f.triggered.action){if(!this.selection&&!this.request.parent&&v.cursor<this.rows().length){if(!this.sorting&&this.rows().length<2)return;const r=this.sorting?this.application.endInventorySort(this.token):this.application.beginInventorySort(this.token,this.pocket,v.cursor);if(r.status==='refused')this.fail(r);else{this.sorting=!this.sorting;this.boundary();this.draw();}}return;}
     const direction=(['up','down','left','right']as const).find(k=>f.repeated[k]);if(direction)this.direction(direction);
     const now=G.performance?.now?.()??Date.now(),phase=[animationPhase(now,8,.1),animationPhase(now,4,.15),itemIconFrame(now,192,48)].join(':');if(phase!==this.lastPhase){this.lastPhase=phase;this.draw();}
    }catch(error){this.fatal(error);}

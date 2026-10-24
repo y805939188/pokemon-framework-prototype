@@ -55,3 +55,19 @@ test('P52-11/28/30: filtered views cannot sort; failed cancellation retries and 
  x.app.inventorySnapshot(t);x.app.beginInventorySort(t,2,0);x.app.moveInventorySort(t,1);x.state.failReplace=Error('cancel install failed');assert.equal(x.app.endInventorySort(t,true).status,'refused');x.state.failReplace=null;assert.equal(x.app.endInventorySort(t,true).status,'committed');assert.equal(x.state.current().inventory.pockets[1][0].itemId,'potion');
  x.app.beginInventorySort(t,2,0);x.app.moveInventorySort(t,1);x.state.failReplace=Error('close install failed');assert.equal(x.app.endInventoryOperation(t).status,'refused');x.state.failReplace=null;const next=x.app.beginInventoryOperation();assert.notEqual(next,t);x.app.endInventoryOperation(next);
 });
+test('CUA-F01 P52-11 entry public API rejects single slots without leaving a sorting owner',()=>{
+ for(const quantity of [0,1,999]){
+  const x=setup(),g=clone(x.state.current());g.inventory=I.inventoryFromBag(quantity?{potion:quantity}:{},x.content.items);x.state.replace(g);const t=x.app.beginInventoryOperation(),before=clone(x.state.current()),writes=x.state.replaced.length;
+  const r=x.app.beginInventorySort(t,2,0);assert.equal(r.status,'refused');assert.equal(r.reason,quantity?'sorting-disabled':'invalid-slot');assert.equal(x.state.replaced.length,writes);assert.deepEqual(x.state.current(),before);assert.equal(x.app.moveInventorySort(t,0).reason,'stale-sort');assert.equal(x.app.endInventoryOperation(t).status,'unchanged');
+ }
+ const x=setup(),g=clone(x.state.current());g.inventory.pockets[1]=[{itemId:'potion',quantity:1},{itemId:'potion',quantity:2}];x.state.replace(g);const t=x.app.beginInventoryOperation();assert.equal(x.app.beginInventorySort(t,2,0).status,'unchanged');assert.equal(x.app.moveInventorySort(t,1).status,'committed');assert.equal(x.app.endInventorySort(t,true).result.index,0);assert.deepEqual(x.state.current().inventory.pockets[1],g.inventory.pockets[1]);assert.equal(x.state.current().inventory.indices[1],1);x.app.endInventoryOperation(t);
+});
+test('CUA-F01 P52-11 entry public API keeps invalid auto filtered and non-bag context guards',()=>{
+ const x=setup(),t=x.app.beginInventoryOperation(),before=clone(x.state.current()),writes=x.state.replaced.length;
+ for(const p of [0,9,NaN,1.5])assert.equal(x.app.beginInventorySort(t,p,0).reason,'sorting-disabled');
+ for(const i of [-1,NaN,.5,before.inventory.pockets[1].length])assert.equal(x.app.beginInventorySort(t,2,i).reason,'invalid-slot');
+ for(const p of [4,5])assert.equal(x.app.beginInventorySort(t,p,0).reason,'sorting-disabled');assert.equal(x.app.beginInventorySort(t,2,0,true).reason,'sorting-disabled');
+ const selection=x.app.beginItemSelection(t);assert.equal(x.app.beginInventorySort(t,2,0).reason,'sorting-disabled');x.app.finishItemSelection(t,selection,'cancel-selection',null);assert.equal(x.state.replaced.length,writes);assert.deepEqual(x.state.current(),before);
+ assert.equal(x.app.beginInventorySort(t,2,0).status,'unchanged');assert.equal(x.app.beginInventorySort(t,2,0).reason,'sorting-disabled');assert.equal(x.app.beginInventorySort('stale',2,0).reason,'stale-operation');assert.equal(x.app.moveInventorySort(t,1).status,'committed');assert.equal(x.app.endInventorySort(t,true).status,'committed');x.app.endInventoryOperation(t);
+ for(const kind of ['item','shop']){const y=setup(),token=kind==='shop'?y.app.beginMoneyShop({stock:['potion']}):y.app.beginInventoryOperation('item'),snapshot=clone(y.state.current());assert.equal(y.app.beginInventorySort(token,2,0).reason,'sorting-disabled');assert.deepEqual(y.state.current(),snapshot);y.app.endInventoryOperation(token);}
+});

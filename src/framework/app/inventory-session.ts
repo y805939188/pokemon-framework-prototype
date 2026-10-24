@@ -223,6 +223,7 @@ export class InventorySession {
       const {game,content,context}=this.current(token);
       if(context.kind!=='bag'||filtered||this.filtering||this.sorting||this.pendingUse||this.selection||this.tossPending||this.readingProjection)throw new Error('sorting-disabled');
       moveInventorySlot(game.inventory,pocket,index,index,inventoryPolicy(content,this.options.limits));
+      if(game.inventory.pockets[pocket-1]!.length<2)throw new Error('sorting-disabled');
       this.sorting={pocket,start:index,cursor:index,order:game.inventory.pockets[pocket-1]!.map((_,i)=>i),revision:String(this.revision)};
       return {status:'unchanged',result:{pocket,index}};
     }catch(error){return {status:'refused',reason:reason(error),error:message(error)};}
