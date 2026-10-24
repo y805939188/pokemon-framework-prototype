@@ -58,8 +58,9 @@ test('D-02 capture outcomes always resolve: success, write failure, capture thro
    ok:await c(base({write:(f,b)=>writes.push([f,b])}),'/e/a.png'),
    write:await c(base({write:()=>{throw new Error('disk full')}}),'/e/b.png'),
    capture:await c(base({capture:()=>{throw new Error('no window')}}),'/e/c.png')};
-  const hang=c(base({capture:d=>{late=d}}),'/e/d.png',2000);timers.at(-1).fn();r.hang=await hang;late('png');
-  r.timerMs=timers.at(-1).ms;r.writes=writes;console.log(JSON.stringify(r));`));
+  const before=timers.length,hang=c(base({capture:d=>{late=d},write:(f,b)=>writes.push([f,b])}),'/e/d.png',2000),timer=timers.length>before?timers.at(-1):null;
+  if(timer){timer.fn();r.hang=await hang;}else r.hang='no timeout registered';late('png');
+  r.timerMs=timer?.ms;r.writes=writes;console.log(JSON.stringify(r));`));
  assert.deepEqual(out.ok,{ok:true});assert.deepEqual(out.writes,[['/e/a.png','png']],'the late callback after the timeout wrote nothing');
  assert.deepEqual(out.write,{ok:false,error:'screenshot write failed: disk full'});
  assert.deepEqual(out.capture,{ok:false,error:'screenshot capture failed: no window'});
@@ -77,7 +78,8 @@ const STUB=`#!/usr/bin/env node
 const fs=require('fs'),path=require('path');const a=process.argv.slice(2),arg=n=>(a.find(x=>x.startsWith('--'+n+'='))||'').slice(n.length+3);
 const out=arg('ps-flow-out'),mode=arg('ps-flow-test'),saves=arg('ps-save-dir');fs.mkdirSync(path.dirname(out),{recursive:true});
 if(mode==='all'){fs.mkdirSync(saves,{recursive:true});fs.writeFileSync(path.join(saves,'file14.rmmzsave'),'save');for(const n of ['ps-flow-expected.json','ps-flow-expected-t31.json'])fs.writeFileSync(path.join(path.dirname(out),n),JSON.stringify({n}));}
-fs.writeFileSync(out,JSON.stringify({overall:'pass',results:[{id:'stub',status:'pass'}],argv:a}));`;
+if(mode==='driver-selftest'){fs.writeFileSync(out,JSON.stringify({overall:'fail',results:[{id:'DS-01/x injected',status:'fail'},{id:'DS-99 control',status:process.env.STUB_DS99||'pass'}],argv:a}));process.exit(0);}
+fs.writeFileSync(out,JSON.stringify({overall:process.env.STUB_OVERALL||'pass',results:[{id:'stub',status:process.env.STUB_OVERALL||'pass'}],argv:a}));`;
 function runner(){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ps52-d03-')),nw=path.join(dir,'nw');fs.writeFileSync(nw,STUB,{mode:0o755});fs.mkdirSync(path.join(dir,'game'));
  const run=(evid,mode,env={})=>{const r=spawnSync('bash',[path.join(ROOT,'scripts/run-inventory-test-mac.sh'),path.join(dir,evid),mode],{encoding:'utf8',env:{...process.env,PF_OWNED_NW:nw,PF_OWNED_PROJECT:path.join(dir,'game'),PF_OWNED_SKIP_BUILD:'1',...env}});
@@ -110,7 +112,7 @@ test('D-03 missing source, missing or changed expected files, wrong directory an
   fs.mkdirSync(path.join(r.dir,'empty'));refused('empty-saves',{PF_OWNED_EXPECTED:src,PF_OWNED_SAVES:path.join(r.dir,'empty')},/saves directory missing or empty/);
   const t31=path.join(src,'ps-flow-expected-t31.json'),bytes=fs.readFileSync(t31);
   fs.writeFileSync(t31,'{"n":"edited after the run"}');refused('changed',{PF_OWNED_EXPECTED:src,PF_OWNED_SAVES:saves},/changed since it was produced/);
-  fs.rmSync(t31);refused('missing',{PF_OWNED_EXPECTED:src,PF_OWNED_SAVES:saves},/expected-state file missing/);
+  fs.rmSync(t31);refused('missing',{PF_OWNED_EXPECTED:src,PF_OWNED_SAVES:saves},/differ from the recorded/);
   fs.writeFileSync(t31,bytes);assert.equal(r.run('restored','verify-save',{PF_OWNED_EXPECTED:src,PF_OWNED_SAVES:saves}).exit,0,'original bytes are accepted again');
  }finally{r.cleanup();}
 });
@@ -129,7 +131,7 @@ test('P-01 plain data from another realm fingerprints like local plain data; non
  const E=require(path.join(ROOT,'js/engine/build/engine.cjs')),fp=E.semantic.semanticFingerprint;
  const shape='({kind:"use-item",itemId:"potion",quantity:1,answers:{learning:[{kind:"decline"}]},list:[1,{a:null}]})';
  const foreign=vm.runInNewContext(shape);assert.notEqual(Object.getPrototypeOf(foreign),Object.prototype,'really another realm');
- assert.equal(fp(foreign),fp(eval(shape)));assert.equal(fp(vm.runInNewContext('Object.create(null)')),fp({}));
+ assert.doesNotThrow(()=>fp(foreign),'another realm\'s plain object is plain data');assert.equal(fp(foreign),fp(eval(shape)));assert.equal(fp(vm.runInNewContext('Object.create(null)')),fp({}));
  const ctx=vm.createContext({});
  for(const [source,error] of [['new Map()','nonplain-intent'],['new Date(0)','nonplain-intent'],['new (class A{})()','nonplain-intent'],['Object.create({})','nonplain-intent'],['({x:new Set()})','nonplain-intent'],['({get a(){return 1}})','intent-accessor'],['({n:NaN})','invalid-intent-number'],['(()=>{const o={};o.o=o;return o})()','cyclic-intent']])
   assert.throws(()=>fp(vm.runInContext(source,ctx)),new RegExp(error),source);
@@ -160,4 +162,33 @@ test('D-06/D-07 source wiring guard: bag comparisons ignore key order, fixtures 
  assert.ok(s.includes("const I6 = {rawBagOf:(game:any):any=>game.inventory?api().inventory.aggregateBag(game.inventory):game.bag,bagOf:(game:any):any=>{const bag=I6.rawBagOf(game);return bag&&Object.fromEntries(Object.keys(bag).sort().map(k=>[k,bag[k]]));},"),'sorted comparison view');
  assert.ok(s.includes('setItemCount:(game:any,id:string,n:number):number=>{const bag=I6.rawBagOf(game);')&&s.includes('bag: clone(I6.rawBagOf(g))'),'fixture edits and legacy documents keep the inventory order');
  assert.ok(s.includes('delete raw.nextMemberOrdinal;raw.bag=I6.rawBagOf(healthy);delete raw.inventory;delete raw.badges;'),'U51-14 schema-4 document');
+});
+
+test('F-03/F-04 hardening: a throwing clearTimer still resolves the capture; a stalled hold still releases the key',()=>{
+ const out=JSON.parse(strip(`import {captureScreenshot as c} from './src/plugins/flowtest/evidence.ts';import {pressKey} from './src/plugins/flowtest/timing.ts';
+  const r=await Promise.race([c({capture:d=>d('png'),write:()=>{},setTimer:()=>1,clearTimer:()=>{throw new Error('clear failed')}},'/e/a.png'),new Promise(res=>setTimeout(()=>res('hung'),2000))]);
+  let t=0;const sent=[];const p={clock:{game:0,ticks:0},sleep:()=>{t+=1000;return Promise.resolve();},now:()=>t};
+  const press=await pressKey(p,type=>sent.push(type)).then(()=>'resolved',e=>e.message);
+  console.log(JSON.stringify({r,sent,press}));`));
+ assert.deepEqual(out.r,{ok:true});assert.deepEqual(out.sent,['keydown','keyup'],'keyup is sent even though the hold wait failed');
+ assert.match(out.press,/^scene loop stopped while waiting key hold/);
+});
+test('F-05/F-06 restart contract: path-like names, unrecorded files, failed producers and malformed records refuse before launch',()=>{
+ const r=runner();try{r.run('all','all');const src=path.join(r.dir,'all'),saves=path.join(src,'saves'),launch=path.join(src,'launch.json'),original=fs.readFileSync(launch,'utf8');
+  const refused=(evid,env,re)=>{const v=r.run(evid,'verify-save',env);assert.equal(v.exit,2,v.out);assert.equal(v.report,null,'nothing launched');assert.equal(v.launch.status,'preflight-refused');assert.match(v.launch.reason,re);};
+  const env={PF_OWNED_EXPECTED:src,PF_OWNED_SAVES:saves};
+  const forged=JSON.parse(original);forged.producedExpected={'../outside.json':'0'.repeat(64)};fs.writeFileSync(launch,JSON.stringify(forged));refused('dotdot',env,/plain ps-flow-expected\*\.json names/);
+  forged.producedExpected={[path.join(src,'ps-flow-expected.json')]:'0'.repeat(64)};fs.writeFileSync(launch,JSON.stringify(forged));refused('absolute',env,/plain ps-flow-expected\*\.json names/);
+  fs.writeFileSync(launch,'[]');refused('array',env,/not an object/);
+  fs.writeFileSync(launch,original);fs.writeFileSync(path.join(src,'ps-flow-expected-t26.json'),'{}');refused('unrecorded',env,/differ from the recorded/);fs.rmSync(path.join(src,'ps-flow-expected-t26.json'));
+  assert.equal(r.run('again','verify-save',env).exit,0,'the untouched producer is accepted');
+  const failed=r.run('failed','all',{STUB_OVERALL:'fail'});assert.equal(failed.exit,1);assert.equal(failed.launch.overall,'fail');
+  refused('from-failed',{PF_OWNED_EXPECTED:path.join(r.dir,'failed'),PF_OWNED_SAVES:path.join(r.dir,'failed','saves')},/producing run did not pass/);
+ }finally{r.cleanup();}
+});
+test('F-10 driver-selftest: overall stays fail by design, the exit code and selftestControl follow DS-99',()=>{
+ const r=runner();try{
+  const ok=r.run('st-ok','driver-selftest');assert.equal(ok.exit,0,ok.out);assert.equal(ok.launch.overall,'fail');assert.equal(ok.launch.selftestControl,'pass');
+  const bad=r.run('st-bad','driver-selftest',{STUB_DS99:'fail'});assert.equal(bad.exit,1);assert.equal(bad.launch.selftestControl,'fail');
+ }finally{r.cleanup();}
 });

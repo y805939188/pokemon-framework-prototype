@@ -5,9 +5,9 @@ function build(){if(bundles)return;dir=fs.mkdtempSync(path.join(os.tmpdir(),'ps5
 function disposeBuild(){if(dir)fs.rmSync(dir,{recursive:true,force:true});bundles=null;dir=null;}
 function host(options={}){
  build();const x=setup({bag:{potion:3,rarecandy:2,ether:2,pokeball:20},variables:{count:()=>G.$dataSystem.variables.length-1,write:(id,value)=>G.$gameVariables.setValue(id,value)},edit:(g,c)=>{g.money=5000;g.party[0].hp=1;c.items.pokeball.price=200;c.items.pokeball.sellPrice=100;c.items.potion.price=300;c.items.potion.sellPrice=150;c.species.Charizard.learnset={51:['Slash']};options.edit?.(g,c);},...options.setup});
- // Node vm objects have another prototype. Only data requests cross this harness seam as
- // JSON-equivalent plain objects; no behavior/status/port faults are stubbed or rewritten.
- const app=new Proxy(x.app,{get(target,key){const v=target[key];if(typeof v!=='function')return v;return(...args)=>v.apply(target,args);}}); // requests cross from the plugin VM realm unchanged, as under NW.js (5.2 P-01)
+ // Plugin objects come from the vm realm (another Object.prototype), exactly like NW.js plugins versus the required
+ // engine; the proxy only binds methods, it never clones or rewrites requests, statuses or port faults (5.2 P-01).
+ const app=new Proxy(x.app,{get(target,key){const v=target[key];if(typeof v!=='function')return v;return(...args)=>v.apply(target,args);}});
  const listeners={},events={},commands={},messages=[],vars={},input={trigger:new Set(),repeat:new Set(),pressed:new Set(),keyMapper:{},isTriggered(k){return this.trigger.has(k)},isRepeated(k){return this.repeat.has(k)},isPressed(k){return this.pressed.has(k)},clear(){this.trigger.clear();this.repeat.clear();this.pressed.clear()}};
  const drawCalls=[];let windowFailures=options.windowFailures??0,attachFailures=options.attachFailures??0,destroyed=0,drawFault=null;
  function Base(){}for(const m of ['initialize','create','start','update','terminate'])Base.prototype[m]=function(){};

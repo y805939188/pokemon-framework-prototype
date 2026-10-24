@@ -33,7 +33,11 @@ export function fileInside(dir: string, name: string, path: PathLike): string {
 export function captureScreenshot(p: CapturePorts, file: string, timeoutMs = 10000): Promise<CaptureResult> {
   return new Promise((resolve) => {
     let settled = false, timer: unknown;
-    const finish = (result: CaptureResult) => { if (settled) return; settled = true; p.clearTimer(timer); resolve(result); };
+    const finish = (result: CaptureResult) => {
+      if (settled) return;
+      settled = true; resolve(result);
+      try { p.clearTimer(timer); } catch { /* a stray timer only calls finish again, which is ignored */ }
+    };
     timer = p.setTimer(() => finish({ ok: false, error: `screenshot callback did not return within ${timeoutMs} ms` }), timeoutMs);
     try {
       p.capture((buffer) => {

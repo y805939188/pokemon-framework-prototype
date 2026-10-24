@@ -37,7 +37,7 @@ export async function waitUntil(p: WaitPorts, cond: () => boolean, describe: () 
 export async function pressKey(p: WaitPorts, dispatch: KeyDispatch, hold = 3, release = 2): Promise<void> {
   if (!Number.isInteger(hold) || hold < 1 || !Number.isInteger(release) || release < 1) throw new Error('a key press needs at least one held and one released game frame');
   dispatch('keydown');
-  await waitGameFrames(p, hold, 'key hold');
-  dispatch('keyup');
+  try { await waitGameFrames(p, hold, 'key hold'); }
+  finally { dispatch('keyup'); } // a stalled loop must not leave the key held for the next scenario
   await waitGameFrames(p, release, 'key release');
 }
