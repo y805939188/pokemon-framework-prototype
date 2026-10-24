@@ -13,6 +13,7 @@ const cases=[
  ['pocket-switch-overwrites-saved-index','if(this.restoredSortCursor===null)this.indices[this.pocket-1]=v.cursor;this.visited.add','this.indices[this.pocket-1]=v.cursor;this.visited.add','pocket switches keep'],
  ['navigation-keeps-stale-live-cursor','this.restoredSortCursor=null;this.indices[this.pocket-1]=v.cursor;if(this.selection)','this.indices[this.pocket-1]=v.cursor;if(this.selection)','ordinary navigation replaces'],
  ['cancel-confirms-order','endInventorySort(this.token,true)','endInventorySort(this.token,false)','cancel restores the live row'],
+ ['clamped-sort-still-moves','if(to===v.cursor)return;','','R1 clamped directions'],
 ].map(([id,before,after,target])=>({id,before,after,target:'CUA-F01 P52-11 '+target}));
 const build=id=>{const r=run('pnpm',['--dir','src','build']);fs.writeFileSync(path.join(out,id+'.build.log'),(r.stdout||'')+(r.stderr||''));return {exit:r.status,signal:r.signal,error:r.error?.message};};
 const declared=(fs.readFileSync(path.join(root,suite),'utf8').match(/^test\('CUA-F01 /gm)||[]).length;

@@ -140,7 +140,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
   }
   direction(dir:'up'|'down'|'left'|'right'){
    const v=this.view;if(v.kind==='bag'){
-    if(this.sorting){if(dir==='left'||dir==='right')return;const to=Math.max(0,Math.min(this.rows().length-1,v.cursor+(dir==='up'?-1:1))),r=this.application.moveInventorySort(this.token,to);if(r.status==='refused'){this.fail(r,()=>this.close(r));return;}this.indices[this.pocket-1]=to;this.refreshBag();v.cursor=to;}
+    if(this.sorting){if(dir==='left'||dir==='right')return;const to=Math.max(0,Math.min(this.rows().length-1,v.cursor+(dir==='up'?-1:1)));if(to===v.cursor)return;const r=this.application.moveInventorySort(this.token,to);if(r.status==='refused'){this.fail(r,()=>this.close(r));return;}this.indices[this.pocket-1]=to;this.refreshBag();v.cursor=to;}
     else if(dir==='left'||dir==='right'){if(this.restoredSortCursor===null)this.indices[this.pocket-1]=v.cursor;this.visited.add(this.pocket);this.pocket=nextPocket(this.pocket,dir==='left'?-1:1,this.bag.pockets.map((p:any[])=>p.length),v.filtered);v.cursor=Math.min(this.indices[this.pocket-1]??0,this.rows().length);}
     else v.cursor=(v.cursor+(dir==='up'?-1:1)+this.rows().length+1)%(this.rows().length+1);
     this.restoredSortCursor=null;this.indices[this.pocket-1]=v.cursor;if(this.selection)this.application.browseItemSelection(this.token,this.selection,this.pocket,v.cursor);

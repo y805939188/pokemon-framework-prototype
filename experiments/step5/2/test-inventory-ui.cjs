@@ -80,6 +80,28 @@ test('CUA-F01 P52-11 cancel release barrier and a second sort preserve live/save
  h.dom('keyup','Escape');h.tick();h.press('shift');h.ready();h.press('ok');h.ready();assert.equal(h.view().view.cursor,1);assert.equal(h.state.current().inventory.indices[1],0);
  h.press('ok');h.ready();h.press('cancel');h.ready();assert.equal(h.view().view.cursor,1);h.press('cancel');assert.equal(h.state.current().inventory.indices[1],0);
 });
+test('CUA-F01 P52-11 R1 clamped directions make no move call or write before any sort finish',()=>{
+ for(const [start,end,direction]of [[0,2,'up'],[2,0,'down']])for(const finish of ['cancel','ok','shift']){
+  const h=sortHost(2,start),original=clone(h.state.current());h.G.PSInventory.showBag();h.ready();moveSort(h,end);h.press('cancel');h.ready();
+  let moves=0;const move=h.app.moveInventorySort;h.app.moveInventorySort=(...args)=>{moves++;return move(...args);};
+  h.press('shift');h.ready();const before=clone(h.state.current()),writes=h.state.replaced.length;h.press(direction);h.press(direction);
+  assert.equal(moves,0,'a clamped direction must not call the domain move');assert.equal(h.state.replaced.length,writes,'no position change means no installation');assert.deepEqual(h.state.current(),before);
+  assert.equal(h.view().view.cursor,start);assert.equal(h.state.current().inventory.indices[1],end);
+  h.press(finish);h.ready();assert.equal(h.view().sorting,false);assert.equal(h.view().view.cursor,start);assert.equal(h.state.current().inventory.indices[1],end);
+  h.press('ok');h.ready();h.press('cancel');h.ready();assert.equal(h.view().view.cursor,start);h.press('right');h.press('left');assert.equal(h.view().view.cursor,end);
+  h.press('cancel');const expected=clone(original);expected.inventory.indices[1]=end;assert.deepEqual(h.state.current(),expected);
+  h.G.PSInventory.showBag();h.ready();assert.equal(h.view().view.cursor,end);h.press('cancel');
+ }
+});
+test('CUA-F01 P52-11 R1 a real second move still writes once after ignored directions',()=>{
+ for(const [start,end,clamped,actual]of [[0,2,'up','down'],[2,0,'down','up']])for(const finish of ['cancel','ok','shift']){
+  const h=sortHost(2,start),original=clone(h.state.current().inventory.pockets);h.G.PSInventory.showBag();h.ready();moveSort(h,end);h.press('cancel');h.ready();h.press('shift');h.ready();
+  h.press(clamped);h.press('left');h.press('right');assert.equal(h.view().view.cursor,start);assert.equal(h.state.current().inventory.indices[1],end);
+  const writes=h.state.replaced.length;h.press(actual);assert.equal(h.state.replaced.length,writes+1);assert.equal(h.view().view.cursor,1);assert.equal(h.state.current().inventory.indices[1],1);
+  const moved=clone(h.state.current().inventory.pockets);h.press(finish);h.ready();assert.equal(h.view().view.cursor,finish==='cancel'?start:1);assert.equal(h.state.current().inventory.indices[1],1);
+  assert.deepEqual(h.state.current().inventory.pockets,finish==='cancel'?original:moved);h.press('cancel');h.G.PSInventory.showBag();h.ready();assert.equal(h.view().view.cursor,1);h.press('cancel');
+ }
+});
 test('P52-33/34/44 real built management embeds party Use without releasing parent or opening boxed use',()=>{
  const h=host();h.G.PSManagement.openParty();h.ready();h.press('ok');h.managementChoose('item');h.managementChoose('use');h.ready();assert.ok(h.G.PSInventory.current());assert.equal(h.G.PSManagement.current().view.kind,'party');assert.equal(h.app.saveBlocked,true);h.pocket(2);h.press('ok');h.choose('use');h.ready();assert.equal(E.inventory.aggregateBag(h.state.current().inventory).potion,2);h.press('ok');h.ready();h.press('cancel');h.ready();assert.equal(h.G.PSInventory.current(),null);assert.equal(h.G.PSManagement.current().view.kind,'party');h.press('cancel');assert.equal(h.app.saveBlocked,false);
 });
