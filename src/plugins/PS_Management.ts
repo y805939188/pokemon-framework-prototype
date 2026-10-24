@@ -35,6 +35,22 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
  document.addEventListener('keyup',(e:any)=>{nativeConsumed.delete(nativeKey(e));keyboardKeys.delete(physicalCode(e));});
  window.addEventListener('blur',()=>{nativeConsumed.clear();keyboardKeys.clear();if(current){current.physical.clear();for(const key of Object.keys(ALIAS))current.latch.release(key);}});
  const debugFrames:any[]=[];
+ let inventorySampleFrame=-1,inventorySample:InputFrame={pressed:{},triggered:{},repeated:{}};
+ const inventoryDomStarts=new Map<Action|Direction,number>();
+ function inventoryInputFrame():InputFrame {
+  const frame=G.Graphics.frameCount??0;
+  if(frame!==inventorySampleFrame){
+   inventorySampleFrame=frame;const sample:InputFrame={pressed:{},triggered:{},repeated:{}},dom=new Set([...keyboardKeys.values(),...nativeConsumed.values()]);
+   for(const key of Object.keys(ALIAS)as(Action|Direction)[]){
+    const was=inventoryDomStarts.has(key);if(dom.has(key)&&!was)inventoryDomStarts.set(key,frame);else if(!dom.has(key))inventoryDomStarts.delete(key);
+    const edge=dom.has(key)&&!was,age=frame-(inventoryDomStarts.get(key)??frame),repeat=edge||dom.has(key)&&age>=(G.Input.keyRepeatWait??24)&&(age-(G.Input.keyRepeatWait??24))%(G.Input.keyRepeatInterval??6)===0;
+    sample.pressed[key]=dom.has(key)||G.Input.isPressed(ALIAS[key]);
+    if(['up','left','right','down'].includes(key))sample.repeated[key as Direction]=repeat||G.Input.isRepeated(ALIAS[key]);else sample.triggered[key as Action]=edge||G.Input.isTriggered(ALIAS[key]);
+   }
+   if(G.TouchInput.isCancelled())sample.triggered.back=true;inventorySample=sample;
+  }
+  return {pressed:{...inventorySample.pressed},triggered:{...inventorySample.triggered},repeated:{...inventorySample.repeated}};
+ }
  function record(data:any){debugFrames.push(data);if(debugFrames.length>256)debugFrames.shift();}
  function open(request:OpenRequest):boolean {if(current||nextRequest)return false;nextRequest=request;G.SceneManager.push(Scene_PSManagement);return true;}
  function boxTitle(s:ManagementSnapshot,box:number):string{return s.storage.boxes[box]?.name||tr('box',{n:box+1});}
@@ -44,13 +60,14 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
   openReceiving:(done?:(result:any)=>void)=>open({kind:'receiving',done}),
   replaceBattleWithReceiving:()=>{if(current||nextRequest)return false;nextRequest={kind:'receiving'};G.SceneManager.goto(Scene_PSManagement);return true;},
   current:()=>current&&!current.closed&&current.top()?{token:current.token,generation:current.generation,ready:current.ready,text:[...current.renderedText],view:{...current.top(),items:current.top().items?.map((x:MenuItem)=>({key:x.key,label:x.label,enabled:x.enabled}))},heldId:current.snapshot?.held?.id??null,frames:[...debugFrames]}:null,
-  hasBoxLink:()=>false, // explicit developer predicate; item acquisition belongs to 5.2
+  inputFrame:inventoryInputFrame,
+  hasBoxLink:()=>app().hasBoxLink?.()??false, // default reads authoritative inventory; explicit developer override stays process-local
   retryReceiving:()=>{if(!app().pendingReceiving)return false;return open({kind:'receiving'});},
  };
  class Controller {
   scene:any;window:any;request:OpenRequest;application:any;token='';generation:number;ready=false;started=false;closed=false;frame=0;serial=0;
   renderedText:string[]=[];snapshot!:ManagementSnapshot;stack:View[]=[];latch=new InputLatch();physical=new Set<Action|Direction>();input:any=null;composition=false;error='';qualified=new Set<string>();
-  storageQuick=false;
+  storageQuick=false;inventoryChild:any=null;
   reception:any=null;decisions:Record<string,ReceivingDecision>={};receiveIndex=0;readonly=false;completion:any=null;
   onKeyDown=(e:any)=>{const key=eventKey(e);if(key)this.physical.add(key);};
   // keyup clears only its DOM source. The next merged frame releases the latch after gamepad polling.
@@ -130,7 +147,7 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
    items.push({key:'cancel',label:tr('cancel'),run:()=>this.back()});this.menu(memberName(m),items);
   }
   itemMenu(id:string){const m=this.find(id);if(!m)return;const source=this.reference(id);this.menu(tr('item'),[
-   {key:'use',label:tr('use'),enabled:false,run:()=>this.fail(tr('useLater'))},
+   {key:'use',label:tr('use'),enabled:!!W.PSInventory&&source.position.kind==='party'&&!m.isEgg&&!this.snapshot.held,run:()=>{this.back();this.inventoryChild=W.PSInventory.attach(this.window,{token:this.managementToken,memberId:id},()=>{this.inventoryChild=null;if(this.valid()){this.boundary();this.refresh();}});}},
    {key:'give',label:tr('give'),enabled:this.snapshot.heldSourcesEnabled&&!m.isEgg,run:()=>{this.back();const items=app().holdableBagItems().map((it:any)=>({key:it.id,label:it.id+' ×'+it.count,run:()=>{this.back();if(m.item)this.confirm(tr('give')+' '+it.id+' → '+memberName(m),()=>this.operate({kind:'give-item',source,item:it.id}));else this.operate({kind:'give-item',source,item:it.id});}}));this.menu(tr('give'),[...items,{key:'cancel',label:tr('cancel'),run:()=>this.back()}]);}},
    {key:'take',label:tr('take'),enabled:!!m.item&&!m.mail,run:()=>{this.back();this.operate({kind:'take-item',source});}},
    {key:'move',label:tr('move'),enabled:this.snapshot.heldSourcesEnabled&&!!m.item&&!m.mail,run:()=>{this.back();const v=this.top();v.itemSource={source,item:m.item};this.boundary();this.draw();}},
@@ -171,6 +188,7 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
   resolveReceive(){const token=this.reception.token,result=flow().resolveReceiving(token,this.decisions);if(!this.valid())return;if(pending(result)||result.status==='refused'){this.stack=[];this.menu(tr('saveFailed'),[{key:'retry',label:tr('recover'),run:()=>this.resolveReceive()}]);this.fail(result.reason||result.error||'pending');return;}const ids=this.reception.members.map((m:Member)=>m.id);for(const decision of Object.values(this.decisions))if(decision.placement?.kind==='replace')ids.push(decision.placement.target.id);try{flow().notifyReceived?.(ids,result.battleId??token);}catch(e){console.error(NAME,'committed placement message failed',e);}this.completion=result;this.close(result);}
   update(){
    if(!this.valid()){if(!this.closed){this.closed=true;this.removeInput();this.scene._invalid=true;}return;}
+   if(this.inventoryChild){this.inventoryChild.update();return;}
    if(!this.top()||!this.started||this.top()?.kind==='text')return;
    const frame=G.Graphics.frameCount??++this.frame;if(!this.ready&&(frame<=this.frame||G.SceneManager.isSceneChanging()))return;
    const sample:InputFrame={repeated:{},triggered:{},pressed:{}};
@@ -252,11 +270,12 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
    this.closed=true;this.removeInput();this.completion=result;this.scene._result=result;this.scene._done=this.request.done;
    if(G.SceneManager._scene===this.scene)this.scene.popScene();
   }
-  dispose(){document.removeEventListener('keydown',this.onKeyDown);document.removeEventListener('keyup',this.onKeyUp);this.removeInput();
+  dispose(){this.inventoryChild?.close({status:'cancelled'},true);this.inventoryChild=null;document.removeEventListener('keydown',this.onKeyDown);document.removeEventListener('keyup',this.onKeyUp);this.removeInput();
    if(!this.closed&&this.application===flow()._app&&this.generation===this.application.stateGeneration){if(this.managementToken){this.application.manage(this.managementToken,'cleanup-'+(++this.serial),{kind:'cancel-held'});this.application.endManagement(this.managementToken);}else if(this.reception&&this.application.pendingReceiving?.token===this.reception.token){const result=flow().resolveReceiving(this.reception.token,this.decisions,'scene-aborted');this.completion=result;if(!pending(result)&&result.status!=='refused'){this.scene._result=result;this.scene._done=this.request.done;}}}
    this.closed=true;if(current===this)current=null;
   }
   draw(){
+   if(this.inventoryChild){this.inventoryChild.draw();return;}
    if(!this.window||!this.top())return;const win=this.window,b=win.contents,v=this.top(),w=b.width,h=b.height; b.clear();b.fontFace=flow().translator().font()||'sans-serif';b.fontSize=20;
    this.renderedText=[];const text=(s:any,x:number,y:number,width=w-x,color='#fff')=>{this.renderedText.push(String(s??''));b.textColor=color;b.drawText(String(s??''),x,y,width,28,'left');};
    const cell=(x:number,y:number,cw:number,ch:number,label:string,selected=false,color='#24334b')=>{b.fillRect(x,y,cw,ch,selected?(this.storageQuick&&['box','panel'].includes(v.kind)?'#896f3e':'#587da2'):color);text(label,x+7,y+5,cw-14);};
@@ -317,7 +336,7 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
   }
  };
  P.update=function(){G.Scene_MenuBase.prototype.update.call(this);if(this._invalid){if(G.SceneManager._scene===this)this.popScene();return;}if(this._initialFailure){if(G.Input.isTriggered('cancel')||G.Input.isTriggered('ok'))this.popScene();return;}try{this._controller?.update();}catch(error){this.rebuildFailed(error);}};
- P.popScene=function(){if(this._controller&&!this._controller.closed&&!this._invalid&&!this._initialFailure){if(this._controller.input){this._controller.input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));}else {this._controller.action('back');this._controller.draw();}return;}G.Scene_MenuBase.prototype.popScene.call(this);};
+ P.popScene=function(){if(this._controller?.inventoryChild){this._controller.inventoryChild.back();return;}if(this._controller&&!this._controller.closed&&!this._invalid&&!this._initialFailure){if(this._controller.input){this._controller.input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));}else {this._controller.action('back');this._controller.draw();}return;}G.Scene_MenuBase.prototype.popScene.call(this);};
  P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);this._controller?.dispose();const done=this._done,result=this._result;if(done&&this._controller.application===flow()._app&&this._controller.generation===this._controller.application.stateGeneration){this._done=null;done(result);}};
  W.Scene_PSManagement=Scene_PSManagement;W.Scene_PSParty=Scene_PSManagement;
  G.PluginManager.registerCommand('PS_BattleFlow','ShowParty',function(){ui.openParty();});

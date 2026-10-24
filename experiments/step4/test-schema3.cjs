@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../step5/2/test-support.cjs");
 // Step 4 / A: schema 3 adds the claims ledger (one-time grants). The migration chain 1 -> 2 -> 3 keeps every older
 // guarantee, newer versions are still refused, and the stage capacities never delete what an existing save holds.
 const test = require('node:test');
@@ -17,16 +18,16 @@ const v1 = () => clone(require('../step3/fixtures/legacy-v1-flow-state.json'));
 const asV2 = () => H.legacyGame(F.makeGame(), 2);
 
 test('schema 3 added the claims ledger (current since step 5.0: schema 4): a new game has an empty one and validates', () => {
-  assert.equal(S.GAME_SCHEMA, 5); assert.deepEqual(SUPPORTED_SCHEMAS, [1, 2, 3, 4, 5]);
+  assert.equal(S.GAME_SCHEMA, 6); assert.deepEqual(SUPPORTED_SCHEMAS, [1, 2, 3, 4, 5, 6]);
   const g = S.newGame({ party: [] });
-  assert.deepEqual([g.schema, g.claims, g.party, E.storage.boxedMembers(g), g.bag, g.money], [5, {}, [], [], {}, 0]);
+  assert.deepEqual([g.schema, g.claims, g.party, E.storage.boxedMembers(g), I6.bagOf(g), g.money], [6, {}, [], [], {}, 0]);
   assert.deepEqual(validateGame(g), []);
 });
 
 test('2 -> 3 adds an empty claims ledger and nothing else (3 -> 4 then adds its own fields); the input is not touched', () => {
   const raw = asV2(), pristine = clone(raw);
   const r = migrateGame(raw);
-  assert.equal(r.ok, true); assert.deepEqual([r.from, r.to, r.migrated], [2, 5, true]);
+  assert.equal(r.ok, true); assert.deepEqual([r.from, r.to, r.migrated], [2, 6, true]);
   assert.deepEqual(raw, pristine);
   const by4 = ['stats', 'steps', ...raw.party.map((_, i) => `party.${i}.form`)];
   assert.deepEqual(S.diffPaths(raw, H.legacyGame(r.state, 4)).sort(), ['claims', 'schema', ...by4].sort());
@@ -36,12 +37,12 @@ test('2 -> 3 adds an empty claims ledger and nothing else (3 -> 4 then adds its 
 
 test('1 -> 2 -> 3 (-> 4) runs as one chain from the real step 2 state', () => {
   const r = migrateGame(v1());
-  assert.equal(r.ok, true); assert.deepEqual([r.from, r.to], [1, 5]); assert.deepEqual(r.state.claims, {});
+  assert.equal(r.ok, true); assert.deepEqual([r.from, r.to], [1, 6]); assert.deepEqual(r.state.claims, {});
   assert.deepEqual(validateGame(r.state), []);
 });
 
 test('a newer schema is still refused with nothing changed; 3 without claims, or a malformed claim, is invalid', () => {
-  for (const schema of [6, 9]) { const r = migrateGame({ ...clone(F.makeGame()), schema }); assert.equal(r.ok, false); assert.equal(r.error.code, 'unknown-version'); assert.match(r.error.message, /Nothing was changed/); }
+  for (const schema of [7, 9]) { const r = migrateGame({ ...clone(F.makeGame()), schema }); assert.equal(r.ok, false); assert.equal(r.error.code, 'unknown-version'); assert.match(r.error.message, /Nothing was changed/); }
   const noClaims = clone(F.makeGame()); delete noClaims.claims; // (schema 4 keeps the claims ledger of schema 3)
   assert.ok(validateGame(noClaims).some(p => p.path === '$.claims'));
   for (const [claims, re] of [[[], /must be an object/], [{ starter: true }, /\{kind/], [{ starter: { kind: 'other' } }, /\{kind/], [{ 'bad key!': { kind: 'grant' } }, /claim id/]]) {
@@ -62,8 +63,8 @@ test('a result is still applied only to the current schema, and keeps the claims
 test('stage capacities are configuration, and an existing save above them still loads unchanged', () => {
   const L = E.limits;
   assert.deepEqual([L.DEFAULT_LIMITS.party, L.DEFAULT_LIMITS.boxes, L.DEFAULT_LIMITS.bagPerItem, L.DEFAULT_LIMITS.money], [6, 1200, 999, 999999]);
-  const g = clone(F.makeGame()); g.bag.potion = 5000; g.money = 2000000; // above the stage caps (e.g. written by an earlier build)
+  const g = clone(F.makeGame()); I6.setItemCount(g, "potion", 5000); g.money = 2000000; // above the stage caps (e.g. written by an earlier build)
   for (let i = 0; i < 3; i++) E.storage.placeInBox(g.storage, { ...clone(g.party[0]), id: `BX-${i}` });
   assert.deepEqual(validateGame(g), [], 'over-cap amounts are not structural errors: nothing is deleted on load');
-  const r = migrateGame(g); assert.equal(r.ok, true); assert.equal(r.state.bag.potion, 5000); assert.equal(r.state.money, 2000000);
+  const r = migrateGame(g); assert.equal(r.ok, true); assert.equal(I6.bagOf(r.state).potion, 5000); assert.equal(r.state.money, 2000000);
 });

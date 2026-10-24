@@ -74,7 +74,7 @@ test('a save written by the step 4 code loads: migrated to schema 4 with the con
   const h = host(J(raw));
   h.load();
   assert.equal(h.sys._psSaveError, undefined, JSON.stringify(h.sys._psSaveError));
-  assert.deepEqual(J(h.sys._psSaveInfo).from, 3); assert.equal(h.sys._psSaveInfo.to, 5); assert.equal(h.sys._psSaveInfo.migrated, true);
+  assert.deepEqual(J(h.sys._psSaveInfo).from, 3); assert.equal(h.sys._psSaveInfo.to, 6); assert.equal(h.sys._psSaveInfo.migrated, true);
   const g = J(h.sys._psGame);
   assert.deepEqual(g.party.map(m => [m.species, m.form]), raw.party.map(m => [E.speciesKey.keyOfBattleName(content, m.species).species, 0]));
   assert.deepEqual(E.saveSchema.validateGame(g), []);
@@ -98,13 +98,13 @@ test('content that cannot be loaded, or a species it cannot map: the migration i
   assert.equal(JSON.stringify(b.sys._psGame), b0);
 });
 
-test('a schema 5 save needs no content to load; a save without framework state gets the empty one', () => {
+test('a current schema 6 save needs no content to load; a save without framework state gets the empty one', () => {
   const h = host(E.state.newGame({ party: [], money: 7 }));
   h.flow.speciesKeyResolver = () => { throw new Error('must not be asked'); };
   h.load();
   assert.deepEqual([h.sys._psSaveError, h.sys._psSaveInfo.migrated, h.sys._psGame.money], [undefined, false, 7]);
   const e = host(undefined); e.load();
-  assert.deepEqual([e.sys._psGame.schema, e.sys._psSaveInfo.created], [5, 'empty']);
+  assert.deepEqual([e.sys._psGame.schema, e.sys._psSaveInfo.created], [6, 'empty']);
 });
 
 test('P4-2: loading a save (or starting a new game) releases a battle the application still held', async () => {
@@ -373,4 +373,13 @@ test('J05: invalid nature/gender in schema4/5 keeps exact raw state and masks ev
 });
 test('J11: cold automatic map held gate precedes app/content and all encounter RNG; experimental control proceeds',()=>{
  for(const allowed of [false,true]){const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';h.flow.developerCapabilities={allowExperimentalHeldItemBattle:allowed};let loads=0,draws=0,stepDraws=0,pushes=0;const original=h.flow.content;h.flow.content=()=>{loads++;return original()};h.flow.rng=()=>{draws++;return 0};h.player.makeEncounterCount=()=>stepDraws++;h.flow.mapEncounters=()=>({data:{table:{regions:[],slots:[{species:'pidgey',weight:1,minLevel:5,maxLevel:5}]}}});h.player._encounterCount=0;h.ctx.SceneManager.push=()=>pushes++;assert.doesNotThrow(()=>h.player.executeEncounter());assert.equal(pushes,allowed?1:0);if(allowed){assert.ok(loads>0);assert.ok(draws>0);assert.equal(stepDraws,1)}else{assert.equal(loads,0);assert.equal(draws,0);assert.equal(stepDraws,0);assert.equal(h.flow._app,null);assert.equal(h.flow.lastEncounter.reason,'held-item-battle-disabled');}}
+});
+test('O51-1: 120 held-map frames retain one cold diagnostic; state/map/party/capability changes invalidate',()=>{
+ const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';let checks=0,loads=0,draws=0,counts=0,pushes=0,map=1;
+ const check=h.flow.assertBattleAllowed;h.flow.assertBattleAllowed=()=>{checks++;return check();};const load=h.flow.content;h.flow.content=()=>{loads++;return load();};h.flow.rng=()=>{draws++;return 0;};h.player.makeEncounterCount=()=>counts++;h.flow.mapEncounters=()=>({data:{table:{regions:[],slots:[{species:'pidgey',weight:1,minLevel:5,maxLevel:5}]}}});h.player._encounterCount=0;h.ctx.$gameMap.mapId=()=>map;h.ctx.SceneManager.push=()=>pushes++;
+ h.player.executeEncounter();const first=h.flow.lastEncounter;for(let i=1;i<120;i++)h.player.executeEncounter();assert.equal(checks,1);assert.equal(h.flow.lastEncounter,first);assert.deepEqual([loads,draws,counts,pushes],[0,0,0,0]);assert.equal(h.player._encounterCount,0);
+ map=2;h.player.executeEncounter();assert.equal(checks,2);h.sys._psGame=J(h.sys._psGame);h.player.executeEncounter();assert.equal(checks,3);h.sys._psGame.party[0].id='changed';h.player.executeEncounter();assert.equal(checks,4);h.flow.developerCapabilities={allowHeldItemSources:true};h.player.executeEncounter();assert.equal(checks,5);h.sys._psGame.party[0].item='';h.player.executeEncounter();assert.equal(checks>=6,true);assert.equal(counts,1);assert.ok(draws>0);assert.equal(pushes,1);
+});
+test('P52-28: every inventory root and management browse refuse automatic encounters before counter RNG or content',()=>{
+ for(const kind of ['bag','shop','item','management']){const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content)),app=h.flow.app();const token=kind==='management'?app.beginManagement():app.beginInventoryOperation(kind);let counts=0,draws=0,loads=0;const original=h.flow.content;h.flow.content=()=>{loads++;return original();};h.player.makeEncounterCount=()=>counts++;h.flow.rng=()=>{draws++;return 0;};h.flow.mapEncounters=()=>({data:{table:{regions:[],slots:[{species:'pidgey',weight:1,minLevel:3,maxLevel:3}]}}});h.player._encounterCount=0;assert.equal(h.player.executeEncounter(),false);assert.deepEqual([counts,draws,loads,h.player._encounterCount],[0,0,0,0],kind);kind==='management'?app.endManagement(token):app.endInventoryOperation(token);}
 });

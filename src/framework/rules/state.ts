@@ -1,8 +1,13 @@
+import { moneyCap } from "./economy.ts";
 /**
  * Persistent game state model + the battle write-back contract (protocol v1).
  * Pure functions. A BattleResult is the only thing that crosses from the battle layer into persistent state;
  * `applyBattleResult` is the single write path.
  */
+import { inventoryFromBag, applyBattleBag, inventoryPolicy } from "./inventory.ts";
+import { catalogOf } from "./item-catalog.ts";
+import { mergeBattleMoves } from "./member-metadata.ts";
+import type { Inventory } from "./inventory.ts";
 import { clone } from "./value.ts";
 export { clone } from "./value.ts";
 import { assertCapturedHeldSources, receiveMembers, requireTemplate } from "./receiving.ts";
@@ -23,7 +28,7 @@ import type { Content, Member, MemberOrigin, MoveSlot, Owner, PartialStats, Stat
 export const PROTOCOL_VERSION = 1;
 
 /** Version of the PERSISTENT game state document (rules/save-schema.ts migrates older ones). Not the battle protocol version. */
-export const GAME_SCHEMA = 5;
+export const GAME_SCHEMA = 6;
 
 /** Fields of a persistent member that a battle result may change. Everything else must be untouched. */
 export const MEMBER_WRITE_SET = ["level", "exp", "hp", "status", "statusCount", "moves", "evs", "friendship"] as const;
@@ -42,7 +47,8 @@ export interface GameState {
   storage: Storage;
   player: Owner;
   nextMemberOrdinal: string;
-  bag: Record<string, number>;
+  inventory: Inventory;
+  badges: boolean[];
   money: number;
   dex: Dex;
   appliedBattles: Record<string, { hash: string }>;
@@ -91,6 +97,7 @@ export interface NewMemberInput {
   item?: string;
   ability: string;
   nature: string;
+  statNature?: string | null;
   gender: string;
   ivs?: PartialStats;
   evs?: PartialStats;
@@ -141,9 +148,9 @@ export function protocolMember(member: Member): Member {
  * A new persistent game state. Its members are persistent: `species` is a content id, and a member given without a
  * form gets the base form 0 here (only here: `newMember` also builds battle records, which carry no form).
  */
-export function newGame({ party, bag = {}, money = 0, player = { ...COMPATIBLE_PLAYER } }: { party: NewMemberInput[]; bag?: Record<string, number>; money?: number; player?: Owner }): GameState {
-  const members = party.map((m) => completeIndividual(newMember({ ...m, form: m.form ?? 0 }), {}));
-  return { schema: GAME_SCHEMA, party: members, storage: newStorage(), player: { ...player }, nextMemberOrdinal: initialOrdinal(members.map((m) => m.id)), bag: { ...bag }, money, dex: { seen: [], owned: [] }, appliedBattles: {}, claims: {}, stats: newStats(), steps: 0 };
+export function newGame({ party, bag = {}, money = 0, player = { ...COMPATIBLE_PLAYER }, content }: { party: NewMemberInput[]; bag?: Record<string, number>; money?: number; player?: Owner; content?: Content }): GameState {
+  const members = party.map((m) => ({...completeIndividual(newMember({ ...m, form: m.form ?? 0 }), {}), statNature: m.statNature ?? null, moves: m.moves.map(move => ({...clone(move),ppUps:move.ppUps ?? 0}))}));
+  return { schema: GAME_SCHEMA, party: members, storage: newStorage(), player: { ...player }, nextMemberOrdinal: initialOrdinal(members.map((m) => m.id)), inventory: inventoryFromBag(bag, catalogOf(content), inventoryPolicy(content)), badges: Array(8).fill(false) as boolean[], money, dex: { seen: [], owned: [] }, appliedBattles: {}, claims: {}, stats: newStats(), steps: 0 };
 }
 
 /** Stable hash of a result, used for idempotency (same battleId + same hash => no-op). */
@@ -164,14 +171,14 @@ export interface BattleCommitOptions {
   heldItemSource?: HeldItemSource;
 }
 
-export function capturedTemplates(result: BattleResult, templates: Readonly<Record<string, Member>>, keys: SpeciesKeyResolver): Member[] {
+export function capturedTemplates(result: BattleResult, templates: Readonly<Record<string, Member>>, keys: SpeciesKeyResolver, content?: Content): Member[] {
   const received: Member[] = [];
   for (const c of result.captured || []) {
     const template = own(templates, c.id);
     requireTemplate(template, c.id);
     const k = keys(c.species);
     if (!k || k.species !== template.species || k.form !== (template.form ?? 0)) throw new Error(`captured member ${c.id}: "${c.species}" has no matching persistent key in its original template`);
-    received.push({ ...clone(template), hp: c.hp, status: c.status, statusCount: c.statusCount ?? 0, moves: clone(c.moves), ball: c.ball ?? template.ball, friendship: c.friendship ?? template.friendship });
+    received.push({ ...clone(template), hp: c.hp, status: c.status, statusCount: c.statusCount ?? 0, moves: mergeBattleMoves(template.moves, c.moves, content), ball: c.ball ?? template.ball, friendship: c.friendship ?? template.friendship });
   }
   return received;
 }
@@ -207,17 +214,11 @@ export function applyBattleResult(state: GameState, result: BattleResult, limits
       if (!(MEMBER_WRITE_SET as readonly string[]).includes(k)) throw new Error(`result tries to write ${k} outside the write set`);
       const v = (patch as Record<string, unknown>)[k];
       if (k === "statusCount" && !(typeof v === "number" && Number.isInteger(v) && v >= 0)) throw new Error("statusCount must be an integer >= 0");
-      (m as unknown as Record<string, unknown>)[k] = clone(v);
+      (m as unknown as Record<string, unknown>)[k] = k === "moves" ? mergeBattleMoves(m.moves, v as MoveSlot[], options.content) : clone(v);
     }
   }
-  for (const [item, delta] of Object.entries(result.bag || {})) {
-    const had = next.bag[item] || 0;
-    const n = had + delta;
-    if (n < 0) throw new Error(`bag would go negative for ${item}`);
-    if (delta > 0 && n > limits.bagPerItem) throw new Error(`${item} would be ${n}, above the stage cap of ${limits.bagPerItem} per item`);
-    if (n === 0) delete next.bag[item]; else next.bag[item] = n;
-  }
-  const received = capturedTemplates(result, options.templates ?? {}, keys);
+  next.inventory = applyBattleBag(next.inventory, result.bag || {}, catalogOf(options.content), inventoryPolicy(options.content, limits));
+  const received = capturedTemplates(result, options.templates ?? {}, keys, options.content);
   if (received.length) {
     const planned = receiveMembers(next, received, options.decisions ?? {}, { limits, content: options.content ?? { species: {} }, profile: options.profile ?? { mode: 0, naming: 0 }, depositHeal: options.depositHeal ?? false });
     next.party = planned.state.party; next.storage = planned.state.storage;
@@ -230,7 +231,10 @@ export function applyBattleResult(state: GameState, result: BattleResult, limits
       if (!next.dex[list].includes(k.species)) next.dex[list].push(k.species);
     }
   }
-  if (result.money) next.money = Math.max(0, next.money + result.money);
+  if (result.money !== undefined) {
+    if (!Number.isSafeInteger(result.money) || !Number.isSafeInteger(next.money + result.money)) throw new Error("invalid-money-delta");
+    next.money = Math.min(moneyCap(options.content,limits.money), Math.max(0, next.money + result.money));
+  }
   setOwn(next.appliedBattles, result.battleId, { hash: h });
   return { state: next, status: "applied" };
 }

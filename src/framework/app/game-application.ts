@@ -1,3 +1,11 @@
+import type {ItemWorldContext} from '../rules/item-effects.ts';
+import { moneyCap, changeMoney } from "../rules/economy.ts";
+import { InventorySession } from "./inventory-session.ts";
+import type { InventoryRequest, InventoryParent, InventoryOutcome } from "./inventory-session.ts";
+import { badgeCount, hasBadge } from "../rules/economy.ts";
+import { assertInventoryMapped, addItems, aggregateBag, inventoryPolicy } from "../rules/inventory.ts";
+import { catalogOf } from "../rules/item-catalog.ts";
+import { computedNature } from "../rules/member-metadata.ts";
 /**
  * The game application: the use cases that coordinate a battle with the persistent game, and nothing else.
  *  - game rules stay in the core (`rules/`): the application calls `applyBattleResult`, it does not re-implement it;
@@ -45,6 +53,8 @@ export interface GameApplicationPorts<S extends BattleHandle> {
   /** The host's wall clock (WP06 §3), for the use cases that need the time; see `now()`. */
   clock?: ClockPort;
   creationContext?: () => CreationContext;
+  itemWorld?:()=>ItemWorldContext;
+  variables?:{count:()=>number;write:(id:number,value:string)=>void};
 }
 
 /** Stage configuration of the application (not ports: plain values the host reads from its settings). */
@@ -136,13 +146,15 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * game). Every session remembers the generation it was opened in; a session of an earlier generation (open or already
    * finished) belongs to a state that no longer exists, so finishing it commits nothing (final review P4-2).
    */
+  private readonly inventory: InventorySession;
   private generation = 0;
   private readonly bornIn = new WeakMap<object, number>();
 
   constructor(ports: GameApplicationPorts<S>, options: GameApplicationOptions = {}) {
-    this.ports = ports;
+    this.ports = {...ports,state:{read:()=>ports.state.read(),replace:next=>{ports.state.replace(next);this.inventory?.stateChanged(next);}}};
     this.limits = options.limits ?? DEFAULT_LIMITS;
     this.startMoney = options.startMoney ?? 3000;
+    if (!Number.isSafeInteger(this.startMoney) || this.startMoney < 0) throw new Error("invalid-start-money");
     this.noMoneyLoss = options.noMoneyLoss ?? false;
     this.capabilities = developmentCapabilities(options.capabilities);
     this.depositHeal = options.depositHeal ?? false;
@@ -154,8 +166,35 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       if (!content.meta?.showdownSourceChecked) throw new ReceivingRefused("held-item-source-unchecked");
       return dex?.heldItem?.(id) ?? null;
     });
-    this.management = new ManagementSession(ports.state, () => ports.content().content, { limits: this.limits, depositHeal: this.depositHeal, sourceAllowed: this.capabilities.allowHeldItemSources, describeItem: this.describeHeldItem });
+    this.management = new ManagementSession(this.ports.state, () => this.ports.content().content, { limits: this.limits, depositHeal: this.depositHeal, sourceAllowed: this.capabilities.allowHeldItemSources, describeItem: this.describeHeldItem });
+    this.inventory = new InventorySession(this.ports.state,()=>this.ports.content().content,{world:ports.itemWorld,variables:ports.variables,limits:this.limits,generation:()=>this.generation,install:next=>this.install(next),
+      enter:parent=>{if(this.op||this.reception)throw new Error('operation-active');if(parent)this.management.reserveChild(parent.token);else if(this.management.active)throw new Error('management-active');},
+      leave:parent=>{if(parent)this.management.releaseChild(parent.token);}});
   }
+
+  beginInventoryOperation(kind:'bag'|'item'|'shop'='bag',parent?:InventoryParent):string { return this.inventory.begin(kind,parent); }
+  endInventoryOperation(token:string):InventoryOutcome { return this.inventory.end(token); }
+  inventorySnapshot(token:string,filter?:Parameters<InventorySession['snapshot']>[1]) { return this.inventory.snapshot(token,filter); }
+  queryInventoryItemQuantity(token:string,itemId:string):number { return this.inventory.quantity(token,itemId); }
+  inventoryTicket(token:string,pocket:number,index:number) { return this.inventory.ticket(token,pocket,index); }
+  inventoryRequest(token:string,requestId:string,request:InventoryRequest,present?:(outcome:InventoryOutcome)=>void):InventoryOutcome { return this.inventory.execute(token,requestId,request,present); }
+  beginInventorySort(token:string,pocket:number,index:number,filtered=false):InventoryOutcome { return this.inventory.beginSort(token,pocket,index,filtered); }
+  moveInventorySort(token:string,to:number):InventoryOutcome { return this.inventory.moveSort(token,to); }
+  endInventorySort(token:string,cancel=false):InventoryOutcome { return this.inventory.endSort(token,cancel); }
+  queryItemUse(token:string,itemId:string,quantity=1,memberId?:string) { return this.inventory.queryUse(token,itemId,quantity,memberId); }
+  beginMoneyShop(input:Parameters<InventorySession['configureShop']>[1]):string {const token=this.inventory.begin('shop');try{this.inventory.configureShop(token,input);return token;}catch(error){this.inventory.end(token);throw error;}}
+  shopView(token:string){return this.inventory.shopView(token);}
+  shopQuote(token:string,itemId:string,selling=false){return this.inventory.quote(token,itemId,selling);}
+  setShopPrices(token:string,itemId:string,buy:number,sell?:number):void{this.inventory.setPrices(token,itemId,buy,sell);}
+  clearShopPrices(token:string):void{this.inventory.clearPrices(token);}
+  beginItemSelection(...args:Parameters<InventorySession['beginSelection']>){return this.inventory.beginSelection(...args);}
+  itemSelectionView(...args:Parameters<InventorySession['selectionView']>){return this.inventory.selectionView(...args);}
+  browseItemSelection(...args:Parameters<InventorySession['selectionBrowse']>){return this.inventory.selectionBrowse(...args);}
+  finishItemSelection(...args:Parameters<InventorySession['finishSelection']>){return this.inventory.finishSelection(...args);}
+  tossItems(...args:Parameters<InventorySession['toss']>){return this.inventory.toss(...args);}
+  queryBadges(index?:number):{count:number;owned?:boolean}{const game=this.ports.state.read();return {count:badgeCount(game.badges),...(index===undefined?{}:{owned:hasBadge(game.badges,index)})};}
+  hasBoxLink():boolean {return this.inventory.hasBoxLink();}
+  heldItemSourcesEnabled():boolean {return this.capabilities.allowHeldItemSources;}
 
   /** A new game: the formal empty state (no members; the player receives them through grants). Throws only if the store refuses. */
   startNewGame(): { status: "started"; state: GameState } {
@@ -171,7 +210,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   claimGrant(grantId: string, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): ClaimOutcome {
     const refused = (reason: string, error: unknown): ClaimOutcome => ({ status: "refused", grantId, reason, error: message(error) });
     if (this.reception?.grantId === grantId) return { status: "pending", grantId, token: this.reception.context.token };
-    if (this.op || this.management.active || this.reception) return refused(this.op ? "battle-active" : "operation-active", "another operation is open");
+    if (this.op || this.management.active || this.reception || this.inventory.active) return refused(this.op ? "battle-active" : "operation-active", "another operation is open");
     let game: GameState;
     try { game = this.ports.state.read(); } catch (error) { return refused("state-unusable", error); }
     try {
@@ -195,8 +234,9 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
           if (own(current.claims, grantId)) { this.reception = null; return { status: "already-claimed", grantId }; }
           const plan = receiveMembers(current, members, context.decisions ?? {}, { limits: this.limits, content, profile: context.profile!, depositHeal: this.depositHeal });
           const next = plan.state;
-          for (const [item, count] of Object.entries(grant.items)) { const n = (own(next.bag, item) ?? 0) + count; if (n > this.limits.bagPerItem) throw new Error("bag-full"); setOwn(next.bag, item, n); }
-          next.money = next.money > this.limits.money ? next.money : Math.min(next.money + grant.money, this.limits.money);
+          for (const [item, count] of Object.entries(grant.items)) next.inventory = addItems(next.inventory, item, count, catalogOf(content), inventoryPolicy(content, this.limits));
+          if (!Number.isSafeInteger(next.money + grant.money)) throw new Error("money-overflow");
+          next.money = changeMoney(next.money,grant.money,moneyCap(content,this.limits.money));
           for (const m of members) for (const key of ["seen", "owned"] as const) if (!next.dex[key].includes(m.species)) next.dex[key].push(m.species);
           setOwn(next.claims, grantId, { kind: "grant" }); next.nextMemberOrdinal = context.nextMemberOrdinal!;
           this.install(next); this.noteReception(context, members, next); this.reception = null;
@@ -211,7 +251,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   receiveGift(request: GiftRequest, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): GiftOutcome {
-    if (this.op || this.management.active || this.reception) return { status: "refused", reason: "operation-active" };
+    if (this.op || this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "operation-active" };
     try {
       if (!["normal", "silent", "party", "party-silent", "foreign"].includes(request.kind)) throw new ReceivingRefused("invalid-gift-mode");
       const input = request.member;
@@ -259,7 +299,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     } catch (error) { return { status: "refused", reason: error instanceof ReceivingRefused ? error.reason : "invalid", error: message(error) }; }
   }
 
-  private install(next: GameState): void { const problems = validateGame(next); if (problems.length) throw new Error(`invalid next state: ${problems[0]!.path} ${problems[0]!.message}`); try { this.ports.state.replace(next); } catch (error) { throw new StateInstallFailed(error); } }
+  private install(next: GameState): void { if(next.inventory.pockets.some(pocket=>pocket.length))assertInventoryMapped(next.inventory,catalogOf(this.ports.content().content)); const problems = validateGame(next); if (problems.length) throw new Error(`invalid next state: ${problems[0]!.path} ${problems[0]!.message}`); try { this.ports.state.replace(next); } catch (error) { throw new StateInstallFailed(error); } }
   get receivingNotifications(): { token: string; placements: { id: string; to: "party" | "boxes"; box?: number; boxName?: string }[] }[] { return [...this.receptionNotices].map(([token, placements]) => ({ token, placements: clone(placements) })); }
   acknowledgeReceivingNotification(token: string): void { this.receptionNotices.delete(token); }
   private noteReception(context: ReceptionContext, members: readonly Member[], next: GameState): void {
@@ -300,16 +340,16 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     return {
       members: game.party.map((m) => {
         const sp = speciesDataOf(content, m);
-        const maxhp = sp ? computeStats(sp.base, m.ivs, m.evs, m.level, m.nature).hp : m.hp;
+        const maxhp = sp ? computeStats(sp.base, m.ivs, m.evs, m.level, computedNature(m)).hp : m.hp;
         return { id: m.id, species: m.species, form: m.form ?? 0, ...(sp?.nameKey ? { nameKey: sp.nameKey } : {}), level: m.level, hp: m.hp, maxhp, status: m.status, moves: m.moves.map((x) => ({ ...x })) };
       }),
-      boxes: boxedMembers(game).length, bag: { ...game.bag }, money: game.money,
+      boxes: boxedMembers(game).length, bag: aggregateBag(game.inventory), money: game.money,
     };
   }
 
   /** Heal the party (HP, status, PP). Safe to repeat: an already healed party writes nothing. Never throws. */
   healParty(): HealOutcome {
-    if (this.management.active || this.reception) return { status: "refused", reason: "management-active" };
+    if (this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "management-active" };
     if (this.op) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
     let game: GameState;
     try { game = this.ports.state.read(); } catch (error) { return { status: "refused", reason: "state-unusable", error: message(error) }; }
@@ -341,18 +381,19 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   searchStorage(search: StorageSearch, displayName: (member: Member) => string): StorageMatch[] { return searchStorage(this.ports.state.read(), search, displayName); }
   holdableBagItems(): { id: string; count: number }[] {
     if (!this.capabilities.allowHeldItemSources) throw new Error("held-item-source-disabled");
-    return Object.entries(this.ports.state.read().bag).filter(([id, count]) => { const item = this.describeHeldItem(id); return count > 0 && item?.holdable && !item.mail; }).map(([id, count]) => ({ id, count }));
+    return Object.entries(aggregateBag(this.ports.state.read().inventory)).filter(([id, count]) => { const item = this.describeHeldItem(id); return count > 0 && item?.holdable && !item.mail; }).map(([id, count]) => ({ id, count }));
   }
-  beginManagement(): string { if (this.op || this.reception) throw new Error("operation-active"); return this.management.begin(); }
+  beginManagement(): string { if (this.op || this.reception || this.inventory.active) throw new Error("operation-active"); return this.management.begin(); }
   manage(token: string, requestId: string, request: ManagementRequest): ManagementOutcome {
     if (this.op) return { status: "refused", reason: "battle-active" };
     return this.management.execute(token, requestId, request);
   }
   endManagement(token: string): ManagementOutcome { return this.management.end(token); }
   heldMemberReference(token: string): MemberReference | null { return this.management.heldReference(token); }
-  get saveBlocked(): boolean { return !!this.op || !!this.reception || this.management.saveBlocked; }
+  get encounterBlocked(): boolean { return !!this.op || !!this.reception || this.management.active || this.inventory.active; }
+  get saveBlocked(): boolean { return !!this.op || !!this.reception || this.management.saveBlocked || this.inventory.saveBlocked; }
   recoverAll(): HealOutcome {
-    if (this.op || this.management.active || this.reception) return { status: "refused", reason: this.op ? "battle-active" : "management-active" };
+    if (this.op || this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: this.op ? "battle-active" : "management-active" };
     try { const game = this.ports.state.read(); const next = recoverAll(game, this.ports.content().content, this.depositHeal); if (JSON.stringify(next) === JSON.stringify(game)) return { status: "unchanged" }; this.ports.state.replace(next); return { status: "healed" }; }
     catch (error) { return { status: "refused", reason: "invalid", error: message(error) }; }
   }
@@ -373,7 +414,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
 
   /** Count steps the player took (WP06 §4.1: the global counter, wrapping at 2^31). The host applies the guards of that step. */
   recordSteps(n = 1): StepsOutcome {
-    if (this.management.active || this.reception) return { status: "refused", reason: "management-active" };
+    if (this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "management-active" };
     if (this.op) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
     let game: GameState;
     try { game = this.ports.state.read(); } catch (error) { return { status: "refused", reason: "state-unusable", error: message(error) }; }
@@ -391,6 +432,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   stateReplacedByHost(): void {
     this.generation++;
     this.op = null;
+    this.inventory.invalidate();
     this.management.invalidate();
     this.reception = null;
     this.receptionReceipts.clear();
@@ -406,7 +448,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * the battle is aborted before its session exists, a session that arrives later is not kept or returned (rejects).
    */
   async startBattle(request: BattleStartRequest): Promise<S> {
-    if (this.management.active || this.reception) throw new Error("operation-active");
+    if (this.management.active || this.reception || this.inventory.active) throw new Error("operation-active");
     if (this.op) throw new Error(`a battle is already open (${this.op.battleId})`);
     const game = this.ports.state.read();
     if (!this.capabilities.allowExperimentalHeldItemBattle && game.party.some((m) => !!m.item)) throw new Error("held-item-battle-disabled: battle item write-back is incomplete");
@@ -454,6 +496,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * Never throws: "not-here" when the table does not apply at the region, and no encounter when nobody can battle.
    */
   prepareEncounter(table: unknown, region: number): EncounterPlan {
+    if (this.encounterBlocked) return { ok: false, reason: "operation-active" };
     const checked = validateEncounterTable(table);
     if (!checked.table) return { ok: false, reason: "invalid-table", error: checked.problems.map((p) => `${p.path} ${p.message}`).join("; ") };
     if (!appliesAt(checked.table, region)) return { ok: false, reason: "not-here" };
@@ -477,7 +520,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * operation the application does not know the battle's kind, so no battle statistics are counted (finishBattle does).
    */
   commitResult(result: BattleResult, options: BattleCommitOptions = {}): CommitResultStatus {
-    if (this.management.active) throw new Error("management-active");
+    if (this.management.active || this.inventory.active) throw new Error("management-active");
     if (this.op) throw new Error("battle-active: use finishBattle for the active session");
     if (this.reception) throw new Error("receiving-active: use its receiving token");
     const context = this.newReceptionContext(options);
@@ -489,7 +532,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       if (!(error instanceof ReceivingRefused)) throw error;
       if (error.reason === "no-template") return "no-template";
       if (error.reason !== "pending") throw error;
-      const members = capturedTemplates(result, context.templates ?? {}, speciesKeyResolver(this.ports.content().content));
+      const members = capturedTemplates(result, context.templates ?? {}, speciesKeyResolver(this.ports.content().content), this.ports.content().content);
       this.reception = { context, members, resume: () => ({ status: this.commitResultWithContext(result, context) }) }; return "pending";
     }
   }
@@ -509,7 +552,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     let next = applied.state;
     let defeat: { moneyLost: number; healed: true } | undefined;
     if (isDefeat(result)) {
-      const settled = settleDefeat(next, content, { noMoneyLoss: this.noMoneyLoss });
+      const settled = settleDefeat(next, content, { noMoneyLoss: this.noMoneyLoss, badges: badgeCount(next.badges), moneyLimit: this.limits.money });
       next = settled.state;
       defeat = { moneyLost: settled.moneyLost, healed: true };
     }
@@ -552,7 +595,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     } catch (error) {
       if (error instanceof StateInstallFailed || (error instanceof ReceivingRefused && error.reason === "pending")) {
         const raw = handle.result();
-        this.reception = { context, members: capturedTemplates(raw, context.templates ?? {}, speciesKeyResolver(this.ports.content().content)), resume: () => this.finishBattle(handle, request) };
+        this.reception = { context, members: capturedTemplates(raw, context.templates ?? {}, speciesKeyResolver(this.ports.content().content), this.ports.content().content), resume: () => this.finishBattle(handle, request) };
         return { code: outcomeCode(raw), battleId: raw.battleId, commit: "none", pending: true, receivingToken: context.token, pendingMember: error instanceof ReceivingRefused ? error.memberId : undefined, ...(error instanceof StateInstallFailed ? { error: `commit-failed: ${message(error)}` } : {}) };
       }
       if (this.reception?.context === context) this.reception = null;

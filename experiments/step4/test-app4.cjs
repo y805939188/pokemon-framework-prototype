@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../step5/2/test-support.cjs");
 // Step 4 / A, application use cases over in-memory ports: a formal new game (no fixture), one-time grants and the
 // party heal. Each is all-or-nothing: a refusal or a failing store leaves the installed state as it was.
 const test = require('node:test');
@@ -15,9 +16,9 @@ const read = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
 const content = E.contentRuntime.assembleContent(E.contentCompile.compileContent({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json'), grants: read('grants.json') }).data, E.dex.createDexLookup()).content;
 function lcg(seed) { let s = seed >>> 0; return n => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor((s / 4294967296) * n); }; }
 const snap = state => JSON.stringify(state.current());
-function setup(initial = E.state.newGame({ party: [] }), options) {
+function setup(initial = E.state.newGame({ party: [] }), options, activeContent = content) {
   const state = K.createMemoryState(initial);
-  const app = new GameApplication({ state, sessions: K.createFakeSessions(() => { throw new Error('no battle in this test'); }), projection: K.createRecordingProjection(), content: () => ({ content }), random: lcg(11) }, options);
+  const app = new GameApplication({ state, sessions: K.createFakeSessions(() => { throw new Error('no battle in this test'); }), projection: K.createRecordingProjection(), content: () => ({ content: activeContent }), random: lcg(11) }, options);
   return { state, app };
 }
 
@@ -27,7 +28,7 @@ test('a new game installs the formal empty state: the current schema, no members
   const r = app.startNewGame();
   assert.equal(r.status, 'started');
   const g = state.current();
-  assert.deepEqual([g.schema, g.party, E.storage.boxedMembers(g), g.bag, g.money, g.claims, g.appliedBattles, g.dex], [E.state.GAME_SCHEMA, [], [], {}, 3000, {}, {}, { seen: [], owned: [] }]);
+  assert.deepEqual([g.schema, g.party, E.storage.boxedMembers(g), I6.bagOf(g), g.money, g.claims, g.appliedBattles, g.dex], [E.state.GAME_SCHEMA, [], [], {}, 3000, {}, {}, { seen: [], owned: [] }]);
   assert.deepEqual([g.stats, g.steps], [E.stats.newStats(), 0], 'schema 4: statistics and the step counter start at zero');
   assert.ok(!JSON.stringify(g).includes('A-000'), 'no fixture member survives');
   assert.equal(setup(undefined, {}).app.startNewGame() && 1, 1);
@@ -48,9 +49,9 @@ test('claim: applied once, the repeat is reported and changes nothing, the store
 test('claim refusals commit nothing and say why: unknown grant, no room, bag cap, unusable save, no random source', () => {
   const unknown = setup(); const u = unknown.app.claimGrant('nope');
   assert.deepEqual([u.status, u.reason], ['refused', 'unknown-grant']); assert.equal(unknown.state.replaced.length, 0);
-  const g = E.state.newGame({ party: [] }); g.bag.potion = 995;
-  const capped = setup(g); const c = capped.app.claimGrant('starter');
-  assert.deepEqual([c.status, c.reason], ['refused', 'bag-full']); assert.match(c.error, /potion would be 1000/);
+  const g = E.state.newGame({ party: [] }); I6.setItemCount(g, "potion", 995);
+  const capped = setup(g, undefined, {...content,settings:{...content.settings,BAG_POCKET_SLOTS:[-1,1,-1,-1,-1,-1,-1,-1]}}); const c = capped.app.claimGrant('starter');
+  assert.deepEqual([c.status, c.reason], ['refused', 'bag-full']); assert.match(c.error, /inventory-full/);
   assert.equal(capped.state.replaced.length, 0); assert.equal(capped.state.current().claims.starter, undefined, 'no claim written');
   const full = setup(undefined, { limits: { party: 0, boxes: 0, bagPerItem: 999, money: 999999 } }); const f = full.app.claimGrant('starter');
   assert.deepEqual([f.status, f.reason], ['refused', 'no-room']);

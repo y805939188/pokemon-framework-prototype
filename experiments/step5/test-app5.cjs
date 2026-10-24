@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("./2/test-support.cjs");
 // Step 5.0, application layer: battles see a battle view and commit through the content mapping (D5-3); battle
 // statistics are counted with the result in the same replacement (WP06 §4.2; r8 FR-000420; WP53 §183 split; WP61 §7
 // blackout), never twice; the step counter (WP06 §4.1, FR-000426); and the release of a battle operation when the host
@@ -18,7 +19,7 @@ const content = E.contentRuntime.assembleContent(E.contentCompile.compileContent
 const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor((s / 4294967296) * n); }; };
 const battleMember = (id, species, level) => E.memberFactory.createMember({ id, species, level }, content, lcg(level));
 const saved = m => E.speciesKey.toPersistentMember(m, content);
-const game = (party = [saved(battleMember('A-1', 'Charmander', 9))], money = 3000) => { const g = S.newGame({ party: [] }); g.party = party; g.money = money; g.bag = { pokeball: 3 }; return g; };
+const game = (party = [saved(battleMember('A-1', 'Charmander', 9))], money = 3000) => { const g = S.newGame({ party: [] }); g.party = party; g.money = money; I6.setBag(g, { pokeball: 3 }); return g; };
 const result = (battleId, kind, winner = null, extra = {}) => ({ protocol: 1, battleId, outcome: { kind, winner }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] }, ...extra });
 
 function app(initial = game(), options = {}) {

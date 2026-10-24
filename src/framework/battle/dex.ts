@@ -23,6 +23,7 @@ export function createDexLookup(engineRoot?: string): DexLookup {
       const gender = s.gender === "M" || s.gender === "F" || s.gender === "N" ? s.gender : Math.round((s.genderRatio as { F: number }).F * 256);
       return { name: s.name as string, baseSpecies: s.baseSpecies as string, types: [...s.types], baseStats: { ...s.baseStats }, abilities, hiddenAbilities: [slots["H"] ?? null], gender };
     },
+    allMoves() { return use().gen8.moves.all().filter((m: {exists:boolean})=>m.exists).map((m:{id:string;name:string;pp:number})=>({id:m.id,name:m.name,pp:m.pp})); },
     move(id) {
       const m = use().gen8.moves.get(id);
       return m && m.exists ? { name: m.name as string, id: m.id as string, pp: m.pp as number } : null;

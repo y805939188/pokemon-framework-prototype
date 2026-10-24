@@ -106,7 +106,7 @@ export function createMember(input: CreateMemberInput, content: Content, random:
   const colors = shinyFromPersonalId(pid, owner.id);
   const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
   const stats = computeStats(sp.base, ivs, evs, level, nature);
-  return newMember({
+  const created = newMember({
     id, species: finalName, form, level, exp: minExp(sp.growth, level), hp: stats.hp, status: "", statusCount: 0, moves, item: "", ability, nature, gender,
     ivs, evs, friendship: sp.happiness ?? inheritedHappiness ?? 70, ball: input.ball ?? "pokeball",
     personalID: pid, owner, ownerCompatibilityDefault: false, abilityIndex: derived.abilityIndex, effectiveAbilityIndex: derived.effectiveAbilityIndex,
@@ -114,4 +114,5 @@ export function createMember(input: CreateMemberInput, content: Content, random:
     origin: { method: input.context?.fateful ? 4 : 0, map: input.context?.map ?? 0, text: "", level, receivedAt: input.context?.receivedAt ?? null, hatchedMap: 0, hatchedAt: null, compatibilityDefault: false },
     firstMoves: [], markings: [], ribbons: [], cannotStore: false, cannotRelease: false, isEgg: false, mail: null, readyToEvolve: false,
   });
+  return {...created,statNature:null,moves:created.moves.map(move=>({...move,ppUps:0}))};
 }

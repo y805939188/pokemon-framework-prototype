@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../step5/2/test-support.cjs");
 // The portable SHA-256 must equal node:crypto for everything the framework hashes, and the identities that already
 // exist (old ledger entries, compiled-content inputs hashes) must not change.
 const test = require('node:test');
@@ -44,7 +45,7 @@ test('result identities that existed before the change are reproduced (golden ve
   // the key order of the object never matters; the content does
   const a = golden.entries.find(e => e.name === 'caught with master ball'), rev = golden.entries.find(e => /reverse insertion order/.test(e.name));
   assert.equal(rev.hash, a.hash); assert.equal(E.state.resultHash(rev.result), a.hash);
-  const changed = JSON.parse(JSON.stringify(a.result)); changed.bag = { ...changed.bag, potion: 1 };
+  const changed = JSON.parse(JSON.stringify(a.result)); I6.setBag(changed, { ...I6.bagOf(changed), potion: 1 });
   assert.notEqual(E.state.resultHash(changed), a.hash);
 });
 

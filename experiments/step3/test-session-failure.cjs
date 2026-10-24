@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../step5/2/test-support.cjs");
 // A failed operation whose rollback also fails leaves the session in an unknown state: it must be closed for good,
 // both errors kept, and nothing from it may reach the persistent game state.
 const test = require('node:test');
@@ -21,7 +22,7 @@ async function breakSession(s) {
   Gateway.restore = async () => { throw new Error('rollback failed'); };
   try { await s.useItem('potion', 'A-0001'); assert.fail('must reject'); } catch (error) { return error; } finally { Gateway.restore = restore; }
 }
-const snapshot = s => JSON.stringify({ bag: s.bag, ledger: s.ledger, party: s.party, engine: s.gw.snapshot() });
+const snapshot = s => JSON.stringify({ bag: I6.bagOf(s), ledger: s.ledger, party: s.party, engine: s.gw.snapshot() });
 
 test('a failed rollback closes the session and reports both errors', async () => {
   const { s } = await make(); const error = await breakSession(s);
@@ -57,7 +58,7 @@ test('a rollback that succeeds still lets the caller retry, and the session is n
   s.gw.act = async (...args) => { await act(...args); throw new Error('operation failed'); };
   await assert.rejects(() => s.useItem('potion', 'A-0001'), /operation failed/);
   assert.equal(s.broken, null);
-  assert.equal((await s.useItem('potion', 'A-0001')).ok, true); assert.equal(s.bag.potion, 2);
+  assert.equal((await s.useItem('potion', 'A-0001')).ok, true); assert.equal(I6.bagOf(s).potion, 2);
 });
 
 test('the failure is logged once with both messages and no secrets', async () => {

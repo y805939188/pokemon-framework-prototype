@@ -5,8 +5,8 @@
 | 批次 | 分支 | 内容 | 状态 |
 |---|---|---|---|
 | 5.0 基础整固 | `step5/0-foundation` | 持久物种键（内容 ID＋形态号）、存档 schema 4、统计与计步、规则配置档、来源使用前核对与 PBS 导入子集、P4-2、CI | **已合并**（2026-10-22，PR #3，合并提交 `5dc86f6`；[收口记录](5.0-closure.md)） |
-| 5.1 个体与仓库 | `step5/1-individual-storage` | 个体、40×30 仓库、schema 5、事务、接收与 UI | **实施中，M 候选待独立复核**；A–E 作者候选，F–J 未完成；[实施记录](5.1.md)、[M 范围](5.1-M-candidate.md) |
-| 5.2 背包、道具与经济 | — | — | 未开始 |
+| 5.1 个体与仓库 | `step5/1-individual-storage` | 个体、40×30 仓库、schema 5、事务、接收与 UI | **已合并**（PR #4，`c5c51a6`，精确7fd候选及main双层CI通过）；[实施记录](5.1.md) |
+| 5.2 背包、道具与经济 | `step5/2-inventory-economy` | 八口袋/schema6/资源与事务 | M1六项复验PASS；M2独立r3 PASS，三项CLOSED；G正式UI/事件已接，H作者固定候选准备，真实层受Mach权限阻塞，最终独立/Claude/CI未完成；[整改闭环](5.2-M2-remediation.md)；[E/F合同](5.2-EF-contract.md)、[范围表](5.2-M2-coverage.md)、[M1历史](5.2-M1.md) |
 | 5.3 成长、进化与图鉴 | — | — | 未开始 |
 | 5.4 训练家、AI 与战斗界面 | — | — | 未开始 |
 | 5.5 世界与遭遇 | — | — | 未开始 |
@@ -14,4 +14,6 @@
 
 文档：[5.0.md](5.0.md)（实施记录）、[5.0-closure.md](5.0-closure.md)（收口记录）、[commands.md](commands.md)（新增作者入口与命令）、[distribution.md](distribution.md)（分发清单骨架）。
 
-5.1作者候选：批准计划r2及M独立复验后推进F–I，见[实施合同](5.1.md)、[完整候选与证据入口](5.1-candidate.md)、[持物P-2提案](5.1-held-item-contract.md)。最终J与用户merge闸门仍独立，未合main。
+5.1作者候选：批准计划r2及M独立复验后推进F–I，见[实施合同](5.1.md)、[完整候选与证据入口](5.1-candidate.md)、[持物P-2提案](5.1-held-item-contract.md)。5.1最终双审及用户条件合并门已完成，PR #4常规合并c5c51a6；原候选历史保留。5.2遵守新的M1/M2与专项push/merge门，不能沿用5.1授权。
+
+5.2 Claude J2在84ca代码/自动化PASS；后续数量、原因及只读兼容诊断作者整改与原证据文字更正见[5.2-J2-remediation.md](5.2-J2-remediation.md)，新候选待独立复验，真实H仍阻塞。

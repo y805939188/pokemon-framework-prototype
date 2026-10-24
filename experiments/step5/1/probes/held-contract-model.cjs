@@ -27,7 +27,7 @@ module.exports={propose,project};
 function createFakeReceiver(){
  const receipts=new Map();
  return {apply(result,install){
-  const fingerprint=JSON.stringify(result),old=receipts.get(result.battleId);
+  const fingerprint=require('../../../../js/engine/build/engine.cjs').semantic.semanticFingerprint(result),old=receipts.get(result.battleId);
   if(old){if(old!==fingerprint)throw Error('result-conflict');return {status:'duplicate'};}
   const plan=propose(result.initial,result.events,result.context),eligible=new Set(Object.keys(plan.initial));
   for(const captured of result.captured??[]){

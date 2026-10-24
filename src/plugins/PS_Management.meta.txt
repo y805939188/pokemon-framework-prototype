@@ -4,7 +4,7 @@
  * @author pokemon-framework
  * @help
  * Input: arrows, Enter/Z, Escape/X, Shift, Ctrl (Box Link), A/S (box jumps).
- * Data writes go through GameApplication. Developer hasBoxLink predicate defaults false.
+ * Data writes go through GameApplication. Box Link reads inventory plus existing switch/map/mode gates. Developer override is runtime only.
  * @command ShowStorage
  * @text Open Storage PC
  * @command ShowSummary

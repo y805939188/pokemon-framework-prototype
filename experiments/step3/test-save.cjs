@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../step5/2/test-support.cjs");
 // Step 3 / B3: versioned game state. Declared legacy versions migrate on a copy, everything else is refused with a
 // diagnosis and left untouched, the store never overwrites what it cannot read, and the replay ledger keeps its guarantees.
 const test = require('node:test');
@@ -64,7 +65,7 @@ test('the oldest prototype shape: counters are added, bad poison becomes plain p
 	assert.deepEqual([a.status, a.statusCount], ['', 0]);
 	assert.deepEqual([b.status, b.statusCount], ['psn', 0]);
 	assert.deepEqual([c.status, c.statusCount], ['slp', undefined], 'no number is invented for a sleeper');
-	assert.equal(r.notes.length, 5); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /schema 4/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
+	assert.equal(r.notes.length, 6); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /schema 4/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
 	assert.deepEqual(validateGame(r.state), []);
 });
 
@@ -97,11 +98,11 @@ test('invalid structure is located, including battle-only fields that must never
 	expectProblem(mk(s => { s.party[1].id = s.party[0].id; }), /\.id$/, /duplicate member id/);
 	expectProblem(mk(s => { s.party[0].moves[0].pp = 99; }), /moves\[0\]$/, /pp <= maxpp/);
 	expectProblem(mk(s => { s.party[0].status = 'xyz'; }), /\.status$/, /must be one of/);
-	expectProblem(mk(s => { s.bag.potion = -1; }), /^\$\.bag\.potion$/, />= 1/);
+	expectProblem(mk(s => { I6.setItemCount(s, "potion", -1); }), /^\$\.inventory\.pockets/, /quantity>=1/);
 	expectProblem(mk(s => { s.money = -5; }), /^\$\.money$/, />= 0/);
 	expectProblem(mk(s => { s.appliedBattles.x = { hash: 'nothex' }; }), /appliedBattles/, /64 hex/);
 	expectProblem(mk(s => { s.party[0].status = 'tox'; }), /\.status$/, /plain poison/);
-	expectProblem(mk(s => { s.party[0].evs.hp = 300; }), /evs\.hp$/, /0 to 252/);
+	expectProblem(mk(s => { s.party[0].evs.hp = 300; }), /evs\.hp$/, /0 to 255/);
 });
 
 test('a result cannot be applied to an un-migrated state', () => {
@@ -121,9 +122,9 @@ test('the store upgrades a legacy file on commit, keeps the original bytes, and 
 	assert.deepEqual(r, { status: 'applied', migratedFrom: 1 });
 	assert.ok(original.equals(fs.readFileSync(f + '.v1.bak')), 'the legacy file is kept byte for byte');
 	const now = store(f).load();
-	assert.equal(now.schema, S.GAME_SCHEMA); assert.equal(now.party[0].hp, 50); assert.equal(now.bag.potion, 2); assert.ok(now.appliedBattles['B-legacy']);
+	assert.equal(now.schema, S.GAME_SCHEMA); assert.equal(now.party[0].hp, 50); assert.equal(I6.bagOf(now).potion, 2); assert.ok(now.appliedBattles['B-legacy']);
 	assert.equal(store(f).commit(resultFor('B-legacy')).status, 'already-applied');
-	assert.equal(store(f).load().bag.potion, 2, 'applied once');
+	assert.equal(I6.bagOf(store(f).load()).potion, 2, 'applied once');
 });
 
 test('the store never overwrites a save it cannot read', () => {
@@ -157,7 +158,7 @@ test('REAL process kill while upgrading a legacy file: old or new at every point
 		const retry = store(f).commit(resultFor('B-kill'));
 		assert.equal(retry.status, committed ? 'already-applied' : 'applied');
 		const fin = store(f).load();
-		assert.equal(fin.bag.potion, 2, `deducted exactly once (${point})`); assert.equal(Object.keys(fin.appliedBattles).length, 1 + Object.keys(oldestV1().appliedBattles).length);
+		assert.equal(I6.bagOf(fin).potion, 2, `deducted exactly once (${point})`); assert.equal(Object.keys(fin.appliedBattles).length, 1 + Object.keys(oldestV1().appliedBattles).length);
 	}
 });
 

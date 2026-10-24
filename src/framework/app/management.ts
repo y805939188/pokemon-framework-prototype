@@ -3,6 +3,7 @@ import type { GameStatePort } from './ports.ts';
 import type { GameState } from '../rules/state.ts';
 import type { Content } from '../rules/types.ts';
 import type { Limits } from '../rules/limits.ts';
+import { InventoryRefused } from '../rules/inventory.ts';
 import { clone } from '../rules/value.ts';
 import { locateMember, SPECIAL_WALLPAPERS } from '../rules/storage.ts';
 import type { MemberPosition } from '../rules/storage.ts';
@@ -30,6 +31,7 @@ export interface ManagementOutcome { status:'applied'|'unchanged'|'held'|'cancel
 export interface ManagementOptions { limits:Limits; depositHeal:boolean; sourceAllowed:boolean; describeItem:(id:string)=>ItemDescriptor|null }
 
 export class ManagementSession {
+  private child=false;
   private seq=0;
   private token:string|null=null;
   private held:HeldIntent|null=null;
@@ -39,10 +41,12 @@ export class ManagementSession {
   private readonly options:ManagementOptions;
   constructor(state:GameStatePort,content:()=>Content,options:ManagementOptions) {this.state=state;this.content=content;this.options=options;}
   get active():boolean {return this.token!==null;}
-  get saveBlocked():boolean {return this.held!==null;}
-  invalidate():void {this.token=null;this.held=null;this.receipts.clear();}
+  get saveBlocked():boolean {return this.held!==null||this.child;}
+  invalidate():void {this.token=null;this.held=null;this.child=false;this.receipts.clear();}
   begin():string {if(this.token)throw new Error('management-active');this.token=`management:${++this.seq}`;this.receipts.clear();return this.token;}
-  end(token:string):ManagementOutcome {if(token!==this.token)return {status:'refused',reason:'stale-operation'};if(this.held)return {status:'refused',reason:'member-held'};this.invalidate();return {status:'unchanged'};}
+  reserveChild(token:string):void {if(token!==this.token)throw new Error('stale-operation');if(this.child||this.held)throw new Error('management-operation-active');this.child=true;}
+  releaseChild(token:string):void {if(token===this.token)this.child=false;}
+  end(token:string):ManagementOutcome {if(this.child)return {status:'refused',reason:'child-operation-active'};if(token!==this.token)return {status:'refused',reason:'stale-operation'};if(this.held)return {status:'refused',reason:'member-held'};this.invalidate();return {status:'unchanged'};}
   snapshot(token:string):{collection:GameState;held:import('../rules/types.ts').Member|null} {
     if(token!==this.token)throw new ManagementRefused('stale-operation');
     const game=this.state.read();
@@ -58,12 +62,13 @@ export class ManagementSession {
   }
   execute(token:string,requestId:string,request:ManagementRequest):ManagementOutcome {
     if(token!==this.token||!token)return {status:'refused',reason:'stale-operation'};
+    if(this.child)return {status:'refused',reason:'child-operation-active'};
     if(!requestId||requestId.length>64)return {status:'refused',reason:'invalid-request-id'};
     const fingerprint=JSON.stringify(request),old=this.receipts.get(requestId);
     if(old)return old.fingerprint===fingerprint?clone(old.outcome):{status:'refused',reason:'request-conflict'};
     if(this.receipts.size>=256){if(request.kind==='cancel-held'){this.held=null;return {status:'cancelled'};}return {status:'refused',reason:'session-request-limit'};}
     let outcome:ManagementOutcome;
-    try {outcome=this.apply(request);}catch(error){outcome={status:'refused',reason:error instanceof ManagementRefused?error.reason:'invalid',error:String(error instanceof Error?error.message:error)};}
+    try {outcome=this.apply(request);}catch(error){outcome={status:'refused',reason:error instanceof ManagementRefused?error.reason:error instanceof InventoryRefused?(error.reason==='inventory-full'?'bag-full':error.reason):'invalid',error:String(error instanceof Error?error.message:error)};}
     this.receipts.set(requestId,{fingerprint,outcome:clone(outcome)});
     // Completed receipts are bounded; an evicted ID is never accepted again in this session.
     // At 256 requests the UI must close/reopen, so we retain every accepted ID until that boundary.
@@ -88,8 +93,8 @@ export class ManagementSession {
       case 'release-held':if(!this.held)throw new ManagementRefused('nothing-held');if(!request.confirmed)return {status:'cancelled'};next=releaseHeld(game,this.held,context);this.state.replace(next);this.held=null;return {status:'applied',heldId:null};
       case 'move':if(this.held)throw new ManagementRefused('member-held');next=moveMember(game,request.source,request.target,request.expectedTargetId,context);break;
       case 'release':if(this.held)throw new ManagementRefused('member-held');if(!request.confirmed)return {status:'cancelled'};next=releaseMember(game,request.source);break;
-      case 'take-item':next=takeItem(game,request.source,this.options.limits);break;
-      case 'give-item':next=giveItem(game,request.source,request.item,{limits:this.options.limits,sourceAllowed:this.options.sourceAllowed,describe:this.options.describeItem});break;
+      case 'take-item':next=takeItem(game,request.source,this.options.limits,context.content);break;
+      case 'give-item':next=giveItem(game,request.source,request.item,{limits:this.options.limits,sourceAllowed:this.options.sourceAllowed,content:context.content,describe:this.options.describeItem});break;
       case 'swap-items': {
         const source=referenced(game,request.source),target=referenced(game,request.target);
         if((request.expectedSourceItem!==undefined&&source.item!==request.expectedSourceItem)||(request.expectedTargetItem!==undefined&&target.item!==request.expectedTargetItem))throw new ManagementRefused('stale-item');
