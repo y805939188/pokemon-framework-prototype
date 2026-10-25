@@ -27,7 +27,7 @@ for(const [method,miss] of Object.entries(F.secondaryMisses))test(`WP31 ${method
   assert.equal(scanEvolution(input).kind,'no-target');
 });
 
-test('BE07–10 / P53-17 guards precede all five families and do not read facts',async()=>{
+test('BE07–10 pure guard predicates / P53-17 guards precede all five families and do not read facts',async()=>{
   const {scanEvolution,planPostBattleEvolution}=await F.rules;
   let reads=0;
   for(const family of ['level','item','trade','battle','event'])for(const change of [{isEgg:true},{item:'Everstone'},{ability:'Battle Bond'},{shadow:true}]){
@@ -40,7 +40,7 @@ test('BE07–10 / P53-17 guards precede all five families and do not read facts'
   assert.equal(reads,0);
 });
 
-test('BE01–06 / P53-17 first-hit, current form and family isolation',async()=>{
+test('WP31 §4.3 / P53-17 first-hit, current form and family isolation',async()=>{
   const {scanEvolution}=await F.rules;
   const input=F.input([F.entry('LevelRain',30,'C'),F.entry('Item','waterstone')]);
   input.facts.weather=()=>{throw Error('must not query unrelated family');};
@@ -87,7 +87,7 @@ test('P53-19 Eevee metadata absent allows later happiness; unavailable/invalid c
   input.facts.mapId=V(0);assert.equal(scanEvolution(input).kind,'invalid');
 });
 
-test('CX01–05 / P53-19 hour boundaries use explicit clock without host time',async()=>{
+test('CX01 pure clock predicates / P53-19 hour boundaries use explicit clock without host time',async()=>{
   const {scanEvolution}=await F.rules;
   const expected={Day:[5,6,9,10,13,14,16,17,19],Night:[0,4,20,23],Morning:[5,6,9],Afternoon:[14,16],Evening:[17,19]};
   for(const [period,hit] of Object.entries(expected))for(const hour of [0,4,5,6,9,10,13,14,16,17,19,20,23]){
@@ -97,7 +97,7 @@ test('CX01–05 / P53-19 hour boundaries use explicit clock without host time',a
   for(const hour of [-1,24,NaN,1.5])assert.equal(scanEvolution(F.input([F.entry('LevelDay',30)],{facts:{hour:V(hour)}})).kind,'invalid');
 });
 
-test('CX06–08 / P53-19 exact world weather mapping, missing system is never None',async()=>{
+test('CX03–04 weather-predicate subset / P53-19 exact world weather mapping, missing system is never None',async()=>{
   const {scanEvolution}=await F.rules;
   for(const [weather,method] of Object.entries({None:'LevelNoWeather',Sun:'LevelSun',Rain:'LevelRain',Storm:'LevelRain',HeavyRain:'LevelRain',Fog:'LevelRain',Snow:'LevelSnow',Blizzard:'LevelSnow',Sandstorm:'LevelSandstorm'})){
     const input=F.input([F.entry(method,30)]);input.facts.weather=V(weather);assert.equal(scanEvolution(input).kind,'target');
@@ -118,7 +118,7 @@ test('P53-18 threshold equality, soft cap and Max255 keep h256 raw',async()=>{
   }
 });
 
-test('CX09–10 / P53-18 party includes self and fainted, excludes eggs, uses current content types',async()=>{
+test('CX08 party-predicate subset / P53-18 party includes self and fainted, excludes eggs, uses current content types',async()=>{
   const {scanEvolution}=await F.rules;
   for(const method of ['HasInParty','LevelDarkInParty']){
     const input=F.input([F.entry(method,method==='HasInParty'?'A':30)]);
@@ -128,7 +128,7 @@ test('CX09–10 / P53-18 party includes self and fainted, excludes eggs, uses cu
   }
 });
 
-test('CX30–34 / P53-21 TradeSpecies compares incoming self and only reads partner after self match',async()=>{
+test('CX31–32 TradeSpecies-predicate subset / P53-21 compares incoming self and only reads partner after self match',async()=>{
   const {scanEvolution}=await F.rules;
   const input=F.input([F.entry('TradeSpecies','C')],{trigger:{family:'trade',partner:null}});
   assert.equal(scanEvolution(input).kind,'no-target');
@@ -138,7 +138,7 @@ test('CX30–34 / P53-21 TradeSpecies compares incoming self and only reads part
   assert.equal(input.trigger.partner.item,'everstone');
 });
 
-test('BE29/CX29 / P53-20 complete battle plan owns tentative R; unknown never leaks it',async()=>{
+test('BE29 readiness-plan subset + r3 §4.2a / P53-20 complete battle plan owns tentative R; unknown never leaks it',async()=>{
   const {scanEvolution,planPostBattleEvolution}=await F.rules;
   const input=F.input([F.entry('EventAfterDamageTaken',2),F.entry('BattleDealCriticalHit',3)],{member:F.member({readyToEvolve:false}),trigger:{family:'battle'}});
   input.facts.criticalHits={status:'unavailable'};
@@ -177,7 +177,7 @@ test('P53-20 damaged expected L0 differs from legal captured absence and indepen
   assert.equal(planPostBattleEvolution({...independent,levelBefore:V(29)}).kind,'target');
 });
 
-test('CX27–29 / P53-20 faint eligibility accepts caller logical HP and default checks fainted',async()=>{
+test('CX20 eligibility-predicate subset + r3 §7.3 / P53-20 accepts caller logical HP and default checks fainted',async()=>{
   const {planPostBattleEvolution}=await F.rules;
   const input=F.input([F.entry('Level',30)]);
   assert.equal(planPostBattleEvolution({...input,levelBefore:V(29),checkFainted:false,eligibleHp:0}).kind,'no-target');
@@ -185,7 +185,7 @@ test('CX27–29 / P53-20 faint eligibility accepts caller logical HP and default
   input.member.hp=0;assert.equal(planPostBattleEvolution({...input,levelBefore:V(29)}).kind,'target');
 });
 
-test('CX30–31 / P53-21 event number can repeat and R unknown only blocks matching R-dependent event',async()=>{
+test('CX26 + BE32–33 event-predicate subset / P53-21 event number can repeat and R unknown only blocks matching R-dependent event',async()=>{
   const {scanEvolution}=await F.rules;
   const input=F.input([F.entry('EventAfterDamageTaken',2),F.entry('Event',0,'C')],{trigger:{family:'event',event:2}});
   assert.equal(scanEvolution(input).kind,'target');assert.equal(scanEvolution(input).kind,'target');
@@ -205,7 +205,7 @@ test('P53-19/23 regional destinations use ruleSpecies, metadata absence and stor
   delete input.content.species.B.defaultForm;input.content.species.A.ruleSpecies='Koffing';input.facts.mapMetadata=V({region:2});assert.equal(scanEvolution(input).target.form,1);
 });
 
-test('CX11–19 / P53-44 normalized facts include substitute/confusion and reset D without clearing K',async()=>{
+test('WP32 §3.2–3.3 / P53-44 limited normalized-input helper resets D without clearing K',async()=>{
   const {applyEvolutionBattleFact:step}=await F.rules;
   const empty=F.freeze({criticalHits:0,damageTaken:0});
   const crit={kind:'critical-hit',playerOwned:true,critical:true,unaffected:false,absorbed:false};

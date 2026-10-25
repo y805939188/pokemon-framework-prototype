@@ -19,6 +19,8 @@
 
 `METHOD-SUPPORT.csv` 逐项登记 B 的全部 64 方法；64 个具名正／拒绝用例之外，还有复合方法在等级／友好／物品满足时独立第二条件失败的反例。None、反向关系与 Shedinja 不作为目标；反向关系仍由 B 独立查询，不拼进前向扫描表。
 
+正式编号的准确窄映射见 `VECTOR-MAPPING.zh.md`。这些是纯谓词、意图或草稿层的规则证据，**不把标题中出现的 BE/CX 编号或连续范围计为整个正式场景通过**。初版 `1a966aa` 的若干标题编号错位，后续仅修正标题及映射，保留所有原始日志和失败史；原规则与断言语义不变。
+
 覆盖 P53-17–21 纯规则：统一守卫、当前 form、首命中、无关家族不读 provider、时段边界、世界天气映射、地图 absence、L0 合法缺席／损坏分叉、升级未知不跨族且不泄漏半个 R、TradeSpecies 保自身比较、事件可复用及 R unknown 屏障。P53-22 只覆盖纯取消权限与技术终止结果。
 
 覆盖 P53-23/24 成功计划：实体/PID/Owner/来源/昵称/自然性格/statNature/IV/EV/球/首招等保真；exp27000 Medium→Slow 重派 L27、HP0 保0；requested/effective 特性槽分开；null 唯一恢复／重名最小槽诊断／可信覆盖与不认识时拒绝；目标默认 form→非零目标记录→保旧 form；通常保性别、固定性别目标重派；旧条目顺序首个成功后置、实际目标＋当前持物消费；额外体无 id、保 PID、清指定字段／全治、满队／无球不阻主体。
@@ -27,7 +29,7 @@
 
 ## 实际验证与限界
 
-详见 `verification/SUMMARY.json` 和两份定向／可用旧回归 TAP；`regressions.tap` 保留额外四套回归尝试的完整失败史。core/app/framework 类型检查、导入边界与 build:engine 已通过。新模块未登记共享 `rules/index.ts` 或总 runner；上述构建不证明新公开入口已经接通，直接模块测试才是本次 D 执行证据。
+初版 `1a966aa` 的实际执行见 `verification/SUMMARY.json` 和两份定向／可用旧回归 TAP；`regressions.tap` 保留额外四套回归尝试的完整失败史。这些文件保留原字节及当时标题，摘要中的源码 hash 对应初版，不是标题修订后的当前测试文件。标题／映射修订另见 `verification/MAPPING-REVISION.json` 及 `directed-mapping-revision.tap`，修订后重跑同一套 136 项，未新增规则覆盖。core/app/framework 类型检查、导入边界与 build:engine 的通过证据仍属初版；本次未重跑这些没有变化的规则检查。新模块未登记共享 `rules/index.ts` 或总 runner；上述构建不证明新公开入口已经接通，直接模块测试才是本次 D 执行证据。
 
 四套旧回归尝试 64 项中 63 通过，P51-05 因本树没有暂存 `js/engine/showdown/dist/sim` 失败；没有修改旧断言或伪造引擎。随后只运行无需此产物的既有 friendship／learning-candidates／member-bridges 三套并单列结果。不宣称完整 quick/headless 通过。
 

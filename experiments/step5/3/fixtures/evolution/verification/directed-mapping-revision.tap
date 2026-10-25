@@ -1,0 +1,830 @@
+TAP version 13
+# (node:44360) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: P53-17 all 64 B method identities have explicit D execution registrations
+ok 1 - P53-17 all 64 B method identities have explicit D execution registrations
+  ---
+  duration_ms: 47.467375
+  type: 'test'
+  ...
+# Subtest: WP31 method Level: named formal-derived positive and refusal
+ok 2 - WP31 method Level: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.884292
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelMale: named formal-derived positive and refusal
+ok 3 - WP31 method LevelMale: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.176125
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelFemale: named formal-derived positive and refusal
+ok 4 - WP31 method LevelFemale: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.2095
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelDay: named formal-derived positive and refusal
+ok 5 - WP31 method LevelDay: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.264208
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelNight: named formal-derived positive and refusal
+ok 6 - WP31 method LevelNight: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.210541
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelMorning: named formal-derived positive and refusal
+ok 7 - WP31 method LevelMorning: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.09725
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelAfternoon: named formal-derived positive and refusal
+ok 8 - WP31 method LevelAfternoon: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.085958
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelEvening: named formal-derived positive and refusal
+ok 9 - WP31 method LevelEvening: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.185
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelNoWeather: named formal-derived positive and refusal
+ok 10 - WP31 method LevelNoWeather: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.373666
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelSun: named formal-derived positive and refusal
+ok 11 - WP31 method LevelSun: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.096459
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelRain: named formal-derived positive and refusal
+ok 12 - WP31 method LevelRain: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.083458
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelSnow: named formal-derived positive and refusal
+ok 13 - WP31 method LevelSnow: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.073208
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelSandstorm: named formal-derived positive and refusal
+ok 14 - WP31 method LevelSandstorm: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.072
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelCycling: named formal-derived positive and refusal
+ok 15 - WP31 method LevelCycling: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.0815
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelSurfing: named formal-derived positive and refusal
+ok 16 - WP31 method LevelSurfing: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.531542
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelDiving: named formal-derived positive and refusal
+ok 17 - WP31 method LevelDiving: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.115833
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelDarkness: named formal-derived positive and refusal
+ok 18 - WP31 method LevelDarkness: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.125917
+  type: 'test'
+  ...
+# Subtest: WP31 method LevelDarkInParty: named formal-derived positive and refusal
+ok 19 - WP31 method LevelDarkInParty: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.11075
+  type: 'test'
+  ...
+# Subtest: WP31 method AttackGreater: named formal-derived positive and refusal
+ok 20 - WP31 method AttackGreater: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.131209
+  type: 'test'
+  ...
+# Subtest: WP31 method AtkDefEqual: named formal-derived positive and refusal
+ok 21 - WP31 method AtkDefEqual: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.074791
+  type: 'test'
+  ...
+# Subtest: WP31 method DefenseGreater: named formal-derived positive and refusal
+ok 22 - WP31 method DefenseGreater: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.069083
+  type: 'test'
+  ...
+# Subtest: WP31 method Silcoon: named formal-derived positive and refusal
+ok 23 - WP31 method Silcoon: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.055333
+  type: 'test'
+  ...
+# Subtest: WP31 method Cascoon: named formal-derived positive and refusal
+ok 24 - WP31 method Cascoon: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.259875
+  type: 'test'
+  ...
+# Subtest: WP31 method Ninjask: named formal-derived positive and refusal
+ok 25 - WP31 method Ninjask: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.059
+  type: 'test'
+  ...
+# Subtest: WP31 method Happiness: named formal-derived positive and refusal
+ok 26 - WP31 method Happiness: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.077125
+  type: 'test'
+  ...
+# Subtest: WP31 method HappinessMale: named formal-derived positive and refusal
+ok 27 - WP31 method HappinessMale: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.057375
+  type: 'test'
+  ...
+# Subtest: WP31 method HappinessFemale: named formal-derived positive and refusal
+ok 28 - WP31 method HappinessFemale: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.0565
+  type: 'test'
+  ...
+# Subtest: WP31 method HappinessDay: named formal-derived positive and refusal
+ok 29 - WP31 method HappinessDay: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.055666
+  type: 'test'
+  ...
+# Subtest: WP31 method HappinessNight: named formal-derived positive and refusal
+ok 30 - WP31 method HappinessNight: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.055625
+  type: 'test'
+  ...
+# Subtest: WP31 method HappinessMove: named formal-derived positive and refusal
+ok 31 - WP31 method HappinessMove: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.082166
+  type: 'test'
+  ...
+# Subtest: WP31 method HappinessMoveType: named formal-derived positive and refusal
+ok 32 - WP31 method HappinessMoveType: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.102958
+  type: 'test'
+  ...
+# Subtest: WP31 method HappinessHoldItem: named formal-derived positive and refusal
+ok 33 - WP31 method HappinessHoldItem: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.102042
+  type: 'test'
+  ...
+# Subtest: WP31 method MaxHappiness: named formal-derived positive and refusal
+ok 34 - WP31 method MaxHappiness: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.070625
+  type: 'test'
+  ...
+# Subtest: WP31 method Beauty: named formal-derived positive and refusal
+ok 35 - WP31 method Beauty: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.087333
+  type: 'test'
+  ...
+# Subtest: WP31 method HoldItem: named formal-derived positive and refusal
+ok 36 - WP31 method HoldItem: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.0645
+  type: 'test'
+  ...
+# Subtest: WP31 method HoldItemMale: named formal-derived positive and refusal
+ok 37 - WP31 method HoldItemMale: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.0635
+  type: 'test'
+  ...
+# Subtest: WP31 method HoldItemFemale: named formal-derived positive and refusal
+ok 38 - WP31 method HoldItemFemale: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.0625
+  type: 'test'
+  ...
+# Subtest: WP31 method DayHoldItem: named formal-derived positive and refusal
+ok 39 - WP31 method DayHoldItem: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.065125
+  type: 'test'
+  ...
+# Subtest: WP31 method NightHoldItem: named formal-derived positive and refusal
+ok 40 - WP31 method NightHoldItem: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.066334
+  type: 'test'
+  ...
+# Subtest: WP31 method HoldItemHappiness: named formal-derived positive and refusal
+ok 41 - WP31 method HoldItemHappiness: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.06175
+  type: 'test'
+  ...
+# Subtest: WP31 method HasMove: named formal-derived positive and refusal
+ok 42 - WP31 method HasMove: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.082792
+  type: 'test'
+  ...
+# Subtest: WP31 method HasMoveType: named formal-derived positive and refusal
+ok 43 - WP31 method HasMoveType: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.065875
+  type: 'test'
+  ...
+# Subtest: WP31 method HasInParty: named formal-derived positive and refusal
+ok 44 - WP31 method HasInParty: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.083292
+  type: 'test'
+  ...
+# Subtest: WP31 method Location: named formal-derived positive and refusal
+ok 45 - WP31 method Location: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.082084
+  type: 'test'
+  ...
+# Subtest: WP31 method LocationFlag: named formal-derived positive and refusal
+ok 46 - WP31 method LocationFlag: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.089375
+  type: 'test'
+  ...
+# Subtest: WP31 method Region: named formal-derived positive and refusal
+ok 47 - WP31 method Region: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.07525
+  type: 'test'
+  ...
+# Subtest: WP31 method Item: named formal-derived positive and refusal
+ok 48 - WP31 method Item: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.833667
+  type: 'test'
+  ...
+# Subtest: WP31 method ItemMale: named formal-derived positive and refusal
+ok 49 - WP31 method ItemMale: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.109875
+  type: 'test'
+  ...
+# Subtest: WP31 method ItemFemale: named formal-derived positive and refusal
+ok 50 - WP31 method ItemFemale: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.082
+  type: 'test'
+  ...
+# Subtest: WP31 method ItemDay: named formal-derived positive and refusal
+ok 51 - WP31 method ItemDay: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.085584
+  type: 'test'
+  ...
+# Subtest: WP31 method ItemNight: named formal-derived positive and refusal
+ok 52 - WP31 method ItemNight: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.06525
+  type: 'test'
+  ...
+# Subtest: WP31 method ItemHappiness: named formal-derived positive and refusal
+ok 53 - WP31 method ItemHappiness: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.058125
+  type: 'test'
+  ...
+# Subtest: WP31 method Trade: named formal-derived positive and refusal
+ok 54 - WP31 method Trade: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.081916
+  type: 'test'
+  ...
+# Subtest: WP31 method TradeMale: named formal-derived positive and refusal
+ok 55 - WP31 method TradeMale: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.064916
+  type: 'test'
+  ...
+# Subtest: WP31 method TradeFemale: named formal-derived positive and refusal
+ok 56 - WP31 method TradeFemale: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.098834
+  type: 'test'
+  ...
+# Subtest: WP31 method TradeDay: named formal-derived positive and refusal
+ok 57 - WP31 method TradeDay: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.0605
+  type: 'test'
+  ...
+# Subtest: WP31 method TradeNight: named formal-derived positive and refusal
+ok 58 - WP31 method TradeNight: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.077208
+  type: 'test'
+  ...
+# Subtest: WP31 method TradeItem: named formal-derived positive and refusal
+ok 59 - WP31 method TradeItem: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.063708
+  type: 'test'
+  ...
+# Subtest: WP31 method TradeSpecies: named formal-derived positive and refusal
+ok 60 - WP31 method TradeSpecies: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.062208
+  type: 'test'
+  ...
+# Subtest: WP31 method BattleDealCriticalHit: named formal-derived positive and refusal
+ok 61 - WP31 method BattleDealCriticalHit: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.067625
+  type: 'test'
+  ...
+# Subtest: WP31 method EventAfterDamageTaken: named formal-derived positive and refusal
+ok 62 - WP31 method EventAfterDamageTaken: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.062291
+  type: 'test'
+  ...
+# Subtest: WP31 method Event: named formal-derived positive and refusal
+ok 63 - WP31 method Event: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.05625
+  type: 'test'
+  ...
+# Subtest: WP31 method Shedinja: named formal-derived positive and refusal
+ok 64 - WP31 method Shedinja: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.059875
+  type: 'test'
+  ...
+# Subtest: WP31 method None: named formal-derived positive and refusal
+ok 65 - WP31 method None: named formal-derived positive and refusal
+  ---
+  duration_ms: 0.052292
+  type: 'test'
+  ...
+# Subtest: WP31 LevelMale: independent secondary condition refuses at valid threshold
+ok 66 - WP31 LevelMale: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.076166
+  type: 'test'
+  ...
+# Subtest: WP31 LevelFemale: independent secondary condition refuses at valid threshold
+ok 67 - WP31 LevelFemale: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.02225
+  type: 'test'
+  ...
+# Subtest: WP31 LevelDay: independent secondary condition refuses at valid threshold
+ok 68 - WP31 LevelDay: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.023375
+  type: 'test'
+  ...
+# Subtest: WP31 LevelNight: independent secondary condition refuses at valid threshold
+ok 69 - WP31 LevelNight: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.021875
+  type: 'test'
+  ...
+# Subtest: WP31 LevelMorning: independent secondary condition refuses at valid threshold
+ok 70 - WP31 LevelMorning: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.021791
+  type: 'test'
+  ...
+# Subtest: WP31 LevelAfternoon: independent secondary condition refuses at valid threshold
+ok 71 - WP31 LevelAfternoon: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.021125
+  type: 'test'
+  ...
+# Subtest: WP31 LevelEvening: independent secondary condition refuses at valid threshold
+ok 72 - WP31 LevelEvening: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.021209
+  type: 'test'
+  ...
+# Subtest: WP31 LevelNoWeather: independent secondary condition refuses at valid threshold
+ok 73 - WP31 LevelNoWeather: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.022583
+  type: 'test'
+  ...
+# Subtest: WP31 LevelSun: independent secondary condition refuses at valid threshold
+ok 74 - WP31 LevelSun: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.080292
+  type: 'test'
+  ...
+# Subtest: WP31 LevelRain: independent secondary condition refuses at valid threshold
+ok 75 - WP31 LevelRain: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.031
+  type: 'test'
+  ...
+# Subtest: WP31 LevelSnow: independent secondary condition refuses at valid threshold
+ok 76 - WP31 LevelSnow: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.024875
+  type: 'test'
+  ...
+# Subtest: WP31 LevelSandstorm: independent secondary condition refuses at valid threshold
+ok 77 - WP31 LevelSandstorm: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.022833
+  type: 'test'
+  ...
+# Subtest: WP31 LevelCycling: independent secondary condition refuses at valid threshold
+ok 78 - WP31 LevelCycling: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.022458
+  type: 'test'
+  ...
+# Subtest: WP31 LevelSurfing: independent secondary condition refuses at valid threshold
+ok 79 - WP31 LevelSurfing: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.021875
+  type: 'test'
+  ...
+# Subtest: WP31 LevelDiving: independent secondary condition refuses at valid threshold
+ok 80 - WP31 LevelDiving: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.023166
+  type: 'test'
+  ...
+# Subtest: WP31 LevelDarkness: independent secondary condition refuses at valid threshold
+ok 81 - WP31 LevelDarkness: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.022292
+  type: 'test'
+  ...
+# Subtest: WP31 LevelDarkInParty: independent secondary condition refuses at valid threshold
+ok 82 - WP31 LevelDarkInParty: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.026667
+  type: 'test'
+  ...
+# Subtest: WP31 AttackGreater: independent secondary condition refuses at valid threshold
+ok 83 - WP31 AttackGreater: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.032166
+  type: 'test'
+  ...
+# Subtest: WP31 AtkDefEqual: independent secondary condition refuses at valid threshold
+ok 84 - WP31 AtkDefEqual: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.027459
+  type: 'test'
+  ...
+# Subtest: WP31 DefenseGreater: independent secondary condition refuses at valid threshold
+ok 85 - WP31 DefenseGreater: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.024166
+  type: 'test'
+  ...
+# Subtest: WP31 Silcoon: independent secondary condition refuses at valid threshold
+ok 86 - WP31 Silcoon: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.028625
+  type: 'test'
+  ...
+# Subtest: WP31 Cascoon: independent secondary condition refuses at valid threshold
+ok 87 - WP31 Cascoon: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.020584
+  type: 'test'
+  ...
+# Subtest: WP31 HappinessMale: independent secondary condition refuses at valid threshold
+ok 88 - WP31 HappinessMale: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.0215
+  type: 'test'
+  ...
+# Subtest: WP31 HappinessFemale: independent secondary condition refuses at valid threshold
+ok 89 - WP31 HappinessFemale: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.021291
+  type: 'test'
+  ...
+# Subtest: WP31 HappinessDay: independent secondary condition refuses at valid threshold
+ok 90 - WP31 HappinessDay: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.021459
+  type: 'test'
+  ...
+# Subtest: WP31 HappinessNight: independent secondary condition refuses at valid threshold
+ok 91 - WP31 HappinessNight: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.022334
+  type: 'test'
+  ...
+# Subtest: WP31 HappinessMove: independent secondary condition refuses at valid threshold
+ok 92 - WP31 HappinessMove: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.022
+  type: 'test'
+  ...
+# Subtest: WP31 HappinessMoveType: independent secondary condition refuses at valid threshold
+ok 93 - WP31 HappinessMoveType: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.026667
+  type: 'test'
+  ...
+# Subtest: WP31 HappinessHoldItem: independent secondary condition refuses at valid threshold
+ok 94 - WP31 HappinessHoldItem: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.030958
+  type: 'test'
+  ...
+# Subtest: WP31 HoldItemMale: independent secondary condition refuses at valid threshold
+ok 95 - WP31 HoldItemMale: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.02225
+  type: 'test'
+  ...
+# Subtest: WP31 HoldItemFemale: independent secondary condition refuses at valid threshold
+ok 96 - WP31 HoldItemFemale: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.021959
+  type: 'test'
+  ...
+# Subtest: WP31 DayHoldItem: independent secondary condition refuses at valid threshold
+ok 97 - WP31 DayHoldItem: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.022709
+  type: 'test'
+  ...
+# Subtest: WP31 NightHoldItem: independent secondary condition refuses at valid threshold
+ok 98 - WP31 NightHoldItem: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.021791
+  type: 'test'
+  ...
+# Subtest: WP31 HoldItemHappiness: independent secondary condition refuses at valid threshold
+ok 99 - WP31 HoldItemHappiness: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.023292
+  type: 'test'
+  ...
+# Subtest: WP31 ItemMale: independent secondary condition refuses at valid threshold
+ok 100 - WP31 ItemMale: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.022709
+  type: 'test'
+  ...
+# Subtest: WP31 ItemFemale: independent secondary condition refuses at valid threshold
+ok 101 - WP31 ItemFemale: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.027917
+  type: 'test'
+  ...
+# Subtest: WP31 ItemDay: independent secondary condition refuses at valid threshold
+ok 102 - WP31 ItemDay: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.022834
+  type: 'test'
+  ...
+# Subtest: WP31 ItemNight: independent secondary condition refuses at valid threshold
+ok 103 - WP31 ItemNight: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.059125
+  type: 'test'
+  ...
+# Subtest: WP31 ItemHappiness: independent secondary condition refuses at valid threshold
+ok 104 - WP31 ItemHappiness: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.033208
+  type: 'test'
+  ...
+# Subtest: WP31 TradeMale: independent secondary condition refuses at valid threshold
+ok 105 - WP31 TradeMale: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.03025
+  type: 'test'
+  ...
+# Subtest: WP31 TradeFemale: independent secondary condition refuses at valid threshold
+ok 106 - WP31 TradeFemale: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.028291
+  type: 'test'
+  ...
+# Subtest: WP31 TradeDay: independent secondary condition refuses at valid threshold
+ok 107 - WP31 TradeDay: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.049792
+  type: 'test'
+  ...
+# Subtest: WP31 TradeNight: independent secondary condition refuses at valid threshold
+ok 108 - WP31 TradeNight: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.025709
+  type: 'test'
+  ...
+# Subtest: WP31 TradeItem: independent secondary condition refuses at valid threshold
+ok 109 - WP31 TradeItem: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.024708
+  type: 'test'
+  ...
+# Subtest: WP31 TradeSpecies: independent secondary condition refuses at valid threshold
+ok 110 - WP31 TradeSpecies: independent secondary condition refuses at valid threshold
+  ---
+  duration_ms: 0.040458
+  type: 'test'
+  ...
+# Subtest: BE07–10 pure guard predicates / P53-17 guards precede all five families and do not read facts
+ok 111 - BE07–10 pure guard predicates / P53-17 guards precede all five families and do not read facts
+  ---
+  duration_ms: 0.345125
+  type: 'test'
+  ...
+# Subtest: WP31 §4.3 / P53-17 first-hit, current form and family isolation
+ok 112 - WP31 §4.3 / P53-17 first-hit, current form and family isolation
+  ---
+  duration_ms: 0.114083
+  type: 'test'
+  ...
+# Subtest: P53-19/20 four-state facts and necessary-condition short circuit
+ok 113 - P53-19/20 four-state facts and necessary-condition short circuit
+  ---
+  duration_ms: 0.133459
+  type: 'test'
+  ...
+# Subtest: P53-19 Eevee metadata absent allows later happiness; unavailable/invalid cannot guess
+ok 114 - P53-19 Eevee metadata absent allows later happiness; unavailable/invalid cannot guess
+  ---
+  duration_ms: 0.116208
+  type: 'test'
+  ...
+# Subtest: CX01 pure clock predicates / P53-19 hour boundaries use explicit clock without host time
+ok 115 - CX01 pure clock predicates / P53-19 hour boundaries use explicit clock without host time
+  ---
+  duration_ms: 0.444084
+  type: 'test'
+  ...
+# Subtest: CX03–04 weather-predicate subset / P53-19 exact world weather mapping, missing system is never None
+ok 116 - CX03–04 weather-predicate subset / P53-19 exact world weather mapping, missing system is never None
+  ---
+  duration_ms: 0.09575
+  type: 'test'
+  ...
+# Subtest: P53-18 threshold equality, soft cap and Max255 keep h256 raw
+ok 117 - P53-18 threshold equality, soft cap and Max255 keep h256 raw
+  ---
+  duration_ms: 0.114666
+  type: 'test'
+  ...
+# Subtest: CX08 party-predicate subset / P53-18 party includes self and fainted, excludes eggs, uses current content types
+ok 118 - CX08 party-predicate subset / P53-18 party includes self and fainted, excludes eggs, uses current content types
+  ---
+  duration_ms: 0.071
+  type: 'test'
+  ...
+# Subtest: CX31–32 TradeSpecies-predicate subset / P53-21 compares incoming self and only reads partner after self match
+ok 119 - CX31–32 TradeSpecies-predicate subset / P53-21 compares incoming self and only reads partner after self match
+  ---
+  duration_ms: 0.058833
+  type: 'test'
+  ...
+# Subtest: BE29 readiness-plan subset + r3 §4.2a / P53-20 complete battle plan owns tentative R; unknown never leaks it
+ok 120 - BE29 readiness-plan subset + r3 §4.2a / P53-20 complete battle plan owns tentative R; unknown never leaks it
+  ---
+  duration_ms: 0.148042
+  type: 'test'
+  ...
+# Subtest: P53-19/20 unavailable and invalid are explicit; thrown/malformed providers cannot become false
+ok 121 - P53-19/20 unavailable and invalid are explicit; thrown/malformed providers cannot become false
+  ---
+  duration_ms: 0.089708
+  type: 'test'
+  ...
+# Subtest: P53-20 damaged expected L0 differs from legal captured absence and independent members
+ok 122 - P53-20 damaged expected L0 differs from legal captured absence and independent members
+  ---
+  duration_ms: 0.052708
+  type: 'test'
+  ...
+# Subtest: CX20 eligibility-predicate subset + r3 §7.3 / P53-20 accepts caller logical HP and default checks fainted
+ok 123 - CX20 eligibility-predicate subset + r3 §7.3 / P53-20 accepts caller logical HP and default checks fainted
+  ---
+  duration_ms: 0.061041
+  type: 'test'
+  ...
+# Subtest: CX26 + BE32–33 event-predicate subset / P53-21 event number can repeat and R unknown only blocks matching R-dependent event
+ok 124 - CX26 + BE32–33 event-predicate subset / P53-21 event number can repeat and R unknown only blocks matching R-dependent event
+  ---
+  duration_ms: 0.0595
+  type: 'test'
+  ...
+# Subtest: P53-19/23 regional destinations use ruleSpecies, metadata absence and stored >=2 lock
+ok 125 - P53-19/23 regional destinations use ruleSpecies, metadata absence and stored >=2 lock
+  ---
+  duration_ms: 0.065167
+  type: 'test'
+  ...
+# Subtest: WP32 §3.2–3.3 / P53-44 limited normalized-input helper resets D without clearing K
+ok 126 - WP32 §3.2–3.3 / P53-44 limited normalized-input helper resets D without clearing K
+  ---
+  duration_ms: 0.352541
+  type: 'test'
+  ...
+# (node:44361) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WP18 §3.4 + BE26 HP invariant / P53-23 metadata retention and exp27000 Medium->Slow L27, HP0 remains 0
+ok 127 - WP18 §3.4 + BE26 HP invariant / P53-23 metadata retention and exp27000 Medium->Slow L27, HP0 remains 0
+  ---
+  duration_ms: 41.224417
+  type: 'test'
+  ...
+# Subtest: BE19/20 pure species-change subset / P53-23 target form priority and fixed gender, normal gender retained
+ok 128 - BE19/20 pure species-change subset / P53-23 target form priority and fixed gender, normal gender retained
+  ---
+  duration_ms: 1.340167
+  type: 'test'
+  ...
+# Subtest: P53-23 requested/effective ability slots preserve missing hidden fallback and legal empty slots
+ok 129 - P53-23 requested/effective ability slots preserve missing hidden fallback and legal empty slots
+  ---
+  duration_ms: 0.3605
+  type: 'test'
+  ...
+# Subtest: D53-04c / P53-23 null ability unique, ambiguous minimum, trusted override and unknown rejection
+ok 130 - D53-04c / P53-23 null ability unique, ambiguous minimum, trusted override and unknown rejection
+  ---
+  duration_ms: 0.350542
+  type: 'test'
+  ...
+# Subtest: BE25/35 pure post-action plans / P53-21/23 consumption matches actual target and current held item, not old condition
+ok 131 - BE25/35 pure post-action plans / P53-21/23 consumption matches actual target and current held item, not old condition
+  ---
+  duration_ms: 0.314709
+  type: 'test'
+  ...
+# Subtest: BE22 pure extra-member draft / P53-24 Shedinja body uses old individual, has no ID/ordinal, heals and clears specific fields
+ok 132 - BE22 pure extra-member draft / P53-24 Shedinja body uses old individual, has no ID/ordinal, heals and clears specific fields
+  ---
+  duration_ms: 0.245917
+  type: 'test'
+  ...
+# Subtest: BE23/24 pure post-action plans / P53-24 space before ball; full/no-ball skip copy and keep primary success
+ok 133 - BE23/24 pure post-action plans / P53-24 space before ball; full/no-ball skip copy and keep primary success
+  ---
+  duration_ms: 0.240792
+  type: 'test'
+  ...
+# Subtest: WP31 §5.2 step 3 / P53-24 old-order first successful post handler wins
+ok 134 - WP31 §5.2 step 3 / P53-24 old-order first successful post handler wins
+  ---
+  duration_ms: 0.169042
+  type: 'test'
+  ...
+# Subtest: P53-19/23 selected destination remains latched and stale member/entry refuses without writes
+ok 135 - P53-19/23 selected destination remains latched and stale member/entry refuses without writes
+  ---
+  duration_ms: 0.331875
+  type: 'test'
+  ...
+# Subtest: BE11/12/21 / P53-22 pure completion permission: cancel has no success plan; technical abort not cancellation
+ok 136 - BE11/12/21 / P53-22 pure completion permission: cancel has no success plan; technical abort not cancellation
+  ---
+  duration_ms: 0.75075
+  type: 'test'
+  ...
+1..136
+# tests 136
+# suites 0
+# pass 136
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 148.032584

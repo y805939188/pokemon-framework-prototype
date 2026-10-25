@@ -7,7 +7,7 @@ const resources=(extra={})=>({partySize:5,partyCapacity:6,pokeBall:{id:'pokeball
 async function selected(input){const {scanEvolution}=await F.rules;const selection=scanEvolution(input);assert.equal(selection.kind,'target');return selection;}
 async function plan(input,options={}){const {planEvolutionSuccess}=await F.success;return planEvolutionSuccess({member:input.member,content:input.content,selection:await selected(input),...options});}
 
-test('BE16–20/26 / P53-23 exact metadata retention and exp27000 Medium->Slow L27, HP0 remains 0',async()=>{
+test('WP18 §3.4 + BE26 HP invariant / P53-23 metadata retention and exp27000 Medium->Slow L27, HP0 remains 0',async()=>{
   const {computeStats}=await F.growth;
   for(const hp of [0,40]){
     const input=F.input([F.entry('Level',30)]);input.member.hp=hp;
@@ -28,7 +28,7 @@ test('BE16–20/26 / P53-23 exact metadata retention and exp27000 Medium->Slow L
   }
 });
 
-test('BE19/20 / P53-23 target form priority and fixed gender, normal gender retained',async()=>{
+test('BE19/20 pure species-change subset / P53-23 target form priority and fixed gender, normal gender retained',async()=>{
   for(const [entryForm,defaultForm,recordForm,oldForm,expected] of [[undefined,3,0,2,3],[2,undefined,2,1,2],[undefined,undefined,0,2,2],[0,undefined,0,2,2]]){
     const input=F.input([F.entry('Level',30,'B',{...(entryForm===undefined?{}:{form:entryForm})})]);input.member.form=oldForm;
     Object.assign(input.content.species.B,{form:recordForm,...(defaultForm===undefined?{}:{defaultForm})});
@@ -62,7 +62,7 @@ test('D53-04c / P53-23 null ability unique, ambiguous minimum, trusted override 
   assert.equal(input.member.abilityIndex,null);assert.equal(input.member.ability,'Unknown Override');
 });
 
-test('BE25/35 / P53-21/23 post consumption matches actual target and current held item, not old condition',async()=>{
+test('BE25/35 pure post-action plans / P53-21/23 consumption matches actual target and current held item, not old condition',async()=>{
   const input=F.input([F.entry('DayHoldItem','waterstone','B'),F.entry('HoldItem','waterstone','C')]);
   const selection=await selected(input),{planEvolutionSuccess}=await F.success;
   input.facts.hour=V(23); // selection latched; successful post action does not recheck day.
@@ -76,7 +76,7 @@ test('BE25/35 / P53-21/23 post consumption matches actual target and current hel
   const tradeOut=await plan(trade);assert.equal(tradeOut.member.item,'');assert.equal(trade.trigger.partner.item,'other');
 });
 
-test('BE22/CX37 / P53-24 Shedinja body uses old individual, has no ID/ordinal, heals and clears specific fields',async()=>{
+test('BE22 pure extra-member draft / P53-24 Shedinja body uses old individual, has no ID/ordinal, heals and clears specific fields',async()=>{
   const input=F.input([F.entry('Ninjask',30),F.entry('Shedinja',undefined,'Extra')]);
   const original=JSON.stringify(input),out=await plan(input,{resources:resources()});
   assert.equal(out.kind,'ready');assert.equal(out.member.species,'B');assert.equal(out.member.nickname,'Buddy');assert.equal(out.member.item,'waterstone');
@@ -90,7 +90,7 @@ test('BE22/CX37 / P53-24 Shedinja body uses old individual, has no ID/ordinal, h
   draft.owner.name='independent';assert.equal(input.member.owner.name,'Old OT');assert.equal(out.member.owner.name,'Old OT');
 });
 
-test('BE23/24 / P53-24 space before ball; full/no-ball skip copy and keep primary success',async()=>{
+test('BE23/24 pure post-action plans / P53-24 space before ball; full/no-ball skip copy and keep primary success',async()=>{
   const input=F.input([F.entry('Ninjask',30),F.entry('Shedinja',undefined,'Extra')]);
   const full={partySize:6,partyCapacity:6,get pokeBall(){throw Error('full must short circuit inventory');}};
   const out=await plan(input,{resources:full});assert.equal(out.kind,'ready');assert.equal(out.afterAction.extraSkipped,'party-full');assert.equal(out.member.species,'B');
@@ -99,7 +99,7 @@ test('BE23/24 / P53-24 space before ball; full/no-ball skip copy and keep primar
   assert.equal(input.member.species,'A');
 });
 
-test('BE16/25 / P53-24 old-order first successful post handler wins',async()=>{
+test('WP31 §5.2 step 3 / P53-24 old-order first successful post handler wins',async()=>{
   for(const extraFirst of [true,false]){
     const held=F.entry('HoldItem','waterstone'),extra=F.entry('Shedinja',undefined,'Extra');
     const input=F.input(extraFirst?[extra,held]:[held,extra]);
