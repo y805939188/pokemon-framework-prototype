@@ -87,7 +87,7 @@ export function firstEvolutionPredecessor(content: Content, target: SpeciesKey):
   const find = (form: number): SpeciesKey | null => {
     for (const key of content.registrationOrder ?? []) {
       const data = speciesDataOf(content, {species:key.species,form:key.form});
-      for (const entry of data?.evolutions ?? []) if (entry.target === target.species && (entry.form ?? 0) === form && battleNameOf(content,key) !== null) return {...key};
+      for (const entry of data?.evolutions ?? []) if (entry.target === target.species && (entry.form ?? key.form) === form && battleNameOf(content,key) !== null) return {...key};
     }
     return null;
   };

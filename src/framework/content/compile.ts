@@ -166,7 +166,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
   const species: SpeciesSource[] = [];
   const ids = new Set<string>(); // content ids with a base form
   const keys = new Set<string>();
-  const nameKeys = new Map<string, string>();
+  const nameKeys = new Map<string, {label:string;id:unknown}>();
   if (!Array.isArray(inputs.species)) report("species.json", "$", "must be an array");
   else for (const [i, s] of inputs.species.entries()) {
     const p = `[${i}]`;
@@ -191,8 +191,8 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
     for (const field of PROGRESSION_FIELDS) if (Object.hasOwn(s, field)) { const problem = progressionFieldProblem(field, s[field]); if (problem) report("species.json", `${p}.${field}`, problem); }
     if (typeof s["nameKey"] === "string") {
       const prev = nameKeys.get(s["nameKey"]);
-      if (prev !== undefined) report("species.json", `${p}.nameKey`, `text key "${s["nameKey"]}" is already used by ${prev}`);
-      else nameKeys.set(s["nameKey"], label);
+      if (prev !== undefined && prev.id !== s["id"]) report("species.json", `${p}.nameKey`, `text key "${s["nameKey"]}" is already used by ${prev.label}`);
+      else nameKeys.set(s["nameKey"], {label,id:s["id"]});
     }
     const sourceProblem = usable(s["source"]);
     if (sourceProblem) report("species.json", `${p}.source`, sourceProblem);
@@ -288,6 +288,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
   // ---- settings: the rule configuration overrides (WP02 subset, rules/config.ts)
   if (inputs.settings !== undefined) for (const p of checkOverrides(inputs.settings)) report("settings.json", p.path, p.message);
 
+  if (errors.length) return {ok:false,errors};
   const registrationOrder = species.map(sp => ({species: sp.id, form: sp.form ?? 0}));
   const effective = [...merged.values()];
   const warnings: ContentError[] = [];

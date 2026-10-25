@@ -84,7 +84,7 @@ export function deriveSpeciesFields(records: SpeciesSource[], report: Progressio
 }
 
 /** Current cache identities use only effective ordered tables, never sources, names or transitions. */
-export function canonicalLayout(layout: DexLayout): DexLayout { return { national: [...layout.national], regions: layout.regions.map(region => ({ id: region.id, species: [...region.species] })) }; }
+export function canonicalLayout(layout: DexLayout): DexLayout { return { national: [...layout.national], regions: [...layout.regions].sort((a,b)=>a.id-b.id).map(region => ({ id: region.id, species: [...region.species] })) }; }
 export function layoutIdentity(layout: DexLayout): string { return sha256Hex(JSON.stringify(stable(canonicalLayout(layout)))); }
 
 export function checkProgressionReferences(records: readonly SpeciesSource[], report: ProgressionReport): void {
@@ -121,9 +121,10 @@ function readLayout(raw: unknown, bases: Set<string> | null, path: string, repor
   if (!obj(raw) || !only(raw, ["national", "regions"]) || !dense(raw.regions)) { report("regional-dex.json", path, "must be {national, regions: [{id,species}]} only"); return null; }
   const national = speciesList(raw.national, bases, "regional-dex.json", `${path}.national`, report), regions: DexLayout["regions"] = [];
   for (const [i, region] of raw.regions.entries()) {
-    if (!obj(region) || !only(region, ["id", "species"]) || region.id !== i) { report("regional-dex.json", `${path}.regions[${i}]`, "region ids must be contiguous in ascending order"); continue; }
-    regions.push({id:i, species:speciesList(region.species,bases,"regional-dex.json",`${path}.regions[${i}].species`,report)});
+    if (!obj(region) || !only(region, ["id", "species"]) || !integer(region.id,0,raw.regions.length-1) || regions.some(r=>r.id===region.id)) { report("regional-dex.json", `${path}.regions[${i}]`, "region ids must be unique and contiguous from 0"); continue; }
+    regions.push({id:region.id as number, species:speciesList(region.species,bases,"regional-dex.json",`${path}.regions[${i}].species`,report)});
   }
+  regions.sort((a,b)=>a.id-b.id);
   return {national,regions};
 }
 export function checkRegionalDex(raw: unknown, order: readonly SpeciesKey[], usable: (id: unknown) => string | null, report: ProgressionReport): RegionalDex & {source?:string} {
@@ -136,9 +137,10 @@ export function checkRegionalDex(raw: unknown, order: readonly SpeciesKey[], usa
       const problem = usable(raw.source); if (problem) report("regional-dex.json", "$.source", `source-unusable: ${problem}`);
       if (raw.national !== undefined) result.national = speciesList(raw.national,bases,"regional-dex.json","$.national",report);
       for (const [i, region] of raw.regions.entries()) {
-        if (!obj(region) || !only(region,["id","nameKey","species"]) || region.id !== i || !key(region.nameKey)) { report("regional-dex.json", `$.regions[${i}]`, "must have contiguous ascending id and valid nameKey"); continue; }
-        result.regions.push({id:i,nameKey:region.nameKey,species:speciesList(region.species,bases,"regional-dex.json",`$.regions[${i}].species`,report)});
+        if (!obj(region) || !only(region,["id","nameKey","species"]) || !integer(region.id,0,raw.regions.length-1) || result.regions.some(r=>r.id===region.id) || !key(region.nameKey)) { report("regional-dex.json", `$.regions[${i}]`, "must have unique contiguous id and valid nameKey"); continue; }
+        result.regions.push({id:region.id as number,nameKey:region.nameKey,species:speciesList(region.species,bases,"regional-dex.json",`$.regions[${i}].species`,report)});
       }
+      result.regions.sort((a,b)=>a.id-b.id);
       if (raw.transitions !== undefined) {
         result.transitions=[];
         if (!dense(raw.transitions)) report("regional-dex.json","$.transitions","must be a dense array");

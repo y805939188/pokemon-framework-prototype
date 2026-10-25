@@ -28,6 +28,7 @@ export function loadCompiled(json: unknown): CompiledContent {
   if (typeof json.inputsHash !== "string" || !/^[a-f0-9]{64}$/.test(json.inputsHash)) report("compiled","$.inputsHash","must be SHA256");
   if (typeof json.showdownSha !== "string" || !/^[a-f0-9]{40}$/.test(json.showdownSha)) report("compiled","$.showdownSha","must be a pinned Showdown SHA");
   if (json.contentIdentity !== sha256Hex(canonicalJson({compiledSemantics: COMPILED_SCHEMA_VERSION, inputsHash:json.inputsHash, showdownSha:json.showdownSha}))) report("compiled","$.contentIdentity","content-identity-mismatch");
+  for(const p of checkOverrides(json.settings??{}))report("settings.json",p.path,p.message);
   const sources = checkSources(json.sources,report);
   const usable = (source: unknown): string | null => preUseProblem(sources,source);
   if (!dense(json.species)) report("compiled","$.species","must be a dense array");
@@ -63,7 +64,6 @@ export function loadCompiled(json: unknown): CompiledContent {
       for(const [i,region] of ((json.settings as {DEXES_WITH_OFFSETS?:number[]} | undefined)?.DEXES_WITH_OFFSETS??[]).entries())if(region>=checked.regions.length)report("compiled",`$.settings.DEXES_WITH_OFFSETS[${i}]`,"unknown region reference");
     }
   }
-  for(const p of checkOverrides(json.settings??{}))report("settings.json",p.path,p.message);
   if(json.grants!==undefined&&(!dense(json.grants)||json.grants.some(g=>!obj(g)||!dense(g.members)||g.members.some(m=>!obj(m))||!obj(g.items))))report("compiled","$.grants","invalid grant records");
   if(problems.length)throw new Error(problems.map(p=>`${p.file} ${p.path}: ${p.message}`).join("; "));
   return json as unknown as CompiledContent;
