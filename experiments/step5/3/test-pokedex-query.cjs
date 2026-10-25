@@ -55,6 +55,22 @@ test('P53-33 GR7-M14-001 complete entry -1 uses last region, and its offset key 
   assert.equal(q.dexCompleteEntryNumber(state,t,'e',{...F.options,useCurrentRegion:true,currentRegion:1}).text,'002');
   assert.equal(q.dexCompleteEntryNumber({...state,view:{...state.view,region:-1}},t,'e',F.options).sceneRegion,0);
 });
+test('P53-33/36 F2-01 complete entry → Area resolves all ten current-region options without changing -1 numbering', async () => {
+  const q=await query,{dexState:b}=require('../../../js/engine/build/core.cjs'),t=F.layout();
+  const state=F.freeze(F.dex(t,{seen:['e'],owned:['e'],view:{region:-1,indices:[0,0,0],mode:0}})),before=JSON.stringify(state);
+  assert.deepEqual(b.dexStateProblems(state),[]);assert.deepEqual(b.dexLayoutStateProblems(state,t),[]);
+  for (const useCurrentRegion of [false,true]) for (const currentRegion of [undefined,null,-1,0,1]) {
+    const options={...F.options,useCurrentRegion,...(currentRegion===undefined?{}:{currentRegion})};
+    const output=q.dexCompleteEntryNumber(state,t,'e',options);
+    const region=useCurrentRegion&&currentRegion!==undefined&&currentRegion!==null&&currentRegion>=0?currentRegion:-1;
+    assert.deepEqual(output,{region,number:region===0?null:2,text:region===0?'???':'002',sceneRegion:currentRegion===1?1:0});
+    assert.equal(q.dexCompleteEntryNumber(state,t,'e',{...options,offsets:[-1]}).text,region===-1?'001':output.text);
+    assert.equal(q.dexCompleteEntryNumber(state,t,'e',{...options,offsets:[1]}).text,region===1?'001':output.text);
+    const area=q.dexArea('e',{region:output.sceneRegion,encounterVersion:0,tables:[{mapId:1,version:0,species:['e']},{mapId:2,version:0,species:['e']}],maps:[{mapId:1,region:0,x:0,y:0},{mapId:2,region:1,x:1,y:0}],points:[{region:0,x:0,y:0,visible:true},{region:1,x:1,y:0,visible:true}]});
+    assert.equal(area.status,'known');assert.deepEqual(area.points,[{x:output.sceneRegion,y:0}]);
+    assert.equal(JSON.stringify(state),before);assert.deepEqual(b.dexStateProblems(JSON.parse(JSON.stringify(state))),[]);
+  }
+});
 test('P53-34 numeric trim removes trailing unseen and an offset-zero unseen row, retaining middle placeholders', async () => {
   const q=await query,c=F.catalog(),state=F.dex(c.layout,{seen:['c']});
   const rows=q.dexList(state,c,0,0,{...F.options,offsets:[0]}).rows;

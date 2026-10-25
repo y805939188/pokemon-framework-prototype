@@ -144,7 +144,7 @@ export function dexEntryNumber(dex: DexState, layout: DexLayout, species: string
 export function dexCompleteEntryNumber(dex: DexState, layout: DexLayout, species: string, options: DexQueryOptions): DexNumber & { sceneRegion: number } {
   const current = options.currentRegion ?? -1;
   const region = options.useCurrentRegion ? current < 0 || current >= layout.regions.length ? -1 : current : dex.view.region;
-  return { ...numberProjection(dexRegionalNumber(layout, species, region), region, options.offsets), sceneRegion: region < 0 ? options.currentRegion ?? 0 : region };
+  return { ...numberProjection(dexRegionalNumber(layout, species, region), region, options.offsets), sceneRegion: region < 0 ? current < 0 ? 0 : current : region };
 }
 
 export function dexNameGroups(locale: string): DexNameGroup[] {

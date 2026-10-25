@@ -19,7 +19,7 @@
 
 区域有 `dexRegionMembers`／`dexRegionalNumber`／`dexRegionLength`／`dexRegionCounts`、`dexAccessibleRegions`、`refreshDexAccess`、`dexMenuEntry`。空／缺区域的数据级计数返回具名 unavailable；列表按已批安全政策回全国。当前区域模式独立于 unlock；常规模式检查 unlock 与 seen。计数投影只含 seen／owned 和各自完成标记，不增加第三个长度显示数。`planDexUnlock` 返回现有 unlocked 的 patch。
 
-`dexEntryNumber(...,"summary"|"brief")` 保留首解锁即停／继续后续区域的差异。`dexCompleteEntryNumber` 独立保留完整单条 view=-1 查最后区域表及偏移键 -1 的参考兼容异常；不要改用全国结果统一它。主列表的 `row.number` 则来自本列表位置与偏移。
+`dexEntryNumber(...,"summary"|"brief")` 保留首解锁即停／继续后续区域的差异。`dexCompleteEntryNumber` 独立保留完整单条 view=-1 查最后区域表及偏移键 -1 的参考兼容异常；不要改用全国结果统一它。其 sceneRegion 独立解析地图地区：缺省／null／负哨兵 -1 为0，合法0／1保留，不能把 -1 原样交给 Area。场景地区解析不重算前面的编号或偏移。主列表的 `row.number` 则来自本列表位置与偏移。
 
 `dexList` 提供六模式、数值裁尾、偏移首行与不可开的未见占位。十元参数顺序是 `[排序,名字组,属性1,属性2,身高下界,身高上界,体重下界,体重上界,颜色,形状]`；目录数量全部由实参决定，大小具体档 0..36、未选 -1、表长哨兵 37 分开。37 档常量单位分别是 dm／hg；筛选始终用这些原值，US Info／搜索重量显示差异单独保留。
 
@@ -36,6 +36,8 @@
 必要命令：`pnpm --dir src typecheck:framework`、`node scripts/check-boundaries.cjs`、`pnpm --dir src build:engine`、`node --test experiments/step5/3/test-pokedex-{rules,query}.cjs`，以及 B `test-migration7.cjs` 回归。构建保留原入口；F 尚未导出到共享 index，正式 runner 也尚未登记，均交 E 单 owner。
 
 初候选 b37084a 的作者自检为规则18／查询29；其独立审复现 F-01 normalizer→lastSeen 组合夹带 species、F-02 翻译标签改变性别行数，旧候选及独立红例保留。整改只显式投影 lastSeen 三字段、按 raw formName 决定性别循环，并增加无断言的严格 typed-client／实际 B schema＋JSON 组合回归及两项翻译反例的 selector 资格检查；PD12 编译器断言从 F 映射中排除。新候选作者自检为规则19／查询31，独立复验另行记录，不用作者自检代签。
+
+第二审在 b70ea4b 发现 F2-01：合法 currentRegion=-1 会漏到 sceneRegion，并使 scene→Area 组合返回 invalid。整改只将负场景哨兵解析为0，保留 region=-1／末地区表／offset键-1。新增设置开关×省略／null／-1／0／1十组合，逐项核编号、两种偏移键、实际 Area 组合、B shape／layout合法和输入不变；旧两审报告与红例保留。新定向数量为规则19／查询32，原首审16探针、第二审6探针及严格typed-client只作为作者回归重跑，不能冒称新的独立审通过。
 
 验证运行使用既有项目 Node v22.21.1；framework／core／app 类型、边界及现有 engine bundle 构建另验。B 迁移40项回归另计，不把它当 F 新功能覆盖。初轮 shell 默认 Node v22.14.0 的历史记录保留。工作区封存分派 SHA256SUMS 的8个输入成员已核同。
 
