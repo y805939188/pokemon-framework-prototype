@@ -114,5 +114,5 @@ export function createMember(input: CreateMemberInput, content: Content, random:
     origin: { method: input.context?.fateful ? 4 : 0, map: input.context?.map ?? 0, text: "", level, receivedAt: input.context?.receivedAt ?? null, hatchedMap: 0, hatchedAt: null, compatibilityDefault: false },
     firstMoves: [], markings: [], ribbons: [], cannotStore: false, cannotRelease: false, isEgg: false, mail: null, readyToEvolve: false,
   });
-  return {...created,statNature:null,moves:created.moves.map(move=>({...move,ppUps:0}))};
+  return { ...created, statNature: null, moves: created.moves.map(move => ({ ...move, ppUps: 0 })), evolutionReadiness: "known", cannotTrade: false };
 }

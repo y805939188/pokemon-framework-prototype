@@ -1,5 +1,6 @@
 /** Pure individual identity and WP18/19 metadata. No host clock, RNG or species loading. */
 import { sha256Hex } from "./sha256.ts";
+import { clonePersistentMember } from "./member-metadata.ts";
 import type { GenderRule, Member, MemberOrigin, Owner, PartialStats, SpeciesData, StatKey } from "./types.ts";
 
 export const COMPATIBLE_PLAYER: Readonly<Owner> = Object.freeze({ id: 0, name: "player", gender: 2, language: 2 });
@@ -66,7 +67,7 @@ export function completeIndividual(member: Member, species: Pick<SpeciesData, "g
   const slot = member.abilityIndex !== undefined ? member.abilityIndex : member.ability === undefined ? inferred.abilityIndex : candidates.length === 1 ? candidates[0]!.index : null;
   const effective = slot === null ? null : resolveAbility(pid, species, slot).effectiveAbilityIndex;
   const out: Member = {
-    ...member, personalID: pid,
+    ...clonePersistentMember(member), personalID: pid,
     nature: member.nature ?? inferred.nature, gender: member.gender ?? inferred.gender, ability: member.ability ?? inferred.ability,
     abilityIndex: slot, effectiveAbilityIndex: member.effectiveAbilityIndex === undefined ? effective : member.effectiveAbilityIndex,
     owner: member.owner ? { ...member.owner } : { ...COMPATIBLE_PLAYER, name: member.ot ?? "player" },
@@ -75,8 +76,9 @@ export function completeIndividual(member: Member, species: Pick<SpeciesData, "g
     shiny: member.shiny ?? false, superShiny: member.superShiny ?? false,
     firstMoves: member.firstMoves ? [...member.firstMoves] : member.moves.map((m) => m.id),
     markings: [...(member.markings ?? [])], ribbons: [...(member.ribbons ?? [])],
-    cannotStore: member.cannotStore ?? false, cannotRelease: member.cannotRelease ?? false,
+    cannotStore: member.cannotStore ?? false, cannotRelease: member.cannotRelease ?? false, cannotTrade: member.cannotTrade ?? false,
     isEgg: member.isEgg ?? false, mail: member.mail ?? null, readyToEvolve: member.readyToEvolve ?? false,
+    evolutionReadiness: member.evolutionReadiness ?? "known",
   };
   delete out.ot;
   return out;

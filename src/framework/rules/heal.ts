@@ -1,8 +1,9 @@
-import { computedNature } from "./member-metadata.ts";
+import { clonePersistentMember, computedNature } from "./member-metadata.ts";
+import { clearEvolutionReadiness } from "./evolution-readiness.ts";
 /**
  * Full heal (WP20 §3.2 heal / heal_party, WP61 §7.3): HP to the maximum from the current stats, status and its counter
- * cleared, every move back to its maximum PP. Nothing else changes (friendship, moves, EVs, origin). The party heal does
- * not touch the boxes (the interpreter's "recover all" that also heals stored members is not part of this build).
+ * cleared, every move back to its maximum PP. Ordinary healing also clears readiness to false/known; deposit healing
+ * can preserve both readiness fields. Other metadata stays unchanged. Party healing does not touch the boxes.
  * Pure and idempotent: healing a healed party gives an equal state.
  */
 import { computeStats } from "./growth.ts";
@@ -12,11 +13,12 @@ import type { MemberCollection } from "./storage.ts";
 import type { Content, Member } from "./types.ts";
 
 export function healMember(m: Member, content: Content, options: { preserveReadyToEvolve?: boolean } = {}): Member {
-  if (m.isEgg) return clone(m);
+  if (m.isEgg) return clonePersistentMember(m);
   const sp = speciesDataOf(content, m);
   if (!sp) throw new Error(`member ${m.id}: species "${m.species}" (form ${m.form ?? 0}) is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
   const maxhp = computeStats(sp.base, m.ivs, m.evs, m.level, computedNature(m)).hp;
-  return { ...clone(m), ...(m.readyToEvolve !== undefined && !options.preserveReadyToEvolve ? { readyToEvolve: false } : {}), hp: maxhp, status: "", statusCount: 0, moves: m.moves.map((mv) => ({ ...mv, pp: mv.maxpp })) };
+  const healed = options.preserveReadyToEvolve ? clonePersistentMember(m) : clearEvolutionReadiness(m);
+  return { ...healed, hp: maxhp, status: "", statusCount: 0, moves: healed.moves.map((mv) => ({ ...mv, pp: mv.maxpp })) };
 }
 
 export function healParty<T extends { party: Member[] }>(state: T, content: Content): T {

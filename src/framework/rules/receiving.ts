@@ -6,6 +6,7 @@ import { able, ableCount, checkStore, referenced } from "./storage-operations.ts
 import { own } from "./own.ts";
 import type { ItemDescriptor, MemberReference } from "./storage-operations.ts";
 import { healMember } from "./heal.ts";
+import { clonePersistentMember } from "./member-metadata.ts";
 import type { Content, Member } from "./types.ts";
 import type { Limits } from "./limits.ts";
 
@@ -32,7 +33,8 @@ export class ReceivingRefused extends Error {
 export function requireTemplate(member: Member | undefined, id: string): asserts member is Member {
   if (!member || member.id !== id || !Number.isInteger(member.form) || member.form! < 0 || member.form! > 999 || !Number.isInteger(member.personalID) || member.personalID! < 0 || member.personalID! > 0xffffffff || !member.owner || !member.origin || member.abilityIndex === undefined || member.effectiveAbilityIndex === undefined
     || typeof member.ownerCompatibilityDefault !== "boolean" || typeof member.shiny !== "boolean" || typeof member.superShiny !== "boolean" || !Array.isArray(member.firstMoves) || !Array.isArray(member.markings) || !Array.isArray(member.ribbons)
-    || typeof member.cannotStore !== "boolean" || typeof member.cannotRelease !== "boolean" || typeof member.isEgg !== "boolean" || member.mail === undefined || typeof member.readyToEvolve !== "boolean") {
+    || typeof member.cannotStore !== "boolean" || typeof member.cannotRelease !== "boolean" || typeof member.cannotTrade !== "boolean" || typeof member.isEgg !== "boolean" || member.mail === undefined || typeof member.readyToEvolve !== "boolean"
+    || !["known", "unknown"].includes(member.evolutionReadiness ?? "") || (!member.readyToEvolve && member.evolutionReadiness === "unknown")) {
     throw new ReceivingRefused("no-template", `captured member ${id} requires its complete original individual template`, id);
   }
 }
@@ -70,7 +72,7 @@ export function receiveMembers<T extends MemberCollection>(state: T, members: re
     taken.add(template.id);
     const decision = Object.hasOwn(decisions, template.id) ? decisions[template.id] : undefined;
     if (context.profile.naming === 0 && !decision?.nickname) throw new ReceivingRefused("pending", "nickname decision required", template.id);
-    const member = clone(template);
+    const member = clonePersistentMember(template);
     if (decision?.nickname?.kind === "set") {
       if (typeof decision.nickname.value !== "string" || Array.from(decision.nickname.value).length > 10) throw new ReceivingRefused("invalid-name");
       member.nickname = decision.nickname.value || null;
