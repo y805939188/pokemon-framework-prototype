@@ -97,9 +97,9 @@ test('factory seal failure cannot lose capture/XP or rerun on duplicate finish',
  const app=new E.app.GameApplication({state,sessions:factory,projection:E.fakes.createRecordingProjection(),content:()=>({content}),random:n=>0,clock:()=>0},{receivingProfile:{naming:1,mode:1}}),request={battleId:'app-seal-failure',kind:'wild',seq:1,foes:[{species:'pidgey',level:5}]};const s=await app.startBattle(request);await s.throwBall('masterball');const out=app.finishBattle(s,request);assert.equal(out.commit,'applied');assert.equal(state.current().party.length,4);assert(state.current().party[0].exp>game.party[0].exp);assert(out.diagnostics.some(x=>x.includes('读取失败')));assert.equal(app.battleEvidenceSnapshot(s),null);assert.equal(app.finishBattle(s,request).commit,'already-applied');assert.equal(calls,1);
 });
 
-for(const failure of ['throw','malformed'])test('control drain '+failure+' preserves successful item, capture and XP while closing only friend execution',async()=>{
+for(const failure of ['throw','malformed','sparse','sparse-opponents'])test('control drain '+failure+' preserves successful item, capture and XP while closing only friend execution',async()=>{
  const {s,game}=await session({party:[member('P1','Charizard',50,['flamethrower'],{hp:50,friendship:99})]});
- s.gw.drainFriendshipFaints=()=>{if(failure==='throw')throw Error('injected control read');return [{}];};
+ s.gw.drainFriendshipFaints=()=>{if(failure==='throw')throw Error('injected control read');if(failure==='sparse')return Array(1);if(failure==='sparse-opponents')return [{kind:'faint',target:{id:'P1',side:'p1',slot:0,level:50,hp:0,active:true},opponents:Array(1)}];return [{}];};
  assert((await s.useItem('potion','P1')).ok);assert.equal(s.bag.potion,3);assert(s.gw.readState('p1')[0].hp>50);
  await s.throwBall('masterball');assert.equal(s.result().captured.length,1);assert(s.result().members.P1.exp>game.party[0].exp);assert(seal(s).issues.some(i=>i.reason==='friendship-control-drain-failed'));
 });

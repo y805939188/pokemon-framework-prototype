@@ -500,7 +500,7 @@ export class BattleSession {
           && (actor.side === "p1" ? this.party : actor.side === "p2" ? this.foeTeam : []).some(m => m.id === actor.id)
           && Number.isSafeInteger(actor.level) && actor.level >= 1 && actor.level <= 100
           && Number.isSafeInteger(actor.hp) && actor.hp >= 0 && Number.isSafeInteger(actor.slot) && actor.slot >= 0 && actor.slot < 6 && typeof actor.active === "boolean";
-        if (!Array.isArray(incoming) || incoming.some(f => f?.kind !== "faint" || !validActor(f.target) || f.target.hp !== 0 || !Array.isArray(f.opponents) || f.opponents.some(p => !validActor(p) || p.side === f.target.side))) throw new Error("invalid friendship control facts");
+        if (!Array.isArray(incoming) || Array.from(incoming).some(f => f?.kind !== "faint" || !validActor(f.target) || f.target.hp !== 0 || !Array.isArray(f.opponents) || Array.from(f.opponents).some(p => !validActor(p) || p.side === f.target.side))) throw new Error("invalid friendship control facts");
         this._pendingFriendFaints.push(...incoming);
       }
       catch {
