@@ -109,3 +109,17 @@ test('save validation refuses accessors without reading them, including schema i
     assert.ok(E.saveSchema.validateGame(g).length);assert.equal(reads,0);
   }
 });
+
+for(const slots of [[],[null]])test(`author explicit natural slots ${JSON.stringify(slots)} can create, grant, save and reload legal no-ability member`,()=>{
+  const read=name=>JSON.parse(fs.readFileSync(path.join(ROOT,'content/sample',name+'.json'),'utf8'));
+  const source={manifest:read('manifest'),sources:read('sources'),species:read('species'),overlays:read('overlays'),grants:[{id:'no-ability',members:[{species:'pidgey',level:5}],items:{},money:0,source:'author-placeholder'}]};
+  const authored=source.species.find(sp=>sp.id==='pidgey');authored.abilities=slots;authored.hiddenAbilities=[];
+  const compiled=E.contentCompile.compileContent(source);assert.equal(compiled.ok,true,JSON.stringify(compiled.errors));
+  const assembled=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(assembled.errors,[]);
+  const content=assembled.content,state=E.fakes.createMemoryState(E.state.newGame({party:[],content}));
+  const app=new E.app.GameApplication({state,sessions:E.fakes.createFakeSessions({}),projection:E.fakes.createRecordingProjection(),content:()=>({content}),random:()=>0,clock:()=>0},{receivingProfile:{mode:1,naming:1}});
+  assert.equal(app.claimGrant('no-ability').status,'applied');const game=state.current();assert.equal(game.party[0].ability,'');assert.equal(game.party[0].effectiveAbilityIndex,null);assert.deepEqual(E.saveSchema.validateGameContent(game,content),[]);
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-empty-ability7-'));try{const store=new E.store.SaveStore(path.join(dir,'save.json'),{},E.speciesKey.speciesKeyResolver(content),content);store.save(game);assert.deepEqual(store.load(),game);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+  const corrupt=clone(game);corrupt.party[0].ability='missing-named-ability';assert.ok(E.saveSchema.validateGameContent(corrupt,content).some(p=>p.path.endsWith('.ability')));
+  const sp=content.species.Pidgey;sp.abilities=['Keen Eye'];const falseEmpty=clone(game);assert.ok(E.saveSchema.validateGameContent(falseEmpty,content).some(p=>p.path.endsWith('.ability')));
+});

@@ -26,7 +26,7 @@ import { createDexState, dexContentProblems, dexStateProblems, dexLayoutStatePro
 import { GAME_SCHEMA } from "./state.ts";
 import type { GameState } from "./state.ts";
 import { MAX_FORM, speciesDataOf } from "./species-key.ts";
-import { completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity.ts";
+import { completeIndividual, COMPATIBLE_PLAYER, initialOrdinal, resolveAbility } from "./member-identity.ts";
 import { BOX_COUNT, SLOTS_PER_BOX, STORAGE_CAPACITY, newStorage } from "./storage.ts";
 import type { Content, DexState, Member } from "./types.ts";
 import type { SpeciesKeyResolver } from "./species-key.ts";
@@ -270,8 +270,13 @@ export function validateGameContent(state: unknown, content: Content): Problem[]
   const moveKnown = (id: string): boolean => moveDirectory.some(move => move.id === id);
   for (const { member, path } of persistentMembers(doc)) {
     const m = member as unknown as Member;
-    if (!speciesDataOf(content, m)) out.push({ path: `${path}.species`, message: "unmapped species/form; original save must be kept" });
-    if (!abilityKnown(m.ability)) out.push({ path: `${path}.ability`, message: "unmapped ability; a trusted legacy override still requires the checked ability directory" });
+    const species = speciesDataOf(content, m);
+    if (!species) out.push({ path: `${path}.species`, message: "unmapped species/form; original save must be kept" });
+    // An explicitly empty/sparse author slot list can legitimately resolve to no ability (WP19).
+    // This is not permission for arbitrary empty overrides or a guessed slot on an old individual.
+    const legalEmpty = m.ability === "" && !!species && m.effectiveAbilityIndex === null &&
+      (m.abilityIndex === null ? [0, 1].some(slot => resolveAbility(m.personalID!, species, slot).ability === "") : resolveAbility(m.personalID!, species, m.abilityIndex!).ability === "");
+    if (!legalEmpty && !abilityKnown(m.ability)) out.push({ path: `${path}.ability`, message: "unmapped ability; a trusted legacy override still requires the checked ability directory" });
     if (m.item && !itemOf(catalog, m.item)) out.push({ path: `${path}.item`, message: "unmapped held item" });
     if (m.ball && !itemOf(catalog, m.ball)) out.push({ path: `${path}.ball`, message: "unmapped capture ball" });
     for (const [i, move] of m.moves.entries()) {
