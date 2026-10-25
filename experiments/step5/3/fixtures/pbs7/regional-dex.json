@@ -1,0 +1,7 @@
+{
+  "source": "author",
+  "regions": [
+    {"id": 0, "nameKey": "region.shared", "species": []},
+    {"id": 1, "nameKey": "region.shared", "species": ["peer", "base"]}
+  ]
+}

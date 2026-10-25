@@ -15,6 +15,14 @@ import type { Limits } from "./limits.ts";
 import { own } from "./own.ts";
 
 export interface RuleConfig {
+  CHECK_EVOLUTION_AFTER_ALL_BATTLES: boolean;
+  CHECK_EVOLUTION_FOR_FAINTED_POKEMON: boolean;
+  MOVE_RELEARNER_CAN_TEACH_MORE_MOVES: boolean;
+  RARE_CANDY_USABLE_AT_MAX_LEVEL: boolean;
+  SHOW_NEW_SPECIES_POKEDEX_ENTRY_MORE_OFTEN: boolean;
+  USE_CURRENT_REGION_DEX: boolean;
+  DEX_SHOWS_ALL_FORMS: boolean;
+  DEXES_WITH_OFFSETS: number[];
   MECHANICS_GENERATION: number;
   MAX_MONEY: number;
   MAX_PARTY_SIZE: number;
@@ -34,7 +42,7 @@ export interface RuleConfig {
 /** Slots per box (WP25 §3.1); not a setting of the reference. */
 export const BOX_SIZE = 30;
 
-export const GEN8_DEFAULTS: Readonly<RuleConfig> = Object.freeze({ MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999,
+export const GEN8_DEFAULTS: Readonly<RuleConfig> = Object.freeze({ CHECK_EVOLUTION_AFTER_ALL_BATTLES: true, CHECK_EVOLUTION_FOR_FAINTED_POKEMON: true, MOVE_RELEARNER_CAN_TEACH_MORE_MOVES: true, RARE_CANDY_USABLE_AT_MAX_LEVEL: true, SHOW_NEW_SPECIES_POKEDEX_ENTRY_MORE_OFTEN: true, USE_CURRENT_REGION_DEX: false, DEX_SHOWS_ALL_FORMS: false, DEXES_WITH_OFFSETS: Object.freeze([]) as unknown as number[],  MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999,
   BAG_POCKET_SLOTS: Object.freeze([-1,-1,-1,-1,-1,-1,-1,-1]) as unknown as number[], BAG_AUTO_SORT: Object.freeze([false,false,false,true,true,false,false,false]) as unknown as boolean[],
   AFFECTION_EFFECTS: false, MORE_BONUS_PREMIER_BALLS: true, USE_MULTIPLE_STAT_ITEMS_AT_ONCE: true, NO_VITAMIN_EV_CAP: true,
   REBALANCED_HEALING_ITEM_AMOUNTS: true, RAGE_CANDY_BAR_CURES_STATUS_PROBLEMS: true, TAUGHT_MACHINES_KEEP_OLD_PP: false });
@@ -56,6 +64,10 @@ export function checkOverrides(overrides: unknown): ConfigProblem[] {
   for (const [k, v] of Object.entries(overrides)) {
     if (Object.hasOwn(GEN8_DEFAULTS, k) && typeof GEN8_DEFAULTS[k as keyof RuleConfig] === 'boolean') {
       if (typeof v !== 'boolean') out.push({ path: `$.${k}`, message: 'must be boolean' });
+      continue;
+    }
+    if (k === 'DEXES_WITH_OFFSETS') {
+      if (!Array.isArray(v) || Object.keys(v).length !== v.length || v.some(n => !Number.isSafeInteger(n) || n < -1) || new Set(v).size !== v.length) out.push({path: `$.${k}`, message: 'must be a dense array of unique integers >= -1; content validates region references'});
       continue;
     }
     if (k === 'BAG_POCKET_SLOTS' || k === 'BAG_AUTO_SORT') {

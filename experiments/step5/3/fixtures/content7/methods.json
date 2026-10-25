@@ -1,0 +1,515 @@
+[
+  {
+    "id": "Level",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelMale",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelFemale",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelDay",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelNight",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelMorning",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelAfternoon",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelEvening",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelNoWeather",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelSun",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelRain",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelSnow",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelSandstorm",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelCycling",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelSurfing",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelDiving",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelDarkness",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LevelDarkInParty",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "AttackGreater",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "AtkDefEqual",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "DefenseGreater",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "Silcoon",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "Cascoon",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "Ninjask",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "Happiness",
+    "parameterKind": "none",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "HappinessMale",
+    "parameterKind": "none",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "HappinessFemale",
+    "parameterKind": "none",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "HappinessDay",
+    "parameterKind": "none",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "HappinessNight",
+    "parameterKind": "none",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "HappinessMove",
+    "parameterKind": "move",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "HappinessMoveType",
+    "parameterKind": "type",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "HappinessHoldItem",
+    "parameterKind": "item",
+    "families": [
+      "level"
+    ],
+    "after": "target-match-held-item-consume"
+  },
+  {
+    "id": "MaxHappiness",
+    "parameterKind": "none",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "Beauty",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "HoldItem",
+    "parameterKind": "item",
+    "families": [
+      "level"
+    ],
+    "after": "target-match-held-item-consume"
+  },
+  {
+    "id": "HoldItemMale",
+    "parameterKind": "item",
+    "families": [
+      "level"
+    ],
+    "after": "target-match-held-item-consume"
+  },
+  {
+    "id": "HoldItemFemale",
+    "parameterKind": "item",
+    "families": [
+      "level"
+    ],
+    "after": "target-match-held-item-consume"
+  },
+  {
+    "id": "DayHoldItem",
+    "parameterKind": "item",
+    "families": [
+      "level"
+    ],
+    "after": "target-match-held-item-consume"
+  },
+  {
+    "id": "NightHoldItem",
+    "parameterKind": "item",
+    "families": [
+      "level"
+    ],
+    "after": "target-match-held-item-consume"
+  },
+  {
+    "id": "HoldItemHappiness",
+    "parameterKind": "item",
+    "families": [
+      "level"
+    ],
+    "after": "target-match-held-item-consume"
+  },
+  {
+    "id": "HasMove",
+    "parameterKind": "move",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "HasMoveType",
+    "parameterKind": "type",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "HasInParty",
+    "parameterKind": "species",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "Location",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "LocationFlag",
+    "parameterKind": "flag",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "Region",
+    "parameterKind": "integer",
+    "families": [
+      "level"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "Item",
+    "parameterKind": "item",
+    "families": [
+      "item"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "ItemMale",
+    "parameterKind": "item",
+    "families": [
+      "item"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "ItemFemale",
+    "parameterKind": "item",
+    "families": [
+      "item"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "ItemDay",
+    "parameterKind": "item",
+    "families": [
+      "item"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "ItemNight",
+    "parameterKind": "item",
+    "families": [
+      "item"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "ItemHappiness",
+    "parameterKind": "item",
+    "families": [
+      "item"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "Trade",
+    "parameterKind": "none",
+    "families": [
+      "trade"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "TradeMale",
+    "parameterKind": "none",
+    "families": [
+      "trade"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "TradeFemale",
+    "parameterKind": "none",
+    "families": [
+      "trade"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "TradeDay",
+    "parameterKind": "none",
+    "families": [
+      "trade"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "TradeNight",
+    "parameterKind": "none",
+    "families": [
+      "trade"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "TradeItem",
+    "parameterKind": "item",
+    "families": [
+      "trade"
+    ],
+    "after": "target-match-held-item-consume"
+  },
+  {
+    "id": "TradeSpecies",
+    "parameterKind": "species",
+    "families": [
+      "trade"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "BattleDealCriticalHit",
+    "parameterKind": "integer",
+    "families": [
+      "battle"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "EventAfterDamageTaken",
+    "parameterKind": "integer",
+    "families": [
+      "battle",
+      "event"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "Event",
+    "parameterKind": "integer",
+    "families": [
+      "event"
+    ],
+    "after": "none"
+  },
+  {
+    "id": "Shedinja",
+    "parameterKind": "none",
+    "families": [
+      "post-only"
+    ],
+    "after": "extra-member-copy"
+  },
+  {
+    "id": "None",
+    "parameterKind": "none",
+    "families": [
+      "none"
+    ],
+    "after": "none"
+  }
+]

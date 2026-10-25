@@ -1,6 +1,6 @@
 'use strict';
 // R04/R05 (ca879273 review): synthetic author PBS input; WP04 §4.2 and WP03 §5.3.
-// A report's species list contains only accepted records, including when the overall import fails.
+// Legacy text imports retain accepted-record diagnostics; the step 5.3 CLI uses an atomic bundle proposal.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -89,7 +89,7 @@ test('R05: physical comments, blank lines, trailing comments, and legal repeated
   assert.deepEqual(r.records[0].showdown, ['Name']);
 });
 
-test('R04/R05 CLI: failed imports write a report containing only valid records and preserve the diagnostic line', () => {
+test('R04/R05 CLI: failed bundle imports write no species prefix and preserve every original diagnostic line', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-pbs-review5-'));
   try {
     const src = path.join(dir, 'src');
@@ -108,7 +108,9 @@ test('R04/R05 CLI: failed imports write a report containing only valid records a
       assert.equal(proc.status, 1, `${label}: ${proc.stdout}\n${proc.stderr}`);
       const r = JSON.parse(fs.readFileSync(report, 'utf8'));
       locatedFailure(r, lines.indexOf(badLine) + 1, `[RATTATA]${suffix}`, message);
-      assert.deepEqual(r.species.map(s => s.id), ['pidgey', 'spearow'], label);
+      assert.deepEqual(r.species, [], `${label}: the entire bundle proposal is rejected`);
+      assert.deepEqual(r.identities, [], `${label}: no accepted identity prefix escapes`);
+      assert.deepEqual(r.texts, [], `${label}: no text proposal escapes`);
       assert.ok(proc.stderr.includes(`pokemon.txt:${lines.indexOf(badLine) + 1} [RATTATA]${suffix}:`), proc.stderr);
     }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }

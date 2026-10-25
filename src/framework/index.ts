@@ -55,3 +55,6 @@ export * as economy from "./rules/economy.ts";
 
 export * as itemEffects from './rules/item-effects.ts';
 export * as shop from './rules/shop.ts';
+
+export * as dexState from "./rules/dex-state.ts";
+export * as evolutionReadiness from "./rules/evolution-readiness.ts";

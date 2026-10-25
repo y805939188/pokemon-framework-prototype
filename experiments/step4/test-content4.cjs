@@ -70,12 +70,13 @@ test('grants.json refusals are located', () => {
   refused(i => { i.grants[0].members = Array(7).fill({ species: 'pidgey', level: 3 }); }, /^\[0\]\.members$/, /at most 6/);
 });
 
-test('content without grants.json keeps its old input hash; compiled documents from before step 4 still load', () => {
+test('author content without grants.json keeps its old input hash; rebuilt cache 2 loads and cache 1 needs rebuilding', () => {
   const i = inputs(); delete i.grants;
   const r = compileContent(i);
-  assert.ok(r.ok); assert.equal(r.data.grants, undefined);
+  assert.ok(r.ok); assert.equal(r.data.grants, undefined); assert.equal(r.data.schema, 2);
   assert.equal(hashInputs(i), hashInputs({ ...i, grants: undefined }));
   const old = loadCompiled(JSON.parse(JSON.stringify(r.data)));
   assert.deepEqual(assembleContent(old, dex).content.grants, {});
-  assert.throws(() => loadCompiled({ ...r.data, grants: 'x' }), /not a schema 1 document/);
+  assert.throws(() => loadCompiled({ ...r.data, schema: 1 }), /needs-rebuild: compiled content requires schema 2/);
+  assert.throws(() => loadCompiled({ ...r.data, grants: 'x' }), /compiled \$\.grants: invalid grant records/);
 });

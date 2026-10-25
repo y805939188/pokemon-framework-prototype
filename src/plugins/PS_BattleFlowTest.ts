@@ -268,6 +268,24 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   }
   const fresh = () => { W.PSFlow.receiveOptions = { mode: 1, naming: 1 }; W.PSFlow.resetGame(); W.PSFlow._app=null; W.PSFlow.rng = seeded(1); }; // foes are created from the content: pin their random draws
 
+  /** Test-only authoring of old/damaged MZ files. The normal player save gate remains strict. */
+  async function writeHostFixture(slot: number, frameworkState: any): Promise<void> {
+    const original = G.$gameSystem._psGame;
+    const hadError = Object.hasOwn(G.$gameSystem, "_psSaveError"), error = G.$gameSystem._psSaveError;
+    try {
+      delete G.$gameSystem._psSaveError;
+      G.$gameSystem._psGame = api().state.newGame({party: [], money: 0, content: W.PSFlow.content()});
+      const envelope = G.DataManager.makeSaveContents();
+      if (frameworkState === undefined) delete envelope.system._psGame;
+      else envelope.system._psGame = frameworkState;
+      await G.StorageManager.saveObject(`file${slot}`, envelope);
+    } finally {
+      G.$gameSystem._psGame = original;
+      if (hadError) G.$gameSystem._psSaveError = error;
+      else delete G.$gameSystem._psSaveError;
+    }
+  }
+
   async function runAll() {
     await toMap();
 
@@ -398,8 +416,8 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       const legacy = legacyDocument(game(), 1);
       for (const m of legacy.party) delete m.statusCount;
       legacy.party[1].status = "tox"; legacy.party[2].status = "slp";
-      G.$gameSystem._psGame = legacy;
-      const rc1 = await G.DataManager.saveGame(2);
+      await writeHostFixture(2, legacy);
+      const rc1 = "test-fixture-authored";
       G.$gameSystem._psGame = { diverged: true };
       const lc1 = await G.DataManager.loadGame(2);
       assert(!G.$gameSystem._psSaveError, "a schema 1 state loads without error");
@@ -408,8 +426,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, api().state.GAME_SCHEMA, true], "migration recorded");
       // a state written by a newer build, and a damaged one
       for (const [slot, doc, code] of [[3, { ...clone(game()), schema: 9 }, "unknown-version"], [4, "not a state", "corrupt"]] as [number, any, string][]) {
-        G.$gameSystem._psGame = doc;
-        await G.DataManager.saveGame(slot);
+        await writeHostFixture(slot, doc);
         G.$gameSystem._psGame = { diverged: true };
         await G.DataManager.loadGame(slot);
         eq(G.$gameSystem._psSaveError && G.$gameSystem._psSaveError.code, code, "refused with a diagnosis: " + code);
@@ -569,7 +586,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         const g1 = clone(game());
         eq(g1.party.map((m: any) => [m.id, m.species, m.form, m.level, m.moves.map((x: any) => x.id)]), [["M1", "charmander", 0, 5, ["scratch", "growl", "ember"]]], "the starter comes from the content (stored by content id + form)");
         eq([I6.bagOf(g1), g1.claims, g1.money], [{ antidote: 2, pokeball: 10, potion: 5 }, { starter: { kind: "grant" } }, 3000], "items and the claim");
-        eq(g1.dex, { seen: ["charmander"], owned: ["charmander"] }, "the received species is seen and owned");
+        eq(g1.dex, { ...g0.dex, seen: ["charmander"], owned: ["charmander"] }, "grant updates seen/owned and preserves all current dex metadata");
         await runEvent(1);
         eq([W.PSFlow.lastClaim.status, G.$gameVariables.value(11)], ["already-claimed", 2], "the repeat is reported");
         eq(game(), g1, "the repeat changes nothing");
@@ -592,13 +609,12 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
 
     await scenario("T15b a save made before the framework state existed loads as the formal empty state (no invented party), and the starter can be claimed", async () => {
       G.DataManager.setupNewGame();
-      delete G.$gameSystem._psGame;
-      await G.DataManager.saveGame(6);
+      await writeHostFixture(6, undefined);
       G.$gameSystem._psGame = { diverged: true };
       await G.DataManager.loadGame(6);
       const info = G.$gameSystem._psSaveInfo;
       eq(info && info.created, "empty", "reported as created on load");
-      eq(game(), nodeRequire("./js/engine/build/engine.cjs").state.newGame({ party: [], money: 0 }), "the whole formal empty state: no members, boxes, items, money, dex entries, battles or claims");
+      eq(game(), nodeRequire("./js/engine/build/engine.cjs").state.newGame({ party: [], money: 0, content: W.PSFlow.content() }), "the whole formal empty state: no members, boxes, items, money, dex entries, battles or claims");
       assert(!G.$gameSystem._psSaveError, "not an error");
       eq(W.PSFlow.claim("starter").status, "applied", "the player can still receive the starter");
       eq([game().party.map((m: any) => m.id), game().claims, game().dex.owned], [["M1"], { starter: { kind: "grant" } }, ["charmander"]], "received into the empty state");
@@ -945,8 +961,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       const sample = clone(STEP4_FULL); // bundled into this test plugin: the package has no experiments/ folder
       const B = nodeRequire("./js/engine/build/engine.cjs");
       await slice(31);
-      G.$gameSystem._psGame = clone(sample); // the framework part of a step 4 save, inside an MZ save written by this build
-      await G.DataManager.saveGame(13);
+      await writeHostFixture(13, clone(sample)); // test-authored step4 file; normal schema7 saving stays strict
       G.$gameSystem._psGame = { diverged: true };
       await G.DataManager.loadGame(13);
       assert(!G.$gameSystem._psSaveError, "loads: " + JSON.stringify(G.$gameSystem._psSaveError));
@@ -962,8 +977,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-t31.json"), JSON.stringify({ state: g }));
       // the same step 4 save naming a species the content does not have: refused as a whole, kept as it was
       const bad = clone(sample); bad.boxes[0].species = "Mew";
-      G.$gameSystem._psGame = clone(bad);
-      await G.DataManager.saveGame(15);
+      await writeHostFixture(15, clone(bad));
       G.$gameSystem._psGame = { diverged: true };
       await G.DataManager.loadGame(15);
       eq(G.$gameSystem._psSaveError && G.$gameSystem._psSaveError.code, "unmapped-species", "refused with the reason");
@@ -1176,7 +1190,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
    });
    await scenario('U51-14 J02 transient snapshot retry and T1 unusable event entries remain contained and exit to map',async()=>{
     await toMap();fresh();const app=W.PSFlow.app(),read=app.managementSnapshot.bind(app);let calls=0;app.managementSnapshot=(...args:any[])=>{if(calls++===0)throw Error('J02 transient snapshot');return read(...args);};W.PSManagement.openParty();await uiReady('party');assert(calls>=2,'initialization actually retried snapshot');await press('cancel');await uiClosed();delete app.managementSnapshot;const token=app.beginManagement();app.endManagement(token);
-    const healthy=clone(game()),raw:any={...healthy,schema:4,boxes:Array.from({length:1201},(_,i)=>({...api().state.protocolMember(healthy.party[0]),form:healthy.party[0].form,id:'T1-'+i}))};raw.party=healthy.party.map((m:any)=>({...api().state.protocolMember(m),form:m.form}));delete raw.storage;delete raw.player;delete raw.nextMemberOrdinal;raw.bag=I6.rawBagOf(healthy);delete raw.inventory;delete raw.badges;/* 5.2 D-07: a schema-4 document has bag, not the schema-6 inventory/badges */const bytes=JSON.stringify(raw);G.$gameSystem._psGame=raw;const contents=G.DataManager.makeSaveContents();G.DataManager.extractSaveContents(contents);eq(G.$gameSystem._psSaveError.code,'capacity-exceeded','actual migration rejected');
+    const healthy=clone(game()),raw:any={...healthy,schema:4,boxes:Array.from({length:1201},(_,i)=>({...api().state.protocolMember(healthy.party[0]),form:healthy.party[0].form,id:'T1-'+i}))};raw.party=healthy.party.map((m:any)=>({...api().state.protocolMember(m),form:m.form}));delete raw.storage;delete raw.player;delete raw.nextMemberOrdinal;raw.bag=I6.rawBagOf(healthy);delete raw.inventory;delete raw.badges;raw.dex={seen:clone(healthy.dex.seen),owned:clone(healthy.dex.owned)};/* author a schema4 payload inside an envelope captured while the current7 state is still valid */const bytes=JSON.stringify(raw),contents=G.DataManager.makeSaveContents();contents.system._psGame=raw;G.DataManager.extractSaveContents(contents);eq(G.$gameSystem._psSaveError.code,'capacity-exceeded','actual migration rejected');
     for(const name of ['ShowStorage','ShowParty','ShowSummary']){const plugin=name==='ShowParty'?'PS_BattleFlow':'PS_Management';G.$gameMap._interpreter.setup([{code:357,indent:0,parameters:[plugin,name,name,{id:healthy.party[0].id}]},{code:0,indent:0,parameters:[]}],0);await waitFor(()=>scene()?._psManagement&&scene()?._initialFailure&&!G.SceneManager.isSceneChanging(),'contained unavailable management '+name);await frames(3);assert(!management()?.ready,'failed scene never ready');await shot('J02-'+name);await press('cancel');await uiClosed();eq(JSON.stringify(G.$gameSystem._psGame),bytes,'unusable original unchanged');assert(!G.$gameSystem.isSaveEnabled(),'all saves remain blocked');}
     await toMap();fresh();
    });
@@ -1435,8 +1449,8 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
             t=performance.now();await G.DataManager.loadGame(18);samples.loadMs.push(performance.now()-t);
             t=performance.now();const matches=W.PSFlow.app().searchStorage({},(m:any)=>W.PSFlow.speciesName(m.species,m.form));samples.searchMs.push(performance.now()-t);eq(matches.length,count,'performance search count');
           }
-          const current=clone(game()),legacy:any={...clone(current),schema:4,bag:B.inventory.aggregateBag(current.inventory),party:current.party.map((m:any)=>({...B.state.protocolMember(m),form:m.form})),boxes:boxed(current).map((m:any)=>({...B.state.protocolMember(m),form:m.form}))};delete legacy.inventory;delete legacy.badges;delete legacy.storage;delete legacy.player;delete legacy.nextMemberOrdinal;
-          for(let i=0;i<3;i++){G.$gameSystem._psGame=clone(legacy);await G.DataManager.saveGame(18);const t=performance.now();await G.DataManager.loadGame(18);samples.migration4to6Ms.push(performance.now()-t);eq([G.$gameSystem._psSaveInfo.from,G.$gameSystem._psSaveInfo.to,G.$gameSystem._psSaveInfo.migrated],[4,6,true],'actual timed legacy migration');eq(boxed().length,count,'migration count');eq(B.inventory.aggregateBag(game().inventory),legacy.bag,'timed migration retains all legacy bag quantities');eq(game().money,legacy.money,'timed migration preserves trusted wallet');}
+          const current=clone(game()),legacy:any={...clone(current),schema:4,bag:B.inventory.aggregateBag(current.inventory),party:current.party.map((m:any)=>({...B.state.protocolMember(m),form:m.form})),boxes:boxed(current).map((m:any)=>({...B.state.protocolMember(m),form:m.form}))};delete legacy.inventory;delete legacy.badges;delete legacy.storage;delete legacy.player;delete legacy.nextMemberOrdinal;legacy.dex={seen:clone(current.dex.seen),owned:clone(current.dex.owned)};
+          for(let i=0;i<3;i++){await writeHostFixture(18,clone(legacy));const t=performance.now();await G.DataManager.loadGame(18);samples.migration4to6Ms.push(performance.now()-t);eq([G.$gameSystem._psSaveInfo.from,G.$gameSystem._psSaveInfo.to,G.$gameSystem._psSaveInfo.migrated],[4,api().state.GAME_SCHEMA,true],'actual timed legacy migration');eq(boxed().length,count,'migration count');eq(B.inventory.aggregateBag(game().inventory),legacy.bag,'timed migration retains all legacy bag quantities');eq(game().money,legacy.money,'timed migration preserves trusted wallet');}
           W.PSManagement.openStorage();await uiChoose('organize');await uiReady('box');for(let i=0;i<6;i++){const t=performance.now();await press('pagedown');await uiReady('box');samples.boxSwitchMs.push(performance.now()-t);}await press('cancel');await uiChoose('no');await uiChoose('close');await uiClosed();measurements.push(samples);
         }
         const uiMemory=[mem('5.1 UI warmed (before 100 opens)')],openMs:number[]=[];
@@ -1596,6 +1610,163 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     results.push({ id: "SL1 save location: a fresh slot is written by this run (saveGame code 0) and removed again", status: !occupied && code === 0 && written && cleanedUp ? "pass" : "fail", ms: 0 });
   }
 
+  // B5: actual MZ persistence and normal application lifecycle, driven by service calls.
+  // Disk assertions complement the VM's exact baseSaveGame/baseMake counters; no hardware input is claimed.
+  function progressionContent(regional: boolean): any {
+    const B = api(), read = (name: string) => JSON.parse(fs.readFileSync(path.join(gameDir, "content/sample", name), "utf8"));
+    const inputs: any = {manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json")};
+    for (const [key, file] of [["grants", "grants.json"], ["settings", "settings.json"], ["items", "items.json"], ["shops", "shops.json"]]) if (fs.existsSync(path.join(gameDir, "content/sample", file))) inputs[key] = read(file);
+    if (regional) inputs.regionalDex = {source: "author-placeholder", regions: [{id: 0, nameKey: "region.test", species: inputs.species.filter((sp: any) => !sp.form).map((sp: any) => sp.id)}]};
+    const compiled = B.contentCompile.compileContent(inputs); assert(compiled.ok, JSON.stringify(compiled.errors));
+    const assembled = B.contentRuntime.assembleContent(compiled.data, B.dex.createDexLookup()); assert(!assembled.errors.length, JSON.stringify(assembled.errors));
+    return assembled.content;
+  }
+  async function settledSave(slot: number): Promise<void> {
+    const base = G.StorageManager.saveObject, writes: Promise<any>[] = [];
+    G.StorageManager.saveObject = function (this: any, ...args: any[]) { const promise = base.apply(this, args); writes.push(Promise.resolve(promise)); return promise; };
+    try { await G.DataManager.saveGame(slot); await Promise.all(writes); } finally { G.StorageManager.saveObject = base; }
+  }
+  function saveFileHashes(): any {
+    const dir = G.StorageManager.fileDirectoryPath();
+    return Object.fromEntries(fs.readdirSync(dir).filter((name: string) => fs.statSync(path.join(dir, name)).isFile()).sort().map((name: string) => [name, nodeRequire("crypto").createHash("sha256").update(fs.readFileSync(path.join(dir, name))).digest("hex")]));
+  }
+  async function runProgressionData() {
+    const progressionRegional = arg("ps-progression-layout") !== "national";
+    report.progressionLayout = progressionRegional ? "regional" : "national";
+    await toMap();
+    await scenario("B53-H01 real setupNewGame: national and regional layouts", async () => {
+      const layouts: any[] = [];
+      for (const regional of [false, true]) {
+        W.PSFlow._content = progressionContent(regional); G.DataManager.setupNewGame();
+        const g = game(); eq(g.schema, 7, "current save schema"); eq(g.dex.hasDex, false, "new player has no dex entitlement");
+        eq(g.dex.unlocked, regional ? [true, false] : [true], "exact new-game region entitlement");
+        eq(g.dex.view, {region: regional ? 0 : -1, indices: regional ? [0, 0] : [0], mode: 0}, "correct default viewing state");
+        eq(g.dex.layoutIdentity, W.PSFlow.content().regionalDex.layoutIdentity, "layout came from compiled content");
+        layouts.push({regional, dex: clone(g.dex), identity: W.PSFlow.content().meta});
+      }
+      return {input: "actual MZ setupNewGame + normal app/content pipeline", layouts};
+    });
+    await scenario("B53-H02 real schema6 load: all metadata retained then current7 save", async () => {
+      W.PSFlow._content = progressionContent(progressionRegional);
+      await toMap(); fresh(); const B = api();
+      const six = clone(game()); six.schema = 6; six.dex = {seen: clone(six.dex.seen), owned: clone(six.dex.owned)};
+      for (const member of B.storage.allMembers(six)) {delete member.evolutionReadiness; delete member.cannotTrade;}
+      six.party[0].readyToEvolve = true; six.party[0].abilityIndex = null; six.party[0].effectiveAbilityIndex = null; six.party[0].friendship = 256;
+      six.appliedBattles["B53-history"] = {hash: "a".repeat(64)};
+      const original = G.$gameSystem._psGame, fixtureContents = G.DataManager.makeSaveContents(); fixtureContents.system._psGame = six;
+      try {await G.StorageManager.saveObject("file54", fixtureContents);}
+      finally {G.$gameSystem._psGame = original;}
+      const sourceFile = path.join(G.StorageManager.fileDirectoryPath(), "file54.rmmzsave"), sourceBytes = fs.readFileSync(sourceFile);
+      const sourceSha = nodeRequire("crypto").createHash("sha256").update(sourceBytes).digest("hex");
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "schema6-source.rmmzsave"), sourceBytes);
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "schema6-document.json"), JSON.stringify(six));
+      // The ordinary save gate correctly refuses6; author a test-only MZ fixture through the underlying serializer instead.
+      await G.DataManager.loadGame(54);
+      assert(!G.$gameSystem._psSaveError, JSON.stringify(G.$gameSystem._psSaveError)); eq(G.$gameSystem._psSaveInfo.from, 6, "actual loader migrated6");
+      eq(nodeRequire("crypto").createHash("sha256").update(fs.readFileSync(sourceFile)).digest("hex"), sourceSha, "loading/migrating left the original schema6 bytes unchanged");
+      const g = game(), m = g.party[0]; eq([g.schema, m.readyToEvolve, m.evolutionReadiness, m.cannotTrade, m.abilityIndex, m.effectiveAbilityIndex, m.friendship], [7, true, "known", false, null, null, 256], "precise migration defaults");
+      eq(g.appliedBattles, six.appliedBattles, "raw ledger unchanged");
+      m.evolutionReadiness = "unknown"; m.cannotTrade = true; m.firstMoves = ["tackle", "gust", "tackle", "roost", "rest", "tackle"];
+      const boxedMember = clone(m); boxedMember.id = "B53-BOX"; g.storage.boxes[39].slots[29] = boxedMember;
+      // Normal MZ encoding must consume the verified owned data, never raw realm hooks or a live game reference.
+      Object.defineProperty(g.appliedBattles, "constructor", {value: {hash: "b".repeat(64)}, enumerable: true, configurable: true, writable: true});
+      const snapshotExpected = clone(g), foreign = nodeRequire("vm").runInNewContext("const g=JSON.parse(text);let calls=0;Object.defineProperty(Array.prototype,Symbol.toStringTag,{get(){calls++;throw Error('raw tag hook executed');},configurable:true});Object.defineProperty(Object.prototype,'name',{get(){calls++;throw Error('raw constructor name hook executed');},configurable:true});const p=Object.getPrototypeOf(g.party.entries());Object.defineProperty(p,'next',{value:function(){calls++;throw Error('raw iterator executed');},configurable:true});({g,calls:()=>calls})", {text: JSON.stringify(g)});
+      let ownedSnapshot: any;
+      G.$gameSystem._psGame = foreign.g;
+      try {
+        await settledSave(57);
+        const captured = G.DataManager.makeSaveContents();
+        assert(captured.system !== G.$gameSystem && captured.system._psGame !== foreign.g, "save envelope owns a separate verified state");
+        foreign.g.money++;
+        await G.StorageManager.saveObject("file58", captured);
+        for (const slot of [57, 58]) {const wire = (await G.StorageManager.loadObject(`file${slot}`)).system._psGame; eq([wire.encoding, wire.version], ["pokemon-framework-json", 1], "versioned host encoding"); eq(JSON.parse(wire.data), snapshotExpected, "actual MZ encoder/decoder preserved the verified values");}
+        eq(foreign.calls(), 0, "actual MZ serialization never executes raw tag/name/iterator hooks");
+        eq(foreign.g.money, snapshotExpected.money + 1, "encoding did not replace or normalize the raw state");
+        ownedSnapshot = {slots: [57, 58], hookCalls: foreign.calls(), detachedMoney: snapshotExpected.money};
+      } finally { G.$gameSystem._psGame = g; }
+      await settledSave(54); await settledSave(55);
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-progression-data.json"), JSON.stringify({state: clone(g), slots: [54, 55, 57, 58], ownedSnapshot, regional: progressionRegional, schema6SourceSha: sourceSha, savedHashes: saveFileHashes()}));
+      return {input: "MZ serializer-authored schema6 fixture -> real loadGame -> saveGame7", sourceFixture: six.schema, schema6SourceSha: sourceSha, layout: g.dex.layoutIdentity, preserved: [m.id, m.firstMoves, m.friendship, m.abilityIndex], lastBox: [39, 29], slots: [54, 55, 57, 58], ownedSnapshot};
+    });
+    await scenario("B53-H05 legal7 then corruption: menu/direct/autosave reject with zero disk writes", async () => {
+      await G.DataManager.loadGame(54); assert(!G.$gameSystem._psSaveError, "legal7 was actually loaded");
+      const good = clone(game()), hashes = saveFileHashes(), outcomes: any[] = [];
+      for (const kind of ["bad-R", "bad-reference", "bad-layout", "array-entries", "array-forEach", "array-toJSON", "foreign-iterator"]) {
+        G.$gameSystem._psGame = clone(good);
+        if (kind === "bad-R") {game().party[0].readyToEvolve = false; game().party[0].evolutionReadiness = "unknown";}
+        if (kind === "bad-reference") game().party[0].species = "missing-species";
+        if (kind === "bad-layout") game().dex.layoutIdentity = "0".repeat(64);
+        if (kind === "array-entries") {
+          const hidden = clone(game().party[0]); hidden.id = "HiddenNW2"; delete hidden.cannotTrade;
+          game().party = [game().party[0], hidden];
+          Object.setPrototypeOf(game().party, Object.create(Array.prototype, {entries: {value: function* (this: any[]) {yield [0, this[0]];}}}));
+        }
+        if (kind === "array-forEach") {
+          game().inventory.pockets[0] = [{itemId: "missing-item", quantity: -1}];
+          Object.setPrototypeOf(game().inventory.pockets, Object.create(Array.prototype, {forEach: {value: () => {throw new Error("untrusted traversal must not run");}}}));
+        }
+        if (kind === "array-toJSON") {
+          G.$gameSystem._psGame = nodeRequire("vm").runInNewContext("const g=JSON.parse(text);Object.defineProperty(Array.prototype,'toJSON',{value:function(){return this===g.party?[{id:'Bad'}]:this;},configurable:true});g", {text: JSON.stringify(game())});
+        }
+        if (kind === "foreign-iterator") {
+          G.$gameSystem._psGame = nodeRequire("vm").runInNewContext("const g=JSON.parse(text);delete g.party[1].cannotTrade;const p=Object.getPrototypeOf(g.party.entries()),next=p.next;Object.defineProperty(p,'next',{value:function(){const v=Reflect.apply(next,this,[]);return !v.done&&Array.isArray(v.value)&&v.value[0]===1?{done:true}:v;},configurable:true});g", {text: JSON.stringify(game())});
+        }
+        const damaged = JSON.stringify(game()), save = G.StorageManager.saveObject, make = G.DataManager.makeSaveContents;
+        let storageCalls = 0, makeCalls = 0;
+        G.StorageManager.saveObject = function (this: any, ...args: any[]) {storageCalls++; return save.apply(this, args);};
+        G.DataManager.makeSaveContents = function (this: any, ...args: any[]) {makeCalls++; return make.apply(this, args);};
+        try {
+          eq(G.$gameSystem.isSaveEnabled(), false, "actual menu permission is masked");
+          for (const slot of [54, 55, 56, 0]) {let refused = false; try {await G.DataManager.saveGame(slot);} catch {refused = true;} assert(refused, `direct/autosave destination ${slot} rejected`);}
+          let menuFailed = 0, autoFailed = 0;
+          G.Scene_Save.prototype.executeSave.call({onSaveSuccess: () => {throw new Error("bad save unexpectedly succeeded");}, onSaveFailure: () => {menuFailed++;}}, 55);
+          G.Scene_Base.prototype.executeAutosave.call({onAutosaveSuccess: () => {throw new Error("bad autosave unexpectedly succeeded");}, onAutosaveFailure: () => {autoFailed++;}});
+          await waitFor(() => menuFailed === 1 && autoFailed === 1, "actual menu save/autosave failure callbacks");
+          eq([storageCalls, makeCalls], [0, 0], "save checks reject before serialization/storage entries");
+          let snapshotRefused = false; try {make.call(G.DataManager);} catch {snapshotRefused = true;} assert(snapshotRefused, "direct makeContents also rejects before underlying snapshot");
+          eq(saveFileHashes(), hashes, "loaded source, occupied target, global and absent target unchanged");
+          eq(JSON.stringify(game()), damaged, "no automatic repair"); outcomes.push({kind, storageCalls, makeEntryCalls: makeCalls, hashes: saveFileHashes(), missingTarget: !G.StorageManager.exists("file56")});
+        } finally {G.StorageManager.saveObject = save; G.DataManager.makeSaveContents = make;}
+      }
+      G.$gameSystem._psGame = good;
+      assert(G.$gameSystem.isSaveEnabled(), "restoring legal memory re-enables the same gate");
+      eq(saveFileHashes(), hashes, "source/target/global remain original through the restart boundary");
+      return {input: "actual MZ menu permission, Scene_Save.executeSave and Scene_Base.executeAutosave with programmatic completion callbacks, plus direct saveGame", note: "exact base function counters separately VM-tested; actual host measures serialization and disk entry zero", outcomes};
+    });
+    await scenario("B53-H03 actual heal/preserve and empty legacy save load", async () => {
+      const B = api(), content = W.PSFlow.content(), member = clone(game().party[0]); member.readyToEvolve = true; member.evolutionReadiness = "unknown";
+      eq([B.heal.healMember(member, content).readyToEvolve, B.heal.healMember(member, content).evolutionReadiness], [false, "known"], "ordinary heal clears both");
+      const preserved = B.heal.healMember(member, content, {preserveReadyToEvolve: true}); eq([preserved.readyToEvolve, preserved.evolutionReadiness], [true, "unknown"], "box heal preserves both");
+      const sys = G.$gameSystem, original = sys._psGame; delete sys._psGame;
+      // Invoke the actual extraction lifecycle with MZ objects, no disk save of the missing state.
+      const normal = {system: sys, screen: G.$gameScreen, timer: G.$gameTimer, switches: G.$gameSwitches, variables: G.$gameVariables, selfSwitches: G.$gameSelfSwitches, actors: G.$gameActors, party: G.$gameParty, map: G.$gameMap, player: G.$gamePlayer};
+      G.DataManager.extractSaveContents(normal); assert(!G.$gameSystem._psSaveError, "empty legacy host initialized"); eq(game().schema, 7, "empty host is7"); eq(game().party, [], "never invent members");
+      G.$gameSystem._psGame = original;
+      return {input: "real host heal API and DataManager.extractSaveContents", emptyCreated: G.$gameSystem._psSaveInfo?.created};
+    });
+    await scenario("B53-H06 actual JsonEx: both reserved ledger orders and grant claims survive save/replay", async () => {
+      const B = api(), content = W.PSFlow.content(), expectedPath = path.join(path.dirname(OUT || "."), "ps-flow-expected-progression-data.json");
+      const expected = JSON.parse(fs.readFileSync(expectedPath, "utf8")), cases: any[] = [];
+      const raw = (id: string) => ({protocol: 1, battleId: id, outcome: {kind: "run", winner: null}, members: {}, bag: {}, captured: [], dex: {seen: [], owned: []}, money: 7});
+      // A removed grant remains claimed too: a legal claim does not depend on a currently published reward catalog.
+      const grantIds = ["constructor", "__proto__", "toJSON", "#.:_-"], grantContent = {...content, grants: Object.fromEntries(grantIds.map(id => [id, {members: [], items: {}, money: 3}]))};
+      for (const [index, ids] of [["constructor", "@"], ["@", "constructor"]].entries()) {
+        let next = clone(expected.state); delete next.appliedBattles.constructor;
+        for (const id of ids) {const r = B.state.applyBattleResult(next, raw(id), undefined, undefined, {content}); eq(r.status, "applied", "normal public battle result creates the claim"); next = r.state;}
+        for (const id of grantIds) {const r = B.grants.applyGrant(next, id, grantContent, () => 0); eq(r.status, "applied", "normal public grant creates the claim"); next = r.state;}
+        const slot = 59 + index, original = clone(next); G.$gameSystem._psGame = next;
+        await settledSave(slot); await G.DataManager.loadGame(slot); assert(!G.$gameSystem._psSaveError, JSON.stringify(G.$gameSystem._psSaveError));
+        eq(game(), original, "real encode/decode/load retains every data key and hash");
+        for (const id of ids) {const r = B.state.applyBattleResult(game(), raw(id), undefined, undefined, {content}); eq(r.status, "already-applied", "battle cannot pay twice"); eq(r.state, original, "no second resource change");}
+        for (const id of grantIds) {const r = B.grants.applyGrant(game(), id, grantContent, () => 0); eq(r.status, "already-claimed", "grant cannot pay twice"); eq(r.state, original, "no second grant resource change");}
+        cases.push({slot, ids, grantIds, state: original});
+      }
+      expected.ledgerCases = cases; expected.savedHashes = saveFileHashes(); fs.writeFileSync(expectedPath, JSON.stringify(expected));
+      return {input: "normal applyBattleResult/applyGrant + actual MZ saveGame/loadGame", cases: cases.map(({state, ...rest}) => ({...rest, money: state.money, ledgerKeys: Object.keys(state.appliedBattles), claimKeys: Object.keys(state.claims)}))};
+    });
+    await shot("B53-progression-data");
+  }
+
   async function runCapabilitySeam() {
     await toMap();
     await scenario("C53-01 real scene: item/level friendship and companion seal; original battle result/save shape", async () => {
@@ -1642,10 +1813,30 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   }
 
   async function verifySave() {
+    if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-progression-data.json"))) {
+      await scenario("B53-V1 independent NW restart: good source and target remain readable7", async () => {
+        const expected = readExpected("ps-flow-expected-progression-data.json"); W.PSFlow._content = progressionContent(expected.regional);
+        eq(saveFileHashes(), expected.savedHashes, "original producing source/target/global bytes reached this new process unchanged");
+        const loaded: any[] = [];
+        for (const slot of expected.slots) {
+          G.DataManager.setupNewGame(); await G.DataManager.loadGame(slot); assert(!G.$gameSystem._psSaveError, JSON.stringify(G.$gameSystem._psSaveError));
+          eq(game(), expected.state, "fresh process rereads exact primary state and schema7 metadata");
+          assert(!game().battleEvidence && api().storage.allMembers(game()).every((m: any) => (m.evolutionReadiness === "known" || m.readyToEvolve && m.evolutionReadiness === "unknown")), "legal R state and no transient companion"); loaded.push(slot);
+        }
+        for (const entry of expected.ledgerCases || []) {
+          G.DataManager.setupNewGame(); await G.DataManager.loadGame(entry.slot); assert(!G.$gameSystem._psSaveError, JSON.stringify(G.$gameSystem._psSaveError)); eq(game(), entry.state, "new process retained legal reserved IDs");
+          for (const id of entry.ids) {const raw = {protocol: 1, battleId: id, outcome: {kind: "run", winner: null}, members: {}, bag: {}, captured: [], dex: {seen: [], owned: []}, money: 7}; const r = api().state.applyBattleResult(game(), raw, undefined, undefined, {content: W.PSFlow.content()}); eq(r.status, "already-applied", "new process refuses duplicate battle payoff"); eq(r.state, entry.state, "new process has no duplicate resource change");}
+          for (const id of entry.grantIds) {const r = api().grants.applyGrant(game(), id, W.PSFlow.content(), () => 0); eq(r.status, "already-claimed", "new process refuses duplicate grant even if no longer published"); eq(r.state, entry.state, "new process has no duplicate grant change");} loaded.push(entry.slot);
+        }
+        eq(saveFileHashes(), expected.savedHashes, "reading both good slots did not write any original file");
+        return {input: "new NW process, real MZ load API", slots: loaded, layout: game().dex.layoutIdentity, identity: W.PSFlow.content().meta};
+      });
+      return;
+    }
     if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-capability.json"))) {
       await scenario("C53-V1 real restart: isolated MZ save keeps primary state and no transient companion", async () => {
         const expected = readExpected("ps-flow-expected-capability.json"); G.DataManager.setupNewGame(); await G.DataManager.loadGame(expected.slot);
-        eq(game(), expected.state, "primary save identical across fresh NW process"); assert(!game().battleEvidence && api().storage.allMembers(game()).every((m: any) => !Object.hasOwn(m, "evolutionReadiness")), "no transient packet or unimplemented member schema field installed");
+        eq(game(), expected.state, "primary save identical across fresh NW process"); assert(!game().battleEvidence && api().storage.allMembers(game()).every((m: any) => (m.evolutionReadiness === "known" || m.readyToEvolve && m.evolutionReadiness === "unknown")), "no transient packet and persistent schema7 R combinations remain legal");
         eq(game().appliedBattles["host-capability-1"].hash, expected.rawHash, "original raw result ledger retained"); return { slot: expected.slot, input: "MZ load API in fresh NW process", primaryUnchanged: true };
       });
       return;
@@ -1766,7 +1957,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       try { startAt.call(this); } finally { fs.readFileSync = read; }
     } else startAt.call(this);
     setTimeout(async () => {
-      try { if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
+      try { if (mode === "progression-data") await runProgressionData(); else if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       try { report.contentIdentity = W.PSFlow.content().meta; } catch (e) { report.contentIdentity = { error: String(e) }; }
       try { report.logTail = W.PSFlow.logger ? W.PSFlow.logger.tail(60) : null; } catch (e) { report.logTail = { error: String(e) }; } // redacted, bounded session diagnostics

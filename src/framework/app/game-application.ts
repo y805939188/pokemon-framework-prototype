@@ -39,7 +39,7 @@ import type { Member } from "../rules/types.ts";
 import { advanceMemberOrdinal, allocateMemberId, ownerLanguage } from "../rules/member-identity.ts";
 import { assertCapturedHeldSources, hasForcedPartyPlan, fallbackDecisions, receiveMembers, ReceivingRefused, requireTemplate } from "../rules/receiving.ts";
 import type { ReceivingDecision, ReceivingProfile, ReceivedPlacement } from "../rules/receiving.ts";
-import { validateGame } from "../rules/save-schema.ts";
+import { validateGameContent } from "../rules/save-schema.ts";
 import { own, setOwn } from "../rules/own.ts";
 import { findDanglingReferences, resolveSpecies } from "../flow/content-runtime.ts";
 import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ClockPort, ContentPort, CreationContext, EncounterPlan, GameStatePort, GiftOutcome, GiftRequest, HealOutcome, OutcomeProjection, PartyView, RandomPort, StepsOutcome } from "./ports.ts";
@@ -159,7 +159,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   constructor(ports: GameApplicationPorts<S>, options: GameApplicationOptions = {}) {
-    this.ports = {...ports,state:{read:()=>ports.state.read(),replace:next=>{ports.state.replace(next);this.inventory?.stateChanged(next);}}};
+    this.ports = {...ports,state:{read:()=>ports.state.read(),replace:next=>{const problems=validateGameContent(next,ports.content().content);if(problems.length)throw new Error(`invalid next state: ${problems[0]!.path} ${problems[0]!.message}`);ports.state.replace(next);this.inventory?.stateChanged(next);}}};
     this.limits = options.limits ?? DEFAULT_LIMITS;
     this.startMoney = options.startMoney ?? 3000;
     if (!Number.isSafeInteger(this.startMoney) || this.startMoney < 0) throw new Error("invalid-start-money");
@@ -208,8 +208,10 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   startNewGame(): { status: "started"; state: GameState } {
     const random = this.ports.random;
     if (!random) throw new Error("no-random: a new player's trainer ID needs an injected random source");
-    const state = newGame({ party: [], money: this.startMoney, player: { id: personalId(random), name: this.playerDefaults.name, gender: this.playerDefaults.gender, language: ownerLanguage(this.playerDefaults.locale) } });
-    this.ports.state.replace(state);
+    const content = this.ports.content().content;
+    if (!content.regionalDex) throw new Error("needs-content: new game requires a validated regional layout");
+    const state = newGame({ content, party: [], money: this.startMoney, player: { id: personalId(random), name: this.playerDefaults.name, gender: this.playerDefaults.gender, language: ownerLanguage(this.playerDefaults.locale) } });
+    this.install(state);
     this.stateReplacedByHost();
     return { status: "started", state };
   }
@@ -307,7 +309,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     } catch (error) { return { status: "refused", reason: error instanceof ReceivingRefused ? error.reason : "invalid", error: message(error) }; }
   }
 
-  private install(next: GameState): void { if(next.inventory.pockets.some(pocket=>pocket.length))assertInventoryMapped(next.inventory,catalogOf(this.ports.content().content)); const problems = validateGame(next); if (problems.length) throw new Error(`invalid next state: ${problems[0]!.path} ${problems[0]!.message}`); try { this.ports.state.replace(next); } catch (error) { throw new StateInstallFailed(error); } }
+  private install(next: GameState): void {
+    const content = this.ports.content().content;
+    if (next.inventory.pockets.some(pocket => pocket.length)) assertInventoryMapped(next.inventory, catalogOf(content));
+    const problems = validateGameContent(next, content);
+    if (problems.length) throw new Error(`invalid next state: ${problems[0]!.path} ${problems[0]!.message}`);
+    try { this.ports.state.replace(next); } catch (error) { throw new StateInstallFailed(error); }
+  }
   get receivingNotifications(): { token: string; placements: { id: string; to: "party" | "boxes"; box?: number; boxName?: string }[] }[] { return [...this.receptionNotices].map(([token, placements]) => ({ token, placements: clone(placements) })); }
   acknowledgeReceivingNotification(token: string): void { this.receptionNotices.delete(token); }
   private noteReception(context: ReceptionContext, members: readonly Member[], next: GameState): void {

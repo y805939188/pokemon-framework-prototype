@@ -3,13 +3,13 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const E=require('../../../js/engine/build/engine.cjs'),H=require('../1/legacy-test-support.cjs');
 const F=E.fixtures,S=E.state,I=E.inventory,clone=x=>structuredClone(x);
 const options={content:F.content,speciesKey:E.speciesKey.identityKeys};
-function old5(){const game=clone(F.makeGame());game.schema=5;game.bag=I.aggregateBag(game.inventory);delete game.inventory;delete game.badges;for(const m of E.storage.allMembers(game)){delete m.statNature;for(const move of m.moves)delete move.ppUps;}return game;}
+function old5(){const game=clone(F.makeGame());game.schema=5;game.bag=I.aggregateBag(game.inventory);delete game.inventory;delete game.badges;game.dex={seen:clone(game.dex.seen),owned:clone(game.dex.owned)};for(const m of E.storage.allMembers(game)){delete m.evolutionReadiness;delete m.cannotTrade;delete m.statNature;for(const move of m.moves)delete move.ppUps;}return game;}
 const migrate=raw=>E.saveSchema.migrateGame(raw,options);
-test('P52-04 FR180: schema1..5 to6 is deterministic, no data loss and no source mutation',()=>{
+test('P52-04 FR180: schema1..5 through6 to7 is deterministic, no data loss and no source mutation',()=>{
  for(const version of [1,2,3,4,5]){
   const raw=version===5?old5():H.legacyGame(F.makeGame(),version);raw.bag.potion=1500;raw.money=2000000;
   const before=clone(raw),one=migrate(raw),two=migrate(raw);assert.equal(one.ok,true,JSON.stringify(one));assert.deepEqual(one,two);assert.deepEqual(raw,before);
-  assert.equal(one.state.schema,6);assert.equal(I.aggregateBag(one.state.inventory).potion,1500);assert.equal(one.state.money,2000000);assert.deepEqual(one.state.badges,Array(8).fill(false));assert.equal('bag'in one.state,false);assert.equal(E.saveSchema.validateGame(one.state).length,0);
+  assert.equal(one.state.schema,7);assert.equal(I.aggregateBag(one.state.inventory).potion,1500);assert.equal(one.state.money,2000000);assert.deepEqual(one.state.badges,Array(8).fill(false));assert.equal('bag'in one.state,false);assert.equal(E.saveSchema.validateGame(one.state).length,0);
   assert.deepEqual(migrate(one.state).state,one.state);assert.deepEqual(one.state.appliedBattles,raw.appliedBattles);assert.equal(one.state.party[0].moves[0].ppUps,0);
  }
 });
@@ -42,8 +42,8 @@ test('P52-13/16: persistent growth keeps both nature identities and validates ba
 test('P52-04/28: invalid current SaveStore.save refuses before creating any file or backup',()=>{
  const fs=require('node:fs'),os=require('node:os'),path=require('node:path');const root=fs.mkdtempSync(path.join(os.tmpdir(),'p52-store-')),file=path.join(root,'state.json'),raw=old5(),bytes=JSON.stringify(raw);fs.writeFileSync(file,bytes);const store=new E.store.SaveStore(file,{},options.speciesKey,F.content),bad=F.makeGame();bad.inventory.pockets[1][0].quantity=0;assert.throws(()=>store.save(bad),e=>e.info.code==='invalid');assert.equal(fs.readFileSync(file,'utf8'),bytes);assert.deepEqual(fs.readdirSync(root),['state.json']);fs.rmSync(root,{recursive:true});
 });
-test('P52-04: current custom inventory loads structurally without content, validates identities when content is available',()=>{
- const game=F.makeGame(),catalog=clone(F.content.items);catalog.local={...catalog.potion,id:'local',pocket:8};game.inventory=I.addItems(game.inventory,'local',1,catalog,I.inventoryPolicy());assert.equal(E.saveSchema.migrateGame(game).ok,true);assert.equal(E.saveSchema.migrateGame(game,{content:F.content}).ok,false);assert.equal(E.saveSchema.migrateGame(game,{content:{...F.content,items:catalog}}).ok,true);
+test('P52-04: current custom inventory validates structurally, requires content to load and validates item identities',()=>{
+ const game=F.makeGame(),catalog=clone(F.content.items);catalog.local={...catalog.potion,id:'local',pocket:8};game.inventory=I.addItems(game.inventory,'local',1,catalog,I.inventoryPolicy());assert.deepEqual(E.saveSchema.validateGame(game),[]);assert.equal(E.saveSchema.migrateGame(game).error.code,'needs-content');assert.equal(E.saveSchema.migrateGame(game,{content:F.content}).error.code,'invalid');assert.equal(E.saveSchema.migrateGame(game,{content:{...F.content,items:catalog}}).ok,true);
 });
 test('P52-04/05/32: unresolved current inventory blocks grants before RNG and even empty battle deltas',()=>{
  const game=F.makeGame();game.inventory.pockets[0].push({itemId:'unmapped',quantity:1});const before=clone(game);let draws=0;assert.throws(()=>E.grants.applyGrant(game,'any',{...F.content,grants:{any:{id:'any',members:[{species:'Pidgey',level:3}],items:{},money:0}}},()=>{draws++;return 0;}),/unmapped/);assert.equal(draws,0);const result={protocol:1,battleId:'unknown',outcome:{kind:'run',winner:null},members:{},bag:{},captured:[],dex:{seen:[],owned:[]}};assert.throws(()=>S.applyBattleResult(game,result),/unmapped/);assert.deepEqual(game,before);

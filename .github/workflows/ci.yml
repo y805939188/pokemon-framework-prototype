@@ -59,6 +59,14 @@ jobs:
         run: ./scripts/ci-run.sh reactor-setup ./scripts/setup-reactor.sh --install
       - name: Install dependencies (lockfile)
         run: ./scripts/ci-run.sh pnpm-install pnpm --dir src install --frozen-lockfile
+      # Full content:build validates authored references against the pinned runtime too.
+      # Prepare it in this job's fresh checkout; the headless job's files are not shared.
+      - name: Build the engine bundles (the Showdown extension is staged from them)
+        run: ./scripts/ci-run.sh build-engine pnpm --dir src build:engine
+      - name: Build the pinned Showdown runtime
+        env:
+          SHOWDOWN_SRC: ${{ runner.temp }}/showdown-src
+        run: ./scripts/ci-run.sh build-showdown ./scripts/build-showdown.sh
       - name: Type check
         run: ./scripts/ci-run.sh typecheck pnpm --dir src typecheck
       - name: Build plugins

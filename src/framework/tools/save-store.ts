@@ -18,7 +18,8 @@ import fs from "node:fs";
 import { applyBattleResult } from "../rules/state.ts";
 import type { BattleCommitOptions, BattleResult, GameState } from "../rules/state.ts";
 import type { Content } from "../rules/types.ts";
-import { migrateGame } from "../rules/save-schema.ts";
+import { migrateGame, snapshotForSave } from "../rules/save-schema.ts";
+import { GAME_SCHEMA } from "../rules/state.ts";
 import type { MigrationResult, SaveErrorInfo } from "../rules/save-schema.ts";
 import type { SpeciesKeyResolver } from "../rules/species-key.ts";
 
@@ -66,13 +67,15 @@ export class SaveStore {
   load(): GameState { return this.loadInfo().state; }
 
   save(state: GameState): void {
-    const checked = migrateGame(state, { ...(this.content ? { content: this.content } : {}) });
-    if (!checked.ok) throw new SaveError(checked.error);
-    if (checked.migrated) throw new SaveError({ code: "invalid", message: "save requires a current state; migrate explicitly before saving; original file untouched" });
+    const version = state && typeof state === "object" ? Object.getOwnPropertyDescriptor(state, "schema") : undefined;
+    if (version && "value" in version && version.value !== GAME_SCHEMA) throw new SaveError({ code: "invalid", message: "save requires a current state; migrate explicitly before saving; original file untouched" });
+    if (!this.content) throw new SaveError({code: "needs-content", message: "saving requires validated content; no file was written"});
+    const prepared = snapshotForSave(state, this.content);
+    if (!prepared.ok) throw new SaveError({code: "invalid", message: `save refused before writing: ${prepared.problems[0]!.path} ${prepared.problems[0]!.message}`, problems: prepared.problems});
     const tmp = this.file + ".tmp";
     const fd = fs.openSync(tmp, "w");
     try {
-      fs.writeSync(fd, JSON.stringify(state));
+      fs.writeSync(fd, JSON.stringify(prepared.state));
       this._at("afterTmpWrite");
       fs.fsyncSync(fd);
     } finally { fs.closeSync(fd); }

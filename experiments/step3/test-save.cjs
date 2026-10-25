@@ -12,7 +12,7 @@ const { spawnSync } = require('node:child_process');
 const E = require('../../js/engine/build/engine.cjs');
 const H = require('../step5/1/legacy-test-support.cjs');
 const { validateGame, ledgerStats } = E.saveSchema;
-// Since step 5.0 the chain ends at schema 4, whose step from 3 needs the content's species mapping (D5-3). These states
+// The chain continues through schema 7; 3→4 needs species mapping and current loading needs the validated dex layout. These states
 // come from the step 2 fixture world, whose content ids are the Showdown names: the identity mapping is that content's.
 const migrateGame = (raw, o = { speciesKey: E.speciesKey.identityKeys, content: E.fixtures.content }) => E.saveSchema.migrateGame(raw, o);
 /** What schemas 3 and 4 add to an older document: the claims ledger, statistics, the step counter, a form per member. */
@@ -65,7 +65,7 @@ test('the oldest prototype shape: counters are added, bad poison becomes plain p
 	assert.deepEqual([a.status, a.statusCount], ['', 0]);
 	assert.deepEqual([b.status, b.statusCount], ['psn', 0]);
 	assert.deepEqual([c.status, c.statusCount], ['slp', undefined], 'no number is invented for a sleeper');
-	assert.equal(r.notes.length, 6); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /schema 4/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
+	assert.equal(r.notes.length, 7); assert.match(r.notes.join('|'), /schema 7: existing readiness is known/); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /schema 4/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
 	assert.deepEqual(validateGame(r.state), []);
 });
 
@@ -132,7 +132,7 @@ test('the store never overwrites a save it cannot read', () => {
 	const attempts = [
 		['garbage', Buffer.from('{ this is not json'), 'corrupt'],
 		['truncated', Buffer.from(JSON.stringify(realV1()).slice(0, 200)), 'corrupt'],
-		['newer', Buffer.from(JSON.stringify({ ...realV1(), schema: 7 })), 'unknown-version'],
+		['newer', Buffer.from(JSON.stringify({ ...realV1(), schema: S.GAME_SCHEMA + 1 })), 'unknown-version'],
 		['invalid', Buffer.from(JSON.stringify({ ...realV1(), money: -1 })), 'invalid'],
 	];
 	for (const [name, bytes, code] of attempts) {

@@ -46,7 +46,7 @@ if (process.argv[2] === '--cold-held') {
   }
   const content = assemble();
   const member = (id, c = content, species = 'Pidgey') => E.speciesKey.toPersistentMember(E.memberFactory.createMember({ id, species, level: 5 }, c, () => 0), c);
-  function setup(game = E.state.newGame({ party: [member('A')], bag: { masterball: 2 } }), options = {}, ports = {}) {
+  function setup(game = E.state.newGame({ content, party: [member('A')], bag: { masterball: 2 } }), options = {}, ports = {}) {
     const state = E.fakes.createMemoryState(game), sessions = E.fakes.createFakeSessions({});
     const app = new E.app.GameApplication({ state, sessions, projection: E.fakes.createRecordingProjection(), content: () => ({ content, dex: E.dex.createDexLookup() }), random: () => 0, clock: () => 1000, ...ports }, options);
     return { state, sessions, app };
@@ -113,14 +113,14 @@ if (process.argv[2] === '--cold-held') {
   });
 
   test('M04: every present legacy metadata field is checked before defaults, strings never become char lists', () => {
-    const H = require('./legacy-test-support.cjs'); const baseRaw = H.legacyGame(E.state.newGame({ party: [member('A')] }), 4), opts = { content, speciesKey: E.speciesKey.speciesKeyResolver(content) };
+    const H = require('./legacy-test-support.cjs'); const baseRaw = H.legacyGame(E.state.newGame({ content, party: [member('A')] }), 4), opts = { content, speciesKey: E.speciesKey.speciesKeyResolver(content) };
     const bad = { personalID: null, owner: null, ownerCompatibilityDefault: null, origin: null, abilityIndex: '1', effectiveAbilityIndex: -1, shiny: null, superShiny: 0, firstMoves: 'cut', markings: null, ribbons: 'Champion', cannotStore: null, cannotRelease: 1, isEgg: 'false', mail: 1, readyToEvolve: null };
     for (const [field, value] of Object.entries(bad)) {
       const raw = clone(baseRaw); raw.party[0][field] = value; const before = JSON.stringify(raw), r = E.saveSchema.migrateGame(raw, opts);
       assert.equal(r.ok, false, field); assert.equal(r.error.code, 'invalid', field); assert.ok(r.error.problems.some(p => p.path.startsWith('$.party[0].' + field)), field); assert.equal(JSON.stringify(raw), before);
     }
     for (const schema of [1, 2, 3, 4]) {
-      const raw = H.legacyGame(E.state.newGame({ party: [member('A')] }), schema); raw.party[0].ribbons = 'Champion'; assert.equal(E.saveSchema.migrateGame(raw, opts).ok, false, schema);
+      const raw = H.legacyGame(E.state.newGame({ content, party: [member('A')] }), schema); raw.party[0].ribbons = 'Champion'; assert.equal(E.saveSchema.migrateGame(raw, opts).ok, false, schema);
     }
     const raw = clone(baseRaw), trusted = member('A');
     for (const field of Object.keys(bad)) raw.party[0][field] = clone(trusted[field]); raw.party[0].shiny = false; raw.party[0].firstMoves = []; raw.party[0].ribbons = ['Champion']; raw.party[0].markings = [];
@@ -135,7 +135,7 @@ if (process.argv[2] === '--cold-held') {
       const H = require('./legacy-test-support.cjs'), file = path.join(dir, 'slot1.json');
       const snapshot = () => Object.fromEntries(fs.readdirSync(dir).map(name => [name, createHash('sha256').update(fs.readFileSync(path.join(dir, name))).digest('hex')]));
       for (const [field, value] of [['firstMoves', 'cut'], ['ribbons', 'Champion'], ['shiny', null], ['owner', null], ['markings', null], ['origin', null]]) {
-        const raw = H.legacyGame(E.state.newGame({ party: [member('A')] }), 4); raw.party[0][field] = value;
+        const raw = H.legacyGame(E.state.newGame({ content, party: [member('A')] }), 4); raw.party[0][field] = value;
         fs.writeFileSync(file, JSON.stringify(raw)); fs.writeFileSync(path.join(dir, 'slot2.json'), 'unrelated slot'); const before = snapshot();
         const store = new E.store.SaveStore(file, {}, E.speciesKey.speciesKeyResolver(content), content);
         assert.throws(() => store.load(), e => e.info.code === 'invalid'); assert.throws(() => store.commit({}), e => e.info.code === 'invalid'); assert.deepEqual(snapshot(), before, field);
@@ -145,7 +145,7 @@ if (process.argv[2] === '--cold-held') {
 
   test('M03: legacy parties above p may reorder/return held members, while actual additions still refuse', () => {
     for (const [p, size] of [[1, 3], [3, 5]]) {
-      const game = E.state.newGame({ party: Array.from({ length: size }, (_, i) => member('P' + i)) }); E.storage.placeInBox(game.storage, member('BOX'));
+      const game = E.state.newGame({ content, party: Array.from({ length: size }, (_, i) => member('P' + i)) }); E.storage.placeInBox(game.storage, member('BOX'));
       const x = setup(game, { limits: { ...E.limits.DEFAULT_LIMITS, party: p } }), token = x.app.beginManagement();
       assert.equal(x.app.manage(token, 'reorder', { kind: 'move', source: ref('P0'), target: { kind: 'party', index: size }, expectedTargetId: null }).status, 'applied');
       assert.deepEqual(x.state.current().party.map(m => m.id), [...game.party.slice(1).map(m => m.id), 'P0']); assert.equal(x.state.replaced.length, 1);
@@ -166,7 +166,7 @@ if (process.argv[2] === '--cold-held') {
   });
 
   test('N01: cancel held survives failing state/content ports, preserves independent edits and writes nothing', () => {
-    let failContent = false, failState = false; const state = E.fakes.createMemoryState(E.state.newGame({ party: [member('A'), member('B')] }));
+    let failContent = false, failState = false; const state = E.fakes.createMemoryState(E.state.newGame({ content, party: [member('A'), member('B')] }));
     const x = setup(undefined, {}, { state: { read() { if (failState) throw Error('state failure'); return state.current(); }, replace(next) { state.replace(next); } }, content: () => { if (failContent) throw Error('content failure'); return { content }; } });
     const token = x.app.beginManagement(); assert.equal(x.app.manage(token, 'pick', { kind: 'pick-up', source: ref('A') }).status, 'held');
     assert.equal(x.app.manage(token, 'rename', { kind: 'box-name', box: 0, name: '保留' }).status, 'applied'); const before = clone(state.current()), writes = state.replaced.length;
@@ -175,7 +175,7 @@ if (process.argv[2] === '--cold-held') {
 
   test('M05: force-party full parties with no legal target disable balls; a legal target and party room remain usable', async () => {
     for (const p of [1, 3, 6]) for (const guard of ['cannotStore', 'mail', 'legal']) {
-      const game = E.state.newGame({ party: Array.from({ length: p }, (_, i) => member('P' + i)) });
+      const game = E.state.newGame({ content, party: Array.from({ length: p }, (_, i) => member('P' + i)) });
       for (const m of game.party) { m.cannotStore = guard !== 'mail'; m.mail = guard === 'mail' ? 'letter' : null; }
       if (guard === 'legal') game.party[p - 1].cannotStore = false;
       const x = setup(game, { limits: { ...E.limits.DEFAULT_LIMITS, party: p }, receivingProfile: auto }); const req = { battleId: 'force-' + p + guard, kind: 'wild', seq: 1, forceParty: true, foes: [{ species: 'pidgey', level: 3 }] };
@@ -185,7 +185,7 @@ if (process.argv[2] === '--cold-held') {
         const pending = x.app.finishBattle(h, req); const done = x.app.resolveReceiving(pending.receivingToken, {}, 'scene-aborted'); assert.equal(done.commit, 'applied'); assert.equal(x.app.saveBlocked, false); assert.equal(x.state.current().party[p - 1].id, foe.id);
       } else x.app.abortBattle(req, 'no capture attempted');
     }
-    const game = E.state.newGame({ party: [member('A')] }); for (let i = 0; i < 1200; i++) E.storage.placeInBox(game.storage, { ...member('B' + i) });
+    const game = E.state.newGame({ content, party: [member('A')] }); for (let i = 0; i < 1200; i++) E.storage.placeInBox(game.storage, { ...member('B' + i) });
     const x = setup(game); await x.app.startBattle({ battleId: 'room', kind: 'wild', seq: 1, forceParty: true, foes: [{ species: 'pidgey', level: 3 }] }); assert.equal(x.sessions.created[0].setup.noBall, false);
   });
   test('M05: unexpected later target loss retains pending/template instead of dropping or boxing the capture', async () => {
@@ -198,7 +198,7 @@ if (process.argv[2] === '--cold-held') {
     assert.equal(recovered.status, 'pending'); assert.match(recovered.reason, /no legal forced-party/); assert.equal(x.app.saveBlocked, true); assert.deepEqual(x.state.current(), before); assert.equal(x.app.pendingReceiving.members[0].id, c.template.id);
   });
   test('M05: real Showdown no-target battle refuses balls without spending one', async () => {
-    const game = E.state.newGame({ party: [member('A')], bag: { masterball: 2 } }); game.party[0].cannotStore = true;
+    const game = E.state.newGame({ content, party: [member('A')], bag: { masterball: 2 } }); game.party[0].cannotStore = true;
     const state = E.fakes.createMemoryState(game); const app = new E.app.GameApplication({ state, sessions: E.composition.createBattleSessionFactory({ content: () => content, seed: () => [1, 2, 3, 4] }), projection: E.fakes.createRecordingProjection(), content: () => ({ content }), random: () => 0, clock: () => 1000 }, { limits: { ...E.limits.DEFAULT_LIMITS, party: 1 } });
     const session = await app.startBattle({ battleId: 'actual-no-target', kind: 'wild', seq: 1, forceParty: true, foes: [{ species: 'pidgey', level: 3 }] });
     assert.deepEqual(await session.throwBall('masterball'), { ok: false, reason: 'ballsdisabled' }); assert.equal(I6.bagOf(state.current()).masterball, 2); assert.equal(state.replaced.length, 0); app.abortBattle({ battleId: 'actual-no-target' }, 'test ended');

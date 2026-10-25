@@ -14,8 +14,8 @@
  *   save : while the loaded framework state is unusable (`_psSaveError`), every save is refused BEFORE MZ writes
  *          anything (code state-unusable, with the slot): the save file the state came from, and every other slot, stay
  *          exactly as they are, and the save menu is masked (Game_System.isSaveEnabled). A new game or a good load
- *          clears the error. Otherwise the state is validated first; a problem is recorded as `_psSaveWarning` and
- *          logged, and the save still goes ahead (refusing would lose the player's progress; the warning is the diagnostic).
+ *          clears the error. Otherwise structure, content references and layout identity are checked synchronously.
+ *          A failed check rejects before MZ builds or writes any save; it never repairs the in-memory state.
  *          While a battle runs (PSFlow.running) every save is refused, including a direct DataManager.saveGame call (the
  *          menu and autosave are already off: PS_BattleFlow masks Game_System.isSaveEnabled). A refused or failed save is recorded in
  *          PSState.lastSaveError {code: state-unusable | battle-running | write-failed, message, savefileId, at} and logged.
@@ -31,6 +31,19 @@
   const schema = (): any => nodeRequire("./js/engine/build/engine.cjs").saveSchema;
   const state = (): any => nodeRequire("./js/engine/build/engine.cjs").state;
 
+  // JsonEx reserves `constructor` and `@` for class metadata. Framework dictionaries allow both as data IDs.
+  // Keep the validated plain snapshot opaque to JsonEx; Game_System itself retains its normal class envelope.
+  // This is a host encoding version, independent of the game schema. Older unwrapped saves still load below.
+  const encoding = "pokemon-framework-json";
+  const unpack = (raw: any): any => {
+    if (!raw || typeof raw !== "object" || Object.getOwnPropertyDescriptor(raw, "encoding")?.value !== encoding) return raw;
+    const descriptors = Object.getOwnPropertyDescriptors(raw);
+    if (Object.keys(descriptors).length !== 3 || descriptors.version?.value !== 1 || typeof descriptors.data?.value !== "string") {
+      throw new Error("unsupported or malformed framework save encoding; original document retained");
+    }
+    return JSON.parse(descriptors.data.value);
+  };
+
   const PSState: any = (W.PSState = {
     lastSaveError: null as any,
     lastSave: null as any,
@@ -38,36 +51,57 @@
     afterLoad(): void {
       const sys = G.$gameSystem;
       delete sys._psSaveError; delete sys._psSaveInfo; delete sys._psSaveWarning;
-      if (sys._psGame === undefined) {
+      const missing = sys._psGame === undefined;
+      let content: any;
+      let speciesKey: any;
+      try {
+        content = W.PSFlow.content();
+        if (!content?.regionalDex) throw new Error("validated content layout is unavailable");
+        speciesKey = W.PSFlow.speciesKeyResolver();
+      } catch (error) {
         if (W.PSFlow) W.PSFlow.stateReplaced();
-        sys._psGame = state().newGame({ party: [], money: 0 });
-        sys._psSaveInfo = { from: null, to: sys._psGame.schema, migrated: false, created: "empty", notes: ["the save had no framework state: an empty one was created (no members, no items, money 0, nothing claimed)"] };
+        sys._psSaveError = { code: "needs-content", message: `the content could not be loaded; original state retained: ${String(error instanceof Error ? error.message : error)}` };
+        console.error("PS_SaveState: save state not usable:", sys._psSaveError.code, sys._psSaveError.message);
         return;
       }
-      let speciesKey: any;
-      let content: any;
-      let contentError = "";
-      if (typeof sys._psGame === "object" && sys._psGame && typeof sys._psGame.schema === "number" && sys._psGame.schema < 6) {
-        try { content = W.PSFlow.content(); speciesKey = W.PSFlow.speciesKeyResolver(); } catch (e) { contentError = String(e instanceof Error ? e.message : e); }
-      }
       if (W.PSFlow) W.PSFlow.stateReplaced();
-      const r = schema().migrateGame(sys._psGame, { ...(speciesKey ? { speciesKey } : {}), ...(content ? { content } : {}) });
-      if (!r.ok && r.error.code === "needs-content" && contentError) r.error.message += ` (the content could not be loaded: ${contentError})`;
+      if (missing) {
+        const empty = state().newGame({ party: [], money: 0, content });
+        const problems = schema().validateGameContent(empty, content);
+        if (problems.length) { sys._psSaveError = {code: "invalid", message: "empty framework state could not be initialized", problems}; return; }
+        sys._psGame = empty;
+        sys._psSaveInfo = { from: null, to: empty.schema, migrated: false, created: "empty", notes: ["the save had no framework state: an empty one was created from validated content"] };
+        return;
+      }
+      let document: any;
+      try { document = unpack(sys._psGame); } catch (error) {
+        sys._psSaveError = {code: "invalid", message: `framework save encoding could not be read; original document retained: ${String(error instanceof Error ? error.message : error)}`};
+        console.error("PS_SaveState: save state not usable:", sys._psSaveError.code, sys._psSaveError.message);
+        return;
+      }
+      const r = schema().migrateGame(document, { ...(speciesKey ? { speciesKey } : {}), ...(content ? { content } : {}) });
       if (r.ok) {
-        if (r.migrated) sys._psGame = r.state;
+        sys._psGame = r.state; // a legitimate explicit layout conversion may also replace a current-version document
         sys._psSaveInfo = { from: r.from, to: r.to, migrated: r.migrated, notes: r.notes };
       } else {
         sys._psSaveError = r.error; // the raw document stays exactly as it was loaded
         console.error("PS_SaveState: save state not usable:", r.error.code, r.error.message);
       }
     },
-    /** Called right before MZ builds the save contents. */
-    beforeSave(): void {
+    /** Synchronous authority shared by saveGame and makeSaveContents. Never migrates or repairs. */
+    beforeSave(capture = false): any {
       const sys = G.$gameSystem;
-      if (!sys || sys._psGame === undefined || sys._psSaveError) return; // an unusable state never gets this far (saveGame refuses)
-      const problems = schema().validateGame(sys._psGame);
-      if (problems.length) { sys._psSaveWarning = { problems: problems.slice(0, 10) }; console.warn("PS_SaveState: saving a state that fails validation:", problems[0]); }
-      else delete sys._psSaveWarning;
+      if (!sys || sys._psGame === undefined) throw new Error("state-unusable: framework state is missing");
+      if (sys._psSaveError) throw new Error(`state-unusable: ${sys._psSaveError.code}: ${sys._psSaveError.message}`);
+      if (W.PSFlow && (W.PSFlow.running || W.PSFlow.operationPending?.())) throw new Error("operation-pending: saving is not allowed while a framework operation is running");
+      let content: any;
+      try { content = W.PSFlow.content(); } catch (error) { throw new Error(`needs-content: ${String(error instanceof Error ? error.message : error)}`); }
+      if (!content?.regionalDex) throw new Error("needs-content: validated layout is unavailable");
+      const prepared = capture ? schema().snapshotForSave(sys._psGame, content) : null;
+      const problems = prepared ? (prepared.ok ? [] : prepared.problems) : schema().validateGameContent(sys._psGame, content);
+      if (problems.length) throw new Error(`invalid-state: ${problems[0].path} ${problems[0].message}`);
+      delete sys._psSaveWarning;
+      return prepared?.state;
     },
   });
 
@@ -95,6 +129,8 @@
       fail(W.PSFlow.running ? "battle-running" : "operation-pending", e);
       return Promise.reject(e);
     }
+    // No await between this check and MZ's synchronous makeSaveContents recheck.
+    try { PSState.beforeSave(); } catch (error) { fail("state-invalid", error); return Promise.reject(error); }
     let p: any;
     try { p = baseSaveGame.call(this, savefileId); } catch (e) { fail("write-failed", e); return Promise.reject(e); }
     return Promise.resolve(p).then((r: any) => { PSState.lastSaveError = null; PSState.lastSave = { savefileId, at: Date.now() }; return r; }, (e: unknown) => { fail("write-failed", e); throw e; });
@@ -102,11 +138,23 @@
   // the save menu and autosave follow the same rule (the game's own save permission is never written)
   if (G.Game_System && G.Game_System.prototype && G.Game_System.prototype.isSaveEnabled) {
     const baseIsSaveEnabled = G.Game_System.prototype.isSaveEnabled;
-    G.Game_System.prototype.isSaveEnabled = function (this: any) { return !this._psSaveError && baseIsSaveEnabled.call(this); };
+    G.Game_System.prototype.isSaveEnabled = function (this: any) {
+      if (!baseIsSaveEnabled.call(this)) return false;
+      try { PSState.beforeSave(); return true; } catch { return false; }
+    };
   }
   const baseMake = G.DataManager.makeSaveContents;
   G.DataManager.makeSaveContents = function (this: any) {
-    PSState.beforeSave();
-    return baseMake.call(this);
+    let snapshot: any;
+    try { snapshot = PSState.beforeSave(true); } catch (error) {
+      PSState.lastSaveError = {code: "state-invalid", message: String(error instanceof Error ? error.message : error), savefileId: null, at: Date.now()};
+      throw error;
+    }
+    const contents = baseMake.call(this);
+    if (!contents?.system || typeof contents.system !== "object") throw new Error("state-unusable: save contents have no Game_System");
+    const descriptors = Object.getOwnPropertyDescriptors(contents.system);
+    descriptors._psGame = {value: {encoding, version: 1, data: JSON.stringify(snapshot)}, enumerable: true, configurable: true, writable: true};
+    contents.system = Object.create(Object.getPrototypeOf(contents.system), descriptors);
+    return contents;
   };
 })();

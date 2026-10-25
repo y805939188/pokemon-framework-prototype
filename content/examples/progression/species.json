@@ -1,0 +1,76 @@
+[
+  {
+    "id": "charizard",
+    "showdownId": "charizard",
+    "nameKey": "species.charizard",
+    "growth": "parabolic",
+    "baseExp": 267,
+    "evYield": {
+      "spa": 3
+    },
+    "catchRate": 45,
+    "learnset": [
+      {
+        "level": 51,
+        "move": "slash"
+      },
+      {
+        "level": 52,
+        "move": "outrage"
+      },
+      {
+        "level": 53,
+        "move": "heatwave"
+      }
+    ],
+    "source": "author-placeholder"
+  },
+  {
+    "id": "charmander",
+    "showdownId": "charmander",
+    "nameKey": "species.charmander",
+    "growth": "parabolic",
+    "baseExp": 62,
+    "evYield": {
+      "spe": 1
+    },
+    "catchRate": 45,
+    "learnset": [
+      {
+        "level": 1,
+        "move": "scratch"
+      },
+      {
+        "level": 1,
+        "move": "growl"
+      },
+      {
+        "level": 4,
+        "move": "ember"
+      },
+      {
+        "level": 8,
+        "move": "smokescreen"
+      },
+      {
+        "level": 12,
+        "move": "dragonbreath"
+      }
+    ],
+    "source": "author-placeholder",
+    "evolutions": [
+      {
+        "target": "charizard",
+        "method": "Level",
+        "parameter": 36
+      }
+    ],
+    "tutorMoves": [
+      "growl"
+    ],
+    "dexSortKeys": {
+      "zh": "xiaohuolong",
+      "en": "charmander"
+    }
+  }
+]

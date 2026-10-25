@@ -1,0 +1,9 @@
+[BASE,1]
+Moves=9,GROWL
+TutorMoves=GROWL
+Types=WATER
+Height=1.25
+FormName=
+Category=Alternate
+Pokedex=An alternate, form
+PokedexForm=0

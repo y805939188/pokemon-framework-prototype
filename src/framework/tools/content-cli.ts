@@ -16,10 +16,13 @@ import path from "node:path";
 import { canonicalJson, checkFresh, checkSources, compileContent, preUseProblem } from "../content/compile.ts";
 import { importPbsItems } from "../content/pbs-items.ts";
 import { checkItemInputs } from "../content/item-input.ts";
-import { importPbsSpecies } from "../content/pbs-import.ts";
+import { importPbsBundle, importPbsSpecies } from "../content/pbs-import.ts";
+import { importPbsRegionalDex } from "../content/pbs-regional-dex.ts";
+import type { PbsFile } from "../content/pbs-regional-dex.ts";
 import type { CompiledContent, ContentError, ContentInputs } from "../content/schema.ts";
 import { createDexLookup } from "../battle/dex.ts";
-import { assembleContent } from "../flow/content-runtime.ts";
+import { CONTENT_SHOWDOWN_SHA } from "../content/showdown-pin.ts";
+import { loadCompiled, assembleContent } from "../flow/content-runtime.ts";
 
 const ROOT = path.resolve(__dirname, "..", "..", ".."); // js/engine/build -> project root
 const arg = (name: string, dflt: string): string => {
@@ -38,10 +41,17 @@ function readInputs(dir: string): { inputs: ContentInputs; errors: ContentError[
   const settings = fs.existsSync(path.join(dir, "settings.json")) ? read("settings.json") : undefined;
   const items = fs.existsSync(path.join(dir, "items.json")) ? read("items.json") : undefined;
   const shops = fs.existsSync(path.join(dir, "shops.json")) ? read("shops.json") : undefined;
-  const inputs = { ...(items !== undefined ? {items} : {}), ...(shops !== undefined ? {shops} : {}), manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json"), ...(grants !== undefined ? { grants } : {}), ...(settings !== undefined ? { settings } : {}) };
+  const regionalDex = fs.existsSync(path.join(dir, "regional-dex.json")) ? read("regional-dex.json") : undefined;
+  const mapMetadata = fs.existsSync(path.join(dir, "map-metadata.json")) ? read("map-metadata.json") : undefined;
+  const inputs = { ...(regionalDex !== undefined ? {regionalDex} : {}), ...(mapMetadata !== undefined ? {mapMetadata} : {}), ...(items !== undefined ? {items} : {}), ...(shops !== undefined ? {shops} : {}), manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json"), ...(grants !== undefined ? { grants } : {}), ...(settings !== undefined ? { settings } : {}) };
   return { inputs, errors };
 }
 
+function buildPin(): string {
+  const sha = /^SHOWDOWN_SHA="([a-f0-9]{40})"$/m.exec(fs.readFileSync(path.join(ROOT,"scripts/showdown.env"),"utf8"))?.[1];
+  if (sha !== CONTENT_SHOWDOWN_SHA) throw new Error("compiler Showdown pin differs from scripts/showdown.env");
+  return sha;
+}
 const show = (errors: ContentError[]): void => { for (const e of errors) console.error(`${e.file} ${e.path}: ${e.message}`); };
 
 export function build(src: string, out: string): number {
@@ -60,8 +70,11 @@ export function build(src: string, out: string): number {
   // Input, compiler, serialization and output failures all invalidate the previous artifact.
   try {
     const { inputs, errors } = readInputs(src);
-    const r = errors.length ? { ok: false as const, errors } : compileContent(inputs);
+    const r = errors.length ? { ok: false as const, errors } : compileContent(inputs, {}, {showdownSha:buildPin()});
     if (!r.ok) return fail(r.errors);
+    const assembled = assembleContent(r.data, createDexLookup());
+    if (assembled.errors.length) return fail(assembled.errors);
+    for (const warning of r.warnings) console.warn(`WARNING ${warning.file} ${warning.path}: ${warning.message}`);
     const text = canonicalJson(r.data, 2) + "\n";
     fs.mkdirSync(path.dirname(out), { recursive: true });
     if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== text) fs.writeFileSync(out, text);
@@ -79,6 +92,7 @@ export function check(src: string, out: string): number {
   try { compiled = JSON.parse(fs.readFileSync(out, "utf8")); } catch { compiled = undefined; }
   const stale = checkFresh(compiled, inputs);
   if (stale) { show([stale]); return 1; }
+  try { const cache=loadCompiled(compiled); if(cache.showdownSha!==buildPin()) throw new Error("needs-rebuild: pinned Showdown changed"); } catch(error) {console.error((error as Error).message);return 1;}
   console.log("compiled content is current");
   return 0;
 }
@@ -86,7 +100,7 @@ export function check(src: string, out: string): number {
 type Cmp = "consistent" | "differs" | "framework-only";
 export function inventory(src: string, report: string): number {
   const { inputs, errors } = readInputs(src);
-  const r = errors.length ? { ok: false as const, errors } : compileContent(inputs);
+  const r = errors.length ? { ok: false as const, errors } : compileContent(inputs, {}, {showdownSha:buildPin()});
   if (!r.ok) { show(r.errors); return 1; }
   const dex = createDexLookup();
   const assembled = assembleContent(r.data as CompiledContent, dex);
@@ -122,7 +136,7 @@ export function inventory(src: string, report: string): number {
 /** Optional read-only compatibility warning; never loads, rewrites or migrates player saves. */
 export function checkItemPockets(src:string,previousFile:string):number {
   const {inputs,errors}=readInputs(src);
-  const compiled=errors.length?{ok:false as const,errors}:compileContent(inputs);
+  const compiled=errors.length?{ok:false as const,errors}:compileContent(inputs, {}, {showdownSha:buildPin()});
   if(!compiled.ok){show(compiled.errors);return 1;}
   let previous:unknown;
   try{previous=JSON.parse(fs.readFileSync(previousFile,"utf8"));}catch(error){console.error(`previous items: cannot read JSON: ${(error as Error).message}`);return 1;}
@@ -165,6 +179,53 @@ export function importPbs(src: string, file: string, sourceId: string, report: s
   return r.ok ? 0 : 1;
 }
 
+/** Ordered author groups and finite identity/name adapters. Every PBS reader remains behind the source gate. */
+export function importPbsFiles(src: string, sourceId: string, report: string, regionalOnly = false, argv: readonly string[] = process.argv): number {
+  const {inputs,errors}=readInputs(src);
+  if(errors.length){show(errors);return 1;}
+  const problems: ContentError[]=[];
+  const sources=checkSources(inputs.sources,(file,path,message)=>problems.push({file,path,message}));
+  const gate=preUseProblem(sources,sourceId);
+  if(gate)problems.push({file:"sources.json",path:sourceId,message:gate});
+  if(problems.length){show(problems);return 1;}
+  const values=(name:string):string[]=>argv.filter(value=>value.startsWith(`--${name}=`)).map(value=>value.slice(name.length+3));
+  const files=(names:readonly string[]):PbsFile[]=>names.map(name=>({file:name,read:()=>fs.readFileSync(path.resolve(ROOT,name),"utf8")}));
+  const regionNameKeys=values("region-name").map(value=>{const at=value.indexOf(":");return {id:/^[0-9]+$/.test(value.slice(0,at))?Number(value.slice(0,at)):NaN,nameKey:at<0?"":value.slice(at+1)};});
+  const formIds=new Map<string,string>();
+  for(const raw of values("form-id")) {
+    const hit=/^([A-Za-z_][A-Za-z0-9_]*),([0-9]+):([a-z0-9]{1,40})$/.exec(raw);
+    const form=hit?Number(hit[2]):NaN,identity=hit?`${hit[1]},${form}`:raw;
+    if(!hit||!Number.isSafeInteger(form)||form<1||form>999||formIds.has(identity)){problems.push({file:"species.json",path:`--form-id=${raw}`,message:"invalid or duplicate form identity; expected SYMBOL,1..999:showdownid"});continue;}
+    formIds.set(identity,hit[3]!);
+  }
+  const write=(value:unknown):void=>{fs.mkdirSync(path.dirname(report),{recursive:true});fs.writeFileSync(report,canonicalJson(value,2)+"\n");};
+  if(problems.length){show(problems);write({schema:1,source:sourceId,ok:false,species:[],errors:problems});return 1;}
+  const explicitBases=values("base-file"),plainFiles=values("file");
+  const baseFiles=files(explicitBases.length?explicitBases:regionalOnly?[]:plainFiles.length?plainFiles:["pokemon.txt"]);
+  const formFiles=files(values("form-file"));
+  const regionalFiles=files(regionalOnly?(plainFiles.length?plainFiles:["regional_dexes.txt"]):values("regional-file"));
+  const sourceProblem=(id:string):string|null=>preUseProblem(sources,id);
+  const bundle=importPbsBundle({sourceId,sourceProblem,baseFiles,formFiles,...(!regionalOnly?{regionalFiles,regionNameKeys}:{}),resolveFormShowdownId:(symbol,form)=>formIds.get(`${symbol},${form}`)??null});
+  if(!regionalOnly){
+    const checked=bundle.ok?compileContent({manifest:inputs.manifest,sources:inputs.sources,species:bundle.species,overlays:[],...(inputs.items!==undefined?{items:inputs.items}:{}),...(bundle.regionalDex!==undefined?{regionalDex:bundle.regionalDex}:{})}, {}, {showdownSha:buildPin()}):null;
+    const ok=bundle.ok&&checked?.ok===true;
+    if(!bundle.ok)for(const error of bundle.errors)console.error(`${error.file??"PBS"}:${error.line} ${error.path}: ${error.message}`);
+    if(checked&&!checked.ok)show(checked.errors);
+    write({schema:1,source:sourceId,...bundle,ok,...(!ok?{species:[],regionalDex:undefined}:{}),contentErrors:checked&&!checked.ok?checked.errors:[]});
+    return ok?0:1;
+  }
+  if(!bundle.ok){write({schema:1,source:sourceId,ok:false,errors:bundle.errors});return 1;}
+  // Bind original PBS symbols to identities already present in the normal authored catalog.
+  const current=compileContent(inputs,{}, {showdownSha:buildPin()});
+  if(!current.ok){show(current.errors);write({schema:1,source:sourceId,ok:false,errors:current.errors});return 1;}
+  const baseIds=new Set(current.data.registrationOrder!.filter(key=>!key.form).map(key=>key.species));
+  const identities=new Map(bundle.identities.filter(key=>!key.form&&baseIds.has(key.species)).map(key=>[key.symbol,key.species]));
+  const regional=importPbsRegionalDex({files:regionalFiles,sourceId,sourceProblem,regionNameKeys,resolveSpecies:symbol=>identities.get(symbol)??null});
+  if(!regional.ok)for(const error of regional.errors)console.error(`${error.file??"PBS"}:${error.line} ${error.path}: ${error.message}`);
+  write({schema:1,source:sourceId,...regional});
+  return regional.ok?0:1;
+}
+
 const cmd = process.argv[2];
 const SRC = arg("src", "content/sample");
 if (cmd === "build") process.exit(build(SRC, arg("out", "data/framework/content.json")));
@@ -175,8 +236,12 @@ else if (cmd === "check-item-pockets") {
   process.exit(checkItemPockets(SRC,path.resolve(ROOT,previous)));
 }
 else if (cmd === "inventory") process.exit(inventory(SRC, arg("report", "docs/step3/content-inventory.json")));
-else if (cmd === "import-pbs" || cmd === "import-pbs-items") {
+else if (cmd === "import-pbs" || cmd === "import-pbs-regional") {
+  const source=process.argv.find(value=>value.startsWith("--source="))?.slice(9)??"";
+  process.exit(importPbsFiles(SRC,source,arg("report","build/pbs-import.json"),cmd==="import-pbs-regional"));
+}
+else if (cmd === "import-pbs-items") {
   const source = process.argv.find((a) => a.startsWith("--source="))?.slice(9) ?? "";
   process.exit(importPbs(SRC, arg("file", "pokemon.txt"), source, arg("report", "build/pbs-import.json"), cmd === "import-pbs-items"));
 }
-else { console.error("usage: content-cli.cjs build|check|check-item-pockets|inventory|import-pbs [--src=content/sample] [--out=...] [--report=...] [--file=pokemon.txt --source=<id>]"); process.exit(2); }
+else { console.error("usage: content-cli.cjs build|check|check-item-pockets|inventory|import-pbs|import-pbs-regional [--src=content/sample] [--out=...] [--report=...] [--file=... --source=<id>] [--base-file=pokemon.txt (repeat; required for nonempty regional symbols)] [--form-file=pokemon_forms.txt --form-id=SYMBOL,N:showdownid] [--regional-file=regional_dexes.txt --region-name=0:region.kanto (repeat)]"); process.exit(2); }

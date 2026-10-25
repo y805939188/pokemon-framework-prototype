@@ -74,7 +74,7 @@ test('a save written by the step 4 code loads: migrated to schema 4 with the con
   const h = host(J(raw));
   h.load();
   assert.equal(h.sys._psSaveError, undefined, JSON.stringify(h.sys._psSaveError));
-  assert.deepEqual(J(h.sys._psSaveInfo).from, 3); assert.equal(h.sys._psSaveInfo.to, 6); assert.equal(h.sys._psSaveInfo.migrated, true);
+  assert.deepEqual(J(h.sys._psSaveInfo).from, 3); assert.equal(h.sys._psSaveInfo.to, 7); assert.equal(h.sys._psSaveInfo.migrated, true);
   const g = J(h.sys._psGame);
   assert.deepEqual(g.party.map(m => [m.species, m.form]), raw.party.map(m => [E.speciesKey.keyOfBattleName(content, m.species).species, 0]));
   assert.deepEqual(E.saveSchema.validateGame(g), []);
@@ -86,9 +86,9 @@ test('content that cannot be loaded, or a species it cannot map: the migration i
   a.flow.speciesKeyResolver = () => { throw new Error('content: cannot read data/framework/content.json'); };
   a.load();
   assert.equal(a.sys._psSaveError.code, 'needs-content');
-  assert.match(a.sys._psSaveError.message, /the content could not be loaded: content: cannot read/);
+  assert.match(a.sys._psSaveError.message, /the content could not be loaded.*content: cannot read/);
   assert.equal(JSON.stringify(a.sys._psGame), before, 'the raw document is kept, so saving writes it back unchanged');
-  a.ctx.DataManager.makeSaveContents(); assert.equal(JSON.stringify(a.sys._psGame), before);
+  assert.throws(() => a.ctx.DataManager.makeSaveContents(), /state-unusable/); assert.equal(JSON.stringify(a.sys._psGame), before);
   assert.throws(() => a.flow.game(), /not usable \(needs-content\)/, 'no battle or grant runs on it');
   const raw = step4('full.json'); raw.boxes[0].species = 'Mew';
   const b = host(J(raw)); const b0 = JSON.stringify(b.sys._psGame);
@@ -98,17 +98,16 @@ test('content that cannot be loaded, or a species it cannot map: the migration i
   assert.equal(JSON.stringify(b.sys._psGame), b0);
 });
 
-test('a current schema 6 save needs no content to load; a save without framework state gets the empty one', () => {
-  const h = host(E.state.newGame({ party: [], money: 7 }));
-  h.flow.speciesKeyResolver = () => { throw new Error('must not be asked'); };
-  h.load();
-  assert.deepEqual([h.sys._psSaveError, h.sys._psSaveInfo.migrated, h.sys._psGame.money], [undefined, false, 7]);
+test('current schema7 and empty legacy host both require current content before loading', () => {
+  const h = host(E.state.newGame({content, party: [], money: 7}));
+  const raw = h.sys._psGame; h.flow.content = () => {throw Error('content unavailable');}; h.load();
+  assert.equal(h.sys._psGame,raw); assert.equal(h.sys._psSaveError.code,'needs-content');
   const e = host(undefined); e.load();
-  assert.deepEqual([e.sys._psGame.schema, e.sys._psSaveInfo.created], [6, 'empty']);
+  assert.deepEqual([e.sys._psGame.schema,e.sys._psSaveInfo.created],[7,'empty']);
 });
 
 test('P4-2: loading a save (or starting a new game) releases a battle the application still held', async () => {
-  const h = host(E.state.newGame({ party: [], money: 0 }));
+  const h = host(E.state.newGame({ content, party: [], money: 0 }));
   h.flow.app().claimGrant('starter');
   h.flow.seed = [1, 2, 3, 4];
   await h.flow.app().startBattle({ battleId: 'open#1', kind: 'wild', foes: [{ species: 'pidgey', level: 3 }], seq: 1 });
@@ -121,7 +120,7 @@ test('P4-2: loading a save (or starting a new game) releases a battle the applic
 });
 
 test('WP06 §4.1 step counter: a normal step counts; a forced move route or a running event does not', () => {
-  const h = host(E.state.newGame({ party: [], money: 0 }));
+  const h = host(E.state.newGame({ content, party: [], money: 0 }));
   const p = h.player;
   p.increaseSteps(); p.increaseSteps();
   assert.deepEqual([p._base, h.sys._psGame.steps], [2, 2], "MZ's own step handling still runs");
@@ -135,7 +134,7 @@ test('WP06 §4.1 step counter: a normal step counts; a forced move route or a ru
 });
 
 test('species names by content id + form or by battle name; ResetGame stores the fixture party by content id', () => {
-  const h = host(E.state.newGame({ party: [], money: 0 }));
+  const h = host(E.state.newGame({ content, party: [], money: 0 }));
   const byId = h.flow.speciesName('charmander', 0), byBattle = h.flow.speciesName('Charmander');
   assert.equal(byId, byBattle); assert.notEqual(byId, 'charmander', 'the content text key is used');
   assert.equal(h.flow.speciesName('nope'), 'nope', 'an unknown name is shown as given');
@@ -175,7 +174,7 @@ async function openedBattle(h, battleId = 'old#1', seq = 1) {
 }
 
 test('F02: openBattle -> begin -> a save is loaded: the host operation ends (not running, saving allowed), the next battle opens and saves work', async () => {
-  const h = host(E.state.newGame({ party: [], money: 0 }));
+  const h = host(E.state.newGame({ content, party: [], money: 0 }));
   h.flow.claim('starter');
   const old = await openedBattle(h);
   assert.equal(h.flow.running, true);
@@ -195,7 +194,7 @@ test('F02: openBattle -> begin -> a save is loaded: the host operation ends (not
 });
 
 test('F02: late finish / abort / close of the replaced battle neither commit, nor close, nor project into the next battle', async () => {
-  const h = host(E.state.newGame({ party: [], money: 0 }));
+  const h = host(E.state.newGame({ content, party: [], money: 0 }));
   h.flow.claim('starter');
   const old = await openedBattle(h);
   await old.session.run(); // the old battle is decided (it ran away) but not ended yet
@@ -226,7 +225,7 @@ test('F02: late finish / abort / close of the replaced battle neither commit, no
 });
 
 test('F02: an application session of a replaced state never commits, also when it had finished before', async () => {
-  const h = host(E.state.newGame({ party: [], money: 0 }));
+  const h = host(E.state.newGame({ content, party: [], money: 0 }));
   h.flow.claim('starter');
   const done = await openedBattle(h);
   await done.session.run();
@@ -244,7 +243,7 @@ test('F10: a content id that is also an Object.prototype name ("constructor") is
   src.species.find(sp => sp.id === 'charmander').id = 'constructor';
   src.grants[0].id = 'constructor'; src.grants[0].members[0].species = 'constructor';
   const ct = E.contentRuntime.assembleContent(E.contentCompile.compileContent(src).data, E.dex.createDexLookup()).content;
-  const h = host(E.state.newGame({ party: [], money: 0 }));
+  const h = host(E.state.newGame({ content: ct, party: [], money: 0 }));
   h.flow._content = ct;
   const grant = h.flow.claim('constructor');
   assert.equal(grant.status, 'applied');
@@ -256,7 +255,7 @@ test('F10: a content id that is also an Object.prototype name ("constructor") is
 });
 
 test('F11: the application reads the time from the injected clock; the plugin wires the host clock and tests may pin it', () => {
-  const h = host(E.state.newGame({ party: [], money: 0 }));
+  const h = host(E.state.newGame({ content, party: [], money: 0 }));
   const t0 = Date.now(); const t = h.flow.app().now(); const t1 = Date.now();
   assert.ok(t >= t0 && t <= t1, 'by default the host clock');
   h.flow.clock = () => 1234567890123;
@@ -264,7 +263,7 @@ test('F11: the application reads the time from the injected clock; the plugin wi
 });
 
 for (const id of ['old#1', 'different#2']) test(`R01: default and explicit finish reject a replaced session while ${id} keeps both save locks`, async () => {
-  const h = host(E.state.newGame({ party: [], money: 0 })); h.flow.claim('starter');
+  const h = host(E.state.newGame({ content, party: [], money: 0 })); h.flow.claim('starter');
   const old = await openedBattle(h); await old.session.run();
   h.load(J(step4('defeat.json')));
   const next = await openedBattle(h, id, 2);
@@ -291,7 +290,7 @@ for (const id of ['old#1', 'different#2']) test(`R01: default and explicit finis
 
 for (const replacement of ['load', 'new-game', 'none']) test(`R02: failed defeat return belongs to its timeline (${replacement})`, async () => {
   const m = E.memberFactory.createMember({ id: 'S-1', species: 'Snorlax', level: 2 }, content, lcg(3)); m.hp = 1;
-  const h = host(E.state.newGame({ party: [E.speciesKey.toPersistentMember(m, content)], money: 1000 }));
+  const h = host(E.state.newGame({ content, party: [E.speciesKey.toPersistentMember(m, content)], money: 1000 }));
   h.ctx.PluginManager.parameters = () => ({ homeMapId: '5', homeX: '8', homeY: '9' }); h.ctx.$dataMapInfos[5] = {};
   const transfers = []; h.ctx.$gamePlayer.reserveTransfer = (...a) => transfers.push(a);
   h.flow.seed = [1, 2, 3, 4];

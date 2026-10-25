@@ -1,0 +1,26 @@
+[
+  {
+    "id": "base", "showdownId": "base", "nameKey": "species.base", "source": "author",
+    "growth": "medium", "baseExp": 51, "evYield": {"spe": 1}, "catchRate": 255, "happiness": 70,
+    "learnset": [{"level": 0, "move": "tackle"}, {"level": 7, "move": "growl"}],
+    "tutorMoves": ["tackle", "growl"], "types": ["normal", "fire", "water"],
+    "abilities": ["a", "b", "c"], "hiddenAbilities": ["h1", "h2"], "flags": ["DefaultForm_1", "Other"],
+    "heightDm": 69, "weightHg": 7, "color": "Gray", "shape": "HeadArms", "formName": "Base",
+    "categoryKey": "species.base.category", "entryKey": "species.base.entry", "pokedexForm": 0,
+    "evolutions": [{"target": "peer", "method": "Level", "parameter": 1}]
+  },
+  {
+    "id": "peer", "showdownId": "peer", "nameKey": "species.peer", "source": "author",
+    "growth": "medium", "baseExp": 51, "evYield": {"spe": 1}, "catchRate": 255, "happiness": 70,
+    "learnset": [{"level": 0, "move": "tackle"}, {"level": 7, "move": "growl"}]
+  },
+  {
+    "id": "base", "form": 1, "showdownId": "baseform1", "nameKey": "species.base", "source": "author",
+    "growth": "medium", "baseExp": 51, "evYield": {"spe": 1}, "catchRate": 255, "happiness": 70,
+    "learnset": [{"level": 9, "move": "growl"}], "tutorMoves": ["growl"], "types": ["water"],
+    "abilities": ["a", "b", "c"], "hiddenAbilities": ["h1", "h2"], "flags": ["DefaultForm_1", "Other"],
+    "heightDm": 13, "weightHg": 7, "color": "Gray", "shape": "HeadArms", "formName": "",
+    "categoryKey": "species.base.form1.category", "entryKey": "species.base.form1.entry", "pokedexForm": 0,
+    "evolutions": [{"target": "peer", "method": "Level", "parameter": 1}]
+  }
+]

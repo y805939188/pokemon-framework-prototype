@@ -16,10 +16,11 @@ const S = E.state;
 const SRC = path.resolve(__dirname, '../../content/sample');
 const read = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
 const content = E.contentRuntime.assembleContent(E.contentCompile.compileContent({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json'), grants: read('grants.json') }).data, E.dex.createDexLookup()).content;
+const expectedEmptyDex = { seen: [], owned: [], hasDex: false, seenForms: {}, lastSeenForm: {}, capturedCounts: {}, defeatedCounts: {}, unlocked: [true], view: { region: -1, indices: [0], mode: 0 }, layoutIdentity: content.regionalDex.layoutIdentity };
 const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor((s / 4294967296) * n); }; };
 const battleMember = (id, species, level) => E.memberFactory.createMember({ id, species, level }, content, lcg(level));
 const saved = m => E.speciesKey.toPersistentMember(m, content);
-const game = (party = [saved(battleMember('A-1', 'Charmander', 9))], money = 3000) => { const g = S.newGame({ party: [] }); g.party = party; g.money = money; I6.setBag(g, { pokeball: 3 }); return g; };
+const game = (party = [saved(battleMember('A-1', 'Charmander', 9))], money = 3000) => { const g = S.newGame({ content, party: [] }); g.party = party; g.money = money; I6.setBag(g, { pokeball: 3 }); return g; };
 const result = (battleId, kind, winner = null, extra = {}) => ({ protocol: 1, battleId, outcome: { kind, winner }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] }, ...extra });
 
 function app(initial = game(), options = {}) {
@@ -49,7 +50,7 @@ test('the session factory gets the battle view (Showdown names); the commit stor
   assert.equal('form' in w.sessions.created[0].game.party[0], false);
   const now = w.state.current();
   assert.deepEqual(now.party.map(m => [m.id, m.species, m.form]), [['A-1', 'charmander', 0], ['M1', 'pidgey', 0]]);
-  assert.deepEqual(now.dex, { seen: ['pidgey'], owned: ['pidgey'] });
+  assert.deepEqual(now.dex, { ...expectedEmptyDex, seen: ['pidgey'], owned: ['pidgey'] });
   assert.deepEqual(E.saveSchema.validateGame(now), []);
 });
 

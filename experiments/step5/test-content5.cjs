@@ -68,6 +68,11 @@ GrowthRate = Medium
 BaseExp = 52
 EVs = SPEED,1,ATTACK,1
 Moves = 1,PECK,1,GROWL
+[RATICATE]
+GrowthRate = Medium
+BaseExp = 145
+EVs = SPEED,2
+Moves = 1,TACKLE
 `;
 
 test('PBS import: framework fields carried over; battle data, later fields and unknown keys reported per record', () => {
@@ -76,11 +81,14 @@ test('PBS import: framework fields carried over; battle data, later fields and u
   assert.deepEqual(r.species.map(s => [s.id, s.showdownId, s.growth, s.baseExp, s.evYield, s.catchRate, s.learnset.length, s.source, s.nameKey]), [
     ['rattata', 'rattata', 'medium', 51, { spe: 1 }, 200, 3, 'author-pbs', 'species.rattata'],
     ['spearow', 'spearow', 'medium', 52, { spe: 1, atk: 1 }, 255, 2, 'author-pbs', 'species.spearow'],
+    ['raticate', 'raticate', 'medium', 145, { spe: 2 }, 255, 1, 'author-pbs', 'species.raticate'],
   ]);
   const [rat, spe] = r.records;
-  assert.deepEqual(rat.showdown, ['Name', 'Types', 'BaseStats'], 'Showdown provides these at run time');
-  assert.deepEqual(rat.later.map(x => x.field), ['Evolutions', 'WildItemCommon']);
-  assert.match(rat.later.find(x => x.field === 'Evolutions').batch, /5\.3/);
+  assert.deepEqual(rat.showdown, ['Name', 'BaseStats'], 'Showdown still provides names and base stats');
+  assert.deepEqual(r.species[0].types, ['normal'], 'explicit author types are imported and validated against the pinned directory');
+  assert.deepEqual(r.species[0].evolutions, [{ target: 'raticate', method: 'Level', parameter: 20 }], 'step 5.3 consumes ordered typed evolution entries');
+  assert.deepEqual(rat.later.map(x => x.field), ['WildItemCommon']);
+  assert.match(rat.later[0].batch, /5\.5/);
   assert.deepEqual(rat.ignored, ['SomethingNew'], 'outside the schema: not consumed, no error (WP04 §4.2)');
   assert.deepEqual(spe.overridden, ['GrowthRate'], 'a repeated property: the later value wins (WP04 §4.2)');
   assert.deepEqual(spe.defaults, ['CatchRate = 255 (WP03 §4.3 class default)']);
@@ -112,7 +120,9 @@ test('PBS import: reading errors are located by line (WP04 §4.2) and a bad reco
   one('[RATTATA]\nGrowthRate = Turbo\nBaseExp = 5\nEVs = SPEED,1\nMoves = 1,TACKLE\n', 2, /"Turbo" is not a growth rate/);
   one('[RATTATA]\nGrowthRate = Fast\nBaseExp = 5\nEVs = SPEED\nMoves = 1,TACKLE\n', 4, /pairs of STAT,amount/);
   one('[RATTATA]\nGrowthRate = Fast\nBaseExp = 5\nEVs = LUCK,1\nMoves = 1,TACKLE\n', 4, /must be a stat/);
-  one('[RATTATA]\nGrowthRate = Fast\nBaseExp = 5\nEVs = SPEED,1\nMoves = 101,TACKLE\n', 5, /level 1\.\.100/);
+  one('[RATTATA]\nGrowthRate = Fast\nBaseExp = 5\nEVs = SPEED,1\nMoves = 101,TACKLE\n', 5, /level 0\.\.100/);
+  const evolutionMove = lines('[RATTATA]\nGrowthRate = Fast\nBaseExp = 5\nEVs = SPEED,1\nMoves = 0,TACKLE\n');
+  assert.equal(evolutionMove.ok, true); assert.deepEqual(evolutionMove.species[0].learnset, [{ level: 0, move: 'tackle' }]);
   one('[RATTATA]\nGrowthRate = Fast\nBaseExp = 5\nEVs = SPEED,1\nCatchRate = 300\nMoves = 1,TACKLE\n', 5, /0 to 255/);
   const ok = lines('#c\n\n[RATTATA]\nGrowthRate = Fast\nBaseExp = 5\nEVs = SPEED,1\nMoves = 1,TACKLE\n');
   assert.equal(ok.ok, true, 'a first-column comment and a blank line are skipped');
@@ -124,6 +134,8 @@ test('PBS import CLI: refused without a checked source (nothing written); with o
     for (const f of ['manifest.json', 'species.json', 'overlays.json', 'grants.json']) fs.copyFileSync(path.join(SRC, f), path.join(dir, f));
     const sources = read('sources.json');
     fs.writeFileSync(path.join(dir, 'sources.json'), JSON.stringify([...sources, authorData(null)]));
+    // This temporary src supplies source/config context for a standalone proposal, with no unrelated starter grant.
+    fs.writeFileSync(path.join(dir, 'grants.json'), '[]');
     fs.writeFileSync(path.join(dir, 'pokemon.txt'), PBS);
     const cli = (src) => spawnSync(process.execPath, [path.join(ROOT, 'js/engine/build/content-cli.cjs'), 'import-pbs', `--src=${src}`, `--file=${path.join(dir, 'pokemon.txt')}`, '--source=author-pbs', `--report=${path.join(dir, 'out.json')}`], { encoding: 'utf8' });
     const refused = cli(dir);
@@ -132,7 +144,7 @@ test('PBS import CLI: refused without a checked source (nothing written); with o
     const done = cli(dir);
     assert.equal(done.status, 0, done.stderr);
     const out = JSON.parse(fs.readFileSync(path.join(dir, 'out.json'), 'utf8'));
-    assert.deepEqual([out.ok, out.species.length, out.records.length, out.source], [true, 2, 2, 'author-pbs']);
+    assert.deepEqual([out.ok, out.species.length, out.records.length, out.source], [true, 3, 3, 'author-pbs']);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -166,7 +178,7 @@ test('FR-000388/389 rule configuration (WP02 subset): Gen 8 defaults, validated 
 const REC = 'GrowthRate = Medium\nBaseExp = 50\nEVs = SPEED,1\nMoves = 1,TACKLE\n';
 
 test('F04: a form section or a section id that is not a symbol is refused at its line, never read as another species', () => {
-  for (const [section, re] of [['PORYGON,2', /form section.*not part of this import subset/], ['PIKA!CHU', /is not a symbol/], ['1ABC', /is not a symbol/], ['RAT TATA', /is not a symbol/]]) {
+  for (const [section, re] of [['PORYGON,2', /form section.*explicit formFiles bundle group.*not imported/], ['PIKA!CHU', /is not a symbol/], ['1ABC', /is not a symbol/], ['RAT TATA', /is not a symbol/]]) {
     const r = importPbsSpecies(`[${section}]\n${REC}[RATTATA]\n${REC}`, 'x');
     assert.equal(r.ok, false, section);
     assert.ok(r.errors.some(e => e.line === 1 && re.test(e.message)), `${section}: ${JSON.stringify(r.errors)}`);
@@ -186,7 +198,7 @@ test('F05: the CLI applies the full registry validation before it reads the PBS 
     for (const [usageCheck, re] of [[{ decision: 'use-allowed' }, /usageCheck\.checkedOn.*YYYY-MM-DD/s], [{ ...CHECK, checkedBy: '' }, /usageCheck\.checkedBy/], [{ ...CHECK, conditions: undefined }, /usageCheck\.conditions/]]) {
       fs.writeFileSync(path.join(dir, 'sources.json'), JSON.stringify([...read('sources.json'), authorData(JSON.parse(JSON.stringify(usageCheck)))]));
       const r = cli(missingFile);
-      assert.equal(r.status, 1); assert.match(r.stderr, re); assert.match(r.stderr, /nothing was imported/);
+      assert.equal(r.status, 1); assert.match(r.stderr, re); assert.match(r.stderr, /sources\.json author-pbs:.*incomplete pre-use check/);
       assert.doesNotMatch(r.stderr, /cannot read/, 'refused before the PBS file is even opened');
       assert.equal(fs.existsSync(path.join(dir, 'out.json')), false, 'no report');
     }
@@ -262,7 +274,14 @@ test('F06: a build that fails (also on such a setting) removes the previous outp
 });
 
 test('F05: assembly validates the complete registry and every consumed source before any Dex call', () => {
-  const compiled = compileContent(inputs()); assert.equal(compiled.ok, true);
+  const TEST_SHA = 'a'.repeat(40);
+  const compiled = compileContent(inputs(), {}, { showdownSha: TEST_SHA }); assert.equal(compiled.ok, true);
+  assert.equal(compiled.data.schema, 2); assert.equal(compiled.data.showdownSha, TEST_SHA);
+  const lookup = E.dex.createDexLookup();
+  const counted = calls => Object.fromEntries(['sha', 'species', 'move', 'type', 'levelUpMoves', 'allAbilities', 'allMoves', 'abilityInfo', 'heldItem'].map(k => [k, (...args) => { calls.push(k); return k === 'sha' ? TEST_SHA : lookup[k](...args); }]));
+  const validCalls = [];
+  assert.deepEqual(E.contentRuntime.assembleContent(compiled.data, counted(validCalls)).errors, []);
+  assert.ok(validCalls.includes('sha') && validCalls.includes('species'), 'the matching compiled identity passes the source gate and actually queries the dependency');
   const variants = [
     ['malformed entry', d => { d.sources.push(null); }, 'sources.json', /must be an object/],
     ['missing description', d => { delete d.sources.find(s => s.kind === 'showdown').description; }, 'sources.json', /non-empty string/],
@@ -280,9 +299,12 @@ test('F05: assembly validates the complete registry and every consumed source be
   for (const [label, mutate, file, re] of variants) {
     const d = JSON.parse(JSON.stringify(compiled.data)); mutate(d);
     const calls = [];
-    const dex = Object.fromEntries(['sha', 'species', 'move', 'levelUpMoves'].map(k => [k, () => { calls.push(k); return k === 'sha' ? 'test-sha' : null; }]));
-    const result = E.contentRuntime.assembleContent(d, dex);
-    assert.ok(result.errors.some(e => e.file === file && re.test(e.message)), `${label}: ${JSON.stringify(result.errors)}`);
+    const result = E.contentRuntime.assembleContent(d, counted(calls));
+    // Cache validation now diagnoses malformed registries/species sources before the assembly source gate.
+    const cacheRejects = file === 'sources.json' || ['denied placeholder', 'unknown species source', 'unchecked species source'].includes(label);
+    const actualFile = cacheRejects ? 'compiled' : file;
+    assert.ok(result.errors.some(e => e.file === actualFile && re.test(e.message)), `${label}: ${JSON.stringify(result.errors)}`);
+    if (file === 'sources.json') assert.ok(result.errors.some(e => /sources\.json \[\d+\]/.test(e.message)), `${label}: original registry location is retained`);
     assert.deepEqual(calls, [], `${label}: refuse before any dependency query`);
     assert.deepEqual(Object.keys(result.content.species), [], `${label}: no partial content`);
   }

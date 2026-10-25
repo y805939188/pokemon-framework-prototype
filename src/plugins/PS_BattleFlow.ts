@@ -189,9 +189,8 @@ import { developmentCapabilities } from "../framework/rules/config";
     resetGame(): void {
       delete G.$gameSystem._psSaveError; delete G.$gameSystem._psSaveInfo; delete G.$gameSystem._psSaveWarning; // an explicit reset is a deliberate act
       PSFlow.stateReplaced();
-      const game = engine().F.makeGame();
       const content = PSFlow.content();
-      game.party = game.party.map((m: any) => engine().B.speciesKey.toPersistentMember(m, content));
+      const game = engine().F.savedFor(engine().F.makeGame(), content);
       G.$gameSystem._psGame = game;
       G.$gameSystem._psBattleSeq = 0;
     },

@@ -1,4 +1,5 @@
 /** Synthetic game fixtures for headless tests, the scripted matrix and the flow test (not shipped content). */
+import { createDexState } from "../../rules/dex-state.ts";
 import * as G from "../../rules/growth.ts";
 import * as S from "../../rules/state.ts";
 import type { GameState } from "../../rules/state.ts";
@@ -55,7 +56,7 @@ export function makeGame(over: GameOverrides = {}): GameState {
  * content's ids + form. The fixture world itself needs no conversion (its content ids are the Showdown names).
  */
 export function savedFor(game: GameState, target: Content): GameState {
-  return { ...game, party: game.party.map((m) => toPersistentMember(m, target)), storage: { ...game.storage, boxes: game.storage.boxes.map((b) => ({ ...b, slots: b.slots.map((m) => m ? toPersistentMember(m, target) : null) })) } };
+  return { ...game, dex: createDexState(target, {seen: game.dex.seen.map(name => target.speciesKeys?.[name]?.species ?? name), owned: game.dex.owned.map(name => target.speciesKeys?.[name]?.species ?? name)}, "migration"), party: game.party.map((m) => toPersistentMember(m, target)), storage: { ...game.storage, boxes: game.storage.boxes.map((b) => ({ ...b, slots: b.slots.map((m) => m ? toPersistentMember(m, target) : null) })) } };
 }
 
 export interface FoeOptions {

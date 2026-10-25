@@ -6,7 +6,10 @@
  */
 import type { CurveId, PartialStats } from "../rules/types.ts";
 
-export const SCHEMA_VERSION = 1;
+export const AUTHOR_SCHEMA_VERSION = 1;
+export const COMPILED_SCHEMA_VERSION = 2;
+/** Author version; compiled consumers use COMPILED_SCHEMA_VERSION. */
+export const SCHEMA_VERSION = AUTHOR_SCHEMA_VERSION;
 export const CURVES_ALLOWED: readonly CurveId[] = ["medium", "fast", "slow", "parabolic", "erratic", "fluctuating"];
 export const STAT_KEYS_ALLOWED = ["hp", "atk", "def", "spa", "spd", "spe"] as const;
 
@@ -55,10 +58,28 @@ export interface SpeciesSource {
   happiness?: number;
   learnset: LearnEntry[];
   source: string;
+  evolutions?: import("../rules/types.ts").EvolutionEntry[];
+  tutorMoves?: string[];
+  types?: string[];
+  abilities?: (string | null)[];
+  hiddenAbilities?: (string | null)[];
+  flags?: string[];
+  pokedexForm?: number;
+  defaultForm?: number;
+  displayForm?: number;
+  categoryKey?: string;
+  entryKey?: string;
+  heightDm?: number;
+  weightHg?: number;
+  color?: string;
+  shape?: string;
+  formName?: string | null;
+  formNameKey?: string;
+  dexSortKeys?: Record<string, string>;
 }
 
-export type OverridableField = "nameKey" | "growth" | "baseExp" | "evYield" | "catchRate" | "happiness" | "learnset";
-export const OVERRIDABLE: readonly OverridableField[] = ["nameKey", "growth", "baseExp", "evYield", "catchRate", "happiness", "learnset"];
+export type OverridableField = "nameKey" | "growth" | "baseExp" | "evYield" | "catchRate" | "happiness" | "learnset" | "evolutions" | "tutorMoves" | "types" | "abilities" | "hiddenAbilities" | "flags" | "pokedexForm" | "categoryKey" | "entryKey" | "heightDm" | "weightHg" | "color" | "shape" | "formName" | "formNameKey" | "dexSortKeys";
+export const OVERRIDABLE: readonly OverridableField[] = ["nameKey", "growth", "baseExp", "evYield", "catchRate", "happiness", "learnset", "evolutions", "tutorMoves", "types", "abilities", "hiddenAbilities", "flags", "pokedexForm", "categoryKey", "entryKey", "heightDm", "weightHg", "color", "shape", "formName", "formNameKey", "dexSortKeys"];
 
 export interface Overlay {
   target: string;
@@ -92,10 +113,12 @@ export interface ContentInputs {
   settings?: unknown;
   items?: unknown;
   shops?: unknown;
+  regionalDex?: unknown;
+  mapMetadata?: unknown;
 }
 
 export interface ContentError {
-  file: "manifest.json" | "sources.json" | "species.json" | "overlays.json" | "grants.json" | "settings.json" | "items.json" | "shops.json" | "compiled" | "assembly";
+  file: "manifest.json" | "sources.json" | "species.json" | "overlays.json" | "grants.json" | "settings.json" | "items.json" | "shops.json" | "regional-dex.json" | "map-metadata.json" | "compiled" | "assembly";
   path: string;
   message: string;
 }
@@ -107,6 +130,11 @@ export interface CompiledContent {
   sources: SourceEntry[];
   overlaysApplied: number;
   species: SpeciesSource[];
+  registrationOrder?: import("../rules/types.ts").SpeciesKey[];
+  regionalDex?: import("../rules/types.ts").RegionalDex;
+  mapMetadata?: import("../rules/types.ts").MapMetadata;
+  showdownSha?: string;
+  contentIdentity?: string;
   /** Absent in documents compiled before step 4 (= no grants). */
   grants?: GrantSource[];
   /** Rule configuration overrides (validated); absent = the Gen 8 defaults. */

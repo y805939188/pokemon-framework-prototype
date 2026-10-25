@@ -1,5 +1,10 @@
 /** Persistent-only move/stat metadata. The frozen result remains an unmodified v1 record. */
 import type { Content, Member, MoveSlot } from './types.ts';
+import { clone } from './value.ts';
+
+/** Copy a persistent individual without deriving, rerolling or normalizing any metadata. */
+export function clonePersistentMember<T extends Member>(member: T): T { return clone(member); }
+
 export const computedNature = (member: Member): string => member.statNature ?? member.nature;
 export function baseMovePp(content: Content, id: string): number | undefined {
   return Object.values(content.moves ?? {}).find(move => move.id === id)?.pp;

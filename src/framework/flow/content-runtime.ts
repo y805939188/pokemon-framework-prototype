@@ -6,29 +6,74 @@
 import { checkItemInputs } from "../content/item-input.ts";
 import type { CompiledContent, ContentError } from "../content/schema.ts";
 import { checkOverrides, developmentCapabilities } from "../rules/config.ts";
-import { SCHEMA_VERSION } from "../content/schema.ts";
-import { checkSources, preUseProblem, showdownDependencyProblem } from "../content/compile.ts";
+import { COMPILED_SCHEMA_VERSION } from "../content/schema.ts";
+import { canonicalJson, speciesFieldProblem, checkSources, preUseProblem, showdownDependencyProblem } from "../content/compile.ts";
 import type { Content, DexLookup, Member } from "../rules/types.ts";
+import { PROGRESSION_FIELDS, progressionFieldProblem, deriveSpeciesFields, checkProgressionReferences, checkRegionalDex, checkMapMetadata } from "../content/progression-input.ts";
+import { evolutionMethod } from "../rules/evolution-data.ts";
+import { sha256Hex } from "../rules/sha256.ts";
 import { allMembers, locateMember } from "../rules/storage.ts";
 import type { MemberCollection } from "../rules/storage.ts";
 import { own, setOwn } from "../rules/own.ts";
 import { battleNameOf, memberKey } from "../rules/species-key.ts";
 
-/** Shape check of a compiled document read from disk (it was validated when it was compiled). */
+/** Validate a cache independently of its producer. Version 1 is a rebuild request, never a save migration. */
 export function loadCompiled(json: unknown): CompiledContent {
-  const o = json as Partial<CompiledContent> | null;
-  if (!o || typeof o !== "object" || o.schema !== SCHEMA_VERSION || !Array.isArray(o.species) || typeof o.inputsHash !== "string" || typeof o.contentId !== "string" || (o.grants !== undefined && !Array.isArray(o.grants)) || (o.settings !== undefined && (typeof o.settings !== "object" || o.settings === null))) {
-    throw new Error(`compiled content is not a schema ${SCHEMA_VERSION} document (run the content build)`);
+  const obj = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+  const dense = (value: unknown): value is unknown[] => Array.isArray(value) && Object.keys(value).length === value.length;
+  if (!obj(json) || json.schema !== COMPILED_SCHEMA_VERSION) throw new Error(`needs-rebuild: compiled content requires schema ${COMPILED_SCHEMA_VERSION}`);
+  const problems: ContentError[] = [];
+  const report = (file: ContentError["file"], path: string, message: string): void => { problems.push({file,path,message}); };
+  if (typeof json.contentId !== "string" || !/^[a-z][a-z0-9-]{0,30}$/.test(json.contentId)) report("compiled","$.contentId","invalid content id");
+  if (typeof json.inputsHash !== "string" || !/^[a-f0-9]{64}$/.test(json.inputsHash)) report("compiled","$.inputsHash","must be SHA256");
+  if (typeof json.showdownSha !== "string" || !/^[a-f0-9]{40}$/.test(json.showdownSha)) report("compiled","$.showdownSha","must be a pinned Showdown SHA");
+  if (json.contentIdentity !== sha256Hex(canonicalJson({compiledSemantics: COMPILED_SCHEMA_VERSION, inputsHash:json.inputsHash, showdownSha:json.showdownSha}))) report("compiled","$.contentIdentity","content-identity-mismatch");
+  for(const p of checkOverrides(json.settings??{}))report("settings.json",p.path,p.message);
+  const sources = checkSources(json.sources,report);
+  const usable = (source: unknown): string | null => preUseProblem(sources,source);
+  if (!dense(json.species)) report("compiled","$.species","must be a dense array");
+  else {
+    const recordKeys = new Set<string>();
+    for (const [i, value] of json.species.entries()) {
+      const p=`$.species[${i}]`;
+      if (!obj(value)) { report("compiled",p,"must be a species record"); continue; }
+      for (const field of Object.keys(value)) if (!["id","form","showdownId","source","defaultForm","displayForm","nameKey","growth","baseExp","evYield","catchRate","happiness","learnset",...PROGRESSION_FIELDS].includes(field)) report("compiled",`${p}.${field}`,"unknown species field");
+      if(typeof value.id!=="string"||!/^[a-z][a-z0-9-]{0,30}$/.test(value.id))report("compiled",`${p}.id`,"invalid species id");
+      if(value.form!==undefined&&(!Number.isSafeInteger(value.form)||(value.form as number)<0||(value.form as number)>999))report("compiled",`${p}.form`,"invalid form");
+      if(typeof value.showdownId!=="string"||!/^[a-z0-9]{1,40}$/.test(value.showdownId))report("compiled",`${p}.showdownId`,"invalid Showdown identity");
+      const recordKey=`${String(value.id)}/${String(value.form??0)}`;
+      if(recordKeys.has(recordKey))report("compiled",p,"duplicate species key"); recordKeys.add(recordKey);
+      for(const field of ["nameKey","growth","baseExp","evYield","catchRate","learnset"]) { const issue=speciesFieldProblem(field,value[field]);if(issue)report("compiled",`${p}.${field}`,issue); }
+      for(const field of ["happiness",...PROGRESSION_FIELDS]) if(Object.hasOwn(value,field)) { const issue=speciesFieldProblem(field,value[field]);if(issue)report("compiled",`${p}.${field}`,issue); }
+      const gate=usable(value.source);if(gate)report("compiled",`${p}.source`,`source-unusable: ${gate}`);
+    }
+    for(const recordKey of recordKeys)if(!recordKeys.has(recordKey.split("/")[0]+"/0"))report("compiled","$.species","missing base form");
+    const order=json.registrationOrder;
+    const orderKeys=dense(order)?order.map(k=>obj(k)&&Object.keys(k).length===2&&typeof k.species==="string"&&Number.isSafeInteger(k.form)?`${k.species}/${String(k.form)}`:""):[];
+    if(!dense(order)||orderKeys.length!==recordKeys.size||new Set(orderKeys).size!==orderKeys.length||orderKeys.some(k=>!recordKeys.has(k)))report("compiled","$.registrationOrder","must contain every species key exactly once");
+    if(!problems.length) {
+      const records=json.species as unknown as CompiledContent["species"];
+      const derived=JSON.parse(JSON.stringify(records)) as CompiledContent["species"];
+      deriveSpeciesFields(derived,report);checkProgressionReferences(records,report);
+      for(const [i,value] of records.entries()) if(value.defaultForm!==derived[i]!.defaultForm||value.displayForm!==derived[i]!.displayForm||value.color!==derived[i]!.color||value.shape!==derived[i]!.shape||canonicalJson(value.dexSortKeys)!==canonicalJson(derived[i]!.dexSortKeys))report("compiled",`$.species[${i}]`,"derived-form-mismatch");
+      const regional=json.regionalDex;
+      const raw=obj(regional)&&regional.source!==undefined?{source:regional.source,national:regional.national,regions:regional.regions,...(Object.hasOwn(regional,"transitions")?{transitions:regional.transitions}:{})}:undefined;
+      const checked=checkRegionalDex(raw,json.registrationOrder as unknown as import("../rules/types.ts").SpeciesKey[],usable,report);
+      if(canonicalJson(regional)!==canonicalJson(checked))report("compiled","$.regionalDex","invalid regional layout, source or layout identity");
+      checkMapMetadata(json.mapMetadata,checked,usable,report);
+      for(const [i,region] of ((json.settings as {DEXES_WITH_OFFSETS?:number[]} | undefined)?.DEXES_WITH_OFFSETS??[]).entries())if(region>=checked.regions.length)report("compiled",`$.settings.DEXES_WITH_OFFSETS[${i}]`,"unknown region reference");
+    }
   }
-  const problems = checkOverrides(o.settings ?? {});
-  if (problems.length) throw new Error(`compiled settings: ${problems.map((p) => `${p.path} ${p.message}`).join("; ")}`);
-  return o as CompiledContent;
+  if(json.grants!==undefined&&(!dense(json.grants)||json.grants.some(g=>!obj(g)||!dense(g.members)||g.members.some(m=>!obj(m))||!obj(g.items))))report("compiled","$.grants","invalid grant records");
+  if(problems.length)throw new Error(problems.map(p=>`${p.file} ${p.path}: ${p.message}`).join("; "));
+  return json as unknown as CompiledContent;
 }
 
 export function assembleContent(compiled: CompiledContent, dex: DexLookup, developerCapabilities: unknown = {}): { content: Content; errors: ContentError[] } {
   const errors: ContentError[] = [];
   const capabilities = developmentCapabilities(developerCapabilities);
-  const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash }, moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {}, ...(compiled.settings ? { settings: { ...compiled.settings } } : {}) };
+  try { loadCompiled(compiled); } catch(error) { return {content:{species:{}},errors:[{file:"compiled",path:"$",message:(error as Error).message}]}; }
+  const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash, compiledSemantics: COMPILED_SCHEMA_VERSION, showdownSha: compiled.showdownSha, contentIdentity: compiled.contentIdentity }, registrationOrder: compiled.registrationOrder?.map(k=>({...k})), regionalDex: JSON.parse(JSON.stringify(compiled.regionalDex)) as import("../rules/types.ts").RegionalDex, ...(compiled.mapMetadata ? {mapMetadata:JSON.parse(JSON.stringify(compiled.mapMetadata)) as import("../rules/types.ts").MapMetadata} : {}), moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {}, ...(compiled.settings ? { settings: { ...compiled.settings } } : {}) };
   // A compiled document may be older than the gate, or edited by hand. Validate the whole registry and every source
   // whose data will be consumed before even querying the Dex; a placeholder's exemption covers only its own fields.
   for (const p of checkOverrides(compiled.settings ?? {})) errors.push({ file: "settings.json", path: p.path, message: p.message });
@@ -55,6 +100,8 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
   if (errors.length) return {content,errors};
   content.items = itemInputs.catalog;
   content.shops = Object.fromEntries(itemInputs.shops.map(shop => [shop.id, shop]));
+  if (compiled.species.length && dex.sha() !== compiled.showdownSha) { errors.push({file:"assembly",path:"$.showdownSha",message:"pinned-showdown-mismatch"}); return {content,errors}; }
+  if (compiled.species.length) content.abilities = Object.fromEntries((dex.allAbilities?.() ?? []).map(ability => [ability.id,{...ability}]));
   if (compiled.species.length || itemInputs.items.some(item=>!!item.move)) for (const move of dex.allMoves?.() ?? []) setOwn(content.moves!,move.name,{...move});
   // Empty author content needs no external battle data, including the lazy Dex's identity lookup.
   const short = compiled.species.length ? dex.sha().slice(0, 8) : null;
@@ -72,19 +119,30 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     byName.set(found.name, path);
     const learnset: Record<number, string[]> = {};
     let ok = true;
+    const moveRef = (ref: string, field: string): string | null => { const move=dex.move(ref); if(!move){errors.push({file:"assembly",path:`${path}.${field}`,message:`unknown move ${ref}`});ok=false;return null;} if(move.id!==undefined&&move.pp!==undefined)setOwn(content.moves!,move.name,{id:move.id,name:move.name,pp:move.pp});return move.name; };
+    for(const [j,ref] of (sp.types??[]).entries())if(!dex.type?.(ref)){errors.push({file:"assembly",path:`${path}.types[${j}]`,message:`unknown type ${ref}`});ok=false;}
+    for(const field of ["abilities","hiddenAbilities"] as const)for(const [j,ref] of (sp[field]??[]).entries())if(ref!==null&&!dex.abilityInfo?.(ref)){errors.push({file:"assembly",path:`${path}.${field}[${j}]`,message:`unknown ability ${ref}`});ok=false;}
+    const tutorMoves=(sp.tutorMoves??[]).map((ref,j)=>moveRef(ref,`tutorMoves[${j}]`)).filter((ref):ref is string=>ref!==null);
+    for(const [j,entry] of (sp.evolutions??[]).entries()) {
+      const kind=evolutionMethod(entry.method)!.parameterKind,ref=String(entry.parameter),field=`evolutions[${j}].parameter`;
+      if(kind==="move")moveRef(ref,field);
+      if(kind==="type"&&!dex.type?.(ref)){errors.push({file:"assembly",path:`${path}.${field}`,message:`unknown type ${ref}`});ok=false;}
+      if(kind==="item"&&!Object.hasOwn(itemInputs.catalog,ref)&&!dex.heldItem?.(ref)){errors.push({file:"assembly",path:`${path}.${field}`,message:`unknown item ${ref}`});ok=false;}
+    }
     for (const [j, e] of sp.learnset.entries()) {
       const mv = dex.move(e.move);
       if (!mv) { errors.push({ file: "assembly", path: `${path}.learnset[${j}].move`, message: `"${e.move}" is not a move in the pinned Showdown data (${short})` }); ok = false; continue; }
       (learnset[e.level] ??= []).push(mv.name);
       // what creating an individual needs about the move (WP20 §5.1: a new move object starts with full PP)
-      if (typeof mv.id === "string" && typeof mv.pp === "number") content.moves![mv.name] = { id: mv.id, name: mv.name, pp: mv.pp };
+      if (typeof mv.id === "string" && typeof mv.pp === "number") setOwn(content.moves!, mv.name, { id: mv.id, name: mv.name, pp: mv.pp });
     }
     if (!ok) continue;
     const happiness = sp.happiness ?? baseHappiness.get(sp.id);
-    content.species[found.name] = {
+    setOwn(content.species, found.name, {
       base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset, nameKey: sp.nameKey, contentId: sp.id, form, ruleSpecies: found.baseSpecies ?? found.name,
-      ...(found.abilities ? { abilities: [...found.abilities] } : {}), ...(found.hiddenAbilities ? { hiddenAbilities: [...found.hiddenAbilities] } : {}), ...(happiness !== undefined ? { happiness } : {}), ...(found.gender !== undefined ? { gender: found.gender } : {}),
-    };
+      ...(sp.abilities !== undefined ? {abilities:sp.abilities.map(ref=>ref===null?null:dex.abilityInfo!(ref)!.name)} : found.abilities ? { abilities: [...found.abilities] } : {}), ...(sp.hiddenAbilities !== undefined ? {hiddenAbilities:sp.hiddenAbilities.map(ref=>ref===null?null:dex.abilityInfo!(ref)!.name)} : found.hiddenAbilities ? { hiddenAbilities: [...found.hiddenAbilities] } : {}), types:sp.types!==undefined?sp.types.map(ref=>dex.type!(ref)!.name):[...(found.types??[])], tutorMoves,
+      ...Object.fromEntries(["evolutions","flags","defaultForm","displayForm","pokedexForm","categoryKey","entryKey","heightDm","weightHg","color","shape","formName","formNameKey","dexSortKeys"].filter(field=>Object.hasOwn(sp,field)).map(field=>[field,JSON.parse(JSON.stringify((sp as unknown as Record<string,unknown>)[field])) as unknown])), ...(happiness !== undefined ? { happiness } : {}), ...(found.gender !== undefined ? { gender: found.gender } : {}),
+    });
     // the persistent key (decision D5-3): content id + form <-> Showdown name, both ways
     if (form === 0) setOwn(content.speciesIds!, sp.id, found.name);
     if (!own(content.forms!, sp.id)) setOwn(content.forms!, sp.id, {});
@@ -105,7 +163,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
       if (!name) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].species`, message: `"${m.species}" is not an assembled species` }); ok = false; continue; }
       members.push({ species: name, level: m.level, ...(m.form !== undefined ? { form: m.form } : {}), ...(m.item !== undefined ? { item: m.item } : {}) });
     }
-    if (ok) content.grants![g.id] = { id: g.id, members, items: { ...g.items }, money: g.money };
+    if (ok) setOwn(content.grants!, g.id, { id: g.id, members, items: { ...g.items }, money: g.money });
   }
   return { content, errors };
 }

@@ -73,7 +73,7 @@ export function createMember(input: CreateMemberInput, content: Content, random:
   if (!Number.isInteger(level) || level < 1 || level > 100) throw new RangeError(`level must be an integer from 1 to 100 (got ${String(level)})`);
   let sp = own(content.species, species);
   if (!sp) throw new Error(`species "${species}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
-  const missing = [...(!sp.abilities || !sp.abilities.length ? ["abilities"] : []), ...(sp.gender === undefined ? ["gender"] : [])];
+  const missing = [...(sp.abilities === undefined ? ["abilities"] : []), ...(sp.gender === undefined ? ["gender"] : [])];
   if (missing.length) throw new Error(`species "${species}" has no creation data (${missing.join(", ")}) in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
   if (sp.happiness !== undefined && (!Number.isSafeInteger(sp.happiness) || sp.happiness < 0)) throw new Error("initial friendship must be a nonnegative safe integer");
   const owner = { ...(input.owner ?? { ...COMPATIBLE_PLAYER, name: input.ot ?? "player" }) };
@@ -114,5 +114,5 @@ export function createMember(input: CreateMemberInput, content: Content, random:
     origin: { method: input.context?.fateful ? 4 : 0, map: input.context?.map ?? 0, text: "", level, receivedAt: input.context?.receivedAt ?? null, hatchedMap: 0, hatchedAt: null, compatibilityDefault: false },
     firstMoves: [], markings: [], ribbons: [], cannotStore: false, cannotRelease: false, isEgg: false, mail: null, readyToEvolve: false,
   });
-  return {...created,statNature:null,moves:created.moves.map(move=>({...move,ppUps:0}))};
+  return { ...created, statNature: null, moves: created.moves.map(move => ({ ...move, ppUps: 0 })), evolutionReadiness: "known", cannotTrade: false };
 }

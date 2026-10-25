@@ -10,24 +10,30 @@ import { baseMovePp, totalPp } from "./member-metadata.ts";
  *   1  step 2 prototype: members have no statusCount; a badly poisoned member may be stored as status "tox".
  *   2  statusCount (sleep = remaining turns, poison = 0 plain), poison stored as plain "psn" (WP20 / WP39).
  *   3  step 4: `claims`, the one-time grant ledger (claim id -> {kind}).
- *   4  current (step 5.0, decision D5-3): a member's species is the content id plus a `form` number (was the Showdown
+ *   4  step 5.0, decision D5-3: a member's species is the content id plus a `form` number (was the Showdown
  *      name), the dex lists content ids; `stats` (WP06, 74 fields) and the global step counter `steps`.
+ *   5  individual metadata and fixed 40×30 storage.
+ *   6  ordered inventory, badges and persistent move PP metadata.
+ *   7  readiness certainty, cannotTrade, complete dex history and stable layout identity.
  * Anything else is refused with a diagnosable error ("unknown-version"/"corrupt"/"invalid") — never silently reset.
  * 3 -> 4 needs the content's species mapping (Showdown name -> content id + form): without it the migration refuses
  * ("needs-content"), and a name the content cannot map refuses the WHOLE migration ("unmapped-species", every place
  * listed). Either way the input document is untouched, so the caller keeps the original save.
  */
 import { NATURES } from "./growth.ts";
+import { own } from "./own.ts";
+import { createDexState, dexContentProblems, dexStateProblems, dexLayoutStateProblems, remapDexLayout } from "./dex-state.ts";
 import { GAME_SCHEMA } from "./state.ts";
 import type { GameState } from "./state.ts";
 import { MAX_FORM, speciesDataOf } from "./species-key.ts";
-import { completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity.ts";
+import { completeIndividual, COMPATIBLE_PLAYER, initialOrdinal, resolveAbility } from "./member-identity.ts";
 import { BOX_COUNT, SLOTS_PER_BOX, STORAGE_CAPACITY, newStorage } from "./storage.ts";
-import type { Content, Member } from "./types.ts";
+import type { Content, DexState, Member } from "./types.ts";
 import type { SpeciesKeyResolver } from "./species-key.ts";
 import { newStats, validateStats } from "./stats.ts";
 
-export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3, 4, 5, 6];
+const SAVE_SCHEMA = GAME_SCHEMA;
+export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
 
 export interface Problem { path: string; message: string }
 export interface SaveErrorInfo {
@@ -49,6 +55,13 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const isInt = (v: unknown, lo: number, hi = Number.MAX_SAFE_INTEGER): v is number => typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi;
 
+function persistentMembers(doc: Obj): { member: Obj; path: string }[] {
+  const members = (doc["party"] as Obj[]).map((member, i) => ({ member, path: `$.party[${i}]` }));
+  const storage = doc["storage"] as { boxes: { slots: (Obj | null)[] }[] };
+  for (const [i, box] of storage.boxes.entries()) for (const [j, member] of box.slots.entries()) if (member !== null) members.push({ member, path: `$.storage.boxes[${i}].slots[${j}]` });
+  return members;
+}
+
 const STATUSES = ["", "psn", "tox", "brn", "par", "slp", "frz"];
 const STAT_KEYS = ["hp", "atk", "def", "spa", "spd", "spe"];
 const TOP_KEYS = ["schema", "party", "boxes", "bag", "money", "dex", "appliedBattles", "claims", "stats", "steps"];
@@ -61,12 +74,13 @@ const MEMBER_ID = /^[A-Za-z0-9#._:-]{1,18}$/;
 function statBlock(v: unknown, lo: number, hi: number, path: string, out: Problem[]): void {
   if (!isObj(v)) { out.push({ path, message: "must be an object of the six stats" }); return; }
   for (const k of Object.keys(v)) if (!STAT_KEYS.includes(k)) out.push({ path: `${path}.${k}`, message: "unknown stat" });
-  for (const k of STAT_KEYS) if (!isInt(v[k], lo, hi)) out.push({ path: `${path}.${k}`, message: `must be an integer from ${lo} to ${hi}` });
+  for (const k of STAT_KEYS) if (!Object.hasOwn(v, k) || !isInt(v[k], lo, hi)) out.push({ path: `${path}.${k}`, message: `must be an integer from ${lo} to ${hi}` });
 }
 
 function validateMember(m: unknown, path: string, out: Problem[], schema: number): void {
   if (!isObj(m)) { out.push({ path, message: "must be an object" }); return; }
-  for (const k of Object.keys(m)) if (!(schema >= 5 ? [...MEMBER_KEYS.filter((k) => k !== "ot"), ...INDIVIDUAL_KEYS, ...(schema >= 6 ? ["statNature"] : [])] : [...MEMBER_KEYS, ...INDIVIDUAL_KEYS]).includes(k)) out.push({ path: `${path}.${k}`, message: "unknown field (battle-only or temporary state does not belong in a save)" });
+  if (schema >= 7 && inheritedFields(m, [...MEMBER_KEYS, ...INDIVIDUAL_KEYS, "statNature", "cannotTrade", "evolutionReadiness"], path, out)) return;
+  for (const k of Object.keys(m)) if (!(schema >= 5 ? [...MEMBER_KEYS.filter((k) => k !== "ot"), ...INDIVIDUAL_KEYS, ...(schema >= 6 ? ["statNature"] : []), ...(schema >= 7 ? ["evolutionReadiness", "cannotTrade"] : [])] : [...MEMBER_KEYS, ...INDIVIDUAL_KEYS]).includes(k)) out.push({ path: `${path}.${k}`, message: "unknown field (battle-only or temporary state does not belong in a save)" });
   if (typeof m["id"] !== "string" || !MEMBER_ID.test(m["id"])) out.push({ path: `${path}.id`, message: "must be 1-18 characters of A-Z a-z 0-9 # . _ : -" });
   for (const k of ["species", "item", "ability", "nature", "gender", "ball", ...(schema >= 5 ? [] : ["ot"])]) if (!(schema < 5 && ["ability", "nature", "gender", "ot"].includes(k) && m[k] === undefined) && typeof m[k] !== "string") out.push({ path: `${path}.${k}`, message: "must be a string" });
   if (typeof m["nature"] === "string" && !Object.hasOwn(NATURES, m["nature"].toLowerCase())) out.push({ path: `${path}.nature`, message: "must name a registered nature (case-insensitive)" });
@@ -93,12 +107,17 @@ function validateMember(m: unknown, path: string, out: Problem[], schema: number
   }
   statBlock(m["ivs"], 0, 31, `${path}.ivs`, out);
   statBlock(m["evs"], 0, 255, `${path}.evs`, out);
-  validateIndividualFields(m, path, out, schema >= 5);
+  validateIndividualFields(m, path, out, schema >= 5, schema);
+  if (schema >= 7) {
+    if (typeof m["cannotTrade"] !== "boolean") out.push({ path: `${path}.cannotTrade`, message: "must be boolean" });
+    if (!["known", "unknown"].includes(m["evolutionReadiness"] as string)) out.push({ path: `${path}.evolutionReadiness`, message: "must be known or unknown" });
+    else if (m["evolutionReadiness"] === "unknown" && m["readyToEvolve"] !== true) out.push({ path: `${path}.evolutionReadiness`, message: "unknown readiness requires readyToEvolve=true" });
+  }
 
 }
 
 /** Old schemas may omit metadata, but an explicitly present bad field is never a default request. */
-function validateIndividualFields(m: Obj, path: string, out: Problem[], required: boolean): void {
+function validateIndividualFields(m: Obj, path: string, out: Problem[], required: boolean, schema: number): void {
   const present = (key: string): boolean => required || Object.hasOwn(m, key);
   if (present("personalID") && !isInt(m["personalID"], 0, 0xffffffff)) out.push({ path: `${path}.personalID`, message: "must be uint32" });
   if (present("owner")) validateOwner(m["owner"], `${path}.owner`, out);
@@ -113,13 +132,19 @@ function validateIndividualFields(m: Obj, path: string, out: Problem[], required
   }
   for (const k of ["abilityIndex", "effectiveAbilityIndex"]) if (present(k) && m[k] !== null && !isInt(m[k], 0)) out.push({ path: `${path}.${k}`, message: "must be a nonnegative safe slot or null" });
   for (const k of ["ownerCompatibilityDefault", "shiny", "superShiny", "cannotStore", "cannotRelease", "isEgg", "readyToEvolve"]) if (present(k) && typeof m[k] !== "boolean") out.push({ path: `${path}.${k}`, message: "must be boolean" });
-  for (const k of ["firstMoves", "ribbons"]) if (present(k) && (!Array.isArray(m[k]) || (m[k] as unknown[]).some((v) => typeof v !== "string" || !v.length) || (k === "firstMoves" && (m[k] as unknown[]).length > 4))) out.push({ path: `${path}.${k}`, message: "must be an ordered string list (firstMoves at most four)" });
+  for (const k of ["firstMoves", "ribbons"]) if (present(k) && (!Array.isArray(m[k]) || (m[k] as unknown[]).some((v) => typeof v !== "string" || !v.length) || (schema < 7 && k === "firstMoves" && (m[k] as unknown[]).length > 4))) out.push({ path: `${path}.${k}`, message: schema >= 7 ? "must be a dense ordered string list" : "must be an ordered string list (firstMoves at most four)" });
   const marks = m["markings"];
   if (present("markings") && (!Array.isArray(marks) || marks.length > 6 || marks.some((v) => !isInt(v, 0)))) out.push({ path: `${path}.markings`, message: "must be up to six nonnegative integer markings" });
   if (present("mail") && m["mail"] !== null && typeof m["mail"] !== "string") out.push({ path: `${path}.mail`, message: "must be string or null" });
 }
 
+function inheritedFields(o: Obj, fields: readonly string[], path: string, out: Problem[]): boolean {
+  const inherited = fields.filter(key => !Object.hasOwn(o, key) && key in o);
+  for (const key of inherited) out.push({path: `${path}.${key}`, message: "persistent fields must be own data, never inherited"});
+  return inherited.length > 0;
+}
 function knownKeys(o: Obj, allowed: readonly string[], path: string, out: Problem[]): void {
+  inheritedFields(o, allowed, path, out);
   for (const k of Object.keys(o)) if (!allowed.includes(k)) out.push({ path: `${path}.${k}`, message: path === "$" ? "unknown top-level field" : "unknown field" });
 }
 function validateOwner(value: unknown, path: string, out: Problem[]): void {
@@ -128,15 +153,98 @@ function validateOwner(value: unknown, path: string, out: Problem[]): void {
   if (!isInt(value["id"], 0, 0xffffffff) || typeof value["name"] !== "string" || !isInt(value["gender"], 0, 2) || !isInt(value["language"], 0)) out.push({ path, message: "must contain uint32 id, string name, gender 0/1/2 and nonnegative language" });
 }
 
+/** JSON-shaped own data only: sparse lists and inherited records cannot pass then change meaning during cloning. */
+function validatePlainData(value: unknown, path: string, out: Problem[], ancestors = new Set<object>()): void {
+  if (value === null || typeof value !== "object") {
+    if (["function", "symbol", "bigint"].includes(typeof value) || (typeof value === "number" && !Number.isFinite(value))) out.push({path, message: "must be serializable plain data"});
+    return;
+  }
+  if (ancestors.has(value)) { out.push({ path, message: "cyclic value is not persistent data" }); return; }
+  if (Array.isArray(value)) {
+    const prototype = Object.getPrototypeOf(value) as object | null;
+    const constructor = prototype && Object.getOwnPropertyDescriptor(prototype, "constructor");
+    if (!prototype || !Array.isArray(prototype) || !constructor || !("value" in constructor) || typeof constructor.value !== "function" || Object.getOwnPropertyDescriptor(constructor.value, "prototype")?.value !== prototype || Function.prototype.toString.call(constructor.value) !== Function.prototype.toString.call(Array)) {
+      out.push({path, message: "must be an own plain-data array with an intrinsic prototype"}); return;
+    }
+  } else {
+    const prototype = Object.getPrototypeOf(value) as object | null;
+    const constructor = prototype && Object.getOwnPropertyDescriptor(prototype, "constructor");
+    // NW's renderer, Node and a bare core may have different intrinsic Object identities.
+    // Accept another realm's intrinsic Object.prototype, not arbitrary inherited-data/class records.
+    if (prototype !== null && !(Object.getPrototypeOf(prototype) === null && constructor && "value" in constructor && typeof constructor.value === "function" && Object.getOwnPropertyDescriptor(constructor.value, "prototype")?.value === prototype && Function.prototype.toString.call(constructor.value) === Function.prototype.toString.call(Object))) {
+      out.push({path, message: "must be an own plain-data record"}); return;
+    }
+  }
+  // JSON resolves inherited toJSON too. A valid own-data document must not serialize as different data (or run an
+  // inherited accessor) after this gate. Resolve descriptors without executing the hook; non-callable data is inert.
+  for (let owner: object | null = value; owner !== null; owner = Object.getPrototypeOf(owner) as object | null) {
+    const hook = Object.getOwnPropertyDescriptor(owner, "toJSON");
+    if (!hook) continue;
+    if (!("value" in hook) || typeof hook.value === "function") {
+      out.push({path, message: "persistent data cannot use a JSON serialization hook"}); return;
+    }
+    break;
+  }
+  ancestors.add(value);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(value)) {
+    if (Array.isArray(value) && key === "length") continue;
+    const descriptor = typeof key === "string" ? descriptors[key] : undefined;
+    if (typeof key !== "string" || !descriptor || !descriptor.enumerable || !("value" in descriptor)) {
+      out.push({path: `${path}.${String(key)}`, message: "persistent fields must be own enumerable data properties"});
+      continue;
+    }
+    if (Array.isArray(value) && !/^(0|[1-9][0-9]*)$/.test(key)) {
+      out.push({path: `${path}.${key}`, message: "arrays may only contain their indexed data"}); continue;
+    }
+    validatePlainData(descriptor.value, `${path}.${key}`, out, ancestors);
+  }
+  if (Array.isArray(value)) for (let i = 0; i < value.length; i++) if (!Object.hasOwn(value, i)) out.push({path: `${path}[${i}]`, message: "sparse arrays are not persistent data"});
+  ancestors.delete(value);
+}
+
+/** Descriptor copy only. Check views retain inherited-name presence (never inherited values/getters), so the
+ * existing own-field rules still reject optional inherited fields. Storage copies use ordinary local prototypes.
+ * Neither copy is installed into the game, and no caller array method/iterator or JSON conversion is executed.
+ */
+function ownDataCopy<T>(value: T, mode: "checks" | "storage", prototypes = new Map<object, object>()): T {
+  if (value === null || typeof value !== "object") return value;
+  const array = Array.isArray(value);
+  let prototype: object | null = mode === "storage" ? Object.prototype : null;
+  const sourcePrototype = Object.getPrototypeOf(value) as object | null;
+  if (!array && mode === "checks" && sourcePrototype !== null) {
+    let presence = prototypes.get(sourcePrototype);
+    if (!presence) {
+      presence = Object.create(null) as object;
+      for (const key of Object.getOwnPropertyNames(sourcePrototype)) Object.defineProperty(presence, key, {value: undefined});
+      prototypes.set(sourcePrototype, presence);
+    }
+    prototype = presence;
+  }
+  const result: object = array ? [] : Object.create(prototype) as object;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Object.keys(descriptors)) {
+    if (array && key === "length") continue;
+    Object.defineProperty(result, key, {value: ownDataCopy(descriptors[key]!.value, mode, prototypes), enumerable: true, configurable: true, writable: true});
+  }
+  return result as T;
+}
+
 /** Strict structural validation of a CURRENT-schema (or already migrated) document. Located problems, all of them. */
-export function validateGame(x: unknown): Problem[] {
+export function validateGame(input: unknown): Problem[] {
   const out: Problem[] = [];
-  if (!isObj(x)) return [{ path: "$", message: "must be an object" }];
-  const schema = typeof x["schema"] === "number" ? x["schema"] : 0;
+  if (!isObj(input)) return [{ path: "$", message: "must be an object" }];
+  let x: Obj = input;
+  const schemaProperty = Object.getOwnPropertyDescriptor(x, "schema");
+  if (!schemaProperty || !("value" in schemaProperty)) return [{path: "$.schema", message: "schema must be an own data property"}];
+  const schema = typeof schemaProperty.value === "number" ? schemaProperty.value : 0;
   if (!isInt(x["schema"], 1)) out.push({ path: "$.schema", message: "must be a positive integer" });
+  else if (!SUPPORTED_SCHEMAS.includes(schema)) out.push({ path: "$.schema", message: `unsupported schema ${schema}` });
+  if (schema >= 7) { validatePlainData(x, "$", out); if (out.length) return out; x = ownDataCopy(x, "checks"); }
   const allowedTop = schema >= 5 ? [...TOP_KEYS.filter((k) => k !== "boxes"), "storage", "player", "nextMemberOrdinal"] : TOP_KEYS;
   if (schema >= 6) { allowedTop.splice(allowedTop.indexOf("bag"),1); allowedTop.push("inventory","badges"); }
   knownKeys(x, allowedTop, "$", out);
+  if (schema >= 7 && out.length) return out;
   const seen = new Set<string>();
   const validateAt = (m: unknown, path: string): void => {
     validateMember(m, path, out, schema);
@@ -174,35 +282,101 @@ export function validateGame(x: unknown): Problem[] {
     }
   }
   if (schema >= 6) {
+    if (schema >= 7 && isObj(x["inventory"])) {
+      const inventory = x["inventory"];
+      knownKeys(inventory, ["pockets", "lastPocket", "indices"], "$.inventory", out);
+      if (Array.isArray(inventory["pockets"])) for (const [i, pocket] of inventory["pockets"].entries()) if (Array.isArray(pocket)) for (const [j, slot] of pocket.entries()) if (isObj(slot)) knownKeys(slot, ["itemId", "quantity"], `$.inventory.pockets[${i}][${j}]`, out);
+    }
     out.push(...inventoryProblems(x['inventory']));
     if (!Array.isArray(x['badges']) || x['badges'].length < 8 || x['badges'].some(v => typeof v !== 'boolean')) out.push({path:'$.badges',message:'must be a boolean array with at least eight positions'});
   } else if (!isObj(x["bag"])) out.push({ path: "$.bag", message: "must be an object" });
   else for (const [k, v] of Object.entries(x["bag"] as Obj)) if (!isInt(v, 1)) out.push({ path: `$.bag.${k}`, message: "must be an integer >= 1 (empty entries are removed)" });
   if (!isInt(x["money"], 0)) out.push({ path: "$.money", message: "must be an integer >= 0" });
   const dex = x["dex"];
-  if (!isObj(dex)) out.push({ path: "$.dex", message: "must be {seen, owned}" });
+  if (schema >= 7) out.push(...dexStateProblems(dex));
+  else if (!isObj(dex)) out.push({ path: "$.dex", message: "must be {seen, owned}" });
   else for (const k of ["seen", "owned"]) {
     const l = dex[k];
     if (!Array.isArray(l) || l.some((s) => typeof s !== "string") || new Set(l).size !== l.length) out.push({ path: `$.dex.${k}`, message: schema >= 4 ? "must be an array of unique species content ids" : "must be an array of unique species names" });
   }
   if (!isObj(x["appliedBattles"])) out.push({ path: "$.appliedBattles", message: "must be an object" });
-  else for (const [id, v] of Object.entries(x["appliedBattles"])) if (!isObj(v) || typeof v["hash"] !== "string" || !/^[0-9a-f]{64}$/.test(v["hash"])) out.push({ path: `$.appliedBattles["${id}"]`, message: "must be {hash: 64 hex characters}" });
+  else for (const [id, v] of Object.entries(x["appliedBattles"])) if (!isObj(v) || !Object.hasOwn(v, "hash") || typeof v["hash"] !== "string" || !/^[0-9a-f]{64}$/.test(v["hash"])) out.push({ path: `$.appliedBattles["${id}"]`, message: "must be {hash: 64 hex characters}" });
+  if (schema >= 7 && isObj(x["appliedBattles"])) for (const [id, record] of Object.entries(x["appliedBattles"])) if (isObj(record)) knownKeys(record, ["hash"], `$.appliedBattles[${JSON.stringify(id)}]`, out);
   if (schema >= 3) {
     const claims = x["claims"];
     if (!isObj(claims)) out.push({ path: "$.claims", message: "must be an object (claim id -> {kind})" });
     else for (const [id, v] of Object.entries(claims)) {
       if (!CLAIM_ID.test(id)) out.push({ path: `$.claims["${id}"]`, message: "claim id must be 1-64 characters of A-Z a-z 0-9 # . _ : -" });
-      if (!isObj(v) || !CLAIM_KINDS.includes(v["kind"] as string) || Object.keys(v).length !== 1) out.push({ path: `$.claims["${id}"]`, message: `must be {kind: ${CLAIM_KINDS.map((k) => `"${k}"`).join(" | ")}}` });
+      if (!isObj(v) || !Object.hasOwn(v, "kind") || !CLAIM_KINDS.includes(v["kind"] as string) || Object.keys(v).length !== 1) out.push({ path: `$.claims["${id}"]`, message: `must be {kind: ${CLAIM_KINDS.map((k) => `"${k}"`).join(" | ")}}` });
     }
   }
+  if (schema >= 7 && isObj(x["stats"])) knownKeys(x["stats"], Object.keys(newStats()), "$.stats", out);
   if (schema >= 4) validateStats(x["stats"], x["steps"], out);
   return out;
+}
+
+/** Synchronous installation/save gate. It validates the present state; only migrateGame may change layouts. */
+export function validateGameContent(state: unknown, content: Content): Problem[] {
+  const out = validateGame(state);
+  if (out.length) return out;
+  const raw = state as Obj;
+  if (raw["schema"] !== SAVE_SCHEMA) return [{ path: "$.schema", message: "must migrate to schema 7 before installation or saving" }];
+  const doc = ownDataCopy(raw, "checks");
+  out.push(...dexContentProblems(content));
+  if (out.length) return out;
+  const catalog = catalogOf(content);
+  const moveDirectory = Object.values(content.moves ?? {});
+  const abilityDirectory = content.abilities;
+  const abilityKnown = (ability: string): boolean => abilityDirectory !== undefined
+    ? Object.values(abilityDirectory).some(entry => entry.id === ability || entry.name === ability)
+    : Object.values(content.species).some(species => [...(species.abilities ?? []), ...(species.hiddenAbilities ?? [])].includes(ability));
+  const moveKnown = (id: string): boolean => moveDirectory.some(move => move.id === id);
+  for (const { member, path } of persistentMembers(doc)) {
+    const m = member as unknown as Member;
+    const species = speciesDataOf(content, m);
+    if (!species) out.push({ path: `${path}.species`, message: "unmapped species/form; original save must be kept" });
+    // An explicitly empty/sparse author slot list can legitimately resolve to no ability (WP19).
+    // This is not permission for arbitrary empty overrides or a guessed slot on an old individual.
+    const legalEmpty = m.ability === "" && !!species && m.effectiveAbilityIndex === null &&
+      (m.abilityIndex === null ? [0, 1].some(slot => resolveAbility(m.personalID!, species, slot).ability === "") : resolveAbility(m.personalID!, species, m.abilityIndex!).ability === "");
+    if (!legalEmpty && !abilityKnown(m.ability)) out.push({ path: `${path}.ability`, message: "unmapped ability; a trusted legacy override still requires the checked ability directory" });
+    if (m.item && !itemOf(catalog, m.item)) out.push({ path: `${path}.item`, message: "unmapped held item" });
+    if (m.ball && !itemOf(catalog, m.ball)) out.push({ path: `${path}.ball`, message: "unmapped capture ball" });
+    for (const [i, move] of m.moves.entries()) {
+      const base = baseMovePp(content, move.id);
+      if (!moveKnown(move.id)) out.push({ path: `${path}.moves[${i}].id`, message: "unmapped move" });
+      else if (base === undefined || move.maxpp !== totalPp(base, move.ppUps ?? 0)) out.push({ path: `${path}.moves[${i}].maxpp`, message: "max PP does not match checked base PP and PP Ups" });
+    }
+    for (const [i, move] of m.firstMoves!.entries()) if (!moveKnown(move)) out.push({ path: `${path}.firstMoves[${i}]`, message: "unmapped first move" });
+  }
+  const inventory = doc["inventory"] as unknown as GameState["inventory"];
+  for (const [i, pocket] of inventory.pockets.entries()) for (const [j, slot] of pocket.entries()) if (!itemOf(catalog, slot.itemId)) out.push({ path: `$.inventory.pockets[${i}][${j}].itemId`, message: "unmapped item; original save must be kept" });
+  const dex = doc["dex"] as unknown as DexState;
+  const baseKnown = (id: string): boolean => !!speciesDataOf(content, { species: id, form: 0 });
+  for (const key of ["seen", "owned"] as const) dex[key].forEach((id, i) => { if (!baseKnown(id)) out.push({ path: `$.dex.${key}[${i}]`, message: "unmapped species content identity" }); });
+  for (const key of ["seenForms", "capturedCounts", "defeatedCounts"] as const) for (const id of Object.keys(dex[key])) if (!baseKnown(id)) out.push({ path: `$.dex.${key}[${JSON.stringify(id)}]`, message: "unmapped species content identity" });
+  // Named record keys and base keys remain distinct. Recognize both without merging or rewriting either history.
+  for (const [id, record] of Object.entries(dex.lastSeenForm)) {
+    const key = own(content.speciesKeys, id);
+    if (!speciesDataOf(content, { species: id, form: record.form }) && !(key && speciesDataOf(content, { ...key, form: record.form }))) out.push({ path: `$.dex.lastSeenForm[${JSON.stringify(id)}]`, message: "unmapped species/form record identity" });
+  }
+  if (dex.layoutIdentity !== content.regionalDex!.layoutIdentity) out.push({ path: "$.dex.layoutIdentity", message: "layout mismatch: explicit load migration is required before saving or installation" });
+  else out.push(...dexLayoutStateProblems(dex, content.regionalDex!));
+  return out;
+}
+
+/** An owned copy is the only value writers may serialize. Validation and the copy are synchronous; raw state is
+ * never passed to JSON/MZ encoding and is not mutated. This is not a migration, repair or persistent new format.
+ */
+export function snapshotForSave(state: unknown, content: Content): {ok: true; state: GameState} | {ok: false; problems: Problem[]} {
+  const problems = validateGameContent(state, content);
+  return problems.length ? {ok: false, problems} : {ok: true, state: ownDataCopy(state as GameState, "storage")};
 }
 
 export interface MigrateOptions {
   /** The current content's mapping from a Showdown species name to its persistent key; needed from schema 3 to 4. */
   speciesKey?: SpeciesKeyResolver;
-  /** Required for 4→5 individual defaults; already validated by the content consumption boundary. */
+  /** Required for 4→5 individual defaults and every schema 7 load; validated by the content boundary. */
   content?: Content;
 }
 
@@ -316,13 +490,26 @@ const MIGRATIONS: Record<number, Migrator> = {
     doc['badges']=Array(8).fill(false);delete doc['bag'];doc['schema']=6;
     notes.push('schema 6: single ordered inventory authority, badges default false, calculation nature has no override, unambiguous move PP metadata preserved');
   },
+  6: (doc, notes, options) => {
+    const content = options.content;
+    if (!content?.regionalDex) throw new MigrationRefused("needs-content", "schema 7 requires validated content and its current regional dex layout; nothing was changed");
+    const contentProblems = dexContentProblems(content);
+    if (contentProblems.length) throw new MigrationRefused("invalid", "schema 7 content layout is invalid; nothing was changed", contentProblems);
+    for (const { member } of persistentMembers(doc)) {
+      member["evolutionReadiness"] = "known";
+      member["cannotTrade"] = false;
+    }
+    doc["dex"] = createDexState(content, doc["dex"] as { seen: string[]; owned: string[] }, "migration");
+    doc["schema"] = 7;
+    notes.push("schema 7: existing readiness is known; cannotTrade defaults false; old seen/owned remain independent, no forms or counts were inferred; dex unlocks follow the declared legacy truth table");
+  },
 };
 
 export function migrateGame(raw: unknown, options: MigrateOptions = {}): MigrationResult {
   if (!isObj(raw)) return { ok: false, error: { code: "corrupt", message: "the save state is not an object (damaged or not a game state)" } };
   const found = raw["schema"];
   if (!isInt(found, 1)) return { ok: false, error: { code: raw["schema"] === undefined ? "corrupt" : "unknown-version", message: raw["schema"] === undefined ? "the save state has no schema version" : `unsupported schema value ${JSON.stringify(found)}`, found } };
-  if (found > GAME_SCHEMA) return { ok: false, error: { code: "unknown-version", message: `saved by a newer version (schema ${found}); this build understands up to ${GAME_SCHEMA}. Nothing was changed.`, found } };
+  if (found > SAVE_SCHEMA) return { ok: false, error: { code: "unknown-version", message: `saved by a newer version (schema ${found}); this build understands up to ${SAVE_SCHEMA}. Nothing was changed.`, found } };
   if (!SUPPORTED_SCHEMAS.includes(found)) return { ok: false, error: { code: "unknown-version", message: `schema ${found} is not a supported old version (supported: ${SUPPORTED_SCHEMAS.join(", ")})`, found } };
   const originalProblems = validateGame(raw);
   if (originalProblems.length) return { ok: false, error: { code: "invalid", message: `the original schema ${found} document is invalid; nothing was changed`, found, problems: originalProblems } };
@@ -332,7 +519,7 @@ export function migrateGame(raw: unknown, options: MigrateOptions = {}): Migrati
   for (const key of ["party", "boxes"]) if (Array.isArray(raw[key])) for (const member of raw[key]) if (isObj(member) && typeof member["id"] === "string") originalMembers.set(member["id"], member);
   const context: MigrationContext = { ...options, originalMembers };
   let v = found;
-  while (v < GAME_SCHEMA) {
+  while (v < SAVE_SCHEMA) {
     const step = MIGRATIONS[v];
     if (!step) return { ok: false, error: { code: "unknown-version", message: `no migration from schema ${v}`, found } };
     try { step(doc, notes, context); }
@@ -342,16 +529,23 @@ export function migrateGame(raw: unknown, options: MigrateOptions = {}): Migrati
     }
     v = doc["schema"] as number;
   }
-  const problems = validateGame(doc);
-  if (!problems.length && (found < 6 || options.content)) {
-    const catalog = catalogOf(options.content), inventory = (doc as unknown as GameState).inventory;
-    for (const [i,pocket] of inventory.pockets.entries()) for (const [j,slot] of pocket.entries()) {
-      const item = itemOf(catalog,slot.itemId);
-      if (!item) problems.push({path:`$.inventory.pockets[${i}][${j}].itemId`,message:'unmapped item; original save must be kept'});
-    }
+  if (!options.content?.regionalDex) return { ok: false, error: { code: "needs-content", message: "schema 7 loading requires validated content and its current dex layout; nothing was changed", found } };
+  const layoutProblems = dexContentProblems(options.content);
+  if (layoutProblems.length) return { ok: false, error: { code: "invalid", message: "current content layout or transition is invalid; nothing was changed", found, problems: layoutProblems } };
+  const dex = doc["dex"] as unknown as DexState, target = options.content.regionalDex;
+  let layoutMigrated = false;
+  if (dex.layoutIdentity !== target.layoutIdentity) {
+    const matches = (target.transitions ?? []).filter(t => t.from === dex.layoutIdentity && t.to === target.layoutIdentity);
+    if (matches.length !== 1) return { ok: false, error: { code: matches.length ? "invalid" : "needs-content", message: matches.length ? "ambiguous-layout-transition: exactly one declared transition is required; nothing was changed" : "layout-transition-missing: no declared one-hop transition; nothing was changed", found, problems: [{ path: "$.dex.layoutIdentity", message: matches.length ? "ambiguous-layout-transition" : "layout-transition-missing" }] } };
+    const oldProblems = dexLayoutStateProblems(dex, matches[0]!.oldLayout);
+    if (oldProblems.length) return { ok: false, error: { code: "invalid", message: "saved dex is invalid for its declared old layout; nothing was changed", found, problems: oldProblems } };
+    remapDexLayout(dex, target, matches[0]!, notes);
+    layoutMigrated = true;
+    notes.push(`schema 7 dex layout: applied declared one-hop transition ${matches[0]!.from} -> ${target.layoutIdentity}`);
   }
+  const problems = validateGameContent(doc, options.content);
   if (problems.length) return { ok: false, error: { code: "invalid", message: `the save state (schema ${found}) is structurally invalid: ${problems.length} problem(s); first: ${problems[0]!.path} ${problems[0]!.message}`, found, problems } };
-  return { ok: true, state: doc as unknown as GameState, from: found, to: GAME_SCHEMA, migrated: found !== GAME_SCHEMA, notes };
+  return { ok: true, state: doc as unknown as GameState, from: found, to: SAVE_SCHEMA, migrated: found !== SAVE_SCHEMA || layoutMigrated, notes };
 }
 
 /** Size of the replay ledger (appliedBattles): the growth that has to stay visible. */

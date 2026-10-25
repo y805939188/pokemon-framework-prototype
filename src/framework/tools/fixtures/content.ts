@@ -1,3 +1,4 @@
+import { dexLayoutIdentity } from "../../rules/dex-state.ts";
 import { legacyCatalog } from "../../rules/item-catalog.ts";
 /**
  * FIXTURE content (step 2.3): the synthetic test content. Base stats come from Showdown's gen8 data (cross-checked in
@@ -28,3 +29,8 @@ export const fixtureContent: Content = {
     Caterpie: { base: { hp: 45, atk: 30, def: 35, spa: 20, spd: 20, spe: 45 }, growth: "medium", baseExp: 39, evYield: { hp: 1 }, catchRate: 255, learnset: {} },
   },
 };
+
+// Explicit synthetic catalog/layout for current-schema headless fixtures, never a runtime content fallback.
+const national = Object.keys(fixtureContent.species);
+fixtureContent.regionalDex = { national, regions: [], layoutIdentity: dexLayoutIdentity({national, regions: []}) };
+fixtureContent.abilities = Object.fromEntries(["Blaze", "Torrent", "Overgrow", "Immunity", "Thick Fat", "Keen Eye", "Run Away", "Shield Dust", "Levitate", "Intimidate", "Static", "Poison Point", "Pressure", "Adaptability"].map(name => [name.toLowerCase().replace(/[^a-z0-9]/g, ""), {id: name.toLowerCase().replace(/[^a-z0-9]/g, ""), name}]));
