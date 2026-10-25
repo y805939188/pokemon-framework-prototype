@@ -107,13 +107,15 @@ test('assembly against the pinned Showdown data reproduces the step 2 fixture co
 	// the sample adds one thing the fixture does not have: the text key of each display name
 	// (and, since step 4, the data needed to create an individual: abilities, gender rule, content id; since step 5.0
 	// the form number of the record, which with the content id is the persistent key; since step 5.1
-	// the stable base-species rule identity, asserted separately below)
-	const withoutKeys = Object.fromEntries(Object.entries(content.species).map(([k, v]) => { const { nameKey, abilities, hiddenAbilities, gender, contentId, form, ruleSpecies, ...rest } = v; assert.equal(ruleSpecies, dex.species(k).baseSpecies); assert.equal(form, 0); assert.match(nameKey, /^species\.[a-z]+$/); return [k, rest]; }));
+	// the stable base-species rule identity; step 5.3 adds explicit static types and dex defaults, asserted below)
+	const withoutKeys = Object.fromEntries(Object.entries(content.species).map(([k, v]) => { const { nameKey, abilities, hiddenAbilities, gender, contentId, form, ruleSpecies, types, tutorMoves, displayForm, formName, dexSortKeys, ...rest } = v; assert.equal(ruleSpecies, dex.species(k).baseSpecies); assert.equal(form, 0); assert.match(nameKey, /^species\.[a-z]+$/); assert.deepEqual(types, dex.species(k).types); assert.deepEqual(tutorMoves, []); assert.equal(displayForm, 0); assert.equal(formName, null); assert.deepEqual(dexSortKeys, { zh: '其他' }); return [k, rest]; }));
 	assert.deepEqual(withoutKeys, E.fixtures.content.species, 'sample content == fixture content (same numbers, same Showdown base stats)');
 	assert.equal(content.meta.kind, 'sample'); assert.equal(content.meta.inputsHash, compiled.inputsHash);
 	assert.equal(E.fixtures.content.meta.kind, 'fixture', 'the fixture keeps a distinct identity');
 	assert.equal(loadCompiled(JSON.parse(JSON.stringify(compiled))).contentId, 'sample');
-	assert.throws(() => loadCompiled({ schema: 9 }), /not a schema 1 document/);
+	assert.equal(compiled.schema, 2, 'author schema 1 is rebuilt under compiled semantics 2');
+	assert.throws(() => loadCompiled({ ...compiled, schema: 1 }), /needs-rebuild: compiled content requires schema 2/);
+	assert.throws(() => loadCompiled({ schema: 9 }), /needs-rebuild: compiled content requires schema 2/);
 });
 
 test('assembly errors name the record and field', () => {
