@@ -586,7 +586,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         const g1 = clone(game());
         eq(g1.party.map((m: any) => [m.id, m.species, m.form, m.level, m.moves.map((x: any) => x.id)]), [["M1", "charmander", 0, 5, ["scratch", "growl", "ember"]]], "the starter comes from the content (stored by content id + form)");
         eq([I6.bagOf(g1), g1.claims, g1.money], [{ antidote: 2, pokeball: 10, potion: 5 }, { starter: { kind: "grant" } }, 3000], "items and the claim");
-        eq(g1.dex, { seen: ["charmander"], owned: ["charmander"] }, "the received species is seen and owned");
+        eq(g1.dex, { ...g0.dex, seen: ["charmander"], owned: ["charmander"] }, "grant updates seen/owned and preserves all current dex metadata");
         await runEvent(1);
         eq([W.PSFlow.lastClaim.status, G.$gameVariables.value(11)], ["already-claimed", 2], "the repeat is reported");
         eq(game(), g1, "the repeat changes nothing");
