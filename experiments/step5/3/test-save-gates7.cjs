@@ -182,3 +182,17 @@ test('native cross-realm arrays remain valid; overwritten foreign intrinsic trav
  const noPrototype=clone(good);Object.setPrototypeOf(noPrototype.party,null);
  assert.ok(E.saveSchema.validateGame(noPrototype).length);
 });
+
+for(const kind of ['array','record','accessor'])test(`inherited ${kind} JSON hook cannot overwrite a readable save`,()=>{
+ const good=E.fixtures.makeGame();
+ const foreign=vm.runInNewContext(`const g=JSON.parse(text);let calls=0;const p=kind==='array'?Array.prototype:Object.prototype;Object.defineProperty(p,'toJSON',kind==='accessor'?{get(){calls++;return undefined;},configurable:true}:{value:function(){calls++;return this===g.party||this===g?[null]:this;},configurable:true});({g,calls:()=>calls})`,{text:JSON.stringify(good),kind});
+ assert.ok(E.saveSchema.validateGameContent(foreign.g,E.fixtures.content).length);assert.equal(foreign.calls(),0);
+ const h=host();h.system._psGame=foreign.g;assert.throws(()=>h.context.DataManager.makeSaveContents());assert.equal(h.counts().made,0);assert.equal(foreign.calls(),0);
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-array-hook7-'));
+ try{const file=path.join(dir,'save.json'),store=new E.store.SaveStore(file,{},E.speciesKey.identityKeys,E.fixtures.content);store.save(good);const bytes=fs.readFileSync(file);assert.throws(()=>store.save(foreign.g));assert.deepEqual(fs.readFileSync(file),bytes);assert.equal(fs.existsSync(file+'.tmp'),false);assert.deepEqual(store.load(),good);assert.equal(foreign.calls(),0);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('non-callable inherited toJSON data is inert and remains readable',()=>{
+ const text=JSON.stringify(E.fixtures.makeGame()),foreign=vm.runInNewContext(`Object.defineProperty(Object.prototype,'toJSON',{value:0,configurable:true});JSON.parse(text)`,{text});
+ assert.deepEqual(E.saveSchema.validateGameContent(foreign,E.fixtures.content),[]);
+ assert.deepEqual(E.saveSchema.validateGameContent(JSON.parse(JSON.stringify(foreign)),E.fixtures.content),[]);
+});

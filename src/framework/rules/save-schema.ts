@@ -185,6 +185,16 @@ function validatePlainData(value: unknown, path: string, out: Problem[], ancesto
       out.push({path, message: "must be an own plain-data record"}); return;
     }
   }
+  // JSON resolves inherited toJSON too. A valid own-data document must not serialize as different data (or run an
+  // inherited accessor) after this gate. Resolve descriptors without executing the hook; non-callable data is inert.
+  for (let owner: object | null = value; owner !== null; owner = Object.getPrototypeOf(owner) as object | null) {
+    const hook = Object.getOwnPropertyDescriptor(owner, "toJSON");
+    if (!hook) continue;
+    if (!("value" in hook) || typeof hook.value === "function") {
+      out.push({path, message: "persistent data cannot use a JSON serialization hook"}); return;
+    }
+    break;
+  }
   ancestors.add(value);
   const descriptors = Object.getOwnPropertyDescriptors(value);
   for (const key of Reflect.ownKeys(value)) {
