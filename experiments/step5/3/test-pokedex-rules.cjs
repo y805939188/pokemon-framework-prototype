@@ -71,6 +71,21 @@ test('P53-31 PD26 original-name and display-name normalization are distinct; rec
   assert.deepEqual(normalizeDexAppearance(content,m,'register'),{species:'cake',gender:0,form:7,shiny:true});
   assert.deepEqual(normalizeDexAppearance(content,m,'recent'),{species:'cake',gender:2,form:0,shiny:true});
 });
+test('P53-45 F-01 typed normalize/recent → lastSeen → apply projects only schema fields and serializes without input changes', async () => {
+  const r=await rules,{dexState:b}=require('../../../js/engine/build/core.cjs');
+  const {spawnSync}=require('node:child_process'),{resolve}=require('node:path');
+  const typed=spawnSync(resolve(F.root,'src/node_modules/.bin/tsc'),['--noEmit','-p',resolve(__dirname,'fixtures/pokedex/tsconfig.composition.json')],{encoding:'utf8'});
+  assert.equal(typed.status,0,typed.stdout+typed.stderr);
+  const content=F.freeze({forms:{cake:{0:'Base',7:'Ruby',8:'Plain'}},species:{Base:{},Ruby:{formName:'Ruby Cream'},Plain:{pokedexForm:7}}});
+  const state=F.freeze(F.dex()),individual=F.freeze(F.appearance('cake',{gender:2,form:8,shiny:true}));
+  const recent=F.freeze(r.normalizeDexAppearance(content,individual,'recent')),before=JSON.stringify({content,state,individual,recent});
+  const plan=r.planDexLastSeen(state,recent.species,recent),next=r.applyDexPatch(state,plan.patch);
+  assert.equal(plan.status,'ok');assert.deepEqual(next.lastSeenForm.cake,{gender:2,form:0,shiny:true});
+  assert.deepEqual(Object.keys(plan.patch.lastSeenForm.cake).sort(),['form','gender','shiny']);
+  assert.deepEqual(b.dexStateProblems(next),[]);
+  const saved=JSON.parse(JSON.stringify(next));assert.deepEqual(b.dexStateProblems(saved),[]);assert.deepEqual(saved,next);
+  assert.equal(JSON.stringify({content,state,individual,recent}),before);
+});
 test('P53-31 PD27 reverse named-origin/unnamed-display fixture does not share the previous normalization', async () => {
   const {normalizeDexAppearance}=await rules;
   const content={forms:{x:{0:'Base',2:'Target',3:'Original'}},species:{Base:{},Target:{},Original:{formName:'Origin',pokedexForm:2}}};

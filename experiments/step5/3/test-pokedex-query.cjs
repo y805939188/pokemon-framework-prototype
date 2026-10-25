@@ -181,6 +181,22 @@ test('P53-36 PD32/33 nil and empty labels, equal-front fold and structural multi
   c.forms=c.forms.filter(f=>f.species!=='a'||f.form===0);delete c.forms[0].formName;opts.baseFrontsEqual=true;
   assert.deepEqual(q.dexForms(d,c,'a',opts),[{gender:0,form:0,label:''}]);
 });
+test('P53-36 F-02 named raw form with empty translation keeps one gender and cannot enable the selector', async () => {
+  const q=await query,content=F.freeze({regionalDex:{national:['x'],regions:[{id:0,species:['x']}]},forms:{x:{0:'X',1:'X-Tall'}},species:{X:{gender:128},'X-Tall':{gender:128,formName:'Tall',formNameKey:'form.tall',pokedexForm:1}}});
+  const c=F.freeze(q.createDexQueryCatalog(content,{'form.tall':''})),d=F.freeze(F.dex(c.layout,{seenForms:{x:[{gender:0,form:1,shiny:false},{gender:1,form:1,shiny:false}]},lastSeenForm:{x:{gender:1,form:1,shiny:true}}}));
+  const before=JSON.stringify({content,c,d}),choices=q.dexForms(d,c,'x',{showAll:false,gender:128,baseFrontsEqual:false});
+  assert.deepEqual(choices,[{gender:0,form:1,label:''}]);assert.deepEqual(q.planDexFormSelection(d,'x',choices).patch,{});
+  assert.equal(JSON.stringify({content,c,d}),before);
+});
+test('P53-36 F-02 empty raw base name with nonempty translation keeps both genders and enables the selector', async () => {
+  const q=await query,r=await rules,content=F.freeze({regionalDex:{national:['x'],regions:[{id:0,species:['x']}]},forms:{x:{0:'X'}},species:{X:{gender:128,formName:'',formNameKey:'form.base'}}});
+  const c=F.freeze(q.createDexQueryCatalog(content,{'form.base':'Base translated'})),d=F.freeze(F.dex(c.layout,{seenForms:{x:[{gender:0,form:0,shiny:false},{gender:1,form:0,shiny:false}]},lastSeenForm:{x:{gender:1,form:0,shiny:true}}}));
+  const before=JSON.stringify({content,c,d}),choices=q.dexForms(d,c,'x',{showAll:false,gender:128,baseFrontsEqual:false});
+  assert.deepEqual(choices,[{gender:0,form:0,label:'Base translated'},{gender:1,form:0,label:'Base translated'}]);
+  const selected=q.planDexFormSelection(d,'x',choices);assert.equal(selected.index,1);
+  assert.deepEqual(r.applyDexPatch(d,selected.patch).lastSeenForm.x,{gender:1,form:0,shiny:false});
+  assert.equal(JSON.stringify({content,c,d}),before);
+});
 test('P53-36 same-front female-only seen folds to male display; female species and genderless retain their query gates', async () => {
   const q=await query,c=F.catalog(),d=F.dex(c.layout,{seenForms:{a:[{gender:1,form:0,shiny:true}]}});
   const opts={showAll:false,gender:128,baseFrontsEqual:true};

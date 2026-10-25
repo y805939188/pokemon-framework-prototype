@@ -304,7 +304,7 @@ export function dexForms(dex: DexState, catalog: DexQueryCatalog, species: strin
       let text = label ?? (fold ? "One Form" : genderRule === "N" ? multi ? "One Form" : "Genderless" : gender === 0 ? "Male" : "Female");
       if (!multi && options.baseFrontsEqual) text = "";
       result.push({ gender: fold ? 0 : gender, form: data.form, label: text });
-      if (fold || Boolean(label)) break;
+      if (fold || Boolean(data.formName)) break;
     }
   }
   return result;

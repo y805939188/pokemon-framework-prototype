@@ -94,7 +94,7 @@ export function planDexLastSeen(dex: DexState, species: string, record: DexLastS
   const previouslyOwned = dex.owned.includes(species);
   if (!validSpecies(species) || !validRecord(record)) return { status: "invalid", patch: {}, changed: false, refreshAccessible: false, previouslyOwned, reason: "invalid last-seen key or record" };
   const changed = !equalRecord(own(dex.lastSeenForm, species), record);
-  return { status: "ok", patch: changed ? { lastSeenForm: { ...copyLastSeen(dex), [species]: { ...record } } } : {}, changed, refreshAccessible: false, previouslyOwned };
+  return { status: "ok", patch: changed ? { lastSeenForm: { ...copyLastSeen(dex), [species]: { gender: record.gender, form: record.form, shiny: record.shiny } } } : {}, changed, refreshAccessible: false, previouslyOwned };
 }
 
 export function dexLastSeen(dex: DexState, species: string): DexLastSeen {
