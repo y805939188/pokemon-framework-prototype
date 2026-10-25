@@ -1631,7 +1631,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       return {input: "actual MZ setupNewGame + normal app/content pipeline", layouts};
     });
     await scenario("B53-H02 real schema6 load: all metadata retained then current7 save", async () => {
-      fresh(); const B = api();
+      await toMap(); fresh(); const B = api();
       const six = clone(game()); six.schema = 6; six.dex = {seen: clone(six.dex.seen), owned: clone(six.dex.owned)};
       for (const member of B.storage.allMembers(six)) {delete member.evolutionReadiness; delete member.cannotTrade;}
       six.party[0].readyToEvolve = true; six.party[0].abilityIndex = null; six.party[0].effectiveAbilityIndex = null; six.party[0].friendship = 256;
@@ -1665,6 +1665,10 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         try {
           eq(G.$gameSystem.isSaveEnabled(), false, "actual menu permission is masked");
           for (const slot of [54, 55, 56, 0]) {let refused = false; try {await G.DataManager.saveGame(slot);} catch {refused = true;} assert(refused, `direct/autosave destination ${slot} rejected`);}
+          let menuFailed = 0, autoFailed = 0;
+          G.Scene_Save.prototype.executeSave.call({onSaveSuccess: () => {throw new Error("bad save unexpectedly succeeded");}, onSaveFailure: () => {menuFailed++;}}, 55);
+          G.Scene_Base.prototype.executeAutosave.call({onAutosaveSuccess: () => {throw new Error("bad autosave unexpectedly succeeded");}, onAutosaveFailure: () => {autoFailed++;}});
+          await waitFor(() => menuFailed === 1 && autoFailed === 1, "actual menu save/autosave failure callbacks");
           eq([storageCalls, makeCalls], [0, 0], "save checks reject before serialization/storage entries");
           let snapshotRefused = false; try {make.call(G.DataManager);} catch {snapshotRefused = true;} assert(snapshotRefused, "direct makeContents also rejects before underlying snapshot");
           eq(saveFileHashes(), hashes, "loaded source, occupied target, global and absent target unchanged");
@@ -1673,14 +1677,13 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       }
       G.$gameSystem._psGame = good; await settledSave(54);
       await G.DataManager.loadGame(54); eq(game(), good, "restored legal in-memory state can save and load again");
-      return {input: "actual MZ menu permission + saveGame destinations including autosave0", note: "exact base function counters separately VM-tested; actual host measures serialization and disk entry zero", outcomes};
+      return {input: "actual MZ menu permission, Scene_Save.executeSave and Scene_Base.executeAutosave with programmatic completion callbacks, plus direct saveGame", note: "exact base function counters separately VM-tested; actual host measures serialization and disk entry zero", outcomes};
     });
     await scenario("B53-H03 actual heal/preserve and empty legacy save load", async () => {
       const B = api(), content = W.PSFlow.content(), member = clone(game().party[0]); member.readyToEvolve = true; member.evolutionReadiness = "unknown";
       eq([B.heal.healMember(member, content).readyToEvolve, B.heal.healMember(member, content).evolutionReadiness], [false, "known"], "ordinary heal clears both");
       const preserved = B.heal.healMember(member, content, {preserveReadyToEvolve: true}); eq([preserved.readyToEvolve, preserved.evolutionReadiness], [true, "unknown"], "box heal preserves both");
       const sys = G.$gameSystem, original = sys._psGame; delete sys._psGame;
-      let contents: any; try {contents = G.DataManager.makeSaveContents();} catch { /* missing state is deliberately unsaveable through ordinary API */ }
       // Invoke the actual extraction lifecycle with MZ objects, no disk save of the missing state.
       const normal = {system: sys, screen: G.$gameScreen, timer: G.$gameTimer, switches: G.$gameSwitches, variables: G.$gameVariables, selfSwitches: G.$gameSelfSwitches, actors: G.$gameActors, party: G.$gameParty, map: G.$gameMap, player: G.$gamePlayer};
       G.DataManager.extractSaveContents(normal); assert(!G.$gameSystem._psSaveError, "empty legacy host initialized"); eq(game().schema, 7, "empty host is7"); eq(game().party, [], "never invent members");

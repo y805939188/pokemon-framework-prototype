@@ -1,0 +1,19 @@
+{
+  "source": "author-placeholder",
+  "regions": [
+    {
+      "id": 0,
+      "nameKey": "region.sample",
+      "species": [
+        "charizard",
+        "blastoise",
+        "venusaur",
+        "snorlax",
+        "gengar",
+        "pidgey",
+        "caterpie",
+        "charmander"
+      ]
+    }
+  ]
+}

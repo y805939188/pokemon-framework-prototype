@@ -118,7 +118,7 @@ test('D-03 missing source, missing or changed expected files, wrong directory an
 });
 test('D-03 source wiring guard: verify-save reads every expected state through the explicit source (not a behaviour test)',()=>{
  const s=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlowTest.ts'),'utf8');
- assert.equal((s.match(/readExpected\("ps-flow-expected[a-z0-9-]*\.json"\)/g)||[]).length,5); // four existing restarts plus the isolated 5.3 capability save
+ assert.equal((s.match(/readExpected\("ps-flow-expected[a-z0-9-]*\.json"\)/g)||[]).length,6); // four historic restarts, capability and progression-data producer saves
  assert.match(s,/readExpected\("ps-flow-expected-capability\.json"\)/);
  assert.doesNotMatch(s,/readFileSync\(path\.join\(path\.dirname\(OUT \|\| "\."\), "ps-flow-expected/);
  assert.match(s,/const dir = EXPECTED_DIR \?\? path\.dirname\(OUT \|\| "\."\), file = path\.join\(dir, name\);/);

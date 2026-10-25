@@ -1,0 +1,13 @@
+{
+  "source": "author-placeholder",
+  "regions": [
+    {
+      "id": 0,
+      "nameKey": "region.sample",
+      "species": [
+        "charmander",
+        "charizard"
+      ]
+    }
+  ]
+}

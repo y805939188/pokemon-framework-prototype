@@ -38,7 +38,7 @@ test.after(() => { if (dir) fs.rmSync(dir, { recursive: true, force: true }); })
 /** A loser's state: one member at 1 HP, 500 money. */
 function losingGame() {
   const m = E.memberFactory.createMember({ id: 'S-1', species: 'Snorlax', level: 2 }, content, lcg(3)); m.hp = 1;
-  return E.state.newGame({ party: [E.speciesKey.toPersistentMember(m, content)], money: 500 }); // stored by content id + form (D5-3)
+  return E.state.newGame({ content, party: [E.speciesKey.toPersistentMember(m, content)], money: 500 }); // stored by content id + form (D5-3)
 }
 const lost = battleId => ({ protocol: 1, battleId, outcome: { kind: 'win', winner: 'Wild' }, members: { 'S-1': { hp: 0 } }, bag: {}, captured: [], dex: { seen: ['Pidgey'], owned: [] } });
 const ran = battleId => ({ protocol: 1, battleId, outcome: { kind: 'run', winner: null }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] } });

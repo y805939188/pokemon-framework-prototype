@@ -73,6 +73,8 @@ async function child(mode, entry, pluginDir) {
   if (mode === 'malformed') sd.usageCheck = { decision: 'internal-use' };
   plugins = readPlugins(pluginDir);
   const h = host(E.state.newGame({ party: [], money: 0 }));
+  // Bind this empty test state to the already compiled layout without warming any external Dex data.
+  h.sys._psGame.dex.layoutIdentity = compiled.regionalDex.layoutIdentity;
   const before = JSON.stringify(h.sys._psGame);
   let result, error;
   try {
@@ -132,7 +134,7 @@ async function matrixChild(shape, mode, entry, pluginDir) {
     process.on('exit', code => {
       try {
         assert.equal(code, accepted ? 0 : 1); assert.equal(fs.existsSync(output), accepted);
-        assert.equal(dataModules().length > 0, accepted && shape !== 'empty' && entry === 'inventory');
+        assert.equal(dataModules().length > 0, accepted && shape !== 'empty' && (entry === 'inventory' || entry === 'build'));
         if (accepted && entry === 'inventory') {
           const report = JSON.parse(fs.readFileSync(output, 'utf8'));
           assert.equal(report.summary.species, source.species.length);
@@ -166,7 +168,7 @@ async function matrixChild(shape, mode, entry, pluginDir) {
     }
   } catch (e) { error = String(e.message); }
   if (entry === 'old-party') assert.ok(error, 'the missing species blocks a battle, without a move lookup');
-  else if (entry === 'assemble') assert.equal(result.errors.length === 0, accepted);
+  else if (entry === 'assemble') { assert.equal(error === undefined && result.errors.length === 0, accepted); if (!accepted) assert.ok(error || result.errors.length); }
   else assert.equal(error === undefined, accepted);
   assert.equal(dataModules().length > 0, accepted && shape !== 'empty');
   if (accepted && entry !== 'old-party') {
