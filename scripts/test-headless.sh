@@ -79,6 +79,10 @@ SUITES=(
   experiments/step5/3/test-capability-seam.cjs
   experiments/step5/3/test-friendship.cjs
   experiments/step5/3/test-learning-candidates.cjs
+  experiments/step5/3/test-learning-plans.cjs
+  experiments/step5/3/test-evolution-rules.cjs
+  experiments/step5/3/test-evolution-success.cjs
+  experiments/step5/3/test-CD-core-integration.cjs
   experiments/step5/3/test-content7.cjs
   experiments/step5/3/test-pbs7.cjs
   experiments/step5/3/test-migration7.cjs

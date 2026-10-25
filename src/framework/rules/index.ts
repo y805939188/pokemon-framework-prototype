@@ -43,3 +43,9 @@ export * as shop from './shop.ts';
 
 export * as dexState from "./dex-state.ts";
 export * as evolutionReadiness from "./evolution-readiness.ts";
+
+// Step5.3 accepted C/D pure modules; application installation remains an E responsibility.
+export * as friendship from "./friendship.ts";
+export * as learning from "./learning.ts";
+export * as evolution from "./evolution.ts";
+export * as evolutionSuccess from "./evolution-success.ts";
