@@ -1,0 +1,14 @@
+{
+  "basis": "Formal sanitized specifications and approved 5.3 r3 section 6.1; derived expectations, not original runtime observations.",
+  "scope": "C pure rules only. Application, live battle, UI, save and restart evidence remain E/G/H/I work.",
+  "groups": [
+    {"p53":"P53-10","vectors":["GR-27","GR-28","HP-05","HP-06","HP-17","HP-18"],"tests":"empty slot / known / egg / Shadow / fresh PP / zero moves / member and draft"},
+    {"p53":"P53-11","vectors":["GR-25","GR-26","GR-51","A19","A20","A21","A22","A31","A33"],"tests":"full replacement / HM selection / fifth row / decline No and Yes / sequential current moves"},
+    {"p53":"P53-12","vectors":["IU-18","IU-19","IU-20","IU-21","IU-22","IU-24","IU-25","IU-50","IU-52","IU-57","IU-58","GR-51"],"tests":"Bag TM/HM/TR identity, consumption, old PP, full-slot machine friendship intent, long firstMoves"},
+    {"p53":"P53-13","vectors":["IU-50","IU-57","IU-58","GR-51"],"tests":"Party machine lacks Bag statistics and TR record; shares PP and friendship branch"},
+    {"p53":"P53-14","vectors":["GR-29","GR-30","GR-31","GR-32","GR-33","GR-34","GR-49","GR-50","GR-52"],"tests":"existing test-learning-candidates.cjs unchanged, plus successful reminder source"},
+    {"p53":"P53-15","vectors":["U10-RL01","U10-RL02","U10-RL03","U10-RL04","U10-RL05","U10-RL06","U10-RL07","U10-RL08","U10-RL09","GR-50","GR-52"],"tests":"empty safe result / reject teaching / inner give-up / exit No and Yes / reminder statistics"},
+    {"p53":"P53-16","vectors":["A19","A20","A21","A22","A31","A33","B16-C126"],"tests":"tutor statistics and no record, independent forgetting permits HM, approved last-move protection, historical zero moves"}
+  ],
+  "qualifications": "Names above map the tested rule portions only; UI input, annotations, battle synchronization and source authority are not signed off by these pure tests. Existing friendship tests cover P53-09 without modifying the algorithm."
+}
