@@ -31,6 +31,19 @@
   const schema = (): any => nodeRequire("./js/engine/build/engine.cjs").saveSchema;
   const state = (): any => nodeRequire("./js/engine/build/engine.cjs").state;
 
+  // JsonEx reserves `constructor` and `@` for class metadata. Framework dictionaries allow both as data IDs.
+  // Keep the validated plain snapshot opaque to JsonEx; Game_System itself retains its normal class envelope.
+  // This is a host encoding version, independent of the game schema. Older unwrapped saves still load below.
+  const encoding = "pokemon-framework-json";
+  const unpack = (raw: any): any => {
+    if (!raw || typeof raw !== "object" || Object.getOwnPropertyDescriptor(raw, "encoding")?.value !== encoding) return raw;
+    const descriptors = Object.getOwnPropertyDescriptors(raw);
+    if (Object.keys(descriptors).length !== 3 || descriptors.version?.value !== 1 || typeof descriptors.data?.value !== "string") {
+      throw new Error("unsupported or malformed framework save encoding; original document retained");
+    }
+    return JSON.parse(descriptors.data.value);
+  };
+
   const PSState: any = (W.PSState = {
     lastSaveError: null as any,
     lastSave: null as any,
@@ -60,7 +73,13 @@
         sys._psSaveInfo = { from: null, to: empty.schema, migrated: false, created: "empty", notes: ["the save had no framework state: an empty one was created from validated content"] };
         return;
       }
-      const r = schema().migrateGame(sys._psGame, { ...(speciesKey ? { speciesKey } : {}), ...(content ? { content } : {}) });
+      let document: any;
+      try { document = unpack(sys._psGame); } catch (error) {
+        sys._psSaveError = {code: "invalid", message: `framework save encoding could not be read; original document retained: ${String(error instanceof Error ? error.message : error)}`};
+        console.error("PS_SaveState: save state not usable:", sys._psSaveError.code, sys._psSaveError.message);
+        return;
+      }
+      const r = schema().migrateGame(document, { ...(speciesKey ? { speciesKey } : {}), ...(content ? { content } : {}) });
       if (r.ok) {
         sys._psGame = r.state; // a legitimate explicit layout conversion may also replace a current-version document
         sys._psSaveInfo = { from: r.from, to: r.to, migrated: r.migrated, notes: r.notes };
@@ -134,7 +153,7 @@
     const contents = baseMake.call(this);
     if (!contents?.system || typeof contents.system !== "object") throw new Error("state-unusable: save contents have no Game_System");
     const descriptors = Object.getOwnPropertyDescriptors(contents.system);
-    descriptors._psGame = {value: snapshot, enumerable: true, configurable: true, writable: true};
+    descriptors._psGame = {value: {encoding, version: 1, data: JSON.stringify(snapshot)}, enumerable: true, configurable: true, writable: true};
     contents.system = Object.create(Object.getPrototypeOf(contents.system), descriptors);
     return contents;
   };

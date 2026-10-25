@@ -1679,7 +1679,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         assert(captured.system !== G.$gameSystem && captured.system._psGame !== foreign.g, "save envelope owns a separate verified state");
         foreign.g.money++;
         await G.StorageManager.saveObject("file58", captured);
-        for (const slot of [57, 58]) eq((await G.StorageManager.loadObject(`file${slot}`)).system._psGame, snapshotExpected, "actual MZ encoder/decoder preserved the verified values");
+        for (const slot of [57, 58]) {const wire = (await G.StorageManager.loadObject(`file${slot}`)).system._psGame; eq([wire.encoding, wire.version], ["pokemon-framework-json", 1], "versioned host encoding"); eq(JSON.parse(wire.data), snapshotExpected, "actual MZ encoder/decoder preserved the verified values");}
         eq(foreign.calls(), 0, "actual MZ serialization never executes raw tag/name/iterator hooks");
         eq(foreign.g.money, snapshotExpected.money + 1, "encoding did not replace or normalize the raw state");
         ownedSnapshot = {slots: [57, 58], hookCalls: foreign.calls(), detachedMoney: snapshotExpected.money};
@@ -1744,6 +1744,26 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       G.$gameSystem._psGame = original;
       return {input: "real host heal API and DataManager.extractSaveContents", emptyCreated: G.$gameSystem._psSaveInfo?.created};
     });
+    await scenario("B53-H06 actual JsonEx: both reserved ledger orders and grant claims survive save/replay", async () => {
+      const B = api(), content = W.PSFlow.content(), expectedPath = path.join(path.dirname(OUT || "."), "ps-flow-expected-progression-data.json");
+      const expected = JSON.parse(fs.readFileSync(expectedPath, "utf8")), cases: any[] = [];
+      const raw = (id: string) => ({protocol: 1, battleId: id, outcome: {kind: "run", winner: null}, members: {}, bag: {}, captured: [], dex: {seen: [], owned: []}, money: 7});
+      // A removed grant remains claimed too: a legal claim does not depend on a currently published reward catalog.
+      const grantIds = ["constructor", "__proto__", "toJSON", "#.:_-"], grantContent = {...content, grants: Object.fromEntries(grantIds.map(id => [id, {members: [], items: {}, money: 3}]))};
+      for (const [index, ids] of [["constructor", "@"], ["@", "constructor"]].entries()) {
+        let next = clone(expected.state); delete next.appliedBattles.constructor;
+        for (const id of ids) {const r = B.state.applyBattleResult(next, raw(id), undefined, undefined, {content}); eq(r.status, "applied", "normal public battle result creates the claim"); next = r.state;}
+        for (const id of grantIds) {const r = B.grants.applyGrant(next, id, grantContent, () => 0); eq(r.status, "applied", "normal public grant creates the claim"); next = r.state;}
+        const slot = 59 + index, original = clone(next); G.$gameSystem._psGame = next;
+        await settledSave(slot); await G.DataManager.loadGame(slot); assert(!G.$gameSystem._psSaveError, JSON.stringify(G.$gameSystem._psSaveError));
+        eq(game(), original, "real encode/decode/load retains every data key and hash");
+        for (const id of ids) {const r = B.state.applyBattleResult(game(), raw(id), undefined, undefined, {content}); eq(r.status, "already-applied", "battle cannot pay twice"); eq(r.state, original, "no second resource change");}
+        for (const id of grantIds) {const r = B.grants.applyGrant(game(), id, grantContent, () => 0); eq(r.status, "already-claimed", "grant cannot pay twice"); eq(r.state, original, "no second grant resource change");}
+        cases.push({slot, ids, grantIds, state: original});
+      }
+      expected.ledgerCases = cases; expected.savedHashes = saveFileHashes(); fs.writeFileSync(expectedPath, JSON.stringify(expected));
+      return {input: "normal applyBattleResult/applyGrant + actual MZ saveGame/loadGame", cases: cases.map(({state, ...rest}) => ({...rest, money: state.money, ledgerKeys: Object.keys(state.appliedBattles), claimKeys: Object.keys(state.claims)}))};
+    });
     await shot("B53-progression-data");
   }
 
@@ -1802,6 +1822,11 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
           G.DataManager.setupNewGame(); await G.DataManager.loadGame(slot); assert(!G.$gameSystem._psSaveError, JSON.stringify(G.$gameSystem._psSaveError));
           eq(game(), expected.state, "fresh process rereads exact primary state and schema7 metadata");
           assert(!game().battleEvidence && api().storage.allMembers(game()).every((m: any) => (m.evolutionReadiness === "known" || m.readyToEvolve && m.evolutionReadiness === "unknown")), "legal R state and no transient companion"); loaded.push(slot);
+        }
+        for (const entry of expected.ledgerCases || []) {
+          G.DataManager.setupNewGame(); await G.DataManager.loadGame(entry.slot); assert(!G.$gameSystem._psSaveError, JSON.stringify(G.$gameSystem._psSaveError)); eq(game(), entry.state, "new process retained legal reserved IDs");
+          for (const id of entry.ids) {const raw = {protocol: 1, battleId: id, outcome: {kind: "run", winner: null}, members: {}, bag: {}, captured: [], dex: {seen: [], owned: []}, money: 7}; const r = api().state.applyBattleResult(game(), raw, undefined, undefined, {content: W.PSFlow.content()}); eq(r.status, "already-applied", "new process refuses duplicate battle payoff"); eq(r.state, entry.state, "new process has no duplicate resource change");}
+          for (const id of entry.grantIds) {const r = api().grants.applyGrant(game(), id, W.PSFlow.content(), () => 0); eq(r.status, "already-claimed", "new process refuses duplicate grant even if no longer published"); eq(r.state, entry.state, "new process has no duplicate grant change");} loaded.push(entry.slot);
         }
         eq(saveFileHashes(), expected.savedHashes, "reading both good slots did not write any original file");
         return {input: "new NW process, real MZ load API", slots: loaded, layout: game().dex.layoutIdentity, identity: W.PSFlow.content().meta};

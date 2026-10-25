@@ -19,8 +19,7 @@ test.before(() => {
 });
 test.after(() => { if (temporary) fs.rmSync(temporary, {recursive:true,force:true}); });
 
-function host() {
-  const content = E.fixtures.content;
+function host(content = E.fixtures.content) {
   let current = E.fixtures.makeGame();
   let saved = 0, made = 0, replacements = 0, unavailable = false, pending = false;
   function System() {}
@@ -211,9 +210,9 @@ test('validation view preserves invalid primitives instead of repairing them wit
 
 function actualMZJsonEx(){
  const core=fs.readFileSync(path.join(ROOT,'js/reactor_core.js'),'utf8');
- const start=core.indexOf('function JsonEx()'),end=core.indexOf('JsonEx._decode = function');
+ const start=core.indexOf('function JsonEx()'),end=core.indexOf('//-----------------------------------------------------------------------------',core.indexOf('JsonEx._decode = function'));
  assert.ok(start>=0&&end>start,'pinned actual MZ serializer source is installed');
- return vm.runInNewContext(core.slice(start,end)+'\nJsonEx');
+ return vm.runInNewContext(core.slice(start,end)+'\nJsonEx',{window:{}});
 }
 test('optional inherited fields remain rejected in the own-data view without calling their getters',()=>{
  for(const key of ['nickname','statusCount']){
@@ -228,7 +227,7 @@ test('both writers use an owned verified snapshot, including actual MZ serialize
   const f=vm.runInNewContext(`const g=JSON.parse(text);let calls=0;if(hook==='tag')Object.defineProperty(Array.prototype,Symbol.toStringTag,{get(){calls++;if(this===g.party)delete g.party[1].cannotTrade;return 'Array'},configurable:true});else Object.defineProperty(Object.prototype,'name',{get(){calls++;delete g.party[1].cannotTrade;return 'Bad'},configurable:true});({g,calls:()=>calls})`,{text:JSON.stringify(good),hook});
   h.system._psGame=f.g;const contents=h.context.DataManager.makeSaveContents();
   assert.notEqual(contents.system,h.system);assert.equal(Object.getPrototypeOf(contents.system),Object.getPrototypeOf(h.system));assert.notEqual(contents.system._psGame,f.g);
-  const encoded=actualMZJsonEx().stringify(contents),parsed=JSON.parse(encoded).system._psGame;
+  const encoded=actualMZJsonEx().stringify(contents),parsed=storedFramework(actualMZJsonEx().parse(encoded).system._psGame);
   assert.deepEqual(parsed,good);assert.equal(f.calls(),0);assert.equal(Object.hasOwn(f.g.party[1],'cannotTrade'),true);assert.equal(Object.hasOwn(h.system,'@'),false);
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-owned-snapshot7-'));
   try{const store=new E.store.SaveStore(path.join(dir,'save.json'),{},E.speciesKey.identityKeys,h.content);store.save(f.g);assert.deepEqual(store.load(),good);assert.equal(f.calls(),0);}finally{fs.rmSync(dir,{recursive:true,force:true});}
@@ -239,7 +238,7 @@ test('snapshot is detached, preserves legal dictionary keys and rejects extra le
  Object.defineProperty(raw.appliedBattles,'constructor',{value:{hash:'0'.repeat(64)},enumerable:true});
  Object.defineProperty(raw.appliedBattles,'__proto__',{value:{hash:'1'.repeat(64)},enumerable:true});
  const expected=clone(raw),contents=h.context.DataManager.makeSaveContents();raw.party[0].cannotTrade=true;
- assert.deepEqual(JSON.parse(actualMZJsonEx().stringify(contents)).system._psGame,expected,'the exact verified values are owned by the pending contents');
+ assert.deepEqual(storedFramework(actualMZJsonEx().parse(actualMZJsonEx().stringify(contents)).system._psGame),expected,'the exact verified values are owned by the pending contents');
  assert.equal(raw.party[0].cannotTrade,true);assert.equal(Object.hasOwn(raw.appliedBattles,'@'),false);
  const bad=clone(expected);bad.appliedBattles.constructor.name='Bad';assert.ok(E.saveSchema.validateGameContent(bad,h.content).some(p=>p.path.endsWith('.name')));
 });
@@ -251,4 +250,52 @@ test('SaveStore never reads raw schema accessors before its shared gate',()=>{
 
 test('fake intrinsic constructor metadata is rejected without executing a prototype getter',()=>{
  const g=E.fixtures.makeGame();let calls=0;const ctor=()=>{};Object.defineProperty(ctor,'prototype',{get(){calls++;return proto;}});const proto=Object.assign(Object.create(null),{constructor:ctor});Object.setPrototypeOf(g.party[0],proto);assert.ok(E.saveSchema.validateGame(g).length);assert.equal(calls,0);
+});
+
+
+// Only the MZ wire envelope changes; the decoded owned game and SaveStore keep schema7.
+function storedFramework(raw) {
+ assert.equal(raw.encoding,'pokemon-framework-json');assert.equal(raw.version,1);
+ assert.deepEqual(Object.keys(raw).sort(),['data','encoding','version']);
+ return JSON.parse(raw.data);
+}
+function battleResult(id,money=0) {
+ return {protocol:1,battleId:id,outcome:{kind:'run',winner:null},members:{},bag:{},captured:[],dex:{seen:[],owned:[]},money};
+}
+for(const ids of [['normal'],['@'],['constructor'],['constructor','@'],['@','constructor']])test(`actual JsonEx full round trip retains legal battle IDs ${ids.join(' then ')} and replay`,()=>{
+ const h=host();let g=h.system._psGame;
+ const results=ids.map(id=>battleResult(id,id==='@'?7:0));
+ for(const result of results){const applied=E.state.applyBattleResult(g,result,undefined,undefined,{content:h.content});assert.equal(applied.status,'applied');g=applied.state;}
+ const expected=clone(g);h.system._psGame=g;
+ const J=actualMZJsonEx(),pending=h.context.DataManager.makeSaveContents(),text=J.stringify(pending),contents=J.parse(text);
+ assert.deepEqual(storedFramework(contents.system._psGame),expected);
+ assert.deepEqual(g,expected,'encoding leaves the live state unchanged');
+ h.system._psGame=contents.system._psGame;h.context.DataManager.extractSaveContents(contents);
+ assert.equal(h.system._psSaveError,undefined);assert.deepEqual(h.system._psGame,expected);
+ for(const result of results){const again=E.state.applyBattleResult(h.system._psGame,result,undefined,undefined,{content:h.content});assert.equal(again.status,'already-applied');assert.deepEqual(again.state,expected);}
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-jsonex-ledger7-'));
+ try{const store=new E.store.SaveStore(path.join(dir,'save.json'),{},E.speciesKey.identityKeys,h.content);store.save(g);assert.deepEqual(store.load(),expected);assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir,'save.json'),'utf8')),expected);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('legal reserved and punctuation grant IDs and ledger IDs survive JsonEx without a second reward',()=>{
+ const ids=['constructor','__proto__','toJSON','#.:_-'];
+ const content={...E.fixtures.content,grants:Object.fromEntries(ids.map(id=>[id,{members:[],items:{},money:3}]))},h=host(content);
+ let g=h.system._psGame;
+ for(const id of ids){const grant=E.grants.applyGrant(g,id,content,()=>0);assert.equal(grant.status,'applied');g=grant.state;const battle=E.state.applyBattleResult(g,battleResult(id,7),undefined,undefined,{content});assert.equal(battle.status,'applied');g=battle.state;}
+ const expected=clone(g);assert.deepEqual(E.saveSchema.validateGameContent(g,content),[]);h.system._psGame=g;
+ const J=actualMZJsonEx(),contents=J.parse(J.stringify(h.context.DataManager.makeSaveContents()));
+ h.system._psGame=contents.system._psGame;h.context.DataManager.extractSaveContents(contents);assert.equal(h.system._psSaveError,undefined);assert.deepEqual(h.system._psGame,expected);
+ for(const id of ids){const again=E.grants.applyGrant(h.system._psGame,id,content,()=>0);assert.equal(again.status,'already-claimed');assert.deepEqual(again.state,expected);const replay=E.state.applyBattleResult(h.system._psGame,battleResult(id,7),undefined,undefined,{content});assert.equal(replay.status,'already-applied');assert.deepEqual(replay.state,expected);}
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-jsonex-claims7-'));
+ try{const store=new E.store.SaveStore(path.join(dir,'save.json'),{},E.speciesKey.identityKeys,content);store.save(g);assert.deepEqual(store.load(),expected);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+for(const [name,raw] of [
+ ['unknown encoding version',{encoding:'pokemon-framework-json',version:2,data:'{}'}],
+ ['non-string encoding data',{encoding:'pokemon-framework-json',version:1,data:{schema:7}}],
+ ['truncated encoding data',{encoding:'pokemon-framework-json',version:1,data:'{'}],
+ ['extra encoding field',{encoding:'pokemon-framework-json',version:1,data:'{}',extra:true}],
+ ['invalid decoded state',{encoding:'pokemon-framework-json',version:1,data:'{"schema":7}'}],
+])test(`unreadable host envelope (${name}) retains raw document and blocks every writer`,async()=>{
+ const h=host();h.system._psGame=raw;const before=JSON.stringify(raw);h.context.DataManager.extractSaveContents({});
+ assert.equal(h.system._psGame,raw);assert.equal(JSON.stringify(raw),before);assert.ok(h.system._psSaveError);assert.equal(h.system.isSaveEnabled(),false);
+ await assert.rejects(h.context.DataManager.saveGame(54));assert.throws(()=>h.context.DataManager.makeSaveContents());assert.equal(h.counts().saved,0);assert.equal(h.counts().made,0);
 });
