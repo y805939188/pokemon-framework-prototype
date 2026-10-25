@@ -77,6 +77,8 @@ SUITES=(
   experiments/step5/2/test-D-remediation.cjs
   experiments/step5/2/test-inventory-ui.cjs
   experiments/step5/3/test-capability-seam.cjs
+  experiments/step5/3/test-friendship.cjs
+  experiments/step5/3/test-learning-candidates.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do
