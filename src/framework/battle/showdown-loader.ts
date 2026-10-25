@@ -7,6 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ShowdownSim } from "./showdown-types.ts";
+import type { FormatObserver } from "../rules/battle-evidence.ts";
 
 // The bundle is CommonJS, so the real Node `require` is in scope here (and is the one NW.js gives to the page).
 const nodeRequire: NodeJS.Require = require;
@@ -35,6 +36,6 @@ export function readEngineSha(root: string): string {
 }
 
 /** The staged RPG format extension (a copy of the custom-formats build); it owns the non-serialized hooks table. */
-export function loadFormatExtension(root: string): { hooks: WeakMap<object, (e: unknown) => void> } {
+export function loadFormatExtension(root: string): { hooks: WeakMap<object, (e: unknown) => void>; observers: WeakMap<object, FormatObserver> } {
   return nodeRequire(path.join(root, "dist", "config", "custom-formats.js"));
 }

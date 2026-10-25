@@ -5,6 +5,7 @@
  */
 import type { BattleResult, GameState } from "../rules/state.ts";
 import type { Content, DexLookup, Member } from "../rules/types.ts";
+import type { BattleEvidence, BattleEvidenceContext, EvidenceBinding } from "../rules/battle-evidence.ts";
 
 /** The persistent game state, held by whoever owns the save (MZ: `$gameSystem._psGame`). The application never mutates what `read` returns. */
 export interface GameStatePort {
@@ -46,6 +47,8 @@ export interface BattleStartRequest {
 
 /** What the application decided before a session exists: the created foes and the effective flags. */
 export interface BattleSetup {
+  /** Internal application authority for a transient companion; never read from a save or UI request. */
+  evidenceContext?: BattleEvidenceContext;
   experimentalHeldBattle?: boolean;
   diagnostics?: string[];
   foes: Member[];
@@ -73,6 +76,8 @@ export interface BattleSessionFactory<S extends BattleHandle = BattleHandle> {
    * `game` is the battle view of the persistent state (rules/species-key.ts battleView): species are Showdown names.
    */
   create(request: BattleStartRequest, game: GameState, setup: BattleSetup): Promise<S>;
+  /** Optional internal companion. Missing/throwing evidence never invalidates a legal primary result. */
+  evidence?(handle: S, binding: EvidenceBinding): BattleEvidence | null;
 }
 
 /** The content a battle uses and, when available, the engine's data to check moves against. */

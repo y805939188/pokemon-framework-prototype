@@ -91,6 +91,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
    *  (observed: blur at frame 94 for ~800 frames). Take focus back before every key press. */
   let refocus = 0;
   async function ensureFocus() {
+    if (argv.includes("--ps-flow-background")) return; // programmatic test input does not require OS focus
     // No longer required (see the top of this file); kept as a cheap best effort that never blocks.
     if (document.hasFocus()) return;
     try { G.nw.Window.get().focus(); refocus++; } catch (e) { /* ignore */ }
@@ -1595,7 +1596,60 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     results.push({ id: "SL1 save location: a fresh slot is written by this run (saveGame code 0) and removed again", status: !occupied && code === 0 && written && cleanedUp ? "pass" : "fail", ms: 0 });
   }
 
+  async function runCapabilitySeam() {
+    await toMap();
+    await scenario("C53-01 real scene: item/level friendship and companion seal; original battle result/save shape", async () => {
+      fresh();
+      const g = game(), id = g.party[0].id;
+      g.party[0].hp = 50; g.party[0].friendship = 99; g.party[0].exp = E.minExp("parabolic", 51) - 1;
+      W.PSFlow.openBattle({ battleId: "host-capability-1", kind: "wild", foes: [{ species: "pidgey", level: 5 }], seq: 1 });
+      await inMode("main");
+      const handle = battle()._session, app = W.PSFlow.app();
+      await choose(/^Bag/); await inMode("bag"); await choose(/^Potion\b/i); await inMode("party"); await choose(/Charizard/i); await inMode("main");
+      eq(handle.party.find((m: any) => m.id === id).friendship, 100, "actual executed item changes working friendship");
+      await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/i); await inMode("learn"); await choose(/Forget roost/i); await inMode("end");
+      await shot("C53-01-capability-end"); await finishBattle();
+      const evidence = app.battleEvidenceSnapshot(handle);
+      assert(evidence && evidence.rawHash === api().state.resultHash(handle.result()), "app sealed original raw hash");
+      eq(evidence.friendship[id].changes.map((c: any) => c.method), ["battleitem", "levelup"], "ordered real triggers");
+      eq(evidence.friendship[id].current, 104, "threshold order respected");
+      assert(evidence.records.some((r: any) => r.kind === "appearance"), "initial appearance before UI take retained");
+      assert(!("friendship" in handle.result().members[id]), "no new protocol member-patch field");
+      eq(game().party.find((m: any) => m.id === id).friendship, 99, "this capability batch does not implement persistent companion consumption");
+      await G.DataManager.saveGame(53);
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-capability.json"), JSON.stringify({ state: clone(game()), slot: 53, rawHash: evidence.rawHash }));
+      return { input: "real scene, synthetic DOM keydown/keyup", rawHash: evidence.rawHash, records: evidence.records.length, friendship: evidence.friendship[id], saveSlot: 53, persistentCompanion: false };
+    });
+    await scenario("C53-02 real host direct application: seal failure cannot lose capture/XP or replay", async () => {
+      fresh(); const B = api(), content = W.PSFlow.content(), factory = B.composition.createBattleSessionFactory({ content: () => content, seed: () => [1,2,3,4] });
+      let seals = 0; factory.evidence = () => { seals++; throw new Error("injected companion seal failure"); };
+      const app = new B.app.GameApplication({ state: { read: () => game(), replace: (next: any) => { G.$gameSystem._psGame = next; } }, sessions: factory, projection: { project: () => {} }, content: () => ({ content }), random: seeded(1), clock: () => 0, itemWorld: () => ({ mapId: G.$gameMap.mapId() }) }, { receivingProfile: { mode: 1, naming: 1 } });
+      const before = clone(game()), request = { battleId: "host-capability-fault", kind: "wild", foes: [{ species: "pidgey", level: 5 }], seq: 2 }, handle = await app.startBattle(request);
+      await handle.throwBall("masterball"); const result = app.finishBattle(handle, request);
+      eq(result.commit, "applied", "primary applied despite optional fault"); assert(game().party.length === before.party.length + 1 && game().party[0].exp > before.party[0].exp, "capture/XP preserved");
+      eq(app.finishBattle(handle, request).commit, "already-applied", "duplicate no-op"); eq(seals, 1, "no late companion backfill"); eq(app.battleEvidenceSnapshot(handle), null, "failed companion never trusted");
+      return { input: "direct app API in actual NW/MZ host", commit: result.commit, diagnostics: result.diagnostics, seals };
+    });
+    await scenario("C53-03 real host engine: precise substitute loss uses internal value seam", async () => {
+      const B = api();
+      const make = (name: string, species: string, level: number, moves: string[]) => ({ name, species, level, moves, gender: "M", happiness: 70, ability: species === "Charizard" ? "Blaze" : "Immunity", nature: "Hardy", ivs: { hp:31,atk:31,def:31,spa:31,spd:31,spe:31 }, evs: {} });
+      const driver = await B.gateway.BattleGateway.create({ formatid: "gen8rpgcustomgame", seed: [1,2,3,4], wild: true, players: [{ name: "Player", team: [make("P1", "Charizard", 100, ["Substitute"])] }, { name: "Wild", team: [make("F1", "Snorlax", 50, ["Surging Strikes"])] }] });
+      await driver.choose("p1", "team 1"); await driver.choose("p2", "team 1"); driver.drain(); driver.drainObservations();
+      await driver.choose("p1", "move 1"); await driver.choose("p2", "move 1"); const batch = driver.drainObservations(), hits = batch.records.filter((r: any) => r.kind === "hit" && r.domain === "substitute");
+      eq(hits.map((h: any) => h.loss), [22,22,24], "actual three substitute losses"); assert(hits.every((h: any) => h.target.id === "P1" && h.source.id === "F1"), "stable identities"); eq(batch.issues, [], "complete supported host interval");
+      return { input: "direct controlled engine API in actual NW host", losses: hits.map((h: any) => h.loss), playerHp: driver.readState("p1")[0].hp };
+    });
+  }
+
   async function verifySave() {
+    if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-capability.json"))) {
+      await scenario("C53-V1 real restart: isolated MZ save keeps primary state and no transient companion", async () => {
+        const expected = readExpected("ps-flow-expected-capability.json"); G.DataManager.setupNewGame(); await G.DataManager.loadGame(expected.slot);
+        eq(game(), expected.state, "primary save identical across fresh NW process"); assert(!game().battleEvidence && api().storage.allMembers(game()).every((m: any) => !Object.hasOwn(m, "evolutionReadiness")), "no transient packet or unimplemented member schema field installed");
+        eq(game().appliedBattles["host-capability-1"].hash, expected.rawHash, "original raw result ledger retained"); return { slot: expected.slot, input: "MZ load API in fresh NW process", primaryUnchanged: true };
+      });
+      return;
+    }
     await scenario("V4 real restart: the step 4 save migrated and saved by the previous process loads as schema 6, without migrating again", async () => {
       const expected = readExpected("ps-flow-expected-t31.json");
       G.DataManager.setupNewGame();
@@ -1712,7 +1766,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       try { startAt.call(this); } finally { fs.readFileSync = read; }
     } else startAt.call(this);
     setTimeout(async () => {
-      try { if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
+      try { if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       try { report.contentIdentity = W.PSFlow.content().meta; } catch (e) { report.contentIdentity = { error: String(e) }; }
       try { report.logTail = W.PSFlow.logger ? W.PSFlow.logger.tail(60) : null; } catch (e) { report.logTail = { error: String(e) }; } // redacted, bounded session diagnostics

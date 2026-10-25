@@ -6,6 +6,7 @@
 import type { BattleEvent } from "./protocol.ts";
 import type { MonView } from "../rules/rules.ts";
 import type { PartialStats, Stats } from "../rules/types.ts";
+import type { ObservationBatch, BattleObservation } from "../rules/battle-evidence.ts";
 
 export interface PlayerSpec {
   name: string;
@@ -79,6 +80,16 @@ export interface BattleDriver {
   readState(side: string): MemberState[];
   seedState(side: string, records: StateRecord[]): void;
   applyGrowth(side: string, id: string, change: GrowthApplication): GrowthOutcome;
+  /** Internal optional capabilities. Absence means unavailable, never an empty/complete observation. */
+  drainObservations?(): ObservationBatch;
+  /** Control-path faint triggers; independent of optional observation quality/failures. */
+  drainFriendshipFaints?(): Extract<BattleObservation, { kind: "faint" }>[];
+  /** Consume private source bindings for the whole published batch before any friendship effect is applied. */
+  validateFriendshipFaints?(records: readonly Extract<BattleObservation, { kind: "faint" }>[], publicIdents: readonly string[]): boolean;
+  /** A member-bound rollback point for only live/set friendship, not the already-executed main action. */
+  checkpointFriendship?(side: string, id: string): DriverCheckpoint;
+  restoreFriendship?(token: DriverCheckpoint): void;
+  applyFriendship?(side: string, id: string, change: { expected: number; value: number }): { before: number; after: number };
   moveInfo(nameOrId: string): { id: string; name: string; pp: number };
   /** Re-issue the pending requests after state changed between turns. */
   refreshRequests(): GatewayMessage[];
