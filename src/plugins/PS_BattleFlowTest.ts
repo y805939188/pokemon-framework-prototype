@@ -1672,11 +1672,12 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
           eq([storageCalls, makeCalls], [0, 0], "save checks reject before serialization/storage entries");
           let snapshotRefused = false; try {make.call(G.DataManager);} catch {snapshotRefused = true;} assert(snapshotRefused, "direct makeContents also rejects before underlying snapshot");
           eq(saveFileHashes(), hashes, "loaded source, occupied target, global and absent target unchanged");
-          eq(JSON.stringify(game()), damaged, "no automatic repair"); outcomes.push({kind, storageCalls, makeEntryCalls: makeCalls, hashes: saveFileHashes(), missingTarget: !G.StorageManager.exists(56)});
+          eq(JSON.stringify(game()), damaged, "no automatic repair"); outcomes.push({kind, storageCalls, makeEntryCalls: makeCalls, hashes: saveFileHashes(), missingTarget: !G.StorageManager.exists("file56")});
         } finally {G.StorageManager.saveObject = save; G.DataManager.makeSaveContents = make;}
       }
-      G.$gameSystem._psGame = good; await settledSave(54);
-      await G.DataManager.loadGame(54); eq(game(), good, "restored legal in-memory state can save and load again");
+      G.$gameSystem._psGame = good;
+      assert(G.$gameSystem.isSaveEnabled(), "restoring legal memory re-enables the same gate");
+      eq(saveFileHashes(), hashes, "source/target/global remain original through the restart boundary");
       return {input: "actual MZ menu permission, Scene_Save.executeSave and Scene_Base.executeAutosave with programmatic completion callbacks, plus direct saveGame", note: "exact base function counters separately VM-tested; actual host measures serialization and disk entry zero", outcomes};
     });
     await scenario("B53-H03 actual heal/preserve and empty legacy save load", async () => {
@@ -1742,12 +1743,14 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-progression-data.json"))) {
       await scenario("B53-V1 independent NW restart: good source and target remain readable7", async () => {
         const expected = readExpected("ps-flow-expected-progression-data.json"); W.PSFlow._content = progressionContent(expected.regional);
+        eq(saveFileHashes(), expected.savedHashes, "original producing source/target/global bytes reached this new process unchanged");
         const loaded: any[] = [];
         for (const slot of expected.slots) {
           G.DataManager.setupNewGame(); await G.DataManager.loadGame(slot); assert(!G.$gameSystem._psSaveError, JSON.stringify(G.$gameSystem._psSaveError));
           eq(game(), expected.state, "fresh process rereads exact primary state and schema7 metadata");
           assert(!game().battleEvidence && api().storage.allMembers(game()).every((m: any) => (m.evolutionReadiness === "known" || m.readyToEvolve && m.evolutionReadiness === "unknown")), "legal R state and no transient companion"); loaded.push(slot);
         }
+        eq(saveFileHashes(), expected.savedHashes, "reading both good slots did not write any original file");
         return {input: "new NW process, real MZ load API", slots: loaded, layout: game().dex.layoutIdentity, identity: W.PSFlow.content().meta};
       });
       return;

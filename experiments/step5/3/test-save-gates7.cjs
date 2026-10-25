@@ -56,7 +56,7 @@ for(const [name,damage] of [
   ['null-root prototype spoof with inherited required field',g=>{const p=Object.assign(Object.create(null),{constructor:Object,cannotTrade:true});delete g.party[0].cannotTrade;Object.setPrototypeOf(g.party[0],p);}],
 ]) test(`loaded legal7 damaged at runtime (${name}) rejects all entry points before base calls`,async()=>{
   const h=host();h.context.DataManager.extractSaveContents({});assert.equal(h.system._psSaveError,undefined);
-  damage(h.system._psGame);const before=JSON.stringify(h.system._psGame);
+  const good=clone(h.system._psGame);damage(h.system._psGame);const before=JSON.stringify(h.system._psGame);
   assert.equal(h.system.isSaveEnabled(),false);
   await assert.rejects(h.context.DataManager.saveGame(4));
   await assert.rejects(h.context.DataManager.saveGame(0));
@@ -64,6 +64,7 @@ for(const [name,damage] of [
   assert.deepEqual(h.counts(),{saved:0,made:0,replacements:1});
   assert.equal(JSON.stringify(h.system._psGame),before,'no implicit repair or migration');
   assert.equal(h.context.PSState.lastSaveError.code,'state-invalid');
+  h.system._psGame=good;await h.context.DataManager.saveGame(4);assert.equal(h.counts().saved,1);assert.equal(h.counts().made,1);assert.equal(h.context.PSState.lastSaveError,null);
 });
 test('content unavailable and active operation refuse before base save and make',async()=>{
   for(const mode of ['unavailable','pending']){
