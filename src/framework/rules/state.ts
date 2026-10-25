@@ -1,3 +1,4 @@
+import { createDexState } from "./dex-state.ts";
 import { moneyCap } from "./economy.ts";
 /**
  * Persistent game state model + the battle write-back contract (protocol v1).
@@ -23,12 +24,12 @@ import type { Storage } from "./storage.ts";
 import { newStats } from "./stats.ts";
 import type { GameStats } from "./stats.ts";
 import type { Limits } from "./limits.ts";
-import type { Content, Member, MemberOrigin, MoveSlot, Owner, PartialStats, Stats } from "./types.ts";
+import type { Content, DexState, Member, MemberOrigin, MoveSlot, Owner, PartialStats, Stats } from "./types.ts";
 
 export const PROTOCOL_VERSION = 1;
 
 /** Version of the PERSISTENT game state document (rules/save-schema.ts migrates older ones). Not the battle protocol version. */
-export const GAME_SCHEMA = 6;
+export const GAME_SCHEMA = 7;
 
 /** Fields of a persistent member that a battle result may change. Everything else must be untouched. */
 export const MEMBER_WRITE_SET = ["level", "exp", "hp", "status", "statusCount", "moves", "evs", "friendship"] as const;
@@ -50,7 +51,7 @@ export interface GameState {
   inventory: Inventory;
   badges: boolean[];
   money: number;
-  dex: Dex;
+  dex: DexState;
   appliedBattles: Record<string, { hash: string }>;
   /** One-time claims (schema 3): a claimed grant id can never be granted again on this save timeline. */
   claims: Record<string, Claim>;
@@ -120,6 +121,8 @@ export interface NewMemberInput {
   isEgg?: boolean;
   mail?: string | null;
   readyToEvolve?: boolean;
+  evolutionReadiness?: "known" | "unknown";
+  cannotTrade?: boolean;
 }
 
 export function newMember(o: NewMemberInput): Member {
@@ -131,7 +134,7 @@ export function newMember(o: NewMemberInput): Member {
     ivs: six(31, o.ivs),
     evs: six(0, o.evs),
     friendship: o.friendship ?? 70, ball: o.ball || "pokeball", ...(o.owner ? { owner: { ...o.owner } } : { ot: o.ot || "player" }),
-    ...Object.fromEntries((["personalID", "ownerCompatibilityDefault", "origin", "abilityIndex", "effectiveAbilityIndex", "shiny", "superShiny", "firstMoves", "markings", "ribbons", "cannotStore", "cannotRelease", "isEgg", "mail", "readyToEvolve"] as const)
+    ...Object.fromEntries((["personalID", "ownerCompatibilityDefault", "origin", "abilityIndex", "effectiveAbilityIndex", "shiny", "superShiny", "firstMoves", "markings", "ribbons", "cannotStore", "cannotRelease", "isEgg", "mail", "readyToEvolve", "evolutionReadiness", "cannotTrade"] as const)
       .filter((key) => o[key] !== undefined).map((key) => [key, clone(o[key])])),
   };
 }
@@ -150,7 +153,7 @@ export function protocolMember(member: Member): Member {
  */
 export function newGame({ party, bag = {}, money = 0, player = { ...COMPATIBLE_PLAYER }, content }: { party: NewMemberInput[]; bag?: Record<string, number>; money?: number; player?: Owner; content?: Content }): GameState {
   const members = party.map((m) => ({...completeIndividual(newMember({ ...m, form: m.form ?? 0 }), {}), statNature: m.statNature ?? null, moves: m.moves.map(move => ({...clone(move),ppUps:move.ppUps ?? 0}))}));
-  return { schema: GAME_SCHEMA, party: members, storage: newStorage(), player: { ...player }, nextMemberOrdinal: initialOrdinal(members.map((m) => m.id)), inventory: inventoryFromBag(bag, catalogOf(content), inventoryPolicy(content)), badges: Array(8).fill(false) as boolean[], money, dex: { seen: [], owned: [] }, appliedBattles: {}, claims: {}, stats: newStats(), steps: 0 };
+  return { schema: GAME_SCHEMA, party: members, storage: newStorage(), player: { ...player }, nextMemberOrdinal: initialOrdinal(members.map((m) => m.id)), inventory: inventoryFromBag(bag, catalogOf(content), inventoryPolicy(content)), badges: Array(8).fill(false) as boolean[], money, dex: createDexState(content), appliedBattles: {}, claims: {}, stats: newStats(), steps: 0 };
 }
 
 /** Stable hash of a result, used for idempotency (same battleId + same hash => no-op). */

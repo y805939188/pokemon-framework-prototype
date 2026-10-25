@@ -1596,6 +1596,100 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     results.push({ id: "SL1 save location: a fresh slot is written by this run (saveGame code 0) and removed again", status: !occupied && code === 0 && written && cleanedUp ? "pass" : "fail", ms: 0 });
   }
 
+  // B5: actual MZ persistence and normal application lifecycle, driven by service calls.
+  // Disk assertions complement the VM's exact baseSaveGame/baseMake counters; no hardware input is claimed.
+  function progressionContent(regional: boolean): any {
+    const B = api(), read = (name: string) => JSON.parse(fs.readFileSync(path.join(gameDir, "content/sample", name), "utf8"));
+    const inputs: any = {manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json")};
+    for (const [key, file] of [["grants", "grants.json"], ["settings", "settings.json"], ["items", "items.json"], ["shops", "shops.json"]]) if (fs.existsSync(path.join(gameDir, "content/sample", file))) inputs[key] = read(file);
+    if (regional) inputs.regionalDex = {source: "author-placeholder", regions: [{id: 0, nameKey: "region.test", species: inputs.species.filter((sp: any) => !sp.form).map((sp: any) => sp.id)}]};
+    const compiled = B.contentCompile.compileContent(inputs); assert(compiled.ok, JSON.stringify(compiled.errors));
+    const assembled = B.contentRuntime.assembleContent(compiled.data, B.dex.createDexLookup()); assert(!assembled.errors.length, JSON.stringify(assembled.errors));
+    return assembled.content;
+  }
+  async function settledSave(slot: number): Promise<void> {
+    const base = G.StorageManager.saveObject, writes: Promise<any>[] = [];
+    G.StorageManager.saveObject = function (this: any, ...args: any[]) { const promise = base.apply(this, args); writes.push(Promise.resolve(promise)); return promise; };
+    try { await G.DataManager.saveGame(slot); await Promise.all(writes); } finally { G.StorageManager.saveObject = base; }
+  }
+  function saveFileHashes(): any {
+    const dir = G.StorageManager.fileDirectoryPath();
+    return Object.fromEntries(fs.readdirSync(dir).filter((name: string) => fs.statSync(path.join(dir, name)).isFile()).sort().map((name: string) => [name, nodeRequire("crypto").createHash("sha256").update(fs.readFileSync(path.join(dir, name))).digest("hex")]));
+  }
+  async function runProgressionData() {
+    await toMap();
+    await scenario("B53-H01 real setupNewGame: national and regional layouts", async () => {
+      const layouts: any[] = [];
+      for (const regional of [false, true]) {
+        W.PSFlow._content = progressionContent(regional); G.DataManager.setupNewGame();
+        const g = game(); eq(g.schema, 7, "current save schema"); eq(g.dex.hasDex, false, "new player has no dex entitlement");
+        eq(g.dex.unlocked, regional ? [true, false] : [true], "exact new-game region entitlement");
+        eq(g.dex.view, {region: regional ? 0 : -1, indices: regional ? [0, 0] : [0], mode: 0}, "correct default viewing state");
+        eq(g.dex.layoutIdentity, W.PSFlow.content().regionalDex.layoutIdentity, "layout came from compiled content");
+        layouts.push({regional, dex: clone(g.dex), identity: W.PSFlow.content().meta});
+      }
+      return {input: "actual MZ setupNewGame + normal app/content pipeline", layouts};
+    });
+    await scenario("B53-H02 real schema6 load: all metadata retained then current7 save", async () => {
+      fresh(); const B = api();
+      const six = clone(game()); six.schema = 6; six.dex = {seen: clone(six.dex.seen), owned: clone(six.dex.owned)};
+      for (const member of B.storage.allMembers(six)) {delete member.evolutionReadiness; delete member.cannotTrade;}
+      six.party[0].readyToEvolve = true; six.party[0].abilityIndex = null; six.party[0].effectiveAbilityIndex = null; six.party[0].friendship = 256;
+      six.appliedBattles["B53-history"] = {hash: "a".repeat(64)};
+      const original = G.$gameSystem._psGame, fixtureContents = G.DataManager.makeSaveContents(); G.$gameSystem._psGame = six;
+      try {await G.StorageManager.saveObject("file54", fixtureContents);}
+      finally {G.$gameSystem._psGame = original;}
+      // The ordinary save gate correctly refuses6; author a test-only MZ fixture through the underlying serializer instead.
+      await G.DataManager.loadGame(54);
+      assert(!G.$gameSystem._psSaveError, JSON.stringify(G.$gameSystem._psSaveError)); eq(G.$gameSystem._psSaveInfo.from, 6, "actual loader migrated6");
+      const g = game(), m = g.party[0]; eq([g.schema, m.readyToEvolve, m.evolutionReadiness, m.cannotTrade, m.abilityIndex, m.effectiveAbilityIndex, m.friendship], [7, true, "known", false, null, null, 256], "precise migration defaults");
+      eq(g.appliedBattles, six.appliedBattles, "raw ledger unchanged");
+      m.evolutionReadiness = "unknown"; m.cannotTrade = true; m.firstMoves = ["tackle", "gust", "tackle", "roost", "rest", "tackle"];
+      const boxedMember = clone(m); boxedMember.id = "B53-BOX"; g.storage.boxes[39].slots[29] = boxedMember;
+      await settledSave(54); await settledSave(55);
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-progression-data.json"), JSON.stringify({state: clone(g), slots: [54, 55], regional: true, savedHashes: saveFileHashes()}));
+      return {input: "MZ serializer-authored schema6 fixture -> real loadGame -> saveGame7", sourceFixture: six.schema, layout: g.dex.layoutIdentity, preserved: [m.id, m.firstMoves, m.friendship, m.abilityIndex], lastBox: [39, 29], slots: [54, 55]};
+    });
+    await scenario("B53-H05 legal7 then corruption: menu/direct/autosave reject with zero disk writes", async () => {
+      await G.DataManager.loadGame(54); assert(!G.$gameSystem._psSaveError, "legal7 was actually loaded");
+      const good = clone(game()), hashes = saveFileHashes(), outcomes: any[] = [];
+      for (const kind of ["bad-R", "bad-reference", "bad-layout"]) {
+        G.$gameSystem._psGame = clone(good);
+        if (kind === "bad-R") {game().party[0].readyToEvolve = false; game().party[0].evolutionReadiness = "unknown";}
+        if (kind === "bad-reference") game().party[0].species = "missing-species";
+        if (kind === "bad-layout") game().dex.layoutIdentity = "0".repeat(64);
+        const damaged = JSON.stringify(game()), save = G.StorageManager.saveObject, make = G.DataManager.makeSaveContents;
+        let storageCalls = 0, makeCalls = 0;
+        G.StorageManager.saveObject = function (this: any, ...args: any[]) {storageCalls++; return save.apply(this, args);};
+        G.DataManager.makeSaveContents = function (this: any, ...args: any[]) {makeCalls++; return make.apply(this, args);};
+        try {
+          eq(G.$gameSystem.isSaveEnabled(), false, "actual menu permission is masked");
+          for (const slot of [54, 55, 56, 0]) {let refused = false; try {await G.DataManager.saveGame(slot);} catch {refused = true;} assert(refused, `direct/autosave destination ${slot} rejected`);}
+          eq([storageCalls, makeCalls], [0, 0], "save checks reject before serialization/storage entries");
+          let snapshotRefused = false; try {make.call(G.DataManager);} catch {snapshotRefused = true;} assert(snapshotRefused, "direct makeContents also rejects before underlying snapshot");
+          eq(saveFileHashes(), hashes, "loaded source, occupied target, global and absent target unchanged");
+          eq(JSON.stringify(game()), damaged, "no automatic repair"); outcomes.push({kind, storageCalls, makeEntryCalls: makeCalls, hashes: saveFileHashes(), missingTarget: !G.StorageManager.exists(56)});
+        } finally {G.StorageManager.saveObject = save; G.DataManager.makeSaveContents = make;}
+      }
+      G.$gameSystem._psGame = good; await settledSave(54);
+      await G.DataManager.loadGame(54); eq(game(), good, "restored legal in-memory state can save and load again");
+      return {input: "actual MZ menu permission + saveGame destinations including autosave0", note: "exact base function counters separately VM-tested; actual host measures serialization and disk entry zero", outcomes};
+    });
+    await scenario("B53-H03 actual heal/preserve and empty legacy save load", async () => {
+      const B = api(), content = W.PSFlow.content(), member = clone(game().party[0]); member.readyToEvolve = true; member.evolutionReadiness = "unknown";
+      eq([B.heal.healMember(member, content).readyToEvolve, B.heal.healMember(member, content).evolutionReadiness], [false, "known"], "ordinary heal clears both");
+      const preserved = B.heal.healMember(member, content, {preserveReadyToEvolve: true}); eq([preserved.readyToEvolve, preserved.evolutionReadiness], [true, "unknown"], "box heal preserves both");
+      const sys = G.$gameSystem, original = sys._psGame; delete sys._psGame;
+      let contents: any; try {contents = G.DataManager.makeSaveContents();} catch { /* missing state is deliberately unsaveable through ordinary API */ }
+      // Invoke the actual extraction lifecycle with MZ objects, no disk save of the missing state.
+      const normal = {system: sys, screen: G.$gameScreen, timer: G.$gameTimer, switches: G.$gameSwitches, variables: G.$gameVariables, selfSwitches: G.$gameSelfSwitches, actors: G.$gameActors, party: G.$gameParty, map: G.$gameMap, player: G.$gamePlayer};
+      G.DataManager.extractSaveContents(normal); assert(!G.$gameSystem._psSaveError, "empty legacy host initialized"); eq(game().schema, 7, "empty host is7"); eq(game().party, [], "never invent members");
+      G.$gameSystem._psGame = original;
+      return {input: "real host heal API and DataManager.extractSaveContents", emptyCreated: G.$gameSystem._psSaveInfo?.created};
+    });
+    await shot("B53-progression-data");
+  }
+
   async function runCapabilitySeam() {
     await toMap();
     await scenario("C53-01 real scene: item/level friendship and companion seal; original battle result/save shape", async () => {
@@ -1642,10 +1736,23 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   }
 
   async function verifySave() {
+    if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-progression-data.json"))) {
+      await scenario("B53-V1 independent NW restart: good source and target remain readable7", async () => {
+        const expected = readExpected("ps-flow-expected-progression-data.json"); W.PSFlow._content = progressionContent(expected.regional);
+        const loaded: any[] = [];
+        for (const slot of expected.slots) {
+          G.DataManager.setupNewGame(); await G.DataManager.loadGame(slot); assert(!G.$gameSystem._psSaveError, JSON.stringify(G.$gameSystem._psSaveError));
+          eq(game(), expected.state, "fresh process rereads exact primary state and schema7 metadata");
+          assert(!game().battleEvidence && api().storage.allMembers(game()).every((m: any) => (m.evolutionReadiness === "known" || m.readyToEvolve && m.evolutionReadiness === "unknown")), "legal R state and no transient companion"); loaded.push(slot);
+        }
+        return {input: "new NW process, real MZ load API", slots: loaded, layout: game().dex.layoutIdentity, identity: W.PSFlow.content().meta};
+      });
+      return;
+    }
     if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-capability.json"))) {
       await scenario("C53-V1 real restart: isolated MZ save keeps primary state and no transient companion", async () => {
         const expected = readExpected("ps-flow-expected-capability.json"); G.DataManager.setupNewGame(); await G.DataManager.loadGame(expected.slot);
-        eq(game(), expected.state, "primary save identical across fresh NW process"); assert(!game().battleEvidence && api().storage.allMembers(game()).every((m: any) => !Object.hasOwn(m, "evolutionReadiness")), "no transient packet or unimplemented member schema field installed");
+        eq(game(), expected.state, "primary save identical across fresh NW process"); assert(!game().battleEvidence && api().storage.allMembers(game()).every((m: any) => (m.evolutionReadiness === "known" || m.readyToEvolve && m.evolutionReadiness === "unknown")), "no transient packet and persistent schema7 R combinations remain legal");
         eq(game().appliedBattles["host-capability-1"].hash, expected.rawHash, "original raw result ledger retained"); return { slot: expected.slot, input: "MZ load API in fresh NW process", primaryUnchanged: true };
       });
       return;
@@ -1766,7 +1873,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       try { startAt.call(this); } finally { fs.readFileSync = read; }
     } else startAt.call(this);
     setTimeout(async () => {
-      try { if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
+      try { if (mode === "progression-data") await runProgressionData(); else if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       try { report.contentIdentity = W.PSFlow.content().meta; } catch (e) { report.contentIdentity = { error: String(e) }; }
       try { report.logTail = W.PSFlow.logger ? W.PSFlow.logger.tail(60) : null; } catch (e) { report.logTail = { error: String(e) }; } // redacted, bounded session diagnostics

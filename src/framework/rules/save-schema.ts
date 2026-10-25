@@ -23,6 +23,7 @@ import { baseMovePp, totalPp } from "./member-metadata.ts";
 import { NATURES } from "./growth.ts";
 import { own } from "./own.ts";
 import { createDexState, dexContentProblems, dexStateProblems, dexLayoutStateProblems, remapDexLayout } from "./dex-state.ts";
+import { GAME_SCHEMA } from "./state.ts";
 import type { GameState } from "./state.ts";
 import { MAX_FORM, speciesDataOf } from "./species-key.ts";
 import { completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity.ts";
@@ -31,8 +32,7 @@ import type { Content, DexState, Member } from "./types.ts";
 import type { SpeciesKeyResolver } from "./species-key.ts";
 import { newStats, validateStats } from "./stats.ts";
 
-// Kept local until the integration owner flips state.GAME_SCHEMA together with all production creation paths.
-const SAVE_SCHEMA = 7;
+const SAVE_SCHEMA = GAME_SCHEMA;
 export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
 
 export interface Problem { path: string; message: string }
