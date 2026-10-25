@@ -72,6 +72,9 @@ export function build(src: string, out: string): number {
     const { inputs, errors } = readInputs(src);
     const r = errors.length ? { ok: false as const, errors } : compileContent(inputs, {}, {showdownSha:buildPin()});
     if (!r.ok) return fail(r.errors);
+    const assembled = assembleContent(r.data, createDexLookup());
+    if (assembled.errors.length) return fail(assembled.errors);
+    for (const warning of r.warnings) console.warn(`WARNING ${warning.file} ${warning.path}: ${warning.message}`);
     const text = canonicalJson(r.data, 2) + "\n";
     fs.mkdirSync(path.dirname(out), { recursive: true });
     if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== text) fs.writeFileSync(out, text);
@@ -204,7 +207,7 @@ export function importPbsFiles(src: string, sourceId: string, report: string, re
   const sourceProblem=(id:string):string|null=>preUseProblem(sources,id);
   const bundle=importPbsBundle({sourceId,sourceProblem,baseFiles,formFiles,...(!regionalOnly?{regionalFiles,regionNameKeys}:{}),resolveFormShowdownId:(symbol,form)=>formIds.get(`${symbol},${form}`)??null});
   if(!regionalOnly){
-    const checked=bundle.ok?compileContent({...inputs,species:bundle.species,overlays:[]}, {}, {showdownSha:buildPin()}):null;
+    const checked=bundle.ok?compileContent({manifest:inputs.manifest,sources:inputs.sources,species:bundle.species,overlays:[],...(inputs.items!==undefined?{items:inputs.items}:{}),...(bundle.regionalDex!==undefined?{regionalDex:bundle.regionalDex}:{})}, {}, {showdownSha:buildPin()}):null;
     const ok=bundle.ok&&checked?.ok===true;
     if(!bundle.ok)for(const error of bundle.errors)console.error(`${error.file??"PBS"}:${error.line} ${error.path}: ${error.message}`);
     if(checked&&!checked.ok)show(checked.errors);

@@ -15,6 +15,8 @@ const text = (v: unknown): v is string => typeof v === "string" && v.length > 0;
 const copy = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const stable = (v: unknown): unknown => Array.isArray(v) ? v.map(stable) : obj(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, stable(v[k])])) : v;
 const only = (v: Record<string, unknown>, keys: readonly string[]): boolean => Object.keys(v).every(k => keys.includes(k));
+const COLORS = ["Red","Blue","Yellow","Green","Black","Brown","Purple","Gray","White","Pink"];
+const SHAPES = ["Head","Serpentine","Finned","HeadArms","HeadBase","BipedalTail","HeadLegs","Quadruped","Winged","Multiped","MultiBody","Bipedal","MultiWinged","Insectoid"];
 export const PROGRESSION_FIELDS = ["evolutions", "tutorMoves", "types", "abilities", "hiddenAbilities", "flags", "pokedexForm", "categoryKey", "entryKey", "heightDm", "weightHg", "color", "shape", "formName", "formNameKey", "dexSortKeys"] as const;
 
 export function progressionFieldProblem(field: string, value: unknown): string | null {
@@ -22,7 +24,7 @@ export function progressionFieldProblem(field: string, value: unknown): string |
   if (["heightDm", "weightHg"].includes(field)) return integer(value, 1) ? null : "must be a positive safe integer in integer units";
   if (field === "pokedexForm") return integer(value, 0, MAX_FORM) ? null : `must be an integer from 0 to ${MAX_FORM}`;
   if (field === "formName") return value === null || typeof value === "string" ? null : "must be text or null (empty text is distinct from null)";
-  if (["color", "shape"].includes(field)) return text(value) ? null : "must be a non-empty identity";
+  if (field === "color" || field === "shape") return typeof value === "string" && (field === "color" ? COLORS : SHAPES).includes(value) ? null : `unknown ${field} identity`;
   if (field === "dexSortKeys") return obj(value) && Object.entries(value).every(([locale, sort]) => /^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(locale) && text(sort)) ? null : "must be locale -> non-empty sort key";
   if (["types", "tutorMoves", "flags", "abilities", "hiddenAbilities"].includes(field)) {
     return dense(value) && value.every(v => ((field === "abilities" || field === "hiddenAbilities") && v === null) || text(v)) ? null : "must be a dense array of non-empty identities (ability slots also allow null)";
@@ -65,6 +67,8 @@ export function inheritSpecies(records: readonly SpeciesSource[]): SpeciesSource
 
 export function deriveSpeciesFields(records: SpeciesSource[], report: ProgressionReport, diagnostic?: ProgressionReport): void {
   for (const [i, sp] of records.entries()) {
+    sp.color ??= "Red";
+    sp.shape ??= "Head";
     const defaults = new Set<number>();
     for (const flag of sp.flags ?? []) {
       const hit = /^DefaultForm_([0-9]+)$/i.exec(flag);

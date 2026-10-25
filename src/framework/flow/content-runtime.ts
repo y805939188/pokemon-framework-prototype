@@ -55,7 +55,7 @@ export function loadCompiled(json: unknown): CompiledContent {
       const records=json.species as unknown as CompiledContent["species"];
       const derived=JSON.parse(JSON.stringify(records)) as CompiledContent["species"];
       deriveSpeciesFields(derived,report);checkProgressionReferences(records,report);
-      for(const [i,value] of records.entries()) if(value.defaultForm!==derived[i]!.defaultForm||value.displayForm!==derived[i]!.displayForm||canonicalJson(value.dexSortKeys)!==canonicalJson(derived[i]!.dexSortKeys))report("compiled",`$.species[${i}]`,"derived-form-mismatch");
+      for(const [i,value] of records.entries()) if(value.defaultForm!==derived[i]!.defaultForm||value.displayForm!==derived[i]!.displayForm||value.color!==derived[i]!.color||value.shape!==derived[i]!.shape||canonicalJson(value.dexSortKeys)!==canonicalJson(derived[i]!.dexSortKeys))report("compiled",`$.species[${i}]`,"derived-form-mismatch");
       const regional=json.regionalDex;
       const raw=obj(regional)&&regional.source!==undefined?{source:regional.source,national:regional.national,regions:regional.regions,...(Object.hasOwn(regional,"transitions")?{transitions:regional.transitions}:{})}:undefined;
       const checked=checkRegionalDex(raw,json.registrationOrder as unknown as import("../rules/types.ts").SpeciesKey[],usable,report);
