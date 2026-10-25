@@ -1,0 +1,211 @@
+TAP version 13
+# Subtest: B08: all six party and 40×30 storage slots preserve every previous value
+ok 1 - B08: all six party and 40×30 storage slots preserve every previous value
+  ---
+  duration_ms: 129.526958
+  ...
+# {"members":1206,"inputBytes":1045545,"outputBytes":1104887,"migrationAndValidationMs":85.47,"oneMemberMigrationAndValidationMs":5.48}
+# Subtest: B09: schema 1 follows the existing chain to 7 without mutating input
+ok 2 - B09: schema 1 follows the existing chain to 7 without mutating input
+  ---
+  duration_ms: 3.551542
+  ...
+# Subtest: B09: schema 2 follows the existing chain to 7 without mutating input
+ok 3 - B09: schema 2 follows the existing chain to 7 without mutating input
+  ---
+  duration_ms: 2.240917
+  ...
+# Subtest: B09: schema 3 follows the existing chain to 7 without mutating input
+ok 4 - B09: schema 3 follows the existing chain to 7 without mutating input
+  ---
+  duration_ms: 2.236167
+  ...
+# Subtest: B09: schema 4 follows the existing chain to 7 without mutating input
+ok 5 - B09: schema 4 follows the existing chain to 7 without mutating input
+  ---
+  duration_ms: 2.487292
+  ...
+# Subtest: B09: schema 5 follows the existing chain to 7 without mutating input
+ok 6 - B09: schema 5 follows the existing chain to 7 without mutating input
+  ---
+  duration_ms: 2.603
+  ...
+# Subtest: B09: schema 6 follows the existing chain to 7 without mutating input
+ok 7 - B09: schema 6 follows the existing chain to 7 without mutating input
+  ---
+  duration_ms: 2.537333
+  ...
+# Subtest: B09: missing content at each old version refuses without mutating the document
+ok 8 - B09: missing content at each old version refuses without mutating the document
+  ---
+  duration_ms: 3.789584
+  ...
+# Subtest: B09: existing poison conversion and deterministic individual completion remain valid
+ok 9 - B09: existing poison conversion and deterministic individual completion remain valid
+  ---
+  duration_ms: 3.435625
+  ...
+# Subtest: B09: legacy invalid member/capacity and unmapped names remain whole-document refusals
+ok 10 - B09: legacy invalid member/capacity and unmapped names remain whole-document refusals
+  ---
+  duration_ms: 25.448709
+  ...
+# Subtest: B12: legacy dex truth N=0 seen=0 owned=0
+ok 11 - B12: legacy dex truth N=0 seen=0 owned=0
+  ---
+  duration_ms: 1.488542
+  ...
+# Subtest: B12: legacy dex truth N=0 seen=0 owned=1
+ok 12 - B12: legacy dex truth N=0 seen=0 owned=1
+  ---
+  duration_ms: 1.751375
+  ...
+# Subtest: B12: legacy dex truth N=0 seen=1 owned=0
+ok 13 - B12: legacy dex truth N=0 seen=1 owned=0
+  ---
+  duration_ms: 2.055875
+  ...
+# Subtest: B12: legacy dex truth N=0 seen=1 owned=1
+ok 14 - B12: legacy dex truth N=0 seen=1 owned=1
+  ---
+  duration_ms: 2.547709
+  ...
+# Subtest: B12: legacy dex truth N=2 seen=0 owned=0
+ok 15 - B12: legacy dex truth N=2 seen=0 owned=0
+  ---
+  duration_ms: 1.221583
+  ...
+# Subtest: B12: legacy dex truth N=2 seen=0 owned=1
+ok 16 - B12: legacy dex truth N=2 seen=0 owned=1
+  ---
+  duration_ms: 1.129417
+  ...
+# Subtest: B12: legacy dex truth N=2 seen=1 owned=0
+ok 17 - B12: legacy dex truth N=2 seen=1 owned=0
+  ---
+  duration_ms: 1.482666
+  ...
+# Subtest: B12: legacy dex truth N=2 seen=1 owned=1
+ok 18 - B12: legacy dex truth N=2 seen=1 owned=1
+  ---
+  duration_ms: 1.363208
+  ...
+# Subtest: B12: new-game dex truth N=0 differs from empty legacy migration
+ok 19 - B12: new-game dex truth N=0 differs from empty legacy migration
+  ---
+  duration_ms: 0.367208
+  ...
+# Subtest: B12: new-game dex truth N=2 differs from empty legacy migration
+ok 20 - B12: new-game dex truth N=2 differs from empty legacy migration
+  ---
+  duration_ms: 0.259917
+  ...
+# Subtest: B12: content omission is explicit empty pure fixture; supplied incomplete content refuses
+ok 21 - B12: content omission is explicit empty pure fixture; supplied incomplete content refuses
+  ---
+  duration_ms: 0.929792
+  ...
+# Subtest: B10/X-SAVE-01 pure gate: required readiness pair and cannotTrade are strict in every persistent slot
+ok 22 - B10/X-SAVE-01 pure gate: required readiness pair and cannotTrade are strict in every persistent slot
+  ---
+  duration_ms: 12.14825
+  ...
+# Subtest: B10: future versions refuse explicitly, and incomplete seven never receives defaults
+ok 23 - B10: future versions refuse explicitly, and incomplete seven never receives defaults
+  ---
+  duration_ms: 5.284917
+  ...
+# Subtest: B10: existing persistent metadata remains required in schema 7; content checks never fill defaults
+ok 24 - B10: existing persistent metadata remains required in schema 7; content checks never fill defaults
+  ---
+  duration_ms: 7.557
+  ...
+# Subtest: B13/14/15: long ordered repeated firstMoves, zero current moves, null slots and 256 round-trip unchanged
+ok 25 - B13/14/15: long ordered repeated firstMoves, zero current moves, null slots and 256 round-trip unchanged
+  ---
+  duration_ms: 4.529166
+  ...
+# Subtest: B14: exact checked ability directory recognizes override; no PID or target-slot guesses
+ok 26 - B14: exact checked ability directory recognizes override; no PID or target-slot guesses
+  ---
+  duration_ms: 3.943916
+  ...
+# Subtest: B11: clear readiness deeply clones, clears both fields and preserves unrelated persistent metadata
+ok 27 - B11: clear readiness deeply clones, clears both fields and preserves unrelated persistent metadata
+  ---
+  duration_ms: 1.0685
+  ...
+# Subtest: B10/17: sparse arrays and inherited records refuse; prototype-looking own IDs survive JSON
+ok 28 - B10/17: sparse arrays and inherited records refuse; prototype-looking own IDs survive JSON
+  ---
+  duration_ms: 5.923
+  ...
+# Subtest: B10/X-SAVE-02 pure gate: required species/move/firstMove/ability/item/dex references fail after legal load
+ok 29 - B10/X-SAVE-02 pure gate: required species/move/firstMove/ability/item/dex references fail after legal load
+  ---
+  duration_ms: 9.317833
+  ...
+# Subtest: B10: malformed dex dictionaries, duplicates, counters and cursor domains reject
+ok 30 - B10: malformed dex dictionaries, duplicates, counters and cursor domains reject
+  ---
+  duration_ms: 3.322125
+  ...
+# Subtest: B12: named last-seen keys remain distinct from base keys; missing forms retain the established base fallback
+ok 31 - B12: named last-seen keys remain distinct from base keys; missing forms retain the established base fallback
+  ---
+  duration_ms: 2.065875
+  ...
+# Subtest: B26/28 X-LAYOUT-01: explicit swap moves unlocks/view and remaps every cursor by stable base ID
+ok 32 - B26/28 X-LAYOUT-01: explicit swap moves unlocks/view and remaps every cursor by stable base ID
+  ---
+  duration_ms: 2.284042
+  ...
+# Subtest: B26/28 X-LAYOUT-02: missing/empty/nonmatching transitions refuse; no implicit positional migration
+ok 33 - B26/28 X-LAYOUT-02: missing/empty/nonmatching transitions refuse; no implicit positional migration
+  ---
+  duration_ms: 5.138042
+  ...
+# Subtest: B26/28 X-LAYOUT-03/04: duplicate from, stale target and old hash corruption reject defensively
+ok 34 - B26/28 X-LAYOUT-03/04: duplicate from, stale target and old hash corruption reject defensively
+  ---
+  duration_ms: 7.1695
+  ...
+# Subtest: B26/28 X-LAYOUT-05: incomplete/duplicate/aliasing maps and national deletion/redirection all reject
+ok 35 - B26/28 X-LAYOUT-05: incomplete/duplicate/aliasing maps and national deletion/redirection all reject
+  ---
+  duration_ms: 10.1555
+  ...
+# Subtest: B26: same layout does not select a transition and never repairs lengths, view or bounds
+ok 36 - B26: same layout does not select a transition and never repairs lengths, view or bounds
+  ---
+  duration_ms: 5.4715
+  ...
+# Subtest: B26: invalid old layout cursors/lengths refuse before any remap
+ok 37 - B26: invalid old layout cursors/lengths refuse before any remap
+  ---
+  duration_ms: 7.091792
+  ...
+# Subtest: B26: add/delete regions and cursor fallback never grant unlocks or filter historical records
+ok 38 - B26: add/delete regions and cursor fallback never grant unlocks or filter historical records
+  ---
+  duration_ms: 2.701208
+  ...
+# Subtest: B26: empty old/current tables require cursor zero; historical layout can name removed unused species
+ok 39 - B26: empty old/current tables require cursor zero; historical layout can name removed unused species
+  ---
+  duration_ms: 3.475542
+  ...
+# Subtest: B26: save/install gate rejects layout mismatch even if migration could succeed
+ok 40 - B26: save/install gate rejects layout mismatch even if migration could succeed
+  ---
+  duration_ms: 2.126167
+  ...
+1..40
+# tests 40
+# suites 0
+# pass 40
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 359.395625
