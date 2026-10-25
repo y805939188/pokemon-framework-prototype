@@ -85,3 +85,13 @@ test('SaveStore rejects damaged current layout before opening a temp file',()=>{
     const noContent=new E.store.SaveStore(file);assert.throws(()=>noContent.save(good),/needs-content/);assert.deepEqual(fs.readFileSync(file),bytes);
   } finally {fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('plain state crosses VM realms while custom inherited records remain invalid',()=>{
+  const raw=E.fixtures.makeGame();
+  const foreign=vm.runInNewContext('JSON.parse(text)',{text:JSON.stringify(raw)});
+  assert.deepEqual(E.saveSchema.validateGameContent(foreign,E.fixtures.content),[]);
+  const inherited=Object.assign(Object.create({unexpected:true}),raw);
+  assert.match(E.saveSchema.validateGame(inherited)[0].message,/plain-data/);
+  const disguised=Object.assign(Object.create(Object.create(null)),raw);
+  assert.match(E.saveSchema.validateGame(disguised)[0].message,/plain-data/);
+});

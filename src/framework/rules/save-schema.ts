@@ -150,7 +150,15 @@ function validateOwner(value: unknown, path: string, out: Problem[]): void {
 function validatePlainData(value: unknown, path: string, out: Problem[], ancestors = new Set<object>()): void {
   if (value === null || typeof value !== "object") return;
   if (ancestors.has(value)) { out.push({ path, message: "cyclic value is not persistent data" }); return; }
-  if (!Array.isArray(value) && ![Object.prototype, null].includes(Object.getPrototypeOf(value) as object | null)) { out.push({ path, message: "must be an own plain-data record" }); return; }
+  if (!Array.isArray(value)) {
+    const prototype = Object.getPrototypeOf(value) as object | null;
+    const constructor = prototype && Object.getOwnPropertyDescriptor(prototype, "constructor");
+    // NW's renderer, Node and a bare core may have different intrinsic Object identities.
+    // Accept another realm's intrinsic Object.prototype, not arbitrary inherited-data/class records.
+    if (prototype !== null && !(Object.getPrototypeOf(prototype) === null && constructor && "value" in constructor && typeof constructor.value === "function" && Function.prototype.toString.call(constructor.value) === Function.prototype.toString.call(Object))) {
+      out.push({path, message: "must be an own plain-data record"}); return;
+    }
+  }
   ancestors.add(value);
   if (Array.isArray(value)) {
     for (let i = 0; i < value.length; i++) {
