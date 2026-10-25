@@ -1,0 +1,326 @@
+TAP version 13
+# (node:9548) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: P53-09 full method table and tier boundaries: walking
+ok 1 - P53-09 full method table and tier boundaries: walking
+  ---
+  duration_ms: 1.221083
+  type: 'test'
+  ...
+# Subtest: P53-09 full method table and tier boundaries: levelup
+ok 2 - P53-09 full method table and tier boundaries: levelup
+  ---
+  duration_ms: 0.19925
+  type: 'test'
+  ...
+# Subtest: P53-09 full method table and tier boundaries: groom
+ok 3 - P53-09 full method table and tier boundaries: groom
+  ---
+  duration_ms: 0.116042
+  type: 'test'
+  ...
+# Subtest: P53-09 full method table and tier boundaries: evberry
+ok 4 - P53-09 full method table and tier boundaries: evberry
+  ---
+  duration_ms: 0.056625
+  type: 'test'
+  ...
+# Subtest: P53-09 full method table and tier boundaries: vitamin
+ok 5 - P53-09 full method table and tier boundaries: vitamin
+  ---
+  duration_ms: 0.058083
+  type: 'test'
+  ...
+# Subtest: P53-09 full method table and tier boundaries: wing
+ok 6 - P53-09 full method table and tier boundaries: wing
+  ---
+  duration_ms: 0.13625
+  type: 'test'
+  ...
+# Subtest: P53-09 full method table and tier boundaries: machine
+ok 7 - P53-09 full method table and tier boundaries: machine
+  ---
+  duration_ms: 0.529709
+  type: 'test'
+  ...
+# Subtest: P53-09 full method table and tier boundaries: battleitem
+ok 8 - P53-09 full method table and tier boundaries: battleitem
+  ---
+  duration_ms: 0.046958
+  type: 'test'
+  ...
+# Subtest: P53-09 full method table and tier boundaries: faint
+ok 9 - P53-09 full method table and tier boundaries: faint
+  ---
+  duration_ms: 0.242375
+  type: 'test'
+  ...
+# Subtest: P53-09 full method table and tier boundaries: faintbad
+ok 10 - P53-09 full method table and tier boundaries: faintbad
+  ---
+  duration_ms: 0.351375
+  type: 'test'
+  ...
+# Subtest: P53-09 full method table and tier boundaries: powder
+ok 11 - P53-09 full method table and tier boundaries: powder
+  ---
+  duration_ms: 0.147833
+  type: 'test'
+  ...
+# Subtest: P53-09 full method table and tier boundaries: energyroot
+ok 12 - P53-09 full method table and tier boundaries: energyroot
+  ---
+  duration_ms: 0.043208
+  type: 'test'
+  ...
+# Subtest: P53-09 full method table and tier boundaries: revivalherb
+ok 13 - P53-09 full method table and tier boundaries: revivalherb
+  ---
+  duration_ms: 0.033
+  type: 'test'
+  ...
+# Subtest: P53-09 GR-35 map then luxury then floor bell; soft cap applies last
+ok 14 - P53-09 GR-35 map then luxury then floor bell; soft cap applies last
+  ---
+  duration_ms: 0.108667
+  type: 'test'
+  ...
+# Subtest: P53-09 GR-36 179 is only a positive-delta soft limit; evberry is exempt
+ok 15 - P53-09 GR-36 179 is only a positive-delta soft limit; evberry is exempt
+  ---
+  duration_ms: 0.159667
+  type: 'test'
+  ...
+# Subtest: P53-09 negative methods ignore every positive modifier and soft limit
+ok 16 - P53-09 negative methods ignore every positive modifier and soft limit
+  ---
+  duration_ms: 0.179083
+  type: 'test'
+  ...
+# Subtest: P53-09 zero machine/battleitem increments do not acquire positive bonuses
+ok 17 - P53-09 zero machine/battleitem increments do not acquire positive bonuses
+  ---
+  duration_ms: 0.05525
+  type: 'test'
+  ...
+# Subtest: P53-09 unknown current/obtained maps never match each other; known map zero does
+ok 18 - P53-09 unknown current/obtained maps never match each other; known map zero does
+  ---
+  duration_ms: 0.078958
+  type: 'test'
+  ...
+# Subtest: P53-09 ball and held item match stable identities, with existing case handling
+ok 19 - P53-09 ball and held item match stable identities, with existing case handling
+  ---
+  duration_ms: 0.053542
+  type: 'test'
+  ...
+# Subtest: P53-09 unknown and prototype-looking method names are explicitly refused
+ok 20 - P53-09 unknown and prototype-looking method names are explicitly refused
+  ---
+  duration_ms: 0.062167
+  type: 'test'
+  ...
+# Subtest: P53-09 author 256 stays out of domain; 255 is a normal calculation input
+ok 21 - P53-09 author 256 stays out of domain; 255 is a normal calculation input
+  ---
+  duration_ms: 0.265083
+  type: 'test'
+  ...
+# Subtest: P53-09 GR-42 affection is derived at every tier edge without a second field
+ok 22 - P53-09 GR-42 affection is derived at every tier edge without a second field
+  ---
+  duration_ms: 0.146333
+  type: 'test'
+  ...
+# Subtest: P53-09 existing missing friendship fallback and frozen inputs are never installed
+ok 23 - P53-09 existing missing friendship fallback and frozen inputs are never installed
+  ---
+  duration_ms: 0.086208
+  type: 'test'
+  ...
+# (node:9549) ExperimentalWarning: stripTypeScriptTypes is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: P53-14 inclusive current level, level zero and future level boundaries
+ok 24 - P53-14 inclusive current level, level zero and future level boundaries
+  ---
+  duration_ms: 0.895
+  type: 'test'
+  ...
+# Subtest: P53-14 current known identities are filtered regardless of PP and slot order
+ok 25 - P53-14 current known identities are filtered regardless of PP and slot order
+  ---
+  duration_ms: 0.150708
+  type: 'test'
+  ...
+# Subtest: P53-14 duplicates keep first eligible table position, not the latest occurrence
+ok 26 - P53-14 duplicates keep first eligible table position, not the latest occurrence
+  ---
+  duration_ms: 0.148875
+  type: 'test'
+  ...
+# Subtest: P53-14 first records precede levels only when enabled; overlaps keep level position
+ok 27 - P53-14 first records precede levels only when enabled; overlaps keep level position
+  ---
+  duration_ms: 0.077833
+  type: 'test'
+  ...
+# Subtest: P53-14 more than four first records survive with order and input duplicates intact
+ok 28 - P53-14 more than four first records survive with order and input duplicates intact
+  ---
+  duration_ms: 0.184
+  type: 'test'
+  ...
+# Subtest: P53-14 canonical duplicate identity across known, records and multiple levels is emitted once
+ok 29 - P53-14 canonical duplicate identity across known, records and multiple levels is emitted once
+  ---
+  duration_ms: 0.064958
+  type: 'test'
+  ...
+# Subtest: P53-14 future level entry does not suppress an actual first record
+ok 30 - P53-14 future level entry does not suppress an actual first record
+  ---
+  duration_ms: 0.105208
+  type: 'test'
+  ...
+# Subtest: P53-14 GR-49 all four controls use recorded moves, never the full species egg table
+ok 31 - P53-14 GR-49 all four controls use recorded moves, never the full species egg table
+  ---
+  duration_ms: 0.080708
+  type: 'test'
+  ...
+# Subtest: P53-14 GR-50 all-known Caterpie/Magikarp return an ordinary empty candidate list
+ok 32 - P53-14 GR-50 all-known Caterpie/Magikarp return an ordinary empty candidate list
+  ---
+  duration_ms: 0.293459
+  type: 'test'
+  ...
+# Subtest: P53-14 zero current moves and missing first records remain valid inputs
+ok 33 - P53-14 zero current moves and missing first records remain valid inputs
+  ---
+  duration_ms: 0.330834
+  type: 'test'
+  ...
+# Subtest: P53-14 absent, egg and explicit Shadow members have no candidates
+ok 34 - P53-14 absent, egg and explicit Shadow members have no candidates
+  ---
+  duration_ms: 0.121625
+  type: 'test'
+  ...
+# Subtest: P53-14 authoritative resolved catalog order is retained for moves at the same level
+ok 35 - P53-14 authoritative resolved catalog order is retained for moves at the same level
+  ---
+  duration_ms: 0.544833
+  type: 'test'
+  ...
+# Subtest: P53-14 frozen inputs stay byte-equivalent and output mutation cannot change candidates
+ok 36 - P53-14 frozen inputs stay byte-equivalent and output mutation cannot change candidates
+  ---
+  duration_ms: 0.175625
+  type: 'test'
+  ...
+# Subtest: B11/B15: creation initializes false/known and cannotTrade false without extra random draws
+ok 37 - B11/B15: creation initializes false/known and cannotTrade false without extra random draws
+  ---
+  duration_ms: 1.866417
+  type: 'test'
+  ...
+# Subtest: B11/B14/B15: completion preserves true/unknown, null slots, long duplicate first records and PID
+ok 38 - B11/B14/B15: completion preserves true/unknown, null slots, long duplicate first records and PID
+  ---
+  duration_ms: 0.638916
+  type: 'test'
+  ...
+# Subtest: B11: completion fills absent schema7 defaults independently of cannotRelease
+ok 39 - B11: completion fills absent schema7 defaults independently of cannotRelease
+  ---
+  duration_ms: 0.271625
+  type: 'test'
+  ...
+# Subtest: B18: pure clone keeps every persistent field with independent nested data
+ok 40 - B18: pure clone keeps every persistent field with independent nested data
+  ---
+  duration_ms: 2.101625
+  type: 'test'
+  ...
+# Subtest: B16: complete templates accept all three legal R pairs, null slots and empty current moves
+ok 41 - B16: complete templates accept all three legal R pairs, null slots and empty current moves
+  ---
+  duration_ms: 0.431875
+  type: 'test'
+  ...
+# Subtest: B16: templates reject missing or malformed new metadata and false/unknown without repairing it
+ok 42 - B16: templates reject missing or malformed new metadata and false/unknown without repairing it
+  ---
+  duration_ms: 1.585167
+  type: 'test'
+  ...
+# Subtest: B11: ordinary complete heal clears both R fields and preserves unrelated metadata
+ok 43 - B11: ordinary complete heal clears both R fields and preserves unrelated metadata
+  ---
+  duration_ms: 0.306792
+  type: 'test'
+  ...
+# Subtest: B11: preserveReadyToEvolve preserves the complete R pair while healing resources
+ok 44 - B11: preserveReadyToEvolve preserves the complete R pair while healing resources
+  ---
+  duration_ms: 0.205416
+  type: 'test'
+  ...
+# Subtest: B11: egg heal remains a pure unchanged copy, including true/unknown
+ok 45 - B11: egg heal remains a pure unchanged copy, including true/unknown
+  ---
+  duration_ms: 0.377208
+  type: 'test'
+  ...
+# Subtest: B11: party and all-member healing clear only their configured collection
+ok 46 - B11: party and all-member healing clear only their configured collection
+  ---
+  duration_ms: 1.073
+  type: 'test'
+  ...
+# Subtest: B11/B14/B15: storage movement with deposit healing preserves unknown R and all metadata
+ok 47 - B11/B14/B15: storage movement with deposit healing preserves unknown R and all metadata
+  ---
+  duration_ms: 0.540792
+  type: 'test'
+  ...
+# Subtest: B11/B16: reception and replacement deposit preserve original member metadata and unknown R
+ok 48 - B11/B16: reception and replacement deposit preserve original member metadata and unknown R
+  ---
+  duration_ms: 1.20075
+  type: 'test'
+  ...
+# Subtest: B11/B16: automatic reception into a box preserves unknown R through deposit healing
+ok 49 - B11/B16: automatic reception into a box preserves unknown R through deposit healing
+  ---
+  duration_ms: 0.398625
+  type: 'test'
+  ...
+# Subtest: B16: incomplete receiving template fails atomically before installing any member
+ok 50 - B16: incomplete receiving template fails atomically before installing any member
+  ---
+  duration_ms: 0.371958
+  type: 'test'
+  ...
+# Subtest: B14/B16: captured bridge restores original persistent metadata and leaves the frozen raw record unchanged
+ok 51 - B14/B16: captured bridge restores original persistent metadata and leaves the frozen raw record unchanged
+  ---
+  duration_ms: 1.083
+  type: 'test'
+  ...
+# Subtest: B16: protocol projection retains its exact v1 keys and memberPatch rejects every persistent-only field
+ok 52 - B16: protocol projection retains its exact v1 keys and memberPatch rejects every persistent-only field
+  ---
+  duration_ms: 6.910334
+  type: 'test'
+  ...
+1..52
+# tests 52
+# suites 0
+# pass 52
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 88.701959
