@@ -1,0 +1,25 @@
+# Synthetic author fixture, not original game data.
+[BASE]
+GrowthRate=Medium
+BaseExp=51
+EVs=SPEED,1
+Moves=0,TACKLE,7,GROWL
+TutorMoves=TACKLE,GROWL
+Types=NORMAL,FIRE,WATER
+Abilities=A,B,C
+HiddenAbilities=H1,H2
+Flags=DefaultForm_1,Other
+Height=6.9
+Weight=0.7
+Color=Gray
+Shape=HeadArms
+FormName=Base
+Category=Seed
+Pokedex=Alpha, Beta # suffix removed before q text
+PokedexForm=0
+Evolution=PEER,Level,01
+[PEER]
+GrowthRate=Medium
+BaseExp=51
+EVs=SPEED,1
+Moves=0,TACKLE,7,GROWL

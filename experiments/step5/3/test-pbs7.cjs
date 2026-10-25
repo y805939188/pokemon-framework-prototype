@@ -167,3 +167,19 @@ test('legacy single-text API keeps old shape/valid-prefix diagnostics and level-
   assert.deepEqual(Object.keys(r.species[0]).sort(),['id','showdownId','nameKey','growth','baseExp','evYield','catchRate','happiness','learnset','source'].sort());
   assert.equal(r.species[0].learnset[0].level,0);assert.equal(r.texts,undefined);
 });
+
+test('B06/B21 complete synthetic PBS files equal independently authored species/region JSON proposals',async()=>{
+  const fixture=path.join(__dirname,'fixtures/pbs7'),input=name=>({file:name,read:()=>fs.readFileSync(path.join(fixture,name),'utf8')});
+  const r=await bundle({baseFiles:[input('pokemon.txt')],formFiles:[input('pokemon_forms.txt')],resolveFormShowdownId:()=> 'baseform1',regionalFiles:[input('regional-first.txt'),input('regional-second.txt')],regionNameKeys:[{id:0,nameKey:'region.shared'},{id:1,nameKey:'region.shared'}]});
+  assert.equal(r.ok,true,JSON.stringify(r.errors));
+  assert.deepEqual(r.species,JSON.parse(fs.readFileSync(path.join(fixture,'species.json'),'utf8')));
+  assert.deepEqual(r.regionalDex,JSON.parse(fs.readFileSync(path.join(fixture,'regional-dex.json'),'utf8')));
+  assert.deepEqual(r.texts.map(t=>[t.key,t.text]),[['species.base.category','Seed'],['species.base.entry','Alpha, Beta'],['species.base.form1.category','Alternate'],['species.base.form1.entry','An alternate, form']]);
+});
+
+test('legacy standalone target references validate symbol syntax and defer catalog existence to compile',async()=>{
+  const {importPbsSpecies}=await imported;
+  const r=importPbsSpecies(base('BASE','Evolution=EXTERNAL_SPECIES,Level,16'),'author');assert.equal(r.ok,true,JSON.stringify(r.errors));assert.deepEqual(r.species[0].evolutions,[{target:'external-species',method:'Level',parameter:16}]);
+  assert.equal(importPbsSpecies(base('BASE','Evolution=EXTERNAL!SPECIES,Level,16'),'author').ok,false);
+  rejected(await bundle({baseFiles:[file('bundle',base('BASE','Evolution=EXTERNAL_SPECIES,Level,16'))]}),/unknown/);
+});
