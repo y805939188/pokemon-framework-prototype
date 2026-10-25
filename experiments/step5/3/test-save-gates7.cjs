@@ -130,3 +130,8 @@ test('required fields inherited from a real foreign intrinsic are not persistent
   const h=host();h.system._psGame=foreign;assert.throws(()=>h.context.DataManager.makeSaveContents());assert.equal(h.counts().made,0);
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-inherited-required7-'));try{const file=path.join(dir,'save.json'),store=new E.store.SaveStore(file,{},E.speciesKey.identityKeys,E.fixtures.content);store.save(own);const before=fs.readFileSync(file);assert.throws(()=>store.save(foreign));assert.deepEqual(fs.readFileSync(file),before);}finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('claims require their own kind, not a foreign intrinsic fallback',()=>{
+ const foreign=vm.runInNewContext(`const g=JSON.parse(text);g.claims.fake={payload:1};Object.defineProperty(Object.prototype,'kind',{value:'grant'});g`,{text:JSON.stringify(E.fixtures.makeGame())});
+ assert.ok(E.saveSchema.validateGame(foreign).some(p=>p.path.includes('claims')));
+});

@@ -259,7 +259,7 @@ export function validateGame(x: unknown): Problem[] {
     if (!isObj(claims)) out.push({ path: "$.claims", message: "must be an object (claim id -> {kind})" });
     else for (const [id, v] of Object.entries(claims)) {
       if (!CLAIM_ID.test(id)) out.push({ path: `$.claims["${id}"]`, message: "claim id must be 1-64 characters of A-Z a-z 0-9 # . _ : -" });
-      if (!isObj(v) || !CLAIM_KINDS.includes(v["kind"] as string) || Object.keys(v).length !== 1) out.push({ path: `$.claims["${id}"]`, message: `must be {kind: ${CLAIM_KINDS.map((k) => `"${k}"`).join(" | ")}}` });
+      if (!isObj(v) || !Object.hasOwn(v, "kind") || !CLAIM_KINDS.includes(v["kind"] as string) || Object.keys(v).length !== 1) out.push({ path: `$.claims["${id}"]`, message: `must be {kind: ${CLAIM_KINDS.map((k) => `"${k}"`).join(" | ")}}` });
     }
   }
   if (schema >= 7 && isObj(x["stats"])) knownKeys(x["stats"], Object.keys(newStats()), "$.stats", out);
