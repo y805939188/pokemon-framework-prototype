@@ -12,6 +12,7 @@ const hash = (x: unknown): x is string => typeof x === "string" && /^[0-9a-f]{64
 const id = (x: unknown): x is string => typeof x === "string" && /^[A-Za-z0-9#._:-]{1,64}$/.test(x);
 const dense = (x: unknown): x is unknown[] => Array.isArray(x) && Array.from({ length: x.length }, (_, i) => Object.hasOwn(x, i)).every(Boolean);
 const keys = (x: Obj, allowed: readonly string[], path: string, out: Problem[]): void => {
+  for (const key of allowed) if (!Object.hasOwn(x, key) && key in x) out.push({path: `${path}.${key}`, message: "persistent fields must be own data, never inherited"});
   for (const k of Object.keys(x)) if (!allowed.includes(k)) out.push({ path: `${path}.${k}`, message: "unknown field" });
 };
 const speciesList = (x: unknown, path: string, out: Problem[]): void => {

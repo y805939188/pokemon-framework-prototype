@@ -83,7 +83,7 @@ export const WORLD_WEATHER_EVOLUTION_METHOD: Readonly<Record<string, EvolutionMe
 /** All forward edges remain intact; the first registered matching predecessor is the static reverse relation. */
 export function firstEvolutionPredecessor(content: Content, target: SpeciesKey): SpeciesKey | null {
   const targetData = speciesDataOf(content, {species:target.species,form:target.form});
-  const targetForm = targetData?.form ?? 0;
+  const targetForm = targetData?.defaultForm ?? targetData?.form ?? 0;
   const find = (form: number): SpeciesKey | null => {
     for (const key of content.registrationOrder ?? []) {
       const data = speciesDataOf(content, {species:key.species,form:key.form});

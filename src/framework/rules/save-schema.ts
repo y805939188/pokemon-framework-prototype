@@ -74,11 +74,12 @@ const MEMBER_ID = /^[A-Za-z0-9#._:-]{1,18}$/;
 function statBlock(v: unknown, lo: number, hi: number, path: string, out: Problem[]): void {
   if (!isObj(v)) { out.push({ path, message: "must be an object of the six stats" }); return; }
   for (const k of Object.keys(v)) if (!STAT_KEYS.includes(k)) out.push({ path: `${path}.${k}`, message: "unknown stat" });
-  for (const k of STAT_KEYS) if (!isInt(v[k], lo, hi)) out.push({ path: `${path}.${k}`, message: `must be an integer from ${lo} to ${hi}` });
+  for (const k of STAT_KEYS) if (!Object.hasOwn(v, k) || !isInt(v[k], lo, hi)) out.push({ path: `${path}.${k}`, message: `must be an integer from ${lo} to ${hi}` });
 }
 
 function validateMember(m: unknown, path: string, out: Problem[], schema: number): void {
   if (!isObj(m)) { out.push({ path, message: "must be an object" }); return; }
+  if (schema >= 7 && inheritedFields(m, [...MEMBER_KEYS, ...INDIVIDUAL_KEYS, "statNature", "cannotTrade", "evolutionReadiness"], path, out)) return;
   for (const k of Object.keys(m)) if (!(schema >= 5 ? [...MEMBER_KEYS.filter((k) => k !== "ot"), ...INDIVIDUAL_KEYS, ...(schema >= 6 ? ["statNature"] : []), ...(schema >= 7 ? ["evolutionReadiness", "cannotTrade"] : [])] : [...MEMBER_KEYS, ...INDIVIDUAL_KEYS]).includes(k)) out.push({ path: `${path}.${k}`, message: "unknown field (battle-only or temporary state does not belong in a save)" });
   if (typeof m["id"] !== "string" || !MEMBER_ID.test(m["id"])) out.push({ path: `${path}.id`, message: "must be 1-18 characters of A-Z a-z 0-9 # . _ : -" });
   for (const k of ["species", "item", "ability", "nature", "gender", "ball", ...(schema >= 5 ? [] : ["ot"])]) if (!(schema < 5 && ["ability", "nature", "gender", "ot"].includes(k) && m[k] === undefined) && typeof m[k] !== "string") out.push({ path: `${path}.${k}`, message: "must be a string" });
@@ -137,7 +138,13 @@ function validateIndividualFields(m: Obj, path: string, out: Problem[], required
   if (present("mail") && m["mail"] !== null && typeof m["mail"] !== "string") out.push({ path: `${path}.mail`, message: "must be string or null" });
 }
 
+function inheritedFields(o: Obj, fields: readonly string[], path: string, out: Problem[]): boolean {
+  const inherited = fields.filter(key => !Object.hasOwn(o, key) && key in o);
+  for (const key of inherited) out.push({path: `${path}.${key}`, message: "persistent fields must be own data, never inherited"});
+  return inherited.length > 0;
+}
 function knownKeys(o: Obj, allowed: readonly string[], path: string, out: Problem[]): void {
+  inheritedFields(o, allowed, path, out);
   for (const k of Object.keys(o)) if (!allowed.includes(k)) out.push({ path: `${path}.${k}`, message: path === "$" ? "unknown top-level field" : "unknown field" });
 }
 function validateOwner(value: unknown, path: string, out: Problem[]): void {
@@ -190,6 +197,7 @@ export function validateGame(x: unknown): Problem[] {
   const allowedTop = schema >= 5 ? [...TOP_KEYS.filter((k) => k !== "boxes"), "storage", "player", "nextMemberOrdinal"] : TOP_KEYS;
   if (schema >= 6) { allowedTop.splice(allowedTop.indexOf("bag"),1); allowedTop.push("inventory","badges"); }
   knownKeys(x, allowedTop, "$", out);
+  if (schema >= 7 && out.length) return out;
   const seen = new Set<string>();
   const validateAt = (m: unknown, path: string): void => {
     validateMember(m, path, out, schema);
@@ -227,6 +235,11 @@ export function validateGame(x: unknown): Problem[] {
     }
   }
   if (schema >= 6) {
+    if (schema >= 7 && isObj(x["inventory"])) {
+      const inventory = x["inventory"];
+      knownKeys(inventory, ["pockets", "lastPocket", "indices"], "$.inventory", out);
+      if (Array.isArray(inventory["pockets"])) for (const [i, pocket] of inventory["pockets"].entries()) if (Array.isArray(pocket)) for (const [j, slot] of pocket.entries()) if (isObj(slot)) knownKeys(slot, ["itemId", "quantity"], `$.inventory.pockets[${i}][${j}]`, out);
+    }
     out.push(...inventoryProblems(x['inventory']));
     if (!Array.isArray(x['badges']) || x['badges'].length < 8 || x['badges'].some(v => typeof v !== 'boolean')) out.push({path:'$.badges',message:'must be a boolean array with at least eight positions'});
   } else if (!isObj(x["bag"])) out.push({ path: "$.bag", message: "must be an object" });
@@ -240,7 +253,7 @@ export function validateGame(x: unknown): Problem[] {
     if (!Array.isArray(l) || l.some((s) => typeof s !== "string") || new Set(l).size !== l.length) out.push({ path: `$.dex.${k}`, message: schema >= 4 ? "must be an array of unique species content ids" : "must be an array of unique species names" });
   }
   if (!isObj(x["appliedBattles"])) out.push({ path: "$.appliedBattles", message: "must be an object" });
-  else for (const [id, v] of Object.entries(x["appliedBattles"])) if (!isObj(v) || typeof v["hash"] !== "string" || !/^[0-9a-f]{64}$/.test(v["hash"])) out.push({ path: `$.appliedBattles["${id}"]`, message: "must be {hash: 64 hex characters}" });
+  else for (const [id, v] of Object.entries(x["appliedBattles"])) if (!isObj(v) || !Object.hasOwn(v, "hash") || typeof v["hash"] !== "string" || !/^[0-9a-f]{64}$/.test(v["hash"])) out.push({ path: `$.appliedBattles["${id}"]`, message: "must be {hash: 64 hex characters}" });
   if (schema >= 3) {
     const claims = x["claims"];
     if (!isObj(claims)) out.push({ path: "$.claims", message: "must be an object (claim id -> {kind})" });
@@ -249,6 +262,7 @@ export function validateGame(x: unknown): Problem[] {
       if (!isObj(v) || !CLAIM_KINDS.includes(v["kind"] as string) || Object.keys(v).length !== 1) out.push({ path: `$.claims["${id}"]`, message: `must be {kind: ${CLAIM_KINDS.map((k) => `"${k}"`).join(" | ")}}` });
     }
   }
+  if (schema >= 7 && isObj(x["stats"])) knownKeys(x["stats"], Object.keys(newStats()), "$.stats", out);
   if (schema >= 4) validateStats(x["stats"], x["steps"], out);
   return out;
 }

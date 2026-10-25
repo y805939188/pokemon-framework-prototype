@@ -123,3 +123,10 @@ for(const slots of [[],[null]])test(`author explicit natural slots ${JSON.string
   const corrupt=clone(game);corrupt.party[0].ability='missing-named-ability';assert.ok(E.saveSchema.validateGameContent(corrupt,content).some(p=>p.path.endsWith('.ability')));
   const sp=content.species.Pidgey;sp.abilities=['Keen Eye'];const falseEmpty=clone(game);assert.ok(E.saveSchema.validateGameContent(falseEmpty,content).some(p=>p.path.endsWith('.ability')));
 });
+
+test('required fields inherited from a real foreign intrinsic are not persistent data',()=>{
+  const own=E.fixtures.makeGame();const foreign=vm.runInNewContext(`const g=JSON.parse(text); delete g.party[0].cannotTrade; Object.defineProperty(Object.prototype,'cannotTrade',{value:true,configurable:true});g`,{text:JSON.stringify(own)});
+  assert.ok(E.saveSchema.validateGameContent(foreign,E.fixtures.content).some(p=>p.path.endsWith('.cannotTrade')));
+  const h=host();h.system._psGame=foreign;assert.throws(()=>h.context.DataManager.makeSaveContents());assert.equal(h.counts().made,0);
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-inherited-required7-'));try{const file=path.join(dir,'save.json'),store=new E.store.SaveStore(file,{},E.speciesKey.identityKeys,E.fixtures.content);store.save(own);const before=fs.readFileSync(file);assert.throws(()=>store.save(foreign));assert.deepEqual(fs.readFileSync(file),before);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
