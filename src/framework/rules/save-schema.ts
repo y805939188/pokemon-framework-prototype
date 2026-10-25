@@ -155,7 +155,7 @@ function validatePlainData(value: unknown, path: string, out: Problem[], ancesto
     const constructor = prototype && Object.getOwnPropertyDescriptor(prototype, "constructor");
     // NW's renderer, Node and a bare core may have different intrinsic Object identities.
     // Accept another realm's intrinsic Object.prototype, not arbitrary inherited-data/class records.
-    if (prototype !== null && !(Object.getPrototypeOf(prototype) === null && constructor && "value" in constructor && typeof constructor.value === "function" && Function.prototype.toString.call(constructor.value) === Function.prototype.toString.call(Object))) {
+    if (prototype !== null && !(Object.getPrototypeOf(prototype) === null && constructor && "value" in constructor && typeof constructor.value === "function" && constructor.value.prototype === prototype && Function.prototype.toString.call(constructor.value) === Function.prototype.toString.call(Object))) {
       out.push({path, message: "must be an own plain-data record"}); return;
     }
   }

@@ -52,6 +52,7 @@ for(const [name,damage] of [
   ['unmapped species',g=>{g.party[0].species='missing-from-content';}],
   ['unmapped learned move',g=>{g.party[0].firstMoves.push('missing-move');}],
   ['layout mismatch',g=>{g.dex.layoutIdentity='0'.repeat(64);}],
+  ['null-root prototype spoof with inherited required field',g=>{const p=Object.assign(Object.create(null),{constructor:Object,cannotTrade:true});delete g.party[0].cannotTrade;Object.setPrototypeOf(g.party[0],p);}],
 ]) test(`loaded legal7 damaged at runtime (${name}) rejects all entry points before base calls`,async()=>{
   const h=host();h.context.DataManager.extractSaveContents({});assert.equal(h.system._psSaveError,undefined);
   damage(h.system._psGame);const before=JSON.stringify(h.system._psGame);
@@ -82,6 +83,8 @@ test('SaveStore rejects damaged current layout before opening a temp file',()=>{
     const good=E.fixtures.makeGame(),content=E.fixtures.content,store=new E.store.SaveStore(file,{},E.speciesKey.identityKeys,content);
     store.save(good);const bytes=fs.readFileSync(file),bad=clone(good);bad.dex.layoutIdentity='0'.repeat(64);
     assert.throws(()=>store.save(bad));assert.deepEqual(fs.readFileSync(file),bytes);assert.equal(fs.existsSync(file+'.tmp'),false);
+    const spoof=clone(good);delete spoof.party[0].cannotTrade;Object.setPrototypeOf(spoof.party[0],Object.assign(Object.create(null),{constructor:Object,cannotTrade:true}));
+    assert.throws(()=>store.save(spoof));assert.deepEqual(fs.readFileSync(file),bytes);assert.equal(fs.existsSync(file+'.tmp'),false);
     const noContent=new E.store.SaveStore(file);assert.throws(()=>noContent.save(good),/needs-content/);assert.deepEqual(fs.readFileSync(file),bytes);
   } finally {fs.rmSync(dir,{recursive:true,force:true});}
 });
