@@ -1,0 +1,386 @@
+[
+  {
+    "method": "Level",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelMale",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelFemale",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelDay",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelNight",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelMorning",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelAfternoon",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelEvening",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelNoWeather",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelSun",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelRain",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelSnow",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelSandstorm",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelCycling",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelSurfing",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelDiving",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelDarkness",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LevelDarkInParty",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "AttackGreater",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "AtkDefEqual",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "DefenseGreater",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "Silcoon",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "Cascoon",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "Ninjask",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "Happiness",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  },
+  {
+    "method": "HappinessMale",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  },
+  {
+    "method": "HappinessFemale",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  },
+  {
+    "method": "HappinessDay",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  },
+  {
+    "method": "HappinessNight",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  },
+  {
+    "method": "HappinessMove",
+    "kind": "move",
+    "pbs": "TACKLE",
+    "expected": "tackle"
+  },
+  {
+    "method": "HappinessMoveType",
+    "kind": "type",
+    "pbs": "NORMAL",
+    "expected": "normal"
+  },
+  {
+    "method": "HappinessHoldItem",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "MaxHappiness",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  },
+  {
+    "method": "Beauty",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "HoldItem",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "HoldItemMale",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "HoldItemFemale",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "DayHoldItem",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "NightHoldItem",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "HoldItemHappiness",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "HasMove",
+    "kind": "move",
+    "pbs": "TACKLE",
+    "expected": "tackle"
+  },
+  {
+    "method": "HasMoveType",
+    "kind": "type",
+    "pbs": "NORMAL",
+    "expected": "normal"
+  },
+  {
+    "method": "HasInParty",
+    "kind": "species",
+    "pbs": "PEER",
+    "expected": "peer"
+  },
+  {
+    "method": "Location",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "LocationFlag",
+    "kind": "flag",
+    "pbs": "Magnetic",
+    "expected": "Magnetic"
+  },
+  {
+    "method": "Region",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "Item",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "ItemMale",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "ItemFemale",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "ItemDay",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "ItemNight",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "ItemHappiness",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "Trade",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  },
+  {
+    "method": "TradeMale",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  },
+  {
+    "method": "TradeFemale",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  },
+  {
+    "method": "TradeDay",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  },
+  {
+    "method": "TradeNight",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  },
+  {
+    "method": "TradeItem",
+    "kind": "item",
+    "pbs": "MOON_STONE",
+    "expected": "moon-stone"
+  },
+  {
+    "method": "TradeSpecies",
+    "kind": "species",
+    "pbs": "PEER",
+    "expected": "peer"
+  },
+  {
+    "method": "BattleDealCriticalHit",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "EventAfterDamageTaken",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "Event",
+    "kind": "integer",
+    "pbs": "01",
+    "expected": 1
+  },
+  {
+    "method": "Shedinja",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  },
+  {
+    "method": "None",
+    "kind": "none",
+    "pbs": "ignored",
+    "expected": null
+  }
+]
