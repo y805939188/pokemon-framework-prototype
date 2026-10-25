@@ -84,6 +84,8 @@ export interface BattleDriver {
   drainObservations?(): ObservationBatch;
   /** Control-path faint triggers; independent of optional observation quality/failures. */
   drainFriendshipFaints?(): Extract<BattleObservation, { kind: "faint" }>[];
+  /** Consume private source bindings for the whole published batch before any friendship effect is applied. */
+  validateFriendshipFaints?(records: readonly Extract<BattleObservation, { kind: "faint" }>[], publicIdents: readonly string[]): boolean;
   /** A member-bound rollback point for only live/set friendship, not the already-executed main action. */
   checkpointFriendship?(side: string, id: string): DriverCheckpoint;
   restoreFriendship?(token: DriverCheckpoint): void;

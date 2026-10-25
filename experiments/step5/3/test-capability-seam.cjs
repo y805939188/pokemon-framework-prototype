@@ -138,3 +138,27 @@ for(const id of ['constructor','__proto__','toString'])test('legal member ID '+i
  assert(Object.hasOwn(evidence.friendship,id));assert.equal(evidence.friendship[id].current,101);assert.equal(evidence.friendship[id].changes.length,2);assert(Object.hasOwn(evidence.damage,id));assert(evidence.damage[id]>0);assert.deepEqual(evidence.issues,[]);
  assert.deepEqual([Object.getOwnPropertyDescriptor(Object.prototype,'current'),Object.getOwnPropertyDescriptor(Object,'current'),Object.getOwnPropertyDescriptor(Object.prototype.toString,'current')],before);
 });
+
+test('R4 same-side wrong member is refused before any friend write; capture and XP still complete',async()=>{
+ const {s,game}=await session({party:[member('P1','Pidgey',5,['splash'],{hp:1,friendship:99}),member('P2','Snorlax',50,['splash'],{friendship:99})],foes:[member('F1','Charizard',100,['quickattack'])]});
+ const drain=s.gw.drainFriendshipFaints.bind(s.gw);s.gw.drainFriendshipFaints=()=>drain().map(r=>r.target.side==='p1'?{...r,target:{...r.target,id:'P2',level:50}}:r);
+ await s.chooseMove(1);for(const id of ['P1','P2']){assert.equal(s.party.find(m=>m.id===id).friendship,99);const p=s.gw._debugBattle().p1.pokemon.find(p=>p.name===id);assert.equal(p.happiness,99);assert.equal(p.set.happiness,99);}
+ assert(s._evidence.value.issues.some(i=>i.reason==='faint-control-source-unavailable'));await s.chooseForcedSwitch('P2');await s.throwBall('masterball');assert.equal(s.result().captured.length,1);assert(s.result().members.P2.exp>game.party.find(m=>m.id==='P2').exp);
+});
+test('R4 extra control with no public faint is closed in the same batch, preserving a legal potion and capture',async()=>{
+ const {s,game}=await session({party:[member('P1','Charizard',50,['flamethrower'],{hp:50,friendship:99})]});const drain=s.gw.drainFriendshipFaints.bind(s.gw);s.gw.drainFriendshipFaints=()=>[...drain(),{kind:'faint',target:{id:'P1',side:'p1',slot:0,level:50,hp:0,active:true},opponents:[]}];
+ await s.useItem('potion','P1');assert.equal(s.bag.potion,3);assert(s.gw.readState('p1')[0].hp>50);assert.equal(s._pendingFriendFaints.length,0);assert.equal(s.party[0].friendship,99);await s.throwBall('masterball');assert.equal(s.result().captured.length,1);assert(s.result().members.P1.exp>game.party[0].exp);assert(seal(s).issues.some(i=>i.reason==='faint-control-source-unavailable'));
+});
+test('R4 real Illusion poison faint uses true P1 while the public faint displays P2',async()=>{
+ const {s}=await session({party:[member('P1','Zoroark',5,['splash'],{hp:1,status:'psn',ability:'Illusion',friendship:99}),member('P2','Snorlax',100,['splash'],{friendship:99})],foes:[member('F1','Charizard',100,['splash'])]});const turn=await s.chooseMove(1);
+ assert(turn.messages.filter(m=>m.kind==='events').flatMap(m=>m.events).some(e=>e.type==='faint'&&e.args[0]==='p1a: P2'));assert.equal(s.party.find(m=>m.id==='P1').friendship,94);assert.equal(s.party.find(m=>m.id==='P2').friendship,99);assert(!s._evidence.value.issues.some(i=>i.group==='friendship'));
+ await s.chooseForcedSwitch('P2');await s.throwBall('masterball');assert.equal(s.result().captured.length,1);
+});
+test('R4 private canonical faint binding survives opaque restore and is consumed once',async()=>{
+ const g=await gw([set('P1','Pidgey',5,['splash']),set('P2','Snorlax',100,['splash'])],[set('F1','Charizard',100,['quickattack'])]);g.seedState('p1',[{id:'P1',hp:1}]);g.drain();g.drainFriendshipFaints();await g.choose('p1','move 1');await g.choose('p2','move 1');const cp=g.checkpoint();
+ const check=driver=>{const messages=driver.drain(),facts=driver.drainFriendshipFaints(),idents=messages.filter(m=>m.kind==='events').flatMap(m=>m.events).filter(e=>e.type==='faint').map(e=>e.args[0]);assert.equal(driver.validateFriendshipFaints(facts,idents),true);assert.equal(driver.validateFriendshipFaints(facts,idents),false);};check(g);check(await E.gateway.BattleGateway.fromCheckpoint(cp));
+});
+test('R4 seal cannot call residual pending friend coverage complete, and leaves primary result unchanged',async()=>{
+ const {s}=await session({party:[member('P1','Charizard',50,['flamethrower'],{hp:50,friendship:99})]});await s.useItem('potion','P1');await s.throwBall('masterball');const raw=clone(s.result());assert(seal(s).friendship.P1);
+ s._pendingFriendFaints.push({kind:'faint',target:{id:'P1',side:'p1',slot:0,level:50,hp:0,active:true},opponents:[]});const evidence=seal(s);assert.deepEqual(evidence.friendship,{});assert(evidence.issues.some(i=>i.reason==='unpaired-faint-control'));assert.deepEqual(s.result(),raw);assert.equal(raw.captured.length,1);
+});

@@ -45,7 +45,12 @@ function persistentStatus(status: string | undefined, count: number | undefined)
 /** Factory companion access, deliberately outside the frozen BattleSession prototype. */
 export function sealBattleEvidence(session: BattleSession, binding: EvidenceBinding): BattleEvidence | null {
   if (!session.finished || session.broken || !session._evidence) return null;
-  return session._evidence.seal(session.result(), binding);
+  const sealed = session._evidence.seal(session.result(), binding);
+  if (sealed && session._pendingFriendFaints.length) {
+    sealed.friendship = {};
+    if (sealed.issues.length < 128) sealed.issues.push({ group: "friendship", reason: "unpaired-faint-control" });
+  }
+  return sealed;
 }
 
 const ITEM_IDS = new Set([...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS)]);
@@ -509,7 +514,20 @@ export class BattleSession {
         this._evidence.issue("friendship", "friendship-control-drain-failed");
       }
     }
-    for (let batch = this.gw.drain(); batch.length; batch = this.gw.drain()) for (const m of batch) {
+    const messages: ReturnType<BattleDriver["drain"]> = [];
+    for (let batch = this.gw.drain(); batch.length; batch = this.gw.drain()) messages.push(...batch);
+    if (this._evidence) {
+      const publicFaints = messages.flatMap(m => m.kind === "events" ? m.events.filter(e => e.type === "faint").map(e => e.args[0] ?? "") : []);
+      let matched = false;
+      try { matched = this.gw.validateFriendshipFaints?.(this._pendingFriendFaints, publicFaints) === true; } catch { /* invalid control source only */ }
+      if (!matched) {
+        this._pendingFriendFaints = [];
+        this._friendUnavailable = [...this._evidence.value.context.playerIds];
+        this._evidence.issue("friendship", "faint-control-source-unavailable");
+      }
+    }
+    // The complete batch was bound to private real identities before the first authoritative friend write.
+    for (const m of messages) {
       if (m.kind === "events") {
         for (const e of m.events) this._onEvent(e);
         this.out.push(m);
@@ -521,6 +539,11 @@ export class BattleSession {
         this._log("warn", "engine.error", { side: m.side, message: m.message });
         this.out.push(m);
       }
+    }
+    if (this._evidence && this._pendingFriendFaints.length) {
+      this._pendingFriendFaints = [];
+      this._friendUnavailable = [...this._evidence.value.context.playerIds];
+      this._evidence.issue("friendship", "unpaired-faint-control");
     }
   }
 

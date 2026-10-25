@@ -35,7 +35,7 @@ interface ObservationState {
   records: BattleObservation[]; issues: EvidenceIssue[]; displays: Record<string, string>;
   pending: Record<string, Extract<FormatObservation, { kind: "before-loss" }>>;
 }
-interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[] }
+interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[]; friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[] }
 const CHECKPOINTS = new WeakMap<GatewayCheckpoint, CheckpointData>();
 const FRIEND_CHECKPOINTS = new WeakMap<DriverCheckpoint, { owner: BattleGateway; side: string; id: string; member: ShowdownPokemon; live: number; setHad: boolean; stored: unknown }>();
 
@@ -49,6 +49,7 @@ export class BattleGateway implements BattleDriver {
   _closed = false;
   _observation: ObservationState = { records: [], issues: [], displays: {}, pending: {} };
   _friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
+  private _friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[] = [];
   _legacyFaintHook?: (e: unknown) => void;
 
   constructor(opts: GatewayOptions, internal?: LoadedSim) {
@@ -102,6 +103,7 @@ export class BattleGateway implements BattleDriver {
       queue: JSON.parse(JSON.stringify(this._queue)) as GatewayMessage[], seq: this._seq, closed: this._closed,
       observation: JSON.parse(JSON.stringify(this._observation)) as ObservationState,
       friendshipFaints: JSON.parse(JSON.stringify(this._friendshipFaints)) as typeof this._friendshipFaints,
+      friendshipFaintOrigins: JSON.parse(JSON.stringify(this._friendshipFaintOrigins)) as typeof this._friendshipFaintOrigins,
     });
     return token;
   }
@@ -115,6 +117,7 @@ export class BattleGateway implements BattleDriver {
     gw._seq = data.seq; gw._closed = data.closed;
     gw._observation = JSON.parse(JSON.stringify(data.observation)) as ObservationState;
     gw._friendshipFaints = JSON.parse(JSON.stringify(data.friendshipFaints)) as typeof gw._friendshipFaints;
+    gw._friendshipFaintOrigins = JSON.parse(JSON.stringify(data.friendshipFaintOrigins)) as typeof gw._friendshipFaintOrigins;
     return gw;
   }
 
@@ -131,7 +134,10 @@ export class BattleGateway implements BattleDriver {
       const e = event as { side: string; id: string };
       const member = this._mon(e.side, e.id);
       const actor = (p: ShowdownPokemon) => ({ id: p.name as string, side: p.side.id as string, slot: p.position as number, level: p.level as number, hp: p.hp as number, active: !!p.isActive });
-      this._friendshipFaints.push({ kind: "faint", target: actor(member), opponents: member.side.foe.active.filter(Boolean).map(actor) });
+      const fact: Extract<BattleObservation, { kind: "faint" }> = { kind: "faint", target: actor(member), opponents: member.side.foe.active.filter(Boolean).map(actor) };
+      this._friendshipFaints.push(fact);
+      // Keep the original source value independent of values handed out through the control drain.
+      this._friendshipFaintOrigins.push(JSON.parse(JSON.stringify(fact)) as typeof fact);
       this._legacyFaintHook?.(event);
     });
     if (!extension.observers) { this._observationIssue("identity", "observation-extension-unavailable"); return; }
@@ -190,6 +196,18 @@ export class BattleGateway implements BattleDriver {
   }
 
   drainFriendshipFaints(): Extract<BattleObservation, { kind: "faint" }>[] { return this._friendshipFaints.splice(0); }
+
+  validateFriendshipFaints(records: readonly Extract<BattleObservation, { kind: "faint" }>[], publicIdents: readonly string[]): boolean {
+    const origins = this._friendshipFaintOrigins.splice(0);
+    if (origins.length !== records.length || origins.length !== publicIdents.length) return false;
+    const sameActor = (a: BattleObservation["target"], b: BattleObservation["target"]) => a.id === b.id && a.side === b.side && a.slot === b.slot && a.level === b.level && a.hp === b.hp && a.active === b.active;
+    return origins.every((origin, i) => {
+      const record = records[i]!, location = /^(p[12])([a-f])?: /.exec(publicIdents[i]!);
+      // Illusion may change the public name, so bind only its side/slot to the actual source event.
+      return !!location && location[1] === origin.target.side && (origin.target.active ? !!location[2] && location[2].charCodeAt(0) - 97 === origin.target.slot : !location[2])
+        && record.kind === "faint" && sameActor(record.target, origin.target) && record.opponents.length === origin.opponents.length && record.opponents.every((p, j) => sameActor(p, origin.opponents[j]!));
+    });
+  }
 
   checkpointFriendship(side: string, id: string): DriverCheckpoint {
     const member = this._mon(side, id), token = Object.freeze({});
