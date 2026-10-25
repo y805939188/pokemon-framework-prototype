@@ -153,11 +153,30 @@ function validateOwner(value: unknown, path: string, out: Problem[]): void {
   if (!isInt(value["id"], 0, 0xffffffff) || typeof value["name"] !== "string" || !isInt(value["gender"], 0, 2) || !isInt(value["language"], 0)) out.push({ path, message: "must contain uint32 id, string name, gender 0/1/2 and nonnegative language" });
 }
 
+// These are the only instance traversal methods used on save arrays by this validator and its finite delegates
+// (inventory/dex/statistics). Another realm's native methods have the same intrinsic text; an override must never
+// decide which stored elements get checked. Keep the references here, before any caller supplies a document.
+const arrayTraversal = ["entries", "map", "some", "forEach", Symbol.iterator].map(key => ({
+  key, text: Function.prototype.toString.call(Object.getOwnPropertyDescriptor(Array.prototype, key)!.value),
+}));
+
 /** JSON-shaped own data only: sparse lists and inherited records cannot pass then change meaning during cloning. */
 function validatePlainData(value: unknown, path: string, out: Problem[], ancestors = new Set<object>()): void {
   if (value === null || typeof value !== "object") return;
   if (ancestors.has(value)) { out.push({ path, message: "cyclic value is not persistent data" }); return; }
-  if (!Array.isArray(value)) {
+  if (Array.isArray(value)) {
+    const prototype = Object.getPrototypeOf(value) as object | null;
+    const constructor = prototype && Object.getOwnPropertyDescriptor(prototype, "constructor");
+    if (!prototype || !Array.isArray(prototype) || !constructor || !("value" in constructor) || typeof constructor.value !== "function" || constructor.value.prototype !== prototype || Function.prototype.toString.call(constructor.value) !== Function.prototype.toString.call(Array)) {
+      out.push({path, message: "must be an own plain-data array with an intrinsic prototype"}); return;
+    }
+    for (const method of arrayTraversal) {
+      const descriptor = Object.getOwnPropertyDescriptor(prototype, method.key);
+      if (!descriptor || !("value" in descriptor) || typeof descriptor.value !== "function" || Function.prototype.toString.call(descriptor.value) !== method.text) {
+        out.push({path, message: "save arrays must retain intrinsic traversal methods"}); return;
+      }
+    }
+  } else {
     const prototype = Object.getPrototypeOf(value) as object | null;
     const constructor = prototype && Object.getOwnPropertyDescriptor(prototype, "constructor");
     // NW's renderer, Node and a bare core may have different intrinsic Object identities.

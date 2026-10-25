@@ -136,3 +136,49 @@ test('claims require their own kind, not a foreign intrinsic fallback',()=>{
  const foreign=vm.runInNewContext(`const g=JSON.parse(text);g.claims.fake={payload:1};Object.defineProperty(Object.prototype,'kind',{value:'grant'});g`,{text:JSON.stringify(E.fixtures.makeGame())});
  assert.ok(E.saveSchema.validateGame(foreign).some(p=>p.path.includes('claims')));
 });
+
+// A JSON write must not accept elements hidden by caller-supplied array traversal.
+const arrayBoundaryCases = [
+ ['party.entries / missing second required field', 'entries', g=>{g.party=[g.party[0],{...clone(g.party[0]),id:'HiddenP2'}];delete g.party[1].cannotTrade;return g.party;}],
+ ['party.map / unchecked member content', 'map', g=>{g.party[0].species='missing-species';return g.party;}],
+ ['boxes.entries / unchecked last box', 'entries', g=>{const m=clone(g.party[0]);m.id='HiddenB2';delete m.cannotTrade;g.storage.boxes[39].slots[29]=m;return g.storage.boxes;}],
+ ['slots.entries / unchecked last member', 'entries', g=>{const m=clone(g.party[0]);m.id='HiddenS2';delete m.cannotTrade;g.storage.boxes[39].slots[29]=m;return g.storage.boxes[39].slots;}],
+ ['moves.entries / invalid PP Ups', 'entries', g=>{g.party[0].moves[0].ppUps=4;return g.party[0].moves;}],
+ ['firstMoves.entries / unmapped record', 'entries', g=>{g.party[0].firstMoves=['missing-move'];return g.party[0].firstMoves;}],
+ ['pockets.forEach / invalid slot quantity', 'forEach', g=>{g.inventory.pockets[0]=[{itemId:'potion',quantity:-1}];return g.inventory.pockets;}],
+ ['pocket.entries / unmapped item', 'entries', g=>{g.inventory.pockets[0]=[{itemId:'missing-item',quantity:1}];return g.inventory.pockets[0];}],
+ ['seen.some / invalid identity', 'some', g=>{g.dex.seen=['missing-species'];return g.dex.seen;}],
+ ['seenForms.entries / invalid gender', 'entries', g=>{g.dex.seenForms.Pidgey=[{gender:9,shiny:false,form:0}];return g.dex.seenForms.Pidgey;}],
+ ['unlocked.some / invalid boolean', 'some', g=>{g.dex.unlocked[0]='false';return g.dex.unlocked;}],
+ ['view.indices.some / invalid cursor', 'some', g=>{g.dex.view.indices[0]=-1;return g.dex.view.indices;}],
+ ['badges.some / invalid boolean', 'some', g=>{g.badges[0]='false';return g.badges;}],
+ ['statistics.some / invalid counter', 'some', g=>{g.stats.gym_leader_attempts[0]=-1;return g.stats.gym_leader_attempts;}],
+ ['statistics iterator / invalid badge time', Symbol.iterator, g=>{g.stats.times_to_get_badges=[-1];return g.stats.times_to_get_badges;}],
+];
+for(const [name,method,damage] of arrayBoundaryCases)test(`array boundary rejects ${name} before all save base calls`,async()=>{
+ const h=host(),good=clone(h.system._psGame),list=damage(h.system._psGame);let calls=0;
+ const hidden=method==='entries'||method===Symbol.iterator?function*(){calls++;}:method==='map'?function(){calls++;return [];}:method==='some'?function(){calls++;return false;}:function(){calls++;};
+ Object.setPrototypeOf(list,Object.create(Array.prototype,{[method]:{value:hidden}}));
+ const before=JSON.stringify(h.system._psGame);
+ assert.ok(E.saveSchema.validateGameContent(h.system._psGame,h.content).length);
+ assert.equal(h.system.isSaveEnabled(),false);
+ for(const slot of [0,4])await assert.rejects(h.context.DataManager.saveGame(slot));
+ assert.throws(()=>h.context.DataManager.makeSaveContents());
+ assert.equal(h.counts().saved,0);assert.equal(h.counts().made,0);assert.equal(calls,0,'untrusted traversal never executes');
+ assert.equal(JSON.stringify(h.system._psGame),before,'no normalization or partial repair');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-array-boundary7-'));
+ try{const file=path.join(dir,'save.json'),store=new E.store.SaveStore(file,{},E.speciesKey.identityKeys,h.content);store.save(good);const bytes=fs.readFileSync(file);assert.throws(()=>store.save(h.system._psGame));assert.deepEqual(fs.readFileSync(file),bytes);assert.equal(fs.existsSync(file+'.tmp'),false);assert.deepEqual(store.load(),good);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+ h.system._psGame=good;await h.context.DataManager.saveGame(4);assert.equal(h.counts().saved,1);
+});
+
+test('native cross-realm arrays remain valid; overwritten foreign intrinsic traversals cannot hide invalid members',()=>{
+ const good=E.fixtures.makeGame(),text=JSON.stringify(good);
+ for(const method of ['entries','map','some','forEach','iterator']){
+  const foreign=vm.runInNewContext(`const g=JSON.parse(text);const key=method==='iterator'?Symbol.iterator:method;let calls=0;Object.defineProperty(Array.prototype,key,{value:method==='entries'||method==='iterator'?function*(){calls++;}:method==='map'?function(){calls++;return [];}:method==='some'?function(){calls++;return false;}:function(){calls++;},configurable:true});delete g.party[0].cannotTrade;({g,calls:()=>calls})`,{text,method});
+  assert.ok(E.saveSchema.validateGameContent(foreign.g,E.fixtures.content).length,method);assert.equal(foreign.calls(),0,method);
+ }
+ const foreign=vm.runInNewContext('JSON.parse(text)',{text});Object.freeze(foreign.party);
+ assert.deepEqual(E.saveSchema.validateGameContent(foreign,E.fixtures.content),[]);
+ const noPrototype=clone(good);Object.setPrototypeOf(noPrototype.party,null);
+ assert.ok(E.saveSchema.validateGame(noPrototype).length);
+});

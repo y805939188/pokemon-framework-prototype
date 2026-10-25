@@ -1661,11 +1661,20 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     await scenario("B53-H05 legal7 then corruption: menu/direct/autosave reject with zero disk writes", async () => {
       await G.DataManager.loadGame(54); assert(!G.$gameSystem._psSaveError, "legal7 was actually loaded");
       const good = clone(game()), hashes = saveFileHashes(), outcomes: any[] = [];
-      for (const kind of ["bad-R", "bad-reference", "bad-layout"]) {
+      for (const kind of ["bad-R", "bad-reference", "bad-layout", "array-entries", "array-forEach"]) {
         G.$gameSystem._psGame = clone(good);
         if (kind === "bad-R") {game().party[0].readyToEvolve = false; game().party[0].evolutionReadiness = "unknown";}
         if (kind === "bad-reference") game().party[0].species = "missing-species";
         if (kind === "bad-layout") game().dex.layoutIdentity = "0".repeat(64);
+        if (kind === "array-entries") {
+          const hidden = clone(game().party[0]); hidden.id = "HiddenNW2"; delete hidden.cannotTrade;
+          game().party = [game().party[0], hidden];
+          Object.setPrototypeOf(game().party, Object.create(Array.prototype, {entries: {value: function* (this: any[]) {yield [0, this[0]];}}}));
+        }
+        if (kind === "array-forEach") {
+          game().inventory.pockets[0] = [{itemId: "missing-item", quantity: -1}];
+          Object.setPrototypeOf(game().inventory.pockets, Object.create(Array.prototype, {forEach: {value: () => {throw new Error("untrusted traversal must not run");}}}));
+        }
         const damaged = JSON.stringify(game()), save = G.StorageManager.saveObject, make = G.DataManager.makeSaveContents;
         let storageCalls = 0, makeCalls = 0;
         G.StorageManager.saveObject = function (this: any, ...args: any[]) {storageCalls++; return save.apply(this, args);};
