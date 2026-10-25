@@ -82,9 +82,14 @@ export function parseEvolutionInteger(text: string): { ok: true; value: number }
 export const WORLD_WEATHER_EVOLUTION_METHOD: Readonly<Record<string, EvolutionMethodId>> = Object.freeze({ None: "LevelNoWeather", Sun: "LevelSun", Rain: "LevelRain", Storm: "LevelRain", HeavyRain: "LevelRain", Fog: "LevelRain", Snow: "LevelSnow", Blizzard: "LevelSnow", Sandstorm: "LevelSandstorm" });
 /** All forward edges remain intact; the first registered matching predecessor is the static reverse relation. */
 export function firstEvolutionPredecessor(content: Content, target: SpeciesKey): SpeciesKey | null {
-  for (const key of content.registrationOrder ?? []) {
-    const data = speciesDataOf(content, { species: key.species, form: key.form });
-    for (const entry of data?.evolutions ?? []) if (entry.method !== "None" && entry.target === target.species && (entry.form ?? 0) === target.form && battleNameOf(content, key) !== null) return { ...key };
-  }
-  return null;
+  const targetData = speciesDataOf(content, {species:target.species,form:target.form});
+  const targetForm = targetData?.form ?? 0;
+  const find = (form: number): SpeciesKey | null => {
+    for (const key of content.registrationOrder ?? []) {
+      const data = speciesDataOf(content, {species:key.species,form:key.form});
+      for (const entry of data?.evolutions ?? []) if (entry.target === target.species && (entry.form ?? 0) === form && battleNameOf(content,key) !== null) return {...key};
+    }
+    return null;
+  };
+  return find(targetForm) ?? (targetForm ? find(0) : null);
 }

@@ -8,8 +8,10 @@ import { DEFAULT_LIMITS } from "../rules/limits.ts";
 import { MAX_FORM } from "../rules/species-key.ts";
 import { checkOverrides, developmentCapabilities } from "../rules/config.ts";
 import {
-  CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, SCHEMA_VERSION, SOURCE_KINDS, STAT_KEYS_ALLOWED, USAGE_DECISIONS,
+  CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, AUTHOR_SCHEMA_VERSION, COMPILED_SCHEMA_VERSION, SOURCE_KINDS, STAT_KEYS_ALLOWED, USAGE_DECISIONS,
 } from "./schema.ts";
+import { CONTENT_SHOWDOWN_SHA } from "./showdown-pin.ts";
+import { PROGRESSION_FIELDS, progressionFieldProblem, inheritSpecies, deriveSpeciesFields, checkProgressionReferences, checkRegionalDex, checkMapMetadata } from "./progression-input.ts";
 import type { CompiledContent, ContentError, ContentInputs, GrantSource, Overlay, SourceEntry, SpeciesSource } from "./schema.ts";
 
 type Obj = Record<string, unknown>;
@@ -24,7 +26,7 @@ export function canonicalJson(v: unknown, indent = 0): string {
 
 export function hashInputs(inputs: ContentInputs): string {
   // grants/settings are undefined for content without those files: JSON drops the key, so older hashes are unchanged
-  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants, settings: inputs.settings, items: inputs.items, shops: inputs.shops }));
+  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants, settings: inputs.settings, items: inputs.items, shops: inputs.shops, regionalDex: inputs.regionalDex, mapMetadata: inputs.mapMetadata }));
 }
 
 const ID = /^[a-z][a-z0-9-]{0,30}$/;
@@ -60,7 +62,7 @@ const FIELD_CHECK: Record<string, (v: unknown) => string | null> = {
     if (!Array.isArray(v)) return "must be an array of {level, move}";
     const seen = new Set<string>();
     for (const [i, e] of v.entries()) {
-      if (!isObj(e) || !isInt(e["level"], 1, 100) || typeof e["move"] !== "string" || !SHOWDOWN_ID.test(e["move"])) return `entry ${i} must be {level: 1..100, move: "<showdown move id>"}`;
+      if (!isObj(e) || !isInt(e["level"], 0, 100) || typeof e["move"] !== "string" || !SHOWDOWN_ID.test(e["move"])) return `entry ${i} must be {level: 0..100, move: "<showdown move id>"}`;
       const key = `${e["level"]}:${e["move"]}`;
       if (seen.has(key)) return `entry ${i} repeats level ${e["level"]} / move ${e["move"]}`;
       seen.add(key);
@@ -68,8 +70,10 @@ const FIELD_CHECK: Record<string, (v: unknown) => string | null> = {
     return null;
   },
 };
+export function speciesFieldProblem(field: string, value: unknown): string | null { return FIELD_CHECK[field]?.(value) ?? null; }
+for (const field of PROGRESSION_FIELDS) FIELD_CHECK[field] = value => progressionFieldProblem(field, value);
 
-export type CompileResult = { ok: true; data: CompiledContent; errors: [] } | { ok: false; errors: ContentError[] };
+export type CompileResult = { ok: true; data: CompiledContent; errors: []; warnings: ContentError[] } | { ok: false; errors: ContentError[] };
 
 /** Located problems of a pre-use check record (DETAILED-PLAN §280, D5-2); empty = complete. */
 export function usageCheckProblems(u: unknown, path: string): { path: string; message: string }[] {
@@ -128,7 +132,7 @@ export function showdownDependencyProblem(sources: readonly SourceEntry[]): stri
   return problem ? `the content's species and moves are read from the pinned Showdown build: ${problem}` : null;
 }
 
-export function compileContent(inputs: ContentInputs, developerCapabilities: unknown = {}): CompileResult {
+export function compileContent(inputs: ContentInputs, developerCapabilities: unknown = {}, context: { showdownSha: string } = { showdownSha: CONTENT_SHOWDOWN_SHA }): CompileResult {
   const capabilities = developmentCapabilities(developerCapabilities);
   const errors: ContentError[] = [];
   const report: Report = (file, path, message) => { errors.push({ file, path, message }); };
@@ -139,7 +143,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
   else {
     const m = inputs.manifest;
     checkKnownKeys(m, ["schema", "id", "title"], "manifest.json", "$", report);
-    if (m["schema"] !== SCHEMA_VERSION) report("manifest.json", "$.schema", `must be ${SCHEMA_VERSION} (this compiler only knows schema ${SCHEMA_VERSION})`);
+    if (m["schema"] !== AUTHOR_SCHEMA_VERSION) report("manifest.json", "$.schema", `must be ${AUTHOR_SCHEMA_VERSION} (this compiler only knows schema ${AUTHOR_SCHEMA_VERSION})`);
     if (typeof m["id"] !== "string" || !ID.test(m["id"])) report("manifest.json", "$.id", "must be an id like \"sample\"");
     else contentId = m["id"];
     if (typeof m["title"] !== "string" || !m["title"]) report("manifest.json", "$.title", "must be a non-empty string");
@@ -167,7 +171,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
   else for (const [i, s] of inputs.species.entries()) {
     const p = `[${i}]`;
     if (!isObj(s)) { report("species.json", p, "must be an object"); continue; }
-    checkKnownKeys(s, ["id", "form", "showdownId", "nameKey", "growth", "baseExp", "evYield", "catchRate", "happiness", "learnset", "source"], "species.json", p, report);
+    checkKnownKeys(s, ["id", "form", "showdownId", "nameKey", "growth", "baseExp", "evYield", "catchRate", "happiness", "learnset", "source", ...PROGRESSION_FIELDS], "species.json", p, report);
     const form = s["form"] === undefined ? 0 : s["form"];
     if (!isInt(form, 0, MAX_FORM)) report("species.json", `${p}.form`, `must be an integer from 0 to ${MAX_FORM} (0 = the base form)`);
     const label = typeof s["id"] === "string" ? `${p} (${s["id"]}${form ? ` form ${String(form)}` : ""})` : p;
@@ -180,10 +184,11 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
     if (typeof s["showdownId"] !== "string" || !SHOWDOWN_ID.test(s["showdownId"])) report("species.json", `${p}.showdownId`, "must be a Showdown species id (lowercase letters and digits)");
     if (s["happiness"] !== undefined) { const issue = FIELD_CHECK["happiness"]!(s["happiness"]); if (issue) report("species.json", `${p}.happiness`, issue); }
     for (const f of ["nameKey", "growth", "baseExp", "catchRate", "evYield", "learnset"] as const) {
-      if (!(f in s)) { report("species.json", `${p}.${f}`, `missing required field "${f}" in ${label}`); continue; }
+      if (!(f in s)) { if (form !== 0) continue; report("species.json", `${p}.${f}`, `missing required field "${f}" in ${label}`); continue; }
       const problem = FIELD_CHECK[f]!(s[f]);
       if (problem) report("species.json", `${p}.${f}`, `${problem} (in ${label})`);
     }
+    for (const field of PROGRESSION_FIELDS) if (Object.hasOwn(s, field)) { const problem = progressionFieldProblem(field, s[field]); if (problem) report("species.json", `${p}.${field}`, problem); }
     if (typeof s["nameKey"] === "string") {
       const prev = nameKeys.get(s["nameKey"]);
       if (prev !== undefined) report("species.json", `${p}.nameKey`, `text key "${s["nameKey"]}" is already used by ${prev}`);
@@ -199,7 +204,8 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
 
   // ---- overlays: author patches on top of the base records, never silently conflicting
   let overlaysApplied = 0;
-  const merged = new Map<string, SpeciesSource>(species.map((sp) => [recordKey(sp.id, sp.form ?? 0), JSON.parse(JSON.stringify(sp)) as SpeciesSource]));
+  const inherited = inheritSpecies(species);
+  const merged = new Map<string, SpeciesSource>(inherited.map((sp) => [recordKey(sp.id, sp.form ?? 0), JSON.parse(JSON.stringify(sp)) as SpeciesSource]));
   const setBy = new Map<string, number>();
   if (!Array.isArray(inputs.overlays)) report("overlays.json", "$", "must be an array");
   else for (const [i, o] of inputs.overlays.entries()) {
@@ -235,7 +241,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
     return at === undefined ? `species.json [${baseIndex.get(target)}]` : `overlays.json [${at}].set.${field}`;
   };
   for (const [key, group] of holders) {
-    if (group.length < 2) continue;
+    if (group.length < 2 || new Set(group.map(target => merged.get(target)!.id)).size === 1) continue;
     for (const target of group) {
       const at = setBy.get(`${target}#nameKey`);
       if (at === undefined) continue; // a base record: base-only duplicates were reported above
@@ -282,21 +288,38 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
   // ---- settings: the rule configuration overrides (WP02 subset, rules/config.ts)
   if (inputs.settings !== undefined) for (const p of checkOverrides(inputs.settings)) report("settings.json", p.path, p.message);
 
+  const registrationOrder = species.map(sp => ({species: sp.id, form: sp.form ?? 0}));
+  const effective = [...merged.values()];
+  const warnings: ContentError[] = [];
+  deriveSpeciesFields(effective, report, (file,path,message)=>warnings.push({file,path,message}));
+  const effectiveByKey = new Map(effective.map(sp=>[recordKey(sp.id,sp.form??0),sp]));
+  for (const [i,sp] of effective.entries()) for (const [j,entry] of (sp.evolutions??[]).entries()) {
+    const target=effectiveByKey.get(recordKey(entry.target,entry.form??0));
+    if(target && target.growth!==sp.growth) warnings.push({file:"species.json",path:`[${i}].evolutions[${j}]`,message:`cross-growth-curve: ${sp.id} (${sp.growth}) -> ${target.id} (${target.growth})`});
+  }
+  if (!errors.length) checkProgressionReferences(effective, report);
+  const regionalDex = checkRegionalDex(inputs.regionalDex, registrationOrder, usable, report);
+  const mapMetadata = checkMapMetadata(inputs.mapMetadata, regionalDex, usable, report);
+  const offsets = (inputs.settings as {DEXES_WITH_OFFSETS?: unknown} | undefined)?.DEXES_WITH_OFFSETS;
+  if (Array.isArray(offsets)) for (const [i, region] of offsets.entries()) if (typeof region === "number" && region >= regionalDex.regions.length) report("settings.json", `$.DEXES_WITH_OFFSETS[${i}]`, "unknown region reference");
+  if (!/^[a-f0-9]{40}$/.test(context.showdownSha)) report("compiled", "$.showdownSha", "must be the 40-character pinned Showdown SHA");
   if (errors.length) return { ok: false, errors };
+  const inputsHash = hashInputs(inputs);
   const data: CompiledContent = {
-    schema: SCHEMA_VERSION, contentId, inputsHash: hashInputs(inputs), sources: [...sources].sort((a, b) => a.id.localeCompare(b.id)),
+    schema: COMPILED_SCHEMA_VERSION, contentId, inputsHash, showdownSha: context.showdownSha, contentIdentity: sha256Hex(canonicalJson({compiledSemantics: COMPILED_SCHEMA_VERSION, inputsHash, showdownSha: context.showdownSha})), registrationOrder, regionalDex, ...(mapMetadata ? {mapMetadata} : {}), sources: [...sources].sort((a, b) => a.id.localeCompare(b.id)),
     overlaysApplied, species: [...merged.values()].sort((a, b) => a.id.localeCompare(b.id) || (a.form ?? 0) - (b.form ?? 0)),
     ...(inputs.items !== undefined ? { items: itemInputs.items } : {}),
     ...(inputs.shops !== undefined ? { shops: itemInputs.shops } : {}),
     ...(inputs.grants !== undefined ? { grants: [...grants].sort((a, b) => a.id.localeCompare(b.id)) } : {}),
     ...(inputs.settings !== undefined ? { settings: { ...(inputs.settings as import("../rules/config.ts").RuleOverrides) } } : {}),
   };
-  return { ok: true, data, errors: [] };
+  return { ok: true, data, errors: [], warnings };
 }
 
 /** Is a compiled document still the build of exactly these inputs? (stale or missing output must not pass as current) */
 export function checkFresh(compiled: unknown, inputs: ContentInputs): ContentError | null {
   if (!isObj(compiled) || typeof compiled["inputsHash"] !== "string") return { file: "compiled", path: "$.inputsHash", message: "compiled content is missing or has no inputsHash: run the content build" };
+  if (compiled["schema"] !== COMPILED_SCHEMA_VERSION) return {file:"compiled",path:"$.schema",message:`needs-rebuild: compiled content must use schema ${COMPILED_SCHEMA_VERSION}`};
   const now = hashInputs(inputs);
   if (compiled["inputsHash"] !== now) return { file: "compiled", path: "$.inputsHash", message: `compiled content is stale (built from ${compiled["inputsHash"].slice(0, 12)}, inputs are now ${now.slice(0, 12)}): run the content build` };
   return null;
