@@ -196,3 +196,15 @@ test('non-callable inherited toJSON data is inert and remains readable',()=>{
  assert.deepEqual(E.saveSchema.validateGameContent(foreign,E.fixtures.content),[]);
  assert.deepEqual(E.saveSchema.validateGameContent(JSON.parse(JSON.stringify(foreign)),E.fixtures.content),[]);
 });
+
+for(const method of ['next','iterator'])test(`foreign native array Iterator.${method} cannot hide stored members`,()=>{
+ const good=E.fixtures.makeGame();
+ const foreign=vm.runInNewContext(`const g=JSON.parse(text);delete g.party[1].cannotTrade;let calls=0;const p=Object.getPrototypeOf(g.party.entries()),next=p.next;if(method==='next')Object.defineProperty(p,'next',{value:function(){calls++;const v=Reflect.apply(next,this,[]);return !v.done&&Array.isArray(v.value)&&v.value[0]===1?{done:true}:v;},configurable:true});else Object.defineProperty(p,Symbol.iterator,{value:function*(){calls++;},configurable:true});({g,calls:()=>calls})`,{text:JSON.stringify(good),method});
+ assert.ok(E.saveSchema.validateGameContent(foreign.g,E.fixtures.content).some(p=>p.path==='$.party[1].cannotTrade'));
+ assert.equal(foreign.calls(),0,'validation never executes a foreign iterator');
+ const h=host();h.system._psGame=foreign.g;assert.throws(()=>h.context.DataManager.makeSaveContents());assert.equal(h.counts().made,0);
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-array-iterator7-'));try{const file=path.join(dir,'save.json'),store=new E.store.SaveStore(file,{},E.speciesKey.identityKeys,E.fixtures.content);store.save(good);const bytes=fs.readFileSync(file);assert.throws(()=>store.save(foreign.g));assert.deepEqual(fs.readFileSync(file),bytes);assert.equal(fs.existsSync(file+'.tmp'),false);assert.equal(foreign.calls(),0);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('validation view preserves invalid primitives instead of repairing them with JSON conversion',()=>{
+ for(const damage of [g=>{g.party[0].origin.map=NaN;},g=>{g.storage.boxes[0].slots[0]=undefined;},g=>{g.money=Infinity;}]){const g=E.fixtures.makeGame();damage(g);assert.ok(E.saveSchema.validateGameContent(g,E.fixtures.content).length);}
+});

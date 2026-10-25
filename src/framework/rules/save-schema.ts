@@ -153,13 +153,6 @@ function validateOwner(value: unknown, path: string, out: Problem[]): void {
   if (!isInt(value["id"], 0, 0xffffffff) || typeof value["name"] !== "string" || !isInt(value["gender"], 0, 2) || !isInt(value["language"], 0)) out.push({ path, message: "must contain uint32 id, string name, gender 0/1/2 and nonnegative language" });
 }
 
-// These are the only instance traversal methods used on save arrays by this validator and its finite delegates
-// (inventory/dex/statistics). Another realm's native methods have the same intrinsic text; an override must never
-// decide which stored elements get checked. Keep the references here, before any caller supplies a document.
-const arrayTraversal = ["entries", "map", "some", "forEach", Symbol.iterator].map(key => ({
-  key, text: Function.prototype.toString.call(Object.getOwnPropertyDescriptor(Array.prototype, key)!.value),
-}));
-
 /** JSON-shaped own data only: sparse lists and inherited records cannot pass then change meaning during cloning. */
 function validatePlainData(value: unknown, path: string, out: Problem[], ancestors = new Set<object>()): void {
   if (value === null || typeof value !== "object") return;
@@ -169,12 +162,6 @@ function validatePlainData(value: unknown, path: string, out: Problem[], ancesto
     const constructor = prototype && Object.getOwnPropertyDescriptor(prototype, "constructor");
     if (!prototype || !Array.isArray(prototype) || !constructor || !("value" in constructor) || typeof constructor.value !== "function" || constructor.value.prototype !== prototype || Function.prototype.toString.call(constructor.value) !== Function.prototype.toString.call(Array)) {
       out.push({path, message: "must be an own plain-data array with an intrinsic prototype"}); return;
-    }
-    for (const method of arrayTraversal) {
-      const descriptor = Object.getOwnPropertyDescriptor(prototype, method.key);
-      if (!descriptor || !("value" in descriptor) || typeof descriptor.value !== "function" || Function.prototype.toString.call(descriptor.value) !== method.text) {
-        out.push({path, message: "save arrays must retain intrinsic traversal methods"}); return;
-      }
     }
   } else {
     const prototype = Object.getPrototypeOf(value) as object | null;
@@ -213,6 +200,22 @@ function validatePlainData(value: unknown, path: string, out: Problem[], ancesto
   ancestors.delete(value);
 }
 
+/** Private validation view after the own-data gate. Copy descriptors, never caller traversal or JSON conversion.
+ * It preserves primitive values (including undefined/nonfinite values for the existing domain checks to reject),
+ * and never installs/normalizes this view into the game. Dictionary keys such as __proto__ remain own data.
+ */
+function ownDataForChecks<T>(value: T): T {
+  if (value === null || typeof value !== "object") return value;
+  const array = Array.isArray(value);
+  const result: object = array ? [] : Object.create(null) as object;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Object.keys(descriptors)) {
+    if (array && key === "length") continue;
+    Object.defineProperty(result, key, {value: ownDataForChecks(descriptors[key]!.value), enumerable: true, configurable: true, writable: true});
+  }
+  return result as T;
+}
+
 /** Strict structural validation of a CURRENT-schema (or already migrated) document. Located problems, all of them. */
 export function validateGame(x: unknown): Problem[] {
   const out: Problem[] = [];
@@ -222,7 +225,7 @@ export function validateGame(x: unknown): Problem[] {
   const schema = typeof schemaProperty.value === "number" ? schemaProperty.value : 0;
   if (!isInt(x["schema"], 1)) out.push({ path: "$.schema", message: "must be a positive integer" });
   else if (!SUPPORTED_SCHEMAS.includes(schema)) out.push({ path: "$.schema", message: `unsupported schema ${schema}` });
-  if (schema >= 7) { validatePlainData(x, "$", out); if (out.length) return out; }
+  if (schema >= 7) { validatePlainData(x, "$", out); if (out.length) return out; x = ownDataForChecks(x); }
   const allowedTop = schema >= 5 ? [...TOP_KEYS.filter((k) => k !== "boxes"), "storage", "player", "nextMemberOrdinal"] : TOP_KEYS;
   if (schema >= 6) { allowedTop.splice(allowedTop.indexOf("bag"),1); allowedTop.push("inventory","badges"); }
   knownKeys(x, allowedTop, "$", out);
@@ -300,8 +303,9 @@ export function validateGame(x: unknown): Problem[] {
 export function validateGameContent(state: unknown, content: Content): Problem[] {
   const out = validateGame(state);
   if (out.length) return out;
-  const doc = state as Obj;
-  if (doc["schema"] !== SAVE_SCHEMA) return [{ path: "$.schema", message: "must migrate to schema 7 before installation or saving" }];
+  const raw = state as Obj;
+  if (raw["schema"] !== SAVE_SCHEMA) return [{ path: "$.schema", message: "must migrate to schema 7 before installation or saving" }];
+  const doc = ownDataForChecks(raw);
   out.push(...dexContentProblems(content));
   if (out.length) return out;
   const catalog = catalogOf(content);
