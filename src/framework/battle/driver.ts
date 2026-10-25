@@ -84,6 +84,9 @@ export interface BattleDriver {
   drainObservations?(): ObservationBatch;
   /** Control-path faint triggers; independent of optional observation quality/failures. */
   drainFriendshipFaints?(): Extract<BattleObservation, { kind: "faint" }>[];
+  /** A member-bound rollback point for only live/set friendship, not the already-executed main action. */
+  checkpointFriendship?(side: string, id: string): DriverCheckpoint;
+  restoreFriendship?(token: DriverCheckpoint): void;
   applyFriendship?(side: string, id: string, change: { expected: number; value: number }): { before: number; after: number };
   moveInfo(nameOrId: string): { id: string; name: string; pp: number };
   /** Re-issue the pending requests after state changed between turns. */

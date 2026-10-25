@@ -1645,7 +1645,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-capability.json"))) {
       await scenario("C53-V1 real restart: isolated MZ save keeps primary state and no transient companion", async () => {
         const expected = readExpected("ps-flow-expected-capability.json"); G.DataManager.setupNewGame(); await G.DataManager.loadGame(expected.slot);
-        eq(game(), expected.state, "primary save identical across fresh NW process"); assert(!game().battleEvidence && !game().evolutionReadiness, "no transient packet or unimplemented schema field installed");
+        eq(game(), expected.state, "primary save identical across fresh NW process"); assert(!game().battleEvidence && api().storage.allMembers(game()).every((m: any) => !Object.hasOwn(m, "evolutionReadiness")), "no transient packet or unimplemented member schema field installed");
         eq(game().appliedBattles["host-capability-1"].hash, expected.rawHash, "original raw result ledger retained"); return { slot: expected.slot, input: "MZ load API in fresh NW process", primaryUnchanged: true };
       });
       return;

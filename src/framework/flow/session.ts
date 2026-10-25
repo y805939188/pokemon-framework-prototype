@@ -25,6 +25,7 @@ import { EvidenceRecorder } from "./battle-evidence.ts";
 import { battleFriendshipValue } from "../rules/battle-evidence.ts";
 import type { BattleEvidenceContext, EvidenceBinding, BattleEvidence, FriendEvidence, BattleObservation } from "../rules/battle-evidence.ts";
 import { resolveConfig } from "../rules/config.ts";
+import { own, setOwn } from "../rules/own.ts";
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
 export const END_REASONS = ["caught", "run", "tie", "win"] as const;
@@ -493,7 +494,20 @@ export class BattleSession {
   _ingest(): void {
     this._ingestObservations();
     if (this._evidence) {
-      this._pendingFriendFaints.push(...(this.gw.drainFriendshipFaints?.() ?? []));
+      try {
+        const incoming = this.gw.drainFriendshipFaints?.() ?? [];
+        const validActor = (actor: BattleObservation["target"]): boolean => !!actor && typeof actor.id === "string"
+          && (actor.side === "p1" ? this.party : actor.side === "p2" ? this.foeTeam : []).some(m => m.id === actor.id)
+          && Number.isSafeInteger(actor.level) && actor.level >= 1 && actor.level <= 100
+          && Number.isSafeInteger(actor.hp) && actor.hp >= 0 && Number.isSafeInteger(actor.slot) && actor.slot >= 0 && actor.slot < 6 && typeof actor.active === "boolean";
+        if (!Array.isArray(incoming) || incoming.some(f => f?.kind !== "faint" || !validActor(f.target) || f.target.hp !== 0 || !Array.isArray(f.opponents) || f.opponents.some(p => !validActor(p) || p.side === f.target.side))) throw new Error("invalid friendship control facts");
+        this._pendingFriendFaints.push(...incoming);
+      }
+      catch {
+        this._pendingFriendFaints = [];
+        this._friendUnavailable = [...this._evidence.value.context.playerIds];
+        this._evidence.issue("friendship", "friendship-control-drain-failed");
+      }
     }
     for (let batch = this.gw.drain(); batch.length; batch = this.gw.drain()) for (const m of batch) {
       if (m.kind === "events") {
@@ -522,19 +536,31 @@ export class BattleSession {
     const recorder = this._evidence;
     if (!recorder || this._friendUnavailable.includes(id) || !recorder.value.context.playerIds.includes(id)) return;
     const m = this.party.find(member => member.id === id);
-    if (!m || !this.gw.applyFriendship) { this._friendUnavailable.push(id); recorder.issue("friendship", "friendship-capability-unavailable", id); return; }
+    if (!m || !this.gw.applyFriendship || !this.gw.checkpointFriendship || !this.gw.restoreFriendship) { this._friendUnavailable.push(id); recorder.issue("friendship", "friendship-capability-unavailable", id); return; }
     const before = m.friendship ?? 70;
     const map = recorder.value.context.mapId;
     if ((method === "battleitem" || method === "levelup") && m.origin?.map !== undefined && m.origin.map !== null && map === undefined) { this._friendUnavailable.push(id); recorder.issue("friendship", "friendship-map-unavailable", id); return; }
     const after = battleFriendshipValue(before, method, { sameMap: map !== undefined && m.origin?.map === map, luxuryBall: m.ball?.toLowerCase() === "luxuryball", sootheBell: m.item?.toLowerCase() === "soothebell", affection: resolveConfig(this.content.settings).AFFECTION_EFFECTS });
     if (after === null) { this._friendUnavailable.push(id); recorder.issue("friendship", "friendship-out-of-domain", id); return; }
+    let checkpoint: ReturnType<NonNullable<BattleDriver["checkpointFriendship"]>>;
+    try { checkpoint = this.gw.checkpointFriendship("p1", id); }
+    catch { this._friendUnavailable.push(id); recorder.issue("friendship", "friendship-checkpoint-failed", id); return; }
+    let failure = "friendship-sync-failed";
     try {
       const ack = this.gw.applyFriendship("p1", id, { expected: before, value: after });
-      if (ack.before !== before || ack.after !== after) { this._friendUnavailable.push(id); recorder.issue("friendship", "invalid-friendship-ack", id); return; }
-      m.friendship = after;
-      const changes = recorder.value.friendship[id] ??= { before, current: before, changes: [] };
+      if (ack.before !== before || ack.after !== after) { failure = "invalid-friendship-ack"; throw new Error(failure); }
+    } catch (error) {
+      try { this.gw.restoreFriendship(checkpoint); }
+      catch (restoreError) { this._broken = new SessionBrokenError(error, restoreError); throw this._broken; }
+      this._friendUnavailable.push(id); recorder.issue("friendship", failure, id); return;
+    }
+    m.friendship = after;
+    // This is only the observation copy. Failure cannot undo legal control or suppress the next real trigger.
+    try {
+      let changes = own(recorder.value.friendship, id);
+      if (!changes) { changes = { before, current: before, changes: [] }; setOwn(recorder.value.friendship, id, changes); }
       changes.current = after; changes.changes.push({ method, before, after });
-    } catch { this._friendUnavailable.push(id); recorder.issue("friendship", "friendship-sync-failed", id); }
+    } catch { recorder.issue("friendship", "friendship-record-failed", id); }
   }
 
   _onEvent(e: BattleEvent): void {

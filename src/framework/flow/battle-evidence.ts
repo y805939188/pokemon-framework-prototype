@@ -1,5 +1,6 @@
 /** Finite companion recording for this capability batch, not a persistent workflow/event bus. */
 import { clone, resultHash } from "../rules/state.ts";
+import { own, setOwn } from "../rules/own.ts";
 import type { BattleResult } from "../rules/state.ts";
 import type { BattleEvidence, BattleEvidenceContext, BattleObservation, EvidenceBinding, EvidenceIssue, ObservationBatch } from "../rules/battle-evidence.ts";
 
@@ -31,12 +32,12 @@ export class EvidenceRecorder {
   private count(fact: BattleObservation): void {
     const ours = this.value.context.playerIds;
     if (fact.kind === "hit" && fact.source && ours.includes(fact.source.id) && fact.critical) {
-      this.value.critical[fact.source.id] = (this.value.critical[fact.source.id] ?? 0) + 1;
+      setOwn(this.value.critical, fact.source.id, (own(this.value.critical, fact.source.id) ?? 0) + 1);
     }
     if (ours.includes(fact.target.id)) {
-      if (fact.kind === "hit" || fact.kind === "confusion") this.value.damage[fact.target.id] = (this.value.damage[fact.target.id] ?? 0) + fact.loss;
+      if (fact.kind === "hit" || fact.kind === "confusion") setOwn(this.value.damage, fact.target.id, (own(this.value.damage, fact.target.id) ?? 0) + fact.loss);
       if (fact.kind === "faint") {
-        this.value.damage[fact.target.id] = 0;
+        setOwn(this.value.damage, fact.target.id, 0);
         if (!this.value.fainted.includes(fact.target.id)) this.value.fainted.push(fact.target.id);
       }
     }

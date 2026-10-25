@@ -9,7 +9,8 @@ import { loadFormatExtension, loadSim } from "./showdown-loader.ts";
 import type { LoadedSim } from "./showdown-loader.ts";
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types.ts";
 import type { BattleEvent } from "./protocol.ts";
-import type { BattleDriver, BattleDriverFactory, GatewayMessage, GatewayOptions, MemberState, SlotSpec, StateRecord, Unsequenced } from "./driver.ts";
+import type { BattleDriver, BattleDriverFactory, DriverCheckpoint, GatewayMessage, GatewayOptions, MemberState, SlotSpec, StateRecord, Unsequenced } from "./driver.ts";
+import { own, setOwn } from "../rules/own.ts";
 import type { PartialStats, Stats } from "../rules/types.ts";
 import type { BattleObservation, EvidenceIssue, ObservationBatch } from "../rules/battle-evidence.ts";
 import type { FormatObservation } from "../rules/battle-evidence.ts";
@@ -36,6 +37,7 @@ interface ObservationState {
 }
 interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[] }
 const CHECKPOINTS = new WeakMap<GatewayCheckpoint, CheckpointData>();
+const FRIEND_CHECKPOINTS = new WeakMap<DriverCheckpoint, { owner: BattleGateway; side: string; id: string; member: ShowdownPokemon; live: number; setHad: boolean; stored: unknown }>();
 
 export class BattleGateway implements BattleDriver {
   _env: LoadedSim;
@@ -143,17 +145,17 @@ export class BattleGateway implements BattleDriver {
   _observe(value: FormatObservation): void {
     const state = this._observation, id = value.target.id;
     if (value.kind === "before-loss") {
-      if (state.pending[id]) this._observationIssue("damage", "overlapping-loss-interval", id);
+      if (own(state.pending, id)) this._observationIssue("damage", "overlapping-loss-interval", id);
       delete state.pending[id];
-      if (value.effectType === "Move") state.pending[id] = JSON.parse(JSON.stringify(value)) as typeof value;
+      if (value.effectType === "Move") setOwn(state.pending, id, JSON.parse(JSON.stringify(value)) as typeof value);
       return;
     }
     if (value.kind === "healing") {
-      if (state.pending[id]) { this._observationIssue("damage", "healing-inside-loss-interval", id); delete state.pending[id]; }
+      if (own(state.pending, id)) { this._observationIssue("damage", "healing-inside-loss-interval", id); delete state.pending[id]; }
       return;
     }
     if (value.kind === "move-aborted") {
-      const pre = state.pending[id];
+      const pre = own(state.pending, id);
       if (!pre) return; // an ordinary non-confusion cancellation is not damage
       delete state.pending[id];
       const loss = pre.target.hp - value.target.hp;
@@ -165,15 +167,16 @@ export class BattleGateway implements BattleDriver {
     }
     if (value.kind === "hit") {
       if (!Number.isSafeInteger(value.loss) || value.loss < 0) { this._observationIssue("damage", "invalid-hit-loss", id); return; }
-      if (state.pending[id]) {
-        if (value.domain !== "body" || state.pending[id]!.effect === "confused") this._observationIssue("damage", "unexpected-hit-interval", id);
+      const pre = own(state.pending, id);
+      if (pre) {
+        if (value.domain !== "body" || pre.effect === "confused") this._observationIssue("damage", "unexpected-hit-interval", id);
         delete state.pending[id];
       }
     }
-    if (value.kind === "faint" && state.pending[id]) { this._observationIssue("damage", "unclosed-loss-at-faint", id); delete state.pending[id]; }
+    if (value.kind === "faint" && own(state.pending, id)) { this._observationIssue("damage", "unclosed-loss-at-faint", id); delete state.pending[id]; }
     if (value.kind === "display" || value.kind === "appearance") {
-      if (value.kind === "display" && state.displays[id] === value.details) return;
-      state.displays[id] = value.details;
+      if (value.kind === "display" && own(state.displays, id) === value.details) return;
+      setOwn(state.displays, id, value.details);
     }
     // Bounds apply only to companion quality. Never interrupt a legal engine action or silently claim complete.
     if (state.records.length >= 16384) { this._observationIssue("identity", "observation-capacity-exceeded"); return; }
@@ -187,6 +190,28 @@ export class BattleGateway implements BattleDriver {
   }
 
   drainFriendshipFaints(): Extract<BattleObservation, { kind: "faint" }>[] { return this._friendshipFaints.splice(0); }
+
+  checkpointFriendship(side: string, id: string): DriverCheckpoint {
+    const member = this._mon(side, id), token = Object.freeze({});
+    const live = Object.getOwnPropertyDescriptor(member, "happiness"), stored = Object.getOwnPropertyDescriptor(member.set, "happiness");
+    if (!live || !("value" in live) || !live.writable || (stored ? !("value" in stored) || !stored.writable : !Object.isExtensible(member.set))) throw new Error("battle friendship fields are not writable data");
+    FRIEND_CHECKPOINTS.set(token, { owner: this, side, id, member, live: live.value as number, setHad: !!stored, stored: stored?.value as unknown });
+    return token;
+  }
+
+  restoreFriendship(token: DriverCheckpoint): void {
+    const data = FRIEND_CHECKPOINTS.get(token);
+    if (!data || data.owner !== this || this._mon(data.side, data.id) !== data.member) throw new Error("invalid friendship checkpoint");
+    const member = data.member, live = Object.getOwnPropertyDescriptor(member, "happiness"), stored = Object.getOwnPropertyDescriptor(member.set, "happiness");
+    // Validate both destinations before either write. Missing set.happiness must stay missing (default 255).
+    if (!live || !("value" in live) || !live.writable || (data.setHad ? (stored ? !("value" in stored) || !stored.writable : !Object.isExtensible(member.set)) : stored && !stored.configurable)) throw new Error("battle friendship cannot be restored");
+    member.happiness = data.live;
+    if (data.setHad) {
+      if (stored) member.set.happiness = data.stored;
+      else Object.defineProperty(member.set, "happiness", { value: data.stored, enumerable: true, writable: true, configurable: true });
+    } else delete member.set.happiness;
+    FRIEND_CHECKPOINTS.delete(token);
+  }
 
   applyFriendship(side: string, id: string, { expected, value }: { expected: number; value: number }): { before: number; after: number } {
     if (![expected, value].every(h => Number.isSafeInteger(h) && h >= 0 && h <= 255)) throw new Error("friendship value outside 0..255");

@@ -96,3 +96,45 @@ test('factory seal failure cannot lose capture/XP or rerun on duplicate finish',
  const content=sample(),game=F.savedFor(F.makeGame(),content),state=E.fakes.createMemoryState(game),factory=E.composition.createBattleSessionFactory({content:()=>content,seed:()=>seed});let calls=0;factory.evidence=()=>{calls++;throw Error('injected seal failure');};
  const app=new E.app.GameApplication({state,sessions:factory,projection:E.fakes.createRecordingProjection(),content:()=>({content}),random:n=>0,clock:()=>0},{receivingProfile:{naming:1,mode:1}}),request={battleId:'app-seal-failure',kind:'wild',seq:1,foes:[{species:'pidgey',level:5}]};const s=await app.startBattle(request);await s.throwBall('masterball');const out=app.finishBattle(s,request);assert.equal(out.commit,'applied');assert.equal(state.current().party.length,4);assert(state.current().party[0].exp>game.party[0].exp);assert(out.diagnostics.some(x=>x.includes('读取失败')));assert.equal(app.battleEvidenceSnapshot(s),null);assert.equal(app.finishBattle(s,request).commit,'already-applied');assert.equal(calls,1);
 });
+
+for(const failure of ['throw','malformed'])test('control drain '+failure+' preserves successful item, capture and XP while closing only friend execution',async()=>{
+ const {s,game}=await session({party:[member('P1','Charizard',50,['flamethrower'],{hp:50,friendship:99})]});
+ s.gw.drainFriendshipFaints=()=>{if(failure==='throw')throw Error('injected control read');return [{}];};
+ assert((await s.useItem('potion','P1')).ok);assert.equal(s.bag.potion,3);assert(s.gw.readState('p1')[0].hp>50);
+ await s.throwBall('masterball');assert.equal(s.result().captured.length,1);assert(s.result().members.P1.exp>game.party[0].exp);assert(seal(s).issues.some(i=>i.reason==='friendship-control-drain-failed'));
+});
+for(const failure of ['bad-ack','postwrite-throw'])test('friend '+failure+' restores live/set and working value before later Return',async()=>{
+ const outcomes=[];
+ for(const injected of [false,true]){
+  const {s}=await session({party:[member('P1','Snorlax',100,['return'],{hp:50,friendship:4})],foes:[member('F1','Snorlax',100,['splash'])]});
+  const apply=s.gw.applyFriendship.bind(s.gw);s.gw.applyFriendship=(...args)=>{if(!injected)throw Error('before write');const ack=apply(...args);if(failure==='postwrite-throw')throw Error('after write');return {before:ack.before+1,after:ack.after+1};};
+  await s.useItem('potion','P1');assert.equal(s.party[0].friendship,4);assert.equal(s.gw._debugBattle().p1.pokemon[0].happiness,4);assert.equal(s.gw._debugBattle().p1.pokemon[0].set.happiness,4);
+  const hp=s.gw.readState('p2')[0].hp;await s.chooseMove(1);outcomes.push(hp-s.gw.readState('p2')[0].hp);await s.throwBall('masterball');assert.equal(s.result().captured.length,1);
+ }
+ assert.deepEqual(outcomes,[3,3]);
+});
+test('friend checkpoint is owner-bound, preserves absent set default and restores only friend',async()=>{
+ const g=await gw([set('P1','Snorlax',50,['return'],{happiness:255})],[set('F1','Snorlax',100,['splash'])]),other=await gw([set('P1','Snorlax',50,['return'])],[set('F1','Snorlax',100,['splash'])]);
+ const p=g._debugBattle().p1.pokemon[0];delete p.set.happiness;const token=g.checkpointFriendship('p1','P1');assert.deepEqual(Object.keys(token),[]);
+ g.applyFriendship('p1','P1',{expected:255,value:70});g.seedState('p1',[{id:'P1',hp:50}]);assert.throws(()=>other.restoreFriendship(token));assert.throws(()=>g.restoreFriendship(clone(token)));
+ g.restoreFriendship(token);assert.equal(p.happiness,255);assert(!Object.hasOwn(p.set,'happiness'));assert.equal(p.hp,50);assert.throws(()=>g.restoreFriendship(token));
+});
+test('missing friend recovery capability refuses the new effect before a write, preserving main capture',async()=>{
+ const {s}=await session({party:[member('P1','Charizard',50,['flamethrower'],{hp:50,friendship:99})]});let calls=0;const apply=s.gw.applyFriendship.bind(s.gw);s.gw.applyFriendship=(...args)=>{calls++;return apply(...args);};s.gw.restoreFriendship=undefined;
+ await s.useItem('potion','P1');await s.throwBall('masterball');assert.equal(calls,0);assert.equal(s.party[0].friendship,99);assert.equal(s.result().captured.length,1);
+});
+test('genuine local friend recovery failure marks the session broken instead of continuing inconsistent play',async()=>{
+ const {s}=await session({party:[member('P1','Charizard',50,['flamethrower'],{hp:50,friendship:99})]});const apply=s.gw.applyFriendship.bind(s.gw);s.gw.applyFriendship=(...args)=>{apply(...args);throw Error('after write');};s.gw.restoreFriendship=()=>{throw Error('local restore failed');};
+ await assert.rejects(s.useItem('potion','P1'),e=>e.name==='SessionBrokenError'&&/after write/.test(String(e.original))&&/local restore failed/.test(String(e.restoreError)));assert(s.broken);await assert.rejects(s.chooseMove(1),/unusable/);
+});
+test('friend observation-copy failure cannot undo successful control or stop a later real level trigger',async()=>{
+ const m=member('P1','Snorlax',50,['return'],{hp:50,friendship:99});m.exp=E.growth.minExp(C.species.Snorlax.growth,51)-1;
+ const {s}=await session({party:[m]});Object.freeze(s._evidence.value.friendship);await s.useItem('potion','P1');assert.equal(s.party[0].friendship,100);await s.throwBall('masterball');assert.equal(s.party[0].friendship,104);assert.equal(s.gw._debugBattle().p1.pokemon[0].happiness,104);assert(seal(s).issues.some(i=>i.reason==='friendship-record-failed'));assert.equal(s.result().captured.length,1);
+});
+for(const id of ['constructor','__proto__','toString'])test('legal member ID '+id+' survives JSON/opaque restore without prototype writes or missing groups',async()=>{
+ const before=[Object.getOwnPropertyDescriptor(Object.prototype,'current'),Object.getOwnPropertyDescriptor(Object,'current'),Object.getOwnPropertyDescriptor(Object.prototype.toString,'current')];
+ const {s}=await session({party:[member(id,'Snorlax',50,['return'],{hp:50,friendship:99})],foes:[member('F1','Pidgey',5,['tackle'])]});
+ await s.useItem('potion',id);const checkpoint=s._checkpoint();await s.useItem('potion',id);await s._restoreCheckpoint(checkpoint);await s.useItem('potion',id);await s.throwBall('masterball');const evidence=seal(s);
+ assert(Object.hasOwn(evidence.friendship,id));assert.equal(evidence.friendship[id].current,101);assert.equal(evidence.friendship[id].changes.length,2);assert(Object.hasOwn(evidence.damage,id));assert(evidence.damage[id]>0);assert.deepEqual(evidence.issues,[]);
+ assert.deepEqual([Object.getOwnPropertyDescriptor(Object.prototype,'current'),Object.getOwnPropertyDescriptor(Object,'current'),Object.getOwnPropertyDescriptor(Object.prototype.toString,'current')],before);
+});
