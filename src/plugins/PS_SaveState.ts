@@ -70,7 +70,7 @@
       }
     },
     /** Synchronous authority shared by saveGame and makeSaveContents. Never migrates or repairs. */
-    beforeSave(): void {
+    beforeSave(capture = false): any {
       const sys = G.$gameSystem;
       if (!sys || sys._psGame === undefined) throw new Error("state-unusable: framework state is missing");
       if (sys._psSaveError) throw new Error(`state-unusable: ${sys._psSaveError.code}: ${sys._psSaveError.message}`);
@@ -78,9 +78,11 @@
       let content: any;
       try { content = W.PSFlow.content(); } catch (error) { throw new Error(`needs-content: ${String(error instanceof Error ? error.message : error)}`); }
       if (!content?.regionalDex) throw new Error("needs-content: validated layout is unavailable");
-      const problems = schema().validateGameContent(sys._psGame, content);
+      const prepared = capture ? schema().snapshotForSave(sys._psGame, content) : null;
+      const problems = prepared ? (prepared.ok ? [] : prepared.problems) : schema().validateGameContent(sys._psGame, content);
       if (problems.length) throw new Error(`invalid-state: ${problems[0].path} ${problems[0].message}`);
       delete sys._psSaveWarning;
+      return prepared?.state;
     },
   });
 
@@ -124,10 +126,16 @@
   }
   const baseMake = G.DataManager.makeSaveContents;
   G.DataManager.makeSaveContents = function (this: any) {
-    try { PSState.beforeSave(); } catch (error) {
+    let snapshot: any;
+    try { snapshot = PSState.beforeSave(true); } catch (error) {
       PSState.lastSaveError = {code: "state-invalid", message: String(error instanceof Error ? error.message : error), savefileId: null, at: Date.now()};
       throw error;
     }
-    return baseMake.call(this);
+    const contents = baseMake.call(this);
+    if (!contents?.system || typeof contents.system !== "object") throw new Error("state-unusable: save contents have no Game_System");
+    const descriptors = Object.getOwnPropertyDescriptors(contents.system);
+    descriptors._psGame = {value: snapshot, enumerable: true, configurable: true, writable: true};
+    contents.system = Object.create(Object.getPrototypeOf(contents.system), descriptors);
+    return contents;
   };
 })();

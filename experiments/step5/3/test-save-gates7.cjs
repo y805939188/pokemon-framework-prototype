@@ -29,7 +29,7 @@ function host() {
   const context = {
     Error, Date, Promise, console: {error(){},warn(){}}, require: p => {assert.match(p,/engine\.cjs$/);return E;},
     Game_System: System, $gameSystem: system,
-    DataManager: {extractSaveContents(){}, makeSaveContents(){made++;return {state:system._psGame};}, saveGame(){saved++;this.makeSaveContents();return Promise.resolve(0);}},
+    DataManager: {extractSaveContents(){}, makeSaveContents(){made++;return {system};}, saveGame(){saved++;this.makeSaveContents();return Promise.resolve(0);}},
     PSFlow: {running:false, operationPending:()=>pending, content(){if(unavailable)throw Error('injected unavailable content');return content;},speciesKeyResolver:()=>E.speciesKey.speciesKeyResolver(content),stateReplaced(){replacements++;}},
   };
   context.window=context;
@@ -207,4 +207,48 @@ for(const method of ['next','iterator'])test(`foreign native array Iterator.${me
 });
 test('validation view preserves invalid primitives instead of repairing them with JSON conversion',()=>{
  for(const damage of [g=>{g.party[0].origin.map=NaN;},g=>{g.storage.boxes[0].slots[0]=undefined;},g=>{g.money=Infinity;}]){const g=E.fixtures.makeGame();damage(g);assert.ok(E.saveSchema.validateGameContent(g,E.fixtures.content).length);}
+});
+
+function actualMZJsonEx(){
+ const core=fs.readFileSync(path.join(ROOT,'js/reactor_core.js'),'utf8');
+ const start=core.indexOf('function JsonEx()'),end=core.indexOf('JsonEx._decode = function');
+ assert.ok(start>=0&&end>start,'pinned actual MZ serializer source is installed');
+ return vm.runInNewContext(core.slice(start,end)+'\nJsonEx');
+}
+test('optional inherited fields remain rejected in the own-data view without calling their getters',()=>{
+ for(const key of ['nickname','statusCount']){
+  const f=vm.runInNewContext(`const g=JSON.parse(text);delete g.party[0][key];let calls=0;Object.defineProperty(Object.prototype,key,{get(){calls++;return key==='nickname'?'Inherited':1;},configurable:true});({g,calls:()=>calls})`,{text:JSON.stringify(E.fixtures.makeGame()),key});
+  assert.ok(E.saveSchema.validateGameContent(f.g,E.fixtures.content).some(p=>p.path===`$.party[0].${key}`));assert.equal(f.calls(),0);
+ }
+});
+test('both writers use an owned verified snapshot, including actual MZ serializer hook behavior',()=>{
+ for(const hook of ['tag','constructor-name']){
+  const h=host(),good=clone(h.system._psGame);
+  if(hook==='constructor-name')Object.defineProperty(good.appliedBattles,'constructor',{value:{hash:'0'.repeat(64)},enumerable:true,writable:true,configurable:true});
+  const f=vm.runInNewContext(`const g=JSON.parse(text);let calls=0;if(hook==='tag')Object.defineProperty(Array.prototype,Symbol.toStringTag,{get(){calls++;if(this===g.party)delete g.party[1].cannotTrade;return 'Array'},configurable:true});else Object.defineProperty(Object.prototype,'name',{get(){calls++;delete g.party[1].cannotTrade;return 'Bad'},configurable:true});({g,calls:()=>calls})`,{text:JSON.stringify(good),hook});
+  h.system._psGame=f.g;const contents=h.context.DataManager.makeSaveContents();
+  assert.notEqual(contents.system,h.system);assert.equal(Object.getPrototypeOf(contents.system),Object.getPrototypeOf(h.system));assert.notEqual(contents.system._psGame,f.g);
+  const encoded=actualMZJsonEx().stringify(contents),parsed=JSON.parse(encoded).system._psGame;
+  assert.deepEqual(parsed,good);assert.equal(f.calls(),0);assert.equal(Object.hasOwn(f.g.party[1],'cannotTrade'),true);assert.equal(Object.hasOwn(h.system,'@'),false);
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-owned-snapshot7-'));
+  try{const store=new E.store.SaveStore(path.join(dir,'save.json'),{},E.speciesKey.identityKeys,h.content);store.save(f.g);assert.deepEqual(store.load(),good);assert.equal(f.calls(),0);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+ }
+});
+test('snapshot is detached, preserves legal dictionary keys and rejects extra ledger data before encoding',()=>{
+ const h=host(),raw=h.system._psGame;
+ Object.defineProperty(raw.appliedBattles,'constructor',{value:{hash:'0'.repeat(64)},enumerable:true});
+ Object.defineProperty(raw.appliedBattles,'__proto__',{value:{hash:'1'.repeat(64)},enumerable:true});
+ const expected=clone(raw),contents=h.context.DataManager.makeSaveContents();raw.party[0].cannotTrade=true;
+ assert.deepEqual(JSON.parse(actualMZJsonEx().stringify(contents)).system._psGame,expected,'the exact verified values are owned by the pending contents');
+ assert.equal(raw.party[0].cannotTrade,true);assert.equal(Object.hasOwn(raw.appliedBattles,'@'),false);
+ const bad=clone(expected);bad.appliedBattles.constructor.name='Bad';assert.ok(E.saveSchema.validateGameContent(bad,h.content).some(p=>p.path.endsWith('.name')));
+});
+test('SaveStore never reads raw schema accessors before its shared gate',()=>{
+ const g=E.fixtures.makeGame();let calls=0;Object.defineProperty(g,'schema',{get(){calls++;return 7;},enumerable:true});
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-schema-accessor7-'));
+ try{const file=path.join(dir,'save.json'),store=new E.store.SaveStore(file,{},E.speciesKey.identityKeys,E.fixtures.content);assert.throws(()=>store.save(g));assert.equal(calls,0);assert.equal(fs.existsSync(file),false);assert.equal(fs.existsSync(file+'.tmp'),false);}finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('fake intrinsic constructor metadata is rejected without executing a prototype getter',()=>{
+ const g=E.fixtures.makeGame();let calls=0;const ctor=()=>{};Object.defineProperty(ctor,'prototype',{get(){calls++;return proto;}});const proto=Object.assign(Object.create(null),{constructor:ctor});Object.setPrototypeOf(g.party[0],proto);assert.ok(E.saveSchema.validateGame(g).length);assert.equal(calls,0);
 });
