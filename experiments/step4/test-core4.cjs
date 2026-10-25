@@ -17,6 +17,8 @@ const S = E.state;
 const SRC = path.resolve(__dirname, '../../content/sample');
 const read = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
 const content = E.contentRuntime.assembleContent(E.contentCompile.compileContent({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json'), grants: read('grants.json') }).data, E.dex.createDexLookup()).content;
+// National-only schema7 fixture. Receipt changes seen/owned; the later dex-history consumers own other records.
+const expectedEmptyDex = { seen: [], owned: [], hasDex: false, seenForms: {}, lastSeenForm: {}, capturedCounts: {}, defeatedCounts: {}, unlocked: [true], view: { region: -1, indices: [0], mode: 0 }, layoutIdentity: content.regionalDex.layoutIdentity };
 const clone = x => JSON.parse(JSON.stringify(x));
 /** Scripted random(n): returns the queued values in order (each checked against n), then 0. Records the calls. */
 function scripted(values) { const calls = []; const f = n => { const v = values.length ? values.shift() : 0; calls.push([n, v]); assert.ok(v >= 0 && v < n, `scripted value ${v} out of range for ${n}`); return v; }; f.calls = calls; return f; }
@@ -64,7 +66,7 @@ test('createMember: the documented random draws, then every field from species +
   assert.deepEqual([m.status, m.statusCount, m.item, m.ball, m.owner.name, m.friendship, m.nickname], ['', 0, '', 'pokeball', 'player', 70, null]);
   // a created member is battle-shaped (Showdown name); stored with its persistent key (D5-3, step 5.0) it is a valid save member
   assert.equal(m.form, 0);
-  assert.deepEqual(E.saveSchema.validateGame({ ...S.newGame({ party: [] }), party: [E.speciesKey.toPersistentMember(m, content)] }), [], 'a created member, stored with its key, is a valid persistent member');
+  assert.deepEqual(E.saveSchema.validateGame({ ...S.newGame({ content, party: [] }), party: [E.speciesKey.toPersistentMember(m, content)] }), [], 'a created member, stored with its key, is a valid persistent member');
 });
 
 test('createMember over many draws: IVs stay in 0..31, every derivation matches its personal id rule', () => {
@@ -94,7 +96,7 @@ test('createMember refuses what it cannot build, with the reason (no half-built 
 });
 
 // ---- grants
-const fresh = () => S.newGame({ party: [] });
+const fresh = () => S.newGame({ content, party: [] });
 const starter = (state, random = lcg(1), limits) => applyGrant(state, 'starter', content, random, limits);
 
 test('a grant is applied once: members (party first), items, money, and the claim, in one new state', () => {
@@ -141,11 +143,11 @@ test('grant money follows the money cap (WP24: clamped); an explicit write clamp
 
 test('a grant registers every received species as seen and owned (WP26 3.2 gifts), once, only when the grant is applied', () => {
   const r = starter(fresh());
-  assert.deepEqual(r.state.dex, { seen: ['charmander'], owned: ['charmander'] }, 'the starter is in the dex (by content id since step 5.0)');
+  assert.deepEqual(r.state.dex, { ...expectedEmptyDex, seen: ['charmander'], owned: ['charmander'] }, 'the starter is in the dex (by content id since step 5.0)');
   assert.equal(starter(r.state).state, r.state, 'a repeat changes nothing, the dex included');
   const flock = { ...content, settings: {...content.settings,BAG_POCKET_SLOTS:[-1,1,-1,-1,-1,-1,-1,-1]}, grants: { flock: { id: 'flock', members: [{ species: 'Pidgey', level: 3 }, { species: 'Pidgey', level: 4 }, { species: 'Caterpie', level: 2 }], items: { potion: 1 }, money: 0 } } };
   const sighted = fresh(); sighted.dex.seen = ['pidgey'];
-  assert.deepEqual(applyGrant(sighted, 'flock', flock, lcg(2)).state.dex, { seen: ['pidgey', 'caterpie'], owned: ['pidgey', 'caterpie'] }, 'one entry per species; an earlier sighting is kept');
+  assert.deepEqual(applyGrant(sighted, 'flock', flock, lcg(2)).state.dex, { ...expectedEmptyDex, seen: ['pidgey', 'caterpie'], owned: ['pidgey', 'caterpie'] }, 'one entry per species; an earlier sighting is kept');
   const full = fresh(); for (let i = 0; i < 6; i++) full.party.push(createMember({ id: `P-${i}`, species: 'Caterpie', level: 2 }, content, lcg(i)));
   const boxed = starter(full);
   assert.deepEqual([boxed.placed[0].to, boxed.state.dex.owned], ['boxes', ['charmander']], 'a member received into the boxes is registered too');

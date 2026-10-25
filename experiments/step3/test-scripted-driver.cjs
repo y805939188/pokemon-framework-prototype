@@ -14,7 +14,7 @@ const WIN = { events: ['|move|p1a: A-0001|Flamethrower|p2a: M4', '|-damage|p2a: 
 // Showdown is loaded here, so it is written out) and the random is seeded.
 const content = JSON.parse(JSON.stringify(F.content));
 Object.assign(content.species.Pidgey, { abilities: ['Keen Eye', 'Tangled Feet'], gender: 128, learnset: { 1: ['Tackle'] } });
-content.moves = { Tackle: { id: 'tackle', name: 'Tackle', pp: 35 } };
+content.moves = { ...content.moves, Tackle: { id: 'tackle', name: 'Tackle', pp: 35 } };
 const random = () => 0;
 const req = (id, kind = 'trainer') => ({ battleId: id, kind, foes: [{ species: 'Pidgey', level: 5 }], seq: 1 });
 function world(script, game = F.makeGame()) {

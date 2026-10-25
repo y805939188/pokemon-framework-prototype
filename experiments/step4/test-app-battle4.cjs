@@ -22,7 +22,7 @@ const clone = x => JSON.parse(JSON.stringify(x));
 const mk = (id, species, level, extra = {}) => ({ ...E.memberFactory.createMember({ id, species, level }, content, lcg(level * 7 + id.length)), ...extra });
 // a save stores members by content id + form since step 5.0 (D5-3): created (battle-shaped) members are stored that way
 const saved = m => E.speciesKey.toPersistentMember(m, content);
-const gameOf = (party, { bag = { pokeball: 5, potion: 2 }, money = 3000, boxes = [] } = {}) => { const g = S.newGame({ party: [] }); g.party = party.map(saved); I6.setBag(g, bag); g.money = money; H.setBoxed(g, boxes.map(saved)); g.nextMemberOrdinal = E.memberIdentity.initialOrdinal(E.storage.allMembers(g).map(m => m.id)); return g; };
+const gameOf = (party, { bag = { pokeball: 5, potion: 2 }, money = 3000, boxes = [] } = {}) => { const g = S.newGame({ content, party: [] }); g.party = party.map(saved); I6.setBag(g, bag); g.money = money; H.setBoxed(g, boxes.map(saved)); g.nextMemberOrdinal = E.memberIdentity.initialOrdinal(E.storage.allMembers(g).map(m => m.id)); return g; };
 const req = (id, foes = [{ species: 'pidgey', level: 3 }], kind = 'wild', seq = 1) => ({ battleId: id, kind, foes, seq });
 
 function fakeApp(game, { first, limits, noMoneyLoss, random = lcg(9) } = {}) {

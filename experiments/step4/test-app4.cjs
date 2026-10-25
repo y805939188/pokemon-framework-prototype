@@ -14,9 +14,11 @@ const K = E.fakes;
 const SRC = path.resolve(__dirname, '../../content/sample');
 const read = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
 const content = E.contentRuntime.assembleContent(E.contentCompile.compileContent({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json'), grants: read('grants.json') }).data, E.dex.createDexLookup()).content;
+// These fixtures compile no regional input: schema7 starts with national unlocked and no recorded history.
+const expectedEmptyDex = { seen: [], owned: [], hasDex: false, seenForms: {}, lastSeenForm: {}, capturedCounts: {}, defeatedCounts: {}, unlocked: [true], view: { region: -1, indices: [0], mode: 0 }, layoutIdentity: content.regionalDex.layoutIdentity };
 function lcg(seed) { let s = seed >>> 0; return n => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor((s / 4294967296) * n); }; }
 const snap = state => JSON.stringify(state.current());
-function setup(initial = E.state.newGame({ party: [] }), options, activeContent = content) {
+function setup(initial = E.state.newGame({ content, party: [] }), options, activeContent = content) {
   const state = K.createMemoryState(initial);
   const app = new GameApplication({ state, sessions: K.createFakeSessions(() => { throw new Error('no battle in this test'); }), projection: K.createRecordingProjection(), content: () => ({ content: activeContent }), random: lcg(11) }, options);
   return { state, app };
@@ -28,7 +30,7 @@ test('a new game installs the formal empty state: the current schema, no members
   const r = app.startNewGame();
   assert.equal(r.status, 'started');
   const g = state.current();
-  assert.deepEqual([g.schema, g.party, E.storage.boxedMembers(g), I6.bagOf(g), g.money, g.claims, g.appliedBattles, g.dex], [E.state.GAME_SCHEMA, [], [], {}, 3000, {}, {}, { seen: [], owned: [] }]);
+  assert.deepEqual([g.schema, g.party, E.storage.boxedMembers(g), I6.bagOf(g), g.money, g.claims, g.appliedBattles, g.dex], [E.state.GAME_SCHEMA, [], [], {}, 3000, {}, {}, expectedEmptyDex]);
   assert.deepEqual([g.stats, g.steps], [E.stats.newStats(), 0], 'schema 4: statistics and the step counter start at zero');
   assert.ok(!JSON.stringify(g).includes('A-000'), 'no fixture member survives');
   assert.equal(setup(undefined, {}).app.startNewGame() && 1, 1);
@@ -49,7 +51,7 @@ test('claim: applied once, the repeat is reported and changes nothing, the store
 test('claim refusals commit nothing and say why: unknown grant, no room, bag cap, unusable save, no random source', () => {
   const unknown = setup(); const u = unknown.app.claimGrant('nope');
   assert.deepEqual([u.status, u.reason], ['refused', 'unknown-grant']); assert.equal(unknown.state.replaced.length, 0);
-  const g = E.state.newGame({ party: [] }); I6.setItemCount(g, "potion", 995);
+  const g = E.state.newGame({ content, party: [] }); I6.setItemCount(g, "potion", 995);
   const capped = setup(g, undefined, {...content,settings:{...content.settings,BAG_POCKET_SLOTS:[-1,1,-1,-1,-1,-1,-1,-1]}}); const c = capped.app.claimGrant('starter');
   assert.deepEqual([c.status, c.reason], ['refused', 'bag-full']); assert.match(c.error, /inventory-full/);
   assert.equal(capped.state.replaced.length, 0); assert.equal(capped.state.current().claims.starter, undefined, 'no claim written');
@@ -57,7 +59,7 @@ test('claim refusals commit nothing and say why: unknown grant, no room, bag cap
   assert.deepEqual([f.status, f.reason], ['refused', 'no-room']);
   const broken = setup(); broken.state.failRead = new Error('the save state is not usable (corrupt)');
   const b = broken.app.claimGrant('starter'); assert.deepEqual([b.status, b.reason], ['refused', 'state-unusable']); assert.match(b.error, /corrupt/);
-  const state = K.createMemoryState(E.state.newGame({ party: [] }));
+  const state = K.createMemoryState(E.state.newGame({ content, party: [] }));
   const noRandom = new GameApplication({ state, sessions: K.createFakeSessions(() => { throw new Error('x'); }), projection: K.createRecordingProjection(), content: () => ({ content }) });
   const n = noRandom.claimGrant('starter'); assert.deepEqual([n.status, n.reason], ['refused', 'no-random']); assert.equal(state.replaced.length, 0);
 });
@@ -68,11 +70,11 @@ test('claim with a failing store: nothing is installed, and a retry applies exac
   const r = app.claimGrant('starter');
   assert.deepEqual([r.status, r.reason, r.error], ['pending', 'commit-failed', 'store refused']);
   assert.deepEqual(state.current().claims, {}); assert.equal(state.current().party.length, 0);
-  assert.deepEqual(state.current().dex, { seen: [], owned: [] }, 'no dex entry left behind by the failed write');
+  assert.deepEqual(state.current().dex, expectedEmptyDex, 'no dex entry left behind by the failed write');
   state.failReplace = null;
   assert.equal(app.resolveReceiving(r.token, {}).status, 'applied'); assert.equal(app.claimGrant('starter').status, 'already-claimed');
   assert.equal(state.replaced.length, 1); assert.equal(state.current().party.length, 1);
-  assert.deepEqual(state.current().dex, { seen: ['charmander'], owned: ['charmander'] }, 'members, items, claim and dex in the same replacement');
+  assert.deepEqual(state.current().dex, { ...expectedEmptyDex, seen: ['charmander'], owned: ['charmander'] }, 'members, items, claim and dex in the same replacement');
 });
 
 test('heal: the party is restored once; healing again is safe and writes nothing', () => {
@@ -99,13 +101,13 @@ test('content ids that are also Object.prototype names work end to end: a "const
   assert.equal(E.contentRuntime.resolveSpecies(ct, 'constructor'), 'Charmander', 'the author id resolves to its species');
   assert.equal(E.contentRuntime.resolveSpecies(ct, 'toString'), null, 'an inherited name resolves to nothing');
   const mk = initial => { const state = K.createMemoryState(initial); const sessions = K.createFakeSessions(() => { throw new Error('x'); }); return { state, sessions, app: new GameApplication({ state, sessions, projection: K.createRecordingProjection(), content: () => ({ content: ct }), random: lcg(5) }) }; };
-  const w = mk(E.state.newGame({ party: [] }));
+  const w = mk(E.state.newGame({ content: ct, party: [] }));
   const first = w.app.claimGrant('constructor');
   assert.deepEqual([first.status, first.placed.map(p => [p.id, p.species, p.form])], ['applied', [['M1', 'constructor', 0]]], 'stored by its content id since step 5.0 (D5-3)');
   assert.equal(w.app.claimGrant('constructor').status, 'already-claimed');
   const loaded = mk(JSON.parse(JSON.stringify(w.state.current()))); // a later process reading the save
   assert.equal(loaded.app.claimGrant('constructor').status, 'already-claimed'); assert.equal(loaded.state.replaced.length, 0);
-  assert.equal(mk(E.state.newGame({ party: [] })).app.claimGrant('toString').reason, 'unknown-grant');
+  assert.equal(mk(E.state.newGame({ content: ct, party: [] })).app.claimGrant('toString').reason, 'unknown-grant');
   await loaded.app.startBattle({ battleId: 'alias#1', seq: 1, kind: 'wild', foes: [{ species: 'constructor', level: 5 }] });
   assert.equal(loaded.sessions.created[0].setup.foes[0].species, 'Charmander', 'a foe named by the author id is created from its species');
   assert.deepEqual(E.contentRuntime.findDanglingReferences({ party: [{ id: 'probe', species: 'toString', form: 0, moves: [] }], storage: E.storage.newStorage() }, ct).map(d => d.path), ['$.party[0].species'], 'a saved species key must be an own key of the content (an inherited name is not)');
