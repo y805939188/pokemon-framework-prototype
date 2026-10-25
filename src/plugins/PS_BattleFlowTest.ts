@@ -1617,6 +1617,8 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     return Object.fromEntries(fs.readdirSync(dir).filter((name: string) => fs.statSync(path.join(dir, name)).isFile()).sort().map((name: string) => [name, nodeRequire("crypto").createHash("sha256").update(fs.readFileSync(path.join(dir, name))).digest("hex")]));
   }
   async function runProgressionData() {
+    const progressionRegional = arg("ps-progression-layout") !== "national";
+    report.progressionLayout = progressionRegional ? "regional" : "national";
     await toMap();
     await scenario("B53-H01 real setupNewGame: national and regional layouts", async () => {
       const layouts: any[] = [];
@@ -1631,6 +1633,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       return {input: "actual MZ setupNewGame + normal app/content pipeline", layouts};
     });
     await scenario("B53-H02 real schema6 load: all metadata retained then current7 save", async () => {
+      W.PSFlow._content = progressionContent(progressionRegional);
       await toMap(); fresh(); const B = api();
       const six = clone(game()); six.schema = 6; six.dex = {seen: clone(six.dex.seen), owned: clone(six.dex.owned)};
       for (const member of B.storage.allMembers(six)) {delete member.evolutionReadiness; delete member.cannotTrade;}
@@ -1639,16 +1642,21 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       const original = G.$gameSystem._psGame, fixtureContents = G.DataManager.makeSaveContents(); G.$gameSystem._psGame = six;
       try {await G.StorageManager.saveObject("file54", fixtureContents);}
       finally {G.$gameSystem._psGame = original;}
+      const sourceFile = path.join(G.StorageManager.fileDirectoryPath(), "file54.rmmzsave"), sourceBytes = fs.readFileSync(sourceFile);
+      const sourceSha = nodeRequire("crypto").createHash("sha256").update(sourceBytes).digest("hex");
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "schema6-source.rmmzsave"), sourceBytes);
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "schema6-document.json"), JSON.stringify(six));
       // The ordinary save gate correctly refuses6; author a test-only MZ fixture through the underlying serializer instead.
       await G.DataManager.loadGame(54);
       assert(!G.$gameSystem._psSaveError, JSON.stringify(G.$gameSystem._psSaveError)); eq(G.$gameSystem._psSaveInfo.from, 6, "actual loader migrated6");
+      eq(nodeRequire("crypto").createHash("sha256").update(fs.readFileSync(sourceFile)).digest("hex"), sourceSha, "loading/migrating left the original schema6 bytes unchanged");
       const g = game(), m = g.party[0]; eq([g.schema, m.readyToEvolve, m.evolutionReadiness, m.cannotTrade, m.abilityIndex, m.effectiveAbilityIndex, m.friendship], [7, true, "known", false, null, null, 256], "precise migration defaults");
       eq(g.appliedBattles, six.appliedBattles, "raw ledger unchanged");
       m.evolutionReadiness = "unknown"; m.cannotTrade = true; m.firstMoves = ["tackle", "gust", "tackle", "roost", "rest", "tackle"];
       const boxedMember = clone(m); boxedMember.id = "B53-BOX"; g.storage.boxes[39].slots[29] = boxedMember;
       await settledSave(54); await settledSave(55);
-      fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-progression-data.json"), JSON.stringify({state: clone(g), slots: [54, 55], regional: true, savedHashes: saveFileHashes()}));
-      return {input: "MZ serializer-authored schema6 fixture -> real loadGame -> saveGame7", sourceFixture: six.schema, layout: g.dex.layoutIdentity, preserved: [m.id, m.firstMoves, m.friendship, m.abilityIndex], lastBox: [39, 29], slots: [54, 55]};
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-progression-data.json"), JSON.stringify({state: clone(g), slots: [54, 55], regional: progressionRegional, schema6SourceSha: sourceSha, savedHashes: saveFileHashes()}));
+      return {input: "MZ serializer-authored schema6 fixture -> real loadGame -> saveGame7", sourceFixture: six.schema, schema6SourceSha: sourceSha, layout: g.dex.layoutIdentity, preserved: [m.id, m.firstMoves, m.friendship, m.abilityIndex], lastBox: [39, 29], slots: [54, 55]};
     });
     await scenario("B53-H05 legal7 then corruption: menu/direct/autosave reject with zero disk writes", async () => {
       await G.DataManager.loadGame(54); assert(!G.$gameSystem._psSaveError, "legal7 was actually loaded");

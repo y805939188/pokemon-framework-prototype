@@ -35,6 +35,10 @@ expected=lambda d:{p.name:sha(p) for p in sorted(d.glob('ps-flow-expected*.json'
 start={'startedUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'concurrency':'UNVERIFIED; read-only process inventory unavailable; never terminates other processes','input':'synthetic DOM/service events in actual host; not hardware input'}
 extra=[]
 if mode in ('capability','progression-data') or os.environ.get('PF_OWNED_BACKGROUND')=='1':extra.append('--ps-flow-background')
+if mode=='progression-data':
+ layout=os.environ.get('PF_OWNED_PROGRESSION_LAYOUT','regional')
+ if layout not in ('regional','national'): raise SystemExit('PF_OWNED_PROGRESSION_LAYOUT must be regional or national')
+ extra.append('--ps-progression-layout='+layout)
 if mode=='verify-save':
  src=Path(os.path.abspath(os.environ['PF_OWNED_EXPECTED']))
  def refuse(reason):
