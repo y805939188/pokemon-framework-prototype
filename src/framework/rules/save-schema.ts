@@ -160,12 +160,20 @@ function validatePlainData(value: unknown, path: string, out: Problem[], ancesto
     }
   }
   ancestors.add(value);
-  if (Array.isArray(value)) {
-    for (let i = 0; i < value.length; i++) {
-      if (!Object.hasOwn(value, i)) out.push({ path: `${path}[${i}]`, message: "sparse arrays are not persistent data" });
-      else validatePlainData(value[i], `${path}[${i}]`, out, ancestors);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(value)) {
+    if (Array.isArray(value) && key === "length") continue;
+    const descriptor = typeof key === "string" ? descriptors[key] : undefined;
+    if (typeof key !== "string" || !descriptor || !descriptor.enumerable || !("value" in descriptor)) {
+      out.push({path: `${path}.${String(key)}`, message: "persistent fields must be own enumerable data properties"});
+      continue;
     }
-  } else for (const [key, entry] of Object.entries(value)) validatePlainData(entry, `${path}.${key}`, out, ancestors);
+    if (Array.isArray(value) && !/^(0|[1-9][0-9]*)$/.test(key)) {
+      out.push({path: `${path}.${key}`, message: "arrays may only contain their indexed data"}); continue;
+    }
+    validatePlainData(descriptor.value, `${path}.${key}`, out, ancestors);
+  }
+  if (Array.isArray(value)) for (let i = 0; i < value.length; i++) if (!Object.hasOwn(value, i)) out.push({path: `${path}[${i}]`, message: "sparse arrays are not persistent data"});
   ancestors.delete(value);
 }
 
@@ -173,10 +181,12 @@ function validatePlainData(value: unknown, path: string, out: Problem[], ancesto
 export function validateGame(x: unknown): Problem[] {
   const out: Problem[] = [];
   if (!isObj(x)) return [{ path: "$", message: "must be an object" }];
-  const schema = typeof x["schema"] === "number" ? x["schema"] : 0;
+  const schemaProperty = Object.getOwnPropertyDescriptor(x, "schema");
+  if (!schemaProperty || !("value" in schemaProperty)) return [{path: "$.schema", message: "schema must be an own data property"}];
+  const schema = typeof schemaProperty.value === "number" ? schemaProperty.value : 0;
   if (!isInt(x["schema"], 1)) out.push({ path: "$.schema", message: "must be a positive integer" });
   else if (!SUPPORTED_SCHEMAS.includes(schema)) out.push({ path: "$.schema", message: `unsupported schema ${schema}` });
-  if (schema >= 7) validatePlainData(x, "$", out);
+  if (schema >= 7) { validatePlainData(x, "$", out); if (out.length) return out; }
   const allowedTop = schema >= 5 ? [...TOP_KEYS.filter((k) => k !== "boxes"), "storage", "player", "nextMemberOrdinal"] : TOP_KEYS;
   if (schema >= 6) { allowedTop.splice(allowedTop.indexOf("bag"),1); allowedTop.push("inventory","badges"); }
   knownKeys(x, allowedTop, "$", out);
