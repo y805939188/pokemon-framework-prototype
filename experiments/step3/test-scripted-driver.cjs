@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../step5/2/test-support.cjs");
 // The same application contract with a scripted battle engine behind the BattleDriver seam: no Showdown is loaded.
 // (Showdown itself is covered by the contract, matrix and integration suites; the real MZ host by the flow scenarios.)
 const test = require('node:test');
@@ -33,7 +34,7 @@ test('a won battle runs end to end on the scripted engine and commits once; a re
   const outcome = app.finishBattle(session, r);
   assert.deepEqual([outcome.code, outcome.commit, outcome.kind, outcome.projection], [1, 'applied', 'win', 'ok']);
   assert.ok(state.current().party[0].exp > before.party[0].exp, 'the winner received experience from the awarded growth');
-  assert.equal(state.current().party[0].level, 50); assert.deepEqual(state.current().bag, before.bag);
+  assert.equal(state.current().party[0].level, 50); assert.deepEqual(I6.bagOf(state.current()), I6.bagOf(before));
   assert.equal(state.replaced.length, 1); assert.equal(state.current().appliedBattles['scripted-win#1'].hash, E.state.resultHash(outcome.result));
   assert.equal(app.finishBattle(session, r).commit, 'already-applied'); assert.equal(state.replaced.length, 1);
   assert.deepEqual(projection.outcomes.map(o => o.code), [1, 1]);
@@ -45,9 +46,9 @@ test('an item used in battle is reserved, consumed by the engine line, and spent
   const { state, app } = world({ maxhp: { 'A-0001': 153 }, turns: [{ events: ['|rpg|item|p1|potion|A-0001|ok|20', ...WIN.events], damage: { 'A-0001': -20, 'M4': 9999 }, end: WIN.end }] }, game);
   const r = req('scripted-item#1'); const s = await app.startBattle(r);
   assert.equal((await s.useItem('potion', 'A-0001')).ok, true);
-  assert.equal(state.current().bag.potion, 3, 'the persistent bag is not touched while the battle runs');
+  assert.equal(I6.bagOf(state.current()).potion, 3, 'the persistent bag is not touched while the battle runs');
   const outcome = app.finishBattle(s, r);
-  assert.equal(outcome.commit, 'applied'); assert.equal(state.current().bag.potion, 2); assert.equal(state.current().party[0].hp, 90);
+  assert.equal(outcome.commit, 'applied'); assert.equal(I6.bagOf(state.current()).potion, 2); assert.equal(state.current().party[0].hp, 90);
 });
 
 test('running ends the battle as "ran" with nothing else changed', async () => {
@@ -57,7 +58,7 @@ test('running ends the battle as "ran" with nothing else changed', async () => {
   const outcome = app.finishBattle(s, r);
   assert.deepEqual([outcome.code, outcome.kind, outcome.commit], [3, 'run', 'applied']);
   const after = JSON.parse(snapshot(state)); const was = JSON.parse(before);
-  assert.deepEqual(after.party.map(m => [m.id, m.level, m.hp]), was.party.map(m => [m.id, m.level, m.hp])); assert.deepEqual(after.bag, was.bag);
+  assert.deepEqual(after.party.map(m => [m.id, m.level, m.hp]), was.party.map(m => [m.id, m.level, m.hp])); assert.deepEqual(I6.bagOf(after), I6.bagOf(was));
 });
 
 test('an engine failure after the engine accepted a choice is rolled back through the driver checkpoint; the retry gives the clean result', async () => {

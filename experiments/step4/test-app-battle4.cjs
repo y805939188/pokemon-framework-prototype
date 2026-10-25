@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../step5/2/test-support.cjs");
 // Step 4 / B, the battle side of the application: foes are created from the content (no fixture), a battle needs an
 // able member, balls are disabled when a catch would have nowhere to go (D1), a lost or drawn battle settles money and
 // heal in the same replacement (D3) exactly once, and encounters are decided by the application. The first half uses
@@ -21,7 +22,7 @@ const clone = x => JSON.parse(JSON.stringify(x));
 const mk = (id, species, level, extra = {}) => ({ ...E.memberFactory.createMember({ id, species, level }, content, lcg(level * 7 + id.length)), ...extra });
 // a save stores members by content id + form since step 5.0 (D5-3): created (battle-shaped) members are stored that way
 const saved = m => E.speciesKey.toPersistentMember(m, content);
-const gameOf = (party, { bag = { pokeball: 5, potion: 2 }, money = 3000, boxes = [] } = {}) => { const g = S.newGame({ party: [] }); g.party = party.map(saved); g.bag = bag; g.money = money; H.setBoxed(g, boxes.map(saved)); g.nextMemberOrdinal = E.memberIdentity.initialOrdinal(E.storage.allMembers(g).map(m => m.id)); return g; };
+const gameOf = (party, { bag = { pokeball: 5, potion: 2 }, money = 3000, boxes = [] } = {}) => { const g = S.newGame({ party: [] }); g.party = party.map(saved); I6.setBag(g, bag); g.money = money; H.setBoxed(g, boxes.map(saved)); g.nextMemberOrdinal = E.memberIdentity.initialOrdinal(E.storage.allMembers(g).map(m => m.id)); return g; };
 const req = (id, foes = [{ species: 'pidgey', level: 3 }], kind = 'wild', seq = 1) => ({ battleId: id, kind, foes, seq });
 
 function fakeApp(game, { first, limits, noMoneyLoss, random = lcg(9) } = {}) {
@@ -211,7 +212,7 @@ test('real: a ball can fail and succeed; the caught member is the created foe; u
     const o = w.app.finishBattle(s, r);
     assert.deepEqual([o.code, o.kind, o.commit], [2, 'caught', 'applied']);
     const now = w.state.current();
-    assert.equal(now.bag.pokeball, 6 - thrown); assert.equal(now.bag.potion, undefined, 'the potion was used once');
+    assert.equal(I6.bagOf(now).pokeball, 6 - thrown); assert.equal(I6.bagOf(now).potion, undefined, 'the potion was used once');
     const c = now.party[1];
     assert.deepEqual([c.id, c.species, c.form, c.level, c.nature, c.ability, c.gender, c.ivs, c.ball], [foe.id, 'pidgey', 0, 3, foe.nature, foe.ability, foe.gender, foe.ivs, 'pokeball'], 'stored by content id + form (D5-3, step 5.0)');
     assert.ok(now.dex.owned.includes('pidgey'));
@@ -231,7 +232,7 @@ test('real: a full party sends a catch to the boxes; with the boxes full too the
   const full = realApp(gameOf(clone(party), { bag: { masterball: 1 }, boxes: [mk('B0', 'Pidgey', 2)] }), { limits: { ...E.limits.DEFAULT_LIMITS, boxes: 1 } });
   const t = await full.app.startBattle(req('box#2', [{ species: 'pidgey', level: 3 }], 'wild', 62));
   assert.deepEqual(await t.throwBall('masterball'), { ok: false, reason: 'ballsdisabled' });
-  assert.equal(t.bag.masterball, 1, 'nothing spent');
+  assert.equal(I6.bagOf(t).masterball, 1, 'nothing spent');
   assert.equal((await t.run()).ok, true); assert.equal(full.app.finishBattle(t, req('box#2')).code, 3);
 });
 
@@ -282,7 +283,7 @@ test('D3 under a battle id that is also "__proto__" or "constructor": a failed s
     state.failReplace = new Error('store refused');
     const failed = app.finishBattle({ result: () => r }, { battleId: id });
     assert.deepEqual([failed.code, failed.commit, failed.pending], [4, 'none', true], id);
-    assert.deepEqual([state.current().money, state.current().bag.potion, state.current().party[0].hp, Object.keys(state.current().appliedBattles)], [1000, 2, 2, []], `${id}: nothing left by the failed write`);
+    assert.deepEqual([state.current().money, I6.bagOf(state.current()).potion, state.current().party[0].hp, Object.keys(state.current().appliedBattles)], [1000, 2, 2, []], `${id}: nothing left by the failed write`);
     state.failReplace = null;
     const o = app.finishBattle({ result: () => r }, { battleId: id });
     assert.deepEqual([o.commit, o.defeat], ['applied', { moneyLost: 72, healed: true }], id);
@@ -290,7 +291,7 @@ test('D3 under a battle id that is also "__proto__" or "constructor": a failed s
     const reloaded = fakeApp(JSON.parse(JSON.stringify(state.current())));
     assert.equal(reloaded.app.commitResult(r), 'already-applied', `${id}: still a repeat after a save round trip`);
     const now = reloaded.state.current();
-    assert.deepEqual([now.money, now.bag.potion, reloaded.state.replaced.length], [928, 1, 0], `${id}: money, item and heal settled once`);
+    assert.deepEqual([now.money, I6.bagOf(now).potion, reloaded.state.replaced.length], [928, 1, 0], `${id}: money, item and heal settled once`);
     assert.ok(Object.hasOwn(now.appliedBattles, id));
   }
 });

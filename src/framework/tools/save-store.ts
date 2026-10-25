@@ -66,6 +66,9 @@ export class SaveStore {
   load(): GameState { return this.loadInfo().state; }
 
   save(state: GameState): void {
+    const checked = migrateGame(state, { ...(this.content ? { content: this.content } : {}) });
+    if (!checked.ok) throw new SaveError(checked.error);
+    if (checked.migrated) throw new SaveError({ code: "invalid", message: "save requires a current state; migrate explicitly before saving; original file untouched" });
     const tmp = this.file + ".tmp";
     const fd = fs.openSync(tmp, "w");
     try {

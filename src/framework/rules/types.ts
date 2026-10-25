@@ -8,6 +8,8 @@ export interface MoveSlot {
   id: string;
   pp: number;
   maxpp: number;
+  /** Required in persistent schema 6, absent in frozen v1 battle records. */
+  ppUps?: number;
 }
 
 /** WP18/WP24: the original owner, independent of the current host actor or UI language. */
@@ -51,6 +53,7 @@ export interface Member {
   item: string;
   ability: string;
   nature: string;
+  statNature?: string | null;
   gender: string;
   ivs?: PartialStats;
   evs?: PartialStats;
@@ -125,6 +128,9 @@ export interface Grant {
 }
 
 export interface Content {
+  /** Absent = explicit legacy compatibility catalog; an empty catalog stays empty. */
+  items?: import('./item-catalog.ts').ItemCatalog;
+  shops?: Record<string, import('./item-catalog.ts').ShopDefinition>;
   species: Record<string, SpeciesData>;
   meta?: ContentMeta;
   /** Every learnset move by its display name (the learnset stores names), with id and PP. Needed to create an individual. */
@@ -137,12 +143,14 @@ export interface Content {
   speciesKeys?: Record<string, SpeciesKey>;
   grants?: Record<string, Grant>;
   /** Rule configuration overrides of the content (rules/config.ts); absent = the Gen 8 defaults. */
-  settings?: Record<string, number>;
+  settings?: import("./settings-types.ts").RuleOverrides;
 }
 
 /** What the content layer needs to know about Showdown's static data (the battle adapter implements it). */
 export interface DexLookup {
   species(showdownId: string): { name: string; baseSpecies: string; types?: string[]; baseStats: Stats; abilities?: (string | null)[]; hiddenAbilities?: (string | null)[]; gender?: GenderRule } | null;
+  /** Optional complete pinned move directory, read only after the source gate. Needed for saved moves outside current learnsets. */
+  allMoves?(): MoveData[];
   move(showdownId: string): { name: string; id?: string; pp?: number } | null;
   /** Gen 8 level-up learn levels per move id (Showdown's learnset data), or null for an unknown species. */
   levelUpMoves(showdownId: string): Record<string, number[]> | null;

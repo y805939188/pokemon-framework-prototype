@@ -4,10 +4,12 @@
  *   members  created by member-factory, named G-<grant id>-<n>; party first, then the boxes (WP38 §6 normal storage);
  *            stored with their persistent key (content id + form, decision D5-3); each received species is registered
  *            as seen and owned in the dex (WP26 §3.2 gifts), once
- *   items    refused as a whole when one would pass the per-item stage cap (an amount already above it, from an
- *            older save, is kept but cannot grow)
- *   money    clamped to the money cap (WP24); a balance already above it is kept, never reduced
+ *   items    ordered slot allocation, with atomic finite-capacity refusal
+ *   money    every explicit write clamps to the configured cap (WP24)
  */
+import { assertInventoryMapped, addItems, inventoryPolicy } from "./inventory.ts";
+import { moneyCap, changeMoney } from "./economy.ts";
+import { catalogOf } from "./item-catalog.ts";
 import { allMembers, boxedMembers, placeInBox } from "./storage.ts";
 import { DEFAULT_LIMITS } from "./limits.ts";
 import type { Limits } from "./limits.ts";
@@ -42,6 +44,7 @@ export function applyGrant(state: GameState, grantId: string, content: Content, 
   const grant = own(content.grants, grantId);
   if (!grant) throw new GrantRefusedError("unknown-grant", `grant "${grantId}" is not in the content${content.meta ? ` "${content.meta.id}"` : ""}`);
   if (grant.members.some((m) => m.item) && !context.allowHeldItemSources) throw new GrantRefusedError("held-item-source-disabled", "held-item-source-disabled");
+  assertInventoryMapped(state.inventory,catalogOf(content));
   const next = clone(state);
   const placed: PlacedMember[] = [];
   const taken = new Set(allMembers(state).map((m) => m.id));
@@ -62,12 +65,12 @@ export function applyGrant(state: GameState, grantId: string, content: Content, 
     for (const k of ["seen", "owned"] as const) if (!next.dex[k].includes(m.species)) next.dex[k].push(m.species);
   }
   for (const [item, count] of Object.entries(grant.items)) {
-    const have = next.bag[item] ?? 0;
-    if (have + count > limits.bagPerItem) throw new GrantRefusedError("bag-full", `grant "${grantId}": ${item} would be ${have + count}, above the stage cap of ${limits.bagPerItem} per item`);
-    next.bag[item] = have + count;
+    try { next.inventory = addItems(next.inventory, item, count, catalogOf(content), inventoryPolicy(content, limits)); }
+    catch (error) { throw new GrantRefusedError("bag-full", String(error)); }
   }
   const before = next.money;
-  next.money = before > limits.money ? before : Math.min(before + grant.money, limits.money);
+  if (!Number.isSafeInteger(before + grant.money)) throw new GrantRefusedError("creation-failed", "money overflow");
+  next.money = changeMoney(before, grant.money, moneyCap(content,limits.money));
   setOwn(next.claims, grantId, { kind: "grant" });
   return { status: "applied", state: next, placed, items: { ...grant.items }, money: next.money - before };
 }

@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("./2/test-support.cjs");
 // Step 5.0 / D5-3: the persistent species key is the content id + form number; the battle layer and protocol v1 keep
 // the Showdown names. Covers the mapping (WP03 §3.2 "(species, form)", r8 FR-000394), content form records and their
 // errors (FR-000396), the battle view, result write-back through the mapping, and schema 4 (validation, 3 -> 4 migration:
@@ -62,7 +63,7 @@ test('members convert both ways; the battle view gives sessions Showdown names a
   assert.equal(battle.form, 1);
   const saved = K.toPersistentMember(battle, formed);
   assert.deepEqual([saved.species, saved.form], ['vulpix', 1]);
-  const projected = clone(battle); delete projected.form;
+  const projected = clone(battle); delete projected.form; delete projected.statNature;
   assert.deepEqual(K.toBattleMember(saved, formed), projected, 'a round trip gives the battle record back');
   assert.throws(() => K.toPersistentMember({ ...battle, species: 'Mew' }, formed), /has no persistent species key/);
   assert.throws(() => K.toBattleMember({ ...saved, species: 'mew' }, formed), /species "mew" \(form 1\) is not in the content/);
@@ -132,7 +133,7 @@ const v3 = () => {
   const box = E.memberFactory.createMember({ id: 'W2-1', species: 'Pidgey', level: 3 }, sample, () => 1);
   const g = H.legacyGame(S.newGame({ party: [] }), 3);
   g.party = [H.legacyMember(m, 3)]; g.boxes = [H.legacyMember(box, 3)]; g.dex = { seen: ['Charmander', 'Pidgey'], owned: ['Charmander', 'Pidgey'] }; g.claims = { starter: { kind: 'grant' } };
-  g.appliedBattles = { 'wild#2': { hash: 'a'.repeat(64) } }; g.bag = { potion: 5000 }; g.money = 2500;
+  g.appliedBattles = { 'wild#2': { hash: 'a'.repeat(64) } }; I6.setBag(g, { potion: 5000 }); g.money = 2500;
   return g;
 };
 
@@ -148,7 +149,7 @@ test('3 -> 4 maps every member and the dex to content id + form, adds statistics
   const raw = v3(), before = clone(raw);
   const r = migrateGame(raw, { speciesKey: K.speciesKeyResolver(sample), content: sample });
   assert.equal(r.ok, true, JSON.stringify(r.error));
-  assert.deepEqual([r.from, r.to, r.migrated], [3, 5, true]);
+  assert.deepEqual([r.from, r.to, r.migrated], [3, 6, true]);
   assert.deepEqual(raw, before, 'the input document is never mutated');
   assert.deepEqual([r.state.party[0].species, r.state.party[0].form, E.storage.boxedMembers(r.state)[0].species, E.storage.boxedMembers(r.state)[0].form], ['charmander', 0, 'pidgey', 0]);
   assert.deepEqual(r.state.dex, { seen: ['charmander', 'pidgey'], owned: ['charmander', 'pidgey'] });

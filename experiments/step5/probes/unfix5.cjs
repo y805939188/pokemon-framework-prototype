@@ -6,6 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '../../..');
+// 5.2 UI extension is opt-in; keep the original cases and all historical logs intact.
+if(process.argv[2]==='--step52-ui'){const r=spawnSync(process.execPath,[path.join(__dirname,'../2/probes/reverse-GH.cjs'),...process.argv.slice(3)],{cwd:ROOT,stdio:'inherit'});process.exit(r.status??1);}
 const FW = 'src/framework';
 const T = f => `experiments/step5/${f}.cjs`;
 const U = [
@@ -75,7 +77,8 @@ const U = [
   { id: 'M01-minior-rule-family', what: 'the data adapter drops stable baseSpecies and substitutes the complete battle form name', edits: [[`${FW}/battle/dex.ts`, 'baseSpecies: s.baseSpecies as string', 'baseSpecies: s.name as string']], tests: ['experiments/step5/1/test-M-remediation.cjs'] },
   {"id": "F-unusable-contained", "what": "unusable saves throw in the map interpreter before the contained scene initialization path", "edits": [["src/plugins/PS_BattleFlow.ts", "      if(!G.$gameSystem._psSaveError&&G.$gameSystem._psGame)PSFlow.assertBattleAllowed();", "      PSFlow.assertBattleAllowed();"]], "tests": ["experiments/step5/test-plugin-host5.cjs"]},
   {"id": "F-app-identity", "what": "generation-zero replacement app shares old UI validity", "edits": [["src/plugins/PS_Management.ts", "valid(){try{return !this.closed&&this.application===app()&&", "valid(){try{return !this.closed&&"]], "tests": ["experiments/step5/1/test-management-ui.cjs"]},
-  {"id": "F-ready-boundary", "what": "UI consumes keys before the start/layout readiness boundary", "edits": [["src/plugins/PS_Management.ts", "if(!this.ready){this.ready=true;record(", "if(false){this.ready=true;record("]], "tests": ["experiments/step5/1/test-management-ui.cjs"]},
+  {"id":"F-ready-first-frame-return","what":"the first ready frame performs an action instead of only sampling release","edits":[["src/plugins/PS_Management.ts","frame,view:this.top()?.kind});return;}","frame,view:this.top()?.kind});}"]],"tests":["experiments/step5/1/test-management-ui.cjs"]},
+  {"id": "F-ready-boundary", "what": "UI never announces readiness (historical broad readiness mutation)", "edits": [["src/plugins/PS_Management.ts", "if(!this.ready){this.ready=true;record(", "if(false){this.ready=true;record("]], "tests": ["experiments/step5/1/test-management-ui.cjs"]},
   {"id": "F-egg-holder", "what": "egg accepts a newly given held item", "edits": [["src/framework/rules/storage-operations.ts", "  if (member.isEgg) return refuse(\"egg\");", ""]], "tests": ["experiments/step5/1/test-management.cjs"]},
   {"id": "F-input-priority", "what": "simultaneous UP/DOWN follows reversed storage direction priority", "edits": [["src/plugins/management/model.ts", "const directions: Direction[] = ['up','left','right','down'];", "const directions: Direction[] = ['down','right','left','up'];"]], "tests": ["experiments/step5/1/test-management-input.cjs"]},
   {"id": "F-stale-held-item", "what": "changed item at the same stable member reference is silently redirected to a new holder", "edits": [["src/framework/app/management.ts", "request.expectedSourceItem!==undefined&&source.item!==request.expectedSourceItem", "false"]], "tests": ["experiments/step5/1/test-management.cjs"]},

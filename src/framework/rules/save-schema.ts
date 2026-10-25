@@ -1,3 +1,6 @@
+import { inventoryFromBag, inventoryPolicy, inventoryProblems } from "./inventory.ts";
+import { catalogOf, itemOf } from "./item-catalog.ts";
+import { baseMovePp, totalPp } from "./member-metadata.ts";
 /**
  * Versioned persistent game state: strict validation, migration from the declared older versions, and errors that are
  * safe to act on. Pure: never touches files or the MZ save, and never mutates its input (migration works on a copy,
@@ -24,7 +27,7 @@ import type { Content, Member } from "./types.ts";
 import type { SpeciesKeyResolver } from "./species-key.ts";
 import { newStats, validateStats } from "./stats.ts";
 
-export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3, 4, 5];
+export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3, 4, 5, 6];
 
 export interface Problem { path: string; message: string }
 export interface SaveErrorInfo {
@@ -63,7 +66,7 @@ function statBlock(v: unknown, lo: number, hi: number, path: string, out: Proble
 
 function validateMember(m: unknown, path: string, out: Problem[], schema: number): void {
   if (!isObj(m)) { out.push({ path, message: "must be an object" }); return; }
-  for (const k of Object.keys(m)) if (!(schema >= 5 ? [...MEMBER_KEYS.filter((k) => k !== "ot"), ...INDIVIDUAL_KEYS] : [...MEMBER_KEYS, ...INDIVIDUAL_KEYS]).includes(k)) out.push({ path: `${path}.${k}`, message: "unknown field (battle-only or temporary state does not belong in a save)" });
+  for (const k of Object.keys(m)) if (!(schema >= 5 ? [...MEMBER_KEYS.filter((k) => k !== "ot"), ...INDIVIDUAL_KEYS, ...(schema >= 6 ? ["statNature"] : [])] : [...MEMBER_KEYS, ...INDIVIDUAL_KEYS]).includes(k)) out.push({ path: `${path}.${k}`, message: "unknown field (battle-only or temporary state does not belong in a save)" });
   if (typeof m["id"] !== "string" || !MEMBER_ID.test(m["id"])) out.push({ path: `${path}.id`, message: "must be 1-18 characters of A-Z a-z 0-9 # . _ : -" });
   for (const k of ["species", "item", "ability", "nature", "gender", "ball", ...(schema >= 5 ? [] : ["ot"])]) if (!(schema < 5 && ["ability", "nature", "gender", "ot"].includes(k) && m[k] === undefined) && typeof m[k] !== "string") out.push({ path: `${path}.${k}`, message: "must be a string" });
   if (typeof m["nature"] === "string" && !Object.hasOwn(NATURES, m["nature"].toLowerCase())) out.push({ path: `${path}.nature`, message: "must name a registered nature (case-insensitive)" });
@@ -82,8 +85,14 @@ function validateMember(m: unknown, path: string, out: Problem[], schema: number
     const p = `${path}.moves[${i}]`;
     if (!isObj(mv) || typeof mv["id"] !== "string" || !isInt(mv["pp"], 0) || !isInt(mv["maxpp"], 1) || (mv["pp"] as number) > (mv["maxpp"] as number)) out.push({ path: p, message: "must be {id, pp >= 0, maxpp >= 1, pp <= maxpp}" });
   }
+  if (schema >= 6 && m["statNature"] !== null && (typeof m["statNature"] !== 'string' || !Object.hasOwn(NATURES, (m["statNature"] as string).toLowerCase()))) out.push({path:`${path}.statNature`,message:'must be null or a registered calculation nature'});
+  if (Array.isArray(m["moves"])) for (const [i, move] of m["moves"].entries()) if (isObj(move)) {
+    const allowed = schema >= 6 ? ['id','pp','maxpp','ppUps'] : ['id','pp','maxpp','ppUps'];
+    knownKeys(move, allowed, `${path}.moves[${i}]`, out);
+    if ((schema >= 6 || move['ppUps'] !== undefined) && !isInt(move['ppUps'],0,3)) out.push({path:`${path}.moves[${i}].ppUps`,message:'must be 0..3'});
+  }
   statBlock(m["ivs"], 0, 31, `${path}.ivs`, out);
-  statBlock(m["evs"], 0, 252, `${path}.evs`, out);
+  statBlock(m["evs"], 0, 255, `${path}.evs`, out);
   validateIndividualFields(m, path, out, schema >= 5);
 
 }
@@ -126,6 +135,7 @@ export function validateGame(x: unknown): Problem[] {
   const schema = typeof x["schema"] === "number" ? x["schema"] : 0;
   if (!isInt(x["schema"], 1)) out.push({ path: "$.schema", message: "must be a positive integer" });
   const allowedTop = schema >= 5 ? [...TOP_KEYS.filter((k) => k !== "boxes"), "storage", "player", "nextMemberOrdinal"] : TOP_KEYS;
+  if (schema >= 6) { allowedTop.splice(allowedTop.indexOf("bag"),1); allowedTop.push("inventory","badges"); }
   knownKeys(x, allowedTop, "$", out);
   const seen = new Set<string>();
   const validateAt = (m: unknown, path: string): void => {
@@ -163,8 +173,11 @@ export function validateGame(x: unknown): Problem[] {
       }
     }
   }
-  if (!isObj(x["bag"])) out.push({ path: "$.bag", message: "must be an object" });
-  else for (const [k, v] of Object.entries(x["bag"])) if (!isInt(v, 1)) out.push({ path: `$.bag.${k}`, message: "must be an integer >= 1 (empty entries are removed)" });
+  if (schema >= 6) {
+    out.push(...inventoryProblems(x['inventory']));
+    if (!Array.isArray(x['badges']) || x['badges'].length < 8 || x['badges'].some(v => typeof v !== 'boolean')) out.push({path:'$.badges',message:'must be a boolean array with at least eight positions'});
+  } else if (!isObj(x["bag"])) out.push({ path: "$.bag", message: "must be an object" });
+  else for (const [k, v] of Object.entries(x["bag"] as Obj)) if (!isInt(v, 1)) out.push({ path: `$.bag.${k}`, message: "must be an integer >= 1 (empty entries are removed)" });
   if (!isInt(x["money"], 0)) out.push({ path: "$.money", message: "must be an integer >= 0" });
   const dex = x["dex"];
   if (!isObj(dex)) out.push({ path: "$.dex", message: "must be {seen, owned}" });
@@ -284,6 +297,25 @@ const MIGRATIONS: Record<number, Migrator> = {
     doc["schema"] = 5;
     notes.push("schema 5: fixed 40×30 storage; stable deterministic legacy PID; trusted fields retained; owner is compatibility data, obtain time/map/method remain unknown");
   },
+  5: (doc, notes, options) => {
+    const content = options.content;
+    try { doc['inventory'] = inventoryFromBag(doc['bag'] as Record<string,number>, catalogOf(content), inventoryPolicy(content)); }
+    catch(error) { throw new MigrationRefused('invalid', `inventory migration refused; original save unchanged: ${String(error)}`, [{path:'$.bag',message:String(error)}]); }
+    const members: {member:Obj;path:string}[] = (doc['party'] as Obj[]).map((member,i)=>({member,path:`$.party[${i}]`}));
+    const storage = doc['storage'] as {boxes:{slots:(Obj|null)[]}[]};
+    for (const [i,box] of storage.boxes.entries()) for (const [j,member] of box.slots.entries()) if(member) members.push({member,path:`$.storage.boxes[${i}].slots[${j}]`});
+    for (const {member,path} of members) {
+      for (const [i,move] of (member['moves'] as Obj[]).entries()) {
+        if (!content) throw new MigrationRefused('needs-content','schema 6 needs validated move base PP before adding PP metadata; nothing changed');
+        const base=baseMovePp(content,move['id'] as string), boost=move['ppUps'] ?? 0;
+        if (base===undefined || move['maxpp']!==totalPp(base,boost as number)) throw new MigrationRefused('invalid','ambiguous-move-pp; repair the content mapping and reload the unchanged save',[{path:`${path}.moves[${i}].maxpp`,message:'base PP/legacy max PP is missing or ambiguous; no guessing or reset'}]);
+        move['ppUps']=boost;
+      }
+      member['statNature']=null;
+    }
+    doc['badges']=Array(8).fill(false);delete doc['bag'];doc['schema']=6;
+    notes.push('schema 6: single ordered inventory authority, badges default false, calculation nature has no override, unambiguous move PP metadata preserved');
+  },
 };
 
 export function migrateGame(raw: unknown, options: MigrateOptions = {}): MigrationResult {
@@ -311,6 +343,13 @@ export function migrateGame(raw: unknown, options: MigrateOptions = {}): Migrati
     v = doc["schema"] as number;
   }
   const problems = validateGame(doc);
+  if (!problems.length && (found < 6 || options.content)) {
+    const catalog = catalogOf(options.content), inventory = (doc as unknown as GameState).inventory;
+    for (const [i,pocket] of inventory.pockets.entries()) for (const [j,slot] of pocket.entries()) {
+      const item = itemOf(catalog,slot.itemId);
+      if (!item) problems.push({path:`$.inventory.pockets[${i}][${j}].itemId`,message:'unmapped item; original save must be kept'});
+    }
+  }
   if (problems.length) return { ok: false, error: { code: "invalid", message: `the save state (schema ${found}) is structurally invalid: ${problems.length} problem(s); first: ${problems[0]!.path} ${problems[0]!.message}`, found, problems } };
   return { ok: true, state: doc as unknown as GameState, from: found, to: GAME_SCHEMA, migrated: found !== GAME_SCHEMA, notes };
 }

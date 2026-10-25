@@ -1,3 +1,6 @@
+import { addItems, removeItems, itemQuantity, inventoryPolicy } from "./inventory.ts";
+import type { Inventory } from "./inventory.ts";
+import { catalogOf } from "./item-catalog.ts";
 /** Pure WP25/66 operations. Callers install the returned next state once, after collecting UI decisions. */
 import { own, setOwn } from "./own.ts";
 import { healMember } from "./heal.ts";
@@ -125,31 +128,26 @@ export function heldDestination(state: MemberCollection, intent: HeldIntent, des
 }
 
 export interface ItemDescriptor { holdable: boolean; mail?: boolean }
-export function giveItem<T extends MemberCollection & { bag: Record<string, number> }>(state: T, ref: MemberReference, item: string, context: { limits: Limits; sourceAllowed: boolean; describe: (id: string) => ItemDescriptor | null }): T {
+export function giveItem<T extends MemberCollection & { inventory: Inventory }>(state: T, ref: MemberReference, item: string, context: { limits: Limits; sourceAllowed: boolean; content?: Content; describe: (id: string) => ItemDescriptor | null }): T {
   if (!context.sourceAllowed) return refuse("held-item-source-disabled");
   const member = referenced(state, ref);
   if (member.isEgg) return refuse("egg");
   const descriptor = context.describe(item);
   if (!item || !descriptor?.holdable || descriptor.mail) return refuse("invalid-held-item");
   if (member.mail) return refuse("mail");
-  if ((own(state.bag, item) ?? 0) < 1) return refuse("no-item");
+  if (itemQuantity(state.inventory, item, catalogOf(context.content)) < 1) return refuse("no-item");
   const next = clone(state), target = locateMember(next, ref.id)!.member;
-  const spent = (own(next.bag, item) ?? 0) - 1; if (!spent) delete next.bag[item]; else setOwn(next.bag, item, spent);
-  if (target.item) {
-    const count = (own(next.bag, target.item) ?? 0) + 1;
-    if (count > context.limits.bagPerItem) return refuse("bag-full");
-    setOwn(next.bag, target.item, count);
-  }
+  next.inventory = removeItems(next.inventory, item, 1, catalogOf(context.content));
+  if (target.item) next.inventory = addItems(next.inventory, target.item, 1, catalogOf(context.content), inventoryPolicy(context.content, context.limits));
   target.item = item; target.mail = null; return next;
 }
-export function takeItem<T extends MemberCollection & { bag: Record<string, number> }>(state: T, ref: MemberReference, limits: Limits): T {
+export function takeItem<T extends MemberCollection & { inventory: Inventory }>(state: T, ref: MemberReference, limits: Limits, content?: Content): T {
   const member = referenced(state, ref);
   if (member.mail) return refuse("mail");
   if (!member.item) return state;
   const next = clone(state), target = locateMember(next, ref.id)!.member;
-  const count = (own(next.bag, target.item) ?? 0) + 1;
-  if (count > limits.bagPerItem) return refuse("bag-full");
-  setOwn(next.bag, target.item, count); target.item = ""; target.mail = null; return next;
+  next.inventory = addItems(next.inventory, target.item, 1, catalogOf(content), inventoryPolicy(content, limits));
+  target.item = ""; target.mail = null; return next;
 }
 export function swapItems<T extends MemberCollection>(state: T, source: MemberReference, target: MemberReference, sourceAllowed: boolean): T {
   if (!sourceAllowed) return refuse("held-item-source-disabled");

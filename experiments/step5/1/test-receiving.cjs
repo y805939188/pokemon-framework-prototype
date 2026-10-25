@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../2/test-support.cjs");
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const E=require('../../../js/engine/build/engine.cjs');const S=E.state;const T=E.storage;const clone=x=>JSON.parse(JSON.stringify(x));
 const read=f=>JSON.parse(fs.readFileSync(path.join(__dirname,'../../../content/sample',f),'utf8'));
 const content=E.contentRuntime.assembleContent(E.contentCompile.compileContent({manifest:read('manifest.json'),sources:read('sources.json'),species:read('species.json'),overlays:read('overlays.json'),grants:read('grants.json')}).data,E.dex.createDexLookup()).content;
@@ -12,7 +13,7 @@ async function battle(x,opts={}){let result; x.sessions.next=()=>result;const r=
 test('P51-14: capture pending retains save lock and all raw state; decline nickname then atomically joins party',async()=>{
  const x=setup(),r=await battle(x);const raw=JSON.stringify(x.state.current());const pending=x.app.finishBattle(r.handle,r.request);assert.equal(pending.pending,true);assert.equal(x.app.saveBlocked,true);assert.equal(JSON.stringify(x.state.current()),raw);assert.equal(x.projection.outcomes.length,0);
  const done=x.app.resolveReceiving(pending.receivingToken,{[r.foe.id]:{nickname:{kind:'keep'}}});assert.equal(done.commit,'applied');assert.equal(x.app.saveBlocked,false);assert.equal(x.state.replaced.length,1);const member=T.locateMember(x.state.current(),r.foe.id).member;
- assert.equal(member.personalID,r.foe.personalID);assert.deepEqual(member.owner,r.foe.owner);assert.equal(member.origin.receivedAt,1234567890);assert.equal(member.hp,1);assert.equal(member.species,'pidgey');assert.deepEqual(member.firstMoves,member.moves.map(m=>m.id));assert.equal(x.state.current().bag.pokeball,4);
+ assert.equal(member.personalID,r.foe.personalID);assert.deepEqual(member.owner,r.foe.owner);assert.equal(member.origin.receivedAt,1234567890);assert.equal(member.hp,1);assert.equal(member.species,'pidgey');assert.deepEqual(member.firstMoves,member.moves.map(m=>m.id));assert.equal(I6.bagOf(x.state.current()).pokeball,4);
  const same=x.app.resolveReceiving(pending.receivingToken,{});assert.deepEqual(same,done);assert.equal(x.state.replaced.length,1);assert.equal(x.app.finishBattle(r.handle,r.request).commit,'already-applied');
 });
 test('P51-14: full party chooses replacement by ID; template PID/form/owner kept and raw result hash unchanged',async()=>{
@@ -55,21 +56,21 @@ test('P51-14: ordinary scene-failure fallback stores in named current box and no
 });
 test('P51-14/22: replace failure keeps raw result/template/lock for a single retry, no RNG reroll or partial resource loss',async()=>{
  const x=setup({options:{receivingProfile:auto}}),r=await battle(x);const draws=x.draws,before=clone(x.state.current());x.state.failReplace=Error('injected replacement failure');const pending=x.app.finishBattle(r.handle,r.request);assert.equal(pending.pending,true);assert.match(pending.error,/commit-failed/);assert.deepEqual(x.state.current(),before);assert.equal(x.app.saveBlocked,true);x.state.failReplace=null;
- const done=x.app.resolveReceiving(pending.receivingToken,{});assert.equal(done.commit,'applied');assert.equal(x.draws,draws);assert.equal(x.state.replaced.length,1);assert.equal(x.state.current().stats.wild_battles_won,1);assert.equal(x.state.current().bag.pokeball,4);
+ const done=x.app.resolveReceiving(pending.receivingToken,{});assert.equal(done.commit,'applied');assert.equal(x.draws,draws);assert.equal(x.state.replaced.length,1);assert.equal(x.state.current().stats.wild_battles_won,1);assert.equal(I6.bagOf(x.state.current()).pokeball,4);
 });
 test('P51-15: multi-member grant is all-or-none across pending decisions and commit failure',()=>{
  const members=clone(content);members.grants.pair={id:'pair',members:[{species:'Pidgey',level:3},{species:'Caterpie',level:3}],items:{potion:2},money:100};const base=S.newGame({party:[],bag:{potion:1}});const state=E.fakes.createMemoryState(base);let draws=0;const app=new E.app.GameApplication({state,sessions:E.fakes.createFakeSessions({}),projection:E.fakes.createRecordingProjection(),content:()=>({content:members}),random:()=>{draws++;return 0;},clock:()=>1000});
  const pending=app.claimGrant('pair');assert.equal(pending.status,'pending');const templates=app.pendingReceiving.members,first=templates[0].id,second=templates[1].id;const expectedDraws=draws;
  assert.equal(app.resolveReceiving(pending.token,{[first]:{nickname:{kind:'keep'}}}).status,'pending');assert.deepEqual(state.current(),base);assert.equal(draws,expectedDraws);
  state.failReplace=Error('fail');const rejected=app.resolveReceiving(pending.token,{[second]:{nickname:{kind:'keep'}}});assert.equal(rejected.status,'pending');assert.equal(rejected.reason,'commit-failed');assert.deepEqual(state.current(),base);state.failReplace=null;
- assert.equal(app.resolveReceiving(pending.token,{}).status,'applied');assert.equal(draws,expectedDraws);assert.equal(state.replaced.length,1);assert.equal(state.current().party.length,2);assert.equal(state.current().bag.potion,3);assert.equal(state.current().money,100);assert.deepEqual(state.current().claims,{pair:{kind:'grant'}});
+ assert.equal(app.resolveReceiving(pending.token,{}).status,'applied');assert.equal(draws,expectedDraws);assert.equal(state.replaced.length,1);assert.equal(state.current().party.length,2);assert.equal(I6.bagOf(state.current()).potion,3);assert.equal(state.current().money,100);assert.deepEqual(state.current().claims,{pair:{kind:'grant'}});
 });
 test('P51-15: normal/silent/party/foreign default to level 1; party-silent missing level explicitly refuses',()=>{
  for(const kind of ['normal','silent','party','foreign']){const x=setup({size:0,options:{receivingProfile:auto}});assert.equal(x.app.receiveGift({kind,member:{species:'pidgey'}}).status,'applied',kind);assert.equal(x.state.current().party[0].level,1);}
  const x=setup({size:0});assert.equal(x.app.receiveGift({kind:'party-silent',member:{species:'pidgey'}}).reason,'level-required');assert.equal(x.state.replaced.length,0);
 });
 test('P51-03/04/14: new provenance is injected once; unknown legacy owner flag is separate from origin',()=>{
- const existing=E.memberIdentity.completeIndividual({...S.protocolMember(E.speciesKey.toPersistentMember(E.memberFactory.createMember({id:'legacy',species:'Pidgey',level:3},content,()=>0),content)),form:0},content.species.Pidgey);assert.equal(existing.ownerCompatibilityDefault,true);assert.equal(existing.origin.compatibilityDefault,true);
+ const existing=E.memberIdentity.completeIndividual({...S.protocolMember(E.speciesKey.toPersistentMember(E.memberFactory.createMember({id:'legacy',species:'Pidgey',level:3},content,()=>0),content)),form:0},content.species.Pidgey);existing.statNature=null;existing.moves=existing.moves.map(m=>({...m,ppUps:0}));assert.equal(existing.ownerCompatibilityDefault,true);assert.equal(existing.origin.compatibilityDefault,true);
  const x=setup({size:0});assert.equal(x.app.receiveGift({kind:'foreign',member:{existing},foreignOwner:{name:'Known'}}).status,'applied');const received=x.state.current().party[0];assert.equal(received.ownerCompatibilityDefault,false);assert.equal(received.origin.compatibilityDefault,true,'old obtain location/time remains unknown after assigning a known foreign owner');
 });
 test('P51-09/14: eggs do not make a party battle-able and unsupported egg/mail gift sources refuse',async()=>{

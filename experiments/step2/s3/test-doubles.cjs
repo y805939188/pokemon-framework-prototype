@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../../step5/2/test-support.cjs");
 // 2.3 gate, part 3: representative doubles combinations (engine level). Not an exhaustive doubles
 // matrix: multi-target catching, Safari-style rules, mega/dynamax and doubles AI are NOT covered.
 const test = require('node:test');
@@ -165,10 +166,10 @@ test('D9 doubles ledger: item reserved per spec, refund on refused choice, spent
 	s.take();
 	// refused choice (bad move index) => reservation returned
 	const bad = await s.chooseDoubles([{ kind: 'item', item: 'potion', target: 'A-0001' }, { move: 99 }]);
-	assert.equal(bad.ok, false); assert.equal(s.bag.potion, 3);
+	assert.equal(bad.ok, false); assert.equal(I6.bagOf(s).potion, 3);
 	// real use: reserved then consumed
 	const good = await s.chooseDoubles([{ kind: 'item', item: 'potion', target: 'A-0001' }, { move: 4 }]);
-	assert.ok(good.ok); assert.equal(s.bag.potion, 2); assert.equal(s.ledger.at(-1).state, 'consumed');
+	assert.ok(good.ok); assert.equal(I6.bagOf(s).potion, 2); assert.equal(s.ledger.at(-1).state, 'consumed');
 	// ball refused with two living foes: nothing reserved
 	assert.deepEqual(s.gw.query('p1', 'ball', 0), { allowed: false, reason: 'multiplefoes' });
 });
@@ -186,8 +187,8 @@ test('review #4: a choice reserved in one slot but never executed (battle ended 
 	assert.ok(r.ok && s.finished);
 	const res = s.result();
 	assert.equal(res.outcome.kind, 'caught');
-	assert.equal(res.bag.potion, undefined, 'the never-executed Potion is back in the bag (bag delta 0)');
-	assert.equal(res.bag.masterball, -1);
+	assert.equal(I6.bagOf(res).potion, undefined, 'the never-executed Potion is back in the bag (bag delta 0)');
+	assert.equal(I6.bagOf(res).masterball, -1);
 	assert.equal(s.ledger.find(e => e.itemId === 'potion').why, 'unexecuted');
 });
 
@@ -198,23 +199,23 @@ test('review #5: chooseDoubles applies the same guards as the menu query (two fo
 	s.take();
 	const ball = { kind: 'ball', ball: 'pokeball', target: 'W1-1' };
 	assert.deepEqual(await s.chooseDoubles([ball, { move: 4 }]), { ok: false, reason: 'multiplefoes' });
-	assert.equal(s.bag.pokeball, 5, 'refused: no ball consumed');
+	assert.equal(I6.bagOf(s).pokeball, 5, 'refused: no ball consumed');
 	assert.equal(s.ledger.length, 0);
 	// a ball must be the first action of the round
 	const one = await BattleSession.create({ game: makeGame(), battleId: 'R5b', content, seed: [1, 2, 3, 4], doubles: true, foe: { kind: 'wild', team: [foeMember('W1-1', 'Pidgey', 5), foeMember('W1-2', 'Snorlax', 40, ['protect'])] } });
 	one.take();
 	await one.chooseDoubles([{ move: 1, target: 1 }, { move: 4 }]); // one living foe left
 	assert.deepEqual(await one.chooseDoubles([{ move: 4 }, { kind: 'ball', ball: 'pokeball', target: 'W1-2' }]), { ok: false, reason: 'notfirst' });
-	assert.equal(one.bag.pokeball, 5);
+	assert.equal(I6.bagOf(one).pokeball, 5);
 	// trainer battle (same policy as singles, decided 2026-10-18): running is refused; a ball is thrown, spent and blocked
 	const tr = await BattleSession.create({ game: makeGame(), battleId: 'R5c', content, seed: [1, 2, 3, 4], doubles: true, foe: { kind: 'trainer', team: twoFoes } });
 	tr.take();
 	assert.deepEqual(await tr.chooseDoubles([{ kind: 'run' }, { move: 4 }]), { ok: false, reason: 'trainer' });
-	assert.equal(tr.bag.pokeball, 5, 'a refused run consumed nothing');
+	assert.equal(I6.bagOf(tr).pokeball, 5, 'a refused run consumed nothing');
 	const thrown = await tr.chooseDoubles([ball, { move: 4 }]);
 	assert.ok(thrown.ok && !tr.finished);
 	assert.equal(rpg(lines(thrown.messages), 'ball')[0][6], 'blocked');
-	assert.equal(tr.bag.pokeball, 4, 'the ball is spent');
+	assert.equal(I6.bagOf(tr).pokeball, 4, 'the ball is spent');
 });
 
 test('review #7: items that cannot work are refused at registration in doubles too (no reservation, no turn)', async () => {
@@ -223,5 +224,5 @@ test('review #7: items that cannot work are refused at registration in doubles t
 		foe: { kind: 'wild', team: [foeMember('W1-1', 'Snorlax', 40, ['protect']), foeMember('W1-2', 'Snorlax', 40, ['protect'])] } });
 	s.take();
 	assert.deepEqual(await s.chooseDoubles([{ kind: 'item', item: 'potion', target: 'A-0001' }, { move: 4 }]), { ok: false, reason: 'item-no-effect' });
-	assert.equal(s.bag.potion, 3); assert.equal(s.ledger.length, 0); assert.deepEqual(s.take(), []);
+	assert.equal(I6.bagOf(s).potion, 3); assert.equal(s.ledger.length, 0); assert.deepEqual(s.take(), []);
 });

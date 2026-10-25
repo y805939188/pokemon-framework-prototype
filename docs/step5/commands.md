@@ -105,3 +105,5 @@ J 整改兼容收窄：`commitResult` 在会话创建中或战斗运行中均拒
 
 
 RJ01–RJ03 定向回归：`node --test experiments/step5/1/test-management-ui.cjs experiments/step5/1/test-held-contract.cjs`；反向使用 `node experiments/step5/probes/unfix5.cjs RJ01-mixed-source-release RJ02-withdraw-panel RJ03-fake-safe-id-write`。真实 U51-18/19 随完整开发树/新包套件执行；输入设备为实际 Reactor 轮询的虚拟 navigator 控制器，不是实体手柄。
+
+5.2 真实宿主整改（D-01～D-07、产品缺陷 P-01）与重启命令约定：[5.2-D-remediation.md](5.2-D-remediation.md)。`scripts/run-inventory-test-mac.sh <新目录> [inventory|all|verify-save|empty-source|perf|matrix|driver-selftest]`；verify-save 需 `PF_OWNED_EXPECTED=<产生期望的证据目录>` 与 `PF_OWNED_SAVES=<其存档目录>`，缺失/哈希不符拒绝启动。

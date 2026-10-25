@@ -6,3 +6,5 @@ export type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, Ba
 export type { ManagementRequest, ManagementOutcome } from "./management.ts";
 
 export type { IndividualView, ManagementSnapshot, StorageMatch, StorageSearch } from "./management-query.ts";
+
+export type { InventoryRequest, InventoryTicket, InventoryParent, InventoryOutcome } from "./inventory-session.ts";

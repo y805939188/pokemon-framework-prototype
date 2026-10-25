@@ -7,7 +7,7 @@
  *   MAX_MONEY             999999   money cap (WP24)
  *   MAX_PARTY_SIZE        6        party capacity; at most 6 (one battle side holds six)
  *   NUM_STORAGE_BOXES     40       boxes x BOX_SIZE (30, WP25) is the storage capacity of this build's flat list
- *   BAG_MAX_PER_SLOT      999      per-slot cap (WP27); this build keeps one count per item (stage limit)
+ *   BAG_MAX_PER_SLOT      999      per-slot cap (WP27); one item may span multiple slots
  * The reference validates none of its settings (WP02 §8); the ranges below are this framework's own supported ranges.
  * None of the five is derived from the generation (WP02 §5), so a literal override needs no detaching rule here. Pure.
  */
@@ -20,14 +20,26 @@ export interface RuleConfig {
   MAX_PARTY_SIZE: number;
   NUM_STORAGE_BOXES: number;
   BAG_MAX_PER_SLOT: number;
+  BAG_POCKET_SLOTS: number[];
+  BAG_AUTO_SORT: boolean[];
+  AFFECTION_EFFECTS: boolean;
+  MORE_BONUS_PREMIER_BALLS: boolean;
+  USE_MULTIPLE_STAT_ITEMS_AT_ONCE: boolean;
+  NO_VITAMIN_EV_CAP: boolean;
+  REBALANCED_HEALING_ITEM_AMOUNTS: boolean;
+  RAGE_CANDY_BAR_CURES_STATUS_PROBLEMS: boolean;
+  TAUGHT_MACHINES_KEEP_OLD_PP: boolean;
 }
 
 /** Slots per box (WP25 §3.1); not a setting of the reference. */
 export const BOX_SIZE = 30;
 
-export const GEN8_DEFAULTS: Readonly<RuleConfig> = Object.freeze({ MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999 });
+export const GEN8_DEFAULTS: Readonly<RuleConfig> = Object.freeze({ MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999,
+  BAG_POCKET_SLOTS: Object.freeze([-1,-1,-1,-1,-1,-1,-1,-1]) as unknown as number[], BAG_AUTO_SORT: Object.freeze([false,false,false,true,true,false,false,false]) as unknown as boolean[],
+  AFFECTION_EFFECTS: false, MORE_BONUS_PREMIER_BALLS: true, USE_MULTIPLE_STAT_ITEMS_AT_ONCE: true, NO_VITAMIN_EV_CAP: true,
+  REBALANCED_HEALING_ITEM_AMOUNTS: true, RAGE_CANDY_BAR_CURES_STATUS_PROBLEMS: true, TAUGHT_MACHINES_KEEP_OLD_PP: false });
 
-const RANGES: Record<keyof RuleConfig, [number, number, string?]> = {
+const RANGES: Partial<Record<keyof RuleConfig, [number, number, string?]>> = {
   MECHANICS_GENERATION: [8, 8, "this build supports mechanics generation 8 only (the battle format is Gen 8)"],
   MAX_MONEY: [0, 2147483647],
   MAX_PARTY_SIZE: [1, 6, "a party holds 1 to 6 members (one battle side)"],
@@ -42,6 +54,14 @@ export function checkOverrides(overrides: unknown): ConfigProblem[] {
   if (typeof overrides !== "object" || overrides === null || Array.isArray(overrides)) return [{ path: "$", message: "must be an object of setting name -> value" }];
   const out: ConfigProblem[] = [];
   for (const [k, v] of Object.entries(overrides)) {
+    if (Object.hasOwn(GEN8_DEFAULTS, k) && typeof GEN8_DEFAULTS[k as keyof RuleConfig] === 'boolean') {
+      if (typeof v !== 'boolean') out.push({ path: `$.${k}`, message: 'must be boolean' });
+      continue;
+    }
+    if (k === 'BAG_POCKET_SLOTS' || k === 'BAG_AUTO_SORT') {
+      if (!Array.isArray(v) || v.length !== 8 || v.some(n => k === 'BAG_AUTO_SORT' ? typeof n !== 'boolean' : !Number.isSafeInteger(n) || (n as number) < -1 || (n as number) > 0xffffffff)) out.push({ path: `$.${k}`, message: 'must be eight pocket values (slots -1 or nonnegative integer; sorting boolean)' });
+      continue;
+    }
     const range = own(RANGES as Record<string, [number, number, string?]>, k); // own keys only: "constructor" is not a setting
     if (!range) { out.push({ path: `$.${k}`, message: `unknown or unsupported setting (this build reads: ${Object.keys(RANGES).join(", ")})` }); continue; }
     const [lo, hi, why] = range;
@@ -54,7 +74,7 @@ export function checkOverrides(overrides: unknown): ConfigProblem[] {
 export function resolveConfig(overrides: unknown = {}): RuleConfig {
   const problems = checkOverrides(overrides);
   if (problems.length) throw new Error(`rule configuration: ${problems.map((p) => `${p.path} ${p.message}`).join("; ")}`);
-  return { ...GEN8_DEFAULTS, ...(overrides as Partial<RuleConfig>) };
+  return JSON.parse(JSON.stringify({ ...GEN8_DEFAULTS, ...(overrides as Partial<RuleConfig>) })) as RuleConfig;
 }
 
 /** The stage capacities (rules/limits.ts) a profile gives. */
@@ -70,3 +90,5 @@ export function developmentCapabilities(raw: unknown = {}): DevelopmentCapabilit
   for (const [key, value] of Object.entries(record)) if (!["allowHeldItemSources", "allowExperimentalHeldItemBattle"].includes(key) || typeof value !== "boolean") throw new Error(`invalid development capability ${key}`);
   return { allowHeldItemSources: false, allowExperimentalHeldItemBattle: false, ...record } as DevelopmentCapabilities;
 }
+
+export type { RuleOverrides } from "./settings-types.ts";

@@ -1,4 +1,5 @@
 'use strict';
+const I6 = require("../2/test-support.cjs");
 // The seven independent M findings, with end-to-end content and real-session controls.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -180,7 +181,7 @@ if (process.argv[2] === '--cold-held') {
       const x = setup(game, { limits: { ...E.limits.DEFAULT_LIMITS, party: p }, receivingProfile: auto }); const req = { battleId: 'force-' + p + guard, kind: 'wild', seq: 1, forceParty: true, foes: [{ species: 'pidgey', level: 3 }] };
       let ended; x.sessions.next = () => ended; const h = await x.app.startBattle(req); assert.equal(x.sessions.created[0].setup.noBall, guard !== 'legal', p + guard); assert.equal(x.state.replaced.length, 0);
       if (guard === 'legal') {
-        const foe = x.sessions.created[0].setup.foes[0], c = capture(foe.id, ''); c.raw.battleId = req.battleId; c.raw.bag = {}; ended = c.raw;
+        const foe = x.sessions.created[0].setup.foes[0], c = capture(foe.id, ''); c.raw.battleId = req.battleId; I6.setBag(c.raw, {}); ended = c.raw;
         const pending = x.app.finishBattle(h, req); const done = x.app.resolveReceiving(pending.receivingToken, {}, 'scene-aborted'); assert.equal(done.commit, 'applied'); assert.equal(x.app.saveBlocked, false); assert.equal(x.state.current().party[p - 1].id, foe.id);
       } else x.app.abortBattle(req, 'no capture attempted');
     }
@@ -200,7 +201,7 @@ if (process.argv[2] === '--cold-held') {
     const game = E.state.newGame({ party: [member('A')], bag: { masterball: 2 } }); game.party[0].cannotStore = true;
     const state = E.fakes.createMemoryState(game); const app = new E.app.GameApplication({ state, sessions: E.composition.createBattleSessionFactory({ content: () => content, seed: () => [1, 2, 3, 4] }), projection: E.fakes.createRecordingProjection(), content: () => ({ content }), random: () => 0, clock: () => 1000 }, { limits: { ...E.limits.DEFAULT_LIMITS, party: 1 } });
     const session = await app.startBattle({ battleId: 'actual-no-target', kind: 'wild', seq: 1, forceParty: true, foes: [{ species: 'pidgey', level: 3 }] });
-    assert.deepEqual(await session.throwBall('masterball'), { ok: false, reason: 'ballsdisabled' }); assert.equal(state.current().bag.masterball, 2); assert.equal(state.replaced.length, 0); app.abortBattle({ battleId: 'actual-no-target' }, 'test ended');
+    assert.deepEqual(await session.throwBall('masterball'), { ok: false, reason: 'ballsdisabled' }); assert.equal(I6.bagOf(state.current()).masterball, 2); assert.equal(state.replaced.length, 0); app.abortBattle({ battleId: 'actual-no-target' }, 'test ended');
   });
   test('M01: real Minior-Meteor base identity reaches creation through the full pipeline at both draw boundaries', () => {
     const c = assemble([{ ...base, id: 'meteor', showdownId: 'miniormeteor' }, { ...base, id: 'meteor', form: 7, showdownId: 'minior' }, { ...base, id: 'meteor', form: 13, showdownId: 'miniorviolet' }]);

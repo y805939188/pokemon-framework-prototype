@@ -4,7 +4,7 @@
   "scripts": {
     "types:prepare": "node vendor/rpgreactor/types/tools/typecheck.cjs --prepare --compiler-root .",
     "typecheck": "pnpm types:prepare && tsc --noEmit && tsc --noEmit -p tsconfig.tools.json && pnpm typecheck:framework",
-    "build": "pnpm build:engine && pnpm content:build && vite build && RR_PLUGIN=PS_BattleSmoke vite build && RR_PLUGIN=PS_SaveState vite build && RR_PLUGIN=PS_BattleFlow vite build && RR_PLUGIN=PS_Management vite build && RR_PLUGIN=PS_BattleFlowTest vite build && RR_PLUGIN=PS_RuntimeFixes vite build && RR_PLUGIN=PS_SaveLocation vite build",
+    "build": "pnpm build:engine && pnpm content:build && vite build && RR_PLUGIN=PS_BattleSmoke vite build && RR_PLUGIN=PS_SaveState vite build && RR_PLUGIN=PS_BattleFlow vite build && RR_PLUGIN=PS_Management vite build && RR_PLUGIN=PS_Inventory vite build && RR_PLUGIN=PS_BattleFlowTest vite build && RR_PLUGIN=PS_RuntimeFixes vite build && RR_PLUGIN=PS_SaveLocation vite build",
     "dev": "vite build --watch",
     "build:engine": "ENGINE_ENTRY=engine vite build -c vite.engine.config.mts && ENGINE_ENTRY=custom-formats vite build -c vite.engine.config.mts && ENGINE_ENTRY=core vite build -c vite.engine.config.mts && ENGINE_ENTRY=content-cli vite build -c vite.engine.config.mts",
     "typecheck:framework": "tsc --noEmit -p framework/tsconfig.json && tsc --noEmit -p framework/tsconfig.core.json && tsc --noEmit -p framework/tsconfig.app.json",

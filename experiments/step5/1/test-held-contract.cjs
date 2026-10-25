@@ -1,4 +1,6 @@
-'use strict';const test=require('node:test'),assert=require('node:assert/strict');const {propose,project}=require('./probes/held-contract-model.cjs');
+'use strict';
+const I6 = require("../2/test-support.cjs");
+const test=require('node:test'),assert=require('node:assert/strict');const {propose,project}=require('./probes/held-contract-model.cjs');
 const event=(id,previous,current,reason,eventId='e1')=>({id,previous,current,reason,eventId});
 test('P51-13/proposal: consumption, temporary Knock Off and wild acquisition have different restoration semantics',()=>{
  const consumed=propose({A:'sitrusberry'},[event('A','sitrusberry','','consumed')]);assert.equal(consumed.restore.A,'');
@@ -13,7 +15,7 @@ test('P51-13/proposal: unknown reason, stale or duplicate event and unresolved T
 });
 const {createFakeReceiver}=require('./probes/held-contract-model.cjs');
 for(const to of ['party','box'])test(`J10/fake: new captured stable ID sent to ${to} has explicit current and correct restoration eligibility`,()=>{
- const receiver=createFakeReceiver(),result={battleId:'capture',initial:{A:'leftovers'},events:[event('A','leftovers','','knocked-off')],captured:[{id:'NEW',current:'sitrusberry'}],placements:[{id:'NEW',to},{id:'A',to:'party'}],bag:{masterball:-1}};let installed;const out=receiver.apply(result,p=>installed=p);assert.deepEqual(installed.writes,{NEW:'sitrusberry',A:'leftovers'});assert.deepEqual(out.restoreEligible,to==='party'?['A','NEW']:['A']);assert.deepEqual(installed.bag,{masterball:-1});
+ const receiver=createFakeReceiver(),result={battleId:'capture',initial:{A:'leftovers'},events:[event('A','leftovers','','knocked-off')],captured:[{id:'NEW',current:'sitrusberry'}],placements:[{id:'NEW',to},{id:'A',to:'party'}],bag:{masterball:-1}};let installed;const out=receiver.apply(result,p=>installed=p);assert.deepEqual(installed.writes,{NEW:'sitrusberry',A:'leftovers'});assert.deepEqual(out.restoreEligible,to==='party'?['A','NEW']:['A']);assert.deepEqual(I6.bagOf(installed),{masterball:-1});
 });
 test('J10/fake: full party replacement removes old ID eligibility and registers new ID, never restores by replaced slot',()=>{
  const receiver=createFakeReceiver(),initial={A:'leftovers',B:'sitrusberry',C:'',D:'',E:'',F:''},result={battleId:'replace',initial,events:[event('A','leftovers','','knocked-off'),event('B','sitrusberry','','consumed','e2')],captured:[{id:'NEW',current:'ironball'}],placements:[{id:'NEW',to:'party'},...['F','E','D','C','B'].map(id=>({id,to:'party'})),{id:'A',to:'box'}]};const out=receiver.apply(result,()=>{});assert.equal(out.writes.A,'');assert.equal(out.writes.NEW,'ironball');assert.equal(out.writes.B,'');assert.deepEqual(out.restoreEligible,['B','C','D','E','F','NEW']);
@@ -38,4 +40,9 @@ test('RJ03/project: prototype-named IDs preserve current and restoration through
   const acquired=reason==='wild-acquired',plan=propose({[id]:acquired?'':'leftovers'},[event(id,acquired?'':'leftovers',acquired?'ironball':'',reason)],{wild:true});
   for(const to of ['party','box']){const out=project(plan,[{id,to}]);assert.deepEqual(Object.keys(out.writes),[id]);assert.equal(out.writes[id],acquired?'ironball':reason==='knocked-off'&&to==='party'?'leftovers':'');assert.equal(JSON.parse(JSON.stringify(out)).writes[id],out.writes[id]);}
  }
+});
+test('O51-2/fake: own dictionary order is semantic, event and placement arrays retain order',()=>{
+ const receiver=createFakeReceiver(),result={battleId:'canonical',initial:{A:'leftovers',B:''},events:[],placements:[{id:'A',to:'party'},{id:'B',to:'party'}],bag:{potion:-1,antidote:0}};let installs=0;receiver.apply(result,()=>installs++);
+ const reordered={bag:{antidote:0,potion:-1},placements:[{to:'party',id:'A'},{to:'party',id:'B'}],events:[],initial:{B:'',A:'leftovers'},battleId:'canonical'};assert.equal(receiver.apply(reordered,()=>installs++).status,'duplicate');assert.equal(installs,1);assert.throws(()=>receiver.apply({...reordered,placements:[...reordered.placements].reverse()},()=>installs++),/result-conflict/);assert.equal(installs,1);
+ const E=require('../../../js/engine/build/engine.cjs');for(const v of [NaN,Infinity,()=>1,undefined,new Date()])assert.throws(()=>E.semantic.semanticFingerprint({v}));const cyclic={};cyclic.self=cyclic;assert.throws(()=>E.semantic.semanticFingerprint(cyclic),/cyclic/);assert.throws(()=>E.semantic.semanticFingerprint({get x(){throw Error('do not run')}}),/accessor/);
 });

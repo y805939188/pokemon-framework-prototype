@@ -3,6 +3,7 @@
  * joining framework-owned fields with Showdown-owned battle data (base stats, display names). Every problem is
  * reported with the record and field it comes from; nothing is repaired silently.
  */
+import { checkItemInputs } from "../content/item-input.ts";
 import type { CompiledContent, ContentError } from "../content/schema.ts";
 import { checkOverrides, developmentCapabilities } from "../rules/config.ts";
 import { SCHEMA_VERSION } from "../content/schema.ts";
@@ -33,7 +34,9 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
   for (const p of checkOverrides(compiled.settings ?? {})) errors.push({ file: "settings.json", path: p.path, message: p.message });
   const sources = checkSources(compiled.sources, (file, path, message) => { errors.push({ file, path, message }); });
   if (errors.length) return { content, errors };
-  if (compiled.species.length || (compiled.grants ?? []).some((g) => g.members.some((m) => !!m.item))) {
+  const itemInputs = checkItemInputs(compiled.items, compiled.shops, id => preUseProblem(sources, id));
+  errors.push(...itemInputs.errors);
+  if (compiled.species.length || itemInputs.items.some(item => !!item.move) || (compiled.grants ?? []).some((g) => g.members.some((m) => !!m.item))) {
     const dep = showdownDependencyProblem(sources);
     if (dep) errors.push({ file: "assembly", path: "sources", message: dep });
   }
@@ -48,6 +51,11 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     if (problem) errors.push({ file: "assembly", path: `grants/${grant.id}.source`, message: problem });
   }
   if (errors.length) return { content, errors };
+  for (const item of itemInputs.items) if (item.move && !dex.move(item.move)) errors.push({file:'assembly',path:`items/${item.id}.move`,message:'move is not in the pinned data'});
+  if (errors.length) return {content,errors};
+  content.items = itemInputs.catalog;
+  content.shops = Object.fromEntries(itemInputs.shops.map(shop => [shop.id, shop]));
+  if (compiled.species.length || itemInputs.items.some(item=>!!item.move)) for (const move of dex.allMoves?.() ?? []) setOwn(content.moves!,move.name,{...move});
   // Empty author content needs no external battle data, including the lazy Dex's identity lookup.
   const short = compiled.species.length ? dex.sha().slice(0, 8) : null;
   // Provenance fact of this assembled runtime content, never a capability or save setting.
@@ -118,11 +126,15 @@ export interface DanglingReference { path: string; message: string }
  * falls back to the base form (WP03 §3.2).
  */
 export function findDanglingReferences(
-  state: MemberCollection,
+  state: MemberCollection & {inventory?:import("../rules/inventory.ts").Inventory},
   content: Content,
   dex?: DexLookup,
 ): DanglingReference[] {
   const out: DanglingReference[] = [];
+  if (state.inventory) for (const [i,pocket] of state.inventory.pockets.entries()) for (const [j,slot] of pocket.entries()) {
+    if (!Object.hasOwn(content.items ?? {},slot.itemId) && content.items !== undefined) out.push({path:`$.inventory.pockets[${i}][${j}].itemId`,message:'item is absent from current content'});
+  }
+  if(out.length)return out;
   for (const m of allMembers(state)) {
       const position = locateMember(state, m.id)!.position;
       const path = position.kind === "party" ? `$.party[${position.index}]` : `$.storage.boxes[${position.box}].slots[${position.slot}]`;

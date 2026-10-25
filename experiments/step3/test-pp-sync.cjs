@@ -15,7 +15,7 @@ async function make(game, team) {
 
 test('persistent max PP and all four PP-Up levels survive import, use and switching', async () => {
   for (let ups = 0; ups <= 3; ups++) {
-    const game = F.makeGame(); game.party[0].moves = [{ id: 'hydropump', pp: 4, maxpp: 5 + ups }];
+    const game = F.makeGame(); game.party[0].moves = [{ id: 'hydropump', pp: 4, maxpp: 5 + ups, ppUps: ups }];
     const s = await make(game);
     assert.equal(s.currentRequest().active[0].moves[0].maxpp, 5 + ups);
     assert.equal(s.gw._debugBattle().getSide('p1').active[0].ppUps[0], ups);
@@ -32,14 +32,14 @@ test('Leppa restoration respects each persistent cap; the result commits and rel
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   for (let ups = 0; ups <= 3; ups++) {
     const game = F.makeGame();
-    game.party[0].moves = [{ id: 'hydropump', pp: 1, maxpp: 5 + ups }]; game.party[0].item = 'leppaberry';
+    game.party[0].moves = [{ id: 'hydropump', pp: 1, maxpp: 5 + ups, ppUps: ups }]; game.party[0].item = 'leppaberry';
     const s = await make(game);
     await s.chooseMove(1);
     assert.equal(s.gw.readState('p1').find(m => m.id === 'A-0001').pp.hydropump, 5 + ups);
     await s.run(); assert.equal(s.finished, true);
     assert.deepEqual(s.result().members['A-0001'].moves[0], { id: 'hydropump', pp: 5 + ups, maxpp: 5 + ups });
     const file = path.join(dir, `${ups}.json`); fs.writeFileSync(file, JSON.stringify(game));
-    const store = new E.store.SaveStore(file, {}, E.speciesKey.identityKeys); // fixture world, chosen explicitly
+    const store = new E.store.SaveStore(file, {}, E.speciesKey.identityKeys, F.content); // fixture world, chosen explicitly
     assert.equal(store.commit(s.result()).status, 'applied');
     assert.deepEqual(E.saveSchema.validateGame(store.load()), []);
     assert.equal(store.commit(s.result()).status, 'already-applied');
@@ -48,7 +48,7 @@ test('Leppa restoration respects each persistent cap; the result commits and rel
 
 test('learning resets the replaced move PP-Up count and keeps the new cap after switching', async () => {
   const game = F.makeGame();
-  game.party[0].moves[0].maxpp = 24;
+  game.party[0].moves[0].maxpp = 24; game.party[0].moves[0].ppUps=3;
   game.party[0].exp = E.growth.minExp('parabolic', 51) - 1;
   const s = await make(game, [F.foeMember('foe1', 'Pidgey', 5), F.foeMember('foe2', 'Snorlax', 40, { moves: ['protect'] })]);
   await s.chooseMove(1); assert.equal(s.pendingLearn.move.id, 'slash');
@@ -57,7 +57,7 @@ test('learning resets the replaced move PP-Up count and keeps the new cap after 
   await s.chooseSwitch('A-0002'); await s.chooseSwitch('A-0001');
   const move = s.currentRequest().active[0].moves[0];
   assert.deepEqual([move.id, move.pp, move.maxpp], ['slash', 20, 20]);
-  await s.run(); assert.deepEqual(E.saveSchema.validateGame(E.state.applyBattleResult(game, s.result()).state), []);
+  await s.run(); assert.deepEqual(E.saveSchema.validateGame(E.state.applyBattleResult(game, s.result(),undefined,undefined,{content:F.content}).state), []);
 });
 
 test('invalid current PP or an unrepresentable cap is diagnosed before any seed write', async () => {
