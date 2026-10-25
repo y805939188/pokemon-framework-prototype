@@ -7,6 +7,8 @@
  */
 import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules.ts";
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types.ts";
+import type { FormatObserver, FormatObservation } from "../rules/battle-evidence.ts";
+import type { BattleActor } from "../rules/battle-evidence.ts";
 
 interface Payload { kind: string; item?: string; target?: string; ball?: string; catchRate?: number; ctx?: Record<string, unknown> }
 
@@ -21,6 +23,9 @@ function pendingFor(battle: ShowdownBattle, sideId: string, position: number): P
 
 function emit(battle: ShowdownBattle, ...parts: unknown[]): void {
   battle.add("rpg", ...parts);
+  if (parts[0] === "item" && parts[4] === "ok") {
+    observe(battle, () => ({ kind: "item", target: actor(battle.getSide(parts[1]).pokemon.find((p: ShowdownPokemon) => p.name === parts[3])), item: String(parts[2]) }));
+  }
 }
 
 function resolveItem(battle: ShowdownBattle, user: ShowdownPokemon, payload: Payload): void {
@@ -142,9 +147,44 @@ const handlers: Record<string, (battle: ShowdownBattle, user: ShowdownPokemon, p
 
 /** Non-serialized per-battle callbacks (engine objects are rebuilt on restore, hooks are re-attached by the gateway). */
 export const hooks = new WeakMap<object, (e: unknown) => void>();
+/** Optional companion observation. It never returns a relay value or throws into an engine action. */
+export const observers = new WeakMap<object, FormatObserver>();
+function actor(p: ShowdownPokemon): BattleActor {
+  return { id: p.name, side: p.side.id, slot: p.position, level: p.level, hp: p.hp, active: !!p.isActive };
+}
+function observe(b: ShowdownBattle, make: () => FormatObservation): void {
+  const receiver = observers.get(b);
+  if (!receiver) return;
+  try { receiver.emit(make()); } catch { try { receiver.failed(); } catch { /* optional observation only */ } }
+}
+function hit(b: ShowdownBattle, domain: "body" | "substitute", loss: number, target: ShowdownPokemon, source: ShowdownPokemon, move: ShowdownPokemon): void {
+  observe(b, () => ({ kind: "hit", domain, loss, target: actor(target), source: source ? actor(source) : null,
+    move: move.id, hit: move.hit ?? 1, critical: !!move.moveHitData?.[target.getSlot()]?.crit }));
+}
 
 const rpgHandlers = {
+  onDamagingHitPriority: -100000,
+  onDamagingHit(this: ShowdownBattle, loss: number, target: ShowdownPokemon, source: ShowdownPokemon, move: ShowdownPokemon): void { hit(this, "body", loss, target, source, move); },
+  onAfterSubDamagePriority: -100000,
+  onAfterSubDamage(this: ShowdownBattle, loss: number, target: ShowdownPokemon, source: ShowdownPokemon, move: ShowdownPokemon): void { hit(this, "substitute", loss, target, source, move); },
+  onDamagePriority: -100000,
+  onDamage(this: ShowdownBattle, amount: number, target: ShowdownPokemon, source: ShowdownPokemon, effect: ShowdownPokemon): void {
+    observe(this, () => ({ kind: "before-loss", target: actor(target), source: source ? actor(source) : null, amount, effect: effect?.id ?? "", effectType: effect?.effectType ?? "" }));
+  },
+  onMoveAbortedPriority: -100000,
+  onMoveAborted(this: ShowdownBattle, target: ShowdownPokemon): void { observe(this, () => ({ kind: "move-aborted", target: actor(target) })); },
+  onTryHealPriority: -100000,
+  onTryHeal(this: ShowdownBattle, _amount: number, target: ShowdownPokemon): void { observe(this, () => ({ kind: "healing", target: actor(target) })); },
+  onSwitchInPriority: -100000,
+  onSwitchIn(this: ShowdownBattle, target: ShowdownPokemon): void {
+    observe(this, () => ({ kind: "appearance", target: actor(target), details: String((target.illusion || target).details) }));
+  },
+  onUpdatePriority: -100000,
+  onUpdate(this: ShowdownBattle, target: ShowdownPokemon): void {
+    if (target.isActive) observe(this, () => ({ kind: "display", target: actor(target), details: String((target.illusion || target).details) }));
+  },
   onFaint(this: ShowdownBattle, pokemon: ShowdownPokemon): void {
+    observe(this, () => ({ kind: "faint", target: actor(pokemon), opponents: pokemon.side.foe.active.filter(Boolean).map(actor) }));
     const h = hooks.get(this);
     if (h) h({ event: "faint", side: pokemon.side.id, id: pokemon.name });
   },

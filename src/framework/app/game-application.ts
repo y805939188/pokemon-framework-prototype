@@ -1,4 +1,5 @@
 import type {ItemWorldContext} from '../rules/item-effects.ts';
+import type { BattleEvidence } from "../rules/battle-evidence.ts";
 import { moneyCap, changeMoney } from "../rules/economy.ts";
 import { InventorySession } from "./inventory-session.ts";
 import type { InventoryRequest, InventoryParent, InventoryOutcome } from "./inventory-session.ts";
@@ -149,6 +150,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly inventory: InventorySession;
   private generation = 0;
   private readonly bornIn = new WeakMap<object, number>();
+  private readonly completedEvidence = new WeakMap<object, BattleEvidence>();
+
+  /** Read-only transient companion view. It supplies no commit authority and is never a persistent save record. */
+  battleEvidenceSnapshot(handle: S): BattleEvidence | null {
+    const value = this.completedEvidence.get(handle);
+    return value?.context.generation === this.generation ? clone(value) : null;
+  }
 
   constructor(ports: GameApplicationPorts<S>, options: GameApplicationOptions = {}) {
     this.ports = {...ports,state:{read:()=>ports.state.read(),replace:next=>{ports.state.replace(next);this.inventory?.stateChanged(next);}}};
@@ -478,6 +486,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const forcedNoRoom = context.profile?.mode === 2 && !Object.values(templates).every((member) => hasForcedPartyPlan(game, member, { limits: this.limits, content, profile: context.profile!, depositHeal: this.depositHeal }));
     const diagnostics = [...(forcedNoRoom ? ["forced-party-no-target"] : []), ...(game.party.some((m) => !!m.item) ? ["战后持物写回未完成"] : [])];
     const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full, ...(diagnostics.length ? { diagnostics } : {}), ...(game.party.some((m) => !!m.item) ? { experimentalHeldBattle: true } : {}) };
+    let mapId: number | undefined;
+    try { mapId = this.ports.itemWorld?.().mapId ?? creationContext.map; } catch { /* optional companion context unavailable */ }
+    setup.evidenceContext = {
+      battleId: request.battleId, generation: this.generation, contentIdentity: content.meta?.inputsHash ?? content.meta?.id ?? "anonymous-content",
+      playerIds: game.party.map(m => m.id), initialLevels: Object.fromEntries(game.party.map(m => [m.id, m.level])),
+      ...(Number.isSafeInteger(mapId) && mapId! >= 0 ? { mapId } : {}),
+    };
     const view = battleView(game, content);
     view.party = view.party.filter((m) => !m.isEgg); // the session speaks Showdown names (protocol v1); the save keeps content ids
     const op: { battleId: string; session: S | null; facts: BattleFacts } = { battleId: request.battleId, session: null, facts: { kind: request.kind, canLose: !!request.canLose, experimentalHeld: game.party.some((m) => !!m.item) } };
@@ -592,6 +607,16 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       const committed = this.commit(result, facts, context);
       if (this.op === ownedOp) this.op = null;
       outcome = { code, battleId, commit: committed.status, kind, ...(facts?.experimentalHeld ? { diagnostics: ["战后持物写回未完成"] } : {}), ...(committed.defeat ? { defeat: committed.defeat } : {}) };
+      if (committed.status === "applied" && this.ports.sessions.evidence) {
+        try {
+          const evidence = this.ports.sessions.evidence(handle, { battleId: result.battleId, generation: this.generation, rawHash: hash });
+          const identity = this.ports.content().content.meta;
+          if (evidence && evidence.rawHash === hash && evidence.context.battleId === result.battleId && evidence.context.generation === this.generation && evidence.context.contentIdentity === (identity?.inputsHash ?? identity?.id ?? "anonymous-content")) {
+            this.completedEvidence.set(handle, clone(evidence));
+            if (evidence.issues.length) outcome.diagnostics = [...(outcome.diagnostics ?? []), "部分战斗伴随事实不可用"];
+          } else outcome.diagnostics = [...(outcome.diagnostics ?? []), "战斗伴随事实不可用"];
+        } catch { outcome.diagnostics = [...(outcome.diagnostics ?? []), "战斗伴随事实读取失败"]; }
+      }
     } catch (error) {
       if (error instanceof StateInstallFailed || (error instanceof ReceivingRefused && error.reason === "pending")) {
         const raw = handle.result();

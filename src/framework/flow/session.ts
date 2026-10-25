@@ -21,6 +21,10 @@ import type { BattleResult, GameState } from "../rules/state.ts";
 import type { Content, Member } from "../rules/types.ts";
 import type { BattleEvent, SessionMessage } from "../battle/protocol.ts";
 import type { LogLevel, LogSink } from "./log.ts";
+import { EvidenceRecorder } from "./battle-evidence.ts";
+import { battleFriendshipValue } from "../rules/battle-evidence.ts";
+import type { BattleEvidenceContext, EvidenceBinding, BattleEvidence, FriendEvidence, BattleObservation } from "../rules/battle-evidence.ts";
+import { resolveConfig } from "../rules/config.ts";
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
 export const END_REASONS = ["caught", "run", "tie", "win"] as const;
@@ -35,6 +39,12 @@ type Req = Record<string, any>;
 function persistentStatus(status: string | undefined, count: number | undefined): { status: string; statusCount: number } {
   if (status === "tox" || status === "psn") return { status: "psn", statusCount: 0 };
   return { status: status || "", statusCount: status === "slp" ? count || 0 : 0 };
+}
+
+/** Factory companion access, deliberately outside the frozen BattleSession prototype. */
+export function sealBattleEvidence(session: BattleSession, binding: EvidenceBinding): BattleEvidence | null {
+  if (!session.finished || session.broken || !session._evidence) return null;
+  return session._evidence.seal(session.result(), binding);
 }
 
 const ITEM_IDS = new Set([...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS)]);
@@ -73,6 +83,8 @@ export interface CreateOptions {
   logger?: LogSink;
   /** The battle engine behind the session; Pokemon Showdown unless a test supplies a scripted driver. */
   driver?: BattleDriverFactory;
+  /** App-owned companion authority, not a player flag or protocol-v1 field. */
+  evidence?: BattleEvidenceContext;
 }
 
 export type Refusal = { ok: false; reason: string };
@@ -149,8 +161,11 @@ export class BattleSession {
   _operation = false;
   _staged = false;
   _broken: SessionBrokenError | null = null;
+  _evidence: EvidenceRecorder | null = null;
+  _friendUnavailable: string[] = [];
+  _pendingFriendFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
 
-  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false }: CreateOptions): Promise<BattleSession> {
+  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, evidence }: CreateOptions): Promise<BattleSession> {
     if (!experimentalHeldBattle && [...game.party, ...foe.team].some((m) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成");
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
     for (const m of [...game.party, ...foe.team]) {
@@ -175,6 +190,10 @@ export class BattleSession {
     s.doubles = doubles;
     s.logger = logger;
     s._driver = driver;
+    if (evidence) {
+      s._evidence = new EvidenceRecorder(evidence, [...party, ...foe.team].map(m => m.id));
+      if (doubles) { s._evidence.issue("friendship", "doubles-friendship-not-supported"); s._friendUnavailable = party.map(m => m.id); }
+    }
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
     s.gw = await driver.create({
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
@@ -252,7 +271,9 @@ export class BattleSession {
         participants: Object.entries(this.participants).map(([id, members]) => [id, [...members]] as const),
         ended: this.ended, finished: this.finished, requests: this.requests, grew: this.grew,
         _caughtAwarded: this._caughtAwarded, _result: this._result, _staged: this._staged,
+        _friendUnavailable: this._friendUnavailable, _pendingFriendFaints: this._pendingFriendFaints,
       }),
+      evidence: this._evidence?.snapshot(),
     };
   }
 
@@ -263,6 +284,7 @@ export class BattleSession {
     this.participants = Object.fromEntries(participants.map(([id, members]) => [id, new Set(members)]));
     // JSON omits undefined properties, so explicitly clear these after a failed first assignment.
     this.requests = state.requests; this._result = state._result;
+    if (checkpoint.evidence) this._evidence?.restore(checkpoint.evidence);
   }
 
   static defaultAi(request: Req): string {
@@ -469,6 +491,10 @@ export class BattleSession {
   }
 
   _ingest(): void {
+    this._ingestObservations();
+    if (this._evidence) {
+      this._pendingFriendFaints.push(...(this.gw.drainFriendshipFaints?.() ?? []));
+    }
     for (let batch = this.gw.drain(); batch.length; batch = this.gw.drain()) for (const m of batch) {
       if (m.kind === "events") {
         for (const e of m.events) this._onEvent(e);
@@ -484,6 +510,33 @@ export class BattleSession {
     }
   }
 
+  _ingestObservations(): void {
+    if (!this._evidence) return;
+    try {
+      if (!this.gw.drainObservations) { this._evidence.issue("identity", "driver-observations-unavailable"); return; }
+      this._evidence.record(this.gw.drainObservations());
+    } catch { this._evidence.issue("identity", "observation-ingest-failed"); }
+  }
+
+  _changeBattleFriendship(id: string, method: FriendEvidence["changes"][number]["method"]): void {
+    const recorder = this._evidence;
+    if (!recorder || this._friendUnavailable.includes(id) || !recorder.value.context.playerIds.includes(id)) return;
+    const m = this.party.find(member => member.id === id);
+    if (!m || !this.gw.applyFriendship) { this._friendUnavailable.push(id); recorder.issue("friendship", "friendship-capability-unavailable", id); return; }
+    const before = m.friendship ?? 70;
+    const map = recorder.value.context.mapId;
+    if ((method === "battleitem" || method === "levelup") && m.origin?.map !== undefined && m.origin.map !== null && map === undefined) { this._friendUnavailable.push(id); recorder.issue("friendship", "friendship-map-unavailable", id); return; }
+    const after = battleFriendshipValue(before, method, { sameMap: map !== undefined && m.origin?.map === map, luxuryBall: m.ball?.toLowerCase() === "luxuryball", sootheBell: m.item?.toLowerCase() === "soothebell", affection: resolveConfig(this.content.settings).AFFECTION_EFFECTS });
+    if (after === null) { this._friendUnavailable.push(id); recorder.issue("friendship", "friendship-out-of-domain", id); return; }
+    try {
+      const ack = this.gw.applyFriendship("p1", id, { expected: before, value: after });
+      if (ack.before !== before || ack.after !== after) { this._friendUnavailable.push(id); recorder.issue("friendship", "invalid-friendship-ack", id); return; }
+      m.friendship = after;
+      const changes = recorder.value.friendship[id] ??= { before, current: before, changes: [] };
+      changes.current = after; changes.changes.push({ method, before, after });
+    } catch { this._friendUnavailable.push(id); recorder.issue("friendship", "friendship-sync-failed", id); }
+  }
+
   _onEvent(e: BattleEvent): void {
     const idOf = (s: string): string => s.replace(/^p\d[a-z]?: /, "");
     const arg0 = e.args[0] ?? "";
@@ -495,6 +548,15 @@ export class BattleSession {
       if (side === "p2") this.participants[id] = new Set(ours);
       else for (const foe of theirs) (this.participants[foe] ??= new Set()).add(id);
     } else if (e.type === "faint") {
+      if (this._evidence) {
+        const trigger = this._pendingFriendFaints.shift();
+        if (trigger && trigger.target.side === arg0.slice(0, 2)) {
+          this._changeBattleFriendship(trigger.target.id, trigger.opponents.some(p => p.level >= trigger.target.level + 30) ? "faintbad" : "faint");
+        } else {
+          this._evidence.issue("friendship", "faint-control-source-unavailable");
+          this._friendUnavailable = [...this._evidence.value.context.playerIds];
+        }
+      }
       const side = arg0.slice(0, 2); const id = idOf(arg0);
       (this.activeNow[side] ??= [])[arg0.charCodeAt(2) - 97] = null; // off the field: not a participant for later arrivals
       if (side === "p2") this.growthQueue.push({ kind: "award", foeId: id });
@@ -504,6 +566,7 @@ export class BattleSession {
       if (what === "item") {
         const entry = this.ledger.find((l) => l.kind === "item" && l.state === "reserved" && l.itemId === itemId);
         if (entry) { if (res === "ok") { entry.state = "consumed"; this._log("info", "ledger", { op: "consume", kind: "item", item: itemId }); } else this._refund(entry, res ?? "invalid"); }
+        if (entry && res === "ok") this._changeBattleFriendship(String(entry.target), "battleitem");
       } else if (what === "ball") {
         const entry = this.ledger.find((l) => l.kind === "ball" && l.state === "reserved" && l.itemId === itemId);
         if (entry) { entry.state = "consumed"; this._log("info", "ledger", { op: "consume", kind: "ball", item: itemId, outcome: res ?? "" }); } // a thrown ball is spent whatever the outcome (WP38)
@@ -570,6 +633,9 @@ export class BattleSession {
       const res = G.applyExp(withEv, amount, this.content, m);
       const idx = this.party.indexOf(m);
       this.party[idx] = res.member;
+      if (this.gw.readState("p1").some(p => p.id === m.id && p.active && !p.fainted)) {
+        for (const _level of res.log.levels) this._changeBattleFriendship(m.id, "levelup");
+      }
       const changed = amount > 0 || JSON.stringify(evs) !== JSON.stringify(m.evs);
       if (changed) {
         const eng = this.gw.applyGrowth("p1", m.id, { level: res.member.level, evs, expect: { stats: res.after.stats } });

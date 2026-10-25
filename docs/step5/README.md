@@ -7,7 +7,7 @@
 | 5.0 基础整固 | `step5/0-foundation` | 持久物种键（内容 ID＋形态号）、存档 schema 4、统计与计步、规则配置档、来源使用前核对与 PBS 导入子集、P4-2、CI | **已合并**（2026-10-22，PR #3，合并提交 `5dc86f6`；[收口记录](5.0-closure.md)） |
 | 5.1 个体与仓库 | `step5/1-individual-storage` | 个体、40×30 仓库、schema 5、事务、接收与 UI | **已合并**（PR #4，`c5c51a6`，精确7fd候选及main双层CI通过）；[实施记录](5.1.md) |
 | 5.2 背包、道具与经济 | `step5/2-inventory-economy` | 八口袋/schema6/资源与事务 | M1六项复验PASS；M2独立r3 PASS，三项CLOSED；G正式UI/事件已接，H作者固定候选准备，真实层受Mach权限阻塞，最终独立/Claude/CI未完成；[整改闭环](5.2-M2-remediation.md)；[E/F合同](5.2-EF-contract.md)、[范围表](5.2-M2-coverage.md)、[M1历史](5.2-M1.md) |
-| 5.3 成长、进化与图鉴 | — | — | 未开始 |
+| 5.3 成长、进化与图鉴 | `step5/3-capability-seam` | A/PX后的内部事实/本场友好度/伴随端口窄接入 | 本地候选，未独立签收、未push/merge；不代表B–J或M1完成，见[窄接缝合同](5.3-capability-seam.md) |
 | 5.4 训练家、AI 与战斗界面 | — | — | 未开始 |
 | 5.5 世界与遭遇 | — | — | 未开始 |
 | 5.6 菜单、标题与存档流程 | — | — | 未开始 |

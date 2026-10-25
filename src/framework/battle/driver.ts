@@ -6,6 +6,7 @@
 import type { BattleEvent } from "./protocol.ts";
 import type { MonView } from "../rules/rules.ts";
 import type { PartialStats, Stats } from "../rules/types.ts";
+import type { ObservationBatch, BattleObservation } from "../rules/battle-evidence.ts";
 
 export interface PlayerSpec {
   name: string;
@@ -79,6 +80,11 @@ export interface BattleDriver {
   readState(side: string): MemberState[];
   seedState(side: string, records: StateRecord[]): void;
   applyGrowth(side: string, id: string, change: GrowthApplication): GrowthOutcome;
+  /** Internal optional capabilities. Absence means unavailable, never an empty/complete observation. */
+  drainObservations?(): ObservationBatch;
+  /** Control-path faint triggers; independent of optional observation quality/failures. */
+  drainFriendshipFaints?(): Extract<BattleObservation, { kind: "faint" }>[];
+  applyFriendship?(side: string, id: string, change: { expected: number; value: number }): { before: number; after: number };
   moveInfo(nameOrId: string): { id: string; name: string; pp: number };
   /** Re-issue the pending requests after state changed between turns. */
   refreshRequests(): GatewayMessage[];

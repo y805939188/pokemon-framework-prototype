@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Actual NW.js/MZ host, synthetic DOM/service input. Isolated saves/profile, exact child PID only.
-# Usage: scripts/run-inventory-test-mac.sh <new evidence-dir> [inventory|all|verify-save|empty-source|perf|matrix|driver-selftest]
+# Usage: scripts/run-inventory-test-mac.sh <new evidence-dir> [inventory|all|verify-save|empty-source|perf|matrix|driver-selftest|capability]
+# PF_OWNED_REQUIRE_IDLE=1 refuses before launch if NW is already running or process inventory is unavailable.
+# PF_OWNED_BACKGROUND=1 uses the programmatic test clock without requesting OS focus (not physical-input evidence).
 # Package: PF_OWNED_NW=<app binary> PF_OWNED_PROJECT=<app.nw> PF_OWNED_SKIP_BUILD=1 ...
 # Restart (5.2 D-03): every run records the SHA-256 of the expected-state files it wrote (launch.json producedExpected).
 #   verify-save runs in its OWN new evidence directory and must name its source explicitly:
@@ -12,7 +14,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EVID="${1:?new evidence directory required}"; MODE="${2:-inventory}"
-case "$MODE" in inventory|all|verify-save|empty-source|perf|matrix|driver-selftest) ;; *) echo "unsupported mode: $MODE" >&2; exit 2;; esac
+case "$MODE" in inventory|all|verify-save|empty-source|perf|matrix|driver-selftest|capability) ;; *) echo "unsupported mode: $MODE" >&2; exit 2;; esac
 mkdir -p "$EVID"; EVID="$(cd "$EVID" && pwd)"
 [[ ! -e "$EVID/report.json" && ! -e "$EVID/launch.json" ]] || { echo 'existing evidence: choose another directory' >&2; exit 2; }
 NW="${PF_OWNED_NW:-$HOME/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.app/Contents/Resources/nwjs-mac/nwjs.app/Contents/MacOS/nwjs}"
@@ -32,6 +34,7 @@ sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 expected=lambda d:{p.name:sha(p) for p in sorted(d.glob('ps-flow-expected*.json'))}
 start={'startedUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'concurrency':'UNVERIFIED; read-only process inventory unavailable; never terminates other processes','input':'synthetic DOM/service events in actual host; not hardware input'}
 extra=[]
+if mode=='capability' or os.environ.get('PF_OWNED_BACKGROUND')=='1':extra.append('--ps-flow-background')
 if mode=='verify-save':
  src=Path(os.path.abspath(os.environ['PF_OWNED_EXPECTED']))
  def refuse(reason):
@@ -51,7 +54,17 @@ if mode=='verify-save':
   if sha(src/name)!=digest: refuse(f'expected-state file changed since it was produced: {src/name}')
  if not save.is_dir() or not any(save.iterdir()): refuse(f'saves directory missing or empty: {save}')
  start['expectedSource']={'dir':str(src),'files':produced};start['savesBefore']={p.name:sha(p) for p in sorted(save.iterdir()) if p.is_file()}
- extra=['--ps-flow-expected-dir='+str(src)]
+ extra.append('--ps-flow-expected-dir='+str(src))
+if mode=='capability' or os.environ.get('PF_OWNED_REQUIRE_IDLE')=='1':
+ try:
+  inventory=subprocess.run(['/bin/ps','-axo','pid=,comm='],capture_output=True,text=True,check=True).stdout
+  running=[line.strip() for line in inventory.splitlines() if 'nwjs' in line.casefold()]
+ except (OSError,subprocess.CalledProcessError) as error:
+  start.update(status='preflight-refused',reason='process inventory unavailable: '+str(error));(out/'launch.json').write_text(json.dumps(start,indent=2)+'\n');raise SystemExit(2)
+ (out/'nw-processes-before.txt').write_text('\n'.join(running)+'\n')
+ if running:
+  start.update(status='preflight-refused',reason='existing NW process; no process signalled',processes=running);(out/'launch.json').write_text(json.dumps(start,indent=2)+'\n');raise SystemExit(2)
+ start['concurrency']='VERIFIED: no NW processes before launch; only the exact owned child may be terminated'
 args=[os.environ['PF_OWNED_BINARY'],os.environ['PF_OWNED_GAME'],'--mute-audio','--disable-renderer-backgrounding','--disable-background-timer-throttling','--disable-backgrounding-occluded-windows','--disable-features=CalculateNativeWinOcclusion','--user-data-dir='+str(out/'profile'),'--ps-save-dir='+str(save),'--ps-flow-test='+mode,'--ps-flow-out='+str(report),'--ps-flow-shots='+str(out/'shots'),'--ps-t0='+str(int(time.time()*1000)),'--ps-flow-quit',*extra]
 start={'command':args,**start}
 with (out/'host.log').open('w')as log:
