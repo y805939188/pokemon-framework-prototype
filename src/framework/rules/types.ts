@@ -157,6 +157,8 @@ export interface Content {
   meta?: ContentMeta;
   /** Every learnset move by its display name (the learnset stores names), with id and PP. Needed to create an individual. */
   moves?: Record<string, MoveData>;
+  /** Complete source-checked ability directory, including trusted overrides outside a species slot list. */
+  abilities?: Record<string, { id: string; name: string }>;
   /** Author content id -> Showdown name of its base form (form 0). */
   speciesIds?: Record<string, string>;
   /** Content id -> form number -> Showdown name. Absent in fixture content, whose content ids are the Showdown names. */
@@ -173,6 +175,8 @@ export interface DexLookup {
   species(showdownId: string): { name: string; baseSpecies: string; types?: string[]; baseStats: Stats; abilities?: (string | null)[]; hiddenAbilities?: (string | null)[]; gender?: GenderRule } | null;
   /** Optional complete pinned move directory, read only after the source gate. Needed for saved moves outside current learnsets. */
   allMoves?(): MoveData[];
+  allAbilities?(): { id: string; name: string }[];
+  type?(id: string): { name: string } | null;
   move(showdownId: string): { name: string; id?: string; pp?: number } | null;
   /** Gen 8 level-up learn levels per move id (Showdown's learnset data), or null for an unknown species. */
   levelUpMoves(showdownId: string): Record<string, number[]> | null;
