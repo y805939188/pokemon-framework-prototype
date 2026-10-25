@@ -9,8 +9,11 @@ import { loadFormatExtension, loadSim } from "./showdown-loader.ts";
 import type { LoadedSim } from "./showdown-loader.ts";
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types.ts";
 import type { BattleEvent } from "./protocol.ts";
-import type { BattleDriver, BattleDriverFactory, GatewayMessage, GatewayOptions, MemberState, SlotSpec, StateRecord, Unsequenced } from "./driver.ts";
+import type { BattleDriver, BattleDriverFactory, DriverCheckpoint, GatewayMessage, GatewayOptions, MemberState, SlotSpec, StateRecord, Unsequenced } from "./driver.ts";
+import { own, setOwn } from "../rules/own.ts";
 import type { PartialStats, Stats } from "../rules/types.ts";
+import type { BattleObservation, EvidenceIssue, ObservationBatch } from "../rules/battle-evidence.ts";
+import type { FormatObservation } from "../rules/battle-evidence.ts";
 
 /** Version tag of the engine-level message stream used by the 2.2 harness only; NOT the game protocol (state.ts PROTOCOL_VERSION = 1). */
 export const PROTOCOL_VERSION = 0;
@@ -28,8 +31,13 @@ function parseLine(raw: string): BattleEvent {
  * It has no readable fields: only `BattleGateway.fromCheckpoint` can open it. Not a save file and not serializable.
  */
 export class GatewayCheckpoint { constructor() { Object.freeze(this); } }
-interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean }
+interface ObservationState {
+  records: BattleObservation[]; issues: EvidenceIssue[]; displays: Record<string, string>;
+  pending: Record<string, Extract<FormatObservation, { kind: "before-loss" }>>;
+}
+interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[]; friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[] }
 const CHECKPOINTS = new WeakMap<GatewayCheckpoint, CheckpointData>();
+const FRIEND_CHECKPOINTS = new WeakMap<DriverCheckpoint, { owner: BattleGateway; side: string; id: string; member: ShowdownPokemon; live: number; setHad: boolean; stored: unknown }>();
 
 export class BattleGateway implements BattleDriver {
   _env: LoadedSim;
@@ -39,6 +47,10 @@ export class BattleGateway implements BattleDriver {
   _battle: ShowdownBattle = null;
   _opts: GatewayOptions;
   _closed = false;
+  _observation: ObservationState = { records: [], issues: [], displays: {}, pending: {} };
+  _friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
+  private _friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[] = [];
+  _legacyFaintHook?: (e: unknown) => void;
 
   constructor(opts: GatewayOptions, internal?: LoadedSim) {
     this._env = internal ?? loadSim(opts.engineRoot);
@@ -54,6 +66,7 @@ export class BattleGateway implements BattleDriver {
       send: (type: string, data: string | string[]) => gw._onSend(type, data),
     });
     gw._battle = battle;
+    gw._attachObservations();
     for (const [i, p] of (opts.players ?? []).entries()) {
       battle.setPlayer(`p${i + 1}`, { name: p.name, team: sim.Teams.pack(p.team) });
     }
@@ -72,6 +85,7 @@ export class BattleGateway implements BattleDriver {
   static async restore(snapshot: string, opts: GatewayOptions = {}): Promise<BattleGateway> {
     const gw = new BattleGateway(opts);
     gw._battle = gw._env.sim.Battle.fromJSON(snapshot);
+    gw._attachObservations();
     gw._battle.restart((type: string, data: string | string[]) => gw._onSend(type, data));
     gw._opts = { ...opts, restored: true };
     return gw;
@@ -87,6 +101,9 @@ export class BattleGateway implements BattleDriver {
     CHECKPOINTS.set(token, {
       snapshot: this.snapshot(), engineRoot: this._env.root,
       queue: JSON.parse(JSON.stringify(this._queue)) as GatewayMessage[], seq: this._seq, closed: this._closed,
+      observation: JSON.parse(JSON.stringify(this._observation)) as ObservationState,
+      friendshipFaints: JSON.parse(JSON.stringify(this._friendshipFaints)) as typeof this._friendshipFaints,
+      friendshipFaintOrigins: JSON.parse(JSON.stringify(this._friendshipFaintOrigins)) as typeof this._friendshipFaintOrigins,
     });
     return token;
   }
@@ -98,7 +115,131 @@ export class BattleGateway implements BattleDriver {
     const gw = await BattleGateway.restore(data.snapshot, { engineRoot: data.engineRoot });
     gw._queue = JSON.parse(JSON.stringify(data.queue)) as GatewayMessage[];
     gw._seq = data.seq; gw._closed = data.closed;
+    gw._observation = JSON.parse(JSON.stringify(data.observation)) as ObservationState;
+    gw._friendshipFaints = JSON.parse(JSON.stringify(data.friendshipFaints)) as typeof gw._friendshipFaints;
+    gw._friendshipFaintOrigins = JSON.parse(JSON.stringify(data.friendshipFaintOrigins)) as typeof gw._friendshipFaintOrigins;
     return gw;
+  }
+
+  _observationIssue(group: EvidenceIssue["group"], reason: string, memberId?: string): void {
+    const issue = { group, reason, ...(memberId ? { memberId } : {}) };
+    if (this._observation.issues.some(x => JSON.stringify(x) === JSON.stringify(issue))) return;
+    if (this._observation.issues.length < 128) this._observation.issues.push(issue);
+    else this._observation.issues[127] = { group: "identity", reason: "observation-issue-capacity-exceeded" };
+  }
+
+  _attachObservations(): void {
+    const extension = loadFormatExtension(this._env.root);
+    extension.hooks.set(this._battle, (event: unknown) => {
+      const e = event as { side: string; id: string };
+      const member = this._mon(e.side, e.id);
+      const actor = (p: ShowdownPokemon) => ({ id: p.name as string, side: p.side.id as string, slot: p.position as number, level: p.level as number, hp: p.hp as number, active: !!p.isActive });
+      const fact: Extract<BattleObservation, { kind: "faint" }> = { kind: "faint", target: actor(member), opponents: member.side.foe.active.filter(Boolean).map(actor) };
+      this._friendshipFaints.push(fact);
+      // Keep the original source value independent of values handed out through the control drain.
+      this._friendshipFaintOrigins.push(JSON.parse(JSON.stringify(fact)) as typeof fact);
+      this._legacyFaintHook?.(event);
+    });
+    if (!extension.observers) { this._observationIssue("identity", "observation-extension-unavailable"); return; }
+    extension.observers.set(this._battle, {
+      emit: value => { try { this._observe(value); } catch { this._observationIssue("identity", "observation-failed"); } },
+      failed: () => this._observationIssue("identity", "observation-failed"),
+    });
+    if (!["gen8rpgcustomgame", "gen8rpgdoublescustomgame"].includes(this._battle.format.id)) this._observationIssue("identity", "unsupported-observation-format");
+  }
+
+  _observe(value: FormatObservation): void {
+    const state = this._observation, id = value.target.id;
+    if (value.kind === "before-loss") {
+      if (own(state.pending, id)) this._observationIssue("damage", "overlapping-loss-interval", id);
+      delete state.pending[id];
+      if (value.effectType === "Move") setOwn(state.pending, id, JSON.parse(JSON.stringify(value)) as typeof value);
+      return;
+    }
+    if (value.kind === "healing") {
+      if (own(state.pending, id)) { this._observationIssue("damage", "healing-inside-loss-interval", id); delete state.pending[id]; }
+      return;
+    }
+    if (value.kind === "move-aborted") {
+      const pre = own(state.pending, id);
+      if (!pre) return; // an ordinary non-confusion cancellation is not damage
+      delete state.pending[id];
+      const loss = pre.target.hp - value.target.hp;
+      if (pre.effect !== "confused" || pre.source?.id !== id || pre.source.side !== pre.target.side || !Number.isSafeInteger(pre.amount) || pre.amount < 0 || !Number.isSafeInteger(loss) || loss < 0 || loss !== Math.min(pre.amount, pre.target.hp)) {
+        this._observationIssue("damage", "unproven-confusion-interval", id); return;
+      }
+      this._observe({ kind: "confusion", target: value.target, loss });
+      return;
+    }
+    if (value.kind === "hit") {
+      if (!Number.isSafeInteger(value.loss) || value.loss < 0) { this._observationIssue("damage", "invalid-hit-loss", id); return; }
+      const pre = own(state.pending, id);
+      if (pre) {
+        if (value.domain !== "body" || pre.effect === "confused") this._observationIssue("damage", "unexpected-hit-interval", id);
+        delete state.pending[id];
+      }
+    }
+    if (value.kind === "faint" && own(state.pending, id)) { this._observationIssue("damage", "unclosed-loss-at-faint", id); delete state.pending[id]; }
+    if (value.kind === "display" || value.kind === "appearance") {
+      if (value.kind === "display" && own(state.displays, id) === value.details) return;
+      setOwn(state.displays, id, value.details);
+    }
+    // Bounds apply only to companion quality. Never interrupt a legal engine action or silently claim complete.
+    if (state.records.length >= 16384) { this._observationIssue("identity", "observation-capacity-exceeded"); return; }
+    state.records.push(JSON.parse(JSON.stringify(value)) as BattleObservation);
+  }
+
+  drainObservations(): ObservationBatch {
+    for (const id of Object.keys(this._observation.pending)) this._observationIssue("damage", "unclosed-loss-interval", id);
+    this._observation.pending = {};
+    return { records: this._observation.records.splice(0), issues: JSON.parse(JSON.stringify(this._observation.issues)) as EvidenceIssue[] };
+  }
+
+  drainFriendshipFaints(): Extract<BattleObservation, { kind: "faint" }>[] { return this._friendshipFaints.splice(0); }
+
+  validateFriendshipFaints(records: readonly Extract<BattleObservation, { kind: "faint" }>[], publicIdents: readonly string[]): boolean {
+    const origins = this._friendshipFaintOrigins.splice(0);
+    if (origins.length !== records.length || origins.length !== publicIdents.length) return false;
+    const sameActor = (a: BattleObservation["target"], b: BattleObservation["target"]) => a.id === b.id && a.side === b.side && a.slot === b.slot && a.level === b.level && a.hp === b.hp && a.active === b.active;
+    return origins.every((origin, i) => {
+      const record = records[i]!, location = /^(p[12])([a-f])?: /.exec(publicIdents[i]!);
+      // Illusion may change the public name, so bind only its side/slot to the actual source event.
+      return !!location && location[1] === origin.target.side && (origin.target.active ? !!location[2] && location[2].charCodeAt(0) - 97 === origin.target.slot : !location[2])
+        && record.kind === "faint" && sameActor(record.target, origin.target) && record.opponents.length === origin.opponents.length && record.opponents.every((p, j) => sameActor(p, origin.opponents[j]!));
+    });
+  }
+
+  checkpointFriendship(side: string, id: string): DriverCheckpoint {
+    const member = this._mon(side, id), token = Object.freeze({});
+    const live = Object.getOwnPropertyDescriptor(member, "happiness"), stored = Object.getOwnPropertyDescriptor(member.set, "happiness");
+    if (!live || !("value" in live) || !live.writable || (stored ? !("value" in stored) || !stored.writable : !Object.isExtensible(member.set))) throw new Error("battle friendship fields are not writable data");
+    FRIEND_CHECKPOINTS.set(token, { owner: this, side, id, member, live: live.value as number, setHad: !!stored, stored: stored?.value as unknown });
+    return token;
+  }
+
+  restoreFriendship(token: DriverCheckpoint): void {
+    const data = FRIEND_CHECKPOINTS.get(token);
+    if (!data || data.owner !== this || this._mon(data.side, data.id) !== data.member) throw new Error("invalid friendship checkpoint");
+    const member = data.member, live = Object.getOwnPropertyDescriptor(member, "happiness"), stored = Object.getOwnPropertyDescriptor(member.set, "happiness");
+    // Validate both destinations before either write. Missing set.happiness must stay missing (default 255).
+    if (!live || !("value" in live) || !live.writable || (data.setHad ? (stored ? !("value" in stored) || !stored.writable : !Object.isExtensible(member.set)) : stored && !stored.configurable)) throw new Error("battle friendship cannot be restored");
+    member.happiness = data.live;
+    if (data.setHad) {
+      if (stored) member.set.happiness = data.stored;
+      else Object.defineProperty(member.set, "happiness", { value: data.stored, enumerable: true, writable: true, configurable: true });
+    } else delete member.set.happiness;
+    FRIEND_CHECKPOINTS.delete(token);
+  }
+
+  applyFriendship(side: string, id: string, { expected, value }: { expected: number; value: number }): { before: number; after: number } {
+    if (![expected, value].every(h => Number.isSafeInteger(h) && h >= 0 && h <= 255)) throw new Error("friendship value outside 0..255");
+    const member = this._mon(side, id);
+    if (member.happiness !== expected || (member.set.happiness ?? 255) !== expected) throw new Error("stale battle friendship");
+    const live = Object.getOwnPropertyDescriptor(member, "happiness"), stored = Object.getOwnPropertyDescriptor(member.set, "happiness");
+    if (!live || !("value" in live) || !live.writable || (stored ? !("value" in stored) || !stored.writable : !Object.isExtensible(member.set))) throw new Error("battle friendship fields are not writable data");
+    // Both writes are ordinary owned fields. Validate everything before either assignment; no callbacks in between.
+    member.happiness = value; member.set.happiness = value;
+    return { before: expected, after: value };
   }
 
   /** Stable id (the nickname we assigned) of the member currently in a side's slot, or null. */
@@ -348,7 +489,7 @@ export class BattleGateway implements BattleDriver {
    * choose or commit anything.
    */
   setFaintHook(fn: (e: unknown) => void): void {
-    loadFormatExtension(this._env.root).hooks.set(this._battle, fn);
+    this._legacyFaintHook = fn;
   }
 
   /** Static move facts the game layer needs (name/id/pp) without holding engine objects. */
