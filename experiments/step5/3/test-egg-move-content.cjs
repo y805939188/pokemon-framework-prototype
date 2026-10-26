@@ -50,3 +50,8 @@ test('egg table permits actual machine transaction through application; no egg p
  assert.equal(app.beginLearning({kind:'teach',memberId:member.id,source:{kind:'machine',itemId:'TM57',entry:'bag'}},{kind:'inventory',token:parent}).status,'committed');assert(state.current().party[0].moves.some(m=>m.id==='unlisted'));assert.equal(E.inventory.itemQuantity(state.current().inventory,'TM57',c.items),0);assert.equal(state.current().stats.moves_taught_by_item,1);assert.equal(state.replaced.length,1);app.endInventoryOperation(parent);
  const reminder=E.learningActions.planRelearningAction(member,c,{shadow:false});assert.equal(reminder.status,'empty');
 });
+test('predecessor egg fallback uses the selected form relation rather than borrowing its base form table',async()=>{
+ const c=await F.content(M,raw=>{const base=raw.species[0];base.eggMoves=[];raw.species[1].eggMoves=[];const pre=ancestor(base,'previous',['growl']);
+  raw.species.unshift(pre,{id:'previous',form:1,showdownId:'previousone',source:'author',eggMoves:['unlisted']});});
+ assert.equal(teacher(c,F.member({form:1})).status,'ready');assert.equal(teacher(c,F.member({form:0})).reason,'incompatible');
+});
