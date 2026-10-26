@@ -38,9 +38,11 @@ test('bad D is local: K, display, independent friend and reliable faint remain c
   assert.equal(r.critical.P1.value,3);assert.equal(r.friendshipReplacements.P1,105);assert.equal(r.appearances.length,1);assert.equal(r.faint.P1.positiveOccurrences.length,1);
 });
 test('observer identity failure leaves independent complete control friendship and faint',async()=>{
-  const {resolveBattleEffects}=await moduleUnderTest;const input=fixture();input.seal.observer.members=null;
-  input.seal.control.members.P1.faint=faintCell([faint('control')]);const r=resolveBattleEffects(input);
-  assert.equal(r.critical.P1.status,'unavailable');assert.equal(r.friendshipReplacements.P1,105);assert.equal(r.faint.P1.positiveOccurrences[0].source,'control');
+  const {resolveBattleEffects}=await moduleUnderTest;
+  for(const corrupt of [i=>{i.seal.observer.members=null;},i=>{i.seal.observer.members=Object.assign([],{P1:i.seal.observer.members.P1});}]){
+    const input=fixture();corrupt(input);input.seal.control.members.P1.faint=faintCell([faint('control')]);const r=resolveBattleEffects(input);
+    assert.equal(r.critical.P1.status,'unavailable');assert.equal(r.friendshipReplacements.P1,105);assert.equal(r.faint.P1.positiveOccurrences[0].source,'control');
+  }
 });
 test('real hook positive survives interrupted prefix and contrary complete-zero coverage',async()=>{
   const {resolveBattleEffects}=await moduleUnderTest;const input=fixture();

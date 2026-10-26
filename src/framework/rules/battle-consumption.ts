@@ -190,14 +190,16 @@ export function resolveBattleEffects(input: ResolveBattleEffectsInput): Resolved
   const result: ResolvedBattleEffects = { binding: null, appearances: [], defeats: [], critical: {}, damage: {}, friendshipReplacements: {}, faint: {}, dispositions: [] };
   const expectedBinding = binding(data(input, "expectedBinding")), expectedContext = context(data(input, "expectedContext")), seal = data(input, "seal");
   const actualBinding = binding(data(seal, "binding")), actualContext = context(data(seal, "context"));
-  const bindingOK = expectedBinding !== null && actualBinding !== null && data(seal, "version") === 2 && JSON.stringify(expectedBinding) === JSON.stringify(actualBinding);
+  const bindingOK = slots(seal, ["version", "binding", "context", "observer", "control"]) && expectedBinding !== null && actualBinding !== null && data(seal, "version") === 2 && JSON.stringify(expectedBinding) === JSON.stringify(actualBinding);
   const contextOK = expectedContext !== null && actualContext !== null && JSON.stringify(expectedContext) === JSON.stringify(actualContext);
   disposition(result, "shared", "binding", bindingOK ? { status: "complete" } : unavailable("seal-binding-mismatch-or-unavailable"));
   disposition(result, "shared", "context", contextOK ? { status: "complete" } : unavailable("seal-context-mismatch-or-unavailable"));
   if (bindingOK && contextOK) result.binding = actualBinding;
   const usable = result.binding !== null;
-  const observer = usable ? data(seal, "observer") : undefined, control = usable ? data(seal, "control") : undefined;
-  const observerMembers = data(observer, "members"), controlMembers = data(control, "members");
+  const rawObserver = usable ? data(seal, "observer") : undefined, rawControl = usable ? data(seal, "control") : undefined;
+  const observer = slots(rawObserver, ["appearances", "defeats", "members"]) ? rawObserver : undefined, control = slots(rawControl, ["members"]) ? rawControl : undefined;
+  const rawObserverMembers = data(observer, "members"), rawControlMembers = data(control, "members");
+  const observerMembers = object(rawObserverMembers) ? rawObserverMembers : undefined, controlMembers = object(rawControlMembers) ? rawControlMembers : undefined;
   for (const group of ["appearances", "defeats"] as const) {
     const records = data(observer, group);
     if (!object(records)) { disposition(result, "observer", group, unavailable("observation-group-not-supplied")); continue; }
