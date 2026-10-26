@@ -166,7 +166,7 @@ test('idempotency: same result twice applies once; a different result for the sa
 	const bad = { ...result, battleId: 'B-bad', members: { 'Z-9999': { hp: 1 } } };
 	assert.throws(() => store.commit(bad), /unknown member/);
 	const badField = { ...result, battleId: 'B-bad2', members: { 'A-0001': { nickname: 'hax' } } };
-	assert.throws(() => store.commit(badField), /outside the write set/);
+	assert.throws(() => store.commit(badField), /invalid battle result \$\.members\.A-0001\.nickname: unknown field/);
 	const neg = { ...result, battleId: 'B-bad3', bag: { potion: -99 } };
 	assert.throws(() => store.commit(neg), /not-enough-items/);
 	assert.deepEqual(store.load(), once);
@@ -251,8 +251,12 @@ test('statusCount is a write-set field: validated, applied, and bad poison is st
 	const game = makeGame();
 	const S2 = require('../../../js/engine/game/state.cjs');
 	assert.ok(S2.MEMBER_WRITE_SET.includes('statusCount'));
-	const base = { protocol: 1, battleId: 'SC-1', outcome: { kind: 'run' }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] } };
-	for (const bad of [-1, 1.5, '2', null]) assert.throws(() => S2.applyBattleResult(game, { ...base, battleId: 'SC-bad', members: { 'A-0001': { statusCount: bad } } }), /statusCount must be an integer/);
+	const base = { protocol: 1, battleId: 'SC-1', outcome: { kind: 'run', winner: null }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] } };
+	const before = S2.clone(game);
+	for (const bad of [-1, 1.5, '2', null]) {
+		assert.throws(() => S2.applyBattleResult(game, { ...base, battleId: 'SC-bad', members: { 'A-0001': { statusCount: bad } } }), /invalid battle result \$\.members\.A-0001\.statusCount: expected a safe integer/);
+		assert.deepEqual(game, before, 'structural rejection leaves the input and ledger untouched');
+	}
 	const ok = S2.applyBattleResult(game, { ...base, members: { 'A-0001': { status: 'slp', statusCount: 2 } } });
 	assert.deepEqual([ok.state.party[0].status, ok.state.party[0].statusCount], ['slp', 2]);
 	// badly poisoned at the end of a battle becomes plain poison with a cleared counter (WP20 / WP39 after_battle)

@@ -54,8 +54,12 @@ test('old ledgers keep working: a result recorded earlier is still recognised, a
   const game = E.fixtures.makeGame();
   game.appliedBattles = { [entry.result.battleId]: { hash: entry.hash } }; // a ledger written before the change (same shape as experiments/step3/fixtures/legacy-v1-flow-state.json)
   assert.equal(E.state.applyBattleResult(game, entry.result).status, 'already-applied');
-  const other = JSON.parse(JSON.stringify(entry.result)); other.outcome = { ...other.outcome, kind: 'win' };
+  const before = JSON.parse(JSON.stringify(game));
+  const other = JSON.parse(JSON.stringify(entry.result)); other.outcome = { kind: 'win', winner: 'Player' };
   assert.throws(() => E.state.applyBattleResult(game, other), /already applied with a different result/);
+  const malformed = { ...other, outcome: { kind: 'win', winner: null } };
+  assert.throws(() => E.state.applyBattleResult(game, malformed), /invalid battle result \$\.outcome\.winner: expected a nonempty string/);
+  assert.deepEqual(game, before, 'both refusals leave the state and historical ledger unchanged');
 });
 
 test('the compiled-content input hash is unchanged by the portable implementation', () => {
