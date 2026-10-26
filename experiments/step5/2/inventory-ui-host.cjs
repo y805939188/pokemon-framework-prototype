@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),os=require('node:os'),{spawnSync}=require('node:child_process');
 const {E,clone,setup}=require('./ef-support.cjs');let bundles,dir;
-function build(){if(bundles)return;dir=fs.mkdtempSync(path.join(os.tmpdir(),'ps52-inventory-host-'));bundles={};for(const plugin of ['PS_Management','PS_Inventory','PS_Progression']){const p=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',dir],{env:{...process.env,RR_PLUGIN:plugin},encoding:'utf8'});if(p.status!==0)throw Error(p.stdout+p.stderr);bundles[plugin]=fs.readFileSync(path.join(dir,plugin+'.js'),'utf8');}}
+function build(){if(bundles)return;dir=fs.mkdtempSync(path.join(os.tmpdir(),'ps52-inventory-host-'));bundles={};for(const plugin of ['PS_Management','PS_Inventory','PS_Progression','PS_Evolution']){const p=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',dir],{env:{...process.env,RR_PLUGIN:plugin},encoding:'utf8'});if(p.status!==0)throw Error(p.stdout+p.stderr);bundles[plugin]=fs.readFileSync(path.join(dir,plugin+'.js'),'utf8');}}
 function disposeBuild(){if(dir)fs.rmSync(dir,{recursive:true,force:true});bundles=null;dir=null;}
 function host(options={}){
  build();const x=options.application??setup({bag:{potion:3,rarecandy:2,ether:2,pokeball:20},variables:{count:()=>G.$dataSystem.variables.length-1,write:(id,value)=>G.$gameVariables.setValue(id,value)},edit:(g,c)=>{g.money=5000;g.party[0].hp=1;c.items.pokeball.price=200;c.items.pokeball.sellPrice=100;c.items.potion.price=300;c.items.potion.sellPrice=150;c.species.Charizard.learnset={51:['Slash']};options.edit?.(g,c);},...options.setup});
@@ -22,7 +22,8 @@ function host(options={}){
  const G={console,structuredClone,Date,performance:{now:()=>G.Graphics.frameCount*1000/60},Input:input,TouchInput:{clear(){},isCancelled:()=>false},Graphics:{boxWidth:816,boxHeight:624,frameCount:0},Scene_MenuBase:Base,Scene_Map:Base,Window_Base:Win,Rectangle:function(){},SceneManager:manager,PluginManager:{registerCommand(p,n,f){commands[p+':'+n]=f}},Game_Interpreter:Base,SoundManager:{playBuzzer(){},playCancel(){}},$gameMessage:{add(s){messages.push(s)},isBusy:()=>G.messageBusy},$gameSwitches:{value:()=>false},$dataMap:{meta:{}},$dataSystem:{switches:Array(36).fill(''),variables:Array(8).fill('')},$gameVariables:{setValue(id,v){vars[id]=v}},messageBusy:false};
  G.Window_MenuCommand=MenuCommand;G.Scene_Menu=Menu;
  G.PSFlow={app:()=>app,_app:app,game:()=>x.state.current(),content:()=>x.content,translator:()=>E.i18n.translatorFor(G.language??'en'),speciesName:s=>s};G.window=G;G.document=document;G.addEventListener=(k,f)=>(events[k]??=new Set()).add(f);
- vm.runInNewContext(bundles.PS_Management,G);vm.runInNewContext(bundles.PS_Inventory,G);vm.runInNewContext(bundles.PS_Progression,G);
+ Object.assign(G.PSFlow,options.flowOverrides??{});
+ vm.runInNewContext(bundles.PS_Management,G);vm.runInNewContext(bundles.PS_Inventory,G);vm.runInNewContext(bundles.PS_Progression,G);vm.runInNewContext(bundles.PS_Evolution,G);
  const tick=()=>{G.Graphics.frameCount++;manager.updateScene();input.trigger.clear();input.repeat.clear();};
  const press=(key)=>{input.trigger.add(key);input.repeat.add(key);input.pressed.add(key);tick();input.pressed.delete(key);tick();};
  const ready=()=>{tick();tick();};const view=()=>G.PSInventory.current();
