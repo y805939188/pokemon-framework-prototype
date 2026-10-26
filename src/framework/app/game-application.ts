@@ -181,6 +181,15 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (context.generation !== this.generation || this.terminatedBattles.has(context)
       || requireOwner && this.battleCommitOwner !== context) throw new Error("stale battle commit generation or owner");
   }
+  private invalidatePreparedSource(prepared: PreparedBattle, battleId: string): void {
+    prepared.sourceInvalidated = true;
+    prepared.effects = resolveBattleEffects({ seal: null, expectedBinding: {
+      battleId, generation: prepared.generation, rawHash: prepared.rawHash,
+      contentIdentity: prepared.sourceIdentity ?? "0".repeat(64),
+    }, expectedContext: prepared.expectedContext, membersBefore: prepared.before.party });
+    delete prepared.next; delete prepared.nextIdentity; delete prepared.defeat;
+    prepared.diagnostics = [];
+  }
 
   /** Read-only transient companion view. It supplies no commit authority and is never a persistent save record. */
   battleEvidenceSnapshot(handle: S): BattleEvidence | null {
@@ -663,9 +672,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       prepared.indeterminate = true;
       throw new StateInstallFailed("state-changed-during-prepared-commit: reload the last complete save", true);
     }
-    if (prepared?.next) {
-      if (prepared.nextIdentity !== identity) throw new StateInstallFailed("content-changed-during-prepared-commit");
-    } else {
+    // A new content identity may revalidate a zero-write primary plan, but can never revive the old source seal.
+    // Actual installed/indeterminate attempts were handled above against their original next state first.
+    if (prepared && (!prepared.sourceInvalidated && prepared.sourceIdentity !== identity
+      || prepared.next && prepared.nextIdentity !== identity)) this.invalidatePreparedSource(prepared, result.battleId);
+    if (!prepared?.next) {
       // Fresh reference checks are complete before a pending receiving choice can defer the source seal.
       let applied: ReturnType<typeof planBattlePrimary> | undefined;
       let receiving: ReceivingRefused | undefined;
@@ -698,8 +709,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       }
       // Content changes can only downgrade a prepared source. They never cause a new source lookup/backfill.
       if (!prepared.sourceInvalidated && prepared.sourceIdentity !== identity) {
-        prepared.sourceInvalidated = true;
-        prepared.effects = resolveBattleEffects({ seal: null, expectedBinding: { battleId: result.battleId, generation: this.generation, rawHash: hash, contentIdentity: prepared.sourceIdentity ?? "0".repeat(64) }, expectedContext: prepared.expectedContext, membersBefore: prepared.before.party });
+        this.invalidatePreparedSource(prepared, result.battleId);
       }
       if (receiving) throw receiving;
       if (!applied || applied.status !== "applied") throw new Error("primary planning failed");
@@ -722,6 +732,12 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (stateIdentity(latest) !== stateIdentity(prepared.before)) {
       prepared.indeterminate = true;
       throw new StateInstallFailed("state-changed-before-battle-install: reload the last complete save", true);
+    }
+    const latestIdentity = validatedContentIdentity(this.ports.content().content);
+    this.assertBattleContext(context, true);
+    if (latestIdentity !== identity) {
+      this.invalidatePreparedSource(prepared, result.battleId);
+      throw new StateInstallFailed("content-changed-before-battle-install: retry with stable current content");
     }
     prepared.attempted = true;
     let failure: unknown;

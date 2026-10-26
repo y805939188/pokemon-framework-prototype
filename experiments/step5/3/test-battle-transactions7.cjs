@@ -102,3 +102,20 @@ test('E2a legal primary friendship outside the auxiliary domain survives complet
   assert.equal(w.state.current().appliedBattles[r.battleId].hash,E.state.resultHash(r));const before=clone(w.state.current());assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied');assert.equal(w.state.replaced.length,1);assert.deepEqual(w.state.current(),before);
  }
 });
+test('E2a content changes during the seal or final state read defer all writes and permanently downgrade the frozen source',async()=>{
+ for(const at of ['seal','last-read'])for(const returnToA of [false,true]){
+  let armed=false,w;const initial=E.fixtures.makeGame();initial.party[0].readyToEvolve=true;initial.party[0].evolutionReadiness='known';
+  w=world({initial,port:state=>({read:()=>{if(armed){armed=false;w.setContent(changed);}return state.read();},replace:next=>state.replace(next)})});
+  const original=w.content(),changed=clone(original);changed.meta.inputsHash='2'.repeat(64);changed.meta.contentIdentity=E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics:2,inputsHash:changed.meta.inputsHash,showdownSha:sourceSha}));
+  const effects=w.sessions.effects;w.sessions.effects=(...args)=>{const seal=effects(...args);if(at==='seal')w.setContent(changed);else armed=true;return seal;};
+  const h=await w.app.startBattle(w.request),before=clone(w.state.current()),pending=w.app.finishBattle(h,w.request);
+  assert.equal(pending.pending,true,at);assert.match(pending.error,/content-changed-before-battle-install/);assert.deepEqual(w.state.current(),before);assert.equal(w.state.replaced.length,0);assert.equal(w.sessions.calls,1);assert.equal(w.app.saveBlocked,true);
+  if(returnToA)w.setContent(original);const complete=w.app.resolveReceiving(pending.receivingToken);assert.equal(complete.commit,'applied');assert.equal(w.state.replaced.length,1);assert.equal(w.sessions.calls,1);assert.equal(w.state.current().party[0].friendship,99);assert.deepEqual([w.state.current().party[0].readyToEvolve,w.state.current().party[0].evolutionReadiness],[true,'unknown']);assert.equal(w.state.current().party.length,before.party.length+1);assert(w.state.current().party[0].exp>before.party[0].exp);assert.equal(w.app.saveBlocked,false);
+ }
+});
+test('E2a a zero-write failed install can revalidate new content without resurrecting its old auxiliary next state',async()=>{
+ const initial=E.fixtures.makeGame();initial.party[0].readyToEvolve=true;initial.party[0].evolutionReadiness='known';const w=world({initial}),h=await w.app.startBattle(w.request),original=w.content(),changed=clone(original);
+ changed.meta.inputsHash='3'.repeat(64);changed.meta.contentIdentity=E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics:2,inputsHash:changed.meta.inputsHash,showdownSha:sourceSha}));w.state.failReplace=Error('synthetic zero-write failure');
+ const first=w.app.finishBattle(h,w.request);assert.equal(first.pending,true);w.setContent(changed);assert.equal(w.app.resolveReceiving(first.receivingToken).pending,true);assert.equal(w.state.replaced.length,0);assert.equal(w.sessions.calls,1);
+ w.setContent(original);w.state.failReplace=null;assert.equal(w.app.resolveReceiving(first.receivingToken).commit,'applied');assert.equal(w.state.replaced.length,1);assert.equal(w.sessions.calls,1);assert.equal(w.state.current().party[0].friendship,99);assert.deepEqual([w.state.current().party[0].readyToEvolve,w.state.current().party[0].evolutionReadiness],[true,'unknown']);
+});
