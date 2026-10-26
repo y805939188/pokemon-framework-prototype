@@ -1847,6 +1847,27 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-effects.json"), JSON.stringify({ slot: 54, state: clone(game()), result: raw, memberId: id }));
       return { input: "actual NW application API and MZ save, synthetic seal failure", replacements, lookups, readiness: game().party[0].evolutionReadiness, slot: 54 };
     });
+    await scenario("C53-06 real host reception: source identity round trip cannot revive pending auxiliary writes", async () => {
+      fresh(); const B = api(), original = W.PSFlow.content(), id = game().party[0].id;
+      game().party[0].hp = 50; game().party[0].friendship = 99; game().party[0].readyToEvolve = true; game().party[0].evolutionReadiness = "known";
+      let current = original, lookups = 0, replacements = 0;
+      const changed = clone(original); changed.meta.inputsHash = "4".repeat(64);
+      changed.meta.contentIdentity = B.digest.sha256Hex(B.contentCompile.canonicalJson({ compiledSemantics: changed.meta.compiledSemantics, inputsHash: changed.meta.inputsHash, showdownSha: changed.meta.showdownSha }));
+      const factory = B.composition.createBattleSessionFactory({ content: () => current, seed: () => [1,2,3,4] }), effects = factory.effects;
+      factory.effects = (handle: any, binding: any) => { lookups++; const seal = effects(handle, binding); current = changed; return seal; };
+      const app = new B.app.GameApplication({ state: { read: () => game(), replace: (next: any) => { assert(app.saveBlocked, "reception owner at replacement"); replacements++; G.$gameSystem._psGame = next; } }, sessions: factory, projection: { project: () => {} }, content: () => ({ content: current }), random: seeded(1), clock: () => 0, itemWorld: () => ({ mapId: G.$gameMap.mapId() }) }, { receivingProfile: { mode: 1, naming: 0 } });
+      const before = clone(game()), request = { battleId: "host-effects-pending-identity", kind: "wild", foes: [{ species: "pidgey", level: 5 }], seq: 6 }, handle = await app.startBattle(request);
+      await handle.useItem("potion", id); await handle.throwBall("masterball"); const raw = handle.result(), pending = app.finishBattle(handle, request);
+      assert(pending.pending && app.saveBlocked, "nickname choice retains the original owner"); eq(replacements, 0, "pending is zero write"); eq(game(), before, "pending preserves original state");
+      current = original; const done = app.resolveReceiving(pending.receivingToken, { [raw.captured[0].id]: { nickname: { kind: "keep" } } });
+      eq(done.commit, "applied", "same token completes the legal primary"); eq([lookups, replacements], [1,1], "one source attempt and one installation");
+      eq([game().party[0].friendship, game().party[0].readyToEvolve, game().party[0].evolutionReadiness], [99,true,"unknown"], "old source is permanently downgraded after A-B-A");
+      assert(game().party.length === before.party.length + 1 && game().party[0].exp > before.party[0].exp, "capture and XP survive pending recovery");
+      await G.DataManager.saveGame(55);
+      const expectedFile = path.join(path.dirname(OUT || "."), "ps-flow-expected-effects.json"), expected = JSON.parse(fs.readFileSync(expectedFile, "utf8"));
+      expected.receivingCase = { slot: 55, state: clone(game()), result: raw }; fs.writeFileSync(expectedFile, JSON.stringify(expected));
+      return { input: "actual NW/MZ application and save, synthetic source callback content replacement", lookups, replacements, slot: 55 };
+    });
   }
 
   async function verifySave() {
@@ -1883,6 +1904,12 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         let contentReads = 0;
         const app = new (api().app.GameApplication)({ state: { read: () => game(), replace: () => { throw new Error("replay must not write"); } }, sessions: { create: async () => { throw new Error("replay must not create"); } }, projection: { project: () => {} }, content: () => { contentReads++; throw new Error("replay must not read changed content"); } });
         eq(app.commitResult(expected.result), "already-applied", "original raw/hash replay after restart"); eq(contentReads, 0, "zero content dependency"); eq(game(), expected.state, "no resource or readiness backfill");
+        if (expected.receivingCase) {
+          const receiving = expected.receivingCase; G.DataManager.setupNewGame(); await G.DataManager.loadGame(receiving.slot);
+          eq(game(), receiving.state, "pending identity recovery survives a real new process");
+          eq(app.commitResult(receiving.result), "already-applied", "reception result has no late backfill after restart");
+          eq(contentReads, 0, "reception replay needs no current content"); eq(game(), receiving.state, "reception replay preserves every field");
+        }
         return { slot: expected.slot, input: "MZ load API in fresh NW process plus direct replay", contentReads };
       });
       return;
