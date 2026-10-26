@@ -89,3 +89,9 @@ test('E2a a started handle cannot relabel a valid raw result as another battle',
  const w=world(),h=await w.app.startBattle(w.request),before=clone(w.state.current());w.sessions.created[0].raw.battleId='another-battle';
  const o=w.app.finishBattle(h,w.request);assert.equal(o.commit,'none');assert.match(o.error,/owner-mismatch/);assert.equal(w.sessions.calls,0);assert.deepEqual(w.state.current(),before);assert.equal(w.app.saveBlocked,false);
 });
+test('E2a a source callback that loads a new game cannot install or abort the new same-id battle',async()=>{
+ const w=world(),h=await w.app.startBattle(w.request),effects=w.sessions.effects;let replacement,newHandle;
+ w.sessions.effects=(...args)=>{const seal=effects(...args);replacement=E.fixtures.makeGame();replacement.money=1234;w.state.replace(replacement);w.app.stateReplacedByHost();newHandle=w.app.startBattle(w.request);return seal;};
+ const old=w.app.finishBattle(h,w.request);assert.equal(old.commit,'none');assert.equal(old.aborted,true);assert.deepEqual(w.state.current(),replacement);assert.equal(w.state.replaced.length,1);assert.equal(w.app.saveBlocked,true);assert.equal(w.projection.outcomes.length,0);
+ const fresh=await newHandle;assert.equal(w.app.saveBlocked,true);w.app.abortBattle(w.request,Error('end isolated replacement fixture'));assert.equal(w.app.saveBlocked,false);assert.equal(w.app.finishBattle(h,w.request).commit,'none');assert.deepEqual(w.state.current(),replacement);assert(fresh);
+});

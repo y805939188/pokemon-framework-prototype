@@ -177,6 +177,10 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly finishing = new WeakSet<object>();
   private readonly terminatedBattles = new WeakSet<ReceptionContext>();
   private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner; }
+  private assertBattleContext(context: ReceptionContext, requireOwner = false): void {
+    if (context.generation !== this.generation || this.terminatedBattles.has(context)
+      || requireOwner && this.battleCommitOwner !== context) throw new Error("stale battle commit generation or owner");
+  }
 
   /** Read-only transient companion view. It supplies no commit authority and is never a persistent save record. */
   battleEvidenceSnapshot(handle: S): BattleEvidence | null {
@@ -369,6 +373,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       catch (error) { return { status: "pending", reason: message(error) }; }
     }
     const outcome = pending.resume();
+    if (pending.context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
     if (!("pending" in outcome && outcome.pending) && !("status" in outcome && outcome.status === "pending") && !("status" in outcome && outcome.status === "refused")) {
       this.receptionReceipts.set(token, clone(outcome));
       if (this.receptionReceipts.size > 32) this.receptionReceipts.delete(this.receptionReceipts.keys().next().value!);
@@ -385,6 +390,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     let current: GameState;
     try { current = this.battleStatePort.read(); }
     catch { prepared.indeterminate = true; return { status: "reload-required", reason: "state-install-indeterminate" }; }
+    if (context.generation !== this.generation || this.battleCommitOwner !== context) return { status: "refused", reason: "stale-operation" };
     if (prepared.completed || prepared.next && stateIdentity(current) === stateIdentity(prepared.next)) return { status: "refused", reason: "already-installed: resume the pending operation" };
     if (stateIdentity(current) !== stateIdentity(prepared.before)) { prepared.indeterminate = true; return { status: "reload-required", reason: "state-install-indeterminate" }; }
     prepared.indeterminate = false;
@@ -607,6 +613,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private commitResultWithContext(result: BattleResult, context: ReceptionContext): CommitResultStatus {
     try { return this.commit(result, undefined, context).status; }
     catch (error) {
+      this.assertBattleContext(context);
       if (error instanceof StateInstallFailed || error instanceof ReceivingRefused && error.reason === "pending") {
         const members = this.preparedBattles.get(context)?.captureMembers ?? [];
         this.reception = { context, members: clone(members), resume: () => ({ status: this.commitResultWithContext(result, context) }) };
@@ -627,9 +634,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    */
   private commit(result: BattleResult, facts: BattleFacts | undefined, context: ReceptionContext, handle?: S): { status: ApplyStatus; defeat?: { moneyLost: number; healed: true }; diagnostics?: string[] } {
     assertBattleResultShape(result);
+    this.assertBattleContext(context);
     const authority = handle ? this.ownedBattleEffects.get(handle) : undefined;
     if (authority && authority.battleId !== result.battleId) throw new Error("battle-result-owner-mismatch");
     const code = outcomeCode(result), hash = resultHash(result), current = this.ports.state.read();
+    this.assertBattleContext(context);
     let prepared = this.preparedBattles.get(context);
     const previous = own(current.appliedBattles, result.battleId);
     if (previous) {
@@ -643,12 +652,12 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       // Exact replay is content-independent and never fetches a newer effects seal.
       return { status: "already-applied" };
     }
-    if (context.generation !== this.generation) throw new Error("stale battle commit generation");
     if (this.battleCommitOwner && this.battleCommitOwner !== context) throw new Error("battle-commit-active");
     this.battleCommitOwner = context;
     // This fresh-only closed-source guard must not load current content or an external item catalog.
     assertCapturedHeldSources(result.captured, context.templates ?? {}, { allowed: this.capabilities.allowHeldItemSources, describe: this.describeHeldItem });
     const { content } = this.ports.content(), identity = validatedContentIdentity(content);
+    this.assertBattleContext(context, true);
     if (prepared && (prepared.rawHash !== hash || prepared.generation !== this.generation)) throw new Error("prepared battle binding changed");
     if (prepared && stateIdentity(current) !== stateIdentity(prepared.before)) {
       prepared.indeterminate = true;
@@ -667,6 +676,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         if (!(error instanceof ReceivingRefused) || error.reason !== "pending") throw error;
         receiving = error;
       }
+      this.assertBattleContext(context, true);
       if (!prepared) {
         const owned = handle ? this.ownedBattleEffects.get(handle) : undefined;
         const expectedContext: EffectsContextV2 = owned?.context ?? {
@@ -679,6 +689,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         if (compatible && handle && this.ports.sessions.effects) {
           try { seal = this.ports.sessions.effects(handle, binding); } catch { /* Auxiliary absence never discards the legal primary plan. */ }
         }
+        this.assertBattleContext(context, true);
         prepared = { rawHash: hash, generation: this.generation, before: clone(current), expectedContext: clone(expectedContext),
           effects: resolveBattleEffects({ seal, expectedBinding: binding, expectedContext, membersBefore: current.party }),
           captureMembers: capturedTemplates(result, context.templates ?? {}, speciesKeyResolver(content), content),
@@ -706,6 +717,12 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const problems = validateGameContent(next, content);
     if (problems.length) throw new Error(`invalid battle next state: ${problems[0]!.path} ${problems[0]!.message}`);
     if (next.inventory.pockets.some(pocket => pocket.length)) assertInventoryMapped(next.inventory, catalogOf(content));
+    const latest = this.battleStatePort.read();
+    this.assertBattleContext(context, true);
+    if (stateIdentity(latest) !== stateIdentity(prepared.before)) {
+      prepared.indeterminate = true;
+      throw new StateInstallFailed("state-changed-before-battle-install: reload the last complete save", true);
+    }
     prepared.attempted = true;
     let failure: unknown;
     try { this.battleStatePort.replace(clone(next)); this.inventory.stateChanged(next); }
@@ -713,6 +730,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     let installed: GameState;
     try { installed = this.battleStatePort.read(); }
     catch (error) { prepared.indeterminate = true; throw new StateInstallFailed(error, true); }
+    this.assertBattleContext(context, true);
     if (stateIdentity(installed) !== stateIdentity(next)) {
       prepared.indeterminate = stateIdentity(installed) !== stateIdentity(prepared.before);
       throw new StateInstallFailed(failure ?? "state port did not install the complete battle state", prepared.indeterminate);
@@ -744,16 +762,18 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       const received = handle.result();
       assertBattleResultShape(received); // Before outcome, copying, hash or any source callback.
       const hash = resultHash(received);
+      this.assertBattleContext(context);
       // Legacy callers may recreate an unowned handle for an existing receiving retry. Matching the private pending
       // hash can resume that same zero-authority context; it cannot borrow a started session's source authority.
       if (!remembered && !this.op && this.battleCommitOwner && this.reception?.context === this.battleCommitOwner
         && this.preparedBattles.get(this.battleCommitOwner)?.rawHash === hash) context = this.battleCommitOwner;
-      this.battleContexts.set(handle, context); this.bornIn.set(handle, this.generation);
+      this.battleContexts.set(handle, context); this.bornIn.set(handle, context.generation);
       result = clone(received);
       const code = outcomeCode(result), kind = result.outcome.kind, battleId = request?.battleId ?? result.battleId;
       if (context.rawHash && context.rawHash !== hash) throw new Error("battle result changed while receiving decisions were pending");
       context.rawHash = hash;
       const committed = this.commit(result, facts, context, handle);
+      this.assertBattleContext(context);
       if (this.op === ownedOp) this.op = null;
       const outcome: BattleOutcome & { result?: BattleResult } = { code, battleId, commit: committed.status, kind,
         ...(facts?.experimentalHeld ? { diagnostics: ["战后持物写回未完成"] } : {}),
@@ -771,9 +791,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
           } else outcome.diagnostics = [...(outcome.diagnostics ?? []), "战斗伴随事实不可用"];
         } catch { outcome.diagnostics = [...(outcome.diagnostics ?? []), "战斗伴随事实读取失败"]; }
       }
+      this.assertBattleContext(context);
       this.project(outcome); outcome.result = result;
       return outcome;
     } catch (error) {
+      // A callback may have loaded another game and even opened a same-id battle. The old completion must not
+      // enqueue a receiving operation, project into that game, or abort its new operation by matching the id.
+      if (context.generation !== this.generation || this.terminatedBattles.has(context)) return { code: 0, battleId: request?.battleId ?? result?.battleId ?? null, commit: "none", aborted: true, error: message(error) };
       if (result && (error instanceof StateInstallFailed || error instanceof ReceivingRefused && error.reason === "pending")) {
         this.reception = { context, members: clone(this.preparedBattles.get(context)?.captureMembers ?? []), resume: () => this.finishBattle(handle, request) };
         return { code: outcomeCode(result), battleId: result.battleId, commit: "none", pending: true, receivingToken: context.token,
