@@ -1953,7 +1953,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       const species = B.speciesKey.speciesDataOf(content,game().party[0]); species.tutorMoves = [move.name]; species.learnset = {1:["Tackle","Rest"]};
       for (const name of ["tackle","rest"]) { const m = B.dex.createDexLookup().move(name); content.moves[m.name] = m; }
       for (const [itemId,fieldUse] of [["host-study-tr","tr"],["host-study-hm","hm"]]) content.items[itemId] = { ...content.items.potion, id:itemId, name:itemId, namePlural:itemId, pocket:4, flags:[], fieldUse, battleUse:"none", battleId:undefined, legacyIds:[], consumable:fieldUse==="tr", move:move.id };
-      content.settings.TAUGHT_MACHINES_KEEP_OLD_PP = true;
+      content.settings = { ...(content.settings ?? {}), TAUGHT_MACHINES_KEEP_OLD_PP: true };
       const authored = clone(content); delete authored.meta; const inputsHash = B.digest.sha256Hex(B.contentCompile.canonicalJson(authored));
       content.meta = { ...content.meta, kind:"fixture", id:"host-learning", inputsHash, contentIdentity:B.digest.sha256Hex(B.contentCompile.canonicalJson({compiledSemantics:content.meta.compiledSemantics,inputsHash,showdownSha:content.meta.showdownSha})) };
       W.PSFlow._content = content; W.PSFlow._app = null; game().inventory = B.inventory.addItems(game().inventory,"host-study-tr",2,content.items,B.inventory.inventoryPolicy(content));
@@ -1971,6 +1971,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       return {input:"real MZ interpreter/save and application bridge, synthetic direct lesson decision; no formal G screen",slot:58,saveRefused,remaining:1};
     });
     await scenario("E53-L2 real MZ: independent HM forgetting, reminder and last-move refusal keep exact state",async()=>{
+      assert(fs.existsSync(path.join(path.dirname(OUT||"."),"ps-flow-expected-learning.json")),"prerequisite L1 produced its learning save and content fixture");
       const app=W.PSFlow.app(),id=game().party[0].id;eq(W.PSFlow.beginLearning({kind:"forget",memberId:id}).status,"pending","independent viewing");let p=app.pendingLearning;
       eq(W.PSFlow.resolveLearning(p.token,p.revision,{kind:"forget",slot:0}).status,"committed","independent forgetting allows HM");assert(!game().party[0].moves.some((m:any)=>m.id==="gust"),"HM removed");
       const before=game().stats.moves_taught_by_reminder;eq(W.PSFlow.beginLearning({kind:"relearn",memberId:id}).status,"pending","reminder candidates");p=app.pendingLearning;assert(p.selection.candidates.includes("tackle"),"actual level-table candidate");

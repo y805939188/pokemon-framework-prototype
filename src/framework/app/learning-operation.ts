@@ -109,6 +109,8 @@ export class LearningOperation {
     if (fingerprint(state) !== fingerprint(op.before)) retire("stale-learning-target-or-resources");
     // Neither port read may hide a content change that happened in another callback.
     if (validatedContentIdentity(this.content().content) !== op.contentIdentity) retire("learning-content-changed"); this.current(op);
+    const finalWorld = this.options.world(); this.current(op);
+    if (fingerprint(finalWorld) !== op.worldIdentity) retire("learning-world-changed");
     return { content, state };
   }
   private plan(op: Operation, content: Content, member: Member): LearningOutcome {
@@ -137,12 +139,13 @@ export class LearningOperation {
   private install(op: Operation): LearningOutcome {
     this.current(op);
     if (!op.next || !op.before) throw Error("learning-plan-not-ready");
+    if (op.retired) { op.error = op.retired; return this.pending(op); }
     let actual: GameState;
     try { actual = clone(this.state.read()); this.current(op); }
     catch (error) { this.current(op); op.error = message(error); return this.pending(op); }
     if (fingerprint(actual) === fingerprint(op.next)) return this.finish(op, "committed");
     if (fingerprint(actual) !== fingerprint(op.before)) {
-      op.error = "learning-state-indeterminate: reload the last complete save"; op.reloadRequired = true; return this.pending(op);
+      op.error = op.retired = "learning-state-indeterminate: reload the last complete save"; op.reloadRequired = true; return this.pending(op);
     }
     try {
       const { content } = this.fresh(op);
@@ -151,8 +154,10 @@ export class LearningOperation {
     } catch (error) { this.current(op); op.error = message(error); }
     try { actual = clone(this.state.read()); this.current(op); }
     catch (error) { this.current(op); op.error = message(error); return this.pending(op); }
+    if (op.retired) return this.pending(op);
     if (fingerprint(actual) === fingerprint(op.next)) return this.finish(op, "committed");
     op.reloadRequired = fingerprint(actual) !== fingerprint(op.before);
+    if (op.reloadRequired) op.retired = "learning-state-indeterminate: reload the last complete save";
     op.error ??= op.reloadRequired ? "learning-state-indeterminate: reload the last complete save" : "learning-install-not-confirmed";
     return this.pending(op);
   }

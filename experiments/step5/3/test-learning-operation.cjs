@@ -84,3 +84,11 @@ test('lost readback keeps proof/owner; retry confirms installed next once and ne
  let unread=false;const w=setup({port:state=>({read:()=>{if(unread)throw Error('injected readback unavailable');return state.read();},replace:next=>{state.replace(next);unread=true;}})});w.machine();const p=w.answer({kind:'learn',answer:{kind:'replace',slot:0}});assert.equal(p.status,'pending');assert(w.app.saveBlocked);assert.equal(quantity(w),1);assert.equal(w.state.replaced.length,1);
  assert.equal(w.answer({kind:'technical-terminate'}).status,'pending');assert(w.app.saveBlocked);unread=false;assert.equal(w.answer({kind:'retry'}).status,'committed');assert.equal(w.state.replaced.length,1);assert.equal(quantity(w),1);assert.equal(w.state.current().stats.moves_taught_by_item,1);
 });
+test('prepared next observing a foreign state cannot revive after state ABA; no stale TR plan can be written',()=>{
+ let fail=true,writes=0;const w=setup({port:state=>({read:()=>state.read(),replace:next=>{if(fail)throw Error('prewrite');writes++;state.replace(next);}})}),original=clone(w.state.current());w.machine();w.answer({kind:'learn',answer:{kind:'replace',slot:0}});fail=false;
+ const changed=clone(original);changed.money++;w.state.replace(changed);assert(w.answer({kind:'retry'}).view.reloadRequired);w.state.replace(original);assert.equal(w.answer({kind:'retry'}).status,'pending');assert.equal(writes,0);assert.equal(quantity(w),2);assert(w.app.saveBlocked);assert.equal(w.answer({kind:'technical-terminate'}).status,'technically-terminated');
+});
+test('final state-read callback cannot hide changed world facts from the prewrite validation',()=>{
+ let map=5,armed=false,reads=0,writes=0;const w=setup({worldPort:()=>({mapId:map}),port:state=>({read:()=>{if(armed&&++reads===3)map=6;return state.read();},replace:next=>{writes++;state.replace(next);}})});w.machine();armed=true;
+ assert.equal(w.answer({kind:'learn',answer:{kind:'replace',slot:0}}).status,'pending');assert.equal(map,6);assert.equal(writes,0);assert.equal(quantity(w),2);assert.equal(w.state.current().party[0].friendship,99);assert.equal(w.answer({kind:'technical-terminate'}).status,'technically-terminated');
+});
