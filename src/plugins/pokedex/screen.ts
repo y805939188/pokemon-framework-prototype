@@ -80,7 +80,8 @@ export class PokedexScreen {
    else if(action==='use')this.write({kind:'view',value:{mode:v.cursor}},()=>{this.session=Q.createDexSearchSession(this.snapshot.dex,this.snapshot.catalog,this.region,this.options);this.list();});return;
   }
   if(v.kind==='entry'){
-   if(action==='back'){if(this.ports.single){this.close();return;}this.ports.stopCry();this.session=Q.refreshDexSearch(this.snapshot.dex,this.snapshot.catalog,this.region,this.session,this.directory??this.ports.directory(),this.options);this.write({kind:'view',value:{region:this.region,cursor:this.session.cursor,searchResults:this.session.results}},()=>this.list());}
+   if(action==='back'){if(this.ports.single){this.close();return;}this.ports.stopCry();if(this.session.results)this.session=Q.refreshDexSearch(this.snapshot.dex,this.snapshot.catalog,this.region,this.session,this.directory??this.ports.directory(),this.options);
+    else{const rows=Q.dexList(this.snapshot.dex,this.snapshot.catalog,this.region,this.snapshot.dex.view.mode as Q.DexOrder,this.options).rows;this.session={...this.session,accepted:[...this.session.accepted],rows,cursor:Math.max(0,Math.min(this.session.cursor,rows.length-1))};}this.write({kind:'view',value:{region:this.region,cursor:this.session.cursor,searchResults:this.session.results}},()=>this.list());}
    else if(action==='left'||action==='right')this.entry(Math.max(0,Math.min(2,v.page+(action==='left'?-1:1))),v.battled);
    else if(action==='up'||action==='down')this.changeSpecies(action==='up'?-1:1);
    else if(action==='action'){this.ports.stopCry();if(v.page===0)this.ports.cry(v.species,v.info.appearance.form);}

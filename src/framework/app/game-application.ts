@@ -330,6 +330,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   pokedexSearchDirectory(locale: string) {
     const generation = this.generation, source = this.ports.content();
     if (generation !== this.generation) throw Error('stale-pokedex-query');
+    if (source.content.meta?.showdownSourceChecked !== true) throw Error('pokedex-type-source-unchecked');
     this.pokedex.observeContent(source.content);
     if (!source.dex?.allTypes) throw Error('pokedex-type-directory-unavailable');
     const identity=semanticFingerprint(source.content),types = source.dex.allTypes().map(t => t.name);
