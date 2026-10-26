@@ -158,6 +158,8 @@ export interface BattleOutcome {
 export interface CreationContext { map?: number; environment?: string | null; timeOfDay?: "day" | "dusk" | "night" }
 
 export interface GiftRequest {
+  /** WP26: register this individual's form and permit the non-silent first-entry presentation; default true. */
+  seeForm?: boolean;
   kind: "normal" | "silent" | "party" | "party-silent" | "foreign";
   member: { species: string; level?: number; form?: number; item?: string } | { existing: Member };
   foreignOwner?: { name?: string; gender?: 0 | 1 | 2; language?: number };
