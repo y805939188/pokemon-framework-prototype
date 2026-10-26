@@ -134,16 +134,17 @@ function appearances(value: unknown, id: string): BattleAppearanceV2[] | null {
 }
 function defeats(value: unknown, id: string, recordHook: (hookKey: string) => void): BattleDefeatV2[] | null {
   const rows = array(value); if (!rows) return null;
-  const result: BattleDefeatV2[] = [], hooks = new Set<string>(); let lastOrder = -1, lastOrdinal = 0;
+  const result: BattleDefeatV2[] = [], hooks = new Set<string>(); let lastOrder = -1, lastOrdinal = 0, projectionValid = true;
   for (const row of rows) {
     const memberId = data(row, "memberId"), sourceOrder = data(row, "sourceOrder"), snapshot = display(data(row, "display")), occurrenceOrdinal = data(row, "occurrenceOrdinal"), hookKey = data(row, "hookKey");
     if (!fields(row, ["memberId", "sourceOrder", "display", "occurrenceOrdinal", "hookKey"]) || memberId !== id || !identity(memberId) || !integer(sourceOrder) || sourceOrder <= lastOrder || !integer(occurrenceOrdinal, 1) || occurrenceOrdinal !== lastOrdinal + 1 || !identity(hookKey) || hooks.has(hookKey)) return null;
-    // Display failure prevents a defeat record, but cannot hide an independently identified hook's owner.
+    // Display failure prevents projection, but ownership remains provable until the identity/order chain breaks.
     recordHook(hookKey);
-    if (!slots(row, ["memberId", "sourceOrder", "display", "occurrenceOrdinal", "hookKey"]) || !snapshot) return null;
-    result.push({ memberId, sourceOrder, display: snapshot, occurrenceOrdinal, hookKey }); hooks.add(hookKey); lastOrder = sourceOrder; lastOrdinal = occurrenceOrdinal;
+    if (!slots(row, ["memberId", "sourceOrder", "display", "occurrenceOrdinal", "hookKey"]) || !snapshot) projectionValid = false;
+    else result.push({ memberId, sourceOrder, display: snapshot, occurrenceOrdinal, hookKey });
+    hooks.add(hookKey); lastOrder = sourceOrder; lastOrdinal = occurrenceOrdinal;
   }
-  return result;
+  return projectionValid ? result : null;
 }
 function damage(value: unknown): BattleDamageV2 | null {
   const total = data(value, "total");

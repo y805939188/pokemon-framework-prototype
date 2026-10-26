@@ -212,3 +212,34 @@ test('same-entity cross-source hooks stay deduplicated and a complete genuine su
   const before=JSON.stringify(input),r=M.resolveBattleEffects(input);
   assert.equal(r.faint.P1.positiveOccurrences.length,1);assert.equal(r.damage.P1.status,'complete');assert.deepEqual(readiness(M,r,'P1',false),{readyToEvolve:true,evolutionReadiness:'known'});assert.equal(JSON.stringify(input),before);
 });
+test('bad defeat displays do not hide later hook owners while the identity and order chain is intact',async()=>{
+  const M=await moduleUnderTest;
+  for(const prefixLength of [1,2]){
+    const input=fixture(),H='later-conflicting-hook',row=input.seal.observer.defeats.F1.value[0];
+    for(const source of ['observer','control'])input.seal[source].members.P1.faint=faintCell([faint(source,'P1',{hookKey:H})]);
+    input.seal.observer.defeats.F1.value=Array.from({length:prefixLength},(_,i)=>({...row,hookKey:'bad-display-'+i,occurrenceOrdinal:i+1,sourceOrder:i+1,display:null}));
+    input.seal.observer.defeats.F1.value.push({...row,hookKey:H,occurrenceOrdinal:prefixLength+1,sourceOrder:prefixLength+1});
+    const before=JSON.stringify(input),r=M.resolveBattleEffects(input);
+    assert.equal(r.faint.P1.positiveOccurrences.length,0);assert.equal(r.defeats.length,0);checkConflict(M,r,'P1');
+    assert.equal(r.damage.P2.status,'complete');assert.equal(r.appearances.length,1);assert.equal(r.friendshipReplacements.P2,125);assert.equal(JSON.stringify(input),before);
+  }
+});
+test('a defeat identity or order break ends the trusted ownership prefix even after display failure',async()=>{
+  const M=await moduleUnderTest;
+  for(const broken of [{sourceOrder:0},{occurrenceOrdinal:3},{memberId:'F2'}]){
+    const input=fixture(),H='untrusted-later-hook',row=input.seal.observer.defeats.F1.value[0];
+    for(const source of ['observer','control'])input.seal[source].members.P1.faint=faintCell([faint(source,'P1',{hookKey:H})]);
+    input.seal.observer.defeats.F1.value=[{...row,hookKey:'bad-display',sourceOrder:1,display:null},{...row,hookKey:'broken-chain',sourceOrder:2,occurrenceOrdinal:2,...broken},{...row,hookKey:H,sourceOrder:3,occurrenceOrdinal:3}];
+    const before=JSON.stringify(input),r=M.resolveBattleEffects(input);
+    assert.equal(r.faint.P1.positiveOccurrences.length,1);assert.equal(r.damage.P1.status,'complete');assert.equal(r.defeats.length,0);
+    assert.deepEqual(readiness(M,r,'P1',false),{readyToEvolve:true,evolutionReadiness:'known'});assert.equal(JSON.stringify(input),before);
+  }
+});
+test('an unrelated defeat display failure leaves a complete independent damage suffix eligible',async()=>{
+  const M=await moduleUnderTest,input=fixture(),row=input.seal.observer.defeats.F1.value[0];
+  for(const source of ['observer','control'])input.seal[source].members.P1.faint=faintCell([faint(source,'P1',{hookKey:'trusted-player-hook'})]);
+  input.seal.observer.defeats.F1.value=[{...row,hookKey:'bad-foe-display',sourceOrder:1,display:null},{...row,hookKey:'another-foe-hook',sourceOrder:2,occurrenceOrdinal:2}];
+  const before=JSON.stringify(input),r=M.resolveBattleEffects(input);
+  assert.equal(r.faint.P1.positiveOccurrences.length,1);assert.equal(r.damage.P1.status,'complete');assert.equal(r.defeats.length,0);assert.equal(r.appearances.length,1);
+  assert.deepEqual(readiness(M,r,'P1',false),{readyToEvolve:true,evolutionReadiness:'known'});assert.equal(r.friendshipReplacements.P1,105);assert.equal(JSON.stringify(input),before);
+});
