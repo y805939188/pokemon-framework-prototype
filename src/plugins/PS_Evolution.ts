@@ -98,7 +98,8 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
      if(!['learn','retry','technical-terminate'].includes(decision.kind))return {status:'refused',reason:'invalid-growth-decision'};
      const result=this.dispatch('t',decision.kind==='learn'?{kind:'growth',answer:decision.answer}:decision);if(result?.status==='refused')return result;
      const next=this.views().t;if(next?.phase==='failed')return {status:'pending',view:{token:next.token,revision:next.revision,memberId:this.request.item!.memberId,kind:'teach',error:next.error,reloadRequired:next.reloadRequired}};
-     if(next?.selection&&next.selection.answerIndex===before.selection?.answerIndex)return convert(next);
+     if(next?.selection&&(next.selection.reason||next.selection.kind==='give-up'||decision.kind==='learn'&&decision.answer.kind==='decline'&&decision.answer.giveUp===false||next.selection.answerIndex===before.selection?.answerIndex))return convert(next);
+     if(decision.kind==='technical-terminate')return {status:'technically-terminated',token,revision};
      return {status:decision.kind==='learn'&&decision.answer.kind==='decline'?'unchanged':'committed',token,revision};
     }},convert(view));
   }
