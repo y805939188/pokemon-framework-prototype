@@ -43,6 +43,7 @@ export class InventorySession {
   private shop:ShopContext|null=null;
   private pendingUse:{requestId:string;fingerprint:string;revision:string;world:string;learning:boolean;stale:boolean}|null=null;
   private effectRevision=0n;
+  private starting:{generation:number}|null=null;
   private observedEffect='';
   private selectionSequence=0n;
   private selection:{id:string;filter?:((item:ItemDefinition)=>boolean);variableId?:number;lastPocket:number;indices:number[]}|null=null;
@@ -52,8 +53,8 @@ export class InventorySession {
   private observedInventory='';
   private readonly receipts=new Map<string,{fingerprint:string;outcome:InventoryOutcome}>();
   constructor(state:GameStatePort,content:()=>Content,options:Options){this.state=state;this.content=content;this.options=options;}
-  get active():boolean{return this.context!==null;}
-  get saveBlocked():boolean{return this.learningChild||this.context?.kind==='item'||!!this.pendingUse||!!this.tossPending;}
+  get active():boolean{return this.context!==null||this.starting!==null;}
+  get saveBlocked():boolean{return !!this.starting||this.learningChild||this.context?.kind==='item'||!!this.pendingUse||!!this.tossPending;}
   reserveLearning(token:string,memberId:string,entry:'bag'|'party'):void {
     const context=this.context;
     if(!context||context.token!==token||context.generation!==this.options.generation())throw new Error('stale-operation');
@@ -73,19 +74,23 @@ export class InventorySession {
     return world;
   }
   stateChanged(next:GameState):void{const effect=JSON.stringify([next.party,next.inventory.pockets]);if(effect!==this.observedEffect){this.effectRevision++;this.observedEffect=effect;}const value=JSON.stringify(next.inventory.pockets);if(value!==this.observedInventory){this.revision++;this.observedInventory=value;}}
-  invalidate():void{const parent=this.context?.parent;this.context=null;this.learningChild=false;this.shop=null;this.pendingUse=null;this.selection=null;this.tossPending=null;this.sorting=null;this.filtering=false;this.receipts.clear();this.options.leave(parent);}
+  invalidate():void{const parent=this.context?.parent;this.context=null;this.starting=null;this.learningChild=false;this.shop=null;this.pendingUse=null;this.selection=null;this.tossPending=null;this.sorting=null;this.filtering=false;this.receipts.clear();this.options.leave(parent);}
   begin(kind:'bag'|'item'|'shop'='bag',parent?:InventoryParent):string{
-    if(this.context)throw new Error('inventory-operation-active');
+    if(this.active)throw new Error('inventory-operation-active');
     if(!['bag','item','shop'].includes(kind)||parent&&kind!=='item')throw new Error('invalid-operation-context');
-    this.options.enter(parent);
+    parent=parent?clone(parent):undefined;
+    const reservation={generation:this.options.generation()};this.starting=reservation;let entered=false;
     try {
+      this.options.enter(parent);entered=true;
       const game=this.state.read(),content=this.content();
+      if(this.starting!==reservation||reservation.generation!==this.options.generation())throw new Error('stale-operation');
       if(parent&&!game.party.some(m=>m.id===parent.memberId&&!m.isEgg))throw new Error('invalid-target');
       for(const pocket of game.inventory.pockets)for(const slot of pocket)if(!itemOf(catalogOf(content),slot.itemId))throw new Error('unmapped-item');
       const revision=this.contentRevision(content);this.stateChanged(game);
-      const token=`inventory:${this.options.generation()}:${++this.sequence}`;
-      this.context={token,generation:this.options.generation(),contentRevision:revision,kind,...(parent?{parent:clone(parent),parentPartyIndex:game.party.findIndex(m=>m.id===parent.memberId)}:{})};this.receipts.clear();return token;
-    } catch(error) {this.options.leave(parent);throw error;}
+      const token=`inventory:${reservation.generation}:${++this.sequence}`;
+      this.context={token,generation:reservation.generation,contentRevision:revision,kind,...(parent?{parent:clone(parent),parentPartyIndex:game.party.findIndex(m=>m.id===parent.memberId)}:{})};this.receipts.clear();return token;
+    } catch(error) {if(entered)this.options.leave(parent);throw error;}
+    finally {if(this.starting===reservation)this.starting=null;}
   }
   end(token:string):InventoryOutcome{
     if(this.readingProjection)return {status:'refused',reason:'projection-active'};

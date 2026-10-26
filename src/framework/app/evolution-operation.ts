@@ -26,12 +26,14 @@ export interface BattleEvolutionSeed {
 /** A target already selected by an owned item/event action, without manufactured battle facts. */
 export interface SelectedEvolutionSeed {
   token: string; generation: number; selected: true;
+  /** The owning draft may present its new-species entry before learning begins. */
+  deferLearning?: boolean;
   cost?: { itemId: string; quantity: number; onCancel?: boolean };
 }
-export type EvolutionDecision = { kind: "complete" | "cancel" | "technical-terminate" | "retry" }
+export type EvolutionDecision = { kind: "complete" | "cancel" | "technical-terminate" | "retry" | "continue-learning" }
   | { kind: "learn"; answer: LearningAnswer };
 export interface EvolutionView {
-  token: string; revision: number; phase: "evolution" | "learning" | "failed";
+  token: string; revision: number; phase: "evolution" | "after-evolution" | "learning" | "failed";
   memberId?: string; selection?: EvolutionSelection; learning?: LearningPending;
   error?: string; reloadRequired?: boolean;
 }
@@ -49,6 +51,7 @@ interface Operation {
   pendingWrite?: { before: GameState; next: GameState; after: AfterInstall; attempted: boolean };
   error?: string; reloadRequired: boolean; diagnostics: string[];
   progress?: { evolved: boolean; cancelled: boolean };
+  deferLearning?: boolean;
 }
 const identity = (state: GameState): string => JSON.stringify(state, (_key, value: unknown) => value && typeof value === "object" && !Array.isArray(value)
   ? Object.fromEntries(Object.keys(value).sort().map(key => [key, (value as Record<string, unknown>)[key]])) : value);
@@ -72,7 +75,7 @@ export class EvolutionOperation {
   get view(): EvolutionView | null {
     const op = this.operation;
     if (!op?.activated) return null;
-    return clone({ token: op.seed.token, revision: op.revision, phase: op.error ? "failed" : op.learning ? "learning" : "evolution",
+    return clone({ token: op.seed.token, revision: op.revision, phase: op.error ? "failed" : op.deferLearning ? "after-evolution" : op.learning ? "learning" : "evolution",
       ...(op.selection ? { memberId: op.selection.memberId, selection: op.selection } : {}),
       ...(op.learning ? { memberId: op.learning.memberId, ...(op.learning.pending ? { learning: op.learning.pending } : {}) } : {}),
       ...(op.error ? { error: op.error, reloadRequired: op.reloadRequired } : {}) });
@@ -169,6 +172,10 @@ export class EvolutionOperation {
       op.error = undefined;
       const state = this.ports.state.read(); this.assertCurrent(op);
       const content = this.content(op);
+      if (op.deferLearning) {
+        if (decision.kind !== "continue-learning") return { status: "refused", reason: "owner-post-evolution-presentation-required" };
+        op.deferLearning = false; op.revision++; return this.learn(op, state, content);
+      }
       if (decision.kind === "retry") {
         op.revision++;
         if (op.learning) return this.learn(op, state, content);
@@ -245,6 +252,7 @@ export class EvolutionOperation {
     if (after.kind === "evolved") {
       if (op.progress) op.progress.evolved = true;
       op.selection = undefined; op.learning = { memberId: after.memberId, moves: after.moves, cursor: 0, answers: [] };
+      if ("selected" in op.seed && op.seed.deferLearning) { op.deferLearning = true; return this.pending(op); }
       return this.learn(op, state, this.content(op));
     }
     if (after.kind === "learned") { op.learning!.cursor++; op.learning!.answers = []; delete op.learning!.pending; return this.learn(op, state, this.content(op)); }
