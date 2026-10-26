@@ -356,6 +356,12 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
   get pendingEvolution(): EvolutionView | null { return this.trade?.continuation ?? this.evolutions.view; }
   get pendingLearning() { return this.learning.view; }
+  teachingCandidates(source: Extract<LearningIntent, { kind: 'teach' }>['source']) { return this.learning.candidates(source); }
+  describeLearningMove(id: string) {
+    const { content, dex } = this.ports.content(), move = Object.values(content.moves ?? {}).find(value => value.id === id);
+    if (!move) return null;
+    return { ...clone(move), ...(dex?.moveDetails?.(id) ?? { name: move.name, type: '', category: '', power: null, accuracy: 0, description: '' }) };
+  }
   beginLearning(intent: LearningIntent, parent?: LearningParent) { return this.learning.begin(intent, parent); }
   resolveLearning(token: string, revision: number, decision: LearningDecision) { return this.learning.resolve(token, revision, decision); }
   get pendingTrade() { return this.trade.view; }

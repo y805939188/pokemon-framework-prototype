@@ -4,6 +4,19 @@ import type { LocaleTable } from "../translator.ts";
 export const en: LocaleTable = {
   meta: { name: "English" },
   text: {
+    "progression.details": "Move details",
+    "progression.type": "Type: {value}",
+    "progression.category": "Category: {value}",
+    "progression.power": "Power: {value}",
+    "progression.accuracy": "Accuracy: {value}",
+    "progression.noDescription": "No description is available.",
+
+    "inventory.machineOpened": "Opened {item}. It contains {move}.",
+    "inventory.machineTeach": "Teach {move}?",
+    "inventory.machine.able": "ABLE",
+    "inventory.machine.learned": "LEARNED",
+    "inventory.machine.not-able": "NOT ABLE",
+
     "progression.lastMove": "A Pokémon must keep its last move.",
     "progression.reload": "Return to title and load a complete save",
 

@@ -4,7 +4,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {host,disposeBuild}=require('../2/inventory-ui-host.cjs');
 const {world,E,clone}=require('./fixtures/postbattle/helpers.cjs');test.after(disposeBuild);
 function setup({full=true,edit,port,worldPort,hostOptions={}}={}){
- const w=world({port,extraContent:c=>{c.species.Charizard.tutorMoves=['Gust','Rest','Tackle'];c.species.Charizard.learnset={1:['Flamethrower','Tackle'],99:['Rest']};
+ const w=world({port,contentPort:c=>({content:c,dex:E.dex.createDexLookup()}),extraContent:c=>{c.species.Charizard.tutorMoves=['Gust','Rest','Tackle'];c.species.Charizard.learnset={1:['Flamethrower','Tackle'],99:['Rest']};
   for(const [id,fieldUse,consumable]of [['study-tr','tr',true],['study-tm','tm',false],['study-hm','hm',false]])c.items[id]={...c.items.potion,id,name:id,namePlural:id,pocket:4,flags:[],fieldUse,battleUse:'none',battleId:undefined,legacyIds:[],consumable,move:'gust'};
  }});
  const game=clone(w.state.current());game.party[0].item='';game.party[0].ball='pokeball';game.party[0].friendship=99;if(!full)game.party[0].moves=game.party[0].moves.slice(0,1);
@@ -57,10 +57,10 @@ test('G1 window/create/render failures retain zero writes and release safe opera
  const w=setup();w.learn();w.setDrawFault(()=>true);w.ready();assert.equal(w.state.replaced.length,0);assert(!w.app.saveBlocked);w.setDrawFault(null);
 });
 test('G1 real Bag TR through bundled adapters holds parent, installs once and consumes once',()=>{
- const w=setup(),h=w.G.PSInventory.useItem('study-tr',w.id);w.ready();assert(w.p());assert(w.app.saveBlocked);assert.equal(count(w),2);w.chooseG('yes');w.chooseG('1');assert.equal(count(w),1);assert.equal(w.state.current().party[0].moves[1].id,'gust');assert.equal(w.state.current().stats.moves_taught_by_item,1);assert(w.state.current().party[0].firstMoves.includes('gust'));w.chooseG('close');assert(h.done);assert.equal(h.result.status,'committed');assert(!w.app.saveBlocked);
+ const w=setup(),h=w.G.PSInventory.useItem('study-tr',w.id);w.ready();w.press('ok');w.ready();w.choose('yes');w.ready();assert(w.p());assert(w.app.saveBlocked);assert.equal(count(w),2);w.chooseG('yes');w.chooseG('1');assert.equal(count(w),1);assert.equal(w.state.current().party[0].moves[1].id,'gust');assert.equal(w.state.current().stats.moves_taught_by_item,1);assert(w.state.current().party[0].firstMoves.includes('gust'));w.chooseG('close');assert(h.done);assert.equal(h.result.status,'committed');assert(!w.app.saveBlocked);
 });
 test('G1 Bag TM cancel consumes nothing and normal bag target returns to a usable layer',()=>{
- const w=setup(),before=clone(w.state.current());const h=w.G.PSInventory.showBag();w.pocket(4);w.press('down');w.press('ok');w.choose('use');w.choose(w.id);w.chooseG('no');w.chooseG('close');assert.equal(w.view().view.kind,'bag');assert.equal(E.inventory.itemQuantity(w.state.current().inventory,'study-tm',w.content.items),2);assert.deepEqual(w.state.current().party,before.party);w.press('cancel');assert(h.done);assert(!w.app.saveBlocked);
+ const w=setup(),before=clone(w.state.current());const h=w.G.PSInventory.showBag();w.pocket(4);w.press('down');w.press('ok');w.choose('use');w.ready();w.press('ok');w.choose('yes');assert(w.view().view.items.some(row=>row.label.includes('ABLE')));w.choose(w.id);w.chooseG('no');w.chooseG('close');assert.equal(w.view().view.kind,'bag');assert.equal(E.inventory.itemQuantity(w.state.current().inventory,'study-tm',w.content.items),2);assert.deepEqual(w.state.current().party,before.party);w.press('cancel');assert(h.done);assert(!w.app.saveBlocked);
 });
 test('G1 author commands wait and release; clear aborts only their own operation',()=>{
  const w=setup(),i=w.pluginCommand('PS_Progression','TeachMove',{memberId:w.id,moveId:'gust',source:'tutor'});w.ready();assert(i.updateWaitMode());w.chooseG('no');w.chooseG('close');assert.equal(i.updateWaitMode(),false);
@@ -71,9 +71,16 @@ test('G1 long Chinese/English labels retain measured PP column and fit selectabl
 });
 
 test('G1 party Use machine preserves parent ownership and branch-specific source effects',()=>{
- const w=setup();w.G.PSManagement.openParty();w.ready();w.press('ok');w.managementChoose('item');w.managementChoose('use');w.ready();w.pocket(4);w.press('ok');w.choose('use');w.chooseG('yes');w.chooseG('1');assert.equal(count(w),1);assert.equal(w.state.current().stats.moves_taught_by_item,0);assert(!w.state.current().party[0].firstMoves.includes('gust'));w.chooseG('close');assert(w.G.PSManagement.current());assert(w.app.saveBlocked);w.press('cancel');w.ready();w.press('cancel');w.ready();w.press('cancel');assert(!w.app.saveBlocked);
+ const w=setup();w.G.PSManagement.openParty();w.ready();w.press('ok');w.managementChoose('item');w.managementChoose('use');w.ready();w.pocket(4);w.press('ok');w.choose('use');w.ready();w.press('ok');w.choose('yes');w.chooseG('yes');w.chooseG('1');assert.equal(count(w),1);assert.equal(w.state.current().stats.moves_taught_by_item,0);assert(!w.state.current().party[0].firstMoves.includes('gust'));w.chooseG('close');assert(w.G.PSManagement.current());assert(w.app.saveBlocked);w.press('cancel');w.ready();w.press('cancel');w.ready();w.press('cancel');assert(!w.app.saveBlocked);
 });
 test('G1 partial installation retains app barrier and provides explicit title/load recovery',()=>{
  const w=setup({port:state=>({read:()=>state.read(),replace:next=>{const partial=clone(state.current());partial.money++;state.replace(partial);throw Error('partial-write');}})});
  w.G.Scene_Title=function(){};w.G.Scene_Title.prototype={create(){},start(){},update(){}};w.learn();w.chooseG('yes');w.chooseG('0');assert.equal(w.p().page.kind,'recovery');assert(w.p().page.rows.some(r=>r.key==='reload'));w.chooseG('terminate');assert(w.app.saveBlocked);w.chooseG('reload');assert(w.manager._scene instanceof w.G.Scene_Title);assert(w.app.saveBlocked);assert.equal(w.p(),null);w.app.stateReplacedByHost();assert(!w.app.saveBlocked);
+});
+
+test('G1 real deferred MZ initialize→create refuses cleared and old-generation requests before app begin',()=>{
+ for(const action of ['clear','reload'])for(const full of [false,true]){const w=setup({full,hostOptions:{deferredCreate:true}}),before=clone(w.state.current());const i=w.pluginCommand('PS_Progression','TeachMove',{memberId:w.id,moveId:'gust',source:'tutor'});assert(w.G.PSFlow.operationPending());if(action==='clear')i.clear();else w.app.stateReplacedByHost();w.tick();w.ready();assert.equal(w.state.replaced.length,0);assert.deepEqual(w.state.current(),before);assert.equal(w.app.pendingLearning,null);assert(!w.app.saveBlocked);assert.equal(i.updateWaitMode(),false);}
+});
+test('G1 annotations distinguish egg, known, compatible and incompatible with zero install; details expose real move directory',()=>{
+ const w=setup(),before=clone(w.state.current());let rows=w.app.teachingCandidates({kind:'machine',itemId:'study-tr',entry:'bag'});assert.equal(rows[0].annotation,'able');assert.deepEqual(w.state.current(),before);let state=clone(before);state.party[0].moves[0]={id:'gust',pp:35,maxpp:35,ppUps:0};w.state.replace(state);assert.equal(w.app.teachingCandidates({kind:'machine',itemId:'study-tr',entry:'bag'})[0].annotation,'learned');state.party[0].isEgg=true;w.state.replace(state);assert.equal(w.app.teachingCandidates({kind:'machine',itemId:'study-tr',entry:'bag'})[0].annotation,'not-able');assert.equal(w.app.describeLearningMove('gust').pp,35);assert.equal(w.app.describeLearningMove('gust').type,'Flying');assert.equal(w.app.describeLearningMove('gust').power,40);assert(w.app.describeLearningMove('gust').description);assert.equal(w.app.describeLearningMove('not-a-move'),null);
 });

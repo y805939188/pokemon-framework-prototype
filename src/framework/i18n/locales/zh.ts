@@ -8,6 +8,19 @@ import type { LocaleTable } from "../translator.ts";
 export const zh: LocaleTable = {
   meta: { name: "简体中文", font: "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif" },
   text: {
+    "progression.details": "招式详情",
+    "progression.type": "属性：{value}",
+    "progression.category": "分类：{value}",
+    "progression.power": "威力：{value}",
+    "progression.accuracy": "命中：{value}",
+    "progression.noDescription": "暂无招式描述。",
+
+    "inventory.machineOpened": "开启了{item}，其中记录着{move}。",
+    "inventory.machineTeach": "要教授{move}吗？",
+    "inventory.machine.able": "可学习",
+    "inventory.machine.learned": "已学会",
+    "inventory.machine.not-able": "不能学习",
+
     "progression.lastMove": "必须保留最后一招。",
     "progression.reload": "回到标题，读取完整存档",
 

@@ -2,12 +2,13 @@
 import type { LearningView, LearningDecision, LearningOutcome } from '../../framework/app/learning-operation.ts';
 import type { LearningAnswer, LearningPending } from '../../framework/rules/learning.ts';
 
-export interface LearningRow { key: string; text: string; details?: string }
+export interface LearningRow { key: string; text: string; details?: string; moveId?: string }
 export interface LearningPage { kind: string; title: string; rows: LearningRow[]; cursor: number; error?: string }
 export interface LearningScreenPort {
   resolve(token: string, revision: number, decision: LearningDecision): LearningOutcome;
   text(key: string, params?: Record<string, string | number>): string;
   move(id: string): string;
+  pp(id: string): number;
   close(outcome: LearningOutcome): void;
   reload(): void;
 }
@@ -25,8 +26,8 @@ export class LearningScreen {
     this.actions = new Map(rows.map(([row, run]) => [row.key, run])); this.backAction = back;
   }
   private text(key: string, params?: Record<string, string | number>) { return this.port.text(key, params); }
-  private row(key: string, text: string, run: () => void, details?: string): [LearningRow, () => void] {
-    return [{ key, text, ...(details ? { details } : {}) }, run];
+  private row(key: string, text: string, run: () => void, details?: string, moveId?: string): [LearningRow, () => void] {
+    return [{ key, text, ...(details ? { details } : {}), ...(moveId ? { moveId } : {}) }, run];
   }
   private confirm(title: string, yes: () => void, no: () => void) {
     this.set('confirm', title, [this.row('yes', this.text('yes'), yes), this.row('no', this.text('no'), no)], no);
@@ -64,7 +65,7 @@ export class LearningScreen {
     if (view.kind === 'forget' && s.kind === 'forget') {
       this.set('forget', this.text('forget'), s.moves.map((move, index) => this.row(String(index), this.port.move(move.id),
         () => this.confirm(this.text('confirmForget', { move: this.port.move(move.id) }),
-          () => this.answer({ kind: 'forget', slot: index }), () => this.render()), `${move.pp}/${move.maxpp} PP`)),
+          () => this.answer({ kind: 'forget', slot: index }), () => this.render()), `${move.pp}/${move.maxpp} PP`, move.id)),
         () => this.answer({ kind: 'forget', slot: null })); return;
     }
     if (view.kind === 'relearn' && 'candidates' in s) {
@@ -72,7 +73,7 @@ export class LearningScreen {
       if (s.kind === 'candidate') {
         this.nested = [];
         this.set('candidates', this.text('relearn'), [...s.candidates.map(id => this.row(id, this.port.move(id),
-          () => this.answer({ kind: 'relearn', answer: { kind: 'select', moveId: id } }))),
+          () => this.answer({ kind: 'relearn', answer: { kind: 'select', moveId: id } }), `${this.port.pp(id) || '--'} PP`, id)),
         this.row('exit', this.text('close'), exit)], exit); return;
       }
       if (s.kind === 'exit') {
@@ -109,8 +110,8 @@ export class LearningScreen {
     }
     const decline = () => send({ kind: 'decline' });
     this.set('moves', this.text('chooseMove', { move: this.port.move(s.move.id) }), [
-      ...s.moves.map((move, index) => this.row(String(index), this.port.move(move.id), () => send({ kind: 'replace', slot: index }), `${move.pp}/${move.maxpp} PP`)),
-      this.row('new', this.port.move(s.move.id), decline, this.text('keepOld')),
+      ...s.moves.map((move, index) => this.row(String(index), this.port.move(move.id), () => send({ kind: 'replace', slot: index }), `${move.pp}/${move.maxpp} PP`, move.id)),
+      this.row('new', this.port.move(s.move.id), decline, this.text('keepOld'), s.move.id),
     ], decline, s.reason ? this.text(s.reason) : undefined);
   }
   select(key: string) { this.actions.get(key)?.(); }

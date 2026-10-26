@@ -2140,7 +2140,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       return{input:'formal G scene and real MZ event, DOM synthetic keys, no OS hardware',saveRefused:denied};
     });
     await scenario('G53-LUI2 real Bag TR child and HM reselect use the same learning transaction',async()=>{
-      const handle=W.PSInventory.useItem('g-study-tr',id);await ready('confirm');await choose('yes');await choose('0');eq(game().party[0].moves[0].id,'gust','TR learned');eq(B.inventory.itemQuantity(game().inventory,'g-study-tr',content.items),1,'one TR');await choose('close');await closed();assert(handle.done&&!W.PSFlow.app().saveBlocked,'parent released');
+      const handle=W.PSInventory.useItem('g-study-tr',id);await inventoryReady('message');await press('ok');await inventoryChoose('yes');await ready('confirm');await choose('yes');await choose('0');eq(game().party[0].moves[0].id,'gust','TR learned');eq(B.inventory.itemQuantity(game().inventory,'g-study-tr',content.items),1,'one TR');await choose('close');await closed();assert(handle.done&&!W.PSFlow.app().saveBlocked,'parent released');
       const i=new G.Game_Interpreter();G.PluginManager.callCommand(i,'PS_Progression','TeachMove',{memberId:id,moveId:'rest',source:'tutor'});await ready('confirm');await choose('yes');await choose('0');await ready('moves');assert(p().page.error,'HM rejection remains on selection');await shot('G53-learning-HM');await choose('1');eq(game().party[0].moves[1].id,'rest','adjacent slot succeeds');await choose('close');await closed();await checkpoint(80);
       return{slot:80,input:'actual Bag child and formal learning scene; direct UI intent then DOM keys, actual JsonEx'};
     });

@@ -53,6 +53,20 @@ export class LearningOperation {
   private readonly content: ContentPort;
   private readonly options: Options;
   get active(): boolean { return this.operation !== null; }
+  /** Display annotations only. This read never installs a plan; begin/resolve recheck the selected member. */
+  candidates(source: Extract<LearningIntent, { kind: 'teach' }>['source']) {
+    const state = clone(this.state.read()), { content } = this.content(), world = clone(this.options.world());
+    const catalog = catalogOf(content);
+    return state.party.map(member => {
+      const plan = planTeachingAction(member, content, source.kind === 'machine' ? { ...source, inventory: state.inventory } : source,
+        { shadow: world.shadowIds?.includes(member.id) ?? false,
+          friendship: { mapId: world.mapId, AFFECTION_EFFECTS: resolveConfig(content.settings).AFFECTION_EFFECTS },
+          friendshipSource: { item: itemOf(catalog, member.item)?.battleId ?? member.item,
+            ball: member.ball ? itemOf(catalog, member.ball)?.battleId ?? member.ball : undefined, origin: member.origin } }, []);
+      return { id: member.id, annotation: plan.status === 'refused' ? plan.reason === 'already-known' ? 'learned' as const : 'not-able' as const : 'able' as const,
+        ...(plan.status === 'refused' ? { reason: plan.reason } : {}) };
+    });
+  }
   get view(): LearningView | null {
     const op = this.operation;
     return op ? clone({ token: op.token, revision: op.revision, memberId: op.intent.memberId, kind: op.intent.kind,

@@ -32,7 +32,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
   token='';selection='';giveToken='';selectedTicket:InventoryTicket|null=null;closed=false;ready=false;frame=0;serial=0;window:any;view!:View;error='';text:string[]=[];latch=new InputLatch();
   pocket=1;indices:number[]=Array(8).fill(0);visited=new Set<number>();bag:any;sorting=false;busy=false;operation:any=null;presentationOutcome:InventoryOutcome|null=null;afterMessage:(()=>void)|null=null;cancelWait:(()=>void)|null=null;lastPhase='';
   // Sort cancellation restores the live row, while indices retain the last moved saved position.
-  restoredSortCursor:number|null=null;learningChild:any=null;
+  restoredSortCursor:number|null=null;learningChild:any=null;machineBrowse:{itemId:string;annotations:any[];members:any[]}|null=null;
   constructor(request:Request,h:Handle,readonly finish:(o:InventoryOutcome)=>void){this.request=request;this.handle=h;this.application=h.application;this.generation=h.generation;}
   valid(){try{return !this.closed&&!this.handle.done&&active===this&&this.application===app()&&this.generation===this.application.stateGeneration;}catch{return false;}}
   get saveBlocked(){return !!this.learningChild||!!this.selectedTicket||!!this.operation||!!this.giveToken||this.busy||this.view?.kind==='quantity'||this.view?.pending===true;}
@@ -45,7 +45,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    if(this.request.kind==='select')this.selection=this.application.beginItemSelection(this.token,this.request.filter,this.request.variableId);
    this.refreshBag();this.pocket=this.bag.lastPocket;this.indices=[...this.bag.indices];
    if(this.request.kind==='shop')this.shopMenu();
-   else if(this.request.kind==='use')this.beginUse(this.request.itemId!,this.request.memberId,this.request.quantity??1);
+   else if(this.request.kind==='use'){if(this.machine(this.request.itemId!))this.machineOpening(this.request.itemId!,()=>this.request.memberId?this.beginUse(this.request.itemId!,this.request.memberId,1):this.machineTargets(this.request.itemId!));else this.beginUse(this.request.itemId!,this.request.memberId,this.request.quantity??1);}
    else this.bagView();
   }
   sample():InputFrame {return W.PSManagement.inputFrame();}
@@ -79,8 +79,27 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    this.choose(tr('target'),[...snap.party.filter((m:any)=>!m.isEgg).map((m:any)=>({key:m.id,label:m.nickname||flow().speciesName(m.species,m.form),run:()=>{const apply=()=>{const r=this.application.manage(this.giveToken,this.id(),{kind:'give-item',source:snap.references[m.id],item:row.item.id});if(r.status==='refused')this.fail(r,resume);else{this.presentationOutcome={status:r.status==='unchanged'?'unchanged':'committed',result:{itemId:row.item.id,memberId:m.id,quantity:1}};this.message(tr('done'),resume);}};if(m.item)this.confirm(tr('confirmUse'),apply,resume);else apply();}})),{key:'close',label:tr('back'),run:resume}],resume);
   }
   party(){return clone(flow().game().party) as any[];}
+  machine(itemId:string){return ['tm','hm','tr'].includes(this.catalog()[itemId]?.fieldUse??'');}
+  machineOpening(itemId:string,next:()=>void){
+   const item=this.catalog()[itemId]!,move=Object.values(flow().content().moves??{}).find((v:any)=>v.id===item.move)as any;
+   this.message(tr('machineOpened',{item:name(item),move:move?.name??item.move??''}),()=>this.confirm(tr('machineTeach',{move:move?.name??item.move??''}),next,()=>this.request.kind==='use'?this.close({status:'cancelled'}):this.bagView()));
+  }
+  machineTargets(itemId:string,reuse=false){
+   if(!reuse||this.machineBrowse?.itemId!==itemId)this.machineBrowse={itemId,annotations:this.application.teachingCandidates({kind:'machine',itemId,entry:'bag'}),members:this.party()};
+   const {annotations,members}=this.machineBrowse!;
+   const cancel=()=>this.request.kind==='use'?this.close({status:'cancelled'}):this.bagView();
+   const show=()=>this.choose(tr('target'),[...members.map(m=>{const annotation=annotations.find((a:any)=>a.id===m.id);return {key:m.id,label:(m.nickname||flow().speciesName(m.species,m.form))+' · '+tr('machine.'+(annotation?.annotation??'not-able')),run:()=>{
+    // Annotations are cached display data, never install authority. The selected member is rechecked by beginLearning.
+    this.beginUse(itemId,m.id,1);
+   }};}),{key:'close',label:tr('back'),run:cancel}],cancel);
+   show();
+  }
   target(itemId:string){
    this.flushBrowse();
+   if(this.machine(itemId)){
+    if(this.request.parent){const annotation=this.application.teachingCandidates({kind:'machine',itemId,entry:'party'}).find((a:any)=>a.id===this.request.parent!.memberId);if(annotation?.annotation!=='able'){this.fail({reason:annotation?.reason??'not-able'});return;}this.machineOpening(itemId,()=>this.beginUse(itemId,this.request.parent!.memberId,1));}
+    else this.machineOpening(itemId,()=>this.machineTargets(itemId));return;
+   }
    if(this.request.parent){this.useQuantity(itemId,this.request.parent.memberId);return;}
    const direct=this.rows().find(r=>r.item.id===itemId)?.item.effect?.family==='sacred-ash';if(direct){this.useQuantity(itemId);return;}
    const members=this.party();this.choose(tr('target'),[...members.map(m=>({key:m.id,label:(m.nickname||flow().speciesName(m.species,m.form))+` Lv.${m.level} HP ${m.hp} ${m.status||''}`+(m.isEgg?' '+tr('egg'):''),run:()=>this.useQuantity(itemId,m.id)})),{key:'close',label:tr('back'),run:()=>this.bagView()}],()=>this.bagView());
@@ -93,7 +112,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
     if(this.selectedTicket&&JSON.stringify(this.selectedTicket)!==JSON.stringify(this.application.inventoryTicket(this.token,this.selectedTicket.pocket,this.selectedTicket.index))){this.fail({reason:'stale-slot'},()=>this.close({status:'refused',reason:'stale-slot'}));return;}
     this.learningChild=W.PSProgression.attachLearning(this.window,{kind:'teach',memberId,source:{kind:'machine',itemId,entry:this.request.parent?'party':'bag'}},{kind:'inventory',token:this.token},(out:any)=>{
      this.learningChild=null;this.selectedTicket=null;const r:InventoryOutcome={status:['committed','unchanged','cancelled'].includes(out.status)?out.status:'refused',...(out.status==='refused'?{reason:out.reason}:{}),result:{itemId,memberId}};
-     if(this.request.kind==='use')this.close(r);else{this.bagView();}
+     if(this.request.kind==='use')this.close(r);else if(out.status==='refused'&&!this.request.parent)this.machineTargets(itemId,true);else{this.bagView();}
     });return;
    }
    this.operation={id:this.id(),request:{kind:'use-item',itemId,quantity,...(memberId?{memberId}:{}),ticket:this.selectedTicket??this.application.inventoryTicket(this.token,row.pocket,row.index),answers:{}}};this.submitUse();

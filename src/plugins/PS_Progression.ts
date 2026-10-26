@@ -7,21 +7,24 @@ import type { LearningIntent, LearningParent, LearningOutcome } from '../framewo
  const tr=(key:string,params?:Record<string,string|number>)=>flow().translator().t('progression.'+key,params);
  type Handle={application:any;generation:number;done:boolean;result?:LearningOutcome};
  type Request={intent?:LearningIntent;resume?:boolean;handle:Handle;done?:(o:LearningOutcome)=>void};
- let queued:Request|null=null,active:Controller|null=null;
+ let queued:Request|null=null,reserved:Request|null=null,active:Controller|null=null;
  const waits=new WeakMap<object,Handle>(),notices:{request:Request;result:LearningOutcome}[]=[];
  class Controller {
   model!:LearningScreen;ready=false;closed=false;frame=0;token='';text:string[]=[];latch=new InputLatch();
+  private moves=new Map<string,any>();
   constructor(readonly window:any,readonly request:Request,readonly finish:(o:LearningOutcome)=>void){}
   valid(){return !this.closed&&this.request.handle.application===flow()._app&&this.request.handle.generation===this.request.handle.application.stateGeneration;}
   start(parent?:LearningParent){
+   if(!this.valid()||this.request.handle.done){this.close({status:'refused',reason:'stale-learning-screen'});return;}
    const r=this.request.resume?(this.request.handle.application.pendingLearning?{status:'pending',view:this.request.handle.application.pendingLearning}:{status:'refused',reason:'no-learning-operation'}):this.request.handle.application.beginLearning(this.request.intent,parent);
    this.token=r.status==='pending'?r.view.token:'';
    this.model=new LearningScreen({resolve:(token,revision,decision)=>{
     if(!this.valid())return {status:'refused',reason:'stale-learning-screen'};
     return this.request.handle.application.resolveLearning(token,revision,decision);
-   },text:tr,move:id=>flow().translator().tOr('move.name.'+id,(Object.values(flow().content().moves??{}) as any[]).find((move:any)=>move.id===id)?.name??id),close:o=>this.close(o),reload:()=>{this.dispose();G.SceneManager.goto(G.Scene_Title);}},r);
+   },text:tr,move:id=>flow().translator().tOr('move.name.'+id,this.move(id)?.name??id),pp:id=>this.move(id)?.pp??0,close:o=>this.close(o),reload:()=>{this.dispose();G.SceneManager.goto(G.Scene_Title);}},r);
    this.boundary();this.draw();
   }
+  move(id:string){if(!this.moves.has(id))this.moves.set(id,this.request.handle.application.describeLearningMove(id));return this.moves.get(id);}
   boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;this.latch.arm(W.PSManagement.inputFrame().pressed);G.Input.clear();G.TouchInput.clear();}
   update(){
    if(!this.valid()){this.close({status:'refused',reason:'stale-learning-screen'});return;}
@@ -41,11 +44,19 @@ import type { LearningIntent, LearningParent, LearningOutcome } from '../framewo
    line(tr('title'),8,12,w-24,'#b8e3ff');
    // Two measured title lines allow long localized prompts without overlapping the selectable rows.
    let current='',n=0;for(const char of Array.from(p.title)){if(this.window.textWidth(current+char)>w-24&&current){line(current,48+n*30);current='';if(++n===2)break;}current+=char;}if(n<2)line(current,48+n*30);
+   const selected=p.rows[p.cursor]?.moveId,info=selected?this.move(selected):null,left=selected?Math.floor(w*.46):w;
    const visible=Math.max(1,Math.floor((h-200)/34)),start=Math.max(0,p.cursor-visible+1);
    for(let i=start;i<Math.min(p.rows.length,start+visible);i++){
     const row=p.rows[i]!,y=124+(i-start)*34,detail=row.details??'',right=this.window.textWidth(detail);
-    if(i===p.cursor)b.fillRect(8,y,w-16,32,'#435f80');
-    if(detail)line(detail,y,w-16-right,right);line((i===p.cursor?'▶ ':'  ')+row.text,y,12,w-40-right);
+    if(i===p.cursor)b.fillRect(8,y,left-16,32,'#435f80');
+    if(detail)line(detail,y,left-16-right,right);line((i===p.cursor?'▶ ':'  ')+row.text,y,12,left-40-right);
+   }
+   if(selected){
+    const x=left+14,width=w-x-12;line(tr('details'),122,x,width,'#b8e3ff');
+    line(tr('type',{value:info?.type||'—'}),156,x,width);line(tr('category',{value:info?.category||'—'}),190,x,width);
+    line(tr('power',{value:info?.power??'—'}),224,x,width);line(tr('accuracy',{value:info?.accuracy===0?'—':info?.accuracy??'—'}),258,x,width);
+    const description=flow().translator().tOr('move.description.'+selected,info?.description||tr('noDescription'));
+    let part='',y=302;for(const char of Array.from(description as string)){if(this.window.textWidth(part+char)>width&&part){line(part,y,x,width);part='';y+=28;if(y>h-110)break;}part+=char;}if(y<=h-110)line(part,y,x,width);
    }
    if(p.error)line(p.error,h-74,12,w-24,'#ffe09a');line(tr('help'),h-38,12,w-24,'#b8e3ff');
   }
@@ -63,14 +74,16 @@ import type { LearningIntent, LearningParent, LearningOutcome } from '../framewo
  }
  function makeRequest(intent?:LearningIntent,done?:Request['done'],resume=false):Request {const application=app();return {intent,done,resume,handle:{application,generation:application.stateGeneration,done:false}};}
  function open(request:Request){
-  if(active||queued||G.SceneManager.isSceneChanging()||G.$gameMessage?.isBusy?.())return null;
-  queued=request;try{G.SceneManager.push(Scene_PSProgression);}catch(e){queued=null;request.handle.done=true;request.handle.result={status:'refused',reason:String(e)};}return request.handle;
+  if(active||queued||reserved||G.SceneManager.isSceneChanging()||G.$gameMessage?.isBusy?.())return null;
+  queued=reserved=request;try{G.SceneManager.push(Scene_PSProgression);}catch(e){queued=null;reserved=null;const created=active as Controller|null;if(created?.request===request)created.dispose();request.handle.done=true;request.handle.result={status:'refused',reason:String(e)};}return request.handle;
  }
  function Scene_PSProgression(this:any){this.initialize(...(arguments as any));}
  const P=Scene_PSProgression.prototype=Object.create(G.Scene_MenuBase.prototype);P.constructor=Scene_PSProgression;
  P.initialize=function(){G.Scene_MenuBase.prototype.initialize.call(this);this._request=queued;queued=null;};
  P.create=function(){G.Scene_MenuBase.prototype.create.call(this);try{
+  if(reserved===this._request)reserved=null;
   if(!this._request)throw Error('missing-learning-request');
+  const h=this._request.handle;if(h.done||h.application!==flow()._app||h.generation!==h.application.stateGeneration){h.done=true;h.result??={status:'refused',reason:'stale-learning-screen'};this._finished=true;return;}
   this._window=new G.Window_Base(new G.Rectangle(0,0,G.Graphics.boxWidth,G.Graphics.boxHeight));this.addWindow(this._window);
   this._controller=new Controller(this._window,this._request,(o:LearningOutcome)=>{this._finished=true;if(this._request.done)notices.push({request:this._request,result:structuredClone(o)});});active=this._controller;this._controller.start();
  }catch(error){this._failure=String(error);this._controller?.dispose();if(this._request&&!this._request.handle.done){this._request.handle.done=true;this._request.handle.result={status:'refused',reason:this._failure};}try{G.$gameMessage.add(tr('refused',{reason:this._failure}));}catch{console.error(NAME,error);}}};
@@ -81,16 +94,16 @@ import type { LearningIntent, LearningParent, LearningOutcome } from '../framewo
   learn:(intent:LearningIntent,done?:Request['done'])=>open(makeRequest(intent,done)),
   resumeLearning:()=>open(makeRequest(undefined,undefined,true)),
   attachLearning:(win:any,intent:LearningIntent,parent:LearningParent,done:Request['done'])=>{
-   if(active||queued)throw Error('learning-screen-active');const request=makeRequest(intent),c=new Controller(win,request,o=>done?.(o));active=c;
+   if(active||queued||reserved)throw Error('learning-screen-active');const request=makeRequest(intent),c=new Controller(win,request,o=>done?.(o));active=c;
    try{c.start(parent);}catch(error){c.dispose();throw error;}return c;
   },
   current:()=>active&&!active.closed?{ready:active.ready,token:active.token,generation:active.request.handle.generation,page:structuredClone(active.model.page),text:[...active.text]}:null,
  };
- const pending=flow().operationPending;flow().operationPending=function(){return (pending?pending.call(this):!!this._app?.saveBlocked)||!!queued||!!active;};
+ const pending=flow().operationPending;flow().operationPending=function(){return (pending?pending.call(this):!!this._app?.saveBlocked)||!!queued||!!reserved||!!active;};
  const register=(name:string,run:(args:any)=>Handle|null)=>G.PluginManager.registerCommand(NAME,name,function(this:any,args:any){try{const h=run(args);if(!h)throw Error('learning-screen-active');waits.set(this,h);this.setWaitMode('psProgression');}catch(error){G.$gameMessage.add(tr('refused',{reason:String(error)}));}});
  register('TeachMove',a=>ui.learn({kind:'teach',memberId:String(a.memberId),source:{kind:a.source==='generic'?'generic':'tutor',moveId:String(a.moveId)}}));
  register('RelearnMove',a=>ui.learn({kind:'relearn',memberId:String(a.memberId)}));register('ForgetMove',a=>ui.learn({kind:'forget',memberId:String(a.memberId)}));register('ResumeLearning',()=>ui.resumeLearning());
  const wait=G.Game_Interpreter.prototype.updateWaitMode;G.Game_Interpreter.prototype.updateWaitMode=function(){if(this._waitMode!=='psProgression')return wait.call(this);const h=waits.get(this);if(h&&!h.done&&h.application===flow()._app&&h.generation===h.application.stateGeneration)return true;this._waitMode='';waits.delete(this);return false;};
- for(const method of ['clear','terminate']){const prior=G.Game_Interpreter.prototype[method];if(typeof prior==='function')G.Game_Interpreter.prototype[method]=function(...args:any[]){const h=waits.get(this);waits.delete(this);if(h&&!h.done){if(active?.request.handle===h)active.dispose();else if(queued?.handle===h){queued=null;h.done=true;h.result={status:'refused',reason:'event-aborted'};}}return prior.apply(this,args);};}
+ for(const method of ['clear','terminate']){const prior=G.Game_Interpreter.prototype[method];if(typeof prior==='function')G.Game_Interpreter.prototype[method]=function(...args:any[]){const h=waits.get(this);waits.delete(this);if(h&&!h.done){if(active?.request.handle===h)active.dispose();else {if(queued?.handle===h)queued=null;if(reserved?.handle===h)reserved=null;h.done=true;h.result={status:'refused',reason:'event-aborted'};}}return prior.apply(this,args);};}
  const update=G.SceneManager.updateScene;G.SceneManager.updateScene=function(...args:any[]){const value=update.apply(this,args);if(!this.isSceneChanging()&&!G.$gameMessage?.isBusy?.()&&!(this._scene instanceof Scene_PSProgression))while(notices.length){const n=notices.shift()!;if(n.request.handle.application===flow()._app&&n.request.handle.generation===n.request.handle.application.stateGeneration)try{n.request.done?.(n.result);}catch(e){console.error(NAME,e);}}return value;};
 })();
