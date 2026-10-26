@@ -6,7 +6,7 @@ const sourceSha=fs.readFileSync(path.resolve(__dirname,'../../../js/engine/showd
 function content(strong=true){const c=clone(E.fixtures.content),dex=E.dex.createDexLookup();
  for(const [name,data] of Object.entries(c.species)){const d=dex.species(name);data.abilities=d.abilities;data.hiddenAbilities=d.hiddenAbilities;data.gender=d.gender;}
  const ids=['flamethrower','airslash','dragonpulse','roost','hydropump','icebeam','flashcannon','protect','gigadrain','sludgebomb','earthquake','synthesis','tackle','rest'];c.moves=Object.fromEntries(ids.map(id=>{const m=dex.move(id);return[m.name,m];}));c.species.Pidgey.learnset={1:['Tackle']};c.species.Snorlax.learnset={1:['Rest']};
- if(strong){const inputsHash='1'.repeat(64),compiledSemantics=2;c.meta={kind:'fixture',id:'effects-transaction',inputsHash,compiledSemantics,showdownSha:sourceSha,contentIdentity:E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics,inputsHash,showdownSha:sourceSha}))};}else delete c.meta;return c;}
+ if(strong){const inputsHash='1'.repeat(64),compiledSemantics=E.contentSchema.COMPILED_SCHEMA_VERSION;c.meta={kind:'fixture',id:'effects-transaction',inputsHash,compiledSemantics,showdownSha:sourceSha,contentIdentity:E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics,inputsHash,showdownSha:sourceSha}))};}else delete c.meta;return c;}
 const raw=(id,extra={})=>({protocol:1,battleId:id,outcome:{kind:'run',winner:null},members:{},bag:{},captured:[],dex:{seen:[],owned:[]},...extra});
 const complete=value=>({status:'complete',value}),faint=()=>({coverage:{status:'complete'},positiveOccurrences:[]});
 function fakeFactory(builder,friendAfter=100){
@@ -48,7 +48,7 @@ test('E2a reliable primary HP0 clears R even with missing effects; defeat heal/m
 test('E2a missing metadata A to B and changed compiled semantics cannot authorize auxiliary writes',async()=>{
  for(const variant of ['anonymous','semantics']){
   const g=E.fixtures.makeGame();g.party[0].readyToEvolve=true;g.party[0].evolutionReadiness='known';const w=world({strong:variant!=='anonymous',initial:g});const h=await w.app.startBattle(w.request),changed=clone(w.content());
-  if(variant==='anonymous')changed.species.Pidgey.baseExp+=1;else changed.meta.compiledSemantics=3;
+  if(variant==='anonymous')changed.species.Pidgey.baseExp+=1;else changed.meta.compiledSemantics=E.contentSchema.COMPILED_SCHEMA_VERSION+1;
   w.setContent(changed);const o=w.app.finishBattle(h,w.request);assert.equal(o.commit,'applied',variant);assert.equal(w.sessions.calls,0,variant);assert.equal(w.state.current().party[0].friendship,99);assert.deepEqual([w.state.current().party[0].readyToEvolve,w.state.current().party[0].evolutionReadiness],[true,'unknown']);assert(w.state.current().dex.owned.includes('Pidgey'));
  }
 });
@@ -106,7 +106,7 @@ test('E2a content changes during the seal or final state read defer all writes a
  for(const at of ['seal','last-read'])for(const returnToA of [false,true]){
   let armed=false,w;const initial=E.fixtures.makeGame();initial.party[0].readyToEvolve=true;initial.party[0].evolutionReadiness='known';
   w=world({initial,port:state=>({read:()=>{if(armed){armed=false;w.setContent(changed);}return state.read();},replace:next=>state.replace(next)})});
-  const original=w.content(),changed=clone(original);changed.meta.inputsHash='2'.repeat(64);changed.meta.contentIdentity=E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics:2,inputsHash:changed.meta.inputsHash,showdownSha:sourceSha}));
+  const original=w.content(),changed=clone(original);changed.meta.inputsHash='2'.repeat(64);changed.meta.contentIdentity=E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics:E.contentSchema.COMPILED_SCHEMA_VERSION,inputsHash:changed.meta.inputsHash,showdownSha:sourceSha}));
   const effects=w.sessions.effects;w.sessions.effects=(...args)=>{const seal=effects(...args);if(at==='seal')w.setContent(changed);else armed=true;return seal;};
   const h=await w.app.startBattle(w.request),before=clone(w.state.current()),pending=w.app.finishBattle(h,w.request);
   assert.equal(pending.pending,true,at);assert.match(pending.error,/content-changed-before-battle-install/);assert.deepEqual(w.state.current(),before);assert.equal(w.state.replaced.length,0);assert.equal(w.sessions.calls,1);assert.equal(w.app.saveBlocked,true);
@@ -115,7 +115,7 @@ test('E2a content changes during the seal or final state read defer all writes a
 });
 test('E2a a zero-write failed install can revalidate new content without resurrecting its old auxiliary next state',async()=>{
  const initial=E.fixtures.makeGame();initial.party[0].readyToEvolve=true;initial.party[0].evolutionReadiness='known';const w=world({initial}),h=await w.app.startBattle(w.request),original=w.content(),changed=clone(original);
- changed.meta.inputsHash='3'.repeat(64);changed.meta.contentIdentity=E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics:2,inputsHash:changed.meta.inputsHash,showdownSha:sourceSha}));w.state.failReplace=Error('synthetic zero-write failure');
+ changed.meta.inputsHash='3'.repeat(64);changed.meta.contentIdentity=E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics:E.contentSchema.COMPILED_SCHEMA_VERSION,inputsHash:changed.meta.inputsHash,showdownSha:sourceSha}));w.state.failReplace=Error('synthetic zero-write failure');
  const first=w.app.finishBattle(h,w.request);assert.equal(first.pending,true);w.setContent(changed);assert.equal(w.app.resolveReceiving(first.receivingToken).pending,true);assert.equal(w.state.replaced.length,0);assert.equal(w.sessions.calls,1);
  w.setContent(original);w.state.failReplace=null;assert.equal(w.app.resolveReceiving(first.receivingToken).commit,'applied');assert.equal(w.state.replaced.length,1);assert.equal(w.sessions.calls,1);assert.equal(w.state.current().party[0].friendship,99);assert.deepEqual([w.state.current().party[0].readyToEvolve,w.state.current().party[0].evolutionReadiness],[true,'unknown']);
 });
@@ -124,7 +124,7 @@ test('E2a source identity is checked before nickname or placement pending; retur
   const initial=E.fixtures.makeGame();initial.party[0].readyToEvolve=true;initial.party[0].evolutionReadiness='known';
   if(kind==='placement')while(initial.party.length<6)initial.party.push({...clone(initial.party[0]),id:'P-extra-'+initial.party.length});
   const w=world({initial,profile:kind==='nickname'?{mode:1,naming:0}:{mode:0,naming:1}}),A=w.content(),B=clone(A);
-  B.meta.inputsHash='4'.repeat(64);B.meta.contentIdentity=E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics:2,inputsHash:B.meta.inputsHash,showdownSha:sourceSha}));
+  B.meta.inputsHash='4'.repeat(64);B.meta.contentIdentity=E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics:E.contentSchema.COMPILED_SCHEMA_VERSION,inputsHash:B.meta.inputsHash,showdownSha:sourceSha}));
   const effects=w.sessions.effects;w.sessions.effects=(...args)=>{const seal=effects(...args);if(variant!=='unchanged')w.setContent(B);return seal;};
   const h=await w.app.startBattle(w.request),r=h.result(),id=r.captured[0].id,before=clone(w.state.current()),pending=w.app.finishBattle(h,w.request);
   assert.equal(pending.pending,true);assert.equal(w.state.replaced.length,0);assert.deepEqual(w.state.current(),before);assert.equal(w.sessions.calls,1);assert.equal(w.app.saveBlocked,true);

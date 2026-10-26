@@ -1612,11 +1612,12 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
 
   // B5: actual MZ persistence and normal application lifecycle, driven by service calls.
   // Disk assertions complement the VM's exact baseSaveGame/baseMake counters; no hardware input is claimed.
-  function progressionContent(regional: boolean): any {
+  function progressionContent(regional: boolean, configure?: (inputs: any) => void): any {
     const B = api(), read = (name: string) => JSON.parse(fs.readFileSync(path.join(gameDir, "content/sample", name), "utf8"));
     const inputs: any = {manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json")};
     for (const [key, file] of [["grants", "grants.json"], ["settings", "settings.json"], ["items", "items.json"], ["shops", "shops.json"]]) if (fs.existsSync(path.join(gameDir, "content/sample", file))) inputs[key] = read(file);
     if (regional) inputs.regionalDex = {source: "author-placeholder", regions: [{id: 0, nameKey: "region.test", species: inputs.species.filter((sp: any) => !sp.form).map((sp: any) => sp.id)}]};
+    configure?.(inputs);
     const compiled = B.contentCompile.compileContent(inputs); assert(compiled.ok, JSON.stringify(compiled.errors));
     const assembled = B.contentRuntime.assembleContent(compiled.data, B.dex.createDexLookup()); assert(!assembled.errors.length, JSON.stringify(assembled.errors));
     return assembled.content;
@@ -1981,6 +1982,19 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       await G.DataManager.saveGame(59);const file=path.join(path.dirname(OUT||"."),"ps-flow-expected-learning.json"),expected=JSON.parse(fs.readFileSync(file,"utf8"));expected.reminderCase={slot:59,state:clone(game())};fs.writeFileSync(file,JSON.stringify(expected));
       return {input:"real MZ application and save; direct reminder/forget answers and explicit one-move fixture",slot:59};
     });
+    await scenario("E53-LEGG real compiled3 author egg table enables one TR transaction and persistent schema7 save",async()=>{
+      const B=api();let target="";
+      const content=progressionContent(false,inputs=>{const base=inputs.species.find((sp:any)=>!sp.form);target=base.id;base.eggMoves=["gust"];base.tutorMoves=[];base.learnset=[{level:1,move:"tackle"}];
+        // This isolated newGame fixture never claims a starter grant. Its authored catalog declares every item it uses.
+        inputs.grants=[];inputs.items??=[];inputs.items.push({id:"host-egg-ball",name:"Fixture Ball",pocket:3,flags:["PokeBall"],battleUse:"ball",battleId:"pokeball",fieldUse:"none",source:base.source},{id:"host-egg-tr",name:"Egg Teaching Record",namePlural:"Egg Teaching Records",pocket:4,fieldUse:"tr",move:"gust",battleUse:"none",consumable:true,source:base.source});});
+      eq(content.meta.compiledSemantics,3,"actual compiler semantic version");const battleName=B.speciesKey.battleNameOf(content,{species:target,form:0});assert(battleName,"author id resolves to pinned battle identity");
+      const member=B.speciesKey.toPersistentMember(B.memberFactory.createMember({id:"EGG-COMPAT-NW",species:battleName,ball:"host-egg-ball",level:5,context:{map:G.$gameMap.mapId(),receivedAt:1}},content,()=>0),content);eq(member.species,target,"persistent identity before newGame");
+      const created=B.state.newGame({party:[member],bag:{"host-egg-tr":1},content});eq(created.schema,7,"save schema unchanged");W.PSFlow._content=content;G.$gameSystem._psGame=created;W.PSFlow.stateReplaced();const app=W.PSFlow.app(),token=app.beginInventoryOperation("bag");
+      const result=W.PSFlow.beginLearning({kind:"teach",memberId:member.id,source:{kind:"machine",itemId:"host-egg-tr",entry:"bag"}},{kind:"inventory",token});eq(result.status,"committed","egg-only compatibility learned through actual app");app.endInventoryOperation(token);
+      assert(game().party[0].moves.some((move:any)=>move.id==="gust"),"learned canonical pinned move");eq(B.inventory.itemQuantity(game().inventory,"host-egg-tr",content.items),0,"single actual TR consumed");eq(game().stats.moves_taught_by_item,1,"one stat");assert(game().party[0].firstMoves.includes("gust"),"TR record persisted");
+      await G.DataManager.saveGame(60);const file=path.join(path.dirname(OUT||"."),"ps-flow-expected-learning.json"),expected=JSON.parse(fs.readFileSync(file,"utf8"));expected.eggCase={slot:60,state:clone(game()),content};fs.writeFileSync(file,JSON.stringify(expected));
+      return {input:"actual author compiler and pinned Gen8 assembly plus MZ app/save; explicit custom egg table and direct service intent",slot:60,compiledSemantics:3,saveSchema:7};
+    });
   }
 
   async function verifySave() {
@@ -1989,6 +2003,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         const expected=readExpected("ps-flow-expected-learning.json");W.PSFlow._content=expected.content;W.PSFlow._app=null;G.DataManager.setupNewGame();await G.DataManager.loadGame(expected.slot);
         eq(game(),expected.state,"complete machine result across new process");assert(!W.PSFlow.app().pendingLearning&&!W.PSFlow.app().saveBlocked,"transient lesson not recreated");
         assert(expected.reminderCase,"producer supplied reminder/forget save");await G.DataManager.loadGame(expected.reminderCase.slot);eq(game(),expected.reminderCase.state,"reminder/forget exact round trip");assert(!W.PSFlow.app().pendingLearning,"no saved workflow");
+        if(expected.eggCase){W.PSFlow._content=expected.eggCase.content;W.PSFlow._app=null;await G.DataManager.loadGame(expected.eggCase.slot);eq(game(),expected.eggCase.state,"compiled3 egg teaching save round trip with unchanged schema7");assert(!W.PSFlow.app().pendingLearning&&!W.PSFlow.app().saveBlocked,"no egg teaching continuation recreated");}
         return {input:"fresh actual NW/MZ load API, no original in-memory receipt",slots:[expected.slot,expected.reminderCase.slot]};
       });return;
     }

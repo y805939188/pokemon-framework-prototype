@@ -10,7 +10,7 @@ function world({initial,entries=[{method:'Level',parameter:51,target:'Blastoise'
  content.moves=Object.fromEntries(ids.map(id=>{const m=dex.move(id);return[m.name,m];}));content.species.Pidgey.learnset={1:['Tackle']};
  content.species.Charizard.evolutions=entries;content.species.Blastoise.learnset={0:targetMoves};content.settings=settings;
  if(extraContent)extraContent(content);
- const inputsHash=E.digest.sha256Hex(E.contentCompile.canonicalJson(content)),showdownSha=fs.readFileSync(path.resolve(__dirname,'../../../../../js/engine/showdown/SOURCE_SHA'),'utf8').trim(),compiledSemantics=2;
+ const inputsHash=E.digest.sha256Hex(E.contentCompile.canonicalJson(content)),showdownSha=fs.readFileSync(path.resolve(__dirname,'../../../../../js/engine/showdown/SOURCE_SHA'),'utf8').trim(),compiledSemantics=E.contentSchema.COMPILED_SCHEMA_VERSION;
  content.meta={kind:'fixture',id:'postbattle',compiledSemantics,inputsHash,showdownSha,contentIdentity:E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics,inputsHash,showdownSha}))};
  const game=initial??E.fixtures.makeGame();game.party[0].friendship=99;
  const state=E.fakes.createMemoryState(game),projection=E.fakes.createRecordingProjection();let app;

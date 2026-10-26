@@ -276,7 +276,7 @@ test('F06: a build that fails (also on such a setting) removes the previous outp
 test('F05: assembly validates the complete registry and every consumed source before any Dex call', () => {
   const TEST_SHA = 'a'.repeat(40);
   const compiled = compileContent(inputs(), {}, { showdownSha: TEST_SHA }); assert.equal(compiled.ok, true);
-  assert.equal(compiled.data.schema, 2); assert.equal(compiled.data.showdownSha, TEST_SHA);
+  assert.equal(compiled.data.schema, 3); assert.equal(compiled.data.showdownSha, TEST_SHA);
   const lookup = E.dex.createDexLookup();
   const counted = calls => Object.fromEntries(['sha', 'species', 'move', 'type', 'levelUpMoves', 'allAbilities', 'allMoves', 'abilityInfo', 'heldItem'].map(k => [k, (...args) => { calls.push(k); return k === 'sha' ? TEST_SHA : lookup[k](...args); }]));
   const validCalls = [];

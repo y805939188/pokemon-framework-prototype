@@ -15,6 +15,8 @@ import type {
 import { own } from "./own.ts";
 import type { Content, Member, MoveData, SpeciesData } from "./types.ts";
 import { clone } from "./value.ts";
+import { firstEvolutionPredecessor } from "./evolution-data.ts";
+import { memberKey } from "./species-key.ts";
 
 /** Both a real member snapshot and an incoming draft use the same Member value; no party lookup occurs here. */
 export type TeachingActionSource = { readonly kind: "generic" | "tutor"; readonly moveId: string }
@@ -102,9 +104,36 @@ function complete(member: Readonly<Member>, plan: LearningReady): TeachingAction
     friendshipChanges: [], outcomes: clone(plan.outcomes), answersUsed: plan.answersUsed };
 }
 
+/** Read only the applicable egg table. Missing data is unavailable; an explicit empty table is known absence. */
+function eggCompatibility(member: Readonly<Member>, content: Content, data: SpeciesData):
+  { eggMoves: string[] | null; predecessorEggMoves: string[] | null } | LearningActionRefused {
+  const read = (source: SpeciesData): string[] | null | LearningActionRefused => {
+    if (source.eggMoves === undefined) return null;
+    const moves: string[] = [];
+    for (const reference of source.eggMoves) {
+      const move = tableMove(content, reference); if (!move) return refused("move-data-unavailable");
+      moves.push(move.id);
+    }
+    return moves;
+  };
+  const eggs = read(data);
+  if (eggs !== null && !Array.isArray(eggs)) return eggs;
+  if (eggs === null || eggs.length) return { eggMoves: eggs, predecessorEggMoves: null };
+  // Only a complete compiled registration order proves that no predecessor exists. Do not invent an order
+  // for legacy partial content or use the battle/PID identity in place of the exact persistent form.
+  if (!content.registrationOrder) return { eggMoves: eggs, predecessorEggMoves: null };
+  const predecessor = firstEvolutionPredecessor(content, memberKey(member));
+  if (!predecessor) return { eggMoves: eggs, predecessorEggMoves: [] };
+  const previous = species(content, { ...member, species: predecessor.species, form: predecessor.form });
+  if ("status" in previous) return previous;
+  const inherited = read(previous);
+  if (inherited !== null && !Array.isArray(inherited)) return inherited;
+  return { eggMoves: eggs, predecessorEggMoves: inherited };
+}
+
 /**
- * One teaching attempt. Compatibility is proved by the current form's tutor/level tables. The current Content
- * contract has no egg-move directory, so a nonmatch stays unavailable; this adapter never fabricates absence.
+ * One teaching attempt. Compatibility uses the exact form's tutor/level tables, then its egg table or the
+ * registered predecessor's table when explicitly empty. Missing author data never fabricates absence.
  * Resource removal and friendship are calculated on copies only after C reports an actual learned outcome.
  */
 export function planTeachingAction(
@@ -142,8 +171,12 @@ export function planTeachingAction(
   } else return refused("invalid-source");
   if (!move) return refused("invalid-move");
   const config = resolveConfig(content.settings);
+  let eggTables: { eggMoves: string[] | null; predecessorEggMoves: string[] | null } = { eggMoves: null, predecessorEggMoves: null };
+  if (!resolved.tutorMoves.includes(move.id) && !resolved.levelMoves.some(entry => entry.id === move.id)) {
+    const result = eggCompatibility(member, content, data); if ("status" in result) return result; eggTables = result;
+  }
   const compatibility = learningCompatibility(move.id, { moveIds: Object.values(content.moves ?? {}).map(move => move.id),
-    tutorMoves: resolved.tutorMoves, levelMoves: resolved.levelMoves, eggMoves: null, predecessorEggMoves: null });
+    tutorMoves: resolved.tutorMoves, levelMoves: resolved.levelMoves, ...eggTables });
   const plan = planLearningQueue(member, [move], learningSource, { shadow: context.shadow, hmMoves: resolved.hmMoves,
     keepMachinePp: config.TAUGHT_MACHINES_KEEP_OLD_PP, compatibility }, answers);
   if (plan.status !== "ready") return plan;

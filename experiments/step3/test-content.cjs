@@ -113,9 +113,9 @@ test('assembly against the pinned Showdown data reproduces the step 2 fixture co
 	assert.equal(content.meta.kind, 'sample'); assert.equal(content.meta.inputsHash, compiled.inputsHash);
 	assert.equal(E.fixtures.content.meta.kind, 'fixture', 'the fixture keeps a distinct identity');
 	assert.equal(loadCompiled(JSON.parse(JSON.stringify(compiled))).contentId, 'sample');
-	assert.equal(compiled.schema, 2, 'author schema 1 is rebuilt under compiled semantics 2');
-	assert.throws(() => loadCompiled({ ...compiled, schema: 1 }), /needs-rebuild: compiled content requires schema 2/);
-	assert.throws(() => loadCompiled({ schema: 9 }), /needs-rebuild: compiled content requires schema 2/);
+	assert.equal(compiled.schema, 3, 'author schema 1 is rebuilt under compiled semantics 3');
+	assert.throws(() => loadCompiled({ ...compiled, schema: 1 }), /needs-rebuild: compiled content requires schema 3/);
+	assert.throws(() => loadCompiled({ schema: 9 }), /needs-rebuild: compiled content requires schema 3/);
 });
 
 test('assembly errors name the record and field', () => {

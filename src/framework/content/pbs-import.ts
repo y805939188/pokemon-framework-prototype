@@ -29,10 +29,10 @@ export interface PbsBundleImport extends PbsImport { identities: PbsIdentity[]; 
 
 const GROWTH: Record<string, CurveId> = { Medium: 'medium', Fast: 'fast', Slow: 'slow', Parabolic: 'parabolic', Erratic: 'erratic', Fluctuating: 'fluctuating' };
 const STAT: Record<string, StatKey> = { HP: 'hp', ATTACK: 'atk', DEFENSE: 'def', SPECIAL_ATTACK: 'spa', SPECIAL_DEFENSE: 'spd', SPEED: 'spe' };
-const IMPORTED = ['GrowthRate','BaseExp','EVs','CatchRate','Happiness','Moves','TutorMoves','Evolutions','Evolution','Types','Abilities','HiddenAbilities','Flags','PokedexForm','Category','Pokedex','Height','Weight','Color','Shape','FormName'];
+const IMPORTED = ['GrowthRate','BaseExp','EVs','CatchRate','Happiness','Moves','TutorMoves','EggMoves','Evolutions','Evolution','Types','Abilities','HiddenAbilities','Flags','PokedexForm','Category','Pokedex','Height','Weight','Color','Shape','FormName'];
 const SHOWDOWN = ['Name','BaseStats','GenderRatio'];
 const LATER: Record<string, string> = {
-  EggMoves: 'after the first version (breeding)', Habitat: '5.3 dex', Generation: '5.3 dex',
+  Habitat: '5.3 dex', Generation: '5.3 dex',
   Incense: 'after the first version (breeding)', Offspring: 'after the first version (breeding)',
   EggGroups: 'after the first version (breeding)', HatchSteps: 'after the first version (breeding)',
   WildItemCommon: '5.5 wild held items', WildItemUncommon: '5.5 wild held items', WildItemRare: '5.5 wild held items',
@@ -134,7 +134,7 @@ function convert(sections: Section[], sourceId: string, errors: PbsProblem[], re
       else for(let i=0;i<mv.length;i+=2){const level=int(mv[i],0,100),token=mv[i+1]??'',move=SYMBOL.test(token)?token.toLowerCase().replace(/_/g,''):'';if(level===null||!move)fail('Moves',`pair ${i/2+1} "${mv[i]},${mv[i+1]}" must be a level 0..100 and a move id`);else if(learnset.some(e=>e.level===level&&e.move===move))report.overridden.push(`Moves ${level},${move} (repeated)`);else learnset.push({level,move});}
       if(learnset.length||!base)out.learnset=learnset;
     }
-    for(const [pbs,key] of [['TutorMoves','tutorMoves'],['Types','types'],['Abilities','abilities'],['HiddenAbilities','hiddenAbilities']] as const){
+    for(const [pbs,key] of [['TutorMoves','tutorMoves'],['EggMoves','eggMoves'],['Types','types'],['Abilities','abilities'],['HiddenAbilities','hiddenAbilities']] as const){
       if(value(pbs)===undefined)continue;
       const tokens=progressionCsv(value(pbs)!);
       if(!tokens.length||tokens.some(token=>!SYMBOL.test(token))){fail(pbs,'must contain one or more valid symbol references (empty PBS text is not JSON [])');continue;}
