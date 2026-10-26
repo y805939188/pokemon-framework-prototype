@@ -21,19 +21,22 @@ export type DexViewingCommand = { kind: "entitlement"; value: boolean }
   | { kind: "unlock"; region: number; unlocked: boolean }
   | { kind: "view"; value: { region?: number; mode?: number; cursor?: number; searchResults?: boolean } }
   | { kind: "form"; species: string; baseFrontsEqual: boolean; selected?: number; text?: Record<string, string>; currentRegion?: number | null };
-export type DexDecision = { kind: "message-complete" | "close-entry" | "retry" | "technical-terminate" };
+export type DexDecision = { kind: "message-complete" | "close-entry" | "retry" | "technical-terminate" }
+ | { kind:"summary-form"; selected?:number; baseFrontsEqual:boolean; text?:Record<string,string>;currentRegion?:number|null };
 export interface DexOperationView {
-  token: string; revision: number; purpose: "entry" | "edit"; phase: "message" | "entry" | "failed";
+  token: string; revision: number; purpose: "entry" | "edit" | "summary"; phase: "message" | "entry" | "failed";
   parentToken?: string; owner?: DexEntryOwner; source: "installed";
+  summary?:{parentToken:string;memberId:string;species:string};
   entry?: DexEntryIntent; error?: string; reloadRequired?: boolean;
 }
 export type DexResolution = { status: "pending"; view: DexOperationView }
   | { status: "complete" | "technically-terminated" | "applied" | "unchanged"; token: string; parentToken?: string; owner?: DexEntryOwner }
   | { status: "refused"; reason: string };
 interface Operation {
-  token: string; generation: number; revision: number; purpose: "entry" | "edit";
+  token: string; generation: number; revision: number; purpose: "entry" | "edit" | "summary";
   parentToken?: string; owner?: DexEntryOwner; entries: DexEntryIntent[]; cursor: number;
   phase: "reserved" | "message" | "entry"; fingerprint: string;
+  summary?:{parentToken:string;memberId:string;species:string};
   pendingWrite?: { before: GameState; next: GameState; attempted: boolean };
   error?: string; retired?: string; reloadRequired: boolean;
 }
@@ -46,7 +49,7 @@ export class PokedexOperation {
   private operation: Operation | null = null;
   private sequence = 0;
   private resolving = false;
-  private readonly ports: { state: GameStatePort; content: ContentPort; generation: () => number; enter: () => void; changed: (next: GameState) => void };
+  private readonly ports: { state: GameStatePort; content: ContentPort; generation: () => number; enter: (parent?:string) => void; leaveSummary:(parent:string)=>void; changed: (next: GameState) => void };
   constructor(ports: PokedexOperation["ports"]) { this.ports = ports; }
   get active(): boolean { return this.operation !== null; }
   get view(): DexOperationView | null {
@@ -55,9 +58,10 @@ export class PokedexOperation {
       phase: op.error ? "failed" as const : op.phase,
       ...(op.parentToken ? { parentToken: op.parentToken, owner: op.owner } : {}),
       ...(op.purpose === "entry" ? { entry: op.entries[op.cursor] } : {}),
+      ...(op.summary ? {summary:op.summary}:{}),
       ...(op.error ? { error: op.error, reloadRequired: op.reloadRequired } : {}) });
   }
-  invalidate(): void { this.operation = null; }
+  invalidate(): void { const op=this.operation;this.operation = null;if(op?.summary)this.ports.leaveSummary(op.summary.parentToken); }
   /** Read-only queries can observe a changed definition too. Retire the in-memory plan without writing the save. */
   observeContent(content: Content): void {
     const op = this.operation; if (!op || !op.fingerprint || op.generation !== this.ports.generation()) return;
@@ -67,7 +71,7 @@ export class PokedexOperation {
   private current(op: Operation): void { if (this.operation !== op || op.generation !== this.ports.generation()) throw Error("stale-pokedex-operation"); }
   private pending(op: Operation): DexResolution { this.current(op); return { status: "pending", view: this.view! }; }
   private finish(op: Operation, status: "complete" | "technically-terminated" | "applied" | "unchanged"): DexResolution {
-    this.current(op); this.operation = null;
+    this.current(op); this.operation = null;if(op.summary)this.ports.leaveSummary(op.summary.parentToken);
     return { status, token: op.token, ...(op.parentToken ? { parentToken: op.parentToken, owner: op.owner } : {}) };
   }
   /** Private source owner calls this before its primary write; no view exists until that write is proved. */
@@ -94,7 +98,7 @@ export class PokedexOperation {
     if (fingerprint(content) !== op.fingerprint) { op.retired = "pokedex-content-changed"; throw Error(op.retired); }
     return content;
   }
-  private patch(state: GameState, content: Content, command: DexViewingCommand): DexPatch {
+  private patch(state: GameState, content: Content, command: DexViewingCommand, summary=false): DexPatch {
     if (!content.regionalDex) throw Error("pokedex-layout-unavailable");
     switch (command.kind) {
       case "entitlement":
@@ -113,7 +117,7 @@ export class PokedexOperation {
         if (command.currentRegion !== undefined && command.currentRegion !== null && !Number.isSafeInteger(command.currentRegion)) throw Error("invalid-pokedex-current-region");
         const catalog = createDexQueryCatalog(content, command.text ?? {}), config = resolveConfig(content.settings);
         const accessible = dexAccessibleRegions(state.dex, catalog.layout, { useCurrentRegion: config.USE_CURRENT_REGION_DEX, currentRegion: command.currentRegion ?? null });
-        if (!accessible.some(region => (region === -1 ? catalog.layout.national : catalog.layout.regions[region]?.species ?? []).includes(command.species))) throw Error("pokedex-entry-not-accessible");
+        if (!summary&&!accessible.some(region => (region === -1 ? catalog.layout.national : catalog.layout.regions[region]?.species ?? []).includes(command.species))) throw Error("pokedex-entry-not-accessible");
         const base = catalog.forms.find(f => f.species === command.species && f.form === 0);
         if (base?.gender === undefined) throw Error("pokedex-gender-rule-unavailable");
         const choices = dexForms(state.dex, catalog, command.species, { showAll: config.DEX_SHOWS_ALL_FORMS,
@@ -123,6 +127,29 @@ export class PokedexOperation {
       }
       default: throw Error("unknown-dex-command");
     }
+  }
+  /** Complete single entry attached to an exact management owner, including held-member summaries. */
+  beginSummary(parentToken:string,memberId:string):DexResolution {
+    if(typeof parentToken!=='string'||!parentToken||typeof memberId!=='string'||!memberId)return {status:'refused',reason:'invalid-summary-parent'};
+    if(this.operation||this.resolving)return {status:'refused',reason:'pokedex-operation-active'};
+    let op:Operation|undefined;this.resolving=true;
+    try{
+      op={token:`dex-summary:${this.ports.generation()}:${++this.sequence}`,generation:this.ports.generation(),revision:1,purpose:'summary',phase:'entry',entries:[],cursor:0,fingerprint:'',reloadRequired:false};
+      this.operation=op;this.ports.enter(parentToken);this.current(op);
+      op.summary={parentToken,memberId,species:''};
+      const state=clone(this.ports.state.read());this.current(op);const content=clone(this.ports.content().content);this.current(op);op.fingerprint=fingerprint(content);
+      const member=locateMember(state,memberId)?.member;
+      if(!state.dex.hasDex||!member||member.isEgg)throw Error('pokedex-summary-not-accessible');
+      const appearance=normalizeMemberDexAppearance(content,member,'recent');if(!appearance)throw Error('pokedex-summary-appearance-unavailable');
+      op.summary.species=member.species;const plan=planDexLastSeen(state.dex,member.species,appearance);if(plan.status!=='ok')throw Error(plan.reason);
+      if(!plan.changed)return this.pending(op);
+      const next=clone(state);next.dex=applyDexPatch(next.dex,plan.patch);const errors=validateGameContent(next,content);if(errors.length)throw Error(`invalid-pokedex-next:${errors[0]!.path}`);
+      op.pendingWrite={before:state,next,attempted:false};return this.install(op);
+    }catch(error){
+      if(!op||this.operation!==op||op.generation!==this.ports.generation())return {status:'refused',reason:'stale-pokedex-operation'};
+      if(!op.pendingWrite){this.finish(op,'technically-terminated');return {status:'refused',reason:message(error)};}
+      op.error=message(error);op.revision++;return this.pending(op);
+    }finally{this.resolving=false;}
   }
   begin(command: DexViewingCommand): DexResolution {
     if (this.operation || this.resolving) return { status: "refused", reason: "pokedex-operation-active" };
@@ -189,6 +216,15 @@ export class PokedexOperation {
       if (op.pendingWrite) {
         if (decision.kind !== "retry") return { status: "refused", reason: "pokedex-retry-or-terminate-required" };
         return this.install(op);
+      }
+      if(op.purpose==='summary'){
+        if(decision.kind==='close-entry')return this.finish(op,'complete');
+        if(decision.kind!=='summary-form')return {status:'refused',reason:'pokedex-summary-decision-required'};
+        const before=clone(this.ports.state.read());this.current(op);const content=this.content(op);
+        const patch=this.patch(before,content,{kind:'form',species:op.summary!.species,baseFrontsEqual:decision.baseFrontsEqual,selected:decision.selected,text:decision.text,currentRegion:decision.currentRegion},true);
+        if(!Object.keys(patch).length)return this.pending(op);
+        const next=clone(before);next.dex=applyDexPatch(next.dex,patch);const errors=validateGameContent(next,content);if(errors.length)throw Error(`invalid-pokedex-next:${errors[0]!.path}`);
+        op.pendingWrite={before,next,attempted:false};return this.install(op);
       }
       if (op.purpose !== "entry") return { status: "refused", reason: "pokedex-edit-not-pending" };
       if (op.phase === "entry") {
