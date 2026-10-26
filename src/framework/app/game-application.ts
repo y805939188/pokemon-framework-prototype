@@ -834,58 +834,66 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.op) throw new Error(`a battle is already open (${this.op.battleId})`);
     if (this.battleCommitOwner) throw new Error("battle-commit-active");
     if (this.evolutions.active) throw new Error("evolution-operation-active");
-    const game = this.ports.state.read();
-    if (!this.capabilities.allowExperimentalHeldItemBattle && game.party.some((m) => !!m.item)) throw new Error("held-item-battle-disabled: battle item write-back is incomplete");
-    const { content, dex } = this.ports.content();
-    const dangling = findDanglingReferences(game, content, dex);
-    if (dangling.length) throw new Error("the save refers to content that no longer exists: " + dangling.slice(0, 3).map((d) => `${d.path} ${d.message}`).join("; "));
-    if (!game.party.some((m) => !m.isEgg && m.hp > 0)) throw new Error("no party member can battle");
-    const random = this.ports.random;
-    if (!random) throw new Error("no random source is configured for this application (needed to create the foes)");
-    if (!request.foes.length) throw new Error("a battle needs at least one foe");
-    const templates: Record<string, Member> = {};
-    let ordinal = game.nextMemberOrdinal;
-    const taken = new Set(allMembers(game).map((m) => m.id));
-    const createdAt = Math.floor(this.now() / 1000);
-    const creationContext = this.ports.creationContext?.() ?? {};
-    const foes: Member[] = request.foes.map((f, i) => {
-      const species = resolveSpecies(content, f.species);
-      if (!species) throw new Error(`foe ${i + 1}: species "${f.species}" is not in the content`);
-      const allocated = allocateMemberId(ordinal, taken); ordinal = allocated.nextMemberOrdinal; taken.add(allocated.id);
-      const m = createMember({ id: allocated.id, species, level: f.level, owner: game.player, context: { ...creationContext, receivedAt: createdAt, playerId: game.player.id } }, content, random);
-      if (!m.moves.length) throw new Error(`foe ${i + 1}: ${species} at level ${f.level} knows no move in the content (its learnset has nothing at or below that level)`);
-      templates[m.id] = toPersistentMember(m, content);
-      return toBattleMember(templates[m.id]!, content);
-    });
-    const context = this.newReceptionContext({ templates, decisions: {}, profile: request.forceParty ? { ...this.profile, mode: 2 } : this.profile, nextMemberOrdinal: ordinal });
-    const full = storageFull(game, this.limits);
-    const forcedNoRoom = context.profile?.mode === 2 && !Object.values(templates).every((member) => hasForcedPartyPlan(game, member, { limits: this.limits, content, profile: context.profile!, depositHeal: this.depositHeal }));
-    const diagnostics = [...(forcedNoRoom ? ["forced-party-no-target"] : []), ...(game.party.some((m) => !!m.item) ? ["战后持物写回未完成"] : [])];
-    const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full, ...(diagnostics.length ? { diagnostics } : {}), ...(game.party.some((m) => !!m.item) ? { experimentalHeldBattle: true } : {}) };
-    let mapId: number | undefined;
-    try { mapId = this.ports.itemWorld?.().mapId ?? creationContext.map; } catch { /* optional companion context unavailable */ }
-    setup.evidenceContext = {
-      battleId: request.battleId, generation: this.generation, contentIdentity: validatedContentIdentity(content) ?? content.meta?.inputsHash ?? content.meta?.id ?? "anonymous-content",
-      playerIds: game.party.map(m => m.id), initialLevels: Object.fromEntries(game.party.map(m => [m.id, m.level])),
-      ...(Number.isSafeInteger(mapId) && mapId! >= 0 ? { mapId } : {}),
-    };
-    const view = battleView(game, content);
-    view.party = view.party.filter((m) => !m.isEgg); // the session speaks Showdown names (protocol v1); the save keeps content ids
-    const op: { battleId: string; session: S | null; facts: BattleFacts } = { battleId: request.battleId, session: null, facts: { kind: request.kind, canLose: !!request.canLose, experimentalHeld: game.party.some((m) => !!m.item) } };
-    this.op = op; // taken before the first await: nothing can write between reading the state and opening the battle
-    let session: S;
-    try { session = await this.ports.sessions.create(request, view, setup); }
-    catch (error) { if (this.op === op) this.op = null; throw error; }
-    if (this.op !== op) throw new Error(`battle ${request.battleId} was aborted while its session was being created; the late session is not used`);
-    op.session = session;
-    if (typeof session === "object" && session !== null) {
-      this.bornIn.set(session, this.generation); this.battleContexts.set(session, context);
-      this.ownedBattleEffects.set(session, { battleId: request.battleId, generation: this.generation, contentIdentity: validatedContentIdentity(content), context: {
-        playerIds: [...setup.evidenceContext.playerIds], L0: clone(setup.evidenceContext.initialLevels),
-        engineRosterIds: view.party.filter(m => !m.isEgg).slice(0, 6).map(m => m.id), foeIds: foes.map(m => m.id), internalBattle: true,
-      } });
-    }
-    return session;
+    if (this.battleBusy) throw new Error("operation-active");
+    const generation = this.generation;
+    const op: { battleId: string; session: S | null; facts: BattleFacts } = { battleId: request.battleId, session: null, facts: { kind: request.kind, canLose: !!request.canLose } };
+    this.op = op; // reserve before synchronous host ports, not merely before the first await
+    const assertCurrent = () => { if (this.op !== op || this.generation !== generation) throw new Error(`battle ${request.battleId} was aborted while its session was being created; the late session is not used`); };
+    try {
+      const game = this.ports.state.read(); assertCurrent();
+      op.facts.experimentalHeld = game.party.some(m => !!m.item);
+      if (!this.capabilities.allowExperimentalHeldItemBattle && game.party.some((m) => !!m.item)) throw new Error("held-item-battle-disabled: battle item write-back is incomplete");
+      const { content, dex } = this.ports.content(); assertCurrent();
+      const dangling = findDanglingReferences(game, content, dex); assertCurrent();
+      if (dangling.length) throw new Error("the save refers to content that no longer exists: " + dangling.slice(0, 3).map((d) => `${d.path} ${d.message}`).join("; "));
+      if (!game.party.some((m) => !m.isEgg && m.hp > 0)) throw new Error("no party member can battle");
+      const sourceRandom = this.ports.random;
+      if (!sourceRandom) throw new Error("no random source is configured for this application (needed to create the foes)");
+      const random = (n: number) => { assertCurrent(); const value = sourceRandom(n); assertCurrent(); return value; };
+      if (!request.foes.length) throw new Error("a battle needs at least one foe");
+      const templates: Record<string, Member> = {};
+      let ordinal = game.nextMemberOrdinal;
+      const taken = new Set(allMembers(game).map((m) => m.id));
+      const createdAt = Math.floor(this.now() / 1000); assertCurrent();
+      const creationContext = this.ports.creationContext?.() ?? {}; assertCurrent();
+      const foes: Member[] = request.foes.map((f, i) => {
+        const species = resolveSpecies(content, f.species);
+        if (!species) throw new Error(`foe ${i + 1}: species "${f.species}" is not in the content`);
+        const allocated = allocateMemberId(ordinal, taken); ordinal = allocated.nextMemberOrdinal; taken.add(allocated.id);
+        const m = createMember({ id: allocated.id, species, level: f.level, owner: game.player, context: { ...creationContext, receivedAt: createdAt, playerId: game.player.id } }, content, random);
+        if (!m.moves.length) throw new Error(`foe ${i + 1}: ${species} at level ${f.level} knows no move in the content (its learnset has nothing at or below that level)`);
+        templates[m.id] = toPersistentMember(m, content);
+        return toBattleMember(templates[m.id]!, content);
+      });
+      assertCurrent();
+      const context = this.newReceptionContext({ templates, decisions: {}, profile: request.forceParty ? { ...this.profile, mode: 2 } : this.profile, nextMemberOrdinal: ordinal });
+      const full = storageFull(game, this.limits);
+      const forcedNoRoom = context.profile?.mode === 2 && !Object.values(templates).every((member) => hasForcedPartyPlan(game, member, { limits: this.limits, content, profile: context.profile!, depositHeal: this.depositHeal }));
+      const diagnostics = [...(forcedNoRoom ? ["forced-party-no-target"] : []), ...(game.party.some((m) => !!m.item) ? ["战后持物写回未完成"] : [])];
+      const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full, ...(diagnostics.length ? { diagnostics } : {}), ...(game.party.some((m) => !!m.item) ? { experimentalHeldBattle: true } : {}) };
+      let mapId: number | undefined;
+      try { mapId = this.ports.itemWorld?.().mapId ?? creationContext.map; } catch { /* optional companion context unavailable */ }
+      assertCurrent(); // a swallowed optional-port failure must not swallow a timeline/owner replacement
+      setup.evidenceContext = {
+        battleId: request.battleId, generation, contentIdentity: validatedContentIdentity(content) ?? content.meta?.inputsHash ?? content.meta?.id ?? "anonymous-content",
+        playerIds: game.party.map(m => m.id), initialLevels: Object.fromEntries(game.party.map(m => [m.id, m.level])),
+        ...(Number.isSafeInteger(mapId) && mapId! >= 0 ? { mapId } : {}),
+      };
+      const view = battleView(game, content);
+      view.party = view.party.filter((m) => !m.isEgg); // the session speaks Showdown names (protocol v1); the save keeps content ids
+      assertCurrent();
+      const session = await this.ports.sessions.create(request, view, setup);
+      assertCurrent();
+      op.session = session;
+      if (typeof session === "object" && session !== null) {
+        this.bornIn.set(session, this.generation); this.battleContexts.set(session, context);
+        this.ownedBattleEffects.set(session, { battleId: request.battleId, generation, contentIdentity: validatedContentIdentity(content), context: {
+          playerIds: [...setup.evidenceContext.playerIds], L0: clone(setup.evidenceContext.initialLevels),
+          engineRosterIds: view.party.filter(m => !m.isEgg).slice(0, 6).map(m => m.id), foeIds: foes.map(m => m.id), internalBattle: true,
+        } });
+      }
+      return session;
+    } catch (error) { if (this.op === op) this.op = null; throw error; }
   }
 
   /**

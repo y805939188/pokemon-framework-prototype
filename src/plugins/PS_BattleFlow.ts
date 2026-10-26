@@ -42,6 +42,7 @@ import { developmentCapabilities } from "../framework/rules/config";
     abortBattle(request: unknown, error: unknown): BattleOutcomeView;
     commitResult(result: unknown, options?: unknown): string;
     readonly saveBlocked: boolean;
+    readonly stateGeneration: number;
     readonly encounterBlocked: boolean;
     readonly pendingPokedex: any;
     pokedexSnapshot(text?: any, currentRegion?: number | null): any;
@@ -72,6 +73,7 @@ import { developmentCapabilities } from "../framework/rules/config";
   }
 
   // ---------------------------------------------------------------- shared flow state / API
+  let openingBattle: object | null = null;
   const PSFlow: any = (W.PSFlow = {
     developerCapabilities: {}, // explicit developer/test injection only; never plugin settings or save data
     operationPending(): boolean { return PSFlow.running || !!PSFlow._app?.saveBlocked; },
@@ -167,6 +169,7 @@ import { developmentCapabilities } from "../framework/rules/config";
      * forgets it, so a late finish/abort/close of the old scene can neither close nor project into a later battle.
      */
     stateReplaced(): void {
+      openingBattle = null;
       if (PSFlow._app) PSFlow._app.stateReplacedByHost();
       PSFlow._receiveNoticeHistory.clear();PSFlow.lastReceivingNotice=null;
       const old = PSFlow._op;
@@ -457,17 +460,28 @@ import { developmentCapabilities } from "../framework/rules/config";
     },
     /** The single way a battle opens (StartBattle command and map encounters): the same application path, the same guards. */
     openBattle(request: any): void {
-      // The held-item guard precedes external data for a usable save. An unusable/missing save is diagnosed by
-      // begin() inside the scene's contained initialization path, rather than crashing the map interpreter here.
-      if(!G.$gameSystem._psSaveError&&G.$gameSystem._psGame)PSFlow.assertBattleAllowed();
       if (PSFlow.running) throw new Error("a battle is already running");
-      PSFlow._op = { request, session: null }; // this operation's identity: its scene and calls carry it (stateReplaced ends it)
-      PSFlow.request = request;
-      PSFlow.running = true;
-      PSFlow.lastOutcome = null; // saving is masked while running (Game_System.isSaveEnabled below; direct saves: PS_SaveState)
-      PSFlow.perf.cur = { battleId: request.battleId, t0: performance.now(), actions: [] as any[], encounter: !!request.encounter };
-      if (PSFlow.perf.encounterT0 !== undefined && request.encounter) { PSFlow.perf.cur.t0 = PSFlow.perf.encounterT0; }
-      G.SceneManager.push(W.Scene_PSBattle);
+      if (openingBattle || PSFlow.operationPending() || PSFlow._app?.encounterBlocked) throw new Error("operation-active");
+      const opening = {}, app = PSFlow._app, generation = app?.stateGeneration;
+      openingBattle = opening;
+      const assertCurrent = () => {
+        if (openingBattle !== opening || PSFlow._app !== app || app?.stateGeneration !== generation) throw new Error("stale-battle-opening");
+        if (PSFlow.operationPending() || PSFlow._app?.encounterBlocked) throw new Error("operation-active");
+      };
+      try {
+        // Preserve contained scene initialization for an unusable/missing save. A usable save retains the held gate.
+        if(!G.$gameSystem._psSaveError&&G.$gameSystem._psGame)PSFlow.assertBattleAllowed();
+        assertCurrent();
+        const started = performance.now(); assertCurrent();
+        PSFlow._op = { request, session: null };
+        PSFlow.request = request;
+        PSFlow.running = true;
+        PSFlow.lastOutcome = null;
+        PSFlow.perf.cur = { battleId: request.battleId, t0: started, actions: [] as any[], encounter: !!request.encounter };
+        if (PSFlow.perf.encounterT0 !== undefined && request.encounter) PSFlow.perf.cur.t0 = PSFlow.perf.encounterT0;
+        openingBattle = null; // running now owns the host save/input barrier
+        G.SceneManager.push(W.Scene_PSBattle);
+      } finally { if (openingBattle === opening) openingBattle = null; }
     },
     /** Player-facing entries contain a closed held-item gate; direct developer openBattle keeps its throwing contract. */
     tryOpenBattle(request: any): boolean {
