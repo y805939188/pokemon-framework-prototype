@@ -23,10 +23,13 @@ export interface EvolutionItemIntent { itemId: string; memberId: string; quantit
 export interface EventEvolutionIntent { event?: number; memberId?: string }
 export interface TriggeredMemberResult { memberId: string; matched: boolean; evolved: boolean; cancelled: boolean }
 export interface TriggeredResult {
+  /** A confirmed state installation occurred. Presentation failure must never report this as an unused item. */
+  primaryCommitted: boolean;
   matched: boolean; evolved: boolean; members: TriggeredMemberResult[]; diagnostics: string[]; item?: ItemResult;
 }
 export interface TriggeredEvolutionView {
   token: string; revision: number; kind: "item" | "event"; phase: "growth" | "evolution" | "failed";
+  intent?: EvolutionItemIntent; primaryCommitted: boolean; itemResult?: ItemResult;
   selection?: ItemPending; evolution?: EvolutionView; error?: string; reloadRequired?: boolean;
 }
 export type TriggeredEvolutionOutcome = { status: "pending"; view: TriggeredEvolutionView }
@@ -65,14 +68,15 @@ export class TriggeredEvolutionOperation {
   get view(): TriggeredEvolutionView | null {
     const op = this.operation; if (!op) return null;
     const evolution = this.options.evolutions.view;
-    return clone({ token: op.token, revision: op.revision, kind: op.kind, phase: op.error || evolution?.phase === "failed" ? "failed" : evolution ? "evolution" : "growth",
+    return clone({ token: op.token, revision: op.revision, kind: op.kind, primaryCommitted: op.primaryCommitted || !!op.selected && this.options.evolutions.selectedBodyCommitted,
+      ...(op.intent ? { intent: op.intent } : {}), ...(op.itemResult ? { itemResult: op.itemResult } : {}), phase: op.error || evolution?.phase === "failed" ? "failed" : evolution ? "evolution" : "growth",
       ...(op.selection ? { selection: op.selection } : {}), ...(evolution ? { evolution } : {}),
       ...(op.error || evolution?.error ? { error: op.error ?? evolution?.error, reloadRequired: op.reloadRequired || evolution?.reloadRequired } : {}) });
   }
   invalidate(): void { const op = this.operation; this.operation = null; this.receipts.clear(); this.receiptParent = ""; if (op) this.options.leave(op.parent); }
   private current(op: Operation): void { if (this.operation !== op || op.generation !== this.options.generation()) throw Error("stale-triggered-evolution"); }
   private pending(op: Operation): TriggeredEvolutionOutcome { this.current(op); return { status: "pending", view: this.view! }; }
-  private result(op: Operation): TriggeredResult { return clone({ matched: op.results.some(r => r.matched) || !!op.selected,
+  private result(op: Operation): TriggeredResult { return clone({ primaryCommitted: op.primaryCommitted, matched: op.results.some(r => r.matched) || !!op.selected,
     evolved: op.results.some(r => r.evolved), members: op.results, diagnostics: op.diagnostics, ...(op.itemResult ? { item: op.itemResult } : {}) }); }
   private finish(op: Operation, technical = false): TriggeredEvolutionOutcome {
     this.current(op); const outcome: TriggeredEvolutionOutcome = { status: technical ? "technically-terminated" : op.primaryCommitted ? "committed" : "unchanged", token: op.token, result: this.result(op) };
