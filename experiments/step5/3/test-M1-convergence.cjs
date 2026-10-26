@@ -3,6 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const E=require('../../../js/engine/build/engine.cjs'),sourceSha=fs.readFileSync(path.resolve(__dirname,'../../../js/engine/showdown/SOURCE_SHA'),'utf8').trim();
 const {actualDamage,unknownReadiness}=require('./fixtures/m1/convergence.cjs');
+for(const name of ['actualEscapeDamage','actualEscapeLevel'])test(`M1-SECOND-01 CX19 actual default session ${name} still scans with all-battles off`,async()=>{await require('./fixtures/m1/convergence.cjs')[name](E,sourceSha);});
 test('M1/P53-21,27,31,39,43 core: actual D62 survives primary capture/Info, grants known R and later event eligibility once',async()=>{const r=await actualDamage(E,sourceSha);assert.equal(r.damage,62);});
 test('M1/P53-21,27,31,39,43 core: missing authority keeps capture/Info and unknown R through deposit, withdraw and recovery',async()=>{const r=await unknownReadiness(E,sourceSha);assert.equal(r.calls,0);});
 

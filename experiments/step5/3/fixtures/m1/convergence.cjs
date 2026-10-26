@@ -3,20 +3,23 @@
 // The host injects only persistent state/install/checkpoint ports; no private engine access.
 const assert=require('node:assert/strict');
 const clone=x=>JSON.parse(JSON.stringify(x));
-function content(E,sourceSha){
+function content(E,sourceSha,options={}){
  const c=clone(E.fixtures.content),dex=E.dex.createDexLookup();
  for(const [id,sp]of Object.entries(c.species)){const d=dex.species(id);Object.assign(sp,{abilities:d.abilities,hiddenAbilities:d.hiddenAbilities,gender:d.gender});}
  c.moves={};for(const id of ['substitute','surgingstrikes','splash','tackle','rest','flamethrower','airslash','dragonpulse','roost','hydropump','icebeam','flashcannon','protect','gigadrain','sludgebomb','earthquake','synthesis']){const m=dex.move(id);c.moves[m.name]=m;}
  c.species.Charizard.learnset={1:['Substitute']};c.species.Charizard.evolutions=[{method:'EventAfterDamageTaken',parameter:7,target:'Blastoise'}];
  c.species.Blastoise.learnset={1:['Tackle']};c.species.Pidgey.learnset={1:['Splash']};c.species.Snorlax.learnset={1:['Surging Strikes']};
  c.settings={SHOW_NEW_SPECIES_POKEDEX_ENTRY_MORE_OFTEN:false};
+ if(options.afterAll!==undefined)c.settings.CHECK_EVOLUTION_AFTER_ALL_BATTLES=options.afterAll;
+ if(options.levelEscape){c.species.Charizard.learnset={1:['Flamethrower']};c.species.Charizard.evolutions=[{method:'Level',parameter:51,target:'Blastoise'}];}
  const inputsHash=E.digest.sha256Hex(E.contentCompile.canonicalJson(c)),compiledSemantics=E.contentSchema.COMPILED_SCHEMA_VERSION;
  c.meta={kind:'fixture',id:'M1-convergence',compiledSemantics,inputsHash,showdownSha:sourceSha,contentIdentity:E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics,inputsHash,showdownSha:sourceSha}))};return c;
 }
 function fixture(E,sourceSha,host={},options={}){
- const c=content(E,sourceSha),hero=E.memberFactory.createMember({id:'M1-ORIGINAL',species:'Charizard',level:100,nature:'hardy',gender:'M'},c,n=>n-1);
+ const c=content(E,sourceSha,options),level=options.levelEscape?50:100,hero=E.memberFactory.createMember({id:'M1-ORIGINAL',species:'Charizard',level,nature:'hardy',gender:'M'},c,n=>n-1);
  // Full IV31 player, zero EV. The ordinary opponent factory uses its own deterministic IV draws; this is not the old PX D68 fixture.
- hero.ivs={hp:31,atk:31,def:31,spa:31,spd:31,spe:31};hero.hp=E.growth.computeStats(c.species.Charizard.base,hero.ivs,hero.evs,100,hero.nature).hp;hero.friendship=99;
+ hero.ivs={hp:31,atk:31,def:31,spa:31,spd:31,spe:31};hero.hp=E.growth.computeStats(c.species.Charizard.base,hero.ivs,hero.evs,level,hero.nature).hp;hero.friendship=99;
+ if(options.levelEscape)hero.exp=E.growth.minExp(c.species.Charizard.growth,51)-1;
  const backup=E.memberFactory.createMember({id:'M1-BACKUP',species:'Venusaur',level:50},c,()=>0),initial=E.state.newGame({party:[hero,backup],bag:{masterball:2,potion:2},money:1000,content:c});
  initial.dex.hasDex=true;if(options.oldReady){Object.assign(initial.party[0],{readyToEvolve:true,evolutionReadiness:'known',hp:50});}
  const trusted=clone(c.meta);if(options.anonymous)delete c.meta;
@@ -59,4 +62,13 @@ async function unknownReadiness(E,sourceSha,host){
  assert.equal(w.app.recoverAll().status,'healed');assert.deepEqual([original(w).readyToEvolve,original(w).evolutionReadiness],[false,'known']);assert.equal(w.read().dex.capturedCounts.Pidgey,1);assert.equal(w.app.commitResult(raw),'already-applied');await w.checkpoint('unknown-R-ordinary-recovery',raw);
  return{kind:'real default capture/item; deliberately missing authority; Info/storage/recovery; no synthetic battle facts',calls:w.calls(),state:clone(w.read()),content:clone(w.c)};
 }
-module.exports={actualDamage,unknownReadiness};
+async function actualEscape(E,sourceSha,host,levelEscape){
+ const w=fixture(E,sourceSha,host,{afterAll:false,levelEscape}),request={battleId:levelEscape?'M1-escape-level':'M1-escape-D',kind:'wild',seq:1,foes:levelEscape?[{species:'Pidgey',level:5},{species:'Snorlax',level:5}]:[{species:'Snorlax',level:50}]},h=await w.app.startBattle(request);
+ assert.equal((await h.chooseMove(1)).ok,true);assert(!h.finished,'a normal opponent remains so the next action can really escape');
+ for(let n=0;n<4&&!h.finished;n++)assert.equal((await h.run()).ok,true);assert(h.finished);
+ const raw=h.result();assert.equal(raw.outcome.kind,'run');const done=w.app.finishBattle(h,request);assert.equal(done.commit,'applied');assert.equal(done.code,3);assert.equal(w.calls(),1);assert.equal(w.read().appliedBattles[raw.battleId].hash,E.state.resultHash(raw));assert.equal(w.read().party.length,2);assert.deepEqual(w.read().dex.capturedCounts,{});
+ if(levelEscape){assert.equal(original(w).level,51);const p=w.app.pendingEvolution;assert(p&&p.selection.family==='level');await host?.blocked?.('escaped-level-evolution');w.app.resolveEvolution(p.token,p.revision,{kind:'cancel'});}
+ else{const d=w.seals[0].observer.members[w.heroId].damage;assert.equal(d.status,'complete');assert.equal(d.value.total,62);assert.deepEqual([original(w).readyToEvolve,original(w).evolutionReadiness],[true,'known']);assert(!w.app.pendingEvolution);}
+ assert(!w.app.saveBlocked&&!w.app.pendingPokedex);const installed=clone(w.read());assert.equal(w.app.commitResult(raw),'already-applied');assert.deepEqual(w.read(),installed);assert.equal(w.calls(),1);await w.checkpoint(levelEscape?'escape-level':'escape-D',raw);return{kind:'actual default session normal escape with CHECK_EVOLUTION_AFTER_ALL_BATTLES=false',level:original(w).level,state:clone(w.read()),content:clone(w.c)};
+}
+module.exports={actualDamage,unknownReadiness,actualEscapeDamage:(E,s,h)=>actualEscape(E,s,h,false),actualEscapeLevel:(E,s,h)=>actualEscape(E,s,h,true)};

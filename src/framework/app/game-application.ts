@@ -1031,7 +1031,9 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         const config = resolveConfig(content.settings);
         next = this.evolutions.prepare({ token: context.token, generation: context.generation, context: prepared.expectedContext, effects: prepared.effects,
           eligibleHp, lateHeal: isDefeat(result) && facts?.canLose === false,
-          enabled: config.CHECK_EVOLUTION_AFTER_ALL_BATTLES || code === 1 || code === 2 }, next, content);
+          // WP32 T4: disabling all-endings excludes only normal loss/tie, not a successful escape.
+          // Technical aborts never reach this owned, validated result transaction.
+          enabled: config.CHECK_EVOLUTION_AFTER_ALL_BATTLES || !isDefeat(result) }, next, content);
       }
       if (prepared.effects.dispositions.some(d => d.status !== "complete") || composed.dispositions.some(d => d.status !== "applied")) prepared.diagnostics.push("部分战斗附加事实不可用，主战果保留");
       prepared.next = clone(next); prepared.nextIdentity = identity;
