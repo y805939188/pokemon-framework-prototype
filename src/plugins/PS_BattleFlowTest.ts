@@ -2170,7 +2170,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   }
 
   async function runPokedexUI() {
-    await toMap();W.PSFlow._content=null;W.PSFlow._app=null;fresh();const B=api(),originalContent=clone(W.PSFlow.content()),originalGame=clone(game()),cases:any[]=[];
+    await toMap();await toMapId(5,8,8);assert(W.PSPokedex?.open,'formal dex plugin loaded from current manifest bridge');W.PSFlow._content=null;W.PSFlow._app=null;fresh();const B=api(),originalContent=clone(W.PSFlow.content()),originalGame=clone(game()),cases:any[]=[];
     const current=()=>W.PSPokedex.current(),ready=async(kind:string)=>waitFor(()=>current()?.ready&&current().view.kind===kind,'dex UI '+kind),closed=async()=>{await waitFor(()=>!current()&&!G.SceneManager.isSceneChanging()&&!!scene()?._spriteset,'dex closed to map');await dismissMessages();};
     function fixture(hasDex=true){const content=clone(originalContent),state=clone(originalGame),a=state.party[0].species,b=state.party[1].species,c=state.party[2].species;
       content.regionalDex.regions=[{id:0,nameKey:'region.sample',species:[a,b,c]},{id:1,nameKey:'region.sample',species:[c]}];content.regionalDex.layoutIdentity=B.dexState.dexLayoutIdentity(content.regionalDex);
