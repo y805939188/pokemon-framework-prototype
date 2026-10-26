@@ -100,10 +100,25 @@ test('finite cells reject sparse/duplicate receipt data and do not execute calle
 });
 test('faint and reset completeness are separate; final HP cannot erase positive facts',async()=>{
   const {resolveBattleEffects,planBattleReadiness}=await moduleUnderTest;const input=fixture();
+  input.seal.observer.members.P1.faint=faintCell([faint('observer')]);
   input.seal.control.members.P1.faint={positiveOccurrences:[faint('control')],coverage:unavailable()};
   const r=resolveBattleEffects(input);const member={id:'P1',hp:10,readyToEvolve:true,evolutionReadiness:'unknown'};
   assert.deepEqual(planBattleReadiness({member,faint:r.faint.P1}),{readyToEvolve:false,evolutionReadiness:'known'});
   assert.deepEqual(planBattleReadiness({member,faint:r.faint.P1,damage:r.damage.P1,scan:{status:'complete',permitsNewReady:true}}),{readyToEvolve:true,evolutionReadiness:'known'});
+});
+test('a real hook omitted by complete observer faint coverage invalidates D reset proof and new R only',async()=>{
+  const {resolveBattleEffects,planBattleReadiness}=await moduleUnderTest;
+  for(const hasOtherHook of [false,true]){
+    const input=fixture();
+    if(hasOtherHook)input.seal.observer.members.P1.faint=faintCell([faint('observer','P1',{hookKey:'other-real-hook'})]);
+    input.seal.control.members.P1.faint=faintCell([faint('control')]);
+    const r=resolveBattleEffects(input);
+    assert.equal(r.damage.P1.status,'invalid');assert.equal(Object.hasOwn(r.damage.P1,'value'),false);
+    assert.equal(r.critical.P1.value,3);assert.equal(r.friendshipReplacements.P1,105);assert.equal(r.appearances.length,1);
+    assert.equal(r.damage.P2.status,'complete');assert.equal(r.faint.P1.positiveOccurrences.length,hasOtherHook?2:1);
+    assert.deepEqual(planBattleReadiness({member:{id:'P1',hp:10,readyToEvolve:false,evolutionReadiness:'known'},faint:r.faint.P1,damage:r.damage.P1,scan:{status:'complete',permitsNewReady:true}}),{readyToEvolve:false,evolutionReadiness:'known'});
+    assert.equal(r.dispositions.filter(d=>d.memberId==='P1'&&d.group==='damage').length,1);
+  }
 });
 test('R clear/unknown/no-new rules require complete D >=49, reset and actual scan permission',async()=>{
   const {planBattleReadiness}=await moduleUnderTest;const member={id:'P1',hp:10,readyToEvolve:true,evolutionReadiness:'known'};

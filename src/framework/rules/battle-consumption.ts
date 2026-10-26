@@ -173,8 +173,9 @@ function faint(value: unknown, id: string, source: EffectSource): FaintCellV2 {
 }
 function combineFaint(observer: FaintCellV2, control: FaintCellV2): ResolvedFaintV2 {
   // Hook keys are the actual cross-source association; equal ordinals carry no cross-source meaning.
-  if (observer.positiveOccurrences.length && control.coverage.status === "complete" && !control.positiveOccurrences.length) control.coverage = invalid("complete-zero-conflicts-with-real-hook");
-  if (control.positiveOccurrences.length && observer.coverage.status === "complete" && !observer.positiveOccurrences.length) observer.coverage = invalid("complete-zero-conflicts-with-real-hook");
+  const observerHooks = new Set(observer.positiveOccurrences.map(fact => fact.hookKey)), controlHooks = new Set(control.positiveOccurrences.map(fact => fact.hookKey));
+  if (control.coverage.status === "complete" && observer.positiveOccurrences.some(fact => !controlHooks.has(fact.hookKey))) control.coverage = invalid("complete-coverage-misses-real-hook");
+  if (observer.coverage.status === "complete" && control.positiveOccurrences.some(fact => !observerHooks.has(fact.hookKey))) observer.coverage = invalid("complete-coverage-misses-real-hook");
   const hooks = new Set<string>(), positiveOccurrences: FaintOccurrenceV2[] = [];
   for (const fact of [...observer.positiveOccurrences, ...control.positiveOccurrences]) if (!hooks.has(fact.hookKey)) { hooks.add(fact.hookKey); positiveOccurrences.push({ ...fact }); }
   const combined = observer.coverage.status === "complete" && control.coverage.status === "complete" ? { status: "complete" as const }
@@ -233,7 +234,7 @@ export function resolveBattleEffects(input: ResolveBattleEffectsInput): Resolved
     const observed = data(observerMembers, id), controlled = data(controlMembers, id);
     const k = cell(data(observed, "critical"), value => integer(value) ? value : null), d = cell(data(observed, "damage"), damage);
     setOwn(result.critical, id, k); setOwn(result.damage, id, d);
-    disposition(result, "observer", "critical", k, id); disposition(result, "observer", "damage", d, id);
+    disposition(result, "observer", "critical", k, id);
     const f = cell(data(controlled, "friendship"), value => friendship(value, before.get(id)));
     disposition(result, "control", "friendship", f, id);
     if (f.status === "complete") setOwn(result.friendshipReplacements, id, f.value.current);
@@ -251,6 +252,9 @@ export function resolveBattleEffects(input: ResolveBattleEffectsInput): Resolved
       if (pair[source].positiveOccurrences.some(fact => owners.get(fact.hookKey)!.size > 1)) pair[source] = { positiveOccurrences: pair[source].positiveOccurrences.filter(fact => owners.get(fact.hookKey)!.size === 1), coverage: invalid("faint-hook-identity-conflict") };
     }
     const resolved = combineFaint(pair.observer, pair.control); setOwn(result.faint, id, resolved);
+    // This observer claimed full reset coverage while omitting a proved actual faint. Do not rebuild its D from control.
+    if (resolved.sources.observer.coverage.reason === "complete-coverage-misses-real-hook" && result.damage[id]!.status === "complete") setOwn(result.damage, id, invalid("damage-faint-reset-coverage-conflict"));
+    disposition(result, "observer", "damage", result.damage[id]!, id);
     disposition(result, "observer", "faint", resolved.sources.observer.coverage, id); disposition(result, "control", "faint", resolved.sources.control.coverage, id);
   }
   return result;
