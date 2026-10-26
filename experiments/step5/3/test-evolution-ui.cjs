@@ -68,3 +68,8 @@ test('G2a repeated evolution move intents ask again after a confirmed give-up',(
 test('G2a empty-slot learning has installed-then-message feedback and holds the original battle host until ACK',async()=>{
  let closes=0;const op={request:{battleId:'postbattle-1'}},w=setup({entries:[{method:'Level',parameter:51,target:'Blastoise'}],targetMoves:['Gust'],edit:g=>{g.party[0].moves=g.party[0].moves.slice(0,1);},options:{flowOverrides:{close(){closes++;this.running=false;}}}});const f=w.G.PSFlow;f.running=true;f.request={battleId:'postbattle-1'};const resolve=f.resolveEvolution;f.resolveEvolution=(...args)=>{const out=resolve(...args);if(!w.app.pendingEvolution&&!w.app.pendingPokedex)f.close(1,op);return out;};await w.finish();w.G.PSEvolution.show();w.success();assert.equal(w.p().layer,'learned');assert(w.state.current().party[0].moves.some(m=>m.id==='gust'));assert(!w.app.saveBlocked);assert(w.G.PSFlow.operationPending());assert.equal(closes,0);assert(f.running);w.press('ok');w.ready();assert.equal(closes,1);assert(!f.running);assert.equal(w.p(),null);
 });
+
+test('G2a reconstructed class with no request reports safely; stale finished update cannot replace next scene',()=>{
+ const w=setup();let callback;w.G.$gameMessage.setChoices=()=>{};w.G.$gameMessage.setChoiceCallback=fn=>callback=fn;w.begin();w.ready();const old=w.manager._scene,C=old.constructor;old.terminate();w.manager._scene=new C();w.manager._scene.create();assert.equal(callback,undefined);w.tick();assert(!w.app.saveBlocked);
+ const x=setup(),r=x.begin();x.ready();const prior=x.manager._scene;prior.terminate();let pops=0;const pop=prior.popScene;prior.popScene=()=>pops++;x.manager.isSceneChanging=()=>true;prior.update();assert.equal(pops,0);prior.popScene=pop;assert(r.done);
+});

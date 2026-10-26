@@ -14,9 +14,9 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
  function retire(r:Request,reason:string){if(queued===r)queued=null;if(reserved===r)reserved=null;if(!r.done){r.done=true;r.result=reason;}}
  function retireOrphan(){const r=reserved??queued;if(!r||r.constructing)return;const m=G.SceneManager;if(r.done||r.application!==flow()._app||r.generation!==r.application.stateGeneration)retire(r,'stale');else if(r.scene&&'_nextScene'in m&&r.scene!==m._scene&&r.scene!==m._nextScene)retire(r,'scene-replaced');}
  const clock=()=>G.performance?.now?.()??Date.now();
- function reportFailure(error:unknown,r:Request){
+ function reportFailure(error:unknown,r:Request|null|undefined){
   try{G.$gameMessage.add(tr('failed',{reason:String(error)}));
-   if(G.$gameMessage.setChoices&&G.$gameMessage.setChoiceCallback){G.$gameMessage.setChoices([tr('retry'),tr('reload')],0,1);G.$gameMessage.setChoiceCallback((choice:number)=>{recoveryChoice={request:r,title:choice===1};});}
+   if(r&&G.$gameMessage.setChoices&&G.$gameMessage.setChoiceCallback){G.$gameMessage.setChoices([tr('retry'),tr('reload')],0,1);G.$gameMessage.setChoiceCallback((choice:number)=>{recoveryChoice={request:r,title:choice===1};});}
   }catch{console.error(NAME,error);}
  }
 
@@ -25,7 +25,7 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
   closed=false;ready=false;frame=0;latch=new InputLatch();timeline:EvolutionTimeline|null=null;selection:any=null;lesson:LearningScreen|null=null;
   layer='';key='';error='';cursor=0;backRequested=false;text:string[]=[];knownTokens=new Set<string>();moves=new Map<string,any>();savedBgm:any;audioCaptured=false;learned:string[]=[];deferredClose:{code:number;op:any}|null=null;
   constructor(readonly window:any,readonly request:Request,readonly finish:()=>void){}
-  valid(){return !this.closed&&!this.request.done&&this.request.application===flow()._app&&this.request.generation===this.request.application.stateGeneration;}
+  valid(){return active===this&&!this.closed&&!this.request.done&&this.request.application===flow()._app&&this.request.generation===this.request.application.stateGeneration;}
   views(){
    const a=this.request.application;if(!this.valid())return {e:null,d:null,t:null};
    const t=a.pendingTriggeredEvolution?.token===this.request.owner?a.pendingTriggeredEvolution:null;
@@ -124,7 +124,7 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
    }
   }
   stopOwned(){const v=this.views();if(v.d)this.dispatch('d',{kind:'technical-terminate'});else if(v.e)this.dispatch('e',{kind:'technical-terminate'});else if(v.t)this.dispatch('t',{kind:'technical-terminate'});}
-  close(result:string){if(this.closed)return;this.closed=true;this.request.done=true;this.request.result=result;if(active===this)active=null;if(this.audioCaptured&&this.savedBgm&&this.request.application===flow()._app&&this.request.generation===this.request.application.stateGeneration)try{G.AudioManager?.replayBgm?.(this.savedBgm);}catch(error){console.error(NAME,'music restore failed',error);}this.finish();if(this.deferredClose){const held=this.deferredClose;this.deferredClose=null;originalClose.call(flow(),held.code,held.op);}}
+  close(result:string){if(this.closed)return;const restore=this.valid();this.closed=true;this.request.done=true;this.request.result=result;if(active===this)active=null;if(restore&&this.audioCaptured&&this.savedBgm)try{G.AudioManager?.replayBgm?.(this.savedBgm);}catch(error){console.error(NAME,'music restore failed',error);}this.finish();if(this.deferredClose){const held=this.deferredClose;this.deferredClose=null;originalClose.call(flow(),held.code,held.op);}}
   dispose(){if(this.closed)return;if(this.valid())this.stopOwned();if(this.views().e||this.views().d||this.views().t)suppress(this.request);this.close('presentation-ended');}
  }
  function request(event?:Request['event']):Request|null{const application=app(),r=root(application);if(event&&(r||application.encounterBlocked))return null;if(!event&&!r)return null;return {application,generation:application.stateGeneration,owner:r?.owner??'',trigger:r?.trigger??!!event,...(flow().running&&flow().request?.battleId?{battleId:flow().request.battleId}:{}),done:false,...(event?{event}:{})};}
@@ -132,15 +132,16 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
  function Scene_PSEvolution(this:any){this.initialize(...(arguments as any));}
  const P=Scene_PSEvolution.prototype=Object.create(G.Scene_MenuBase.prototype);P.constructor=Scene_PSEvolution;
  P.initialize=function(){G.Scene_MenuBase.prototype.initialize.call(this);this._request=queued;if(this._request)this._request.scene=this;queued=null;};
- P.create=function(){G.Scene_MenuBase.prototype.create.call(this);const r:Request=this._request;try{
-  if(!r)throw Error('missing-evolution-request');const valid=()=>!r.done&&r.application===flow()._app&&r.generation===r.application.stateGeneration;
+ P.create=function(){let r:Request|null=this._request;try{
+  G.Scene_MenuBase.prototype.create.call(this);if(!r){r=request();this._request=r;}
+  if(!r)throw Error('missing-evolution-request');const owned=r;const valid=()=>!owned.done&&owned.application===flow()._app&&owned.generation===owned.application.stateGeneration;
   if(!valid()){r.done=true;this._finished=true;if(reserved===r)reserved=null;return;}
   this._window=new G.Window_Base(new G.Rectangle(0,0,G.Graphics.boxWidth,G.Graphics.boxHeight));this.addWindow(this._window);
   if(!valid()){r.done=true;this._finished=true;if(reserved===r)reserved=null;return;}
   if(r.event){const out=flow().beginEventEvolution(r.event);if(out.status==='refused')throw Error(out.reason);const selected=root(r.application);if(!selected){r.outcome=structuredClone(out);r.result='no-target';G.$gameMessage?.add(tr('noTarget'));r.done=true;this._finished=true;if(reserved===r)reserved=null;return;}r.owner=selected.owner;r.trigger=selected.trigger;}
   this._controller=new Controller(this._window,r,()=>{this._finished=true;});active=this._controller;if(reserved===r)reserved=null;this._controller.start();
  }catch(error){if(reserved===r)reserved=null;this._controller?.dispose();if(r){r.done=true;r.result=String(error);suppress(r);}this._failure=String(error);reportFailure(error,this._request);}};
- P.update=function(){G.Scene_MenuBase.prototype.update.call(this);if(this._finished||this._failure){this.popScene();return;}try{this._controller?.update();}catch(error){this._controller?.dispose();this._failure=String(error);reportFailure(error,this._request);}};
+ P.update=function(){if(G.SceneManager._scene!==this)return;G.Scene_MenuBase.prototype.update.call(this);if(this._finished||this._failure){if(!G.SceneManager.isSceneChanging())this.popScene();return;}try{this._controller?.update();}catch(error){this._controller?.dispose();this._failure=String(error);reportFailure(error,this._request);}};
  P.popScene=function(){if(this._controller&&!this._controller.closed){if(this._controller.ready)this._controller.backRequested=true;return;}G.Scene_MenuBase.prototype.popScene.call(this);};
  P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);if(this._controller)this._controller.dispose();else if(this._request)retire(this._request,'presentation-ended');};
  const ui:any=W.PSEvolution={automatic:true,show:()=>open(request()),event:(event=0,memberId?:string)=>open(request({event,...(memberId?{memberId}:{})})),current:()=>active&&!active.closed?{ready:active.ready,owner:active.request.owner,generation:active.request.generation,layer:active.layer,timeline:active.timeline?{phase:active.timeline.phase,successReady:active.timeline.successReady,picture:active.timeline.picture}:null,lesson:active.lesson?structuredClone(active.lesson.page):null,error:active.error,text:[...active.text]}:null};
@@ -149,7 +150,7 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
  const prior=G.SceneManager.updateScene;G.SceneManager.updateScene=function(...args:any[]){retireOrphan();const value=prior.apply(this,args);retireOrphan();const scene=this._scene;
   if(recoveryChoice&&!this.isSceneChanging()&&!G.$gameMessage?.isBusy?.()){
    const choice=recoveryChoice;recoveryChoice=null;const r=choice.request;
-   if(r.application===flow()._app&&r.generation===r.application.stateGeneration){
+   if(r&&r.application===flow()._app&&r.generation===r.application.stateGeneration){
     if(choice.title){this.goto(G.Scene_Title);return value;}
     const current=root(r.application);if(current?.owner===r.owner)open(request());else if(!r.owner&&r.event&&!current)open(request(r.event));else G.$gameMessage?.add(tr('ended'));
    }
