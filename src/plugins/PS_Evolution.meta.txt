@@ -5,6 +5,19 @@
  * @help
  * Placeholder art/audio. Normal battle evolutions open automatically after returning to the map.
  * The app owns cancellation permission and atomic writes. No workflow is saved.
+ * ScriptTrade takes the existing application's TradeIntent as JSON. If outgoingId is absent,
+ * the standard party selector is opened first. requestId identifies this logical operation.
+ * Formal trade animation and trade evolution cannot be cancelled; technical recovery is separate.
+ * @command ScriptTrade
+ * @text Script trade / 脚本交换
+ * @arg requestId
+ * @type string
+ * @default trade-demo
+ * @arg intent
+ * @type multiline_string
+ * @default {"incoming":{"species":"pidgey"},"foreignOwner":{"name":"NPC"}}
+ * @command ShowTrade
+ * @text Resume trade / 恢复交换
  * @command ShowEvolution
  * @text Resume evolution / 恢复进化流程
  * @command EventEvolution

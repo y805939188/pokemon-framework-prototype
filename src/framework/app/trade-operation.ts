@@ -45,6 +45,8 @@ interface Operation {
 }
 export interface TradeDraftView {
   token: string; revision: number; draftKey: string; source: "trade-draft";
+  intent: TradeIntent;
+  contentIdentity?: string;
   phase: Operation["phase"] | "failed"; outgoing: Member;
   incoming?: { source: "trade-draft"; draftKey: string; member: Member };
   dex?: GameState["dex"]; entry?: Entry; evolution?: NonNullable<EvolutionOperation["view"]>;
@@ -81,7 +83,7 @@ export class TradeOperation {
   get view(): TradeDraftView | null {
     const op = this.operation; if (!op?.before || op.index === undefined) return null;
     const member = op.draft?.party.find(value => value.id === op.incomingId), evolution = this.continuation;
-    return clone({ token: op.token, revision: op.revision, draftKey: op.token, source: "trade-draft", phase: op.error || evolution?.phase === "failed" ? "failed" : op.phase,
+    return clone({ token: op.token, revision: op.revision, draftKey: op.token, source: "trade-draft", intent: op.intent, contentIdentity: op.identity, phase: op.error || evolution?.phase === "failed" ? "failed" : op.phase,
       outgoing: op.before.party[op.index]!, ...(member ? { incoming: { source: "trade-draft", draftKey: op.token, member }, dex: op.draft!.dex } : {}),
       ...(op.entry ? { entry: op.entry } : {}), ...(evolution ? { evolution } : {}),
       ...(op.error || evolution?.error ? { error: op.error ?? evolution?.error, reloadRequired: op.reloadRequired || evolution?.reloadRequired } : {}) });
