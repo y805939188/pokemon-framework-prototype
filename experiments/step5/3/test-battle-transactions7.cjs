@@ -95,3 +95,10 @@ test('E2a a source callback that loads a new game cannot install or abort the ne
  const old=w.app.finishBattle(h,w.request);assert.equal(old.commit,'none');assert.equal(old.aborted,true);assert.deepEqual(w.state.current(),replacement);assert.equal(w.state.replaced.length,1);assert.equal(w.app.saveBlocked,true);assert.equal(w.projection.outcomes.length,0);
  const fresh=await newHandle;assert.equal(w.app.saveBlocked,true);w.app.abortBattle(w.request,Error('end isolated replacement fixture'));assert.equal(w.app.saveBlocked,false);assert.equal(w.app.finishBattle(h,w.request).commit,'none');assert.deepEqual(w.state.current(),replacement);assert(fresh);
 });
+test('E2a legal primary friendship outside the auxiliary domain survives complete ACK evidence and exact replay',async()=>{
+ for(const value of [256,Number.MAX_SAFE_INTEGER]){
+  const w=world({builder:({request,game})=>raw(request.battleId,{members:{[game.party[0].id]:{friendship:value}},money:7})}),h=await w.app.startBattle(w.request),r=h.result();
+  assert.equal(w.app.finishBattle(h,w.request).commit,'applied');assert.equal(w.state.current().party[0].friendship,value);assert.equal(w.sessions.calls,1);assert.equal(w.state.replaced.length,1);assert.deepEqual(E.saveSchema.validateGameContent(w.state.current(),w.content()),[]);
+  assert.equal(w.state.current().appliedBattles[r.battleId].hash,E.state.resultHash(r));const before=clone(w.state.current());assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied');assert.equal(w.state.replaced.length,1);assert.deepEqual(w.state.current(),before);
+ }
+});

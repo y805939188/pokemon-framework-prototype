@@ -69,7 +69,9 @@ export function composeBattleEffects(input: ComposeBattleEffectsInput): Composed
     const member = locateMember(state, id)?.member, replacement = own(effects.friendshipReplacements, id);
     if (!member || !locateMember(before, id)) { note("friendship", id, "invalid", "original-member-not-found"); continue; }
     const primaryFriendship = own(raw.members, id);
-    if (primaryFriendship && Object.hasOwn(primaryFriendship, "friendship") && friendshipValue(primaryFriendship.friendship)) {
+    // Primary was already validated under v1's nonnegative safe-integer contract. Its legal legacy values may
+    // exceed the auxiliary trigger domain (0..255); auxiliary evidence must never replace that main write.
+    if (primaryFriendship && Object.hasOwn(primaryFriendship, "friendship")) {
       note("friendship", id, "skipped", "legal-primary-friendship-wins"); continue;
     }
     if (!friendshipValue(replacement)) { note("friendship", id, "invalid", "friendship-out-of-range"); continue; }

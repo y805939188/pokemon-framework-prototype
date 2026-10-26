@@ -80,8 +80,10 @@ test('deposit healing alone cannot clear a previous R barrier when no real faint
   const r=f.compose({primary});assert.equal(f.T.locateMember(r.state,'P1').member.readyToEvolve,true);assert.equal(f.T.locateMember(r.state,'P1').member.evolutionReadiness,'unknown');
 });
 test('explicit legal raw friendship wins without changing another member replacement',async()=>{
-  const f=await fixture();f.raw.members.P1.friendship=130;const r=f.compose();assert.equal(r.state.party[0].friendship,130);assert.equal(r.state.party[1].friendship,105);
-  assert.ok(r.dispositions.some(d=>d.memberId==='P1'&&d.group==='friendship'&&d.reason==='legal-primary-friendship-wins'));
+  for(const value of [0,130,255,256,Number.MAX_SAFE_INTEGER]){
+    const f=await fixture();f.raw.members.P1.friendship=value;const r=f.compose();assert.equal(r.state.party[0].friendship,value);assert.equal(r.state.party[1].friendship,105);
+    assert.deepEqual(f.V.validateGame(r.state),[]);assert.ok(r.dispositions.some(d=>d.memberId==='P1'&&d.group==='friendship'&&d.reason==='legal-primary-friendship-wins'));
+  }
 });
 test('bad member friendship is local and a missing stable ID is diagnostic only',async()=>{
   const f=await fixture();const effects=f.E.resolveBattleEffects(f.source);effects.friendshipReplacements.P1=256;effects.friendshipReplacements.Missing=100;
