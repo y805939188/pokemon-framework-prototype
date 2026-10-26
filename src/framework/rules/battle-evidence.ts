@@ -5,15 +5,18 @@ export interface BattleActor {
 }
 export type EvidenceGroup = "identity" | "display" | "critical" | "damage" | "friendship";
 export interface EvidenceIssue { group: EvidenceGroup; memberId?: string; reason: string }
+/** Actual displayed object, normalized inside the battle adapter; never parsed from a public log. */
+export interface BattleDisplaySnapshot { battleSpecies: string; gender: 0 | 1 | 2; shiny: boolean }
 export type BattleObservation =
   | { kind: "hit"; domain: "body" | "substitute"; source: BattleActor | null; target: BattleActor; move: string; hit: number; loss: number; critical: boolean }
-  | { kind: "faint"; target: BattleActor; opponents: BattleActor[] }
+  | { kind: "faint"; target: BattleActor; opponents: BattleActor[]; hookKey?: string; display?: BattleDisplaySnapshot }
   | { kind: "item"; target: BattleActor; item: string }
-  | { kind: "appearance" | "display"; target: BattleActor; details: string }
+  | { kind: "appearance" | "display"; target: BattleActor; details: string; display?: BattleDisplaySnapshot }
   | { kind: "confusion"; target: BattleActor; loss: number };
 export interface ObservationBatch { records: BattleObservation[]; issues: EvidenceIssue[] }
 /** Internal adapter notifications before precise loss intervals have been resolved. Plain values only. */
-export type FormatObservation = BattleObservation
+export type FormatObservation = Exclude<BattleObservation, { kind: "faint" }>
+  | (Extract<BattleObservation, { kind: "faint" }> & { faintToken?: object })
   | { kind: "before-loss"; target: BattleActor; source: BattleActor | null; amount: number; effect: string; effectType: string }
   | { kind: "move-aborted"; target: BattleActor }
   | { kind: "healing"; target: BattleActor };

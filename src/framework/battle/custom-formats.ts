@@ -8,7 +8,7 @@
 import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules.ts";
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types.ts";
 import type { FormatObserver, FormatObservation } from "../rules/battle-evidence.ts";
-import type { BattleActor } from "../rules/battle-evidence.ts";
+import type { BattleActor, BattleDisplaySnapshot } from "../rules/battle-evidence.ts";
 
 interface Payload { kind: string; item?: string; target?: string; ball?: string; catchRate?: number; ctx?: Record<string, unknown> }
 
@@ -152,6 +152,14 @@ export const observers = new WeakMap<object, FormatObserver>();
 function actor(p: ShowdownPokemon): BattleActor {
   return { id: p.name, side: p.side.id, slot: p.position, level: p.level, hp: p.hp, active: !!p.isActive };
 }
+function display(p: ShowdownPokemon): BattleDisplaySnapshot | undefined {
+  const shown = p.illusion || p;
+  if (typeof shown.species?.name !== "string" || !shown.set || (shown.set.shiny !== undefined && typeof shown.set.shiny !== "boolean") || !["M", "F", ""].includes(shown.gender)) return undefined;
+  // Pinned Showdown getUpdatedDetails reads set.shiny (absence is false), and hides these two internal form names.
+  const battleSpecies = ["Greninja-Bond", "Rockruff-Dusk"].includes(shown.species.name) ? shown.species.baseSpecies : shown.species.name;
+  if (typeof battleSpecies !== "string") return undefined;
+  return { battleSpecies, gender: shown.gender === "M" ? 0 : shown.gender === "F" ? 1 : 2, shiny: !!shown.set.shiny };
+}
 function observe(b: ShowdownBattle, make: () => FormatObservation): void {
   const receiver = observers.get(b);
   if (!receiver) return;
@@ -177,16 +185,19 @@ const rpgHandlers = {
   onTryHeal(this: ShowdownBattle, _amount: number, target: ShowdownPokemon): void { observe(this, () => ({ kind: "healing", target: actor(target) })); },
   onSwitchInPriority: -100000,
   onSwitchIn(this: ShowdownBattle, target: ShowdownPokemon): void {
-    observe(this, () => ({ kind: "appearance", target: actor(target), details: String((target.illusion || target).details) }));
+    observe(this, () => ({ kind: "appearance", target: actor(target), details: String((target.illusion || target).details), display: display(target) }));
   },
   onUpdatePriority: -100000,
   onUpdate(this: ShowdownBattle, target: ShowdownPokemon): void {
-    if (target.isActive) observe(this, () => ({ kind: "display", target: actor(target), details: String((target.illusion || target).details) }));
+    if (target.isActive) observe(this, () => ({ kind: "display", target: actor(target), details: String((target.illusion || target).details), display: display(target) }));
   },
   onFaint(this: ShowdownBattle, pokemon: ShowdownPokemon): void {
-    observe(this, () => ({ kind: "faint", target: actor(pokemon), opponents: pokemon.side.foe.active.filter(Boolean).map(actor) }));
+    // One opaque token per actual hook invocation binds the two sources. It is resolved to a plain key in gateway,
+    // never persisted or sent through the public protocol; source ordinals alone do not prove this association.
+    const faintToken = {};
+    observe(this, () => ({ kind: "faint", target: actor(pokemon), opponents: pokemon.side.foe.active.filter(Boolean).map(actor), display: display(pokemon), faintToken }));
     const h = hooks.get(this);
-    if (h) h({ event: "faint", side: pokemon.side.id, id: pokemon.name });
+    if (h) h({ event: "faint", side: pokemon.side.id, id: pokemon.name, faintToken });
   },
   onBegin(this: ShowdownBattle): void {
     this.rpg = { pending: {}, attempts: {} };

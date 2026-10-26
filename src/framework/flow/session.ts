@@ -22,6 +22,8 @@ import type { Content, Member } from "../rules/types.ts";
 import type { BattleEvent, SessionMessage } from "../battle/protocol.ts";
 import type { LogLevel, LogSink } from "./log.ts";
 import { EvidenceRecorder } from "./battle-evidence.ts";
+import { BattleEffectsRecorder } from "./battle-effects.ts";
+import type { EffectsBindingV2, EffectsSealV2 } from "../rules/battle-consumption.ts";
 import { battleFriendshipValue } from "../rules/battle-evidence.ts";
 import type { BattleEvidenceContext, EvidenceBinding, BattleEvidence, FriendEvidence, BattleObservation } from "../rules/battle-evidence.ts";
 import { resolveConfig } from "../rules/config.ts";
@@ -51,6 +53,12 @@ export function sealBattleEvidence(session: BattleSession, binding: EvidenceBind
     if (sealed.issues.length < 128) sealed.issues.push({ group: "friendship", reason: "unpaired-faint-control" });
   }
   return sealed;
+}
+/** Internal factory companion, deliberately outside the frozen BattleSession prototype. */
+export function sealBattleEffects(session: BattleSession, binding: EffectsBindingV2): EffectsSealV2 | null {
+  if (!session.finished || session.broken || !session._effects) return null;
+  if (session._pendingFriendFaints.length) session._effects.controlFaintFailed("unpaired-faint-control");
+  return session._effects.seal(session.result(), binding, session._pendingFriendFaints.length ? session.party.map(m => m.id) : session._friendUnavailable);
 }
 
 const ITEM_IDS = new Set([...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS)]);
@@ -168,6 +176,7 @@ export class BattleSession {
   _staged = false;
   _broken: SessionBrokenError | null = null;
   _evidence: EvidenceRecorder | null = null;
+  _effects: BattleEffectsRecorder | null = null;
   _friendUnavailable: string[] = [];
   _pendingFriendFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
 
@@ -198,6 +207,7 @@ export class BattleSession {
     s._driver = driver;
     if (evidence) {
       s._evidence = new EvidenceRecorder(evidence, [...party, ...foe.team].map(m => m.id));
+      s._effects = new BattleEffectsRecorder({ battleId, generation: evidence.generation, contentIdentity: evidence.contentIdentity }, evidence, party, s.foeTeam);
       if (doubles) { s._evidence.issue("friendship", "doubles-friendship-not-supported"); s._friendUnavailable = party.map(m => m.id); }
     }
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
@@ -205,6 +215,7 @@ export class BattleSession {
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
       players: [{ name: "Player", team: lead.map((m) => toSet(m, moveName)) }, { name: foe.kind === "wild" ? "Wild" : "Trainer", team: s.foeTeam.map((m) => toSet(m, moveName)) }],
     });
+    s._effects?.startControl(!doubles && !!s.gw.drainFriendshipFaints && !!s.gw.validateFriendshipFaints && !!s.gw.applyFriendship && !!s.gw.checkpointFriendship && !!s.gw.restoreFriendship);
     await s.gw.choose("p1", "team " + lead.map((_, i) => i + 1).join(""));
     await s.gw.choose("p2", "team " + s.foeTeam.map((_, i) => i + 1).join(""));
     s.gw.seedState("p1", lead);
@@ -280,6 +291,7 @@ export class BattleSession {
         _friendUnavailable: this._friendUnavailable, _pendingFriendFaints: this._pendingFriendFaints,
       }),
       evidence: this._evidence?.snapshot(),
+      effects: this._effects?.snapshot(),
     };
   }
 
@@ -291,6 +303,7 @@ export class BattleSession {
     // JSON omits undefined properties, so explicitly clear these after a failed first assignment.
     this.requests = state.requests; this._result = state._result;
     if (checkpoint.evidence) this._evidence?.restore(checkpoint.evidence);
+    if (checkpoint.effects) this._effects?.restore(checkpoint.effects);
   }
 
   static defaultAi(request: Req): string {
@@ -512,6 +525,7 @@ export class BattleSession {
         this._pendingFriendFaints = [];
         this._friendUnavailable = [...this._evidence.value.context.playerIds];
         this._evidence.issue("friendship", "friendship-control-drain-failed");
+        this._effects?.controlFaintFailed("friendship-control-drain-failed");
       }
     }
     const messages: ReturnType<BattleDriver["drain"]> = [];
@@ -524,6 +538,12 @@ export class BattleSession {
         this._pendingFriendFaints = [];
         this._friendUnavailable = [...this._evidence.value.context.playerIds];
         this._evidence.issue("friendship", "faint-control-source-unavailable");
+        this._effects?.controlFaintFailed("faint-control-source-unavailable");
+      } else {
+        for (const fact of this._pendingFriendFaints) {
+          try { this._effects?.controlFaint(fact); }
+          catch { this._effects?.controlFaintFailed("control-faint-receipt-failed"); }
+        }
       }
     }
     // The complete batch was bound to private real identities before the first authoritative friend write.
@@ -544,15 +564,29 @@ export class BattleSession {
       this._pendingFriendFaints = [];
       this._friendUnavailable = [...this._evidence.value.context.playerIds];
       this._evidence.issue("friendship", "unpaired-faint-control");
+      this._effects?.controlFaintFailed("unpaired-faint-control");
     }
   }
 
   _ingestObservations(): void {
     if (!this._evidence) return;
+    let batch: ReturnType<NonNullable<BattleDriver["drainObservations"]>>;
     try {
-      if (!this.gw.drainObservations) { this._evidence.issue("identity", "driver-observations-unavailable"); return; }
-      this._evidence.record(this.gw.drainObservations());
-    } catch { this._evidence.issue("identity", "observation-ingest-failed"); }
+      if (!this.gw.drainObservations) {
+        this._evidence.issue("identity", "driver-observations-unavailable");
+        this._effects?.observerFailed("driver-observations-unavailable");
+        return;
+      }
+      batch = this.gw.drainObservations();
+    } catch {
+      this._evidence.issue("identity", "observation-ingest-failed");
+      this._effects?.observerFailed("observation-ingest-failed");
+      return;
+    }
+    try { this._effects?.observe(batch); }
+    catch { this._effects?.observerFailed("effects-observation-ingest-failed"); }
+    try { this._evidence.record(batch); }
+    catch { this._evidence.issue("identity", "observation-ingest-failed"); }
   }
 
   _changeBattleFriendship(id: string, method: FriendEvidence["changes"][number]["method"]): void {
@@ -578,6 +612,8 @@ export class BattleSession {
       this._friendUnavailable.push(id); recorder.issue("friendship", failure, id); return;
     }
     m.friendship = after;
+    try { this._effects?.friendshipReceipt(id, method, before, after); }
+    catch { this._effects?.friendshipFailed(id, "control-friendship-receipt-failed"); }
     // This is only the observation copy. Failure cannot undo legal control or suppress the next real trigger.
     try {
       let changes = own(recorder.value.friendship, id);
