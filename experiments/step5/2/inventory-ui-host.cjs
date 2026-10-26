@@ -32,7 +32,8 @@ function host(options={}){
  const pocket=n=>{ready();let tries=0;while(view()?.pocket!==n&&tries++<8)press('right');};
  const command=(name,args={})=>{const interpreter=new Base();commands['PS_Inventory:'+name].call(interpreter,args);return interpreter;};
  const dom=(kind,code)=>{for(const f of listeners[kind]??[])f({code,key:code==='Enter'?'Enter':code==='Escape'?'Escape':code,keyCode:code==='Enter'?13:code==='Escape'?27:0});};
- const pluginCommand=(plugin,name,args={})=>{const interpreter=new Base();commands[plugin+':'+name].call(interpreter,args);return interpreter;};
- return {...x,app,G,input,pluginCommand,drawCalls,manager,listeners,events,messages,vars,tick,press,ready,view,choose,managementChoose,pocket,command,dom,setDrawFault(f){drawFault=f;},get destroyed(){return destroyed;}};
+ const callCommand=(interpreter,plugin,name,args={})=>commands[plugin+':'+name].call(interpreter,args);
+ const pluginCommand=(plugin,name,args={})=>{const interpreter=new Base();callCommand(interpreter,plugin,name,args);return interpreter;};
+ return {...x,app,G,input,pluginCommand,callCommand,drawCalls,manager,listeners,events,messages,vars,tick,press,ready,view,choose,managementChoose,pocket,command,dom,setDrawFault(f){drawFault=f;},get destroyed(){return destroyed;}};
 }
 module.exports={host,build,disposeBuild,E,clone};
