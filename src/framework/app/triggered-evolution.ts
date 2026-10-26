@@ -39,7 +39,7 @@ interface Operation {
   intent?: EvolutionItemIntent; event?: number; ids: string[]; cursor: number; identity?: string;
   before?: GameState; world?: ItemWorldContext; answers: LearningAnswer[]; selection?: ItemPending;
   pendingWrite?: { before: GameState; next: GameState; activate: boolean };
-  selected?: { memberId: string; token: string };
+  selected?: { memberId: string; token: string; before: GameState };
   primaryCommitted: boolean; results: TriggeredMemberResult[]; diagnostics: string[]; itemResult?: ItemResult;
   retired?: string; error?: string; reloadRequired: boolean;
 }
@@ -131,10 +131,10 @@ export class TriggeredEvolutionOperation {
     if (op && this.operation === op) { this.options.evolutions.cancelPrepared(op.selected?.token ?? op.token); this.operation = null; this.options.leave(op.parent); }
     return { status: "refused", reason: message(error) };
   }
-  private fresh(op: Operation): Content {
+  private fresh(op: Operation, expected = op.before): Content {
     if (op.parent && !this.options.ownsParent(op.parent)) { op.retired = "stale-inventory-parent"; throw Error(op.retired); }
     const content = this.content(op), state = clone(this.options.state.read()); this.current(op);
-    if (hash(state) !== hash(op.before)) { op.retired = "stale-triggered-target-or-resources"; throw Error(op.retired); }
+    if (hash(state) !== hash(expected)) { op.retired = "stale-triggered-target-or-resources"; throw Error(op.retired); }
     const world = this.options.world(); this.current(op);
     if (hash(world) !== hash(op.world)) { op.retired = "triggered-item-world-changed"; throw Error(op.retired); }
     return this.content(op);
@@ -147,7 +147,7 @@ export class TriggeredEvolutionOperation {
     this.current(op); this.content(op);
     const token = `${op.token}:target:${op.cursor}`;
     this.options.evolutions.prepareSelected({ token, generation: op.generation, selected: true, ...(cost ? { cost } : {}) }, selection, content);
-    op.selected = { memberId: selection.memberId, token };
+    op.selected = { memberId: selection.memberId, token, before: clone(state) };
     return true;
   }
   private check(op: Operation, state: GameState, member: Member, trigger: Parameters<typeof scanEvolution>[0]["trigger"], content: Content): EvolutionCheckResult {
@@ -207,7 +207,7 @@ export class TriggeredEvolutionOperation {
     const actual = clone(this.options.state.read()); this.current(op);
     if (hash(actual) === hash(pending.next)) return this.installed(op);
     if (hash(actual) !== hash(pending.before)) { op.retired = "triggered-install-indeterminate"; op.reloadRequired = true; throw Error(op.retired); }
-    const content = this.content(op), errors = validateGameContent(pending.next, content); if (errors.length) throw Error(`invalid-triggered-next:${errors[0]!.path}`);
+    const content = this.fresh(op), errors = validateGameContent(pending.next, content); if (errors.length) throw Error(`invalid-triggered-next:${errors[0]!.path}`);
     let failure: unknown;
     try { this.options.state.replace(clone(pending.next)); } catch (error) { failure = error; }
     let after: GameState;
@@ -255,7 +255,11 @@ export class TriggeredEvolutionOperation {
     catch (error) { return this.failure(op, error); } finally { this.resolving = false; }
   }
   private resolveContinuationInner(op: Operation, revision: number, decision: EvolutionDecision): TriggeredEvolutionOutcome {
-    if (decision.kind !== "technical-terminate") this.content(op);
+    if (decision.kind !== "technical-terminate") {
+      // Until the selected body is committed, authority still belongs to the exact state/world that selected it.
+      if (!this.options.evolutions.selectedBodyCommitted) this.fresh(op, op.selected!.before);
+      else this.content(op);
+    }
     const result = this.options.evolutions.resolve(op.selected!.token, revision, decision); this.current(op);
     if (result.status === "refused") return result;
     op.revision++; if (result.status === "pending") { op.error = undefined; return this.pending(op); }

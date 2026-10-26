@@ -93,6 +93,7 @@ export class EvolutionOperation {
     return prefix.state;
   }
   /** Reserve before the action installs its growth/entry cost; activation occurs only after that write is proved. */
+  get selectedBodyCommitted(): boolean { return this.operation?.progress?.evolved === true; }
   prepareSelected(seed: SelectedEvolutionSeed, selection: EvolutionSelection, content: Content): void {
     if (this.operation) throw new Error("evolution-operation-active");
     const key = validatedContentIdentity(content); if (!key) throw new Error("evolution-content-identity-unavailable");
