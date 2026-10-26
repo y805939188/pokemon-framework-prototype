@@ -337,6 +337,18 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const info = dexInfo(snapshot.dex, snapshot.catalog, species, dexEntryNumber(snapshot.dex, snapshot.catalog.layout, species, "brief", config.DEXES_WITH_OFFSETS));
     return info ? { ...info, measurements: info.heightDm === null || info.weightHg === null ? null : dexMeasurements(info.heightDm, info.weightHg, locale, "info") } : null;
   }
+  /** Read-only entry from this exact trade draft. Never reads its incoming member from the real party. */
+  describeTradeEntry(token: string, revision: number, locale = "en", text: Readonly<Record<string, string>> = {}) {
+    const generation = this.generation, view = this.trade.view;
+    if (!view || view.token !== token || view.revision !== revision || !view.dex || !view.entry) return null;
+    const content = clone(this.ports.content().content);
+    if (validatedContentIdentity(content) !== view.contentIdentity) throw Error("stale-trade-entry-content");
+    const catalog = createDexQueryCatalog(content, text), config = resolveConfig(content.settings);
+    const info = dexInfo(view.dex, catalog, view.entry.species, dexEntryNumber(view.dex, catalog.layout, view.entry.species, "brief", config.DEXES_WITH_OFFSETS));
+    const current = this.trade.view;
+    if (generation !== this.generation || current?.token !== token || current.revision !== revision) throw Error("stale-trade-entry-query");
+    return info ? { ...info, measurements: info.heightDm === null || info.weightHg === null ? null : dexMeasurements(info.heightDm, info.weightHg, locale, "info") } : null;
+  }
   resolvePokedex(token: string, revision: number, decision: DexDecision) {
     const generation = this.generation, before = this.pokedex.view, outcome = this.pokedex.resolve(token, revision, decision);
     if (generation !== this.generation) return { status: "refused" as const, reason: "stale-pokedex-operation" };

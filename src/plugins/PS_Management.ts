@@ -78,6 +78,11 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
   refresh(){this.snapshot=this.reception&&app().pendingReceiving?.token===this.reception.token?app().previewReceiving(this.reception.token,this.decisions,this.receiveIndex):app().managementSnapshot(this.readonly?undefined:this.managementToken);for(const view of this.stack)if(view.kind==='party'&&view.cursor!==6&&view.cursor>=this.snapshot.party.length)view.cursor=this.snapshot.party.length?this.snapshot.party.length-1:6;this.draw();}
   managementToken='';
   start(win:any){
+   const manager=G.SceneManager;
+   // Window/attachment hooks may have loaded another game or queued a replacement after construction.
+   // Do not acquire a token from that new game on behalf of this old presenter.
+   if(this.closed||this.application!==flow()._app||this.generation!==this.application.stateGeneration||
+    ('_scene'in manager&&manager._scene!==this.scene)||manager._nextScene&&manager._nextScene!==this.scene){this.closed=true;this.scene._invalid=true;return;}
    this.window=win;this.started=false;current=this;
    for(const key of keyboardKeys.values())this.physical.add(key);
    document.addEventListener('keydown',this.onKeyDown);document.addEventListener('keyup',this.onKeyUp);
