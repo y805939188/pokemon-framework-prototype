@@ -63,3 +63,56 @@ for(const party of [false,true])test(`SOL-FINAL-01 abandoned ${party?'party':'ba
 test('SOL-FINAL-01 old recovery cleanup cannot release a replacement inventory owner',()=>{
  let unread=false;const w=setup({entries:[{method:'Item',parameter:'ui-stone',target:'Blastoise'}],port:s=>({read:()=>{if(unread)throw Error('readback');return s.read();},replace:n=>{s.replace(n);unread=true;}})}),h=w.use('ui-stone');w.ready();w.success();const owner=w.app.pendingTriggeredEvolution.token,generation=w.app.stateGeneration;w.manager.goto(w.G.Scene_Map);w.ready();assert(h.done&&w.app.saveBlocked);unread=false;w.app.stateReplacedByHost();const successor=w.app.beginInventoryOperation('item');w.G.PSInventory.acknowledgeRecoveredItem(w.app,generation,owner);assert(w.app.saveBlocked);assert.equal(w.app.endInventoryOperation(successor).status,'unchanged');assert(!w.app.encounterBlocked);
 });
+
+function openAttached(w,parent,done){
+ if(parent==='use')return w.use('ui-stone',1,w.id,done);
+ if(parent==='party'){assert(w.G.PSManagement.openParty());w.ready();w.press('ok');w.managementChoose('item');w.managementChoose('use');}
+ else assert(w.G.PSInventory.showBag(done));
+ w.ready();const token=w.view().token,groups=w.app.inventorySnapshot(token).pockets,pocket=groups.findIndex(rows=>rows.some(r=>r.item.id==='ui-stone'));
+ assert(pocket>=0);w.pocket(pocket+1);const rows=w.app.inventorySnapshot(token).pockets[pocket],index=rows.findIndex(r=>r.item.id==='ui-stone');assert(index>=0);
+ for(let n=0;w.view().view.cursor!==index&&n<30;n++)w.press('down');assert.equal(w.view().view.cursor,index);w.press('ok');w.choose('use');if(parent!=='party')w.choose(w.id);w.ready();
+ return null;
+}
+function recovery({parent='use',install=true,partial=false}={}){
+ let unread=false,armed=false,writes=0,done=0;
+ const w=setup({entries:[{method:'Item',parameter:'ui-stone',target:'Blastoise'}],port:s=>({read:()=>{if(unread)throw Error('independent-finite-readback');return s.read();},replace:n=>{if(armed){writes++;if(install){const next=clone(n);if(partial)next.money++;s.replace(next);}unread=true;}else s.replace(n);}})}),h=openAttached(w,parent,()=>done++);
+ w.ready();const inventory=w.view().token,management=w.manager._scene._controller?.managementToken??'',application=w.G.PSFlow.app(),generation=w.app.stateGeneration;
+ armed=true;w.success();assert.equal(w.p().layer,'recovery');assert.equal(writes,1);const owner=w.app.pendingTriggeredEvolution.token;
+ return {w,h,inventory,management,application,generation,owner,get writes(){return writes;},get done(){return done;},readable(){unread=false;}};
+}
+function reopen(r){const i=r.w.pluginCommand('PS_Evolution','ShowEvolution');assert.equal(i._waitMode,'psEvolutionUI');r.w.ready();assert.equal(r.w.p().layer,'recovery');return i;}
+function abandon(r){r.w.manager.goto(r.w.G.Scene_Map);r.w.ready();assert(r.w.app.saveBlocked&&r.w.app.encounterBlocked);assert.equal(r.w.G.PSInventory.current(),null);assert.equal(r.w.G.PSManagement.current(),null);}
+function ack(w,i){assert.equal(w.p().layer,'item-result');assert(w.G.PSFlow.operationPending());assert(w.app.encounterBlocked);w.press('ok');w.ready();assert.equal(i.updateWaitMode(),false);}
+
+for(const parent of ['use','bag','party'])test(`SOL-FINAL-01/R3 retry ${parent}: successful retry holds until final ACK; duplicate ACK cannot touch same-generation successor`,()=>{
+ const r=recovery({parent});abandon(r);const oldDone=r.done;r.readable();const i=reopen(r);r.w.press('ok');r.w.ready();assert.equal(r.w.p().layer,'item-result');assert(!r.w.app.pendingTriggeredEvolution);assert(!r.w.app.pendingEvolution);assert(r.w.app.encounterBlocked);ack(r.w,i);
+ assert.equal(i._psEvolutionOutcome.status,'committed');assert.equal(r.w.app.encounterBlocked,false);assert.equal(r.w.app.saveBlocked,false);assert.equal(r.w.G.PSInventory.current(),null);assert.equal(r.w.G.PSEvolution.current(),null);assert.equal(r.w.count('ui-stone'),2);assert.equal(r.w.state.current().stats.evolution_count,1);assert.equal(r.w.state.current().stats.evolutions_cancelled,0);assert.equal(r.writes,1);assert.equal(r.done,oldDone);
+ if(r.inventory)assert.equal(r.w.app.endInventoryOperation(r.inventory).reason,'stale-operation');if(r.management)assert.equal(r.w.app.endManagement(r.management).reason,'stale-operation');
+ const next=r.w.app.beginInventoryOperation('item');for(let n=0;n<3;n++)r.w.G.PSInventory.acknowledgeRecoveredItem(r.application,r.generation,r.owner);assert(r.w.app.saveBlocked&&r.w.app.encounterBlocked);assert.equal(r.w.app.endInventoryOperation(next).status,'unchanged');assert(!r.w.app.encounterBlocked);assert.equal(r.done,oldDone);assert.equal(r.writes,1);
+});
+test('SOL-FINAL-01/R3 partial partial remains guarded through formal Retry and Terminate, ACK helper cannot release pending owner',()=>{
+ const r=recovery({partial:true});abandon(r);r.readable();const i=reopen(r);const before=clone(r.w.state.current());r.w.press('ok');r.w.ready();assert.equal(r.w.p().layer,'recovery');r.w.press('down');r.w.press('ok');r.w.ready();assert.equal(r.w.p().layer,'recovery');
+ r.w.G.PSInventory.acknowledgeRecoveredItem(r.application,r.generation,r.owner);assert(r.w.app.pendingTriggeredEvolution);assert(r.w.app.pendingEvolution);assert(r.w.app.saveBlocked&&r.w.app.encounterBlocked);assert.deepEqual(r.w.state.current(),before);assert.equal(r.writes,1);assert.equal(r.done,1);assert.equal(i.updateWaitMode(),true);r.w.app.stateReplacedByHost();r.w.manager.goto(r.w.G.Scene_Map);r.w.ready();assert(!r.w.app.saveBlocked);
+});
+test('SOL-FINAL-01/R3 unreadable unreadable installation remains guarded through formal Retry and Terminate; no additional body or callback',()=>{
+ const r=recovery();abandon(r);const i=reopen(r);r.w.press('ok');r.w.ready();assert.equal(r.w.p().layer,'recovery');r.w.press('down');r.w.press('ok');r.w.ready();assert.equal(r.w.p().layer,'recovery');assert(r.w.app.saveBlocked&&r.w.app.encounterBlocked);assert.equal(r.writes,1);assert.equal(r.done,1);assert.equal(i.updateWaitMode(),true);r.readable();r.w.app.stateReplacedByHost();r.w.manager.goto(r.w.G.Scene_Map);r.w.ready();assert(!r.w.app.saveBlocked);
+});
+test('SOL-FINAL-01/R3 replacement state replacement at recovered item feedback protects successor inventory and drops stale UI completion',()=>{
+ const r=recovery();abandon(r);r.readable();const i=reopen(r);r.w.press('ok');r.w.ready();assert.equal(r.w.p().layer,'item-result');r.w.app.stateReplacedByHost();const next=r.w.app.beginInventoryOperation('item');r.w.press('ok');r.w.ready();assert.equal(i.updateWaitMode(),false);assert.equal(i._psEvolutionOutcome,undefined);r.w.G.PSInventory.acknowledgeRecoveredItem(r.application,r.generation,r.owner);assert(r.w.app.saveBlocked&&r.w.app.encounterBlocked);assert.equal(r.w.app.endInventoryOperation(next).status,'unchanged');assert(!r.w.app.encounterBlocked);assert.equal(r.done,1);assert.equal(r.writes,1);
+});
+for(const parent of ['bag','party'])test(`SOL-FINAL-01/R3 live live ${parent}: completed child ACK keeps original parent usable and preserves normal save policy`,()=>{
+ let unread=false,armed=false,writes=0;const w=setup({entries:[{method:'Item',parameter:'ui-stone',target:'Blastoise'}],port:s=>({read:()=>{if(unread)throw Error('live readback');return s.read();},replace:n=>{s.replace(n);if(armed){writes++;unread=true;}}})});openAttached(w,parent);const token=w.view().token;armed=true;w.success();assert.equal(w.p().layer,'recovery');unread=false;w.press('ok');w.ready();assert.equal(w.p().layer,'item-result');w.press('ok');w.ready();assert.equal(w.p(),null);assert.equal(w.view().view.kind,'bag');assert.equal(w.view().token,token);assert(w.app.inventorySnapshot(token));assert(w.app.encounterBlocked);assert.equal(w.app.saveBlocked,parent==='party');assert.equal(writes,1);assert.equal(w.count('ui-stone'),2);
+ w.press('cancel');w.ready();assert.equal(w.G.PSInventory.current(),null);if(parent==='party'){assert(w.G.PSManagement.current());assert(w.app.encounterBlocked);assert(!w.app.saveBlocked);w.press('cancel');w.ready();}assert(!w.app.encounterBlocked);assert(!w.app.saveBlocked);
+});
+
+for(const parent of ['use','bag','party'])for(const install of [false,true])test(`SOL-FINAL-01/R3 ${parent} Terminate proven ${install?'next':'before'} ends dead parents only after ACK`,()=>{
+ const r=recovery({parent,install});abandon(r);const callbacks=r.done;r.readable();const i=reopen(r);r.w.press('down');r.w.press('ok');r.w.ready();assert.equal(r.w.p().layer,'item-result');assert(!r.w.app.pendingTriggeredEvolution&&!r.w.app.pendingEvolution);ack(r.w,i);assert.equal(i._psEvolutionOutcome.status,'technically-terminated');assert.equal(i._psEvolutionOutcome.result.primaryCommitted,install);assert.equal(r.w.app.saveBlocked,false);assert.equal(r.w.app.encounterBlocked,false);assert.equal(r.writes,1);assert.equal(r.done,callbacks);assert.equal(r.w.count('ui-stone'),install?2:3);assert.equal(r.w.state.current().party[0].species,install?'Blastoise':'Charizard');const successor=r.w.app.beginInventoryOperation('item');r.w.G.PSInventory.acknowledgeRecoveredItem(r.application,r.generation,r.owner);assert(r.w.app.saveBlocked);assert.equal(r.w.app.endInventoryOperation(successor).status,'unchanged');
+});
+for(const phase of ['readable-recovery','retry-result','terminate-result'])test(`SOL-FINAL-01/R3 second presentation exit at ${phase} keeps a reopenable ACK barrier`,()=>{
+ const r=recovery();abandon(r);r.readable();const old=reopen(r);
+ if(phase!=='readable-recovery'){if(phase==='terminate-result')r.w.press('down');r.w.press('ok');r.w.ready();assert.equal(r.w.p().layer,'item-result');}
+ r.w.manager.goto(r.w.G.Scene_Map);r.w.ready();assert(!old.updateWaitMode());assert(r.w.app.encounterBlocked&&r.w.G.PSFlow.operationPending(),'unacknowledged dead parent remains blocked');const i=r.w.pluginCommand('PS_Evolution','ShowEvolution');r.w.ready();assert.equal(r.w.p()?.layer,'item-result','safe terminal feedback can reopen without redoing domain work');ack(r.w,i);assert(!r.w.app.encounterBlocked&&!r.w.app.saveBlocked);assert.equal(r.writes,1);assert.equal(r.done,1);assert.equal(r.w.count('ui-stone'),2);
+});
+test('SOL-FINAL-01/R3 retained terminal feedback never crosses generation or releases a successor',()=>{
+ const r=recovery();abandon(r);r.readable();const old=reopen(r);r.w.press('down');r.w.press('ok');r.w.ready();r.w.manager.goto(r.w.G.Scene_Map);r.w.ready();assert(!old.updateWaitMode());assert(r.w.G.PSFlow.operationPending());r.w.app.stateReplacedByHost();const successor=r.w.app.beginInventoryOperation('item');assert.equal(r.w.G.PSEvolution.show(),null);r.w.G.PSInventory.acknowledgeRecoveredItem(r.application,r.generation,r.owner);assert(r.w.app.saveBlocked&&r.w.app.encounterBlocked);assert.equal(r.w.app.endInventoryOperation(successor).status,'unchanged');assert(!r.w.G.PSFlow.operationPending());assert.equal(r.writes,1);assert.equal(r.done,1);
+});

@@ -13,11 +13,11 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
  const G:any=globalThis,W:any=window,NAME='PS_Evolution',flow=()=>W.PSFlow,app=()=>flow().app();
  const tr=(key:string,p?:Record<string,string|number>)=>flow().translator().t('evolution.'+key,p);
  type Request={scene?:any;constructing?:boolean;application:any;generation:number;owner:string;trigger:boolean;battleId?:string;done:boolean;result?:string;outcome?:any;event?:{event:number;memberId?:string};item?:EvolutionItemIntent;trade?:true|{requestId:string;intent:any};selectorStage?:'selecting'|'ready';selectorScene?:any};
- let queued:Request|null=null,reserved:Request|null=null,active:Controller|null=null,recoveryChoice:{request:Request;title:boolean}|null=null;
+ let queued:Request|null=null,reserved:Request|null=null,active:Controller|null=null,feedbackRecovery:Request|null=null,recoveryChoice:{request:Request;title:boolean}|null=null;
  const waits=new WeakMap<object,Request>(),outcomes=new WeakMap<object,any>(),tradeOutcomes=new WeakMap<object,{request:Request;outcome:any}>(),tradeRequests=new WeakMap<object,Request>(),suppressed=new Set<string>();
  const suppress=(r:Request)=>{suppressed.add(r.generation+':'+r.owner);if(suppressed.size>32)suppressed.delete(suppressed.values().next().value!);};
  function retire(r:Request,reason:string){if(queued===r)queued=null;if(reserved===r)reserved=null;if(!r.done){r.done=true;r.result=reason;}}
- function retireOrphan(){const r=reserved??queued;if(!r||r.constructing)return;const m=G.SceneManager;if(r.done||r.application!==flow()._app||r.generation!==r.application.stateGeneration)retire(r,'stale');else if(r.selectorStage==='selecting'&&r.selectorScene&&r.selectorScene!==m._scene&&r.selectorScene!==m._nextScene)retire(r,'selector-ended');else if(r.scene&&'_nextScene'in m&&r.scene!==m._scene&&r.scene!==m._nextScene)retire(r,'scene-replaced');}
+ function retireOrphan(){if(feedbackRecovery&&!abandonedItem(feedbackRecovery))feedbackRecovery=null;const r=reserved??queued;if(!r||r.constructing)return;const m=G.SceneManager;if(r.done||r.application!==flow()._app||r.generation!==r.application.stateGeneration)retire(r,'stale');else if(r.selectorStage==='selecting'&&r.selectorScene&&r.selectorScene!==m._scene&&r.selectorScene!==m._nextScene)retire(r,'selector-ended');else if(r.scene&&'_nextScene'in m&&r.scene!==m._scene&&r.scene!==m._nextScene)retire(r,'scene-replaced');}
  const clock=()=>G.performance?.now?.()??Date.now();
  function reportFailure(error:unknown,r:Request|null|undefined){
   try{G.$gameMessage.add(tr('failed',{reason:String(error)}));
@@ -26,6 +26,10 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
  }
 
  const root=(a:any)=>a.pendingTrade?null:a.pendingTriggeredEvolution?{owner:a.pendingTriggeredEvolution.token,trigger:true}:a.pendingPokedex?.parentToken?{owner:a.pendingPokedex.parentToken,trigger:false}:a.pendingEvolution?{owner:a.pendingEvolution.token,trigger:false}:null;
+ const terminalItem=(r:Request)=>!!r.item&&r.outcome?.token===r.owner&&['committed','unchanged','technically-terminated'].includes(r.outcome?.status);
+ const abandonedItem=(r:Request)=>r.application===flow()._app&&r.generation===r.application.stateGeneration&&W.PSInventory?.hasAbandonedItem(r.application,r.generation,r.owner)===true;
+ const sameItem=(a:Request,b:Request)=>a.application===b.application&&a.generation===b.generation&&a.owner===b.owner;
+ function retainFeedback(r:Request){if(!terminalItem(r)||!abandonedItem(r)||r.application.pendingTriggeredEvolution||r.application.pendingEvolution||r.application.pendingPokedex)return;feedbackRecovery={application:r.application,generation:r.generation,owner:r.owner,trigger:true,item:structuredClone(r.item),outcome:structuredClone(r.outcome),done:false};}
  class Controller {
   closed=false;ready=false;frame=0;latch=new InputLatch();timeline:EvolutionTimeline|null=null;selection:any=null;lesson:LearningScreen|null=null;
   private itemFacts:{primaryCommitted:true;itemResult?:NonNullable<GameApplication['pendingTriggeredEvolution']>['itemResult']}|null=null;
@@ -177,10 +181,18 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
    line(tr('placeholder'),h-112,'#b7bdc6');line(tr(phase==='card'?'tradeCardWait':['outgoing','incoming'].includes(phase)?'wait':'continue'),h-55);
   }
   stopOwned(){const v=this.views();if(v.q)this.dispatch('q',{kind:'technical-terminate'});else if(v.d)this.dispatch('d',{kind:'technical-terminate'});else if(v.e)this.dispatch('e',{kind:'technical-terminate'});else if(v.t)this.dispatch('t',{kind:'technical-terminate'});}
-  close(result:string){if(this.closed)return;const restore=this.valid();this.closed=true;this.request.done=true;this.request.result=result;if(active===this)active=null;if(restore&&result==='complete'&&this.request.item&&['committed','unchanged','cancelled'].includes(this.request.outcome?.status))W.PSInventory?.acknowledgeRecoveredItem(this.request.application,this.request.generation,this.request.owner);if(restore&&this.audioCaptured&&this.savedBgm)try{G.AudioManager?.replayBgm?.(this.savedBgm);}catch(error){console.error(NAME,'music restore failed',error);}this.finish();if(this.deferredClose){const held=this.deferredClose;this.deferredClose=null;originalClose.call(flow(),held.code,held.op);}}
+  close(result:string){
+   if(this.closed)return;const restore=this.valid();this.closed=true;this.request.done=true;this.request.result=result;if(active===this)active=null;
+   if(restore&&terminalItem(this.request)&&abandonedItem(this.request)){
+    if(result==='complete'){W.PSInventory.acknowledgeRecoveredItem(this.request.application,this.request.generation,this.request.owner);if(!abandonedItem(this.request)&&feedbackRecovery&&sameItem(feedbackRecovery,this.request))feedbackRecovery=null;}
+    // A reliable domain terminal is not a presentation ACK. Keep only this bounded, same-owner feedback until re-open/ACK.
+    if(abandonedItem(this.request))retainFeedback(this.request);
+   }
+   if(restore&&this.audioCaptured&&this.savedBgm)try{G.AudioManager?.replayBgm?.(this.savedBgm);}catch(error){console.error(NAME,'music restore failed',error);}this.finish();if(this.deferredClose){const held=this.deferredClose;this.deferredClose=null;originalClose.call(flow(),held.code,held.op);}
+  }
   dispose(){if(this.closed)return;this.presentationError||='presentation-ended';if(this.valid())this.stopOwned();if(this.views().q||this.views().e||this.views().d||this.views().t)suppress(this.request);this.close('presentation-ended');}
  }
- function request(event?:Request['event']):Request|null{const application=app(),r=root(application);if(event&&(r||application.encounterBlocked))return null;if(!event&&!r)return null;return {application,generation:application.stateGeneration,owner:r?.owner??'',trigger:r?.trigger??!!event,...(flow().running&&flow().request?.battleId?{battleId:flow().request.battleId}:{}),done:false,...(event?{event}:{}),...(application.pendingTriggeredEvolution?.kind==='item'?{item:application.pendingTriggeredEvolution.intent}:{})};}
+ function request(event?:Request['event']):Request|null{const application=app(),r=root(application);if(event&&(r||application.encounterBlocked))return null;if(!event&&!r){if(feedbackRecovery&&abandonedItem(feedbackRecovery))return {...feedbackRecovery,done:false,outcome:structuredClone(feedbackRecovery.outcome)};feedbackRecovery=null;return null;}return {application,generation:application.stateGeneration,owner:r?.owner??'',trigger:r?.trigger??!!event,...(flow().running&&flow().request?.battleId?{battleId:flow().request.battleId}:{}),done:false,...(event?{event}:{}),...(application.pendingTriggeredEvolution?.kind==='item'?{item:application.pendingTriggeredEvolution.intent}:{})};}
  function open(r:Request|null){retireOrphan();if(!r||active||reserved||queued||G.SceneManager.isSceneChanging()||G.$gameMessage?.isBusy?.())return null;queued=reserved=r;r.constructing=true;try{G.SceneManager.push(Scene_PSEvolution);}catch(error){if(queued===r)queued=null;if(reserved===r)reserved=null;const created=active as Controller|null;if(created?.request===r)created.dispose();r.done=true;r.result=String(error);}finally{r.constructing=false;}return r;}
  function Scene_PSEvolution(this:any){this.initialize(...(arguments as any));}
  const P=Scene_PSEvolution.prototype=Object.create(G.Scene_MenuBase.prototype);P.constructor=Scene_PSEvolution;
@@ -209,7 +221,7 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
   finally{if(reserved===r)reserved=null;}return c;
  };
  ui.trade=beginTradeUI;ui.showTrade=()=>open(tradeRequest());
- const pending=flow().operationPending;flow().operationPending=function(){retireOrphan();return pending.call(this)||!!reserved||!!queued||!!active;};
+ const pending=flow().operationPending;flow().operationPending=function(){retireOrphan();return pending.call(this)||!!reserved||!!queued||!!active||!!feedbackRecovery;};
  const prior=G.SceneManager.updateScene;G.SceneManager.updateScene=function(...args:any[]){retireOrphan();const value=prior.apply(this,args);retireOrphan();const scene=this._scene;
   if(reserved?.selectorStage==='ready'&&scene instanceof G.Scene_Map&&scene.isStarted()&&!this.isSceneChanging()&&!G.$gameMessage?.isBusy?.()){const r=reserved;reserved=null;delete r.selectorStage;open(r);}
   if(recoveryChoice&&!this.isSceneChanging()&&!G.$gameMessage?.isBusy?.()){

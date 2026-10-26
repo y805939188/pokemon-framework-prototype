@@ -151,3 +151,12 @@ for(const phase of ['before-create','after-create'])test(`SOL-FINAL-02 ${phase} 
 test('SOL-FINAL-02 replaced queued scene retires callback once and cannot clear a successor request',()=>{
  const {w,G,m,flow}=deferredHost();let done=0;const h=G.PSInventory.useItem('rarecandy',w.id,1,()=>done++),old=m._nextScene;m.goto(G.Scene_Map);assert(!flow.operationPending());m.changeScene();m.updateScene();assert(h.done);assert.equal(done,1);const next=G.PSInventory.showBag();assert(next&&!next.done);const scene=m._nextScene;old.terminate();old.create();old.start();assert.equal(m._nextScene,scene);assert(!next.done);assert.equal(done,1);m.goto(G.Scene_Map);flow.operationPending();m.changeScene();m.updateScene();assert(next.done&&!flow.operationPending());
 });
+
+for(const point of ['create','window','addWindow'])test(`UI-R2-OBS01 ${point} failure completes API callback once and late scene preserves successor`,()=>{
+ const {w,G,m,flow}=deferredHost(),before=snapshot(w);let done=0;const h=G.PSInventory.useItem('rarecandy',w.id,1,()=>done++),old=m._nextScene;
+ if(point==='window')G.Window_Base.prototype.initialize=function(){throw Error('window-failed');};else{const p=G.Scene_MenuBase.prototype[point];G.Scene_MenuBase.prototype[point]=function(){if(this._psInventory)throw Error('presentation-'+point);return p.call(this);};}
+ for(let n=0;n<6;n++){m.changeScene();m.updateScene();}assert(h.done);assert.equal(h.result.reason,'presentation-failed');assert.equal(done,1);assert(!flow.operationPending()&&!w.app.encounterBlocked);assert.deepEqual(snapshot(w),before);assert.deepEqual(w.counts,{create:0,random:0,replace:0});const successor=w.app.beginManagement();old.terminate();old.create();old.start();m.updateScene();assert.equal(done,1);assert.equal(w.app.endManagement(successor).status,'unchanged');
+});
+test('UI-R2-OBS01 create failure after generation replacement suppresses old notice and protects successor',()=>{
+ const {w,G,m,flow}=deferredHost();let done=0,successor;const h=G.PSInventory.useItem('rarecandy',w.id,1,()=>done++);const p=G.Scene_MenuBase.prototype.create;G.Scene_MenuBase.prototype.create=function(){if(this._psInventory){flow.stateReplaced();successor=w.app.beginManagement();throw Error('old create failed');}p.call(this);};m.changeScene();m.updateScene();m.changeScene();m.updateScene();assert(h.done);assert.equal(done,0);assert.equal(w.app.endManagement(successor).status,'unchanged');assert(!flow.operationPending());
+});
