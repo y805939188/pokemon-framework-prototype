@@ -2,6 +2,9 @@ import type {ItemWorldContext} from '../rules/item-effects.ts';
 import type { BattleEvidence } from "../rules/battle-evidence.ts";
 import { moneyCap, changeMoney } from "../rules/economy.ts";
 import { InventorySession } from "./inventory-session.ts";
+import { EvolutionOperation } from "./evolution-operation.ts";
+import type { EvolutionDecision, EvolutionResolution, EvolutionView } from "./evolution-operation.ts";
+import type { EvolutionFacts } from "../rules/evolution.ts";
 import type { InventoryRequest, InventoryParent, InventoryOutcome } from "./inventory-session.ts";
 import { badgeCount, hasBadge } from "../rules/economy.ts";
 import { assertInventoryMapped, addItems, aggregateBag, inventoryPolicy } from "../rules/inventory.ts";
@@ -28,7 +31,7 @@ import { managementSnapshot, individualView, searchStorage } from "./management-
 import type { IndividualView, ManagementSnapshot, StorageMatch, StorageSearch } from "./management-query.ts";
 import { ManagementSession } from "./management.ts";
 import type { ManagementOutcome, ManagementRequest } from "./management.ts";
-import { developmentCapabilities } from "../rules/config.ts";
+import { developmentCapabilities, resolveConfig } from "../rules/config.ts";
 import type { DevelopmentCapabilities } from "../rules/config.ts";
 import type { ItemDescriptor, MemberReference } from "../rules/storage-operations.ts";
 import { healParty, recoverAll } from "../rules/heal.ts";
@@ -59,6 +62,8 @@ export interface GameApplicationPorts<S extends BattleHandle> {
   clock?: ClockPort;
   creationContext?: () => CreationContext;
   itemWorld?:()=>ItemWorldContext;
+  /** Current world facts only. The application supplies private battle K/D/L0 itself. */
+  evolutionWorld?: (member: Readonly<Member>) => EvolutionFacts;
   variables?:{count:()=>number;write:(id:number,value:string)=>void};
 }
 
@@ -168,6 +173,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * finished) belongs to a state that no longer exists, so finishing it commits nothing (final review P4-2).
    */
   private readonly inventory: InventorySession;
+  private readonly evolutions: EvolutionOperation;
+  private evolutionCompletion: { token: string; generation: number; outcome: BattleOutcome & { result?: BattleResult } } | null = null;
   private generation = 0;
   private readonly bornIn = new WeakMap<object, number>();
   private readonly completedEvidence = new WeakMap<object, BattleEvidence>();
@@ -176,12 +183,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private battleCommitOwner: ReceptionContext | null = null;
   private readonly finishing = new WeakSet<object>();
   private readonly terminatedBattles = new WeakSet<ReceptionContext>();
-  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner; }
+  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active; }
   private assertBattleContext(context: ReceptionContext, requireOwner = false): void {
     if (context.generation !== this.generation || this.terminatedBattles.has(context)
       || requireOwner && this.battleCommitOwner !== context) throw new Error("stale battle commit generation or owner");
   }
   private invalidatePreparedSource(prepared: PreparedBattle, battleId: string): void {
+    this.evolutions.discardPrepared();
     prepared.sourceInvalidated = true;
     prepared.effects = resolveBattleEffects({ seal: null, expectedBinding: {
       battleId, generation: prepared.generation, rawHash: prepared.rawHash,
@@ -218,6 +226,37 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.inventory = new InventorySession(this.ports.state,()=>this.ports.content().content,{world:ports.itemWorld,variables:ports.variables,limits:this.limits,generation:()=>this.generation,install:next=>this.install(next),
       enter:parent=>{if(this.battleBusy||this.reception)throw new Error('operation-active');if(parent)this.management.reserveChild(parent.token);else if(this.management.active)throw new Error('management-active');},
       leave:parent=>{if(parent)this.management.releaseChild(parent.token);}});
+    this.evolutions = new EvolutionOperation({ state: { read: () => this.battleStatePort.read(), replace: next => {
+      this.battleStatePort.replace(next); this.inventory.stateChanged(next);
+    } }, content: this.ports.content, generation: () => this.generation, limits: this.limits,
+      facts: (member, content) => this.evolutionFacts(member, content) });
+  }
+
+  private evolutionFacts(member: Readonly<Member>, content: ReturnType<ContentPort>["content"]): EvolutionFacts {
+    let world: EvolutionFacts = {};
+    try { world = this.ports.evolutionWorld?.(member) ?? {}; }
+    catch { const invalid = { status: "invalid" as const, reason: "world-provider-failed" };
+      world = { hour: invalid, mapId: invalid, mapMetadata: invalid, weather: invalid, cycling: invalid, surfing: invalid, diving: invalid, beauty: invalid, moveTypes: invalid }; }
+    return world;
+  }
+  get pendingEvolution(): EvolutionView | null { return this.evolutions.view; }
+  private evolutionOutcome(outcome: BattleOutcome & { result?: BattleResult }, resolved: EvolutionResolution): BattleOutcome & { result?: BattleResult } {
+    if (resolved.status === "refused") return { ...outcome, error: resolved.reason };
+    const next = { ...clone(outcome), ...(resolved.diagnostics.length ? { diagnostics: [...new Set([...(outcome.diagnostics ?? []), ...resolved.diagnostics])] } : {}) };
+    if (resolved.status === "pending") return { ...next, pending: true, continuationToken: resolved.view.token, continuationRevision: resolved.view.revision };
+    delete next.pending; delete next.continuationToken; delete next.continuationRevision;
+    if (resolved.status === "technically-terminated") next.diagnostics = [...(next.diagnostics ?? []), "战后进化后续已技术终止，已提交战果保留"];
+    return next;
+  }
+  resolveEvolution(token: string, revision: number, decision: EvolutionDecision): (BattleOutcome & { result?: BattleResult }) | { status: "refused"; reason: string } {
+    const completion = this.evolutionCompletion;
+    if (!completion || completion.token !== token || completion.generation !== this.generation) return { status: "refused", reason: "stale-evolution-operation" };
+    const resolved = this.evolutions.resolve(token, revision, decision);
+    if (completion.generation !== this.generation || this.evolutionCompletion !== completion) return { status: "refused", reason: "stale-evolution-operation" };
+    if (resolved.status === "refused") return resolved;
+    const outcome = this.evolutionOutcome(completion.outcome, resolved);
+    if (resolved.status !== "pending") { this.evolutionCompletion = null; this.project(outcome); }
+    return outcome;
   }
 
   beginInventoryOperation(kind:'bag'|'item'|'shop'='bag',parent?:InventoryParent):string { return this.inventory.begin(kind,parent); }
@@ -406,6 +445,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.reception?.context === context) this.reception = null;
     if (this.op?.session && this.battleContexts.get(this.op.session) === context) this.op = null;
     this.terminatedBattles.add(context);
+    this.evolutions.cancelPrepared(context.token);
     this.battleCommitOwner = null;
     return { status: "aborted" };
   }
@@ -510,6 +550,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.generation++;
     this.op = null;
     this.battleCommitOwner = null;
+    this.evolutions.invalidate(); this.evolutionCompletion = null;
     this.inventory.invalidate();
     this.management.invalidate();
     this.reception = null;
@@ -529,6 +570,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.management.active || this.reception || this.inventory.active) throw new Error("operation-active");
     if (this.op) throw new Error(`a battle is already open (${this.op.battleId})`);
     if (this.battleCommitOwner) throw new Error("battle-commit-active");
+    if (this.evolutions.active) throw new Error("evolution-operation-active");
     const game = this.ports.state.read();
     if (!this.capabilities.allowExperimentalHeldItemBattle && game.party.some((m) => !!m.item)) throw new Error("held-item-battle-disabled: battle item write-back is incomplete");
     const { content, dex } = this.ports.content();
@@ -723,11 +765,18 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       if (!applied || applied.status !== "applied") throw new Error("primary planning failed");
       const composed = composeBattleEffects({ before: prepared.before, primary: applied.state, raw: result, content, effects: prepared.effects, internalBattle: prepared.expectedContext.internalBattle });
       let next = composed.state;
+      const eligibleHp = Object.fromEntries(next.party.map(member => [member.id, member.hp]));
       if (isDefeat(result)) {
         const settled = settleDefeat(next, content, { noMoneyLoss: this.noMoneyLoss, badges: badgeCount(next.badges), moneyLimit: this.limits.money });
         next = settled.state; prepared.defeat = { moneyLost: settled.moneyLost, healed: true };
       }
       if (facts) next = { ...next, stats: battleStats(next.stats, facts, code, prepared.defeat) };
+      if (handle && authority) {
+        const config = resolveConfig(content.settings);
+        next = this.evolutions.prepare({ token: context.token, generation: context.generation, context: prepared.expectedContext, effects: prepared.effects,
+          eligibleHp, lateHeal: isDefeat(result) && facts?.canLose === false,
+          enabled: config.CHECK_EVOLUTION_AFTER_ALL_BATTLES || code === 1 || code === 2 }, next, content);
+      }
       if (prepared.effects.dispositions.some(d => d.status !== "complete") || composed.dispositions.some(d => d.status !== "applied")) prepared.diagnostics.push("部分战斗附加事实不可用，主战果保留");
       prepared.next = clone(next); prepared.nextIdentity = identity;
     }
@@ -778,6 +827,10 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.op && this.op.session !== handle) return { code: 0, battleId: request?.battleId ?? null, commit: "none", aborted: true, error: "stale battle session" };
     const ownedOp = this.op?.session === handle ? this.op : null, facts = ownedOp?.facts;
     const remembered = this.battleContexts.get(handle);
+    if (this.evolutions.active && this.evolutionCompletion) {
+      if (remembered?.token === this.evolutionCompletion.token) return this.evolutionOutcome(this.evolutionCompletion.outcome, { status: "pending", view: this.evolutions.view!, diagnostics: [] });
+      return { code: 0, battleId: request?.battleId ?? null, commit: "none", error: "evolution-operation-active" };
+    }
     let context = remembered ?? this.newReceptionContext();
     if (this.terminatedBattles.has(context)) return { code: 0, battleId: request?.battleId ?? null, commit: "none", aborted: true, error: "battle-commit-terminated" };
     let result: BattleResult | undefined;
@@ -816,6 +869,15 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         } catch { outcome.diagnostics = [...(outcome.diagnostics ?? []), "战斗伴随事实读取失败"]; }
       }
       this.assertBattleContext(context);
+      if (committed.status === "applied") {
+        const continuation = this.evolutions.activate(context.token);
+        const continued = this.evolutionOutcome({ ...outcome, result }, continuation);
+        if (continuation.status === "pending") {
+          this.evolutionCompletion = { token: context.token, generation: this.generation, outcome: clone({ ...outcome, result }) };
+          return continued;
+        }
+        if (continuation.status !== "refused" && continuation.diagnostics.length) outcome.diagnostics = continued.diagnostics;
+      }
       this.project(outcome); outcome.result = result;
       return outcome;
     } catch (error) {
@@ -830,6 +892,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       }
       if (this.reception?.context === context) this.reception = null;
       if (!this.preparedBattles.get(context)?.indeterminate) this.terminatedBattles.add(context);
+      this.evolutions.cancelPrepared(context.token);
       if (this.op === ownedOp) this.op = null;
       return this.abortBattle(request, error);
     } finally {
@@ -846,6 +909,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.op && request && this.op.battleId === request.battleId) {
       const context = this.op.session ? this.battleContexts.get(this.op.session) : undefined;
       if (context && !this.preparedBattles.get(context)?.indeterminate) {
+        this.evolutions.cancelPrepared(context.token);
         this.terminatedBattles.add(context);
         if (this.reception?.context === context) this.reception = null;
         if (this.battleCommitOwner === context) this.battleCommitOwner = null;
