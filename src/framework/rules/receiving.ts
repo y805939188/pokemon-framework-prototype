@@ -94,8 +94,11 @@ export function receiveMembers<T extends MemberCollection>(state: T, members: re
       checkStore(old);
       if (boxedMembers(next).length >= context.limits.boxes || !firstFreeBox(next.storage)) throw new ReceivingRefused("boxes-full");
       placeInBox(next.storage, context.depositHeal ? healMember(old, context.content, { preserveReadyToEvolve: true }) : old);
-      next.party[choice.target.position.index] = member;
-      placed.push({ id: member.id, to: "party", position: clone(choice.target.position), replacedId: old.id }); continue;
+      // WP38 §6 / CX22: remove the outgoing identity, compact survivors, then append the newcomer.
+      // Battle snapshots are keyed by member ID; neither a compacted survivor nor the newcomer inherits a slot's facts.
+      next.party.splice(choice.target.position.index, 1);
+      next.party.push(member);
+      placed.push({ id: member.id, to: "party", position: { kind: "party", index: next.party.length - 1 }, replacedId: old.id }); continue;
     }
     if (context.profile.mode === 2) throw new ReceivingRefused("pending", "forced party reception requires a replacement", member.id);
     checkStore(member);

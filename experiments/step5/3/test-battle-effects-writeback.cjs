@@ -72,7 +72,7 @@ test('reliable raw HP0 clears R after real replacement reception deposit-heals t
   const primary=f.primary({depositHeal:true,decisions:{C1:{placement:{kind:'replace',target:{id:'P1',position:{kind:'party',index:0}}}}}});
   const boxed=f.T.locateMember(primary,'P1').member;assert.ok(boxed.hp>0);assert.equal(boxed.readyToEvolve,true);
   const r=f.compose({primary});const result=f.T.locateMember(r.state,'P1').member;
-  assert.equal(result.readyToEvolve,false);assert.equal(result.evolutionReadiness,'known');assert.equal(result.friendship,105);assert.equal(result.hp,boxed.hp);assert.equal(r.state.party[0].id,'C1');assertFinite(f.S,primary,r.state);
+  assert.equal(result.readyToEvolve,false);assert.equal(result.evolutionReadiness,'known');assert.equal(result.friendship,105);assert.equal(result.hp,boxed.hp);assert.equal(r.state.party.at(-1).id,'C1');assert.equal(r.state.party[0].id,'P2');assertFinite(f.S,primary,r.state);
 });
 test('deposit healing alone cannot clear a previous R barrier when no real faint was proved',async()=>{
   const f=await fixture({partySize:6});f.before.party[0].evolutionReadiness='unknown';

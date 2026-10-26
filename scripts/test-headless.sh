@@ -93,6 +93,7 @@ SUITES=(
   experiments/step5/3/test-trade-operation.cjs
   experiments/step5/3/test-acquisition-dex.cjs
   experiments/step5/3/test-dex-viewing.cjs
+  experiments/step5/3/test-M1-convergence.cjs
   experiments/step5/3/test-effects-source.cjs
   experiments/step5/3/test-learning-candidates.cjs
   experiments/step5/3/test-learning-plans.cjs
