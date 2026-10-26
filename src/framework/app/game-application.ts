@@ -4,6 +4,8 @@ import { moneyCap, changeMoney } from "../rules/economy.ts";
 import { InventorySession } from "./inventory-session.ts";
 import { EvolutionOperation } from "./evolution-operation.ts";
 import { LearningOperation } from "./learning-operation.ts";
+import { TriggeredEvolutionOperation } from "./triggered-evolution.ts";
+import type { EvolutionItemIntent, EventEvolutionIntent, TriggeredDecision, TriggeredEvolutionOutcome } from "./triggered-evolution.ts";
 import type { LearningIntent, LearningDecision, LearningParent } from "./learning-operation.ts";
 import type { EvolutionDecision, EvolutionResolution, EvolutionView } from "./evolution-operation.ts";
 import type { EvolutionFacts } from "../rules/evolution.ts";
@@ -177,6 +179,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly inventory: InventorySession;
   private readonly evolutions: EvolutionOperation;
   private readonly learning: LearningOperation;
+  private readonly triggered: TriggeredEvolutionOperation;
   private evolutionCompletion: { token: string; generation: number; outcome: BattleOutcome & { result?: BattleResult } } | null = null;
   private generation = 0;
   private readonly bornIn = new WeakMap<object, number>();
@@ -186,7 +189,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private battleCommitOwner: ReceptionContext | null = null;
   private readonly finishing = new WeakSet<object>();
   private readonly terminatedBattles = new WeakSet<ReceptionContext>();
-  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active; }
+  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active || !!this.triggered?.active; }
   private assertBattleContext(context: ReceptionContext, requireOwner = false): void {
     if (context.generation !== this.generation || this.terminatedBattles.has(context)
       || requireOwner && this.battleCommitOwner !== context) throw new Error("stale battle commit generation or owner");
@@ -250,6 +253,15 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       },
       leave: parent => { if (parent?.kind === "inventory") this.inventory.releaseLearning(parent.token);
         else if (parent?.kind === "management") this.management.releaseChild(parent.token); } });
+    this.triggered = new TriggeredEvolutionOperation({ state: { read: () => this.battleStatePort.read(), replace: next => {
+      this.battleStatePort.replace(next); this.inventory.stateChanged(next);
+    } }, content: this.ports.content, generation: () => this.generation, limits: this.limits, evolutions: this.evolutions,
+      world: () => clone(ports.itemWorld?.() ?? {}), facts: (member, content) => this.evolutionFacts(member, content),
+      ownsParent: token => this.inventory.owns(token), enter: (parent, memberId) => {
+        if (this.op || this.battleCommitOwner || this.evolutions.active || this.learning.active || this.reception) throw new Error("operation-active");
+        if (parent) this.inventory.reserveEvolution(parent, memberId!);
+        else if (this.inventory.active || this.management.active) throw new Error("management-operation-active");
+      }, leave: parent => { if (parent) this.inventory.releaseLearning(parent); } });
   }
 
   private evolutionFacts(member: Readonly<Member>, content: ReturnType<ContentPort>["content"]): EvolutionFacts {
@@ -263,6 +275,10 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   get pendingLearning() { return this.learning.view; }
   beginLearning(intent: LearningIntent, parent?: LearningParent) { return this.learning.begin(intent, parent); }
   resolveLearning(token: string, revision: number, decision: LearningDecision) { return this.learning.resolve(token, revision, decision); }
+  get pendingTriggeredEvolution() { return this.triggered.view; }
+  beginEvolutionItem(parent: string, requestId: string, intent: EvolutionItemIntent) { return this.triggered.beginItem(parent, requestId, intent); }
+  beginEventEvolution(intent: EventEvolutionIntent = {}) { return this.triggered.beginEvent(intent); }
+  resolveTriggeredEvolution(token: string, revision: number, decision: TriggeredDecision) { return this.triggered.resolve(token, revision, decision); }
   private evolutionOutcome(outcome: BattleOutcome & { result?: BattleResult }, resolved: EvolutionResolution): BattleOutcome & { result?: BattleResult } {
     if (resolved.status === "refused") return { ...outcome, error: resolved.reason };
     const next = { ...clone(outcome), ...(resolved.diagnostics.length ? { diagnostics: [...new Set([...(outcome.diagnostics ?? []), ...resolved.diagnostics])] } : {}) };
@@ -271,7 +287,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (resolved.status === "technically-terminated") next.diagnostics = [...(next.diagnostics ?? []), "战后进化后续已技术终止，已提交战果保留"];
     return next;
   }
-  resolveEvolution(token: string, revision: number, decision: EvolutionDecision): (BattleOutcome & { result?: BattleResult }) | { status: "refused"; reason: string } {
+  resolveEvolution(token: string, revision: number, decision: EvolutionDecision): (BattleOutcome & { result?: BattleResult }) | TriggeredEvolutionOutcome | { status: "refused"; reason: string } {
+    if (this.triggered.matchesContinuation(token)) return this.triggered.resolveContinuation(token, revision, decision);
     const completion = this.evolutionCompletion;
     if (!completion || completion.token !== token || completion.generation !== this.generation) return { status: "refused", reason: "stale-evolution-operation" };
     const resolved = this.evolutions.resolve(token, revision, decision);
@@ -575,6 +592,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.battleCommitOwner = null;
     this.evolutions.invalidate(); this.evolutionCompletion = null;
     this.learning.invalidate();
+    this.triggered.invalidate();
     this.inventory.invalidate();
     this.management.invalidate();
     this.reception = null;

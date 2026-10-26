@@ -2,6 +2,7 @@
 import { evolutionMethod, WORLD_WEATHER_EVOLUTION_METHOD } from "./evolution-data.ts";
 import { computeStats } from "./growth.ts";
 import { computedNature } from "./member-metadata.ts";
+import { catalogOf, itemOf } from "./item-catalog.ts";
 import { speciesDataOf } from "./species-key.ts";
 import type { Content, EvolutionEntry, Member, SpeciesKey } from "./types.ts";
 
@@ -70,9 +71,9 @@ function readFact<T>(input: EvolutionFactInput<T> | undefined, key: string, vali
   } catch { return blocked("invalid", key, "provider-threw"); }
 }
 const isBlocked = (result: { readonly kind: string }): result is EvolutionBlocked => result.kind === "invalid" || result.kind === "context-unavailable";
-function guardReason(member: Readonly<Member>, shadow = false): string | null {
+function guardReason(member: Readonly<Member>, shadow = false, content?: Content): string | null {
   if (member.isEgg || shadow) return member.isEgg ? "egg" : "shadow";
-  if (identity(member.item) === "everstone") return "everstone";
+  if (identity(itemOf(catalogOf(content), member.item)?.battleId ?? member.item) === "everstone") return "everstone";
   return identity(member.ability) === "battlebond" ? "battle-bond" : null;
 }
 function requiredFact<T>(input: EvolutionFactInput<T> | undefined, key: string, valid: (value: unknown) => boolean): Exclude<ReadFact<T>, { kind: "absent" }> {
@@ -246,7 +247,7 @@ export function resolveEvolutionTarget(member: Readonly<Member>, entry: Readonly
 /** A query returns a complete plan; an unknown later condition discards earlier tentative readiness. */
 export function scanEvolution(input: EvolutionCheckInput): EvolutionCheckResult {
   const m = input.member;
-  const guard = guardReason(m, input.shadow);
+  const guard = guardReason(m, input.shadow, input.content);
   if (guard) return { kind: "no-target", reason: guard };
   const sourceData = speciesDataOf(input.content, m);
   if (!sourceData) return blocked("invalid", "member", "unknown-source-species");
@@ -281,7 +282,7 @@ export interface PostBattleEvolutionInput extends Omit<EvolutionCheckInput, "tri
 }
 /** Upgrade family has priority. A selected/cancelled upgrade never falls through to battle achievements. */
 export function planPostBattleEvolution(input: PostBattleEvolutionInput): EvolutionCheckResult {
-  const guard = guardReason(input.member, input.shadow);
+  const guard = guardReason(input.member, input.shadow, input.content);
   if (guard) return { kind: "no-target", reason: guard };
   if (input.checkFainted === false && (input.eligibleHp ?? input.member.hp) <= 0) return { kind: "no-target", reason: "ineligible-member" };
   const entries = speciesDataOf(input.content, input.member)?.evolutions ?? [];

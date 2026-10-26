@@ -9,6 +9,7 @@ import { planLearningQueue } from "../rules/learning.ts";
 import type { LearningAnswer, LearningPending } from "../rules/learning.ts";
 import { resolveConfig } from "../rules/config.ts";
 import { catalogOf } from "../rules/item-catalog.ts";
+import { removeItems } from "../rules/inventory.ts";
 import { bumpStat } from "../rules/stats.ts";
 import { own } from "../rules/own.ts";
 import { validateGameContent } from "../rules/save-schema.ts";
@@ -22,6 +23,11 @@ export interface BattleEvolutionSeed {
   token: string; generation: number; context: EffectsContextV2; effects: ResolvedBattleEffects;
   eligibleHp: Record<string, number>; lateHeal: boolean; enabled: boolean;
 }
+/** A target already selected by an owned item/event action, without manufactured battle facts. */
+export interface SelectedEvolutionSeed {
+  token: string; generation: number; selected: true;
+  cost?: { itemId: string; quantity: number; onCancel?: boolean };
+}
 export type EvolutionDecision = { kind: "complete" | "cancel" | "technical-terminate" | "retry" }
   | { kind: "learn"; answer: LearningAnswer };
 export interface EvolutionView {
@@ -30,7 +36,7 @@ export interface EvolutionView {
   error?: string; reloadRequired?: boolean;
 }
 export type EvolutionResolution = { status: "pending"; view: EvolutionView; diagnostics: string[] }
-  | { status: "complete" | "technically-terminated"; diagnostics: string[] }
+  | { status: "complete" | "technically-terminated"; diagnostics: string[]; progress?: { evolved: boolean; cancelled: boolean } }
   | { status: "refused"; reason: string };
 interface Prefix { state: GameState; cursor: number; selection?: EvolutionSelection; diagnostics: string[] }
 type AfterInstall = { kind: "scan"; prefix: Prefix }
@@ -38,10 +44,11 @@ type AfterInstall = { kind: "scan"; prefix: Prefix }
   | { kind: "learned" }
   | { kind: "cancelled" };
 interface Operation {
-  seed: BattleEvolutionSeed; identity: string; ids: string[]; cursor: number; activated: boolean; revision: number;
+  seed: BattleEvolutionSeed | SelectedEvolutionSeed; identity: string; ids: string[]; cursor: number; activated: boolean; revision: number;
   selection?: EvolutionSelection; learning?: { memberId: string; moves: string[]; cursor: number; answers: LearningAnswer[]; pending?: LearningPending };
-  pendingWrite?: { before: GameState; next: GameState; after: AfterInstall };
+  pendingWrite?: { before: GameState; next: GameState; after: AfterInstall; attempted: boolean };
   error?: string; reloadRequired: boolean; diagnostics: string[];
+  progress?: { evolved: boolean; cancelled: boolean };
 }
 const identity = (state: GameState): string => JSON.stringify(state, (_key, value: unknown) => value && typeof value === "object" && !Array.isArray(value)
   ? Object.fromEntries(Object.keys(value).sort().map(key => [key, (value as Record<string, unknown>)[key]])) : value);
@@ -50,6 +57,7 @@ const message = (error: unknown): string => error instanceof Error ? error.messa
 export class EvolutionOperation {
   private operation: Operation | null = null;
   private resolving = false;
+  private authorizeWrite: (() => void) | undefined;
   private readonly ports: {
     state: GameStatePort; content: ContentPort; generation: () => number;
     facts: (member: Readonly<Member>, content: Content) => EvolutionFacts;
@@ -85,6 +93,14 @@ export class EvolutionOperation {
     // preceding selected evolutions, against the then-current party, while the same continuation stays reserved.
     return prefix.state;
   }
+  /** Reserve before the action installs its growth/entry cost; activation occurs only after that write is proved. */
+  get selectedBodyCommitted(): boolean { return this.operation?.progress?.evolved === true; }
+  prepareSelected(seed: SelectedEvolutionSeed, selection: EvolutionSelection, content: Content): void {
+    if (this.operation) throw new Error("evolution-operation-active");
+    const key = validatedContentIdentity(content); if (!key) throw new Error("evolution-content-identity-unavailable");
+    this.operation = { seed: clone(seed), identity: key, ids: [], cursor: 0, activated: false, revision: 1,
+      selection: clone(selection), reloadRequired: false, diagnostics: [], progress: { evolved: false, cancelled: false } };
+  }
   activate(token: string): EvolutionResolution {
     const op = this.operation;
     if (!op || op.seed.token !== token) return { status: "complete", diagnostics: [] };
@@ -102,6 +118,7 @@ export class EvolutionOperation {
   }
   private scan(op: Operation, state: GameState, content: Content): Prefix {
     const next = clone(state), diagnostics: string[] = [], config = resolveConfig(content.settings);
+    if (!("context" in op.seed)) return { state: next, cursor: 0, diagnostics };
     let cursor = op.cursor;
     for (; cursor < op.ids.length; cursor++) {
       const id = op.ids[cursor]!, member = next.party.find(m => m.id === id);
@@ -135,14 +152,14 @@ export class EvolutionOperation {
   private pending(op: Operation): EvolutionResolution { this.assertCurrent(op); return { status: "pending", view: this.view!, diagnostics: [...op.diagnostics] }; }
   private complete(op: Operation, terminated = false): EvolutionResolution {
     this.assertCurrent(op); this.operation = null;
-    return { status: terminated ? "technically-terminated" : "complete", diagnostics: [...op.diagnostics] };
+    return { status: terminated ? "technically-terminated" : "complete", diagnostics: [...op.diagnostics], ...(op.progress ? { progress: { ...op.progress } } : {}) };
   }
-  resolve(token: string, revision: number, decision: EvolutionDecision): EvolutionResolution {
+  resolve(token: string, revision: number, decision: EvolutionDecision, authorizeWrite?: () => void): EvolutionResolution {
     const op = this.operation;
     if (!op?.activated || op.seed.token !== token || op.seed.generation !== this.ports.generation()) return { status: "refused", reason: "stale-operation" };
     if (op.revision !== revision) return { status: "refused", reason: "stale-decision" };
     if (this.resolving) return { status: "refused", reason: "evolution-resolution-active" };
-    this.resolving = true;
+    this.resolving = true; this.authorizeWrite = authorizeWrite;
     try {
       if (decision.kind === "technical-terminate") return this.terminate(op);
       if (op.pendingWrite) {
@@ -172,21 +189,25 @@ export class EvolutionOperation {
       if (decision.kind === "cancel") {
         if (!selection.cancellable) return { status: "refused", reason: "evolution-cannot-cancel" };
         if (!Number.isSafeInteger(state.stats.evolutions_cancelled + 1)) throw new Error("evolution-cancellation-count-overflow");
-        const next = clone(state); next.stats = bumpStat(next.stats, "evolutions_cancelled");
+        const next = clone(state);
+        if ("selected" in op.seed && op.seed.cost?.onCancel) next.inventory = removeItems(next.inventory, op.seed.cost.itemId, op.seed.cost.quantity, catalogOf(content));
+        next.stats = bumpStat(next.stats, "evolutions_cancelled");
         return this.write(op, state, next, { kind: "cancelled" });
       }
       if (decision.kind !== "complete") return { status: "refused", reason: "evolution-decision-required" };
-      const plan = planEvolutionCommit({ state, memberId: selection.memberId, selection, content, limits: this.ports.limits });
+      const input = clone(state);
+      if ("selected" in op.seed && op.seed.cost) input.inventory = removeItems(input.inventory, op.seed.cost.itemId, op.seed.cost.quantity, catalogOf(content));
+      const plan = planEvolutionCommit({ state: input, memberId: selection.memberId, selection, content, limits: this.ports.limits });
       if (plan.status !== "ready") { op.error = plan.reason; op.revision++; return this.pending(op); }
       op.diagnostics.push(...plan.diagnostics);
       return this.write(op, state, plan.state, { kind: "evolved", memberId: selection.memberId, moves: [...plan.learning.moves] });
     } catch (error) {
       if (this.operation !== op || op.seed.generation !== this.ports.generation()) return { status: "refused", reason: "stale-operation" };
       op.error = message(error); op.revision++; return this.pending(op);
-    } finally { this.resolving = false; }
+    } finally { this.resolving = false; this.authorizeWrite = undefined; }
   }
   private write(op: Operation, before: GameState, next: GameState, after: AfterInstall): EvolutionResolution {
-    op.pendingWrite = { before: clone(before), next: clone(next), after };
+    op.pendingWrite = { before: clone(before), next: clone(next), after, attempted: false };
     return this.install(op);
   }
   private install(op: Operation): EvolutionResolution {
@@ -198,6 +219,10 @@ export class EvolutionOperation {
     if (problems.length) { op.error = `invalid-evolution-next:${problems[0]!.path}:${problems[0]!.message}`; op.revision++; return this.pending(op); }
     this.assertCurrent(op);
     let failure: unknown;
+    // The owner guards only a new write. Exact next-state acknowledgement must remain available after lost readback.
+    pending.attempted = false;
+    this.authorizeWrite?.(); this.assertCurrent(op);
+    pending.attempted = true;
     try { this.ports.state.replace(clone(pending.next)); } catch (error) { failure = error; }
     let actual: GameState;
     try { actual = this.ports.state.read(); } catch (error) { op.reloadRequired = true; op.error = message(error); op.revision++; return this.pending(op); }
@@ -218,10 +243,12 @@ export class EvolutionOperation {
       return op.selection ? this.pending(op) : this.complete(op);
     }
     if (after.kind === "evolved") {
+      if (op.progress) op.progress.evolved = true;
       op.selection = undefined; op.learning = { memberId: after.memberId, moves: after.moves, cursor: 0, answers: [] };
       return this.learn(op, state, this.content(op));
     }
     if (after.kind === "learned") { op.learning!.cursor++; op.learning!.answers = []; delete op.learning!.pending; return this.learn(op, state, this.content(op)); }
+    if (after.kind === "cancelled" && op.progress) op.progress.cancelled = true;
     op.selection = undefined;
     return this.advance(op, state, this.content(op));
   }
@@ -256,9 +283,13 @@ export class EvolutionOperation {
     return op.selection ? this.pending(op) : this.complete(op);
   }
   private terminate(op: Operation): EvolutionResolution {
+    // A rejected owner gate has made no write; discard the local plan without touching intervening external state.
+    if (op.pendingWrite && !op.pendingWrite.attempted) return this.complete(op, true);
     if (op.pendingWrite) {
       const state = this.ports.state.read(); this.assertCurrent(op);
       if (identity(state) === identity(op.pendingWrite.next)) {
+        if (op.progress && op.pendingWrite.after.kind === "evolved") op.progress.evolved = true;
+        if (op.progress && op.pendingWrite.after.kind === "cancelled") op.progress.cancelled = true;
         // The installed state already includes its resources/statistics. A technical exit must not auto-learn
         // another move or scan another member merely to acknowledge that complete write.
         return this.complete(op, true);

@@ -10,6 +10,7 @@ import {resolveAbility} from './member-identity.ts';
 import {healMember} from './heal.ts';
 import {fieldEffectProblem} from './item-families.ts';
 import {planFriendshipChange} from './friendship.ts';
+import {planLearningQueue,levelLearningIntents} from './learning.ts';
 import type {Content,Member,MoveSlot,StatKey} from './types.ts';
 import type {GameState} from './state.ts';
 export interface ItemWorldContext {mapId?:number;shadowIds?:string[];hyperIds?:string[];hmMoves?:string[]}
@@ -27,7 +28,8 @@ const key=(raw:unknown):StatKey=>{if(typeof raw!=='string'||!['hp','atk','def','
 const integer=(raw:unknown):number=>{if(typeof raw!=='number'||!Number.isSafeInteger(raw)||raw<1)return refuse('invalid-effect-parameter');return raw;};
 const moveIdentity=(name:string):string=>name.toLowerCase().replace(/[^a-z0-9]/g,'');
 export function changeFriendship(m:Member,method:string,c:Content,world:ItemWorldContext):void {
- const plan=planFriendshipChange(m,['vitamin','wing','evberry','powder','energyroot','revivalherb'].includes(method)?method:'',
+ const catalog=catalogOf(c),source={...m,item:itemOf(catalog,m.item)?.battleId??m.item,ball:m.ball?(itemOf(catalog,m.ball)?.battleId??m.ball):m.ball};
+ const plan=planFriendshipChange(source,['vitamin','wing','evberry','powder','energyroot','revivalherb'].includes(method)?method:'',
   {mapId:world.mapId,AFFECTION_EFFECTS:resolveConfig(c.settings).AFFECTION_EFFECTS});
  if(plan.status==='refused')return refuse(plan.reason);
  m.friendship=plan.after;
@@ -103,12 +105,16 @@ export function planItemUse(game:GameState,c:Content,intent:ItemIntent,answers:I
    if(m.level>=100)return refuse(active==='rare-candy'?'evolution-not-ready':'max-level');const sp=speciesDataOf(c,m)!,oldLevel=m.level,oldExp=m.exp;const rawGain=active==='exp-candy'?integer(p.exp)*q:0;if(!Number.isSafeInteger(rawGain))return refuse('integer-overflow');const exp=active==='rare-candy'?minExp(sp.growth,m.level+1):Math.min(maxExp(sp.growth),safeAdd(m.exp,rawGain));if(!Number.isSafeInteger(exp))return refuse('integer-overflow');if(exp===m.exp)return refuse('no-effect');
    for(let i=0;i<q;i++)changeFriendship(m,'vitamin',c,world);m.exp=exp;m.level=levelForExp(sp.growth,exp);recalcHp(m,oldMax,c,active==='rare-candy');
    details.expGained=exp-oldExp;details.oldLevel=oldLevel;details.newLevel=m.level;
-   let answerIndex=0;const protectedMoves=new Set([...(world.hmMoves??[]),...Object.values(catalog).filter(x=>x.fieldUse==='hm').map(x=>x.move!)].map(moveIdentity));
-   for(let level=oldLevel+1;level<=m.level;level++)for(const name of sp.learnset[level]??[]){const move=Object.values(c.moves??{}).find(x=>x.name===name||x.id===moveIdentity(name));if(!move)return refuse('unknown-move');if(m.moves.some(x=>x.id===move.id))continue;const fresh={id:move.id,pp:move.pp,maxpp:move.pp,ppUps:0};if(m.moves.length<4){m.moves.push(fresh);learned.push(move.id);continue;}
-    const answer=answers.learning?.[answerIndex];if(!answer)return {status:'pending',selection:{kind:'learn',answerIndex,move:clone(move),moves:clone(m.moves)}};
-    if(answer.kind==='decline'){if(answer.giveUp!==true)return {status:'pending',selection:{kind:answer.giveUp===undefined?'give-up':'learn',answerIndex,move:clone(move),moves:clone(m.moves)}};skipped.push(move.id);}else{if(!Number.isInteger(answer.slot)||answer.slot<0||answer.slot>=m.moves.length)return refuse('invalid-move');if(protectedMoves.has(moveIdentity(m.moves[answer.slot]!.id)))return {status:'pending',selection:{kind:'learn',answerIndex,move:clone(move),moves:clone(m.moves),reason:'hm-protected'}};m.moves[answer.slot]=fresh;learned.push(move.id);}answerIndex++;
-   }
-   if((answers.learning?.length??0)>answerIndex)return refuse('unexpected-learning-answer');
+   const protectedMoves=new Set([...(world.hmMoves??[]),...Object.values(catalog).filter(x=>x.fieldUse==='hm').map(x=>x.move!)].map(moveIdentity));
+   const intents=levelLearningIntents(oldLevel,m.level,Object.entries(sp.learnset).flatMap(([level,refs])=>refs.map(id=>({level:Number(level),id}))));
+   if(intents.status==='refused')return refuse(intents.reason);
+   const moves=intents.moves.map(entry=>{const move=Object.values(c.moves??{}).find(x=>x.name===entry.id||x.id===moveIdentity(entry.id));if(!move)return refuse('unknown-move');return move;});
+   const learning=planLearningQueue(m,moves,{kind:'level'},{shadow:false,hmMoves:[...protectedMoves],keepMachinePp:config.TAUGHT_MACHINES_KEEP_OLD_PP},answers.learning);
+   if(learning.status==='refused')return refuse(learning.reason==='unexpected-answer'?'unexpected-learning-answer':learning.reason==='invalid-answer'?'invalid-answers':learning.reason);
+   if(learning.status==='pending')return {status:'pending',selection:{kind:learning.selection.kind,answerIndex:learning.selection.answerIndex,move:{...learning.selection.move,name:learning.selection.move.name??learning.selection.move.id},moves:learning.selection.moves,...(learning.selection.reason?{reason:learning.selection.reason}:{})}};
+   m.moves=learning.patch.moves;
+   for(const outcome of learning.outcomes){if(outcome.outcome==='learned')learned.push(outcome.moveId);else if(outcome.outcome==='gave-up')skipped.push(outcome.moveId);}
+
   }else return refuse('not-ready');
   if(typeof p.friendship==='string')changeFriendship(m,p.friendship,c,world);actualHp=m.hp-oldHp;
  }

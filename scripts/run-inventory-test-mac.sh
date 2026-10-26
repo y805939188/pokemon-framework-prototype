@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Actual NW.js/MZ host, synthetic DOM/service input. Isolated saves/profile, exact child PID only.
-# Usage: scripts/run-inventory-test-mac.sh <new evidence-dir> [inventory|all|verify-save|empty-source|perf|matrix|driver-selftest|capability|progression-data|postbattle|learning]
+# Usage: scripts/run-inventory-test-mac.sh <new evidence-dir> [inventory|all|verify-save|empty-source|perf|matrix|driver-selftest|capability|progression-data|postbattle|learning|triggered]
 # PF_OWNED_REQUIRE_IDLE=1 refuses before launch if NW is already running or process inventory is unavailable.
 # PF_OWNED_BACKGROUND=1 uses the programmatic test clock without requesting OS focus (not physical-input evidence).
 # Package: PF_OWNED_NW=<app binary> PF_OWNED_PROJECT=<app.nw> PF_OWNED_SKIP_BUILD=1 ...
@@ -14,7 +14,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EVID="${1:?new evidence directory required}"; MODE="${2:-inventory}"
-case "$MODE" in inventory|all|verify-save|empty-source|perf|matrix|driver-selftest|capability|progression-data|postbattle|learning) ;; *) echo "unsupported mode: $MODE" >&2; exit 2;; esac
+case "$MODE" in inventory|all|verify-save|empty-source|perf|matrix|driver-selftest|capability|progression-data|postbattle|learning|triggered) ;; *) echo "unsupported mode: $MODE" >&2; exit 2;; esac
 mkdir -p "$EVID"; EVID="$(cd "$EVID" && pwd)"
 [[ ! -e "$EVID/report.json" && ! -e "$EVID/launch.json" ]] || { echo 'existing evidence: choose another directory' >&2; exit 2; }
 NW="${PF_OWNED_NW:-$HOME/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.app/Contents/Resources/nwjs-mac/nwjs.app/Contents/MacOS/nwjs}"
@@ -34,7 +34,7 @@ sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 expected=lambda d:{p.name:sha(p) for p in sorted(d.glob('ps-flow-expected*.json'))}
 start={'startedUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'concurrency':'UNVERIFIED; read-only process inventory unavailable; never terminates other processes','input':'synthetic DOM/service events in actual host; not hardware input'}
 extra=[]
-if mode in ('capability','progression-data','postbattle','learning') or os.environ.get('PF_OWNED_BACKGROUND')=='1':extra.append('--ps-flow-background')
+if mode in ('capability','progression-data','postbattle','learning','triggered') or os.environ.get('PF_OWNED_BACKGROUND')=='1':extra.append('--ps-flow-background')
 if mode=='progression-data':
  layout=os.environ.get('PF_OWNED_PROGRESSION_LAYOUT','regional')
  if layout not in ('regional','national'): raise SystemExit('PF_OWNED_PROGRESSION_LAYOUT must be regional or national')
@@ -59,7 +59,7 @@ if mode=='verify-save':
  if not save.is_dir() or not any(save.iterdir()): refuse(f'saves directory missing or empty: {save}')
  start['expectedSource']={'dir':str(src),'files':produced};start['savesBefore']={p.name:sha(p) for p in sorted(save.iterdir()) if p.is_file()}
  extra.append('--ps-flow-expected-dir='+str(src))
-if mode in ('capability','progression-data','postbattle','learning') or os.environ.get('PF_OWNED_REQUIRE_IDLE')=='1':
+if mode in ('capability','progression-data','postbattle','learning','triggered') or os.environ.get('PF_OWNED_REQUIRE_IDLE')=='1':
  try:
   inventory=subprocess.run(['/bin/ps','-axo','pid=,comm='],capture_output=True,text=True,check=True).stdout
   running=[line.strip() for line in inventory.splitlines() if 'nwjs' in line.casefold()]
