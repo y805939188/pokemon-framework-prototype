@@ -80,7 +80,7 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
   update(){
    if(!this.valid()){this.close('stale');return;}
    const frame=G.Graphics.frameCount??0;if(!this.ready&&(frame<=this.frame||G.SceneManager.isSceneChanging()))return;
-   const input=this.latch.filter(W.PSManagement.inputFrame());if(!this.ready){this.ready=true;return;}if(G.$gameMessage?.isBusy?.())return;
+   const input=this.latch.filter(W.PSManagement.inputFrame());if(!this.ready){this.ready=true;return;} // Messages queued by the completed host are displayed on Map after our final ACK.
    const use=!!input.triggered.use,back=!!input.triggered.back||this.backRequested;this.backRequested=false;
    if(this.layer==='animation'&&this.timeline){
     if(this.timeline.phase==='cancelled'){if(use||back)this.sync();else this.draw();return;}

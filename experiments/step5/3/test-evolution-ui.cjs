@@ -77,3 +77,12 @@ test('G2a reconstructed class with no request reports safely; stale finished upd
 test('G2a automatic transfer waits for Map start before stopping its message-window lifecycle',async()=>{
  const w=setup({entries:[{method:'Level',parameter:51,target:'Blastoise'}]});await w.finish();const map=new w.G.Scene_Map();let started=false;map.isStarted=()=>started;w.manager._scene=map;w.tick();assert.equal(w.p(),null);assert(w.app.pendingEvolution&&w.app.saveBlocked);started=true;w.tick();assert(w.p());w.manager._scene.terminate();assert(!w.app.saveBlocked);
 });
+
+test('G2a queued host received message waits for Map without blocking the owned final learning ACK',async()=>{
+ for(const empty of [false,true]){
+  let closes=0;const op={request:{battleId:'postbattle-1'}},w=setup({entries:[{method:'Level',parameter:51,target:'Blastoise'}],targetMoves:['Gust'],edit:g=>{if(empty)g.party[0].moves=g.party[0].moves.slice(0,1);},options:{flowOverrides:{close(){closes++;this.running=false;}}}}),f=w.G.PSFlow;
+  f.running=true;f.request=op.request;const resolve=f.resolveEvolution;let busy=false;w.G.$gameMessage.isBusy=()=>busy;
+  f.resolveEvolution=(...args)=>{const out=resolve(...args);if(!w.app.pendingEvolution&&!w.app.pendingPokedex){f.close(2,op);busy=true;w.G.$gameMessage.add('Received: Blastoise → Party');}return out;};
+  await w.finish();w.G.PSEvolution.show();w.success();if(!empty){w.chooseE('yes');w.chooseE('1');}const installed=clone(w.state.current());assert(busy);assert.equal(closes,0);w.press('ok');w.ready();assert.equal(w.p(),null);assert.equal(closes,1);assert(!f.running);assert.deepEqual(w.state.current(),installed);assert(busy,'host message retained for Map');
+ }
+});
