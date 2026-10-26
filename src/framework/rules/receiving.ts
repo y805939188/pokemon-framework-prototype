@@ -1,6 +1,6 @@
 /** WP26/38 receive plans. No UI, no host state mutation, no protocol shape changes. */
 import { clone } from "./value.ts";
-import { allMembers, boxedMembers, firstFreeBox, memberAt, placeInBox } from "./storage.ts";
+import { allMembers, boxedMembers, firstFreeBox, locateMember, memberAt, placeInBox } from "./storage.ts";
 import type { MemberCollection, MemberPosition } from "./storage.ts";
 import { able, ableCount, checkStore, referenced } from "./storage-operations.ts";
 import { own } from "./own.ts";
@@ -105,6 +105,16 @@ export function receiveMembers<T extends MemberCollection>(state: T, members: re
     if (boxedMembers(next).length >= context.limits.boxes) throw new ReceivingRefused("boxes-full");
     const position = placeInBox(next.storage, context.depositHeal ? healMember(member, context.content, { preserveReadyToEvolve: true }) : member);
     placed.push({ id: member.id, to: "boxes", position, boxName: next.storage.boxes[position.box]!.name });
+  }
+  // A later reception can compact the party again, or box an earlier newcomer.
+  // Every returned location describes the same complete next, never an intermediate prefix.
+  for (const placement of placed) {
+    const location = locateMember(next, placement.id);
+    if (!location) throw new Error("received-member-missing");
+    placement.position = clone(location.position);
+    placement.to = location.position.kind === "party" ? "party" : "boxes";
+    if (location.position.kind === "box") placement.boxName = next.storage.boxes[location.position.box]!.name;
+    else delete placement.boxName;
   }
   return { state: next, placed };
 }
