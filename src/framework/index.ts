@@ -64,3 +64,5 @@ export * as friendship from "./rules/friendship.ts";
 export * as learning from "./rules/learning.ts";
 export * as evolution from "./rules/evolution.ts";
 export * as evolutionSuccess from "./rules/evolution-success.ts";
+export * as pokedex from "./rules/pokedex.ts";
+export * as pokedexQuery from "./rules/pokedex-query.ts";

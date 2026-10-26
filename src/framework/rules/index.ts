@@ -49,3 +49,5 @@ export * as friendship from "./friendship.ts";
 export * as learning from "./learning.ts";
 export * as evolution from "./evolution.ts";
 export * as evolutionSuccess from "./evolution-success.ts";
+export * as pokedex from "./pokedex.ts";
+export * as pokedexQuery from "./pokedex-query.ts";
