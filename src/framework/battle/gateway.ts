@@ -35,7 +35,7 @@ interface ObservationState {
   records: BattleObservation[]; issues: EvidenceIssue[]; displays: Record<string, string>;
   pending: Record<string, Extract<FormatObservation, { kind: "before-loss" }>>;
 }
-interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[]; friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[] }
+interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[]; friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[]; faintSequence: number }
 const CHECKPOINTS = new WeakMap<GatewayCheckpoint, CheckpointData>();
 const FRIEND_CHECKPOINTS = new WeakMap<DriverCheckpoint, { owner: BattleGateway; side: string; id: string; member: ShowdownPokemon; live: number; setHad: boolean; stored: unknown }>();
 
@@ -50,6 +50,8 @@ export class BattleGateway implements BattleDriver {
   _observation: ObservationState = { records: [], issues: [], displays: {}, pending: {} };
   _friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
   private _friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[] = [];
+  private _faintKeys = new WeakMap<object, string>();
+  private _faintSequence = 0;
   _legacyFaintHook?: (e: unknown) => void;
 
   constructor(opts: GatewayOptions, internal?: LoadedSim) {
@@ -104,6 +106,7 @@ export class BattleGateway implements BattleDriver {
       observation: JSON.parse(JSON.stringify(this._observation)) as ObservationState,
       friendshipFaints: JSON.parse(JSON.stringify(this._friendshipFaints)) as typeof this._friendshipFaints,
       friendshipFaintOrigins: JSON.parse(JSON.stringify(this._friendshipFaintOrigins)) as typeof this._friendshipFaintOrigins,
+      faintSequence: this._faintSequence,
     });
     return token;
   }
@@ -118,6 +121,7 @@ export class BattleGateway implements BattleDriver {
     gw._observation = JSON.parse(JSON.stringify(data.observation)) as ObservationState;
     gw._friendshipFaints = JSON.parse(JSON.stringify(data.friendshipFaints)) as typeof gw._friendshipFaints;
     gw._friendshipFaintOrigins = JSON.parse(JSON.stringify(data.friendshipFaintOrigins)) as typeof gw._friendshipFaintOrigins;
+    gw._faintSequence = data.faintSequence;
     return gw;
   }
 
@@ -131,10 +135,10 @@ export class BattleGateway implements BattleDriver {
   _attachObservations(): void {
     const extension = loadFormatExtension(this._env.root);
     extension.hooks.set(this._battle, (event: unknown) => {
-      const e = event as { side: string; id: string };
+      const e = event as { side: string; id: string; faintToken?: object };
       const member = this._mon(e.side, e.id);
       const actor = (p: ShowdownPokemon) => ({ id: p.name as string, side: p.side.id as string, slot: p.position as number, level: p.level as number, hp: p.hp as number, active: !!p.isActive });
-      const fact: Extract<BattleObservation, { kind: "faint" }> = { kind: "faint", target: actor(member), opponents: member.side.foe.active.filter(Boolean).map(actor) };
+      const fact: Extract<BattleObservation, { kind: "faint" }> = { kind: "faint", target: actor(member), opponents: member.side.foe.active.filter(Boolean).map(actor), ...(e.faintToken ? { hookKey: this._faintKey(e.faintToken) } : {}) };
       this._friendshipFaints.push(fact);
       // Keep the original source value independent of values handed out through the control drain.
       this._friendshipFaintOrigins.push(JSON.parse(JSON.stringify(fact)) as typeof fact);
@@ -146,6 +150,14 @@ export class BattleGateway implements BattleDriver {
       failed: () => this._observationIssue("identity", "observation-failed"),
     });
     if (!["gen8rpgcustomgame", "gen8rpgdoublescustomgame"].includes(this._battle.format.id)) this._observationIssue("identity", "unsupported-observation-format");
+  }
+
+  private _faintKey(token: object): string {
+    const previous = this._faintKeys.get(token);
+    if (previous) return previous;
+    const key = `faint:${++this._faintSequence}`;
+    this._faintKeys.set(token, key);
+    return key;
   }
 
   _observe(value: FormatObservation): void {
@@ -181,12 +193,17 @@ export class BattleGateway implements BattleDriver {
     }
     if (value.kind === "faint" && own(state.pending, id)) { this._observationIssue("damage", "unclosed-loss-at-faint", id); delete state.pending[id]; }
     if (value.kind === "display" || value.kind === "appearance") {
-      if (value.kind === "display" && own(state.displays, id) === value.details) return;
-      setOwn(state.displays, id, value.details);
+      // Transform can change the displayed species while Showdown's legacy details string remains unchanged.
+      const key = value.display ? JSON.stringify([value.display.battleSpecies, value.display.gender, value.display.shiny]) : value.details;
+      if (value.kind === "display" && own(state.displays, id) === key) return;
+      setOwn(state.displays, id, key);
     }
     // Bounds apply only to companion quality. Never interrupt a legal engine action or silently claim complete.
     if (state.records.length >= 16384) { this._observationIssue("identity", "observation-capacity-exceeded"); return; }
-    state.records.push(JSON.parse(JSON.stringify(value)) as BattleObservation);
+    if (value.kind === "faint") {
+      const { faintToken, ...fact } = value;
+      state.records.push(JSON.parse(JSON.stringify({ ...fact, ...(faintToken ? { hookKey: this._faintKey(faintToken) } : {}) })) as BattleObservation);
+    } else state.records.push(JSON.parse(JSON.stringify(value)) as BattleObservation);
   }
 
   drainObservations(): ObservationBatch {
@@ -205,7 +222,7 @@ export class BattleGateway implements BattleDriver {
       const record = records[i]!, location = /^(p[12])([a-f])?: /.exec(publicIdents[i]!);
       // Illusion may change the public name, so bind only its side/slot to the actual source event.
       return !!location && location[1] === origin.target.side && (origin.target.active ? !!location[2] && location[2].charCodeAt(0) - 97 === origin.target.slot : !location[2])
-        && record.kind === "faint" && sameActor(record.target, origin.target) && record.opponents.length === origin.opponents.length && record.opponents.every((p, j) => sameActor(p, origin.opponents[j]!));
+        && record.kind === "faint" && record.hookKey === origin.hookKey && sameActor(record.target, origin.target) && record.opponents.length === origin.opponents.length && record.opponents.every((p, j) => sameActor(p, origin.opponents[j]!));
     });
   }
 

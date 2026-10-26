@@ -3,7 +3,7 @@
  * Everything here is a choice of implementation, not logic: change the engine by changing this file (or by passing
  * another driver factory), not the application.
  */
-import { BattleSession, sealBattleEvidence } from "./flow/session.ts";
+import { BattleSession, sealBattleEvidence, sealBattleEffects } from "./flow/session.ts";
 import type { LogSink } from "./flow/log.ts";
 import type { BattleDriverFactory } from "./battle/driver.ts";
 import type { BattleSessionFactory } from "./app/index.ts";
@@ -30,5 +30,6 @@ export function createBattleSessionFactory(options: BattleSessionFactoryOptions)
       foe: { kind: request.kind, team: setup.foes, noRun: setup.noRun, noBall: setup.noBall },
     }),
     evidence: (handle, binding) => sealBattleEvidence(handle, binding),
+    effects: (handle, binding) => sealBattleEffects(handle, binding),
   };
 }

@@ -6,6 +6,7 @@
 import type { BattleResult, GameState } from "../rules/state.ts";
 import type { Content, DexLookup, Member } from "../rules/types.ts";
 import type { BattleEvidence, BattleEvidenceContext, EvidenceBinding } from "../rules/battle-evidence.ts";
+import type { EffectsBindingV2, EffectsSealV2 } from "../rules/battle-consumption.ts";
 
 /** The persistent game state, held by whoever owns the save (MZ: `$gameSystem._psGame`). The application never mutates what `read` returns. */
 export interface GameStatePort {
@@ -78,6 +79,8 @@ export interface BattleSessionFactory<S extends BattleHandle = BattleHandle> {
   create(request: BattleStartRequest, game: GameState, setup: BattleSetup): Promise<S>;
   /** Optional internal companion. Missing/throwing evidence never invalidates a legal primary result. */
   evidence?(handle: S, binding: EvidenceBinding): BattleEvidence | null;
+  /** V2 source-isolated receipts; E consumer owns binding, preparation and eventual installation. */
+  effects?(handle: S, binding: EffectsBindingV2): EffectsSealV2 | null;
 }
 
 /** The content a battle uses and, when available, the engine's data to check moves against. */

@@ -1782,6 +1782,11 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       await shot("C53-01-capability-end"); await finishBattle();
       const evidence = app.battleEvidenceSnapshot(handle);
       assert(evidence && evidence.rawHash === api().state.resultHash(handle.result()), "app sealed original raw hash");
+      const v2Context = handle._evidence.value.context;
+      const v2 = api().session.sealBattleEffects(handle, { battleId: handle.result().battleId, generation: v2Context.generation, contentIdentity: v2Context.contentIdentity, rawHash: evidence.rawHash });
+      assert(v2 && v2.version === 2, "actual host V2 source seal available independently of persistent consumption");
+      eq(v2.control.members[id].friendship.value.current, 104, "V2 holds actual ACK chain");
+      assert(Object.values(v2.observer.appearances).some((cell: any) => cell.status === "complete" && cell.value.some((r: any) => r.display.battleSpecies === "Pidgey")), "V2 actual display snapshot");
       eq(evidence.friendship[id].changes.map((c: any) => c.method), ["battleitem", "levelup"], "ordered real triggers");
       eq(evidence.friendship[id].current, 104, "threshold order respected");
       assert(evidence.records.some((r: any) => r.kind === "appearance"), "initial appearance before UI take retained");
@@ -1789,7 +1794,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       eq(game().party.find((m: any) => m.id === id).friendship, 99, "this capability batch does not implement persistent companion consumption");
       await G.DataManager.saveGame(53);
       fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-capability.json"), JSON.stringify({ state: clone(game()), slot: 53, rawHash: evidence.rawHash }));
-      return { input: "real scene, synthetic DOM keydown/keyup", rawHash: evidence.rawHash, records: evidence.records.length, friendship: evidence.friendship[id], saveSlot: 53, persistentCompanion: false };
+      return { input: "real scene, synthetic DOM keydown/keyup", rawHash: evidence.rawHash, records: evidence.records.length, friendship: evidence.friendship[id], v2Friendship: v2.control.members[id].friendship, v2SourceOnly: true, saveSlot: 53, persistentCompanion: false };
     });
     await scenario("C53-02 real host direct application: seal failure cannot lose capture/XP or replay", async () => {
       fresh(); const B = api(), content = W.PSFlow.content(), factory = B.composition.createBattleSessionFactory({ content: () => content, seed: () => [1,2,3,4] });
@@ -1809,6 +1814,22 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       await driver.choose("p1", "move 1"); await driver.choose("p2", "move 1"); const batch = driver.drainObservations(), hits = batch.records.filter((r: any) => r.kind === "hit" && r.domain === "substitute");
       eq(hits.map((h: any) => h.loss), [22,22,24], "actual three substitute losses"); assert(hits.every((h: any) => h.target.id === "P1" && h.source.id === "F1"), "stable identities"); eq(batch.issues, [], "complete supported host interval");
       return { input: "direct controlled engine API in actual NW host", losses: hits.map((h: any) => h.loss), playerHp: driver.readState("p1")[0].hp };
+    });
+    await scenario("C53-04 real host V2: observer failure preserves ACK receipt and primary capture/XP", async () => {
+      fresh(); const B = api(), content = W.PSFlow.content(), id = game().party[0].id;
+      game().party[0].hp = 50; game().party[0].friendship = 99;
+      const factory = B.composition.createBattleSessionFactory({ content: () => content, seed: () => [1,2,3,4] });
+      const app = new B.app.GameApplication({ state: { read: () => game(), replace: (next: any) => { G.$gameSystem._psGame = next; } }, sessions: factory, projection: { project: () => {} }, content: () => ({ content }), random: seeded(1), clock: () => 0, itemWorld: () => ({ mapId: G.$gameMap.mapId() }) }, { receivingProfile: { mode: 1, naming: 1 } });
+      const before = clone(game()), request = { battleId: "host-effects-observer-failure", kind: "wild", foes: [{ species: "pidgey", level: 5 }], seq: 4 }, handle = await app.startBattle(request);
+      handle.gw.drainObservations = () => { throw new Error("synthetic observer interruption"); };
+      await handle.useItem("potion", id); await handle.throwBall("masterball"); const raw = handle.result(), c = handle._evidence.value.context;
+      const seal = factory.effects(handle, { battleId: raw.battleId, generation: c.generation, contentIdentity: c.contentIdentity, rawHash: B.state.resultHash(raw) });
+      eq(seal.observer.members[id].critical.status, "unavailable", "observer group closed");
+      eq(seal.control.members[id].friendship.value.current, 100, "independent acknowledged control retained");
+      const result = app.finishBattle(handle, request); eq(result.commit, "applied", "primary survives");
+      assert(game().party.length === before.party.length + 1 && game().party[0].exp > before.party[0].exp, "capture/XP survive");
+      eq(game().party[0].friendship, 99, "this source checkpoint does not yet install persistent V2 effects");
+      return { input: "direct application API in actual NW, synthetic observer fault", observer: seal.observer.members[id].critical, control: seal.control.members[id].friendship, primary: result.commit, persistentCompanion: false };
     });
   }
 
