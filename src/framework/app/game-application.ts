@@ -14,7 +14,11 @@ import { computedNature } from "../rules/member-metadata.ts";
  * Outcomes are explicit so a caller can tell the four situations apart:
  *   not committed (aborted) | committed | already committed (duplicate) | committed but the host was not informed.
  */
-import { applyBattleResult, capturedTemplates, clone, newGame, resultHash } from "../rules/state.ts";
+import { planBattlePrimary, capturedTemplates, clone, newGame, resultHash } from "../rules/state.ts";
+import { assertBattleResultShape } from "../rules/battle-result-validation.ts";
+import { resolveBattleEffects } from "../rules/battle-consumption.ts";
+import type { EffectsBindingV2, EffectsContextV2, ResolvedBattleEffects } from "../rules/battle-consumption.ts";
+import { composeBattleEffects } from "../rules/battle-effects-writeback.ts";
 import type { ApplyStatus, BattleCommitOptions, BattleResult, GameState } from "../rules/state.ts";
 import { allMembers, boxedMembers, locateMember } from "../rules/storage.ts";
 import { DEFAULT_LIMITS, storageFull } from "../rules/limits.ts";
@@ -41,7 +45,7 @@ import { assertCapturedHeldSources, hasForcedPartyPlan, fallbackDecisions, recei
 import type { ReceivingDecision, ReceivingProfile, ReceivedPlacement } from "../rules/receiving.ts";
 import { validateGameContent } from "../rules/save-schema.ts";
 import { own, setOwn } from "../rules/own.ts";
-import { findDanglingReferences, resolveSpecies } from "../flow/content-runtime.ts";
+import { findDanglingReferences, resolveSpecies, validatedContentIdentity } from "../flow/content-runtime.ts";
 import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ClockPort, ContentPort, CreationContext, EncounterPlan, GameStatePort, GiftOutcome, GiftRequest, HealOutcome, OutcomeProjection, PartyView, RandomPort, StepsOutcome } from "./ports.ts";
 
 export interface GameApplicationPorts<S extends BattleHandle> {
@@ -107,7 +111,22 @@ function battleStats(stats: GameStats, facts: BattleFacts, code: number, defeat:
 }
 
 class StateInstallFailed extends Error {
-  constructor(error: unknown) { super(message(error)); }
+  readonly indeterminate: boolean;
+  constructor(error: unknown, indeterminate = false) { super(message(error)); this.indeterminate = indeterminate; }
+}
+/** Private operation values: public BattleCommitOptions never carry effects authority. */
+interface OwnedBattleEffects {
+  battleId: string; generation: number; context: EffectsContextV2; contentIdentity: string | null;
+}
+interface PreparedBattle {
+  rawHash: string; generation: number; before: GameState; effects: ResolvedBattleEffects; captureMembers: Member[];
+  sourceIdentity: string | null; sourceInvalidated: boolean; expectedContext: EffectsContextV2;
+  next?: GameState; nextIdentity?: string | null; defeat?: { moneyLost: number; healed: true }; attempted: boolean; indeterminate: boolean; completed: boolean;
+  diagnostics: string[];
+}
+function stateIdentity(value: GameState): string {
+  return JSON.stringify(value, (_key, data: unknown) => data && typeof data === "object" && !Array.isArray(data)
+    ? Object.fromEntries(Object.keys(data).sort().map(key => [key, (data as Record<string, unknown>)[key]])) : data);
 }
 interface ReceptionContext extends BattleCommitOptions { token: string; generation: number; rawHash?: string; recovered?: boolean }
 interface ReceptionPending {
@@ -120,6 +139,7 @@ export type CommitResultStatus = ApplyStatus | "pending" | "no-template";
 
 export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly ports: GameApplicationPorts<S>;
+  private readonly battleStatePort: GameStatePort;
   private readonly limits: Limits;
   private readonly startMoney: number;
   private readonly noMoneyLoss: boolean;
@@ -151,6 +171,25 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private generation = 0;
   private readonly bornIn = new WeakMap<object, number>();
   private readonly completedEvidence = new WeakMap<object, BattleEvidence>();
+  private readonly ownedBattleEffects = new WeakMap<object, OwnedBattleEffects>();
+  private readonly preparedBattles = new WeakMap<ReceptionContext, PreparedBattle>();
+  private battleCommitOwner: ReceptionContext | null = null;
+  private readonly finishing = new WeakSet<object>();
+  private readonly terminatedBattles = new WeakSet<ReceptionContext>();
+  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner; }
+  private assertBattleContext(context: ReceptionContext, requireOwner = false): void {
+    if (context.generation !== this.generation || this.terminatedBattles.has(context)
+      || requireOwner && this.battleCommitOwner !== context) throw new Error("stale battle commit generation or owner");
+  }
+  private invalidatePreparedSource(prepared: PreparedBattle, battleId: string): void {
+    prepared.sourceInvalidated = true;
+    prepared.effects = resolveBattleEffects({ seal: null, expectedBinding: {
+      battleId, generation: prepared.generation, rawHash: prepared.rawHash,
+      contentIdentity: prepared.sourceIdentity ?? "0".repeat(64),
+    }, expectedContext: prepared.expectedContext, membersBefore: prepared.before.party });
+    delete prepared.next; delete prepared.nextIdentity; delete prepared.defeat;
+    prepared.diagnostics = [];
+  }
 
   /** Read-only transient companion view. It supplies no commit authority and is never a persistent save record. */
   battleEvidenceSnapshot(handle: S): BattleEvidence | null {
@@ -159,6 +198,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   constructor(ports: GameApplicationPorts<S>, options: GameApplicationOptions = {}) {
+    this.battleStatePort = ports.state;
     this.ports = {...ports,state:{read:()=>ports.state.read(),replace:next=>{const problems=validateGameContent(next,ports.content().content);if(problems.length)throw new Error(`invalid next state: ${problems[0]!.path} ${problems[0]!.message}`);ports.state.replace(next);this.inventory?.stateChanged(next);}}};
     this.limits = options.limits ?? DEFAULT_LIMITS;
     this.startMoney = options.startMoney ?? 3000;
@@ -176,7 +216,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     });
     this.management = new ManagementSession(this.ports.state, () => this.ports.content().content, { limits: this.limits, depositHeal: this.depositHeal, sourceAllowed: this.capabilities.allowHeldItemSources, describeItem: this.describeHeldItem });
     this.inventory = new InventorySession(this.ports.state,()=>this.ports.content().content,{world:ports.itemWorld,variables:ports.variables,limits:this.limits,generation:()=>this.generation,install:next=>this.install(next),
-      enter:parent=>{if(this.op||this.reception)throw new Error('operation-active');if(parent)this.management.reserveChild(parent.token);else if(this.management.active)throw new Error('management-active');},
+      enter:parent=>{if(this.battleBusy||this.reception)throw new Error('operation-active');if(parent)this.management.reserveChild(parent.token);else if(this.management.active)throw new Error('management-active');},
       leave:parent=>{if(parent)this.management.releaseChild(parent.token);}});
   }
 
@@ -220,7 +260,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   claimGrant(grantId: string, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): ClaimOutcome {
     const refused = (reason: string, error: unknown): ClaimOutcome => ({ status: "refused", grantId, reason, error: message(error) });
     if (this.reception?.grantId === grantId) return { status: "pending", grantId, token: this.reception.context.token };
-    if (this.op || this.management.active || this.reception || this.inventory.active) return refused(this.op ? "battle-active" : "operation-active", "another operation is open");
+    if (this.battleBusy || this.management.active || this.reception || this.inventory.active) return refused(this.battleBusy ? "battle-active" : "operation-active", "another operation is open");
     let game: GameState;
     try { game = this.ports.state.read(); } catch (error) { return refused("state-unusable", error); }
     try {
@@ -261,7 +301,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   receiveGift(request: GiftRequest, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): GiftOutcome {
-    if (this.op || this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "operation-active" };
+    if (this.battleBusy || this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "operation-active" };
     try {
       if (!["normal", "silent", "party", "party-silent", "foreign"].includes(request.kind)) throw new ReceivingRefused("invalid-gift-mode");
       const input = request.member;
@@ -342,11 +382,32 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       catch (error) { return { status: "pending", reason: message(error) }; }
     }
     const outcome = pending.resume();
+    if (pending.context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
     if (!("pending" in outcome && outcome.pending) && !("status" in outcome && outcome.status === "pending") && !("status" in outcome && outcome.status === "refused")) {
       this.receptionReceipts.set(token, clone(outcome));
       if (this.receptionReceipts.size > 32) this.receptionReceipts.delete(this.receptionReceipts.keys().next().value!);
     }
     return outcome;
+  }
+
+  /** Technical termination of a proved zero-write battle attempt. It never rolls back an installed primary result. */
+  terminateBattleCommit(token: string): { status: "aborted" | "refused" | "reload-required"; reason?: string } {
+    const context = this.battleCommitOwner;
+    if (!context || context.token !== token || context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
+    const prepared = this.preparedBattles.get(context);
+    if (!prepared) return { status: "refused", reason: "not-a-prepared-battle" };
+    let current: GameState;
+    try { current = this.battleStatePort.read(); }
+    catch { prepared.indeterminate = true; return { status: "reload-required", reason: "state-install-indeterminate" }; }
+    if (context.generation !== this.generation || this.battleCommitOwner !== context) return { status: "refused", reason: "stale-operation" };
+    if (prepared.completed || prepared.next && stateIdentity(current) === stateIdentity(prepared.next)) return { status: "refused", reason: "already-installed: resume the pending operation" };
+    if (stateIdentity(current) !== stateIdentity(prepared.before)) { prepared.indeterminate = true; return { status: "reload-required", reason: "state-install-indeterminate" }; }
+    prepared.indeterminate = false;
+    if (this.reception?.context === context) this.reception = null;
+    if (this.op?.session && this.battleContexts.get(this.op.session) === context) this.op = null;
+    this.terminatedBattles.add(context);
+    this.battleCommitOwner = null;
+    return { status: "aborted" };
   }
 
   /** What a party/bag screen shows. Throws when the state is unusable (the screen then says so). */
@@ -366,7 +427,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   /** Heal the party (HP, status, PP). Safe to repeat: an already healed party writes nothing. Never throws. */
   healParty(): HealOutcome {
     if (this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "management-active" };
-    if (this.op) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
+    if (this.battleBusy) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
     let game: GameState;
     try { game = this.ports.state.read(); } catch (error) { return { status: "refused", reason: "state-unusable", error: message(error) }; }
     let next: GameState;
@@ -399,17 +460,17 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (!this.capabilities.allowHeldItemSources) throw new Error("held-item-source-disabled");
     return Object.entries(aggregateBag(this.ports.state.read().inventory)).filter(([id, count]) => { const item = this.describeHeldItem(id); return count > 0 && item?.holdable && !item.mail; }).map(([id, count]) => ({ id, count }));
   }
-  beginManagement(): string { if (this.op || this.reception || this.inventory.active) throw new Error("operation-active"); return this.management.begin(); }
+  beginManagement(): string { if (this.battleBusy || this.reception || this.inventory.active) throw new Error("operation-active"); return this.management.begin(); }
   manage(token: string, requestId: string, request: ManagementRequest): ManagementOutcome {
-    if (this.op) return { status: "refused", reason: "battle-active" };
+    if (this.battleBusy) return { status: "refused", reason: "battle-active" };
     return this.management.execute(token, requestId, request);
   }
   endManagement(token: string): ManagementOutcome { return this.management.end(token); }
   heldMemberReference(token: string): MemberReference | null { return this.management.heldReference(token); }
-  get encounterBlocked(): boolean { return !!this.op || !!this.reception || this.management.active || this.inventory.active; }
-  get saveBlocked(): boolean { return !!this.op || !!this.reception || this.management.saveBlocked || this.inventory.saveBlocked; }
+  get encounterBlocked(): boolean { return this.battleBusy || !!this.reception || this.management.active || this.inventory.active; }
+  get saveBlocked(): boolean { return this.battleBusy || !!this.reception || this.management.saveBlocked || this.inventory.saveBlocked; }
   recoverAll(): HealOutcome {
-    if (this.op || this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: this.op ? "battle-active" : "management-active" };
+    if (this.battleBusy || this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: this.battleBusy ? "battle-active" : "management-active" };
     try { const game = this.ports.state.read(); const next = recoverAll(game, this.ports.content().content, this.depositHeal); if (JSON.stringify(next) === JSON.stringify(game)) return { status: "unchanged" }; this.ports.state.replace(next); return { status: "healed" }; }
     catch (error) { return { status: "refused", reason: "invalid", error: message(error) }; }
   }
@@ -431,7 +492,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   /** Count steps the player took (WP06 §4.1: the global counter, wrapping at 2^31). The host applies the guards of that step. */
   recordSteps(n = 1): StepsOutcome {
     if (this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "management-active" };
-    if (this.op) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
+    if (this.battleBusy) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
     let game: GameState;
     try { game = this.ports.state.read(); } catch (error) { return { status: "refused", reason: "state-unusable", error: message(error) }; }
     let steps: number;
@@ -448,6 +509,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   stateReplacedByHost(): void {
     this.generation++;
     this.op = null;
+    this.battleCommitOwner = null;
     this.inventory.invalidate();
     this.management.invalidate();
     this.reception = null;
@@ -466,6 +528,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   async startBattle(request: BattleStartRequest): Promise<S> {
     if (this.management.active || this.reception || this.inventory.active) throw new Error("operation-active");
     if (this.op) throw new Error(`a battle is already open (${this.op.battleId})`);
+    if (this.battleCommitOwner) throw new Error("battle-commit-active");
     const game = this.ports.state.read();
     if (!this.capabilities.allowExperimentalHeldItemBattle && game.party.some((m) => !!m.item)) throw new Error("held-item-battle-disabled: battle item write-back is incomplete");
     const { content, dex } = this.ports.content();
@@ -497,7 +560,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     let mapId: number | undefined;
     try { mapId = this.ports.itemWorld?.().mapId ?? creationContext.map; } catch { /* optional companion context unavailable */ }
     setup.evidenceContext = {
-      battleId: request.battleId, generation: this.generation, contentIdentity: content.meta?.inputsHash ?? content.meta?.id ?? "anonymous-content",
+      battleId: request.battleId, generation: this.generation, contentIdentity: validatedContentIdentity(content) ?? content.meta?.inputsHash ?? content.meta?.id ?? "anonymous-content",
       playerIds: game.party.map(m => m.id), initialLevels: Object.fromEntries(game.party.map(m => [m.id, m.level])),
       ...(Number.isSafeInteger(mapId) && mapId! >= 0 ? { mapId } : {}),
     };
@@ -510,7 +573,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     catch (error) { if (this.op === op) this.op = null; throw error; }
     if (this.op !== op) throw new Error(`battle ${request.battleId} was aborted while its session was being created; the late session is not used`);
     op.session = session;
-    if (typeof session === "object" && session !== null) { this.bornIn.set(session, this.generation); this.battleContexts.set(session, context); }
+    if (typeof session === "object" && session !== null) {
+      this.bornIn.set(session, this.generation); this.battleContexts.set(session, context);
+      this.ownedBattleEffects.set(session, { battleId: request.battleId, generation: this.generation, contentIdentity: validatedContentIdentity(content), context: {
+        playerIds: [...setup.evidenceContext.playerIds], L0: clone(setup.evidenceContext.initialLevels),
+        engineRosterIds: view.party.filter(m => !m.isEgg).slice(0, 6).map(m => m.id), foeIds: foes.map(m => m.id), internalBattle: true,
+      } });
+    }
     return session;
   }
 
@@ -544,19 +613,26 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    */
   commitResult(result: BattleResult, options: BattleCommitOptions = {}): CommitResultStatus {
     if (this.management.active || this.inventory.active) throw new Error("management-active");
-    if (this.op) throw new Error("battle-active: use finishBattle for the active session");
+    if (this.battleBusy) throw new Error("battle-active: use the current battle/receiving operation");
     if (this.reception) throw new Error("receiving-active: use its receiving token");
+    assertBattleResultShape(result);
     const context = this.newReceptionContext(options);
     return this.commitResultWithContext(clone(result), context);
   }
   private commitResultWithContext(result: BattleResult, context: ReceptionContext): CommitResultStatus {
     try { return this.commit(result, undefined, context).status; }
     catch (error) {
+      this.assertBattleContext(context);
+      if (error instanceof StateInstallFailed || error instanceof ReceivingRefused && error.reason === "pending") {
+        const members = this.preparedBattles.get(context)?.captureMembers ?? [];
+        this.reception = { context, members: clone(members), resume: () => ({ status: this.commitResultWithContext(result, context) }) };
+        return "pending";
+      }
       if (!(error instanceof ReceivingRefused)) throw error;
       if (error.reason === "no-template") return "no-template";
-      if (error.reason !== "pending") throw error;
-      const members = capturedTemplates(result, context.templates ?? {}, speciesKeyResolver(this.ports.content().content), this.ports.content().content);
-      this.reception = { context, members, resume: () => ({ status: this.commitResultWithContext(result, context) }) }; return "pending";
+      throw error;
+    } finally {
+      if (this.battleCommitOwner === context && this.reception?.context !== context && !this.preparedBattles.get(context)?.indeterminate) this.battleCommitOwner = null;
     }
   }
 
@@ -565,25 +641,128 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * lost or drawn battle the defeat settlement (money loss and party heal, D3), and the battle statistics. All are
    * identified by the result's battleId + hash in appliedBattles, so a repeat (already-applied) never settles again.
    */
-  private commit(result: BattleResult, facts?: BattleFacts, options: BattleCommitOptions = {}): { status: ApplyStatus; defeat?: { moneyLost: number; healed: true } } {
-    const code = outcomeCode(result); // pure validation precedes any source lookup or persistent installation
-    const heldItemSource = { allowed: this.capabilities.allowHeldItemSources, describe: this.describeHeldItem };
-    assertCapturedHeldSources(result.captured ?? [], options.templates ?? {}, heldItemSource);
-    const { content } = this.ports.content();
-    const applied = applyBattleResult(this.ports.state.read(), result, this.limits, speciesKeyResolver(content), { ...options, content, depositHeal: this.depositHeal, heldItemSource });
-    if (applied.status !== "applied") return { status: applied.status };
-    let next = applied.state;
-    let defeat: { moneyLost: number; healed: true } | undefined;
-    if (isDefeat(result)) {
-      const settled = settleDefeat(next, content, { noMoneyLoss: this.noMoneyLoss, badges: badgeCount(next.badges), moneyLimit: this.limits.money });
-      next = settled.state;
-      defeat = { moneyLost: settled.moneyLost, healed: true };
+  private commit(result: BattleResult, facts: BattleFacts | undefined, context: ReceptionContext, handle?: S): { status: ApplyStatus; defeat?: { moneyLost: number; healed: true }; diagnostics?: string[] } {
+    assertBattleResultShape(result);
+    this.assertBattleContext(context);
+    const authority = handle ? this.ownedBattleEffects.get(handle) : undefined;
+    if (authority && authority.battleId !== result.battleId) throw new Error("battle-result-owner-mismatch");
+    // read() is a synchronous host port and may call back into the application. Reserve before the first read,
+    // including exact replay, so no other operation can take a stale snapshot in that callback window.
+    if (this.battleCommitOwner && this.battleCommitOwner !== context) throw new Error("battle-commit-active");
+    if (this.op && (!handle || this.op.session !== handle)) throw new Error("battle-active");
+    this.battleCommitOwner = context;
+    const code = outcomeCode(result), hash = resultHash(result), current = this.ports.state.read();
+    this.assertBattleContext(context);
+    let prepared = this.preparedBattles.get(context);
+    const previous = own(current.appliedBattles, result.battleId);
+    if (previous) {
+      if (previous.hash !== hash) throw new Error(`battle ${result.battleId} already applied with a different result`);
+      if (prepared?.attempted && !prepared.completed && prepared.next) {
+        if (stateIdentity(current) !== stateIdentity(prepared.next)) { prepared.indeterminate = true; throw new StateInstallFailed("state-install-indeterminate: reload the last complete save", true); }
+        prepared.completed = true; prepared.indeterminate = false;
+        this.noteReception(context, result.captured, current); this.reception = null;
+        return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), diagnostics: [...prepared.diagnostics, "状态已完整安装，已核定原提交"] };
+      }
+      // Exact replay is content-independent and never fetches a newer effects seal.
+      return { status: "already-applied" };
     }
-    if (facts) next = { ...next, stats: battleStats(next.stats, facts, code, defeat) };
-    this.install(next);
-    if ("token" in options) this.noteReception(options as ReceptionContext, result.captured, next);
-    this.reception = null;
-    return defeat ? { status: "applied", defeat } : { status: "applied" };
+    // This fresh-only closed-source guard must not load current content or an external item catalog.
+    assertCapturedHeldSources(result.captured, context.templates ?? {}, { allowed: this.capabilities.allowHeldItemSources, describe: this.describeHeldItem });
+    const { content } = this.ports.content(), identity = validatedContentIdentity(content);
+    this.assertBattleContext(context, true);
+    if (prepared && (prepared.rawHash !== hash || prepared.generation !== this.generation)) throw new Error("prepared battle binding changed");
+    if (prepared && stateIdentity(current) !== stateIdentity(prepared.before)) {
+      prepared.indeterminate = true;
+      throw new StateInstallFailed("state-changed-during-prepared-commit: reload the last complete save", true);
+    }
+    // A new content identity may revalidate a zero-write primary plan, but can never revive the old source seal.
+    // Actual installed/indeterminate attempts were handled above against their original next state first.
+    if (prepared && (!prepared.sourceInvalidated && prepared.sourceIdentity !== identity
+      || prepared.next && prepared.nextIdentity !== identity)) this.invalidatePreparedSource(prepared, result.battleId);
+    if (!prepared?.next) {
+      // Fresh reference checks are complete before a pending receiving choice can defer the source seal.
+      let applied: ReturnType<typeof planBattlePrimary> | undefined;
+      let receiving: ReceivingRefused | undefined;
+      try {
+        applied = planBattlePrimary(current, result, this.limits, speciesKeyResolver(content), { ...context, content, depositHeal: this.depositHeal,
+          heldItemSource: { allowed: this.capabilities.allowHeldItemSources, describe: this.describeHeldItem } });
+      } catch (error) {
+        if (!(error instanceof ReceivingRefused) || error.reason !== "pending") throw error;
+        receiving = error;
+      }
+      this.assertBattleContext(context, true);
+      if (!prepared) {
+        const owned = handle ? this.ownedBattleEffects.get(handle) : undefined;
+        const expectedContext: EffectsContextV2 = owned?.context ?? {
+          playerIds: current.party.map(m => m.id), L0: Object.fromEntries(current.party.map(m => [m.id, m.level])),
+          engineRosterIds: current.party.filter(m => !m.isEgg).slice(0, 6).map(m => m.id), foeIds: result.captured.map(m => m.id), internalBattle: false,
+        };
+        const binding: EffectsBindingV2 = { battleId: result.battleId, generation: this.generation, rawHash: hash, contentIdentity: owned?.contentIdentity ?? "0".repeat(64) };
+        let seal: unknown = null;
+        const compatible = !!owned && owned.generation === this.generation && owned.contentIdentity !== null && owned.contentIdentity === identity;
+        if (compatible && handle && this.ports.sessions.effects) {
+          try { seal = this.ports.sessions.effects(handle, binding); } catch { /* Auxiliary absence never discards the legal primary plan. */ }
+        }
+        this.assertBattleContext(context, true);
+        prepared = { rawHash: hash, generation: this.generation, before: clone(current), expectedContext: clone(expectedContext),
+          effects: resolveBattleEffects({ seal, expectedBinding: binding, expectedContext, membersBefore: current.party }),
+          captureMembers: capturedTemplates(result, context.templates ?? {}, speciesKeyResolver(content), content),
+          sourceIdentity: owned?.contentIdentity ?? null, sourceInvalidated: !compatible, attempted: false, indeterminate: false, completed: false, diagnostics: [] };
+        this.preparedBattles.set(context, prepared);
+      }
+      // Content changes can only downgrade a prepared source. They never cause a new source lookup/backfill.
+      if (!prepared.sourceInvalidated && prepared.sourceIdentity !== identity) {
+        this.invalidatePreparedSource(prepared, result.battleId);
+      }
+      // Reception may return pending before an install exists. It must still observe any content replacement
+      // made by the one source callback; returning to the old identity later cannot revive that old authority.
+      const afterSourceIdentity = validatedContentIdentity(this.ports.content().content);
+      this.assertBattleContext(context, true);
+      if (!prepared.sourceInvalidated && prepared.sourceIdentity !== afterSourceIdentity) this.invalidatePreparedSource(prepared, result.battleId);
+      if (receiving) throw receiving;
+      if (!applied || applied.status !== "applied") throw new Error("primary planning failed");
+      const composed = composeBattleEffects({ before: prepared.before, primary: applied.state, raw: result, content, effects: prepared.effects, internalBattle: prepared.expectedContext.internalBattle });
+      let next = composed.state;
+      if (isDefeat(result)) {
+        const settled = settleDefeat(next, content, { noMoneyLoss: this.noMoneyLoss, badges: badgeCount(next.badges), moneyLimit: this.limits.money });
+        next = settled.state; prepared.defeat = { moneyLost: settled.moneyLost, healed: true };
+      }
+      if (facts) next = { ...next, stats: battleStats(next.stats, facts, code, prepared.defeat) };
+      if (prepared.effects.dispositions.some(d => d.status !== "complete") || composed.dispositions.some(d => d.status !== "applied")) prepared.diagnostics.push("部分战斗附加事实不可用，主战果保留");
+      prepared.next = clone(next); prepared.nextIdentity = identity;
+    }
+    const next = prepared.next!;
+    const problems = validateGameContent(next, content);
+    if (problems.length) throw new Error(`invalid battle next state: ${problems[0]!.path} ${problems[0]!.message}`);
+    if (next.inventory.pockets.some(pocket => pocket.length)) assertInventoryMapped(next.inventory, catalogOf(content));
+    const latest = this.battleStatePort.read();
+    this.assertBattleContext(context, true);
+    if (stateIdentity(latest) !== stateIdentity(prepared.before)) {
+      prepared.indeterminate = true;
+      throw new StateInstallFailed("state-changed-before-battle-install: reload the last complete save", true);
+    }
+    const latestIdentity = validatedContentIdentity(this.ports.content().content);
+    this.assertBattleContext(context, true);
+    if (latestIdentity !== identity) {
+      this.invalidatePreparedSource(prepared, result.battleId);
+      throw new StateInstallFailed("content-changed-before-battle-install: retry with stable current content");
+    }
+    prepared.attempted = true;
+    let failure: unknown;
+    try { this.battleStatePort.replace(clone(next)); this.inventory.stateChanged(next); }
+    catch (error) { failure = error; }
+    let installed: GameState;
+    try { installed = this.battleStatePort.read(); }
+    catch (error) { prepared.indeterminate = true; throw new StateInstallFailed(error, true); }
+    this.assertBattleContext(context, true);
+    if (stateIdentity(installed) !== stateIdentity(next)) {
+      prepared.indeterminate = stateIdentity(installed) !== stateIdentity(prepared.before);
+      throw new StateInstallFailed(failure ?? "state port did not install the complete battle state", prepared.indeterminate);
+    }
+    if (failure) prepared.diagnostics.push(`状态已完整安装，宿主确认失败: ${message(failure)}`);
+    prepared.completed = true; prepared.indeterminate = false;
+    this.noteReception(context, result.captured, next); this.reception = null;
+    return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), ...(prepared.diagnostics.length ? { diagnostics: [...prepared.diagnostics] } : {}) };
   }
 
   /**
@@ -592,52 +771,71 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * is committed a failing host projection is reported on the outcome and does not undo or repeat the commit.
    */
   finishBattle(handle: S, request: Pick<BattleStartRequest, "battleId"> | null): BattleOutcome & { result?: BattleResult } {
+    if ((typeof handle !== "object" || handle === null) && typeof handle !== "function") return this.abortBattle(request, new Error("invalid battle handle"));
     const born = typeof handle === "object" && handle !== null ? this.bornIn.get(handle) : undefined;
-    if (born !== undefined && born !== this.generation) {
-      // the state this battle read is gone: no commit, no projection into the new state, and no lock to release
-      return { code: 0, battleId: request ? request.battleId : null, commit: "none", aborted: true, error: "the game state was replaced while this battle was open (a save was loaded or a new game started); its result is not committed" };
-    }
+    if (born !== undefined && born !== this.generation) return { code: 0, battleId: request?.battleId ?? null, commit: "none", aborted: true, error: "the game state was replaced while this battle was open (a save was loaded or a new game started); its result is not committed" };
+    if (this.finishing.has(handle)) return { code: 0, battleId: request?.battleId ?? null, commit: "none", aborted: true, error: "battle-finish-active" };
     if (this.op && this.op.session !== handle) return { code: 0, battleId: request?.battleId ?? null, commit: "none", aborted: true, error: "stale battle session" };
-    const ownedOp = this.op && this.op.session === handle ? this.op : null;
-    const facts = ownedOp?.facts;
-    const context = this.battleContexts.get(handle) ?? this.newReceptionContext();
-    let result: BattleResult;
-    let outcome: BattleOutcome & { result?: BattleResult };
+    const ownedOp = this.op?.session === handle ? this.op : null, facts = ownedOp?.facts;
+    const remembered = this.battleContexts.get(handle);
+    let context = remembered ?? this.newReceptionContext();
+    if (this.terminatedBattles.has(context)) return { code: 0, battleId: request?.battleId ?? null, commit: "none", aborted: true, error: "battle-commit-terminated" };
+    let result: BattleResult | undefined;
+    this.finishing.add(handle);
     try {
-      result = handle.result();
-      // Read and validate every result field needed after commit first. A bad handle must never leave a committed
-      // battle that the caller subsequently mistakes for an abort.
-      const code = outcomeCode(result), kind = result.outcome.kind;
-      const battleId = request ? request.battleId : result.battleId;
-      const hash = resultHash(result);
+      const received = handle.result();
+      assertBattleResultShape(received); // Before outcome, copying, hash or any source callback.
+      const hash = resultHash(received);
+      this.assertBattleContext(context);
+      // Legacy callers may recreate an unowned handle for an existing receiving retry. Matching the private pending
+      // hash can resume that same zero-authority context; it cannot borrow a started session's source authority.
+      if (!remembered && !this.op && this.battleCommitOwner && this.reception?.context === this.battleCommitOwner
+        && this.preparedBattles.get(this.battleCommitOwner)?.rawHash === hash) context = this.battleCommitOwner;
+      this.battleContexts.set(handle, context); this.bornIn.set(handle, context.generation);
+      result = clone(received);
+      const code = outcomeCode(result), kind = result.outcome.kind, battleId = request?.battleId ?? result.battleId;
       if (context.rawHash && context.rawHash !== hash) throw new Error("battle result changed while receiving decisions were pending");
       context.rawHash = hash;
-      const committed = this.commit(result, facts, context);
+      const committed = this.commit(result, facts, context, handle);
+      this.assertBattleContext(context);
       if (this.op === ownedOp) this.op = null;
-      outcome = { code, battleId, commit: committed.status, kind, ...(facts?.experimentalHeld ? { diagnostics: ["战后持物写回未完成"] } : {}), ...(committed.defeat ? { defeat: committed.defeat } : {}) };
+      const outcome: BattleOutcome & { result?: BattleResult } = { code, battleId, commit: committed.status, kind,
+        ...(facts?.experimentalHeld ? { diagnostics: ["战后持物写回未完成"] } : {}),
+        ...(committed.diagnostics?.length ? { diagnostics: [...(facts?.experimentalHeld ? ["战后持物写回未完成"] : []), ...committed.diagnostics] } : {}),
+        ...(committed.defeat ? { defeat: committed.defeat } : {}) };
+      // Legacy diagnostics are optional and supply no authority to the V2 consumer or public options.
       if (committed.status === "applied" && this.ports.sessions.evidence) {
         try {
           const evidence = this.ports.sessions.evidence(handle, { battleId: result.battleId, generation: this.generation, rawHash: hash });
-          const identity = this.ports.content().content.meta;
-          if (evidence && evidence.rawHash === hash && evidence.context.battleId === result.battleId && evidence.context.generation === this.generation && evidence.context.contentIdentity === (identity?.inputsHash ?? identity?.id ?? "anonymous-content")) {
+          const currentContent = this.ports.content().content;
+          const identity = validatedContentIdentity(currentContent) ?? currentContent.meta?.inputsHash ?? currentContent.meta?.id ?? "anonymous-content";
+          if (evidence && evidence.rawHash === hash && evidence.context.battleId === result.battleId && evidence.context.generation === this.generation && evidence.context.contentIdentity === identity) {
             this.completedEvidence.set(handle, clone(evidence));
             if (evidence.issues.length) outcome.diagnostics = [...(outcome.diagnostics ?? []), "部分战斗伴随事实不可用"];
           } else outcome.diagnostics = [...(outcome.diagnostics ?? []), "战斗伴随事实不可用"];
         } catch { outcome.diagnostics = [...(outcome.diagnostics ?? []), "战斗伴随事实读取失败"]; }
       }
+      this.assertBattleContext(context);
+      this.project(outcome); outcome.result = result;
+      return outcome;
     } catch (error) {
-      if (error instanceof StateInstallFailed || (error instanceof ReceivingRefused && error.reason === "pending")) {
-        const raw = handle.result();
-        this.reception = { context, members: capturedTemplates(raw, context.templates ?? {}, speciesKeyResolver(this.ports.content().content), this.ports.content().content), resume: () => this.finishBattle(handle, request) };
-        return { code: outcomeCode(raw), battleId: raw.battleId, commit: "none", pending: true, receivingToken: context.token, pendingMember: error instanceof ReceivingRefused ? error.memberId : undefined, ...(error instanceof StateInstallFailed ? { error: `commit-failed: ${message(error)}` } : {}) };
+      // A callback may have loaded another game and even opened a same-id battle. The old completion must not
+      // enqueue a receiving operation, project into that game, or abort its new operation by matching the id.
+      if (context.generation !== this.generation || this.terminatedBattles.has(context)) return { code: 0, battleId: request?.battleId ?? result?.battleId ?? null, commit: "none", aborted: true, error: message(error) };
+      if (result && (error instanceof StateInstallFailed || error instanceof ReceivingRefused && error.reason === "pending")) {
+        this.reception = { context, members: clone(this.preparedBattles.get(context)?.captureMembers ?? []), resume: () => this.finishBattle(handle, request) };
+        return { code: outcomeCode(result), battleId: result.battleId, commit: "none", pending: true, receivingToken: context.token,
+          pendingMember: error instanceof ReceivingRefused ? error.memberId : undefined,
+          ...(error instanceof StateInstallFailed ? { error: `commit-failed: ${message(error)}` } : {}) };
       }
       if (this.reception?.context === context) this.reception = null;
+      if (!this.preparedBattles.get(context)?.indeterminate) this.terminatedBattles.add(context);
       if (this.op === ownedOp) this.op = null;
       return this.abortBattle(request, error);
+    } finally {
+      this.finishing.delete(handle);
+      if (this.battleCommitOwner === context && this.reception?.context !== context && !this.preparedBattles.get(context)?.indeterminate) this.battleCommitOwner = null;
     }
-    this.project(outcome);
-    outcome.result = result;
-    return outcome;
   }
 
   /**
@@ -647,7 +845,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   abortBattle(request: Pick<BattleStartRequest, "battleId"> | null, error: unknown): BattleOutcome {
     if (this.op && request && this.op.battleId === request.battleId) {
       const context = this.op.session ? this.battleContexts.get(this.op.session) : undefined;
-      if (context && this.reception?.context === context) this.reception = null;
+      if (context && !this.preparedBattles.get(context)?.indeterminate) {
+        this.terminatedBattles.add(context);
+        if (this.reception?.context === context) this.reception = null;
+        if (this.battleCommitOwner === context) this.battleCommitOwner = null;
+      }
       this.op = null;
     }
     const outcome: BattleOutcome = { code: 0, battleId: request ? request.battleId : null, commit: "none", aborted: true, error: message(error) };

@@ -1,3 +1,4 @@
+import { memberContentProblems } from "./member-content.ts";
 import { inventoryFromBag, inventoryPolicy, inventoryProblems } from "./inventory.ts";
 import { catalogOf, itemOf } from "./item-catalog.ts";
 import { baseMovePp, totalPp } from "./member-metadata.ts";
@@ -26,7 +27,7 @@ import { createDexState, dexContentProblems, dexStateProblems, dexLayoutStatePro
 import { GAME_SCHEMA } from "./state.ts";
 import type { GameState } from "./state.ts";
 import { MAX_FORM, speciesDataOf } from "./species-key.ts";
-import { completeIndividual, COMPATIBLE_PLAYER, initialOrdinal, resolveAbility } from "./member-identity.ts";
+import { completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity.ts";
 import { BOX_COUNT, SLOTS_PER_BOX, STORAGE_CAPACITY, newStorage } from "./storage.ts";
 import type { Content, DexState, Member } from "./types.ts";
 import type { SpeciesKeyResolver } from "./species-key.ts";
@@ -325,30 +326,7 @@ export function validateGameContent(state: unknown, content: Content): Problem[]
   out.push(...dexContentProblems(content));
   if (out.length) return out;
   const catalog = catalogOf(content);
-  const moveDirectory = Object.values(content.moves ?? {});
-  const abilityDirectory = content.abilities;
-  const abilityKnown = (ability: string): boolean => abilityDirectory !== undefined
-    ? Object.values(abilityDirectory).some(entry => entry.id === ability || entry.name === ability)
-    : Object.values(content.species).some(species => [...(species.abilities ?? []), ...(species.hiddenAbilities ?? [])].includes(ability));
-  const moveKnown = (id: string): boolean => moveDirectory.some(move => move.id === id);
-  for (const { member, path } of persistentMembers(doc)) {
-    const m = member as unknown as Member;
-    const species = speciesDataOf(content, m);
-    if (!species) out.push({ path: `${path}.species`, message: "unmapped species/form; original save must be kept" });
-    // An explicitly empty/sparse author slot list can legitimately resolve to no ability (WP19).
-    // This is not permission for arbitrary empty overrides or a guessed slot on an old individual.
-    const legalEmpty = m.ability === "" && !!species && m.effectiveAbilityIndex === null &&
-      (m.abilityIndex === null ? [0, 1].some(slot => resolveAbility(m.personalID!, species, slot).ability === "") : resolveAbility(m.personalID!, species, m.abilityIndex!).ability === "");
-    if (!legalEmpty && !abilityKnown(m.ability)) out.push({ path: `${path}.ability`, message: "unmapped ability; a trusted legacy override still requires the checked ability directory" });
-    if (m.item && !itemOf(catalog, m.item)) out.push({ path: `${path}.item`, message: "unmapped held item" });
-    if (m.ball && !itemOf(catalog, m.ball)) out.push({ path: `${path}.ball`, message: "unmapped capture ball" });
-    for (const [i, move] of m.moves.entries()) {
-      const base = baseMovePp(content, move.id);
-      if (!moveKnown(move.id)) out.push({ path: `${path}.moves[${i}].id`, message: "unmapped move" });
-      else if (base === undefined || move.maxpp !== totalPp(base, move.ppUps ?? 0)) out.push({ path: `${path}.moves[${i}].maxpp`, message: "max PP does not match checked base PP and PP Ups" });
-    }
-    for (const [i, move] of m.firstMoves!.entries()) if (!moveKnown(move)) out.push({ path: `${path}.firstMoves[${i}]`, message: "unmapped first move" });
-  }
+  for (const { member, path } of persistentMembers(doc)) out.push(...memberContentProblems(member as unknown as Member, content, path));
   const inventory = doc["inventory"] as unknown as GameState["inventory"];
   for (const [i, pocket] of inventory.pockets.entries()) for (const [j, slot] of pocket.entries()) if (!itemOf(catalog, slot.itemId)) out.push({ path: `$.inventory.pockets[${i}][${j}].itemId`, message: "unmapped item; original save must be kept" });
   const dex = doc["dex"] as unknown as DexState;

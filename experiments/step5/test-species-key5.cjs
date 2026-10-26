@@ -96,9 +96,10 @@ test('FR-000396: form records compile with located errors (duplicate form, missi
 
 test('a result is written back through the content mapping: captured member and dex by content id + form; an unmapped name refuses it all', () => {
   const g = S.newGame({ party: [], content: formed });
-  const caught = E.memberFactory.createMember({ id: 'W1-1', species: 'Vulpix-Alola', level: 5 }, formed, () => 0);
+  const original = E.memberFactory.createMember({ id: 'W1-1', species: 'Vulpix-Alola', level: 5 }, formed, () => 0);
+  const caught = S.protocolMember(original);
   const result = { protocol: 1, battleId: 'cap#1', outcome: { kind: 'caught', winner: null, target: 'W1-1', ball: 'pokeball' }, members: {}, bag: {}, captured: [caught], dex: { seen: ['Vulpix-Alola'], owned: ['Vulpix-Alola'] } };
-  const reception = { templates: { [caught.id]: K.toPersistentMember(caught, formed) }, profile: { mode: 1, naming: 1 } };
+  const reception = { templates: { [original.id]: K.toPersistentMember(original, formed) }, profile: { mode: 1, naming: 1 } };
   const r = S.applyBattleResult(g, result, undefined, K.speciesKeyResolver(formed), reception);
   assert.deepEqual([r.state.party[0].species, r.state.party[0].form, r.state.dex], ['vulpix', 1, { ...g.dex, seen: ['vulpix'], owned: ['vulpix'] }]);
   assert.deepEqual(validateGame(r.state), []);
@@ -188,10 +189,11 @@ test('3 -> 4 refuses as a whole when the content cannot map a name: every place 
 
 test('replay ledger across the migration: a result committed before schema 4 is still recognised afterwards (applied once)', () => {
   const g3 = v3(); g3.appliedBattles = {};
-  const caught = E.memberFactory.createMember({ id: 'W3-1', species: 'Pidgey', level: 4 }, sample, () => 2);
+  const original = E.memberFactory.createMember({ id: 'W3-1', species: 'Pidgey', level: 4 }, sample, () => 2);
+  const caught = S.protocolMember(original);
   const result = { protocol: 1, battleId: 'wild#3', outcome: { kind: 'caught', winner: null, target: 'W3-1', ball: 'pokeball' }, members: { 'G-starter-1': { hp: 10 } }, bag: { potion: -1 }, captured: [caught], dex: { seen: ['Pidgey'], owned: ['Pidgey'] } };
   // what a step 4 build did: schema 3, battle names stored, the hash of the result as received in the ledger
-  const committed3 = { ...clone(g3), party: [...clone(g3.party), H.legacyMember(caught, 3)], bag: { potion: 4999 }, appliedBattles: { 'wild#3': { hash: S.resultHash(result) } } };
+  const committed3 = { ...clone(g3), party: [...clone(g3.party), H.legacyMember(original, 3)], bag: { potion: 4999 }, appliedBattles: { 'wild#3': { hash: S.resultHash(result) } } };
   committed3.party[0].hp = 10;
   const m = migrateGame(committed3, { speciesKey: K.speciesKeyResolver(sample), content: sample });
   assert.equal(m.ok, true, JSON.stringify(m.error));

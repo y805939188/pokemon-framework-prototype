@@ -14,8 +14,8 @@ const auto = { mode: 1, naming: 1 };
 
 if (process.argv[2] === '--cold-held') {
   const game = E.fixtures.makeGame(), template = clone(game.party[0]);
-  template.id = 'NEW'; template.item = 'leftovers';
-  const raw = { protocol: 1, battleId: 'cold-held', outcome: { kind: 'caught', winner: null }, members: {}, captured: [E.state.protocolMember(template)], bag: {}, dex: { seen: [], owned: [] } };
+  template.id = 'NEW'; template.item = 'leftovers'; template.ball = 'pokeball';
+  const raw = { protocol: 1, battleId: 'cold-held', outcome: { kind: 'caught', winner: null, target: template.id, ball: template.ball }, members: {}, captured: [E.state.protocolMember(template)], bag: {}, dex: { seen: [], owned: [] } };
   const state = E.fakes.createMemoryState(game); let loads = 0;
   const app = new E.app.GameApplication({ state, sessions: E.fakes.createFakeSessions({}), projection: E.fakes.createRecordingProjection(), content: () => { loads++; throw Error('unexpected content load'); } });
   let expected = /held-item-source-disabled/;
@@ -52,8 +52,8 @@ if (process.argv[2] === '--cold-held') {
     return { state, sessions, app };
   }
   function capture(id = 'NEW', item = 'leftovers') {
-    const template = member(id); template.item = item;
-    const raw = { protocol: 1, battleId: 'capture-' + id, outcome: { kind: 'caught', winner: null }, members: {}, captured: [E.state.protocolMember(E.speciesKey.toBattleMember(template, content))], bag: { masterball: -1 }, dex: { seen: ['Pidgey'], owned: ['Pidgey'] } };
+    const template = member(id); template.item = item; template.ball = 'masterball';
+    const raw = { protocol: 1, battleId: 'capture-' + id, outcome: { kind: 'caught', winner: null, target: id, ball: template.ball }, members: {}, captured: [E.state.protocolMember(E.speciesKey.toBattleMember(template, content))], bag: { masterball: -1 }, dex: { seen: ['Pidgey'], owned: ['Pidgey'] } };
     return { template, raw, options: { templates: { [id]: template }, profile: auto } };
   }
   const ref = (id, index = 0) => ({ id, position: { kind: 'party', index } });
@@ -85,6 +85,17 @@ if (process.argv[2] === '--cold-held') {
       const r = spawnSync(process.execPath, [__filename, '--cold-held', mode], { encoding: 'utf8' }); assert.equal(r.status, 0, mode + '\n' + r.stdout + r.stderr);
     }
   });
+  test('M02: malformed raw held item fails at its protocol field before content, species or item lookup', () => {
+    for (const item of [null, 1, true, [], {}]) for (const allowed of [false, true]) {
+      const c = capture(); c.raw.captured[0].item = item; const rawBefore = clone(c.raw);
+      let loads = 0, lookups = 0; const describe = () => { lookups++; throw Error('unexpected item lookup'); };
+      const x = setup(undefined, { capabilities: { allowHeldItemSources: allowed }, describeHeldItem: describe }, { content: () => { loads++; throw Error('unexpected content load'); } });
+      const before = clone(x.state.current()), error = /invalid battle result \$\.captured\[0\]\.item: expected a string/;
+      assert.throws(() => x.app.commitResult(c.raw, c.options), error);
+      assert.throws(() => E.state.applyBattleResult(before, c.raw, E.limits.DEFAULT_LIMITS, () => { lookups++; throw Error('unexpected species lookup'); }, { ...c.options, content, heldItemSource: { allowed, describe } }), error);
+      assert.equal(loads, 0); assert.equal(lookups, 0); assert.equal(x.state.replaced.length, 0); assert.deepEqual(x.state.current(), before); assert.deepEqual(c.raw, rawBefore);
+    }
+  });
   test('M02: explicit source capability permits checked held item, independently of battle capability', async () => {
     const x = setup(undefined, { capabilities: { allowHeldItemSources: true } }), { raw, options } = capture();
     assert.equal(x.app.commitResult(raw, options), 'applied'); assert.equal(x.state.current().party[1].item, 'leftovers');
@@ -92,6 +103,14 @@ if (process.argv[2] === '--cold-held') {
     await assert.rejects(x.app.startBattle({ battleId: 'held', kind: 'wild', seq: 1, foes: [{ species: 'pidgey', level: 3 }] }), /held-item-battle-disabled/);
     const core = setup(), source = { allowed: true, describe: id => id === 'leftovers' ? { holdable: true, mail: false } : null };
     assert.equal(E.state.applyBattleResult(core.state.current(), raw, E.limits.DEFAULT_LIMITS, E.speciesKey.speciesKeyResolver(content), { ...options, content, heldItemSource: source }).state.party[1].item, 'leftovers');
+  });
+  test('M02: installed held capture exact replay ignores the now-closed source without content or item lookup', () => {
+    const x = setup(undefined, { capabilities: { allowHeldItemSources: true } }), c = capture(); assert.equal(x.app.commitResult(c.raw, c.options), 'applied');
+    const before = clone(x.state.current()); let loads = 0, lookups = 0;
+    const app = new E.app.GameApplication({ state: x.state, sessions: E.fakes.createFakeSessions({}), projection: E.fakes.createRecordingProjection(), content: () => { loads++; throw Error('unexpected replay content'); } }, { describeHeldItem: () => { lookups++; throw Error('unexpected replay item lookup'); } });
+    assert.equal(app.commitResult(c.raw), 'already-applied');
+    assert.equal(E.state.applyBattleResult(before, c.raw, E.limits.DEFAULT_LIMITS, () => { lookups++; throw Error('unexpected replay species lookup'); }).status, 'already-applied');
+    assert.equal(loads, 0); assert.equal(lookups, 0); assert.equal(x.state.replaced.length, 1); assert.deepEqual(x.state.current(), before); assert.equal(app.saveBlocked, false);
   });
   test('M02: controlled capture still rejects unknown/nonholdable/mail and unchecked external source before data', () => {
     for (const [item, descriptor, mail] of [['unknown', null, null], ['key', { holdable: false }, null], ['letter', { holdable: true, mail: true }, null], ['leftovers', { holdable: true }, 'letter']]) {

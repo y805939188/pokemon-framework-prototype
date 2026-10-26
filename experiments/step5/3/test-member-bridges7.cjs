@@ -178,7 +178,7 @@ test('B16: protocol projection retains its exact v1 keys and memberPatch rejects
   const game = S.newGame({party:[member]}), before = copy(game);
   for (const key of persistentOnly) {
     const result = {protocol:1,battleId:`bad-${key}`,outcome:{kind:'win',winner:'Player'},members:{barrier:{[key]:member[key]}},bag:{},captured:[],dex:{seen:[],owned:[]}};
-    assert.throws(() => S.applyBattleResult(game,result),/outside the write set/);
+    assert.throws(() => S.applyBattleResult(game,result),/invalid battle result \$\.members\.barrier\..*: unknown field/);
     assert.deepEqual(game,before);
   }
 });

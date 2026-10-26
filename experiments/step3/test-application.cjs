@@ -60,7 +60,7 @@ test('duplicate: finishing the same battle again is a no-op for the state; nothi
   const again = app.finishBattle(handle, request(r));
   assert.equal(again.commit, 'already-applied'); assert.equal(again.code, 2);
   assert.equal(state.replaced.length, 1, 'the state was replaced exactly once'); assert.equal(snapshot(state), afterFirst);
-  assert.equal(app.commitResult(r), 'no-template');
+  assert.equal(app.commitResult(r), 'already-applied', 'exact replay does not need removed capture templates');
   assert.equal(app.commitResult(r, H.templatesFor(state.current(), r)), 'already-applied');
 });
 
@@ -80,8 +80,8 @@ test('a result that breaks the contract aborts without any partial change (unkno
   for (const [label, mutate, message] of [
     ['unknown member', r => { r.members['A-9999'] = { level: 5 }; }, /unknown member/],
     ['bag below zero', r => { I6.setBag(r, { potion: -50 }); }, /not-enough-items/],
-    ['wrong protocol', r => { r.protocol = 99; }, /unsupported protocol/],
-    ['write outside the write set', r => { r.members['A-0001'].species = 'Mew'; }, /outside the write set/],
+    ['wrong protocol', r => { r.protocol = 99; }, /invalid battle result \$\.protocol: expected protocol 1/],
+    ['write outside the write set', r => { r.members['A-0001'].species = 'Mew'; }, /invalid battle result \$\.members\..*: unknown field/],
   ]) {
     const r = result('wild run'); mutate(r); const { state, app } = setup(r); const before = snapshot(state);
     const outcome = app.finishBattle({ result: () => r }, request(r));
@@ -128,12 +128,12 @@ test('an invalid outcome is rejected before any commit, including direct commits
     for (let attempt = 0; attempt < 2; attempt++) {
       const outcome = app.finishBattle({ result: () => r }, request(r));
       assert.deepEqual([outcome.battleId, outcome.code, outcome.commit, outcome.aborted, outcome.projection], [r.battleId, 0, 'none', true, 'ok']);
-      assert.match(outcome.error, /invalid battle outcome/);
+      assert.match(outcome.error, /invalid battle result \$\.outcome/);
       assert.equal(snapshot(state), before, 'no partial capture, bag, reward or ledger entry');
       assert.equal(state.replaced.length, 0);
       assert.equal(projection.outcomes.at(-1).code, 0);
     }
-    assert.throws(() => app.commitResult(r), /invalid battle outcome/);
+    assert.throws(() => app.commitResult(r), /invalid battle result \$\.outcome/);
     r.outcome = result('caught with master ball').outcome;
     const correctedHandle = await app.startBattle(request(r));
     const first = app.finishBattle(correctedHandle, request(r));

@@ -83,20 +83,22 @@ test('isDefeat: a lost or drawn battle (code 4 outcomes), never a win, run or ca
 });
 
 // ---- applyBattleResult capacity backstop
-const caughtResult = (id, battleId = 'cap#1') => ({ protocol: 1, battleId, outcome: { kind: 'caught', winner: null, target: id, ball: 'pokeball' }, members: {}, bag: { pokeball: -1 }, captured: [member(id, 'Pidgey', 3)], dex: { seen: ['Pidgey'], owned: ['Pidgey'] } });
+const caughtResult = (original, battleId = 'cap#1') => ({ protocol: 1, battleId, outcome: { kind: 'caught', winner: null, target: original.id, ball: 'pokeball' }, members: {}, bag: { pokeball: -1 }, captured: [S.protocolMember(original)], dex: { seen: ['Pidgey'], owned: ['Pidgey'] } });
 
 test('a capture goes to the party, then to the boxes; with both full the whole result is refused, nothing dropped or half-applied', () => {
   const L = { ...E.limits.DEFAULT_LIMITS, boxes: 1 };
   const g = gameWith(Array.from({ length: 6 }, (_, i) => member(`P${i}`, 'Caterpie', 2)), 0); I6.setBag(g, { pokeball: 3 });
-  const first = caughtResult('W1-1'), second = caughtResult('W2-1', 'cap#2');
-  const receiving = r => ({templates: {[r.captured[0].id]: E.speciesKey.toPersistentMember(r.captured[0], content)}, profile:{mode:1,naming:1}});
+  const firstOriginal = member('W1-1', 'Pidgey', 3), secondOriginal = member('W2-1', 'Pidgey', 3);
+  const first = caughtResult(firstOriginal), second = caughtResult(secondOriginal, 'cap#2');
+  // Keep each full original individual independently of the frozen-v1 captured projection.
+  const receiving = original => ({templates: {[original.id]: E.speciesKey.toPersistentMember(original, content)}, profile:{mode:1,naming:1}});
   const keys = E.speciesKey.speciesKeyResolver(content);
-  const one = S.applyBattleResult(g, first, L, keys, receiving(first));
+  const one = S.applyBattleResult(g, first, L, keys, receiving(firstOriginal));
   assert.deepEqual([one.state.party.length, E.storage.boxedMembers(one.state).map(m => m.id)], [6, ['W1-1']]);
   const before = clone(one.state);
-  assert.throws(() => S.applyBattleResult(one.state, second, L, keys, receiving(second)), e => e.reason === 'boxes-full');
+  assert.throws(() => S.applyBattleResult(one.state, second, L, keys, receiving(secondOriginal)), e => e.reason === 'boxes-full');
   assert.deepEqual(one.state, before, 'the bag, dex and ledger are untouched as well');
-  assert.equal(S.applyBattleResult(g, first, L, keys, receiving(first)).status, 'applied', 'the default limits apply when none are given');
+  assert.equal(S.applyBattleResult(g, first, L, keys, receiving(firstOriginal)).status, 'applied', 'the default limits apply when none are given');
 });
 
 test('battle additions split slots and respect explicit finite capacity; trusted high quantities can be spent', () => {
