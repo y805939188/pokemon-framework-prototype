@@ -152,8 +152,14 @@ export class EvolutionOperation {
       op.error = undefined;
       const state = this.ports.state.read(); this.assertCurrent(op);
       const content = this.content(op);
+      if (decision.kind === "retry") {
+        op.revision++;
+        if (op.learning) return this.learn(op, state, content);
+        return op.selection ? this.pending(op) : this.advance(op, state, content);
+      }
       if (op.learning) {
         if (decision.kind !== "learn") return { status: "refused", reason: "learning-answer-required" };
+        if (!op.learning.pending) return { status: "refused", reason: "retry-or-terminate-required" };
         const previous = op.learning.answers;
         const answerIndex = op.learning.pending?.answerIndex ?? previous.length;
         op.learning.answers = [...previous.slice(0, answerIndex), clone(decision.answer)];
@@ -215,7 +221,7 @@ export class EvolutionOperation {
       op.selection = undefined; op.learning = { memberId: after.memberId, moves: after.moves, cursor: 0, answers: [] };
       return this.learn(op, state, this.content(op));
     }
-    if (after.kind === "learned") { op.learning!.cursor++; op.learning!.answers = []; return this.learn(op, state, this.content(op)); }
+    if (after.kind === "learned") { op.learning!.cursor++; op.learning!.answers = []; delete op.learning!.pending; return this.learn(op, state, this.content(op)); }
     op.selection = undefined;
     return this.advance(op, state, this.content(op));
   }
@@ -238,7 +244,7 @@ export class EvolutionOperation {
         const next = clone(state), target = next.party.find(m => m.id === member.id)!; target.moves = plan.patch.moves;
         return this.write(op, state, next, { kind: "learned" });
       }
-      learning.cursor++; learning.answers = [];
+      learning.cursor++; learning.answers = []; delete learning.pending;
     }
     op.learning = undefined;
     return this.advance(op, state, content);
