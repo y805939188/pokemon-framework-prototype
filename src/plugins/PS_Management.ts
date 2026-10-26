@@ -22,7 +22,9 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
  const eventKey=(e:any):Action|Direction|undefined=>KEY[e.code]||LEGACY_KEY[e.keyCode];
  // A/S are adapter bindings for the specification's abstract JUMPUP/JUMPDOWN actions.
  G.Input.keyMapper[65]='pageup';G.Input.keyMapper[83]='pagedown';
- let nextRequest:OpenRequest|null=null,sequence=0,current:any=null;
+ let nextRequest:OpenRequest|null=null,sequence=0,current:any=null,queuedScene:any=null,initializingScene:any=null;
+ function presentationPending():boolean {const s=queuedScene,m=G.SceneManager;if(s&&s!==initializingScene){const stale=s._psQueuedApp&&(s._psQueuedApp!==flow()._app||s._psQueuedGeneration!==s._psQueuedApp.stateGeneration),orphan=('_scene'in m)&&('_nextScene'in m)&&s!==m._scene&&s!==m._nextScene;if(stale||orphan){s._invalid=true;if(queuedScene===s)queuedScene=null;}}return !!nextRequest||!!queuedScene;}
+
  // Native inputs stop propagation before MZ sees their initial keydown. Keep that consumed action blocked
  // until the real keyup, including after the input or its entire scene has been removed.
  const nativeConsumed=new Map<string,Action|Direction>();
@@ -52,13 +54,14 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
   return {pressed:{...inventorySample.pressed},triggered:{...inventorySample.triggered},repeated:{...inventorySample.repeated}};
  }
  function record(data:any){debugFrames.push(data);if(debugFrames.length>256)debugFrames.shift();}
- function open(request:OpenRequest):boolean {if(current||nextRequest)return false;nextRequest=request;G.SceneManager.push(Scene_PSManagement);return true;}
+ function open(request:OpenRequest):boolean {if(current||presentationPending())return false;nextRequest=request;try{G.SceneManager.push(Scene_PSManagement);return true;}catch(error){if(nextRequest===request)nextRequest=null;presentationPending();throw error;}}
  function boxTitle(s:ManagementSnapshot,box:number):string{return s.storage.boxes[box]?.name||tr('box',{n:box+1});}
  const ui:any=W.PSManagement={
   openParty:()=>open({kind:'party'}),openStorage:()=>open({kind:'pc'}),openSummary:(id:string)=>open({kind:'summary',id}),
   selectMember:(qualifier:(m:Member)=>boolean,done:(result:any)=>void)=>open({kind:'selector',qualifier,done}),
   openReceiving:(done?:(result:any)=>void)=>open({kind:'receiving',done}),
-  replaceBattleWithReceiving:()=>{if(current||nextRequest)return false;nextRequest={kind:'receiving'};G.SceneManager.goto(Scene_PSManagement);return true;},
+  presentationPending,
+  replaceBattleWithReceiving:()=>{if(current||presentationPending())return false;nextRequest={kind:'receiving'};G.SceneManager.goto(Scene_PSManagement);return true;},
   current:()=>current&&!current.closed&&current.top()?{token:current.token,generation:current.generation,ready:current.ready,text:[...current.renderedText],view:{...current.top(),items:current.top().items?.map((x:MenuItem)=>({key:x.key,label:x.label,enabled:x.enabled}))},heldId:current.snapshot?.held?.id??null,frames:[...debugFrames]}:null,
   inputFrame:inventoryInputFrame,
   hasBoxLink:()=>app().hasBoxLink?.()??false, // default reads authoritative inventory; explicit developer override stays process-local
@@ -318,9 +321,9 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
  function Scene_PSManagement(this:any){this.initialize(...(arguments as any));}
  Scene_PSManagement.prototype=Object.create(G.Scene_MenuBase.prototype);Scene_PSManagement.prototype.constructor=Scene_PSManagement;
  const P=Scene_PSManagement.prototype;
- P.initialize=function(){G.Scene_MenuBase.prototype.initialize.call(this);this._psParty=true;this._psManagement=true;this._request=nextRequest||{kind:'party'};nextRequest=null;};
+ P.initialize=function(){queuedScene=initializingScene=this;this._request=nextRequest||{kind:'party'};nextRequest=null;this._psQueuedApp=flow()._app;this._psQueuedGeneration=this._psQueuedApp?.stateGeneration;try{G.Scene_MenuBase.prototype.initialize.call(this);this._psParty=true;this._psManagement=true;}finally{if(initializingScene===this)initializingScene=null;}};
  P.createPresentation=function(){G.Scene_MenuBase.prototype.create.call(this);const win=new(Window_PSManagement as any)(new G.Rectangle(0,0,G.Graphics.boxWidth,G.Graphics.boxHeight));try{this.addWindow(win);}catch(error){win.parent?.removeChild(win);win.destroy?.();throw error;}this._window=win;};
- P.create=function(){try{this._controller=new Controller(this,this._request);}catch(e){this._creationFailure=e;}try{this.createPresentation();}catch(e){this._creationFailure=e;}};
+ P.create=function(){if(this._invalid)return;try{this._controller=new Controller(this,this._request);}catch(e){this._creationFailure=e;}try{this.createPresentation();}catch(e){this._creationFailure=e;}};
  P.rebuildFailed=function(error:unknown){
   console.error(NAME,'management initialization/presentation failed',error);this._initialFailure=true;
   const c=this._controller;if(c){c.resetInitialization();
@@ -334,15 +337,15 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
    for(const char of Array.from(message)){if(this._window.textWidth(line+char)>width&&line){b.drawText(line,8,y,width,28,'left');line='';y+=30;}line+=char;}if(line)b.drawText(line,8,y,width,28,'left');
   }else G.$gameMessage.add(message);}catch{console.error(NAME,message);}
  };
- P.start=function(){G.Scene_MenuBase.prototype.start.call(this);
+ P.start=function(){if(this._invalid)return;G.Scene_MenuBase.prototype.start.call(this);
   const attempts=this._creationFailure?1:2;for(let attempt=0;attempt<attempts;attempt++){
-   try{if(!this._controller)this._controller=new Controller(this,this._request);if(!this._window)this.createPresentation();this._controller.start(this._window);this._initialFailure=false;return;}
+   try{if(!this._controller)this._controller=new Controller(this,this._request);if(!this._window)this.createPresentation();this._controller.start(this._window);this._initialFailure=false;if(queuedScene===this)queuedScene=null;return;}
    catch(error){console.error(NAME,error);this._controller?.resetInitialization();if(attempt===attempts-1){this.rebuildFailed(error);return;}}
   }
  };
  P.update=function(){G.Scene_MenuBase.prototype.update.call(this);if(this._invalid){if(G.SceneManager._scene===this)this.popScene();return;}if(this._initialFailure){if(G.Input.isTriggered('cancel')||G.Input.isTriggered('ok'))this.popScene();return;}try{this._controller?.update();}catch(error){this.rebuildFailed(error);}};
  P.popScene=function(){if(this._controller?.inventoryChild){this._controller.inventoryChild.back();return;}if(this._controller&&!this._controller.closed&&!this._invalid&&!this._initialFailure){if(this._controller.input){this._controller.input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));}else {this._controller.action('back');this._controller.draw();}return;}G.Scene_MenuBase.prototype.popScene.call(this);};
- P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);this._controller?.dispose();const done=this._done,result=this._result;if(done&&this._controller.application===flow()._app&&this._controller.generation===this._controller.application.stateGeneration){this._done=null;done(result);}};
+ P.terminate=function(){if(queuedScene===this)queuedScene=null;if(initializingScene===this)initializingScene=null;G.Scene_MenuBase.prototype.terminate.call(this);this._controller?.dispose();const done=this._done,result=this._result;if(done&&this._controller.application===flow()._app&&this._controller.generation===this._controller.application.stateGeneration){this._done=null;done(result);}};
  W.Scene_PSManagement=Scene_PSManagement;W.Scene_PSParty=Scene_PSManagement;
  G.PluginManager.registerCommand('PS_BattleFlow','ShowParty',function(){ui.openParty();});
  G.PluginManager.registerCommand(NAME,'ShowStorage',function(){ui.openStorage();});
