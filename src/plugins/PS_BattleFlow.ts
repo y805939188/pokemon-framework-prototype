@@ -43,6 +43,10 @@ import { developmentCapabilities } from "../framework/rules/config";
     commitResult(result: unknown, options?: unknown): string;
     readonly saveBlocked: boolean;
     readonly encounterBlocked: boolean;
+    readonly pendingPokedex: any;
+    pokedexSnapshot(text?: any, currentRegion?: number | null): any;
+    updatePokedex(command: any): any;
+    resolvePokedex(token: string, revision: number, decision: any): any;
     resolveReceiving(token: string, decisions?: unknown, signal?: unknown): any;
     terminateAcquisition(token: string): any;
     readonly pendingEvolution: any;
@@ -78,6 +82,19 @@ import { developmentCapabilities } from "../framework/rules/config";
     beginEventEvolution(intent: any = {}): any { return PSFlow.app().beginEventEvolution(intent); },
     resolveTriggeredEvolution(token: string, revision: number, decision: any): any { return PSFlow.app().resolveTriggeredEvolution(token, revision, decision); },
     terminateAcquisition(token: string): any { return PSFlow.app().terminateAcquisition(token); },
+    pokedexSnapshot(text: any = {}, currentRegion: number | null = null): any { return PSFlow.app().pokedexSnapshot(text, currentRegion); },
+    updatePokedex(command: any): any { return PSFlow.app().updatePokedex(command); },
+    waitForPokedex(interpreter: any): boolean {
+      const pending = PSFlow._app?.pendingPokedex; if (!pending) return false;
+      interpreter.setWaitMode("psPokedex"); interpreter._psPokedexToken = pending.token; return true;
+    },
+    resolvePokedex(token: string, revision: number, decision: any): any {
+      const op = PSFlow._op, returned = PSFlow.app().resolvePokedex(token, revision, decision), continuation = returned.continuation;
+      if (continuation && "code" in continuation && op && op === PSFlow._op) {
+        const { result, ...outcome } = continuation; PSFlow.completeBattleOutcome(outcome, result, op);
+      }
+      return returned;
+    },
     beginTrade(requestId: string, intent: any): any { return PSFlow.app().beginTrade(requestId, intent); },
     resolveTrade(token: string, revision: number, decision: any): any { return PSFlow.app().resolveTrade(token, revision, decision); },
     assertBattleAllowed(): void { const capabilities = developmentCapabilities(PSFlow.developerCapabilities); if (!capabilities.allowExperimentalHeldItemBattle && (PSFlow.game().party || []).some((m: any) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成"); },
@@ -407,6 +424,8 @@ import { developmentCapabilities } from "../framework/rules/config";
       const done = PSFlow.lastOutcome;
       if (done && done.commit && done.commit !== "none" && done.battleId === op.request.battleId) {
         PSFlow.afterCommit(done, "after-commit", () => { throw error; });
+        const dex = PSFlow._app?.pendingPokedex;
+        if (dex) { PSFlow.resolvePokedex(dex.token, dex.revision, { kind: "technical-terminate" }); return; }
         const continuation = PSFlow._app?.pendingEvolution;
         if (continuation) {
           const ended = PSFlow.resolveEvolution(continuation.token, continuation.revision, { kind: "technical-terminate" });
@@ -431,7 +450,7 @@ import { developmentCapabilities } from "../framework/rules/config";
      */
     close(code: number, op: any = PSFlow._op): void {
       if (op !== PSFlow._op) { PSFlow.stale("close", op); return; }
-      if (PSFlow._app?.pendingEvolution || PSFlow._app?.pendingReceiving) return;
+      if (PSFlow._app?.pendingEvolution || PSFlow._app?.pendingReceiving || PSFlow._app?.pendingPokedex) return;
       PSFlow.running = false;
       const cur = PSFlow.perf.cur;
       if (cur && !cur.totalMs) { cur.totalMs = Math.round((performance.now() - cur.t0) * 10) / 10; cur.code = code; PSFlow.perf.battles.push(cur); }
@@ -606,6 +625,7 @@ import { developmentCapabilities } from "../framework/rules/config";
     if (v) G.$gameVariables.setValue(v, o.status === "applied" ? 1 : o.status === "already-claimed" ? 2 : 0);
     if (o.status === "refused") console.warn("PS_BattleFlow: grant refused:", o.grantId, o.reason, o.error);
     if (flag(args.message, true)) say(this, PSFlow.claimLines(o));
+    PSFlow.waitForPokedex(this);
   });
   G.PluginManager.registerCommand(NAME, "HealParty", function (this: any, args: any) {
     const o = PSFlow.heal();
@@ -634,6 +654,11 @@ import { developmentCapabilities } from "../framework/rules/config";
   // MZ's "Exit Event Processing" does; interpreters outside that calling chain are not touched.
   const baseUpdateWaitMode = G.Game_Interpreter.prototype.updateWaitMode;
   G.Game_Interpreter.prototype.updateWaitMode = function (this: any) {
+    if (this._waitMode === "psPokedex") {
+      const pending = PSFlow._app?.pendingPokedex;
+      if (pending && this._psPokedexToken === pending.token) return true;
+      this._waitMode = ""; delete this._psPokedexToken; return false;
+    }
     if (this._waitMode === "psTrade") {
       const pending = PSFlow._app?.pendingTrade;
       if (pending && this._psTradeToken === pending.token) return true;
