@@ -339,14 +339,23 @@ import { developmentCapabilities } from "../framework/rules/config";
     async begin(): Promise<any> {
       const op = PSFlow._op;
       if (!op) throw new Error("no battle was opened (openBattle)");
-      PSFlow.assertBattleAllowed();
-      const app = PSFlow.app();
-      PSFlow.content(); // loaded before the clock starts: "session create" keeps meaning what it meant in the earlier measurements
-      const tCreate = performance.now();
-      op.request.storageFull = engine().B.limits.storageFull(PSFlow.game(), PSFlow.limits()); // only for the refusal text (the application decides noBall)
-      const session = await app.startBattle(op.request); // refuses a save that refers to content that no longer exists, then opens the session
+      const initialApp = PSFlow._app, initialGeneration = initialApp?.stateGeneration;
+      const assertHost = () => {
+        if (op !== PSFlow._op || !PSFlow.running || initialApp && (PSFlow._app !== initialApp || initialApp.stateGeneration !== initialGeneration)) throw new Error("stale-battle-opening");
+      };
+      assertHost(); PSFlow.assertBattleAllowed(); assertHost();
+      const app = PSFlow.app(); assertHost();
+      const generation = app.stateGeneration;
+      const assertCurrent = () => { assertHost(); if (PSFlow._app !== app || app.stateGeneration !== generation) throw new Error("stale-battle-opening"); };
+      PSFlow.content(); assertCurrent();
+      const tCreate = performance.now(); assertCurrent();
+      const current = PSFlow.game(); assertCurrent();
+      const limits = PSFlow.limits(); assertCurrent();
+      op.request.storageFull = engine().B.limits.storageFull(current, limits); // only refusal text; application decides noBall
+      const session = await app.startBattle(op.request); assertCurrent();
+      const elapsed = performance.now() - tCreate; assertCurrent();
       op.session = session;
-      if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round((performance.now() - tCreate) * 10) / 10;
+      if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round(elapsed * 10) / 10;
       return session;
     },
     /** End the battle of `op` (default: the current operation), only with the session begin() assigned to it. */
