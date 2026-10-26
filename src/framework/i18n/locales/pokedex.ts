@@ -1,5 +1,6 @@
 /** Default MZ Pokédex captions; author creature/region keys remain content-owned. */
 export const pokedexEnglish:Record<string,string>={
+ 'pokedex.male':'Male','pokedex.female':'Female','pokedex.genderless':'Genderless','pokedex.entryScroll':'A/PageUp · S/PageDown: Entry {from}–{to}/{total}',
  'pokedex.title':'Pokédex','pokedex.exit':'Exit','pokedex.national':'National Pokédex','pokedex.seen':'Seen','pokedex.owned':'Owned',
  'pokedex.empty':'No entries available. Back to exit.','pokedex.orderHelp':'Action: list order','pokedex.sortKeyMissing':'Some entries use Other: localized sorting key missing.',
  'pokedex.order0':'Numerical','pokedex.order1':'Alphabetical','pokedex.order2':'Tallest','pokedex.order3':'Shortest','pokedex.order4':'Heaviest','pokedex.order5':'Lightest',
@@ -12,6 +13,7 @@ export const pokedexEnglish:Record<string,string>={
  'pokedex.help':'Arrows: navigate · Confirm: Z/Enter · Back: X/Esc','pokedex.failed':'Pokédex unavailable: {reason}'
 };
 export const pokedexChinese:Record<string,string>={
+ 'pokedex.male':'雄性','pokedex.female':'雌性','pokedex.genderless':'无性别','pokedex.entryScroll':'A／上页 · S／下页：正文 {from}–{to}／{total}',
  'pokedex.title':'图鉴','pokedex.exit':'退出','pokedex.national':'全国图鉴','pokedex.seen':'已见','pokedex.owned':'拥有',
  'pokedex.empty':'暂无可显示条目，返回退出。','pokedex.orderHelp':'动作键：列表排序','pokedex.sortKeyMissing':'部分条目缺中文排序键，已归入“其他”。',
  'pokedex.order0':'编号','pokedex.order1':'字母','pokedex.order2':'最高','pokedex.order3':'最矮','pokedex.order4':'最重','pokedex.order5':'最轻',

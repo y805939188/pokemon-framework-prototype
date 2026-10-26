@@ -33,6 +33,9 @@ export class PokedexScreen {
   const number={region:this.region,number:row.number,text:String(row.number).padStart(3,'0')},info=Q.dexInfo(this.snapshot.dex,this.snapshot.catalog,row.species,number);
   const base=this.snapshot.catalog.forms.find(f=>f.species===row.species&&f.form===0),config=C.resolveConfig(this.ports.content().settings);
   const forms=base?.gender?Q.dexForms(this.snapshot.dex,this.snapshot.catalog,row.species,{showAll:config.DEX_SHOWS_ALL_FORMS,gender:base.gender,baseFrontsEqual:true}):[];
+  // Translate only proven generated captions. Authored English or empty labels remain authored data.
+  for(const choice of forms){const data=this.snapshot.catalog.forms.find(f=>f.species===row.species&&f.form===choice.form),authored=data?.formLabel!==undefined?data.formLabel:data?.formName;
+   if(authored==null&&choice.label)(choice as Q.DexFormChoice&{autoLabel?:string}).autoLabel=({'One Form':'oneForm',Male:'male',Female:'female',Genderless:'genderless'}as Record<string,string>)[choice.label];}
   const area=Q.dexArea(row.species); // 5.5 owns the world map provider. No fabricated habitat points.
   this.view={kind:'entry',species:row.species,page,battled,info,forms,area,measurements:info?.heightDm==null||info.weightHg==null?null:Q.dexMeasurements(info.heightDm,info.weightHg,this.ports.locale,'info')};
  }
@@ -47,7 +50,7 @@ export class PokedexScreen {
   const v=this.view;
   if(v.kind==='error'){if(action==='back'||action==='use')this.close();return;}
   if(v.kind==='recovery'){
-   if(action==='back'){if(v.reloadRequired){this.ports.reload();return;}const p=this.pending!;const r=this.ports.resolve(p.view.token,p.view.revision,{kind:'technical-terminate'});if(r.status==='pending')this.accept(r,()=>this.close());else this.close();}
+   if(action==='back'){if(v.reloadRequired){this.ports.reload();return;}const p=this.pending!;const r=this.ports.resolve(p.view.token,p.view.revision,{kind:'technical-terminate'});if(r.status==='pending')this.accept(r,()=>this.close());else{this.pending=null;this.afterWrite=null;this.close();}}
    else if(action==='use'){const p=this.pending!;this.accept(this.ports.resolve(p.view.token,p.view.revision,{kind:'retry'}),this.afterWrite!);}return;
   }
   if(v.kind==='regions'){if(action==='back'){this.close();return;}if(action==='up'||action==='down'){v.cursor=(v.cursor+(action==='up'?-1:1)+v.rows.length)%v.rows.length;this.regionCursor=v.cursor;}else if(action==='use'){const r=v.rows[v.cursor];if(r.region===null)this.close();else this.selectRegion(r.region);}return;}
