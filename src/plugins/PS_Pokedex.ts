@@ -96,6 +96,7 @@ import { InputLatch } from './management/model.ts';
  P.update=function(){G.Scene_MenuBase.prototype.update.call(this);if(this._failure||!this._request||!valid(this._request)){this._controller?.retireStale();if(!G.SceneManager.isSceneChanging())this.popScene();return;}try{this._controller?.update();}catch(e){this._failure=String(e);G.$gameMessage?.add(text('failed',{reason:String(e)}));this._controller?.dispose();}};
  P.terminate=function(){this._controller?.dispose();if(this._request)retire(this._request);this._window?.destroy?.();G.Scene_MenuBase.prototype.terminate.call(this);};
  function open(){reap();if(busy()||G.SceneManager.isSceneChanging())return{status:'refused',reason:'operation-active'};
+  if(G.SceneManager._scene?._started===false)return{status:'refused',reason:'scene-not-started'};
   const r:Request={application:null,generation:-1,constructing:true,done:false,status:'queued',fingerprint:''};reserved=r;
   // Capture an existing recovery owner before app()/content/state callbacks can replace it.
   const prior=flow()._app,pending=prior?.pendingPokedex;
@@ -111,7 +112,7 @@ import { InputLatch } from './management/model.ts';
   }catch(e){r.constructing=false;retire(r);return{status:'refused',reason:String(e)};}
  }
  function attach(window:any,parent:{token:string;memberId:string;application:any;generation:number}){
-  if(busy())return null;const application=flow()._app;if(!application||parent.application!==application||parent.generation!==application.stateGeneration)return null;
+  if(busy()||G.SceneManager._scene?._started===false)return null;const application=flow()._app;if(!application||parent.application!==application||parent.generation!==application.stateGeneration)return null;
   const r:Request={application,generation:application.stateGeneration,constructing:true,done:false,status:'queued',fingerprint:'',parent:{token:parent.token,memberId:parent.memberId}};reserved=r;
   try{
    const result=application.beginSummaryPokedex(parent.token,parent.memberId);
