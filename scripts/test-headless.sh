@@ -86,6 +86,7 @@ SUITES=(
   experiments/step5/3/test-evolution-commit.cjs
   experiments/step5/3/test-learning-actions.cjs
   experiments/step5/3/test-postbattle-evolution.cjs
+  experiments/step5/3/test-postbattle-host.cjs
   experiments/step5/3/test-effects-source.cjs
   experiments/step5/3/test-learning-candidates.cjs
   experiments/step5/3/test-learning-plans.cjs

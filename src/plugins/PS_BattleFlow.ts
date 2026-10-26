@@ -363,9 +363,11 @@ import { developmentCapabilities } from "../framework/rules/config";
     },
     /** Core continuation bridge. Formal evolution/learning scenes are the later G package. */
     resolveEvolution(token: string, revision: number, decision: any): any {
-      const op = PSFlow._op, returned = PSFlow.app().resolveEvolution(token, revision, decision);
+      const op = PSFlow._op, previous = PSFlow.lastOutcome, returned = PSFlow.app().resolveEvolution(token, revision, decision);
       if (returned && "code" in returned && op === PSFlow._op) {
-        const { result, ...outcome } = returned; return PSFlow.completeBattleOutcome(outcome, result, op);
+        const { result, ...outcome } = returned;
+        if (previous?.battleId === outcome.battleId && previous.hostErrors?.length) outcome.hostErrors = [...previous.hostErrors, ...(outcome.hostErrors ?? [])];
+        return PSFlow.completeBattleOutcome(outcome, result, op);
       }
       return returned;
     },
@@ -385,6 +387,12 @@ import { developmentCapabilities } from "../framework/rules/config";
       const done = PSFlow.lastOutcome;
       if (done && done.commit && done.commit !== "none" && done.battleId === op.request.battleId) {
         PSFlow.afterCommit(done, "after-commit", () => { throw error; });
+        const continuation = PSFlow._app?.pendingEvolution;
+        if (continuation) {
+          const ended = PSFlow.resolveEvolution(continuation.token, continuation.revision, { kind: "technical-terminate" });
+          if (ended?.status === "refused") PSFlow.afterCommit(done, "continuation-termination", () => { throw new Error(ended.reason); });
+          return; // Unsafe/indeterminate termination keeps the original running/wait owner for recovery.
+        }
         PSFlow.close(done.code, op);
         return;
       }
@@ -403,6 +411,7 @@ import { developmentCapabilities } from "../framework/rules/config";
      */
     close(code: number, op: any = PSFlow._op): void {
       if (op !== PSFlow._op) { PSFlow.stale("close", op); return; }
+      if (PSFlow._app?.pendingEvolution || PSFlow._app?.pendingReceiving) return;
       PSFlow.running = false;
       const cur = PSFlow.perf.cur;
       if (cur && !cur.totalMs) { cur.totalMs = Math.round((performance.now() - cur.t0) * 10) / 10; cur.code = code; PSFlow.perf.battles.push(cur); }
