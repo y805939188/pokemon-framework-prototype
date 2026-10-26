@@ -95,6 +95,8 @@ export interface SpeciesData {
   learnset: Record<number, string[]>;
   evolutions?: EvolutionEntry[];
   tutorMoves?: string[];
+  /** Canonical runtime move references. Absence means author data unavailable, not an empty list. */
+  eggMoves?: string[];
   types?: string[];
   flags?: string[];
   defaultForm?: number;

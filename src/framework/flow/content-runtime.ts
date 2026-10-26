@@ -26,7 +26,7 @@ export function validatedContentIdentity(content: Content): string | null {
   return meta.contentIdentity === identity ? identity : null;
 }
 
-/** Validate a cache independently of its producer. Version 1 is a rebuild request, never a save migration. */
+/** Validate a cache independently of its producer. Older versions are a rebuild request, never a save migration. */
 export function loadCompiled(json: unknown): CompiledContent {
   const obj = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
   const dense = (value: unknown): value is unknown[] => Array.isArray(value) && Object.keys(value).length === value.length;
@@ -131,6 +131,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     const moveRef = (ref: string, field: string): string | null => { const move=dex.move(ref); if(!move){errors.push({file:"assembly",path:`${path}.${field}`,message:`unknown move ${ref}`});ok=false;return null;} if(move.id!==undefined&&move.pp!==undefined)setOwn(content.moves!,move.name,{id:move.id,name:move.name,pp:move.pp});return move.name; };
     for(const [j,ref] of (sp.types??[]).entries())if(!dex.type?.(ref)){errors.push({file:"assembly",path:`${path}.types[${j}]`,message:`unknown type ${ref}`});ok=false;}
     for(const field of ["abilities","hiddenAbilities"] as const)for(const [j,ref] of (sp[field]??[]).entries())if(ref!==null&&!dex.abilityInfo?.(ref)){errors.push({file:"assembly",path:`${path}.${field}[${j}]`,message:`unknown ability ${ref}`});ok=false;}
+    const eggMoves = sp.eggMoves?.map((ref,j)=>moveRef(ref,`eggMoves[${j}]`)).filter((ref):ref is string=>ref!==null);
     const tutorMoves=(sp.tutorMoves??[]).map((ref,j)=>moveRef(ref,`tutorMoves[${j}]`)).filter((ref):ref is string=>ref!==null);
     for(const [j,entry] of (sp.evolutions??[]).entries()) {
       const kind=evolutionMethod(entry.method)!.parameterKind,ref=String(entry.parameter),field=`evolutions[${j}].parameter`;
@@ -149,7 +150,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     const happiness = sp.happiness ?? baseHappiness.get(sp.id);
     setOwn(content.species, found.name, {
       base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset, nameKey: sp.nameKey, contentId: sp.id, form, ruleSpecies: found.baseSpecies ?? found.name,
-      ...(sp.abilities !== undefined ? {abilities:sp.abilities.map(ref=>ref===null?null:dex.abilityInfo!(ref)!.name)} : found.abilities ? { abilities: [...found.abilities] } : {}), ...(sp.hiddenAbilities !== undefined ? {hiddenAbilities:sp.hiddenAbilities.map(ref=>ref===null?null:dex.abilityInfo!(ref)!.name)} : found.hiddenAbilities ? { hiddenAbilities: [...found.hiddenAbilities] } : {}), types:sp.types!==undefined?sp.types.map(ref=>dex.type!(ref)!.name):[...(found.types??[])], tutorMoves,
+      ...(sp.abilities !== undefined ? {abilities:sp.abilities.map(ref=>ref===null?null:dex.abilityInfo!(ref)!.name)} : found.abilities ? { abilities: [...found.abilities] } : {}), ...(sp.hiddenAbilities !== undefined ? {hiddenAbilities:sp.hiddenAbilities.map(ref=>ref===null?null:dex.abilityInfo!(ref)!.name)} : found.hiddenAbilities ? { hiddenAbilities: [...found.hiddenAbilities] } : {}), types:sp.types!==undefined?sp.types.map(ref=>dex.type!(ref)!.name):[...(found.types??[])], tutorMoves, ...(eggMoves !== undefined ? { eggMoves } : {}),
       ...Object.fromEntries(["evolutions","flags","defaultForm","displayForm","pokedexForm","categoryKey","entryKey","heightDm","weightHg","color","shape","formName","formNameKey","dexSortKeys"].filter(field=>Object.hasOwn(sp,field)).map(field=>[field,JSON.parse(JSON.stringify((sp as unknown as Record<string,unknown>)[field])) as unknown])), ...(happiness !== undefined ? { happiness } : {}), ...(found.gender !== undefined ? { gender: found.gender } : {}),
     });
     // the persistent key (decision D5-3): content id + form <-> Showdown name, both ways

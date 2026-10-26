@@ -7,7 +7,7 @@
 import type { CurveId, PartialStats } from "../rules/types.ts";
 
 export const AUTHOR_SCHEMA_VERSION = 1;
-export const COMPILED_SCHEMA_VERSION = 2;
+export const COMPILED_SCHEMA_VERSION = 3;
 /** Author version; compiled consumers use COMPILED_SCHEMA_VERSION. */
 export const SCHEMA_VERSION = AUTHOR_SCHEMA_VERSION;
 export const CURVES_ALLOWED: readonly CurveId[] = ["medium", "fast", "slow", "parabolic", "erratic", "fluctuating"];
@@ -60,6 +60,8 @@ export interface SpeciesSource {
   source: string;
   evolutions?: import("../rules/types.ts").EvolutionEntry[];
   tutorMoves?: string[];
+  /** Omitted is unavailable author data; [] is known absence and enables predecessor fallback. */
+  eggMoves?: string[];
   types?: string[];
   abilities?: (string | null)[];
   hiddenAbilities?: (string | null)[];
@@ -78,8 +80,8 @@ export interface SpeciesSource {
   dexSortKeys?: Record<string, string>;
 }
 
-export type OverridableField = "nameKey" | "growth" | "baseExp" | "evYield" | "catchRate" | "happiness" | "learnset" | "evolutions" | "tutorMoves" | "types" | "abilities" | "hiddenAbilities" | "flags" | "pokedexForm" | "categoryKey" | "entryKey" | "heightDm" | "weightHg" | "color" | "shape" | "formName" | "formNameKey" | "dexSortKeys";
-export const OVERRIDABLE: readonly OverridableField[] = ["nameKey", "growth", "baseExp", "evYield", "catchRate", "happiness", "learnset", "evolutions", "tutorMoves", "types", "abilities", "hiddenAbilities", "flags", "pokedexForm", "categoryKey", "entryKey", "heightDm", "weightHg", "color", "shape", "formName", "formNameKey", "dexSortKeys"];
+export type OverridableField = "nameKey" | "growth" | "baseExp" | "evYield" | "catchRate" | "happiness" | "learnset" | "evolutions" | "tutorMoves" | "eggMoves" | "types" | "abilities" | "hiddenAbilities" | "flags" | "pokedexForm" | "categoryKey" | "entryKey" | "heightDm" | "weightHg" | "color" | "shape" | "formName" | "formNameKey" | "dexSortKeys";
+export const OVERRIDABLE: readonly OverridableField[] = ["nameKey", "growth", "baseExp", "evYield", "catchRate", "happiness", "learnset", "evolutions", "tutorMoves", "eggMoves", "types", "abilities", "hiddenAbilities", "flags", "pokedexForm", "categoryKey", "entryKey", "heightDm", "weightHg", "color", "shape", "formName", "formNameKey", "dexSortKeys"];
 
 export interface Overlay {
   target: string;
