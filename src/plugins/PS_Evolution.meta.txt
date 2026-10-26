@@ -1,0 +1,19 @@
+/*:
+ * @target MZ
+ * @plugindesc Owned post-battle/event evolution and learning continuation.
+ * @author Pokémon Framework
+ * @help
+ * Placeholder art/audio. Normal battle evolutions open automatically after returning to the map.
+ * The app owns cancellation permission and atomic writes. No workflow is saved.
+ * @command ShowEvolution
+ * @text Resume evolution / 恢复进化流程
+ * @command EventEvolution
+ * @text Event evolution / 事件进化
+ * @arg event
+ * @type number
+ * @min 0
+ * @default 0
+ * @arg memberId
+ * @type string
+ * @default
+ */

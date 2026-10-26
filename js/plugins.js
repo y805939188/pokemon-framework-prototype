@@ -11,5 +11,6 @@ var $plugins =
 {"name":"PS_Management","status":true,"description":"Party, individual summary, storage and receiving.","parameters":{}},
 {"name":"PS_Inventory","status":true,"description":"Bag, item use, money shop and author events.","parameters":{}},
 {"name":"PS_Progression","status":true,"description":"Learning, reminder and forgetting screens.","parameters":{}},
+{"name":"PS_Evolution","status":true,"description":"Owned evolution, first-entry and learning continuation.","parameters":{}},
 {"name":"PS_BattleFlowTest","status":true,"description":"Step 2.4 test driver (inert without --ps-flow-test).","parameters":{}}
 ];

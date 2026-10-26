@@ -23,7 +23,14 @@
         "move": "heatwave"
       }
     ],
-    "source": "author-placeholder"
+    "source": "author-placeholder",
+    "evolutions": [
+      {
+        "method": "Event",
+        "parameter": 7,
+        "target": "blastoise"
+      }
+    ]
   },
   {
     "id": "blastoise",

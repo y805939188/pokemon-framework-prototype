@@ -2,7 +2,7 @@ import { planAcquisitionDex, normalizeMemberDexAppearance } from "../rules/acqui
 import { PokedexOperation } from "./pokedex-operation.ts";
 import type { DexEntryIntent, DexDecision, DexViewingCommand, DexResolution } from "./pokedex-operation.ts";
 import { dexShouldOfferEntry } from "../rules/pokedex.ts";
-import { createDexQueryCatalog, dexAccessibleRegions, dexMenuEntry, dexInUnlockedRegion } from "../rules/pokedex-query.ts";
+import { createDexQueryCatalog, dexAccessibleRegions, dexMenuEntry, dexInUnlockedRegion, dexInfo, dexEntryNumber, dexMeasurements } from "../rules/pokedex-query.ts";
 import type { AcquisitionEntryIntent } from "../rules/acquisition-dex.ts";
 import { semanticFingerprint } from "../rules/semantic.ts";
 import { TradeOperation, tradeEligibility } from "./trade-operation.ts";
@@ -330,6 +330,12 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const catalog = createDexQueryCatalog(content, text), config = resolveConfig(content.settings);
     const accessible = dexAccessibleRegions(state.dex, catalog.layout, { useCurrentRegion: config.USE_CURRENT_REGION_DEX, currentRegion });
     return { generation, dex: state.dex, catalog, accessible, menu: dexMenuEntry(state.dex, accessible, config.USE_CURRENT_REGION_DEX) };
+  }
+  /** Read-only installed-entry projection. Draft trade entries remain owned by their separate view. */
+  describePokedexEntry(species: string, locale = "en", text: Readonly<Record<string, string>> = {}) {
+    const snapshot = this.pokedexSnapshot(text), config = resolveConfig(this.ports.content().content.settings);
+    const info = dexInfo(snapshot.dex, snapshot.catalog, species, dexEntryNumber(snapshot.dex, snapshot.catalog.layout, species, "brief", config.DEXES_WITH_OFFSETS));
+    return info ? { ...info, measurements: info.heightDm === null || info.weightHg === null ? null : dexMeasurements(info.heightDm, info.weightHg, locale, "info") } : null;
   }
   resolvePokedex(token: string, revision: number, decision: DexDecision) {
     const generation = this.generation, before = this.pokedex.view, outcome = this.pokedex.resolve(token, revision, decision);
