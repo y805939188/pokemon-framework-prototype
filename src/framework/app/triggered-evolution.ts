@@ -139,7 +139,7 @@ export class TriggeredEvolutionOperation {
     if (hash(world) !== hash(op.world)) { op.retired = "triggered-item-world-changed"; throw Error(op.retired); }
     return this.content(op);
   }
-  private selected(op: Operation, state: GameState, selection: EvolutionSelection, content: Content, cost?: { itemId: string; quantity: number }): boolean {
+  private selected(op: Operation, state: GameState, selection: EvolutionSelection, content: Content, cost?: { itemId: string; quantity: number; onCancel?: boolean }): boolean {
     const input = clone(state); if (cost) input.inventory = removeItems(input.inventory, cost.itemId, cost.quantity, catalogOf(content));
     const preflight = planEvolutionCommit({ state: input, memberId: selection.memberId, selection, content, limits: this.options.limits });
     if (preflight.status !== "ready") { op.diagnostics.push(`evolution-preflight:${preflight.reason}`); return false; }
@@ -170,10 +170,9 @@ export class TriggeredEvolutionOperation {
       if (!stone && !resolveConfig(content.settings).RARE_CANDY_USABLE_AT_MAX_LEVEL) throw Error("max-level-candy-disabled");
       const selected = this.check(op, state, member, stone ? { family: "item", item: item.id } : { family: "level" }, content);
       if (selected.kind !== "target") throw Error(`evolution-${selected.kind}:${"reason" in selected ? selected.reason ?? "" : ""}`);
-      const next = clone(state); if (consumesItem(item)) next.inventory = removeItems(next.inventory, item.id, 1, catalog);
-      if (!this.selected(op, stone ? state : next, selected, content, stone && consumesItem(item) ? { itemId: item.id, quantity: 1 } : undefined)) throw Error(op.diagnostics.at(-1)!);
-      if (stone) return this.activate(op);
-      return this.write(op, state, next, true);
+      const cost = consumesItem(item) ? { itemId: item.id, quantity: 1, ...(!stone ? { onCancel: true } : {}) } : undefined;
+      if (!this.selected(op, state, selected, content, cost)) throw Error(op.diagnostics.at(-1)!);
+      return this.activate(op);
     }
     const plan = planItemUse(state, content, intent, { learning: op.answers }, op.world);
     if (plan.status === "pending") { op.selection = clone(plan.selection); return this.pending(op); }
