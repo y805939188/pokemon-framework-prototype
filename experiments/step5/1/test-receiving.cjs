@@ -18,7 +18,7 @@ test('P51-14: capture pending retains save lock and all raw state; decline nickn
 });
 test('P51-14: full party chooses replacement by ID; template PID/form/owner kept and raw result hash unchanged',async()=>{
  const x=setup({size:6}),r=await battle(x);const pending=x.app.finishBattle(r.handle,r.request);const old=x.game.party[2].id;const hash=S.resultHash(r.result);
- const done=x.app.resolveReceiving(pending.receivingToken,{[r.foe.id]:{nickname:{kind:'set',value:'小风'},placement:{kind:'replace',target:ref(x.game,old)}}});assert.equal(done.commit,'applied');const g=x.state.current();assert.equal(g.party.length,6);assert.equal(g.party[2].id,r.foe.id);assert.equal(g.party[2].nickname,'小风');assert.equal(T.boxedMembers(g)[0].id,old);assert.equal(g.appliedBattles[r.request.battleId].hash,hash);
+ const done=x.app.resolveReceiving(pending.receivingToken,{[r.foe.id]:{nickname:{kind:'set',value:'小风'},placement:{kind:'replace',target:ref(x.game,old)}}});assert.equal(done.commit,'applied');const g=x.state.current();assert.equal(g.party.length,6);assert.deepEqual(g.party.map(m=>m.id),[...x.game.party.filter(m=>m.id!==old).map(m=>m.id),r.foe.id]);assert.equal(g.party.at(-1).nickname,'小风');assert.equal(T.boxedMembers(g)[0].id,old);assert.equal(g.appliedBattles[r.request.battleId].hash,hash);
 });
 test('P51-14: full box still allows party room; dual full disables ball and failed placement spends nothing',async()=>{
  const room=setup({size:1,boxes:1200,options:{receivingProfile:auto}}),r=await battle(room);assert.equal(room.sessions.created[0].setup.noBall,false);assert.equal(room.app.finishBattle(r.handle,r.request).commit,'applied');

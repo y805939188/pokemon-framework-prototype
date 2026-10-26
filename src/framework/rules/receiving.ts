@@ -1,6 +1,6 @@
 /** WP26/38 receive plans. No UI, no host state mutation, no protocol shape changes. */
 import { clone } from "./value.ts";
-import { allMembers, boxedMembers, firstFreeBox, memberAt, placeInBox } from "./storage.ts";
+import { allMembers, boxedMembers, firstFreeBox, locateMember, memberAt, placeInBox } from "./storage.ts";
 import type { MemberCollection, MemberPosition } from "./storage.ts";
 import { able, ableCount, checkStore, referenced } from "./storage-operations.ts";
 import { own } from "./own.ts";
@@ -94,14 +94,27 @@ export function receiveMembers<T extends MemberCollection>(state: T, members: re
       checkStore(old);
       if (boxedMembers(next).length >= context.limits.boxes || !firstFreeBox(next.storage)) throw new ReceivingRefused("boxes-full");
       placeInBox(next.storage, context.depositHeal ? healMember(old, context.content, { preserveReadyToEvolve: true }) : old);
-      next.party[choice.target.position.index] = member;
-      placed.push({ id: member.id, to: "party", position: clone(choice.target.position), replacedId: old.id }); continue;
+      // WP38 §6 / CX22: remove the outgoing identity, compact survivors, then append the newcomer.
+      // Battle snapshots are keyed by member ID; neither a compacted survivor nor the newcomer inherits a slot's facts.
+      next.party.splice(choice.target.position.index, 1);
+      next.party.push(member);
+      placed.push({ id: member.id, to: "party", position: { kind: "party", index: next.party.length - 1 }, replacedId: old.id }); continue;
     }
     if (context.profile.mode === 2) throw new ReceivingRefused("pending", "forced party reception requires a replacement", member.id);
     checkStore(member);
     if (boxedMembers(next).length >= context.limits.boxes) throw new ReceivingRefused("boxes-full");
     const position = placeInBox(next.storage, context.depositHeal ? healMember(member, context.content, { preserveReadyToEvolve: true }) : member);
     placed.push({ id: member.id, to: "boxes", position, boxName: next.storage.boxes[position.box]!.name });
+  }
+  // A later reception can compact the party again, or box an earlier newcomer.
+  // Every returned location describes the same complete next, never an intermediate prefix.
+  for (const placement of placed) {
+    const location = locateMember(next, placement.id);
+    if (!location) throw new Error("received-member-missing");
+    placement.position = clone(location.position);
+    placement.to = location.position.kind === "party" ? "party" : "boxes";
+    if (location.position.kind === "box") placement.boxName = next.storage.boxes[location.position.box]!.name;
+    else delete placement.boxName;
   }
   return { state: next, placed };
 }
