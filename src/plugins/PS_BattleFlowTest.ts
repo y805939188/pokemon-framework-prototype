@@ -1850,14 +1850,21 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     await scenario("C53-06 real host reception: source identity round trip cannot revive pending auxiliary writes", async () => {
       fresh(); const B = api(), original = W.PSFlow.content(), id = game().party[0].id;
       game().party[0].hp = 50; game().party[0].friendship = 99; game().party[0].readyToEvolve = true; game().party[0].evolutionReadiness = "known";
-      let current = original, lookups = 0, replacements = 0;
+      let current = original, lookups = 0, replacements = 0, sourceSeal: any = null;
       const changed = clone(original); changed.meta.inputsHash = "4".repeat(64);
       changed.meta.contentIdentity = B.digest.sha256Hex(B.contentCompile.canonicalJson({ compiledSemantics: changed.meta.compiledSemantics, inputsHash: changed.meta.inputsHash, showdownSha: changed.meta.showdownSha }));
       const factory = B.composition.createBattleSessionFactory({ content: () => current, seed: () => [1,2,3,4] }), effects = factory.effects;
-      factory.effects = (handle: any, binding: any) => { lookups++; const seal = effects(handle, binding); current = changed; return seal; };
+      factory.effects = (handle: any, binding: any) => { lookups++; sourceSeal = effects(handle, binding); current = changed; return sourceSeal; };
       const app = new B.app.GameApplication({ state: { read: () => game(), replace: (next: any) => { assert(app.saveBlocked, "reception owner at replacement"); replacements++; G.$gameSystem._psGame = next; } }, sessions: factory, projection: { project: () => {} }, content: () => ({ content: current }), random: seeded(1), clock: () => 0, itemWorld: () => ({ mapId: G.$gameMap.mapId() }) }, { receivingProfile: { mode: 1, naming: 0 } });
       const before = clone(game()), request = { battleId: "host-effects-pending-identity", kind: "wild", foes: [{ species: "pidgey", level: 5 }], seq: 6 }, handle = await app.startBattle(request);
-      await handle.useItem("potion", id); await handle.throwBall("masterball"); const raw = handle.result(), pending = app.finishBattle(handle, request);
+      const used = await handle.useItem("potion", id); assert(used.ok, "real potion action succeeded");
+      await handle.throwBall("masterball"); const raw = handle.result(), pending = app.finishBattle(handle, request);
+      // These assertions live outside the optional source callback: the application's missing-source recovery must
+      // not turn a thrown source into a false positive for the A-B-A identity regression.
+      assert(current === changed, "source callback actually changed the current content to B");
+      assert(sourceSeal?.version === 2 && sourceSeal.binding.contentIdentity === original.meta.contentIdentity, "real source returned its original A binding");
+      eq(sourceSeal.control.members[id].friendship.status, "complete", "source ACK was complete before downgrading");
+      eq([sourceSeal.control.members[id].friendship.value.before, sourceSeal.control.members[id].friendship.value.current], [99,100], "real acknowledged potion friendship would otherwise be installable");
       assert(pending.pending && app.saveBlocked, "nickname choice retains the original owner"); eq(replacements, 0, "pending is zero write"); eq(game(), before, "pending preserves original state");
       current = original; const done = app.resolveReceiving(pending.receivingToken, { [raw.captured[0].id]: { nickname: { kind: "keep" } } });
       eq(done.commit, "applied", "same token completes the legal primary"); eq([lookups, replacements], [1,1], "one source attempt and one installation");
@@ -1866,7 +1873,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       await G.DataManager.saveGame(55);
       const expectedFile = path.join(path.dirname(OUT || "."), "ps-flow-expected-effects.json"), expected = JSON.parse(fs.readFileSync(expectedFile, "utf8"));
       expected.receivingCase = { slot: 55, state: clone(game()), result: raw }; fs.writeFileSync(expectedFile, JSON.stringify(expected));
-      return { input: "actual NW/MZ application and save, synthetic source callback content replacement", lookups, replacements, slot: 55 };
+      return { input: "actual NW/MZ application and save, synthetic source callback content replacement", sourceFriendship: sourceSeal.control.members[id].friendship, lookups, replacements, slot: 55 };
     });
   }
 
