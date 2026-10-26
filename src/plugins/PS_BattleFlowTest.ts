@@ -2118,6 +2118,40 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     });
   }
 
+  async function runLearningUI() {
+    await toMap();fresh();const B=api(),content=clone(W.PSFlow.content()),id=game().party[0].id;
+    for(const moveId of ['gust','rest','tackle']){const move=B.dex.createDexLookup().move(moveId);content.moves[move.name]=move;}
+    const species=B.speciesKey.speciesDataOf(content,game().party[0]);species.tutorMoves=['Gust','Rest'];species.learnset={1:['Tackle'],99:['Rest']};
+    for(const [itemId,fieldUse]of [['g-study-tr','tr'],['g-study-hm','hm']])content.items[itemId]={...content.items.potion,id:itemId,name:itemId,namePlural:itemId,pocket:4,flags:[],fieldUse,battleUse:'none',battleId:undefined,legacyIds:[],consumable:fieldUse==='tr',move:'gust'};
+    content.moves.Gust.name='阵风'.repeat(60);content.settings={...(content.settings??{}),TAUGHT_MACHINES_KEEP_OLD_PP:true};
+    const authored=clone(content);delete authored.meta;const inputsHash=B.digest.sha256Hex(B.contentCompile.canonicalJson(authored));
+    content.meta={...content.meta,kind:'fixture',id:'G-learning-ui',inputsHash,contentIdentity:B.digest.sha256Hex(B.contentCompile.canonicalJson({compiledSemantics:content.meta.compiledSemantics,inputsHash,showdownSha:content.meta.showdownSha}))};
+    W.PSFlow._content=content;W.PSFlow._app=null;game().inventory=B.inventory.addItems(game().inventory,'g-study-tr',2,content.items,B.inventory.inventoryPolicy(content));
+    const p=()=>W.PSProgression.current();
+    const ready=async(kind?:string)=>waitFor(()=>p()?.ready&&(!kind||p().page.kind===kind)&&!G.SceneManager.isSceneChanging(),'learning ready '+(kind??''));
+    const choose=async(key:string)=>{await ready();let n=0;while(p().page.rows[p().page.cursor]?.key!==key&&n++<60)await press('down');eq(p().page.rows[p().page.cursor]?.key,key,'learning choice');await press('ok');};
+    const closed=async()=>waitFor(()=>!p()&&!!scene()?._spriteset&&!G.SceneManager.isSceneChanging(),'learning closed');
+    const cases:any[]=[],checkpoint=async(slot:number)=>{await settledSave(slot);cases.push({slot,state:clone(game()),content});fs.writeFileSync(path.join(path.dirname(OUT||'.'),'ps-flow-expected-learning-ui.json'),JSON.stringify({cases}));};
+    await scenario('G53-LUI1 formal tutor command: Yes default, Back/give-up, HM and Chinese long layout',async()=>{
+      W.PSFlow.setLanguage('zh');const before=clone(game()),i=new G.Game_Interpreter();
+      G.PluginManager.callCommand(i,'PS_Progression','TeachMove',{memberId:id,moveId:'gust',source:'tutor'});await ready('confirm');assert(i.updateWaitMode(),'real event waits for its screen');eq(p().page.cursor,0,'default Yes');
+      assert(W.PSFlow.app().saveBlocked&&!G.$gameSystem.isSaveEnabled(),'screen owner blocks save');let denied=false;try{await G.DataManager.saveGame(80);}catch{denied=true;}assert(denied,'actual direct save refused');
+      await choose('yes');await ready('moves');assert(p().text.some((v:string)=>v.includes('…')),'long Chinese move ellipsized');await shot('G53-learning-zh-long');await press('cancel');await ready('confirm');await choose('no');await ready('moves');await choose('new');await choose('yes');await choose('close');await closed();assert(!i.updateWaitMode(),'wait ends');eq(game(),before,'declining a lesson is zero write');
+      return{input:'formal G scene and real MZ event, DOM synthetic keys, no OS hardware',saveRefused:denied};
+    });
+    await scenario('G53-LUI2 real Bag TR child and HM reselect use the same learning transaction',async()=>{
+      const handle=W.PSInventory.useItem('g-study-tr',id);await ready('confirm');await choose('yes');await choose('0');eq(game().party[0].moves[0].id,'gust','TR learned');eq(B.inventory.itemQuantity(game().inventory,'g-study-tr',content.items),1,'one TR');await choose('close');await closed();assert(handle.done&&!W.PSFlow.app().saveBlocked,'parent released');
+      const i=new G.Game_Interpreter();G.PluginManager.callCommand(i,'PS_Progression','TeachMove',{memberId:id,moveId:'rest',source:'tutor'});await ready('confirm');await choose('yes');await choose('0');await ready('moves');assert(p().page.error,'HM rejection remains on selection');await shot('G53-learning-HM');await choose('1');eq(game().party[0].moves[1].id,'rest','adjacent slot succeeds');await choose('close');await closed();await checkpoint(80);
+      return{slot:80,input:'actual Bag child and formal learning scene; direct UI intent then DOM keys, actual JsonEx'};
+    });
+    await scenario('G53-LUI3 reminder cancellation layers and independent HM/last-move forgetting',async()=>{
+      W.PSFlow.setLanguage('en');const i=new G.Game_Interpreter();G.PluginManager.callCommand(i,'PS_Progression','RelearnMove',{memberId:id});await ready('candidates');await choose('tackle');await choose('no');await ready('candidates');await choose('tackle');await choose('yes');await choose('new');await choose('yes');await ready('candidates');await press('cancel');await ready('confirm');await choose('no');await ready('candidates');await choose('tackle');await choose('yes');await choose('2');await choose('close');await closed();
+      const j=new G.Game_Interpreter();G.PluginManager.callCommand(j,'PS_Progression','ForgetMove',{memberId:id});await ready('forget');await choose('0');await choose('yes');assert(!game().party[0].moves.some((m:any)=>m.id==='gust'),'independent forgetting allows HM');await choose('close');await closed();
+      game().party[0].moves=[{id:'tackle',pp:35,maxpp:35,ppUps:0}];W.PSFlow.stateReplaced();const k=new G.Game_Interpreter();G.PluginManager.callCommand(k,'PS_Progression','ForgetMove',{memberId:id});await ready('forget');await choose('0');await choose('yes');await ready('forget');assert(p().page.error,'last move blocked and layer remains exit-capable');await shot('G53-learning-en-last');await press('cancel');await ready('message');await choose('close');await closed();eq(game().party[0].moves.length,1,'one move remains');await checkpoint(81);W.PSFlow.setLanguage(null);
+      return{slot:81,input:'formal reminder/forgetting screens with DOM keys; explicit one-move boundary fixture'};
+    });
+  }
+
   async function runM1Convergence() {
     await toMap();const B=api(),cases:any[]=[],helper=nodeRequire(path.join(gameDir,'experiments/step5/3/fixtures/m1/convergence.cjs'));
     const sourceSha=fs.readFileSync(path.join(gameDir,'js/engine/showdown/SOURCE_SHA'),'utf8').trim();
@@ -2134,6 +2168,10 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   }
 
   async function verifySave() {
+    if(EXPECTED_DIR&&fs.existsSync(path.join(EXPECTED_DIR,'ps-flow-expected-learning-ui.json'))){
+      await scenario('G53-LUIV fresh real NW restores complete learning UI checkpoints',async()=>{const expected=readExpected('ps-flow-expected-learning-ui.json');eq(expected.cases.map((c:any)=>c.slot),[80,81],'two formal UI checkpoints');for(const item of expected.cases){W.PSFlow._content=item.content;W.PSFlow._app=null;await G.DataManager.loadGame(item.slot);eq(game(),item.state,'complete JsonEx state '+item.slot);assert(!W.PSFlow.app().pendingLearning&&!W.PSFlow.app().saveBlocked,'no saved transient lesson');}return{slots:[80,81],input:'fresh actual NW/MZ process, full JsonEx roundtrip; no physical keyboard'};});return;
+    }
+
     if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-m1.json"))) {
       await scenario('E53-M1V fresh actual NW: known and unknown R, deposit heal, capture ledger and full state survive JsonEx',async()=>{
         const B=api(),expected=readExpected('ps-flow-expected-m1.json');eq(expected.cases.map((c:any)=>c.slot),[75,76,77,78,79],'five source checkpoints');
@@ -2346,7 +2384,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       try { startAt.call(this); } finally { fs.readFileSync = read; }
     } else startAt.call(this);
     setTimeout(async () => {
-      try { if (mode === "m1") await runM1Convergence(); else if (mode === "viewing") await runDexViewing(); else if (mode === "acquisition") await runAcquisitionTransactions(); else if (mode === "trade") await runTradeTransactions(); else if (mode === "triggered") await runTriggeredEvolution(); else if (mode === "learning") await runLearningTransactions(); else if (mode === "postbattle") await runPostbattleEvolution(); else if (mode === "progression-data") await runProgressionData(); else if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
+      try { if (mode === "learning-ui") await runLearningUI(); else if (mode === "m1") await runM1Convergence(); else if (mode === "viewing") await runDexViewing(); else if (mode === "acquisition") await runAcquisitionTransactions(); else if (mode === "trade") await runTradeTransactions(); else if (mode === "triggered") await runTriggeredEvolution(); else if (mode === "learning") await runLearningTransactions(); else if (mode === "postbattle") await runPostbattleEvolution(); else if (mode === "progression-data") await runProgressionData(); else if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       try { report.contentIdentity = W.PSFlow.content().meta; } catch (e) { report.contentIdentity = { error: String(e) }; }
       try { report.logTail = W.PSFlow.logger ? W.PSFlow.logger.tail(60) : null; } catch (e) { report.logTail = { error: String(e) }; } // redacted, bounded session diagnostics

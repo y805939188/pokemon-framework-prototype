@@ -1,0 +1,32 @@
+/*:
+ * @target MZ
+ * @plugindesc Move learning, reminder and independent forgetting.
+ * @author Pokémon Framework
+ * @help
+ * Member IDs are stable persistent IDs. Moves use canonical content IDs.
+ * Each command waits until its own screen ends. No cost is installed by the UI.
+ * Use ResumeLearning after an interrupted screen; load a complete save if recovery requires it.
+ * @command TeachMove
+ * @text Teach a move / 教学招式
+ * @arg memberId
+ * @type string
+ * @arg moveId
+ * @type string
+ * @arg source
+ * @type select
+ * @option Tutor / 教学
+ * @value tutor
+ * @option Generic / 通用
+ * @value generic
+ * @default tutor
+ * @command RelearnMove
+ * @text Remember a move / 回忆招式
+ * @arg memberId
+ * @type string
+ * @command ForgetMove
+ * @text Forget a move / 遗忘招式
+ * @arg memberId
+ * @type string
+ * @command ResumeLearning
+ * @text Resume interrupted learning / 恢复招式流程
+ */
