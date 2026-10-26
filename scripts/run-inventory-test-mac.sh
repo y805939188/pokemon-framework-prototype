@@ -2,6 +2,7 @@
 # Actual NW.js/MZ host, synthetic DOM/service input. Isolated saves/profile, exact child PID only.
 # Usage: scripts/run-inventory-test-mac.sh <new evidence-dir> [inventory|all|verify-save|empty-source|perf|matrix|driver-selftest|capability|progression-data|postbattle|learning|triggered|trade|acquisition|viewing]
 # PF_OWNED_REQUIRE_IDLE=1 refuses before launch if NW is already running or process inventory is unavailable.
+# PF_OWNED_ONLY=U52-05,U52-07 selects existing driver scenario prefixes; the launch record retains the filter.
 # PF_OWNED_BACKGROUND=1 uses the programmatic test clock without requesting OS focus (not physical-input evidence).
 # Package: PF_OWNED_NW=<app binary> PF_OWNED_PROJECT=<app.nw> PF_OWNED_SKIP_BUILD=1 ...
 # Restart (5.2 D-03): every run records the SHA-256 of the expected-state files it wrote (launch.json producedExpected).
@@ -34,6 +35,10 @@ sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 expected=lambda d:{p.name:sha(p) for p in sorted(d.glob('ps-flow-expected*.json'))}
 start={'startedUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'concurrency':'UNVERIFIED; read-only process inventory unavailable; never terminates other processes','input':'synthetic DOM/service events in actual host; not hardware input'}
 extra=[]
+only=os.environ.get('PF_OWNED_ONLY')
+if only:
+ if not re.fullmatch(r'[A-Za-z0-9_/-]+(?:,[A-Za-z0-9_/-]+)*',only):raise SystemExit('PF_OWNED_ONLY must be comma-separated scenario prefixes')
+ extra.append('--ps-flow-only='+only)
 if mode in ('capability','progression-data','postbattle','learning','triggered','trade','acquisition','viewing','m1','learning-ui','evolution-ui','trade-ui','battle-entry','item-evolution-ui') or os.environ.get('PF_OWNED_BACKGROUND')=='1':extra.append('--ps-flow-background')
 if mode=='progression-data':
  layout=os.environ.get('PF_OWNED_PROGRESSION_LAYOUT','regional')
