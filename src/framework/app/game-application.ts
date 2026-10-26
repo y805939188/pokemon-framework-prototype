@@ -1,3 +1,5 @@
+import { TradeOperation, tradeEligibility } from "./trade-operation.ts";
+import type { TradeIntent, TradeDecision, TradeOutcome } from "./trade-operation.ts";
 import type {ItemWorldContext} from '../rules/item-effects.ts';
 import type { BattleEvidence } from "../rules/battle-evidence.ts";
 import { moneyCap, changeMoney } from "../rules/economy.ts";
@@ -180,6 +182,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly evolutions: EvolutionOperation;
   private readonly learning: LearningOperation;
   private readonly triggered: TriggeredEvolutionOperation;
+  private readonly trade: TradeOperation;
   private evolutionCompletion: { token: string; generation: number; outcome: BattleOutcome & { result?: BattleResult } } | null = null;
   private generation = 0;
   private readonly bornIn = new WeakMap<object, number>();
@@ -189,7 +192,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private battleCommitOwner: ReceptionContext | null = null;
   private readonly finishing = new WeakSet<object>();
   private readonly terminatedBattles = new WeakSet<ReceptionContext>();
-  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active || !!this.triggered?.active; }
+  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active || !!this.triggered?.active || !!this.trade?.active; }
   private assertBattleContext(context: ReceptionContext, requireOwner = false): void {
     if (context.generation !== this.generation || this.terminatedBattles.has(context)
       || requireOwner && this.battleCommitOwner !== context) throw new Error("stale battle commit generation or owner");
@@ -258,10 +261,17 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     } }, content: this.ports.content, generation: () => this.generation, limits: this.limits, evolutions: this.evolutions,
       world: () => clone(ports.itemWorld?.() ?? {}), facts: (member, content) => this.evolutionFacts(member, content),
       ownsParent: token => this.inventory.owns(token), enter: (parent, memberId) => {
-        if (this.op || this.battleCommitOwner || this.evolutions.active || this.learning.active || this.reception) throw new Error("operation-active");
+        if (this.op || this.battleCommitOwner || this.evolutions.active || this.learning.active || this.trade?.active || this.reception) throw new Error("operation-active");
         if (parent) this.inventory.reserveEvolution(parent, memberId!);
         else if (this.inventory.active || this.management.active) throw new Error("management-operation-active");
       }, leave: parent => { if (parent) this.inventory.releaseLearning(parent); } });
+    this.trade = new TradeOperation({ state: { read: () => this.battleStatePort.read(), replace: next => {
+      this.battleStatePort.replace(next); this.inventory.stateChanged(next);
+    } }, content: this.ports.content, generation: () => this.generation, limits: this.limits,
+      enter: () => { if (this.op || this.battleCommitOwner || this.evolutions.active || this.learning.active || this.triggered.active || this.reception || this.inventory.active || this.management.active) throw Error("operation-active"); },
+      world: () => clone(ports.itemWorld?.() ?? {}), facts: (member, content) => this.evolutionFacts(member, content),
+      random: this.ports.random, now: () => this.now(), creationContext: this.ports.creationContext,
+      allowHeldSources: this.capabilities.allowHeldItemSources, holdable: id => { const item = this.describeHeldItem(id); return !!item?.holdable && !item.mail; } });
   }
 
   private evolutionFacts(member: Readonly<Member>, content: ReturnType<ContentPort>["content"]): EvolutionFacts {
@@ -271,10 +281,18 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       world = { hour: invalid, mapId: invalid, mapMetadata: invalid, weather: invalid, cycling: invalid, surfing: invalid, diving: invalid, beauty: invalid, moveTypes: invalid }; }
     return world;
   }
-  get pendingEvolution(): EvolutionView | null { return this.evolutions.view; }
+  get pendingEvolution(): EvolutionView | null { return this.trade?.continuation ?? this.evolutions.view; }
   get pendingLearning() { return this.learning.view; }
   beginLearning(intent: LearningIntent, parent?: LearningParent) { return this.learning.begin(intent, parent); }
   resolveLearning(token: string, revision: number, decision: LearningDecision) { return this.learning.resolve(token, revision, decision); }
+  get pendingTrade() { return this.trade.view; }
+  beginTrade(requestId: string, intent: TradeIntent) { return this.trade.begin(requestId, intent); }
+  resolveTrade(token: string, revision: number, decision: TradeDecision) { return this.trade.resolve(token, revision, decision); }
+  tradeCandidates(requiredSpecies?: string) {
+    const game = this.ports.state.read(), world = clone(this.ports.itemWorld?.() ?? {});
+    return game.party.map(member => ({ memberId: member.id, name: member.nickname || member.species,
+      eligible: tradeEligibility(member, world, requiredSpecies) === null, reason: tradeEligibility(member, world, requiredSpecies) }));
+  }
   get pendingTriggeredEvolution() { return this.triggered.view; }
   beginEvolutionItem(parent: string, requestId: string, intent: EvolutionItemIntent) { return this.triggered.beginItem(parent, requestId, intent); }
   beginEventEvolution(intent: EventEvolutionIntent = {}) { return this.triggered.beginEvent(intent); }
@@ -287,7 +305,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (resolved.status === "technically-terminated") next.diagnostics = [...(next.diagnostics ?? []), "战后进化后续已技术终止，已提交战果保留"];
     return next;
   }
-  resolveEvolution(token: string, revision: number, decision: EvolutionDecision): (BattleOutcome & { result?: BattleResult }) | TriggeredEvolutionOutcome | { status: "refused"; reason: string } {
+  resolveEvolution(token: string, revision: number, decision: EvolutionDecision): (BattleOutcome & { result?: BattleResult }) | TriggeredEvolutionOutcome | TradeOutcome | { status: "refused"; reason: string } {
+    if (this.trade.matchesContinuation(token)) return this.trade.resolveEvolution(token, revision, decision);
     if (this.triggered.matchesContinuation(token)) return this.triggered.resolveContinuation(token, revision, decision);
     const completion = this.evolutionCompletion;
     if (!completion || completion.token !== token || completion.generation !== this.generation) return { status: "refused", reason: "stale-evolution-operation" };
@@ -593,6 +612,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.evolutions.invalidate(); this.evolutionCompletion = null;
     this.learning.invalidate();
     this.triggered.invalidate();
+    this.trade.invalidate();
     this.inventory.invalidate();
     this.management.invalidate();
     this.reception = null;
