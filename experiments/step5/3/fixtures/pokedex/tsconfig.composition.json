@@ -1,0 +1,4 @@
+{
+  "extends": "../../../../../src/framework/tsconfig.core.json",
+  "include": ["composition-client.ts"]
+}

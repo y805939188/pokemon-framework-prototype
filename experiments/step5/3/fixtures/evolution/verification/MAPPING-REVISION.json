@@ -1,0 +1,157 @@
+{
+  "checkedUtc": "2026-10-25T22:59:41.994Z",
+  "originalCommit": "1a966aade3f20541333656c35f958c705900beb9",
+  "scope": "test titles and scoped formal mapping only; no implementation or assertion changes",
+  "requestedConfiguration": {
+    "model": "sol",
+    "effort": "xhigh",
+    "speed": "Standard/nonFast"
+  },
+  "effectiveHiddenConfiguration": "UNVERIFIED",
+  "tests": [
+    {
+      "path": "experiments/step5/3/test-evolution-rules.cjs",
+      "oldSha256": "614549cd73f96ab183ff70340ea0735af1ffb3f04fe9f0d0e0d487f9ede95287",
+      "newSha256": "5707170a05fd778350f038981c85c06d8bae4629f27529fd7e86f6becb236d37",
+      "normalizedNonTitleBytesIdentical": true,
+      "normalizedSha256": "4f85760e10074f4c45a7a99c561666461b74d8820c9b972fa015c63ee18ffbb9",
+      "titleChanges": [
+        {
+          "before": "BE07–10 / P53-17 guards precede all five families and do not read facts",
+          "after": "BE07–10 pure guard predicates / P53-17 guards precede all five families and do not read facts"
+        },
+        {
+          "before": "BE01–06 / P53-17 first-hit, current form and family isolation",
+          "after": "WP31 §4.3 / P53-17 first-hit, current form and family isolation"
+        },
+        {
+          "before": "CX01–05 / P53-19 hour boundaries use explicit clock without host time",
+          "after": "CX01 pure clock predicates / P53-19 hour boundaries use explicit clock without host time"
+        },
+        {
+          "before": "CX06–08 / P53-19 exact world weather mapping, missing system is never None",
+          "after": "CX03–04 weather-predicate subset / P53-19 exact world weather mapping, missing system is never None"
+        },
+        {
+          "before": "CX09–10 / P53-18 party includes self and fainted, excludes eggs, uses current content types",
+          "after": "CX08 party-predicate subset / P53-18 party includes self and fainted, excludes eggs, uses current content types"
+        },
+        {
+          "before": "CX30–34 / P53-21 TradeSpecies compares incoming self and only reads partner after self match",
+          "after": "CX31–32 TradeSpecies-predicate subset / P53-21 compares incoming self and only reads partner after self match"
+        },
+        {
+          "before": "BE29/CX29 / P53-20 complete battle plan owns tentative R; unknown never leaks it",
+          "after": "BE29 readiness-plan subset + r3 §4.2a / P53-20 complete battle plan owns tentative R; unknown never leaks it"
+        },
+        {
+          "before": "CX27–29 / P53-20 faint eligibility accepts caller logical HP and default checks fainted",
+          "after": "CX20 eligibility-predicate subset + r3 §7.3 / P53-20 accepts caller logical HP and default checks fainted"
+        },
+        {
+          "before": "CX30–31 / P53-21 event number can repeat and R unknown only blocks matching R-dependent event",
+          "after": "CX26 + BE32–33 event-predicate subset / P53-21 event number can repeat and R unknown only blocks matching R-dependent event"
+        },
+        {
+          "before": "CX11–19 / P53-44 normalized facts include substitute/confusion and reset D without clearing K",
+          "after": "WP32 §3.2–3.3 / P53-44 limited normalized-input helper resets D without clearing K"
+        }
+      ]
+    },
+    {
+      "path": "experiments/step5/3/test-evolution-success.cjs",
+      "oldSha256": "260d20c01d2774dd0e88a7d0ad0bb7663a8e946da0b86afa37a2e08ffe0e12bb",
+      "newSha256": "df0e6b5123b9624fa97cb970003e3a79ef3631039e21ae3b35fe013e4f418353",
+      "normalizedNonTitleBytesIdentical": true,
+      "normalizedSha256": "d4fb1d9d19bdd79bea9544fb24342132750cec1025142a7a9d67036a163797ac",
+      "titleChanges": [
+        {
+          "before": "BE16–20/26 / P53-23 exact metadata retention and exp27000 Medium->Slow L27, HP0 remains 0",
+          "after": "WP18 §3.4 + BE26 HP invariant / P53-23 metadata retention and exp27000 Medium->Slow L27, HP0 remains 0"
+        },
+        {
+          "before": "BE19/20 / P53-23 target form priority and fixed gender, normal gender retained",
+          "after": "BE19/20 pure species-change subset / P53-23 target form priority and fixed gender, normal gender retained"
+        },
+        {
+          "before": "BE25/35 / P53-21/23 post consumption matches actual target and current held item, not old condition",
+          "after": "BE25/35 pure post-action plans / P53-21/23 consumption matches actual target and current held item, not old condition"
+        },
+        {
+          "before": "BE22/CX37 / P53-24 Shedinja body uses old individual, has no ID/ordinal, heals and clears specific fields",
+          "after": "BE22 pure extra-member draft / P53-24 Shedinja body uses old individual, has no ID/ordinal, heals and clears specific fields"
+        },
+        {
+          "before": "BE23/24 / P53-24 space before ball; full/no-ball skip copy and keep primary success",
+          "after": "BE23/24 pure post-action plans / P53-24 space before ball; full/no-ball skip copy and keep primary success"
+        },
+        {
+          "before": "BE16/25 / P53-24 old-order first successful post handler wins",
+          "after": "WP31 §5.2 step 3 / P53-24 old-order first successful post handler wins"
+        }
+      ]
+    }
+  ],
+  "unchanged": [
+    {
+      "path": "src/framework/rules/evolution.ts",
+      "sha256": "74fa763163e78e1a06806dade5b9af96a679a716e4d879d4639478d5f054b733",
+      "matchesOriginal": true
+    },
+    {
+      "path": "src/framework/rules/evolution-success.ts",
+      "sha256": "2e1e52e9043635e5a52cc1851d7376ddcca0fd01561d886252510bca6bc0a356",
+      "matchesOriginal": true
+    },
+    {
+      "path": "experiments/step5/3/fixtures/evolution/helpers.cjs",
+      "sha256": "e860d7c5fe9259054bc9e0498aac5ec577376b633d8f7022efbfc144820bc418",
+      "matchesOriginal": true
+    },
+    {
+      "path": "experiments/step5/3/fixtures/evolution/METHOD-SUPPORT.csv",
+      "sha256": "e752c75fd61fd181c9045bbe1f05b25f0ed3a0ded4f85fb80786a3a226d0bedf",
+      "matchesOriginal": true
+    },
+    {
+      "path": "experiments/step5/3/fixtures/evolution/verification/SUMMARY.json",
+      "sha256": "23fafb4e95214a730db316c25e9539f828f3c45349325721a00526ee9a0f13b1",
+      "matchesOriginal": true
+    },
+    {
+      "path": "experiments/step5/3/fixtures/evolution/verification/directed.tap",
+      "sha256": "1bb609f36b6ab09c67e3fcc407135832b7403bee610aa27ab06196d731427d84",
+      "matchesOriginal": true
+    },
+    {
+      "path": "experiments/step5/3/fixtures/evolution/verification/regressions.tap",
+      "sha256": "d81e71d1596d0c55ffc23b8e16acfd8ef95858ef4e5cf03e8cd722a6c6f2c27a",
+      "matchesOriginal": true
+    },
+    {
+      "path": "experiments/step5/3/fixtures/evolution/verification/regressions-available.tap",
+      "sha256": "b6cfe57777b8ea37e7b47a2c57f52a11f894144d2ba332ad8d8ef3100d6015ba",
+      "matchesOriginal": true
+    }
+  ],
+  "rerun": {
+    "command": "/Users/dingshinn/.nvm/versions/node/v22.21.1/bin/node --test experiments/step5/3/test-evolution-rules.cjs experiments/step5/3/test-evolution-success.cjs",
+    "node": "v22.21.1",
+    "tests": 136,
+    "pass": 136,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "path": "experiments/step5/3/fixtures/evolution/verification/directed-mapping-revision.tap",
+    "sha256": "cf4af4ed3225873c66c36158dfe38f30602de2351ddc96218bd5b6e26840afc9",
+    "additionalCoverage": 0
+  },
+  "notRerun": [
+    "52 prior available regressions",
+    "type checks",
+    "boundary check",
+    "engine build"
+  ],
+  "acceptanceLimit": "Formal IDs identify rule subsets only; no complete catalog-group, E integration, B reception, M1, NW or CI acceptance claim"
+}

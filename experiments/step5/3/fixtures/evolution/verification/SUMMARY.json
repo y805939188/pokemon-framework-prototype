@@ -1,0 +1,104 @@
+{
+  "checkedUtc": "2026-10-25T22:48:34.585Z",
+  "base": "b9d29a8fe718e865ef64123ba44f7190ff5a87f2",
+  "branch": "step5/3-D-evolution-core",
+  "requestedConfiguration": {
+    "model": "sol",
+    "effort": "xhigh",
+    "speed": "Standard/nonFast"
+  },
+  "effectiveHiddenConfiguration": "UNVERIFIED",
+  "node": "v22.21.1",
+  "directed": {
+    "tests": 136,
+    "pass": 136,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "path": "experiments/step5/3/fixtures/evolution/verification/directed.tap",
+    "sha256": "1bb609f36b6ab09c67e3fcc407135832b7403bee610aa27ab06196d731427d84"
+  },
+  "existingRegressionAttempt": {
+    "tests": 64,
+    "pass": 63,
+    "fail": 1,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "path": "experiments/step5/3/fixtures/evolution/verification/regressions.tap",
+    "sha256": "d81e71d1596d0c55ffc23b8e16acfd8ef95858ef4e5cf03e8cd722a6c6f2c27a"
+  },
+  "existingRegressionAttemptDisposition": "63 pass; one P51-05 failure missing local staged Showdown dist/sim, preserved without changing assertion",
+  "existingAvailableRegressions": {
+    "tests": 52,
+    "pass": 52,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "path": "experiments/step5/3/fixtures/evolution/verification/regressions-available.tap",
+    "sha256": "b6cfe57777b8ea37e7b47a2c57f52a11f894144d2ba332ad8d8ef3100d6015ba"
+  },
+  "typeChecks": {
+    "core": "PASS",
+    "app": "PASS",
+    "framework": "PASS",
+    "commands": [
+      "../../pokemon-framework-prototype/src/node_modules/.bin/tsc --noEmit -p src/framework/tsconfig.core.json",
+      "../../pokemon-framework-prototype/src/node_modules/.bin/tsc --noEmit -p src/framework/tsconfig.app.json",
+      "../../pokemon-framework-prototype/src/node_modules/.bin/tsc --noEmit -p src/framework/tsconfig.json"
+    ]
+  },
+  "boundaries": {
+    "result": "PASS",
+    "files": 84
+  },
+  "buildEngine": {
+    "result": "PASS",
+    "command": "pnpm --dir src build:engine",
+    "node": "22.21.1",
+    "bundles": [
+      "engine",
+      "custom-formats",
+      "core",
+      "content-cli"
+    ],
+    "newModulesExported": false,
+    "evidence": "execution tool output; no standalone build log"
+  },
+  "supportRows": 64,
+  "sources": [
+    {
+      "path": "src/framework/rules/evolution.ts",
+      "sha256": "74fa763163e78e1a06806dade5b9af96a679a716e4d879d4639478d5f054b733"
+    },
+    {
+      "path": "src/framework/rules/evolution-success.ts",
+      "sha256": "2e1e52e9043635e5a52cc1851d7376ddcca0fd01561d886252510bca6bc0a356"
+    },
+    {
+      "path": "experiments/step5/3/test-evolution-rules.cjs",
+      "sha256": "614549cd73f96ab183ff70340ea0735af1ffb3f04fe9f0d0e0d487f9ede95287"
+    },
+    {
+      "path": "experiments/step5/3/test-evolution-success.cjs",
+      "sha256": "260d20c01d2774dd0e88a7d0ad0bb7663a8e946da0b86afa37a2e08ffe0e12bb"
+    },
+    {
+      "path": "experiments/step5/3/fixtures/evolution/helpers.cjs",
+      "sha256": "e860d7c5fe9259054bc9e0498aac5ec577376b633d8f7022efbfc144820bc418"
+    }
+  ],
+  "unexecuted": [
+    "full quick/headless",
+    "actual E application integration",
+    "real battle V2/K/D/faint evidence",
+    "resource/ordinal/dex atomic installation",
+    "NW/GUI/new-process save",
+    "remote/CI",
+    "hardware input",
+    "performance"
+  ],
+  "scope": "pure D author self-check only; not independent acceptance, B reception or M1"
+}

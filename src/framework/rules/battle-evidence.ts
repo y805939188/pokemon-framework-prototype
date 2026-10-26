@@ -1,4 +1,5 @@
 /** Internal, transient companion values. These are NOT protocol-v1 messages or persistent save fields. */
+import { planFriendshipChange } from "./friendship.ts";
 export interface BattleActor {
   id: string; side: string; slot: number; level: number; hp: number; active: boolean;
 }
@@ -36,13 +37,11 @@ export interface EvidenceBinding { battleId: string; generation: number; rawHash
 /** Only four battle-triggered methods in this narrow capability batch; general learning/world methods are separate. */
 export function battleFriendshipValue(h: number, method: FriendEvidence["changes"][number]["method"], modifiers: { sameMap: boolean; luxuryBall: boolean; sootheBell: boolean; affection: boolean }): number | null {
   if (!Number.isSafeInteger(h) || h < 0 || h > 255) return null;
-  const row = { levelup: [5, 4, 3], battleitem: [1, 1, 0], faint: [-1, -1, -1], faintbad: [-5, -5, -10] }[method];
-  let delta = row[Math.floor(h / 100)]!;
-  if (delta > 0) {
-    if (modifiers.sameMap) delta++;
-    if (modifiers.luxuryBall) delta++;
-    if (modifiers.sootheBell) delta = Math.floor(delta * 1.5);
-    if (modifiers.affection) delta = h >= 179 ? 0 : Math.min(delta, 179 - h);
-  }
-  return Math.min(255, Math.max(0, h + delta));
+  // The session already resolved real map/item identities. This legacy value adapter preserves those four facts;
+  // the local matching-map sentinel is calculation input only, never an observation or persistent provenance.
+  const plan = planFriendshipChange({friendship: h, item: modifiers.sootheBell ? "soothebell" : "",
+    ball: modifiers.luxuryBall ? "luxuryball" : "", ...(modifiers.sameMap ? {origin: {map: 0}} : {})},
+    ["levelup", "battleitem", "faint", "faintbad"].includes(method) ? method : "",
+    {mapId: modifiers.sameMap ? 0 : undefined, AFFECTION_EFFECTS: modifiers.affection});
+  return plan.status === "ready" ? plan.after : null;
 }

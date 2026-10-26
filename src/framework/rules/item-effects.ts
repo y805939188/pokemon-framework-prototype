@@ -9,6 +9,7 @@ import {speciesDataOf} from './species-key.ts';
 import {resolveAbility} from './member-identity.ts';
 import {healMember} from './heal.ts';
 import {fieldEffectProblem} from './item-families.ts';
+import {planFriendshipChange} from './friendship.ts';
 import type {Content,Member,MoveSlot,StatKey} from './types.ts';
 import type {GameState} from './state.ts';
 export interface ItemWorldContext {mapId?:number;shadowIds?:string[];hyperIds?:string[];hmMoves?:string[]}
@@ -26,11 +27,10 @@ const key=(raw:unknown):StatKey=>{if(typeof raw!=='string'||!['hp','atk','def','
 const integer=(raw:unknown):number=>{if(typeof raw!=='number'||!Number.isSafeInteger(raw)||raw<1)return refuse('invalid-effect-parameter');return raw;};
 const moveIdentity=(name:string):string=>name.toLowerCase().replace(/[^a-z0-9]/g,'');
 export function changeFriendship(m:Member,method:string,c:Content,world:ItemWorldContext):void {
- const h=m.friendship??70;if(!Number.isSafeInteger(h)||h<0||h>255)return refuse('friendship-out-of-domain');
- const table:Record<string,number[]>={vitamin:[5,3,2],wing:[3,2,1],evberry:[10,5,2],powder:[-5,-5,-10],energyroot:[-10,-10,-15],revivalherb:[-15,-15,-20]};
- const row=table[method];if(!row)return refuse('unknown-friendship-method');let delta=row[Math.floor(h/100)]!;
- if(delta>0){if(world.mapId!==undefined&&m.origin?.map===world.mapId)delta++;if(m.ball?.toLowerCase()==='luxuryball')delta++;if(m.item.toLowerCase()==='soothebell')delta=Math.floor(delta*1.5);if(resolveConfig(c.settings).AFFECTION_EFFECTS&&method!=='evberry')delta=h>=179?0:Math.min(delta,179-h);}
- m.friendship=Math.min(255,Math.max(0,h+delta));
+ const plan=planFriendshipChange(m,['vitamin','wing','evberry','powder','energyroot','revivalherb'].includes(method)?method:'',
+  {mapId:world.mapId,AFFECTION_EFFECTS:resolveConfig(c.settings).AFFECTION_EFFECTS});
+ if(plan.status==='refused')return refuse(plan.reason);
+ m.friendship=plan.after;
 }
 function recalcHp(m:Member,oldMax:number,c:Content,rare=false):void {const sp=speciesDataOf(c,m)!;const next=stats(m,c).hp,delta=next-oldMax;m.hp=rare&&sp.base.hp===1?1:m.hp>0?Math.min(next,Math.max(1,m.hp+delta)):Math.max(0,delta);}
 const supported=new Set(['hp','status','full-restore','revive','sacred-ash','rage-candy','pp','pp-up','vitamin','wing','ev-berry','mint','ability-capsule','ability-patch','rare-candy','exp-candy']);
