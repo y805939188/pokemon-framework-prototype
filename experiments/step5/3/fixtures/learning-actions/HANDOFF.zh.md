@@ -28,16 +28,18 @@ planForgettingAction(member, slot?)
 
 所有 Node 调用使用 `/Users/dingshinn/.nvm/versions/node/v22.21.1/bin/node`（v22.21.1）；pnpm 10.20.0 / TypeScript 7.0.2。工作树仅只读链接同锁文件的 `src/node_modules` 依赖，四包由本树自行生成，未复制其它作者的 build。测试用 Node 官方 TS loader 读取本树实际模块图；未为了测试更改公共 index。
 
-下列原始 `.tap`／`.log` 在工作树原位保留；提交中用同名加 `.gz` 的精确压缩副本交付，以保留测试器原生尾空白和空行。解压字节与原件一致，不整理或重写原始失败。
+详细原始证据位于工作区 `/Users/dingshinn/Desktop/pokemon-framework/.verify/step5-3-E3-learning-actions-4cb12d1/`。下列 `logs/` 路径相对此证据目录。12份原始 `.tap`／`.log`、12份同名 `.gz` 压缩副本及原交付说明已逐文件复制并核对 SHA256，gzip 解压字节与原件一致；`COPY-VERIFICATION.json` 记录来源与核验，`SHA256SUMS` 封印26个成员。原始失败未整理或重写。本地原始日志仍在工作树原位被精确忽略，仓库 fixture 历史只保留必要辅助代码与说明，不再新增运行输出；旧 `4cb12d1` 提交保留原压缩副本。
 
-- `pnpm --dir src build:engine`：本树四包构建通过，`verification/build02.log`。
-- `pnpm --dir src typecheck:framework`：framework／core／app 三项通过，`verification/framework02.log`。
-- `node scripts/check-boundaries.cjs`：92 文件通过，`verification/boundaries02.log`。
-- `node --test experiments/step5/3/test-learning-actions.cjs`：新增16项通过，`verification/target03.tap`；随后别名断言亦包含于最终组合回归。
-- 新测试加已有 learning-candidates／learning-plans／friendship／friendship-adapters／CD-core-integration 五套：**93 PASS，fail／cancelled／skipped 全0**，`verification/regression02.tap`。
+- `pnpm --dir src build:engine`：本树四包构建通过，`logs/build02.log`。
+- `pnpm --dir src typecheck:framework`：framework／core／app 三项通过，`logs/framework02.log`。
+- `node scripts/check-boundaries.cjs`：92 文件通过，`logs/boundaries02.log`。
+- `node --test experiments/step5/3/test-learning-actions.cjs`：新增16项通过，`logs/target03.tap`；随后别名断言亦包含于最终组合回归。
+- 新测试加已有 learning-candidates／learning-plans／friendship／friendship-adapters／CD-core-integration 五套：**93 PASS，fail／cancelled／skipped 全0**，`logs/regression02.tap`。
 - 新测试实际调用编译→组装、C／友好规则、真实 Inventory API、createMember／newGame，并把 teaching→forgetting→reminder 的完整 ready 副本组合后通过 schema7 内容验证。此为纯组合状态验证，未安装到真实应用。
 - `git diff --check` 通过。
 
 首轮 `target01.tap` 保留 **13 PASS／1 FAIL**：关闭更多重学后候选实际为空，测试误期待 not-a-candidate；按 C 原有空列表＋额外答案为 unexpected-answer 修正期望。未修改生产规则迎合该测试。`target02.tap`、`regression01.tap` 为中间真实绿结果；没有覆盖旧红输出。
 
 未执行全量 quick、NW／GUI、实体输入、CI、远端 push／PR／merge，也没有独立审查或 M1／完整 E 签收。root 需唯一持锁，在最终身份／资源／内容／generation 复检后，把成员、机器库存及统计同次安装；外层确认／菜单与可控技术终止仍由 root 应用处理。无当前工具／权限阻塞，无后台自有进程。请求编码 gpt-6.1-sol xhigh、Standard／nonFast；隐藏有效字段 UNVERIFIED。
+
+本次后续交付整理只迁出12份受控运行输出并更新证据路径，生产源码、测试及 helpers 与 `4cb12d1` 逐 SHA256 不变；没有重跑或改写功能测试结论。原13 PASS／1 FAIL 和最终93 PASS均仍是原先的实际执行结果。
