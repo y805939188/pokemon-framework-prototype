@@ -68,3 +68,5 @@ export * as evolutionCommit from "./rules/evolution-commit.ts";
 export * as learningActions from "./rules/learning-actions.ts";
 export * as pokedex from "./rules/pokedex.ts";
 export * as pokedexQuery from "./rules/pokedex-query.ts";
+
+export * as acquisitionDex from "./rules/acquisition-dex.ts";

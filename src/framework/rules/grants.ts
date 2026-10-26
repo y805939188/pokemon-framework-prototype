@@ -19,6 +19,7 @@ import { own, setOwn } from "./own.ts";
 import { toPersistentMember } from "./species-key.ts";
 import { GAME_SCHEMA, clone } from "./state.ts";
 import type { GameState } from "./state.ts";
+import { planAcquisitionDex } from "./acquisition-dex.ts";
 import { allocateMemberId } from "./member-identity.ts";
 import type { Content } from "./types.ts";
 
@@ -62,7 +63,9 @@ export function applyGrant(state: GameState, grantId: string, content: Content, 
     next.nextMemberOrdinal = allocated.nextMemberOrdinal; taken.add(id);
     if (to === "party") next.party.push(m); else placeInBox(next.storage, m);
     placed.push({ id, species: m.species, form: m.form ?? 0, level: spec.level, to });
-    for (const k of ["seen", "owned"] as const) if (!next.dex[k].includes(m.species)) next.dex[k].push(m.species);
+    const registration = planAcquisitionDex(next.dex, [m], content, { source: "grant", seeForm: true, showMessages: false });
+    if (registration.status !== "ready") throw new GrantRefusedError("creation-failed", registration.reason);
+    next.dex = registration.dex;
   }
   for (const [item, count] of Object.entries(grant.items)) {
     try { next.inventory = addItems(next.inventory, item, count, catalogOf(content), inventoryPolicy(content, limits)); }

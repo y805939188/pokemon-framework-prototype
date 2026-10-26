@@ -44,6 +44,7 @@ import { developmentCapabilities } from "../framework/rules/config";
     readonly saveBlocked: boolean;
     readonly encounterBlocked: boolean;
     resolveReceiving(token: string, decisions?: unknown, signal?: unknown): any;
+    terminateAcquisition(token: string): any;
     readonly pendingEvolution: any;
     readonly pendingLearning: any;
     readonly pendingTriggeredEvolution: any;
@@ -76,6 +77,7 @@ import { developmentCapabilities } from "../framework/rules/config";
     beginEvolutionItem(parent: string, requestId: string, intent: any): any { return PSFlow.app().beginEvolutionItem(parent, requestId, intent); },
     beginEventEvolution(intent: any = {}): any { return PSFlow.app().beginEventEvolution(intent); },
     resolveTriggeredEvolution(token: string, revision: number, decision: any): any { return PSFlow.app().resolveTriggeredEvolution(token, revision, decision); },
+    terminateAcquisition(token: string): any { return PSFlow.app().terminateAcquisition(token); },
     beginTrade(requestId: string, intent: any): any { return PSFlow.app().beginTrade(requestId, intent); },
     resolveTrade(token: string, revision: number, decision: any): any { return PSFlow.app().resolveTrade(token, revision, decision); },
     assertBattleAllowed(): void { const capabilities = developmentCapabilities(PSFlow.developerCapabilities); if (!capabilities.allowExperimentalHeldItemBattle && (PSFlow.game().party || []).some((m: any) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成"); },

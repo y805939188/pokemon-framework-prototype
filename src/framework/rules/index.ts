@@ -53,3 +53,5 @@ export * as evolutionCommit from "./evolution-commit.ts";
 export * as learningActions from "./learning-actions.ts";
 export * as pokedex from "./pokedex.ts";
 export * as pokedexQuery from "./pokedex-query.ts";
+
+export * as acquisitionDex from "./acquisition-dex.ts";
