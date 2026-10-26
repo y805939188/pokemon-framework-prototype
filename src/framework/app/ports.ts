@@ -132,6 +132,9 @@ export interface StepsOutcome {
 }
 
 export interface BattleOutcome {
+  /** Transient post-battle continuation, separate from pending reception and frozen battle protocol v1. */
+  continuationToken?: string;
+  continuationRevision?: number;
   pending?: true;
   receivingToken?: string;
   pendingMember?: string;

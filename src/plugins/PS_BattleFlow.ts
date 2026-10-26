@@ -44,6 +44,8 @@ import { developmentCapabilities } from "../framework/rules/config";
     readonly saveBlocked: boolean;
     readonly encounterBlocked: boolean;
     resolveReceiving(token: string, decisions?: unknown, signal?: unknown): any;
+    readonly pendingEvolution: any;
+    resolveEvolution(token: string, revision: number, decision: unknown): any;
     startNewGame(): { status: string };
     claimGrant(grantId: string): { status: string; grantId: string; reason?: string; error?: string; placed?: { id: string; species: string; form: number; level: number; to: string }[]; items?: Record<string, number>; money?: number };
     healParty(): { status: string; reason?: string; error?: string };
@@ -212,6 +214,24 @@ import { developmentCapabilities } from "../framework/rules/config";
           random: (n: number) => PSFlow.random(n),
           clock: () => PSFlow.now(),
           itemWorld:()=>({mapId:G.$gameMap?.mapId?.()}),
+          evolutionWorld: (member: any) => ({
+            hour: () => ({ status: "value", value: new Date(PSFlow.now()).getHours() }),
+            mapId: () => G.$dataMap && Number.isSafeInteger(G.$gameMap?.mapId?.()) && G.$gameMap.mapId() > 0
+              ? { status: "value", value: G.$gameMap.mapId() } : { status: "invalid", reason: "current-map-unavailable" },
+            mapMetadata: () => {
+              const mapId = G.$gameMap?.mapId?.();
+              if (!G.$dataMap || !Number.isSafeInteger(mapId) || mapId <= 0) return { status: "invalid", reason: "current-map-unavailable" };
+              const maps = PSFlow.content().mapMetadata?.maps;
+              return maps && Object.hasOwn(maps, String(mapId)) ? { status: "value", value: maps[String(mapId)] } : { status: "absent" };
+            },
+            moveTypes: () => {
+              if (!PSFlow.content().meta?.showdownSourceChecked || !PSFlow._dex?.moveDetails) return { status: "unavailable", reason: "checked-move-types-unavailable" };
+              const types: Record<string, string> = {};
+              for (const move of member.moves) { const data = PSFlow._dex.moveDetails(move.id); if (!data?.type) return { status: "invalid", reason: "missing-current-move-type" }; types[move.id] = data.type; }
+              return { status: "value", value: types };
+            },
+            // World weather, mounts and contest beauty remain explicit unavailable facts until their real providers.
+          }),
           variables:{count:()=>Math.max(0,(G.$dataSystem?.variables?.length??1)-1),write:(id:number,value:string)=>G.$gameVariables.setValue(id,value)},
           creationContext: () => ({ map: G.$gameMap?.mapId?.() ?? 0, ...(PSFlow.creationEnvironment?.() ?? {}) }),
         }, { startMoney: PSFlow.param("startMoney", 3000), noMoneyLoss: PSFlow.flagParam("noMoneyLoss", false), limits: PSFlow.limits(), capabilities: PSFlow.developerCapabilities, receivingProfile: PSFlow.receiveOptions ?? { mode: 0, naming: 0 }, playerLocale: G.navigator?.language ?? "en", playerName: G.$gameParty?.leader?.()?.name?.() || "player" });
@@ -341,6 +361,16 @@ import { developmentCapabilities } from "../framework/rules/config";
       }
       return returned;
     },
+    /** Core continuation bridge. Formal evolution/learning scenes are the later G package. */
+    resolveEvolution(token: string, revision: number, decision: any): any {
+      const op = PSFlow._op, previous = PSFlow.lastOutcome, returned = PSFlow.app().resolveEvolution(token, revision, decision);
+      if (returned && "code" in returned && op === PSFlow._op) {
+        const { result, ...outcome } = returned;
+        if (previous?.battleId === outcome.battleId && previous.hostErrors?.length) outcome.hostErrors = [...previous.hostErrors, ...(outcome.hostErrors ?? [])];
+        return PSFlow.completeBattleOutcome(outcome, result, op);
+      }
+      return returned;
+    },
     /** Host work after a commit (messages): a failure is kept in `outcome.hostErrors` and logged; the outcome itself stands. */
     afterCommit(outcome: any, step: string, fn: () => void): void {
       try { fn(); }
@@ -357,6 +387,12 @@ import { developmentCapabilities } from "../framework/rules/config";
       const done = PSFlow.lastOutcome;
       if (done && done.commit && done.commit !== "none" && done.battleId === op.request.battleId) {
         PSFlow.afterCommit(done, "after-commit", () => { throw error; });
+        const continuation = PSFlow._app?.pendingEvolution;
+        if (continuation) {
+          const ended = PSFlow.resolveEvolution(continuation.token, continuation.revision, { kind: "technical-terminate" });
+          if (ended?.status === "refused") PSFlow.afterCommit(done, "continuation-termination", () => { throw new Error(ended.reason); });
+          return; // Unsafe/indeterminate termination keeps the original running/wait owner for recovery.
+        }
         PSFlow.close(done.code, op);
         return;
       }
@@ -375,6 +411,7 @@ import { developmentCapabilities } from "../framework/rules/config";
      */
     close(code: number, op: any = PSFlow._op): void {
       if (op !== PSFlow._op) { PSFlow.stale("close", op); return; }
+      if (PSFlow._app?.pendingEvolution || PSFlow._app?.pendingReceiving) return;
       PSFlow.running = false;
       const cur = PSFlow.perf.cur;
       if (cur && !cur.totalMs) { cur.totalMs = Math.round((performance.now() - cur.t0) * 10) / 10; cur.code = code; PSFlow.perf.battles.push(cur); }
@@ -873,14 +910,14 @@ import { developmentCapabilities } from "../framework/rules/config";
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // bare API callers refer to the current operation
     if (op !== PSFlow._op) { PSFlow.stale("finish", op); return; }
     if (!this._aborted && !this._failure) {
-      try { const outcome=PSFlow.finish(this._session, this._psOp);if(outcome?.pending&&W.PSManagement){this._menu.deactivate();this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
+      try { const outcome=PSFlow.finish(this._session, this._psOp);if(outcome?.continuationToken){this._evolutionTransferred=true;this.popScene();return;}if(outcome?.pending&&W.PSManagement){this._menu.deactivate();this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
     }
     this.popScene();
   };
   P.terminate = function () {
     G.Scene_MenuBase.prototype.terminate.call(this);
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // (a scene always has one; a bare caller means the current one)
-    if (PSFlow.running && op === PSFlow._op && !(this._receivingTransferred&&PSFlow.app().pendingReceiving)) PSFlow.abort(new Error("the battle scene closed without an outcome"), op); // transferred reception keeps the same operation and save lock
+    if (PSFlow.running && op === PSFlow._op && !(this._receivingTransferred&&PSFlow.app().pendingReceiving) && !(this._evolutionTransferred&&PSFlow.app().pendingEvolution)) PSFlow.abort(new Error("the battle scene closed without an outcome"), op); // transferred operations keep the same event and save lock
   };
 
   // ---------------------------------------------------------------- read-only party / bag screen (no management in this version)
