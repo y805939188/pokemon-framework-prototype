@@ -68,3 +68,7 @@ test('ACQ-01 same-token resolve/technical termination are mutually exclusive acr
   const x=setup({port:state=>({read:()=>state.read(),replace:()=>{throw Error('zero');}})}),p=kind==='gift'?x.gift():x.grant();assert.equal(x.app.terminateAcquisition(p.token).status,'aborted');assert.equal(x.app.resolveReceiving(p.token).reason,'stale-operation');assert.equal(x.state.replaced.length,0);assert(!x.app.saveBlocked);assert.notDeepEqual(w.state.current(),before);
  }
 });
+
+test('ACQ-02 registration refuses missing physical data or exact explicit display alias slots/data',()=>{
+ for(const mode of ['physical-data','display-slot','display-data']){const w=setup(),c=clone(w.content),m=clone(w.state.current().party[1]);m.species='Pidgey';m.form=1;c.forms={Pidgey:{0:'Pidgey',1:'PidgeyNamed'}};if(mode!=='physical-data')c.species.PidgeyNamed={...c.species.Pidgey,formName:'Named',pokedexForm:2};if(mode==='display-data')c.forms.Pidgey[2]='MISSING-DATA';const before=clone(w.state.current().dex),p=E.acquisitionDex.planAcquisitionDex(before,[m],c,{source:'receive',seeForm:true,showMessages:true});assert.equal(p.status,'refused');assert.deepEqual(w.state.current().dex,before);assert.equal(p.dex,undefined);}
+});

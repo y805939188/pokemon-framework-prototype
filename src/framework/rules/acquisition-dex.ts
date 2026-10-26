@@ -18,8 +18,14 @@ export function planAcquisitionDex(dex: DexState, members: readonly Member[], co
   for (const member of members) {
     const gender = member.gender === "M" ? 0 : member.gender === "F" ? 1 : member.gender === "N" ? 2 : null;
     if (gender === null || typeof member.shiny !== "boolean") return { status: "refused", reason: "unknown-acquired-appearance" };
-    if (!Number.isInteger(member.form) || member.form! < 0 || member.form! > 999
-      || (content.forms ? own(own(content.forms, member.species), String(member.form)) === undefined : member.form !== 0)) return { status: "refused", reason: "unknown-acquired-form" };
+    const exact = (form: number) => {
+      const name = content.forms ? own(own(content.forms, member.species), String(form)) : form === 0 ? member.species : undefined;
+      return name === undefined ? undefined : own(content.species, name);
+    };
+    const original = Number.isInteger(member.form) && member.form! >= 0 && member.form! <= 999 ? exact(member.form!) : undefined;
+    if (!original) return { status: "refused", reason: "unknown-acquired-form" };
+    const display = original.pokedexForm ?? member.form!;
+    if (!Number.isInteger(display) || display < 0 || display > 999 || !exact(display)) return { status: "refused", reason: "unknown-acquired-display-form" };
     const raw: DexAppearance = { species: member.species, form: member.form!, gender, shiny: member.shiny };
     const appearance = normalizeDexAppearance(content, raw), recent = normalizeDexAppearance(content, raw, "recent");
     if (!appearance || !recent) return { status: "refused", reason: "unknown-acquired-form" };
