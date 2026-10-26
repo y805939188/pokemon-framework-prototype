@@ -65,8 +65,9 @@ const integer = (value: unknown, min = 0, max = Number.MAX_SAFE_INTEGER): value 
 const identity = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9#._:-]{1,128}$/.test(value);
 const hash = (value: unknown): value is string => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 const reason = (value: unknown): value is string => typeof value === "string" && value.length > 0;
+const fields = (value: unknown, allowed: readonly string[]): boolean => object(value) && Object.keys(value).every(key => allowed.includes(key));
 function slots(value: unknown, allowed: readonly string[]): boolean {
-  return object(value) && Object.keys(value).every(key => allowed.includes(key) && Object.hasOwn(Object.getOwnPropertyDescriptor(value, key)!, "value"));
+  return fields(value, allowed) && Object.keys(value as Obj).every(key => Object.hasOwn(Object.getOwnPropertyDescriptor(value, key)!, "value"));
 }
 function array(value: unknown, maximum = 100000): unknown[] | null {
   if (!Array.isArray(value)) return null;
@@ -192,14 +193,14 @@ export function resolveBattleEffects(input: ResolveBattleEffectsInput): Resolved
   const expectedBinding = binding(data(input, "expectedBinding")), expectedContext = context(data(input, "expectedContext")), seal = data(input, "seal");
   const actualBinding = binding(data(seal, "binding")), actualContext = context(data(seal, "context"));
   // Source slots are optional reads: an unreadable observer cannot invalidate the independent control binding.
-  const bindingOK = object(seal) && Object.keys(seal).every(key => ["version", "binding", "context", "observer", "control"].includes(key)) && expectedBinding !== null && actualBinding !== null && data(seal, "version") === 2 && JSON.stringify(expectedBinding) === JSON.stringify(actualBinding);
+  const bindingOK = fields(seal, ["version", "binding", "context", "observer", "control"]) && expectedBinding !== null && actualBinding !== null && data(seal, "version") === 2 && JSON.stringify(expectedBinding) === JSON.stringify(actualBinding);
   const contextOK = expectedContext !== null && actualContext !== null && JSON.stringify(expectedContext) === JSON.stringify(actualContext);
   disposition(result, "shared", "binding", bindingOK ? { status: "complete" } : unavailable("seal-binding-mismatch-or-unavailable"));
   disposition(result, "shared", "context", contextOK ? { status: "complete" } : unavailable("seal-context-mismatch-or-unavailable"));
   if (bindingOK && contextOK) result.binding = actualBinding;
   const usable = result.binding !== null;
   const rawObserver = usable ? data(seal, "observer") : undefined, rawControl = usable ? data(seal, "control") : undefined;
-  const observer = slots(rawObserver, ["appearances", "defeats", "members"]) ? rawObserver : undefined, control = slots(rawControl, ["members"]) ? rawControl : undefined;
+  const observer = fields(rawObserver, ["appearances", "defeats", "members"]) ? rawObserver : undefined, control = fields(rawControl, ["members"]) ? rawControl : undefined;
   const rawObserverMembers = data(observer, "members"), rawControlMembers = data(control, "members");
   const observerMembers = object(rawObserverMembers) ? rawObserverMembers : undefined, controlMembers = object(rawControlMembers) ? rawControlMembers : undefined;
   for (const group of ["appearances", "defeats"] as const) {

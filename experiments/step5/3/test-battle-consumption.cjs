@@ -53,7 +53,11 @@ test('an unreadable source slot never becomes a shared binding failure or execut
   const controlFailure=fixture();controlFailure.seal.observer.members.P1.faint=faintCell([faint('observer')]);
   Object.defineProperty(controlFailure.seal,'control',{enumerable:true,get(){reads++;throw Error('control');}});
   const observer=resolveBattleEffects(controlFailure);
-  assert.notEqual(observer.binding,null);assert.equal(observer.critical.P1.value,3);assert.equal(observer.appearances.length,1);assert.equal(observer.faint.P1.positiveOccurrences.length,1);assert.equal(Object.hasOwn(observer.friendshipReplacements,'P1'),false);assert.equal(reads,0);
+  assert.notEqual(observer.binding,null);assert.equal(observer.critical.P1.value,3);assert.equal(observer.appearances.length,1);assert.equal(observer.faint.P1.positiveOccurrences.length,1);assert.equal(Object.hasOwn(observer.friendshipReplacements,'P1'),false);
+  const displayFailure=fixture();
+  Object.defineProperty(displayFailure.seal.observer,'appearances',{enumerable:true,get(){reads++;throw Error('display');}});
+  const members=resolveBattleEffects(displayFailure);
+  assert.equal(members.appearances.length,0);assert.equal(members.critical.P1.value,3);assert.equal(members.damage.P1.status,'complete');assert.equal(members.friendshipReplacements.P1,105);assert.equal(reads,0);
 });
 test('real hook positive survives interrupted prefix and contrary complete-zero coverage',async()=>{
   const {resolveBattleEffects}=await moduleUnderTest;const input=fixture();
