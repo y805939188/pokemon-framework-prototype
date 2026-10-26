@@ -68,3 +68,8 @@ test('DEX-01 Forms refuses a species unavailable in all unlocked regions without
 test('DEX-02 a readonly query observing B retires an active A display even when A returns before the answer',()=>{
  let altered=false;const w=setup({contentPort:content=>({content:altered?{...content,meta:undefined}:content})});previousSighting(w);w.app.receiveGift({kind:'normal',member:{species:'Pidgey',level:3}});const main=clone(w.state.current()),writes=w.state.replaced.length;altered=true;w.app.pokedexSnapshot();altered=false;assert.equal(answer(w.app,{kind:'message-complete'}).view.phase,'failed');assert.deepEqual(w.state.current(),main);assert.equal(w.state.replaced.length,writes);assert.equal(answer(w.app,{kind:'technical-terminate'}).status,'technically-terminated');assert(!w.app.saveBlocked);
 });
+
+test('nullable currentRegion rejects nonfinite input before JSON retention while explicit null and legal outside-region fallback remain valid',()=>{
+ for(const region of [NaN,Infinity,-Infinity,1.5,'0']){const w=setup({settings:{USE_CURRENT_REGION_DEX:true,DEX_SHOWS_ALL_FORMS:true}});previousSighting(w);const before=clone(w.state.current());assert.equal(w.app.updatePokedex({kind:'form',species:'Pidgey',baseFrontsEqual:false,currentRegion:region}).reason,'invalid-pokedex-current-region');assert.deepEqual(w.state.current(),before);assert.equal(w.state.replaced.length,0);assert(!w.app.saveBlocked);}
+ for(const currentRegion of [null,700]){const w=setup({settings:{USE_CURRENT_REGION_DEX:true,DEX_SHOWS_ALL_FORMS:true}});previousSighting(w);assert.equal(w.app.updatePokedex({kind:'form',species:'Pidgey',baseFrontsEqual:false,currentRegion}).status,'applied');assert.equal(w.state.current().dex.lastSeenForm.Pidgey.shiny,false);assert(!w.app.saveBlocked);}
+});

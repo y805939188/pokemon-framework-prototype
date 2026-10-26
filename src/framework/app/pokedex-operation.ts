@@ -126,6 +126,8 @@ export class PokedexOperation {
   }
   begin(command: DexViewingCommand): DexResolution {
     if (this.operation || this.resolving) return { status: "refused", reason: "pokedex-operation-active" };
+    // JSON copies map nonfinite numbers to null; validate this nullable author input before retaining it.
+    if (command?.kind === "form" && command.currentRegion !== undefined && command.currentRegion !== null && !Number.isSafeInteger(command.currentRegion)) return { status: "refused", reason: "invalid-pokedex-current-region" };
     let op: Operation | undefined;
     this.resolving = true;
     try {
