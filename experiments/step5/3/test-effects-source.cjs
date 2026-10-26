@@ -5,8 +5,8 @@ const {register}=require('node:module'),{pathToFileURL}=require('node:url'),{res
 register('data:text/javascript,'+encodeURIComponent(`import{readFile}from'node:fs/promises';import{stripTypeScriptTypes}from'node:module';export async function load(url,context,next){if(url.endsWith('.ts'))return{format:'module',source:stripTypeScriptTypes(await readFile(new URL(url),'utf8'),{sourceUrl:url}),shortCircuit:true};return next(url,context);}`),pathToFileURL(__filename));
 const pure=import(pathToFileURL(resolve(__dirname,'../../../src/framework/rules/battle-consumption.ts')));
 const E=require('../../../js/engine/build/engine.cjs'),clone=x=>JSON.parse(JSON.stringify(x)),D=E.dex.createDexLookup(),C=clone(E.fixtures.content);
-for(const id of ['splash','surgingstrikes','substitute','quickattack','return']){const m=D.move(id);C.moves[id]={id:m.id,name:m.name,pp:m.pp};}
-C.species.Zoroark={base:D.species('Zoroark').baseStats,growth:'medium',baseExp:50,evYield:{},catchRate:255,learnset:{}};
+for(const id of ['splash','surgingstrikes','substitute','quickattack','return','transform']){const m=D.move(id);C.moves[id]={id:m.id,name:m.name,pp:m.pp};}
+for(const id of ['Zoroark','Ditto'])C.species[id]={base:D.species(id).baseStats,growth:'medium',baseExp:50,evYield:{},catchRate:255,learnset:{}};
 function member(id,species,level,moves,extra={}){
  const ivs={hp:31,atk:31,def:31,spa:31,spd:31,spe:31},evs={},hp=E.growth.computeStats(C.species[species].base,ivs,evs,level,'hardy').hp;
  return {id,species,form:0,level,exp:E.growth.minExp(C.species[species].growth,level),hp,status:'',item:'',ability:D.species(species).abilities[0],nature:'hardy',gender:'M',ivs,evs,moves:moves.map(id=>({id,pp:D.move(id).pp,maxpp:D.move(id).pp})),friendship:99,...extra};
@@ -69,4 +69,9 @@ test('V2 control receipt survives an exception in the old optional friendship co
  Object.defineProperty(s._evidence.value,'friendship',{get(){throw Error('synthetic old-copy failure');},configurable:true,enumerable:false});
  await s.useItem('potion','P1');await s.throwBall('masterball');const r=await resolved(s,game);
  assert(r.friendshipReplacements.P1>99);assert.equal(s.result().captured.length,1);assert(s.result().members.P1.exp>game.party[0].exp);
+});
+test('V2 natural Transform records normalized display changes even when legacy details stay the same',async()=>{
+ const {s,game}=await make({party:[member('P1','Snorlax',50,['splash'])],foes:[member('F1','Ditto',50,['transform'])]});
+ await s.chooseMove(1);await s.throwBall('masterball');const r=await resolved(s,game),displayed=r.appearances.filter(x=>x.memberId==='F1').map(x=>x.display.battleSpecies);
+ assert(displayed.includes('Ditto'));assert(displayed.includes('Snorlax'));assert.equal(s.result().captured[0].species,'Ditto');
 });

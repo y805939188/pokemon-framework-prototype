@@ -193,8 +193,10 @@ export class BattleGateway implements BattleDriver {
     }
     if (value.kind === "faint" && own(state.pending, id)) { this._observationIssue("damage", "unclosed-loss-at-faint", id); delete state.pending[id]; }
     if (value.kind === "display" || value.kind === "appearance") {
-      if (value.kind === "display" && own(state.displays, id) === value.details) return;
-      setOwn(state.displays, id, value.details);
+      // Transform can change the displayed species while Showdown's legacy details string remains unchanged.
+      const key = value.display ? JSON.stringify([value.display.battleSpecies, value.display.gender, value.display.shiny]) : value.details;
+      if (value.kind === "display" && own(state.displays, id) === key) return;
+      setOwn(state.displays, id, key);
     }
     // Bounds apply only to companion quality. Never interrupt a legal engine action or silently claim complete.
     if (state.records.length >= 16384) { this._observationIssue("identity", "observation-capacity-exceeded"); return; }
