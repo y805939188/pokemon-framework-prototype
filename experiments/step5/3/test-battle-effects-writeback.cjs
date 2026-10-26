@@ -120,6 +120,51 @@ test('reliably mapped base retains seen and defeat count when exact form normali
   assert.deepEqual(r.state.dex.seen,['snorlax','zoroark']);assert.equal(r.state.dex.defeatedCounts.snorlax,1);assert.equal(Object.hasOwn(r.state.dex.seenForms,'snorlax'),false);assert.equal(Object.hasOwn(r.state.dex.lastSeenForm,'snorlax'),false);
   assert.ok(r.dispositions.some(d=>d.memberId==='F1'&&d.reason==='display-form-unavailable'));assert.equal(r.state.dex.capturedCounts.zoroark,1);assert.deepEqual(f.V.validateGame(r.state),[]);
 });
+test('missing exact physical form mapping never registers fallback form0 while base facts and captures survive',async()=>{
+  for(const pokedexForm of [undefined,0]){
+    const f=await fixture();if(pokedexForm!==undefined)f.content.species['Snorlax-Gmax'].pokedexForm=pokedexForm;
+    delete f.content.forms.snorlax[1];const r=f.compose();
+    assert.deepEqual(r.state.dex.seen,['snorlax','zoroark']);assert.equal(r.state.dex.defeatedCounts.snorlax,1);
+    assert.equal(Object.hasOwn(r.state.dex.seenForms,'snorlax'),false);assert.equal(Object.hasOwn(r.state.dex.lastSeenForm,'snorlax'),false);
+    assert.ok(r.dispositions.some(d=>d.memberId==='F1'&&d.reason==='display-form-unavailable'));
+    assert.deepEqual(r.state.dex.owned,['zoroark']);assert.equal(r.state.dex.capturedCounts.zoroark,1);assert.equal(r.state.party[0].exp,f.raw.members.P1.exp);assert.deepEqual(f.V.validateGame(r.state),[]);
+  }
+});
+test('exact physical source mapping must match the observed battle name',async()=>{
+  const f=await fixture();f.content.forms.snorlax[1]='Snorlax';const r=f.compose();
+  assert.deepEqual(r.state.dex.seen,['snorlax','zoroark']);assert.equal(r.state.dex.defeatedCounts.snorlax,1);
+  assert.equal(Object.hasOwn(r.state.dex.seenForms,'snorlax'),false);assert.equal(Object.hasOwn(r.state.dex.lastSeenForm,'snorlax'),false);
+});
+test('explicit PokedexForm alias and legitimately unnamed forms retain F registration semantics',async()=>{
+  for(const kind of ['named-alias','alias-zero','unnamed-source','unnamed-alias']){
+    const f=await fixture();let expected=0;
+    if(kind==='named-alias'||kind==='unnamed-alias'){
+      f.content.species['Snorlax-Gmax'].pokedexForm=7;f.content.forms.snorlax[7]='Snorlax-Dex';
+      f.content.species['Snorlax-Dex']={...clone(f.content.species.Snorlax),form:7,...(kind==='named-alias'?{formName:'Dex display'}:{})};
+      if(kind==='named-alias')expected=7;
+    }else if(kind==='alias-zero')f.content.species['Snorlax-Gmax'].pokedexForm=0;
+    else delete f.content.species['Snorlax-Gmax'].formName;
+    const r=f.compose();assert.deepEqual(r.state.dex.seenForms.snorlax,[{gender:0,form:expected,shiny:true}],kind);assert.equal(r.state.dex.lastSeenForm.snorlax.form,expected,kind);
+    assert.equal(r.state.dex.defeatedCounts.snorlax,1);assert.equal(r.dispositions.some(d=>d.memberId==='F1'&&d.reason==='display-form-unavailable'),false,kind);
+  }
+});
+test('missing explicit dex alias mapping or data skips only precision without borrowing form0',async()=>{
+  for(const missing of ['mapping','data']){
+    const f=await fixture();f.content.species['Snorlax-Gmax'].pokedexForm=7;
+    if(missing==='mapping')f.content.species['Snorlax-Dex']={...clone(f.content.species.Snorlax),form:7,formName:'Dex display'};
+    else f.content.forms.snorlax[7]='Snorlax-Dex';
+    const r=f.compose();assert.equal(Object.hasOwn(r.state.dex.seenForms,'snorlax'),false,missing);assert.equal(Object.hasOwn(r.state.dex.lastSeenForm,'snorlax'),false,missing);
+    assert.deepEqual(r.state.dex.seen,['snorlax','zoroark']);assert.equal(r.state.dex.defeatedCounts.snorlax,1);assert.equal(r.state.dex.capturedCounts.zoroark,1);
+  }
+});
+test('accepted nonzero-form capture without its exact mapping still owns, sees and counts without form fabrication',async()=>{
+  const f=await fixture();f.caught.form=1;f.content.speciesKeys.Zoroark.form=1;
+  f.content.species['Zoroark-Base']=clone(f.content.species.Zoroark);f.content.forms.zoroark[0]='Zoroark-Base';
+  f.content.species.Zoroark.form=1;f.content.species.Zoroark.formName='Captured form';f.content.forms.zoroark[1]='Zoroark';
+  const primary=f.primary();delete f.content.forms.zoroark[1];const r=f.compose({primary});
+  assert.equal(f.T.locateMember(r.state,'C1').member.form,1);assert.deepEqual(r.state.dex.owned,['zoroark']);assert.deepEqual(r.state.dex.seen,['snorlax','zoroark']);assert.equal(r.state.dex.capturedCounts.zoroark,1);
+  assert.equal(Object.hasOwn(r.state.dex.seenForms,'zoroark'),false);assert.equal(Object.hasOwn(r.state.dex.lastSeenForm,'zoroark'),false);assert.ok(r.dispositions.some(d=>d.memberId==='C1'&&d.reason==='capture-form-unavailable'));
+});
 test('real repeated defeat ordinals count actual occurrences without a second persistent event table',async()=>{
   const f=await fixture();f.source.seal.observer.defeats.F1.value.push({...clone(defeat),sourceOrder:4,occurrenceOrdinal:2,hookKey:'foe-faint-2'});
   const r=f.compose();assert.equal(r.state.dex.defeatedCounts.snorlax,2);assert.deepEqual(Object.keys(r.state).sort(),Object.keys(f.primary()).sort());assert.equal('events' in r.state.dex,false);assert.equal('critical' in r.state,false);assert.equal('damage' in r.state,false);

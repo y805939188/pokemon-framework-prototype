@@ -38,6 +38,24 @@ const speciesId = (value: string): boolean => typeof value === "string" && /^[A-
 const formNumber = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 999;
 const friendshipValue = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 255;
 
+/** Battle evidence needs exact source data before F's ordinary compatibility normalization may collapse a form. */
+function exactDexAppearance(content: Content, individual: DexAppearance, battleSpecies?: string): DexAppearance | null {
+  if (!formNumber(individual.form)) return null;
+  const forms = own(content.forms, individual.species);
+  const exactName = (form: number): string | undefined => content.forms ? own(forms, String(form)) : form === 0 ? individual.species : undefined;
+  const originalName = exactName(individual.form);
+  if (!originalName || battleSpecies !== undefined && originalName !== battleSpecies) return null;
+  const original = own(content.species, originalName);
+  if (!original) return null;
+  // An explicitly authored PokedexForm alias remains valid, including 0. Its target must exist too.
+  const displayForm = original.pokedexForm ?? individual.form;
+  if (!formNumber(displayForm)) return null;
+  const displayName = exactName(displayForm);
+  if (!displayName || !own(content.species, displayName)) return null;
+  // F still decides gender normalization and the permitted unnamed-display => 0 rule.
+  return normalizeDexAppearance(content, individual);
+}
+
 /** Only friendship, the readiness pair and finite dex fields may differ from primary. Inputs stay detached. */
 export function composeBattleEffects(input: ComposeBattleEffectsInput): ComposedBattleEffects {
   const { before, primary, raw, content, effects, internalBattle } = input;
@@ -93,7 +111,7 @@ export function composeBattleEffects(input: ComposeBattleEffectsInput): Composed
     const key = resolveKey(battleSpecies);
     // A failed mapping never borrows the captured template, another member or a guessed form0.
     if (!key || !speciesId(key.species)) return null;
-    return { species: key.species, appearance: formNumber(key.form) ? normalizeDexAppearance(content, { ...key, gender, shiny }) : null };
+    return { species: key.species, appearance: formNumber(key.form) ? exactDexAppearance(content, { ...key, gender, shiny }, battleSpecies) : null };
   };
   for (const appearance of effects.appearances) {
     const normalized = display(appearance.display.battleSpecies, appearance.display.gender, appearance.display.shiny);
@@ -115,7 +133,7 @@ export function composeBattleEffects(input: ComposeBattleEffectsInput): Composed
     record("capture-owned", member.id, { source: "set-owned", species: member.species });
     const gender = member.gender === "M" ? 0 : member.gender === "F" ? 1 : member.gender === "N" ? 2 : null;
     const normalized = gender !== null && formNumber(member.form) && typeof member.shiny === "boolean"
-      ? normalizeDexAppearance(content, { species: member.species, form: member.form, gender, shiny: member.shiny }) : null;
+      ? exactDexAppearance(content, { species: member.species, form: member.form, gender, shiny: member.shiny }) : null;
     record("capture-appearance", member.id, { source: "appearance", species: member.species, appearance: normalized, internalBattle }, undefined, normalized ? undefined : "capture-form-unavailable");
     record("capture-count", member.id, { source: "capture", species: member.species, appearance: null, internalBattle }, "capturedCounts");
   }
