@@ -84,3 +84,11 @@ test('G1 real deferred MZ initialize→create refuses cleared and old-generation
 test('G1 annotations distinguish egg, known, compatible and incompatible with zero install; details expose real move directory',()=>{
  const w=setup(),before=clone(w.state.current());let rows=w.app.teachingCandidates({kind:'machine',itemId:'study-tr',entry:'bag'});assert.equal(rows[0].annotation,'able');assert.deepEqual(w.state.current(),before);let state=clone(before);state.party[0].moves[0]={id:'gust',pp:35,maxpp:35,ppUps:0};w.state.replace(state);assert.equal(w.app.teachingCandidates({kind:'machine',itemId:'study-tr',entry:'bag'})[0].annotation,'learned');state.party[0].isEgg=true;w.state.replace(state);assert.equal(w.app.teachingCandidates({kind:'machine',itemId:'study-tr',entry:'bag'})[0].annotation,'not-able');assert.equal(w.app.describeLearningMove('gust').pp,35);assert.equal(w.app.describeLearningMove('gust').type,'Flying');assert.equal(w.app.describeLearningMove('gust').power,40);assert(w.app.describeLearningMove('gust').description);assert.equal(w.app.describeLearningMove('not-a-move'),null);
 });
+
+test('G1 authored/localized move name is retained while details come from the pinned Dex',()=>{
+ const w=setup({edit:(g,c)=>{c.moves.Gust.name='阵风'.repeat(60);}}),info=w.app.describeLearningMove('gust');assert.equal(info.name,'阵风'.repeat(60));assert.equal(info.power,40);w.learn();w.chooseG('yes');assert(w.p().text.some(t=>t.includes('…')));w.press('cancel');w.ready();w.chooseG('yes');w.chooseG('close');
+});
+
+test('G1 reservation stays continuous during window construction/attach and rechecks cancellation there',()=>{
+ for(const hook of ['windowHook','attachHook'])for(const action of ['observe','clear','reload']){let interpreter,seen;const w=setup({full:false,hostOptions:{deferredCreate:true,[hook]:G=>{seen=G.PSFlow.operationPending();if(action==='clear')interpreter.clear();else if(action==='reload')G.PSFlow.app().stateReplacedByHost();}}});interpreter=w.pluginCommand('PS_Progression','TeachMove',{memberId:w.id,moveId:'gust',source:'tutor'});w.tick();assert.equal(seen,true);if(action==='observe'){assert.equal(w.state.replaced.length,1);w.chooseG('close');}else{assert.equal(w.state.replaced.length,0);assert.equal(w.app.pendingLearning,null);assert.equal(interpreter.updateWaitMode(),false);assert(!w.app.saveBlocked);}}
+});

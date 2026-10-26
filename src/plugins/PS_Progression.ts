@@ -75,18 +75,18 @@ import type { LearningIntent, LearningParent, LearningOutcome } from '../framewo
  function makeRequest(intent?:LearningIntent,done?:Request['done'],resume=false):Request {const application=app();return {intent,done,resume,handle:{application,generation:application.stateGeneration,done:false}};}
  function open(request:Request){
   if(active||queued||reserved||G.SceneManager.isSceneChanging()||G.$gameMessage?.isBusy?.())return null;
-  queued=reserved=request;try{G.SceneManager.push(Scene_PSProgression);}catch(e){queued=null;reserved=null;const created=active as Controller|null;if(created?.request===request)created.dispose();request.handle.done=true;request.handle.result={status:'refused',reason:String(e)};}return request.handle;
+  queued=reserved=request;try{G.SceneManager.push(Scene_PSProgression);}catch(e){if(queued===request)queued=null;if(reserved===request)reserved=null;const created=active as Controller|null;if(created?.request===request)created.dispose();request.handle.done=true;request.handle.result={status:'refused',reason:String(e)};}return request.handle;
  }
  function Scene_PSProgression(this:any){this.initialize(...(arguments as any));}
  const P=Scene_PSProgression.prototype=Object.create(G.Scene_MenuBase.prototype);P.constructor=Scene_PSProgression;
  P.initialize=function(){G.Scene_MenuBase.prototype.initialize.call(this);this._request=queued;queued=null;};
  P.create=function(){G.Scene_MenuBase.prototype.create.call(this);try{
-  if(reserved===this._request)reserved=null;
   if(!this._request)throw Error('missing-learning-request');
-  const h=this._request.handle;if(h.done||h.application!==flow()._app||h.generation!==h.application.stateGeneration){h.done=true;h.result??={status:'refused',reason:'stale-learning-screen'};this._finished=true;return;}
+  const h=this._request.handle;if(h.done||h.application!==flow()._app||h.generation!==h.application.stateGeneration){h.done=true;h.result??={status:'refused',reason:'stale-learning-screen'};if(reserved===this._request)reserved=null;this._finished=true;return;}
   this._window=new G.Window_Base(new G.Rectangle(0,0,G.Graphics.boxWidth,G.Graphics.boxHeight));this.addWindow(this._window);
-  this._controller=new Controller(this._window,this._request,(o:LearningOutcome)=>{this._finished=true;if(this._request.done)notices.push({request:this._request,result:structuredClone(o)});});active=this._controller;this._controller.start();
- }catch(error){this._failure=String(error);this._controller?.dispose();if(this._request&&!this._request.handle.done){this._request.handle.done=true;this._request.handle.result={status:'refused',reason:this._failure};}try{G.$gameMessage.add(tr('refused',{reason:this._failure}));}catch{console.error(NAME,error);}}};
+  if(h.done||h.application!==flow()._app||h.generation!==h.application.stateGeneration){h.done=true;h.result??={status:'refused',reason:'stale-learning-screen'};if(reserved===this._request)reserved=null;this._finished=true;return;}
+  this._controller=new Controller(this._window,this._request,(o:LearningOutcome)=>{this._finished=true;if(this._request.done)notices.push({request:this._request,result:structuredClone(o)});});active=this._controller;if(reserved===this._request)reserved=null;this._controller.start();
+ }catch(error){if(reserved===this._request)reserved=null;this._failure=String(error);this._controller?.dispose();if(this._request&&!this._request.handle.done){this._request.handle.done=true;this._request.handle.result={status:'refused',reason:this._failure};}try{G.$gameMessage.add(tr('refused',{reason:this._failure}));}catch{console.error(NAME,error);}}};
  P.update=function(){G.Scene_MenuBase.prototype.update.call(this);if(this._finished||this._failure){this.popScene();return;}try{this._controller?.update();}catch(error){this._controller?.dispose();this._failure=String(error);try{G.$gameMessage.add(tr('refused',{reason:this._failure}));}catch{console.error(NAME,error);}}};
  P.popScene=function(){if(this._controller&&!this._controller.closed){this._controller.model.back();this._controller.boundary();this._controller.draw();return;}G.Scene_MenuBase.prototype.popScene.call(this);};
  P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);this._controller?.dispose();};

@@ -360,7 +360,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   describeLearningMove(id: string) {
     const { content, dex } = this.ports.content(), move = Object.values(content.moves ?? {}).find(value => value.id === id);
     if (!move) return null;
-    return { ...clone(move), ...(dex?.moveDetails?.(id) ?? { name: move.name, type: '', category: '', power: null, accuracy: 0, description: '' }) };
+    return { ...(dex?.moveDetails?.(id) ?? { type: '', category: '', power: null, accuracy: 0, description: '' }), ...clone(move) };
   }
   beginLearning(intent: LearningIntent, parent?: LearningParent) { return this.learning.begin(intent, parent); }
   resolveLearning(token: string, revision: number, decision: LearningDecision) { return this.learning.resolve(token, revision, decision); }
