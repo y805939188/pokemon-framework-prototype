@@ -132,12 +132,15 @@ function appearances(value: unknown, id: string): BattleAppearanceV2[] | null {
   }
   return result;
 }
-function defeats(value: unknown, id: string): BattleDefeatV2[] | null {
+function defeats(value: unknown, id: string, recordHook: (hookKey: string) => void): BattleDefeatV2[] | null {
   const rows = array(value); if (!rows) return null;
   const result: BattleDefeatV2[] = [], hooks = new Set<string>(); let lastOrder = -1, lastOrdinal = 0;
   for (const row of rows) {
     const memberId = data(row, "memberId"), sourceOrder = data(row, "sourceOrder"), snapshot = display(data(row, "display")), occurrenceOrdinal = data(row, "occurrenceOrdinal"), hookKey = data(row, "hookKey");
-    if (!slots(row, ["memberId", "sourceOrder", "display", "occurrenceOrdinal", "hookKey"]) || memberId !== id || !identity(memberId) || !integer(sourceOrder) || sourceOrder <= lastOrder || !snapshot || !integer(occurrenceOrdinal, 1) || occurrenceOrdinal !== lastOrdinal + 1 || !identity(hookKey) || hooks.has(hookKey)) return null;
+    if (!fields(row, ["memberId", "sourceOrder", "display", "occurrenceOrdinal", "hookKey"]) || memberId !== id || !identity(memberId) || !integer(sourceOrder) || sourceOrder <= lastOrder || !integer(occurrenceOrdinal, 1) || occurrenceOrdinal !== lastOrdinal + 1 || !identity(hookKey) || hooks.has(hookKey)) return null;
+    // Display failure prevents a defeat record, but cannot hide an independently identified hook's owner.
+    recordHook(hookKey);
+    if (!slots(row, ["memberId", "sourceOrder", "display", "occurrenceOrdinal", "hookKey"]) || !snapshot) return null;
     result.push({ memberId, sourceOrder, display: snapshot, occurrenceOrdinal, hookKey }); hooks.add(hookKey); lastOrder = sourceOrder; lastOrdinal = occurrenceOrdinal;
   }
   return result;
@@ -166,7 +169,7 @@ function faint(value: unknown, id: string, source: EffectSource): FaintCellV2 {
   const result: FaintOccurrenceV2[] = [], hooks = new Set<string>(); let lastOrder = -1, lastOrdinal = 0;
   for (const row of rows) {
     const memberId = data(row, "memberId"), occurrenceOrdinal = data(row, "occurrenceOrdinal"), sourceOrder = data(row, "sourceOrder"), hookKey = data(row, "hookKey");
-    if (!slots(row, ["memberId", "source", "occurrenceOrdinal", "sourceOrder", "hookKey"]) || memberId !== id || data(row, "source") !== source || !integer(occurrenceOrdinal, 1) || occurrenceOrdinal !== lastOrdinal + 1 || !integer(sourceOrder) || sourceOrder <= lastOrder || !identity(hookKey) || hooks.has(hookKey)) return { positiveOccurrences: [], coverage: invalid("invalid-faint-identity-or-order") };
+    if (!slots(row, ["memberId", "source", "occurrenceOrdinal", "sourceOrder", "hookKey"]) || memberId !== id || data(row, "source") !== source || !integer(occurrenceOrdinal, 1) || occurrenceOrdinal !== lastOrdinal + 1 || !integer(sourceOrder) || sourceOrder <= lastOrder || !identity(hookKey) || hooks.has(hookKey)) return { positiveOccurrences: result, coverage: invalid("invalid-faint-identity-or-order") };
     result.push({ memberId: id, source, occurrenceOrdinal, sourceOrder, hookKey }); hooks.add(hookKey); lastOrder = sourceOrder; lastOrdinal = occurrenceOrdinal;
   }
   // Invalid coverage alone cannot revoke an independently valid hook identity.
@@ -203,29 +206,25 @@ export function resolveBattleEffects(input: ResolveBattleEffectsInput): Resolved
   const observer = fields(rawObserver, ["appearances", "defeats", "members"]) ? rawObserver : undefined, control = fields(rawControl, ["members"]) ? rawControl : undefined;
   const rawObserverMembers = data(observer, "members"), rawControlMembers = data(control, "members");
   const observerMembers = object(rawObserverMembers) ? rawObserverMembers : undefined, controlMembers = object(rawControlMembers) ? rawControlMembers : undefined;
+  // A real faint hook has one entity owner across both sources and enemy defeat records.
+  const hookOwners = new Map<string, Set<string>>();
+  const recordHook = (hookKey: string, id: string): void => { const ids = hookOwners.get(hookKey) ?? new Set<string>(); ids.add(id); hookOwners.set(hookKey, ids); };
+  const pendingDefeats: { id: string; parsed: EffectCell<BattleDefeatV2[]> }[] = [];
   for (const group of ["appearances", "defeats"] as const) {
     const records = data(observer, group);
     if (!object(records)) { disposition(result, "observer", group, unavailable("observation-group-not-supplied")); continue; }
-    const pendingDefeats: { id: string; parsed: EffectCell<BattleDefeatV2[]> }[] = [];
-    const hookOwners = new Map<string, Set<string>>();
     for (const id of Object.keys(records)) {
       if (group === "appearances") {
         const parsed = cell(data(records, id), value => identity(id) && (expectedContext!.engineRosterIds.includes(id) || expectedContext!.foeIds.includes(id)) ? appearances(value, id) : null);
         disposition(result, "observer", group, parsed, id);
         if (parsed.status === "complete") result.appearances.push(...parsed.value);
       } else {
-        const parsed = cell(data(records, id), value => identity(id) && expectedContext!.foeIds.includes(id) ? defeats(value, id) : null);
+        const parsed = cell(data(records, id), value => identity(id) && expectedContext!.foeIds.includes(id) ? defeats(value, id, hookKey => recordHook(hookKey, id)) : null);
         pendingDefeats.push({ id, parsed });
-        if (parsed.status === "complete") for (const row of parsed.value) { const ids = hookOwners.get(row.hookKey) ?? new Set<string>(); ids.add(id); hookOwners.set(row.hookKey, ids); }
       }
     }
-    for (const { id, parsed } of pendingDefeats) {
-      if (parsed.status === "complete" && parsed.value.some(row => hookOwners.get(row.hookKey)!.size > 1)) { disposition(result, "observer", group, invalid("defeat-hook-identity-conflict"), id); continue; }
-      disposition(result, "observer", group, parsed, id);
-      if (parsed.status === "complete") result.defeats.push(...parsed.value);
-    }
   }
-  result.appearances.sort((a, b) => a.sourceOrder - b.sourceOrder); result.defeats.sort((a, b) => a.sourceOrder - b.sourceOrder);
+  result.appearances.sort((a, b) => a.sourceOrder - b.sourceOrder);
   const before = new Map<string, unknown>();
   for (const member of array(data(input, "membersBefore")) ?? []) {
     const id = data(member, "id");
@@ -244,18 +243,29 @@ export function resolveBattleEffects(input: ResolveBattleEffectsInput): Resolved
     pairs.set(id, inEngine ? { observer: faint(data(observed, "faint"), id, "observer"), control: faint(data(controlled, "faint"), id, "control") }
       : { observer: { positiveOccurrences: [], coverage: { status: "complete", reason: "not-in-engine-roster" } }, control: { positiveOccurrences: [], coverage: { status: "complete", reason: "not-in-engine-roster" } } });
   }
-  // Reusing an actual hook for two different stable identities makes only those facts unresolvable.
-  const owners = new Map<string, Set<string>>();
   for (const [id, pair] of pairs) for (const source of ["observer", "control"] as const) for (const fact of pair[source].positiveOccurrences) {
-    const ids = owners.get(fact.hookKey) ?? new Set<string>(); ids.add(id); owners.set(fact.hookKey, ids);
+    recordHook(fact.hookKey, id);
   }
+  for (const { id, parsed } of pendingDefeats) {
+    const conflicted = parsed.status === "complete" && parsed.value.some(row => hookOwners.get(row.hookKey)!.size > 1);
+    disposition(result, "observer", "defeats", conflicted ? invalid("defeat-hook-identity-conflict") : parsed, id);
+    if (parsed.status === "complete") result.defeats.push(...parsed.value.filter(row => hookOwners.get(row.hookKey)!.size === 1));
+  }
+  result.defeats.sort((a, b) => a.sourceOrder - b.sourceOrder);
   for (const [id, pair] of pairs) {
+    let ownershipConflict = false;
     for (const source of ["observer", "control"] as const) {
-      if (pair[source].positiveOccurrences.some(fact => owners.get(fact.hookKey)!.size > 1)) pair[source] = { positiveOccurrences: pair[source].positiveOccurrences.filter(fact => owners.get(fact.hookKey)!.size === 1), coverage: invalid("faint-hook-identity-conflict") };
+      if (pair[source].positiveOccurrences.some(fact => hookOwners.get(fact.hookKey)!.size > 1)) {
+        ownershipConflict = true;
+        pair[source] = { positiveOccurrences: pair[source].positiveOccurrences.filter(fact => hookOwners.get(fact.hookKey)!.size === 1), coverage: invalid("faint-hook-identity-conflict") };
+      }
     }
     const resolved = combineFaint(pair.observer, pair.control); setOwn(result.faint, id, resolved);
-    // This observer claimed full reset coverage while omitting a proved actual faint. Do not rebuild its D from control.
-    if (resolved.sources.observer.coverage.reason === "complete-coverage-misses-real-hook" && result.damage[id]!.status === "complete") setOwn(result.damage, id, invalid("damage-faint-reset-coverage-conflict"));
+    // A disputed entity or disproved observer reset coverage cannot authorize D/new R. Never rebuild D from control.
+    if (result.damage[id]!.status === "complete") {
+      if (ownershipConflict) setOwn(result.damage, id, invalid("damage-faint-hook-identity-conflict"));
+      else if (resolved.sources.observer.coverage.reason === "complete-coverage-misses-real-hook") setOwn(result.damage, id, invalid("damage-faint-reset-coverage-conflict"));
+    }
     disposition(result, "observer", "damage", result.damage[id]!, id);
     disposition(result, "observer", "faint", resolved.sources.observer.coverage, id); disposition(result, "control", "faint", resolved.sources.control.coverage, id);
   }

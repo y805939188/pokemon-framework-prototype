@@ -144,3 +144,71 @@ test('R clear/unknown/no-new rules require complete D >=49, reset and actual sca
   for(const damage of [complete({total:48,resetCoverage:'complete'}),unavailable(),complete({total:49,resetCoverage:'unavailable'})])assert.deepEqual(planBattleReadiness({member:{...member,readyToEvolve:false},faint:missing,damage,scan:{status:'complete',permitsNewReady:true}}),{readyToEvolve:false,evolutionReadiness:'known'});
   assert.deepEqual(planBattleReadiness({member:{...member,readyToEvolve:false},faint:missing,damage:complete({total:49,resetCoverage:'complete'})}),{readyToEvolve:false,evolutionReadiness:'known'});
 });
+function readiness(M,r,id,readyToEvolve,extra={}){
+  return M.planBattleReadiness({member:{id,hp:10,readyToEvolve,evolutionReadiness:'known'},faint:r.faint[id],damage:r.damage[id],scan:{status:'complete',permitsNewReady:true},...extra});
+}
+function checkConflict(M,r,id){
+  assert.equal(r.damage[id].status,'invalid');assert.equal(Object.hasOwn(r.damage[id],'value'),false);
+  assert.deepEqual(readiness(M,r,id,false),{readyToEvolve:false,evolutionReadiness:'known'});
+  assert.deepEqual(readiness(M,r,id,true),{readyToEvolve:true,evolutionReadiness:'unknown'});
+  assert.equal(r.critical[id].value,3);assert.equal(r.friendshipReplacements[id],id==='P1'?105:125);
+}
+test('cross-player hook ownership conflict blocks D and new R while preserving old R uncertainty',async()=>{
+  const M=await moduleUnderTest;
+  for(const cover of [coverage(),unavailable(),{status:'invalid',reason:'tail-unavailable'}]){
+    const input=fixture(),H='shared-player-hook';
+    input.seal.observer.members.P1.faint={positiveOccurrences:[faint('observer','P1',{hookKey:H})],coverage:cover};
+    input.seal.control.members.P2.faint=faintCell([faint('control','P2',{hookKey:H})]);
+    const before=JSON.stringify(input),r=M.resolveBattleEffects(input);
+    for(const id of ['P1','P2']){assert.equal(r.faint[id].positiveOccurrences.length,0);checkConflict(M,r,id);}
+    assert.equal(r.appearances.length,1);assert.equal(r.defeats.length,1);assert.equal(JSON.stringify(input),before);
+  }
+});
+test('player observer/control faint and foe defeat share one entity ownership domain',async()=>{
+  const M=await moduleUnderTest;
+  for(const source of ['observer','control'])for(const foe of ['F1','F2']){
+    const input=fixture(),H='shared-player-foe-hook',foeRow={...input.seal.observer.defeats.F1.value[0],memberId:foe,hookKey:H};
+    input.seal[source].members.P1.faint=faintCell([faint(source,'P1',{hookKey:H})]);
+    input.seal.observer.defeats[foe]=complete([foeRow]);
+    const before=JSON.stringify(input),r=M.resolveBattleEffects(input);
+    assert.equal(r.faint.P1.positiveOccurrences.length,0);assert.equal(r.defeats.some(row=>row.hookKey===H),false);checkConflict(M,r,'P1');
+    assert.equal(r.dispositions.find(d=>d.group==='defeats'&&d.memberId===foe).status,'invalid');
+    assert.equal(r.damage.P2.status,'complete');assert.equal(r.faint.P2.coverage.status,'complete');assert.equal(r.appearances.length,1);assert.equal(JSON.stringify(input),before);
+  }
+});
+test('a damaged faint tail retains valid prefix hooks, isolating its conflicting hook and D only',async()=>{
+  const M=await moduleUnderTest,input=fixture(),H='shared-prefix-hook';
+  input.seal.observer.members.P1.faint=faintCell([
+    faint('observer','P1',{hookKey:'independent-positive'}),
+    faint('observer','P1',{hookKey:H,occurrenceOrdinal:2,sourceOrder:5}),
+    faint('observer','P2',{hookKey:'bad-tail',occurrenceOrdinal:3,sourceOrder:6}),
+  ]);
+  input.seal.control.members.P2.faint=faintCell([faint('control','P2',{hookKey:H})]);
+  const before=JSON.stringify(input),r=M.resolveBattleEffects(input);
+  assert.deepEqual(r.faint.P1.positiveOccurrences.map(row=>row.hookKey),['independent-positive']);
+  assert.equal(r.faint.P2.positiveOccurrences.length,0);assert.equal(r.damage.P1.status,'invalid');assert.equal(r.damage.P2.status,'invalid');
+  assert.deepEqual(readiness(M,r,'P1',true),{readyToEvolve:false,evolutionReadiness:'known'});checkConflict(M,r,'P2');assert.equal(JSON.stringify(input),before);
+});
+test('a defeat display failure cannot hide its independently valid hook ownership conflict',async()=>{
+  const M=await moduleUnderTest,input=fixture(),H='damaged-defeat-hook';
+  input.seal.control.members.P1.faint=faintCell([faint('control','P1',{hookKey:H})]);
+  input.seal.observer.defeats.F1.value[0].hookKey=H;input.seal.observer.defeats.F1.value[0].display=null;
+  const before=JSON.stringify(input),r=M.resolveBattleEffects(input);
+  assert.equal(r.defeats.length,0);assert.equal(r.faint.P1.positiveOccurrences.length,0);checkConflict(M,r,'P1');assert.equal(JSON.stringify(input),before);
+});
+test('hook conflicts preserve unrelated defeat rows and deterministic HP0/heal/evolution or real faint clearing',async()=>{
+  const M=await moduleUnderTest,input=fixture(),H='partly-conflicted-hook';
+  input.seal.control.members.P1.faint=faintCell([faint('control','P1',{hookKey:H})]);
+  const first=input.seal.observer.defeats.F1.value[0];
+  input.seal.observer.defeats.F1.value=[{...first,hookKey:H},{...first,hookKey:'valid-foe-hook',occurrenceOrdinal:2,sourceOrder:5}];
+  const r=M.resolveBattleEffects(input);assert.deepEqual(r.defeats.map(row=>row.hookKey),['valid-foe-hook']);checkConflict(M,r,'P1');
+  for(const extra of [{member:{id:'P1',hp:0,readyToEvolve:true,evolutionReadiness:'known'}},{healed:true},{evolved:true}])assert.deepEqual(readiness(M,r,'P1',true,extra),{readyToEvolve:false,evolutionReadiness:'known'});
+  input.seal.control.members.P1.faint.positiveOccurrences.push(faint('control','P1',{hookKey:'valid-player-hook',occurrenceOrdinal:2,sourceOrder:5}));
+  const positive=M.resolveBattleEffects(input);assert.deepEqual(positive.faint.P1.positiveOccurrences.map(row=>row.hookKey),['valid-player-hook']);assert.deepEqual(readiness(M,positive,'P1',true),{readyToEvolve:false,evolutionReadiness:'known'});
+});
+test('same-entity cross-source hooks stay deduplicated and a complete genuine suffix may set new R',async()=>{
+  const M=await moduleUnderTest,input=fixture();
+  for(const source of ['observer','control'])input.seal[source].members.P1.faint=faintCell([faint(source)]);
+  const before=JSON.stringify(input),r=M.resolveBattleEffects(input);
+  assert.equal(r.faint.P1.positiveOccurrences.length,1);assert.equal(r.damage.P1.status,'complete');assert.deepEqual(readiness(M,r,'P1',false),{readyToEvolve:true,evolutionReadiness:'known'});assert.equal(JSON.stringify(input),before);
+});
