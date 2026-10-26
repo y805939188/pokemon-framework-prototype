@@ -28,7 +28,7 @@ export interface SelectedEvolutionSeed {
   token: string; generation: number; selected: true;
   /** The owning draft may present its new-species entry before learning begins. */
   deferLearning?: boolean;
-  cost?: { itemId: string; quantity: number };
+  cost?: { itemId: string; quantity: number; onCancel?: boolean };
 }
 export type EvolutionDecision = { kind: "complete" | "cancel" | "technical-terminate" | "retry" | "continue-learning" }
   | { kind: "learn"; answer: LearningAnswer };
@@ -196,7 +196,9 @@ export class EvolutionOperation {
       if (decision.kind === "cancel") {
         if (!selection.cancellable) return { status: "refused", reason: "evolution-cannot-cancel" };
         if (!Number.isSafeInteger(state.stats.evolutions_cancelled + 1)) throw new Error("evolution-cancellation-count-overflow");
-        const next = clone(state); next.stats = bumpStat(next.stats, "evolutions_cancelled");
+        const next = clone(state);
+        if ("selected" in op.seed && op.seed.cost?.onCancel) next.inventory = removeItems(next.inventory, op.seed.cost.itemId, op.seed.cost.quantity, catalogOf(content));
+        next.stats = bumpStat(next.stats, "evolutions_cancelled");
         return this.write(op, state, next, { kind: "cancelled" });
       }
       if (decision.kind !== "complete") return { status: "refused", reason: "evolution-decision-required" };
