@@ -6,6 +6,14 @@ const {actualDamage,unknownReadiness}=require('./fixtures/m1/convergence.cjs');
 test('M1/P53-21,27,31,39,43 core: actual D62 survives primary capture/Info, grants known R and later event eligibility once',async()=>{const r=await actualDamage(E,sourceSha);assert.equal(r.damage,62);});
 test('M1/P53-21,27,31,39,43 core: missing authority keeps capture/Info and unknown R through deposit, withdraw and recovery',async()=>{const r=await unknownReadiness(E,sourceSha);assert.equal(r.calls,0);});
 
+test('M1/P53-25 IU-18 explicit XS quantity2 adds200 XP and exactly two tiered vitamin changes in one growth install',()=>{
+ const {world}=require('./fixtures/postbattle/helpers.cjs'),w=world({entries:[],extraContent:c=>{c.species.Charizard.growth='medium';c.species.Charizard.learnset={1:['Tackle']};c.items['m1-xs']={...c.items.potion,id:'m1-xs',name:'XS',namePlural:'XS',fieldUse:'member',battleUse:'none',battleId:undefined,consumable:true,effect:{family:'exp-candy',parameters:{exp:100}}};}});
+ const before=JSON.parse(JSON.stringify(w.state.current()));Object.assign(before.party[0],{level:10,exp:1000,hp:1,friendship:99});before.inventory=E.inventory.addItems(before.inventory,'m1-xs',2,w.content.items,E.inventory.inventoryPolicy(w.content));w.state.replace(before);w.state.replaced.length=0;
+ const parent=w.app.beginInventoryOperation('bag'),out=w.app.beginEvolutionItem(parent,'IU-18',{itemId:'m1-xs',memberId:before.party[0].id,quantity:2}),next=w.state.current();assert.equal(out.status,'committed');assert.equal(next.party[0].exp,1200);assert.equal(next.party[0].level,10);
+ // Neither same-map nor luxury/held bonuses apply: vitamin 99+5=104, then 104+3=107; no level-up friendship.
+ assert.equal(next.party[0].friendship,107);assert.equal(E.inventory.itemQuantity(next.inventory,'m1-xs',w.content.items),0);assert.equal(w.state.replaced.length,1);assert(!w.app.pendingTriggeredEvolution&&!w.app.pendingEvolution);assert.deepEqual(next.stats,before.stats);assert.deepEqual(E.saveSchema.validateGameContent(next,w.content),[]);w.app.endInventoryOperation(parent);assert(!w.app.saveBlocked);
+});
+
 for(const outgoingD of [0,49])for(const capacity of [3,6])test(`M1/P53-28 CX22/CX23/CX39 core synthetic receipt: A D${outgoingD}, capacity ${capacity} retains K/D/L0 by ID across capture placement`,async()=>{
  const c=JSON.parse(JSON.stringify(E.fixtures.content)),dex=E.dex.createDexLookup(),copy=x=>JSON.parse(JSON.stringify(x));
  for(const [id,sp]of Object.entries(c.species)){const d=dex.species(id);Object.assign(sp,{abilities:d.abilities,hiddenAbilities:d.hiddenAbilities,gender:d.gender,learnset:{}});}
