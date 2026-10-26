@@ -10,29 +10,43 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
  const flow=()=>W.PSFlow,app=()=>flow().app(),tr=(k:string,p?:Record<string,string|number>)=>flow().translator().t('inventory.'+k,p);
  const why=(o:any)=>String(o?.reason??o?.error??o?.message??o),detail=(o:any)=>flow().translator().tOr('inventory.reason.'+why(o),why(o));
  const name=(it:ItemDefinition)=>flow().translator().tOr(it.nameKey??'item.name.'+it.id,it.name);
- type Request={kind:'bag'|'select'|'shop'|'use';parent?:InventoryParent;itemId?:string;quantity?:number;memberId?:string;filter?:(item:ItemDefinition)=>boolean;variableId?:number;shop?:any;prices?:{itemId:string;buy:number;sell?:number}[];done?:(o:InventoryOutcome)=>void};
+ type Request={kind:'bag'|'select'|'shop'|'use';parent?:InventoryParent;itemId?:string;quantity?:number;memberId?:string;filter?:(item:ItemDefinition)=>boolean;variableId?:number;shop?:any;prices?:{itemId:string;buy:number;sell?:number}[];done?:(o:InventoryOutcome)=>void;retireParent?:()=>void};
  type Handle={id:string;application:any;generation:number;done:boolean;result?:InventoryOutcome};
  type Choice={key:string;label:string;displayName?:string;details?:string[];enabled?:boolean;run:()=>void};
  type InventoryRow={item:ItemDefinition;quantity:number;index:number;pocket:number};
  type View={kind:string;cursor:number;title?:string;items?:Choice[];[key:string]:any};
- let active:Controller|null=null,queued:{request:Request;handle:Handle}|null=null,sequence=0;
+ type Queued={request:Request;handle:Handle;scene?:any;constructing?:boolean};
+ let active:Controller|null=null,queued:Queued|null=null,reserved:Queued|null=null,sequence=0;
+ // A dead presentation can retain a child recovery barrier. Transfer only its exact process-local parent token.
+ const abandoned:{application:any;generation:number;token:string;owner:string;retireParent?:()=>void}[]=[];
+ const sameHandle=(h:Handle)=>h.application===flow()._app&&h.generation===h.application.stateGeneration;
+ function retireQueued(q:Queued,result:InventoryOutcome){if(queued===q)queued=null;if(reserved===q)reserved=null;if(q.handle.done)return;q.handle.done=true;q.handle.result=clone(result);if(sameHandle(q.handle)&&q.request.done)notices.push({application:q.handle.application,generation:q.handle.generation,result:clone(result),done:q.request.done});}
+ function retireOrphan(){for(let i=abandoned.length-1;i>=0;i--)if(abandoned[i]!.application!==flow()._app||abandoned[i]!.generation!==abandoned[i]!.application.stateGeneration)abandoned.splice(i,1);const q=reserved;if(!q||q.constructing)return;const m=G.SceneManager;if(q.handle.done||!sameHandle(q.handle)||q.scene&&'_nextScene'in m&&q.scene!==m._scene&&q.scene!==m._nextScene)retireQueued(q,{status:'refused',reason:'stale-operation'});}
+ function queuedValid(scene:any){const q=scene._request;if(!q||q.handle.done||!sameHandle(q.handle)){if(q)retireQueued(q,{status:'refused',reason:'stale-operation'});scene._finished=true;scene._controller?.close({status:'refused',reason:'stale-operation'},true);return false;}return true;}
+ function acknowledgeRecoveredItem(application:any,generation:number,owner:string){
+  for(let i=abandoned.length-1;i>=0;i--){const entry=abandoned[i]!;if(entry.application!==flow()._app||entry.generation!==entry.application.stateGeneration){abandoned.splice(i,1);continue;}
+   if(entry.application!==application||entry.generation!==generation||entry.owner!==owner)continue;
+   if(application.pendingTriggeredEvolution||application.pendingEvolution||application.pendingPokedex)return;
+   const out=application.endInventoryOperation(entry.token);if(out.status==='refused')return;abandoned.splice(i,1);entry.retireParent?.();
+  }
+ }
  const waits=new WeakMap<object,Handle>(),outcomes=new WeakMap<object,InventoryOutcome>();
  const notices:{application:any;generation:number;result:InventoryOutcome;done:(o:InventoryOutcome)=>void}[]=[];
  const discardStaleNotices=()=>{for(let i=notices.length-1;i>=0;i--)if(notices[i]!.application!==flow()._app||notices[i]!.generation!==notices[i]!.application.stateGeneration)notices.splice(i,1);};
  const frames:any[]=[];const record=(row:any)=>{frames.push(row);if(frames.length>256)frames.shift();};
  const handle=():Handle=>{const application=app(),h={id:'inventory-ui:'+ ++sequence,done:false}as Handle;Object.defineProperties(h,{application:{value:application},generation:{value:application.stateGeneration}});return h;};
  function open(request:Request):Handle|null {
-  discardStaleNotices();const scene=G.SceneManager._scene;
-  if(active||queued||notices.length||scene?._psInventory||G.SceneManager.isSceneChanging()||scene?.isStarted?.()===false||G.$gameMessage?.isBusy?.())return null;
-  const application=app();if(application.encounterBlocked)return null;const h=handle();queued={request,handle:h};
-  try{G.SceneManager.push(Scene_PSInventory);}catch(error){queued=null;h.done=true;h.result={status:'refused',reason:'presentation-failed',error:String(error)};throw error;}return h;
+  retireOrphan();discardStaleNotices();const scene=G.SceneManager._scene;
+  if(active||queued||reserved||notices.length||scene?._psInventory||G.SceneManager.isSceneChanging()||scene?.isStarted?.()===false||G.$gameMessage?.isBusy?.())return null;
+  const application=app();if(application.encounterBlocked)return null;const h=handle(),q:Queued={request,handle:h,constructing:true};queued=reserved=q;
+  try{G.SceneManager.push(Scene_PSInventory);}catch(error){const created=active as Controller|null;if(created?.handle===h)created.close({status:'refused',reason:'presentation-failed',error:String(error)},true);retireQueued(q,{status:'refused',reason:'presentation-failed',error:String(error)});throw error;}finally{q.constructing=false;}return h;
  }
  class Controller {
   readonly application:any;readonly generation:number;readonly handle:Handle;readonly request:Request;
   token='';selection='';giveToken='';selectedTicket:InventoryTicket|null=null;closed=false;closing=false;ready=false;frame=0;serial=0;window:any;view!:View;error='';text:string[]=[];latch=new InputLatch();
   pocket=1;indices:number[]=Array(8).fill(0);visited=new Set<number>();bag:any;sorting=false;busy=false;operation:any=null;presentationOutcome:InventoryOutcome|null=null;afterMessage:(()=>void)|null=null;cancelWait:(()=>void)|null=null;lastPhase='';
   // Sort cancellation restores the live row, while indices retain the last moved saved position.
-  restoredSortCursor:number|null=null;evolutionChild:any=null;evolutionIntent:{itemId:string;memberId:string;quantity:number}|null=null;learningChild:any=null;learningItem:{itemId:string;memberId:string}|null=null;machineBrowse:{itemId:string;annotations:any[];members:any[]}|null=null;
+  restoredSortCursor:number|null=null;evolutionOwner='';evolutionChild:any=null;evolutionIntent:{itemId:string;memberId:string;quantity:number}|null=null;learningChild:any=null;learningItem:{itemId:string;memberId:string}|null=null;machineBrowse:{itemId:string;annotations:any[];members:any[]}|null=null;
   constructor(request:Request,h:Handle,readonly finish:(o:InventoryOutcome)=>void){this.request=request;this.handle=h;this.application=h.application;this.generation=h.generation;}
   valid(){try{return !this.closed&&!this.handle.done&&active===this&&this.application===app()&&this.generation===this.application.stateGeneration;}catch{return false;}}
   get saveBlocked(){return !!this.evolutionChild||!!this.learningChild||!!this.selectedTicket||!!this.operation||!!this.giveToken||this.busy||this.view?.kind==='quantity'||this.view?.pending===true;}
@@ -111,7 +125,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    if(this.triggerItem(itemId)){
     if(!memberId){this.fail({reason:'absent-party-target'});return;}
     if(this.selectedTicket&&JSON.stringify(this.selectedTicket)!==JSON.stringify(this.application.inventoryTicket(this.token,this.selectedTicket.pocket,this.selectedTicket.index))){this.fail({reason:'stale-slot'},()=>this.close({status:'refused',reason:'stale-slot'}));return;}
-    this.presentationOutcome=null;this.evolutionIntent={itemId,memberId,quantity};this.evolutionChild=W.PSEvolution.attachItem(this.window,this.token,this.id(),this.evolutionIntent);return;
+    this.presentationOutcome=null;this.evolutionIntent={itemId,memberId,quantity};this.evolutionChild=W.PSEvolution.attachItem(this.window,this.token,this.id(),this.evolutionIntent);this.evolutionOwner=this.evolutionChild.request.owner;return;
    }
    if(['tm','hm','tr'].includes(row.item.fieldUse)){
     if(!memberId||!W.PSProgression){this.fail({reason:'learning-screen-unavailable'});return;}
@@ -207,7 +221,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    if(this.closed||this.closing)return;this.closing=true;try{if(this.evolutionChild){const child=this.evolutionChild;this.evolutionChild=null;child.dispose();const outcome=this.evolutionOutcome(child);if(outcome.status==='committed')this.presentationOutcome=outcome;else result={...outcome,...(result.reason&&outcome.reason!=='evolution-recovery-required'?{reason:result.reason}:{})};}if(this.learningChild){const child=this.learningChild;this.learningChild=null;child.dispose();const done=child.completedOutcome;if(done?.status==='committed')this.presentationOutcome={status:'committed',result:{...this.learningItem}};else if(done?.status==='refused'&&done.reason==='learning-recovery-required')result={status:'refused',reason:done.reason,presentation:'failed'};}const same=this.application===flow()._app&&this.generation===this.application.stateGeneration;
    if(invalid&&this.presentationOutcome&&['cancelled','refused'].includes(result.status))result={...clone(this.presentationOutcome),presentation:'failed',error:result.error??why(result)};
    if(this.giveToken&&same){const out=this.application.endManagement(this.giveToken);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close(out,true));return;}}
-   if(this.token&&same){const out=this.application.endInventoryOperation(this.token);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close(out,true));return;}}
+   if(this.token&&same){const out=this.application.endInventoryOperation(this.token);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close(out,true));return;}if(out.reason==='child-operation-active'&&this.evolutionOwner&&this.application.pendingTriggeredEvolution?.token===this.evolutionOwner&&!abandoned.some(e=>e.application===this.application&&e.token===this.token))abandoned.push({application:this.application,generation:this.generation,token:this.token,owner:this.evolutionOwner,retireParent:this.request.retireParent});}
    this.closed=true;this.handle.done=true;this.handle.result=clone(result);if(active===this)active=null;
    const pending=this.cancelWait;this.cancelWait=null;this.afterMessage=null;pending?.();this.finish(result);
    if(same&&this.request.done)notices.push({application:this.application,generation:this.generation,result:clone(result),done:this.request.done});
@@ -235,16 +249,18 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
  }
  function Scene_PSInventory(this:any){this.initialize(...(arguments as any));}
  const P=Scene_PSInventory.prototype=Object.create(G.Scene_MenuBase.prototype);P.constructor=Scene_PSInventory;
- P.initialize=function(){G.Scene_MenuBase.prototype.initialize.call(this);this._psInventory=true;this._request=queued;queued=null;};
- P.create=function(){G.Scene_MenuBase.prototype.create.call(this);try{const q=this._request;if(!q)throw Error('missing-inventory-request');this._controller=new Controller(q.request,q.handle,()=>{this._finished=true;});active=this._controller;this._window=new G.Window_Base(new G.Rectangle(0,0,G.Graphics.boxWidth,G.Graphics.boxHeight));this.addWindow(this._window);this._attached=true;this._controller.start(this._window);}catch(error){this._failure=String(error);if(this._window&&!this._attached){try{this._window.destroy?.();}catch{}}this._controller?.close({status:'refused',reason:'presentation-failed',error:this._failure},true);if(this._request&&!this._request.handle.done){this._request.handle.done=true;this._request.handle.result={status:'refused',reason:'presentation-failed',error:this._failure};}try{const applied=['committed','duplicate','unchanged'].includes(this._request?.handle.result?.status);G.$gameMessage.add(applied?tr('presentationFailed'):tr('refused',{reason:this._failure}));}catch{}}};
- P.update=function(){G.Scene_MenuBase.prototype.update.call(this);if(this._finished||this._failure){this.popScene();return;}try{this._controller?.update();}catch(error){this._controller?.fatal(error);}};
+ P.initialize=function(){this._psInventory=true;this._request=queued;if(this._request)this._request.scene=this;queued=null;G.Scene_MenuBase.prototype.initialize.call(this);};
+ P.create=function(){if(!queuedValid(this))return;try{G.Scene_MenuBase.prototype.create.call(this);if(!queuedValid(this))return;const q=this._request;if(!q)throw Error('missing-inventory-request');this._controller=new Controller(q.request,q.handle,()=>{this._finished=true;});active=this._controller;this._window=new G.Window_Base(new G.Rectangle(0,0,G.Graphics.boxWidth,G.Graphics.boxHeight));this.addWindow(this._window);this._attached=true;if(!queuedValid(this))return;this._controller.start(this._window);if(reserved===q)reserved=null;}catch(error){this._failure=String(error);if(this._window&&!this._attached){try{this._window.destroy?.();}catch{}}this._controller?.close({status:'refused',reason:'presentation-failed',error:this._failure},true);if(this._request&&!this._request.handle.done){this._request.handle.done=true;this._request.handle.result={status:'refused',reason:'presentation-failed',error:this._failure};}try{const applied=['committed','duplicate','unchanged'].includes(this._request?.handle.result?.status);G.$gameMessage.add(applied?tr('presentationFailed'):tr('refused',{reason:this._failure}));}catch{}}};
+ P.update=function(){if(this._finished||this._failure){if(!G.SceneManager.isSceneChanging())G.Scene_MenuBase.prototype.popScene.call(this);return;}G.Scene_MenuBase.prototype.update.call(this);try{this._controller?.update();}catch(error){this._controller?.fatal(error);}};
  P.popScene=function(){const c=this._controller;if(c&&!c.closed&&(c.evolutionChild||c.learningChild)){c.back();return;}G.Scene_MenuBase.prototype.popScene.call(this);};
- P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);this._controller?.close({status:'cancelled'},true);};
+ P.start=function(){G.Scene_MenuBase.prototype.start.call(this);queuedValid(this);};
+ P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);if(this._controller)this._controller.close({status:'cancelled'},true);else if(this._request)retireQueued(this._request,{status:'cancelled'});if(reserved===this._request)reserved=null;};
  const ui:any=W.PSInventory={
   trace:()=>clone(frames),
-  saveBlocked:()=>!!queued||!!active?.saveBlocked,
+  saveBlocked:()=>{retireOrphan();return !!queued||!!reserved||!!active?.saveBlocked;},
+  acknowledgeRecoveredItem,
   showBag:(done?:Request['done'])=>open({kind:'bag',done}),selectItem:(filter?:Request['filter'],variableId?:number,done?:Request['done'])=>open({kind:'select',filter,variableId,done}),openShop:(shop:any,prices?:Request['prices'],done?:Request['done'])=>open({kind:'shop',shop,prices,done}),useItem:(itemId:string,memberId?:string,quantity=1,done?:Request['done'])=>open({kind:'use',itemId,memberId,quantity,done}),
-  attach:(win:any,parent:InventoryParent,done:()=>void)=>{if(active||queued)throw Error('inventory-operation-active');const h=handle(),c=new Controller({kind:'bag',parent},h,done);active=c;try{c.start(win);}catch(error){c.close({status:'refused',reason:'presentation-failed',error:String(error)},true);throw error;}return c;},
+  attach:(win:any,parent:InventoryParent,done:()=>void,retireParent?:()=>void)=>{retireOrphan();if(active||queued||reserved)throw Error('inventory-operation-active');const h=handle(),c=new Controller({kind:'bag',parent,retireParent},h,done);active=c;try{c.start(win);}catch(error){c.close({status:'refused',reason:'presentation-failed',error:String(error)},true);throw error;}return c;},
   current:()=>active&&!active.closed?{token:active.token,generation:active.generation,ready:active.ready,pocket:active.pocket,sorting:active.sorting,text:[...active.text],view:{kind:active.view?.kind,cursor:active.view?.cursor,value:active.view?.value,maximum:active.view?.maximum,title:active.view?.title,items:active.view?.items?.map(i=>({key:i.key,label:i.label,enabled:i.enabled}))},frames:clone(frames)}:null,
  };
  const pending=flow().operationPending;
@@ -265,10 +281,10 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
  const wait=G.Game_Interpreter.prototype.updateWaitMode;
  Object.defineProperty(G.Game_Interpreter.prototype,'_psInventoryOutcome',{configurable:true,enumerable:false,get(){const value=outcomes.get(this);return value?clone(value):undefined;},set(value:InventoryOutcome){outcomes.set(this,clone(value));}});
  G.Game_Interpreter.prototype.updateWaitMode=function(){if(this._waitMode==='psInventory'){const h=waits.get(this);if(h&&!h.done&&h.application===flow()._app&&h.generation===h.application.stateGeneration)return true;this._psInventoryOutcome=h?.result??{status:'refused',reason:'stale-operation'};this._waitMode='';waits.delete(this);return false;}return wait.call(this);};
- const abandon=(self:object)=>{const h=waits.get(self);waits.delete(self);outcomes.delete(self);if(h&&!h.done){if(active?.handle===h)active.close({status:'refused',reason:'event-aborted'},true);else{h.done=true;h.result={status:'refused',reason:'event-aborted'};if(queued?.handle===h)queued=null;}}};
+ const abandon=(self:object)=>{const h=waits.get(self);waits.delete(self);outcomes.delete(self);if(h&&!h.done){if(active?.handle===h)active.close({status:'refused',reason:'event-aborted'},true);else{h.done=true;h.result={status:'refused',reason:'event-aborted'};if(reserved?.handle===h)retireQueued(reserved,h.result);if(queued?.handle===h)queued=null;}}};
  for(const method of ['clear','terminate']){const previous=G.Game_Interpreter.prototype[method];if(typeof previous==='function')G.Game_Interpreter.prototype[method]=function(...args:any[]){abandon(this);return previous.apply(this,args);};}
  const updateScene=G.SceneManager.updateScene;
- if(typeof updateScene==='function')G.SceneManager.updateScene=function(...args:any[]){const value=updateScene.apply(this,args);discardStaleNotices();const parent=this._scene;if(notices.length&&parent&&!parent._psInventory&&!this.isSceneChanging()&&parent.isStarted?.()!==false&&!G.$gameMessage?.isBusy?.()){const notice=notices.shift()!;try{notice.done(clone(notice.result));}catch(error){console.error(NAME,'completion callback failed',error);}}return value;};
+ if(typeof updateScene==='function')G.SceneManager.updateScene=function(...args:any[]){retireOrphan();const value=updateScene.apply(this,args);retireOrphan();discardStaleNotices();const parent=this._scene;if(notices.length&&parent&&!parent._psInventory&&!this.isSceneChanging()&&parent.isStarted?.()!==false&&!G.$gameMessage?.isBusy?.()){const notice=notices.shift()!;try{notice.done(clone(notice.result));}catch(error){console.error(NAME,'completion callback failed',error);}}return value;};
  if(G.Window_MenuCommand&&G.Scene_Menu){const commands=G.Window_MenuCommand.prototype.addOriginalCommands;G.Window_MenuCommand.prototype.addOriginalCommands=function(){commands.call(this);let enabled=false;try{app().describeParty();enabled=true;}catch{}this.addCommand(tr('bag'),'psBag',enabled);};const create=G.Scene_Menu.prototype.createCommandWindow;G.Scene_Menu.prototype.createCommandWindow=function(){create.call(this);this._commandWindow.setHandler('psBag',()=>{try{const h=ui.showBag();if((!h||h.done)&&G.SceneManager._scene===this)this._commandWindow.activate();}catch(error){this._commandWindow.activate();G.$gameMessage.add(tr('refused',{reason:detail(error)}));}});};}
  W.Scene_PSInventory=Scene_PSInventory;
 })();

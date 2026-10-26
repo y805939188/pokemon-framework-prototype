@@ -3,7 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),os=require('node:os'),{spawnSync}=require('node:child_process');
 const{world,E,clone}=require('./fixtures/postbattle/helpers.cjs'),ROOT=path.resolve(__dirname,'../../..');
 let plugin,buildDir;const uiBundles={};
-test.before(()=>{buildDir=fs.mkdtempSync(path.join(os.tmpdir(),'ps53-entry-host-'));const p=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',buildDir],{cwd:ROOT,env:{...process.env,RR_PLUGIN:'PS_BattleFlow'},encoding:'utf8'});assert.equal(p.status,0,p.stdout+p.stderr);plugin=fs.readFileSync(path.join(buildDir,'PS_BattleFlow.js'),'utf8');for(const name of ['PS_Progression','PS_Evolution','PS_Management']){const q=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',buildDir],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(q.status,0,q.stdout+q.stderr);uiBundles[name]=fs.readFileSync(path.join(buildDir,name+'.js'),'utf8');}});
+test.before(()=>{buildDir=fs.mkdtempSync(path.join(os.tmpdir(),'ps53-entry-host-'));const p=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',buildDir],{cwd:ROOT,env:{...process.env,RR_PLUGIN:'PS_BattleFlow'},encoding:'utf8'});assert.equal(p.status,0,p.stdout+p.stderr);plugin=fs.readFileSync(path.join(buildDir,'PS_BattleFlow.js'),'utf8');for(const name of ['PS_Progression','PS_Evolution','PS_Management','PS_Inventory']){const q=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',buildDir],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(q.status,0,q.stdout+q.stderr);uiBundles[name]=fs.readFileSync(path.join(buildDir,name+'.js'),'utf8');}});
 test.after(()=>{if(buildDir)fs.rmSync(buildDir,{recursive:true,force:true});});
 function setup({evolution=false,hasDex=false}={}){
  const w=world({entries:evolution?[{method:'Level',parameter:51,target:'Blastoise'}]:[]}),g=clone(w.state.current());g.dex.hasDex=hasDex;w.state.replace(g);w.state.replaced.length=0;
@@ -108,3 +108,46 @@ for(const [phase,successor,replaceApp]of [['before-create','none',false],['befor
  if(successor==='learning'){assert.equal(application.pendingLearning.token,owner.view.token);application.resolveLearning(owner.view.token,owner.view.revision,{kind:'technical-terminate'});}else if(successor==='management')assert.equal(application.endManagement(owner).status,'unchanged');assert(!application.encounterBlocked);h.G.PSManagement.presentationPending=predicate;
 });
 test('AR01-KIMI-01-R1 a first lazy application on the unchanged initial save can still start management',()=>{const w=setup(),h=managementHost(w);h.flow._app=null;h.flow.app=()=>{h.flow._app=w.app;return w.app;};assert(h.G.PSManagement.openParty());const scene=h.G.SceneManager.activate();assert(scene._controller.started);assert(w.app.encounterBlocked);assert.equal(w.app.saveBlocked,false);scene.terminate();assert(!w.app.encounterBlocked);});
+
+function assignment(name,source){const at=source.indexOf(name+' = function');assert(at>=0,name);const end=source.indexOf('\n};',at);assert(end>at,name);return source.slice(at,end+3);}
+function deferredHost(){
+ const w=setup(),h=managementHost(w),G=h.G,m=G.SceneManager,commands={};const Window=G.Window_Base;G.Window_Base=function(){this.initialize();};G.Window_Base.prototype=Window.prototype;
+ // Preserve the actual native scheduling/started marker, stubbing only rendering hooks.
+ G.Scene_MenuBase.prototype.constructor=G.Scene_MenuBase;
+ G.Scene_MenuBase.prototype.initialize=function(){this._started=false;};
+ G.Scene_MenuBase.prototype.isStarted=function(){return this._started===true;};
+ G.Scene_MenuBase.prototype.isReady=()=>true;G.Scene_MenuBase.prototype.isBusy=()=>false;
+ G.Scene_MenuBase.prototype.start=function(){this._started=true;};G.Scene_MenuBase.prototype.stop=function(){this._active=false;};
+ G.Scene_MenuBase.prototype.popScene=function(){m.pop();};
+ m._scene=new G.Scene_Map();m._scene.start();m._nextScene=null;m._stack=[];m._exiting=false;
+ m.onSceneTerminate=()=>{};m.onSceneCreate=()=>{};m.onBeforeSceneStart=()=>{};m.onSceneStart=()=>{};m.isGameActive=()=>true;m.isCurrentSceneBusy=()=>false;
+ for(const name of ['goto','push','pop','isSceneChanging','changeScene','updateScene'])vm.runInContext(assignment('SceneManager.'+name,fs.readFileSync(path.join(ROOT,'js/reactor_managers.js'),'utf8')),G);
+ // Use native start exactly, needed by the Management invalid-scene check.
+ vm.runInContext(assignment('Scene_Base.prototype.start',fs.readFileSync(path.join(ROOT,'js/reactor_scenes.js'),'utf8')).replaceAll('Scene_Base.prototype','Scene_MenuBase.prototype'),G);
+ for(const name of ['clear','setup'])vm.runInContext(assignment('Game_Interpreter.prototype.'+name,fs.readFileSync(path.join(ROOT,'js/reactor_objects.js'),'utf8')),G);G.Game_Interpreter.prototype.loadImages=()=>{};
+ G.PluginManager.registerCommand=(p,n,f)=>commands[p+':'+n]=f;
+ vm.runInContext(uiBundles.PS_Inventory,G);vm.runInContext(uiBundles.PS_Progression,G);vm.runInContext(uiBundles.PS_Evolution,G);
+ return {...h,w,G,m,commands};
+}
+
+for(const entry of ['useItem','UseItemOnMember'])test(`SOL-FINAL-02 deferred ${entry} remains reserved and can finish once after battle refusal`,()=>{
+ const {w,G,m,flow,commands}=deferredHost();let callbacks=0,handle,i;
+ if(entry==='useItem')handle=G.PSInventory.useItem('rarecandy',w.id,1,()=>callbacks++);else{i=new G.Game_Interpreter();i.setWaitMode=function(mode){this._waitMode=mode;};commands['PS_Inventory:UseItemOnMember'].call(i,{itemId:'rarecandy',memberId:w.id,quantity:'1'});}
+ const queued=m._nextScene;handle??=queued._request.handle;const before=snapshot(w),counts={...w.counts},op=flow._op;
+ assert(flow.operationPending());assert.throws(()=>flow.openBattle(w.request),/operation-active/);assert.equal(m._nextScene,queued);assert.equal(flow._op,op);assert.deepEqual(w.counts,counts);assert.deepEqual(snapshot(w),before);
+ m.changeScene();m.updateScene();assert(queued._controller&&!handle.done,JSON.stringify({handle,reason:queued._failure},(key,value)=>key==='application'?undefined:value));queued._controller.close({status:'cancelled'},true);m.pop();m.changeScene();m.updateScene();m.updateScene();assert(handle.done);if(i)assert(!i.updateWaitMode());else assert.equal(callbacks,1);assert(!flow.operationPending());assert(!w.app.encounterBlocked);
+});
+for(const point of ['held-check','performance','initialize'])test(`SOL-FINAL-02 ${point} callback cannot overwrite an initialized item request`,()=>{
+ const {w,G,m,flow}=deferredHost();let handle,queued;const queue=()=>{handle=G.PSInventory.useItem('rarecandy',w.id,1);queued=m._nextScene;assert(handle&&!handle.done);};
+ if(point==='initialize'){const previous=G.Scene_MenuBase.prototype.initialize;let nested;G.Scene_MenuBase.prototype.initialize=function(){previous.call(this);if(this._psInventory)try{flow.openBattle(w.request);}catch(e){nested=e;}};queue();assert.match(nested?.message??'',/operation-active/);}
+ else{if(point==='held-check'){const old=flow.assertBattleAllowed;flow.assertBattleAllowed=()=>{flow.assertBattleAllowed=old;old();queue();};}else G.performance={now:()=>{G.performance=performance;queue();return 0;}};assert.throws(()=>flow.openBattle(w.request),/operation-active/);}
+ assert.equal(m._nextScene,queued);assert(!flow.running&&!handle.done);assert.deepEqual(w.counts,{create:0,random:0,replace:0});m.goto(G.Scene_Map);flow.operationPending();m.changeScene();m.updateScene();assert(handle.done);assert(!flow.operationPending());
+});
+for(const phase of ['before-create','after-create'])test(`SOL-FINAL-02 ${phase} replacement retires old handle without touching successor`,()=>{
+ const {w,G,m,flow}=deferredHost();const h=G.PSInventory.useItem('rarecandy',w.id),old=m._nextScene;
+ if(phase==='after-create')m.changeScene();flow.stateReplaced();const successor=w.app.beginManagement();m.changeScene();m.updateScene();m.updateScene();assert(h.done);assert(!old._controller?.token||old._controller.closed);assert.equal(w.app.endManagement(successor).status,'unchanged');assert(!flow.operationPending());
+});
+
+test('SOL-FINAL-02 replaced queued scene retires callback once and cannot clear a successor request',()=>{
+ const {w,G,m,flow}=deferredHost();let done=0;const h=G.PSInventory.useItem('rarecandy',w.id,1,()=>done++),old=m._nextScene;m.goto(G.Scene_Map);assert(!flow.operationPending());m.changeScene();m.updateScene();assert(h.done);assert.equal(done,1);const next=G.PSInventory.showBag();assert(next&&!next.done);const scene=m._nextScene;old.terminate();old.create();old.start();assert.equal(m._nextScene,scene);assert(!next.done);assert.equal(done,1);m.goto(G.Scene_Map);flow.operationPending();m.changeScene();m.updateScene();assert(next.done&&!flow.operationPending());
+});

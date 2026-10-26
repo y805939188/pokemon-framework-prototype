@@ -157,7 +157,7 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
    items.push({key:'cancel',label:tr('cancel'),run:()=>this.back()});this.menu(memberName(m),items);
   }
   itemMenu(id:string){const m=this.find(id);if(!m)return;const source=this.reference(id);this.menu(tr('item'),[
-   {key:'use',label:tr('use'),enabled:!!W.PSInventory&&source.position.kind==='party'&&!m.isEgg&&!this.snapshot.held,run:()=>{this.back();this.inventoryChild=W.PSInventory.attach(this.window,{token:this.managementToken,memberId:id},()=>{this.inventoryChild=null;if(this.valid()){this.boundary();this.refresh();}});}},
+   {key:'use',label:tr('use'),enabled:!!W.PSInventory&&source.position.kind==='party'&&!m.isEgg&&!this.snapshot.held,run:()=>{this.back();this.inventoryChild=W.PSInventory.attach(this.window,{token:this.managementToken,memberId:id},()=>{this.inventoryChild=null;if(this.valid()){this.boundary();this.refresh();}},()=>{if(this.closed&&this.application===flow()._app&&this.generation===this.application.stateGeneration)this.application.endManagement(this.managementToken);});}},
    {key:'give',label:tr('give'),enabled:this.snapshot.heldSourcesEnabled&&!m.isEgg,run:()=>{this.back();const items=app().holdableBagItems().map((it:any)=>({key:it.id,label:it.id+' ×'+it.count,run:()=>{this.back();if(m.item)this.confirm(tr('give')+' '+it.id+' → '+memberName(m),()=>this.operate({kind:'give-item',source,item:it.id}));else this.operate({kind:'give-item',source,item:it.id});}}));this.menu(tr('give'),[...items,{key:'cancel',label:tr('cancel'),run:()=>this.back()}]);}},
    {key:'take',label:tr('take'),enabled:!!m.item&&!m.mail,run:()=>{this.back();this.operate({kind:'take-item',source});}},
    {key:'move',label:tr('move'),enabled:this.snapshot.heldSourcesEnabled&&!!m.item&&!m.mail,run:()=>{this.back();const v=this.top();v.itemSource={source,item:m.item};this.boundary();this.draw();}},
@@ -280,8 +280,8 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
    this.closed=true;this.removeInput();this.completion=result;this.scene._result=result;this.scene._done=this.request.done;
    if(G.SceneManager._scene===this.scene)this.scene.popScene();
   }
-  dispose(){this.inventoryChild?.close({status:'cancelled'},true);this.inventoryChild=null;document.removeEventListener('keydown',this.onKeyDown);document.removeEventListener('keyup',this.onKeyUp);this.removeInput();
-   if(!this.closed&&this.application===flow()._app&&this.generation===this.application.stateGeneration){if(this.managementToken){this.application.manage(this.managementToken,'cleanup-'+(++this.serial),{kind:'cancel-held'});this.application.endManagement(this.managementToken);}else if(this.reception&&this.application.pendingReceiving?.token===this.reception.token){const result=flow().resolveReceiving(this.reception.token,this.decisions,'scene-aborted');this.completion=result;if(!pending(result)&&result.status!=='refused'){this.scene._result=result;this.scene._done=this.request.done;}}}
+  dispose(){const wasClosed=this.closed;this.closed=true;this.inventoryChild?.close({status:'cancelled'},true);this.inventoryChild=null;document.removeEventListener('keydown',this.onKeyDown);document.removeEventListener('keyup',this.onKeyUp);this.removeInput();
+   if(!wasClosed&&this.application===flow()._app&&this.generation===this.application.stateGeneration){if(this.managementToken){this.application.manage(this.managementToken,'cleanup-'+(++this.serial),{kind:'cancel-held'});this.application.endManagement(this.managementToken);}else if(this.reception&&this.application.pendingReceiving?.token===this.reception.token){const result=flow().resolveReceiving(this.reception.token,this.decisions,'scene-aborted');this.completion=result;if(!pending(result)&&result.status!=='refused'){this.scene._result=result;this.scene._done=this.request.done;}}}
    this.closed=true;if(current===this)current=null;
   }
   draw(){
