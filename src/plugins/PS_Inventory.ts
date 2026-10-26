@@ -29,13 +29,13 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
  }
  class Controller {
   readonly application:any;readonly generation:number;readonly handle:Handle;readonly request:Request;
-  token='';selection='';giveToken='';selectedTicket:InventoryTicket|null=null;closed=false;ready=false;frame=0;serial=0;window:any;view!:View;error='';text:string[]=[];latch=new InputLatch();
+  token='';selection='';giveToken='';selectedTicket:InventoryTicket|null=null;closed=false;closing=false;ready=false;frame=0;serial=0;window:any;view!:View;error='';text:string[]=[];latch=new InputLatch();
   pocket=1;indices:number[]=Array(8).fill(0);visited=new Set<number>();bag:any;sorting=false;busy=false;operation:any=null;presentationOutcome:InventoryOutcome|null=null;afterMessage:(()=>void)|null=null;cancelWait:(()=>void)|null=null;lastPhase='';
   // Sort cancellation restores the live row, while indices retain the last moved saved position.
-  restoredSortCursor:number|null=null;
+  restoredSortCursor:number|null=null;learningChild:any=null;learningItem:{itemId:string;memberId:string}|null=null;machineBrowse:{itemId:string;annotations:any[];members:any[]}|null=null;
   constructor(request:Request,h:Handle,readonly finish:(o:InventoryOutcome)=>void){this.request=request;this.handle=h;this.application=h.application;this.generation=h.generation;}
   valid(){try{return !this.closed&&!this.handle.done&&active===this&&this.application===app()&&this.generation===this.application.stateGeneration;}catch{return false;}}
-  get saveBlocked(){return !!this.selectedTicket||!!this.operation||!!this.giveToken||this.busy||this.view?.kind==='quantity'||this.view?.pending===true;}
+  get saveBlocked(){return !!this.learningChild||!!this.selectedTicket||!!this.operation||!!this.giveToken||this.busy||this.view?.kind==='quantity'||this.view?.pending===true;}
   id(){return 'ui-'+ ++this.serial;}
   start(win:any){
    if(!this.valid())throw Error('stale-operation');
@@ -45,13 +45,13 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    if(this.request.kind==='select')this.selection=this.application.beginItemSelection(this.token,this.request.filter,this.request.variableId);
    this.refreshBag();this.pocket=this.bag.lastPocket;this.indices=[...this.bag.indices];
    if(this.request.kind==='shop')this.shopMenu();
-   else if(this.request.kind==='use')this.beginUse(this.request.itemId!,this.request.memberId,this.request.quantity??1);
+   else if(this.request.kind==='use'){if(this.machine(this.request.itemId!))this.machineOpening(this.request.itemId!,()=>this.request.memberId?this.beginUse(this.request.itemId!,this.request.memberId,1):this.machineTargets(this.request.itemId!));else this.beginUse(this.request.itemId!,this.request.memberId,this.request.quantity??1);}
    else this.bagView();
   }
   sample():InputFrame {return W.PSManagement.inputFrame();}
   boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;const pressed=this.sample().pressed;this.latch.arm(pressed);G.Input.clear();G.TouchInput.clear();record({event:'boundary',token:this.handle.id,frame:this.frame,view:this.view?.kind,pressed});}
   set(v:View){this.view=v;this.error='';this.boundary();this.draw();}
-  refreshBag(){const bag=this.selection?this.application.itemSelectionView(this.token,this.selection):this.application.inventorySnapshot(this.token,this.request.parent?(it:ItemDefinition)=>this.application.queryItemUse(this.token,it.id,1,this.request.parent!.memberId).ready:undefined);this.bag={...bag,pockets:bag.pockets.map((rows:Omit<InventoryRow,'pocket'>[],pocket:number)=>rows.map(row=>({...row,pocket:pocket+1})))};}
+  refreshBag(){const bag=this.selection?this.application.itemSelectionView(this.token,this.selection):this.application.inventorySnapshot(this.token,this.request.parent?(it:ItemDefinition)=>(['tm','hm','tr'].includes(it.fieldUse)||this.application.queryItemUse(this.token,it.id,1,this.request.parent!.memberId).ready):undefined);this.bag={...bag,pockets:bag.pockets.map((rows:Omit<InventoryRow,'pocket'>[],pocket:number)=>rows.map(row=>({...row,pocket:pocket+1})))};}
   bagView(){this.selectedTicket=null;this.refreshBag();const filtered=!!this.selection&&!!this.request.filter||!!this.request.parent;if(filtered&&!this.bag.pockets[this.pocket-1]?.length)this.pocket=nextPocket(this.pocket,1,this.bag.pockets.map((p:any[])=>p.length),true);this.indices[this.pocket-1]=Math.min(this.indices[this.pocket-1]??0,this.bag.pockets[this.pocket-1].length);this.set({kind:'bag',cursor:Math.min(this.restoredSortCursor??this.indices[this.pocket-1]!,this.bag.pockets[this.pocket-1].length),filtered});}
   flushBrowse(){if(this.selection||this.request.parent||this.request.kind==='use'||this.request.kind==='shop')return;for(const p of new Set([...this.visited].filter(p=>p!==this.pocket).concat(this.pocket))){const r=this.application.inventoryRequest(this.token,this.id(),{kind:'browse',pocket:p,index:Math.min(this.indices[p-1]??0,this.bag.pockets[p-1].length)});if(r.status==='refused')throw Error(why(r));}this.visited.clear();}
   rows(){return this.bag.pockets[this.pocket-1] as InventoryRow[];}
@@ -65,7 +65,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
   total(itemId:string){return this.bag.pockets.flat().reduce((n:number,r:any)=>n+(r.item.id===itemId?r.quantity:0),0);}
   itemMenu(row:any){
    const ticket:InventoryTicket=this.application.inventoryTicket(this.token,row.pocket,row.index);if(ticket.itemId!==row.item.id)throw Error('stale-slot');this.selectedTicket=ticket;
-   const ready=this.application.queryItemUse(this.token,row.item.id,1,this.request.parent?.memberId).ready;
+   const ready=['tm','hm','tr'].includes(row.item.fieldUse)||this.application.queryItemUse(this.token,row.item.id,1,this.request.parent?.memberId).ready;
    this.choose(name(row.item),[
     {key:'use',label:tr('use'),enabled:ready,run:()=>this.target(row.item.id)},
     ...(!this.request.parent&&holdableItem(row.item)&&this.application.heldItemSourcesEnabled()?[{key:'give',label:tr('give'),run:()=>this.give(row)}]:[]),
@@ -79,15 +79,43 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    this.choose(tr('target'),[...snap.party.filter((m:any)=>!m.isEgg).map((m:any)=>({key:m.id,label:m.nickname||flow().speciesName(m.species,m.form),run:()=>{const apply=()=>{const r=this.application.manage(this.giveToken,this.id(),{kind:'give-item',source:snap.references[m.id],item:row.item.id});if(r.status==='refused')this.fail(r,resume);else{this.presentationOutcome={status:r.status==='unchanged'?'unchanged':'committed',result:{itemId:row.item.id,memberId:m.id,quantity:1}};this.message(tr('done'),resume);}};if(m.item)this.confirm(tr('confirmUse'),apply,resume);else apply();}})),{key:'close',label:tr('back'),run:resume}],resume);
   }
   party(){return clone(flow().game().party) as any[];}
+  machine(itemId:string){return ['tm','hm','tr'].includes(this.catalog()[itemId]?.fieldUse??'');}
+  machineOpening(itemId:string,next:()=>void){
+   const item=this.catalog()[itemId]!,move=Object.values(flow().content().moves??{}).find((v:any)=>v.id===item.move)as any;
+   this.message(tr('machineOpened',{item:name(item),move:move?.name??item.move??''}),()=>this.confirm(tr('machineTeach',{move:move?.name??item.move??''}),next,()=>this.request.kind==='use'?this.close({status:'cancelled'}):this.bagView()));
+  }
+  machineTargets(itemId:string,reuse=false){
+   if(!reuse||this.machineBrowse?.itemId!==itemId)this.machineBrowse={itemId,annotations:this.application.teachingCandidates({kind:'machine',itemId,entry:'bag'}),members:this.party()};
+   const {annotations,members}=this.machineBrowse!;
+   const cancel=()=>this.request.kind==='use'?this.close({status:'cancelled'}):this.bagView();
+   const show=()=>this.choose(tr('target'),[...members.map(m=>{const annotation=annotations.find((a:any)=>a.id===m.id);return {key:m.id,label:(m.nickname||flow().speciesName(m.species,m.form))+' · '+tr('machine.'+(annotation?.annotation??'not-able')),run:()=>{
+    // Annotations are cached display data, never install authority. The selected member is rechecked by beginLearning.
+    this.beginUse(itemId,m.id,1);
+   }};}),{key:'close',label:tr('back'),run:cancel}],cancel);
+   show();
+  }
   target(itemId:string){
    this.flushBrowse();
+   if(this.machine(itemId)){
+    if(this.request.parent){const annotation=this.application.teachingCandidates({kind:'machine',itemId,entry:'party'}).find((a:any)=>a.id===this.request.parent!.memberId);if(annotation?.annotation!=='able'){this.fail({reason:annotation?.reason??'not-able'});return;}this.machineOpening(itemId,()=>this.beginUse(itemId,this.request.parent!.memberId,1));}
+    else this.machineOpening(itemId,()=>this.machineTargets(itemId));return;
+   }
    if(this.request.parent){this.useQuantity(itemId,this.request.parent.memberId);return;}
    const direct=this.rows().find(r=>r.item.id===itemId)?.item.effect?.family==='sacred-ash';if(direct){this.useQuantity(itemId);return;}
    const members=this.party();this.choose(tr('target'),[...members.map(m=>({key:m.id,label:(m.nickname||flow().speciesName(m.species,m.form))+` Lv.${m.level} HP ${m.hp} ${m.status||''}`+(m.isEgg?' '+tr('egg'):''),run:()=>this.useQuantity(itemId,m.id)})),{key:'close',label:tr('back'),run:()=>this.bagView()}],()=>this.bagView());
   }
-  useQuantity(itemId:string,memberId?:string){const q=this.application.queryItemUse(this.token,itemId,1,memberId);if(q.eligible!=='eligible'){this.fail(q,()=>this.request.parent?this.bagView():this.target(itemId));return;}const max=q.maximum??1;if(max>1)this.quantity(max,false,n=>{if(n)this.beginUse(itemId,memberId,n);else this.request.parent?this.bagView():this.target(itemId);});else this.beginUse(itemId,memberId,1);}
+  useQuantity(itemId:string,memberId?:string){if(['tm','hm','tr'].includes(this.catalog()[itemId]?.fieldUse??'')){this.beginUse(itemId,memberId,1);return;}const q=this.application.queryItemUse(this.token,itemId,1,memberId);if(q.eligible!=='eligible'){this.fail(q,()=>this.request.parent?this.bagView():this.target(itemId));return;}const max=q.maximum??1;if(max>1)this.quantity(max,false,n=>{if(n)this.beginUse(itemId,memberId,n);else this.request.parent?this.bagView():this.target(itemId);});else this.beginUse(itemId,memberId,1);}
   beginUse(itemId:string,memberId:string|undefined,quantity:number){
    this.refreshBag();const row=this.bag.pockets.flat().find((r:any)=>r.item.id===itemId);if(!row){this.fail({reason:'not-enough-items'},()=>this.request.kind==='use'?this.close({status:'refused',reason:'not-enough-items'}):this.bagView());return;}
+   if(['tm','hm','tr'].includes(row.item.fieldUse)){
+    if(!memberId||!W.PSProgression){this.fail({reason:'learning-screen-unavailable'});return;}
+    if(this.selectedTicket&&JSON.stringify(this.selectedTicket)!==JSON.stringify(this.application.inventoryTicket(this.token,this.selectedTicket.pocket,this.selectedTicket.index))){this.fail({reason:'stale-slot'},()=>this.close({status:'refused',reason:'stale-slot'}));return;}
+    this.learningItem={itemId,memberId};this.learningChild=W.PSProgression.attachLearning(this.window,{kind:'teach',memberId,source:{kind:'machine',itemId,entry:this.request.parent?'party':'bag'}},{kind:'inventory',token:this.token},(out:any)=>{
+     if(this.closed||this.closing)return;
+     this.learningChild=null;this.selectedTicket=null;const r:InventoryOutcome={status:['committed','unchanged','cancelled'].includes(out.status)?out.status:'refused',...(out.status==='refused'?{reason:out.reason}:{}),result:{itemId,memberId}};
+     if(this.request.kind==='use')this.close(r);else if(out.status==='refused'&&!this.request.parent)this.machineTargets(itemId,true);else{this.bagView();}
+    });return;
+   }
    this.operation={id:this.id(),request:{kind:'use-item',itemId,quantity,...(memberId?{memberId}:{}),ticket:this.selectedTicket??this.application.inventoryTicket(this.token,row.pocket,row.index),answers:{}}};this.submitUse();
   }
   submitUse(){
@@ -126,6 +154,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
   shopQuantity(itemId:string,selling:boolean){const quote=this.application.shopQuote(this.token,itemId,selling);this.quantity(quote.maximum,true,q=>{if(!q){this.shopList(selling);return;}if(!Number.isSafeInteger(quote.price*q)){this.fail({reason:'integer-overflow'},()=>this.shopList(selling));return;}this.confirm(tr('confirmTrade',{quantity:q,item:name(this.catalog()[itemId]!),total:quote.price*q}),()=>{const r=this.application.inventoryRequest(this.token,this.id(),{kind:selling?'sell':'buy',itemId,quantity:q,confirmed:true,expectedPrice:quote.price,expectedRevision:quote.revision});if(r.status==='refused'){this.fail(r,()=>this.shopList(selling));return;}this.presentationOutcome=r;this.message(tr('tradeDone',{quantity:q,item:name(this.catalog()[itemId]!)} )+(r.result?.bonus?tr('bonus',{quantity:r.result.bonus as number}):''),()=>this.shopList(selling));},()=>this.shopList(selling));this.view.summary=[tr('quantity')+': '+q,tr('price',{price:quote.price}),tr('total',{total:quote.price*q})];this.draw();});if(this.view.kind==='quantity'){this.view.unitPrice=quote.price;this.view.title=tr('quantity')+' · '+name(this.catalog()[itemId]!);this.draw();}}
   update(){
    if(!this.valid()){this.close({status:'refused',reason:'stale-operation'},true);return;}
+   if(this.learningChild){this.learningChild.update();return;}
    if(!this.view)return;const frame=G.Graphics.frameCount??0;if(!this.ready&&(frame<=this.frame||G.SceneManager.isSceneChanging()))return;
    const f=this.latch.filter(this.sample());if(!this.ready){this.ready=true;record({event:'ready',token:this.handle.id,frame,view:this.view.kind});return;}
    if(G.$gameMessage?.isBusy?.()||this.busy&&this.view.kind!=='message')return;
@@ -152,20 +181,22 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    const row=this.rows()[v.cursor];if(!row){this.back();return;}
    if(this.selection){this.finishSelection(row.item.id);return;}this.itemMenu(row);
   }else {const it=v.items?.[v.cursor];if(it?.enabled===false){G.SoundManager.playBuzzer();return;}it?.run();}}
-  back(){const v=this.view;if(v.kind==='message'){this.use();return;}if(v.kind==='bag'){
+  back(){if(this.learningChild){this.learningChild.model.back();this.learningChild.boundary();this.learningChild.draw();return;}const v=this.view;if(v.kind==='message'){this.use();return;}if(v.kind==='bag'){
    if(this.sorting){const r=this.application.endInventorySort(this.token,true);this.sorting=false;if(r.status==='refused')this.fail(r);else{this.restoredSortCursor=r.result.index;this.bagView();}return;}
    if(this.selection)this.finishSelection(null);else{this.flushBrowse();this.close({status:'cancelled'});}return;
   }v.back?.();}
   close(result:InventoryOutcome,invalid=false){
-   if(this.closed)return;const same=this.application===flow()._app&&this.generation===this.application.stateGeneration;
+   if(this.closed||this.closing)return;this.closing=true;try{if(this.learningChild){const child=this.learningChild;this.learningChild=null;child.dispose();const done=child.completedOutcome;if(done?.status==='committed')this.presentationOutcome={status:'committed',result:{...this.learningItem}};else if(done?.status==='refused'&&done.reason==='learning-recovery-required')result={status:'refused',reason:done.reason,presentation:'failed'};}const same=this.application===flow()._app&&this.generation===this.application.stateGeneration;
    if(invalid&&this.presentationOutcome&&['cancelled','refused'].includes(result.status))result={...clone(this.presentationOutcome),presentation:'failed',error:result.error??why(result)};
    if(this.giveToken&&same){const out=this.application.endManagement(this.giveToken);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close(out,true));return;}}
    if(this.token&&same){const out=this.application.endInventoryOperation(this.token);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close(out,true));return;}}
    this.closed=true;this.handle.done=true;this.handle.result=clone(result);if(active===this)active=null;
    const pending=this.cancelWait;this.cancelWait=null;this.afterMessage=null;pending?.();this.finish(result);
    if(same&&this.request.done)notices.push({application:this.application,generation:this.generation,result:clone(result),done:this.request.done});
+   }finally{this.closing=false;}
   }
   draw(){
+   if(this.learningChild){this.learningChild.draw();return;}
    if(!this.window||!this.view)return;const b=this.window.contents,v=this.view,w=b.width,h=b.height;b.clear();b.fontFace=flow().translator().font()||'sans-serif';b.fontSize=20;this.text=[];
    const line=(value:string,y:number,color='#fff',x=12,width=w-24)=>{if(width<=0)return;if(this.window.textWidth(value)>width){let fitted='';for(const ch of Array.from(value)){if(this.window.textWidth(fitted+ch+'…')>width)break;fitted+=ch;}value=fitted+'…';}this.text.push(value);b.textColor=color;b.drawText(value,x,y,width,28,'left');};
    // Reserve measured regions for quantities/prices/reasons; ellipsize only the remaining name area.
