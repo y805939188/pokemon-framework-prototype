@@ -1877,7 +1877,60 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     });
   }
 
+  async function runPostbattleEvolution() {
+    await toMap();
+    await scenario("E53-P1 real battle scene: K3 to evolution and learning keeps interpreter/save owner through restart", async () => {
+      fresh(); const B = api(), content = clone(W.PSFlow.content()), before = clone(game()), id = game().party[0].id, target = game().party[1].species;
+      const dex = B.dex.createDexLookup(), names = ["surgingstrikes", "tackle", "growl", "rest", "gust"];
+      const moves = names.map(name => dex.move(name)); assert(moves.every((move: any) => move?.id && move.pp), "real pinned move data");
+      for (const move of moves) content.moves[move.name] = move;
+      B.speciesKey.speciesDataOf(content, game().party[0]).evolutions = [{ method: "BattleDealCriticalHit", parameter: 3, target }];
+      B.speciesKey.speciesDataOf(content, game().party[0]).learnset = { 1: moves.slice(0,4).map((move: any) => move.name) };
+      B.speciesKey.speciesDataOf(content, game().party[1]).learnset = { 0: [moves[4].name], 1: [moves[1].name] };
+      const authored = clone(content); delete authored.meta;
+      const inputsHash = B.digest.sha256Hex(B.contentCompile.canonicalJson(authored));
+      content.meta = { ...content.meta, kind: "fixture", id: "host-postbattle", inputsHash,
+        contentIdentity: B.digest.sha256Hex(B.contentCompile.canonicalJson({ compiledSemantics: content.meta.compiledSemantics, inputsHash, showdownSha: content.meta.showdownSha })) };
+      W.PSFlow._content = content; W.PSFlow._app = null;
+      game().party[0].moves = moves.slice(0,4).map((move: any) => ({ id: move.id, pp: move.pp, maxpp: move.pp, ppUps: 0 }));
+      const request = { battleId: "host-postbattle-K3", kind: "wild", foes: [{ species: target, level: 50 }], seq: 7 };
+      W.PSFlow.openBattle(request); await inMode("main"); const handle = battle()._session, app = W.PSFlow.app();
+      await choose(/^Fight/); await inMode("moves"); await choose(/surging strikes/i); await inMode("main");
+      await choose(/^Bag/); await inMode("bag"); await choose(/master ball/i); await inMode("end");
+      const raw = handle.result(), binding = handle._evidence.value.context;
+      await press("ok"); await waitFor(() => !battle() && !!app.pendingEvolution, "battle scene transferred to core evolution owner");
+      const seal = B.session.sealBattleEffects(handle, { battleId: raw.battleId, generation: binding.generation, contentIdentity: binding.contentIdentity, rawHash: B.state.resultHash(raw) });
+      eq(seal.observer.members[id].critical, { status: "complete", value: 3 }, "actual default gateway measured three critical hits");
+      eq(app.pendingEvolution.selection.family, "battle", "actual K3 selected the battle family");
+      const waiter = new G.Game_Interpreter(); waiter.setWaitMode("psBattle");
+      assert(waiter.updateWaitMode() && W.PSFlow.running && app.saveBlocked && !G.$gameSystem.isSaveEnabled(), "same owner keeps actual MZ interpreter and save mask");
+      let saveRefused = false; try { await G.DataManager.saveGame(56); } catch { saveRefused = true; } assert(saveRefused, "actual direct MZ save refused during evolution");
+      let pending = app.pendingEvolution; const evolved = W.PSFlow.resolveEvolution(pending.token, pending.revision, { kind: "complete" });
+      assert(evolved.pending && app.pendingEvolution.phase === "learning", "evolution committed, fifth move awaits a decision");
+      eq(game().party[0].species, target, "species write installed"); eq(game().stats.evolution_count, 1, "one evolution statistic");
+      assert(waiter.updateWaitMode() && app.saveBlocked && W.PSFlow.running, "learning continues the same owner");
+      pending = app.pendingEvolution; const done = W.PSFlow.resolveEvolution(pending.token, pending.revision, { kind: "learn", answer: { kind: "replace", slot: 3 } });
+      eq(done.commit, "applied", "original primary remains the business outcome"); assert(!done.pending && !app.pendingEvolution && !app.saveBlocked && !W.PSFlow.running && !waiter.updateWaitMode(), "all owners release only after learning");
+      eq(game().party[0].moves[3], { id: moves[4].id, pp: moves[4].pp, maxpp: moves[4].pp, ppUps: 0 }, "real C planner taught the evolution move");
+      eq(game().appliedBattles[raw.battleId].hash, B.state.resultHash(raw), "unchanged original battle ledger"); assert(game().party.length === before.party.length + 1, "real caught member retained");
+      await G.DataManager.saveGame(56);
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-postbattle.json"), JSON.stringify({ slot: 56, state: clone(game()), result: raw, content }));
+      await shot("E53-P1-postbattle-complete");
+      return { input: "real scene and synthetic DOM battle choices, actual gateway K3, explicit core continuation answers, real MZ interpreter/save", critical: seal.observer.members[id].critical, slot: 56, evolutionCount: game().stats.evolution_count, saveRefused };
+    });
+  }
+
   async function verifySave() {
+    if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-postbattle.json"))) {
+      await scenario("E53-V1 new NW process: evolved species/move and original ledger survive; no continuation rebuilt", async () => {
+        const expected = readExpected("ps-flow-expected-postbattle.json"); W.PSFlow._content = expected.content; W.PSFlow._app = null;
+        G.DataManager.setupNewGame(); await G.DataManager.loadGame(expected.slot); eq(game(), expected.state, "complete evolved state round trip");
+        const app = W.PSFlow.app(); assert(!app.pendingEvolution && !app.saveBlocked, "no transient queue saved or recreated");
+        eq(app.commitResult(expected.result), "already-applied", "same raw battle cannot make a new evolution chance"); eq(game(), expected.state, "no repeated resource, statistic or move change");
+        return { input: "fresh actual NW/MZ load API and original-result replay", slot: expected.slot, evolutionCount: game().stats.evolution_count };
+      });
+      return;
+    }
     if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-progression-data.json"))) {
       await scenario("B53-V1 independent NW restart: good source and target remain readable7", async () => {
         const expected = readExpected("ps-flow-expected-progression-data.json"); W.PSFlow._content = progressionContent(expected.regional);
@@ -2037,7 +2090,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       try { startAt.call(this); } finally { fs.readFileSync = read; }
     } else startAt.call(this);
     setTimeout(async () => {
-      try { if (mode === "progression-data") await runProgressionData(); else if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
+      try { if (mode === "postbattle") await runPostbattleEvolution(); else if (mode === "progression-data") await runProgressionData(); else if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       try { report.contentIdentity = W.PSFlow.content().meta; } catch (e) { report.contentIdentity = { error: String(e) }; }
       try { report.logTail = W.PSFlow.logger ? W.PSFlow.logger.tail(60) : null; } catch (e) { report.logTail = { error: String(e) }; } // redacted, bounded session diagnostics
