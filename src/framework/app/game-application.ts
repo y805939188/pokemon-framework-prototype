@@ -326,6 +326,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   pokedexSnapshot(text: Readonly<Record<string, string>> = {}, currentRegion: number | null = null) {
     const generation = this.generation, state = clone(this.ports.state.read()), content = clone(this.ports.content().content);
     if (generation !== this.generation) throw Error("stale-pokedex-query");
+    this.pokedex.observeContent(content);
     const catalog = createDexQueryCatalog(content, text), config = resolveConfig(content.settings);
     const accessible = dexAccessibleRegions(state.dex, catalog.layout, { useCurrentRegion: config.USE_CURRENT_REGION_DEX, currentRegion });
     return { generation, dex: state.dex, catalog, accessible, menu: dexMenuEntry(state.dex, accessible, config.USE_CURRENT_REGION_DEX) };

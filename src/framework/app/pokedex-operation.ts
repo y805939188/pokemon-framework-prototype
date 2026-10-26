@@ -4,7 +4,7 @@ import { normalizeMemberDexAppearance } from "../rules/acquisition-dex.ts";
 import { semanticFingerprint } from "../rules/semantic.ts";
 import { applyDexPatch, planDexLastSeen } from "../rules/pokedex.ts";
 import type { DexAppearance, DexPatch } from "../rules/pokedex.ts";
-import { createDexQueryCatalog, dexForms, planDexFormSelection, planDexUnlock, planDexViewing } from "../rules/pokedex-query.ts";
+import { createDexQueryCatalog, dexAccessibleRegions, dexForms, planDexFormSelection, planDexUnlock, planDexViewing } from "../rules/pokedex-query.ts";
 import { resolveConfig } from "../rules/config.ts";
 import { locateMember } from "../rules/storage.ts";
 import { validateGameContent } from "../rules/save-schema.ts";
@@ -20,7 +20,7 @@ export type DexEntryOwner = "acquisition" | "capture" | "evolution";
 export type DexViewingCommand = { kind: "entitlement"; value: boolean }
   | { kind: "unlock"; region: number; unlocked: boolean }
   | { kind: "view"; value: { region?: number; mode?: number; cursor?: number; searchResults?: boolean } }
-  | { kind: "form"; species: string; baseFrontsEqual: boolean; selected?: number; text?: Record<string, string> };
+  | { kind: "form"; species: string; baseFrontsEqual: boolean; selected?: number; text?: Record<string, string>; currentRegion?: number | null };
 export type DexDecision = { kind: "message-complete" | "close-entry" | "retry" | "technical-terminate" };
 export interface DexOperationView {
   token: string; revision: number; purpose: "entry" | "edit"; phase: "message" | "entry" | "failed";
@@ -58,6 +58,12 @@ export class PokedexOperation {
       ...(op.error ? { error: op.error, reloadRequired: op.reloadRequired } : {}) });
   }
   invalidate(): void { this.operation = null; }
+  /** Read-only queries can observe a changed definition too. Retire the in-memory plan without writing the save. */
+  observeContent(content: Content): void {
+    const op = this.operation; if (!op || !op.fingerprint || op.generation !== this.ports.generation()) return;
+    try { if (fingerprint(content) !== op.fingerprint) op.retired = "pokedex-content-changed"; }
+    catch { op.retired = "invalid-pokedex-content"; }
+  }
   private current(op: Operation): void { if (this.operation !== op || op.generation !== this.ports.generation()) throw Error("stale-pokedex-operation"); }
   private pending(op: Operation): DexResolution { this.current(op); return { status: "pending", view: this.view! }; }
   private finish(op: Operation, status: "complete" | "technically-terminated" | "applied" | "unchanged"): DexResolution {
@@ -104,9 +110,13 @@ export class PokedexOperation {
       case "form": {
         if (!state.dex.hasDex || !state.dex.seen.includes(command.species)) throw Error("pokedex-entry-not-accessible");
         if (typeof command.baseFrontsEqual !== "boolean") throw Error("pokedex-front-equality-required");
-        const catalog = createDexQueryCatalog(content, command.text ?? {}), base = catalog.forms.find(f => f.species === command.species && f.form === 0);
+        if (command.currentRegion !== undefined && command.currentRegion !== null && !Number.isSafeInteger(command.currentRegion)) throw Error("invalid-pokedex-current-region");
+        const catalog = createDexQueryCatalog(content, command.text ?? {}), config = resolveConfig(content.settings);
+        const accessible = dexAccessibleRegions(state.dex, catalog.layout, { useCurrentRegion: config.USE_CURRENT_REGION_DEX, currentRegion: command.currentRegion ?? null });
+        if (!accessible.some(region => (region === -1 ? catalog.layout.national : catalog.layout.regions[region]?.species ?? []).includes(command.species))) throw Error("pokedex-entry-not-accessible");
+        const base = catalog.forms.find(f => f.species === command.species && f.form === 0);
         if (base?.gender === undefined) throw Error("pokedex-gender-rule-unavailable");
-        const choices = dexForms(state.dex, catalog, command.species, { showAll: resolveConfig(content.settings).DEX_SHOWS_ALL_FORMS,
+        const choices = dexForms(state.dex, catalog, command.species, { showAll: config.DEX_SHOWS_ALL_FORMS,
           gender: base.gender, baseFrontsEqual: command.baseFrontsEqual });
         if (!choices.length || command.selected !== undefined && (!Number.isInteger(command.selected) || command.selected < 0 || command.selected >= choices.length)) throw Error("pokedex-form-unavailable");
         return planDexFormSelection(state.dex, command.species, choices, command.selected).patch;
