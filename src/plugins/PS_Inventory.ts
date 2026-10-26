@@ -29,10 +29,10 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
  }
  class Controller {
   readonly application:any;readonly generation:number;readonly handle:Handle;readonly request:Request;
-  token='';selection='';giveToken='';selectedTicket:InventoryTicket|null=null;closed=false;ready=false;frame=0;serial=0;window:any;view!:View;error='';text:string[]=[];latch=new InputLatch();
+  token='';selection='';giveToken='';selectedTicket:InventoryTicket|null=null;closed=false;closing=false;ready=false;frame=0;serial=0;window:any;view!:View;error='';text:string[]=[];latch=new InputLatch();
   pocket=1;indices:number[]=Array(8).fill(0);visited=new Set<number>();bag:any;sorting=false;busy=false;operation:any=null;presentationOutcome:InventoryOutcome|null=null;afterMessage:(()=>void)|null=null;cancelWait:(()=>void)|null=null;lastPhase='';
   // Sort cancellation restores the live row, while indices retain the last moved saved position.
-  restoredSortCursor:number|null=null;learningChild:any=null;machineBrowse:{itemId:string;annotations:any[];members:any[]}|null=null;
+  restoredSortCursor:number|null=null;learningChild:any=null;learningItem:{itemId:string;memberId:string}|null=null;machineBrowse:{itemId:string;annotations:any[];members:any[]}|null=null;
   constructor(request:Request,h:Handle,readonly finish:(o:InventoryOutcome)=>void){this.request=request;this.handle=h;this.application=h.application;this.generation=h.generation;}
   valid(){try{return !this.closed&&!this.handle.done&&active===this&&this.application===app()&&this.generation===this.application.stateGeneration;}catch{return false;}}
   get saveBlocked(){return !!this.learningChild||!!this.selectedTicket||!!this.operation||!!this.giveToken||this.busy||this.view?.kind==='quantity'||this.view?.pending===true;}
@@ -110,7 +110,8 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    if(['tm','hm','tr'].includes(row.item.fieldUse)){
     if(!memberId||!W.PSProgression){this.fail({reason:'learning-screen-unavailable'});return;}
     if(this.selectedTicket&&JSON.stringify(this.selectedTicket)!==JSON.stringify(this.application.inventoryTicket(this.token,this.selectedTicket.pocket,this.selectedTicket.index))){this.fail({reason:'stale-slot'},()=>this.close({status:'refused',reason:'stale-slot'}));return;}
-    this.learningChild=W.PSProgression.attachLearning(this.window,{kind:'teach',memberId,source:{kind:'machine',itemId,entry:this.request.parent?'party':'bag'}},{kind:'inventory',token:this.token},(out:any)=>{
+    this.learningItem={itemId,memberId};this.learningChild=W.PSProgression.attachLearning(this.window,{kind:'teach',memberId,source:{kind:'machine',itemId,entry:this.request.parent?'party':'bag'}},{kind:'inventory',token:this.token},(out:any)=>{
+     if(this.closed||this.closing)return;
      this.learningChild=null;this.selectedTicket=null;const r:InventoryOutcome={status:['committed','unchanged','cancelled'].includes(out.status)?out.status:'refused',...(out.status==='refused'?{reason:out.reason}:{}),result:{itemId,memberId}};
      if(this.request.kind==='use')this.close(r);else if(out.status==='refused'&&!this.request.parent)this.machineTargets(itemId,true);else{this.bagView();}
     });return;
@@ -185,13 +186,14 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    if(this.selection)this.finishSelection(null);else{this.flushBrowse();this.close({status:'cancelled'});}return;
   }v.back?.();}
   close(result:InventoryOutcome,invalid=false){
-   if(this.closed)return;if(this.learningChild){const child=this.learningChild;this.learningChild=null;child.dispose();}const same=this.application===flow()._app&&this.generation===this.application.stateGeneration;
+   if(this.closed||this.closing)return;this.closing=true;try{if(this.learningChild){const child=this.learningChild;this.learningChild=null;child.dispose();const done=child.completedOutcome;if(done?.status==='committed')this.presentationOutcome={status:'committed',result:{...this.learningItem}};else if(done?.status==='refused'&&done.reason==='learning-recovery-required')result={status:'refused',reason:done.reason,presentation:'failed'};}const same=this.application===flow()._app&&this.generation===this.application.stateGeneration;
    if(invalid&&this.presentationOutcome&&['cancelled','refused'].includes(result.status))result={...clone(this.presentationOutcome),presentation:'failed',error:result.error??why(result)};
    if(this.giveToken&&same){const out=this.application.endManagement(this.giveToken);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close(out,true));return;}}
    if(this.token&&same){const out=this.application.endInventoryOperation(this.token);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close(out,true));return;}}
    this.closed=true;this.handle.done=true;this.handle.result=clone(result);if(active===this)active=null;
    const pending=this.cancelWait;this.cancelWait=null;this.afterMessage=null;pending?.();this.finish(result);
    if(same&&this.request.done)notices.push({application:this.application,generation:this.generation,result:clone(result),done:this.request.done});
+   }finally{this.closing=false;}
   }
   draw(){
    if(this.learningChild){this.learningChild.draw();return;}
