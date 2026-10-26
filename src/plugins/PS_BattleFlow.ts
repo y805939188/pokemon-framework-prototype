@@ -76,7 +76,7 @@ import { developmentCapabilities } from "../framework/rules/config";
   let openingBattle: object | null = null;
   const PSFlow: any = (W.PSFlow = {
     developerCapabilities: {}, // explicit developer/test injection only; never plugin settings or save data
-    operationPending(): boolean { return PSFlow.running || !!PSFlow._app?.saveBlocked; },
+    operationPending(): boolean { return PSFlow.running || !!PSFlow._app?.saveBlocked || !!W.PSManagement?.presentationPending?.(); },
     /** Programmatic action bridges; formal learning screens/commands belong to G. */
     beginLearning(intent: any, parent?: any): any { return PSFlow.app().beginLearning(intent, parent); },
     resolveLearning(token: string, revision: number, decision: any): any { return PSFlow.app().resolveLearning(token, revision, decision); },

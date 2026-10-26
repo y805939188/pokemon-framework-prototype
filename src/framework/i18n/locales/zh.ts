@@ -8,6 +8,13 @@ import type { LocaleTable } from "../translator.ts";
 export const zh: LocaleTable = {
   meta: { name: "简体中文", font: "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif" },
   text: {
+    "evolution.itemGrowth": "成长已生效。",
+    "evolution.itemChoiceRecorded": "已记录本次用药的学招选择。",
+    "evolution.itemUsed": "使用了{quantity}个{item}。",
+    "evolution.itemNoCommit": "没有新增道具效果写入。",
+    "evolution.itemLearned": "学会：{moves}",
+    "evolution.itemSkipped": "未学习：{moves}",
+    "evolution.itemStopped": "后续呈现已安全终止，确认生效的变更保留。",
     "evolution.tradeTitle": "交换",
     "evolution.tradeOffer": "用{old}交换{target}吗？",
     "evolution.tradeYes": "是，开始交换",

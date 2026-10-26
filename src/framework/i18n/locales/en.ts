@@ -4,6 +4,13 @@ import type { LocaleTable } from "../translator.ts";
 export const en: LocaleTable = {
   meta: { name: "English" },
   text: {
+    "evolution.itemGrowth": "Growth has been applied.",
+    "evolution.itemChoiceRecorded": "The learning choice is recorded for this use.",
+    "evolution.itemUsed": "Used {quantity} × {item}.",
+    "evolution.itemNoCommit": "No new item effect was installed.",
+    "evolution.itemLearned": "Learned: {moves}",
+    "evolution.itemSkipped": "Did not learn: {moves}",
+    "evolution.itemStopped": "The remaining presentation ended safely. Confirmed changes are kept.",
     "evolution.tradeTitle": "Trade",
     "evolution.tradeOffer": "Trade {old} for {target}?",
     "evolution.tradeYes": "Yes, begin trade",

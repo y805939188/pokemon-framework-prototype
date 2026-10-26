@@ -94,6 +94,7 @@ SUITES=(
   experiments/step5/3/test-evolution-timeline.cjs
   experiments/step5/3/test-pokedex-ui.cjs
   experiments/step5/3/test-evolution-ui.cjs
+  experiments/step5/3/test-item-evolution-ui.cjs
   experiments/step5/3/test-trade-timeline.cjs
   experiments/step5/3/test-trade-ui.cjs
   experiments/step5/3/test-egg-move-content.cjs

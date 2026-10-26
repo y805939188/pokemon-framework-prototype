@@ -2,7 +2,7 @@
 import {InputLatch} from './management/model.ts';
 import type {InputFrame} from './management/model.ts';
 import {quantityStep,nextPocket,animationPhase,itemIconFrame} from './inventory/model.ts';
-import {importantItem,showsQuantity,catalogOf,holdableItem} from '../framework/rules/item-catalog.ts';
+import {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag} from '../framework/rules/item-catalog.ts';
 import type {ItemDefinition} from '../framework/rules/item-catalog.ts';
 import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framework/app/inventory-session.ts';
 (() => {
@@ -10,32 +10,47 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
  const flow=()=>W.PSFlow,app=()=>flow().app(),tr=(k:string,p?:Record<string,string|number>)=>flow().translator().t('inventory.'+k,p);
  const why=(o:any)=>String(o?.reason??o?.error??o?.message??o),detail=(o:any)=>flow().translator().tOr('inventory.reason.'+why(o),why(o));
  const name=(it:ItemDefinition)=>flow().translator().tOr(it.nameKey??'item.name.'+it.id,it.name);
- type Request={kind:'bag'|'select'|'shop'|'use';parent?:InventoryParent;itemId?:string;quantity?:number;memberId?:string;filter?:(item:ItemDefinition)=>boolean;variableId?:number;shop?:any;prices?:{itemId:string;buy:number;sell?:number}[];done?:(o:InventoryOutcome)=>void};
+ type Request={kind:'bag'|'select'|'shop'|'use';parent?:InventoryParent;itemId?:string;quantity?:number;memberId?:string;filter?:(item:ItemDefinition)=>boolean;variableId?:number;shop?:any;prices?:{itemId:string;buy:number;sell?:number}[];done?:(o:InventoryOutcome)=>void;retireParent?:()=>void};
  type Handle={id:string;application:any;generation:number;done:boolean;result?:InventoryOutcome};
  type Choice={key:string;label:string;displayName?:string;details?:string[];enabled?:boolean;run:()=>void};
  type InventoryRow={item:ItemDefinition;quantity:number;index:number;pocket:number};
  type View={kind:string;cursor:number;title?:string;items?:Choice[];[key:string]:any};
- let active:Controller|null=null,queued:{request:Request;handle:Handle}|null=null,sequence=0;
+ type Queued={request:Request;handle:Handle;scene?:any;constructing?:boolean};
+ let active:Controller|null=null,queued:Queued|null=null,reserved:Queued|null=null,sequence=0;
+ // A dead presentation can retain a child recovery barrier. Transfer only its exact process-local parent token.
+ const abandoned:{application:any;generation:number;token:string;owner:string;retireParent?:()=>void}[]=[];
+ const sameHandle=(h:Handle)=>h.application===flow()._app&&h.generation===h.application.stateGeneration;
+ function retireQueued(q:Queued,result:InventoryOutcome){if(queued===q)queued=null;if(reserved===q)reserved=null;if(q.handle.done)return;q.handle.done=true;q.handle.result=clone(result);if(sameHandle(q.handle)&&q.request.done)notices.push({application:q.handle.application,generation:q.handle.generation,result:clone(result),done:q.request.done});}
+ function retireOrphan(){for(let i=abandoned.length-1;i>=0;i--)if(abandoned[i]!.application!==flow()._app||abandoned[i]!.generation!==abandoned[i]!.application.stateGeneration)abandoned.splice(i,1);const q=reserved;if(!q||q.constructing)return;const m=G.SceneManager;if(q.handle.done||!sameHandle(q.handle)||q.scene&&'_nextScene'in m&&q.scene!==m._scene&&q.scene!==m._nextScene)retireQueued(q,{status:'refused',reason:'stale-operation'});}
+ function queuedValid(scene:any){const q=scene._request;if(!q||q.handle.done||!sameHandle(q.handle)){if(q)retireQueued(q,{status:'refused',reason:'stale-operation'});scene._finished=true;scene._controller?.close({status:'refused',reason:'stale-operation'},true);return false;}return true;}
+ const hasAbandonedItem=(application:any,generation:number,owner:string)=>application===flow()._app&&generation===application.stateGeneration&&abandoned.some(e=>e.application===application&&e.generation===generation&&e.owner===owner);
+ function acknowledgeRecoveredItem(application:any,generation:number,owner:string){
+  for(let i=abandoned.length-1;i>=0;i--){const entry=abandoned[i]!;if(entry.application!==flow()._app||entry.generation!==entry.application.stateGeneration){abandoned.splice(i,1);continue;}
+   if(entry.application!==application||entry.generation!==generation||entry.owner!==owner)continue;
+   if(application.pendingTriggeredEvolution||application.pendingEvolution||application.pendingPokedex)return;
+   const out=application.endInventoryOperation(entry.token);if(out.status==='refused')return;abandoned.splice(i,1);entry.retireParent?.();
+  }
+ }
  const waits=new WeakMap<object,Handle>(),outcomes=new WeakMap<object,InventoryOutcome>();
  const notices:{application:any;generation:number;result:InventoryOutcome;done:(o:InventoryOutcome)=>void}[]=[];
  const discardStaleNotices=()=>{for(let i=notices.length-1;i>=0;i--)if(notices[i]!.application!==flow()._app||notices[i]!.generation!==notices[i]!.application.stateGeneration)notices.splice(i,1);};
  const frames:any[]=[];const record=(row:any)=>{frames.push(row);if(frames.length>256)frames.shift();};
  const handle=():Handle=>{const application=app(),h={id:'inventory-ui:'+ ++sequence,done:false}as Handle;Object.defineProperties(h,{application:{value:application},generation:{value:application.stateGeneration}});return h;};
  function open(request:Request):Handle|null {
-  discardStaleNotices();const scene=G.SceneManager._scene;
-  if(active||queued||notices.length||scene?._psInventory||G.SceneManager.isSceneChanging()||scene?.isStarted?.()===false||G.$gameMessage?.isBusy?.())return null;
-  const application=app();if(application.encounterBlocked)return null;const h=handle();queued={request,handle:h};
-  try{G.SceneManager.push(Scene_PSInventory);}catch(error){queued=null;h.done=true;h.result={status:'refused',reason:'presentation-failed',error:String(error)};throw error;}return h;
+  retireOrphan();discardStaleNotices();const scene=G.SceneManager._scene;
+  if(active||queued||reserved||notices.length||scene?._psInventory||G.SceneManager.isSceneChanging()||scene?.isStarted?.()===false||G.$gameMessage?.isBusy?.())return null;
+  const application=app();if(application.encounterBlocked)return null;const h=handle(),q:Queued={request,handle:h,constructing:true};queued=reserved=q;
+  try{G.SceneManager.push(Scene_PSInventory);}catch(error){const created=active as Controller|null;if(created?.handle===h)created.close({status:'refused',reason:'presentation-failed',error:String(error)},true);retireQueued(q,{status:'refused',reason:'presentation-failed',error:String(error)});throw error;}finally{q.constructing=false;}return h;
  }
  class Controller {
   readonly application:any;readonly generation:number;readonly handle:Handle;readonly request:Request;
   token='';selection='';giveToken='';selectedTicket:InventoryTicket|null=null;closed=false;closing=false;ready=false;frame=0;serial=0;window:any;view!:View;error='';text:string[]=[];latch=new InputLatch();
   pocket=1;indices:number[]=Array(8).fill(0);visited=new Set<number>();bag:any;sorting=false;busy=false;operation:any=null;presentationOutcome:InventoryOutcome|null=null;afterMessage:(()=>void)|null=null;cancelWait:(()=>void)|null=null;lastPhase='';
   // Sort cancellation restores the live row, while indices retain the last moved saved position.
-  restoredSortCursor:number|null=null;learningChild:any=null;learningItem:{itemId:string;memberId:string}|null=null;machineBrowse:{itemId:string;annotations:any[];members:any[]}|null=null;
+  restoredSortCursor:number|null=null;evolutionOwner='';evolutionChild:any=null;evolutionIntent:{itemId:string;memberId:string;quantity:number}|null=null;learningChild:any=null;learningItem:{itemId:string;memberId:string}|null=null;machineBrowse:{itemId:string;annotations:any[];members:any[]}|null=null;
   constructor(request:Request,h:Handle,readonly finish:(o:InventoryOutcome)=>void){this.request=request;this.handle=h;this.application=h.application;this.generation=h.generation;}
   valid(){try{return !this.closed&&!this.handle.done&&active===this&&this.application===app()&&this.generation===this.application.stateGeneration;}catch{return false;}}
-  get saveBlocked(){return !!this.learningChild||!!this.selectedTicket||!!this.operation||!!this.giveToken||this.busy||this.view?.kind==='quantity'||this.view?.pending===true;}
+  get saveBlocked(){return !!this.evolutionChild||!!this.learningChild||!!this.selectedTicket||!!this.operation||!!this.giveToken||this.busy||this.view?.kind==='quantity'||this.view?.pending===true;}
   id(){return 'ui-'+ ++this.serial;}
   start(win:any){
    if(!this.valid())throw Error('stale-operation');
@@ -45,13 +60,13 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    if(this.request.kind==='select')this.selection=this.application.beginItemSelection(this.token,this.request.filter,this.request.variableId);
    this.refreshBag();this.pocket=this.bag.lastPocket;this.indices=[...this.bag.indices];
    if(this.request.kind==='shop')this.shopMenu();
-   else if(this.request.kind==='use'){if(this.machine(this.request.itemId!))this.machineOpening(this.request.itemId!,()=>this.request.memberId?this.beginUse(this.request.itemId!,this.request.memberId,1):this.machineTargets(this.request.itemId!));else this.beginUse(this.request.itemId!,this.request.memberId,this.request.quantity??1);}
+   else if(this.request.kind==='use'){if(this.machine(this.request.itemId!))this.machineOpening(this.request.itemId!,()=>this.request.memberId?this.beginUse(this.request.itemId!,this.request.memberId,1):this.machineTargets(this.request.itemId!));else if(this.triggerItem(this.request.itemId!)&&!this.request.memberId)this.target(this.request.itemId!);else this.beginUse(this.request.itemId!,this.request.memberId,this.request.quantity??1);}
    else this.bagView();
   }
   sample():InputFrame {return W.PSManagement.inputFrame();}
   boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;const pressed=this.sample().pressed;this.latch.arm(pressed);G.Input.clear();G.TouchInput.clear();record({event:'boundary',token:this.handle.id,frame:this.frame,view:this.view?.kind,pressed});}
   set(v:View){this.view=v;this.error='';this.boundary();this.draw();}
-  refreshBag(){const bag=this.selection?this.application.itemSelectionView(this.token,this.selection):this.application.inventorySnapshot(this.token,this.request.parent?(it:ItemDefinition)=>(['tm','hm','tr'].includes(it.fieldUse)||this.application.queryItemUse(this.token,it.id,1,this.request.parent!.memberId).ready):undefined);this.bag={...bag,pockets:bag.pockets.map((rows:Omit<InventoryRow,'pocket'>[],pocket:number)=>rows.map(row=>({...row,pocket:pocket+1})))};}
+  refreshBag(){const bag=this.selection?this.application.itemSelectionView(this.token,this.selection):this.application.inventorySnapshot(this.token,this.request.parent?(it:ItemDefinition)=>(this.triggerItem(it.id)||['tm','hm','tr'].includes(it.fieldUse)||this.application.queryItemUse(this.token,it.id,1,this.request.parent!.memberId).ready):undefined);this.bag={...bag,pockets:bag.pockets.map((rows:Omit<InventoryRow,'pocket'>[],pocket:number)=>rows.map(row=>({...row,pocket:pocket+1})))};}
   bagView(){this.selectedTicket=null;this.refreshBag();const filtered=!!this.selection&&!!this.request.filter||!!this.request.parent;if(filtered&&!this.bag.pockets[this.pocket-1]?.length)this.pocket=nextPocket(this.pocket,1,this.bag.pockets.map((p:any[])=>p.length),true);this.indices[this.pocket-1]=Math.min(this.indices[this.pocket-1]??0,this.bag.pockets[this.pocket-1].length);this.set({kind:'bag',cursor:Math.min(this.restoredSortCursor??this.indices[this.pocket-1]!,this.bag.pockets[this.pocket-1].length),filtered});}
   flushBrowse(){if(this.selection||this.request.parent||this.request.kind==='use'||this.request.kind==='shop')return;for(const p of new Set([...this.visited].filter(p=>p!==this.pocket).concat(this.pocket))){const r=this.application.inventoryRequest(this.token,this.id(),{kind:'browse',pocket:p,index:Math.min(this.indices[p-1]??0,this.bag.pockets[p-1].length)});if(r.status==='refused')throw Error(why(r));}this.visited.clear();}
   rows(){return this.bag.pockets[this.pocket-1] as InventoryRow[];}
@@ -65,7 +80,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
   total(itemId:string){return this.bag.pockets.flat().reduce((n:number,r:any)=>n+(r.item.id===itemId?r.quantity:0),0);}
   itemMenu(row:any){
    const ticket:InventoryTicket=this.application.inventoryTicket(this.token,row.pocket,row.index);if(ticket.itemId!==row.item.id)throw Error('stale-slot');this.selectedTicket=ticket;
-   const ready=['tm','hm','tr'].includes(row.item.fieldUse)||this.application.queryItemUse(this.token,row.item.id,1,this.request.parent?.memberId).ready;
+   const ready=this.triggerItem(row.item.id)||['tm','hm','tr'].includes(row.item.fieldUse)||this.application.queryItemUse(this.token,row.item.id,1,this.request.parent?.memberId).ready;
    this.choose(name(row.item),[
     {key:'use',label:tr('use'),enabled:ready,run:()=>this.target(row.item.id)},
     ...(!this.request.parent&&holdableItem(row.item)&&this.application.heldItemSourcesEnabled()?[{key:'give',label:tr('give'),run:()=>this.give(row)}]:[]),
@@ -79,6 +94,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    this.choose(tr('target'),[...snap.party.filter((m:any)=>!m.isEgg).map((m:any)=>({key:m.id,label:m.nickname||flow().speciesName(m.species,m.form),run:()=>{const apply=()=>{const r=this.application.manage(this.giveToken,this.id(),{kind:'give-item',source:snap.references[m.id],item:row.item.id});if(r.status==='refused')this.fail(r,resume);else{this.presentationOutcome={status:r.status==='unchanged'?'unchanged':'committed',result:{itemId:row.item.id,memberId:m.id,quantity:1}};this.message(tr('done'),resume);}};if(m.item)this.confirm(tr('confirmUse'),apply,resume);else apply();}})),{key:'close',label:tr('back'),run:resume}],resume);
   }
   party(){return clone(flow().game().party) as any[];}
+  triggerItem(itemId:string){const item=this.catalog()[itemId];return typeof W.PSEvolution?.attachItem==='function'&&item?.fieldUse==='member'&&(['rare-candy','exp-candy','evolution'].includes(item.effect?.family??'')||hasFlag(item,'EvolutionStone'));}
   machine(itemId:string){return ['tm','hm','tr'].includes(this.catalog()[itemId]?.fieldUse??'');}
   machineOpening(itemId:string,next:()=>void){
    const item=this.catalog()[itemId]!,move=Object.values(flow().content().moves??{}).find((v:any)=>v.id===item.move)as any;
@@ -102,11 +118,16 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    }
    if(this.request.parent){this.useQuantity(itemId,this.request.parent.memberId);return;}
    const direct=this.rows().find(r=>r.item.id===itemId)?.item.effect?.family==='sacred-ash';if(direct){this.useQuantity(itemId);return;}
-   const members=this.party();this.choose(tr('target'),[...members.map(m=>({key:m.id,label:(m.nickname||flow().speciesName(m.species,m.form))+` Lv.${m.level} HP ${m.hp} ${m.status||''}`+(m.isEgg?' '+tr('egg'):''),run:()=>this.useQuantity(itemId,m.id)})),{key:'close',label:tr('back'),run:()=>this.bagView()}],()=>this.bagView());
+   const members=this.party(),back=()=>this.request.kind==='use'?this.close({status:'cancelled'}):this.bagView();this.choose(tr('target'),[...members.map(m=>({key:m.id,label:(m.nickname||flow().speciesName(m.species,m.form))+` Lv.${m.level} HP ${m.hp} ${m.status||''}`+(m.isEgg?' '+tr('egg'):''),run:()=>this.request.kind==='use'?this.beginUse(itemId,m.id,this.request.quantity??1):this.useQuantity(itemId,m.id)})),{key:'close',label:tr('back'),run:back}],back);
   }
-  useQuantity(itemId:string,memberId?:string){if(['tm','hm','tr'].includes(this.catalog()[itemId]?.fieldUse??'')){this.beginUse(itemId,memberId,1);return;}const q=this.application.queryItemUse(this.token,itemId,1,memberId);if(q.eligible!=='eligible'){this.fail(q,()=>this.request.parent?this.bagView():this.target(itemId));return;}const max=q.maximum??1;if(max>1)this.quantity(max,false,n=>{if(n)this.beginUse(itemId,memberId,n);else this.request.parent?this.bagView():this.target(itemId);});else this.beginUse(itemId,memberId,1);}
+  useQuantity(itemId:string,memberId?:string){if(['tm','hm','tr'].includes(this.catalog()[itemId]?.fieldUse??'')){this.beginUse(itemId,memberId,1);return;}const item=this.catalog()[itemId],member=this.party().find(m=>m.id===memberId);if(this.triggerItem(itemId)&&(item.effect?.family==='evolution'||hasFlag(item,'EvolutionStone')||item.effect?.family==='rare-candy'&&member?.level===100)){this.beginUse(itemId,memberId,1);return;}const q=this.application.queryItemUse(this.token,itemId,1,memberId);if(q.eligible!=='eligible'){this.fail(q,()=>this.request.parent?this.bagView():this.target(itemId));return;}const max=q.maximum??1;if(max>1)this.quantity(max,false,n=>{if(n)this.beginUse(itemId,memberId,n);else this.request.parent?this.bagView():this.target(itemId);});else this.beginUse(itemId,memberId,1);}
   beginUse(itemId:string,memberId:string|undefined,quantity:number){
    this.refreshBag();const row=this.bag.pockets.flat().find((r:any)=>r.item.id===itemId);if(!row){this.fail({reason:'not-enough-items'},()=>this.request.kind==='use'?this.close({status:'refused',reason:'not-enough-items'}):this.bagView());return;}
+   if(this.triggerItem(itemId)){
+    if(!memberId){this.fail({reason:'absent-party-target'});return;}
+    if(this.selectedTicket&&JSON.stringify(this.selectedTicket)!==JSON.stringify(this.application.inventoryTicket(this.token,this.selectedTicket.pocket,this.selectedTicket.index))){this.fail({reason:'stale-slot'},()=>this.close({status:'refused',reason:'stale-slot'}));return;}
+    this.presentationOutcome=null;this.evolutionIntent={itemId,memberId,quantity};this.evolutionChild=W.PSEvolution.attachItem(this.window,this.token,this.id(),this.evolutionIntent);this.evolutionOwner=this.evolutionChild.request.owner;return;
+   }
    if(['tm','hm','tr'].includes(row.item.fieldUse)){
     if(!memberId||!W.PSProgression){this.fail({reason:'learning-screen-unavailable'});return;}
     if(this.selectedTicket&&JSON.stringify(this.selectedTicket)!==JSON.stringify(this.application.inventoryTicket(this.token,this.selectedTicket.pocket,this.selectedTicket.index))){this.fail({reason:'stale-slot'},()=>this.close({status:'refused',reason:'stale-slot'}));return;}
@@ -117,6 +138,17 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
     });return;
    }
    this.operation={id:this.id(),request:{kind:'use-item',itemId,quantity,...(memberId?{memberId}:{}),ticket:this.selectedTicket??this.application.inventoryTicket(this.token,row.pocket,row.index),answers:{}}};this.submitUse();
+  }
+  evolutionOutcome(child:any):InventoryOutcome {
+   const out=child.completedOutcome,body=out?.result,confirmed=child.confirmedItem,primary=body?.primaryCommitted===true||confirmed?.primaryCommitted===true,itemResult=primary?(body?.item??confirmed?.itemResult):undefined,blocked=out?.status==='pending'||this.application.pendingTriggeredEvolution?.token===child.request.owner;
+   const status=blocked?'refused':out?.status==='committed'||primary?'committed':out?.status==='unchanged'?'unchanged':'refused';
+   return {status,...(status==='refused'?{reason:blocked?'evolution-recovery-required':out?.reason??'presentation-ended'}:{}),...((blocked||child.presentationError||out?.status==='technically-terminated')?{presentation:'failed'}:{}),result:{...this.evolutionIntent,evolution:body,primaryCommitted:primary,...(itemResult?{itemResult}: {})}};
+  }
+  finishEvolutionChild(child:any){
+   if(this.evolutionChild!==child)return;const result=this.evolutionOutcome(child);this.evolutionChild=null;this.selectedTicket=null;
+   if(this.request.kind==='use'){this.close(result);return;}
+   if(child.presentationError){this.presentationOutcome=result.status==='committed'?result:null;this.message(result.status==='committed'?tr('presentationFailed'):tr('refused',{reason:detail(result)}),()=>{this.presentationOutcome=null;result.reason==='evolution-recovery-required'?this.close(result,true):this.bagView();});return;}
+   this.presentationOutcome=null;this.bagView();
   }
   submitUse(){
    const op=this.operation,r=this.application.inventoryRequest(this.token,op.id,op.request);
@@ -154,6 +186,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
   shopQuantity(itemId:string,selling:boolean){const quote=this.application.shopQuote(this.token,itemId,selling);this.quantity(quote.maximum,true,q=>{if(!q){this.shopList(selling);return;}if(!Number.isSafeInteger(quote.price*q)){this.fail({reason:'integer-overflow'},()=>this.shopList(selling));return;}this.confirm(tr('confirmTrade',{quantity:q,item:name(this.catalog()[itemId]!),total:quote.price*q}),()=>{const r=this.application.inventoryRequest(this.token,this.id(),{kind:selling?'sell':'buy',itemId,quantity:q,confirmed:true,expectedPrice:quote.price,expectedRevision:quote.revision});if(r.status==='refused'){this.fail(r,()=>this.shopList(selling));return;}this.presentationOutcome=r;this.message(tr('tradeDone',{quantity:q,item:name(this.catalog()[itemId]!)} )+(r.result?.bonus?tr('bonus',{quantity:r.result.bonus as number}):''),()=>this.shopList(selling));},()=>this.shopList(selling));this.view.summary=[tr('quantity')+': '+q,tr('price',{price:quote.price}),tr('total',{total:quote.price*q})];this.draw();});if(this.view.kind==='quantity'){this.view.unitPrice=quote.price;this.view.title=tr('quantity')+' · '+name(this.catalog()[itemId]!);this.draw();}}
   update(){
    if(!this.valid()){this.close({status:'refused',reason:'stale-operation'},true);return;}
+   if(this.evolutionChild){const child=this.evolutionChild;child.update();if(child.closed)this.finishEvolutionChild(child);return;}
    if(this.learningChild){this.learningChild.update();return;}
    if(!this.view)return;const frame=G.Graphics.frameCount??0;if(!this.ready&&(frame<=this.frame||G.SceneManager.isSceneChanging()))return;
    const f=this.latch.filter(this.sample());if(!this.ready){this.ready=true;record({event:'ready',token:this.handle.id,frame,view:this.view.kind});return;}
@@ -181,21 +214,22 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    const row=this.rows()[v.cursor];if(!row){this.back();return;}
    if(this.selection){this.finishSelection(row.item.id);return;}this.itemMenu(row);
   }else {const it=v.items?.[v.cursor];if(it?.enabled===false){G.SoundManager.playBuzzer();return;}it?.run();}}
-  back(){if(this.learningChild){this.learningChild.model.back();this.learningChild.boundary();this.learningChild.draw();return;}const v=this.view;if(v.kind==='message'){this.use();return;}if(v.kind==='bag'){
+  back(){if(this.evolutionChild){this.evolutionChild.back();return;}if(this.learningChild){this.learningChild.model.back();this.learningChild.boundary();this.learningChild.draw();return;}const v=this.view;if(v.kind==='message'){this.use();return;}if(v.kind==='bag'){
    if(this.sorting){const r=this.application.endInventorySort(this.token,true);this.sorting=false;if(r.status==='refused')this.fail(r);else{this.restoredSortCursor=r.result.index;this.bagView();}return;}
    if(this.selection)this.finishSelection(null);else{this.flushBrowse();this.close({status:'cancelled'});}return;
   }v.back?.();}
   close(result:InventoryOutcome,invalid=false){
-   if(this.closed||this.closing)return;this.closing=true;try{if(this.learningChild){const child=this.learningChild;this.learningChild=null;child.dispose();const done=child.completedOutcome;if(done?.status==='committed')this.presentationOutcome={status:'committed',result:{...this.learningItem}};else if(done?.status==='refused'&&done.reason==='learning-recovery-required')result={status:'refused',reason:done.reason,presentation:'failed'};}const same=this.application===flow()._app&&this.generation===this.application.stateGeneration;
+   if(this.closed||this.closing)return;this.closing=true;try{if(this.evolutionChild){const child=this.evolutionChild;this.evolutionChild=null;child.dispose();const outcome=this.evolutionOutcome(child);if(outcome.status==='committed')this.presentationOutcome=outcome;else result={...outcome,...(result.reason&&outcome.reason!=='evolution-recovery-required'?{reason:result.reason}:{})};}if(this.learningChild){const child=this.learningChild;this.learningChild=null;child.dispose();const done=child.completedOutcome;if(done?.status==='committed')this.presentationOutcome={status:'committed',result:{...this.learningItem}};else if(done?.status==='refused'&&done.reason==='learning-recovery-required')result={status:'refused',reason:done.reason,presentation:'failed'};}const same=this.application===flow()._app&&this.generation===this.application.stateGeneration;
    if(invalid&&this.presentationOutcome&&['cancelled','refused'].includes(result.status))result={...clone(this.presentationOutcome),presentation:'failed',error:result.error??why(result)};
    if(this.giveToken&&same){const out=this.application.endManagement(this.giveToken);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close(out,true));return;}}
-   if(this.token&&same){const out=this.application.endInventoryOperation(this.token);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close(out,true));return;}}
+   if(this.token&&same){const out=this.application.endInventoryOperation(this.token);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close(out,true));return;}if(out.reason==='child-operation-active'&&this.evolutionOwner&&this.application.pendingTriggeredEvolution?.token===this.evolutionOwner&&!abandoned.some(e=>e.application===this.application&&e.token===this.token))abandoned.push({application:this.application,generation:this.generation,token:this.token,owner:this.evolutionOwner,retireParent:this.request.retireParent});}
    this.closed=true;this.handle.done=true;this.handle.result=clone(result);if(active===this)active=null;
    const pending=this.cancelWait;this.cancelWait=null;this.afterMessage=null;pending?.();this.finish(result);
    if(same&&this.request.done)notices.push({application:this.application,generation:this.generation,result:clone(result),done:this.request.done});
    }finally{this.closing=false;}
   }
   draw(){
+   if(this.evolutionChild){this.evolutionChild.draw();return;}
    if(this.learningChild){this.learningChild.draw();return;}
    if(!this.window||!this.view)return;const b=this.window.contents,v=this.view,w=b.width,h=b.height;b.clear();b.fontFace=flow().translator().font()||'sans-serif';b.fontSize=20;this.text=[];
    const line=(value:string,y:number,color='#fff',x=12,width=w-24)=>{if(width<=0)return;if(this.window.textWidth(value)>width){let fitted='';for(const ch of Array.from(value)){if(this.window.textWidth(fitted+ch+'…')>width)break;fitted+=ch;}value=fitted+'…';}this.text.push(value);b.textColor=color;b.drawText(value,x,y,width,28,'left');};
@@ -216,15 +250,18 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
  }
  function Scene_PSInventory(this:any){this.initialize(...(arguments as any));}
  const P=Scene_PSInventory.prototype=Object.create(G.Scene_MenuBase.prototype);P.constructor=Scene_PSInventory;
- P.initialize=function(){G.Scene_MenuBase.prototype.initialize.call(this);this._psInventory=true;this._request=queued;queued=null;};
- P.create=function(){G.Scene_MenuBase.prototype.create.call(this);try{const q=this._request;if(!q)throw Error('missing-inventory-request');this._controller=new Controller(q.request,q.handle,()=>{this._finished=true;});active=this._controller;this._window=new G.Window_Base(new G.Rectangle(0,0,G.Graphics.boxWidth,G.Graphics.boxHeight));this.addWindow(this._window);this._attached=true;this._controller.start(this._window);}catch(error){this._failure=String(error);if(this._window&&!this._attached){try{this._window.destroy?.();}catch{}}this._controller?.close({status:'refused',reason:'presentation-failed',error:this._failure},true);if(this._request&&!this._request.handle.done){this._request.handle.done=true;this._request.handle.result={status:'refused',reason:'presentation-failed',error:this._failure};}try{const applied=['committed','duplicate','unchanged'].includes(this._request?.handle.result?.status);G.$gameMessage.add(applied?tr('presentationFailed'):tr('refused',{reason:this._failure}));}catch{}}};
- P.update=function(){G.Scene_MenuBase.prototype.update.call(this);if(this._finished||this._failure){this.popScene();return;}try{this._controller?.update();}catch(error){this._controller?.fatal(error);}};
- P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);this._controller?.close({status:'cancelled'},true);};
+ P.initialize=function(){this._psInventory=true;this._request=queued;if(this._request)this._request.scene=this;queued=null;G.Scene_MenuBase.prototype.initialize.call(this);};
+ P.create=function(){if(!queuedValid(this))return;try{G.Scene_MenuBase.prototype.create.call(this);if(!queuedValid(this))return;const q=this._request;if(!q)throw Error('missing-inventory-request');this._controller=new Controller(q.request,q.handle,()=>{this._finished=true;});active=this._controller;this._window=new G.Window_Base(new G.Rectangle(0,0,G.Graphics.boxWidth,G.Graphics.boxHeight));this.addWindow(this._window);this._attached=true;if(!queuedValid(this))return;this._controller.start(this._window);if(reserved===q)reserved=null;}catch(error){this._failure=String(error);if(this._window&&!this._attached){try{this._window.destroy?.();}catch{}}this._controller?.close({status:'refused',reason:'presentation-failed',error:this._failure},true);if(this._request&&!this._request.handle.done)retireQueued(this._request,{status:'refused',reason:'presentation-failed',error:this._failure});try{const applied=['committed','duplicate','unchanged'].includes(this._request?.handle.result?.status);G.$gameMessage.add(applied?tr('presentationFailed'):tr('refused',{reason:this._failure}));}catch{}}};
+ P.update=function(){if(this._finished||this._failure){if(!G.SceneManager.isSceneChanging())G.Scene_MenuBase.prototype.popScene.call(this);return;}G.Scene_MenuBase.prototype.update.call(this);try{this._controller?.update();}catch(error){this._controller?.fatal(error);}};
+ P.popScene=function(){const c=this._controller;if(c&&!c.closed&&(c.evolutionChild||c.learningChild)){c.back();return;}G.Scene_MenuBase.prototype.popScene.call(this);};
+ P.start=function(){G.Scene_MenuBase.prototype.start.call(this);queuedValid(this);};
+ P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);if(this._controller)this._controller.close({status:'cancelled'},true);else if(this._request)retireQueued(this._request,{status:'cancelled'});if(reserved===this._request)reserved=null;};
  const ui:any=W.PSInventory={
   trace:()=>clone(frames),
-  saveBlocked:()=>!!queued||!!active?.saveBlocked,
+  saveBlocked:()=>{retireOrphan();return !!queued||!!reserved||!!active?.saveBlocked;},
+  acknowledgeRecoveredItem,hasAbandonedItem,
   showBag:(done?:Request['done'])=>open({kind:'bag',done}),selectItem:(filter?:Request['filter'],variableId?:number,done?:Request['done'])=>open({kind:'select',filter,variableId,done}),openShop:(shop:any,prices?:Request['prices'],done?:Request['done'])=>open({kind:'shop',shop,prices,done}),useItem:(itemId:string,memberId?:string,quantity=1,done?:Request['done'])=>open({kind:'use',itemId,memberId,quantity,done}),
-  attach:(win:any,parent:InventoryParent,done:()=>void)=>{if(active||queued)throw Error('inventory-operation-active');const h=handle(),c=new Controller({kind:'bag',parent},h,done);active=c;try{c.start(win);}catch(error){c.close({status:'refused',reason:'presentation-failed',error:String(error)},true);throw error;}return c;},
+  attach:(win:any,parent:InventoryParent,done:()=>void,retireParent?:()=>void)=>{retireOrphan();if(active||queued||reserved)throw Error('inventory-operation-active');const h=handle(),c=new Controller({kind:'bag',parent,retireParent},h,done);active=c;try{c.start(win);}catch(error){c.close({status:'refused',reason:'presentation-failed',error:String(error)},true);throw error;}return c;},
   current:()=>active&&!active.closed?{token:active.token,generation:active.generation,ready:active.ready,pocket:active.pocket,sorting:active.sorting,text:[...active.text],view:{kind:active.view?.kind,cursor:active.view?.cursor,value:active.view?.value,maximum:active.view?.maximum,title:active.view?.title,items:active.view?.items?.map(i=>({key:i.key,label:i.label,enabled:i.enabled}))},frames:clone(frames)}:null,
  };
  const pending=flow().operationPending;
@@ -245,10 +282,10 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
  const wait=G.Game_Interpreter.prototype.updateWaitMode;
  Object.defineProperty(G.Game_Interpreter.prototype,'_psInventoryOutcome',{configurable:true,enumerable:false,get(){const value=outcomes.get(this);return value?clone(value):undefined;},set(value:InventoryOutcome){outcomes.set(this,clone(value));}});
  G.Game_Interpreter.prototype.updateWaitMode=function(){if(this._waitMode==='psInventory'){const h=waits.get(this);if(h&&!h.done&&h.application===flow()._app&&h.generation===h.application.stateGeneration)return true;this._psInventoryOutcome=h?.result??{status:'refused',reason:'stale-operation'};this._waitMode='';waits.delete(this);return false;}return wait.call(this);};
- const abandon=(self:object)=>{const h=waits.get(self);waits.delete(self);outcomes.delete(self);if(h&&!h.done){if(active?.handle===h)active.close({status:'refused',reason:'event-aborted'},true);else{h.done=true;h.result={status:'refused',reason:'event-aborted'};if(queued?.handle===h)queued=null;}}};
+ const abandon=(self:object)=>{const h=waits.get(self);waits.delete(self);outcomes.delete(self);if(h&&!h.done){if(active?.handle===h)active.close({status:'refused',reason:'event-aborted'},true);else{h.done=true;h.result={status:'refused',reason:'event-aborted'};if(reserved?.handle===h)retireQueued(reserved,h.result);if(queued?.handle===h)queued=null;}}};
  for(const method of ['clear','terminate']){const previous=G.Game_Interpreter.prototype[method];if(typeof previous==='function')G.Game_Interpreter.prototype[method]=function(...args:any[]){abandon(this);return previous.apply(this,args);};}
  const updateScene=G.SceneManager.updateScene;
- if(typeof updateScene==='function')G.SceneManager.updateScene=function(...args:any[]){const value=updateScene.apply(this,args);discardStaleNotices();const parent=this._scene;if(notices.length&&parent&&!parent._psInventory&&!this.isSceneChanging()&&parent.isStarted?.()!==false&&!G.$gameMessage?.isBusy?.()){const notice=notices.shift()!;try{notice.done(clone(notice.result));}catch(error){console.error(NAME,'completion callback failed',error);}}return value;};
+ if(typeof updateScene==='function')G.SceneManager.updateScene=function(...args:any[]){retireOrphan();const value=updateScene.apply(this,args);retireOrphan();discardStaleNotices();const parent=this._scene;if(notices.length&&parent&&!parent._psInventory&&!this.isSceneChanging()&&parent.isStarted?.()!==false&&!G.$gameMessage?.isBusy?.()){const notice=notices.shift()!;try{notice.done(clone(notice.result));}catch(error){console.error(NAME,'completion callback failed',error);}}return value;};
  if(G.Window_MenuCommand&&G.Scene_Menu){const commands=G.Window_MenuCommand.prototype.addOriginalCommands;G.Window_MenuCommand.prototype.addOriginalCommands=function(){commands.call(this);let enabled=false;try{app().describeParty();enabled=true;}catch{}this.addCommand(tr('bag'),'psBag',enabled);};const create=G.Scene_Menu.prototype.createCommandWindow;G.Scene_Menu.prototype.createCommandWindow=function(){create.call(this);this._commandWindow.setHandler('psBag',()=>{try{const h=ui.showBag();if((!h||h.done)&&G.SceneManager._scene===this)this._commandWindow.activate();}catch(error){this._commandWindow.activate();G.$gameMessage.add(tr('refused',{reason:detail(error)}));}});};}
  W.Scene_PSInventory=Scene_PSInventory;
 })();

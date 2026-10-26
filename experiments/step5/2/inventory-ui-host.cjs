@@ -5,6 +5,8 @@ function build(){if(bundles)return;dir=fs.mkdtempSync(path.join(os.tmpdir(),'ps5
 function disposeBuild(){if(dir)fs.rmSync(dir,{recursive:true,force:true});bundles=null;dir=null;}
 function host(options={}){
  build();const x=options.application??setup({bag:{potion:3,rarecandy:2,ether:2,pokeball:20},variables:{count:()=>G.$dataSystem.variables.length-1,write:(id,value)=>G.$gameVariables.setValue(id,value)},edit:(g,c)=>{g.money=5000;g.party[0].hp=1;c.items.pokeball.price=200;c.items.pokeball.sellPrice=100;c.items.potion.price=300;c.items.potion.sellPrice=150;c.species.Charizard.learnset={51:['Slash']};options.edit?.(g,c);},...options.setup});
+ // The shared legacy fixture now reaches 5.3 triggered actions, which require an explicit trusted content identity.
+ if(!options.application){const inputsHash=E.digest.sha256Hex(E.contentCompile.canonicalJson(x.content)),showdownSha=fs.readFileSync(path.resolve(__dirname,'../../../js/engine/showdown/SOURCE_SHA'),'utf8').trim(),compiledSemantics=E.contentSchema.COMPILED_SCHEMA_VERSION;x.content.meta={kind:'fixture',id:'inventory-host',inputsHash,showdownSha,compiledSemantics,contentIdentity:E.digest.sha256Hex(E.contentCompile.canonicalJson({inputsHash,showdownSha,compiledSemantics}))};}
  // Plugin objects come from the vm realm (another Object.prototype), exactly like NW.js plugins versus the required
  // engine; the proxy only binds methods, it never clones or rewrites requests, statuses or port faults (5.2 P-01).
  const app=new Proxy(x.app,{get(target,key){const v=target[key];if(typeof v!=='function')return v;return(...args)=>v.apply(target,args);}});
@@ -22,6 +24,7 @@ function host(options={}){
  const G={console,structuredClone,Date,performance:{now:()=>G.Graphics.frameCount*1000/60},Input:input,TouchInput:{clear(){},isCancelled:()=>false},Graphics:{boxWidth:816,boxHeight:624,frameCount:0},Scene_MenuBase:Base,Scene_Map:Base,Window_Base:Win,Rectangle:function(){},SceneManager:manager,PluginManager:{registerCommand(p,n,f){commands[p+':'+n]=f}},Game_Interpreter:Base,SoundManager:{playBuzzer(){},playCancel(){}},$gameMessage:{add(s){messages.push(s)},isBusy:()=>G.messageBusy},$gameSwitches:{value:()=>false},$dataMap:{meta:{}},$dataSystem:{switches:Array(36).fill(''),variables:Array(8).fill('')},$gameVariables:{setValue(id,v){vars[id]=v}},messageBusy:false};
  G.Window_MenuCommand=MenuCommand;G.Scene_Menu=Menu;
  G.PSFlow={app:()=>app,_app:app,game:()=>x.state.current(),content:()=>x.content,translator:()=>E.i18n.translatorFor(G.language??'en'),speciesName:s=>s};G.window=G;G.document=document;G.addEventListener=(k,f)=>(events[k]??=new Set()).add(f);
+ for(const name of ['beginEvolutionItem','resolveTriggeredEvolution','resolveEvolution','resolvePokedex'])G.PSFlow[name]=(...args)=>app[name](...args);
  Object.assign(G.PSFlow,options.flowOverrides??{});
  vm.runInNewContext(bundles.PS_Management,G);vm.runInNewContext(bundles.PS_Inventory,G);vm.runInNewContext(bundles.PS_Progression,G);vm.runInNewContext(bundles.PS_Evolution,G);
  const tick=()=>{G.Graphics.frameCount++;manager.updateScene();input.trigger.clear();input.repeat.clear();};
