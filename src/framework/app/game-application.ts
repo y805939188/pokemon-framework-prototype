@@ -1,4 +1,8 @@
-import { planAcquisitionDex } from "../rules/acquisition-dex.ts";
+import { planAcquisitionDex, normalizeMemberDexAppearance } from "../rules/acquisition-dex.ts";
+import { PokedexOperation } from "./pokedex-operation.ts";
+import type { DexEntryIntent, DexDecision, DexViewingCommand, DexResolution } from "./pokedex-operation.ts";
+import { dexShouldOfferEntry } from "../rules/pokedex.ts";
+import { createDexQueryCatalog, dexAccessibleRegions, dexMenuEntry, dexInUnlockedRegion } from "../rules/pokedex-query.ts";
 import type { AcquisitionEntryIntent } from "../rules/acquisition-dex.ts";
 import { semanticFingerprint } from "../rules/semantic.ts";
 import { TradeOperation, tradeEligibility } from "./trade-operation.ts";
@@ -137,6 +141,7 @@ interface PreparedBattle {
   sourceIdentity: string | null; sourceInvalidated: boolean; expectedContext: EffectsContextV2;
   next?: GameState; nextIdentity?: string | null; defeat?: { moneyLost: number; healed: true }; attempted: boolean; indeterminate: boolean; completed: boolean;
   diagnostics: string[];
+  entries?: DexEntryIntent[];
 }
 function stateIdentity(value: GameState): string {
   return JSON.stringify(value, (_key, data: unknown) => data && typeof data === "object" && !Array.isArray(data)
@@ -190,6 +195,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly learning: LearningOperation;
   private readonly triggered: TriggeredEvolutionOperation;
   private readonly trade: TradeOperation;
+  private readonly pokedex: PokedexOperation;
+  private dexBattleCompletion: { parentToken: string; generation: number; outcome: BattleOutcome & { result?: BattleResult } } | null = null;
   private acquisition: { generation: number } | null = null;
   private evolutionCompletion: { token: string; generation: number; outcome: BattleOutcome & { result?: BattleResult } } | null = null;
   private generation = 0;
@@ -202,19 +209,21 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private battleCommitOwner: ReceptionContext | null = null;
   private readonly finishing = new WeakSet<object>();
   private readonly terminatedBattles = new WeakSet<ReceptionContext>();
-  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active || !!this.triggered?.active || !!this.trade?.active || !!this.acquisition; }
+  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active || !!this.triggered?.active || !!this.trade?.active || !!this.acquisition || !!this.pokedex?.active || !!this.dexBattleCompletion; }
   private assertBattleContext(context: ReceptionContext, requireOwner = false): void {
     if (context.generation !== this.generation || this.terminatedBattles.has(context)
       || requireOwner && this.battleCommitOwner !== context) throw new Error("stale battle commit generation or owner");
   }
   private invalidatePreparedSource(prepared: PreparedBattle, battleId: string): void {
     this.evolutions.discardPrepared();
+    this.pokedex.discardReserved(this.battleCommitOwner?.token ?? "");
     prepared.sourceInvalidated = true;
     prepared.effects = resolveBattleEffects({ seal: null, expectedBinding: {
       battleId, generation: prepared.generation, rawHash: prepared.rawHash,
       contentIdentity: prepared.sourceIdentity ?? "0".repeat(64),
     }, expectedContext: prepared.expectedContext, membersBefore: prepared.before.party });
     delete prepared.next; delete prepared.nextIdentity; delete prepared.defeat;
+    delete prepared.entries;
     prepared.diagnostics = [];
   }
 
@@ -242,18 +251,30 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       return dex?.heldItem?.(id) ?? null;
     });
     this.management = new ManagementSession(this.ports.state, () => this.ports.content().content, { limits: this.limits, depositHeal: this.depositHeal, sourceAllowed: this.capabilities.allowHeldItemSources, describeItem: this.describeHeldItem });
+    this.pokedex = new PokedexOperation({ state: this.battleStatePort, content: this.ports.content, generation: () => this.generation,
+      changed: next => this.inventory?.stateChanged(next), enter: () => {
+        if (this.op || this.battleCommitOwner || this.evolutions?.active || this.learning?.active || this.triggered?.active || this.trade?.active || this.acquisition || this.reception || this.inventory?.active || this.management.active) throw Error("operation-active");
+      } });
     this.inventory = new InventorySession(this.ports.state,()=>this.ports.content().content,{world:ports.itemWorld,variables:ports.variables,limits:this.limits,generation:()=>this.generation,install:next=>this.install(next),
       enter:parent=>{if(this.battleBusy||this.reception)throw new Error('operation-active');if(parent)this.management.reserveChild(parent.token);else if(this.management.active)throw new Error('management-active');},
       leave:parent=>{if(parent)this.management.releaseChild(parent.token);}});
     this.evolutions = new EvolutionOperation({ state: { read: () => this.battleStatePort.read(), replace: next => {
       this.battleStatePort.replace(next); this.inventory.stateChanged(next);
     } }, content: this.ports.content, generation: () => this.generation, limits: this.limits,
-      facts: (member, content) => this.evolutionFacts(member, content) });
+      facts: (member, content) => this.evolutionFacts(member, content), entries: {
+        prepare: (token, before, next, memberId, content) => {
+          const member = locateMember(next, memberId)?.member;
+          const entry = member && this.memberEntry(before, member, content, "evolution");
+          return !!entry && this.pokedex.reserve(token, "evolution", [entry], content);
+        }, activate: token => this.pokedex.activate(token),
+        blocked: token => this.pokedex.view?.parentToken === token,
+        discard: token => this.pokedex.discardReserved(token),
+      } });
     this.learning = new LearningOperation({ read: () => this.battleStatePort.read(), replace: next => {
       this.battleStatePort.replace(next); this.inventory.stateChanged(next);
     } }, this.ports.content, { generation: () => this.generation, world: () => clone(ports.itemWorld?.() ?? {}),
       enter: (parent, intent) => {
-        if (this.op || this.battleCommitOwner || this.evolutions.active || this.triggered?.active || this.trade?.active || this.acquisition || this.reception) throw new Error("operation-active");
+        if (this.op || this.battleCommitOwner || this.evolutions.active || this.triggered?.active || this.trade?.active || this.acquisition || this.reception || this.pokedex.active) throw new Error("operation-active");
         if (parent?.kind === "inventory") {
           if (intent.kind !== "teach" || intent.source.kind !== "machine") throw new Error("invalid-learning-parent");
           this.inventory.reserveLearning(parent.token, intent.memberId, intent.source.entry);
@@ -271,14 +292,14 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     } }, content: this.ports.content, generation: () => this.generation, limits: this.limits, evolutions: this.evolutions,
       world: () => clone(ports.itemWorld?.() ?? {}), facts: (member, content) => this.evolutionFacts(member, content),
       ownsParent: token => this.inventory.owns(token), enter: (parent, memberId) => {
-        if (this.op || this.battleCommitOwner || this.evolutions.active || this.learning.active || this.trade?.active || this.acquisition || this.reception) throw new Error("operation-active");
+        if (this.op || this.battleCommitOwner || this.evolutions.active || this.learning.active || this.trade?.active || this.acquisition || this.reception || this.pokedex.active) throw new Error("operation-active");
         if (parent) this.inventory.reserveEvolution(parent, memberId!);
         else if (this.inventory.active || this.management.active) throw new Error("management-operation-active");
       }, leave: parent => { if (parent) this.inventory.releaseLearning(parent); } });
     this.trade = new TradeOperation({ state: { read: () => this.battleStatePort.read(), replace: next => {
       this.battleStatePort.replace(next); this.inventory.stateChanged(next);
     } }, content: this.ports.content, generation: () => this.generation, limits: this.limits,
-      enter: () => { if (this.op || this.battleCommitOwner || this.evolutions.active || this.learning.active || this.triggered.active || this.acquisition || this.reception || this.inventory.active || this.management.active) throw Error("operation-active"); },
+      enter: () => { if (this.op || this.battleCommitOwner || this.evolutions.active || this.learning.active || this.triggered.active || this.acquisition || this.reception || this.inventory.active || this.management.active || this.pokedex.active) throw Error("operation-active"); },
       world: () => clone(ports.itemWorld?.() ?? {}), facts: (member, content) => this.evolutionFacts(member, content),
       random: this.ports.random, now: () => this.now(), creationContext: this.ports.creationContext,
       allowHeldSources: this.capabilities.allowHeldItemSources, holdable: id => { const item = this.describeHeldItem(id); return !!item?.holdable && !item.mail; } });
@@ -290,6 +311,47 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     catch { const invalid = { status: "invalid" as const, reason: "world-provider-failed" };
       world = { hour: invalid, mapId: invalid, mapMetadata: invalid, weather: invalid, cycling: invalid, surfing: invalid, diving: invalid, beauty: invalid, moveTypes: invalid }; }
     return world;
+  }
+  private memberEntry(before: GameState, member: Readonly<Member>, content: ReturnType<ContentPort>["content"], source: "capture" | "evolution"): DexEntryIntent | null {
+    const appearance = normalizeMemberDexAppearance(content, member, "recent");
+    if (!appearance) return null;
+    const previouslyOwned = before.dex.owned.includes(member.species);
+    return { memberId: member.id, species: member.species, source, previouslyOwned, appearance,
+      offer: dexShouldOfferEntry({ source, previouslyOwned, hasDex: before.dex.hasDex,
+        inUnlockedDex: !!content.regionalDex && dexInUnlockedRegion(before.dex, content.regionalDex, member.species),
+        moreOften: resolveConfig(content.settings).SHOW_NEW_SPECIES_POKEDEX_ENTRY_MORE_OFTEN }) };
+  }
+  get pendingPokedex() { return this.pokedex.view; }
+  updatePokedex(command: DexViewingCommand): DexResolution { return this.pokedex.begin(command); }
+  pokedexSnapshot(text: Readonly<Record<string, string>> = {}, currentRegion: number | null = null) {
+    const generation = this.generation, state = clone(this.ports.state.read()), content = clone(this.ports.content().content);
+    if (generation !== this.generation) throw Error("stale-pokedex-query");
+    const catalog = createDexQueryCatalog(content, text), config = resolveConfig(content.settings);
+    const accessible = dexAccessibleRegions(state.dex, catalog.layout, { useCurrentRegion: config.USE_CURRENT_REGION_DEX, currentRegion });
+    return { generation, dex: state.dex, catalog, accessible, menu: dexMenuEntry(state.dex, accessible, config.USE_CURRENT_REGION_DEX) };
+  }
+  resolvePokedex(token: string, revision: number, decision: DexDecision) {
+    const generation = this.generation, before = this.pokedex.view, outcome = this.pokedex.resolve(token, revision, decision);
+    if (generation !== this.generation) return { status: "refused" as const, reason: "stale-pokedex-operation" };
+    if (outcome.status === "pending" || outcome.status === "refused" || !before) return outcome;
+    if (before.owner === "evolution") {
+      const continuation = this.pendingEvolution;
+      if (continuation && continuation.token === before.parentToken && continuation.phase === "after-evolution") {
+        return { ...outcome, continuation: this.resolveEvolution(continuation.token, continuation.revision, { kind: decision.kind === "technical-terminate" ? "technical-terminate" : "continue-learning" }) };
+      }
+    }
+    const completion = this.dexBattleCompletion;
+    if (before.owner === "capture" && completion && completion.parentToken === before.parentToken && completion.generation === generation) {
+      if (decision.kind === "technical-terminate") this.evolutions.cancelPrepared(completion.parentToken);
+      const continuation = decision.kind === "technical-terminate" ? { status: "technically-terminated" as const, diagnostics: ["首获展示后续已技术终止，已安装主战果保留"] } : this.evolutions.activate(completion.parentToken);
+      if (this.dexBattleCompletion !== completion || generation !== this.generation) return { status: "refused" as const, reason: "stale-pokedex-operation" };
+      const continued = this.evolutionOutcome(completion.outcome, continuation);
+      if (continuation.status === "pending") this.evolutionCompletion = { token: completion.parentToken, generation, outcome: clone(completion.outcome) };
+      this.dexBattleCompletion = null;
+      if (continuation.status !== "pending") this.project(continued);
+      return { ...outcome, continuation: continued };
+    }
+    return outcome;
   }
   get pendingEvolution(): EvolutionView | null { return this.trade?.continuation ?? this.evolutions.view; }
   get pendingLearning() { return this.learning.view; }
@@ -392,7 +454,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       const context = this.newReceptionContext({ profile: options.profile ?? this.profile, decisions: options.decisions ?? {}, nextMemberOrdinal: prepared.state.nextMemberOrdinal });
       this.preparedAcquisitions.set(context, { fingerprint: semanticFingerprint(content), attempted: false, complete: false, entries: [] });
       let completed: ClaimOutcome | undefined;
-      const finish = (next: GameState): ClaimOutcome => { this.noteReception(context, members, next); this.reception = null; return clone(completed!); };
+      const finish = (next: GameState): ClaimOutcome => { this.pokedex.activate(context.token); this.noteReception(context, members, next); this.reception = null; return clone(completed!); };
       const resume = (): ClaimOutcome => {
         try {
           const staged = this.preparedAcquisitions.get(context)!;
@@ -465,7 +527,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       const context = this.newReceptionContext({ decisions: options.decisions ?? {}, profile: silent ? { mode: 1, naming: 1 } : options.profile ?? this.profile, nextMemberOrdinal: nextOrdinal });
       this.preparedAcquisitions.set(context, { fingerprint: semanticFingerprint(content), attempted: false, complete: false, entries: [] });
       let completed: GiftOutcome | undefined;
-      const finish = (next: GameState): GiftOutcome => { this.noteReception(context, [member], next); this.reception = null; return clone(completed!); };
+      const finish = (next: GameState): GiftOutcome => { this.pokedex.activate(context.token); this.noteReception(context, [member], next); this.reception = null; return clone(completed!); };
       const resume = (): GiftOutcome => {
         try {
           const staged = this.preparedAcquisitions.get(context)!;
@@ -512,6 +574,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (errors.length) throw new ReceivingRefused("invalid-acquisition-next", errors[0]!.path + ": " + errors[0]!.message);
     staged.before = clone(before); staged.next = clone(next); staged.entries = clone(entries);
     staged.decisions = semanticFingerprint(context.decisions ?? {});
+    this.pokedex.reserve(context.token, "acquisition", entries, content);
   }
   private installAcquisition(context: ReceptionContext): GameState {
     const staged = this.preparedAcquisitions.get(context); if (!staged?.next || !staged.before || context.generation !== this.generation) throw Error("stale-acquisition");
@@ -552,6 +615,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         ? { status: "already-installed" } : { status: "refused", reason: "resume-installed-acquisition" }; }
       if (stateIdentity(current) !== stateIdentity(staged.before)) return { status: "reload-required", reason: "acquisition-install-indeterminate" };
     }
+    this.pokedex.discardReserved(pending.context.token);
     if (this.reception === pending) this.reception = null;
     return { status: "aborted" };
     } finally { this.receptionActions.delete(pending.context); }
@@ -623,6 +687,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.reception?.context === context) this.reception = null;
     if (this.op?.session && this.battleContexts.get(this.op.session) === context) this.op = null;
     this.terminatedBattles.add(context);
+    this.pokedex.discardReserved(context.token);
     this.evolutions.cancelPrepared(context.token);
     this.battleCommitOwner = null;
     return { status: "aborted" };
@@ -732,6 +797,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.op = null;
     this.battleCommitOwner = null;
     this.evolutions.invalidate(); this.evolutionCompletion = null;
+    this.pokedex.invalidate(); this.dexBattleCompletion = null;
     this.learning.invalidate();
     this.triggered.invalidate();
     this.trade.invalidate();
@@ -846,7 +912,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     return this.commitResultWithContext(clone(result), context);
   }
   private commitResultWithContext(result: BattleResult, context: ReceptionContext): CommitResultStatus {
-    try { return this.commit(result, undefined, context).status; }
+    try { const status = this.commit(result, undefined, context).status; if (status === "applied") this.pokedex.activate(context.token); return status; }
     catch (error) {
       this.assertBattleContext(context);
       if (error instanceof StateInstallFailed || error instanceof ReceivingRefused && error.reason === "pending") {
@@ -949,6 +1015,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       if (!applied || applied.status !== "applied") throw new Error("primary planning failed");
       const composed = composeBattleEffects({ before: prepared.before, primary: applied.state, raw: result, content, effects: prepared.effects, internalBattle: prepared.expectedContext.internalBattle });
       let next = composed.state;
+      prepared.entries = composed.captures.flatMap(capture => {
+        const member = locateMember(next, capture.memberId)?.member;
+        const entry = member && this.memberEntry(prepared!.before, member, content, "capture");
+        return entry ? [{ ...entry, previouslyOwned: capture.previouslyOwned }] : [];
+      });
       const eligibleHp = Object.fromEntries(next.party.map(member => [member.id, member.hp]));
       if (isDefeat(result)) {
         const settled = settleDefeat(next, content, { noMoneyLoss: this.noMoneyLoss, badges: badgeCount(next.badges), moneyLimit: this.limits.money });
@@ -967,6 +1038,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const next = prepared.next!;
     const problems = validateGameContent(next, content);
     if (problems.length) throw new Error(`invalid battle next state: ${problems[0]!.path} ${problems[0]!.message}`);
+      this.pokedex.reserve(context.token, "capture", prepared.entries ?? [], content);
     if (next.inventory.pockets.some(pocket => pocket.length)) assertInventoryMapped(next.inventory, catalogOf(content));
     const latest = this.battleStatePort.read();
     this.assertBattleContext(context, true);
@@ -1011,6 +1083,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.op && this.op.session !== handle) return { code: 0, battleId: request?.battleId ?? null, commit: "none", aborted: true, error: "stale battle session" };
     const ownedOp = this.op?.session === handle ? this.op : null, facts = ownedOp?.facts;
     const remembered = this.battleContexts.get(handle);
+    if (this.dexBattleCompletion) {
+      const pending = this.pokedex.view;
+      if (remembered?.token === this.dexBattleCompletion.parentToken && pending) return { ...clone(this.dexBattleCompletion.outcome), pending: true, continuationToken: pending.token, continuationRevision: pending.revision };
+      return { code: 0, battleId: request?.battleId ?? null, commit: "none", error: "pokedex-operation-active" };
+    }
     if (this.evolutions.active && this.evolutionCompletion) {
       if (remembered?.token === this.evolutionCompletion.token) return this.evolutionOutcome(this.evolutionCompletion.outcome, { status: "pending", view: this.evolutions.view!, diagnostics: [] });
       return { code: 0, battleId: request?.battleId ?? null, commit: "none", error: "evolution-operation-active" };
@@ -1054,6 +1131,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       }
       this.assertBattleContext(context);
       if (committed.status === "applied") {
+        if (this.pokedex.activate(context.token)) {
+          this.dexBattleCompletion = { parentToken: context.token, generation: this.generation, outcome: clone({ ...outcome, result }) };
+          const pending = this.pokedex.view!;
+          return { ...outcome, result, pending: true, continuationToken: pending.token, continuationRevision: pending.revision };
+        }
         const continuation = this.evolutions.activate(context.token);
         const continued = this.evolutionOutcome({ ...outcome, result }, continuation);
         if (continuation.status === "pending") {
@@ -1077,6 +1159,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       if (this.reception?.context === context) this.reception = null;
       if (!this.preparedBattles.get(context)?.indeterminate) this.terminatedBattles.add(context);
       this.evolutions.cancelPrepared(context.token);
+      this.pokedex.discardReserved(context.token);
       if (this.op === ownedOp) this.op = null;
       return this.abortBattle(request, error);
     } finally {
@@ -1094,6 +1177,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       const context = this.op.session ? this.battleContexts.get(this.op.session) : undefined;
       if (context && !this.preparedBattles.get(context)?.indeterminate) {
         this.evolutions.cancelPrepared(context.token);
+        this.pokedex.discardReserved(context.token);
         this.terminatedBattles.add(context);
         if (this.reception?.context === context) this.reception = null;
         if (this.battleCommitOwner === context) this.battleCommitOwner = null;

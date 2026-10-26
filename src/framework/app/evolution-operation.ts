@@ -42,7 +42,7 @@ export type EvolutionResolution = { status: "pending"; view: EvolutionView; diag
   | { status: "refused"; reason: string };
 interface Prefix { state: GameState; cursor: number; selection?: EvolutionSelection; diagnostics: string[] }
 type AfterInstall = { kind: "scan"; prefix: Prefix }
-  | { kind: "evolved"; memberId: string; moves: string[] }
+  | { kind: "evolved"; memberId: string; moves: string[]; entry?: boolean }
   | { kind: "learned" }
   | { kind: "cancelled" };
 interface Operation {
@@ -65,6 +65,8 @@ export class EvolutionOperation {
     state: GameStatePort; content: ContentPort; generation: () => number;
     facts: (member: Readonly<Member>, content: Content) => EvolutionFacts;
     limits: Limits;
+    entries?: { prepare: (token: string, before: GameState, next: GameState, memberId: string, content: Content) => boolean;
+      activate: (token: string) => boolean; blocked: (token: string) => boolean; discard: (token: string) => void };
   };
   constructor(ports: EvolutionOperation["ports"]) { this.ports = ports; }
   get active(): boolean { return this.operation !== null; }
@@ -154,7 +156,7 @@ export class EvolutionOperation {
   }
   private pending(op: Operation): EvolutionResolution { this.assertCurrent(op); return { status: "pending", view: this.view!, diagnostics: [...op.diagnostics] }; }
   private complete(op: Operation, terminated = false): EvolutionResolution {
-    this.assertCurrent(op); this.operation = null;
+    this.assertCurrent(op); this.ports.entries?.discard(op.seed.token); this.operation = null;
     return { status: terminated ? "technically-terminated" : "complete", diagnostics: [...op.diagnostics], ...(op.progress ? { progress: { ...op.progress } } : {}) };
   }
   resolve(token: string, revision: number, decision: EvolutionDecision, authorizeWrite?: () => void): EvolutionResolution {
@@ -162,6 +164,7 @@ export class EvolutionOperation {
     if (!op?.activated || op.seed.token !== token || op.seed.generation !== this.ports.generation()) return { status: "refused", reason: "stale-operation" };
     if (op.revision !== revision) return { status: "refused", reason: "stale-decision" };
     if (this.resolving) return { status: "refused", reason: "evolution-resolution-active" };
+    if (this.ports.entries?.blocked(token)) return { status: "refused", reason: "pokedex-presentation-active" };
     this.resolving = true; this.authorizeWrite = authorizeWrite;
     try {
       if (decision.kind === "technical-terminate") return this.terminate(op);
@@ -214,6 +217,11 @@ export class EvolutionOperation {
     } finally { this.resolving = false; this.authorizeWrite = undefined; }
   }
   private write(op: Operation, before: GameState, next: GameState, after: AfterInstall): EvolutionResolution {
+    // Draft trades own their private Info projection. Ordinary entries are reserved while this same owner is held.
+    if (after.kind === "evolved" && !("selected" in op.seed && op.seed.deferLearning)) {
+      after.entry = this.ports.entries?.prepare(op.seed.token, before, next, after.memberId, this.content(op)) ?? false;
+      this.assertCurrent(op);
+    }
     op.pendingWrite = { before: clone(before), next: clone(next), after, attempted: false };
     return this.install(op);
   }
@@ -252,7 +260,7 @@ export class EvolutionOperation {
     if (after.kind === "evolved") {
       if (op.progress) op.progress.evolved = true;
       op.selection = undefined; op.learning = { memberId: after.memberId, moves: after.moves, cursor: 0, answers: [] };
-      if ("selected" in op.seed && op.seed.deferLearning) { op.deferLearning = true; return this.pending(op); }
+      if (after.entry && this.ports.entries?.activate(op.seed.token) || "selected" in op.seed && op.seed.deferLearning) { op.deferLearning = true; return this.pending(op); }
       return this.learn(op, state, this.content(op));
     }
     if (after.kind === "learned") { op.learning!.cursor++; op.learning!.answers = []; delete op.learning!.pending; return this.learn(op, state, this.content(op)); }
