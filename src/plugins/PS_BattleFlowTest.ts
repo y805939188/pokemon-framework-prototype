@@ -1945,7 +1945,53 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     });
   }
 
+  async function runLearningTransactions() {
+    await toMap();
+    await scenario("E53-L1 real MZ: TR learning commits once under inventory child, interpreter and save guards", async () => {
+      fresh(); const B = api(), content = clone(W.PSFlow.content()), id = game().party[0].id;
+      const move = B.dex.createDexLookup().move("gust"); assert(move?.id && move.pp, "pinned Gen8 move data"); content.moves[move.name] = move;
+      const species = B.speciesKey.speciesDataOf(content,game().party[0]); species.tutorMoves = [move.name]; species.learnset = {1:["Tackle","Rest"]};
+      for (const name of ["tackle","rest"]) { const m = B.dex.createDexLookup().move(name); content.moves[m.name] = m; }
+      for (const [itemId,fieldUse] of [["host-study-tr","tr"],["host-study-hm","hm"]]) content.items[itemId] = { ...content.items.potion, id:itemId, name:itemId, namePlural:itemId, pocket:4, flags:[], fieldUse, battleUse:"none", battleId:undefined, legacyIds:[], consumable:fieldUse==="tr", move:move.id };
+      content.settings = { ...(content.settings ?? {}), TAUGHT_MACHINES_KEEP_OLD_PP: true };
+      const authored = clone(content); delete authored.meta; const inputsHash = B.digest.sha256Hex(B.contentCompile.canonicalJson(authored));
+      content.meta = { ...content.meta, kind:"fixture", id:"host-learning", inputsHash, contentIdentity:B.digest.sha256Hex(B.contentCompile.canonicalJson({compiledSemantics:content.meta.compiledSemantics,inputsHash,showdownSha:content.meta.showdownSha})) };
+      W.PSFlow._content = content; W.PSFlow._app = null; game().inventory = B.inventory.addItems(game().inventory,"host-study-tr",2,content.items,B.inventory.inventoryPolicy(content));
+      const app = W.PSFlow.app(), before = clone(game()), token = app.beginInventoryOperation("bag");
+      const started = W.PSFlow.beginLearning({kind:"teach",memberId:id,source:{kind:"machine",itemId:"host-study-tr",entry:"bag"}},{kind:"inventory",token}); eq(started.status,"pending","four old moves require one decision");
+      const waiter = new G.Game_Interpreter(); waiter.setWaitMode("psLearning"); waiter._psLearningToken = started.view.token;
+      assert(waiter.updateWaitMode() && app.saveBlocked && !G.$gameSystem.isSaveEnabled(),"actual interpreter and save remain blocked");
+      let saveRefused = false; try { await G.DataManager.saveGame(58); } catch { saveRefused = true; } assert(saveRefused,"actual direct save refuses pending lesson");
+      eq(app.endInventoryOperation(token).reason,"child-operation-active","parent cannot release child");
+      const decision = {kind:"learn",answer:{kind:"replace",slot:0}},done=W.PSFlow.resolveLearning(started.view.token,started.view.revision,decision);eq(done.status,"committed","complete pure plan installed");
+      eq(game().party[0].moves[0],{id:move.id,pp:Math.min(before.party[0].moves[0].pp,move.pp),maxpp:move.pp,ppUps:0},"replacement PP contract");
+      eq(B.inventory.itemQuantity(game().inventory,"host-study-tr",content.items),1,"TR consumed once");eq(game().stats.moves_taught_by_item,before.stats.moves_taught_by_item+1,"wrapper statistic once");assert(game().party[0].firstMoves.includes(move.id),"TR first record kept");
+      const after=clone(game());eq(W.PSFlow.resolveLearning(started.view.token,started.view.revision,decision),done,"duplicate result receipt");eq(game(),after,"duplicate zero write");assert(!waiter.updateWaitMode()&&!app.saveBlocked,"only completed lesson releases waiting/save mask");app.endInventoryOperation(token);
+      await G.DataManager.saveGame(58); fs.writeFileSync(path.join(path.dirname(OUT||"."),"ps-flow-expected-learning.json"),JSON.stringify({slot:58,state:clone(game()),content}));await shot("E53-L1-learning-complete");
+      return {input:"real MZ interpreter/save and application bridge, synthetic direct lesson decision; no formal G screen",slot:58,saveRefused,remaining:1};
+    });
+    await scenario("E53-L2 real MZ: independent HM forgetting, reminder and last-move refusal keep exact state",async()=>{
+      assert(fs.existsSync(path.join(path.dirname(OUT||"."),"ps-flow-expected-learning.json")),"prerequisite L1 produced its learning save and content fixture");
+      const app=W.PSFlow.app(),id=game().party[0].id;eq(W.PSFlow.beginLearning({kind:"forget",memberId:id}).status,"pending","independent viewing");let p=app.pendingLearning;
+      eq(W.PSFlow.resolveLearning(p.token,p.revision,{kind:"forget",slot:0}).status,"committed","independent forgetting allows HM");assert(!game().party[0].moves.some((m:any)=>m.id==="gust"),"HM removed");
+      const before=game().stats.moves_taught_by_reminder;eq(W.PSFlow.beginLearning({kind:"relearn",memberId:id}).status,"pending","reminder candidates");p=app.pendingLearning;assert(p.selection.candidates.includes("tackle"),"actual level-table candidate");
+      eq(W.PSFlow.resolveLearning(p.token,p.revision,{kind:"relearn",answer:{kind:"select",moveId:"tackle",teach:true}}).status,"committed","reminder empty slot succeeds");eq(game().stats.moves_taught_by_reminder,before+1,"reminder statistic once");
+      game().party[0].moves=[{id:"tackle",pp:35,maxpp:35,ppUps:0}];const exact=clone(game());eq(W.PSFlow.beginLearning({kind:"forget",memberId:id}).status,"pending","last move still viewable");p=app.pendingLearning;
+      eq(W.PSFlow.resolveLearning(p.token,p.revision,{kind:"forget",slot:0}).reason,"last-move","cannot remove last move");eq(game(),exact,"refusal changes nothing");p=app.pendingLearning;eq(W.PSFlow.resolveLearning(p.token,p.revision,{kind:"forget",slot:null}).status,"cancelled","view can leave");assert(!app.saveBlocked,"no stuck owner");
+      await G.DataManager.saveGame(59);const file=path.join(path.dirname(OUT||"."),"ps-flow-expected-learning.json"),expected=JSON.parse(fs.readFileSync(file,"utf8"));expected.reminderCase={slot:59,state:clone(game())};fs.writeFileSync(file,JSON.stringify(expected));
+      return {input:"real MZ application and save; direct reminder/forget answers and explicit one-move fixture",slot:59};
+    });
+  }
+
   async function verifySave() {
+    if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-learning.json"))) {
+      await scenario("E53-LV1 fresh NW: TR/moves/firstMoves/statistics and reminder/forget saves round trip",async()=>{
+        const expected=readExpected("ps-flow-expected-learning.json");W.PSFlow._content=expected.content;W.PSFlow._app=null;G.DataManager.setupNewGame();await G.DataManager.loadGame(expected.slot);
+        eq(game(),expected.state,"complete machine result across new process");assert(!W.PSFlow.app().pendingLearning&&!W.PSFlow.app().saveBlocked,"transient lesson not recreated");
+        assert(expected.reminderCase,"producer supplied reminder/forget save");await G.DataManager.loadGame(expected.reminderCase.slot);eq(game(),expected.reminderCase.state,"reminder/forget exact round trip");assert(!W.PSFlow.app().pendingLearning,"no saved workflow");
+        return {input:"fresh actual NW/MZ load API, no original in-memory receipt",slots:[expected.slot,expected.reminderCase.slot]};
+      });return;
+    }
     if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-postbattle.json"))) {
       await scenario("E53-V1 new NW process: evolved species/move and original ledger survive; no continuation rebuilt", async () => {
         const expected = readExpected("ps-flow-expected-postbattle.json"); W.PSFlow._content = expected.content; W.PSFlow._app = null;
@@ -2119,7 +2165,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       try { startAt.call(this); } finally { fs.readFileSync = read; }
     } else startAt.call(this);
     setTimeout(async () => {
-      try { if (mode === "postbattle") await runPostbattleEvolution(); else if (mode === "progression-data") await runProgressionData(); else if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
+      try { if (mode === "learning") await runLearningTransactions(); else if (mode === "postbattle") await runPostbattleEvolution(); else if (mode === "progression-data") await runProgressionData(); else if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       try { report.contentIdentity = W.PSFlow.content().meta; } catch (e) { report.contentIdentity = { error: String(e) }; }
       try { report.logTail = W.PSFlow.logger ? W.PSFlow.logger.tail(60) : null; } catch (e) { report.logTail = { error: String(e) }; } // redacted, bounded session diagnostics
