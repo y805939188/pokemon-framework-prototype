@@ -155,7 +155,7 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
     const current=root(r.application);if(current?.owner===r.owner)open(request());else if(!r.owner&&r.event&&!current)open(request(r.event));else G.$gameMessage?.add(tr('ended'));
    }
   }
-  if(ui.automatic&&scene instanceof G.Scene_Map&&!active&&!reserved&&!queued&&!this.isSceneChanging()&&!G.$gameMessage?.isBusy?.()&&!W.PSInventory?.current()&&!W.PSManagement?.current()&&!W.PSProgression?.current()){
+  if(ui.automatic&&scene instanceof G.Scene_Map&&scene.isStarted()&&!active&&!reserved&&!queued&&!this.isSceneChanging()&&!G.$gameMessage?.isBusy?.()&&!W.PSInventory?.current()&&!W.PSManagement?.current()&&!W.PSProgression?.current()){
    const r=request();if(r&&!suppressed.has(r.generation+':'+r.owner))open(r);
   }return value;
  };

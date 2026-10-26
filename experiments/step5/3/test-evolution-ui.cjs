@@ -73,3 +73,7 @@ test('G2a reconstructed class with no request reports safely; stale finished upd
  const w=setup();let callback;w.G.$gameMessage.setChoices=()=>{};w.G.$gameMessage.setChoiceCallback=fn=>callback=fn;w.begin();w.ready();const old=w.manager._scene,C=old.constructor;old.terminate();w.manager._scene=new C();w.manager._scene.create();assert.equal(callback,undefined);w.tick();assert(!w.app.saveBlocked);
  const x=setup(),r=x.begin();x.ready();const prior=x.manager._scene;prior.terminate();let pops=0;const pop=prior.popScene;prior.popScene=()=>pops++;x.manager.isSceneChanging=()=>true;prior.update();assert.equal(pops,0);prior.popScene=pop;assert(r.done);
 });
+
+test('G2a automatic transfer waits for Map start before stopping its message-window lifecycle',async()=>{
+ const w=setup({entries:[{method:'Level',parameter:51,target:'Blastoise'}]});await w.finish();const map=new w.G.Scene_Map();let started=false;map.isStarted=()=>started;w.manager._scene=map;w.tick();assert.equal(w.p(),null);assert(w.app.pendingEvolution&&w.app.saveBlocked);started=true;w.tick();assert(w.p());w.manager._scene.terminate();assert(!w.app.saveBlocked);
+});
