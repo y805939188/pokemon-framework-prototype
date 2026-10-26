@@ -8,6 +8,7 @@ import { moneyCap } from "./economy.ts";
 import { inventoryFromBag, applyBattleBag, inventoryPolicy } from "./inventory.ts";
 import { catalogOf } from "./item-catalog.ts";
 import { mergeBattleMoves } from "./member-metadata.ts";
+import { memberContentProblems } from "./member-content.ts";
 import type { Inventory } from "./inventory.ts";
 import { clone } from "./value.ts";
 export { clone } from "./value.ts";
@@ -209,6 +210,12 @@ function applyResult(state: GameState, result: BattleResult, limits: Limits, key
   }
   next.inventory = applyBattleBag(next.inventory, result.bag || {}, catalogOf(options.content), inventoryPolicy(options.content, limits));
   const received = capturedTemplates(result, options.templates ?? {}, keys, options.content);
+  // Normal application reception must finish resource-reference validation before it can ask for decisions or
+  // authorize a source lookup. The legacy wrapper retains its explicitly supported minimal-content harness.
+  if (!rawDex && options.content) for (const member of received) {
+    const problems = memberContentProblems(member, options.content, `captured.${member.id}`);
+    if (problems.length) throw new Error(`invalid captured member: ${problems[0]!.path} ${problems[0]!.message}`);
+  }
   if (result.dex) {
     for (const list of ["seen", "owned"] as const) for (const name of result.dex[list] || []) {
       const k = keys(name);

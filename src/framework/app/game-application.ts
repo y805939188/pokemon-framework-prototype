@@ -646,6 +646,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.assertBattleContext(context);
     const authority = handle ? this.ownedBattleEffects.get(handle) : undefined;
     if (authority && authority.battleId !== result.battleId) throw new Error("battle-result-owner-mismatch");
+    // read() is a synchronous host port and may call back into the application. Reserve before the first read,
+    // including exact replay, so no other operation can take a stale snapshot in that callback window.
+    if (this.battleCommitOwner && this.battleCommitOwner !== context) throw new Error("battle-commit-active");
+    if (this.op && (!handle || this.op.session !== handle)) throw new Error("battle-active");
+    this.battleCommitOwner = context;
     const code = outcomeCode(result), hash = resultHash(result), current = this.ports.state.read();
     this.assertBattleContext(context);
     let prepared = this.preparedBattles.get(context);
@@ -661,8 +666,6 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       // Exact replay is content-independent and never fetches a newer effects seal.
       return { status: "already-applied" };
     }
-    if (this.battleCommitOwner && this.battleCommitOwner !== context) throw new Error("battle-commit-active");
-    this.battleCommitOwner = context;
     // This fresh-only closed-source guard must not load current content or an external item catalog.
     assertCapturedHeldSources(result.captured, context.templates ?? {}, { allowed: this.capabilities.allowHeldItemSources, describe: this.describeHeldItem });
     const { content } = this.ports.content(), identity = validatedContentIdentity(content);
@@ -711,6 +714,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       if (!prepared.sourceInvalidated && prepared.sourceIdentity !== identity) {
         this.invalidatePreparedSource(prepared, result.battleId);
       }
+      // Reception may return pending before an install exists. It must still observe any content replacement
+      // made by the one source callback; returning to the old identity later cannot revive that old authority.
+      const afterSourceIdentity = validatedContentIdentity(this.ports.content().content);
+      this.assertBattleContext(context, true);
+      if (!prepared.sourceInvalidated && prepared.sourceIdentity !== afterSourceIdentity) this.invalidatePreparedSource(prepared, result.battleId);
       if (receiving) throw receiving;
       if (!applied || applied.status !== "applied") throw new Error("primary planning failed");
       const composed = composeBattleEffects({ before: prepared.before, primary: applied.state, raw: result, content, effects: prepared.effects, internalBattle: prepared.expectedContext.internalBattle });

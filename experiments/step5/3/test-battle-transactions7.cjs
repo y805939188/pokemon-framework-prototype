@@ -19,11 +19,11 @@ function fakeFactory(builder,friendAfter=100){
   }};return f;
 }
 const capture=({request,game,setup})=>raw(request.battleId,{outcome:{kind:'caught',winner:null,target:setup.foes[0].id,ball:'masterball'},members:{[game.party[0].id]:{exp:game.party[0].exp+5}},bag:{masterball:-1},captured:[E.state.protocolMember({...setup.foes[0],ball:'masterball'})],dex:{seen:setup.foes.map(m=>m.species),owned:[setup.foes[0].species]}});
-function world({strong=true,builder=capture,initial,friendAfter=100,real=false,port}={}){
+function world({strong=true,builder=capture,initial,friendAfter=100,real=false,port,profile}={}){
  let c=content(strong),blocked=false;const g=initial??E.fixtures.makeGame();g.party[0].friendship=99;const state=E.fakes.createMemoryState(g);
  const sessions=real?E.composition.createBattleSessionFactory({content:()=>c,seed:()=>[1,2,3,4]}):fakeFactory(builder,friendAfter);
  const projection=E.fakes.createRecordingProjection();const statePort=port?port(state):state;
- const app=new E.app.GameApplication({state:statePort,sessions,projection,content:()=>{if(blocked)throw Error('current content deliberately unavailable');return {content:c};},random:n=>0,clock:()=>0,itemWorld:()=>({mapId:123})},{receivingProfile:{mode:1,naming:1}});
+ const app=new E.app.GameApplication({state:statePort,sessions,projection,content:()=>{if(blocked)throw Error('current content deliberately unavailable');return {content:c};},random:n=>0,clock:()=>0,itemWorld:()=>({mapId:123})},{receivingProfile:profile??{mode:1,naming:1}});
  return {app,state,sessions,projection,content:()=>c,setContent:v=>{c=v;},blockContent:()=>{blocked=true;},request:{battleId:'transaction-1',kind:'wild',seq:1,foes:[{species:'Pidgey',level:5}]}};
 }
 test('E2a real default session installs acknowledged friendship, capture, XP, forms/count and original hash once',async()=>{
@@ -118,4 +118,37 @@ test('E2a a zero-write failed install can revalidate new content without resurre
  changed.meta.inputsHash='3'.repeat(64);changed.meta.contentIdentity=E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics:2,inputsHash:changed.meta.inputsHash,showdownSha:sourceSha}));w.state.failReplace=Error('synthetic zero-write failure');
  const first=w.app.finishBattle(h,w.request);assert.equal(first.pending,true);w.setContent(changed);assert.equal(w.app.resolveReceiving(first.receivingToken).pending,true);assert.equal(w.state.replaced.length,0);assert.equal(w.sessions.calls,1);
  w.setContent(original);w.state.failReplace=null;assert.equal(w.app.resolveReceiving(first.receivingToken).commit,'applied');assert.equal(w.state.replaced.length,1);assert.equal(w.sessions.calls,1);assert.equal(w.state.current().party[0].friendship,99);assert.deepEqual([w.state.current().party[0].readyToEvolve,w.state.current().party[0].evolutionReadiness],[true,'unknown']);
+});
+test('E2a source identity is checked before nickname or placement pending; return to A never revives old authority',async()=>{
+ for(const kind of ['nickname','placement'])for(const variant of ['stay-B','return-A','unchanged']){
+  const initial=E.fixtures.makeGame();initial.party[0].readyToEvolve=true;initial.party[0].evolutionReadiness='known';
+  if(kind==='placement')while(initial.party.length<6)initial.party.push({...clone(initial.party[0]),id:'P-extra-'+initial.party.length});
+  const w=world({initial,profile:kind==='nickname'?{mode:1,naming:0}:{mode:0,naming:1}}),A=w.content(),B=clone(A);
+  B.meta.inputsHash='4'.repeat(64);B.meta.contentIdentity=E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics:2,inputsHash:B.meta.inputsHash,showdownSha:sourceSha}));
+  const effects=w.sessions.effects;w.sessions.effects=(...args)=>{const seal=effects(...args);if(variant!=='unchanged')w.setContent(B);return seal;};
+  const h=await w.app.startBattle(w.request),r=h.result(),id=r.captured[0].id,before=clone(w.state.current()),pending=w.app.finishBattle(h,w.request);
+  assert.equal(pending.pending,true);assert.equal(w.state.replaced.length,0);assert.deepEqual(w.state.current(),before);assert.equal(w.sessions.calls,1);assert.equal(w.app.saveBlocked,true);
+  if(variant==='return-A')w.setContent(A);const done=w.app.resolveReceiving(pending.receivingToken,{[id]:kind==='nickname'?{nickname:{kind:'keep'}}:{placement:{kind:'box'}}});
+  assert.equal(done.commit,'applied');assert.equal(w.sessions.calls,1);assert.equal(w.state.replaced.length,1);assert.equal(w.state.current().party[0].friendship,variant==='unchanged'?100:99);assert.equal(w.state.current().party[0].evolutionReadiness,variant==='unchanged'?'known':'unknown');assert(w.state.current().party[0].exp>before.party[0].exp);assert.equal(w.state.current().appliedBattles[r.battleId].hash,E.state.resultHash(r));assert.equal(w.app.saveBlocked,false);
+ }
+});
+test('E2a invalid captured resource references are refused before pending/source on owned and public fresh paths',async()=>{
+ for(const kind of ['nickname','placement'])for(const publicCommit of [false,true]){
+  const initial=E.fixtures.makeGame();if(kind==='placement')while(initial.party.length<6)initial.party.push({...clone(initial.party[0]),id:'P-extra-'+initial.party.length});
+  const w=world({initial,profile:kind==='nickname'?{mode:1,naming:0}:{mode:0,naming:1},builder:x=>{const r=capture(x);r.outcome.ball='not-in-content';r.captured[0].ball='not-in-content';return r;}}),h=await w.app.startBattle(w.request),r=h.result(),rawBefore=clone(r),before=clone(w.state.current());
+  if(publicCommit){const foe=w.sessions.created[0].setup.foes[0],template=E.speciesKey.toPersistentMember(foe,w.content());w.app.abortBattle(w.request,Error('switch to public result'));assert.throws(()=>w.app.commitResult(r,{templates:{[foe.id]:template}}),/unmapped capture ball/);}
+  else{const o=w.app.finishBattle(h,w.request);assert.equal(o.commit,'none');assert.equal(o.pending,undefined);assert.match(o.error,/unmapped capture ball/);}
+  assert.equal(w.sessions.calls,0);assert.equal(w.state.replaced.length,0);assert.deepEqual(w.state.current(),before);assert.deepEqual(r,rawBefore);assert.equal(w.app.pendingReceiving,null);assert.equal(w.app.saveBlocked,false);
+ }
+ for(const resource of ['ability','firstMoves']){
+  const w=world(),h=await w.app.startBattle(w.request),r=h.result(),foe=w.sessions.created[0].setup.foes[0],template=E.speciesKey.toPersistentMember(foe,w.content());
+  template[resource]=resource==='ability'?'not-in-content':['not-in-content'];w.app.abortBattle(w.request,Error('switch to public resource test'));
+  assert.throws(()=>w.app.commitResult(r,{templates:{[foe.id]:template},profile:{mode:1,naming:0}}),/unmapped ability|unmapped first move/);assert.equal(w.state.replaced.length,0);assert.equal(w.app.saveBlocked,false);
+ }
+});
+test('E2a direct commit owns the first read callback; new battle and management cannot take its old snapshot',async()=>{
+ let w,armed=false,attempt,management,heal;w=world({builder:x=>{const r=capture(x);r.members[x.game.party[0].id].hp=x.game.party[0].hp;return r;},port:state=>({read:()=>{if(armed){armed=false;assert.equal(w.app.saveBlocked,true);attempt=w.app.startBattle(w.request).then(handle=>({handle}),error=>({error}));try{w.app.beginManagement();}catch(error){management=error;}heal=w.app.healParty();}return state.read();},replace:next=>state.replace(next)})});
+ const id=w.state.current().party[0].id;armed=true;assert.equal(w.app.commitResult(raw('exclusive-first-read',{members:{[id]:{hp:1}},money:7})),'applied');
+ const competing=await attempt;assert(competing.error);assert.equal(competing.handle,undefined);assert.match(management.message,/operation-active/);assert.equal(heal.status,'refused');assert.equal(w.state.replaced.length,1);assert.equal(w.state.current().party[0].hp,1);assert.equal(w.app.saveBlocked,false);
+ const fresh=await w.app.startBattle(w.request);assert.equal(w.sessions.created[0].game.party[0].hp,1);assert.equal(w.app.finishBattle(fresh,w.request).commit,'applied');assert.equal(w.state.current().party[0].hp,1);assert.equal(w.state.replaced.length,2);assert.equal(w.app.saveBlocked,false);
 });
