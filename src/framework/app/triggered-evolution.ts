@@ -65,9 +65,9 @@ export class TriggeredEvolutionOperation {
   get view(): TriggeredEvolutionView | null {
     const op = this.operation; if (!op) return null;
     const evolution = this.options.evolutions.view;
-    return clone({ token: op.token, revision: op.revision, kind: op.kind, phase: op.error ? "failed" : evolution ? "evolution" : "growth",
+    return clone({ token: op.token, revision: op.revision, kind: op.kind, phase: op.error || evolution?.phase === "failed" ? "failed" : evolution ? "evolution" : "growth",
       ...(op.selection ? { selection: op.selection } : {}), ...(evolution ? { evolution } : {}),
-      ...(op.error ? { error: op.error, reloadRequired: op.reloadRequired } : {}) });
+      ...(op.error || evolution?.error ? { error: op.error ?? evolution?.error, reloadRequired: op.reloadRequired || evolution?.reloadRequired } : {}) });
   }
   invalidate(): void { const op = this.operation; this.operation = null; this.receipts.clear(); this.receiptParent = ""; if (op) this.options.leave(op.parent); }
   private current(op: Operation): void { if (this.operation !== op || op.generation !== this.options.generation()) throw Error("stale-triggered-evolution"); }
@@ -255,12 +255,11 @@ export class TriggeredEvolutionOperation {
     catch (error) { return this.failure(op, error); } finally { this.resolving = false; }
   }
   private resolveContinuationInner(op: Operation, revision: number, decision: EvolutionDecision): TriggeredEvolutionOutcome {
-    if (decision.kind !== "technical-terminate") {
-      // Until the selected body is committed, authority still belongs to the exact state/world that selected it.
+    if (decision.kind !== "technical-terminate") this.content(op);
+    const result = this.options.evolutions.resolve(op.selected!.token, revision, decision, () => {
+      // The child first proves before/next. Never mistake an installed body with lost readback for stale authority.
       if (!this.options.evolutions.selectedBodyCommitted) this.fresh(op, op.selected!.before);
-      else this.content(op);
-    }
-    const result = this.options.evolutions.resolve(op.selected!.token, revision, decision); this.current(op);
+    }); this.current(op);
     if (result.status === "refused") return result;
     op.revision++; if (result.status === "pending") { op.error = undefined; return this.pending(op); }
     const selected = op.selected!;

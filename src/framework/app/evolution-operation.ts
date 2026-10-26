@@ -46,7 +46,7 @@ type AfterInstall = { kind: "scan"; prefix: Prefix }
 interface Operation {
   seed: BattleEvolutionSeed | SelectedEvolutionSeed; identity: string; ids: string[]; cursor: number; activated: boolean; revision: number;
   selection?: EvolutionSelection; learning?: { memberId: string; moves: string[]; cursor: number; answers: LearningAnswer[]; pending?: LearningPending };
-  pendingWrite?: { before: GameState; next: GameState; after: AfterInstall };
+  pendingWrite?: { before: GameState; next: GameState; after: AfterInstall; attempted: boolean };
   error?: string; reloadRequired: boolean; diagnostics: string[];
   progress?: { evolved: boolean; cancelled: boolean };
 }
@@ -57,6 +57,7 @@ const message = (error: unknown): string => error instanceof Error ? error.messa
 export class EvolutionOperation {
   private operation: Operation | null = null;
   private resolving = false;
+  private authorizeWrite: (() => void) | undefined;
   private readonly ports: {
     state: GameStatePort; content: ContentPort; generation: () => number;
     facts: (member: Readonly<Member>, content: Content) => EvolutionFacts;
@@ -153,12 +154,12 @@ export class EvolutionOperation {
     this.assertCurrent(op); this.operation = null;
     return { status: terminated ? "technically-terminated" : "complete", diagnostics: [...op.diagnostics], ...(op.progress ? { progress: { ...op.progress } } : {}) };
   }
-  resolve(token: string, revision: number, decision: EvolutionDecision): EvolutionResolution {
+  resolve(token: string, revision: number, decision: EvolutionDecision, authorizeWrite?: () => void): EvolutionResolution {
     const op = this.operation;
     if (!op?.activated || op.seed.token !== token || op.seed.generation !== this.ports.generation()) return { status: "refused", reason: "stale-operation" };
     if (op.revision !== revision) return { status: "refused", reason: "stale-decision" };
     if (this.resolving) return { status: "refused", reason: "evolution-resolution-active" };
-    this.resolving = true;
+    this.resolving = true; this.authorizeWrite = authorizeWrite;
     try {
       if (decision.kind === "technical-terminate") return this.terminate(op);
       if (op.pendingWrite) {
@@ -201,10 +202,10 @@ export class EvolutionOperation {
     } catch (error) {
       if (this.operation !== op || op.seed.generation !== this.ports.generation()) return { status: "refused", reason: "stale-operation" };
       op.error = message(error); op.revision++; return this.pending(op);
-    } finally { this.resolving = false; }
+    } finally { this.resolving = false; this.authorizeWrite = undefined; }
   }
   private write(op: Operation, before: GameState, next: GameState, after: AfterInstall): EvolutionResolution {
-    op.pendingWrite = { before: clone(before), next: clone(next), after };
+    op.pendingWrite = { before: clone(before), next: clone(next), after, attempted: false };
     return this.install(op);
   }
   private install(op: Operation): EvolutionResolution {
@@ -216,6 +217,10 @@ export class EvolutionOperation {
     if (problems.length) { op.error = `invalid-evolution-next:${problems[0]!.path}:${problems[0]!.message}`; op.revision++; return this.pending(op); }
     this.assertCurrent(op);
     let failure: unknown;
+    // The owner guards only a new write. Exact next-state acknowledgement must remain available after lost readback.
+    pending.attempted = false;
+    this.authorizeWrite?.(); this.assertCurrent(op);
+    pending.attempted = true;
     try { this.ports.state.replace(clone(pending.next)); } catch (error) { failure = error; }
     let actual: GameState;
     try { actual = this.ports.state.read(); } catch (error) { op.reloadRequired = true; op.error = message(error); op.revision++; return this.pending(op); }
@@ -276,6 +281,8 @@ export class EvolutionOperation {
     return op.selection ? this.pending(op) : this.complete(op);
   }
   private terminate(op: Operation): EvolutionResolution {
+    // A rejected owner gate has made no write; discard the local plan without touching intervening external state.
+    if (op.pendingWrite && !op.pendingWrite.attempted) return this.complete(op, true);
     if (op.pendingWrite) {
       const state = this.ports.state.read(); this.assertCurrent(op);
       if (identity(state) === identity(op.pendingWrite.next)) {
