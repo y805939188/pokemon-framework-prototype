@@ -1891,7 +1891,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       const inputsHash = B.digest.sha256Hex(B.contentCompile.canonicalJson(authored));
       content.meta = { ...content.meta, kind: "fixture", id: "host-postbattle", inputsHash,
         contentIdentity: B.digest.sha256Hex(B.contentCompile.canonicalJson({ compiledSemantics: content.meta.compiledSemantics, inputsHash, showdownSha: content.meta.showdownSha })) };
-      W.PSFlow._content = content; W.PSFlow._app = null;
+      W.PSFlow._content = content; W.PSFlow._app = null; W.PSFlow.rng = () => 0;
       game().party[0].moves = moves.slice(0,4).map((move: any) => ({ id: move.id, pp: move.pp, maxpp: move.pp, ppUps: 0 }));
       const request = { battleId: "host-postbattle-K3", kind: "wild", foes: [{ species: target, level: 50 }], seq: 7 };
       W.PSFlow.openBattle(request); await inMode("main"); const handle = battle()._session, app = W.PSFlow.app();
@@ -1918,6 +1918,31 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       await shot("E53-P1-postbattle-complete");
       return { input: "real scene and synthetic DOM battle choices, actual gateway K3, explicit core continuation answers, real MZ interpreter/save", critical: seal.observer.members[id].critical, slot: 56, evolutionCount: game().stats.evolution_count, saveRefused };
     });
+    await scenario("E53-P2 real battle scene: four actual Tackle losses earn durable R in the primary install", async () => {
+      fresh(); const B = api(), content = clone(W.PSFlow.content()), id = game().party[0].id, target = game().party[1].species;
+      const splash = B.dex.createDexLookup().move("splash"); content.moves[splash.name] = splash;
+      B.speciesKey.speciesDataOf(content, game().party[0]).evolutions = [{ method: "EventAfterDamageTaken", parameter: 7, target }];
+      B.speciesKey.speciesDataOf(content, game().party[0]).learnset = { 1: [splash.name] };
+      B.speciesKey.speciesDataOf(content, game().party[1]).learnset = { 1: ["Tackle"] };
+      const authored = clone(content); delete authored.meta;
+      const inputsHash = B.digest.sha256Hex(B.contentCompile.canonicalJson(authored));
+      content.meta = { ...content.meta, id: "host-postbattle-D60", inputsHash,
+        contentIdentity: B.digest.sha256Hex(B.contentCompile.canonicalJson({ compiledSemantics: content.meta.compiledSemantics, inputsHash, showdownSha: content.meta.showdownSha })) };
+      W.PSFlow._content = content; W.PSFlow._app = null; W.PSFlow.rng = () => 0;
+      game().party[0].moves = [{ id: splash.id, pp: splash.pp, maxpp: splash.pp, ppUps: 0 }]; const hpBefore = game().party[0].hp;
+      const request = { battleId: "host-postbattle-D60", kind: "wild", foes: [{ species: target, level: 50 }], seq: 8 };
+      W.PSFlow.openBattle(request); await inMode("main"); const handle = battle()._session;
+      for (let turn = 0; turn < 4; turn++) { await choose(/^Fight/); await inMode("moves"); await choose(/splash/i); await inMode("main"); }
+      await choose(/^Bag/); await inMode("bag"); await choose(/master ball/i); await inMode("end"); const raw = handle.result(), binding = handle._evidence.value.context;
+      await finishBattle(); const seal = B.session.sealBattleEffects(handle, { battleId: raw.battleId, generation: binding.generation, contentIdentity: binding.contentIdentity, rawHash: B.state.resultHash(raw) });
+      eq(seal.observer.members[id].damage, { status: "complete", value: { total: 60, resetCoverage: "complete" } }, "exact four-hit controlled direct-loss fixture");
+      eq(hpBefore - game().party[0].hp, 60, "no healing/faint/substitute masks this fixture's exact direct loss");
+      eq([game().party[0].readyToEvolve, game().party[0].evolutionReadiness], [true,"known"], "complete ordered scan earns R with main state");
+      assert(!W.PSFlow.app().pendingEvolution && !W.PSFlow.app().saveBlocked, "R registration alone opens no animation and leaves no owner"); eq(game().stats.evolution_count, 0, "no spontaneous event evolution");
+      await G.DataManager.saveGame(57); const file = path.join(path.dirname(OUT || "."), "ps-flow-expected-postbattle.json"), expected = JSON.parse(fs.readFileSync(file,"utf8"));
+      expected.readinessCase = { slot:57, state:clone(game()), result:raw, content }; fs.writeFileSync(file, JSON.stringify(expected));
+      return { input:"real scene synthetic DOM, four real engine losses, actual application scan and MZ save", damage:seal.observer.members[id].damage, hpBefore, hpAfter:game().party[0].hp, slot:57 };
+    });
   }
 
   async function verifySave() {
@@ -1927,6 +1952,10 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         G.DataManager.setupNewGame(); await G.DataManager.loadGame(expected.slot); eq(game(), expected.state, "complete evolved state round trip");
         const app = W.PSFlow.app(); assert(!app.pendingEvolution && !app.saveBlocked, "no transient queue saved or recreated");
         eq(app.commitResult(expected.result), "already-applied", "same raw battle cannot make a new evolution chance"); eq(game(), expected.state, "no repeated resource, statistic or move change");
+        const readiness = expected.readinessCase;
+        assert(readiness, "producer supplied the actual D readiness save"); W.PSFlow._content = readiness.content; W.PSFlow._app = null; await G.DataManager.loadGame(readiness.slot);
+        eq(game(), readiness.state, "R known survives independent process load"); eq([game().party[0].readyToEvolve,game().party[0].evolutionReadiness],[true,"known"],"no historical damage/faint record needs to be invented on load");
+        eq(W.PSFlow.app().commitResult(readiness.result), "already-applied", "R result cannot be reprocessed after restart"); eq(game(), readiness.state, "R and resources unchanged on replay");
         return { input: "fresh actual NW/MZ load API and original-result replay", slot: expected.slot, evolutionCount: game().stats.evolution_count };
       });
       return;
