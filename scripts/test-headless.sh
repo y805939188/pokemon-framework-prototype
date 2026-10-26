@@ -89,6 +89,7 @@ SUITES=(
   experiments/step5/3/test-postbattle-host.cjs
   experiments/step5/3/test-learning-operation.cjs
   experiments/step5/3/test-egg-move-content.cjs
+  experiments/step5/3/test-triggered-evolution.cjs
   experiments/step5/3/test-effects-source.cjs
   experiments/step5/3/test-learning-candidates.cjs
   experiments/step5/3/test-learning-plans.cjs

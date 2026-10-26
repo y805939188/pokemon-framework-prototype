@@ -62,6 +62,8 @@ export class InventorySession {
     this.learningChild=true;
   }
   releaseLearning(token:string):void {if(this.context?.token===token)this.learningChild=false;}
+  owns(token:string):boolean {return this.context?.token===token&&this.context.generation===this.options.generation();}
+  reserveEvolution(token:string,memberId:string):void {this.reserveLearning(token,memberId,this.context?.parent?'party':'bag');}
   private contentRevision(content:Content):string{return semanticFingerprint(clone(content));}
   private itemWorld():ItemWorldContext {
     const world=clone(this.options.world?.()??{});
