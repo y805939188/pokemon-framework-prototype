@@ -22,6 +22,7 @@ function host(options={}){
  const G={console,structuredClone,Date,performance:{now:()=>G.Graphics.frameCount*1000/60},Input:input,TouchInput:{clear(){},isCancelled:()=>false},Graphics:{boxWidth:816,boxHeight:624,frameCount:0},Scene_MenuBase:Base,Scene_Map:Base,Window_Base:Win,Rectangle:function(){},SceneManager:manager,PluginManager:{registerCommand(p,n,f){commands[p+':'+n]=f}},Game_Interpreter:Base,SoundManager:{playBuzzer(){},playCancel(){}},$gameMessage:{add(s){messages.push(s)},isBusy:()=>G.messageBusy},$gameSwitches:{value:()=>false},$dataMap:{meta:{}},$dataSystem:{switches:Array(36).fill(''),variables:Array(8).fill('')},$gameVariables:{setValue(id,v){vars[id]=v}},messageBusy:false};
  G.Window_MenuCommand=MenuCommand;G.Scene_Menu=Menu;
  G.PSFlow={app:()=>app,_app:app,game:()=>x.state.current(),content:()=>x.content,translator:()=>E.i18n.translatorFor(G.language??'en'),speciesName:s=>s};G.window=G;G.document=document;G.addEventListener=(k,f)=>(events[k]??=new Set()).add(f);
+ Object.assign(G.PSFlow,options.flowOverrides??{});
  vm.runInNewContext(bundles.PS_Management,G);vm.runInNewContext(bundles.PS_Inventory,G);vm.runInNewContext(bundles.PS_Progression,G);vm.runInNewContext(bundles.PS_Evolution,G);
  const tick=()=>{G.Graphics.frameCount++;manager.updateScene();input.trigger.clear();input.repeat.clear();};
  const press=(key)=>{input.trigger.add(key);input.repeat.add(key);input.pressed.add(key);tick();input.pressed.delete(key);tick();};

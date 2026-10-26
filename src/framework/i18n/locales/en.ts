@@ -4,6 +4,9 @@ import type { LocaleTable } from "../translator.ts";
 export const en: LocaleTable = {
   meta: { name: "English" },
   text: {
+    "evolution.learned": "Learned {move}!",
+    "evolution.ended": "The interrupted operation has ended. Already installed changes are kept.",
+    "evolution.noTarget": "No matching evolution was found.",
     "evolution.title": "Evolution",
     "evolution.what": "What?",
     "evolution.evolving": "{name} is evolving!",

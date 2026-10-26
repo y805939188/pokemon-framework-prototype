@@ -8,6 +8,9 @@ import type { LocaleTable } from "../translator.ts";
 export const zh: LocaleTable = {
   meta: { name: "简体中文", font: "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif" },
   text: {
+    "evolution.learned": "学会了{move}！",
+    "evolution.ended": "被中断的流程已结束，已经生效的变更保留。",
+    "evolution.noTarget": "没有符合条件的进化目标。",
     "evolution.title": "进化",
     "evolution.what": "咦？",
     "evolution.evolving": "{name}正在进化！",

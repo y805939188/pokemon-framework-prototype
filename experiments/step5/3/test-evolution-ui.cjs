@@ -50,3 +50,21 @@ test('G2a interrupted Info never rolls back installed acquisition and auto UI do
 test('G2a window fault leaves pending source recoverable without endless automatic opening',()=>{
  const w=setup({options:{windowFailures:1}});w.app.beginEventEvolution({event:7,memberId:w.id});w.G.PSEvolution.show();w.ready();assert(w.app.pendingEvolution);assert.equal(w.p(),null);const before=clone(w.state.current());w.tick();w.tick();assert.deepEqual(w.state.current(),before);w.G.PSEvolution.show();w.ready();assert(w.p());w.manager._scene.terminate();assert(!w.app.saveBlocked);
 });
+
+test('G2a abandoned initialized event request retires without later action or save/entry leak',()=>{
+ for(const reload of [false,true]){const w=setup(),m=w.manager;m._scene=new w.G.Scene_Map();m._nextScene=null;m.goto=function(C){this._nextScene=new C();};m.push=function(C){this.goto(C);};m.isSceneChanging=function(){return !!this._nextScene;};const before=clone(w.state.current()),h=w.begin(),old=m._nextScene;if(reload)w.app.stateReplacedByHost();m.goto(w.G.Scene_Map);m._scene=m._nextScene;m._nextScene=null;w.tick();assert(h.done);assert(!w.G.PSFlow.operationPending());assert(!w.app.pendingEvolution&&!w.app.pendingTriggeredEvolution);old.create();old.terminate();assert.deepEqual(w.state.current(),before);assert(!w.app.saveBlocked);}
+});
+
+test('G2a a stale screen cannot restore an old BGM into the new generation',()=>{
+ const w=setup(),calls=[];w.G.AudioManager={saveBgm:()=>({name:'OldMap'}),stopBgm(){},replayBgm:()=>calls.push('old')};w.begin();w.ready();w.app.stateReplacedByHost();w.tick();assert.deepEqual(calls,[]);
+});
+test('G2a no-window failure presents independent retry/title choices on the healthy map',()=>{
+ const w=setup({options:{windowFailures:1}});let callback;w.G.$gameMessage.setChoices=(rows,initial,cancel)=>{assert.equal(rows.length,2);};w.G.$gameMessage.setChoiceCallback=fn=>callback=fn;w.G.PSEvolution.event(7,w.id);w.ready();assert(callback);assert(!w.app.pendingEvolution&&!w.app.saveBlocked);callback(0);w.tick();w.ready();assert(w.p());assert(w.app.pendingEvolution);w.manager._scene.terminate();assert(!w.app.saveBlocked);
+});
+
+test('G2a repeated evolution move intents ask again after a confirmed give-up',()=>{
+ const w=setup({targetMoves:['Gust','Gust']});w.begin();w.success();w.chooseE('no');assert.equal(w.p().lesson.kind,'message');w.chooseE('close');assert.equal(w.p().lesson.kind,'confirm');w.chooseE('yes');w.chooseE('1');w.chooseE('close');assert.equal(w.state.current().party[0].moves[1].id,'gust');assert(!w.app.saveBlocked);
+});
+test('G2a empty-slot learning has installed-then-message feedback and holds the original battle host until ACK',async()=>{
+ let closes=0;const op={request:{battleId:'postbattle-1'}},w=setup({entries:[{method:'Level',parameter:51,target:'Blastoise'}],targetMoves:['Gust'],edit:g=>{g.party[0].moves=g.party[0].moves.slice(0,1);},options:{flowOverrides:{close(){closes++;this.running=false;}}}});const f=w.G.PSFlow;f.running=true;f.request={battleId:'postbattle-1'};const resolve=f.resolveEvolution;f.resolveEvolution=(...args)=>{const out=resolve(...args);if(!w.app.pendingEvolution&&!w.app.pendingPokedex)f.close(1,op);return out;};await w.finish();w.G.PSEvolution.show();w.success();assert.equal(w.p().layer,'learned');assert(w.state.current().party[0].moves.some(m=>m.id==='gust'));assert(!w.app.saveBlocked);assert(w.G.PSFlow.operationPending());assert.equal(closes,0);assert(f.running);w.press('ok');w.ready();assert.equal(closes,1);assert(!f.running);assert.equal(w.p(),null);
+});

@@ -17,6 +17,8 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   const arg = (n: string) => { const a = argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : undefined; };
   const mode = arg("ps-flow-test");
   if (!mode) return;
+  // Backend contract modes drive their own answers; only the formal UI mode uses the default automatic presenter.
+  if(mode!=="evolution-ui"&&W.PSEvolution)W.PSEvolution.automatic=false;
 
   const nodeRequire: any = G.require;
 

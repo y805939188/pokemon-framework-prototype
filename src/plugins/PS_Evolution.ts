@@ -7,15 +7,23 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Evolution',flow=()=>W.PSFlow,app=()=>flow().app();
  const tr=(key:string,p?:Record<string,string|number>)=>flow().translator().t('evolution.'+key,p);
- type Request={application:any;generation:number;owner:string;trigger:boolean;done:boolean;result?:string;outcome?:any;event?:{event:number;memberId?:string}};
- let queued:Request|null=null,reserved:Request|null=null,active:Controller|null=null;
- const waits=new WeakMap<object,Request>(),suppressed=new Set<string>();
+ type Request={scene?:any;constructing?:boolean;application:any;generation:number;owner:string;trigger:boolean;battleId?:string;done:boolean;result?:string;outcome?:any;event?:{event:number;memberId?:string}};
+ let queued:Request|null=null,reserved:Request|null=null,active:Controller|null=null,recoveryChoice:{request:Request;title:boolean}|null=null;
+ const waits=new WeakMap<object,Request>(),outcomes=new WeakMap<object,any>(),suppressed=new Set<string>();
  const suppress=(r:Request)=>{suppressed.add(r.generation+':'+r.owner);if(suppressed.size>32)suppressed.delete(suppressed.values().next().value!);};
+ function retire(r:Request,reason:string){if(queued===r)queued=null;if(reserved===r)reserved=null;if(!r.done){r.done=true;r.result=reason;}}
+ function retireOrphan(){const r=reserved??queued;if(!r||r.constructing)return;const m=G.SceneManager;if(r.done||r.application!==flow()._app||r.generation!==r.application.stateGeneration)retire(r,'stale');else if(r.scene&&'_nextScene'in m&&r.scene!==m._scene&&r.scene!==m._nextScene)retire(r,'scene-replaced');}
  const clock=()=>G.performance?.now?.()??Date.now();
+ function reportFailure(error:unknown,r:Request){
+  try{G.$gameMessage.add(tr('failed',{reason:String(error)}));
+   if(G.$gameMessage.setChoices&&G.$gameMessage.setChoiceCallback){G.$gameMessage.setChoices([tr('retry'),tr('reload')],0,1);G.$gameMessage.setChoiceCallback((choice:number)=>{recoveryChoice={request:r,title:choice===1};});}
+  }catch{console.error(NAME,error);}
+ }
+
  const root=(a:any)=>a.pendingTrade?null:a.pendingTriggeredEvolution?{owner:a.pendingTriggeredEvolution.token,trigger:true}:a.pendingPokedex?.parentToken?{owner:a.pendingPokedex.parentToken,trigger:false}:a.pendingEvolution?{owner:a.pendingEvolution.token,trigger:false}:null;
  class Controller {
   closed=false;ready=false;frame=0;latch=new InputLatch();timeline:EvolutionTimeline|null=null;selection:any=null;lesson:LearningScreen|null=null;
-  layer='';key='';error='';cursor=0;backRequested=false;text:string[]=[];knownTokens=new Set<string>();moves=new Map<string,any>();savedBgm:any;audioCaptured=false;
+  layer='';key='';error='';cursor=0;backRequested=false;text:string[]=[];knownTokens=new Set<string>();moves=new Map<string,any>();savedBgm:any;audioCaptured=false;learned:string[]=[];deferredClose:{code:number;op:any}|null=null;
   constructor(readonly window:any,readonly request:Request,readonly finish:()=>void){}
   valid(){return !this.closed&&!this.request.done&&this.request.application===flow()._app&&this.request.generation===this.request.application.stateGeneration;}
   views(){
@@ -33,13 +41,17 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
   dispatch(kind:'e'|'d'|'t',decision:any){
    if(!this.valid()){this.close('stale');return null;}
    const p=this.views()[kind];if(!p){this.error='stale-continuation';return null;}
+   const before=this.views().e,memberId=before?.memberId,oldMoves=memberId?new Set(flow().game().party.find((m:any)=>m.id===memberId)?.moves.map((m:any)=>m.id)??[]):null;
    const result=kind==='e'?flow().resolveEvolution(p.token,p.revision,decision):kind==='d'?flow().resolvePokedex(p.token,p.revision,decision):flow().resolveTriggeredEvolution(p.token,p.revision,decision);
-   this.request.outcome=structuredClone(result?.continuation??result);return result;
+   this.request.outcome=structuredClone(result?.continuation??result);
+   if(oldMoves&&decision.kind!=='learn'){const member=flow().game().party.find((m:any)=>m.id===memberId);for(const move of member?.moves??[])if(!oldMoves.has(move.id)&&!this.learned.includes(move.id))this.learned.push(move.id);}
+   return result;
   }
   resolve(kind:'e'|'d'|'t',decision:any){const result=this.dispatch(kind,decision);if(result?.status==='refused'){this.error=result.reason;this.layer='recovery';this.key=kind;this.cursor=0;this.boundary();this.draw();return;}this.sync();}
   sync(){
    if(!this.valid()){this.close('stale');return;}
    const {e,d,t}=this.views();this.error='';this.lesson=null;this.timeline=null;
+   if(this.learned.length){this.layer='learned';this.boundary();this.draw();return;}
    if(d){this.key='d';this.layer=d.phase==='failed'?'recovery':d.phase==='entry'?'entry':'dex-message';this.error=d.error??'';}
    else if(e){this.key='e';if(e.phase==='failed'){this.layer='recovery';this.error=e.error??'';}
     else if(e.phase==='learning'&&e.learning){this.layer='learning';this.mountLesson(e);}
@@ -61,7 +73,7 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
      if(result?.status==='refused')return result;
      const next=this.views().e;
      if(next?.phase==='failed')return {status:'pending',view:{token:next.token,revision:next.revision,memberId:next.memberId??view.memberId,kind:'teach',error:next.error,reloadRequired:next.reloadRequired}};
-     if(next?.phase==='learning'&&next.learning&&next.learning.move.id===before.learning.move.id)return convert(next);
+     if(next?.phase==='learning'&&next.learning&&next.learning.move.id===before.learning.move.id&&!(decision.kind==='learn'&&decision.answer.kind==='decline'&&decision.answer.giveUp===true))return convert(next);
      return {status:decision.kind==='learn'&&decision.answer.kind==='decline'?'unchanged':'committed',token:_token,revision:_revision};
     }},convert(view));
   }
@@ -73,14 +85,14 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
    if(this.layer==='animation'&&this.timeline){
     if(this.timeline.phase==='cancelled'){if(use||back)this.sync();else this.draw();return;}
     const before=this.timeline.phase,decision=this.timeline.update(clock(),{use,back});
-    if(before!==this.timeline.phase){if(this.timeline.cancelled)G.SoundManager?.playCancel?.();this.boundary();}
+    if(before!==this.timeline.phase){if(before==='animation'&&this.timeline.cancelled)G.SoundManager?.playCancel?.();this.boundary();}
     if(decision){const result=this.dispatch('e',{kind:decision});if(result?.status==='refused'){this.error=result.reason;this.layer='recovery';this.key='e';this.boundary();}
      else if(decision==='complete'){this.sync();return;}}
    }else if(this.layer==='learning'&&this.lesson){
     const page=this.lesson.page;
     if(back)this.lesson.back();else if(use)this.lesson.select(page.rows[page.cursor]?.key??'');else if(input.repeated.up||input.repeated.down)page.cursor=(page.cursor+(input.repeated.up?-1:1)+page.rows.length)%page.rows.length;
     if(this.lesson?.page!==page)this.boundary();
-   }else if(this.layer==='dex-message'&&(use||back)){this.resolve('d',{kind:'message-complete'});return;}
+   }else if(this.layer==='learned'&&(use||back)){this.learned.shift();this.sync();return;}else if(this.layer==='dex-message'&&(use||back)){this.resolve('d',{kind:'message-complete'});return;}
    else if(this.layer==='entry'&&(use||back)){this.resolve('d',{kind:'close-entry'});return;}
    else if(this.layer==='recovery'){
     if(input.repeated.up||input.repeated.down)this.cursor=(this.cursor+(input.repeated.up?2:1))%3;
@@ -100,7 +112,8 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
     silhouette(p.oldScale,w*.3,'#86bbde',old);if(p.targetVisible)silhouette(p.targetScale,w*.7,p.targetWhite?'#fff':'#a6df99',target);
     if(p.white)b.fillRect(0,112,w,h-210,'rgba(255,255,255,'+p.white+')');
     line(tr('placeholder'),h-112,'#b7bdc6');line(t.phase==='animation'?tr(s.cancellable?'cancelHelp':'cannotCancel'):t.phase==='success'&&!t.successReady?tr('wait'):tr('continue'),h-55);
-   }else if(this.layer==='dex-message'||this.layer==='entry'){
+   }else if(this.layer==='learned'){line(tr('learned',{move:this.move(this.learned[0]!)?.name??this.learned[0]!}),80);line(tr('continue'),h-55);}
+   else if(this.layer==='dex-message'||this.layer==='entry'){
     const d=this.views().d,entry=d?.entry,name=entry?flow().speciesName(entry.species,entry.appearance.form):'—';
     line(tr('dexTitle'),10,'#b8e3ff');if(this.layer==='dex-message')line(tr('added',{name}),80);
     else {const a=this.request.application,info=a.describePokedexEntry(entry.species,flow().translator().lang??'en');line((info?.number.text??'???')+'  '+name,70);line(info?.types?.join(' / ')||'—',115);line(info?.measurements?info.measurements.height+'  '+info.measurements.weight:'—',160);
@@ -111,14 +124,14 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
    }
   }
   stopOwned(){const v=this.views();if(v.d)this.dispatch('d',{kind:'technical-terminate'});else if(v.e)this.dispatch('e',{kind:'technical-terminate'});else if(v.t)this.dispatch('t',{kind:'technical-terminate'});}
-  close(result:string){if(this.closed)return;this.closed=true;this.request.done=true;this.request.result=result;if(active===this)active=null;if(this.audioCaptured&&this.savedBgm)try{G.AudioManager?.replayBgm?.(this.savedBgm);}catch(error){console.error(NAME,'music restore failed',error);}this.finish();}
+  close(result:string){if(this.closed)return;this.closed=true;this.request.done=true;this.request.result=result;if(active===this)active=null;if(this.audioCaptured&&this.savedBgm&&this.request.application===flow()._app&&this.request.generation===this.request.application.stateGeneration)try{G.AudioManager?.replayBgm?.(this.savedBgm);}catch(error){console.error(NAME,'music restore failed',error);}this.finish();if(this.deferredClose){const held=this.deferredClose;this.deferredClose=null;originalClose.call(flow(),held.code,held.op);}}
   dispose(){if(this.closed)return;if(this.valid())this.stopOwned();if(this.views().e||this.views().d||this.views().t)suppress(this.request);this.close('presentation-ended');}
  }
- function request(event?:Request['event']):Request|null{const application=app(),r=root(application);if(event&&(r||application.encounterBlocked))return null;if(!event&&!r)return null;return {application,generation:application.stateGeneration,owner:r?.owner??'',trigger:r?.trigger??!!event,done:false,...(event?{event}:{})};}
- function open(r:Request|null){if(!r||active||reserved||queued||G.SceneManager.isSceneChanging()||G.$gameMessage?.isBusy?.())return null;queued=reserved=r;try{G.SceneManager.push(Scene_PSEvolution);}catch(error){if(queued===r)queued=null;if(reserved===r)reserved=null;r.done=true;r.result=String(error);}return r;}
+ function request(event?:Request['event']):Request|null{const application=app(),r=root(application);if(event&&(r||application.encounterBlocked))return null;if(!event&&!r)return null;return {application,generation:application.stateGeneration,owner:r?.owner??'',trigger:r?.trigger??!!event,...(flow().running&&flow().request?.battleId?{battleId:flow().request.battleId}:{}),done:false,...(event?{event}:{})};}
+ function open(r:Request|null){retireOrphan();if(!r||active||reserved||queued||G.SceneManager.isSceneChanging()||G.$gameMessage?.isBusy?.())return null;queued=reserved=r;r.constructing=true;try{G.SceneManager.push(Scene_PSEvolution);}catch(error){if(queued===r)queued=null;if(reserved===r)reserved=null;const created=active as Controller|null;if(created?.request===r)created.dispose();r.done=true;r.result=String(error);}finally{r.constructing=false;}return r;}
  function Scene_PSEvolution(this:any){this.initialize(...(arguments as any));}
  const P=Scene_PSEvolution.prototype=Object.create(G.Scene_MenuBase.prototype);P.constructor=Scene_PSEvolution;
- P.initialize=function(){G.Scene_MenuBase.prototype.initialize.call(this);this._request=queued;queued=null;};
+ P.initialize=function(){G.Scene_MenuBase.prototype.initialize.call(this);this._request=queued;if(this._request)this._request.scene=this;queued=null;};
  P.create=function(){G.Scene_MenuBase.prototype.create.call(this);const r:Request=this._request;try{
   if(!r)throw Error('missing-evolution-request');const valid=()=>!r.done&&r.application===flow()._app&&r.generation===r.application.stateGeneration;
   if(!valid()){r.done=true;this._finished=true;if(reserved===r)reserved=null;return;}
@@ -126,18 +139,27 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
   if(!valid()){r.done=true;this._finished=true;if(reserved===r)reserved=null;return;}
   if(r.event){const out=flow().beginEventEvolution(r.event);if(out.status==='refused')throw Error(out.reason);const selected=root(r.application);if(!selected){r.outcome=structuredClone(out);r.result='no-target';G.$gameMessage?.add(tr('noTarget'));r.done=true;this._finished=true;if(reserved===r)reserved=null;return;}r.owner=selected.owner;r.trigger=selected.trigger;}
   this._controller=new Controller(this._window,r,()=>{this._finished=true;});active=this._controller;if(reserved===r)reserved=null;this._controller.start();
- }catch(error){if(reserved===r)reserved=null;this._controller?.dispose();if(r){r.done=true;r.result=String(error);suppress(r);}this._failure=String(error);try{G.$gameMessage.add(tr('failed',{reason:this._failure}));}catch{console.error(NAME,error);}}};
- P.update=function(){G.Scene_MenuBase.prototype.update.call(this);if(this._finished||this._failure){this.popScene();return;}try{this._controller?.update();}catch(error){this._controller?.dispose();this._failure=String(error);try{G.$gameMessage.add(tr('failed',{reason:this._failure}));}catch{console.error(NAME,error);}}};
+ }catch(error){if(reserved===r)reserved=null;this._controller?.dispose();if(r){r.done=true;r.result=String(error);suppress(r);}this._failure=String(error);reportFailure(error,this._request);}};
+ P.update=function(){G.Scene_MenuBase.prototype.update.call(this);if(this._finished||this._failure){this.popScene();return;}try{this._controller?.update();}catch(error){this._controller?.dispose();this._failure=String(error);reportFailure(error,this._request);}};
  P.popScene=function(){if(this._controller&&!this._controller.closed){if(this._controller.ready)this._controller.backRequested=true;return;}G.Scene_MenuBase.prototype.popScene.call(this);};
- P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);this._controller?.dispose();};
- const ui:any=W.PSEvolution={show:()=>open(request()),event:(event=0,memberId?:string)=>open(request({event,...(memberId?{memberId}:{})})),current:()=>active&&!active.closed?{ready:active.ready,owner:active.request.owner,generation:active.request.generation,layer:active.layer,timeline:active.timeline?{phase:active.timeline.phase,successReady:active.timeline.successReady,picture:active.timeline.picture}:null,lesson:active.lesson?structuredClone(active.lesson.page):null,error:active.error,text:[...active.text]}:null};
- const pending=flow().operationPending;flow().operationPending=function(){return pending.call(this)||!!reserved||!!queued||!!active;};
- const prior=G.SceneManager.updateScene;G.SceneManager.updateScene=function(...args:any[]){const value=prior.apply(this,args);const scene=this._scene;
-  if(scene instanceof G.Scene_Map&&!active&&!reserved&&!queued&&!this.isSceneChanging()&&!G.$gameMessage?.isBusy?.()&&!W.PSInventory?.current()&&!W.PSManagement?.current()&&!W.PSProgression?.current()){
+ P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);if(this._controller)this._controller.dispose();else if(this._request)retire(this._request,'presentation-ended');};
+ const ui:any=W.PSEvolution={automatic:true,show:()=>open(request()),event:(event=0,memberId?:string)=>open(request({event,...(memberId?{memberId}:{})})),current:()=>active&&!active.closed?{ready:active.ready,owner:active.request.owner,generation:active.request.generation,layer:active.layer,timeline:active.timeline?{phase:active.timeline.phase,successReady:active.timeline.successReady,picture:active.timeline.picture}:null,lesson:active.lesson?structuredClone(active.lesson.page):null,error:active.error,text:[...active.text]}:null};
+ const originalClose=flow().close;if(typeof originalClose==='function')flow().close=function(code:number,op:any){if(op&&active?.valid()&&active.request.battleId===op.request?.battleId){active.deferredClose={code,op};return;}return originalClose.call(this,code,op);};
+ const pending=flow().operationPending;flow().operationPending=function(){retireOrphan();return pending.call(this)||!!reserved||!!queued||!!active;};
+ const prior=G.SceneManager.updateScene;G.SceneManager.updateScene=function(...args:any[]){retireOrphan();const value=prior.apply(this,args);retireOrphan();const scene=this._scene;
+  if(recoveryChoice&&!this.isSceneChanging()&&!G.$gameMessage?.isBusy?.()){
+   const choice=recoveryChoice;recoveryChoice=null;const r=choice.request;
+   if(r.application===flow()._app&&r.generation===r.application.stateGeneration){
+    if(choice.title){this.goto(G.Scene_Title);return value;}
+    const current=root(r.application);if(current?.owner===r.owner)open(request());else if(!r.owner&&r.event&&!current)open(request(r.event));else G.$gameMessage?.add(tr('ended'));
+   }
+  }
+  if(ui.automatic&&scene instanceof G.Scene_Map&&!active&&!reserved&&!queued&&!this.isSceneChanging()&&!G.$gameMessage?.isBusy?.()&&!W.PSInventory?.current()&&!W.PSManagement?.current()&&!W.PSProgression?.current()){
    const r=request();if(r&&!suppressed.has(r.generation+':'+r.owner))open(r);
   }return value;
  };
  for(const [name,begin]of [['ShowEvolution',()=>ui.show()],['EventEvolution',(args:any)=>{const n=Number(args.event??0);if(!Number.isSafeInteger(n)||n<0)throw Error('invalid-evolution-event');return ui.event(n,args.memberId||undefined);}]]as const)G.PluginManager.registerCommand(NAME,name,function(this:any,args:any){try{const r=begin(args);if(r){waits.set(this,r);this.setWaitMode('psEvolutionUI');}}catch(error){G.$gameMessage.add(tr('failed',{reason:String(error)}));}});
- const wait=G.Game_Interpreter.prototype.updateWaitMode;G.Game_Interpreter.prototype.updateWaitMode=function(){if(this._waitMode!=='psEvolutionUI')return wait.call(this);const r=waits.get(this);if(r&&!r.done&&r.application===flow()._app&&r.generation===r.application.stateGeneration)return true;waits.delete(this);this._waitMode='';return false;};
- for(const method of ['clear','terminate']){const original=G.Game_Interpreter.prototype[method];if(typeof original==='function')G.Game_Interpreter.prototype[method]=function(...args:any[]){const r=waits.get(this);waits.delete(this);if(r&&!r.done){if(active?.request===r)active.dispose();else{r.done=true;if(queued===r)queued=null;if(reserved===r)reserved=null;}}return original.apply(this,args);};}
+ Object.defineProperty(G.Game_Interpreter.prototype,'_psEvolutionOutcome',{configurable:true,enumerable:false,get(){const value=outcomes.get(this);return value?structuredClone(value):undefined;}});
+ const wait=G.Game_Interpreter.prototype.updateWaitMode;G.Game_Interpreter.prototype.updateWaitMode=function(){if(this._waitMode!=='psEvolutionUI')return wait.call(this);const r=waits.get(this);if(r&&!r.done&&r.application===flow()._app&&r.generation===r.application.stateGeneration)return true;if(r&&r.application===flow()._app&&r.generation===r.application.stateGeneration)outcomes.set(this,structuredClone(r.outcome??{status:'refused',reason:r.result??'presentation-ended'}));waits.delete(this);this._waitMode='';return false;};
+ for(const method of ['clear','terminate']){const original=G.Game_Interpreter.prototype[method];if(typeof original==='function')G.Game_Interpreter.prototype[method]=function(...args:any[]){const r=waits.get(this);waits.delete(this);outcomes.delete(this);if(r&&!r.done){if(active?.request===r)active.dispose();else{r.done=true;if(queued===r)queued=null;if(reserved===r)reserved=null;}}return original.apply(this,args);};}
 })();
