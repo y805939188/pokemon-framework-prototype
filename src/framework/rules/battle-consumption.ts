@@ -191,7 +191,8 @@ export function resolveBattleEffects(input: ResolveBattleEffectsInput): Resolved
   const result: ResolvedBattleEffects = { binding: null, appearances: [], defeats: [], critical: {}, damage: {}, friendshipReplacements: {}, faint: {}, dispositions: [] };
   const expectedBinding = binding(data(input, "expectedBinding")), expectedContext = context(data(input, "expectedContext")), seal = data(input, "seal");
   const actualBinding = binding(data(seal, "binding")), actualContext = context(data(seal, "context"));
-  const bindingOK = slots(seal, ["version", "binding", "context", "observer", "control"]) && expectedBinding !== null && actualBinding !== null && data(seal, "version") === 2 && JSON.stringify(expectedBinding) === JSON.stringify(actualBinding);
+  // Source slots are optional reads: an unreadable observer cannot invalidate the independent control binding.
+  const bindingOK = object(seal) && Object.keys(seal).every(key => ["version", "binding", "context", "observer", "control"].includes(key)) && expectedBinding !== null && actualBinding !== null && data(seal, "version") === 2 && JSON.stringify(expectedBinding) === JSON.stringify(actualBinding);
   const contextOK = expectedContext !== null && actualContext !== null && JSON.stringify(expectedContext) === JSON.stringify(actualContext);
   disposition(result, "shared", "binding", bindingOK ? { status: "complete" } : unavailable("seal-binding-mismatch-or-unavailable"));
   disposition(result, "shared", "context", contextOK ? { status: "complete" } : unavailable("seal-context-mismatch-or-unavailable"));
