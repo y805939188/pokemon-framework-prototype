@@ -74,7 +74,7 @@ test('claim with a failing store: nothing is installed, and a retry applies exac
   state.failReplace = null;
   assert.equal(app.resolveReceiving(r.token, {}).status, 'applied'); assert.equal(app.claimGrant('starter').status, 'already-claimed');
   assert.equal(state.replaced.length, 1); assert.equal(state.current().party.length, 1);
-  assert.deepEqual(state.current().dex, { ...expectedEmptyDex, seen: ['charmander'], owned: ['charmander'] }, 'members, items, claim and dex in the same replacement');
+  assert.deepEqual(state.current().dex, { ...expectedEmptyDex, seen: ['charmander'], owned: ['charmander'], seenForms: {charmander:[{gender:0,form:0,shiny:false}]}, lastSeenForm: {charmander:{gender:0,form:0,shiny:false}} }, 'members, items, claim and dex in the same replacement');
 });
 
 test('heal: the party is restored once; healing again is safe and writes nothing', () => {

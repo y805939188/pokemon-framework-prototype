@@ -197,6 +197,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly completedEvidence = new WeakMap<object, BattleEvidence>();
   private readonly ownedBattleEffects = new WeakMap<object, OwnedBattleEffects>();
   private readonly preparedAcquisitions = new WeakMap<ReceptionContext, PreparedAcquisition>();
+  private readonly receptionActions = new WeakSet<ReceptionContext>();
   private readonly preparedBattles = new WeakMap<ReceptionContext, PreparedBattle>();
   private battleCommitOwner: ReceptionContext | null = null;
   private readonly finishing = new WeakSet<object>();
@@ -541,15 +542,19 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const pending = this.reception;
     if (!pending || pending.context.token !== token || pending.context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
     const staged = this.preparedAcquisitions.get(pending.context); if (!staged) return { status: "refused", reason: "not-an-acquisition" };
+    if (this.receptionActions.has(pending.context)) return { status: "refused", reason: "reception-busy" };
+    this.receptionActions.add(pending.context);
+    try {
     if (staged.attempted && staged.next && staged.before) {
       let current: GameState; try { current = clone(this.battleStatePort.read()); } catch { return { status: "reload-required", reason: "acquisition-install-indeterminate" }; }
       if (pending.context.generation !== this.generation || this.reception !== pending) return { status: "refused", reason: "stale-operation" };
-      if (stateIdentity(current) === stateIdentity(staged.next)) { const outcome = this.resolveReceiving(token); return "status" in outcome && outcome.status === "applied"
+      if (stateIdentity(current) === stateIdentity(staged.next)) { this.receptionActions.delete(pending.context); const outcome = this.resolveReceiving(token); return "status" in outcome && outcome.status === "applied"
         ? { status: "already-installed" } : { status: "refused", reason: "resume-installed-acquisition" }; }
       if (stateIdentity(current) !== stateIdentity(staged.before)) return { status: "reload-required", reason: "acquisition-install-indeterminate" };
     }
     if (this.reception === pending) this.reception = null;
     return { status: "aborted" };
+    } finally { this.receptionActions.delete(pending.context); }
   }
   private assertAcquisition(owner: { generation: number }): void {
     if (this.acquisition !== owner || owner.generation !== this.generation) throw Error("stale-acquisition");
@@ -580,6 +585,9 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const receipt = this.receptionReceipts.get(token); if (receipt) return clone(receipt);
     const pending = this.reception;
     if (!pending || pending.context.token !== token || pending.context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
+    if (this.receptionActions.has(pending.context)) return { status: "refused", reason: "reception-busy" };
+    this.receptionActions.add(pending.context);
+    try {
     const acquisition = this.preparedAcquisitions.get(pending.context);
     const merged = { ...pending.context.decisions, ...clone(decisions) };
     if (acquisition?.next && semanticFingerprint(merged) !== acquisition.decisions) return { status: "refused", reason: "acquisition-decision-conflict" };
@@ -596,6 +604,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       if (this.receptionReceipts.size > 32) this.receptionReceipts.delete(this.receptionReceipts.keys().next().value!);
     }
     return outcome;
+    } finally { this.receptionActions.delete(pending.context); }
   }
 
   /** Technical termination of a proved zero-write battle attempt. It never rolls back an installed primary result. */

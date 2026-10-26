@@ -61,3 +61,10 @@ test('first-entry offers require entitlement, an unlocked regional match, the se
 test('host replacement in an installation callback invalidates the old acquisition without reconstructing its pending owner',()=>{
  for(const kind of ['gift','grant']){let app;const w=setup({port:state=>({read:()=>state.read(),replace:next=>{const loaded=clone(state.current());loaded.money=789;state.replace(loaded);app.stateReplacedByHost();}})});app=w.app;const out=kind==='gift'?w.gift():w.grant();assert.equal(out.status,'refused');assert.equal(out.reason,'stale-operation');assert.equal(w.state.current().money,789);assert.equal(w.state.current().party.length,3);assert(!app.pendingReceiving&&!app.saveBlocked);}
 });
+
+test('ACQ-01 same-token resolve/technical termination are mutually exclusive across ordinary host read callbacks',()=>{
+ for(const kind of ['gift','grant']){let hook=null,fail=true,writes=0,nested;const w=setup({port:(state,getApp)=>({read:()=>{hook?.(getApp());return state.read();},replace:next=>{if(fail)throw Error('zero-write');writes++;state.replace(next);}})}),before=clone(w.state.current());
+  const out=kind==='gift'?w.gift():w.grant();assert.equal(out.status,'pending');fail=false;hook=app=>{hook=null;nested=app.terminateAcquisition(out.token);assert.deepEqual(nested,{status:'refused',reason:'reception-busy'});assert(app.saveBlocked);assert.equal(app.resolveReceiving(out.token).reason,'reception-busy');};assert.equal(w.app.resolveReceiving(out.token).status,'applied');assert.equal(writes,1);assert(!w.app.saveBlocked);
+  const x=setup({port:state=>({read:()=>state.read(),replace:()=>{throw Error('zero');}})}),p=kind==='gift'?x.gift():x.grant();assert.equal(x.app.terminateAcquisition(p.token).status,'aborted');assert.equal(x.app.resolveReceiving(p.token).reason,'stale-operation');assert.equal(x.state.replaced.length,0);assert(!x.app.saveBlocked);assert.notDeepEqual(w.state.current(),before);
+ }
+});

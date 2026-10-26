@@ -17,7 +17,7 @@ const S = E.state;
 const SRC = path.resolve(__dirname, '../../content/sample');
 const read = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
 const content = E.contentRuntime.assembleContent(E.contentCompile.compileContent({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json'), grants: read('grants.json') }).data, E.dex.createDexLookup()).content;
-// National-only schema7 fixture. Receipt changes seen/owned; the later dex-history consumers own other records.
+// National-only schema7 fixture. E3 grants register precise acquired appearances with seen/owned.
 const expectedEmptyDex = { seen: [], owned: [], hasDex: false, seenForms: {}, lastSeenForm: {}, capturedCounts: {}, defeatedCounts: {}, unlocked: [true], view: { region: -1, indices: [0], mode: 0 }, layoutIdentity: content.regionalDex.layoutIdentity };
 const clone = x => JSON.parse(JSON.stringify(x));
 /** Scripted random(n): returns the queued values in order (each checked against n), then 0. Records the calls. */
@@ -143,11 +143,13 @@ test('grant money follows the money cap (WP24: clamped); an explicit write clamp
 
 test('a grant registers every received species as seen and owned (WP26 3.2 gifts), once, only when the grant is applied', () => {
   const r = starter(fresh());
-  assert.deepEqual(r.state.dex, { ...expectedEmptyDex, seen: ['charmander'], owned: ['charmander'] }, 'the starter is in the dex (by content id since step 5.0)');
+  assert.deepEqual(r.state.dex, { ...expectedEmptyDex, seen: ['charmander'], owned: ['charmander'], seenForms: {charmander:[{gender:0,form:0,shiny:false}]}, lastSeenForm: {charmander:{gender:0,form:0,shiny:false}} }, 'the starter is in the dex (by content id since step 5.0)');
   assert.equal(starter(r.state).state, r.state, 'a repeat changes nothing, the dex included');
   const flock = { ...content, settings: {...content.settings,BAG_POCKET_SLOTS:[-1,1,-1,-1,-1,-1,-1,-1]}, grants: { flock: { id: 'flock', members: [{ species: 'Pidgey', level: 3 }, { species: 'Pidgey', level: 4 }, { species: 'Caterpie', level: 2 }], items: { potion: 1 }, money: 0 } } };
   const sighted = fresh(); sighted.dex.seen = ['pidgey'];
-  assert.deepEqual(applyGrant(sighted, 'flock', flock, lcg(2)).state.dex, { ...expectedEmptyDex, seen: ['pidgey', 'caterpie'], owned: ['pidgey', 'caterpie'] }, 'one entry per species; an earlier sighting is kept');
+  const flockState=applyGrant(sighted, 'flock', flock, lcg(2)).state, forms={}, last={};
+  for(const m of flockState.party){const record={gender:m.gender==='F'?1:0,form:0,shiny:m.shiny};forms[m.species]??=[];if(!forms[m.species].some(r=>JSON.stringify(r)===JSON.stringify(record)))forms[m.species].push(record);last[m.species]??=record;}
+  assert.deepEqual(flockState.dex, { ...expectedEmptyDex, seen: ['pidgey', 'caterpie'], owned: ['pidgey', 'caterpie'], seenForms:forms,lastSeenForm:last }, 'one species entry with each actual form; an earlier sighting is kept');
   const full = fresh(); for (let i = 0; i < 6; i++) full.party.push(createMember({ id: `P-${i}`, species: 'Caterpie', level: 2 }, content, lcg(i)));
   const boxed = starter(full);
   assert.deepEqual([boxed.placed[0].to, boxed.state.dex.owned], ['boxes', ['charmander']], 'a member received into the boxes is registered too');
