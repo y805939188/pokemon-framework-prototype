@@ -3,6 +3,8 @@ import type { BattleEvidence } from "../rules/battle-evidence.ts";
 import { moneyCap, changeMoney } from "../rules/economy.ts";
 import { InventorySession } from "./inventory-session.ts";
 import { EvolutionOperation } from "./evolution-operation.ts";
+import { LearningOperation } from "./learning-operation.ts";
+import type { LearningIntent, LearningDecision, LearningParent } from "./learning-operation.ts";
 import type { EvolutionDecision, EvolutionResolution, EvolutionView } from "./evolution-operation.ts";
 import type { EvolutionFacts } from "../rules/evolution.ts";
 import type { InventoryRequest, InventoryParent, InventoryOutcome } from "./inventory-session.ts";
@@ -174,6 +176,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    */
   private readonly inventory: InventorySession;
   private readonly evolutions: EvolutionOperation;
+  private readonly learning: LearningOperation;
   private evolutionCompletion: { token: string; generation: number; outcome: BattleOutcome & { result?: BattleResult } } | null = null;
   private generation = 0;
   private readonly bornIn = new WeakMap<object, number>();
@@ -183,7 +186,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private battleCommitOwner: ReceptionContext | null = null;
   private readonly finishing = new WeakSet<object>();
   private readonly terminatedBattles = new WeakSet<ReceptionContext>();
-  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active; }
+  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active; }
   private assertBattleContext(context: ReceptionContext, requireOwner = false): void {
     if (context.generation !== this.generation || this.terminatedBattles.has(context)
       || requireOwner && this.battleCommitOwner !== context) throw new Error("stale battle commit generation or owner");
@@ -230,6 +233,23 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       this.battleStatePort.replace(next); this.inventory.stateChanged(next);
     } }, content: this.ports.content, generation: () => this.generation, limits: this.limits,
       facts: (member, content) => this.evolutionFacts(member, content) });
+    this.learning = new LearningOperation({ read: () => this.battleStatePort.read(), replace: next => {
+      this.battleStatePort.replace(next); this.inventory.stateChanged(next);
+    } }, this.ports.content, { generation: () => this.generation, world: () => clone(ports.itemWorld?.() ?? {}),
+      enter: (parent, intent) => {
+        if (this.op || this.battleCommitOwner || this.evolutions.active || this.reception) throw new Error("operation-active");
+        if (parent?.kind === "inventory") {
+          if (intent.kind !== "teach" || intent.source.kind !== "machine") throw new Error("invalid-learning-parent");
+          this.inventory.reserveLearning(parent.token, intent.memberId, intent.source.entry);
+        } else {
+          if (this.inventory.active) throw new Error("inventory-operation-active");
+          if (intent.kind === "teach" && intent.source.kind === "machine") throw new Error("machine-inventory-parent-required");
+          if (parent?.kind === "management") this.management.reserveChild(parent.token);
+          else if (this.management.active) throw new Error("management-operation-active");
+        }
+      },
+      leave: parent => { if (parent?.kind === "inventory") this.inventory.releaseLearning(parent.token);
+        else if (parent?.kind === "management") this.management.releaseChild(parent.token); } });
   }
 
   private evolutionFacts(member: Readonly<Member>, content: ReturnType<ContentPort>["content"]): EvolutionFacts {
@@ -240,6 +260,9 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     return world;
   }
   get pendingEvolution(): EvolutionView | null { return this.evolutions.view; }
+  get pendingLearning() { return this.learning.view; }
+  beginLearning(intent: LearningIntent, parent?: LearningParent) { return this.learning.begin(intent, parent); }
+  resolveLearning(token: string, revision: number, decision: LearningDecision) { return this.learning.resolve(token, revision, decision); }
   private evolutionOutcome(outcome: BattleOutcome & { result?: BattleResult }, resolved: EvolutionResolution): BattleOutcome & { result?: BattleResult } {
     if (resolved.status === "refused") return { ...outcome, error: resolved.reason };
     const next = { ...clone(outcome), ...(resolved.diagnostics.length ? { diagnostics: [...new Set([...(outcome.diagnostics ?? []), ...resolved.diagnostics])] } : {}) };
@@ -551,6 +574,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.op = null;
     this.battleCommitOwner = null;
     this.evolutions.invalidate(); this.evolutionCompletion = null;
+    this.learning.invalidate();
     this.inventory.invalidate();
     this.management.invalidate();
     this.reception = null;

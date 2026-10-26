@@ -45,6 +45,9 @@ import { developmentCapabilities } from "../framework/rules/config";
     readonly encounterBlocked: boolean;
     resolveReceiving(token: string, decisions?: unknown, signal?: unknown): any;
     readonly pendingEvolution: any;
+    readonly pendingLearning: any;
+    beginLearning(intent: any, parent?: any): any;
+    resolveLearning(token: string, revision: number, decision: any): any;
     resolveEvolution(token: string, revision: number, decision: unknown): any;
     startNewGame(): { status: string };
     claimGrant(grantId: string): { status: string; grantId: string; reason?: string; error?: string; placed?: { id: string; species: string; form: number; level: number; to: string }[]; items?: Record<string, number>; money?: number };
@@ -60,6 +63,9 @@ import { developmentCapabilities } from "../framework/rules/config";
   const PSFlow: any = (W.PSFlow = {
     developerCapabilities: {}, // explicit developer/test injection only; never plugin settings or save data
     operationPending(): boolean { return PSFlow.running || !!PSFlow._app?.saveBlocked; },
+    /** Programmatic action bridges; formal learning screens/commands belong to G. */
+    beginLearning(intent: any, parent?: any): any { return PSFlow.app().beginLearning(intent, parent); },
+    resolveLearning(token: string, revision: number, decision: any): any { return PSFlow.app().resolveLearning(token, revision, decision); },
     assertBattleAllowed(): void { const capabilities = developmentCapabilities(PSFlow.developerCapabilities); if (!capabilities.allowExperimentalHeldItemBattle && (PSFlow.game().party || []).some((m: any) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成"); },
     running: false, // a battle scene is open (the interpreter waits on this)
     request: null as any,
@@ -614,6 +620,11 @@ import { developmentCapabilities } from "../framework/rules/config";
   // MZ's "Exit Event Processing" does; interpreters outside that calling chain are not touched.
   const baseUpdateWaitMode = G.Game_Interpreter.prototype.updateWaitMode;
   G.Game_Interpreter.prototype.updateWaitMode = function (this: any) {
+    if (this._waitMode === "psLearning") {
+      const pending = PSFlow._app?.pendingLearning;
+      if (pending && (!this._psLearningToken || pending.token === this._psLearningToken)) return true;
+      this._waitMode = ""; delete this._psLearningToken; return false;
+    }
     if (this._waitMode === "psBattle") {
       if (PSFlow.running) return true;
       this._waitMode = "";
