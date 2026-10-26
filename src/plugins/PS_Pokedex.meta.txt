@@ -1,0 +1,24 @@
+/*:
+ * @target MZ
+ * @plugindesc Default Pokédex region/list/entry/forms UI. Placeholder media.
+ * @author Pokémon Framework
+ * @help
+ * Menu entry requires entitlement and a nonempty accessible dex. Core/app owns viewing writes.
+ * H1 supplies six list orders and three entry pages. Full ten-field search follows in H2.
+ * @command ShowPokedex
+ * @text Pokédex / 图鉴
+ * @command SetPokedex
+ * @text Grant/remove Pokédex / 图鉴资格
+ * @arg enabled
+ * @type boolean
+ * @default true
+ * @command UnlockRegion
+ * @text Unlock/lock Pokédex region / 图鉴地区解锁
+ * @arg region
+ * @type number
+ * @min -1
+ * @default -1
+ * @arg enabled
+ * @type boolean
+ * @default true
+ */
