@@ -7,6 +7,7 @@ import { EvolutionTimeline } from './progression/evolution-timeline.ts';
 import { LearningScreen } from './progression/learning-screen.ts';
 import { drawLearningPage } from './progression/learning-draw.ts';
 import { InputLatch } from './management/model.ts';
+import type { GameApplication } from '../framework/app/index.ts';
 import type { LearningOutcome } from '../framework/app/learning-operation.ts';
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Evolution',flow=()=>W.PSFlow,app=()=>flow().app();
@@ -27,15 +28,19 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
  const root=(a:any)=>a.pendingTrade?null:a.pendingTriggeredEvolution?{owner:a.pendingTriggeredEvolution.token,trigger:true}:a.pendingPokedex?.parentToken?{owner:a.pendingPokedex.parentToken,trigger:false}:a.pendingEvolution?{owner:a.pendingEvolution.token,trigger:false}:null;
  class Controller {
   closed=false;ready=false;frame=0;latch=new InputLatch();timeline:EvolutionTimeline|null=null;selection:any=null;lesson:LearningScreen|null=null;
+  private itemFacts:{primaryCommitted:true;itemResult?:NonNullable<GameApplication['pendingTriggeredEvolution']>['itemResult']}|null=null;
   growthShown=false;presentationError='';tradeTimeline:TradeTimeline|null=null;layer='';key='';error='';cursor=0;backRequested=false;text:string[]=[];knownTokens=new Set<string>();moves=new Map<string,any>();savedBgm:any;audioCaptured=false;learned:string[]=[];deferredClose:{code:number;op:any}|null=null;
   constructor(readonly window:any,readonly request:Request,readonly finish:()=>void){}
   get completedOutcome(){return this.request.outcome??{status:'refused',reason:this.request.result??'presentation-ended'};}
+  get confirmedItem(){return this.itemFacts?structuredClone(this.itemFacts):null;}
+  private confirmItem(primary:boolean,item?:NonNullable<GameApplication['pendingTriggeredEvolution']>['itemResult']){if(!this.request.item||!primary)return;this.itemFacts={primaryCommitted:true,...(item?{itemResult:structuredClone(item)}:this.itemFacts?.itemResult?{itemResult:structuredClone(this.itemFacts.itemResult)}:{})};}
   back(){if(this.ready)this.backRequested=true;}
   valid(){return active===this&&!this.closed&&!this.request.done&&this.request.application===flow()._app&&this.request.generation===this.request.application.stateGeneration;}
   views(){
    const a=this.request.application;if(!this.valid())return {e:null,d:null,t:null,q:null};
    if(this.request.trade){const q=a.pendingTrade?.token===this.request.owner?a.pendingTrade:null;return {q,e:q?.evolution??null,t:null,d:q?.entry?{token:q.token,revision:q.revision,parentToken:q.token,phase:q.entry.opened?'entry':'message',entry:q.entry}:null};}
    const t=a.pendingTriggeredEvolution?.token===this.request.owner?a.pendingTriggeredEvolution:null;
+   if(t)this.confirmItem(t.primaryCommitted===true,t.itemResult);
    if(this.request.trigger&&!t)return {e:null,d:null,t:null,q:null};
    const e=a.pendingEvolution;
    if(e&&(e.token===this.request.owner||t?.evolution?.token===e.token))this.knownTokens.add(e.token);
@@ -50,7 +55,7 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
    const p=this.views()[kind];if(!p){this.error='stale-continuation';return null;}
    const views=this.views(),before=views.e,memberId=before?.memberId,member=views.q?.incoming?.member??flow().game().party.find((m:any)=>m.id===memberId),oldMoves=memberId?new Set(member?.moves.map((m:any)=>m.id)??[]):null;
    const result=views.q&&kind!=='e'?flow().resolveTrade(views.q.token,views.q.revision,kind==='d'?{kind:decision.kind==='message-complete'?'open-entry':decision.kind==='close-entry'?'close-entry':decision.kind}:decision):kind==='e'?flow().resolveEvolution(p.token,p.revision,decision):kind==='d'?flow().resolvePokedex(p.token,p.revision,decision):flow().resolveTriggeredEvolution(p.token,p.revision,decision);
-   this.request.outcome=structuredClone(result?.continuation??result);
+   const owned=result?.continuation??result;this.request.outcome=structuredClone(owned);if(this.valid()){this.views();if(owned?.token===this.request.owner)this.confirmItem(owned.result?.primaryCommitted===true,owned.result?.item);}
    if(oldMoves&&decision.kind!=='learn'){const member=this.views().q?.incoming?.member??flow().game().party.find((m:any)=>m.id===memberId);for(const move of member?.moves??[])if(!oldMoves.has(move.id)&&!this.learned.includes(move.id))this.learned.push(move.id);}
    return result;
   }
@@ -157,8 +162,8 @@ import type { LearningOutcome } from '../framework/app/learning-operation.ts';
    }
   }
   drawItem(line:(text:string,y:number,color?:string)=>void,h:number){
-   const intent=this.request.item!,out=this.request.outcome,t=this.views().t,info=this.layer==='item-growth'?t?.itemResult:out?.result?.item,item=catalogOf(flow().content())[intent.itemId],label=item?flow().translator().tOr(item.nameKey??'item.name.'+item.id,item.name):intent.itemId;
-   line(this.layer==='item-growth'?tr('itemGrowth'):out?.result?.primaryCommitted?tr('itemUsed',{quantity:intent.quantity,item:label}):tr('itemNoCommit'),50);
+   const intent=this.request.item!,out=this.request.outcome,t=this.views().t,info=this.layer==='item-growth'?t?.itemResult:out?.result?.item??this.itemFacts?.itemResult,item=catalogOf(flow().content())[intent.itemId],label=item?flow().translator().tOr(item.nameKey??'item.name.'+item.id,item.name):intent.itemId;
+   line(this.layer==='item-growth'?tr('itemGrowth'):(out?.result?.primaryCommitted||this.itemFacts?.primaryCommitted)?tr('itemUsed',{quantity:intent.quantity,item:label}):tr('itemNoCommit'),50);
    if(info&&(this.layer==='item-growth'||!this.growthShown)){line('Lv.'+info.oldLevel+' → '+info.newLevel,105);if(info.learned.length)line(tr('itemLearned',{moves:info.learned.map((id:string)=>this.move(id)?.name??id).join(', ')}),155);if(info.skipped.length)line(tr('itemSkipped',{moves:info.skipped.map((id:string)=>this.move(id)?.name??id).join(', ')}),205);}
    if(out?.status==='refused')line(out.reason,260,'#ffe09a');if(out?.status==='technically-terminated')line(tr('itemStopped'),310,'#ffe09a');line(tr('continue'),h-55);
   }

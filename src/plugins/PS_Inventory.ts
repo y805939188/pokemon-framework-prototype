@@ -125,9 +125,9 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
    this.operation={id:this.id(),request:{kind:'use-item',itemId,quantity,...(memberId?{memberId}:{}),ticket:this.selectedTicket??this.application.inventoryTicket(this.token,row.pocket,row.index),answers:{}}};this.submitUse();
   }
   evolutionOutcome(child:any):InventoryOutcome {
-   const out=child.completedOutcome,body=out?.result,primary=body?.primaryCommitted===true,blocked=out?.status==='pending'||this.application.pendingTriggeredEvolution?.token===child.request.owner;
+   const out=child.completedOutcome,body=out?.result,confirmed=child.confirmedItem,primary=body?.primaryCommitted===true||confirmed?.primaryCommitted===true,itemResult=primary?(body?.item??confirmed?.itemResult):undefined,blocked=out?.status==='pending'||this.application.pendingTriggeredEvolution?.token===child.request.owner;
    const status=blocked?'refused':out?.status==='committed'||primary?'committed':out?.status==='unchanged'?'unchanged':'refused';
-   return {status,...(status==='refused'?{reason:blocked?'evolution-recovery-required':out?.reason??'presentation-ended'}:{}),...((blocked||child.presentationError||out?.status==='technically-terminated')?{presentation:'failed'}:{}),result:{...this.evolutionIntent,evolution:body,primaryCommitted:primary}};
+   return {status,...(status==='refused'?{reason:blocked?'evolution-recovery-required':out?.reason??'presentation-ended'}:{}),...((blocked||child.presentationError||out?.status==='technically-terminated')?{presentation:'failed'}:{}),result:{...this.evolutionIntent,evolution:body,primaryCommitted:primary,...(itemResult?{itemResult}: {})}};
   }
   finishEvolutionChild(child:any){
    if(this.evolutionChild!==child)return;const result=this.evolutionOutcome(child);this.evolutionChild=null;this.selectedTicket=null;
