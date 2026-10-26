@@ -3,6 +3,7 @@ import { PokedexOperation } from "./pokedex-operation.ts";
 import type { DexEntryIntent, DexDecision, DexViewingCommand, DexResolution } from "./pokedex-operation.ts";
 import { dexShouldOfferEntry } from "../rules/pokedex.ts";
 import { createDexQueryCatalog, dexAccessibleRegions, dexMenuEntry, dexInUnlockedRegion, dexInfo, dexEntryNumber, dexMeasurements } from "../rules/pokedex-query.ts";
+import { dexNameGroups, DEX_COLORS, DEX_SHAPES } from "../rules/pokedex-query.ts";
 import type { AcquisitionEntryIntent } from "../rules/acquisition-dex.ts";
 import { semanticFingerprint } from "../rules/semantic.ts";
 import { TradeOperation, tradeEligibility } from "./trade-operation.ts";
@@ -323,6 +324,17 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
   get pendingPokedex() { return this.pokedex.view; }
   updatePokedex(command: DexViewingCommand): DexResolution { return this.pokedex.begin(command); }
+  /** Read-only directory from the source-checked adapter, never inferred from species currently in the dex. */
+  pokedexSearchDirectory(locale: string) {
+    const generation = this.generation, source = this.ports.content();
+    if (generation !== this.generation) throw Error('stale-pokedex-query');
+    this.pokedex.observeContent(source.content);
+    if (!source.dex?.allTypes) throw Error('pokedex-type-directory-unavailable');
+    const types = source.dex.allTypes().map(t => t.name);
+    if (generation !== this.generation) throw Error('stale-pokedex-query');
+    if (!types.length || types.some(t => typeof t !== 'string' || !t) || new Set(types).size !== types.length) throw Error('invalid-pokedex-type-directory');
+    return { names: dexNameGroups(locale), types, colors: [...DEX_COLORS], shapes: [...DEX_SHAPES] };
+  }
   pokedexSnapshot(text: Readonly<Record<string, string>> = {}, currentRegion: number | null = null) {
     const generation = this.generation, state = clone(this.ports.state.read()), content = clone(this.ports.content().content);
     if (generation !== this.generation) throw Error("stale-pokedex-query");

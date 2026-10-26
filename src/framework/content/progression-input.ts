@@ -1,3 +1,4 @@
+import { DEX_COLORS as COLORS, DEX_SHAPES as SHAPES } from "../rules/pokedex-query.ts";
 /** Static progression author fields, inheritance and the single regional layout authority. Pure. */
 import type { ContentError, SpeciesSource } from "./schema.ts";
 import type { DexLayout, DexLayoutTransition, MapMetadata, RegionalDex, SpeciesKey } from "../rules/types.ts";
@@ -15,8 +16,6 @@ const text = (v: unknown): v is string => typeof v === "string" && v.length > 0;
 const copy = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const stable = (v: unknown): unknown => Array.isArray(v) ? v.map(stable) : obj(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, stable(v[k])])) : v;
 const only = (v: Record<string, unknown>, keys: readonly string[]): boolean => Object.keys(v).every(k => keys.includes(k));
-const COLORS = ["Red","Blue","Yellow","Green","Black","Brown","Purple","Gray","White","Pink"];
-const SHAPES = ["Head","Serpentine","Finned","HeadArms","HeadBase","BipedalTail","HeadLegs","Quadruped","Winged","Multiped","MultiBody","Bipedal","MultiWinged","Insectoid"];
 export const PROGRESSION_FIELDS = ["evolutions", "tutorMoves", "eggMoves", "types", "abilities", "hiddenAbilities", "flags", "pokedexForm", "categoryKey", "entryKey", "heightDm", "weightHg", "color", "shape", "formName", "formNameKey", "dexSortKeys"] as const;
 
 export function progressionFieldProblem(field: string, value: unknown): string | null {

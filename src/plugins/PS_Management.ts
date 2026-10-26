@@ -49,7 +49,7 @@ import type { ReceivingDecision } from '../framework/rules/receiving.ts';
     const was=inventoryDomStarts.has(key);if(dom.has(key)&&!was)inventoryDomStarts.set(key,frame);else if(!dom.has(key))inventoryDomStarts.delete(key);
     const edge=dom.has(key)&&!was,age=frame-(inventoryDomStarts.get(key)??frame),repeat=edge||dom.has(key)&&age>=(G.Input.keyRepeatWait??24)&&(age-(G.Input.keyRepeatWait??24))%(G.Input.keyRepeatInterval??6)===0;
     sample.pressed[key]=dom.has(key)||G.Input.isPressed(ALIAS[key]);
-    if(['up','left','right','down'].includes(key))sample.repeated[key as Direction]=repeat||G.Input.isRepeated(ALIAS[key]);else sample.triggered[key as Action]=edge||G.Input.isTriggered(ALIAS[key]);
+    sample.triggered[key]=edge||G.Input.isTriggered(ALIAS[key]);if(['up','left','right','down'].includes(key))sample.repeated[key as Direction]=repeat||G.Input.isRepeated(ALIAS[key]);
    }
    if(G.TouchInput.isCancelled())sample.triggered.back=true;inventorySample=sample;
   }

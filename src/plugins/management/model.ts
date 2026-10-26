@@ -1,7 +1,7 @@
 /** Host-independent input/focus model, owned by the MZ adapter. No game state writes. */
 export type Direction = 'up' | 'left' | 'right' | 'down';
 export type Action = 'back' | 'use' | 'action' | 'special' | 'jumpup' | 'jumpdown';
-export interface InputFrame { repeated: Partial<Record<Direction, boolean>>; triggered: Partial<Record<Action, boolean>>; pressed: Partial<Record<Action | Direction, boolean>> }
+export interface InputFrame { repeated: Partial<Record<Direction, boolean>>; triggered: Partial<Record<Action | Direction, boolean>>; pressed: Partial<Record<Action | Direction, boolean>> }
 const directions: Direction[] = ['up','left','right','down'];
 export function inputIntent(frame: InputFrame, context: 'box'|'panel'|'mark-summary'|'mark-storage'|'ordinary', organize = true): { direction?: Direction; action?: Action } {
   const direction = directions.find(key => frame.repeated[key]);

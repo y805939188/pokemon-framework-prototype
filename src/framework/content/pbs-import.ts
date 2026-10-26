@@ -1,3 +1,4 @@
+import { DEX_COLORS as COLORS, DEX_SHAPES as SHAPES } from "../rules/pokedex-query.ts";
 /** Author PBS species proposals (WP03/04/18/31/62, reference R). No source or output writes.
  * The legacy text API keeps accepted-record diagnostics. The gated bundle API is atomic and reads explicit
  * ordered base files, then forms, then regions. Catalog validation remains with normal compile/assembly.
@@ -39,8 +40,6 @@ const LATER: Record<string, string> = {
 };
 const ID = /^[a-z][a-z0-9-]{0,30}$/;
 const SYMBOL = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const COLORS = ['Red','Blue','Yellow','Green','Black','Brown','Purple','Gray','White','Pink'];
-const SHAPES = ['Head','Serpentine','Finned','HeadArms','HeadBase','BipedalTail','HeadLegs','Quadruped','Winged','Multiped','MultiBody','Bipedal','MultiWinged','Insectoid'];
 /** Original symbol spelling is validated before deriving a JSON id; no characters are guessed or deleted. */
 export const deriveIds = (section: string): { id: string; showdownId: string } | null => SYMBOL.test(section)
   ? { id: section.toLowerCase().replace(/_/g, '-'), showdownId: section.toLowerCase().replace(/_/g, '') } : null;
