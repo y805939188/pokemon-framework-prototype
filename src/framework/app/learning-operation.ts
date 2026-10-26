@@ -76,12 +76,12 @@ export class LearningOperation {
     this.operation = op;
     let entered = false;
     try {
-      this.options.enter(parent, intent); entered = true; this.current(op);
+      this.options.enter(op.parent, op.intent); entered = true; this.current(op);
       const before = clone(this.state.read()); this.current(op);
       const { content } = this.content(); this.current(op);
       const key = validatedContentIdentity(content); if (!key) throw Error("learning-content-identity-unavailable");
       const problems = validateGameContent(before, content); if (problems.length) throw Error("invalid-learning-state");
-      const member = before.party.find(member => member.id === intent.memberId); if (!member) throw Error("absent-party-target");
+      const member = before.party.find(member => member.id === op.intent.memberId); if (!member) throw Error("absent-party-target");
       const world = clone(this.options.world()); this.current(op);
       op.before = before; op.contentIdentity = key; op.worldIdentity = fingerprint(world);
       const catalog = catalogOf(content);
@@ -114,6 +114,7 @@ export class LearningOperation {
     return { content, state };
   }
   private plan(op: Operation, content: Content, member: Member): LearningOutcome {
+    if (member.id !== op.intent.memberId) throw Error("learning-target-conflict");
     const plan = op.intent.kind === "teach" ? planTeachingAction(member, content,
       op.intent.source.kind === "machine" ? { ...op.intent.source, inventory: op.before!.inventory } : op.intent.source, op.context!, op.answers)
       : op.intent.kind === "relearn" ? planRelearningAction(member, content, { shadow: op.context!.shadow }, op.reminder)

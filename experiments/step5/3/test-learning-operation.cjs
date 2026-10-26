@@ -92,3 +92,9 @@ test('final state-read callback cannot hide changed world facts from the prewrit
  let map=5,armed=false,reads=0,writes=0;const w=setup({worldPort:()=>({mapId:map}),port:state=>({read:()=>{if(armed&&++reads===3)map=6;return state.read();},replace:next=>{writes++;state.replace(next);}})});w.machine();armed=true;
  assert.equal(w.answer({kind:'learn',answer:{kind:'replace',slot:0}}).status,'pending');assert.equal(map,6);assert.equal(writes,0);assert.equal(quantity(w),2);assert.equal(w.state.current().party[0].friendship,99);assert.equal(w.answer({kind:'technical-terminate'}).status,'technically-terminated');
 });
+test('caller intent mutation inside initial read cannot retarget the member reserved by a Party parent',()=>{
+ let intent,armed=false;const w=setup({full:false,port:state=>({read:()=>{if(armed){armed=false;intent.memberId='OtherStable';}return state.read();},replace:next=>state.replace(next)})});
+ const game=clone(w.state.current()),other=clone(game.party[0]);other.id='OtherStable';game.party.push(other);w.state.replace(game);w.state.replaced.length=0;
+ const management=w.app.beginManagement(),token=w.app.beginInventoryOperation('item',{token:management,memberId:w.id});intent={kind:'teach',memberId:w.id,source:{kind:'machine',itemId:'study-tr',entry:'party'}};armed=true;
+ assert.equal(w.app.beginLearning(intent,{kind:'inventory',token}).status,'committed');assert.equal(intent.memberId,'OtherStable');assert(w.state.current().party.find(m=>m.id===w.id).moves.some(m=>m.id==='gust'));assert(!w.state.current().party.find(m=>m.id==='OtherStable').moves.some(m=>m.id==='gust'));assert.equal(w.state.replaced.length,1);assert.equal(quantity(w),1);w.app.endInventoryOperation(token);w.app.endManagement(management);
+});
