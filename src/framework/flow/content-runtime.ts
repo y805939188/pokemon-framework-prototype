@@ -17,6 +17,15 @@ import type { MemberCollection } from "../rules/storage.ts";
 import { own, setOwn } from "../rules/own.ts";
 import { battleNameOf, memberKey } from "../rules/species-key.ts";
 
+/** Strong compiled identity only; id/inputsHash/anonymous fallbacks are diagnostics, never effects authority. */
+export function validatedContentIdentity(content: Content): string | null {
+  const meta = content.meta;
+  if (!meta || meta.compiledSemantics !== COMPILED_SCHEMA_VERSION || typeof meta.inputsHash !== "string" || !/^[a-f0-9]{64}$/.test(meta.inputsHash)
+    || typeof meta.showdownSha !== "string" || !/^[a-f0-9]{40}$/.test(meta.showdownSha) || typeof meta.contentIdentity !== "string") return null;
+  const identity = sha256Hex(canonicalJson({ compiledSemantics: COMPILED_SCHEMA_VERSION, inputsHash: meta.inputsHash, showdownSha: meta.showdownSha }));
+  return meta.contentIdentity === identity ? identity : null;
+}
+
 /** Validate a cache independently of its producer. Version 1 is a rebuild request, never a save migration. */
 export function loadCompiled(json: unknown): CompiledContent {
   const obj = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);

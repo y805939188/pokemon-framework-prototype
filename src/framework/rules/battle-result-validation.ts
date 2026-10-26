@@ -3,7 +3,7 @@
  * Fresh content references, original capture templates, receiving and state-dependent limits
  * remain the primary planner's responsibility; exact replay needs none of those lookups.
  */
-import type { BattleResult } from "./state.ts";
+import type { BattleResult } from "./battle-result.ts";
 
 type Data = Record<string, unknown>;
 const MEMBER_ID = /^[A-Za-z0-9#._:-]{1,18}$/;

@@ -1791,10 +1791,10 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       eq(evidence.friendship[id].current, 104, "threshold order respected");
       assert(evidence.records.some((r: any) => r.kind === "appearance"), "initial appearance before UI take retained");
       assert(!("friendship" in handle.result().members[id]), "no new protocol member-patch field");
-      eq(game().party.find((m: any) => m.id === id).friendship, 99, "this capability batch does not implement persistent companion consumption");
+      eq(game().party.find((m: any) => m.id === id).friendship, 104, "E2a installs the complete acknowledged friendship chain with the main result");
       await G.DataManager.saveGame(53);
       fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-capability.json"), JSON.stringify({ state: clone(game()), slot: 53, rawHash: evidence.rawHash }));
-      return { input: "real scene, synthetic DOM keydown/keyup", rawHash: evidence.rawHash, records: evidence.records.length, friendship: evidence.friendship[id], v2Friendship: v2.control.members[id].friendship, v2SourceOnly: true, saveSlot: 53, persistentCompanion: false };
+      return { input: "real scene, synthetic DOM keydown/keyup", rawHash: evidence.rawHash, records: evidence.records.length, friendship: evidence.friendship[id], v2Friendship: v2.control.members[id].friendship, saveSlot: 53, persistentCompanion: true };
     });
     await scenario("C53-02 real host direct application: seal failure cannot lose capture/XP or replay", async () => {
       fresh(); const B = api(), content = W.PSFlow.content(), factory = B.composition.createBattleSessionFactory({ content: () => content, seed: () => [1,2,3,4] });
@@ -1828,8 +1828,24 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       eq(seal.control.members[id].friendship.value.current, 100, "independent acknowledged control retained");
       const result = app.finishBattle(handle, request); eq(result.commit, "applied", "primary survives");
       assert(game().party.length === before.party.length + 1 && game().party[0].exp > before.party[0].exp, "capture/XP survive");
-      eq(game().party[0].friendship, 99, "this source checkpoint does not yet install persistent V2 effects");
-      return { input: "direct application API in actual NW, synthetic observer fault", observer: seal.observer.members[id].critical, control: seal.control.members[id].friendship, primary: result.commit, persistentCompanion: false };
+      eq(game().party[0].friendship, 100, "E2a persists the independent complete control group despite observer loss");
+      return { input: "direct application API in actual NW, synthetic observer fault", observer: seal.observer.members[id].critical, control: seal.control.members[id].friendship, primary: result.commit, persistentCompanion: true };
+    });
+    await scenario("C53-05 real host atomic primary and R unknown barrier survive missing auxiliary seal", async () => {
+      fresh(); const B = api(), content = W.PSFlow.content(), id = game().party[0].id;
+      game().party[0].friendship = 99; game().party[0].readyToEvolve = true; game().party[0].evolutionReadiness = "known";
+      const factory = B.composition.createBattleSessionFactory({ content: () => content, seed: () => [1,2,3,4] });
+      let lookups = 0; factory.effects = () => { lookups++; throw new Error("synthetic missing V2 seal"); };
+      let replacements = 0; const app = new B.app.GameApplication({ state: { read: () => game(), replace: (next: any) => { assert(app.saveBlocked, "continuous transaction owner at host replacement"); replacements++; G.$gameSystem._psGame = next; } }, sessions: factory, projection: { project: () => {} }, content: () => ({ content }), random: seeded(1), clock: () => 0, itemWorld: () => ({ mapId: G.$gameMap.mapId() }) }, { receivingProfile: { mode: 1, naming: 1 } });
+      const before = clone(game()), request = { battleId: "host-effects-R-barrier", kind: "wild", foes: [{ species: "pidgey", level: 5 }], seq: 5 }, handle = await app.startBattle(request);
+      await handle.throwBall("masterball"); const raw = handle.result(), result = app.finishBattle(handle, request);
+      eq(result.commit, "applied", "legal primary committed"); eq(replacements, 1, "single replacement"); eq(lookups, 1, "single seal attempt");
+      assert(game().party.length === before.party.length + 1 && game().party[0].exp > before.party[0].exp, "capture and XP survive");
+      eq([game().party[0].readyToEvolve, game().party[0].evolutionReadiness, game().party[0].friendship], [true, "unknown", 99], "old value preserved with durable uncertainty barrier");
+      eq(app.finishBattle(handle, request).commit, "already-applied", "no late backfill"); eq(lookups, 1, "duplicate never refetches seal");
+      await G.DataManager.saveGame(54);
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-effects.json"), JSON.stringify({ slot: 54, state: clone(game()), result: raw, memberId: id }));
+      return { input: "actual NW application API and MZ save, synthetic seal failure", replacements, lookups, readiness: game().party[0].evolutionReadiness, slot: 54 };
     });
   }
 
@@ -1859,6 +1875,15 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         const expected = readExpected("ps-flow-expected-capability.json"); G.DataManager.setupNewGame(); await G.DataManager.loadGame(expected.slot);
         eq(game(), expected.state, "primary save identical across fresh NW process"); assert(!game().battleEvidence && api().storage.allMembers(game()).every((m: any) => (m.evolutionReadiness === "known" || m.readyToEvolve && m.evolutionReadiness === "unknown")), "no transient packet and persistent schema7 R combinations remain legal");
         eq(game().appliedBattles["host-capability-1"].hash, expected.rawHash, "original raw result ledger retained"); return { slot: expected.slot, input: "MZ load API in fresh NW process", primaryUnchanged: true };
+      });
+      if (fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-effects.json"))) await scenario("C53-V2 real restart: R unknown barrier and exact replay retain capture and XP", async () => {
+        const expected = readExpected("ps-flow-expected-effects.json"); G.DataManager.setupNewGame(); await G.DataManager.loadGame(expected.slot);
+        eq(game(), expected.state, "full committed effects state survives the new process");
+        const member = game().party.find((m: any) => m.id === expected.memberId); eq([member.readyToEvolve, member.evolutionReadiness, member.friendship], [true, "unknown", 99], "durable barrier is not silently repaired");
+        let contentReads = 0;
+        const app = new (api().app.GameApplication)({ state: { read: () => game(), replace: () => { throw new Error("replay must not write"); } }, sessions: { create: async () => { throw new Error("replay must not create"); } }, projection: { project: () => {} }, content: () => { contentReads++; throw new Error("replay must not read changed content"); } });
+        eq(app.commitResult(expected.result), "already-applied", "original raw/hash replay after restart"); eq(contentReads, 0, "zero content dependency"); eq(game(), expected.state, "no resource or readiness backfill");
+        return { slot: expected.slot, input: "MZ load API in fresh NW process plus direct replay", contentReads };
       });
       return;
     }

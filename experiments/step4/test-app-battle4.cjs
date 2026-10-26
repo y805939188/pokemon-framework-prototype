@@ -114,8 +114,9 @@ test('the capacity backstop: a capture that cannot be stored aborts the whole re
   const party = Array.from({ length: 6 }, (_, i) => mk(`P${i}`, 'Caterpie', 3));
   const { state, app } = fakeApp(gameOf(party), { limits: { ...E.limits.DEFAULT_LIMITS, boxes: 0 } });
   const before = JSON.stringify(state.current());
-  const r = { protocol: 1, battleId: 'c#1', outcome: { kind: 'caught', winner: null, target: 'W1-1', ball: 'pokeball' }, members: {}, bag: { pokeball: -1 }, captured: [mk('W1-1', 'Pidgey', 3)], dex: { seen: ['Pidgey'], owned: ['Pidgey'] } };
-  assert.throws(() => app.commitResult(r, { templates: { 'W1-1': saved(r.captured[0]) }, profile: { mode: 1, naming: 1 } }), e => e.reason === 'boxes-full');
+  const template = mk('W1-1', 'Pidgey', 3);
+  const r = { protocol: 1, battleId: 'c#1', outcome: { kind: 'caught', winner: null, target: 'W1-1', ball: 'pokeball' }, members: {}, bag: { pokeball: -1 }, captured: [S.protocolMember(template)], dex: { seen: ['Pidgey'], owned: ['Pidgey'] } };
+  assert.throws(() => app.commitResult(r, { templates: { 'W1-1': saved(template) }, profile: { mode: 1, naming: 1 } }), e => e.reason === 'boxes-full');
   assert.equal(JSON.stringify(state.current()), before);
 });
 

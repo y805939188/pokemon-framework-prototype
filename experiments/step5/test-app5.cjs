@@ -32,6 +32,7 @@ async function battle(w, r, { kind = 'wild', canLose = false } = {}) {
   w.sessions.next = r;
   const req = { battleId: r.battleId, kind, foes: [{ species: 'pidgey', level: 3 }], seq: 1, canLose };
   const h = await w.app.startBattle(req);
+  r.captured = r.captured.map(S.protocolMember); // Frozen result records, not schema-7 persistent individuals.
   for (const [i, caught] of r.captured.entries()) { caught.id = w.sessions.created.at(-1).setup.foes[i].id; r.outcome.target = caught.id; }
   return { h, req, o: w.app.finishBattle(h, req) };
 }
@@ -50,7 +51,8 @@ test('the session factory gets the battle view (Showdown names); the commit stor
   assert.equal('form' in w.sessions.created[0].game.party[0], false);
   const now = w.state.current();
   assert.deepEqual(now.party.map(m => [m.id, m.species, m.form]), [['A-1', 'charmander', 0], ['M1', 'pidgey', 0]]);
-  assert.deepEqual(now.dex, { ...expectedEmptyDex, seen: ['pidgey'], owned: ['pidgey'] });
+  const form = {gender: now.party[1].gender === 'F' ? 1 : 0, form: 0, shiny: false};
+  assert.deepEqual(now.dex, { ...expectedEmptyDex, seen: ['pidgey'], owned: ['pidgey'], seenForms: {pidgey:[form]}, lastSeenForm: {pidgey:form}, capturedCounts: {pidgey:1} });
   assert.deepEqual(E.saveSchema.validateGame(now), []);
 });
 

@@ -16,6 +16,7 @@ import type { HeldItemSource, ReceivingDecision, ReceivingProfile } from "./rece
 import { sha256Hex } from "./sha256.ts";
 import { DEFAULT_LIMITS } from "./limits.ts";
 import { own, setOwn } from "./own.ts";
+import { assertBattleResultShape } from "./battle-result-validation.ts";
 import { identityKeys } from "./species-key.ts";
 import type { SpeciesKeyResolver } from "./species-key.ts";
 import { advanceMemberOrdinal, completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity.ts";
@@ -25,22 +26,13 @@ import { newStats } from "./stats.ts";
 import type { GameStats } from "./stats.ts";
 import type { Limits } from "./limits.ts";
 import type { Content, DexState, Member, MemberOrigin, MoveSlot, Owner, PartialStats, Stats } from "./types.ts";
-
-export const PROTOCOL_VERSION = 1;
+import { PROTOCOL_VERSION, MEMBER_WRITE_SET } from "./battle-result.ts";
+import type { BattleResult } from "./battle-result.ts";
+export { PROTOCOL_VERSION, MEMBER_WRITE_SET } from "./battle-result.ts";
+export type { BattleResult, BattleOutcome, MemberPatch, WriteKey, Dex } from "./battle-result.ts";
 
 /** Version of the PERSISTENT game state document (rules/save-schema.ts migrates older ones). Not the battle protocol version. */
 export const GAME_SCHEMA = 7;
-
-/** Fields of a persistent member that a battle result may change. Everything else must be untouched. */
-export const MEMBER_WRITE_SET = ["level", "exp", "hp", "status", "statusCount", "moves", "evs", "friendship"] as const;
-export type WriteKey = (typeof MEMBER_WRITE_SET)[number];
-
-export type MemberPatch = Partial<Pick<Member, WriteKey>>;
-
-export interface Dex {
-  seen: string[];
-  owned: string[];
-}
 
 export interface GameState {
   schema: number;
@@ -63,24 +55,6 @@ export interface GameState {
 
 export interface Claim {
   kind: "grant";
-}
-
-export interface BattleOutcome {
-  kind: string;
-  winner: string | null;
-  target?: string;
-  ball?: string;
-}
-
-export interface BattleResult {
-  protocol: number;
-  battleId: string;
-  outcome: BattleOutcome;
-  members: Record<string, MemberPatch>;
-  bag: Record<string, number>;
-  captured: Member[];
-  dex: Dex;
-  money?: number;
 }
 
 export interface NewMemberInput {
@@ -199,16 +173,29 @@ export function capturedTemplates(result: BattleResult, templates: Readonly<Reco
  * result. Without `keys` the battle name is the content id (fixture worlds); the game application always passes them.
  */
 export function applyBattleResult(state: GameState, result: BattleResult, limits: Limits = DEFAULT_LIMITS, keys: SpeciesKeyResolver = identityKeys, options: BattleCommitOptions = {}): { state: GameState; status: ApplyStatus } {
+  return applyResult(state, result, limits, keys, options, true);
+}
+
+/** Normal application path: validate every raw dex reference, but leave all dex writes to the source-aware owner.
+ * The original result and its ledger hash are unchanged. The legacy wrapper retains its explicit raw-dex behavior.
+ */
+export function planBattlePrimary(state: GameState, result: BattleResult, limits: Limits = DEFAULT_LIMITS, keys: SpeciesKeyResolver = identityKeys, options: BattleCommitOptions = {}): { state: GameState; status: ApplyStatus } {
+  return applyResult(state, result, limits, keys, options, false);
+}
+
+function applyResult(state: GameState, result: BattleResult, limits: Limits, keys: SpeciesKeyResolver, options: BattleCommitOptions, rawDex: boolean): { state: GameState; status: ApplyStatus } {
+  // Structural validity is independent of current content and must precede hashing or exact-replay shortcuts.
+  assertBattleResultShape(result);
   if (result.protocol !== PROTOCOL_VERSION) throw new Error(`unsupported protocol ${result.protocol}`);
   if (state.schema !== GAME_SCHEMA) throw new Error(`game state has schema ${state.schema}, this build writes schema ${GAME_SCHEMA}: migrate it first (rules/save-schema.ts)`);
   if (!result.battleId) throw new Error("result without battleId");
-  assertCapturedHeldSources(result.captured ?? [], options.templates ?? {}, options.heldItemSource);
   const h = resultHash(result);
   const prev = own(state.appliedBattles, result.battleId);
   if (prev) {
     if (prev.hash === h) return { state, status: "already-applied" };
     throw new Error(`battle ${result.battleId} already applied with a different result`);
   }
+  assertCapturedHeldSources(result.captured ?? [], options.templates ?? {}, options.heldItemSource);
   const next = clone(state);
   for (const [id, patch] of Object.entries(result.members || {})) {
     const m = next.party.find((x) => x.id === id);
@@ -222,21 +209,21 @@ export function applyBattleResult(state: GameState, result: BattleResult, limits
   }
   next.inventory = applyBattleBag(next.inventory, result.bag || {}, catalogOf(options.content), inventoryPolicy(options.content, limits));
   const received = capturedTemplates(result, options.templates ?? {}, keys, options.content);
-  if (received.length) {
-    const planned = receiveMembers(next, received, options.decisions ?? {}, { limits, content: options.content ?? { species: {} }, profile: options.profile ?? { mode: 0, naming: 0 }, depositHeal: options.depositHeal ?? false });
-    next.party = planned.state.party; next.storage = planned.state.storage;
-    next.nextMemberOrdinal = advanceMemberOrdinal(state.nextMemberOrdinal, received.map((m) => m.id), options.nextMemberOrdinal ?? state.nextMemberOrdinal);
-  }
   if (result.dex) {
     for (const list of ["seen", "owned"] as const) for (const name of result.dex[list] || []) {
       const k = keys(name);
       if (!k) throw new Error(`dex ${list}: "${name}" has no persistent species key in the content`);
-      if (!next.dex[list].includes(k.species)) next.dex[list].push(k.species);
+      if (rawDex && !next.dex[list].includes(k.species)) next.dex[list].push(k.species);
     }
   }
   if (result.money !== undefined) {
     if (!Number.isSafeInteger(result.money) || !Number.isSafeInteger(next.money + result.money)) throw new Error("invalid-money-delta");
     next.money = Math.min(moneyCap(options.content,limits.money), Math.max(0, next.money + result.money));
+  }
+  if (received.length) {
+    const planned = receiveMembers(next, received, options.decisions ?? {}, { limits, content: options.content ?? { species: {} }, profile: options.profile ?? { mode: 0, naming: 0 }, depositHeal: options.depositHeal ?? false });
+    next.party = planned.state.party; next.storage = planned.state.storage;
+    next.nextMemberOrdinal = advanceMemberOrdinal(state.nextMemberOrdinal, received.map((m) => m.id), options.nextMemberOrdinal ?? state.nextMemberOrdinal);
   }
   setOwn(next.appliedBattles, result.battleId, { hash: h });
   return { state: next, status: "applied" };
