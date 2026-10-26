@@ -24,7 +24,7 @@ function fixture(E,sourceSha,host={},options={}){
  const replace=next=>{writes++;if(host.replace)host.replace(next);else state=next;};
  const sessions=E.composition.createBattleSessionFactory({content:()=>c,seed:()=>[1,2,3,4]}),effects=sessions.effects,seals=[];let calls=0;
  sessions.effects=(...args)=>{calls++;const s=effects(...args);seals.push(clone(s));return s;};
- const app=new E.app.GameApplication({state:{read,replace},content:()=>({content:c}),sessions,projection:{project:()=>{}},random:()=>0,clock:()=>0,itemWorld:()=>({mapId:0})},{receivingProfile:{mode:1,naming:1}});host.bind?.(app,c);
+ const app=new E.app.GameApplication({state:{read,replace},content:()=>({content:c}),sessions,projection:{project:()=>{}},random:()=>0,clock:()=>0,itemWorld:()=>({mapId:0})},{receivingProfile:{mode:1,naming:1},depositHeal:options.depositHeal===true});host.bind?.(app,c);
  return{c,app,read,replace,seals,heroId:hero.id,restoreIdentity:()=>{c.meta=clone(trusted);},calls:()=>calls,writes:()=>writes,checkpoint:async(label,result)=>{assert.deepEqual(E.saveSchema.validateGameContent(read(),c),[]);assert(!app.saveBlocked);return host.checkpoint?.(label,{app,content:c,state:clone(read()),result:clone(result)});}};
 }
 function drain(app){for(let n=0;n<12&&app.pendingPokedex;n++){const p=app.pendingPokedex;assert.notEqual(p.phase,'failed');const r=app.resolvePokedex(p.token,p.revision,{kind:p.phase==='message'?'message-complete':'close-entry'});assert.notEqual(r.status,'refused');}assert(!app.pendingPokedex);}
@@ -43,15 +43,16 @@ async function actualDamage(E,sourceSha,host){
  return{kind:'real default Showdown/session/application D=62; event selection cancelled explicitly',damage:damage.value.total,state:clone(w.read()),content:clone(w.c)};
 }
 async function unknownReadiness(E,sourceSha,host){
- const w=fixture(E,sourceSha,host,{oldReady:true,anonymous:true}),request={battleId:'M1-untrusted-source',kind:'wild',seq:1,foes:[{species:'Pidgey',level:5}]},h=await w.app.startBattle(request),xp=original(w).exp;
+ const w=fixture(E,sourceSha,host,{oldReady:true,anonymous:true,depositHeal:true}),request={battleId:'M1-untrusted-source',kind:'wild',seq:1,foes:[{species:'Pidgey',level:5}]},h=await w.app.startBattle(request),xp=original(w).exp;
  assert.equal((await h.useItem('potion',w.heroId)).ok,true);assert.equal((await h.throwBall('masterball')).ok,true);const raw=h.result();assert(h.party[0].friendship>99);
  const done=w.app.finishBattle(h,request);assert.equal(done.commit,'applied');assert(w.app.pendingPokedex,'trusted primary capture may offer ordinary Info');assert.equal(w.calls(),0,'missing content authority must not fetch an auxiliary source');
  assert.deepEqual([original(w).readyToEvolve,original(w).evolutionReadiness,original(w).friendship],[true,'unknown',99]);assert.equal(original(w).exp,xp,'level100 fixture remains capped, not a claim about gained XP');
  const captured=w.read().party.at(-1);assert.equal(captured.species,'Pidgey');assert.equal(w.read().dex.capturedCounts.Pidgey,1);assert.equal(w.read().appliedBattles[raw.battleId].hash,E.state.resultHash(raw));
  drain(w.app);assert(!w.app.saveBlocked);assert.deepEqual([original(w).readyToEvolve,original(w).evolutionReadiness,original(w).friendship],[true,'unknown',99]);
  w.restoreIdentity();const before=clone(w.read()),blocked=w.app.beginEventEvolution({event:7,memberId:w.heroId});assert.equal(blocked.status,'unchanged');assert(blocked.result.diagnostics.length);assert.deepEqual(w.read(),before,'valid current content cannot backfill this battle');
+ const fullHP=E.heal.healMember(original(w),w.c,{preserveReadyToEvolve:true}).hp;assert(original(w).hp<fullHP,'the pre-deposit body is genuinely damaged');
  const t=w.app.beginManagement(),m=w.app.manage(t,'deposit',{kind:'move',source:{id:w.heroId,position:{kind:'party',index:0}},target:{kind:'box',box:0,slot:0},expectedTargetId:null});assert.equal(m.status,'applied');w.app.endManagement(t);
- assert(original(w).hp>50);assert.deepEqual([original(w).readyToEvolve,original(w).evolutionReadiness],[true,'unknown']);assert.equal(w.calls(),0);await w.checkpoint('unknown-R-deposited',raw);
+ assert.equal(original(w).hp,fullHP,'explicit deposit healing restored the full body while keeping R provenance');assert.deepEqual([original(w).readyToEvolve,original(w).evolutionReadiness],[true,'unknown']);assert.equal(w.calls(),0);await w.checkpoint('unknown-R-deposited',raw);
  // A normal withdraw is another existing owner, not a synthesized readiness repair.
  const t2=w.app.beginManagement(),n=w.app.manage(t2,'withdraw',{kind:'move',source:{id:w.heroId,position:{kind:'box',box:0,slot:0}},target:{kind:'party',index:w.read().party.length},expectedTargetId:null});assert.equal(n.status,'applied');w.app.endManagement(t2);
  const unchanged=clone(w.read());assert.equal(w.app.beginEventEvolution({event:7,memberId:w.heroId}).status,'unchanged');assert.deepEqual(w.read(),unchanged);
