@@ -8,6 +8,14 @@ import type { LocaleTable } from "../translator.ts";
 export const zh: LocaleTable = {
   meta: { name: "简体中文", font: "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif" },
   text: {
+    "evolution.tradeTitle": "交换",
+    "evolution.tradeOffer": "用{old}交换{target}吗？",
+    "evolution.tradeYes": "是，开始交换",
+    "evolution.tradeNo": "否，保留原成员",
+    "evolution.tradeSending": "{trainer}送来{target}，交换{old}。",
+    "evolution.tradeFarewell": "向{name}道别。",
+    "evolution.tradeCare": "请好好照顾{name}。",
+    "evolution.tradeCardWait": "信息卡2.5秒后继续；确认或返回可提前继续。",
     "evolution.learned": "学会了{move}！",
     "evolution.ended": "被中断的流程已结束，已经生效的变更保留。",
     "evolution.noTarget": "没有符合条件的进化目标。",

@@ -4,6 +4,14 @@ import type { LocaleTable } from "../translator.ts";
 export const en: LocaleTable = {
   meta: { name: "English" },
   text: {
+    "evolution.tradeTitle": "Trade",
+    "evolution.tradeOffer": "Trade {old} for {target}?",
+    "evolution.tradeYes": "Yes, begin trade",
+    "evolution.tradeNo": "No, keep my Pokémon",
+    "evolution.tradeSending": "For {old}, {trainer} sends {target}.",
+    "evolution.tradeFarewell": "Bid farewell to {name}.",
+    "evolution.tradeCare": "Take good care of {name}.",
+    "evolution.tradeCardWait": "Card advances after 2.5 seconds; confirm or back advances sooner.",
     "evolution.learned": "Learned {move}!",
     "evolution.ended": "The interrupted operation has ended. Already installed changes are kept.",
     "evolution.noTarget": "No matching evolution was found.",

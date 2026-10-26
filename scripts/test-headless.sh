@@ -92,6 +92,8 @@ SUITES=(
   experiments/step5/3/test-learning-ui.cjs
   experiments/step5/3/test-evolution-timeline.cjs
   experiments/step5/3/test-evolution-ui.cjs
+  experiments/step5/3/test-trade-timeline.cjs
+  experiments/step5/3/test-trade-ui.cjs
   experiments/step5/3/test-egg-move-content.cjs
   experiments/step5/3/test-triggered-evolution.cjs
   experiments/step5/3/test-trade-operation.cjs
