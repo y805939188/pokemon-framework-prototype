@@ -47,6 +47,9 @@ import { developmentCapabilities } from "../framework/rules/config";
     readonly pendingEvolution: any;
     readonly pendingLearning: any;
     readonly pendingTriggeredEvolution: any;
+    readonly pendingTrade: any;
+    beginTrade(requestId: string, intent: any): any;
+    resolveTrade(token: string, revision: number, decision: any): any;
     beginEvolutionItem(parent: string, requestId: string, intent: any): any;
     beginEventEvolution(intent?: any): any;
     resolveTriggeredEvolution(token: string, revision: number, decision: any): any;
@@ -73,6 +76,8 @@ import { developmentCapabilities } from "../framework/rules/config";
     beginEvolutionItem(parent: string, requestId: string, intent: any): any { return PSFlow.app().beginEvolutionItem(parent, requestId, intent); },
     beginEventEvolution(intent: any = {}): any { return PSFlow.app().beginEventEvolution(intent); },
     resolveTriggeredEvolution(token: string, revision: number, decision: any): any { return PSFlow.app().resolveTriggeredEvolution(token, revision, decision); },
+    beginTrade(requestId: string, intent: any): any { return PSFlow.app().beginTrade(requestId, intent); },
+    resolveTrade(token: string, revision: number, decision: any): any { return PSFlow.app().resolveTrade(token, revision, decision); },
     assertBattleAllowed(): void { const capabilities = developmentCapabilities(PSFlow.developerCapabilities); if (!capabilities.allowExperimentalHeldItemBattle && (PSFlow.game().party || []).some((m: any) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成"); },
     running: false, // a battle scene is open (the interpreter waits on this)
     request: null as any,
@@ -627,6 +632,11 @@ import { developmentCapabilities } from "../framework/rules/config";
   // MZ's "Exit Event Processing" does; interpreters outside that calling chain are not touched.
   const baseUpdateWaitMode = G.Game_Interpreter.prototype.updateWaitMode;
   G.Game_Interpreter.prototype.updateWaitMode = function (this: any) {
+    if (this._waitMode === "psTrade") {
+      const pending = PSFlow._app?.pendingTrade;
+      if (pending && this._psTradeToken === pending.token) return true;
+      this._waitMode = ""; delete this._psTradeToken; return false;
+    }
     if (this._waitMode === "psEvolutionAction") {
       const pending = PSFlow._app?.pendingTriggeredEvolution;
       if (pending && this._psEvolutionActionToken === pending.token) return true;

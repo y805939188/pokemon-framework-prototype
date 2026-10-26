@@ -80,11 +80,11 @@ export class TradeOperation {
   matchesContinuation(token: string): boolean { return !!this.operation?.evolution?.matches(token); }
   get view(): TradeDraftView | null {
     const op = this.operation; if (!op?.before || op.index === undefined) return null;
-    const member = op.draft?.party.find(value => value.id === op.incomingId);
-    return clone({ token: op.token, revision: op.revision, draftKey: op.token, source: "trade-draft", phase: op.error ? "failed" : op.phase,
+    const member = op.draft?.party.find(value => value.id === op.incomingId), evolution = this.continuation;
+    return clone({ token: op.token, revision: op.revision, draftKey: op.token, source: "trade-draft", phase: op.error || evolution?.phase === "failed" ? "failed" : op.phase,
       outgoing: op.before.party[op.index]!, ...(member ? { incoming: { source: "trade-draft", draftKey: op.token, member }, dex: op.draft!.dex } : {}),
-      ...(op.entry ? { entry: op.entry } : {}), ...(this.continuation ? { evolution: this.continuation } : {}),
-      ...(op.error ? { error: op.error, reloadRequired: op.reloadRequired } : {}) });
+      ...(op.entry ? { entry: op.entry } : {}), ...(evolution ? { evolution } : {}),
+      ...(op.error || evolution?.error ? { error: op.error ?? evolution?.error, reloadRequired: op.reloadRequired || evolution?.reloadRequired } : {}) });
   }
   invalidate(): void { this.operation?.evolution?.invalidate(); this.operation = null; this.receipts.clear(); }
   private current(op: Operation): void { if (this.operation !== op || op.generation !== this.options.generation()) throw Error("stale-trade"); }
@@ -122,7 +122,7 @@ export class TradeOperation {
       if (op.index < 0) throw Error("outgoing-not-in-party"); this.fresh(op);
       const incoming = op.intent.incoming;
       if (!incoming || typeof incoming !== "object") throw Error("invalid-trade-incoming");
-      if ("existing" in incoming) { requireTemplate(incoming.existing, incoming.existing?.id); if (incoming.existing.isEgg || incoming.existing.mail) throw Error("unsupported-incoming-egg-or-mail"); }
+      if ("existing" in incoming) requireTemplate(incoming.existing, incoming.existing?.id);
       else if (!resolveSpecies(content, incoming.species)) throw Error("unknown-trade-species");
       const held = "existing" in incoming ? incoming.existing.item : incoming.item;
       if (held && (!this.options.allowHeldSources || !this.options.holdable(held))) throw Error("held-item-source-disabled-or-invalid");
@@ -208,7 +208,10 @@ export class TradeOperation {
         if (stage === "received") result = this.evolve(op);
         else { const p = op.evolution!.view!; result = this.afterEvolution(op, op.evolution!.resolve(p.token, p.revision, { kind: "continue-learning" })); }
       } else if (decision.kind === "commit" && op.phase === "ready") return this.commit(op);
-      else if (decision.kind === "retry") result = this.pending(op);
+      else if (decision.kind === "retry" && op.phase === "evolution") {
+        const p = op.evolution!.view!;
+        result = this.afterEvolution(op, op.evolution!.resolve(p.token, p.revision, { kind: "retry" }, () => { this.fresh(op); }));
+      } else if (decision.kind === "retry") result = this.pending(op);
       else return { status: "refused", reason: "trade-stage-decision-mismatch" };
       op.revision++; return result.status === "pending" ? this.pending(op) : result;
     } catch (error) { return this.failure(op, error); } finally { this.resolving = false; }
