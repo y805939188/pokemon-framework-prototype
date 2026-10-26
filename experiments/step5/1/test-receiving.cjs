@@ -33,10 +33,17 @@ test('P51-14/21: old receiving token and old finish after state replacement do n
  const x=setup(),r=await battle(x);const pending=x.app.finishBattle(r.handle,r.request);x.app.stateReplacedByHost();const before=clone(x.state.current());assert.equal(x.app.resolveReceiving(pending.receivingToken,{}).reason,'stale-operation');assert.equal(x.app.finishBattle(r.handle,r.request).aborted,true);assert.deepEqual(x.state.current(),before);
  x.sessions.next=()=>{throw Error('not ended');};await x.app.startBattle({...r.request,battleId:'new#2'});assert.equal(x.app.finishBattle(r.handle,r.request).aborted,true);assert.equal(x.app.saveBlocked,true);
 });
-test('P51-14: public missing-template refusal precedes replay ledger; explicit templates without decisions returns pending',async()=>{
+test('P51-14: fresh public capture requires its original template; explicit templates without decisions returns pending',async()=>{
  const x=setup(),r=await battle(x);x.app.abortBattle(r.request,'test switches to public caller');const before=clone(x.state.current());assert.equal(x.app.commitResult(r.result),'no-template');assert.deepEqual(x.state.current(),before);
  const template=E.speciesKey.toPersistentMember(r.foe,content);assert.equal(x.app.commitResult(r.result,{templates:{[r.foe.id]:template},nextMemberOrdinal:'999'}),'pending');const token=x.app.pendingReceiving.token;assert.equal(x.app.saveBlocked,true);
- assert.equal(x.app.resolveReceiving(token,{[r.foe.id]:{nickname:{kind:'keep'}}}).status,'applied');assert.equal(x.app.commitResult(r.result),'no-template');assert.equal(x.app.commitResult(r.result,{templates:{[r.foe.id]:template},profile:auto}),'already-applied');assert.equal(x.state.replaced.length,1);
+ assert.equal(x.app.resolveReceiving(token,{[r.foe.id]:{nickname:{kind:'keep'}}}).status,'applied');assert.equal(x.state.replaced.length,1);
+});
+test('P51-14: installed exact capture replay needs neither current content nor its original template',async()=>{
+ const x=setup(),r=await battle(x);x.app.abortBattle(r.request,'test switches to public caller');const template=E.speciesKey.toPersistentMember(r.foe,content);
+ assert.equal(x.app.commitResult(r.result,{templates:{[r.foe.id]:template},profile:auto}),'applied');const before=clone(x.state.current());let loads=0;
+ const projection=E.fakes.createRecordingProjection(),app=new E.app.GameApplication({state:x.state,sessions:E.fakes.createFakeSessions({}),projection,content:()=>{loads++;throw Error('replay must not load current content');}});
+ assert.equal(app.commitResult(r.result),'already-applied');assert.equal(app.commitResult(r.result,{templates:{[r.foe.id]:template},profile:auto}),'already-applied');
+ assert.equal(loads,0);assert.deepEqual(x.state.current(),before);assert.equal(x.state.replaced.length,1);assert.equal(projection.outcomes.length,0);assert.equal(app.saveBlocked,false);
 });
 test('P51-15: multi-member grant collects decisions before whole grant/claim/items/money; repeat pending never rerolls',()=>{
  const x=setup({size:0});let pending=x.app.claimGrant('starter');assert.equal(pending.status,'pending');const raw=clone(x.state.current()),draws=x.draws;assert.equal(x.app.claimGrant('starter').token,pending.token);assert.equal(x.draws,draws);assert.deepEqual(x.state.current(),raw);
