@@ -111,7 +111,9 @@ export class LearningOperation {
     if (validatedContentIdentity(this.content().content) !== op.contentIdentity) retire("learning-content-changed"); this.current(op);
     const finalWorld = this.options.world(); this.current(op);
     if (fingerprint(finalWorld) !== op.worldIdentity) retire("learning-world-changed");
-    return { content, state };
+    const finalContent = this.content().content; this.current(op);
+    if (validatedContentIdentity(finalContent) !== op.contentIdentity) retire("learning-content-changed");
+    return { content: finalContent, state };
   }
   private plan(op: Operation, content: Content, member: Member): LearningOutcome {
     if (member.id !== op.intent.memberId) throw Error("learning-target-conflict");

@@ -98,3 +98,9 @@ test('caller intent mutation inside initial read cannot retarget the member rese
  const management=w.app.beginManagement(),token=w.app.beginInventoryOperation('item',{token:management,memberId:w.id});intent={kind:'teach',memberId:w.id,source:{kind:'machine',itemId:'study-tr',entry:'party'}};armed=true;
  assert.equal(w.app.beginLearning(intent,{kind:'inventory',token}).status,'committed');assert.equal(intent.memberId,'OtherStable');assert(w.state.current().party.find(m=>m.id===w.id).moves.some(m=>m.id==='gust'));assert(!w.state.current().party.find(m=>m.id==='OtherStable').moves.some(m=>m.id==='gust'));assert.equal(w.state.replaced.length,1);assert.equal(quantity(w),1);w.app.endInventoryOperation(token);w.app.endManagement(management);
 });
+test('the final world observation also rechecks strong content before replacing resources',()=>{
+ let alternate=false,armed=false,reads=0,writes=0;const w=setup({worldPort:()=>{if(armed&&++reads===4)alternate=true;return {mapId:5};},contentPort:c=>{
+  if(!alternate)return {content:c};const meta={...c.meta,inputsHash:'b'.repeat(64)};meta.contentIdentity=E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics:meta.compiledSemantics,inputsHash:meta.inputsHash,showdownSha:meta.showdownSha}));return {content:{...c,meta}};
+ },port:state=>({read:()=>state.read(),replace:next=>{writes++;state.replace(next);}})});w.machine();armed=true;
+ assert.equal(w.answer({kind:'learn',answer:{kind:'replace',slot:0}}).status,'pending');assert(alternate);assert.equal(writes,0);assert.equal(quantity(w),2);assert.equal(w.answer({kind:'technical-terminate'}).status,'technically-terminated');
+});
