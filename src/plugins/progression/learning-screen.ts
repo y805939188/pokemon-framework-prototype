@@ -114,6 +114,7 @@ export class LearningScreen {
       this.row('new', this.port.move(s.move.id), decline, this.text('keepOld'), s.move.id),
     ], decline, s.reason ? this.text(s.reason) : undefined);
   }
+  get completedOutcome(): LearningOutcome | null { return this.final ? structuredClone(this.final) : null; }
   select(key: string) { this.actions.get(key)?.(); }
   back() { this.backAction(); }
   terminate() { if (this.view) this.answer({ kind: 'technical-terminate' }); else if (this.final) this.port.close(this.final); }
