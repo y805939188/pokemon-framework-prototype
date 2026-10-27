@@ -34,15 +34,15 @@ test.after(() => { if (dir) fs.rmSync(dir, { recursive: true, force: true }); })
 
 function host(game) {
   const Ctor = () => { function C() {} C.prototype = { initialize() {}, terminate() {} }; return C; };
-  const errors = [], warnings = [], writes = [];
+  const errors = [], warnings = [], writes = [], loads = [];
   function Game_System() {}
   Game_System.prototype.isSaveEnabled = function () { return this._saveEnabled !== false; };
   const sys = Object.assign(new Game_System(), { _psGame: game, _psBattleSeq: 0 });
   const req = p => {
+    loads.push(p);
     if (p === 'path' || p === 'fs') return require(p);
-    if (/engine\.cjs$/.test(p)) return E;
-    if (/fixtures\/game\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/fixtures/game.cjs'));
-    if (/game\/describe\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/game/describe.cjs'));
+    if (/production\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/production.cjs'));
+    if (/testing\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/testing.cjs'));
     throw new Error('unexpected require ' + p);
   };
   req.resolve = p => path.resolve(ROOT, p);
@@ -66,7 +66,7 @@ function host(game) {
   const flow = ctx.PSFlow;
   flow.receiveOptions = { mode: 1, naming: 1 }; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.rng = lcg(1);
   const load = (next) => { if (next !== undefined) sys._psGame = next; ctx.DataManager.extractSaveContents({}); };
-  return { ctx, flow, sys, map, errors, warnings, writes, load, player: new Game_Player() };
+  return { ctx, flow, sys, map, errors, warnings, writes, loads, load, player: new Game_Player() };
 }
 
 test('a save written by the step 4 code loads: migrated to schema 4 with the content mapping, reported in _psSaveInfo', () => {
@@ -138,7 +138,10 @@ test('species names by content id + form or by battle name; ResetGame stores the
   const byId = h.flow.speciesName('charmander', 0), byBattle = h.flow.speciesName('Charmander');
   assert.equal(byId, byBattle); assert.notEqual(byId, 'charmander', 'the content text key is used');
   assert.equal(h.flow.speciesName('nope'), 'nope', 'an unknown name is shown as given');
+  assert.ok(h.loads.some(p => /production\.cjs$/.test(p)), 'ordinary sample work loads the production entry');
+  assert.equal(h.loads.some(p => /testing\.cjs$/.test(p)), false, 'ordinary sample work never eagerly loads testing');
   h.flow.resetGame();
+  assert.ok(h.loads.some(p => /testing\.cjs$/.test(p)), 'the explicit ResetGame aid loads testing');
   assert.deepEqual(J(h.sys._psGame).party.map(m => [m.species, m.form]), [['charizard', 0], ['blastoise', 0], ['venusaur', 0]]);
   assert.deepEqual(E.saveSchema.validateGame(J(h.sys._psGame)), []);
 });

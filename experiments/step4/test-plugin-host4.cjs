@@ -53,9 +53,8 @@ function host({ interpreter = false, saveEnabled = true, failMessage = false, ga
   const sys = Object.assign(new Game_System(), { _saveEnabled: saveEnabled, _psGame: game, _psBattleSeq: 0 });
   const req = p => {
     if (p === 'path' || p === 'fs') return require(p);
-    if (/engine\.cjs$/.test(p)) return E;
-    if (/fixtures\/game\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/fixtures/game.cjs'));
-    if (/game\/describe\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/game/describe.cjs'));
+    if (/production\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/production.cjs'));
+    if (/testing\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/testing.cjs'));
     throw new Error('unexpected require ' + p);
   };
   req.resolve = p => path.resolve(ROOT, p);

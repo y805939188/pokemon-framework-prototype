@@ -6,13 +6,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 [[ -d js/engine/showdown/dist ]] || { echo "engine not staged: run scripts/build-showdown.sh first" >&2; exit 1; }
-# the TS framework: strict type check, import-boundary check, then build the bundles every suite loads
+# the TS framework: strict type check, import-boundary check, then rebuild runtime, declarations, sample and local delivery
 pnpm --dir src typecheck:framework
 node scripts/check-boundaries.cjs
-pnpm --dir src build:engine > /dev/null
-# Source-backed host fixtures validate the compiled sample via the real assembler.
-# This standalone CI entry must prepare it; a prior full plugin build is not a prerequisite.
-pnpm --dir src content:build
+pnpm --dir src build:distribution > /dev/null
 SUITES=(
   experiments/step2/test-headless.cjs
   experiments/step2/s2/test-actions.cjs
@@ -25,6 +22,9 @@ SUITES=(
   experiments/step2/s5/test-engine-contract.cjs
   scripts/tests/reactor-install.test.cjs
   scripts/tests/check-boundaries.test.cjs
+  experiments/framework-remediation/test-step1-public-api.cjs
+  experiments/framework-remediation/test-step1-distribution.cjs
+  experiments/framework-remediation/test-step1-external-consumer.cjs
   experiments/step3/test-content.cjs
   experiments/step3/test-i18n.cjs
   experiments/step3/test-save.cjs

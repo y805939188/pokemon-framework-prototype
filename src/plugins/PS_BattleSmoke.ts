@@ -1,5 +1,5 @@
 /**
- * Step 2.1 smoke plugin. Loads js/engine/harness.cjs (the same module the Node gate uses)
+ * Step 2.1 smoke plugin. Loads js/engine/build/testing.cjs (the same harness the Node gate uses)
  * from the game directory resolved at runtime, runs all checks, writes a JSON report and
  * shows a PASS/FAIL overlay. No battle UI: this only proves the engine loads and behaves
  * identically inside the NW.js runtime.
@@ -32,14 +32,14 @@ interface NodeFs {
 
   // The page URL is chrome-extension://..., so the game directory comes from Node's
   // resolver (relative to index.html) at runtime; nothing absolute is baked into the build.
-  const HARNESS = "./js/engine/harness.cjs";
-  function harnessPath(): string {
+  const TESTING = "./js/engine/build/testing.cjs";
+  function testingPath(): string {
     if (!nodeRequire) throw new Error("Node require() is not available in this runtime");
-    return nodeRequire.resolve(HARNESS);
+    return nodeRequire.resolve(TESTING);
   }
   function gameDir(): string {
     const nodePath = nodeRequire!("path") as { dirname(p: string): string };
-    return nodePath.dirname(nodePath.dirname(nodePath.dirname(harnessPath()))) + "/";
+    return nodePath.dirname(nodePath.dirname(nodePath.dirname(nodePath.dirname(testingPath())))) + "/";
   }
 
   function argValue(name: string): string | undefined {
@@ -89,7 +89,7 @@ interface NodeFs {
     started = true;
     let report: SmokeReport;
     try {
-      const harness = nodeRequire!(HARNESS) as Harness;
+      const harness = (nodeRequire!(TESTING) as { harness: Harness }).harness;
       if (!harness) throw new Error("harness not loaded");
       const t0 = performance.now();
       report = await harness.runSmoke({

@@ -2,7 +2,7 @@
 import { drawLearningPage } from './progression/learning-draw.ts';
 import { LearningScreen } from './progression/learning-screen.ts';
 import { InputLatch } from './management/model.ts';
-import type { LearningIntent, LearningParent, LearningOutcome } from '../framework/app/learning-operation.ts';
+import type { LearningIntent, LearningParent, LearningOutcome } from '../framework/app/index.ts';
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Progression',flow=()=>W.PSFlow,app=()=>flow().app();
  const tr=(key:string,params?:Record<string,string|number>)=>flow().translator().t('progression.'+key,params);

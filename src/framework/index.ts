@@ -1,4 +1,7 @@
-/** Public entry of the engine bundle (js/engine/build/engine.cjs). Namespaces mirror the module responsibilities. */
+/**
+ * Legacy public entry of js/engine/build/engine.cjs. Keep every historical export, including testing facilities.
+ * New consumers should choose production.cjs or testing.cjs explicitly; neither may depend on this legacy entry.
+ */
 export * as growth from "./rules/growth.ts";
 export * as rules from "./rules/rules.ts";
 export * as state from "./rules/state.ts";

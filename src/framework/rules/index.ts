@@ -20,6 +20,13 @@ export * as stats from "./stats.ts";
 export * as config from "./config.ts";
 export * as digest from "./sha256.ts";
 export type * from "./types.ts";
+// Named type contracts used by host adapters and public consumers; type-only exports do not change the core runtime keys.
+export type { ItemDefinition } from "./item-catalog.ts";
+export type { MemberPosition } from "./storage.ts";
+export type { MemberReference } from "./storage-operations.ts";
+export type { ReceivingDecision, ReceivingProfile } from "./receiving.ts";
+export type { LearningAnswer, LearningPending } from "./learning.ts";
+export type { DexAppearance } from "./pokedex.ts";
 
 export * as memberIdentity from "./member-identity.ts";
 export * as creationForms from "./creation-form.ts";

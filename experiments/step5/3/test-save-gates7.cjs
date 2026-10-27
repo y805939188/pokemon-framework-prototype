@@ -26,7 +26,7 @@ function host(content = E.fixtures.content) {
   System.prototype.isSaveEnabled = () => true;
   const system = Object.assign(new System(), {_psGame: current});
   const context = {
-    Error, Date, Promise, console: {error(){},warn(){}}, require: p => {assert.match(p,/engine\.cjs$/);return E;},
+    Error, Date, Promise, console: {error(){},warn(){}}, require: p => {assert.match(p,/production\.cjs$/);return require(path.join(ROOT, 'js/engine/build/production.cjs'));},
     Game_System: System, $gameSystem: system,
     DataManager: {extractSaveContents(){}, makeSaveContents(){made++;return {system};}, saveGame(){saved++;this.makeSaveContents();return Promise.resolve(0);}},
     PSFlow: {running:false, operationPending:()=>pending, content(){if(unavailable)throw Error('injected unavailable content');return content;},speciesKeyResolver:()=>E.speciesKey.speciesKeyResolver(content),stateReplaced(){replacements++;}},

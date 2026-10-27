@@ -1,0 +1,12 @@
+'use strict';
+const assert = require('node:assert/strict');
+const order = process.argv[2].split(',');
+const loaded = {};
+for (const name of order) loaded[name] = require(`@pokemon-framework/engine/${name}`);
+const P = loaded.production, T = loaded.testing, L = loaded.legacy;
+for (const name of Object.keys(P)) assert.equal(P[name], L[name]);
+for (const name of Object.keys(T)) assert.equal(T[name], L[name]);
+assert.equal(P.app.GameApplication, L.app.GameApplication);
+assert.equal(P.store.SaveError, L.store.SaveError);
+assert.equal(P.gateway.GatewayCheckpoint, L.gateway.GatewayCheckpoint);
+console.log(`identity OK: ${order.join(' -> ')}`);

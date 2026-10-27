@@ -1,6 +1,6 @@
-import { applyDexPatch, normalizeDexAppearance, planDexLastSeen } from "../../../../../src/framework/rules/pokedex.ts";
-import type { DexAppearance } from "../../../../../src/framework/rules/pokedex.ts";
-import type { Content, DexState } from "../../../../../src/framework/rules/types.ts";
+import { pokedex } from "../../../../../src/framework/rules/index.ts";
+import type { DexAppearance, Content, DexState } from "../../../../../src/framework/rules/index.ts";
+const { applyDexPatch, normalizeDexAppearance, planDexLastSeen } = pokedex;
 
 /** The normalizer's structural subtype must remain a valid lastSeen input without assertions or copied fields. */
 export function recentView(content: Pick<Content, "species" | "forms">, dex: DexState, individual: DexAppearance): DexState {

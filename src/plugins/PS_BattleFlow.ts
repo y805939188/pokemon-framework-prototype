@@ -7,7 +7,8 @@
  * Not here: art, animation, full menu system, doubles UI.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { developmentCapabilities } from "../framework/rules/config";
+import { config as RuleConfig } from "../framework/rules/index.ts";
+const { developmentCapabilities } = RuleConfig;
 
 (() => {
   "use strict";
@@ -17,21 +18,30 @@ import { developmentCapabilities } from "../framework/rules/config";
   const W = window as any;
   const nodeRequire = (globalThis as any).require as any; // NW.js Node require (has .resolve)
 
-  // ---------------------------------------------------------------- engine access (loaded lazily, runtime-relative)
+  // ------------------------------------------------------- production engine access (loaded lazily, runtime-relative)
   let ENGINE: any = null;
   function engine(): any {
     if (!ENGINE) {
       const tLoad = performance.now();
       if (!nodeRequire) throw new Error("Node require() is not available in this runtime");
+      const B = nodeRequire("./js/engine/build/production.cjs");
       ENGINE = {
-        F: nodeRequire("./js/engine/fixtures/game.cjs"),
-        D: nodeRequire("./js/engine/game/describe.cjs"),
-        B: nodeRequire("./js/engine/build/engine.cjs"), // the built engine bundle (content pipeline runtime, Showdown dex)
-        root: nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire.resolve("./js/engine/build/engine.cjs"))))),
+        B,
+        D: B.describe,
+        root: nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire.resolve("./js/engine/build/production.cjs"))))),
       };
       W.PSFlow && (W.PSFlow.perf.engineLoadMs = Math.round((performance.now() - tLoad) * 10) / 10);
     }
     return ENGINE;
+  }
+  // Only explicit fixture content and ResetGame load testing. Normal sample/new-game paths never touch this entry.
+  let TESTING: any = null;
+  function testing(): any {
+    if (!TESTING) {
+      if (!nodeRequire) throw new Error("Node require() is not available in this runtime");
+      TESTING = nodeRequire("./js/engine/build/testing.cjs").fixtures;
+    }
+    return TESTING;
   }
 
   /** What this plugin uses of the game application (framework/app); the full typed contract is app/game-application.ts. */
@@ -232,7 +242,7 @@ import { developmentCapabilities } from "../framework/rules/config";
       delete G.$gameSystem._psSaveError; delete G.$gameSystem._psSaveInfo; delete G.$gameSystem._psSaveWarning; // an explicit reset is a deliberate act
       PSFlow.stateReplaced();
       const content = PSFlow.content();
-      const game = engine().F.savedFor(engine().F.makeGame(), content);
+      const game = testing().savedFor(testing().makeGame(), content);
       G.$gameSystem._psGame = game;
       G.$gameSystem._psBattleSeq = 0;
     },

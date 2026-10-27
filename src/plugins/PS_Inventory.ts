@@ -2,9 +2,10 @@
 import {InputLatch} from './management/model.ts';
 import type {InputFrame} from './management/model.ts';
 import {quantityStep,nextPocket,animationPhase,itemIconFrame} from './inventory/model.ts';
-import {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag} from '../framework/rules/item-catalog.ts';
-import type {ItemDefinition} from '../framework/rules/item-catalog.ts';
-import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framework/app/inventory-session.ts';
+import {itemCatalog as Catalog} from '../framework/rules/index.ts';
+import type {ItemDefinition} from '../framework/rules/index.ts';
+import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framework/app/index.ts';
+const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Inventory',clone=structuredClone;
  const flow=()=>W.PSFlow,app=()=>flow().app(),tr=(k:string,p?:Record<string,string|number>)=>flow().translator().t('inventory.'+k,p);
