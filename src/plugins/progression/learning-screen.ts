@@ -1,6 +1,6 @@
 /** Presentation decisions only. The application owns compatibility, costs, installation and revision checks. */
-import type { LearningView, LearningDecision, LearningOutcome } from '../../framework/app/learning-operation.ts';
-import type { LearningAnswer, LearningPending } from '../../framework/rules/learning.ts';
+import type { LearningView, LearningDecision, LearningOutcome } from '../../framework/app/index.ts';
+import type { LearningAnswer, LearningPending } from '../../framework/rules/index.ts';
 
 export interface LearningRow { key: string; text: string; details?: string; moveId?: string }
 export interface LearningPage { kind: string; title: string; rows: LearningRow[]; cursor: number; error?: string }

@@ -24,9 +24,8 @@ function host(game) {
   const sys = Object.assign(new Game_System(), { _psGame: game, _psBattleSeq: 0 });
   const req = p => {
     if(p==='fs') return {...fs,readFileSync(f,...args){if(String(f).endsWith('/data/framework/content.json')) return JSON.stringify(compiled);return fs.readFileSync(f,...args);}}; if(p==='path') return path;
-    if (/engine\.cjs$/.test(p)) return E;
-    if (/fixtures\/game\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/fixtures/game.cjs'));
-    if (/game\/describe\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/game/describe.cjs'));
+    if (/production\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/production.cjs'));
+    if (/testing\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/testing.cjs'));
     throw new Error('unexpected require ' + p);
   };
   req.resolve = p => path.resolve(ROOT, p);

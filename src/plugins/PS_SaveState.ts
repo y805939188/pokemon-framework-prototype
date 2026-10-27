@@ -28,8 +28,8 @@
   const W = window as any;
   if (!nodeRequire || !G.DataManager) return;
 
-  const schema = (): any => nodeRequire("./js/engine/build/engine.cjs").saveSchema;
-  const state = (): any => nodeRequire("./js/engine/build/engine.cjs").state;
+  const schema = (): any => nodeRequire("./js/engine/build/production.cjs").saveSchema;
+  const state = (): any => nodeRequire("./js/engine/build/production.cjs").state;
 
   // JsonEx reserves `constructor` and `@` for class metadata. Framework dictionaries allow both as data IDs.
   // Keep the validated plain snapshot opaque to JsonEx; Game_System itself retains its normal class envelope.

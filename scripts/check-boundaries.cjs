@@ -20,7 +20,9 @@ const LAYERS = {
 	tools: ['rules', 'content', 'battle', 'flow', 'app', 'tools', 'i18n'],
 	entry: ['rules', 'content', 'battle', 'flow', 'app', 'tools', 'i18n', 'entry'], // files at the framework root: the public index and the composition root
 };
-const ENTRY_FILES = new Set(['index.ts', 'composition.ts']);
+const ENTRY_FILES = new Set(['index.ts', 'production.ts', 'testing.ts', 'composition.ts']);
+const TESTING_SOURCES = new Set(['tools/harness.ts', 'tools/matrix.ts', 'tools/fakes.ts', 'tools/scripted-driver.ts']);
+const isTestingSource = rel => rel === 'testing.ts' || rel.startsWith('tools/fixtures/') || TESTING_SOURCES.has(rel);
 // The sole flow service app uses is a host-free content check. Keep its imports in the lower pure layers too, so
 // it cannot silently turn into an indirect Showdown/session bridge.
 const APP_FLOW_SERVICE = 'flow/content-runtime.ts';
@@ -134,7 +136,7 @@ function check(root) {
 		const layer = rel.includes('/') ? rel.split('/')[0] : 'entry';
 		const raw = fs.readFileSync(abs, 'utf8');
 		if (!LAYERS[layer]) { violations.push(`${rel}: unknown layer "${layer}" (add it to LAYERS)`); continue; }
-		if (layer === 'entry' && !ENTRY_FILES.has(rel)) violations.push(`${rel}: root entry must be index.ts or composition.ts`);
+		if (layer === 'entry' && !ENTRY_FILES.has(rel)) violations.push(`${rel}: root entry must be one of ${[...ENTRY_FILES].join(', ')}`);
 		let specs, bare, names, globalRefs, dynamicImports, anys;
 		try { const sc = scan(raw); specs = sc.specs; names = sc.names; globalRefs = sc.globalRefs; dynamicImports = sc.dynamicImports; anys = sc.anys; bare = bareCode(raw, sc.text); }
 		catch (e) { if (/needs the parser/.test(e.message)) throw e; violations.push(`${rel}: cannot be parsed (${String(e.message).split('\n')[0]})`); continue; }
@@ -182,6 +184,19 @@ function check(root) {
 		stack.pop(); state.set(n, 2);
 	}
 	for (const n of rels.keys()) if (!state.get(n)) dfs(n);
+	// Entry purity is a transitive property: a production adapter must not become a bridge to fixtures or legacy.
+	if (rels.has('production.ts')) {
+		const reached = new Set();
+		function reach(n) {
+			if (reached.has(n)) return;
+			reached.add(n);
+			for (const target of edges.get(n) || []) reach(target);
+		}
+		reach('production.ts');
+		for (const rel of reached) if (rel !== 'production.ts' && isTestingSource(rel))
+			violations.push(`production.ts: production dependency closure includes testing module ${rel}`);
+		if (reached.has('index.ts')) violations.push('production.ts: production entry may not depend on legacy index.ts');
+	}
 	return { files: rels.size, violations };
 }
 

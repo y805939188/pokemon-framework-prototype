@@ -193,9 +193,25 @@ test('the content-runtime exception cannot become an indirect engine bridge for 
 	}
 });
 
-test('only index.ts and composition.ts are framework root entries', () => {
+test('only the classified production, testing, legacy and composition entries are framework root entries', () => {
 	bad({ ...OK, 'another-root.ts': 'import { g } from "./battle/gateway.ts"; export const engine = g;' }, /another-root\.ts.*root entry.*index\.ts.*composition\.ts/);
-	clean({ ...OK, 'index.ts': 'export { g } from "./battle/gateway.ts";', 'composition.ts': 'import { g } from "./battle/gateway.ts"; export const wire = g;' });
+	clean({ ...OK,
+		'index.ts': 'export { g } from "./battle/gateway.ts";',
+		'production.ts': 'export { g } from "./battle/gateway.ts";',
+		'testing.ts': 'export const tests = 1;',
+		'composition.ts': 'import { g } from "./battle/gateway.ts"; export const wire = g;',
+	});
+});
+
+test('the production entry cannot reach testing directly or through a production adapter', () => {
+	const fixtures = { 'tools/fixtures/game.ts': 'export const fixture = 1;' };
+	for (const files of [
+		{ ...OK, ...fixtures, 'production.ts': 'export { fixture } from "./tools/fixtures/game.ts";' },
+		{ ...OK, ...fixtures, 'production.ts': 'export { adapter } from "./tools/save-store.ts";', 'tools/save-store.ts': 'export { fixture as adapter } from "./fixtures/game.ts";' },
+		{ ...OK, 'production.ts': 'export { tests } from "./testing.ts";', 'testing.ts': 'export const tests = 1;' },
+	]) bad(files, /production\.ts: production dependency closure includes testing module/);
+	bad({ ...OK, 'production.ts': 'export { g } from "./index.ts";', 'index.ts': 'export { g } from "./battle/gateway.ts";' }, /production\.ts: production entry may not depend on legacy index\.ts/);
+	clean({ ...OK, ...fixtures, 'production.ts': 'export { adapter } from "./tools/save-store.ts";', 'tools/save-store.ts': 'export const adapter = 1;', 'testing.ts': 'export { fixture } from "./tools/fixtures/game.ts";' });
 });
 
 test('host-provided encoders, timers, scheduling and IO globals stay out of the pure layers', () => {

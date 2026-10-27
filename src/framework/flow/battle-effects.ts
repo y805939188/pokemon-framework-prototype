@@ -6,7 +6,8 @@ import type { Member } from "../rules/types.ts";
 import type { BattleEvidenceContext, BattleObservation, EvidenceIssue, FriendEvidence, ObservationBatch } from "../rules/battle-evidence.ts";
 import type { EffectsSealV2, EffectsBindingV2, EffectsContextV2, EffectCell, FaintCellV2, BattleAppearanceV2, BattleDefeatV2, FriendshipReceiptV2 } from "../rules/battle-consumption.ts";
 
-interface SourceState {
+/** Serializable recorder snapshot; exported so BattleSession's public checkpoint type can be named in declarations. */
+export interface SourceState {
   context: EffectsContextV2;
   facts: BattleObservation[];
   issues: EvidenceIssue[];

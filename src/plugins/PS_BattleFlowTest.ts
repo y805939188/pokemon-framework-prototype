@@ -46,7 +46,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   window.addEventListener("blur", (e) => e.stopImmediatePropagation(), true);
   const fs = nodeRequire("fs");
   const path = nodeRequire("path");
-  const E = nodeRequire("./js/engine/game/growth.cjs");
+  const E = nodeRequire("./js/engine/build/production.cjs").growth;
   const OUT = arg("ps-flow-out");
   const ONLY = arg("ps-flow-only"); // e.g. --ps-flow-only=T16,T17 runs just those scenarios (development aid)
   const SHOTS = arg("ps-flow-shots");
@@ -180,7 +180,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   }
   /** A member created from the content and stored the way the save stores it (content id + form, D5-3). */
   const mkMember = (id: string, species: string, level: number, extra: any = {}) => {
-    const B = nodeRequire("./js/engine/build/engine.cjs");
+    const B = nodeRequire("./js/engine/build/production.cjs");
     return { ...B.speciesKey.toPersistentMember(B.memberFactory.createMember({ id, species, level }, W.PSFlow.content(), seeded(level * 13 + id.length)), W.PSFlow.content()), ...extra };
   };
   async function finishBattle() { await inMode("end"); await press("ok"); await dismissMessages(); await waitFor(() => !W.PSFlow.running && !battle(), "back from the battle"); await frames(5); }
@@ -209,7 +209,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     await frames(3);
   }
   const game = (): any => W.PSFlow.game();
-  const api = (): any => nodeRequire("./js/engine/build/engine.cjs");
+  const api = (): any => nodeRequire("./js/engine/build/production.cjs");
   const boxed = (g = game()): any[] => api().storage.boxedMembers(g);
   const setBoxed = (g: any, members: any[]): void => { g.storage = api().storage.newStorage(); members.forEach((m, i) => { if (i >= 1200) throw new Error("test setup exceeds fixed storage"); g.storage.boxes[Math.floor(i / 30)].slots[i % 30] = m; }); };
   const replayTemplates = (g: any, result: any): any => ({ templates: Object.fromEntries(result.captured.map((m: any) => { const found = api().storage.locateMember(g, m.id); if (!found) throw new Error(`missing original template ${m.id}`); return [m.id, clone(found.member)]; })), profile: { mode: 1, naming: 1 } });
@@ -621,7 +621,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       await G.DataManager.loadGame(6);
       const info = G.$gameSystem._psSaveInfo;
       eq(info && info.created, "empty", "reported as created on load");
-      eq(game(), nodeRequire("./js/engine/build/engine.cjs").state.newGame({ party: [], money: 0, content: W.PSFlow.content() }), "the whole formal empty state: no members, boxes, items, money, dex entries, battles or claims");
+      eq(game(), nodeRequire("./js/engine/build/production.cjs").state.newGame({ party: [], money: 0, content: W.PSFlow.content() }), "the whole formal empty state: no members, boxes, items, money, dex entries, battles or claims");
       assert(!G.$gameSystem._psSaveError, "not an error");
       eq(W.PSFlow.claim("starter").status, "applied", "the player can still receive the starter");
       eq([game().party.map((m: any) => m.id), game().claims, game().dex.owned], [["M1"], { starter: { kind: "grant" } }, ["charmander"]], "received into the empty state");
@@ -966,7 +966,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
 
     await scenario("T31 a save written by the step 4 code (schema 3, P-1 sample) through MZ's own save/load: migrated to schema 6 field by field with the content mapping and saved again; an unmappable one is refused and kept", async () => {
       const sample = clone(STEP4_FULL); // bundled into this test plugin: the package has no experiments/ folder
-      const B = nodeRequire("./js/engine/build/engine.cjs");
+      const B = nodeRequire("./js/engine/build/production.cjs");
       await slice(31);
       await writeHostFixture(13, clone(sample)); // test-authored step4 file; normal schema7 saving stays strict
       G.$gameSystem._psGame = { diverged: true };
@@ -1393,7 +1393,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     // this build (flat boxes, one count per item, the read-only party screen); the 5.1/5.2 structures are measured later
     try {
       const n = Number(arg("ps-perf-step5")) || 6;
-      const B = nodeRequire("./js/engine/build/engine.cjs");
+      const B = nodeRequire("./js/engine/build/production.cjs");
       await slice(51);
       const g = game();
       for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3));
@@ -2583,7 +2583,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
 
   /** A cold real-host check: empty content uses no external battle data, including for an old saved party. */
   async function runEmptySource() {
-    const B = nodeRequire("./js/engine/build/engine.cjs");
+    const B = nodeRequire("./js/engine/build/production.cjs");
     const dataModules = () => Object.keys(nodeRequire.cache).filter((p) => p.includes("/showdown/dist/data/"));
     eq(dataModules().length, 0, "cold MZ host before source consumption");
     const contentFile = path.join(gameDir, "data/framework/content.json");

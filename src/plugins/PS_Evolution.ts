@@ -1,14 +1,13 @@
 /** G2a: owned evolution/Info/learning continuation. Domain authority remains in GameApplication. */
-import { catalogOf } from '../framework/rules/item-catalog.ts';
-import type { EvolutionItemIntent } from '../framework/app/triggered-evolution.ts';
+import { itemCatalog, memberIdentity } from '../framework/rules/index.ts';
+import type { EvolutionItemIntent, GameApplication, LearningOutcome } from '../framework/app/index.ts';
 import { TradeTimeline } from './progression/trade-timeline.ts';
-import { publicIdText } from '../framework/rules/member-identity.ts';
 import { EvolutionTimeline } from './progression/evolution-timeline.ts';
 import { LearningScreen } from './progression/learning-screen.ts';
 import { drawLearningPage } from './progression/learning-draw.ts';
 import { InputLatch } from './management/model.ts';
-import type { GameApplication } from '../framework/app/index.ts';
-import type { LearningOutcome } from '../framework/app/learning-operation.ts';
+const { catalogOf } = itemCatalog;
+const { publicIdText } = memberIdentity;
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Evolution',flow=()=>W.PSFlow,app=()=>flow().app();
  const tr=(key:string,p?:Record<string,string|number>)=>flow().translator().t('evolution.'+key,p);

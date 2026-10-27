@@ -22,7 +22,7 @@ function host(failure, failVariable = false) {
   const Ctor = () => { function C() {} C.prototype = { initialize() {}, terminate() {} }; return C; };
   const fakeEngine = { log: { createRingLogger: () => ({ sink() {} }) }, dex: { createDexLookup() { throw new Error('dex unavailable'); } } };
   const req = p => {
-    if (/engine\.cjs$/.test(p)) { if (failure === 'engine') throw new Error('engine unavailable'); return fakeEngine; }
+    if (/production\.cjs$/.test(p)) { if (failure === 'engine') throw new Error('engine unavailable'); return fakeEngine; }
     if (p === 'path' || p === 'fs') return require(p);
     return {};
   };
