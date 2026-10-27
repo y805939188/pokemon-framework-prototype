@@ -4,7 +4,7 @@
 export async function continueCloseout(p:any):Promise<void>{
  const {G,W,fs,hashFile,scenario,assert,eq,press,waitFor,scene,game,readExpected,shot}=p;
  const expected=readExpected('ps-flow-expected-closeout.json');
- assert(expected.cases.length===5,'five independent G/H producer checkpoints');
+ assert(expected.kind==='step53-closeout'&&expected.version===2,'versioned six-family producer');eq(expected.cases.map((c:any)=>c.family),['learning','evolution','trade','item-evolution','pokedex','grant'],'six complete producer families');
  for(const c of expected.cases)await scenario('I-CONTINUE-'+c.family+' normal Title/Continue/Scene_Load/full state',async()=>{
   const file=G.StorageManager.filePath(G.DataManager.makeSavename(c.slot));assert(fs.existsSync(file),'ordinary save file exists');eq(hashFile(file),c.slotSha256,'producer-consumer exact slot bytes');
   W.PSFlow._content=c.content;W.PSFlow._app=null;
@@ -16,9 +16,13 @@ export async function continueCloseout(p:any):Promise<void>{
   await shot('I-Continue-'+c.family+'-slot-'+c.slot);await press('ok');
   await waitFor(()=>scene() instanceof G.Scene_Map&&scene().isStarted()&&!G.SceneManager.isSceneChanging(),'normal loaded map');
   assert(load._loadSuccess,'Scene_Load success, not direct DataManager shortcut');eq(game(),c.state,'entire saved framework document');
-  assert(!W.PSFlow.app().saveBlocked&&!W.PSFlow.operationPending(),'no transient owner reconstructed');
-  const before=JSON.stringify(game());W.PSFlow.app().pokedexSnapshot();eq(JSON.stringify(game()),before,'ordinary read/render has no new dex history');
-  return{slot:c.slot,input:'synthetic DOM OK, real Title command/Scene_Load selection and onLoadSuccess/terminate; no hardware or native IME evidence'};
+  await p.frames(30);assert(W.PSEvolution.automatic===true,'normal automatic continuation remains enabled');assert(!W.PSFlow.app().saveBlocked&&!W.PSFlow.operationPending()&&!W.PSEvolution.current(),'no transient owner or repeated presentation after normal map frames');eq(game(),c.state,'automatic normal lifecycle does not mutate the restored document');
+  const before=JSON.stringify(game()),replays:any[]=[];W.PSFlow.app().pokedexSnapshot();eq(JSON.stringify(game()),before,'ordinary read/render has no new dex history');
+  if(c.result){eq(W.PSFlow.app().commitResult(c.result,p.replayTemplates(game(),c.result)),'already-applied','saved raw battle cannot settle twice');replays.push('battle-already-applied');}
+  if(c.intent&&c.requestId){const retry=W.PSFlow.app().beginTrade(c.requestId,c.intent);eq(retry.status,'refused','retired outgoing identity cannot be traded a second time');replays.push({trade:retry.reason});}
+  if(c.family==='grant'){eq(W.PSFlow.app().claimGrant('starter').status,'already-claimed','persistent claim survives ordinary Continue');replays.push('grant-already-claimed');}
+  eq(JSON.stringify(game()),before,'replays change no body/dex/stat/cost/claim/ledger');assert(!W.PSFlow.operationPending(),'replays leave no owner');
+  return{slot:c.slot,replays,input:'synthetic DOM OK, real Title command/Scene_Load selection and onLoadSuccess/terminate; no hardware or native IME evidence'};
  });
 }
 export async function runCloseout(p:any):Promise<void>{
@@ -32,13 +36,16 @@ export async function runCloseout(p:any):Promise<void>{
    G.SceneManager.goto(G.Scene_Map);await waitFor(()=>scene() instanceof G.Scene_Map&&scene().isStarted()&&!G.SceneManager.isSceneChanging(),'checkpoint normal map');
    assert(slot<G.DataManager.maxSavefiles(),'ordinary Continue slot lies inside visible list');await p.settledSave(slot);
    const file=G.StorageManager.filePath(G.DataManager.makeSavename(slot)),slotSha256=p.hashFile(file);cases.push({...c,sourceSlot:c.slot,slot,family,state:clone(game()),slotSha256});
-   fs.writeFileSync(path.join(path.dirname(OUT),'ps-flow-expected-closeout.json'),JSON.stringify({cases}));return{family,sourceSlot:c.slot,ordinarySlot:slot,slotSha256};
+   fs.writeFileSync(path.join(path.dirname(OUT),'ps-flow-expected-closeout.json'),JSON.stringify({kind:'step53-closeout',version:2,cases}));return{family,sourceSlot:c.slot,ordinarySlot:slot,slotSha256};
   });
  }
- await scenario('I-CHECKPOINT five preserved G/H families keep their exact ordinary slot bytes',async()=>{
-  eq(cases.length,5,'all five families retained immediately');eq(new Set(cases.map(c=>c.slot)).size,5,'distinct ordinary slots');
+ await scenario('I-RETAIN-grant real one-time starter claim retained in ordinary slot6',async()=>{
+  W.PSFlow._content=null;W.PSFlow._app=null;await p.slice(53);assert(game().claims.starter?.kind==='grant','real application claim, not a forged result');assert(!W.PSFlow.operationPending(),'claim fully installed');const slot=6,content=clone(W.PSFlow.content());assert(slot<G.DataManager.maxSavefiles(),'visible grant slot');await p.settledSave(slot);const file=G.StorageManager.filePath(G.DataManager.makeSavename(slot)),slotSha256=p.hashFile(file);cases.push({family:'grant',slot,content,state:clone(game()),slotSha256});fs.writeFileSync(path.join(path.dirname(OUT),'ps-flow-expected-closeout.json'),JSON.stringify({kind:'step53-closeout',version:2,cases}));return{slot,slotSha256};
+ });
+ await scenario('I-CHECKPOINT six preserved families keep their exact ordinary slot bytes',async()=>{
+  eq(cases.length,6,'all six families retained immediately');eq(new Set(cases.map(c=>c.slot)).size,6,'distinct ordinary slots');
   for(const c of cases)eq(p.hashFile(G.StorageManager.filePath(G.DataManager.makeSavename(c.slot))),c.slotSha256,'later suites never overwrite ordinary slot '+c.slot);
-  return{slots:cases.map(c=>c.slot),method:'five retained full documents, producer and consumer both bind raw save bytes; not all intermediate checkpoints or formal vectors'};
+  return{slots:cases.map(c=>c.slot),method:'five G/H and one claim full documents, producer and consumer both bind raw save bytes; not all intermediate checkpoints or formal vectors'};
  });
  await scenario('I-H2-WARN-01 actual English/Chinese empty-result layout at 640x480 and default bitmap',async()=>{
   await toMap();fresh();await toMapId(5,8,9);const fixture=game();fixture.dex.hasDex=true;fixture.dex.seen=[...new Set(fixture.party.map((m:any)=>m.species))];fixture.dex.owned=[...fixture.dex.seen];fixture.dex.unlocked=Array(W.PSFlow.content().regionalDex.regions.length+1).fill(true);W.PSFlow.stateReplaced();
