@@ -2,15 +2,16 @@
  * Actual host scenes + programmatic actions. This is never physical-input evidence.
  */
 export async function continueCloseout(p:any):Promise<void>{
- const {G,W,scenario,assert,eq,press,waitFor,scene,game,readExpected,shot}=p;
+ const {G,W,fs,hashFile,scenario,assert,eq,press,waitFor,scene,game,readExpected,shot}=p;
  const expected=readExpected('ps-flow-expected-closeout.json');
  assert(expected.cases.length===5,'five independent G/H producer checkpoints');
  for(const c of expected.cases)await scenario('I-CONTINUE-'+c.family+' normal Title/Continue/Scene_Load/full state',async()=>{
+  const file=G.StorageManager.filePath(G.DataManager.makeSavename(c.slot));assert(fs.existsSync(file),'ordinary save file exists');eq(hashFile(file),c.slotSha256,'producer-consumer exact slot bytes');
   W.PSFlow._content=c.content;W.PSFlow._app=null;
   G.SceneManager.goto(G.Scene_Title);
-  await waitFor(()=>scene() instanceof G.Scene_Title&&scene().isStarted()&&scene()._commandWindow.active&&!G.SceneManager.isSceneChanging(),'normal Title');
+  await waitFor(()=>scene() instanceof G.Scene_Title&&scene().isStarted()&&scene()._commandWindow.isOpenAndActive()&&!scene().isBusy()&&!G.SceneManager.isSceneChanging(),'normal Title');
   const title=scene(),window=title._commandWindow;window.selectSymbol('continue');assert(window.isCurrentItemEnabled(),'Continue enabled from real isolated global save info');
-  await press('ok');await waitFor(()=>scene() instanceof G.Scene_Load&&scene().isStarted()&&scene()._listWindow.active&&!G.SceneManager.isSceneChanging(),'normal Scene_Load');
+  await press('ok');await waitFor(()=>scene() instanceof G.Scene_Load&&scene().isStarted()&&scene()._listWindow.isOpenAndActive()&&!scene().isBusy()&&!G.SceneManager.isSceneChanging(),'normal Scene_Load');
   const load=scene();load._listWindow.selectSavefile(c.slot);assert(load._listWindow.index()>=0&&load._listWindow.index()<load._listWindow.maxItems(),'visible ordinary save row');eq(load._listWindow.savefileId(),c.slot,'actual highlighted slot');
   await shot('I-Continue-'+c.family+'-slot-'+c.slot);await press('ok');
   await waitFor(()=>scene() instanceof G.Scene_Map&&scene().isStarted()&&!G.SceneManager.isSceneChanging(),'normal loaded map');
@@ -22,21 +23,26 @@ export async function continueCloseout(p:any):Promise<void>{
 }
 export async function runCloseout(p:any):Promise<void>{
  const {G,W,fs,path,OUT,api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,toMap,toMapId,fresh,shot,uiReady,uiClosed,management,corpus}=p;
- // Same built product/process traverses all default new G/H workflows. Each existing suite keeps its own source-bound fixtures.
- await p.runLearningUI();await p.runEvolutionUI();await p.runTradeUI();await p.runItemEvolutionUI();await p.runPokedexUI();
- await scenario('I-CHECKPOINT five G/H families retained for a new process using ordinary Continue',async()=>{
-  const cases:any[]=[];for(const family of ['learning','evolution','trade','item-evolution','pokedex']){
+ // Retain each family's complete checkpoint before later suites can reuse its high test slot.
+ const cases:any[]=[];
+ for(const [family,run] of [['learning',p.runLearningUI],['evolution',p.runEvolutionUI],['trade',p.runTradeUI],['item-evolution',p.runItemEvolutionUI],['pokedex',p.runPokedexUI]]as const){
+  await run();await scenario('I-RETAIN-'+family+' immediate full snapshot to ordinary Continue slot',async()=>{
    const doc=JSON.parse(fs.readFileSync(path.join(path.dirname(OUT),'ps-flow-expected-'+family+'-ui.json'),'utf8')),c=doc.cases.at(-1),slot=cases.length+1;
-   W.PSFlow._content=c.content;W.PSFlow._app=null;await G.DataManager.loadGame(c.slot);eq(game(),c.state,'source full checkpoint '+family);
+   W.PSFlow._content=c.content;W.PSFlow._app=null;await G.DataManager.loadGame(c.slot);eq(game(),c.state,'source complete state before later high-slot reuse '+family);
    G.SceneManager.goto(G.Scene_Map);await waitFor(()=>scene() instanceof G.Scene_Map&&scene().isStarted()&&!G.SceneManager.isSceneChanging(),'checkpoint normal map');
-   assert(slot<G.DataManager.maxSavefiles(),'ordinary Continue slot is inside visible list, not a legacy test-only high slot');await p.settledSave(slot);cases.push({...c,sourceSlot:c.slot,slot,family,state:clone(game())});
-  }
-  eq(new Set(cases.map(c=>c.slot)).size,5,'producer ordinary slots do not overwrite each other');
-  fs.writeFileSync(path.join(path.dirname(OUT),'ps-flow-expected-closeout.json'),JSON.stringify({cases}));return{slots:cases.map(c=>c.slot),method:'five final full documents; not all intermediate checkpoints or all formal vectors'};
+   assert(slot<G.DataManager.maxSavefiles(),'ordinary Continue slot lies inside visible list');await p.settledSave(slot);
+   const file=G.StorageManager.filePath(G.DataManager.makeSavename(slot)),slotSha256=p.hashFile(file);cases.push({...c,sourceSlot:c.slot,slot,family,state:clone(game()),slotSha256});
+   fs.writeFileSync(path.join(path.dirname(OUT),'ps-flow-expected-closeout.json'),JSON.stringify({cases}));return{family,sourceSlot:c.slot,ordinarySlot:slot,slotSha256};
+  });
+ }
+ await scenario('I-CHECKPOINT five preserved G/H families keep their exact ordinary slot bytes',async()=>{
+  eq(cases.length,5,'all five families retained immediately');eq(new Set(cases.map(c=>c.slot)).size,5,'distinct ordinary slots');
+  for(const c of cases)eq(p.hashFile(G.StorageManager.filePath(G.DataManager.makeSavename(c.slot))),c.slotSha256,'later suites never overwrite ordinary slot '+c.slot);
+  return{slots:cases.map(c=>c.slot),method:'five retained full documents, producer and consumer both bind raw save bytes; not all intermediate checkpoints or formal vectors'};
  });
  await scenario('I-H2-WARN-01 actual English/Chinese empty-result layout at 640x480 and default bitmap',async()=>{
   const bounds=[];for(const locale of ['en','zh'])for(const size of [[784,592],[640,480]]){
-   W.PSFlow.setLanguage(locale);W.PSPokedex.open();await waitFor(()=>W.PSPokedex.current()?.ready,'layout dex');
+   W.PSFlow.setLanguage(locale);const opened=W.PSPokedex.open();eq(opened.status,'opened','layout open '+String(opened.reason));await waitFor(()=>W.PSPokedex.current()?.ready,'layout dex');
    while(W.PSPokedex.current().view.kind==='regions'){const v=W.PSPokedex.current().view,target=v.rows.findIndex((r:any)=>r.region===-1);for(let k=0;W.PSPokedex.current().view.cursor!==target&&k<10;k++)await press('down');await press('ok');await waitFor(()=>W.PSPokedex.current()?.ready,'layout list');}
    await press('shift');const c=scene()._controller,b=c.window.contents;c.screen.editor.draft[4]=37;c.screen.editor.view.focus=8;c.screen.searchInput({triggered:{use:true},repeated:{}});assert(c.screen.view.notice,'real query is empty');b.resize(size[0],size[1]);
    const draw=b.drawText,rects:any[]=[];b.drawText=function(...args:any[]){rects.push(args);return draw.apply(this,args);};try{c.draw();}finally{b.drawText=draw;}
@@ -70,7 +76,9 @@ export async function runCloseout(p:any):Promise<void>{
 }
 export async function runCloseoutLifecycle(p:any):Promise<void>{
  const {G,W,fs,path,OUT,api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,toMap,toMapId,fresh,uiReady,uiClosed,management}=p;
- await scenario('I-LIFECYCLE each new scene family 100 real creations/closures, listener/window/resource samples',async()=>{
+ const defaults=['learning','evolution','trade','inventory','pokedex','summary-pokedex'];const families=p.lifecycleGroups?p.lifecycleGroups.split(','):defaults,cycles=p.lifecycleCycles??100;
+ assert([100,200].includes(cycles),'lifecycle cycles 100 or 200');assert(families.length>0&&new Set(families).size===families.length&&families.every((f:string)=>[...defaults,'summary-only'].includes(f)),'known distinct lifecycle families');
+ await scenario('I-LIFECYCLE selected scene families real creations/closures, listener/window/resource samples',async()=>{
   await toMap();fresh();await toMapId(5,8,9);const B=api(),content=clone(W.PSFlow.content()),state=clone(game()),id=state.party[0].id;
   const source=B.speciesKey.speciesDataOf(content,state.party[0]);source.evolutions=[{method:'Event',parameter:7,target:state.party[1].species}];state.dex.hasDex=true;state.dex.seen=[...new Set([...state.dex.seen,...state.party.map((m:any)=>m.species)])];state.dex.owned=[...state.dex.seen];state.dex.unlocked=Array(content.regionalDex.regions.length+1).fill(true);
   // Test-only authored content identity is explicit, just as in the individual G suites.
@@ -83,21 +91,21 @@ export async function runCloseoutLifecycle(p:any):Promise<void>{
   const memory=()=>{if(typeof G.gc==='function')G.gc();return{...G.process.memoryUsage(),gcForced:typeof G.gc==='function',mapChildren:scene()?.children?.length??null,inputs:document.querySelectorAll('input').length,trackedNewDocumentWindowListeners:[...live.values()].reduce((n,s)=>n+s.size,0)};};
   const readyMap=()=>waitFor(()=>scene() instanceof G.Scene_Map&&scene().isStarted()&&!G.SceneManager.isSceneChanging(),'lifecycle map');
   const closeScene=async()=>{G.SceneManager.goto(G.Scene_Map);await readyMap();await frames(2);assert(!W.PSFlow.operationPending()&&!W.PSFlow.app().saveBlocked,'technical before-install exit releases own locks');};
-  try{for(const family of ['learning','evolution','trade','inventory','pokedex','summary-pokedex']){
+  try{for(const family of families){
    const samples=[],before=memory(),openMs:number[]=[];let destroyedWindows=0,createdWindows=0;
-   for(let i=0;i<100;i++){
+   for(let i=0;i<cycles;i++){
     const t=performance.now();
     if(family==='learning'){W.PSProgression.learn({kind:'forget',memberId:id});await waitFor(()=>W.PSProgression.current()?.ready,'cycle learning');}
     else if(family==='evolution'){W.PSEvolution.event(7,id);await waitFor(()=>W.PSEvolution.current()?.ready,'cycle event');}
     else if(family==='trade'){const waiter=new G.Game_Interpreter();G.PluginManager.callCommand(waiter,'PS_Evolution','ScriptTrade',{requestId:'I-cycle-'+i,intent:JSON.stringify({outgoingId:id,incoming:{species:state.party[1].species},foreignOwner:{name:'Lifecycle'}})});await waitFor(()=>W.PSEvolution.current()?.ready,'cycle offer');}
     else if(family==='inventory'){W.PSInventory.showBag();await waitFor(()=>W.PSInventory.current()?.ready,'cycle inventory');}
     else if(family==='pokedex'){const opened=W.PSPokedex.open();eq(opened.status,'opened','formal Pokedex opens: '+JSON.stringify(opened.reason));await waitFor(()=>W.PSPokedex.current()?.ready,'cycle dex');}
-    else{W.PSManagement.openSummary(id);await uiReady('summary');await press('ok');await p.uiChoose('pokedex');await waitFor(()=>W.PSPokedex.current()?.ready,'cycle attached dex');}
+    else{W.PSManagement.openSummary(id);await uiReady('summary');if(family==='summary-pokedex'){await press('ok');await p.uiChoose('pokedex');await waitFor(()=>W.PSPokedex.current()?.ready,'cycle attached dex');}}
     openMs.push(performance.now()-t);const windows=(scene()?._windowLayer?.children??[]).slice();createdWindows+=windows.length;
     await closeScene();destroyedWindows+=windows.filter((w:any)=>w.destroyed||w._destroyed).length;
-    if([0,24,49,74,99].includes(i)){samples.push({cycles:i+1,...memory()});fs.writeFileSync(OUT+'.lifecycle.json',JSON.stringify({groups,current:{family,createdWindows,destroyedWindows,samples,openMs}}));}
+    if(i===0||(i+1)%25===0){samples.push({cycles:i+1,...memory()});fs.writeFileSync(OUT+'.lifecycle.json',JSON.stringify({groups,current:{family,createdWindows,destroyedWindows,samples,openMs}}));}
    }
-   const after=memory();eq(after.inputs,before.inputs,'no input nodes accumulate');eq(after.trackedNewDocumentWindowListeners,before.trackedNewDocumentWindowListeners,'no new live document/window listener accumulation');assert(createdWindows>0,'actual host windows created');eq(destroyedWindows,createdWindows,'all scene windows destroyed');groups.push({family,cycles:100,createdWindows,destroyedWindows,openMs,before,after,samples});fs.writeFileSync(OUT+'.lifecycle.json',JSON.stringify({groups,complete:false}));
+   const after=memory();eq(after.inputs,before.inputs,'no input nodes accumulate');eq(after.trackedNewDocumentWindowListeners,before.trackedNewDocumentWindowListeners,'no new live document/window listener accumulation');assert(createdWindows>0,'actual host windows created');eq(destroyedWindows,createdWindows,'all scene windows destroyed');await frames(120);const afterIdle=memory();groups.push({family,cycles,createdWindows,destroyedWindows,openMs,before,after,afterIdle,samples});fs.writeFileSync(OUT+'.lifecycle.json',JSON.stringify({groups,complete:false}));
   }}finally{prototype.addEventListener=add;prototype.removeEventListener=remove;}
   fs.writeFileSync(OUT+'.lifecycle.json',JSON.stringify({groups,complete:true}));return{groups,method:'real scene create/start/terminate, explicit test-triggered SceneManager.goto before install; normal user flows separately above; RSS raw/forced GC if available; tracked listeners added only during this measurement, no proof of absence of every engine resource leak'};
  });

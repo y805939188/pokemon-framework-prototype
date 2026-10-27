@@ -1,0 +1,5 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process');
+for(const [mode,name,value]of [['closeout-lifecycle','PF_OWNED_LIFECYCLE_GROUPS','summary-only,unknown'],['closeout-lifecycle','PF_OWNED_LIFECYCLE_GROUPS','summary-only,summary-only'],['closeout-lifecycle','PF_OWNED_LIFECYCLE_CYCLES','201'],['inventory','PF_OWNED_LIFECYCLE_CYCLES','100'],['perf','PF_OWNED_PERF_ROUNDS','26']]){
+ test('I runner rejects '+name+'='+value+' before child launch',()=>{const out=fs.mkdtempSync(path.join(os.tmpdir(),'ps53-runner-'));try{const result=spawnSync('bash',['scripts/run-inventory-test-mac.sh',out,mode],{encoding:'utf8',env:{...process.env,PF_OWNED_NW:process.execPath,PF_OWNED_SKIP_BUILD:'1',PF_OWNED_REQUIRE_IDLE:'0',[name]:value}});assert.notEqual(result.status,0);assert.match(result.stdout+result.stderr,new RegExp(name));assert(!fs.existsSync(path.join(out,'launch.json')),'no child launch record');assert(!fs.existsSync(path.join(out,'host.log')),'no process stdout opened');}finally{fs.rmSync(out,{recursive:true,force:true});}});
+}

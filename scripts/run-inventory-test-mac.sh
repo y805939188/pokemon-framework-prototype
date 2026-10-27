@@ -42,6 +42,16 @@ if rounds is not None:
 gc=os.environ.get('PF_OWNED_FORCE_GC','0')
 if gc not in ('0','1'):raise SystemExit('PF_OWNED_FORCE_GC must be 0 or 1')
 if gc=='1':extra.append('--js-flags=--expose-gc')
+groups=os.environ.get('PF_OWNED_LIFECYCLE_GROUPS')
+cycles=os.environ.get('PF_OWNED_LIFECYCLE_CYCLES')
+if groups is not None:
+ allowed={'learning','evolution','trade','inventory','pokedex','summary-pokedex','summary-only'}
+ values=groups.split(',')
+ if mode!='closeout-lifecycle' or not values or len(set(values))!=len(values) or any(x not in allowed for x in values):raise SystemExit('PF_OWNED_LIFECYCLE_GROUPS requires distinct known groups and closeout-lifecycle')
+ extra.append('--ps-lifecycle-groups='+groups)
+if cycles is not None:
+ if mode!='closeout-lifecycle' or cycles not in ('100','200'):raise SystemExit('PF_OWNED_LIFECYCLE_CYCLES requires closeout-lifecycle and 100 or 200')
+ extra.append('--ps-lifecycle-cycles='+cycles)
 only=os.environ.get('PF_OWNED_ONLY')
 if only:
  if not re.fullmatch(r'[A-Za-z0-9_/-]+(?:,[A-Za-z0-9_/-]+)*',only):raise SystemExit('PF_OWNED_ONLY must be comma-separated scenario prefixes')
