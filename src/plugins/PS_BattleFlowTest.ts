@@ -6,6 +6,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // the step 4 (schema 3) save written by the step 4 code (step 5.0 checkpoint P-1), for T31
 import SCALE_CORPUS from "../../experiments/step5/3/closeout/scale-fixtures.json";
+import { progressionDonorInputs } from "./flowtest/source-fixture.ts";
 import { runCloseout, continueCloseout, runCloseoutLifecycle } from "./flowtest/closeout.ts";
 import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
 import { pressKey, waitGameFrames, waitUntil } from "./flowtest/timing.ts";
@@ -1622,9 +1623,9 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   // B5: actual MZ persistence and normal application lifecycle, driven by service calls.
   // Disk assertions complement the VM's exact baseSaveGame/baseMake counters; no hardware input is claimed.
   function progressionContent(regional: boolean, configure?: (inputs: any) => void): any {
-    const B = api(), read = (name: string) => JSON.parse(fs.readFileSync(path.join(gameDir, "content/sample", name), "utf8"));
-    const inputs: any = {manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json")};
-    for (const [key, file] of [["grants", "grants.json"], ["settings", "settings.json"], ["items", "items.json"], ["shops", "shops.json"]]) if (fs.existsSync(path.join(gameDir, "content/sample", file))) inputs[key] = read(file);
+    const B = api(), inputs: any = progressionDonorInputs();
+    // Same authored donor fields are compiled and source-checked in development and the source-free offline app.
+    // Scenario-specific settings/items/shops/regions below remain explicit, never fallback empty runtime data.
     if (regional) inputs.regionalDex = {source: "author-placeholder", regions: [{id: 0, nameKey: "region.test", species: inputs.species.filter((sp: any) => !sp.form).map((sp: any) => sp.id)}]};
     configure?.(inputs);
     const compiled = B.contentCompile.compileContent(inputs); assert(compiled.ok, JSON.stringify(compiled.errors));
