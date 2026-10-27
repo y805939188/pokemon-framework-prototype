@@ -34,7 +34,7 @@ export type DexResolution = { status: "pending"; view: DexOperationView }
   | { status: "refused"; reason: string };
 interface PendingWrite {
   before: GameState; next: GameState; attempted: boolean;
-  beforeKey?: string; nextKey?: string;
+  beforeKey: string | undefined; nextKey: string | undefined;
 }
 interface Operation {
   token: string; generation: number; revision: number; purpose: "entry" | "edit" | "summary";
@@ -151,7 +151,7 @@ export class PokedexOperation {
       op.summary.species=member.species;const plan=planDexLastSeen(state.dex,member.species,appearance);if(plan.status!=='ok')throw Error(plan.reason);
       if(!plan.changed)return this.pending(op);
       const next=clone(state);next.dex=applyDexPatch(next.dex,plan.patch);const errors=validateGameContent(next,content);if(errors.length)throw Error(`invalid-pokedex-next:${errors[0]!.path}`);
-      op.pendingWrite={before:state,next,attempted:false};return this.install(op);
+      op.pendingWrite={before:state,next,attempted:false,beforeKey:undefined,nextKey:undefined};return this.install(op);
     }catch(error){
       if(!op||this.operation!==op||op.generation!==this.ports.generation())return {status:'refused',reason:'stale-pokedex-operation'};
       if(!op.pendingWrite){this.finish(op,'technically-terminated');return {status:'refused',reason:message(error)};}
@@ -174,7 +174,7 @@ export class PokedexOperation {
       if (!Object.keys(patch).length) return this.finish(op, "unchanged");
       const next = clone(state); next.dex = applyDexPatch(next.dex, patch);
       const errors = validateGameContent(next, content); if (errors.length) throw Error(`invalid-pokedex-next:${errors[0]!.path}`);
-      op.pendingWrite = { before: state, next, attempted: false };
+      op.pendingWrite = { before: state, next, attempted: false, beforeKey: undefined, nextKey: undefined };
       return this.install(op);
     } catch (error) {
       if (!op || this.operation !== op || op.generation !== this.ports.generation()) return { status: "refused", reason: "stale-pokedex-operation" };
@@ -234,7 +234,7 @@ export class PokedexOperation {
         const patch=this.patch(before,content,{kind:'form',species:op.summary!.species,baseFrontsEqual:decision.baseFrontsEqual,selected:decision.selected,text:decision.text,currentRegion:decision.currentRegion},true);
         if(!Object.keys(patch).length)return this.pending(op);
         const next=clone(before);next.dex=applyDexPatch(next.dex,patch);const errors=validateGameContent(next,content);if(errors.length)throw Error(`invalid-pokedex-next:${errors[0]!.path}`);
-        op.pendingWrite={before,next,attempted:false};return this.install(op);
+        op.pendingWrite={before,next,attempted:false,beforeKey:undefined,nextKey:undefined};return this.install(op);
       }
       if (op.purpose !== "entry") return { status: "refused", reason: "pokedex-edit-not-pending" };
       if (op.phase === "entry") {
@@ -253,7 +253,7 @@ export class PokedexOperation {
       if (!plan.changed) { op.phase = "entry"; op.error = undefined; op.revision++; return this.pending(op); }
       const next = clone(before); next.dex = applyDexPatch(next.dex, plan.patch);
       const errors = validateGameContent(next, content); if (errors.length) throw Error(`invalid-pokedex-next:${errors[0]!.path}`);
-      op.pendingWrite = { before, next, attempted: false };
+      op.pendingWrite = { before, next, attempted: false, beforeKey: undefined, nextKey: undefined };
       return this.install(op);
     } catch (error) {
       if (this.operation !== op || op.generation !== this.ports.generation()) return { status: "refused", reason: "stale-pokedex-operation" };

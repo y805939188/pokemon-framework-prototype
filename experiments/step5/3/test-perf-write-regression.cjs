@@ -3,7 +3,10 @@
 const test = require('node:test'), assert = require('node:assert/strict');
 const path = require('node:path');
 const E = require(path.resolve(__dirname, '../../../js/engine/build/engine.cjs'));
+const { world } = require('./fixtures/postbattle/helpers.cjs');
 const clone = value => JSON.parse(JSON.stringify(value));
+const canonical = value => JSON.stringify(value, (_key, data) => data && typeof data === 'object' && !Array.isArray(data)
+  ? Object.fromEntries(Object.keys(data).sort().map(key => [key, data[key]])) : data);
 
 function fullWorld() {
   const full = clone(E.fixtures.makeGame()); full.party = full.party.slice(0, 1);
@@ -114,3 +117,135 @@ test('P2-1 local item negatives remain per-member errors and duplicate move ids 
   good.content.moves.Duplicate = { ...first, pp: first.pp + 1 };
   assert.deepEqual(E.saveSchema.validateGameContent(good.state(), good.content), []);
 });
+
+function dexWorld(kind) {
+  const options = { entries: [] };
+  if (kind === 'resolve-summary') Object.assign(options, {
+    settings: { DEX_SHOWS_ALL_FORMS: true },
+    extraContent: content => {
+      content.forms = Object.fromEntries(Object.keys(content.species).map(id => [id, { 0: id }]));
+      content.forms.Charizard = { 0: 'Charizard', 1: 'Charizard-Alt' };
+      content.species['Charizard-Alt'] = { ...clone(content.species.Charizard), formName: 'Alternate', pokedexForm: 1 };
+    },
+  });
+  const w = world(options), state = clone(w.state.current());
+  state.dex.hasDex = kind !== 'begin';
+  if (kind === 'begin-summary' || kind === 'resolve-summary') {
+    const species = state.party[0].species;
+    delete state.dex.lastSeenForm[species];
+    if (kind === 'resolve-summary') {
+      if (!state.dex.seen.includes(species)) state.dex.seen.push(species);
+      state.dex.seenForms[species] = [
+        { gender: 0, form: 0, shiny: false }, { gender: 0, form: 1, shiny: false },
+      ];
+    }
+  }
+  if (kind === 'resolve-entry') {
+    if (!state.dex.seen.includes('Pidgey')) state.dex.seen.push('Pidgey');
+    state.dex.owned = state.dex.owned.filter(id => id !== 'Pidgey');
+    state.dex.seenForms.Pidgey = [{ gender: 0, form: 0, shiny: true }];
+    state.dex.lastSeenForm.Pidgey = { gender: 0, form: 0, shiny: true };
+  }
+  w.state.replace(state); w.state.replaced.length = 0;
+  return w;
+}
+
+function prepareDexPath(kind) {
+  const w = dexWorld(kind), context = { kind, w, parentToken: null, memberId: null, species: null };
+  if (kind === 'begin-summary' || kind === 'resolve-summary') {
+    context.parentToken = w.app.beginManagement();
+    context.memberId = w.state.current().party[0].id;
+    context.species = w.state.current().party[0].species;
+  }
+  if (kind === 'resolve-summary') {
+    const opened = w.app.beginSummaryPokedex(context.parentToken, context.memberId);
+    assert.equal(opened.status, 'pending');
+  }
+  if (kind === 'resolve-entry') {
+    const opened = w.app.receiveGift({ kind: 'normal', member: { species: 'Pidgey', level: 3 } });
+    assert.equal(opened.status, 'applied');
+    context.species = 'Pidgey'; context.memberId = w.app.pendingPokedex.entry.memberId;
+  }
+  w.state.replaced.length = 0;
+  return context;
+}
+
+function runDexCommand(context) {
+  const { kind, w } = context;
+  if (kind === 'begin') return w.app.updatePokedex({ kind: 'entitlement', value: true });
+  if (kind === 'begin-summary') return w.app.beginSummaryPokedex(context.parentToken, context.memberId);
+  const pending = w.app.pendingPokedex;
+  if (kind === 'resolve-summary') return w.app.resolvePokedex(pending.token, pending.revision, { kind: 'summary-form', baseFrontsEqual: false, selected: 2 });
+  if (kind === 'resolve-entry') return w.app.resolvePokedex(pending.token, pending.revision, { kind: 'message-complete' });
+  throw Error(`unknown path ${kind}`);
+}
+
+function pollutedDexScenario(kind, field, mode) {
+  const context = prepareDexPath(kind), w = context.w, before = clone(w.state.current());
+  const previous = Object.getOwnPropertyDescriptor(Object.prototype, field);
+  let outcome, error, hookCalls = 0;
+  try {
+    if (mode === 'data' || mode === 'readonly-data') Object.defineProperty(Object.prototype, field, {
+      value: field === 'nextKey' ? canonical(before) : `inherited-${field}`,
+      writable: mode === 'data', configurable: true, enumerable: false,
+    });
+    if (mode === 'accessor') Object.defineProperty(Object.prototype, field, {
+      get() { hookCalls++; return undefined; }, set(_value) { hookCalls++; }, configurable: true, enumerable: false,
+    });
+    outcome = runDexCommand(context);
+  } catch (caught) { error = caught; }
+  finally {
+    if (previous) Object.defineProperty(Object.prototype, field, previous);
+    else delete Object.prototype[field];
+  }
+  return { context, w, before, after: clone(w.state.current()), outcome, error, hookCalls, field, mode };
+}
+
+function expectedDexState(context, before, after) {
+  const expected = clone(before), { kind } = context;
+  if (kind === 'begin') { expected.dex.hasDex = true; return expected; }
+  let record;
+  if (kind === 'resolve-summary') record = { gender: 0, form: 1, shiny: false };
+  else {
+    const member = kind === 'begin-summary' ? before.party[0] : [...after.party, ...after.storage.boxes.flatMap(box => box.slots.filter(Boolean))].find(value => value.id === context.memberId);
+    assert(member, `${kind}: expected installed member`);
+    record = { gender: member.gender === 'F' ? 1 : member.gender === 'N' ? 2 : 0, form: 0, shiny: member.shiny };
+  }
+  expected.dex.lastSeenForm[context.species] = record;
+  return expected;
+}
+
+function assertDexScenario(scenario) {
+  const { context, w, before, after, outcome, error, hookCalls, field, mode } = scenario;
+  const label = `${context.kind}/${field}/${mode}`;
+  assert.ifError(error, label);
+  assert.equal(hookCalls, 0, label);
+  assert.equal(w.state.replaced.length, 1, `${label}: exactly one real target installation`);
+  assert.equal(outcome.status, context.kind === 'begin' ? 'applied' : 'pending', label);
+  assert.deepEqual(after, expectedDexState(context, before, after), `${label}: complete state and exact write set`);
+  if (context.kind === 'begin') {
+    assert.equal(runDexCommand(context).status, 'unchanged', `${label}: idempotent replay`);
+    assert.equal(w.state.replaced.length, 1, label);
+  } else {
+    const pending = w.app.pendingPokedex;
+    assert(pending, `${label}: installed owner still present before close`);
+    assert.equal(w.app.resolvePokedex(pending.token, pending.revision, { kind: 'close-entry' }).status, 'complete', label);
+    assert.equal(w.state.replaced.length, 1, `${label}: close writes nothing`);
+    assert.equal(w.app.resolvePokedex(pending.token, pending.revision, { kind: 'close-entry' }).status, 'refused', `${label}: stale duplicate`);
+    assert.equal(w.state.replaced.length, 1, `${label}: stale duplicate writes nothing`);
+    if (context.parentToken) assert.equal(w.app.endManagement(context.parentToken).status, 'unchanged', label);
+  }
+  assert.equal(w.app.saveBlocked, false, `${label}: owner released`);
+  const management = w.app.beginManagement();
+  assert.equal(w.app.endManagement(management).status, 'unchanged', `${label}: subsequent operation available`);
+  assert.equal(w.state.replaced.length, 1, label);
+}
+
+for (const kind of ['begin', 'begin-summary', 'resolve-summary', 'resolve-entry']) {
+  test(`PERF-ULTRA-01 ${kind} creates both cache slots as own data across all four creation paths`, () => {
+    assertDexScenario(pollutedDexScenario(kind, 'beforeKey', 'clean'));
+    for (const field of ['beforeKey', 'nextKey']) for (const mode of ['data', 'readonly-data', 'accessor']) {
+      assertDexScenario(pollutedDexScenario(kind, field, mode));
+    }
+  });
+}
