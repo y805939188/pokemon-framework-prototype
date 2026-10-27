@@ -2,11 +2,11 @@ import { planAcquisitionDex, normalizeMemberDexAppearance } from "../rules/acqui
 import { PokedexOperation } from "./pokedex-operation";
 import type { DexEntryIntent, DexDecision, DexViewingCommand, DexResolution } from "./pokedex-operation";
 import { dexShouldOfferEntry } from "../rules/pokedex";
-import { createDexQueryCatalog, dexAccessibleRegions, dexMenuEntry, dexInUnlockedRegion, dexInfo, dexEntryNumber, dexMeasurements } from "../rules/pokedex-query";
+import { dexInUnlockedRegion } from "../rules/pokedex-query";
 import { dexNameGroups, DEX_COLORS, DEX_SHAPES } from "../rules/pokedex-query";
 import type { AcquisitionEntryIntent } from "../rules/acquisition-dex";
 import { semanticFingerprint } from "../rules/semantic";
-import { TradeOperation, tradeEligibility } from "./trade-operation";
+import { TradeOperation } from "./trade-operation";
 import type { TradeIntent, TradeDecision, TradeOutcome } from "./trade-operation";
 import type {ItemWorldContext} from '../rules/item-effects';
 import type { BattleEvidence } from "../rules/battle-evidence";
@@ -23,7 +23,6 @@ import type { InventoryRequest, InventoryParent, InventoryOutcome } from "./inve
 import { badgeCount, hasBadge } from "../rules/economy";
 import { assertInventoryMapped, addItems, aggregateBag, inventoryPolicy } from "../rules/inventory";
 import { catalogOf } from "../rules/item-catalog";
-import { computedNature } from "../rules/member-metadata";
 /**
  * The game application: the use cases that coordinate a battle with the persistent game, and nothing else.
  *  - game rules stay in the core (`rules/`): the application calls `applyBattleResult`, it does not re-implement it;
@@ -37,23 +36,23 @@ import { resolveBattleEffects } from "../rules/battle-consumption";
 import type { EffectsBindingV2, EffectsContextV2, ResolvedBattleEffects } from "../rules/battle-consumption";
 import { composeBattleEffects } from "../rules/battle-effects-writeback";
 import type { ApplyStatus, BattleCommitOptions, BattleResult, GameState } from "../rules/state";
-import { allMembers, boxedMembers, locateMember } from "../rules/storage";
+import { allMembers, locateMember } from "../rules/storage";
 import { DEFAULT_LIMITS, storageFull } from "../rules/limits";
 import type { Limits } from "../rules/limits";
 import { GrantRefusedError, applyGrant } from "../rules/grants";
 import { managementSnapshot, individualView, searchStorage } from "./management-query";
 import type { IndividualView, ManagementSnapshot, StorageMatch, StorageSearch } from "./management-query";
+import { installedPokedexEntryView, learningMoveView, partyView, pokedexEntryWithMeasurements, pokedexSnapshotView, tradeCandidateViews, tradePokedexEntryInfo } from "./query-views";
 import { ManagementSession } from "./management";
 import type { ManagementOutcome, ManagementRequest } from "./management";
 import { developmentCapabilities, resolveConfig } from "../rules/config";
 import type { DevelopmentCapabilities } from "../rules/config";
 import type { ItemDescriptor, MemberReference } from "../rules/storage-operations";
 import { healParty, recoverAll } from "../rules/heal";
-import { computeStats } from "../rules/growth";
 import { createMember, personalId } from "../rules/member-factory";
 import { appliesAt, pickEncounter, validateEncounterTable } from "../rules/encounter";
 import { isDefeat, settleDefeat } from "../rules/defeat";
-import { battleView, speciesDataOf, speciesKeyResolver, toBattleMember, toPersistentMember } from "../rules/species-key";
+import { battleView, speciesKeyResolver, toBattleMember, toPersistentMember } from "../rules/species-key";
 import { addSteps, bumpStat } from "../rules/stats";
 import type { GameStats, StatCounter } from "../rules/stats";
 import type { Member } from "../rules/types";
@@ -343,15 +342,12 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const generation = this.generation, state = clone(this.ports.state.read()), content = clone(this.ports.content().content);
     if (generation !== this.generation) throw Error("stale-pokedex-query");
     this.pokedex.observeContent(content);
-    const catalog = createDexQueryCatalog(content, text), config = resolveConfig(content.settings);
-    const accessible = dexAccessibleRegions(state.dex, catalog.layout, { useCurrentRegion: config.USE_CURRENT_REGION_DEX, currentRegion });
-    return { generation, dex: state.dex, catalog, accessible, menu: dexMenuEntry(state.dex, accessible, config.USE_CURRENT_REGION_DEX) };
+    return pokedexSnapshotView(generation, state, content, text, currentRegion);
   }
   /** Read-only installed-entry projection. Draft trade entries remain owned by their separate view. */
   describePokedexEntry(species: string, locale = "en", text: Readonly<Record<string, string>> = {}) {
-    const snapshot = this.pokedexSnapshot(text), config = resolveConfig(this.ports.content().content.settings);
-    const info = dexInfo(snapshot.dex, snapshot.catalog, species, dexEntryNumber(snapshot.dex, snapshot.catalog.layout, species, "brief", config.DEXES_WITH_OFFSETS));
-    return info ? { ...info, measurements: info.heightDm === null || info.weightHg === null ? null : dexMeasurements(info.heightDm, info.weightHg, locale, "info") } : null;
+    const snapshot = this.pokedexSnapshot(text), content = this.ports.content().content;
+    return installedPokedexEntryView(snapshot, content, species, locale);
   }
   /** Read-only entry from this exact trade draft. Never reads its incoming member from the real party. */
   describeTradeEntry(token: string, revision: number, locale = "en", text: Readonly<Record<string, string>> = {}) {
@@ -359,11 +355,10 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (!view || view.token !== token || view.revision !== revision || !view.dex || !view.entry) return null;
     const content = clone(this.ports.content().content);
     if (validatedContentIdentity(content) !== view.contentIdentity) throw Error("stale-trade-entry-content");
-    const catalog = createDexQueryCatalog(content, text), config = resolveConfig(content.settings);
-    const info = dexInfo(view.dex, catalog, view.entry.species, dexEntryNumber(view.dex, catalog.layout, view.entry.species, "brief", config.DEXES_WITH_OFFSETS));
+    const info = tradePokedexEntryInfo(view, content, text);
     const current = this.trade.view;
     if (generation !== this.generation || current?.token !== token || current.revision !== revision) throw Error("stale-trade-entry-query");
-    return info ? { ...info, measurements: info.heightDm === null || info.weightHg === null ? null : dexMeasurements(info.heightDm, info.weightHg, locale, "info") } : null;
+    return pokedexEntryWithMeasurements(info, locale);
   }
   resolvePokedex(token: string, revision: number, decision: DexDecision) {
     const generation = this.generation, before = this.pokedex.view, outcome = this.pokedex.resolve(token, revision, decision);
@@ -392,9 +387,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   get pendingLearning() { return this.learning.view; }
   teachingCandidates(source: Extract<LearningIntent, { kind: 'teach' }>['source']) { return this.learning.candidates(source); }
   describeLearningMove(id: string) {
-    const { content, dex } = this.ports.content(), move = Object.values(content.moves ?? {}).find(value => value.id === id);
-    if (!move) return null;
-    return { ...(dex?.moveDetails?.(id) ?? { type: '', category: '', power: null, accuracy: 0, description: '' }), ...clone(move) };
+    const { content, dex } = this.ports.content();
+    return learningMoveView(content, dex, id);
   }
   beginLearning(intent: LearningIntent, parent?: LearningParent) { return this.learning.begin(intent, parent); }
   resolveLearning(token: string, revision: number, decision: LearningDecision) { return this.learning.resolve(token, revision, decision); }
@@ -403,8 +397,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   resolveTrade(token: string, revision: number, decision: TradeDecision) { return this.trade.resolve(token, revision, decision); }
   tradeCandidates(requiredSpecies?: string) {
     const game = this.ports.state.read(), world = clone(this.ports.itemWorld?.() ?? {});
-    return game.party.map(member => ({ memberId: member.id, name: member.nickname || member.species,
-      eligible: tradeEligibility(member, world, requiredSpecies) === null, reason: tradeEligibility(member, world, requiredSpecies) }));
+    return tradeCandidateViews(game, world, requiredSpecies);
   }
   get pendingTriggeredEvolution() { return this.triggered.view; }
   beginEvolutionItem(parent: string, requestId: string, intent: EvolutionItemIntent) { return this.triggered.beginItem(parent, requestId, intent); }
@@ -738,14 +731,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   describeParty(): PartyView {
     const game = this.ports.state.read();
     const { content } = this.ports.content();
-    return {
-      members: game.party.map((m) => {
-        const sp = speciesDataOf(content, m);
-        const maxhp = sp ? computeStats(sp.base, m.ivs, m.evs, m.level, computedNature(m)).hp : m.hp;
-        return { id: m.id, species: m.species, form: m.form ?? 0, ...(sp?.nameKey ? { nameKey: sp.nameKey } : {}), level: m.level, hp: m.hp, maxhp, status: m.status, moves: m.moves.map((x) => ({ ...x })) };
-      }),
-      boxes: boxedMembers(game).length, bag: aggregateBag(game.inventory), money: game.money,
-    };
+    return partyView(game, content);
   }
 
   /** Heal the party (HP, status, PP). Safe to repeat: an already healed party writes nothing. Never throws. */
