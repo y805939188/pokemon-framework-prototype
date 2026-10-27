@@ -62,9 +62,12 @@ export async function runCloseout(p:any):Promise<void>{
    measurements.push({rows:fixture.rows,baseSpecies:fixture.baseSpecies,forms:fixture.forms,regions:fixture.regions,contentIdentity:fixture.contentIdentity,compiledSha256:fixture.compiledSha256,storage:{boxes:40,slotsPerBox:30,members:1200},assemblyMs:t-start,listOpenMs:saveStart-t,saveMs,loadMs,totalMs:performance.now()-start});
   }return{measurements,input:'legal pinned data via strict compiler/assembly, real MZ dex windows/save/load; author placeholder numeric values; no hard budget or no-leak claim'};
  });
+}
+export async function runCloseoutLifecycle(p:any):Promise<void>{
+ const {G,W,fs,path,OUT,api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,toMap,toMapId,fresh,uiReady,uiClosed,management}=p;
  await scenario('I-LIFECYCLE each new scene family 100 real creations/closures, listener/window/resource samples',async()=>{
   await toMap();fresh();await toMapId(5,8,9);const B=api(),content=clone(W.PSFlow.content()),state=clone(game()),id=state.party[0].id;
-  const source=B.speciesKey.speciesDataOf(content,state.party[0]);source.evolutions=[{method:'Event',parameter:7,target:state.party[1].species}];state.dex.hasDex=true;state.dex.unlocked=Array(content.regionalDex.regions.length+1).fill(true);
+  const source=B.speciesKey.speciesDataOf(content,state.party[0]);source.evolutions=[{method:'Event',parameter:7,target:state.party[1].species}];state.dex.hasDex=true;state.dex.seen=[...new Set([...state.dex.seen,...state.party.map((m:any)=>m.species)])];state.dex.owned=[...state.dex.seen];state.dex.unlocked=Array(content.regionalDex.regions.length+1).fill(true);
   // Test-only authored content identity is explicit, just as in the individual G suites.
   const raw=clone(content);delete raw.meta;const inputsHash=B.digest.sha256Hex(B.contentCompile.canonicalJson(raw));content.meta={...content.meta,kind:'fixture',id:'I-lifecycle',inputsHash,contentIdentity:B.digest.sha256Hex(B.contentCompile.canonicalJson({compiledSemantics:content.meta.compiledSemantics,inputsHash,showdownSha:content.meta.showdownSha}))};
   W.PSFlow._content=content;G.$gameSystem._psGame=state;W.PSFlow.stateReplaced();
@@ -83,14 +86,14 @@ export async function runCloseout(p:any):Promise<void>{
     else if(family==='evolution'){W.PSEvolution.event(7,id);await waitFor(()=>W.PSEvolution.current()?.ready,'cycle event');}
     else if(family==='trade'){const waiter=new G.Game_Interpreter();G.PluginManager.callCommand(waiter,'PS_Evolution','ScriptTrade',{requestId:'I-cycle-'+i,intent:JSON.stringify({outgoingId:id,incoming:{species:state.party[1].species},foreignOwner:{name:'Lifecycle'}})});await waitFor(()=>W.PSEvolution.current()?.ready,'cycle offer');}
     else if(family==='inventory'){W.PSInventory.showBag();await waitFor(()=>W.PSInventory.current()?.ready,'cycle inventory');}
-    else if(family==='pokedex'){W.PSPokedex.open();await waitFor(()=>W.PSPokedex.current()?.ready,'cycle dex');}
+    else if(family==='pokedex'){const opened=W.PSPokedex.open();eq(opened.status,'opened','formal Pokedex opens: '+JSON.stringify(opened.reason));await waitFor(()=>W.PSPokedex.current()?.ready,'cycle dex');}
     else{W.PSManagement.openSummary(id);await uiReady('summary');await press('ok');await p.uiChoose('pokedex');await waitFor(()=>W.PSPokedex.current()?.ready,'cycle attached dex');}
     openMs.push(performance.now()-t);const windows=(scene()?._windowLayer?.children??[]).slice();createdWindows+=windows.length;
     await closeScene();destroyedWindows+=windows.filter((w:any)=>w.destroyed||w._destroyed).length;
-    if([0,24,49,74,99].includes(i))samples.push({cycles:i+1,...memory()});
+    if([0,24,49,74,99].includes(i)){samples.push({cycles:i+1,...memory()});fs.writeFileSync(OUT+'.lifecycle.json',JSON.stringify({groups,current:{family,createdWindows,destroyedWindows,samples,openMs}}));}
    }
-   const after=memory();eq(after.inputs,before.inputs,'no input nodes accumulate');eq(after.trackedNewDocumentWindowListeners,before.trackedNewDocumentWindowListeners,'no new live document/window listener accumulation');assert(createdWindows>0,'actual host windows created');eq(destroyedWindows,createdWindows,'all scene windows destroyed');groups.push({family,cycles:100,createdWindows,destroyedWindows,openMs,before,after,samples});
+   const after=memory();eq(after.inputs,before.inputs,'no input nodes accumulate');eq(after.trackedNewDocumentWindowListeners,before.trackedNewDocumentWindowListeners,'no new live document/window listener accumulation');assert(createdWindows>0,'actual host windows created');eq(destroyedWindows,createdWindows,'all scene windows destroyed');groups.push({family,cycles:100,createdWindows,destroyedWindows,openMs,before,after,samples});fs.writeFileSync(OUT+'.lifecycle.json',JSON.stringify({groups,complete:false}));
   }}finally{prototype.addEventListener=add;prototype.removeEventListener=remove;}
-  return{groups,method:'real scene create/start/terminate, explicit test-triggered SceneManager.goto before install; normal user flows separately above; RSS raw/forced GC if available; tracked listeners added only during this measurement, no proof of absence of every engine resource leak'};
+  fs.writeFileSync(OUT+'.lifecycle.json',JSON.stringify({groups,complete:true}));return{groups,method:'real scene create/start/terminate, explicit test-triggered SceneManager.goto before install; normal user flows separately above; RSS raw/forced GC if available; tracked listeners added only during this measurement, no proof of absence of every engine resource leak'};
  });
 }
