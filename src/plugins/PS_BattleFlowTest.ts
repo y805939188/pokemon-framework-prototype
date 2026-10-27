@@ -5,6 +5,8 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // the step 4 (schema 3) save written by the step 4 code (step 5.0 checkpoint P-1), for T31
+import SCALE_CORPUS from "../../experiments/step5/3/closeout/scale-fixtures.json";
+import { runCloseout, continueCloseout } from "./flowtest/closeout.ts";
 import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
 import { pressKey, waitGameFrames, waitUntil } from "./flowtest/timing.ts";
 import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } from "./flowtest/evidence.ts";
@@ -18,7 +20,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   const mode = arg("ps-flow-test");
   if (!mode) return;
   // Backend contract modes drive their own answers; only the formal UI mode uses the default automatic presenter.
-  if(mode!=="evolution-ui"&&mode!=="trade-ui"&&W.PSEvolution)W.PSEvolution.automatic=false;
+  if(mode!=="evolution-ui"&&mode!=="trade-ui"&&mode!=="closeout"&&W.PSEvolution)W.PSEvolution.automatic=false;
 
   const nodeRequire: any = G.require;
 
@@ -545,7 +547,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       return rows;
     });
 
-    await scenario("T14 invalid result outcome: abort before capture commit; a corrected retry applies exactly once", async () => {
+    await scenario("T14 invalid primary outcome: abort/zero write, retired handle cannot regain authority; new valid battle applies once", async () => {
       fresh(); I6.setItemCount(game(), "masterball", 1); const before = clone(game());
       G.$gameVariables.setValue(10, 1);
       await startEvent(1); await inMode("main");
@@ -557,15 +559,17 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         await press("ok"); await dismissMessages();
         const aborted = clone(W.PSFlow.lastOutcome);
         eq([aborted.battleId, aborted.code, aborted.commit, aborted.aborted], [W.PSFlow.request.battleId, 0, "none", true], "invalid result aborted");
-        assert(/invalid battle outcome/.test(aborted.error), "contract error reported");
+        assert(/invalid battle result \$\.outcome: missing field/.test(aborted.error), "strict primary outcome error reported");
         eq(G.$gameVariables.value(10), 0, "event sees abort");
         eq(game(), before, "capture, bag and ledger untouched");
         session.result = readResult;
-        const fixed = W.PSFlow.app().finishBattle(session, W.PSFlow.request), after = clone(game());
-        eq([fixed.code, fixed.commit, fixed.projection], [2, "applied", "ok"], "corrected result committed");
+        const retired = W.PSFlow.app().finishBattle(session, W.PSFlow.request);
+        eq([retired.code,retired.commit],[0,"none"],"invalid primary retired its old authority; correcting an old handle cannot reuse missing capture templates");eq(game(),before,"retired retry has zero writes");
+        await startEvent(1);await inMode("main");await choose(/^Bag/);await inMode("bag");await choose(/Master Ball/i);await inMode("end");const correctedSession=battle()._session;await finishBattle();
+        const fixed=W.PSFlow.lastOutcome,after=clone(game());eq([fixed.code,fixed.commit,fixed.projection],[2,"applied","ok"],"new valid normal battle commits once");
         eq(after.party.length, before.party.length + 1, "one capture");
         assert(!I6.bagOf(after).masterball, "one ball consumed");
-        const repeated = W.PSFlow.app().finishBattle(session, W.PSFlow.request);
+        const repeated = W.PSFlow.app().finishBattle(correctedSession, W.PSFlow.request);
         eq(repeated.commit, "already-applied", "duplicate is a no-op"); eq(game(), after, "no duplicate reward");
         assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "interpreter released");
         return { aborted, correctedCommit: fixed.commit, repeatedCommit: repeated.commit };
@@ -588,7 +592,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         const g1 = clone(game());
         eq(g1.party.map((m: any) => [m.id, m.species, m.form, m.level, m.moves.map((x: any) => x.id)]), [["M1", "charmander", 0, 5, ["scratch", "growl", "ember"]]], "the starter comes from the content (stored by content id + form)");
         eq([I6.bagOf(g1), g1.claims, g1.money], [{ antidote: 2, pokeball: 10, potion: 5 }, { starter: { kind: "grant" } }, 3000], "items and the claim");
-        eq(g1.dex, { ...g0.dex, seen: ["charmander"], owned: ["charmander"] }, "grant updates seen/owned and preserves all current dex metadata");
+        eq(g1.dex, { ...g0.dex, seen: ["charmander"], owned: ["charmander"], seenForms: {charmander:[{gender:0,form:0,shiny:false}]}, lastSeenForm:{charmander:{gender:0,form:0,shiny:false}} }, "grant registers the actual complete F appearance without inventing capture counts");
         await runEvent(1);
         eq([W.PSFlow.lastClaim.status, G.$gameVariables.value(11)], ["already-claimed", 2], "the repeat is reported");
         eq(game(), g1, "the repeat changes nothing");
@@ -647,7 +651,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       eq([busyBattle, W.PSFlow.lastEncounter], [false, null], "busy: nothing opens and nothing is decided");
       // a real trigger
       const saveBefore = G.$gameSystem.isSaveEnabled();
-      await stepInto(4, 9, 2);
+      await stepInto(3, 9, 2);
       await waitFor(() => battle() && battle()._mode !== "boot", "encounter battle scene");
       const req = W.PSFlow.request;
       assert(req.encounter && /^wild#\d+$/.test(req.battleId), "an encounter request: " + req.battleId);
@@ -674,7 +678,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     await scenario("T17 encounter win: Ember until the foe faints, level-up to 8 and the level 8 move learned; HP/PP/status/exp written back once", async () => {
       await slice(17);
       const m = game().party[0]; m.exp = E.minExp("parabolic", 8) - 1;
-      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await stepInto(3, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await fightUntilEnd(/^Ember|^ember/i);
       const live = battle()._session.gw.readState("p1").find((x: any) => x.id === "M1");
       await finishBattle();
@@ -694,7 +698,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       g.party[0].hp = 5; I6.setItemCount(g, "pokeball", 30);
       const ids: string[] = [];
       for (let round = 0; round < 2; round++) {
-        await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+        await stepInto(3, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
         if (round === 0) {
           await choose(/^Bag/); await inMode("bag"); await choose(/Potion/); await inMode("party"); await choose(/Charmander/); await inMode("main");
           assert(battle()._log._lines.some((l: string) => /Recovered/.test(l)), "the Potion healed");
@@ -719,7 +723,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       api().storage.placeInBox(g.storage, mkMember("B-1", "Pidgey", 3));
       W.PSFlow.testLimits = { party: 6, boxes: 1, bagPerItem: 999, money: 999999 }; W.PSFlow._app = null;
       const before = clone(game());
-      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await stepInto(3, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await choose(/^Bag/); await inMode("bag"); await choose(/Poké Ball/); await inMode("main");
       assert(battle()._log._lines.some((l: string) => /party and boxes are full/.test(l)), "the reason is shown");
       eq(I6.bagOf(battle()._session).pokeball, I6.bagOf(before).pokeball, "nothing spent");
@@ -731,7 +735,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     await scenario("T20 encounter defeat: money lost (highest level x 8) and the party healed with the commit, the player taken home, nothing left running", async () => {
       await slice(20);
       const g = game(); g.party = [mkMember("S-1", "Snorlax", 2, { hp: 1 })]; g.money = 1000;
-      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await stepInto(3, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await choose(/^Fight/); await inMode("moves"); await choose(/tackle/i);
       await inMode("end"); await press("ok");
       await dismissMessages();
@@ -747,10 +751,10 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       await slice(21);
       const g = game(); g.party = [mkMember("S-1", "Snorlax", 2, { hp: 1 })]; g.money = 1000;
       W.PSFlow.debug.failReturn = true;
-      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await stepInto(3, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await choose(/^Fight/); await inMode("moves"); await choose(/tackle/i);
       await inMode("end"); await press("ok"); await dismissMessages(); await frames(20);
-      eq([W.PSFlow.lastReturn.status, G.$gamePlayer.x, G.$gamePlayer.y], ["failed", 4, 10], "still where the battle was");
+      eq([W.PSFlow.lastReturn.status, G.$gamePlayer.x, G.$gamePlayer.y], ["failed", 3, 10], "still where the battle was (same region, unoccupied test tile)");
       eq(game().money, 984, "settled once");
       const settled = clone(game());
       const r = W.PSFlow.retryReturnHome(); eq(r.status, "requested", "retry requested");
@@ -919,7 +923,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       await slice(25);
       const g = game(); for (let i = 2; i <= 6; i++) g.party.push(mkMember(`P-${i}`, "Caterpie", 3)); I6.setItemCount(g, "masterball", 5);
       const catchOne = async () => {
-        await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+        await stepInto(3, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
         await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); await finishBattle();
         eq(W.PSFlow.lastOutcome.code, 2, "caught"); return boxed()[boxed().length - 1].id;
       };
@@ -940,14 +944,14 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       await slice(26);
       const m0 = game().party[0]; m0.exp = E.minExp("parabolic", 8) - 1; // test setup: one fight away from level 8
       I6.setItemCount(game(), "masterball", 2); // test setup: certain catches
-      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await stepInto(3, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await fightUntilEnd(/^Ember|^ember/i); await finishBattle();
       eq(W.PSFlow.lastOutcome.code, 1, "won"); eq(game().party[0].level, 8, "grew");
-      await stepInto(4, 9, 8); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await stepInto(3, 9, 8); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); await finishBattle();
       eq([W.PSFlow.lastOutcome.code, game().party.length], [2, 2], "caught into the party");
       for (let i = 3; i <= 6; i++) game().party.push(mkMember(`P-${i}`, "Caterpie", 3)); // test setup: a full party
-      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+      await stepInto(3, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
       await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/); await finishBattle();
       eq([W.PSFlow.lastOutcome.code, game().party.length, boxed().length], [2, 6, 1], "caught into the boxes");
       game().party[0].hp = 3; game().party[0].moves[2].pp = 1; // hurt before the nurse
@@ -1079,7 +1083,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         await slice(35); await G.DataManager.saveGame(21);
         game().party = [mkMember("S-1", "Snorlax", 2, { hp: 1 })]; game().money = 1000;
         W.PSFlow.debug.failReturn = true;
-        await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
+        await stepInto(3, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
         await choose(/^Fight/); await inMode("moves"); await choose(/tackle/i); await finishBattle(); await frames(20);
         eq([W.PSFlow.lastOutcome.code, W.PSFlow.pendingReturn.status, game().money], [4, "failed", 984], "defeat settled, trip failed");
         const diagnostic = W.PSFlow.lastReturn;
@@ -1159,10 +1163,10 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     await toMap();fresh();W.PSFlow.setLanguage('zh');W.PSManagement.openStorage();await uiChoose('organize');await uiReady('box');await press('up');await press('ok');await uiChoose('name');const input=document.querySelector('input') as HTMLInputElement;input.value='迟到';W.PSFlow.app().stateReplacedByHost();const before=clone(game());nativeSubmit(input,'Enter');await frames(4);eq(game(),before,'stale input no write');await uiClosed();W.PSManagement.openParty();await uiReady('party');assert(management().text.some((s:string)=>s.includes('队伍')),'Chinese management labels');assert(!management().text.some((s:string)=>s.includes('[missing:')),'no missing translated key');await shot('U51-party-zh');await press('cancel');await uiClosed();W.PSFlow.setLanguage('en');
    });
    await scenario('U51-07 captured full-template pending transfers battle to reception and returns directly to map without restart/abort',async()=>{
-    await toMap();fresh();while(game().party.length<6)game().party.push(mkMember('CAP-FILL-'+game().party.length,'Pidgey',3));const storedId=game().party[0].id;W.PSFlow.receiveOptions={mode:0,naming:0};W.PSFlow._app=null;I6.setItemCount(game(), "masterball", 2);await startEvent(1);await inMode('main');await choose(/^Bag/);await inMode('bag');await choose(/Master Ball/);await inMode('end');assert(!battle()._log._lines.some((line:string)=>line.includes('was sent to the boxes')),'no destination claim before full-party decision');await press('ok');await uiReady('menu');assert(W.PSFlow.running,'battle root stays open while receiving');await uiChoose('no');await uiChoose('party');await uiReady('party');await press('ok');await uiClosed();eq(api().storage.locateMember(game(),storedId).position.kind,'box','selected old member stored after full-party capture');eq(game().party[0].id,W.PSFlow.lastResult.captured[0].id,'caught stable identity joins the chosen party slot');assert(!W.PSFlow.running,'battle root closes after receipt');eq(W.PSFlow.lastOutcome.code,2,'caught outcome retained');assert(!W.PSFlow.lastOutcome.aborted,'reception transfer did not abort caught battle');
+    await toMap();fresh();while(game().party.length<6)game().party.push(mkMember('CAP-FILL-'+game().party.length,'Pidgey',3));const storedId=game().party[0].id;W.PSFlow.receiveOptions={mode:0,naming:0};W.PSFlow._app=null;I6.setItemCount(game(), "masterball", 2);await startEvent(1);await inMode('main');await choose(/^Bag/);await inMode('bag');await choose(/Master Ball/);await inMode('end');assert(!battle()._log._lines.some((line:string)=>line.includes('was sent to the boxes')),'no destination claim before full-party decision');await press('ok');await uiReady('menu');assert(W.PSFlow.running,'battle root stays open while receiving');await uiChoose('no');await uiChoose('party');await uiReady('party');await press('ok');await uiClosed();eq(api().storage.locateMember(game(),storedId).position.kind,'box','selected old member stored after full-party capture');eq(game().party.at(-1).id,W.PSFlow.lastResult.captured[0].id,'WP38 compacts survivors then appends caught identity');assert(!W.PSFlow.running,'battle root closes after receipt');eq(W.PSFlow.lastOutcome.code,2,'caught outcome retained');assert(!W.PSFlow.lastOutcome.aborted,'reception transfer did not abort caught battle');
    });
    await scenario('U51-08 forced party receiving cannot cancel or send to box; replacing deposits the chosen stable ID',async()=>{
-    await toMap();fresh();while(game().party.length<6)game().party.push(mkMember('FORCE-FILL-'+game().party.length,'Pidgey',5));W.PSFlow.receiveOptions={mode:2,naming:1};W.PSFlow._app=null;const original=game().party[0].id,result=W.PSFlow.app().receiveGift({kind:'normal',member:{existing:mkMember('FORCE-NEW','Pidgey',5)}});eq(result.status,'pending','force pending');W.PSManagement.openReceiving();await uiReady('menu');assert(!management().view.items.some((x:any)=>x.key==='box'),'force has no box option');await press('cancel');await uiReady('menu');assert(W.PSFlow.operationPending(),'cancel cannot unlock force receiving');await uiChoose('party');await uiReady('party');await press('cancel');await uiChoose('party');await uiReady('party');await press('ok');await uiClosed();eq(game().party[0].id,'FORCE-NEW','new identity occupies chosen party slot');eq(api().storage.locateMember(game(),original).position.kind,'box','chosen old member stored');
+    await toMap();fresh();while(game().party.length<6)game().party.push(mkMember('FORCE-FILL-'+game().party.length,'Pidgey',5));W.PSFlow.receiveOptions={mode:2,naming:1};W.PSFlow._app=null;const original=game().party[0].id,result=W.PSFlow.app().receiveGift({kind:'normal',member:{existing:mkMember('FORCE-NEW','Pidgey',5)}});eq(result.status,'pending','force pending');W.PSManagement.openReceiving();await uiReady('menu');assert(!management().view.items.some((x:any)=>x.key==='box'),'force has no box option');await press('cancel');await uiReady('menu');assert(W.PSFlow.operationPending(),'cancel cannot unlock force receiving');await uiChoose('party');await uiReady('party');await press('cancel');await uiChoose('party');await uiReady('party');await press('ok');await uiClosed();eq(game().party.at(-1).id,'FORCE-NEW','WP38 compacts survivors then appends new identity');eq(api().storage.locateMember(game(),original).position.kind,'box','chosen old member stored');
    });
    await scenario('U51-09 source-off UI permits taking existing item; selector caches qualifier and returns stable identity; Box Link requires three gates',async()=>{
     await toMap();fresh();game().party[0].item='leftovers';const id=game().party[0].id;W.PSManagement.openParty();await uiReady('party');await press('ok');await uiChoose('item');await uiReady('menu');assert(management().view.items.find((x:any)=>x.key==='give').enabled===false,'source off give disabled');await uiChoose('take');await uiReady('party');eq(game().party[0].item,'','taken item');eq(I6.bagOf(game()).leftovers,1,'returned exactly once');
@@ -1369,7 +1373,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       const enc: number[] = [], saveMs: number[] = [], loadMs: number[] = [];
       for (let i = 0; i < n; i++) {
         W.PSFlow.perf.cur = null;
-        await stepInto(4, 9, i % 2 ? 8 : 2); await waitFor(() => battle() && battle()._mode !== "boot", "encounter"); await inMode("main");
+        await stepInto(3, 9, i % 2 ? 8 : 2); await waitFor(() => battle() && battle()._mode !== "boot", "encounter"); await inMode("main");
         const cur = W.PSFlow.perf.cur; if (cur && cur.encounter && cur.firstMenuMs !== undefined) enc.push(cur.firstMenuMs);
         for (let k = 0; k < 6 && mode_() !== "end"; k++) { await choose(/^Run/); await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after run"); }
         await finishBattle();
@@ -1404,7 +1408,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       await toMapId(5, 8, 9);
       for (let i = 0; i < n; i++) {
         W.PSFlow.perf.cur = null;
-        await stepInto(4, 9, i % 2 ? 8 : 2); await waitFor(() => battle() && battle()._mode !== "boot", "encounter"); await inMode("main");
+        await stepInto(3, 9, i % 2 ? 8 : 2); await waitFor(() => battle() && battle()._mode !== "boot", "encounter"); await inMode("main");
         const cur = W.PSFlow.perf.cur; if (cur && cur.encounter && cur.firstMenuMs !== undefined) enc.push(cur.firstMenuMs);
         for (let k = 0; k < 6 && mode_() !== "end"; k++) { await choose(/^Run/); await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after run"); }
         await finishBattle();
@@ -2546,7 +2550,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       // continue playing from the loaded save
       W.PSFlow.rng = seeded(303); W.PSFlow.seed = [1, 2, 3, 4]; W.PSFlow.fast = true;
       await toMapId(expected.map.mapId, expected.map.x, expected.map.y);
-      await stepInto(4, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle after loading"); await inMode("main");
+      await stepInto(3, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle after loading"); await inMode("main");
       for (let k = 0; k < 6 && mode_() !== "end"; k++) { await choose(/^Run/); await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after run"); }
       await finishBattle();
       eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit], [3, "applied"], "a battle after loading commits");
@@ -2643,7 +2647,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       try { startAt.call(this); } finally { fs.readFileSync = read; }
     } else startAt.call(this);
     setTimeout(async () => {
-      try { if (mode === "pokedex-ui") await runPokedexUI(); else if (mode === "item-evolution-ui") await runItemEvolutionUI(); else if (mode === "battle-entry") await runBattleEntryOwnership(); else if (mode === "trade-ui") await runTradeUI(); else if (mode === "evolution-ui") await runEvolutionUI(); else if (mode === "learning-ui") await runLearningUI(); else if (mode === "m1") await runM1Convergence(); else if (mode === "viewing") await runDexViewing(); else if (mode === "acquisition") await runAcquisitionTransactions(); else if (mode === "trade") await runTradeTransactions(); else if (mode === "triggered") await runTriggeredEvolution(); else if (mode === "learning") await runLearningTransactions(); else if (mode === "postbattle") await runPostbattleEvolution(); else if (mode === "progression-data") await runProgressionData(); else if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
+      try { if (mode === "closeout") await runCloseout({G,W,fs,path,OUT,api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,toMap,toMapId,fresh,shot,settledSave,uiReady,uiClosed,uiChoose,management,runLearningUI,runEvolutionUI,runTradeUI,runItemEvolutionUI,runPokedexUI,corpus:SCALE_CORPUS}); else if(mode === "closeout-continue") await continueCloseout({G,W,scenario,assert,eq,frames,press,waitFor,scene,game,readExpected,shot}); else if (mode === "pokedex-ui") await runPokedexUI(); else if (mode === "item-evolution-ui") await runItemEvolutionUI(); else if (mode === "battle-entry") await runBattleEntryOwnership(); else if (mode === "trade-ui") await runTradeUI(); else if (mode === "evolution-ui") await runEvolutionUI(); else if (mode === "learning-ui") await runLearningUI(); else if (mode === "m1") await runM1Convergence(); else if (mode === "viewing") await runDexViewing(); else if (mode === "acquisition") await runAcquisitionTransactions(); else if (mode === "trade") await runTradeTransactions(); else if (mode === "triggered") await runTriggeredEvolution(); else if (mode === "learning") await runLearningTransactions(); else if (mode === "postbattle") await runPostbattleEvolution(); else if (mode === "progression-data") await runProgressionData(); else if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       try { report.contentIdentity = W.PSFlow.content().meta; } catch (e) { report.contentIdentity = { error: String(e) }; }
       try { report.logTail = W.PSFlow.logger ? W.PSFlow.logger.tail(60) : null; } catch (e) { report.logTail = { error: String(e) }; } // redacted, bounded session diagnostics
