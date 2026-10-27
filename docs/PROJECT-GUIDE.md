@@ -160,3 +160,8 @@ pnpm --dir src build                                                            
 - `main` 是唯一长期分支；新工作开短期分支，合并后删除。远端与本地保持一致。
 - 阶段里程碑用标签保留：`step2.1-accepted`、`step2.2-feasibility`、`step2.3-c1`、`step2.4-mz-flow`、`step2.5-c2`、`step2.runtime-pass`；独立评审的基线标签是 `step2-review-baseline`（指向 `2e5f2e5`，评审报告审查的就是它）；`step2-review-fixes` 是评审修复完成时的状态（`c2a3e29`，在用户决定 D1–D5 落地之前）；**`step2-closed` 是第二步收尾时的最终状态**；第三步在短期分支 `step3/foundation` 上做，**独立复核通过后**才合并并打 `step3-closed`。评审后的修复与决定见 `docs/step2/review-followups.md`。
 - 提交信息写清做了什么和为什么；AI 协作提交按所用工具要求添加署名行。
+
+
+## 2026-10-27 I/J技术门增补
+
+5.3固定代码29791cb的Kimi/ultra技术门已有限通过，材料增补闭环与保留风险见[5.3 I/J技术收尾](step5/5.3-IJ-closeout.md)。本增补不预签精确CI、远端接收、完整5.3或原版等价；五项计时WARN、当前Renderer增长WARN_OPEN、Ruby新增执行0、FINAL-INPUT后置NOT RUN及原历史限制保持。前表为各阶段历史截面，具体新结论以上述版本化增补和实际发布回执为准。
