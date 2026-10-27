@@ -1,4 +1,4 @@
-import { memberContentProblems } from "./member-content.ts";
+import { createMemberContentIndex, memberContentProblems } from "./member-content.ts";
 import { inventoryFromBag, inventoryPolicy, inventoryProblems } from "./inventory.ts";
 import { catalogOf, itemOf } from "./item-catalog.ts";
 import { baseMovePp, totalPp } from "./member-metadata.ts";
@@ -154,66 +154,40 @@ function validateOwner(value: unknown, path: string, out: Problem[]): void {
   if (!isInt(value["id"], 0, 0xffffffff) || typeof value["name"] !== "string" || !isInt(value["gender"], 0, 2) || !isInt(value["language"], 0)) out.push({ path, message: "must contain uint32 id, string name, gender 0/1/2 and nonnegative language" });
 }
 
-/** JSON-shaped own data only: sparse lists and inherited records cannot pass then change meaning during cloning. */
-function validatePlainData(value: unknown, path: string, out: Problem[], ancestors = new Set<object>()): void {
+/** Validate and detach JSON-shaped own data in one descriptor traversal. Check views retain inherited-name presence
+ * (never inherited values/getters), so the existing own-field rules still reject optional inherited fields.
+ * No caller array method/iterator, getter or JSON conversion is executed.
+ */
+function validatedOwnDataCopy<T>(value: T, path: string, out: Problem[], ancestors = new Set<object>(), prototypes = new Map<object, object>()): T {
   if (value === null || typeof value !== "object") {
     if (["function", "symbol", "bigint"].includes(typeof value) || (typeof value === "number" && !Number.isFinite(value))) out.push({path, message: "must be serializable plain data"});
-    return;
+    return value;
   }
-  if (ancestors.has(value)) { out.push({ path, message: "cyclic value is not persistent data" }); return; }
-  if (Array.isArray(value)) {
-    const prototype = Object.getPrototypeOf(value) as object | null;
-    const constructor = prototype && Object.getOwnPropertyDescriptor(prototype, "constructor");
-    if (!prototype || !Array.isArray(prototype) || !constructor || !("value" in constructor) || typeof constructor.value !== "function" || Object.getOwnPropertyDescriptor(constructor.value, "prototype")?.value !== prototype || Function.prototype.toString.call(constructor.value) !== Function.prototype.toString.call(Array)) {
-      out.push({path, message: "must be an own plain-data array with an intrinsic prototype"}); return;
+  if (ancestors.has(value)) { out.push({ path, message: "cyclic value is not persistent data" }); return value; }
+  const array = Array.isArray(value), sourcePrototype = Object.getPrototypeOf(value) as object | null;
+  if (array) {
+    const constructor = sourcePrototype && Object.getOwnPropertyDescriptor(sourcePrototype, "constructor");
+    if (!sourcePrototype || !Array.isArray(sourcePrototype) || !constructor || !("value" in constructor) || typeof constructor.value !== "function" || Object.getOwnPropertyDescriptor(constructor.value, "prototype")?.value !== sourcePrototype || Function.prototype.toString.call(constructor.value) !== Function.prototype.toString.call(Array)) {
+      out.push({path, message: "must be an own plain-data array with an intrinsic prototype"}); return value;
     }
   } else {
-    const prototype = Object.getPrototypeOf(value) as object | null;
-    const constructor = prototype && Object.getOwnPropertyDescriptor(prototype, "constructor");
+    const constructor = sourcePrototype && Object.getOwnPropertyDescriptor(sourcePrototype, "constructor");
     // NW's renderer, Node and a bare core may have different intrinsic Object identities.
-    // Accept another realm's intrinsic Object.prototype, not arbitrary inherited-data/class records.
-    if (prototype !== null && !(Object.getPrototypeOf(prototype) === null && constructor && "value" in constructor && typeof constructor.value === "function" && Object.getOwnPropertyDescriptor(constructor.value, "prototype")?.value === prototype && Function.prototype.toString.call(constructor.value) === Function.prototype.toString.call(Object))) {
-      out.push({path, message: "must be an own plain-data record"}); return;
+    if (sourcePrototype !== null && !(Object.getPrototypeOf(sourcePrototype) === null && constructor && "value" in constructor && typeof constructor.value === "function" && Object.getOwnPropertyDescriptor(constructor.value, "prototype")?.value === sourcePrototype && Function.prototype.toString.call(constructor.value) === Function.prototype.toString.call(Object))) {
+      out.push({path, message: "must be an own plain-data record"}); return value;
     }
   }
-  // JSON resolves inherited toJSON too. A valid own-data document must not serialize as different data (or run an
-  // inherited accessor) after this gate. Resolve descriptors without executing the hook; non-callable data is inert.
+  // JSON resolves inherited toJSON too. Resolve descriptors without executing the hook; non-callable data is inert.
   for (let owner: object | null = value; owner !== null; owner = Object.getPrototypeOf(owner) as object | null) {
     const hook = Object.getOwnPropertyDescriptor(owner, "toJSON");
     if (!hook) continue;
     if (!("value" in hook) || typeof hook.value === "function") {
-      out.push({path, message: "persistent data cannot use a JSON serialization hook"}); return;
+      out.push({path, message: "persistent data cannot use a JSON serialization hook"}); return value;
     }
     break;
   }
-  ancestors.add(value);
-  const descriptors = Object.getOwnPropertyDescriptors(value);
-  for (const key of Reflect.ownKeys(value)) {
-    if (Array.isArray(value) && key === "length") continue;
-    const descriptor = typeof key === "string" ? descriptors[key] : undefined;
-    if (typeof key !== "string" || !descriptor || !descriptor.enumerable || !("value" in descriptor)) {
-      out.push({path: `${path}.${String(key)}`, message: "persistent fields must be own enumerable data properties"});
-      continue;
-    }
-    if (Array.isArray(value) && !/^(0|[1-9][0-9]*)$/.test(key)) {
-      out.push({path: `${path}.${key}`, message: "arrays may only contain their indexed data"}); continue;
-    }
-    validatePlainData(descriptor.value, `${path}.${key}`, out, ancestors);
-  }
-  if (Array.isArray(value)) for (let i = 0; i < value.length; i++) if (!Object.hasOwn(value, i)) out.push({path: `${path}[${i}]`, message: "sparse arrays are not persistent data"});
-  ancestors.delete(value);
-}
-
-/** Descriptor copy only. Check views retain inherited-name presence (never inherited values/getters), so the
- * existing own-field rules still reject optional inherited fields. Storage copies use ordinary local prototypes.
- * Neither copy is installed into the game, and no caller array method/iterator or JSON conversion is executed.
- */
-function ownDataCopy<T>(value: T, mode: "checks" | "storage", prototypes = new Map<object, object>()): T {
-  if (value === null || typeof value !== "object") return value;
-  const array = Array.isArray(value);
-  let prototype: object | null = mode === "storage" ? Object.prototype : null;
-  const sourcePrototype = Object.getPrototypeOf(value) as object | null;
-  if (!array && mode === "checks" && sourcePrototype !== null) {
+  let prototype: object | null = null;
+  if (!array && sourcePrototype !== null) {
     let presence = prototypes.get(sourcePrototype);
     if (!presence) {
       presence = Object.create(null) as object;
@@ -222,30 +196,54 @@ function ownDataCopy<T>(value: T, mode: "checks" | "storage", prototypes = new M
     }
     prototype = presence;
   }
+  ancestors.add(value);
   const result: object = array ? [] : Object.create(prototype) as object;
   const descriptors = Object.getOwnPropertyDescriptors(value);
-  for (const key of Object.keys(descriptors)) {
+  for (const key of Reflect.ownKeys(value)) {
     if (array && key === "length") continue;
-    Object.defineProperty(result, key, {value: ownDataCopy(descriptors[key]!.value, mode, prototypes), enumerable: true, configurable: true, writable: true});
+    const descriptor = typeof key === "string" ? descriptors[key] : undefined;
+    if (typeof key !== "string" || !descriptor || !descriptor.enumerable || !("value" in descriptor)) {
+      out.push({path: `${path}.${String(key)}`, message: "persistent fields must be own enumerable data properties"});
+      continue;
+    }
+    if (array && !/^(0|[1-9][0-9]*)$/.test(key)) {
+      out.push({path: `${path}.${key}`, message: "arrays may only contain their indexed data"}); continue;
+    }
+    Object.defineProperty(result, key, {value: validatedOwnDataCopy(descriptor.value, `${path}.${key}`, out, ancestors, prototypes), enumerable: true, configurable: true, writable: true});
+  }
+  if (array) for (let i = 0; i < value.length; i++) if (!Object.hasOwn(value, i)) out.push({path: `${path}[${i}]`, message: "sparse arrays are not persistent data"});
+  ancestors.delete(value);
+  return result as T;
+}
+
+/** Descriptor-only storage snapshot with ordinary local prototypes and no JSON conversion. */
+function ownDataCopy<T>(value: T): T {
+  if (value === null || typeof value !== "object") return value;
+  const result: object = Array.isArray(value) ? [] : Object.create(Object.prototype) as object;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Object.keys(descriptors)) {
+    if (Array.isArray(value) && key === "length") continue;
+    Object.defineProperty(result, key, {value: ownDataCopy(descriptors[key]!.value), enumerable: true, configurable: true, writable: true});
   }
   return result as T;
 }
 
+interface GameValidationView { problems: Problem[]; view: Obj | null }
 /** Strict structural validation of a CURRENT-schema (or already migrated) document. Located problems, all of them. */
-export function validateGame(input: unknown): Problem[] {
+function validateGameView(input: unknown): GameValidationView {
   const out: Problem[] = [];
-  if (!isObj(input)) return [{ path: "$", message: "must be an object" }];
+  if (!isObj(input)) return { problems: [{ path: "$", message: "must be an object" }], view: null };
   let x: Obj = input;
   const schemaProperty = Object.getOwnPropertyDescriptor(x, "schema");
-  if (!schemaProperty || !("value" in schemaProperty)) return [{path: "$.schema", message: "schema must be an own data property"}];
+  if (!schemaProperty || !("value" in schemaProperty)) return { problems: [{path: "$.schema", message: "schema must be an own data property"}], view: x };
   const schema = typeof schemaProperty.value === "number" ? schemaProperty.value : 0;
   if (!isInt(x["schema"], 1)) out.push({ path: "$.schema", message: "must be a positive integer" });
   else if (!SUPPORTED_SCHEMAS.includes(schema)) out.push({ path: "$.schema", message: `unsupported schema ${schema}` });
-  if (schema >= 7) { validatePlainData(x, "$", out); if (out.length) return out; x = ownDataCopy(x, "checks"); }
+  if (schema >= 7) { const checked = validatedOwnDataCopy(x, "$", out); if (out.length) return { problems: out, view: x }; x = checked; }
   const allowedTop = schema >= 5 ? [...TOP_KEYS.filter((k) => k !== "boxes"), "storage", "player", "nextMemberOrdinal"] : TOP_KEYS;
   if (schema >= 6) { allowedTop.splice(allowedTop.indexOf("bag"),1); allowedTop.push("inventory","badges"); }
   knownKeys(x, allowedTop, "$", out);
-  if (schema >= 7 && out.length) return out;
+  if (schema >= 7 && out.length) return { problems: out, view: x };
   const seen = new Set<string>();
   const validateAt = (m: unknown, path: string): void => {
     validateMember(m, path, out, schema);
@@ -313,20 +311,22 @@ export function validateGame(input: unknown): Problem[] {
   }
   if (schema >= 7 && isObj(x["stats"])) knownKeys(x["stats"], Object.keys(newStats()), "$.stats", out);
   if (schema >= 4) validateStats(x["stats"], x["steps"], out);
-  return out;
+  return { problems: out, view: x };
 }
+
+export function validateGame(input: unknown): Problem[] { return validateGameView(input).problems; }
 
 /** Synchronous installation/save gate. It validates the present state; only migrateGame may change layouts. */
 export function validateGameContent(state: unknown, content: Content): Problem[] {
-  const out = validateGame(state);
+  const checked = validateGameView(state), out = checked.problems;
   if (out.length) return out;
-  const raw = state as Obj;
-  if (raw["schema"] !== SAVE_SCHEMA) return [{ path: "$.schema", message: "must migrate to schema 7 before installation or saving" }];
-  const doc = ownDataCopy(raw, "checks");
+  const doc = checked.view!;
+  if (doc["schema"] !== SAVE_SCHEMA) return [{ path: "$.schema", message: "must migrate to schema 7 before installation or saving" }];
+  // Schema 7 validation already made this detached own-data view. Reuse it only within this synchronous gate.
   out.push(...dexContentProblems(content));
   if (out.length) return out;
-  const catalog = catalogOf(content);
-  for (const { member, path } of persistentMembers(doc)) out.push(...memberContentProblems(member as unknown as Member, content, path));
+  const contentIndex = createMemberContentIndex(content), catalog = contentIndex.catalog;
+  for (const { member, path } of persistentMembers(doc)) out.push(...memberContentProblems(member as unknown as Member, content, path, contentIndex));
   const inventory = doc["inventory"] as unknown as GameState["inventory"];
   for (const [i, pocket] of inventory.pockets.entries()) for (const [j, slot] of pocket.entries()) if (!itemOf(catalog, slot.itemId)) out.push({ path: `$.inventory.pockets[${i}][${j}].itemId`, message: "unmapped item; original save must be kept" });
   const dex = doc["dex"] as unknown as DexState;
@@ -348,7 +348,7 @@ export function validateGameContent(state: unknown, content: Content): Problem[]
  */
 export function snapshotForSave(state: unknown, content: Content): {ok: true; state: GameState} | {ok: false; problems: Problem[]} {
   const problems = validateGameContent(state, content);
-  return problems.length ? {ok: false, problems} : {ok: true, state: ownDataCopy(state as GameState, "storage")};
+  return problems.length ? {ok: false, problems} : {ok: true, state: ownDataCopy(state as GameState)};
 }
 
 export interface MigrateOptions {
