@@ -16,7 +16,7 @@
 | 2 | 验证战斗接入，确定路线和首版范围 | **已完成并经用户决定（C2）**，补充修复已于 2026-10-19 收口（标签 `step2-closeout`），见 `docs/step2/README.md`、`docs/step2/closeout-addendum.md` |
 | 3 | 工程与测试基础：模块边界、构建/CI、内容数据、本地化、存档基础、第一条 Ruby/TS 对照测试链 | **已收口（2026-10-19，标签 `step3-closed`）**：独立验收先不通过、整改后有条件通过，见 `docs/step3/closure.md`；性能尚无同条件基线。第四步前短架构批次（含复核修复）已于 2026-10-20 经 PR #1 合入 `main`，见 `docs/step3/architecture-batch-closure.md` |
 | 4 | 最小可玩闭环（获得精灵→遭遇→战斗/捕获→成长→治疗→存档读档） | **已完成（2026-10-21）**：批次 A/B/C 与两轮复核整改经 PR #2 合入 `main`（合并提交 `3e3e655`），收口记录 `docs/step4/closure.md`；见 `docs/step4/README.md`、`acceptance.md`、`commands.md` |
-| 5 | 按功能族扩展，每批交付规则、接口、UI、事件入口、测试和示例 | **进行中**：计划 r3 经用户批准（工作区 `.handoff/step5-plan.zh.md`，7 批）。**5.0 基础整固已完成（2026-10-22）**：经 PR #3 合入 `main`（合并提交 `5dc86f6`），收口记录 `docs/step5/5.0-closure.md`。非阻塞遗留：包内 T24 首轮超时一次，根因未证实；最终候选没有新的计时和 100 场测量，沿用历史 WARN 与内存记录。5.1 已经双审、精确候选与 main 双层 CI 及用户条件合并授权后经 PR #4 常规合入 `c5c51a6`。5.2已按批准范围有条件收尾，经PR #5合入9a93b5c，F02 FAIL/OPEN+条件DEFERRED、UI-MEM与未测项保留。5.3 B–F及E有限事务已分批合入，M1经PR #19在b977ed7正式中间接收；G1经PR20/a289086、G2a经PR21/c70d441接收；G2b＋AR01经PR22/main34fecd8接收，G2c与AR01后续经PR23/main04a2f47正式接收（105套1816）；H1默认图鉴整改913150a待Kimi增量／ultra，H2完整搜索与摘要单条作者实现验证中，完整H、I/J未完成。Ruby等价证据与功能验证分列，5.3新增Ruby差分仍0、补齐方案待批。见 `docs/step5/README.md` |
+| 5 | 按功能族扩展，每批交付规则、接口、UI、事件入口、测试和示例 | **进行中**：计划 r3 经用户批准（工作区 `.handoff/step5-plan.zh.md`，7 批）。**5.0 基础整固已完成（2026-10-22）**：经 PR #3 合入 `main`（合并提交 `5dc86f6`），收口记录 `docs/step5/5.0-closure.md`。非阻塞遗留：包内 T24 首轮超时一次，根因未证实；最终候选没有新的计时和 100 场测量，沿用历史 WARN 与内存记录。5.1 已经双审、精确候选与 main 双层 CI 及用户条件合并授权后经 PR #4 常规合入 `c5c51a6`。5.2已按批准范围有条件收尾，经PR #5合入9a93b5c，F02 FAIL/OPEN+条件DEFERRED、UI-MEM与未测项保留。5.3 B–F及E有限事务已分批合入，M1经PR #19在b977ed7正式中间接收；G1经PR20/a289086、G2a经PR21/c70d441接收；G2b＋AR01经PR22/main34fecd8接收，G2c与AR01后续经PR23/main04a2f47正式接收（105套1816）；H1经PR24/main d53311f接收，H2经PR25/main fcd6c57接收（112套1912）；I整合验证进行中，J及完整5.3未签收，小画布空结果提示P3仍待当前I候选独立复核。Ruby等价证据与功能验证分列，5.3新增Ruby差分仍0、补齐方案待批。见 `docs/step5/README.md` |
 | 6 | 作者工具与 Demo（用户会自制符合 MZ 规格的美术资源） | 未开始 |
 | 7 | 平台、存档、性能、分发验收，发布可用版本 | 未开始 |
 
@@ -160,3 +160,8 @@ pnpm --dir src build                                                            
 - `main` 是唯一长期分支；新工作开短期分支，合并后删除。远端与本地保持一致。
 - 阶段里程碑用标签保留：`step2.1-accepted`、`step2.2-feasibility`、`step2.3-c1`、`step2.4-mz-flow`、`step2.5-c2`、`step2.runtime-pass`；独立评审的基线标签是 `step2-review-baseline`（指向 `2e5f2e5`，评审报告审查的就是它）；`step2-review-fixes` 是评审修复完成时的状态（`c2a3e29`，在用户决定 D1–D5 落地之前）；**`step2-closed` 是第二步收尾时的最终状态**；第三步在短期分支 `step3/foundation` 上做，**独立复核通过后**才合并并打 `step3-closed`。评审后的修复与决定见 `docs/step2/review-followups.md`。
 - 提交信息写清做了什么和为什么；AI 协作提交按所用工具要求添加署名行。
+
+
+## 2026-10-27 I/J技术门增补
+
+5.3固定代码29791cb的Kimi/ultra技术门已有限通过，材料增补闭环与保留风险见[5.3 I/J技术收尾](step5/5.3-IJ-closeout.md)。本增补不预签精确CI、远端接收、完整5.3或原版等价；五项计时WARN、当前Renderer增长WARN_OPEN、Ruby新增执行0、FINAL-INPUT后置NOT RUN及原历史限制保持。前表为各阶段历史截面，具体新结论以上述版本化增补和实际发布回执为准。

@@ -15,13 +15,13 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EVID="${1:?new evidence directory required}"; MODE="${2:-inventory}"
-case "$MODE" in inventory|all|verify-save|empty-source|perf|matrix|driver-selftest|capability|progression-data|postbattle|learning|triggered|trade|acquisition|viewing|m1|learning-ui|evolution-ui|trade-ui|battle-entry|item-evolution-ui|pokedex-ui) ;; *) echo "unsupported mode: $MODE" >&2; exit 2;; esac
+case "$MODE" in inventory|all|verify-save|empty-source|perf|matrix|driver-selftest|capability|progression-data|postbattle|learning|triggered|trade|acquisition|viewing|m1|learning-ui|evolution-ui|trade-ui|battle-entry|item-evolution-ui|pokedex-ui|closeout|closeout-continue|closeout-lifecycle) ;; *) echo "unsupported mode: $MODE" >&2; exit 2;; esac
 mkdir -p "$EVID"; EVID="$(cd "$EVID" && pwd)"
 [[ ! -e "$EVID/report.json" && ! -e "$EVID/launch.json" ]] || { echo 'existing evidence: choose another directory' >&2; exit 2; }
 NW="${PF_OWNED_NW:-$HOME/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.app/Contents/Resources/nwjs-mac/nwjs.app/Contents/MacOS/nwjs}"
 PROJECT="${PF_OWNED_PROJECT:-$ROOT}"
 [[ -x "$NW" ]] || { echo "NW.js not found: $NW" >&2; exit 1; }
-if [[ "$MODE" == verify-save && ( -z "${PF_OWNED_EXPECTED:-}" || -z "${PF_OWNED_SAVES:-}" ) ]]; then
+if [[ ( "$MODE" == verify-save || "$MODE" == closeout-continue ) && ( -z "${PF_OWNED_EXPECTED:-}" || -z "${PF_OWNED_SAVES:-}" ) ]]; then
   echo 'verify-save needs PF_OWNED_EXPECTED=<producing evidence dir> and PF_OWNED_SAVES=<its saves dir>' >&2; exit 2
 fi
 if [[ "${PF_OWNED_SKIP_BUILD:-0}" != 1 ]]; then pnpm --dir "$ROOT/src" build >"$EVID/build.log" 2>&1; fi
@@ -35,6 +35,23 @@ sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 expected=lambda d:{p.name:sha(p) for p in sorted(d.glob('ps-flow-expected*.json'))}
 start={'startedUTC':datetime.datetime.now(datetime.timezone.utc).isoformat(),'concurrency':'UNVERIFIED; read-only process inventory unavailable; never terminates other processes','input':'synthetic DOM/service events in actual host; not hardware input'}
 extra=[]
+rounds=os.environ.get('PF_OWNED_PERF_ROUNDS')
+if rounds is not None:
+ if mode!='perf' or not re.fullmatch(r'[0-9]+',rounds) or not 1<=int(rounds)<=25:raise SystemExit('PF_OWNED_PERF_ROUNDS requires perf and integer 1..25')
+ extra.append('--ps-perf-rounds='+rounds)
+gc=os.environ.get('PF_OWNED_FORCE_GC','0')
+if gc not in ('0','1'):raise SystemExit('PF_OWNED_FORCE_GC must be 0 or 1')
+if gc=='1':extra.append('--js-flags=--expose-gc')
+groups=os.environ.get('PF_OWNED_LIFECYCLE_GROUPS')
+cycles=os.environ.get('PF_OWNED_LIFECYCLE_CYCLES')
+if groups is not None:
+ allowed={'learning','evolution','trade','inventory','pokedex','summary-pokedex','summary-only'}
+ values=groups.split(',')
+ if mode!='closeout-lifecycle' or not values or len(set(values))!=len(values) or any(x not in allowed for x in values):raise SystemExit('PF_OWNED_LIFECYCLE_GROUPS requires distinct known groups and closeout-lifecycle')
+ extra.append('--ps-lifecycle-groups='+groups)
+if cycles is not None:
+ if mode!='closeout-lifecycle' or cycles not in ('100','200'):raise SystemExit('PF_OWNED_LIFECYCLE_CYCLES requires closeout-lifecycle and 100 or 200')
+ extra.append('--ps-lifecycle-cycles='+cycles)
 only=os.environ.get('PF_OWNED_ONLY')
 if only:
  if not re.fullmatch(r'[A-Za-z0-9_/-]+(?:,[A-Za-z0-9_/-]+)*',only):raise SystemExit('PF_OWNED_ONLY must be comma-separated scenario prefixes')
@@ -44,7 +61,7 @@ if mode=='progression-data':
  layout=os.environ.get('PF_OWNED_PROGRESSION_LAYOUT','regional')
  if layout not in ('regional','national'): raise SystemExit('PF_OWNED_PROGRESSION_LAYOUT must be regional or national')
  extra.append('--ps-progression-layout='+layout)
-if mode=='verify-save':
+if mode in ('verify-save','closeout-continue'):
  src=Path(os.path.abspath(os.environ['PF_OWNED_EXPECTED']))
  def refuse(reason):
   start.update(status='preflight-refused',reason=reason,expectedSource=str(src),saves=str(save));(out/'launch.json').write_text(json.dumps(start,indent=2)+'\n');print(reason,flush=True);raise SystemExit(2)

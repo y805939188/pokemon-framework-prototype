@@ -107,3 +107,31 @@ J 整改兼容收窄：`commitResult` 在会话创建中或战斗运行中均拒
 RJ01–RJ03 定向回归：`node --test experiments/step5/1/test-management-ui.cjs experiments/step5/1/test-held-contract.cjs`；反向使用 `node experiments/step5/probes/unfix5.cjs RJ01-mixed-source-release RJ02-withdraw-panel RJ03-fake-safe-id-write`。真实 U51-18/19 随完整开发树/新包套件执行；输入设备为实际 Reactor 轮询的虚拟 navigator 控制器，不是实体手柄。
 
 5.2 真实宿主整改（D-01～D-07、产品缺陷 P-01）与重启命令约定：[5.2-D-remediation.md](5.2-D-remediation.md)。`scripts/run-inventory-test-mac.sh <新目录> [inventory|all|verify-save|empty-source|perf|matrix|driver-selftest]`；verify-save 需 `PF_OWNED_EXPECTED=<产生期望的证据目录>` 与 `PF_OWNED_SAVES=<其存档目录>`，缺失/哈希不符拒绝启动。
+
+## 5.3 正常作者入口（默认 MZ UI，I 整包验收中）
+
+先启用 `PS_Management`、`PS_Inventory`、`PS_Progression`、`PS_Evolution`、`PS_Pokedex`（在 `PS_BattleFlow` 后；样例 `js/plugins.js` 已登记）。应用状态 schema **7**、编译内容 schema **3**、作者输入 schema **1**，与冻结 battle protocol v1 分开。下表是当前入口，前文5.1候选/5.2历史段保留用于溯源，不能当最新阶段状态。
+
+| 插件／入口 | 参数与结果 | 等待、取消及失败 |
+| --- | --- | --- |
+| `PS_Progression:TeachMove` | `memberId` 稳定ID、`moveId` 登记招式ID、`source` 为 `tutor`（缺省）或 `generic` | 解释器 `psProgression` 等到本次屏幕完成；已会、无候选、最后一招等显示可退出消息；满槽用4＋新招选择。正常放弃零招式写入；技术错误可 `ResumeLearning` 恢复本代 pending |
+| `PS_Progression:RelearnMove` / `ForgetMove` | `memberId`；前者仅展示可信首招／等级／前驱候选，后者不允许忘掉最后一招 | 重学三层取消不误作用药取消；独立遗忘允许HM，学新招替换HM被拒。不能把整个物种蛋招表伪装成个体历史 |
+| `PS_Progression:ResumeLearning` | 无；只恢复本代既有学习事务 | 无pending时可退出诊断；partial不假装回滚。换档／新游戏退休旧回调 |
+| `PS_Inventory:ShowBag`、队伍 Item→Use、`UseItemOnMember` | 后者 `itemId`、可选 `memberId`、`quantity`；省略成员进入正式选择器 | TM/HM不耗、TR按成功来源消费；稀有糖果每次1，经验糖果数量选择。普通糖果先完成成长写集再演出；满级糖果／石头在成功身体提交或正常取消的已批消费规则下结算，技术零写终止不扣。unknown／invalid／无资格零消费、不进动画。恢复界面区分已提交主写和后续失败 |
+| `PS_Evolution:EventEvolution` | `event` 非负安全整数、可选 `memberId`；缺省按合法队伍检查。编号匹配不等于已进化 | `psEvolution` 等到本次演出／Info／学习完成；普通等级／事件进化按资格允许BACK取消；石头／交换进化不可取消。最后一帧与成功后输入分别处理 |
+| `PS_Evolution:ShowEvolution` | 无；恢复已有本代进化／道具续接 | Retry重试安装或反馈；Terminate仅在before／next可证明时结束，partial保留保存屏障并读最后完整档。ACK后只释放本次已死亡父owner，不碰successor |
+| `PS_Evolution:ScriptTrade` | `requestId`、`intent` JSON，例如 `{"outgoingId":"M1","incoming":{"species":"pidgey"},"foreignOwner":{"name":"NPC"}}`；省略 `outgoingId` 进入合格成员选择 | `psTrade` 等到私有草稿的演出／图鉴／学习结束，最后一次替换；仅选择／要约可普通取消。`requestId`标识一次操作，不能当永久领取凭证；本代pending用`ShowTrade`恢复 |
+| `PS_Evolution:ShowTrade` | 无；本代pending恢复 | 同一解释器可在下一事件分支读 `this._psTradeOutcome?.status`。未启动／忙／新尝试／clear／terminate会退休旧receipt；不要用上次 `committed` 判断本次成功。`_psEvolutionOutcome`为对应通用别名，非存档字段 |
+| `PS_Pokedex:SetPokedex` | `enabled: "true"`／`"false"` | 授予资格不等于解锁所有地区；所有权冲突、安装失败有诊断，不伪装成功 |
+| `PS_Pokedex:UnlockRegion` | `region` 数字、`enabled` 字符串；`-1`为全国、`0..N-1`为作者地区 | 显式地区身份依编译布局；不存在的地区拒绝。作者重排数字地区不是自动迁移 |
+| `PS_Pokedex:ShowPokedex`／标准菜单 Pokédex | 无；无资格／无可访问条目显示可退出状态 | `psPokedex` 仅等待本次请求。六序、十参数、双属性、37档及两哨兵、Info／Area／Forms；搜索目录可选且必须有来源核验，缺少不妨碍普通浏览／返回 |
+| 摘要 Info／Memo／Skills 的 USE→View Pokédex | 非蛋且合格成员；完整单条三页／Forms，保持同一父窗口及暂持 | 单条与简略Info的编号合同有意不同；单条不改列表模式／索引。父销毁、换代、外部转场只清本次子owner，已安装recent不回滚 |
+| `PSManagement.selectMember(qualifier, callback)` | `qualifier(member副本)`；返回 `{id,index}` 或 `null` | 格式是稳定ID＋当前队伍位置，不返回成员引用。可战斗选择传 `m=>!m.egg && m.hp>0`，单纯非蛋选择可接受HP0；取消由事件自己写`-1`／空字符串，框架不替作者猜变量号 |
+
+普通学习／进化／交换／图鉴UI采用离散选择，没有新增自由文字框。方向、确认、返回、ACTION、JUMPUP/DOWN沿默认MZ绑定；重入／按住未释放不会跨ready屏障自动确认。图鉴精确身高／体重输入是受控数字编辑，英文／中文名称分组用作者`dexSortKeys`，缺失归“其他”并提示。不要用DOM程序化输入的自动测试声称实体键鼠、原生IME或手柄通过。
+
+地图5的6／7／8／9事件分别示范学习、编号7事件进化、脚本交换、授图鉴并解全国后浏览。样例物种的进化数据为**作者占位演示**，不是完整原版自然进化表；自然进化／TM兼容／教学／EggMoves／地区／分类正文／中文排序键来自经过来源门的作者JSON或PBS。普通获得的命名框是旧接收路径，是否验收真实IME须按实际输入路径另记。
+
+正常操作进行时禁止保存／开战；保存开关由游戏自己的开关和框架owner共同决定。新游戏／读档换代清旧token，UI草稿、动画、锁及receipt不存；正常Continue由MZ `Scene_Load`负责界面切换。所有错误／恢复说明以实际 `primaryCommitted` 和 pending为准，不能因“出现错误”一律退款，也不能把未知结果伪装成功。
+
+后继：正常玩家持物战斗写回5.4（两个开发开关仍默认关）；完整世界／栖息地图资料与128步触发5.5；名人堂快照／浏览5.6；片尾第六步Demo。专用精灵图像／叫声／脚印／栖息遮罩仍显式占位。可替换无头UI与TS后缀机械批次独立后置；5.3 Ruby新增执行对照0是证据欠账，不以当前TS／NW自测替代或默认为已批准延期。

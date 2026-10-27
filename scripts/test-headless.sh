@@ -102,6 +102,9 @@ SUITES=(
   experiments/step5/3/test-pokedex-summary.cjs
   experiments/step5/3/test-pokedex-final.cjs
   experiments/step5/3/test-pokedex-h2-final.cjs
+  experiments/step5/3/test-closeout-scale.cjs
+  experiments/step5/3/test-closeout-layout.cjs
+  experiments/step5/3/test-closeout-runner.cjs
   experiments/step5/3/test-evolution-ui.cjs
   experiments/step5/3/test-item-evolution-ui.cjs
   experiments/step5/3/test-trade-timeline.cjs
