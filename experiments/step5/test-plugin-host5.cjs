@@ -32,7 +32,7 @@ test.before(() => {
 });
 test.after(() => { if (dir) fs.rmSync(dir, { recursive: true, force: true }); });
 
-function host(game) {
+function host(game, missingTesting = false) {
   const Ctor = () => { function C() {} C.prototype = { initialize() {}, terminate() {} }; return C; };
   const errors = [], warnings = [], writes = [], loads = [];
   function Game_System() {}
@@ -42,7 +42,10 @@ function host(game) {
     loads.push(p);
     if (p === 'path' || p === 'fs') return require(p);
     if (/production\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/production.cjs'));
-    if (/testing\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/testing.cjs'));
+    if (/testing\.cjs$/.test(p)) {
+      if (missingTesting) throw new Error('testing dependency unavailable (injected)');
+      return require(path.join(ROOT, 'js/engine/build/testing.cjs'));
+    }
     throw new Error('unexpected require ' + p);
   };
   req.resolve = p => path.resolve(ROOT, p);
@@ -67,6 +70,14 @@ function host(game) {
   flow.receiveOptions = { mode: 1, naming: 1 }; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.rng = lcg(1);
   const load = (next) => { if (next !== undefined) sys._psGame = next; ctx.DataManager.extractSaveContents({}); };
   return { ctx, flow, sys, map, errors, warnings, writes, loads, load, player: new Game_Player() };
+}
+
+// Public cold-load contract: do not pre-inject content; use the actual PluginManager contentSource parameter.
+function coldHost(mode, missingTesting = false) {
+  const h = host(E.state.newGame({ content, party: [], money: 0 }), missingTesting);
+  h.flow._content = null; h.flow._dex = null;
+  h.ctx.PluginManager.parameters = () => ({ contentSource: mode });
+  return h;
 }
 
 test('a save written by the step 4 code loads: migrated to schema 4 with the content mapping, reported in _psSaveInfo', () => {
@@ -144,6 +155,58 @@ test('species names by content id + form or by battle name; ResetGame stores the
   assert.ok(h.loads.some(p => /testing\.cjs$/.test(p)), 'the explicit ResetGame aid loads testing');
   assert.deepEqual(J(h.sys._psGame).party.map(m => [m.species, m.form]), [['charizard', 0], ['blastoise', 0], ['venusaur', 0]]);
   assert.deepEqual(E.saveSchema.validateGame(J(h.sys._psGame)), []);
+});
+
+test('cold explicit fixture content uses testing once and keeps the same cached object', () => {
+  const h = coldHost('fixture');
+  const first = h.flow.content();
+  assert.equal(first, E.fixtures.content);
+  assert.notEqual(first, content, 'fixture mode must not silently substitute the compiled sample');
+  assert.equal(h.loads.filter(p => /testing\.cjs$/.test(p)).length, 1);
+  assert.equal(h.flow.content(), first);
+  assert.equal(h.flow.content(), first);
+  assert.equal(h.loads.filter(p => /testing\.cjs$/.test(p)).length, 1, 'cached content does not reload testing');
+  assert.equal(h.loads.some(p => /build\/engine\.cjs|fixtures\/game\.cjs|game\/describe\.cjs/.test(p)), false, 'no legacy fallback');
+});
+
+test('cold explicit fixture ResetGame creates the valid fixture party and repeated reset does not duplicate it', () => {
+  const h = coldHost('fixture');
+  h.flow.resetGame();
+  assert.equal(h.flow._content, E.fixtures.content);
+  assert.equal(h.sys._psGame.party.length, 3);
+  assert.deepEqual(E.saveSchema.validateGame(J(h.sys._psGame)), []);
+  h.flow.resetGame();
+  assert.equal(h.sys._psGame.party.length, 3);
+  assert.equal(h.flow.content(), E.fixtures.content);
+  assert.equal(h.loads.filter(p => /testing\.cjs$/.test(p)).length, 1);
+  assert.deepEqual(E.saveSchema.validateGame(J(h.sys._psGame)), []);
+});
+
+test('cold sample and the formal empty new game avoid testing; explicit sample ResetGame loads it once', () => {
+  const h = coldHost('sample');
+  const loaded = h.flow.content();
+  assert.equal(loaded.meta.id, 'sample');
+  assert.equal(h.loads.some(p => /testing\.cjs$/.test(p)), false);
+  h.flow.startNewGame();
+  assert.equal(h.sys._psInitError, undefined);
+  assert.deepEqual(J(h.sys._psGame.party), []);
+  assert.equal(h.loads.some(p => /testing\.cjs$/.test(p)), false, 'the formal empty new game does not use fixtures');
+  h.flow.resetGame();
+  assert.equal(h.sys._psGame.party.length, 3);
+  assert.equal(h.flow.content(), loaded, 'sample ResetGame retains the cached sample content');
+  assert.equal(h.loads.filter(p => /testing\.cjs$/.test(p)).length, 1, 'only the explicit test aid loads testing');
+  assert.deepEqual(E.saveSchema.validateGame(J(h.sys._psGame)), []);
+});
+
+test('missing explicit testing fails accurately for content and ResetGame without sample or state fallback', () => {
+  for (const method of ['content', 'resetGame']) {
+    const h = coldHost('fixture', true), before = J(h.sys._psGame);
+    assert.throws(() => method === 'content' ? h.flow.content() : h.flow.resetGame(), /testing dependency unavailable \(injected\)/);
+    assert.equal(h.flow._content, null, `${method}: no sample or other content is fabricated`);
+    assert.deepEqual(J(h.sys._psGame), before, `${method}: failure does not invent or replace game state`);
+    assert.equal(h.loads.filter(p => /testing\.cjs$/.test(p)).length, 1, `${method}: the explicit dependency was attempted`);
+    assert.equal(h.loads.some(p => /build\/engine\.cjs|fixtures\/game\.cjs|game\/describe\.cjs/.test(p)), false, `${method}: no legacy fallback`);
+  }
 });
 
 // ---- review of 1960b92 (2026-10-22): F01 save refusal, F02 host battle operation, F10 own keys, F11 clock

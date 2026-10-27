@@ -129,7 +129,7 @@ const { developmentCapabilities } = RuleConfig;
       if (!PSFlow._content) {
         const params = G.PluginManager.parameters(NAME) as Record<string, string>;
         const E = engine();
-        if ((params.contentSource || "sample") === "fixture") PSFlow._content = E.F.content;
+        if ((params.contentSource || "sample") === "fixture") PSFlow._content = testing().content;
         else {
           const file = nodeRequire("path").join(E.root, "data", "framework", "content.json");
           let json: unknown;
