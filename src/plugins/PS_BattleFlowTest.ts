@@ -6,7 +6,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // the step 4 (schema 3) save written by the step 4 code (step 5.0 checkpoint P-1), for T31
 import SCALE_CORPUS from "../../experiments/step5/3/closeout/scale-fixtures.json";
-import { progressionDonorInputs } from "./flowtest/source-fixture.ts";
+import { progressionDonorInputs, m1ConvergenceFixture } from "./flowtest/source-fixture.ts";
 import { runCloseout, continueCloseout, runCloseoutLifecycle } from "./flowtest/closeout.ts";
 import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
 import { pressKey, waitGameFrames, waitUntil } from "./flowtest/timing.ts";
@@ -2403,7 +2403,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   }
 
   async function runM1Convergence() {
-    await toMap();const B=api(),cases:any[]=[],helper=nodeRequire(path.join(gameDir,'experiments/step5/3/fixtures/m1/convergence.cjs'));
+    await toMap();const B=api(),cases:any[]=[],helper=m1ConvergenceFixture(nodeRequire('node:assert/strict'),nodeRequire('node:vm').runInThisContext);
     const sourceSha=fs.readFileSync(path.join(gameDir,'js/engine/showdown/SOURCE_SHA'),'utf8').trim();
     const host={
       install:(content:any,state:any)=>{W.PSFlow._content=content;G.$gameSystem._psGame=state;W.PSFlow.stateReplaced();G.$gameMessage.clear();},
