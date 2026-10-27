@@ -20,9 +20,11 @@ import { InputLatch } from './management/model.ts';
   if(!valid(r))throw Error('stale-pokedex-ui');
  }
  function check(r:Request){owner(r);const c=flow().content();owner(r);if(semantic.semanticFingerprint(c)!==r.fingerprint)throw Error('stale-pokedex-ui-content');}
+ function releaseSummary(r:Request){const p=r.application?.pendingPokedex;if(r.parent&&r.edit&&r.application===flow()._app&&r.generation===r.application.stateGeneration&&p?.token===r.edit.token&&p.revision===r.edit.revision&&p.summary?.parentToken===r.parent.token){const result=r.application.resolvePokedex(p.token,p.revision,{kind:'technical-terminate'});if(result.status==='pending')r.edit={token:result.view.token,revision:result.view.revision};else if(result.status!=='refused')delete r.edit;}if(r.parent&&!r.parent.isCurrent()){try{r.parent.releaseAbandoned();}catch(error){console.error(NAME,error);}}}
  function returned(r:Request,result:any){
   if(result.status==='pending'){if(result.view.purpose!==(r.parent?'summary':'edit')||r.edit&&r.edit.token!==result.view.token)throw Error('stale-pokedex-edit-owner');r.edit={token:result.view.token,revision:result.view.revision};}
   else if(r.edit&&result.token===r.edit.token)delete r.edit;
+  if(r.parent&&(!valid(r)||!r.parent.isCurrent())){releaseSummary(r);throw Error('stale-pokedex-parent');}
   if(r.parent&&!r.edit){if(!valid(r)||r.application.pendingPokedex)throw Error('stale-pokedex-summary-owner');}else check(r);return result;
  }
  function dictionary(content:any){const t=flow().translator(),keys=new Set<string>();for(const data of Object.values(content.species)as any[])for(const k of ['nameKey','formNameKey','categoryKey','entryKey'])if(data[k])keys.add(data[k]);for(const r of content.regionalDex?.regions??[])keys.add(r.nameKey);return Object.fromEntries([...keys].map(k=>[k,t.tOr(k,k)]));}
@@ -47,8 +49,11 @@ import { InputLatch } from './management/model.ts';
   back(){if(!valid(this.request)){this.retireStale();return;}try{check(this.request);this.screen?.action('back');}catch{this.dispose();}}
   get view(){return this.screen?.view;}
   retireStale(){this.closed=true;retire(this.request);if(active===this)active=null;}
-  finish(){if(this.closed)return;const r=this.request;if(r.parent&&r.edit){check(r);returned(r,r.application.resolvePokedex(r.edit.token,r.edit.revision,{kind:'close-entry'}));}this.closed=true;if(this.request.status==='queued')this.request.status='complete';retire(this.request);if(active===this)active=null;if(!this.attached&&!this.disposing&&G.SceneManager._scene===this.scene&&!G.SceneManager.isSceneChanging())this.scene.popScene();}
-  dispose(){if(this.closed)return;this.disposing=true;if(this.request.status==='queued')this.request.status='technically-terminated';try{if(valid(this.request))this.screen?.close();}catch(e){console.error(NAME,e);}const r=this.request,p=r.application?.pendingPokedex;if(r.parent&&r.edit&&valid(r)&&p?.token===r.edit.token&&p.revision===r.edit.revision&&p.summary?.parentToken===r.parent.token){const result=r.application.resolvePokedex(p.token,p.revision,{kind:'technical-terminate'});if(result.status==='pending')r.edit={token:result.view.token,revision:result.view.revision};else if(result.status!=='refused')delete r.edit;}this.retireStale();}
+  finish(){if(this.closed)return;const r=this.request;if(r.parent&&r.edit){check(r);returned(r,r.application.resolvePokedex(r.edit.token,r.edit.revision,{kind:'close-entry'}));}this.closed=true;if(this.request.status==='queued')this.request.status='complete';retire(this.request);if(active===this)active=null;this.releaseSummary();if(!this.attached&&!this.disposing&&G.SceneManager._scene===this.scene&&!G.SceneManager.isSceneChanging())this.scene.popScene();}
+  releaseSummary(){releaseSummary(this.request);}
+
+  dispose(){if(this.closed){this.releaseSummary();return;}this.disposing=true;if(this.request.status==='queued')this.request.status='technically-terminated';try{if(valid(this.request))this.screen?.close();}catch(e){console.error(NAME,e);}this.releaseSummary();this.retireStale();}
+
   drawSearch(v:any,b:any,width:number){
    const cell=(label:string,x:number,y:number,w:number,focus:boolean)=>{b.fontSize=20;b.textColor=focus?'#ffe29a':'#ffffff';const chars=Array.from((focus?'▶ ':'  ')+label);let value=chars.join('');while(chars.length&&this.window.textWidth(value)>w-12){chars.pop();value=chars.join('')+'…';}this.text.push(value);b.drawText(value,x,y,w-12,32,'left');};
    const labels=['sort','name','types','height','weight','color','shape','reset','start','cancel'];
