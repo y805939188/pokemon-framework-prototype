@@ -11,7 +11,7 @@ export async function continueCloseout(p:any):Promise<void>{
   await waitFor(()=>scene() instanceof G.Scene_Title&&scene().isStarted()&&scene()._commandWindow.active&&!G.SceneManager.isSceneChanging(),'normal Title');
   const title=scene(),window=title._commandWindow;window.selectSymbol('continue');assert(window.isCurrentItemEnabled(),'Continue enabled from real isolated global save info');
   await press('ok');await waitFor(()=>scene() instanceof G.Scene_Load&&scene().isStarted()&&scene()._listWindow.active&&!G.SceneManager.isSceneChanging(),'normal Scene_Load');
-  const load=scene();load._listWindow.selectSavefile(c.slot);eq(load._listWindow.savefileId(),c.slot,'actual highlighted slot');
+  const load=scene();load._listWindow.selectSavefile(c.slot);assert(load._listWindow.index()>=0&&load._listWindow.index()<load._listWindow.maxItems(),'visible ordinary save row');eq(load._listWindow.savefileId(),c.slot,'actual highlighted slot');
   await shot('I-Continue-'+c.family+'-slot-'+c.slot);await press('ok');
   await waitFor(()=>scene() instanceof G.Scene_Map&&scene().isStarted()&&!G.SceneManager.isSceneChanging(),'normal loaded map');
   assert(load._loadSuccess,'Scene_Load success, not direct DataManager shortcut');eq(game(),c.state,'entire saved framework document');
@@ -25,8 +25,13 @@ export async function runCloseout(p:any):Promise<void>{
  // Same built product/process traverses all default new G/H workflows. Each existing suite keeps its own source-bound fixtures.
  await p.runLearningUI();await p.runEvolutionUI();await p.runTradeUI();await p.runItemEvolutionUI();await p.runPokedexUI();
  await scenario('I-CHECKPOINT five G/H families retained for a new process using ordinary Continue',async()=>{
-  const cases=['learning','evolution','trade','item-evolution','pokedex'].map(family=>{const doc=JSON.parse(fs.readFileSync(path.join(path.dirname(OUT),'ps-flow-expected-'+family+'-ui.json'),'utf8')),c=doc.cases.at(-1);return{...c,family};});
-  eq(new Set(cases.map(c=>c.slot)).size,5,'producer slots do not overwrite each other');
+  const cases:any[]=[];for(const family of ['learning','evolution','trade','item-evolution','pokedex']){
+   const doc=JSON.parse(fs.readFileSync(path.join(path.dirname(OUT),'ps-flow-expected-'+family+'-ui.json'),'utf8')),c=doc.cases.at(-1),slot=cases.length+1;
+   W.PSFlow._content=c.content;W.PSFlow._app=null;await G.DataManager.loadGame(c.slot);eq(game(),c.state,'source full checkpoint '+family);
+   G.SceneManager.goto(G.Scene_Map);await waitFor(()=>scene() instanceof G.Scene_Map&&scene().isStarted()&&!G.SceneManager.isSceneChanging(),'checkpoint normal map');
+   assert(slot<G.DataManager.maxSavefiles(),'ordinary Continue slot is inside visible list, not a legacy test-only high slot');await p.settledSave(slot);cases.push({...c,sourceSlot:c.slot,slot,family,state:clone(game())});
+  }
+  eq(new Set(cases.map(c=>c.slot)).size,5,'producer ordinary slots do not overwrite each other');
   fs.writeFileSync(path.join(path.dirname(OUT),'ps-flow-expected-closeout.json'),JSON.stringify({cases}));return{slots:cases.map(c=>c.slot),method:'five final full documents; not all intermediate checkpoints or all formal vectors'};
  });
  await scenario('I-H2-WARN-01 actual English/Chinese empty-result layout at 640x480 and default bitmap',async()=>{
