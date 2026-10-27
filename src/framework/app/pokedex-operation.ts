@@ -32,16 +32,23 @@ export interface DexOperationView {
 export type DexResolution = { status: "pending"; view: DexOperationView }
   | { status: "complete" | "technically-terminated" | "applied" | "unchanged"; token: string; parentToken?: string; owner?: DexEntryOwner }
   | { status: "refused"; reason: string };
+interface PendingWrite {
+  before: GameState; next: GameState; attempted: boolean;
+  beforeKey?: string; nextKey?: string;
+}
 interface Operation {
   token: string; generation: number; revision: number; purpose: "entry" | "edit" | "summary";
   parentToken?: string; owner?: DexEntryOwner; entries: DexEntryIntent[]; cursor: number;
   phase: "reserved" | "message" | "entry"; fingerprint: string;
   summary?:{parentToken:string;memberId:string;species:string};
-  pendingWrite?: { before: GameState; next: GameState; attempted: boolean };
+  pendingWrite?: PendingWrite;
   error?: string; retired?: string; reloadRequired: boolean;
 }
 const key = (state: GameState): string => JSON.stringify(state, (_k, v: unknown) => v && typeof v === "object" && !Array.isArray(v)
   ? Object.fromEntries(Object.keys(v).sort().map(k => [k, (v as Record<string, unknown>)[k]])) : v);
+// Only the operation's detached snapshots are memoized. Every host readback is still cloned and canonicalized afresh.
+const pendingBefore = (pending: PendingWrite): string => pending.beforeKey ??= key(pending.before);
+const pendingNext = (pending: PendingWrite): string => pending.nextKey ??= key(pending.next);
 const fingerprint = (content: Content): string => semanticFingerprint(clone(content));
 const message = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
@@ -184,19 +191,22 @@ export class PokedexOperation {
   private install(op: Operation): DexResolution {
     const pending = op.pendingWrite!;
     let current = clone(this.ports.state.read()); this.current(op);
-    if (key(current) === key(pending.next)) return this.installed(op);
-    if (key(current) !== key(pending.before)) { op.reloadRequired = true; throw Error("pokedex-install-indeterminate:reload-required"); }
+    let currentKey = key(current);
+    if (currentKey === pendingNext(pending)) return this.installed(op);
+    if (currentKey !== pendingBefore(pending)) { op.reloadRequired = true; throw Error("pokedex-install-indeterminate:reload-required"); }
     const content = this.content(op), errors = validateGameContent(pending.next, content);
     if (errors.length) throw Error(`invalid-pokedex-next:${errors[0]!.path}`);
     current = clone(this.ports.state.read()); this.current(op); this.content(op);
-    if (key(current) !== key(pending.before)) { op.reloadRequired = true; throw Error("pokedex-install-indeterminate:reload-required"); }
+    currentKey = key(current);
+    if (currentKey !== pendingBefore(pending)) { op.reloadRequired = true; throw Error("pokedex-install-indeterminate:reload-required"); }
     pending.attempted = true; let failure: unknown;
     try { this.ports.state.replace(clone(pending.next)); } catch (error) { failure = error; }
     this.current(op);
     try { current = clone(this.ports.state.read()); } catch (error) { op.reloadRequired = true; throw error; }
     this.current(op);
-    if (key(current) === key(pending.next)) return this.installed(op);
-    op.reloadRequired = key(current) !== key(pending.before);
+    currentKey = key(current);
+    if (currentKey === pendingNext(pending)) return this.installed(op);
+    op.reloadRequired = currentKey !== pendingBefore(pending);
     throw failure ?? Error(op.reloadRequired ? "pokedex-install-indeterminate:reload-required" : "pokedex-state-not-installed");
   }
   resolve(token: string, revision: number, decision: DexDecision): DexResolution {
@@ -209,7 +219,7 @@ export class PokedexOperation {
       if (decision.kind === "technical-terminate") {
         if (op.pendingWrite?.attempted) {
           const current = clone(this.ports.state.read()); this.current(op);
-          if (![key(op.pendingWrite.before), key(op.pendingWrite.next)].includes(key(current))) { op.reloadRequired = true; throw Error("pokedex-install-indeterminate:reload-required"); }
+          if (![pendingBefore(op.pendingWrite), pendingNext(op.pendingWrite)].includes(key(current))) { op.reloadRequired = true; throw Error("pokedex-install-indeterminate:reload-required"); }
         }
         return this.finish(op, "technically-terminated");
       }
