@@ -332,3 +332,63 @@ test('every unresolved local module syntax is an explicit failure', () => {
 		'export const p = () => import("./missing-directory");\n',
 	]) bad({ 'rules/a.ts': 'export const a = 1;\n', 'rules/p.ts': code }, /rules\/p\.ts: import ".*" does not resolve/);
 });
+
+// ---- STEP2-ULTRA-01: fail closed when another branch can change Vite's actual target.
+test('directory package metadata and alternate index files reject instead of inventing an index identity', () => {
+	for (const field of ['main', 'module']) {
+		bad({
+			'rules/entry.ts': 'export { marker } from "./nested";\n',
+			'rules/nested/index.ts': 'export const marker = 11;\n',
+			'rules/nested/package.json': JSON.stringify({ [field]: '../../battle/gateway.ts' }),
+			'battle/gateway.ts': 'export const marker = 77;\n',
+		}, /cannot verify the actual Vite module target.*rules\/nested\/package\.json/);
+	}
+	bad({
+		'rules/entry.ts': 'export { marker } from "./nested";\n',
+		'rules/nested/index.ts': 'export const marker = 11;\n',
+		'rules/nested/index.js': 'export { marker } from "../../battle/gateway.ts";\n',
+		'battle/gateway.ts': 'export const marker = 77;\n',
+	}, /cannot verify the actual Vite module target.*rules\/nested\/index\.js/);
+});
+
+test('same-stem source shadows reject, while an explicit TS specifier remains unambiguous', () => {
+	const files = {
+		'rules/nested.ts': 'export const marker = 11;\n',
+		'rules/nested.js': 'export { marker } from "../battle/gateway.ts";\n',
+		'battle/gateway.ts': 'export const marker = 77;\n',
+	};
+	bad({ ...files, 'rules/entry.ts': 'export { marker } from "./nested";\n' }, /cannot verify the actual Vite module target.*rules\/nested\.js/);
+	clean({ ...files, 'rules/entry.ts': 'export { marker } from "./nested.ts";\n' });
+});
+
+test('ambiguous targets cannot bypass private-path or cycle gates', () => {
+	bad({
+		'flow/entry.ts': 'export type { X } from "./nested";\n',
+		'flow/nested/index.ts': 'export type X = string;\n',
+		'flow/nested/package.json': JSON.stringify({ main: '../../battle/showdown-types.ts' }),
+		'battle/showdown-types.ts': 'export type X = unknown;\n',
+	}, /cannot verify the actual Vite module target.*flow\/nested\/package\.json/);
+	bad({
+		'rules/a.ts': 'export { b } from "./nested";\n',
+		'rules/nested/index.ts': 'export const b = 1;\n',
+		'rules/nested/index.js': 'export { a } from "../a.ts";\n',
+	}, /cannot verify the actual Vite module target.*rules\/nested\/index\.js/);
+});
+
+test('ambiguous targets cannot bypass production closure purity', () => {
+	bad({
+		'production.ts': 'export { adapter } from "./tools/adapter";\n',
+		'tools/adapter/index.ts': 'export const adapter = 1;\n',
+		'tools/adapter/package.json': JSON.stringify({ main: '../fixtures/game.ts' }),
+		'tools/fixtures/game.ts': 'export const fixture = 1;\n',
+	}, /cannot verify the actual Vite module target.*tools\/adapter\/package\.json/);
+});
+
+test('a same-stem shadow cannot widen the app content-runtime exception', () => {
+	bad({
+		'app/a.ts': 'import { content } from "../flow/content-runtime";\nexport const a = content;\n',
+		'flow/content-runtime.ts': 'export const content = 11;\n',
+		'flow/content-runtime.js': 'export { content } from "./session.ts";\n',
+		'flow/session.ts': 'export const content = 77;\n',
+	}, /cannot verify the actual Vite module target.*flow\/content-runtime\.js/);
+});
