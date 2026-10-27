@@ -27,30 +27,57 @@ export async function runWriteScale(p: any): Promise<void> {
       Object.defineProperty(system, '_psGame', { configurable: true, enumerable: original!.enumerable, get: () => current, set: next => { writes++; current = next; } });
       return { get writes() { return writes; }, restore() { const value = system._psGame; delete system._psGame; Object.defineProperty(system, '_psGame', { ...original!, value }); } };
     };
+    const tickSource = 'Graphics._tickHandler: registered SceneManager.update callback';
     const updateProbe = () => {
-      const original = G.SceneManager.update, intervals: number[] = [];
-      let last = 0;
-      G.SceneManager.update = function (...args: any[]) { const now = performance.now(); if (last) intervals.push(now - last); last = now; return original.apply(this, args); };
-      return { intervals, restore() { G.SceneManager.update = original; } };
+      const original = G.Graphics._tickHandler, timestamps: number[] = [];
+      assert(typeof original === 'function', 'the running Graphics tick callback is available');
+      G.Graphics.setTickHandler((...args: any[]) => { timestamps.push(performance.now()); return original(...args); });
+      return {
+        timestamps, source: tickSource,
+        async prime() {
+          for (let waits = 0; waits < 10 && timestamps.length < 2; waits++) await Promise.race([frames(1), new Promise(resolve => setTimeout(resolve, 100))]);
+          assert(timestamps.length >= 2, 'two real tick timestamps within ten bounded waits (about one second)');
+        },
+        intervals() { return timestamps.slice(1).map((updateAt, i) => ({ previousUpdateAt: timestamps[i]!, updateAt, durationMs: updateAt - timestamps[i]! })); },
+        restore() { G.Graphics.setTickHandler(original); },
+      };
     };
+    const coverSync = (updates: { previousUpdateAt: number; updateAt: number; durationMs: number }[], syncStarted: number, syncEnded: number) => {
+      const covered = updates.filter(update => update.previousUpdateAt <= syncStarted && update.updateAt >= syncEnded);
+      assert(covered.length >= 1, 'an actual update interval covers the complete synchronous write');
+      return covered.map(update => {
+        const syncMs = syncEnded - syncStarted, outsideSyncMs = Math.max(0, syncStarted - update.previousUpdateAt) + Math.max(0, update.updateAt - syncEnded);
+        assert(update.durationMs >= syncMs, 'covered update duration is consistent with its synchronous span');
+        return { ...update, syncStartedAt: syncStarted, syncEndedAt: syncEnded, syncMs, outsideSyncMs, containsOracleOrSyntheticWait: outsideSyncMs > 0 };
+      });
+    };
+    const sanityProbe = updateProbe();
+    let tickSanity;
+    try {
+      await sanityProbe.prime();
+      tickSanity = { status: 'pass', source: sanityProbe.source, timestamps: [...sanityProbe.timestamps], intervals: sanityProbe.intervals(), maxWaits: 10, maxWallMsPerWait: 100, businessWrites: 0 };
+      assert(tickSanity.intervals.length >= 1, 'bounded sanity produced a real tick interval');
+    } finally { sanityProbe.restore(); }
     const context = (frameStart: number, started: number, ended: number) => ({
       scene: scene()?.constructor?.name, dex: W.PSPokedex.current()?.view?.kind ?? null,
       hasFocus: document.hasFocus(), visibility: document.visibilityState, elapsedMs: ended - started,
-      driverFrameStart: frameStart, driverFrameEnd: p.driverFrame(), startedAt: started, endedAt: ended,
+      driverFrameStart: frameStart, driverFrameEnd: p.driverFrame(), logicFrameSource: 'SceneManager.updateMain', startedAt: started, endedAt: ended,
     });
     const stepSample = async (index: number) => {
-      const before = clone(game()), expected = { ...before, steps: B.stats.addSteps(before.steps, 1) }, mzBefore = G.$gamePlayer._steps;
+      const before = clone(game()), expected = { ...before, steps: B.stats.addSteps(before.steps, 1) }, mzBefore = G.$gameParty.steps();
       const installs = stateProbe(), updates = updateProbe(), frameStart = p.driverFrame(), started = performance.now();
       let syncStarted = 0, syncEnded = 0;
       try {
+        await updates.prime();
         assert(!G.$gameMap.isEventRunning() && !G.$gamePlayer.isMoveRouteForcing(), 'actual step guards allow counting');
         syncStarted = performance.now(); G.$gamePlayer.increaseSteps(); syncEnded = performance.now();
         eq(W.PSFlow.lastSteps.status, 'counted', 'actual PSFlow step receipt');
-        eq(G.$gamePlayer._steps, mzBefore + 1, 'actual MZ player step increment');
+        eq(G.$gameParty.steps(), mzBefore + 1, 'actual Game_Party step ledger increment');
         eq(installs.writes, 1, 'one real MZ state replacement for one step');
         eq(game(), expected, 'complete state: only the global framework step counter changes');
         await frames(2);
-        return { chain: 'steps', index, warmup: index < 2, syncStartedAt: syncStarted, syncEndedAt: syncEnded, syncMs: syncEnded - syncStarted, updateIntervalsMs: [...updates.intervals], context: context(frameStart, started, performance.now()), steps: game().steps };
+        const intervals = updates.intervals(), syncCoverage = coverSync(intervals, syncStarted, syncEnded);
+        return { chain: 'steps', index, warmup: index < 2, syncStartedAt: syncStarted, syncEndedAt: syncEnded, syncMs: syncEnded - syncStarted, updates: intervals, syncCoverage, tickSource: updates.source, tickCount: updates.timestamps.length, context: context(frameStart, started, performance.now()), steps: game().steps };
       } finally { updates.restore(); installs.restore(); }
     };
     const steps = [];
@@ -80,6 +107,7 @@ export async function runWriteScale(p: any): Promise<void> {
       let calls = 0, outcome: any, syncStarted = 0, syncEnded = 0;
       app.updatePokedex = function (command: any) { calls++; syncStarted = performance.now(); try { outcome = original.call(this, command); return outcome; } finally { syncEnded = performance.now(); } };
       try {
+        await updates.prime();
         await press('down');
         eq(calls, 1, 'one actual UI callback into updatePokedex');
         eq(outcome.status, 'applied', 'actual UI cursor edit applied');
@@ -87,7 +115,8 @@ export async function runWriteScale(p: any): Promise<void> {
         eq(game(), expected, 'complete state: only the planned dex viewing patch changes');
         eq(W.PSPokedex.current().view.cursor, next, 'real list cursor moved once');
         await frames(2);
-        return { chain: 'dex', index, warmup: index < 2, syncStartedAt: syncStarted, syncEndedAt: syncEnded, syncMs: syncEnded - syncStarted, updateIntervalsMs: [...updates.intervals], context: context(frameStart, started, performance.now()), cursor: next };
+        const intervals = updates.intervals(), syncCoverage = coverSync(intervals, syncStarted, syncEnded);
+        return { chain: 'dex', index, warmup: index < 2, syncStartedAt: syncStarted, syncEndedAt: syncEnded, syncMs: syncEnded - syncStarted, updates: intervals, syncCoverage, tickSource: updates.source, tickCount: updates.timestamps.length, context: context(frameStart, started, performance.now()), cursor: next };
       } finally { app.updatePokedex = original; updates.restore(); installs.restore(); }
     };
     const dex = [];
@@ -112,7 +141,7 @@ export async function runWriteScale(p: any): Promise<void> {
     };
     fs.writeFileSync(path.join(path.dirname(OUT), 'ps-flow-expected-write-scale.json'), JSON.stringify(expected));
     return {
-      slot, slotSha256, saveMs, steps, dex,
+      slot, slotSha256, saveMs, tickSanity, steps, dex,
       final: { party: game().party.length, boxed: B.storage.boxedMembers(game()).length, steps: game().steps, view: clone(game().dex.view), claims: Object.keys(game().claims), ledger: Object.keys(game().appliedBattles).length },
       input: 'real Game_Player.increaseSteps and real Pokedex DOM/list path; programmatic synthetic events, not physical input',
     };
