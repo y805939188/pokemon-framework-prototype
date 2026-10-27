@@ -2,7 +2,7 @@
  * The bag items this build knows (step 4): the battle items of rules.ts plus the balls the capture rules handle.
  * Content (grants) may only hand out these ids; anything else is refused when the content is compiled.
  */
-import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS } from "./rules.ts";
+import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS } from "./rules";
 
 /** Balls with a defined capture rule (rules.ts ballRate; pokeball and premierball have no modifier). */
 export const BALLS: readonly string[] = [

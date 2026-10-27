@@ -1,9 +1,9 @@
 /** WP24 money and the approved badge author-entry contract. No host time or randomness. */
-import { resolveConfig } from './config.ts';
-import type { Content } from './types.ts';
-import { clone } from './value.ts';
-import { safeAdd } from './inventory.ts';
-import type { GameStats } from './stats.ts';
+import { resolveConfig } from './config';
+import type { Content } from './types';
+import { clone } from './value';
+import { safeAdd } from './inventory';
+import type { GameStats } from './stats';
 
 export const moneyCap = (content:Pick<Content,'settings'>|undefined,fallback:number):number => typeof content?.settings?.MAX_MONEY === 'number' ? resolveConfig(content.settings).MAX_MONEY : fallback;
 export function writeMoney(value: number, cap: number): number {

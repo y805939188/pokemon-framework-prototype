@@ -1,14 +1,14 @@
 /** One bounded management session. Held plans contain movement intentions, never member/state snapshots. */
-import type { GameStatePort } from './ports.ts';
-import type { GameState } from '../rules/state.ts';
-import type { Content } from '../rules/types.ts';
-import type { Limits } from '../rules/limits.ts';
-import { InventoryRefused } from '../rules/inventory.ts';
-import { clone } from '../rules/value.ts';
-import { locateMember, SPECIAL_WALLPAPERS } from '../rules/storage.ts';
-import type { MemberPosition } from '../rules/storage.ts';
-import { ManagementRefused, giveItem, heldDestination, moveMember, pickUp, placeHeld, referenced, releaseHeld, releaseMember, replayHeld, swapItems, takeItem } from '../rules/storage-operations.ts';
-import type { HeldIntent, ItemDescriptor, MemberReference, MovementContext } from '../rules/storage-operations.ts';
+import type { GameStatePort } from './ports';
+import type { GameState } from '../rules/state';
+import type { Content } from '../rules/types';
+import type { Limits } from '../rules/limits';
+import { InventoryRefused } from '../rules/inventory';
+import { clone } from '../rules/value';
+import { locateMember, SPECIAL_WALLPAPERS } from '../rules/storage';
+import type { MemberPosition } from '../rules/storage';
+import { ManagementRefused, giveItem, heldDestination, moveMember, pickUp, placeHeld, referenced, releaseHeld, releaseMember, replayHeld, swapItems, takeItem } from '../rules/storage-operations';
+import type { HeldIntent, ItemDescriptor, MemberReference, MovementContext } from '../rules/storage-operations';
 
 export type ManagementRequest =
  | { kind:'move'; source:MemberReference; target:MemberPosition; expectedTargetId:string|null }
@@ -48,7 +48,7 @@ export class ManagementSession {
   reserveDexChild(token:string):void {if(token!==this.token)throw new Error('stale-operation');if(this.child)throw new Error('management-operation-active');this.child=true;}
   releaseChild(token:string):void {if(token===this.token)this.child=false;}
   end(token:string):ManagementOutcome {if(this.child)return {status:'refused',reason:'child-operation-active'};if(token!==this.token)return {status:'refused',reason:'stale-operation'};if(this.held)return {status:'refused',reason:'member-held'};this.invalidate();return {status:'unchanged'};}
-  snapshot(token:string):{collection:GameState;held:import('../rules/types.ts').Member|null} {
+  snapshot(token:string):{collection:GameState;held:import('../rules/types').Member|null} {
     if(token!==this.token)throw new ManagementRefused('stale-operation');
     const game=this.state.read();
     if(!this.held)return {collection:clone(game),held:null};

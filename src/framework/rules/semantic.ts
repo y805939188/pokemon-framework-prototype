@@ -1,5 +1,5 @@
 /** Canonical plain-data intent identity. Dictionary keys sort, arrays retain order; no coercion or accessors. */
-import { sha256Hex } from './sha256.ts';
+import { sha256Hex } from './sha256';
 /** Null or the Object.prototype of ANY realm. Under NW.js the required engine runs in Node's context while plugins
  *  build their requests in the window's, so a plain literal there has a different Object.prototype (5.2 P-01).
  *  Read through descriptors only: a class instance, Map, Date or forged prototype still does not qualify. */

@@ -1,16 +1,16 @@
 /** Explicit viewing edits and the installed-member Info continuation. No render-triggered writes or saved workflow. */
-import { clone } from "../rules/value.ts";
-import { normalizeMemberDexAppearance } from "../rules/acquisition-dex.ts";
-import { semanticFingerprint } from "../rules/semantic.ts";
-import { applyDexPatch, planDexLastSeen } from "../rules/pokedex.ts";
-import type { DexAppearance, DexPatch } from "../rules/pokedex.ts";
-import { createDexQueryCatalog, dexAccessibleRegions, dexForms, planDexFormSelection, planDexUnlock, planDexViewing } from "../rules/pokedex-query.ts";
-import { resolveConfig } from "../rules/config.ts";
-import { locateMember } from "../rules/storage.ts";
-import { validateGameContent } from "../rules/save-schema.ts";
-import type { Content } from "../rules/types.ts";
-import type { GameState } from "../rules/state.ts";
-import type { ContentPort, GameStatePort } from "./ports.ts";
+import { clone } from "../rules/value";
+import { normalizeMemberDexAppearance } from "../rules/acquisition-dex";
+import { semanticFingerprint } from "../rules/semantic";
+import { applyDexPatch, planDexLastSeen } from "../rules/pokedex";
+import type { DexAppearance, DexPatch } from "../rules/pokedex";
+import { createDexQueryCatalog, dexAccessibleRegions, dexForms, planDexFormSelection, planDexUnlock, planDexViewing } from "../rules/pokedex-query";
+import { resolveConfig } from "../rules/config";
+import { locateMember } from "../rules/storage";
+import { validateGameContent } from "../rules/save-schema";
+import type { Content } from "../rules/types";
+import type { GameState } from "../rules/state";
+import type { ContentPort, GameStatePort } from "./ports";
 
 export interface DexEntryIntent {
   memberId: string; species: string; previouslyOwned: boolean; offer: boolean; appearance: DexAppearance;

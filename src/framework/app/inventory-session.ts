@@ -1,19 +1,19 @@
 /** Process-local operation ownership, selection revisions and bounded completed receipts. No persistent journal. */
-import {planItemUse,itemReadiness,itemUseLimit} from '../rules/item-effects.ts';
-import type {ItemAnswers,ItemIntent,ItemWorldContext} from '../rules/item-effects.ts';
-import {planShop,filterShopStock,shopQuote,updatePrice,assertMutableStock} from '../rules/shop.ts';
-import type {ShopContext,ShopIntent} from '../rules/shop.ts';
-import { clone } from '../rules/value.ts';
-import { semanticFingerprint } from '../rules/semantic.ts';
-import { addItems, aggregateBag, inventoryPolicy, moveInventorySlot, positiveQuantity, removeItems, itemQuantity } from '../rules/inventory.ts';
-import { catalogOf, hasFlag, importantItem, itemOf } from '../rules/item-catalog.ts';
-import { changeMoney, moneyCap, setBadge } from '../rules/economy.ts';
-import { own, setOwn } from '../rules/own.ts';
-import type { GameState } from '../rules/state.ts';
-import type { Content } from '../rules/types.ts';
-import type { Limits } from '../rules/limits.ts';
-import type { GameStatePort } from './ports.ts';
-import type { ItemDefinition } from '../rules/item-catalog.ts';
+import {planItemUse,itemReadiness,itemUseLimit} from '../rules/item-effects';
+import type {ItemAnswers,ItemIntent,ItemWorldContext} from '../rules/item-effects';
+import {planShop,filterShopStock,shopQuote,updatePrice,assertMutableStock} from '../rules/shop';
+import type {ShopContext,ShopIntent} from '../rules/shop';
+import { clone } from '../rules/value';
+import { semanticFingerprint } from '../rules/semantic';
+import { addItems, aggregateBag, inventoryPolicy, moveInventorySlot, positiveQuantity, removeItems, itemQuantity } from '../rules/inventory';
+import { catalogOf, hasFlag, importantItem, itemOf } from '../rules/item-catalog';
+import { changeMoney, moneyCap, setBadge } from '../rules/economy';
+import { own, setOwn } from '../rules/own';
+import type { GameState } from '../rules/state';
+import type { Content } from '../rules/types';
+import type { Limits } from '../rules/limits';
+import type { GameStatePort } from './ports';
+import type { ItemDefinition } from '../rules/item-catalog';
 
 export interface InventoryParent { token:string; memberId:string }
 export interface InventoryTicket { token:string; generation:number; revision:string; contentRevision:string; pocket:number; index:number; itemId:string; quantity:number }

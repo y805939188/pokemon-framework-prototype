@@ -1,5 +1,5 @@
-import { badgeCount, changeMoney, moneyCap } from "./economy.ts";
-import { DEFAULT_LIMITS } from "./limits.ts";
+import { badgeCount, changeMoney, moneyCap } from "./economy";
+import { DEFAULT_LIMITS } from "./limits";
 /**
  * Defeat settlement (decision D3): a lost or drawn battle costs money and fully heals the party.
  *   money  WP42 §6.1 / WP24 §4.4: highest level of the player's own party x the badge factor (8, 16, 24, 36, 48, 64, 80,
@@ -9,9 +9,9 @@ import { DEFAULT_LIMITS } from "./limits.ts";
  * The application applies it together with the battle result, in the same state replacement; the trip home is a host
  * action after that commit. Pure.
  */
-import { healParty } from "./heal.ts";
-import type { BattleResult, GameState } from "./state.ts";
-import type { Content } from "./types.ts";
+import { healParty } from "./heal";
+import type { BattleResult, GameState } from "./state";
+import type { Content } from "./types";
 
 export const BADGE_FACTORS: readonly number[] = [8, 16, 24, 36, 48, 64, 80, 100, 120];
 

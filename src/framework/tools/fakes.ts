@@ -2,9 +2,9 @@
  * In-memory stand-ins for the application's ports, for tests and the headless harness: a state holder that counts and
  * (optionally) refuses, a projection that records and can fail, and a session factory that hands out scripted handles.
  */
-import { clone } from "../rules/state.ts";
-import type { BattleResult, GameState } from "../rules/state.ts";
-import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, GameStatePort, OutcomeProjection } from "../app/ports.ts";
+import { clone } from "../rules/state";
+import type { BattleResult, GameState } from "../rules/state";
+import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, GameStatePort, OutcomeProjection } from "../app/ports";
 
 /** Recursively freeze, so any in-place write by the code under test throws instead of passing silently. */
 export function deepFreeze<T>(value: T): T {

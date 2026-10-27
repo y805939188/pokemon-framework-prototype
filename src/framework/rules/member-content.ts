@@ -1,10 +1,10 @@
 /** Present-member content references shared by fresh reception and the final save gate. No state or migration. */
-import { catalogOf, itemOf } from "./item-catalog.ts";
-import type { ItemCatalog } from "./item-catalog.ts";
-import { totalPp } from "./member-metadata.ts";
-import { resolveAbility } from "./member-identity.ts";
-import { speciesDataOf } from "./species-key.ts";
-import type { Content, Member } from "./types.ts";
+import { catalogOf, itemOf } from "./item-catalog";
+import type { ItemCatalog } from "./item-catalog";
+import { totalPp } from "./member-metadata";
+import { resolveAbility } from "./member-identity";
+import { speciesDataOf } from "./species-key";
+import type { Content, Member } from "./types";
 
 /** A synchronous validation's private directory. Never cached by content identity or shared with a later write. */
 export interface MemberContentIndex {

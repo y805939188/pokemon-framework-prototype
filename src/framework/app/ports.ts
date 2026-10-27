@@ -3,10 +3,10 @@
  * `$gameSystem` and `$gameVariables`; tests implement them in memory; the composition root wires the Showdown-backed
  * battle session factory. Types only.
  */
-import type { BattleResult, GameState } from "../rules/state.ts";
-import type { Content, DexLookup, Member } from "../rules/types.ts";
-import type { BattleEvidence, BattleEvidenceContext, EvidenceBinding } from "../rules/battle-evidence.ts";
-import type { EffectsBindingV2, EffectsSealV2 } from "../rules/battle-consumption.ts";
+import type { BattleResult, GameState } from "../rules/state";
+import type { Content, DexLookup, Member } from "../rules/types";
+import type { BattleEvidence, BattleEvidenceContext, EvidenceBinding } from "../rules/battle-evidence";
+import type { EffectsBindingV2, EffectsSealV2 } from "../rules/battle-consumption";
 
 /** The persistent game state, held by whoever owns the save (MZ: `$gameSystem._psGame`). The application never mutates what `read` returns. */
 export interface GameStatePort {

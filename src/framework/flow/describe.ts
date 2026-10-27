@@ -4,9 +4,9 @@
  * translator (English by default, so the English output is exactly the step 2 text). Unknown event types are ignored
  * on purpose: the text UI is a placeholder, not a protocol consumer.
  */
-import { defaultTranslator } from "../i18n/index.ts";
-import type { Translator } from "../i18n/index.ts";
-import type { BattleEvent, SessionMessage } from "../battle/protocol.ts";
+import { defaultTranslator } from "../i18n/index";
+import type { Translator } from "../i18n/index";
+import type { BattleEvent, SessionMessage } from "../battle/protocol";
 
 export interface Describer {
   message(m: SessionMessage): string[];

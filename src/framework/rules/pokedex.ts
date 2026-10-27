@@ -1,5 +1,5 @@
 /** WP62 / approved 5.3 r3 §8. Pure plans over normalized facts; the application owns once-only installation. */
-import type { Content, DexFormRecord, DexState, SpeciesData } from "./types.ts";
+import type { Content, DexFormRecord, DexState, SpeciesData } from "./types";
 
 export interface DexAppearance { species: string; gender: 0 | 1 | 2; form: number; shiny: boolean }
 export type DexLastSeen = DexState["lastSeenForm"][string];

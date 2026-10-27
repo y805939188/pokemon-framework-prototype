@@ -1,8 +1,8 @@
 /** Finite companion recording for this capability batch, not a persistent workflow/event bus. */
-import { clone, resultHash } from "../rules/state.ts";
-import { own, setOwn } from "../rules/own.ts";
-import type { BattleResult } from "../rules/state.ts";
-import type { BattleEvidence, BattleEvidenceContext, BattleObservation, EvidenceBinding, EvidenceIssue, ObservationBatch } from "../rules/battle-evidence.ts";
+import { clone, resultHash } from "../rules/state";
+import { own, setOwn } from "../rules/own";
+import type { BattleResult } from "../rules/state";
+import type { BattleEvidence, BattleEvidenceContext, BattleObservation, EvidenceBinding, EvidenceIssue, ObservationBatch } from "../rules/battle-evidence";
 
 export class EvidenceRecorder {
   value: BattleEvidence;

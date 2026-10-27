@@ -15,13 +15,13 @@
  * (a capture, the dex) is refused: nothing is guessed.
  */
 import fs from "node:fs";
-import { applyBattleResult } from "../rules/state.ts";
-import type { BattleCommitOptions, BattleResult, GameState } from "../rules/state.ts";
-import type { Content } from "../rules/types.ts";
-import { migrateGame, snapshotForSave } from "../rules/save-schema.ts";
-import { GAME_SCHEMA } from "../rules/state.ts";
-import type { MigrationResult, SaveErrorInfo } from "../rules/save-schema.ts";
-import type { SpeciesKeyResolver } from "../rules/species-key.ts";
+import { applyBattleResult } from "../rules/state";
+import type { BattleCommitOptions, BattleResult, GameState } from "../rules/state";
+import type { Content } from "../rules/types";
+import { migrateGame, snapshotForSave } from "../rules/save-schema";
+import { GAME_SCHEMA } from "../rules/state";
+import type { MigrationResult, SaveErrorInfo } from "../rules/save-schema";
+import type { SpeciesKeyResolver } from "../rules/species-key";
 
 export type FaultPoint = "start" | "afterBackup" | "beforeSave" | "afterTmpWrite" | "beforeRename" | "afterRename";
 

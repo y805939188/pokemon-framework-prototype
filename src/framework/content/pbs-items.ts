@@ -1,7 +1,7 @@
 /** Author PBS Item subset. Unsupported fields are reported; no reference implementation is read or translated. */
-import { deriveIds } from './pbs-import.ts';
-import type { PbsProblem } from './pbs-import.ts';
-import type { FieldUse, ItemDefinition } from '../rules/item-catalog.ts';
+import { deriveIds } from './pbs-import';
+import type { PbsProblem } from './pbs-import';
+import type { FieldUse, ItemDefinition } from '../rules/item-catalog';
 
 export function importPbsItems(text: string, source: string): { ok: boolean; items: Partial<ItemDefinition>[]; errors: PbsProblem[]; later: { line: number; field: string }[] } {
   const errors: PbsProblem[] = [], later: { line: number; field: string }[] = [];

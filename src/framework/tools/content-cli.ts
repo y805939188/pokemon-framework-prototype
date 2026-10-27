@@ -13,16 +13,16 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { canonicalJson, checkFresh, checkSources, compileContent, preUseProblem } from "../content/compile.ts";
-import { importPbsItems } from "../content/pbs-items.ts";
-import { checkItemInputs } from "../content/item-input.ts";
-import { importPbsBundle, importPbsSpecies } from "../content/pbs-import.ts";
-import { importPbsRegionalDex } from "../content/pbs-regional-dex.ts";
-import type { PbsFile } from "../content/pbs-regional-dex.ts";
-import type { CompiledContent, ContentError, ContentInputs } from "../content/schema.ts";
-import { createDexLookup } from "../battle/dex.ts";
-import { CONTENT_SHOWDOWN_SHA } from "../content/showdown-pin.ts";
-import { loadCompiled, assembleContent } from "../flow/content-runtime.ts";
+import { canonicalJson, checkFresh, checkSources, compileContent, preUseProblem } from "../content/compile";
+import { importPbsItems } from "../content/pbs-items";
+import { checkItemInputs } from "../content/item-input";
+import { importPbsBundle, importPbsSpecies } from "../content/pbs-import";
+import { importPbsRegionalDex } from "../content/pbs-regional-dex";
+import type { PbsFile } from "../content/pbs-regional-dex";
+import type { CompiledContent, ContentError, ContentInputs } from "../content/schema";
+import { createDexLookup } from "../battle/dex";
+import { CONTENT_SHOWDOWN_SHA } from "../content/showdown-pin";
+import { loadCompiled, assembleContent } from "../flow/content-runtime";
 
 const ROOT = path.resolve(__dirname, "..", "..", ".."); // js/engine/build -> project root
 const arg = (name: string, dflt: string): string => {

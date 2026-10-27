@@ -11,8 +11,8 @@
  * The reference validates none of its settings (WP02 §8); the ranges below are this framework's own supported ranges.
  * None of the five is derived from the generation (WP02 §5), so a literal override needs no detaching rule here. Pure.
  */
-import type { Limits } from "./limits.ts";
-import { own } from "./own.ts";
+import type { Limits } from "./limits";
+import { own } from "./own";
 
 export interface RuleConfig {
   CHECK_EVOLUTION_AFTER_ALL_BATTLES: boolean;
@@ -103,4 +103,4 @@ export function developmentCapabilities(raw: unknown = {}): DevelopmentCapabilit
   return { allowHeldItemSources: false, allowExperimentalHeldItemBattle: false, ...record } as DevelopmentCapabilities;
 }
 
-export type { RuleOverrides } from "./settings-types.ts";
+export type { RuleOverrides } from "./settings-types";

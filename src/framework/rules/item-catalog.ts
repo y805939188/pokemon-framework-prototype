@@ -1,7 +1,7 @@
 /** Item identity belongs to content; battle IDs, prices and display names are independent. */
-import { FIELD_EFFECTS } from './item-families.ts';
-import { BAG_ITEMS, BALLS } from './items.ts';
-import { own, setOwn } from './own.ts';
+import { FIELD_EFFECTS } from './item-families';
+import { BAG_ITEMS, BALLS } from './items';
+import { own, setOwn } from './own';
 
 export type FieldUse = 'none' | 'member' | 'direct' | 'field' | 'tm' | 'hm' | 'tr';
 export interface ItemDefinition {

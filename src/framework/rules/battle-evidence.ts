@@ -1,5 +1,5 @@
 /** Internal, transient companion values. These are NOT protocol-v1 messages or persistent save fields. */
-import { planFriendshipChange } from "./friendship.ts";
+import { planFriendshipChange } from "./friendship";
 export interface BattleActor {
   id: string; side: string; slot: number; level: number; hp: number; active: boolean;
 }

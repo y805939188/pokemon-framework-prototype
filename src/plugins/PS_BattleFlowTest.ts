@@ -6,12 +6,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // the step 4 (schema 3) save written by the step 4 code (step 5.0 checkpoint P-1), for T31
 import SCALE_CORPUS from "../../experiments/step5/3/closeout/scale-fixtures.json";
-import { progressionDonorInputs, m1ConvergenceFixture } from "./flowtest/source-fixture.ts";
-import { runCloseout, continueCloseout, runCloseoutLifecycle } from "./flowtest/closeout.ts";
-import { runWriteScale, continueWriteScale } from "./flowtest/write-scale.ts";
+import { progressionDonorInputs, m1ConvergenceFixture } from "./flowtest/source-fixture";
+import { runCloseout, continueCloseout, runCloseoutLifecycle } from "./flowtest/closeout";
+import { runWriteScale, continueWriteScale } from "./flowtest/write-scale";
 import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
-import { pressKey, waitGameFrames, waitUntil } from "./flowtest/timing.ts";
-import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } from "./flowtest/evidence.ts";
+import { pressKey, waitGameFrames, waitUntil } from "./flowtest/timing";
+import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } from "./flowtest/evidence";
 
 (() => {
   "use strict";

@@ -1,15 +1,15 @@
 /** Finite auxiliary composition over an already validated primary plan. The application owns installation and replay. */
-import { planBattleReadiness } from "./battle-consumption.ts";
-import type { ResolvedBattleEffects } from "./battle-consumption.ts";
-import type { EvolutionCheckResult } from "./evolution.ts";
-import { own } from "./own.ts";
-import { applyDexPatch, normalizeDexAppearance, planDexRecord } from "./pokedex.ts";
-import type { DexAppearance, DexRecordInput } from "./pokedex.ts";
-import { speciesKeyResolver } from "./species-key.ts";
-import { locateMember } from "./storage.ts";
-import type { BattleResult, GameState } from "./state.ts";
-import type { Content } from "./types.ts";
-import { clone } from "./value.ts";
+import { planBattleReadiness } from "./battle-consumption";
+import type { ResolvedBattleEffects } from "./battle-consumption";
+import type { EvolutionCheckResult } from "./evolution";
+import { own } from "./own";
+import { applyDexPatch, normalizeDexAppearance, planDexRecord } from "./pokedex";
+import type { DexAppearance, DexRecordInput } from "./pokedex";
+import { speciesKeyResolver } from "./species-key";
+import { locateMember } from "./storage";
+import type { BattleResult, GameState } from "./state";
+import type { Content } from "./types";
+import { clone } from "./value";
 
 export interface BattleEffectsWritebackDisposition {
   group: "friendship" | "readiness" | "appearance" | "defeat" | "capture-owned" | "capture-appearance" | "capture-count";

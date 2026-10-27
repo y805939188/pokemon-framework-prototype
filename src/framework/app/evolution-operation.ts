@@ -1,23 +1,23 @@
 /** A finite, transient post-battle continuation. No saved workflow and no authority from public answers. */
-import { clone } from "../rules/value.ts";
-import { planPostBattleEvolution } from "../rules/evolution.ts";
-import type { EvolutionFacts, EvolutionSelection } from "../rules/evolution.ts";
-import { planBattleReadiness } from "../rules/battle-consumption.ts";
-import type { EffectsContextV2, ResolvedBattleEffects } from "../rules/battle-consumption.ts";
-import { planEvolutionCommit } from "../rules/evolution-commit.ts";
-import { planLearningQueue } from "../rules/learning.ts";
-import type { LearningAnswer, LearningPending } from "../rules/learning.ts";
-import { resolveConfig } from "../rules/config.ts";
-import { catalogOf } from "../rules/item-catalog.ts";
-import { removeItems } from "../rules/inventory.ts";
-import { bumpStat } from "../rules/stats.ts";
-import { own } from "../rules/own.ts";
-import { validateGameContent } from "../rules/save-schema.ts";
-import { validatedContentIdentity } from "../flow/content-runtime.ts";
-import type { Content, Member } from "../rules/types.ts";
-import type { Limits } from "../rules/limits.ts";
-import type { GameState } from "../rules/state.ts";
-import type { ContentPort, GameStatePort } from "./ports.ts";
+import { clone } from "../rules/value";
+import { planPostBattleEvolution } from "../rules/evolution";
+import type { EvolutionFacts, EvolutionSelection } from "../rules/evolution";
+import { planBattleReadiness } from "../rules/battle-consumption";
+import type { EffectsContextV2, ResolvedBattleEffects } from "../rules/battle-consumption";
+import { planEvolutionCommit } from "../rules/evolution-commit";
+import { planLearningQueue } from "../rules/learning";
+import type { LearningAnswer, LearningPending } from "../rules/learning";
+import { resolveConfig } from "../rules/config";
+import { catalogOf } from "../rules/item-catalog";
+import { removeItems } from "../rules/inventory";
+import { bumpStat } from "../rules/stats";
+import { own } from "../rules/own";
+import { validateGameContent } from "../rules/save-schema";
+import { validatedContentIdentity } from "../flow/content-runtime";
+import type { Content, Member } from "../rules/types";
+import type { Limits } from "../rules/limits";
+import type { GameState } from "../rules/state";
+import type { ContentPort, GameStatePort } from "./ports";
 
 export interface BattleEvolutionSeed {
   token: string; generation: number; context: EffectsContextV2; effects: ResolvedBattleEffects;

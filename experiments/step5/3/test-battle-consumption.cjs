@@ -1,10 +1,9 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {register}=require('node:module');
 const {pathToFileURL}=require('node:url');
 const {resolve}=require('node:path');
-register('data:text/javascript,'+encodeURIComponent(`import {readFile} from 'node:fs/promises'; import {stripTypeScriptTypes} from 'node:module'; export async function load(url,context,next){if(url.endsWith('.ts'))return {format:'module',source:stripTypeScriptTypes(await readFile(new URL(url),'utf8'),{sourceUrl:url}),shortCircuit:true};return next(url,context);}`),pathToFileURL(__filename));
+require('../../../scripts/tests/ts-source-loader.cjs');
 const moduleUnderTest=import(pathToFileURL(resolve(__dirname,'../../../src/framework/rules/battle-consumption.ts')));
 const complete=value=>({status:'complete',value});
 const unavailable=()=>({status:'unavailable',reason:'observer-interrupted'});

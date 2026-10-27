@@ -1,18 +1,18 @@
 /** Finite teaching/reminder/forgetting transaction. Answers carry no resource or compatibility authority. */
-import { planTeachingAction, planRelearningAction, planForgettingAction } from "../rules/learning-actions.ts";
-import type { TeachingActionContext } from "../rules/learning-actions.ts";
-import type { LearningAnswer, LearningPending, RelearningAnswer, RelearningPending } from "../rules/learning.ts";
-import type { Content, Member, MoveSlot } from "../rules/types.ts";
-import type { GameState } from "../rules/state.ts";
-import type { ContentPort, GameStatePort } from "./ports.ts";
-import type { ItemWorldContext } from "../rules/item-effects.ts";
-import { catalogOf, itemOf } from "../rules/item-catalog.ts";
-import { clone } from "../rules/value.ts";
-import { semanticFingerprint } from "../rules/semantic.ts";
-import { resolveConfig } from "../rules/config.ts";
-import { bumpStat } from "../rules/stats.ts";
-import { validateGameContent } from "../rules/save-schema.ts";
-import { validatedContentIdentity } from "../flow/content-runtime.ts";
+import { planTeachingAction, planRelearningAction, planForgettingAction } from "../rules/learning-actions";
+import type { TeachingActionContext } from "../rules/learning-actions";
+import type { LearningAnswer, LearningPending, RelearningAnswer, RelearningPending } from "../rules/learning";
+import type { Content, Member, MoveSlot } from "../rules/types";
+import type { GameState } from "../rules/state";
+import type { ContentPort, GameStatePort } from "./ports";
+import type { ItemWorldContext } from "../rules/item-effects";
+import { catalogOf, itemOf } from "../rules/item-catalog";
+import { clone } from "../rules/value";
+import { semanticFingerprint } from "../rules/semantic";
+import { resolveConfig } from "../rules/config";
+import { bumpStat } from "../rules/stats";
+import { validateGameContent } from "../rules/save-schema";
+import { validatedContentIdentity } from "../flow/content-runtime";
 
 export type LearningParent = { kind: "inventory" | "management"; token: string };
 export type LearningIntent = { memberId: string } & (

@@ -1,5 +1,5 @@
 /** Frozen v1 value/type contract, independent of persistent-state planning and validation. */
-import type { Member } from "./types.ts";
+import type { Member } from "./types";
 
 export const PROTOCOL_VERSION = 1;
 export const MEMBER_WRITE_SET = ["level", "exp", "hp", "status", "statusCount", "moves", "evs", "friendship"] as const;

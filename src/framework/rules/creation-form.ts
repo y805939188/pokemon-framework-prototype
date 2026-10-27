@@ -1,5 +1,5 @@
 /** WP21 B-family only. Stored forms are never recomputed by reading a summary/storage screen. */
-import { secretId } from "./member-identity.ts";
+import { secretId } from "./member-identity";
 
 export interface CreationEnvironment { environment?: string | null; timeOfDay?: "day" | "dusk" | "night" }
 const LOW_KEY_NATURES = ["lonely", "bold", "relaxed", "timid", "serious", "modest", "mild", "quiet", "bashful", "calm", "gentle", "careful"];

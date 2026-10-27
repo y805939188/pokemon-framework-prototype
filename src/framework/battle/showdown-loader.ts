@@ -6,8 +6,8 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import type { ShowdownSim } from "./showdown-types.ts";
-import type { FormatObserver } from "../rules/battle-evidence.ts";
+import type { ShowdownSim } from "./showdown-types";
+import type { FormatObserver } from "../rules/battle-evidence";
 
 // The bundle is CommonJS, so the real Node `require` is in scope here (and is the one NW.js gives to the page).
 const nodeRequire: NodeJS.Require = require;

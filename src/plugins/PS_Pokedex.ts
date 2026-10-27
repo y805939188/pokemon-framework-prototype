@@ -1,7 +1,7 @@
 /** H1 default MZ dex; the application owns all persistent viewing edits. */
-import { PokedexScreen } from './pokedex/screen.ts';
-import { pokedexQuery as Q, config as C, semantic } from '../framework/rules/index.ts';
-import { InputLatch } from './management/model.ts';
+import { PokedexScreen } from './pokedex/screen';
+import { pokedexQuery as Q, config as C, semantic } from '../framework/rules/index';
+import { InputLatch } from './management/model';
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Pokedex',flow=()=>W.PSFlow;
  const text=(key:string,p?:Record<string,string|number>)=>flow().translator().t('pokedex.'+key,p);

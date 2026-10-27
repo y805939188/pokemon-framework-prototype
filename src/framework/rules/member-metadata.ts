@@ -1,6 +1,6 @@
 /** Persistent-only move/stat metadata. The frozen result remains an unmodified v1 record. */
-import type { Content, Member, MoveSlot } from './types.ts';
-import { clone } from './value.ts';
+import type { Content, Member, MoveSlot } from './types';
+import { clone } from './value';
 
 /** Copy a persistent individual without deriving, rerolling or normalizing any metadata. */
 export function clonePersistentMember<T extends Member>(member: T): T { return clone(member); }

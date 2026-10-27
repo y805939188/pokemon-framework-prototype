@@ -3,6 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const path=require('node:path'),{pathToFileURL}=require('node:url');
 const E=require('../../../js/engine/build/engine.cjs');
+require('../../../scripts/tests/ts-source-loader.cjs');
 const {setup,plan,count}=require('../2/ef-support.cjs');
 const source=name=>import(pathToFileURL(path.resolve(__dirname,'../../../src/framework/rules',name+'.ts')).href);
 const pure=source('friendship'),battle=source('battle-evidence');

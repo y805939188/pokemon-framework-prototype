@@ -1,12 +1,12 @@
-import { dexLayoutIdentity } from "../../rules/dex-state.ts";
-import { legacyCatalog } from "../../rules/item-catalog.ts";
+import { dexLayoutIdentity } from "../../rules/dex-state";
+import { legacyCatalog } from "../../rules/item-catalog";
 /**
  * FIXTURE content (step 2.3): the synthetic test content. Base stats come from Showdown's gen8 data (cross-checked in
  * tests); growth rate / base exp / EV yield / catch rate are stand-in values entered by hand, and learnsets are
  * SYNTHETIC (chosen to exercise level-up learning), not authoritative data. Kept as a fixture on purpose: runtime
  * entry points use the content pipeline's small real sample instead (step 3, batch B).
  */
-import type { Content } from "../../rules/types.ts";
+import type { Content } from "../../rules/types";
 
 export const FIXTURE_MOVE_PP: Record<string,number> = { flamethrower: 15, airslash: 15, dragonpulse: 10, roost: 10, hydropump: 5, icebeam: 10, flashcannon: 10, protect: 10, gigadrain: 10, sludgebomb: 10, earthquake: 10, synthesis: 5, tackle: 35, gust: 35, quickattack: 30, bodyslam: 15, shadowball: 15, crunch: 15, rest: 10, slash:20, outrage:10, heatwave:10, waterfall:15, powerwhip:10 };
 

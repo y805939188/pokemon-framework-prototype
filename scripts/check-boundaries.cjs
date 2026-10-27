@@ -62,6 +62,17 @@ function listTs(dir) {
 	}
 	return out;
 }
+// This checker deliberately supports a pure-TS graph, not arbitrary Vite packages. These siblings can make Vite select
+// a different module for an implicit specifier. Never assign the convenient TS identity when such a branch exists.
+const ALTERNATE_MODULE_SUFFIXES = ['.mjs', '.js', '.mts', '.cjs', '.cts', '.jsx', '.tsx', '.json'];
+function firstExistingFile(root, candidates) {
+	for (const rel of candidates) {
+		if (rel === '..' || rel.startsWith('../') || path.posix.isAbsolute(rel)) continue;
+		try { if (fs.statSync(path.join(root, rel)).isFile()) return rel; }
+		catch (e) { if (e.code !== 'ENOENT' && e.code !== 'ENOTDIR') throw e; }
+	}
+	return null;
+}
 const stripComments = t => t.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:\\])\/\/.*$/gm, '$1');
 
 // Source is read with the parser that ships with Vite (a dev dependency; the pinned TypeScript 7 has no JS compiler
@@ -153,8 +164,20 @@ function check(root) {
 				continue;
 			}
 			if (!spec.startsWith('.')) { violations.push(`${rel}: external package "${spec}" (the framework has no dependencies)`); continue; }
-			const target = path.posix.normalize(path.posix.join(path.posix.dirname(rel), spec));
-			if (!rels.has(target)) { violations.push(`${rel}: import "${spec}" does not resolve to a framework file`); continue; }
+			const requested = path.posix.normalize(path.posix.join(path.posix.dirname(rel), spec));
+			// Resolve only the supported pure-TS forms. Explicit .ts is unambiguous; implicit specifiers must not have
+			// another branch that can change Vite's actual target. Every later check and graph edge uses this identity.
+			const candidates = requested.endsWith('.ts') ? [requested] : [requested, `${requested}.ts`, `${requested}/index.ts`];
+			const target = candidates.find(candidate => rels.has(candidate));
+			if (!target) { violations.push(`${rel}: import "${spec}" does not resolve to a framework file`); continue; }
+			if (!requested.endsWith('.ts')) {
+				const shadow = firstExistingFile(root, [requested, ...ALTERNATE_MODULE_SUFFIXES.map(suffix => `${requested}${suffix}`)]);
+				if (shadow) { violations.push(`${rel}: import "${spec}" cannot verify the actual Vite module target; unsupported same-stem branch "${shadow}"`); continue; }
+			}
+			if (target === `${requested}/index.ts`) {
+				const branch = firstExistingFile(root, [`${requested}/package.json`, ...ALTERNATE_MODULE_SUFFIXES.map(suffix => `${requested}/index${suffix}`)]);
+				if (branch) { violations.push(`${rel}: import "${spec}" cannot verify the actual Vite module target; unsupported directory branch "${branch}"`); continue; }
+			}
 			const tlayer = target.includes('/') ? target.split('/')[0] : 'entry';
 			if (!LAYERS[layer].includes(tlayer)) violations.push(`${rel}: layer "${layer}" may not import layer "${tlayer}" (${target})`);
 			if (layer === 'app' && tlayer === 'flow' && target !== APP_FLOW_SERVICE) violations.push(`${rel}: app may only import ${APP_FLOW_SERVICE} from flow (${target})`);

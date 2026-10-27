@@ -4,9 +4,8 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const path=require('node:path');
 const {pathToFileURL}=require('node:url');
-const {register}=require('node:module');
 const F=require('./fixtures/learning-actions/helpers.cjs');
-register('data:text/javascript,'+encodeURIComponent(`import {readFile} from 'node:fs/promises'; import {stripTypeScriptTypes} from 'node:module'; export async function load(url,context,next){if(url.endsWith('.ts'))return {format:'module',source:stripTypeScriptTypes(await readFile(new URL(url),'utf8'),{sourceUrl:url}),shortCircuit:true};return next(url,context);}`),pathToFileURL(__filename));
+require('../../../scripts/tests/ts-source-loader.cjs');
 const modules=Promise.all(['rules/learning-actions','rules/learning','rules/friendship','rules/inventory','rules/item-catalog','rules/stats',
   'rules/member-factory','rules/state','rules/save-schema','content/compile','flow/content-runtime']
   .map(file=>import(pathToFileURL(path.resolve(__dirname,'../../../src/framework',file+'.ts')).href))).then(parts=>Object.assign({},...parts));

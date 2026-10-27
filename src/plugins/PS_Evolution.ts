@@ -1,11 +1,11 @@
 /** G2a: owned evolution/Info/learning continuation. Domain authority remains in GameApplication. */
-import { itemCatalog, memberIdentity } from '../framework/rules/index.ts';
-import type { EvolutionItemIntent, GameApplication, LearningOutcome } from '../framework/app/index.ts';
-import { TradeTimeline } from './progression/trade-timeline.ts';
-import { EvolutionTimeline } from './progression/evolution-timeline.ts';
-import { LearningScreen } from './progression/learning-screen.ts';
-import { drawLearningPage } from './progression/learning-draw.ts';
-import { InputLatch } from './management/model.ts';
+import { itemCatalog, memberIdentity } from '../framework/rules/index';
+import type { EvolutionItemIntent, GameApplication, LearningOutcome } from '../framework/app/index';
+import { TradeTimeline } from './progression/trade-timeline';
+import { EvolutionTimeline } from './progression/evolution-timeline';
+import { LearningScreen } from './progression/learning-screen';
+import { drawLearningPage } from './progression/learning-draw';
+import { InputLatch } from './management/model';
 const { catalogOf } = itemCatalog;
 const { publicIdText } = memberIdentity;
 (() => {

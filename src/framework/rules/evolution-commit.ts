@@ -1,22 +1,22 @@
 /** One selected party evolution's complete pure state plan. The application owns installation and learning. */
-import { planEvolutionSuccess } from "./evolution-success.ts";
-import type { EvolutionLearningIntent } from "./evolution-success.ts";
-import type { EvolutionSelection } from "./evolution.ts";
-import { itemQuantity, removeItems } from "./inventory.ts";
-import { catalogOf, itemOf } from "./item-catalog.ts";
-import type { ItemCatalog } from "./item-catalog.ts";
-import { DEFAULT_LIMITS } from "./limits.ts";
-import type { Limits } from "./limits.ts";
-import { allocateMemberId } from "./member-identity.ts";
-import { own } from "./own.ts";
-import { applyDexPatch, normalizeDexAppearance, planDexRecord } from "./pokedex.ts";
-import type { DexAppearance } from "./pokedex.ts";
-import { validateGameContent } from "./save-schema.ts";
-import { bumpStat } from "./stats.ts";
-import { allMembers } from "./storage.ts";
-import type { GameState } from "./state.ts";
-import type { Content, Member, SpeciesData } from "./types.ts";
-import { clone } from "./value.ts";
+import { planEvolutionSuccess } from "./evolution-success";
+import type { EvolutionLearningIntent } from "./evolution-success";
+import type { EvolutionSelection } from "./evolution";
+import { itemQuantity, removeItems } from "./inventory";
+import { catalogOf, itemOf } from "./item-catalog";
+import type { ItemCatalog } from "./item-catalog";
+import { DEFAULT_LIMITS } from "./limits";
+import type { Limits } from "./limits";
+import { allocateMemberId } from "./member-identity";
+import { own } from "./own";
+import { applyDexPatch, normalizeDexAppearance, planDexRecord } from "./pokedex";
+import type { DexAppearance } from "./pokedex";
+import { validateGameContent } from "./save-schema";
+import { bumpStat } from "./stats";
+import { allMembers } from "./storage";
+import type { GameState } from "./state";
+import type { Content, Member, SpeciesData } from "./types";
+import { clone } from "./value";
 
 export interface EvolutionCommitInput {
   readonly state: GameState;

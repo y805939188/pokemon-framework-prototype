@@ -3,19 +3,19 @@
  * joining framework-owned fields with Showdown-owned battle data (base stats, display names). Every problem is
  * reported with the record and field it comes from; nothing is repaired silently.
  */
-import { checkItemInputs } from "../content/item-input.ts";
-import type { CompiledContent, ContentError } from "../content/schema.ts";
-import { checkOverrides, developmentCapabilities } from "../rules/config.ts";
-import { COMPILED_SCHEMA_VERSION } from "../content/schema.ts";
-import { canonicalJson, speciesFieldProblem, checkSources, preUseProblem, showdownDependencyProblem } from "../content/compile.ts";
-import type { Content, DexLookup, Member } from "../rules/types.ts";
-import { PROGRESSION_FIELDS, progressionFieldProblem, deriveSpeciesFields, checkProgressionReferences, checkRegionalDex, checkMapMetadata } from "../content/progression-input.ts";
-import { evolutionMethod } from "../rules/evolution-data.ts";
-import { sha256Hex } from "../rules/sha256.ts";
-import { allMembers, locateMember } from "../rules/storage.ts";
-import type { MemberCollection } from "../rules/storage.ts";
-import { own, setOwn } from "../rules/own.ts";
-import { battleNameOf, memberKey } from "../rules/species-key.ts";
+import { checkItemInputs } from "../content/item-input";
+import type { CompiledContent, ContentError } from "../content/schema";
+import { checkOverrides, developmentCapabilities } from "../rules/config";
+import { COMPILED_SCHEMA_VERSION } from "../content/schema";
+import { canonicalJson, speciesFieldProblem, checkSources, preUseProblem, showdownDependencyProblem } from "../content/compile";
+import type { Content, DexLookup, Member } from "../rules/types";
+import { PROGRESSION_FIELDS, progressionFieldProblem, deriveSpeciesFields, checkProgressionReferences, checkRegionalDex, checkMapMetadata } from "../content/progression-input";
+import { evolutionMethod } from "../rules/evolution-data";
+import { sha256Hex } from "../rules/sha256";
+import { allMembers, locateMember } from "../rules/storage";
+import type { MemberCollection } from "../rules/storage";
+import { own, setOwn } from "../rules/own";
+import { battleNameOf, memberKey } from "../rules/species-key";
 
 /** Strong compiled identity only; id/inputsHash/anonymous fallbacks are diagnostics, never effects authority. */
 export function validatedContentIdentity(content: Content): string | null {
@@ -67,7 +67,7 @@ export function loadCompiled(json: unknown): CompiledContent {
       for(const [i,value] of records.entries()) if(value.defaultForm!==derived[i]!.defaultForm||value.displayForm!==derived[i]!.displayForm||value.color!==derived[i]!.color||value.shape!==derived[i]!.shape||canonicalJson(value.dexSortKeys)!==canonicalJson(derived[i]!.dexSortKeys))report("compiled",`$.species[${i}]`,"derived-form-mismatch");
       const regional=json.regionalDex;
       const raw=obj(regional)&&regional.source!==undefined?{source:regional.source,national:regional.national,regions:regional.regions,...(Object.hasOwn(regional,"transitions")?{transitions:regional.transitions}:{})}:undefined;
-      const checked=checkRegionalDex(raw,json.registrationOrder as unknown as import("../rules/types.ts").SpeciesKey[],usable,report);
+      const checked=checkRegionalDex(raw,json.registrationOrder as unknown as import("../rules/types").SpeciesKey[],usable,report);
       if(canonicalJson(regional)!==canonicalJson(checked))report("compiled","$.regionalDex","invalid regional layout, source or layout identity");
       checkMapMetadata(json.mapMetadata,checked,usable,report);
       for(const [i,region] of ((json.settings as {DEXES_WITH_OFFSETS?:number[]} | undefined)?.DEXES_WITH_OFFSETS??[]).entries())if(region>=checked.regions.length)report("compiled",`$.settings.DEXES_WITH_OFFSETS[${i}]`,"unknown region reference");
@@ -82,7 +82,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
   const errors: ContentError[] = [];
   const capabilities = developmentCapabilities(developerCapabilities);
   try { loadCompiled(compiled); } catch(error) { return {content:{species:{}},errors:[{file:"compiled",path:"$",message:(error as Error).message}]}; }
-  const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash, compiledSemantics: COMPILED_SCHEMA_VERSION, showdownSha: compiled.showdownSha, contentIdentity: compiled.contentIdentity }, registrationOrder: compiled.registrationOrder?.map(k=>({...k})), regionalDex: JSON.parse(JSON.stringify(compiled.regionalDex)) as import("../rules/types.ts").RegionalDex, ...(compiled.mapMetadata ? {mapMetadata:JSON.parse(JSON.stringify(compiled.mapMetadata)) as import("../rules/types.ts").MapMetadata} : {}), moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {}, ...(compiled.settings ? { settings: { ...compiled.settings } } : {}) };
+  const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash, compiledSemantics: COMPILED_SCHEMA_VERSION, showdownSha: compiled.showdownSha, contentIdentity: compiled.contentIdentity }, registrationOrder: compiled.registrationOrder?.map(k=>({...k})), regionalDex: JSON.parse(JSON.stringify(compiled.regionalDex)) as import("../rules/types").RegionalDex, ...(compiled.mapMetadata ? {mapMetadata:JSON.parse(JSON.stringify(compiled.mapMetadata)) as import("../rules/types").MapMetadata} : {}), moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {}, ...(compiled.settings ? { settings: { ...compiled.settings } } : {}) };
   // A compiled document may be older than the gate, or edited by hand. Validate the whole registry and every source
   // whose data will be consumed before even querying the Dex; a placeholder's exemption covers only its own fields.
   for (const p of checkOverrides(compiled.settings ?? {})) errors.push({ file: "settings.json", path: p.path, message: p.message });
@@ -194,7 +194,7 @@ export interface DanglingReference { path: string; message: string }
  * falls back to the base form (WP03 §3.2).
  */
 export function findDanglingReferences(
-  state: MemberCollection & {inventory?:import("../rules/inventory.ts").Inventory},
+  state: MemberCollection & {inventory?:import("../rules/inventory").Inventory},
   content: Content,
   dex?: DexLookup,
 ): DanglingReference[] {

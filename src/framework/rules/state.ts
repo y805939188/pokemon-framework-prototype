@@ -1,36 +1,36 @@
-import { createDexState } from "./dex-state.ts";
-import { moneyCap } from "./economy.ts";
+import { createDexState } from "./dex-state";
+import { moneyCap } from "./economy";
 /**
  * Persistent game state model + the battle write-back contract (protocol v1).
  * Pure functions. A BattleResult is the only thing that crosses from the battle layer into persistent state;
  * `applyBattleResult` is the single write path.
  */
-import { inventoryFromBag, applyBattleBag, inventoryPolicy } from "./inventory.ts";
-import { catalogOf } from "./item-catalog.ts";
-import { mergeBattleMoves } from "./member-metadata.ts";
-import { memberContentProblems } from "./member-content.ts";
-import type { Inventory } from "./inventory.ts";
-import { clone } from "./value.ts";
-export { clone } from "./value.ts";
-import { assertCapturedHeldSources, receiveMembers, requireTemplate } from "./receiving.ts";
-import type { HeldItemSource, ReceivingDecision, ReceivingProfile } from "./receiving.ts";
-import { sha256Hex } from "./sha256.ts";
-import { DEFAULT_LIMITS } from "./limits.ts";
-import { own, setOwn } from "./own.ts";
-import { assertBattleResultShape } from "./battle-result-validation.ts";
-import { identityKeys } from "./species-key.ts";
-import type { SpeciesKeyResolver } from "./species-key.ts";
-import { advanceMemberOrdinal, completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity.ts";
-import { allMembers, boxedMembers, newStorage, placeInBox } from "./storage.ts";
-import type { Storage } from "./storage.ts";
-import { newStats } from "./stats.ts";
-import type { GameStats } from "./stats.ts";
-import type { Limits } from "./limits.ts";
-import type { Content, DexState, Member, MemberOrigin, MoveSlot, Owner, PartialStats, Stats } from "./types.ts";
-import { PROTOCOL_VERSION, MEMBER_WRITE_SET } from "./battle-result.ts";
-import type { BattleResult } from "./battle-result.ts";
-export { PROTOCOL_VERSION, MEMBER_WRITE_SET } from "./battle-result.ts";
-export type { BattleResult, BattleOutcome, MemberPatch, WriteKey, Dex } from "./battle-result.ts";
+import { inventoryFromBag, applyBattleBag, inventoryPolicy } from "./inventory";
+import { catalogOf } from "./item-catalog";
+import { mergeBattleMoves } from "./member-metadata";
+import { memberContentProblems } from "./member-content";
+import type { Inventory } from "./inventory";
+import { clone } from "./value";
+export { clone } from "./value";
+import { assertCapturedHeldSources, receiveMembers, requireTemplate } from "./receiving";
+import type { HeldItemSource, ReceivingDecision, ReceivingProfile } from "./receiving";
+import { sha256Hex } from "./sha256";
+import { DEFAULT_LIMITS } from "./limits";
+import { own, setOwn } from "./own";
+import { assertBattleResultShape } from "./battle-result-validation";
+import { identityKeys } from "./species-key";
+import type { SpeciesKeyResolver } from "./species-key";
+import { advanceMemberOrdinal, completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity";
+import { allMembers, boxedMembers, newStorage, placeInBox } from "./storage";
+import type { Storage } from "./storage";
+import { newStats } from "./stats";
+import type { GameStats } from "./stats";
+import type { Limits } from "./limits";
+import type { Content, DexState, Member, MemberOrigin, MoveSlot, Owner, PartialStats, Stats } from "./types";
+import { PROTOCOL_VERSION, MEMBER_WRITE_SET } from "./battle-result";
+import type { BattleResult } from "./battle-result";
+export { PROTOCOL_VERSION, MEMBER_WRITE_SET } from "./battle-result";
+export type { BattleResult, BattleOutcome, MemberPatch, WriteKey, Dex } from "./battle-result";
 
 /** Version of the PERSISTENT game state document (rules/save-schema.ts migrates older ones). Not the battle protocol version. */
 export const GAME_SCHEMA = 7;

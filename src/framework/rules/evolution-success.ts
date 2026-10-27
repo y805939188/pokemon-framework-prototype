@@ -1,12 +1,12 @@
 /** WP31 successful evolution write set. Caller installs resources, statistics and dex atomically. */
-import { evolutionMethod } from "./evolution-data.ts";
-import { clearEvolutionReadiness } from "./evolution-readiness.ts";
-import { computeStats, hpAfterRecalc, levelForExp } from "./growth.ts";
-import { resolveAbility } from "./member-identity.ts";
-import { clonePersistentMember, computedNature } from "./member-metadata.ts";
-import { speciesDataOf } from "./species-key.ts";
-import type { EvolutionBlocked, EvolutionSelection } from "./evolution.ts";
-import type { Content, Member, SpeciesData, SpeciesKey } from "./types.ts";
+import { evolutionMethod } from "./evolution-data";
+import { clearEvolutionReadiness } from "./evolution-readiness";
+import { computeStats, hpAfterRecalc, levelForExp } from "./growth";
+import { resolveAbility } from "./member-identity";
+import { clonePersistentMember, computedNature } from "./member-metadata";
+import { speciesDataOf } from "./species-key";
+import type { EvolutionBlocked, EvolutionSelection } from "./evolution";
+import type { Content, Member, SpeciesData, SpeciesKey } from "./types";
 
 export interface EvolutionExtraResources {
   readonly partySize: number;

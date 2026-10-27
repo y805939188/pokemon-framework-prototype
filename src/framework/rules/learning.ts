@@ -1,5 +1,5 @@
 /** WP20 §5 / WP30 §6 / approved 5.3 r3 §6.1. Pure plans; the caller owns installation and resources. */
-import type { Member, MoveSlot } from "./types.ts";
+import type { Member, MoveSlot } from "./types";
 
 export type RelearningMember = Readonly<Pick<Member, "level" | "isEgg">> & {
   readonly moves: readonly Readonly<Pick<MoveSlot, "id">>[];

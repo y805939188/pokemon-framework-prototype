@@ -4,18 +4,13 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
-const {stripTypeScriptTypes}=require('node:module');
+const {pathToFileURL}=require('node:url');
 const root=path.resolve(__dirname,'../../..');
-const urls=new Map();
-function tsUrl(file){
-  if(urls.has(file))return urls.get(file);
-  const source=stripTypeScriptTypes(fs.readFileSync(file,'utf8'),{sourceUrl:file});
-  const rewritten=source.replace(/from\s+(['"])(\.[^'"]+\.ts)\1/g,(_,q,relative)=>`from ${q}${tsUrl(path.resolve(path.dirname(file),relative))}${q}`);
-  const url='data:text/javascript;base64,'+Buffer.from(rewritten).toString('base64');urls.set(file,url);return url;
-}
-const imported=import(tsUrl(path.join(root,'src/framework/content/pbs-import.ts')));
-const regional=import(tsUrl(path.join(root,'src/framework/content/pbs-regional-dex.ts')));
-const csvModule=import(tsUrl(path.join(root,'src/framework/content/pbs-progression.ts')));
+require('../../../scripts/tests/ts-source-loader.cjs');
+const sourceUrl=file=>pathToFileURL(file).href;
+const imported=import(sourceUrl(path.join(root,'src/framework/content/pbs-import.ts')));
+const regional=import(sourceUrl(path.join(root,'src/framework/content/pbs-regional-dex.ts')));
+const csvModule=import(sourceUrl(path.join(root,'src/framework/content/pbs-progression.ts')));
 const methods=require('./fixtures/pbs7/method-cases.json');
 const required='GrowthRate=Medium\nBaseExp=51\nEVs=SPEED,1\nMoves=0,TACKLE,7,GROWL';
 const base=(name='BASE',extra='')=>`[${name}]\n${required}\n${extra}\n`;

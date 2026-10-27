@@ -3,11 +3,11 @@
  * Everything here is a choice of implementation, not logic: change the engine by changing this file (or by passing
  * another driver factory), not the application.
  */
-import { BattleSession, sealBattleEvidence, sealBattleEffects } from "./flow/session.ts";
-import type { LogSink } from "./flow/log.ts";
-import type { BattleDriverFactory } from "./battle/driver.ts";
-import type { BattleSessionFactory } from "./app/index.ts";
-import type { Content } from "./rules/types.ts";
+import { BattleSession, sealBattleEvidence, sealBattleEffects } from "./flow/session";
+import type { LogSink } from "./flow/log";
+import type { BattleDriverFactory } from "./battle/driver";
+import type { BattleSessionFactory } from "./app/index";
+import type { Content } from "./rules/types";
 
 export interface BattleSessionFactoryOptions {
   content: () => Content;

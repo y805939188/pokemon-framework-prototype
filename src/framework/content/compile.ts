@@ -2,17 +2,17 @@
  * Pure content compiler: validate authored JSON (every problem is located by file and path), apply overlays with
  * conflict detection, emit one canonical document whose `inputsHash` covers every input. No file system, no Showdown.
  */
-import { sha256Hex } from "../rules/sha256.ts";
-import { checkItemInputs } from "./item-input.ts";
-import { DEFAULT_LIMITS } from "../rules/limits.ts";
-import { MAX_FORM } from "../rules/species-key.ts";
-import { checkOverrides, developmentCapabilities } from "../rules/config.ts";
+import { sha256Hex } from "../rules/sha256";
+import { checkItemInputs } from "./item-input";
+import { DEFAULT_LIMITS } from "../rules/limits";
+import { MAX_FORM } from "../rules/species-key";
+import { checkOverrides, developmentCapabilities } from "../rules/config";
 import {
   CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, AUTHOR_SCHEMA_VERSION, COMPILED_SCHEMA_VERSION, SOURCE_KINDS, STAT_KEYS_ALLOWED, USAGE_DECISIONS,
-} from "./schema.ts";
-import { CONTENT_SHOWDOWN_SHA } from "./showdown-pin.ts";
-import { PROGRESSION_FIELDS, progressionFieldProblem, inheritSpecies, deriveSpeciesFields, checkProgressionReferences, checkRegionalDex, checkMapMetadata } from "./progression-input.ts";
-import type { CompiledContent, ContentError, ContentInputs, GrantSource, Overlay, SourceEntry, SpeciesSource } from "./schema.ts";
+} from "./schema";
+import { CONTENT_SHOWDOWN_SHA } from "./showdown-pin";
+import { PROGRESSION_FIELDS, progressionFieldProblem, inheritSpecies, deriveSpeciesFields, checkProgressionReferences, checkRegionalDex, checkMapMetadata } from "./progression-input";
+import type { CompiledContent, ContentError, ContentInputs, GrantSource, Overlay, SourceEntry, SpeciesSource } from "./schema";
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -312,7 +312,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
     ...(inputs.items !== undefined ? { items: itemInputs.items } : {}),
     ...(inputs.shops !== undefined ? { shops: itemInputs.shops } : {}),
     ...(inputs.grants !== undefined ? { grants: [...grants].sort((a, b) => a.id.localeCompare(b.id)) } : {}),
-    ...(inputs.settings !== undefined ? { settings: { ...(inputs.settings as import("../rules/config.ts").RuleOverrides) } } : {}),
+    ...(inputs.settings !== undefined ? { settings: { ...(inputs.settings as import("../rules/config").RuleOverrides) } } : {}),
   };
   return { ok: true, data, errors: [], warnings };
 }

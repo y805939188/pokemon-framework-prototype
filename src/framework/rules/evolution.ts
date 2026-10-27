@@ -1,10 +1,10 @@
 /** WP31/32 pure, ordered evolution checks. Facts are supplied by an owner, never inferred from logs. */
-import { evolutionMethod, WORLD_WEATHER_EVOLUTION_METHOD } from "./evolution-data.ts";
-import { computeStats } from "./growth.ts";
-import { computedNature } from "./member-metadata.ts";
-import { catalogOf, itemOf } from "./item-catalog.ts";
-import { speciesDataOf } from "./species-key.ts";
-import type { Content, EvolutionEntry, Member, SpeciesKey } from "./types.ts";
+import { evolutionMethod, WORLD_WEATHER_EVOLUTION_METHOD } from "./evolution-data";
+import { computeStats } from "./growth";
+import { computedNature } from "./member-metadata";
+import { catalogOf, itemOf } from "./item-catalog";
+import { speciesDataOf } from "./species-key";
+import type { Content, EvolutionEntry, Member, SpeciesKey } from "./types";
 
 export type EvolutionFact<T> = { readonly status: "value"; readonly value: T }
   | { readonly status: "absent" }

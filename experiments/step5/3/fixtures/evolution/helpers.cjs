@@ -1,9 +1,8 @@
 'use strict';
 // All expectations in this directory derive from the approved formal specifications, not Ruby observations.
-const {register} = require('node:module');
 const {pathToFileURL} = require('node:url');
 const {resolve} = require('node:path');
-register('data:text/javascript,'+encodeURIComponent(`import {readFile} from 'node:fs/promises'; import {stripTypeScriptTypes} from 'node:module'; export async function load(url,context,next){if(url.endsWith('.ts'))return {format:'module',source:stripTypeScriptTypes(await readFile(new URL(url),'utf8'),{sourceUrl:url}),shortCircuit:true};return next(url,context);}`),pathToFileURL(__filename));
+require('../../../../../scripts/tests/ts-source-loader.cjs');
 exports.rules = import(pathToFileURL(resolve(__dirname,'../../../../../src/framework/rules/evolution.ts')));
 exports.success = import(pathToFileURL(resolve(__dirname,'../../../../../src/framework/rules/evolution-success.ts')));
 exports.data = import(pathToFileURL(resolve(__dirname,'../../../../../src/framework/rules/evolution-data.ts')));

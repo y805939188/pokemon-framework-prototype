@@ -1,6 +1,6 @@
 /** WP30 §7 / approved 5.3 r3 §6.2. Pure queries: callers own eligibility, timing and installation. */
-import type { RuleConfig } from "./config.ts";
-import type { Member } from "./types.ts";
+import type { RuleConfig } from "./config";
+import type { Member } from "./types";
 
 export type FriendshipMember = Readonly<Pick<Member, "friendship" | "ball" | "item">> & {
   readonly origin?: Readonly<Pick<NonNullable<Member["origin"]>, "map">>;

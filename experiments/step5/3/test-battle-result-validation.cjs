@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {readFileSync} = require('node:fs');
 const {resolve} = require('node:path');
 const {stripTypeScriptTypes} = require('node:module');
+require('../../../scripts/tests/ts-source-loader.cjs');
 const vm = require('node:vm');
 const golden = require('../../step3/fixtures/result-hash-golden.json');
 const frozen = require('../../../docs/step2/protocol-v1.frozen.json');

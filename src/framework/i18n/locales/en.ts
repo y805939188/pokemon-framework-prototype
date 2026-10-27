@@ -1,5 +1,5 @@
 /** English: the base language. Every key the framework uses exists here; other languages are checked against it. */
-import type { LocaleTable } from "../translator.ts";
+import type { LocaleTable } from "../translator";
 
 export const en: LocaleTable = {
   meta: { name: "English" },

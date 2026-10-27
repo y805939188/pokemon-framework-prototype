@@ -1,6 +1,6 @@
 /** Static WP31 identities and parameter contracts. No condition execution or host facts. */
-import type { Content, EvolutionMethodId, SpeciesKey } from "./types.ts";
-import { battleNameOf, speciesDataOf } from "./species-key.ts";
+import type { Content, EvolutionMethodId, SpeciesKey } from "./types";
+import { battleNameOf, speciesDataOf } from "./species-key";
 export type EvolutionParameterKind = "none" | "integer" | "item" | "move" | "type" | "species" | "flag";
 export type EvolutionFamily = "level" | "item" | "trade" | "battle" | "event" | "post-only" | "none";
 export interface EvolutionMethod { readonly id: EvolutionMethodId; readonly parameterKind: EvolutionParameterKind; readonly families: readonly EvolutionFamily[]; readonly after: "none" | "target-match-held-item-consume" | "extra-member-copy"; }

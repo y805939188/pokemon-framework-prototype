@@ -1,5 +1,5 @@
 /** WP66-B search editor. Local draft/focus only; no application state or filtering here. */
-import type {pokedexQuery as Q} from '../../framework/rules/index.ts';
+import type {pokedexQuery as Q} from '../../framework/rules/index';
 type Frame={triggered:Partial<Record<'up'|'down'|'left'|'right'|'action'|'back'|'use',boolean>>;repeated:Partial<Record<'up'|'down'|'left'|'right',boolean>>};
 type Action='up'|'down'|'left'|'right'|'action'|'back'|'use';
 export class DexSearchEditor {

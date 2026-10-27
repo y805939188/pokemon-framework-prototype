@@ -1,10 +1,10 @@
 /** Source-aware gift/grant registration and retained first-entry facts. No installation or UI work. */
-import { applyDexPatch, normalizeDexAppearance, planDexRecord, dexShouldOfferEntry } from "./pokedex.ts";
-import type { DexAppearance } from "./pokedex.ts";
-import { dexInUnlockedRegion } from "./pokedex-query.ts";
-import { own } from "./own.ts";
-import { resolveConfig } from "./config.ts";
-import type { Content, DexState, Member } from "./types.ts";
+import { applyDexPatch, normalizeDexAppearance, planDexRecord, dexShouldOfferEntry } from "./pokedex";
+import type { DexAppearance } from "./pokedex";
+import { dexInUnlockedRegion } from "./pokedex-query";
+import { own } from "./own";
+import { resolveConfig } from "./config";
+import type { Content, DexState, Member } from "./types";
 export type AcquisitionDexSource = "grant" | "receive" | "party-gift" | "party-silent";
 export interface AcquisitionEntryIntent {
   memberId: string; species: string; source: AcquisitionDexSource; previouslyOwned: boolean; offer: boolean; appearance: DexAppearance;

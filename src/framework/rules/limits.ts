@@ -10,8 +10,8 @@
  * Existing values above configurable caps are preserved. Exception: migration to the fixed 40×30 structure refuses
  * more than 1200 boxed members without changing the original (5.1 T1).
  */
-import { boxedMembers } from "./storage.ts";
-import type { Storage } from "./storage.ts";
+import { boxedMembers } from "./storage";
+import type { Storage } from "./storage";
 
 export interface Limits {
   party: number;

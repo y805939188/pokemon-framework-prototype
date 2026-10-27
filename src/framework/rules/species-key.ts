@@ -5,11 +5,11 @@
  * The content layer owns the mapping (`Content.forms` and its reverse `Content.speciesKeys`, built by the runtime
  * assembly). Fixture content has no mapping table: its content ids ARE the Showdown names (form 0). Pure.
  */
-import { computedNature } from "./member-metadata.ts";
-import { clone } from "./value.ts";
-import type { Storage } from "./storage.ts";
-import { own } from "./own.ts";
-import type { Content, Member, SpeciesData, SpeciesKey } from "./types.ts";
+import { computedNature } from "./member-metadata";
+import { clone } from "./value";
+import type { Storage } from "./storage";
+import { own } from "./own";
+import type { Content, Member, SpeciesData, SpeciesKey } from "./types";
 
 /** Highest form number a record or a save may carry (the editors' range, WP73-A: 0-999). */
 export const MAX_FORM = 999;

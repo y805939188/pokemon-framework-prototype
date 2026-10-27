@@ -7,21 +7,21 @@
  *   items    ordered slot allocation, with atomic finite-capacity refusal
  *   money    every explicit write clamps to the configured cap (WP24)
  */
-import { assertInventoryMapped, addItems, inventoryPolicy } from "./inventory.ts";
-import { moneyCap, changeMoney } from "./economy.ts";
-import { catalogOf } from "./item-catalog.ts";
-import { allMembers, boxedMembers, placeInBox } from "./storage.ts";
-import { DEFAULT_LIMITS } from "./limits.ts";
-import type { Limits } from "./limits.ts";
-import { createMember } from "./member-factory.ts";
-import type { Random } from "./member-factory.ts";
-import { own, setOwn } from "./own.ts";
-import { toPersistentMember } from "./species-key.ts";
-import { GAME_SCHEMA, clone } from "./state.ts";
-import type { GameState } from "./state.ts";
-import { planAcquisitionDex } from "./acquisition-dex.ts";
-import { allocateMemberId } from "./member-identity.ts";
-import type { Content } from "./types.ts";
+import { assertInventoryMapped, addItems, inventoryPolicy } from "./inventory";
+import { moneyCap, changeMoney } from "./economy";
+import { catalogOf } from "./item-catalog";
+import { allMembers, boxedMembers, placeInBox } from "./storage";
+import { DEFAULT_LIMITS } from "./limits";
+import type { Limits } from "./limits";
+import { createMember } from "./member-factory";
+import type { Random } from "./member-factory";
+import { own, setOwn } from "./own";
+import { toPersistentMember } from "./species-key";
+import { GAME_SCHEMA, clone } from "./state";
+import type { GameState } from "./state";
+import { planAcquisitionDex } from "./acquisition-dex";
+import { allocateMemberId } from "./member-identity";
+import type { Content } from "./types";
 
 export type GrantRefusal = "unknown-grant" | "no-room" | "bag-full" | "member-id-taken" | "creation-failed" | "held-item-source-disabled" | "invalid-held-item";
 

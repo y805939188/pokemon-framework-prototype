@@ -150,8 +150,8 @@ export interface Grant {
 
 export interface Content {
   /** Absent = explicit legacy compatibility catalog; an empty catalog stays empty. */
-  items?: import('./item-catalog.ts').ItemCatalog;
-  shops?: Record<string, import('./item-catalog.ts').ShopDefinition>;
+  items?: import('./item-catalog').ItemCatalog;
+  shops?: Record<string, import('./item-catalog').ShopDefinition>;
   species: Record<string, SpeciesData>;
   registrationOrder?: SpeciesKey[];
   regionalDex?: RegionalDex;
@@ -169,7 +169,7 @@ export interface Content {
   speciesKeys?: Record<string, SpeciesKey>;
   grants?: Record<string, Grant>;
   /** Rule configuration overrides of the content (rules/config.ts); absent = the Gen 8 defaults. */
-  settings?: import("./settings-types.ts").RuleOverrides;
+  settings?: import("./settings-types").RuleOverrides;
 }
 
 /** What the content layer needs to know about Showdown's static data (the battle adapter implements it). */

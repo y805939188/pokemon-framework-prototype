@@ -1,6 +1,6 @@
 /** Internal V2 finite receipts. Neither these values nor the plans extend frozen protocol v1. */
-import type { DexState, Member } from "./types.ts";
-import { setOwn } from "./own.ts";
+import type { DexState, Member } from "./types";
+import { setOwn } from "./own";
 
 export type EffectStatus = "complete" | "unavailable" | "invalid";
 export type EffectCoverage = { status: "complete"; reason?: string } | { status: "unavailable" | "invalid"; reason: string };

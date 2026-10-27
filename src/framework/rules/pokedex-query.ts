@@ -1,6 +1,6 @@
 /** WP62 + WP66-B. Plain data projections and explicit viewing patches; no persistent cache or hidden writes. */
-import type { Content, DexLayout, DexState, GenderRule, SpeciesData } from "./types.ts";
-import type { DexPatch } from "./pokedex.ts";
+import type { Content, DexLayout, DexState, GenderRule, SpeciesData } from "./types";
+import type { DexPatch } from "./pokedex";
 
 export interface DexCatalogForm extends Pick<SpeciesData, "heightDm" | "weightHg" | "types" | "color" | "shape" | "categoryKey" | "entryKey" | "dexSortKeys" | "formName" | "pokedexForm" | "gender"> {
   species: string;
