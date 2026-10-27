@@ -1,16 +1,14 @@
-import { planAcquisitionDex, normalizeMemberDexAppearance } from "../rules/acquisition-dex";
+import { normalizeMemberDexAppearance } from "../rules/acquisition-dex";
 import { PokedexOperation } from "./pokedex-operation";
 import type { DexEntryIntent, DexDecision, DexViewingCommand, DexResolution } from "./pokedex-operation";
 import { dexShouldOfferEntry } from "../rules/pokedex";
 import { dexInUnlockedRegion } from "../rules/pokedex-query";
 import { dexNameGroups, DEX_COLORS, DEX_SHAPES } from "../rules/pokedex-query";
-import type { AcquisitionEntryIntent } from "../rules/acquisition-dex";
 import { semanticFingerprint } from "../rules/semantic";
 import { TradeOperation } from "./trade-operation";
 import type { TradeIntent, TradeDecision, TradeOutcome } from "./trade-operation";
 import type {ItemWorldContext} from '../rules/item-effects';
 import type { BattleEvidence } from "../rules/battle-evidence";
-import { moneyCap, changeMoney } from "../rules/economy";
 import { InventorySession } from "./inventory-session";
 import { EvolutionOperation } from "./evolution-operation";
 import { LearningOperation } from "./learning-operation";
@@ -21,7 +19,7 @@ import type { EvolutionDecision, EvolutionResolution, EvolutionView } from "./ev
 import type { EvolutionFacts } from "../rules/evolution";
 import type { InventoryRequest, InventoryParent, InventoryOutcome } from "./inventory-session";
 import { badgeCount, hasBadge } from "../rules/economy";
-import { assertInventoryMapped, addItems, aggregateBag, inventoryPolicy } from "../rules/inventory";
+import { assertInventoryMapped, aggregateBag } from "../rules/inventory";
 import { catalogOf } from "../rules/item-catalog";
 /**
  * The game application: the use cases that coordinate a battle with the persistent game, and nothing else.
@@ -39,10 +37,13 @@ import type { ApplyStatus, BattleCommitOptions, BattleResult, GameState } from "
 import { allMembers, locateMember } from "../rules/storage";
 import { DEFAULT_LIMITS, storageFull } from "../rules/limits";
 import type { Limits } from "../rules/limits";
-import { GrantRefusedError, applyGrant } from "../rules/grants";
 import { managementSnapshot, individualView, searchStorage } from "./management-query";
 import type { IndividualView, ManagementSnapshot, StorageMatch, StorageSearch } from "./management-query";
 import { installedPokedexEntryView, learningMoveView, partyView, pokedexEntryWithMeasurements, pokedexSnapshotView, tradeCandidateViews, tradePokedexEntryInfo } from "./query-views";
+import { AcquisitionOperation } from "./acquisition-operation";
+import { message, StateInstallFailed } from "./application-errors";
+import { stateIdentity } from "./state-identity";
+import type { ReceptionContext, ReceptionPending } from "./reception-types";
 import { ManagementSession } from "./management";
 import type { ManagementOutcome, ManagementRequest } from "./management";
 import { developmentCapabilities, resolveConfig } from "../rules/config";
@@ -56,11 +57,11 @@ import { battleView, speciesKeyResolver, toBattleMember, toPersistentMember } fr
 import { addSteps, bumpStat } from "../rules/stats";
 import type { GameStats, StatCounter } from "../rules/stats";
 import type { Member } from "../rules/types";
-import { advanceMemberOrdinal, allocateMemberId, ownerLanguage } from "../rules/member-identity";
-import { assertCapturedHeldSources, hasForcedPartyPlan, fallbackDecisions, receiveMembers, ReceivingRefused, requireTemplate } from "../rules/receiving";
-import type { ReceivingDecision, ReceivingProfile, ReceivedPlacement } from "../rules/receiving";
+import { allocateMemberId, ownerLanguage } from "../rules/member-identity";
+import { assertCapturedHeldSources, hasForcedPartyPlan, fallbackDecisions, receiveMembers, ReceivingRefused } from "../rules/receiving";
+import type { ReceivingDecision, ReceivingProfile } from "../rules/receiving";
 import { validateGameContent } from "../rules/save-schema";
-import { own, setOwn } from "../rules/own";
+import { own } from "../rules/own";
 import { findDanglingReferences, resolveSpecies, validatedContentIdentity } from "../flow/content-runtime";
 import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ClockPort, ContentPort, CreationContext, EncounterPlan, GameStatePort, GiftOutcome, GiftRequest, HealOutcome, OutcomeProjection, PartyView, RandomPort, StepsOutcome } from "./ports";
 
@@ -97,8 +98,6 @@ export interface GameApplicationOptions {
   describeHeldItem?: (id: string) => ItemDescriptor | null;
 }
 
-const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-
 /** How the host numbers an ending. */
 export function outcomeCode(result: BattleResult): number {
   const outcome = result.outcome;
@@ -128,10 +127,6 @@ function battleStats(stats: GameStats, facts: BattleFacts, code: number, defeat:
   return next;
 }
 
-class StateInstallFailed extends Error {
-  readonly indeterminate: boolean;
-  constructor(error: unknown, indeterminate = false) { super(message(error)); this.indeterminate = indeterminate; }
-}
 /** Private operation values: public BattleCommitOptions never carry effects authority. */
 interface OwnedBattleEffects {
   battleId: string; generation: number; context: EffectsContextV2; contentIdentity: string | null;
@@ -142,21 +137,6 @@ interface PreparedBattle {
   next?: GameState; nextIdentity?: string | null; defeat?: { moneyLost: number; healed: true }; attempted: boolean; indeterminate: boolean; completed: boolean;
   diagnostics: string[];
   entries?: DexEntryIntent[];
-}
-function stateIdentity(value: GameState): string {
-  return JSON.stringify(value, (_key, data: unknown) => data && typeof data === "object" && !Array.isArray(data)
-    ? Object.fromEntries(Object.keys(data).sort().map(key => [key, (data as Record<string, unknown>)[key]])) : data);
-}
-interface ReceptionContext extends BattleCommitOptions { token: string; generation: number; rawHash?: string; recovered?: boolean }
-interface PreparedAcquisition {
-  fingerprint: string; before?: GameState; next?: GameState; decisions?: string;
-  attempted: boolean; complete: boolean; retired?: string; entries: AcquisitionEntryIntent[];
-}
-interface ReceptionPending {
-  context: ReceptionContext;
-  grantId?: string;
-  members: Member[];
-  resume: () => BattleOutcome | ClaimOutcome | GiftOutcome | { status: string };
 }
 export type CommitResultStatus = ApplyStatus | "pending" | "no-template";
 
@@ -197,19 +177,18 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly trade: TradeOperation;
   private readonly pokedex: PokedexOperation;
   private dexBattleCompletion: { parentToken: string; generation: number; outcome: BattleOutcome & { result?: BattleResult } } | null = null;
-  private acquisition: { generation: number } | null = null;
+  private readonly acquisition: AcquisitionOperation;
   private evolutionCompletion: { token: string; generation: number; outcome: BattleOutcome & { result?: BattleResult } } | null = null;
   private generation = 0;
   private readonly bornIn = new WeakMap<object, number>();
   private readonly completedEvidence = new WeakMap<object, BattleEvidence>();
   private readonly ownedBattleEffects = new WeakMap<object, OwnedBattleEffects>();
-  private readonly preparedAcquisitions = new WeakMap<ReceptionContext, PreparedAcquisition>();
   private readonly receptionActions = new WeakSet<ReceptionContext>();
   private readonly preparedBattles = new WeakMap<ReceptionContext, PreparedBattle>();
   private battleCommitOwner: ReceptionContext | null = null;
   private readonly finishing = new WeakSet<object>();
   private readonly terminatedBattles = new WeakSet<ReceptionContext>();
-  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active || !!this.triggered?.active || !!this.trade?.active || !!this.acquisition || !!this.pokedex?.active || !!this.dexBattleCompletion; }
+  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active || !!this.triggered?.active || !!this.trade?.active || !!this.acquisition?.active || !!this.pokedex?.active || !!this.dexBattleCompletion; }
   private assertBattleContext(context: ReceptionContext, requireOwner = false): void {
     if (context.generation !== this.generation || this.terminatedBattles.has(context)
       || requireOwner && this.battleCommitOwner !== context) throw new Error("stale battle commit generation or owner");
@@ -253,7 +232,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.management = new ManagementSession(this.ports.state, () => this.ports.content().content, { limits: this.limits, depositHeal: this.depositHeal, sourceAllowed: this.capabilities.allowHeldItemSources, describeItem: this.describeHeldItem });
     this.pokedex = new PokedexOperation({ state: this.battleStatePort, content: this.ports.content, generation: () => this.generation,
       changed: next => this.inventory?.stateChanged(next), leaveSummary:parent=>this.management.releaseChild(parent), enter: parent => {
-        if (this.op || this.battleCommitOwner || this.evolutions?.active || this.learning?.active || this.triggered?.active || this.trade?.active || this.acquisition || this.reception || this.inventory?.active || !parent&&this.management.active) throw Error("operation-active");
+        if (this.op || this.battleCommitOwner || this.evolutions?.active || this.learning?.active || this.triggered?.active || this.trade?.active || this.acquisition?.active || this.reception || this.inventory?.active || !parent&&this.management.active) throw Error("operation-active");
         if(parent)this.management.reserveDexChild(parent);
       } });
     this.inventory = new InventorySession(this.ports.state,()=>this.ports.content().content,{world:ports.itemWorld,variables:ports.variables,limits:this.limits,generation:()=>this.generation,install:next=>this.install(next),
@@ -275,7 +254,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       this.battleStatePort.replace(next); this.inventory.stateChanged(next);
     } }, this.ports.content, { generation: () => this.generation, world: () => clone(ports.itemWorld?.() ?? {}),
       enter: (parent, intent) => {
-        if (this.op || this.battleCommitOwner || this.evolutions.active || this.triggered?.active || this.trade?.active || this.acquisition || this.reception || this.pokedex.active) throw new Error("operation-active");
+        if (this.op || this.battleCommitOwner || this.evolutions.active || this.triggered?.active || this.trade?.active || this.acquisition?.active || this.reception || this.pokedex.active) throw new Error("operation-active");
         if (parent?.kind === "inventory") {
           if (intent.kind !== "teach" || intent.source.kind !== "machine") throw new Error("invalid-learning-parent");
           this.inventory.reserveLearning(parent.token, intent.memberId, intent.source.entry);
@@ -293,17 +272,27 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     } }, content: this.ports.content, generation: () => this.generation, limits: this.limits, evolutions: this.evolutions,
       world: () => clone(ports.itemWorld?.() ?? {}), facts: (member, content) => this.evolutionFacts(member, content),
       ownsParent: token => this.inventory.owns(token), enter: (parent, memberId) => {
-        if (this.op || this.battleCommitOwner || this.evolutions.active || this.learning.active || this.trade?.active || this.acquisition || this.reception || this.pokedex.active) throw new Error("operation-active");
+        if (this.op || this.battleCommitOwner || this.evolutions.active || this.learning.active || this.trade?.active || this.acquisition?.active || this.reception || this.pokedex.active) throw new Error("operation-active");
         if (parent) this.inventory.reserveEvolution(parent, memberId!);
         else if (this.inventory.active || this.management.active) throw new Error("management-operation-active");
       }, leave: parent => { if (parent) this.inventory.releaseLearning(parent); } });
     this.trade = new TradeOperation({ state: { read: () => this.battleStatePort.read(), replace: next => {
       this.battleStatePort.replace(next); this.inventory.stateChanged(next);
     } }, content: this.ports.content, generation: () => this.generation, limits: this.limits,
-      enter: () => { if (this.op || this.battleCommitOwner || this.evolutions.active || this.learning.active || this.triggered.active || this.acquisition || this.reception || this.inventory.active || this.management.active || this.pokedex.active) throw Error("operation-active"); },
+      enter: () => { if (this.op || this.battleCommitOwner || this.evolutions.active || this.learning.active || this.triggered.active || this.acquisition?.active || this.reception || this.inventory.active || this.management.active || this.pokedex.active) throw Error("operation-active"); },
       world: () => clone(ports.itemWorld?.() ?? {}), facts: (member, content) => this.evolutionFacts(member, content),
       random: this.ports.random, now: () => this.now(), creationContext: this.ports.creationContext,
       allowHeldSources: this.capabilities.allowHeldItemSources, holdable: id => { const item = this.describeHeldItem(id); return !!item?.holdable && !item.mail; } });
+    this.acquisition = new AcquisitionOperation({
+      state: this.battleStatePort, content: () => this.ports.content().content, random: this.ports.random,
+      creationContext: this.ports.creationContext, now: () => this.now(), generation: () => this.generation,
+      newContext: options => this.newReceptionContext(options), setReception: pending => { this.reception = pending; },
+      noteReception: (context, members, next) => this.noteReception(context, members, next),
+      reserveDex: (token, entries, content) => { this.pokedex.reserve(token, "acquisition", entries, content); },
+      activateDex: token => { this.pokedex.activate(token); }, stateChanged: next => this.inventory.stateChanged(next),
+      limits: this.limits, depositHeal: this.depositHeal, allowHeldItemSources: this.capabilities.allowHeldItemSources,
+      profile: this.profile, describeHeldItem: this.describeHeldItem,
+    });
   }
 
   private evolutionFacts(member: Readonly<Member>, content: ReturnType<ContentPort>["content"]): EvolutionFacts {
@@ -465,197 +454,31 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const refused = (reason: string, error: unknown): ClaimOutcome => ({ status: "refused", grantId, reason, error: message(error) });
     if (this.reception?.grantId === grantId) return { status: "pending", grantId, token: this.reception.context.token };
     if (this.battleBusy || this.management.active || this.reception || this.inventory.active) return refused(this.battleBusy ? "battle-active" : "operation-active", "another operation is open");
-    const acquisition = { generation: this.generation }; this.acquisition = acquisition;
-    try {
-    try { options = clone(options); } catch (error) { return refused("invalid", error); }
-    let game: GameState;
-    try { game = this.ports.state.read(); this.assertAcquisition(acquisition); } catch (error) { return refused("state-unusable", error); }
-    try {
-      if (own(game.claims, grantId)) return { status: "already-claimed", grantId };
-      if (!this.ports.random) return refused("no-random", "no random source");
-      const content = clone(this.ports.content().content); this.assertAcquisition(acquisition);
-      const sourceGrant = own(content.grants, grantId); if (!sourceGrant) throw new GrantRefusedError("unknown-grant", `grant "${grantId}" is not in the content`);
-      for (const member of sourceGrant.members) if (member.item) {
-        if (!this.capabilities.allowHeldItemSources) throw new GrantRefusedError("held-item-source-disabled", "held-item-source-disabled");
-        const descriptor = this.describeHeldItem(member.item); if (!descriptor?.holdable || descriptor.mail) throw new GrantRefusedError("invalid-held-item", `unsupported held item ${member.item}`);
-      }
-      const prepared = applyGrant(game, grantId, content, this.ports.random, this.limits, { ...(sourceGrant.members.length ? { ...this.ports.creationContext?.(), receivedAt: Math.floor(this.now() / 1000) } : {}), allowHeldItemSources: this.capabilities.allowHeldItemSources });
-      this.assertAcquisition(acquisition);
-      if (prepared.status !== "applied") return { status: "already-claimed", grantId };
-      const oldIds = new Set(allMembers(game).map((m) => m.id));
-      const members = allMembers(prepared.state).filter((m) => !oldIds.has(m.id));
-      const grant = own(content.grants, grantId)!;
-      const context = this.newReceptionContext({ profile: options.profile ?? this.profile, decisions: options.decisions ?? {}, nextMemberOrdinal: prepared.state.nextMemberOrdinal });
-      this.preparedAcquisitions.set(context, { fingerprint: semanticFingerprint(content), attempted: false, complete: false, entries: [] });
-      let completed: ClaimOutcome | undefined;
-      const finish = (next: GameState): ClaimOutcome => { this.pokedex.activate(context.token); this.noteReception(context, members, next); this.reception = null; return clone(completed!); };
-      const resume = (): ClaimOutcome => {
-        try {
-          const staged = this.preparedAcquisitions.get(context)!;
-          if (staged.next) return finish(this.installAcquisition(context));
-          this.acquisitionContent(context);
-          const current = clone(this.battleStatePort.read());
-          if (context.generation !== this.generation) throw Error("stale-acquisition");
-          if (own(current.claims, grantId)) { this.reception = null; return { status: "already-claimed", grantId }; }
-          const plan = receiveMembers(current, members, context.decisions ?? {}, { limits: this.limits, content, profile: context.profile!, depositHeal: this.depositHeal });
-          const next = plan.state;
-          for (const [item, count] of Object.entries(grant.items)) next.inventory = addItems(next.inventory, item, count, catalogOf(content), inventoryPolicy(content, this.limits));
-          if (!Number.isSafeInteger(next.money + grant.money)) throw new Error("money-overflow");
-          next.money = changeMoney(next.money,grant.money,moneyCap(content,this.limits.money));
-          const registration = planAcquisitionDex(next.dex, members.map(m => locateMember(next, m.id)!.member), content, { source: "grant", seeForm: true, showMessages: true });
-          if (registration.status !== "ready") throw new ReceivingRefused(registration.reason);
-          next.dex = registration.dex;
-          setOwn(next.claims, grantId, { kind: "grant" }); next.nextMemberOrdinal = context.nextMemberOrdinal!;
-          completed = { status: "applied", grantId, placed: plan.placed.map(p => { const m = locateMember(next, p.id)!.member; return { id: m.id, species: m.species, form: m.form ?? 0, level: m.level, to: p.to }; }), items: { ...grant.items }, money: next.money - current.money };
-          this.prepareAcquisition(context, current, next, registration.entries);
-          return finish(this.installAcquisition(context));
-        } catch (error) {
-          if (context.generation !== this.generation) return refused("stale-operation", error);
-          if (error instanceof StateInstallFailed || (error instanceof ReceivingRefused && error.reason === "pending")) { this.reception = { context, members, resume, grantId }; return { status: "pending", grantId, token: context.token, pendingMember: error instanceof ReceivingRefused ? error.memberId : undefined, ...(error instanceof StateInstallFailed ? { reason: "commit-failed", error: message(error) } : {}) }; }
-          return refused(error instanceof ReceivingRefused ? error.reason : "commit-failed", error);
-        }
-      };
-      return resume();
-    } catch (error) { return refused(error instanceof GrantRefusedError ? error.reason : "invalid", error); }
-    } finally { if (this.acquisition === acquisition) this.acquisition = null; }
+    return this.acquisition.claimGrant(grantId, options);
   }
 
   receiveGift(request: GiftRequest, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): GiftOutcome {
     if (this.battleBusy || this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "operation-active" };
-    const acquisition = { generation: this.generation }; this.acquisition = acquisition;
-    try {
-    try {
-      request = clone(request); options = clone(options);
-      if (!["normal", "silent", "party", "party-silent", "foreign"].includes(request.kind)) throw new ReceivingRefused("invalid-gift-mode");
-      if (request.seeForm !== undefined && typeof request.seeForm !== "boolean") throw new ReceivingRefused("invalid-see-form");
-      const input = request.member;
-      if (!input || Object.keys(input).some((k) => !("existing" in input ? ["existing"] : ["species", "level", "form", "item"]).includes(k))) throw new ReceivingRefused("invalid-member");
-      if ("existing" in input && (input.existing.isEgg || input.existing.mail)) throw new ReceivingRefused(input.existing.isEgg ? "egg-not-supported" : "mail-not-supported");
-      const held = "existing" in input ? input.existing.item : input.item;
-      if (held && !this.capabilities.allowHeldItemSources) throw new ReceivingRefused("held-item-source-disabled");
-      if (held && (!this.describeHeldItem(held)?.holdable || this.describeHeldItem(held)?.mail)) throw new ReceivingRefused("invalid-held-item");
-      const game = this.ports.state.read(), content = clone(this.ports.content().content); this.assertAcquisition(acquisition);
-      const partyOnly = ["party", "party-silent", "foreign"].includes(request.kind);
-      if (partyOnly && game.party.length >= this.limits.party) throw new ReceivingRefused("party-full");
-      let nextOrdinal = game.nextMemberOrdinal;
-      let owner = game.player;
-      if (request.kind === "foreign") {
-        if (!this.ports.random) throw new ReceivingRefused("no-random");
-        let id = personalId(this.ports.random); if (id === game.player.id) id = (id + 1) >>> 0;
-        owner = { id, name: request.foreignOwner?.name ?? "", gender: request.foreignOwner?.gender ?? 0, language: request.foreignOwner?.language ?? 2 };
-      }
-      let member: Member;
-      if ("existing" in input) { requireTemplate(input.existing, input.existing.id); member = clone(input.existing); if (request.kind === "foreign") { member.owner = clone(owner); member.ownerCompatibilityDefault = false; } }
-      else {
-        if (!this.ports.random) throw new ReceivingRefused("no-random");
-        if (request.kind === "party-silent" && input.level === undefined) throw new ReceivingRefused("level-required");
-        const allocated = allocateMemberId(nextOrdinal, new Set(allMembers(game).map((m) => m.id))); nextOrdinal = allocated.nextMemberOrdinal;
-        const name = resolveSpecies(content, input.species); if (!name) throw new ReceivingRefused("unknown-species");
-        member = toPersistentMember(createMember({ id: allocated.id, species: name, level: input.level ?? 1, ...(input.form !== undefined ? { form: input.form } : {}), owner, context: { ...this.ports.creationContext?.(), receivedAt: Math.floor(this.now() / 1000), playerId: game.player.id } }, content, this.ports.random), content);
-        member.item = input.item ?? "";
-      }
-      this.assertAcquisition(acquisition);
-      nextOrdinal = advanceMemberOrdinal(game.nextMemberOrdinal, [member.id], nextOrdinal);
-      if (request.kind === "foreign" && request.nickname) member.nickname = Array.from(request.nickname).slice(0, 10).join("");
-      const silent = ["silent", "party-silent", "foreign"].includes(request.kind);
-      const context = this.newReceptionContext({ decisions: options.decisions ?? {}, profile: silent ? { mode: 1, naming: 1 } : options.profile ?? this.profile, nextMemberOrdinal: nextOrdinal });
-      this.preparedAcquisitions.set(context, { fingerprint: semanticFingerprint(content), attempted: false, complete: false, entries: [] });
-      let completed: GiftOutcome | undefined;
-      const finish = (next: GameState): GiftOutcome => { this.pokedex.activate(context.token); this.noteReception(context, [member], next); this.reception = null; return clone(completed!); };
-      const resume = (): GiftOutcome => {
-        try {
-          const staged = this.preparedAcquisitions.get(context)!;
-          if (staged.next) return finish(this.installAcquisition(context));
-          this.acquisitionContent(context);
-          const current = clone(this.battleStatePort.read());
-          if (context.generation !== this.generation) throw Error("stale-acquisition");
-          const plan = receiveMembers(current, [member], context.decisions ?? {}, { limits: this.limits, content, profile: context.profile!, partyOnly, depositHeal: this.depositHeal });
-          plan.state.nextMemberOrdinal = context.nextMemberOrdinal!;
-          const registration = planAcquisitionDex(plan.state.dex, [locateMember(plan.state, member.id)!.member], content,
-            { source: request.kind === "party-silent" ? "party-silent" : request.kind === "party" ? "party-gift" : "receive", seeForm: request.seeForm ?? true,
-              showMessages: request.kind !== "silent" && request.kind !== "party-silent" });
-          if (registration.status !== "ready") throw new ReceivingRefused(registration.reason);
-          plan.state.dex = registration.dex;
-          completed = { status: "applied", placed: plan.placed };
-          this.prepareAcquisition(context, current, plan.state, registration.entries);
-          return finish(this.installAcquisition(context));
-        } catch (error) {
-          if (context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
-          if (error instanceof StateInstallFailed || (error instanceof ReceivingRefused && error.reason === "pending")) { this.reception = { context, members: [member], resume }; return { status: "pending", token: context.token, ...(error instanceof StateInstallFailed ? { reason: "commit-failed", error: message(error) } : {}) }; }
-          return { status: "refused", reason: error instanceof ReceivingRefused ? error.reason : "commit-failed", error: message(error) };
-        }
-      }; return resume();
-    } catch (error) { return { status: "refused", reason: error instanceof ReceivingRefused ? error.reason : "invalid", error: message(error) }; }
-    } finally { if (this.acquisition === acquisition) this.acquisition = null; }
+    return this.acquisition.receiveGift(request, options);
   }
 
-  private acquisitionContent(context: ReceptionContext): ReturnType<ContentPort>["content"] {
-    const staged = this.preparedAcquisitions.get(context); if (!staged || context.generation !== this.generation) throw Error("stale-acquisition");
-    if (staged.retired) throw new StateInstallFailed(Error(staged.retired), staged.retired === "acquisition-install-indeterminate");
-    let content: ReturnType<ContentPort>["content"];
-    try { content = this.ports.content().content; } catch (error) { throw new StateInstallFailed(error); }
-    if (context.generation !== this.generation) throw Error("stale-acquisition");
-    // This private definition fingerprint only binds this gift plan. It never grants battle auxiliary authority.
-    let fingerprint: string;
-    try { fingerprint = semanticFingerprint(clone(content)); }
-    catch (error) { staged.retired = "invalid-acquisition-content"; throw new StateInstallFailed(error); }
-    if (fingerprint !== staged.fingerprint) { staged.retired = "stale-acquisition-content"; throw new StateInstallFailed(Error(staged.retired)); }
-    return content;
-  }
-  private prepareAcquisition(context: ReceptionContext, before: GameState, next: GameState, entries: AcquisitionEntryIntent[]): void {
-    const staged = this.preparedAcquisitions.get(context)!;
-    const content = this.acquisitionContent(context), errors = validateGameContent(next, content);
-    if (errors.length) throw new ReceivingRefused("invalid-acquisition-next", errors[0]!.path + ": " + errors[0]!.message);
-    staged.before = clone(before); staged.next = clone(next); staged.entries = clone(entries);
-    staged.decisions = semanticFingerprint(context.decisions ?? {});
-    this.pokedex.reserve(context.token, "acquisition", entries, content);
-  }
-  private installAcquisition(context: ReceptionContext): GameState {
-    const staged = this.preparedAcquisitions.get(context); if (!staged?.next || !staged.before || context.generation !== this.generation) throw Error("stale-acquisition");
-    let current: GameState;
-    try { current = clone(this.battleStatePort.read()); } catch (error) { throw new StateInstallFailed(error, staged.attempted); }
-    if (context.generation !== this.generation) throw Error("stale-acquisition");
-    if (stateIdentity(current) === stateIdentity(staged.next)) { staged.complete = true; this.inventory.stateChanged(staged.next); return clone(staged.next); }
-    if (stateIdentity(current) !== stateIdentity(staged.before)) { staged.retired = "acquisition-install-indeterminate"; throw new StateInstallFailed(Error(staged.retired), true); }
-    const content = this.acquisitionContent(context), errors = validateGameContent(staged.next, content);
-    if (errors.length) throw new StateInstallFailed(Error("invalid-acquisition-next:" + errors[0]!.path));
-    // State readers may invoke host code; recheck both definition and base before the actual write.
-    this.acquisitionContent(context); current = clone(this.battleStatePort.read());
-    if (context.generation !== this.generation) throw Error("stale-acquisition");
-    if (stateIdentity(current) !== stateIdentity(staged.before)) { staged.retired = "acquisition-install-indeterminate"; throw new StateInstallFailed(Error(staged.retired), true); }
-    this.acquisitionContent(context);
-    if (context.generation !== this.generation) throw Error("stale-acquisition");
-    staged.attempted = true; let failure: unknown;
-    try { this.battleStatePort.replace(clone(staged.next)); } catch (error) { failure = error; }
-    if (context.generation !== this.generation) throw Error("stale-acquisition");
-    try { current = clone(this.battleStatePort.read()); } catch (error) { throw new StateInstallFailed(error, true); }
-    if (context.generation !== this.generation) throw Error("stale-acquisition");
-    if (stateIdentity(current) === stateIdentity(staged.next)) { staged.complete = true; this.inventory.stateChanged(staged.next); return clone(staged.next); }
-    if (stateIdentity(current) !== stateIdentity(staged.before)) staged.retired = "acquisition-install-indeterminate";
-    throw new StateInstallFailed(failure ?? Error("acquisition-not-installed"), !!staged.retired);
-  }
   /** Discard only a proved uninstalled acquisition. An installed result is acknowledged, never rolled back. */
   terminateAcquisition(token: string): { status: "aborted" | "already-installed" | "refused" | "reload-required"; reason?: string } {
     const pending = this.reception;
     if (!pending || pending.context.token !== token || pending.context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
-    const staged = this.preparedAcquisitions.get(pending.context); if (!staged) return { status: "refused", reason: "not-an-acquisition" };
+    if (!this.acquisition.hasPrepared(pending.context)) return { status: "refused", reason: "not-an-acquisition" };
     if (this.receptionActions.has(pending.context)) return { status: "refused", reason: "reception-busy" };
     this.receptionActions.add(pending.context);
     try {
-    if (staged.attempted && staged.next && staged.before) {
-      let current: GameState; try { current = clone(this.battleStatePort.read()); } catch { return { status: "reload-required", reason: "acquisition-install-indeterminate" }; }
-      if (pending.context.generation !== this.generation || this.reception !== pending) return { status: "refused", reason: "stale-operation" };
-      if (stateIdentity(current) === stateIdentity(staged.next)) { this.receptionActions.delete(pending.context); const outcome = this.resolveReceiving(token); return "status" in outcome && outcome.status === "applied"
-        ? { status: "already-installed" } : { status: "refused", reason: "resume-installed-acquisition" }; }
-      if (stateIdentity(current) !== stateIdentity(staged.before)) return { status: "reload-required", reason: "acquisition-install-indeterminate" };
-    }
+    const probe = this.acquisition.terminationProbe(pending.context, () => pending.context.generation === this.generation && this.reception === pending);
+    if (probe === "stale") return { status: "refused", reason: "stale-operation" };
+    if (probe === "reload-required") return { status: "reload-required", reason: "acquisition-install-indeterminate" };
+    if (probe === "installed") { this.receptionActions.delete(pending.context); const outcome = this.resolveReceiving(token); return "status" in outcome && outcome.status === "applied"
+      ? { status: "already-installed" } : { status: "refused", reason: "resume-installed-acquisition" }; }
     this.pokedex.discardReserved(pending.context.token);
     if (this.reception === pending) this.reception = null;
     return { status: "aborted" };
     } finally { this.receptionActions.delete(pending.context); }
-  }
-  private assertAcquisition(owner: { generation: number }): void {
-    if (this.acquisition !== owner || owner.generation !== this.generation) throw Error("stale-acquisition");
   }
   private install(next: GameState): void {
     const content = this.ports.content().content;
@@ -686,13 +509,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.receptionActions.has(pending.context)) return { status: "refused", reason: "reception-busy" };
     this.receptionActions.add(pending.context);
     try {
-    const acquisition = this.preparedAcquisitions.get(pending.context);
+    const acquisitionNext = this.acquisition.hasPreparedNext(pending.context);
     const merged = { ...pending.context.decisions, ...clone(decisions) };
-    if (acquisition?.next && semanticFingerprint(merged) !== acquisition.decisions) return { status: "refused", reason: "acquisition-decision-conflict" };
+    if (acquisitionNext && this.acquisition.decisionConflict(pending.context, merged)) return { status: "refused", reason: "acquisition-decision-conflict" };
     pending.context.decisions = merged;
     if (signal !== undefined) {
       if (!["scene-aborted", "rebuild-failed"].includes(signal)) return { status: "refused", reason: "invalid-recovery-signal" };
-      try { if (!acquisition?.next) pending.context.decisions = fallbackDecisions(this.ports.state.read(), pending.members, { limits: this.limits, content: this.ports.content().content, profile: pending.context.profile ?? this.profile, depositHeal: this.depositHeal }, pending.context.decisions); pending.context.recovered = true; }
+      try { if (!acquisitionNext) pending.context.decisions = fallbackDecisions(this.ports.state.read(), pending.members, { limits: this.limits, content: this.ports.content().content, profile: pending.context.profile ?? this.profile, depositHeal: this.depositHeal }, pending.context.decisions); pending.context.recovered = true; }
       catch (error) { return { status: "pending", reason: message(error) }; }
     }
     const outcome = pending.resume();
@@ -757,8 +580,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   previewReceiving(token: string, decisions: Record<string, ReceivingDecision>, completed: number): ManagementSnapshot {
     const reception=this.reception;if(!reception||reception.context.token!==token||reception.context.generation!==this.generation)throw new Error('stale-operation');
     if(!Number.isInteger(completed)||completed<0||completed>reception.members.length)throw new Error('invalid-preview-count');
-    const prepared=this.preparedAcquisitions.get(reception.context);
-    if(prepared?.next)return managementSnapshot(prepared.next,prepared.next,null,this.generation,this.limits,this.capabilities.allowHeldItemSources);
+    const prepared=this.acquisition.preparedNext(reception.context);
+    if(prepared)return managementSnapshot(prepared,prepared,null,this.generation,this.limits,this.capabilities.allowHeldItemSources);
     const game=this.ports.state.read(),collection=receiveMembers(game,reception.members.slice(0,completed),decisions,{limits:this.limits,content:this.ports.content().content,profile:reception.context.profile??this.profile,depositHeal:this.depositHeal}).state;
     return managementSnapshot(collection,collection,null,this.generation,this.limits,this.capabilities.allowHeldItemSources);
   }
@@ -820,7 +643,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    */
   stateReplacedByHost(): void {
     this.generation++;
-    this.acquisition = null;
+    this.acquisition.invalidate();
     this.op = null;
     this.battleCommitOwner = null;
     this.evolutions.invalidate(); this.evolutionCompletion = null;
