@@ -3,6 +3,7 @@ import { PokedexOperation } from "./pokedex-operation.ts";
 import type { DexEntryIntent, DexDecision, DexViewingCommand, DexResolution } from "./pokedex-operation.ts";
 import { dexShouldOfferEntry } from "../rules/pokedex.ts";
 import { createDexQueryCatalog, dexAccessibleRegions, dexMenuEntry, dexInUnlockedRegion, dexInfo, dexEntryNumber, dexMeasurements } from "../rules/pokedex-query.ts";
+import { dexNameGroups, DEX_COLORS, DEX_SHAPES } from "../rules/pokedex-query.ts";
 import type { AcquisitionEntryIntent } from "../rules/acquisition-dex.ts";
 import { semanticFingerprint } from "../rules/semantic.ts";
 import { TradeOperation, tradeEligibility } from "./trade-operation.ts";
@@ -252,8 +253,9 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     });
     this.management = new ManagementSession(this.ports.state, () => this.ports.content().content, { limits: this.limits, depositHeal: this.depositHeal, sourceAllowed: this.capabilities.allowHeldItemSources, describeItem: this.describeHeldItem });
     this.pokedex = new PokedexOperation({ state: this.battleStatePort, content: this.ports.content, generation: () => this.generation,
-      changed: next => this.inventory?.stateChanged(next), enter: () => {
-        if (this.op || this.battleCommitOwner || this.evolutions?.active || this.learning?.active || this.triggered?.active || this.trade?.active || this.acquisition || this.reception || this.inventory?.active || this.management.active) throw Error("operation-active");
+      changed: next => this.inventory?.stateChanged(next), leaveSummary:parent=>this.management.releaseChild(parent), enter: parent => {
+        if (this.op || this.battleCommitOwner || this.evolutions?.active || this.learning?.active || this.triggered?.active || this.trade?.active || this.acquisition || this.reception || this.inventory?.active || !parent&&this.management.active) throw Error("operation-active");
+        if(parent)this.management.reserveDexChild(parent);
       } });
     this.inventory = new InventorySession(this.ports.state,()=>this.ports.content().content,{world:ports.itemWorld,variables:ports.variables,limits:this.limits,generation:()=>this.generation,install:next=>this.install(next),
       enter:parent=>{if(this.battleBusy||this.reception)throw new Error('operation-active');if(parent)this.management.reserveChild(parent.token);else if(this.management.active)throw new Error('management-active');},
@@ -322,7 +324,21 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         moreOften: resolveConfig(content.settings).SHOW_NEW_SPECIES_POKEDEX_ENTRY_MORE_OFTEN }) };
   }
   get pendingPokedex() { return this.pokedex.view; }
+  beginSummaryPokedex(parentToken:string,memberId:string):DexResolution {return this.pokedex.beginSummary(parentToken,memberId);}
   updatePokedex(command: DexViewingCommand): DexResolution { return this.pokedex.begin(command); }
+  /** Read-only directory from the source-checked adapter, never inferred from species currently in the dex. */
+  pokedexSearchDirectory(locale: string) {
+    const generation = this.generation, source = this.ports.content();
+    if (generation !== this.generation) throw Error('stale-pokedex-query');
+    if (source.content.meta?.showdownSourceChecked !== true) throw Error('pokedex-type-source-unchecked');
+    this.pokedex.observeContent(source.content);
+    if (!source.dex?.allTypes) throw Error('pokedex-type-directory-unavailable');
+    const identity=semanticFingerprint(source.content),types = source.dex.allTypes().map(t => t.name);
+    if(identity!==semanticFingerprint(this.ports.content().content))throw Error("stale-pokedex-query-content");
+    if (generation !== this.generation) throw Error('stale-pokedex-query');
+    if (!types.length || types.some(t => typeof t !== 'string' || !t) || new Set(types).size !== types.length) throw Error('invalid-pokedex-type-directory');
+    return { names: dexNameGroups(locale), types, colors: [...DEX_COLORS], shapes: [...DEX_SHAPES] };
+  }
   pokedexSnapshot(text: Readonly<Record<string, string>> = {}, currentRegion: number | null = null) {
     const generation = this.generation, state = clone(this.ports.state.read()), content = clone(this.ports.content().content);
     if (generation !== this.generation) throw Error("stale-pokedex-query");

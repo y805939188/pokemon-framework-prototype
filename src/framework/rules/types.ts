@@ -178,6 +178,8 @@ export interface DexLookup {
   /** Optional complete pinned move directory, read only after the source gate. Needed for saved moves outside current learnsets. */
   allMoves?(): MoveData[];
   allAbilities?(): { id: string; name: string }[];
+  /** Complete registered, non-pseudo type directory in definition order. Optional adapter capability. */
+  allTypes?(): { name: string }[];
   type?(id: string): { name: string } | null;
   move(showdownId: string): { name: string; id?: string; pp?: number } | null;
   /** Gen 8 level-up learn levels per move id (Showdown's learnset data), or null for an unknown species. */

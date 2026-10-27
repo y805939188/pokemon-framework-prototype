@@ -20,6 +20,9 @@ export type DexOrder = 0 | 1 | 2 | 3 | 4 | 5;
 export interface DexList { rows: DexListRow[]; diagnostics: DexDiagnostic[] }
 export interface DexNameGroup { id: string; characters: string; other?: boolean }
 export interface DexSearchDirectory { names: readonly DexNameGroup[]; types: readonly string[]; colors: readonly string[]; shapes: readonly string[] }
+/** WP03 fixed definition order, shared by author validation and default selectors. None is not a candidate. */
+export const DEX_COLORS: readonly string[] = Object.freeze(['Red','Blue','Yellow','Green','Black','Brown','Purple','Gray','White','Pink']);
+export const DEX_SHAPES: readonly string[] = Object.freeze(['Head','Serpentine','Finned','HeadArms','HeadBase','BipedalTail','HeadLegs','Quadruped','Winged','Multiped','MultiBody','Bipedal','MultiWinged','Insectoid']);
 /** Sort, name group, both types, height lower/upper, weight lower/upper, color, shape. Selectors use -1 for unselected. */
 export type DexSearchParameters = [number, number, number, number, number, number, number, number, number, number];
 export interface DexSearchSession { accepted: DexSearchParameters; rows: DexListRow[]; results: boolean; cursor: number }

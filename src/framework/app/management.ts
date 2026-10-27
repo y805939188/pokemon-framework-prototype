@@ -45,6 +45,7 @@ export class ManagementSession {
   invalidate():void {this.token=null;this.held=null;this.child=false;this.receipts.clear();}
   begin():string {if(this.token)throw new Error('management-active');this.token=`management:${++this.seq}`;this.receipts.clear();return this.token;}
   reserveChild(token:string):void {if(token!==this.token)throw new Error('stale-operation');if(this.child||this.held)throw new Error('management-operation-active');this.child=true;}
+  reserveDexChild(token:string):void {if(token!==this.token)throw new Error('stale-operation');if(this.child)throw new Error('management-operation-active');this.child=true;}
   releaseChild(token:string):void {if(token===this.token)this.child=false;}
   end(token:string):ManagementOutcome {if(this.child)return {status:'refused',reason:'child-operation-active'};if(token!==this.token)return {status:'refused',reason:'stale-operation'};if(this.held)return {status:'refused',reason:'member-held'};this.invalidate();return {status:'unchanged'};}
   snapshot(token:string):{collection:GameState;held:import('../rules/types.ts').Member|null} {
