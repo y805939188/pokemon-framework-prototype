@@ -1,4 +1,4 @@
-import { aggregateBag } from "../rules/inventory.ts";
+import { aggregateBag } from "../rules/inventory";
 /**
  * Step 2 scenario matrix S1..S10 as one runnable module (no test framework): the same code runs under
  * Node (headless) and inside the packaged NW.js app, and every scenario returns a fingerprint of its
@@ -13,12 +13,12 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BattleSession } from "../flow/session.ts";
-import * as G from "../rules/growth.ts";
-import * as S from "../rules/state.ts";
-import { SaveStore } from "./save-store.ts";
-import { identityKeys } from "../rules/species-key.ts"; // the fixture world: content ids are the Showdown names
-import * as F from "./fixtures/game.ts";
+import { BattleSession } from "../flow/session";
+import * as G from "../rules/growth";
+import * as S from "../rules/state";
+import { SaveStore } from "./save-store";
+import { identityKeys } from "../rules/species-key"; // the fixture world: content ids are the Showdown names
+import * as F from "./fixtures/game";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Scenario code drives the session through plain JSON messages; message payloads are loosely typed on purpose.

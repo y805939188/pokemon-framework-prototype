@@ -1,11 +1,11 @@
 /** Synthetic game fixtures for headless tests, the scripted matrix and the flow test (not shipped content). */
-import { createDexState } from "../../rules/dex-state.ts";
-import * as G from "../../rules/growth.ts";
-import * as S from "../../rules/state.ts";
-import type { GameState } from "../../rules/state.ts";
-import { toPersistentMember } from "../../rules/species-key.ts";
-import type { Content, Member, PartialStats } from "../../rules/types.ts";
-import { fixtureContent as content } from "./content.ts";
+import { createDexState } from "../../rules/dex-state";
+import * as G from "../../rules/growth";
+import * as S from "../../rules/state";
+import type { GameState } from "../../rules/state";
+import { toPersistentMember } from "../../rules/species-key";
+import type { Content, Member, PartialStats } from "../../rules/types";
+import { fixtureContent as content } from "./content";
 
 export { content };
 

@@ -1,4 +1,4 @@
-import type { LearningPage } from './learning-screen.ts';
+import type { LearningPage } from './learning-screen';
 export function drawLearningPage(win:any,p:LearningPage,ports:{font:string;text:(key:string,params?:Record<string,string|number>)=>string;textOr:(key:string,fallback:string)=>string;move:(id:string)=>any}):string[]{
  const tr=ports.text;
    const b=win.contents,w=b.width,h=b.height;b.clear();b.fontFace=ports.font||'sans-serif';b.fontSize=20;const rendered:string[]=[];

@@ -3,10 +3,10 @@
  * operations. `BattleGateway` (Pokemon Showdown) implements it; a scripted fake can stand in for it in tests. Types
  * only: no behaviour lives here.
  */
-import type { BattleEvent } from "./protocol.ts";
-import type { MonView } from "../rules/rules.ts";
-import type { PartialStats, Stats } from "../rules/types.ts";
-import type { ObservationBatch, BattleObservation } from "../rules/battle-evidence.ts";
+import type { BattleEvent } from "./protocol";
+import type { MonView } from "../rules/rules";
+import type { PartialStats, Stats } from "../rules/types";
+import type { ObservationBatch, BattleObservation } from "../rules/battle-evidence";
 
 export interface PlayerSpec {
   name: string;

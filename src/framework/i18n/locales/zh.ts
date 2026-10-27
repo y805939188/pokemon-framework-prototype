@@ -3,7 +3,7 @@
  * missing-key checks and layout. Translations are working text for the pipeline, not reviewed localisation.
  * Move names are Showdown-owned data and stay in English until a move-name table is part of the content.
  */
-import type { LocaleTable } from "../translator.ts";
+import type { LocaleTable } from "../translator";
 
 export const zh: LocaleTable = {
   meta: { name: "简体中文", font: "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif" },

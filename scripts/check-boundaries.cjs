@@ -153,8 +153,12 @@ function check(root) {
 				continue;
 			}
 			if (!spec.startsWith('.')) { violations.push(`${rel}: external package "${spec}" (the framework has no dependencies)`); continue; }
-			const target = path.posix.normalize(path.posix.join(path.posix.dirname(rel), spec));
-			if (!rels.has(target)) { violations.push(`${rel}: import "${spec}" does not resolve to a framework file`); continue; }
+			const requested = path.posix.normalize(path.posix.join(path.posix.dirname(rel), spec));
+			// Match the TypeScript/Vite source forms used by this repository: an explicit file, an extensionless
+			// file, then a directory index. Every check and graph edge uses the canonical file, not its spelling.
+			const candidates = requested.endsWith('.ts') ? [requested] : [requested, `${requested}.ts`, `${requested}/index.ts`];
+			const target = candidates.find(candidate => rels.has(candidate));
+			if (!target) { violations.push(`${rel}: import "${spec}" does not resolve to a framework file`); continue; }
 			const tlayer = target.includes('/') ? target.split('/')[0] : 'entry';
 			if (!LAYERS[layer].includes(tlayer)) violations.push(`${rel}: layer "${layer}" may not import layer "${tlayer}" (${target})`);
 			if (layer === 'app' && tlayer === 'flow' && target !== APP_FLOW_SERVICE) violations.push(`${rel}: app may only import ${APP_FLOW_SERVICE} from flow (${target})`);

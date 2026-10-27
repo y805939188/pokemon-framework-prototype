@@ -1,12 +1,12 @@
 /** Money-shop planning. Stock aliases and price slots are process-local; resources install atomically. */
-import {clone} from './value.ts';
-import {catalogOf,hasFlag,importantItem,itemOf} from './item-catalog.ts';
-import {addItems,capacityFor,inventoryPolicy,itemQuantity,positiveQuantity,removeItems,safeAdd} from './inventory.ts';
-import {changeMoney,moneyCap} from './economy.ts';
-import {bumpStat} from './stats.ts';
-import type {GameState} from './state.ts';
-import type {Content} from './types.ts';
-import type {Limits} from './limits.ts';
+import {clone} from './value';
+import {catalogOf,hasFlag,importantItem,itemOf} from './item-catalog';
+import {addItems,capacityFor,inventoryPolicy,itemQuantity,positiveQuantity,removeItems,safeAdd} from './inventory';
+import {changeMoney,moneyCap} from './economy';
+import {bumpStat} from './stats';
+import type {GameState} from './state';
+import type {Content} from './types';
+import type {Limits} from './limits';
 export interface PriceSlots {buy:number;sell:number}
 export interface ShopContext {stock:string[];allowSell:boolean;overrides:Record<string,PriceSlots>;revision:number}
 export interface ShopIntent {kind:'buy'|'sell';itemId:string;quantity:number;confirmed?:boolean;expectedPrice?:number;expectedRevision?:number}

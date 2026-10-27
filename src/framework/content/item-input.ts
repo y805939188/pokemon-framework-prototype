@@ -1,9 +1,9 @@
 /** Validation shared by authored JSON and the compiled-content consumption gate; never queries Dex. */
-import { ITEM_ID, importantItem, legacyCatalog } from '../rules/item-catalog.ts';
-import type { FieldUse, ItemCatalog, ItemDefinition, ShopDefinition } from '../rules/item-catalog.ts';
-import { setOwn } from '../rules/own.ts';
-import type { ContentError } from './schema.ts';
-import { fieldEffectProblem } from '../rules/item-families.ts';
+import { ITEM_ID, importantItem, legacyCatalog } from '../rules/item-catalog';
+import type { FieldUse, ItemCatalog, ItemDefinition, ShopDefinition } from '../rules/item-catalog';
+import { setOwn } from '../rules/own';
+import type { ContentError } from './schema';
+import { fieldEffectProblem } from '../rules/item-families';
 
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const integer = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;

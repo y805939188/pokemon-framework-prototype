@@ -1,14 +1,14 @@
 /** WP26/38 receive plans. No UI, no host state mutation, no protocol shape changes. */
-import { clone } from "./value.ts";
-import { allMembers, boxedMembers, firstFreeBox, locateMember, memberAt, placeInBox } from "./storage.ts";
-import type { MemberCollection, MemberPosition } from "./storage.ts";
-import { able, ableCount, checkStore, referenced } from "./storage-operations.ts";
-import { own } from "./own.ts";
-import type { ItemDescriptor, MemberReference } from "./storage-operations.ts";
-import { healMember } from "./heal.ts";
-import { clonePersistentMember } from "./member-metadata.ts";
-import type { Content, Member } from "./types.ts";
-import type { Limits } from "./limits.ts";
+import { clone } from "./value";
+import { allMembers, boxedMembers, firstFreeBox, locateMember, memberAt, placeInBox } from "./storage";
+import type { MemberCollection, MemberPosition } from "./storage";
+import { able, ableCount, checkStore, referenced } from "./storage-operations";
+import { own } from "./own";
+import type { ItemDescriptor, MemberReference } from "./storage-operations";
+import { healMember } from "./heal";
+import { clonePersistentMember } from "./member-metadata";
+import type { Content, Member } from "./types";
+import type { Limits } from "./limits";
 
 export interface ReceivingProfile { mode: 0 | 1 | 2; naming: number }
 export interface ReceivingDecision {

@@ -1,5 +1,5 @@
 /** Fixed WP25 storage. These helpers never compact box slots or expose a second writable member list. */
-import type { Member } from "./types.ts";
+import type { Member } from "./types";
 
 export const BOX_COUNT = 40;
 export const SLOTS_PER_BOX = 30;

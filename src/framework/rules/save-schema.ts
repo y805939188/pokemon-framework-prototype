@@ -1,7 +1,7 @@
-import { createMemberContentIndex, memberContentProblems } from "./member-content.ts";
-import { inventoryFromBag, inventoryPolicy, inventoryProblems } from "./inventory.ts";
-import { catalogOf, itemOf } from "./item-catalog.ts";
-import { baseMovePp, totalPp } from "./member-metadata.ts";
+import { createMemberContentIndex, memberContentProblems } from "./member-content";
+import { inventoryFromBag, inventoryPolicy, inventoryProblems } from "./inventory";
+import { catalogOf, itemOf } from "./item-catalog";
+import { baseMovePp, totalPp } from "./member-metadata";
 /**
  * Versioned persistent game state: strict validation, migration from the declared older versions, and errors that are
  * safe to act on. Pure: never touches files or the MZ save, and never mutates its input (migration works on a copy,
@@ -21,17 +21,17 @@ import { baseMovePp, totalPp } from "./member-metadata.ts";
  * ("needs-content"), and a name the content cannot map refuses the WHOLE migration ("unmapped-species", every place
  * listed). Either way the input document is untouched, so the caller keeps the original save.
  */
-import { NATURES } from "./growth.ts";
-import { own } from "./own.ts";
-import { createDexState, dexContentProblems, dexStateProblems, dexLayoutStateProblems, remapDexLayout } from "./dex-state.ts";
-import { GAME_SCHEMA } from "./state.ts";
-import type { GameState } from "./state.ts";
-import { MAX_FORM, speciesDataOf } from "./species-key.ts";
-import { completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity.ts";
-import { BOX_COUNT, SLOTS_PER_BOX, STORAGE_CAPACITY, newStorage } from "./storage.ts";
-import type { Content, DexState, Member } from "./types.ts";
-import type { SpeciesKeyResolver } from "./species-key.ts";
-import { newStats, validateStats } from "./stats.ts";
+import { NATURES } from "./growth";
+import { own } from "./own";
+import { createDexState, dexContentProblems, dexStateProblems, dexLayoutStateProblems, remapDexLayout } from "./dex-state";
+import { GAME_SCHEMA } from "./state";
+import type { GameState } from "./state";
+import { MAX_FORM, speciesDataOf } from "./species-key";
+import { completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity";
+import { BOX_COUNT, SLOTS_PER_BOX, STORAGE_CAPACITY, newStorage } from "./storage";
+import type { Content, DexState, Member } from "./types";
+import type { SpeciesKeyResolver } from "./species-key";
+import { newStats, validateStats } from "./stats";
 
 const SAVE_SCHEMA = GAME_SCHEMA;
 export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];

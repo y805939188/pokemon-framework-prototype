@@ -4,7 +4,7 @@
  * compiled document. Showdown-owned battle data (base stats, display names, move names) is NOT copied here: records
  * name a `showdownId` and the runtime assembly resolves it against the pinned Showdown build.
  */
-import type { CurveId, PartialStats } from "../rules/types.ts";
+import type { CurveId, PartialStats } from "../rules/types";
 
 export const AUTHOR_SCHEMA_VERSION = 1;
 export const COMPILED_SCHEMA_VERSION = 3;
@@ -58,7 +58,7 @@ export interface SpeciesSource {
   happiness?: number;
   learnset: LearnEntry[];
   source: string;
-  evolutions?: import("../rules/types.ts").EvolutionEntry[];
+  evolutions?: import("../rules/types").EvolutionEntry[];
   tutorMoves?: string[];
   /** Omitted is unavailable author data; [] is known absence and enables predecessor fallback. */
   eggMoves?: string[];
@@ -132,17 +132,17 @@ export interface CompiledContent {
   sources: SourceEntry[];
   overlaysApplied: number;
   species: SpeciesSource[];
-  registrationOrder?: import("../rules/types.ts").SpeciesKey[];
-  regionalDex?: import("../rules/types.ts").RegionalDex;
-  mapMetadata?: import("../rules/types.ts").MapMetadata;
+  registrationOrder?: import("../rules/types").SpeciesKey[];
+  regionalDex?: import("../rules/types").RegionalDex;
+  mapMetadata?: import("../rules/types").MapMetadata;
   showdownSha?: string;
   contentIdentity?: string;
   /** Absent in documents compiled before step 4 (= no grants). */
   grants?: GrantSource[];
   /** Rule configuration overrides (validated); absent = the Gen 8 defaults. */
-  settings?: import("../rules/config.ts").RuleOverrides;
-  items?: import('../rules/item-catalog.ts').ItemDefinition[];
-  shops?: import('../rules/item-catalog.ts').ShopDefinition[];
+  settings?: import("../rules/config").RuleOverrides;
+  items?: import('../rules/item-catalog').ItemDefinition[];
+  shops?: import('../rules/item-catalog').ShopDefinition[];
 }
 
 /** Grant ids stay short: the members they create are named G-<grant id>-<n>, and member ids are limited to 18 characters. */

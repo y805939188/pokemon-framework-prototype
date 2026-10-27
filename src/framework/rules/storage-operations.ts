@@ -1,14 +1,14 @@
-import { addItems, removeItems, itemQuantity, inventoryPolicy } from "./inventory.ts";
-import type { Inventory } from "./inventory.ts";
-import { catalogOf } from "./item-catalog.ts";
+import { addItems, removeItems, itemQuantity, inventoryPolicy } from "./inventory";
+import type { Inventory } from "./inventory";
+import { catalogOf } from "./item-catalog";
 /** Pure WP25/66 operations. Callers install the returned next state once, after collecting UI decisions. */
-import { own, setOwn } from "./own.ts";
-import { healMember } from "./heal.ts";
-import { clone } from "./value.ts";
-import { allMembers, firstFreeBox, locateMember, memberAt, validPosition } from "./storage.ts";
-import type { MemberCollection, MemberPosition } from "./storage.ts";
-import type { Content, Member } from "./types.ts";
-import type { Limits } from "./limits.ts";
+import { own, setOwn } from "./own";
+import { healMember } from "./heal";
+import { clone } from "./value";
+import { allMembers, firstFreeBox, locateMember, memberAt, validPosition } from "./storage";
+import type { MemberCollection, MemberPosition } from "./storage";
+import type { Content, Member } from "./types";
+import type { Limits } from "./limits";
 
 export interface MemberReference { id: string; position: MemberPosition }
 export interface MovementContext { limits: Limits; content: Content; depositHeal?: boolean }

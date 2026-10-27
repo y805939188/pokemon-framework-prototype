@@ -1,10 +1,10 @@
-import { DEX_COLORS as COLORS, DEX_SHAPES as SHAPES } from "../rules/pokedex-query.ts";
+import { DEX_COLORS as COLORS, DEX_SHAPES as SHAPES } from "../rules/pokedex-query";
 /** Static progression author fields, inheritance and the single regional layout authority. Pure. */
-import type { ContentError, SpeciesSource } from "./schema.ts";
-import type { DexLayout, DexLayoutTransition, MapMetadata, RegionalDex, SpeciesKey } from "../rules/types.ts";
-import { evolutionMethod } from "../rules/evolution-data.ts";
-import { MAX_FORM } from "../rules/species-key.ts";
-import { sha256Hex } from "../rules/sha256.ts";
+import type { ContentError, SpeciesSource } from "./schema";
+import type { DexLayout, DexLayoutTransition, MapMetadata, RegionalDex, SpeciesKey } from "../rules/types";
+import { evolutionMethod } from "../rules/evolution-data";
+import { MAX_FORM } from "../rules/species-key";
+import { sha256Hex } from "../rules/sha256";
 
 export type ProgressionReport = (file: ContentError["file"], path: string, message: string) => void;
 const obj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);

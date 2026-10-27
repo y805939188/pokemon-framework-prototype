@@ -1,16 +1,16 @@
-import { aggregateBag } from "../rules/inventory.ts";
-import { computedNature } from "../rules/member-metadata.ts";
+import { aggregateBag } from "../rules/inventory";
+import { computedNature } from "../rules/member-metadata";
 /** Read models for the management host. Copies only: the save remains the sole authority. */
-import { clone } from '../rules/value.ts';
-import { allMembers, locateMember } from '../rules/storage.ts';
-import type { MemberCollection, MemberPosition } from '../rules/storage.ts';
-import type { GameState } from '../rules/state.ts';
-import { computeStats, minExp, natureModifiers } from '../rules/growth.ts';
-import { characteristic, publicIdText } from '../rules/member-identity.ts';
-import { battleNameOf, memberKey, speciesDataOf } from '../rules/species-key.ts';
-import type { Content, DexLookup, Member, Owner, Stats } from '../rules/types.ts';
-import type { Limits } from '../rules/limits.ts';
-import type { MemberReference } from '../rules/storage-operations.ts';
+import { clone } from '../rules/value';
+import { allMembers, locateMember } from '../rules/storage';
+import type { MemberCollection, MemberPosition } from '../rules/storage';
+import type { GameState } from '../rules/state';
+import { computeStats, minExp, natureModifiers } from '../rules/growth';
+import { characteristic, publicIdText } from '../rules/member-identity';
+import { battleNameOf, memberKey, speciesDataOf } from '../rules/species-key';
+import type { Content, DexLookup, Member, Owner, Stats } from '../rules/types';
+import type { Limits } from '../rules/limits';
+import type { MemberReference } from '../rules/storage-operations';
 
 export interface ManagementSnapshot extends MemberCollection {
   generation: number;

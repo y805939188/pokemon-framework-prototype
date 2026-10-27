@@ -1,22 +1,22 @@
 /** E3 value composition only. The application owns target identity, locks, final revalidation and installation. */
-import { resolveConfig } from "./config.ts";
-import { planFriendshipChange } from "./friendship.ts";
-import type { FriendshipContext, FriendshipMember, FriendshipPlan } from "./friendship.ts";
-import { assertInventoryMapped, inventoryProblems, InventoryRefused, itemQuantity, removeItems } from "./inventory.ts";
-import type { Inventory } from "./inventory.ts";
-import { catalogOf, consumesItem, itemOf } from "./item-catalog.ts";
+import { resolveConfig } from "./config";
+import { planFriendshipChange } from "./friendship";
+import type { FriendshipContext, FriendshipMember, FriendshipPlan } from "./friendship";
+import { assertInventoryMapped, inventoryProblems, InventoryRefused, itemQuantity, removeItems } from "./inventory";
+import type { Inventory } from "./inventory";
+import { catalogOf, consumesItem, itemOf } from "./item-catalog";
 import {
   learningCompatibility, planLearningQueue, planMoveForgetting, planRelearning,
-} from "./learning.ts";
+} from "./learning";
 import type {
   ForgettingPlan, LearningAnswer, LearningEffects, LearningOutcome, LearningPlan, LearningReady,
   LearningRefusal, LearningSource, RelearningAnswer, RelearningPlan, ResolvedLevelMove,
-} from "./learning.ts";
-import { own } from "./own.ts";
-import type { Content, Member, MoveData, SpeciesData } from "./types.ts";
-import { clone } from "./value.ts";
-import { firstEvolutionPredecessor } from "./evolution-data.ts";
-import { memberKey } from "./species-key.ts";
+} from "./learning";
+import { own } from "./own";
+import type { Content, Member, MoveData, SpeciesData } from "./types";
+import { clone } from "./value";
+import { firstEvolutionPredecessor } from "./evolution-data";
+import { memberKey } from "./species-key";
 
 /** Both a real member snapshot and an incoming draft use the same Member value; no party lookup occurs here. */
 export type TeachingActionSource = { readonly kind: "generic" | "tutor"; readonly moveId: string }

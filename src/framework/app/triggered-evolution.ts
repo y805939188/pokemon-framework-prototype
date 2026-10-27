@@ -1,23 +1,23 @@
 /** Owned candy/item/event transactions. No battle evidence is manufactured and no workflow is saved. */
-import { clone } from "../rules/value.ts";
-import { semanticFingerprint } from "../rules/semantic.ts";
-import { planItemUse } from "../rules/item-effects.ts";
-import type { ItemIntent, ItemPending, ItemWorldContext, ItemResult } from "../rules/item-effects.ts";
-import type { LearningAnswer } from "../rules/learning.ts";
-import { scanEvolution } from "../rules/evolution.ts";
-import type { EvolutionSelection, EvolutionFacts, EvolutionCheckResult } from "../rules/evolution.ts";
-import { planEvolutionCommit } from "../rules/evolution-commit.ts";
-import { catalogOf, itemOf, hasFlag, consumesItem } from "../rules/item-catalog.ts";
-import { itemQuantity, positiveQuantity, removeItems } from "../rules/inventory.ts";
-import { resolveConfig } from "../rules/config.ts";
-import { validatedContentIdentity } from "../flow/content-runtime.ts";
-import { validateGameContent } from "../rules/save-schema.ts";
-import type { Content, Member } from "../rules/types.ts";
-import type { GameState } from "../rules/state.ts";
-import type { Limits } from "../rules/limits.ts";
-import type { ContentPort, GameStatePort } from "./ports.ts";
-import type { EvolutionDecision, EvolutionView } from "./evolution-operation.ts";
-import { EvolutionOperation } from "./evolution-operation.ts";
+import { clone } from "../rules/value";
+import { semanticFingerprint } from "../rules/semantic";
+import { planItemUse } from "../rules/item-effects";
+import type { ItemIntent, ItemPending, ItemWorldContext, ItemResult } from "../rules/item-effects";
+import type { LearningAnswer } from "../rules/learning";
+import { scanEvolution } from "../rules/evolution";
+import type { EvolutionSelection, EvolutionFacts, EvolutionCheckResult } from "../rules/evolution";
+import { planEvolutionCommit } from "../rules/evolution-commit";
+import { catalogOf, itemOf, hasFlag, consumesItem } from "../rules/item-catalog";
+import { itemQuantity, positiveQuantity, removeItems } from "../rules/inventory";
+import { resolveConfig } from "../rules/config";
+import { validatedContentIdentity } from "../flow/content-runtime";
+import { validateGameContent } from "../rules/save-schema";
+import type { Content, Member } from "../rules/types";
+import type { GameState } from "../rules/state";
+import type { Limits } from "../rules/limits";
+import type { ContentPort, GameStatePort } from "./ports";
+import type { EvolutionDecision, EvolutionView } from "./evolution-operation";
+import { EvolutionOperation } from "./evolution-operation";
 
 export interface EvolutionItemIntent { itemId: string; memberId: string; quantity: number }
 export interface EventEvolutionIntent { event?: number; memberId?: string }

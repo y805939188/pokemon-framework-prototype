@@ -4,8 +4,8 @@
  * (WP19 stat formula, WP30 curves and battle experience, defaults for Gen 8).
  * The engine is only told the outcome (battle/gateway applyGrowth) and cross-checked against it.
  */
-import type { Content, CurveId, Member, PartialStats, StatKey, Stats } from "./types.ts";
-import { toBattleMember } from "./species-key.ts";
+import type { Content, CurveId, Member, PartialStats, StatKey, Stats } from "./types";
+import { toBattleMember } from "./species-key";
 
 export const MAX_LEVEL = 100;
 

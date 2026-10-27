@@ -1,10 +1,10 @@
 /** 5.2 host presentation. Application plans/install resources; this adapter owns focus and answers. */
-import {InputLatch} from './management/model.ts';
-import type {InputFrame} from './management/model.ts';
-import {quantityStep,nextPocket,animationPhase,itemIconFrame} from './inventory/model.ts';
-import {itemCatalog as Catalog} from '../framework/rules/index.ts';
-import type {ItemDefinition} from '../framework/rules/index.ts';
-import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framework/app/index.ts';
+import {InputLatch} from './management/model';
+import type {InputFrame} from './management/model';
+import {quantityStep,nextPocket,animationPhase,itemIconFrame} from './inventory/model';
+import {itemCatalog as Catalog} from '../framework/rules/index';
+import type {ItemDefinition} from '../framework/rules/index';
+import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framework/app/index';
 const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Inventory',clone=structuredClone;

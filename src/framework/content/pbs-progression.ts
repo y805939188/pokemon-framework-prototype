@@ -1,6 +1,6 @@
 /** Local PBS progression token rules, derived from WP04/WP31 (reference R); no file I/O. */
-import type { EvolutionEntry, SpeciesKey } from '../rules/types.ts';
-import { evolutionMethod, parseEvolutionInteger } from '../rules/evolution-data.ts';
+import type { EvolutionEntry, SpeciesKey } from '../rules/types';
+import { evolutionMethod, parseEvolutionInteger } from '../rules/evolution-data';
 
 /** WP04's position-dependent markers are two physical characters: backslash then quote.
  * Plain quotes are retained. Only a non-final completed token has its markers removed.

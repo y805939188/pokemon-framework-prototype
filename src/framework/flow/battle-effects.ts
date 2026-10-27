@@ -1,10 +1,10 @@
 /** Finite transient V2 source receipts. This owner is independent of the legacy optional evidence copy. */
-import { clone, resultHash } from "../rules/state.ts";
-import { own, setOwn } from "../rules/own.ts";
-import type { BattleResult } from "../rules/state.ts";
-import type { Member } from "../rules/types.ts";
-import type { BattleEvidenceContext, BattleObservation, EvidenceIssue, FriendEvidence, ObservationBatch } from "../rules/battle-evidence.ts";
-import type { EffectsSealV2, EffectsBindingV2, EffectsContextV2, EffectCell, FaintCellV2, BattleAppearanceV2, BattleDefeatV2, FriendshipReceiptV2 } from "../rules/battle-consumption.ts";
+import { clone, resultHash } from "../rules/state";
+import { own, setOwn } from "../rules/own";
+import type { BattleResult } from "../rules/state";
+import type { Member } from "../rules/types";
+import type { BattleEvidenceContext, BattleObservation, EvidenceIssue, FriendEvidence, ObservationBatch } from "../rules/battle-evidence";
+import type { EffectsSealV2, EffectsBindingV2, EffectsContextV2, EffectCell, FaintCellV2, BattleAppearanceV2, BattleDefeatV2, FriendshipReceiptV2 } from "../rules/battle-consumption";
 
 /** Serializable recorder snapshot; exported so BattleSession's public checkpoint type can be named in declarations. */
 export interface SourceState {

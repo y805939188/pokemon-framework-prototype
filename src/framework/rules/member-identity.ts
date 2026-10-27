@@ -1,7 +1,7 @@
 /** Pure individual identity and WP18/19 metadata. No host clock, RNG or species loading. */
-import { sha256Hex } from "./sha256.ts";
-import { clonePersistentMember } from "./member-metadata.ts";
-import type { GenderRule, Member, MemberOrigin, Owner, PartialStats, SpeciesData, StatKey } from "./types.ts";
+import { sha256Hex } from "./sha256";
+import { clonePersistentMember } from "./member-metadata";
+import type { GenderRule, Member, MemberOrigin, Owner, PartialStats, SpeciesData, StatKey } from "./types";
 
 export const COMPATIBLE_PLAYER: Readonly<Owner> = Object.freeze({ id: 0, name: "player", gender: 2, language: 2 });
 export const NATURE_ORDER: readonly string[] = [

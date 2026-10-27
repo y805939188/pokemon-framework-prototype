@@ -5,10 +5,10 @@
  * (js/engine/build/custom-formats.cjs) and staged into the engine by scripts/build-showdown.sh; no Showdown source is
  * modified. It runs inside Showdown, so it may only depend on plain rules code (bundled in), never on the gateway.
  */
-import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules.ts";
-import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types.ts";
-import type { FormatObserver, FormatObservation } from "../rules/battle-evidence.ts";
-import type { BattleActor, BattleDisplaySnapshot } from "../rules/battle-evidence.ts";
+import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules";
+import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types";
+import type { FormatObserver, FormatObservation } from "../rules/battle-evidence";
+import type { BattleActor, BattleDisplaySnapshot } from "../rules/battle-evidence";
 
 interface Payload { kind: string; item?: string; target?: string; ball?: string; catchRate?: number; ctx?: Record<string, unknown> }
 

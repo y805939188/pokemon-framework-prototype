@@ -1,8 +1,8 @@
 /** 5.1 management adapter. The application owns all records; this scene owns focus and decisions only. */
-import { boxCursor, boxLinkAvailable, editMark, InputLatch, inputIntent, markCursor, panelCursor, partyCursor, ribbonCursor, summaryCursor } from './management/model.ts';
-import type { Action, Direction, InputFrame } from './management/model.ts';
-import type { ManagementRequest, ManagementSnapshot, IndividualView, StorageSearch } from '../framework/app/index.ts';
-import type { Member, MemberPosition, MemberReference, ReceivingDecision } from '../framework/rules/index.ts';
+import { boxCursor, boxLinkAvailable, editMark, InputLatch, inputIntent, markCursor, panelCursor, partyCursor, ribbonCursor, summaryCursor } from './management/model';
+import type { Action, Direction, InputFrame } from './management/model';
+import type { ManagementRequest, ManagementSnapshot, IndividualView, StorageSearch } from '../framework/app/index';
+import type { Member, MemberPosition, MemberReference, ReceivingDecision } from '../framework/rules/index';
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Management';
  const flow=()=>W.PSFlow,app=()=>flow().app();

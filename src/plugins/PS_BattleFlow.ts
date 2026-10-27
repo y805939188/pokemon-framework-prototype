@@ -7,7 +7,7 @@
  * Not here: art, animation, full menu system, doubles UI.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { config as RuleConfig } from "../framework/rules/index.ts";
+import { config as RuleConfig } from "../framework/rules/index";
 const { developmentCapabilities } = RuleConfig;
 
 (() => {

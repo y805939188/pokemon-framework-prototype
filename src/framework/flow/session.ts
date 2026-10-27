@@ -1,5 +1,5 @@
-import { battleBag } from "../rules/inventory.ts";
-import { catalogOf } from "../rules/item-catalog.ts";
+import { battleBag } from "../rules/inventory";
+import { catalogOf } from "../rules/item-catalog";
 /**
  * BattleSession: the game-side owner of one battle.
  *
@@ -10,24 +10,24 @@ import { catalogOf } from "../rules/item-catalog.ts";
  * Sync points: (1) battle start: persistent -> engine (seedState); (2) between turns when growth
  * happened: session -> engine (applyGrowth) + refreshed requests; (3) battle end: engine -> result.
  */
-import { showdownDriverFactory } from "../battle/gateway.ts";
-import type { BattleDriver, BattleDriverFactory } from "../battle/driver.ts";
-import { isSelectableMove } from "../battle/move-requests.ts";
-import type { GatewayMessage, MemberState } from "../battle/gateway.ts";
-import * as G from "../rules/growth.ts";
-import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, itemEligibility } from "../rules/rules.ts";
-import * as S from "../rules/state.ts";
-import type { BattleResult, GameState } from "../rules/state.ts";
-import type { Content, Member } from "../rules/types.ts";
-import type { BattleEvent, SessionMessage } from "../battle/protocol.ts";
-import type { LogLevel, LogSink } from "./log.ts";
-import { EvidenceRecorder } from "./battle-evidence.ts";
-import { BattleEffectsRecorder } from "./battle-effects.ts";
-import type { EffectsBindingV2, EffectsSealV2 } from "../rules/battle-consumption.ts";
-import { battleFriendshipValue } from "../rules/battle-evidence.ts";
-import type { BattleEvidenceContext, EvidenceBinding, BattleEvidence, FriendEvidence, BattleObservation } from "../rules/battle-evidence.ts";
-import { resolveConfig } from "../rules/config.ts";
-import { own, setOwn } from "../rules/own.ts";
+import { showdownDriverFactory } from "../battle/gateway";
+import type { BattleDriver, BattleDriverFactory } from "../battle/driver";
+import { isSelectableMove } from "../battle/move-requests";
+import type { GatewayMessage, MemberState } from "../battle/gateway";
+import * as G from "../rules/growth";
+import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, itemEligibility } from "../rules/rules";
+import * as S from "../rules/state";
+import type { BattleResult, GameState } from "../rules/state";
+import type { Content, Member } from "../rules/types";
+import type { BattleEvent, SessionMessage } from "../battle/protocol";
+import type { LogLevel, LogSink } from "./log";
+import { EvidenceRecorder } from "./battle-evidence";
+import { BattleEffectsRecorder } from "./battle-effects";
+import type { EffectsBindingV2, EffectsSealV2 } from "../rules/battle-consumption";
+import { battleFriendshipValue } from "../rules/battle-evidence";
+import type { BattleEvidenceContext, EvidenceBinding, BattleEvidence, FriendEvidence, BattleObservation } from "../rules/battle-evidence";
+import { resolveConfig } from "../rules/config";
+import { own, setOwn } from "../rules/own";
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
 export const END_REASONS = ["caught", "run", "tie", "win"] as const;

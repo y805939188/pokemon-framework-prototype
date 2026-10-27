@@ -1,11 +1,11 @@
 /** Eight ordered pockets. All public resource changes return a complete plan or throw without touching input. */
-import { clone } from './value.ts';
-import { own, setOwn } from './own.ts';
-import { catalogOf, itemForBattleId, itemForLegacyId, itemOf } from './item-catalog.ts';
-import type { ItemCatalog } from './item-catalog.ts';
-import type { Content } from './types.ts';
-import type { Limits } from './limits.ts';
-import { resolveConfig } from './config.ts';
+import { clone } from './value';
+import { own, setOwn } from './own';
+import { catalogOf, itemForBattleId, itemForLegacyId, itemOf } from './item-catalog';
+import type { ItemCatalog } from './item-catalog';
+import type { Content } from './types';
+import type { Limits } from './limits';
+import { resolveConfig } from './config';
 
 export interface InventorySlot { itemId: string; quantity: number }
 export interface Inventory { pockets: InventorySlot[][]; lastPocket: number; indices: number[] }

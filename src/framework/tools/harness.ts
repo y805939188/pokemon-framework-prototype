@@ -1,4 +1,4 @@
-import { aggregateBag } from "../rules/inventory.ts";
+import { aggregateBag } from "../rules/inventory";
 /**
  * Scripted smoke harness shared by Node (headless) and the NW.js plugin so both
  * environments execute exactly the same checks against the same fixture.
@@ -8,13 +8,13 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { BattleGateway, PROTOCOL_VERSION } from "../battle/gateway.ts";
-import { isSelectableMove } from "../battle/move-requests.ts";
-import { BattleSession } from "../flow/session.ts";
-import * as G from "../rules/growth.ts";
-import { SaveStore } from "./save-store.ts";
-import { identityKeys } from "../rules/species-key.ts"; // the fixture world: content ids are the Showdown names
-import * as F from "./fixtures/game.ts";
+import { BattleGateway, PROTOCOL_VERSION } from "../battle/gateway";
+import { isSelectableMove } from "../battle/move-requests";
+import { BattleSession } from "../flow/session";
+import * as G from "../rules/growth";
+import { SaveStore } from "./save-store";
+import { identityKeys } from "../rules/species-key"; // the fixture world: content ids are the Showdown names
+import * as F from "./fixtures/game";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type L = any;

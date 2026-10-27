@@ -5,20 +5,20 @@
  * - Callers never hold Battle/Pokemon objects. `_debugBattle()` is the single diagnostic escape hatch.
  * - Members are addressed by stable id (= the Showdown nickname we assigned), never by slot.
  */
-import { loadFormatExtension, loadSim } from "./showdown-loader.ts";
-import type { LoadedSim } from "./showdown-loader.ts";
-import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types.ts";
-import type { BattleEvent } from "./protocol.ts";
-import type { BattleDriver, BattleDriverFactory, DriverCheckpoint, GatewayMessage, GatewayOptions, MemberState, SlotSpec, StateRecord, Unsequenced } from "./driver.ts";
-import { own, setOwn } from "../rules/own.ts";
-import type { PartialStats, Stats } from "../rules/types.ts";
-import type { BattleObservation, EvidenceIssue, ObservationBatch } from "../rules/battle-evidence.ts";
-import type { FormatObservation } from "../rules/battle-evidence.ts";
+import { loadFormatExtension, loadSim } from "./showdown-loader";
+import type { LoadedSim } from "./showdown-loader";
+import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types";
+import type { BattleEvent } from "./protocol";
+import type { BattleDriver, BattleDriverFactory, DriverCheckpoint, GatewayMessage, GatewayOptions, MemberState, SlotSpec, StateRecord, Unsequenced } from "./driver";
+import { own, setOwn } from "../rules/own";
+import type { PartialStats, Stats } from "../rules/types";
+import type { BattleObservation, EvidenceIssue, ObservationBatch } from "../rules/battle-evidence";
+import type { FormatObservation } from "../rules/battle-evidence";
 
 /** Version tag of the engine-level message stream used by the 2.2 harness only; NOT the game protocol (state.ts PROTOCOL_VERSION = 1). */
 export const PROTOCOL_VERSION = 0;
 
-export type { GatewayMessage, GatewayOptions, MemberState, PlayerSpec, SlotSpec, StateRecord } from "./driver.ts";
+export type { GatewayMessage, GatewayOptions, MemberState, PlayerSpec, SlotSpec, StateRecord } from "./driver";
 
 function parseLine(raw: string): BattleEvent {
   if (!raw.startsWith("|")) return { type: "text", args: [raw], raw };

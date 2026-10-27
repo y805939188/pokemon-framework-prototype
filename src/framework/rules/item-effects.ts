@@ -1,18 +1,18 @@
 /** Field item planning only. No RNG, host callbacks, mutation of input, evolution or machine teaching. */
-import {clone} from './value.ts';
-import {catalogOf,consumesItem,itemOf} from './item-catalog.ts';
-import {itemQuantity,positiveQuantity,removeItems,safeAdd} from './inventory.ts';
-import {resolveConfig} from './config.ts';
-import {computeStats,levelForExp,maxExp,minExp,NATURES} from './growth.ts';
-import {computedNature,baseMovePp,totalPp} from './member-metadata.ts';
-import {speciesDataOf} from './species-key.ts';
-import {resolveAbility} from './member-identity.ts';
-import {healMember} from './heal.ts';
-import {fieldEffectProblem} from './item-families.ts';
-import {planFriendshipChange} from './friendship.ts';
-import {planLearningQueue,levelLearningIntents} from './learning.ts';
-import type {Content,Member,MoveSlot,StatKey} from './types.ts';
-import type {GameState} from './state.ts';
+import {clone} from './value';
+import {catalogOf,consumesItem,itemOf} from './item-catalog';
+import {itemQuantity,positiveQuantity,removeItems,safeAdd} from './inventory';
+import {resolveConfig} from './config';
+import {computeStats,levelForExp,maxExp,minExp,NATURES} from './growth';
+import {computedNature,baseMovePp,totalPp} from './member-metadata';
+import {speciesDataOf} from './species-key';
+import {resolveAbility} from './member-identity';
+import {healMember} from './heal';
+import {fieldEffectProblem} from './item-families';
+import {planFriendshipChange} from './friendship';
+import {planLearningQueue,levelLearningIntents} from './learning';
+import type {Content,Member,MoveSlot,StatKey} from './types';
+import type {GameState} from './state';
 export interface ItemWorldContext {mapId?:number;shadowIds?:string[];hyperIds?:string[];hmMoves?:string[]}
 export type LearnAnswer={kind:'replace';slot:number}|{kind:'decline';giveUp?:boolean};
 export interface ItemAnswers {confirmed?:boolean;cancelled?:boolean;moveIndex?:number;learning?:LearnAnswer[]}

@@ -1,7 +1,7 @@
 /** Default MZ dex presentation. All persistent edits go through the existing application owner. */
-import { pokedexQuery as Q, config as C, type Content } from '../../framework/rules/index.ts';
-import type { GameApplication } from '../../framework/app/index.ts';
-import { DexSearchEditor } from './search.ts';
+import { pokedexQuery as Q, config as C, type Content } from '../../framework/rules/index';
+import type { GameApplication } from '../../framework/app/index';
+import { DexSearchEditor } from './search';
 type Snapshot = ReturnType<GameApplication['pokedexSnapshot']>;
 type Command = Parameters<GameApplication['updatePokedex']>[0];
 type Result = ReturnType<GameApplication['updatePokedex']>;

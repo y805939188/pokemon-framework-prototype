@@ -7,8 +7,8 @@
  */
 import type {
   BattleDriver, BattleDriverFactory, DriverCheckpoint, GatewayMessage, GatewayOptions, GrowthApplication, GrowthOutcome, MemberState, SlotSpec, StateRecord, Unsequenced,
-} from "../battle/driver.ts";
-import type { BattleEvent } from "../battle/protocol.ts";
+} from "../battle/driver";
+import type { BattleEvent } from "../battle/protocol";
 
 export interface ScriptedTurn {
   /** Raw engine lines, e.g. "|move|p1a: A-0001|Tackle|p2a: W1-1", "|-damage|p2a: W1-1|0 fnt", "|faint|p2a: W1-1". */

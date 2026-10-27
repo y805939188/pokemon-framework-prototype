@@ -7,8 +7,8 @@
  * modifiers, several rolls, time-of-day / surf / cave / fishing types, and the WP36 §4.2 trigger probability — the
  * trigger frequency is the host's step counter (MZ map "encounter steps").
  */
-import { draw } from "./member-factory.ts";
-import type { Random } from "./member-factory.ts";
+import { draw } from "./member-factory";
+import type { Random } from "./member-factory";
 
 export interface EncounterSlot {
   /** Species as the author wrote it (content id or persistent name); the application resolves it against the content. */

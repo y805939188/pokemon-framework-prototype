@@ -5,11 +5,10 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const {pathToFileURL}=require('node:url');
-const {register}=require('node:module');
 const {spawnSync}=require('node:child_process');
 const ROOT=path.resolve(__dirname,'../../..');
 // Execute the actual TS graph without adding a public production bundle export solely for tests.
-register('data:text/javascript,'+encodeURIComponent(`import {readFile} from 'node:fs/promises'; import {stripTypeScriptTypes} from 'node:module'; export async function load(url,context,next){if(url.endsWith('.ts'))return {format:'module',source:stripTypeScriptTypes(await readFile(new URL(url),'utf8'),{sourceUrl:url}),shortCircuit:true};return next(url,context);}`),pathToFileURL(__filename));
+require('../../../scripts/tests/ts-source-loader.cjs');
 const mod=Promise.all(['content/compile','flow/content-runtime','content/progression-input','rules/evolution-data','content/showdown-pin'].map(file=>import(pathToFileURL(path.join(ROOT,'src/framework',file+'.ts')).href)));
 const clone=x=>JSON.parse(JSON.stringify(x));
 const SHA='a'.repeat(40);

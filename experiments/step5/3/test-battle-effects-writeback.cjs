@@ -2,10 +2,9 @@
 // Formal-spec-derived expectations (06ac r3 §§2–9); real F registration, B schema and receiving, no source-runtime claims.
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {register}=require('node:module');
 const {pathToFileURL}=require('node:url');
 const {resolve}=require('node:path');
-register('data:text/javascript,'+encodeURIComponent(`import {readFile} from 'node:fs/promises'; import {stripTypeScriptTypes} from 'node:module'; export async function load(url,context,next){if(url.endsWith('.ts'))return {format:'module',source:stripTypeScriptTypes(await readFile(new URL(url),'utf8'),{sourceUrl:url}),shortCircuit:true};return next(url,context);}`),pathToFileURL(__filename));
+require('../../../scripts/tests/ts-source-loader.cjs');
 const leaf=name=>import(pathToFileURL(resolve(__dirname,'../../../src/framework/rules',name+'.ts')));
 const loaded=Promise.all(['battle-effects-writeback','battle-consumption','state','member-factory','species-key','dex-state','save-schema','evolution','storage','heal'].map(leaf));
 const complete=value=>({status:'complete',value});

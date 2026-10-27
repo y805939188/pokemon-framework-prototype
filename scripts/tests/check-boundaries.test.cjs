@@ -233,3 +233,102 @@ test('nonliteral dynamic imports cannot bypass layer and built-in checks', () =>
 		bad({ ...OK, 'app/a.ts': `export const load = (name: string) => import(${expr});` }, /dynamic import.*string literal/);
 	}
 });
+
+// ---- Step 2: resolve every local module syntax to one canonical source identity before checking it.
+test('extensionless files, directory indexes, re-exports, type imports and literal dynamic imports form a clean graph', () => {
+	clean({
+		'rules/a.ts': 'export type A = number; export const a = 1;\n',
+		'rules/nested/index.ts': 'export { a as indexed } from "../a";\nexport type { A as IndexedA } from "../a";\n',
+		'rules/b.ts': [
+			'import { a } from "./a";',
+			'import type { A } from "./a";',
+			'import { indexed } from "./nested";',
+			'import type { IndexedA } from "./nested";',
+			'export { a as reexported } from "./a";',
+			'export type ViaType = import("./a").A;',
+			'export const load = () => import("./nested");',
+			'export const b: [A, IndexedA, number] = [a, a, indexed];',
+			'',
+		].join('\n'),
+		'battle/gateway.ts': 'import { b } from "../rules/b";\nexport const g = b;\n',
+	});
+});
+
+const extensionlessLayerImports = [
+	['import', 'import { g } from "../battle/gateway";\nexport const p = g;\n'],
+	['re-export', 'export { g } from "../battle/gateway";\n'],
+	['import type', 'import type { G } from "../battle/gateway";\nexport type P = G;\n'],
+	['import type expression', 'export type P = import("../battle/gateway").G;\n'],
+	['literal dynamic import', 'export const p = () => import("../battle/gateway");\n'],
+];
+for (const [name, code] of extensionlessLayerImports) {
+	test(`extensionless ${name} cannot bypass layer checks`, () => {
+		bad({ 'rules/a.ts': 'export const a = 1;\n', 'battle/gateway.ts': 'export type G = unknown; export const g = 1;\n', 'rules/p.ts': code }, /layer "rules" may not import layer "battle"/);
+	});
+}
+
+test('directory index and re-export targets retain their actual layer identity', () => {
+	bad({
+		'rules/a.ts': 'export const a = 1;\n',
+		'battle/index.ts': 'export { g } from "./gateway";\n',
+		'battle/gateway.ts': 'export const g = 1;\n',
+		'rules/p.ts': 'export { g } from "../battle";\n',
+	}, /layer "rules" may not import layer "battle".*battle\/index\.ts/);
+});
+
+for (const [name, code] of [
+	['import type', 'import type { X } from "../battle/showdown-types";\nexport type P = X;\n'],
+	['type re-export', 'export type { X } from "../battle/showdown-types";\n'],
+	['literal dynamic import', 'export const p = () => import("../battle/showdown-types");\n'],
+]) {
+	test(`extensionless ${name} cannot bypass private-path checks`, () => {
+		bad({ ...OK, 'battle/showdown-types.ts': 'export type X = unknown;\n', 'flow/p.ts': code }, /battle\/showdown-types\.ts is private to layer "battle"/);
+	});
+}
+
+test('the app content-runtime exception accepts only its canonical module with extensionless and type syntax', () => {
+	clean({
+		'flow/content-runtime.ts': 'export type C = number; export const content = 1;\n',
+		'app/a.ts': 'import { content } from "../flow/content-runtime";\nimport type { C } from "../flow/content-runtime";\nexport type T = import("../flow/content-runtime").C;\nexport const a: C = content;\n',
+	});
+	for (const [name, target] of [
+		['extensionless file', '../flow/session'],
+		['directory index', '../flow'],
+	]) {
+		bad({
+			'flow/index.ts': 'export { BattleSession } from "./session";\n',
+			'flow/session.ts': 'export class BattleSession {}\n',
+			'flow/content-runtime.ts': 'export const content = 1;\n',
+			'app/a.ts': `export { BattleSession } from "${target}";\n`,
+		}, new RegExp(`app may only import flow/content-runtime\\.ts.*${name === 'directory index' ? 'flow/index\\.ts' : 'flow/session\\.ts'}`));
+	}
+});
+
+for (const [name, files] of [
+	['extensionless files', {
+		'rules/a.ts': 'import { b } from "./b";\nexport const a = b;\n',
+		'rules/b.ts': 'import { a } from "./a";\nexport const b = a;\n',
+	}],
+	['directory index and re-export', {
+		'rules/a.ts': 'export { b } from "./nested";\n',
+		'rules/nested/index.ts': 'export { a } from "../a";\nexport const b = 1;\n',
+	}],
+	['type-only imports', {
+		'rules/a.ts': 'import type { B } from "./b";\nexport type A = B;\n',
+		'rules/b.ts': 'import type { A } from "./a";\nexport type B = A;\n',
+	}],
+]) {
+	test(`cycles are checked on canonical module identities: ${name}`, () => {
+		bad(files, /import cycle: rules\/.*\.ts -> rules\/.*\.ts/);
+	});
+}
+
+test('every unresolved local module syntax is an explicit failure', () => {
+	for (const code of [
+		'import { x } from "./missing";\nexport const p = x;\n',
+		'export { x } from "./missing";\n',
+		'import type { X } from "./missing";\nexport type P = X;\n',
+		'export type P = import("./missing").X;\n',
+		'export const p = () => import("./missing-directory");\n',
+	]) bad({ 'rules/a.ts': 'export const a = 1;\n', 'rules/p.ts': code }, /rules\/p\.ts: import ".*" does not resolve/);
+});

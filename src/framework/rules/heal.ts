@@ -1,16 +1,16 @@
-import { clonePersistentMember, computedNature } from "./member-metadata.ts";
-import { clearEvolutionReadiness } from "./evolution-readiness.ts";
+import { clonePersistentMember, computedNature } from "./member-metadata";
+import { clearEvolutionReadiness } from "./evolution-readiness";
 /**
  * Full heal (WP20 §3.2 heal / heal_party, WP61 §7.3): HP to the maximum from the current stats, status and its counter
  * cleared, every move back to its maximum PP. Ordinary healing also clears readiness to false/known; deposit healing
  * can preserve both readiness fields. Other metadata stays unchanged. Party healing does not touch the boxes.
  * Pure and idempotent: healing a healed party gives an equal state.
  */
-import { computeStats } from "./growth.ts";
-import { speciesDataOf } from "./species-key.ts";
-import { clone } from "./value.ts";
-import type { MemberCollection } from "./storage.ts";
-import type { Content, Member } from "./types.ts";
+import { computeStats } from "./growth";
+import { speciesDataOf } from "./species-key";
+import { clone } from "./value";
+import type { MemberCollection } from "./storage";
+import type { Content, Member } from "./types";
 
 export function healMember(m: Member, content: Content, options: { preserveReadyToEvolve?: boolean } = {}): Member {
   if (m.isEgg) return clonePersistentMember(m);

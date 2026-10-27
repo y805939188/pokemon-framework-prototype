@@ -1,18 +1,18 @@
 /** WP18/19 individual creation. Random order: PID high/low, six IVs hp/atk/def/spa/spd/spe,
  * then the optional WP21 B-family form draw. Identity allocation never consumes this RNG.
  * Context supplies time/owner/environment; no clock or host data is read here. */
-import { computeStats, minExp } from "./growth.ts";
-import { own } from "./own.ts";
-import { newMember } from "./state.ts";
-import { creationForm } from "./creation-form.ts";
-import type { CreationEnvironment } from "./creation-form.ts";
-import { COMPATIBLE_PLAYER, deriveIndividual, NATURE_ORDER, shinyFromPersonalId, uint32 } from "./member-identity.ts";
-import type { Content, GenderRule, Member, MoveSlot, Owner, SpeciesData } from "./types.ts";
+import { computeStats, minExp } from "./growth";
+import { own } from "./own";
+import { newMember } from "./state";
+import { creationForm } from "./creation-form";
+import type { CreationEnvironment } from "./creation-form";
+import { COMPATIBLE_PLAYER, deriveIndividual, NATURE_ORDER, shinyFromPersonalId, uint32 } from "./member-identity";
+import type { Content, GenderRule, Member, MoveSlot, Owner, SpeciesData } from "./types";
 
 /** An integer in [0, n). Tests inject a scripted or seeded one; the MZ host uses its own generator. */
 export type Random = (n: number) => number;
 
-export { NATURE_ORDER } from "./member-identity.ts";
+export { NATURE_ORDER } from "./member-identity";
 
 const MEMBER_ID = /^[A-Za-z0-9#._:-]{1,18}$/;
 

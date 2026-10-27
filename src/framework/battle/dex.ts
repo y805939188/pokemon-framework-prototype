@@ -1,6 +1,6 @@
 /** Static Showdown data (species, moves) behind the small DexLookup interface the content layers use. */
-import type { DexLookup } from "../rules/types.ts";
-import { loadSim, readEngineSha } from "./showdown-loader.ts";
+import type { DexLookup } from "../rules/types";
+import { loadSim, readEngineSha } from "./showdown-loader";
 
 export function createDexLookup(engineRoot?: string): DexLookup {
   // Constructing the port must consume no external data. Content assembly checks the complete source registry before

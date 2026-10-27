@@ -1,5 +1,5 @@
 /** Adapter-only focus/clock rules. No resource mutations or host dependencies. */
-import type { InputFrame } from '../management/model.ts';
+import type { InputFrame } from '../management/model';
 export function quantityStep(value:number,maximum:number,frame:InputFrame,shop=false):{value:number;done:boolean;cancelled:boolean} {
  const order=shop?['left','right','up','down','use','back']:['back','use','up','down','left','right'];
  const key=order.find(k=>['use','back'].includes(k)?frame.triggered[k as 'use'|'back']:frame.repeated[k as 'up'|'down'|'left'|'right']);

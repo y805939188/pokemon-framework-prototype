@@ -1,16 +1,16 @@
-import { DEX_COLORS as COLORS, DEX_SHAPES as SHAPES } from "../rules/pokedex-query.ts";
+import { DEX_COLORS as COLORS, DEX_SHAPES as SHAPES } from "../rules/pokedex-query";
 /** Author PBS species proposals (WP03/04/18/31/62, reference R). No source or output writes.
  * The legacy text API keeps accepted-record diagnostics. The gated bundle API is atomic and reads explicit
  * ordered base files, then forms, then regions. Catalog validation remains with normal compile/assembly.
  */
-import type { CurveId, PartialStats, SpeciesKey, StatKey } from '../rules/types.ts';
-import { own } from '../rules/own.ts';
-import type { LearnEntry, SpeciesSource } from './schema.ts';
-import { parsePbsEvolutions, progressionCsv } from './pbs-progression.ts';
-import type { EvolutionProperty } from './pbs-progression.ts';
-import { importPbsRegionalDex } from './pbs-regional-dex.ts';
-import type { PbsFile, PbsSourceGate, RegionNameKey, RegionalDexProposal } from './pbs-regional-dex.ts';
-export type { PbsFile, PbsSourceGate, RegionNameKey } from './pbs-regional-dex.ts';
+import type { CurveId, PartialStats, SpeciesKey, StatKey } from '../rules/types';
+import { own } from '../rules/own';
+import type { LearnEntry, SpeciesSource } from './schema';
+import { parsePbsEvolutions, progressionCsv } from './pbs-progression';
+import type { EvolutionProperty } from './pbs-progression';
+import { importPbsRegionalDex } from './pbs-regional-dex';
+import type { PbsFile, PbsSourceGate, RegionNameKey, RegionalDexProposal } from './pbs-regional-dex';
+export type { PbsFile, PbsSourceGate, RegionNameKey } from './pbs-regional-dex';
 
 export interface PbsProblem { file?: string; line: number; path: string; message: string }
 export interface PbsRecordReport {

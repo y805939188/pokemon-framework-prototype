@@ -1,8 +1,8 @@
 /** 5.3 G1. Thin learning/reminder/forgetting screens; all writes go through the existing application transaction. */
-import { drawLearningPage } from './progression/learning-draw.ts';
-import { LearningScreen } from './progression/learning-screen.ts';
-import { InputLatch } from './management/model.ts';
-import type { LearningIntent, LearningParent, LearningOutcome } from '../framework/app/index.ts';
+import { drawLearningPage } from './progression/learning-draw';
+import { LearningScreen } from './progression/learning-screen';
+import { InputLatch } from './management/model';
+import type { LearningIntent, LearningParent, LearningOutcome } from '../framework/app/index';
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Progression',flow=()=>W.PSFlow,app=()=>flow().app();
  const tr=(key:string,params?:Record<string,string|number>)=>flow().translator().t('progression.'+key,params);

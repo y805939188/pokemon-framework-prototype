@@ -1,7 +1,7 @@
 /** Schema 7 Pokédex state and the single, author-declared layout transition. Pure, with no history inference. */
-import { sha256Hex } from "./sha256.ts";
-import { speciesDataOf, MAX_FORM } from "./species-key.ts";
-import type { Content, DexLayout, DexLayoutTransition, DexState } from "./types.ts";
+import { sha256Hex } from "./sha256";
+import { speciesDataOf, MAX_FORM } from "./species-key";
+import type { Content, DexLayout, DexLayoutTransition, DexState } from "./types";
 
 interface Problem { path: string; message: string }
 

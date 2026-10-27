@@ -1,8 +1,8 @@
 'use strict';
 // Real default Showdown/session source integration; fault injections and controlled revival are explicitly synthetic.
 const test=require('node:test'),assert=require('node:assert/strict');
-const {register}=require('node:module'),{pathToFileURL}=require('node:url'),{resolve}=require('node:path');
-register('data:text/javascript,'+encodeURIComponent(`import{readFile}from'node:fs/promises';import{stripTypeScriptTypes}from'node:module';export async function load(url,context,next){if(url.endsWith('.ts'))return{format:'module',source:stripTypeScriptTypes(await readFile(new URL(url),'utf8'),{sourceUrl:url}),shortCircuit:true};return next(url,context);}`),pathToFileURL(__filename));
+const {pathToFileURL}=require('node:url'),{resolve}=require('node:path');
+require('../../../scripts/tests/ts-source-loader.cjs');
 const pure=import(pathToFileURL(resolve(__dirname,'../../../src/framework/rules/battle-consumption.ts')));
 const E=require('../../../js/engine/build/engine.cjs'),clone=x=>JSON.parse(JSON.stringify(x)),D=E.dex.createDexLookup(),C=clone(E.fixtures.content);
 for(const id of ['splash','surgingstrikes','substitute','quickattack','return','transform']){const m=D.move(id);C.moves[id]={id:m.id,name:m.name,pp:m.pp};}
