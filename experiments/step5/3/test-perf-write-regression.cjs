@@ -65,7 +65,8 @@ test('STEP4-DEX-CANONICAL-01 direct private key construction preserves both stro
   const result = measure('dex');
   assert.equal(result.members, 1201);
   assert.equal(result.memberDescriptorScans, 2 * result.members, JSON.stringify(result));
-  assert.equal(result.stateJsonStringifyCalls, 6, JSON.stringify(result));
+  // Six application clones/comparisons plus one JSON clone inside this suite's memory-state replacement port.
+  assert.equal(result.stateJsonStringifyCalls, 7, JSON.stringify(result));
 });
 
 function rawWorld() {
