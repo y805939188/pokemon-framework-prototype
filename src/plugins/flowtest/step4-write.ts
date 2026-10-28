@@ -75,8 +75,9 @@ export async function runStep4Write(p: any): Promise<void> {
       } finally { updates.restore(); installs.restore(); }
     };
     const dexSample = async (index: number) => {
-      const before = clone(game()), cursor = W.PSPokedex.current().view.cursor, next = cursor + 1;
-      assert(next < W.PSPokedex.current().view.rows.length, 'real cursor move is not clamped');
+      const before = clone(game()), view = W.PSPokedex.current().view, cursor = view.cursor;
+      const direction = cursor === view.rows.length - 1 ? -1 : 1, next = cursor + direction;
+      assert(next >= 0 && next < view.rows.length, 'real cursor move is not clamped');
       const patch = B.pokedexQuery.planDexViewing(before.dex, content.regionalDex, { region: before.dex.view.region, cursor: next, searchResults: false });
       assert(patch.view, 'cursor command has a real persistent patch');
       const expected = { ...before, dex: B.pokedex.applyDexPatch(before.dex, patch) };
@@ -85,7 +86,7 @@ export async function runStep4Write(p: any): Promise<void> {
       app.updatePokedex = function (command: any) { calls++; syncStarted = performance.now(); try { outcome = original.call(this, command); return outcome; } finally { syncEnded = performance.now(); } };
       try {
         await updates.prime();
-        await press('down');
+        await press(direction === 1 ? 'down' : 'up');
         eq(calls, 1, 'one actual UI callback into updatePokedex');
         eq(outcome.status, 'applied', 'actual UI cursor edit applied');
         eq(installs.writes, 1, 'one real MZ state replacement for one cursor move');
@@ -93,7 +94,7 @@ export async function runStep4Write(p: any): Promise<void> {
         eq(W.PSPokedex.current().view.cursor, next, 'real list cursor moved once');
         await frames(2);
         const intervals = updates.intervals(), syncCoverage = coverSync(intervals, syncStarted, syncEnded);
-        return { chain, index, warmup: index < 2, syncStartedAt: syncStarted, syncEndedAt: syncEnded, syncMs: syncEnded - syncStarted, updates: intervals, syncCoverage, tickSource, tickCount: updates.timestamps.length, context: context(frameStart, started, performance.now()), cursor: next };
+        return { chain, index, warmup: index < 2, direction, syncStartedAt: syncStarted, syncEndedAt: syncEnded, syncMs: syncEnded - syncStarted, updates: intervals, syncCoverage, tickSource, tickCount: updates.timestamps.length, context: context(frameStart, started, performance.now()), cursor: next };
       } finally { app.updatePokedex = original; updates.restore(); installs.restore(); }
     };
 
