@@ -87,3 +87,29 @@ test('P51-09/14: eggs do not make a party battle-able and unsupported egg/mail g
 test('P51-01: receiving an external M-id advances the shared counter and never rerolls individual attributes',()=>{
  const x=setup({size:0});const external=E.speciesKey.toPersistentMember(E.memberFactory.createMember({id:'Mzz',species:'Pidgey',level:3},content,()=>0),content);assert.equal(x.app.receiveGift({kind:'silent',member:{existing:external}}).status,'applied');assert.equal(x.state.current().nextMemberOrdinal,'1296');assert.equal(x.state.current().party[0].personalID,external.personalID);assert.equal(E.memberIdentity.allocateMemberId(x.state.current().nextMemberOrdinal,new Set()).id,'M100');
 });
+
+function optionalCreationWorld(callback){
+ const c=clone(content),grant={members:[{species:'Pidgey',level:3}],items:{},money:0};c.grants={...c.grants,'optional-grant':grant,'optional-grant-2':clone(grant)};
+ const game=S.newGame({content:c,party:[],player:{id:0x12345678,name:'Trainer',gender:1,language:1}}),state=E.fakes.createMemoryState(game);let supply=false;
+ const ports={state,sessions:E.fakes.createFakeSessions({}),projection:E.fakes.createRecordingProjection(),content(){if(supply&&!this.creationContext)this.creationContext=function(){return{map:this.content().content?7:9};};return{content:c};},random:()=>0,clock:()=>1234567890000};
+ if(callback)ports.creationContext=callback;
+ const app=new E.app.GameApplication(ports,{receivingProfile:{mode:1,naming:1}});return{app,state,ports,supplyCreationContext:()=>{supply=true;}};
+}
+function selfRetiringCreation(){const answer={map:this.content().content?7:9};this.creationContext=undefined;return answer;}
+const silentGift=()=>({kind:'silent',member:{species:'Pidgey',level:3}});
+test('STEP3-ULTRA-02: gift re-reads an optional creationContext after successful self-retirement',()=>{
+ const x=optionalCreationWorld(selfRetiringCreation);assert.equal(x.app.receiveGift(silentGift()).status,'applied');assert.equal(x.app.receiveGift(silentGift()).status,'applied');
+ assert.deepEqual(x.state.current().party.map(m=>m.origin.map),[7,0]);assert.equal(x.state.replaced.length,2);assert.equal(x.app.saveBlocked,false);
+});
+test('STEP3-ULTRA-02: distinct grants re-read an optional creationContext after successful self-retirement',()=>{
+ const x=optionalCreationWorld(selfRetiringCreation);assert.equal(x.app.claimGrant('optional-grant').status,'applied');assert.equal(x.app.claimGrant('optional-grant-2').status,'applied');
+ assert.deepEqual(x.state.current().party.map(m=>m.origin.map),[7,0]);assert.equal(x.state.replaced.length,2);assert.equal(x.app.saveBlocked,false);
+});
+test('STEP3-ULTRA-02: gift observes creationContext supplied after an initially absent first acquisition',()=>{
+ const x=optionalCreationWorld();assert.equal(x.app.receiveGift(silentGift()).status,'applied');x.supplyCreationContext();assert.equal(x.app.receiveGift(silentGift()).status,'applied');
+ assert.deepEqual(x.state.current().party.map(m=>m.origin.map),[0,7]);assert.equal(x.state.replaced.length,2);assert.equal(x.app.saveBlocked,false);
+});
+test('STEP3-ULTRA-02: grants observe creationContext supplied after an initially absent first acquisition',()=>{
+ const x=optionalCreationWorld();assert.equal(x.app.claimGrant('optional-grant').status,'applied');x.supplyCreationContext();assert.equal(x.app.claimGrant('optional-grant-2').status,'applied');
+ assert.deepEqual(x.state.current().party.map(m=>m.origin.map),[0,7]);assert.equal(x.state.replaced.length,2);assert.equal(x.app.saveBlocked,false);
+});
