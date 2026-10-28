@@ -285,7 +285,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       allowHeldSources: this.capabilities.allowHeldItemSources, holdable: id => { const item = this.describeHeldItem(id); return !!item?.holdable && !item.mail; } });
     this.acquisition = new AcquisitionOperation({
       state: this.battleStatePort, content: () => this.ports.content().content, random: this.ports.random,
-      creationContext: this.ports.creationContext && (() => this.ports.creationContext!()), now: () => this.now(), generation: () => this.generation,
+      creationContext: () => this.ports.creationContext?.(), now: () => this.now(), generation: () => this.generation,
       newContext: options => this.newReceptionContext(options), setReception: pending => { this.reception = pending; },
       noteReception: (context, members, next) => this.noteReception(context, members, next),
       reserveDex: (token, entries, content) => { this.pokedex.reserve(token, "acquisition", entries, content); },

@@ -40,7 +40,7 @@ interface AcquisitionOperationOptions {
   state: { read(): GameState; replace(next: GameState): void };
   content: () => Content;
   random?: RandomPort;
-  creationContext?: () => CreationContext;
+  creationContext?: () => CreationContext | undefined;
   now: () => number;
   generation: () => number;
   newContext: (options?: BattleCommitOptions) => ReceptionContext;
