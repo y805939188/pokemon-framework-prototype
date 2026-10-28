@@ -95,16 +95,20 @@ export async function runStep4Memory(p: any): Promise<void> {
         return result;
       },
       managedTextureTransitions() {
+        const unknown = { total: 'UNKNOWN', active: 'UNKNOWN', tombstones: 'UNKNOWN', nullEntries: 'UNKNOWN', undefinedEntries: 'UNKNOWN', added: 'UNKNOWN', removed: 'UNKNOWN', currentByKind: 'UNKNOWN', addedByKind: 'UNKNOWN', removedByKind: 'UNKNOWN' };
         try {
           const textures = G.Graphics?.app?.renderer?.texture?.managedTextures;
-          if (!Array.isArray(textures)) return { total: 'UNKNOWN', added: 'UNKNOWN', removed: 'UNKNOWN', currentByKind: 'UNKNOWN', addedByKind: 'UNKNOWN', removedByKind: 'UNKNOWN' };
-          for (const source of textures) managedKinds.set(managedId(source), managedKind(source));
-          const current = new Set(textures.map(managedId)), added = textures.filter(source => !previousManaged.has(managedId(source)));
-          const currentByKind = countKinds(textures), addedByKind = countKinds(added), removedByKind: Record<string, number> = {};
+          if (!Array.isArray(textures)) return unknown;
+          const active = textures.filter(source => source !== null && source !== undefined);
+          for (const source of active) managedKinds.set(managedId(source), managedKind(source));
+          const current = new Set(active.map(managedId)), added = active.filter(source => !previousManaged.has(managedId(source)));
+          const currentByKind = countKinds(active), addedByKind = countKinds(added), removedByKind: Record<string, number> = {};
           for (const id of previousManaged) if (!current.has(id)) { const kind = managedKinds.get(id) ?? `previously-managed|${id}`; removedByKind[kind] = (removedByKind[kind] ?? 0) + 1; }
-          const result = { total: textures.length, added: added.length, removed: [...previousManaged].filter(id => !current.has(id)).length, currentByKind, addedByKind, removedByKind };
+          const result = { total: textures.length, active: active.length, tombstones: textures.length - active.length,
+            nullEntries: textures.filter(source => source === null).length, undefinedEntries: textures.filter(source => source === undefined).length,
+            added: added.length, removed: [...previousManaged].filter(id => !current.has(id)).length, currentByKind, addedByKind, removedByKind };
           previousManaged = current; return result;
-        } catch { return { total: 'UNKNOWN', added: 'UNKNOWN', removed: 'UNKNOWN', currentByKind: 'UNKNOWN', addedByKind: 'UNKNOWN', removedByKind: 'UNKNOWN' }; }
+        } catch { return unknown; }
       },
       restore() { for (let i = restored.length - 1; i >= 0; i--) restored[i]!(); },
     };
@@ -132,7 +136,7 @@ export async function runStep4Memory(p: any): Promise<void> {
         gcForced, gcCalls: gcForced ? 2 : 0,
         heapUsed: usage.heapUsed ?? 'UNKNOWN', heapTotal: usage.heapTotal ?? 'UNKNOWN', external: usage.external ?? 'UNKNOWN', arrayBuffers: usage.arrayBuffers ?? 'UNKNOWN', rendererRss: usage.rss ?? 'UNKNOWN', appRss: 'UNKNOWN',
         chromiumHeap: js ? { usedJSHeapSize: js.usedJSHeapSize, totalJSHeapSize: js.totalJSHeapSize, jsHeapSizeLimit: js.jsHeapSizeLimit } : 'UNKNOWN',
-        counters: { ...probe.counters }, weakAlive: probe.alive(), managedTextures: managed.total, managedTextureTransitions: managed,
+        counters: { ...probe.counters }, weakAlive: probe.alive(), managedTextures: managed.total, managedActiveTextures: managed.active, managedTextureTombstones: managed.tombstones, managedTextureTransitions: managed,
         scene: scene()?.constructor?.name, sceneWindows: scene()?._windowLayer?.children?.length ?? 'UNKNOWN', inputs: document.querySelectorAll('input').length,
         mapChildren: scene()?.children?.length ?? 'UNKNOWN',
       };
