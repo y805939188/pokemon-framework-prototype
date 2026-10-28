@@ -175,7 +175,7 @@ export async function continueStep5Sample(p: any): Promise<void> {
     W.PSManagement.openParty(); await uiReady("party");
     const parent = scene();
     await press("ok"); await uiChoose("summary"); await uiReady("summary");
-    eq(scene(), parent, "summary stays in the same real parent scene across frames");
+    assert(scene() === parent, "summary stays in the same real parent scene across frames");
     await press("cancel"); await uiReady("party");
     await press("cancel"); await uiClosed();
     eq(game(), before, "party to summary to return preserves the complete state");
