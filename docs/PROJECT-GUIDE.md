@@ -165,3 +165,7 @@ pnpm --dir src build                                                            
 ## 2026-10-27 I/J技术门增补
 
 5.3固定代码29791cb的Kimi/ultra技术门已有限通过，材料增补闭环与保留风险见[5.3 I/J技术收尾](step5/5.3-IJ-closeout.md)。本增补不预签精确CI、远端接收、完整5.3或原版等价；五项计时WARN、当前Renderer增长WARN_OPEN、Ruby新增执行0、FINAL-INPUT后置NOT RUN及原历史限制保持。前表为各阶段历史截面，具体新结论以上述版本化增补和实际发布回执为准。
+
+## 2026-10-28 框架整改组合验收入口
+
+[框架整改第五步组合验收](framework-remediation/step5-integration.zh.md)固定当前 A–F 命令、真实宿主场景与外部结果入口。它是已批准整改五步的组合批次，不是产品5.4/5.5、性能/内存/Ruby专项或独立通过结论。最终SHA/tree、实测exit和交付状态只读该文链接的author外部报告；未执行不得写PASS。总体同步性能与五项计时WARN、Renderer/summary-dex归因OPEN、CPU profile/instrument-off/allocation缺证、appRSS UNKNOWN、Ruby新增0和FINAL-INPUT/适用IME NOT RUN继续保留，P-3/P-4及5.4出口不因此视为完成或自动延期。

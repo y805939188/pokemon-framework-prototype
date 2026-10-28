@@ -135,3 +135,17 @@ RJ01–RJ03 定向回归：`node --test experiments/step5/1/test-management-ui.c
 正常操作进行时禁止保存／开战；保存开关由游戏自己的开关和框架owner共同决定。新游戏／读档换代清旧token，UI草稿、动画、锁及receipt不存；正常Continue由MZ `Scene_Load`负责界面切换。所有错误／恢复说明以实际 `primaryCommitted` 和 pending为准，不能因“出现错误”一律退款，也不能把未知结果伪装成功。
 
 后继：正常玩家持物战斗写回5.4（两个开发开关仍默认关）；完整世界／栖息地图资料与128步触发5.5；名人堂快照／浏览5.6；片尾第六步Demo。专用精灵图像／叫声／脚印／栖息遮罩仍显式占位。可替换无头UI与TS后缀机械批次独立后置；5.3 Ruby新增执行对照0是证据欠账，不以当前TS／NW自测替代或默认为已批准延期。
+
+## 框架整改第五步组合验收（不是产品5.4/5.5）
+
+稳定范围、外部结果入口与风险边界见[框架整改组合验收](../framework-remediation/step5-integration.zh.md)。本批只新增三个测试驱动 mode；不改变上述作者 API、schema、冻结协议或持物双门。
+
+| mode | 用途 |
+|---|---|
+| `step5-fixture` | 真实 boot 的显式 fixture 冷加载与两次 ResetGame；不代替正常 sample |
+| `step5-sample` | 正式空新游戏、真实 starter、成长/捕获/治疗及普通槽 producer |
+| `step5-continue` | 新进程正常 Title→Continue→Scene_Load、队伍/背包/图鉴返回及 claim/battle 防重放 |
+
+开发树/包内均使用 `PF_OWNED_BACKGROUND=1 PF_OWNED_SKIP_BUILD=1 scripts/run-inventory-test-mac.sh <新证据目录> <mode>`；包内另设 `PF_OWNED_NW=<APP>/Contents/MacOS/nwjs` 和 `PF_OWNED_PROJECT=<APP>/Contents/Resources/app.nw`。`step5-continue` 必须同时指定成功 producer 的 `PF_OWNED_EXPECTED` 与其隔离 `PF_OWNED_SAVES`。runner 用共享锁及自有 PID/PGID，不能启用 `PF_OWNED_REQUIRE_IDLE`，profile/save/expected 只能放在本批 author 下。
+
+最终实测身份和结论不写进本命令表；只读 `author/DELIVERY.zh.md`、`CANDIDATE.json`、`VERIFICATION.json`、`FAILURES.zh.md`。未执行时不得把这些命令或驱动存在本身记作 PASS。
