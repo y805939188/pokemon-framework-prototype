@@ -69,6 +69,19 @@ export async function runStep4Memory(p: any): Promise<void> {
       return remove.call(this, type, listener, options);
     };
     restored.push(() => { prototype.addEventListener = add; prototype.removeEventListener = remove; });
+    const managedIds = new WeakMap<object, string>(), managedKinds = new Map<string, string>(); let managedSerial = 0, previousManaged = new Set<string>();
+    const managedId = (source: any): string => {
+      if ((typeof source !== 'object' || source === null) && typeof source !== 'function') return `primitive:${String(source)}`;
+      let id = managedIds.get(source); if (!id) { id = `local:${++managedSerial}`; managedIds.set(source, id); } return id;
+    };
+    const managedKind = (source: any): string => {
+      const ctor = String(source?.constructor?.name ?? 'UNKNOWN'), resource = String(source?.resource?.constructor?.name ?? 'UNKNOWN');
+      const label = typeof source?.label === 'string' ? source.label.slice(0, 120) : '';
+      return `${ctor}|${resource}|${String(source?.width ?? '?')}x${String(source?.height ?? '?')}|destroyed=${Boolean(source?.destroyed)}|${label}`;
+    };
+    const countKinds = (sources: any[]): Record<string, number> => {
+      const result: Record<string, number> = {}; for (const source of sources) { const kind = managedKind(source); result[kind] = (result[kind] ?? 0) + 1; } return result;
+    };
     return {
       counters, scope,
       alive() {
@@ -81,9 +94,17 @@ export async function runStep4Memory(p: any): Promise<void> {
         }
         return result;
       },
-      managedTextures() {
-        try { const textures = G.Graphics?.app?.renderer?.texture?.managedTextures; return Array.isArray(textures) ? textures.length : 'UNKNOWN'; }
-        catch { return 'UNKNOWN'; }
+      managedTextureTransitions() {
+        try {
+          const textures = G.Graphics?.app?.renderer?.texture?.managedTextures;
+          if (!Array.isArray(textures)) return { total: 'UNKNOWN', added: 'UNKNOWN', removed: 'UNKNOWN', currentByKind: 'UNKNOWN', addedByKind: 'UNKNOWN', removedByKind: 'UNKNOWN' };
+          for (const source of textures) managedKinds.set(managedId(source), managedKind(source));
+          const current = new Set(textures.map(managedId)), added = textures.filter(source => !previousManaged.has(managedId(source)));
+          const currentByKind = countKinds(textures), addedByKind = countKinds(added), removedByKind: Record<string, number> = {};
+          for (const id of previousManaged) if (!current.has(id)) { const kind = managedKinds.get(id) ?? `previously-managed|${id}`; removedByKind[kind] = (removedByKind[kind] ?? 0) + 1; }
+          const result = { total: textures.length, added: added.length, removed: [...previousManaged].filter(id => !current.has(id)).length, currentByKind, addedByKind, removedByKind };
+          previousManaged = current; return result;
+        } catch { return { total: 'UNKNOWN', added: 'UNKNOWN', removed: 'UNKNOWN', currentByKind: 'UNKNOWN', addedByKind: 'UNKNOWN', removedByKind: 'UNKNOWN' }; }
       },
       restore() { for (let i = restored.length - 1; i >= 0; i--) restored[i]!(); },
     };
@@ -105,13 +126,13 @@ export async function runStep4Memory(p: any): Promise<void> {
     const startedAt = performance.now(), startFrame = G.Graphics.frameCount, startDriverFrame = p.driverFrame();
     const memory = (phase: string, cycle: number | null) => {
       const gcForced = typeof G.gc === 'function'; if (gcForced) { G.gc(); G.gc(); }
-      const usage = G.process.memoryUsage(), js = (performance as any).memory;
+      const usage = G.process.memoryUsage(), js = (performance as any).memory, managed = probe.managedTextureTransitions();
       const row = {
         phase, cycle, at: performance.now(), graphicsFrame: G.Graphics.frameCount, driverFrame: p.driverFrame(),
         gcForced, gcCalls: gcForced ? 2 : 0,
         heapUsed: usage.heapUsed ?? 'UNKNOWN', heapTotal: usage.heapTotal ?? 'UNKNOWN', external: usage.external ?? 'UNKNOWN', arrayBuffers: usage.arrayBuffers ?? 'UNKNOWN', rendererRss: usage.rss ?? 'UNKNOWN', appRss: 'UNKNOWN',
         chromiumHeap: js ? { usedJSHeapSize: js.usedJSHeapSize, totalJSHeapSize: js.totalJSHeapSize, jsHeapSizeLimit: js.jsHeapSizeLimit } : 'UNKNOWN',
-        counters: { ...probe.counters }, weakAlive: probe.alive(), managedTextures: probe.managedTextures(),
+        counters: { ...probe.counters }, weakAlive: probe.alive(), managedTextures: managed.total, managedTextureTransitions: managed,
         scene: scene()?.constructor?.name, sceneWindows: scene()?._windowLayer?.children?.length ?? 'UNKNOWN', inputs: document.querySelectorAll('input').length,
         mapChildren: scene()?.children?.length ?? 'UNKNOWN',
       };
@@ -174,6 +195,7 @@ export async function runStep4Memory(p: any): Promise<void> {
     try {
       probe.scope.value = 'empty-control'; await frames(cycleFrames); memory('empty-control', null);
       for (let i = 0; i < warmupCycles; i++) await runCycle(i, true);
+      assert(probe.counters.bitmapCreated > 0 && probe.counters.bitmapDestroyed > 0 && probe.counters.canvasCreated > 0 && probe.counters.baseTextureCreated > 0 && probe.counters.textureDestroy > 0 && probe.counters.textureSourceDestroy > 0, 'resource probe observed real create/destroy paths');
       stableState = clone(game()); probe.scope.value = 'ready'; memory('ready', 0);
       for (let i = 0; i < cycles; i++) {
         await runCycle(i + 1, false); eq(game(), stableState, 'measured lifecycle performs no persistent writes');
