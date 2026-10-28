@@ -44,8 +44,17 @@ interface Operation {
   pendingWrite?: PendingWrite;
   error?: string; retired?: string; reloadRequired: boolean;
 }
-const key = (state: GameState): string => JSON.stringify(state, (_k, v: unknown) => v && typeof v === "object" && !Array.isArray(v)
-  ? Object.fromEntries(Object.keys(v).sort().map(k => [k, (v as Record<string, unknown>)[k]])) : v);
+// Inputs are already detached JSON clones. Build their canonical strings directly instead of allocating a sorted
+// intermediate record for every nested object. This changes no validation, comparison, clone or installation step.
+const key = (state: GameState): string => {
+  const canonical = (value: unknown): string => {
+    if (value === null || typeof value !== "object") return JSON.stringify(value) as string;
+    if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).sort().map(k => `${JSON.stringify(k)}:${canonical(record[k])}`).join(",")}}`;
+  };
+  return canonical(state);
+};
 // Only the operation's detached snapshots are memoized. Every host readback is still cloned and canonicalized afresh.
 const pendingBefore = (pending: PendingWrite): string => pending.beforeKey ??= key(pending.before);
 const pendingNext = (pending: PendingWrite): string => pending.nextKey ??= key(pending.next);
