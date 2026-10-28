@@ -61,6 +61,13 @@ test('P2-1 dex view preserves both strong gates and bounds private snapshot cano
   assert.deepEqual(violations, [], JSON.stringify(result));
 });
 
+test('STEP4-DEX-CANONICAL-01 direct private key construction preserves both strong gates and all detached clones', () => {
+  const result = measure('dex');
+  assert.equal(result.members, 1201);
+  assert.equal(result.memberDescriptorScans, 2 * result.members, JSON.stringify(result));
+  assert.equal(result.stateJsonStringifyCalls, 6, JSON.stringify(result));
+});
+
 function rawWorld() {
   let state = clone(E.fixtures.makeGame()); state.party = state.party.slice(0, 1);
   const content = clone(E.fixtures.content); let writes = 0;
