@@ -1,6 +1,6 @@
 {
-  "protocol": "ruby-ts-differential/normalizer-v1",
-  "version": "wp30-r2-normalizer-v1",
+  "protocol": "ruby-ts-differential/normalizer-v2",
+  "version": "wp30-r2-normalizer-v2",
   "rawRetention": "private-full-json-and-streams-v1",
   "arrayOrder": "preserve",
   "objectEquality": "canonical-keys-without-field-removal",
@@ -10,8 +10,8 @@
     {"operation": "growth.addExp", "projection": "integer-v1", "rawFieldsRetainedPrivately": true},
     {"operation": "growth.addExpSequence", "projection": "ordered-after-and-steps-v1", "rawFieldsRetainedPrivately": true},
     {"operation": "growth.levelFromExp", "projection": "integer-or-raised-class-v1", "rawFieldsRetainedPrivately": true},
-    {"operation": "friendship.change", "projection": "ruby-state-change-to-ts-plan-after-v1", "fields": ["status", "before", "after", "delta"], "inputBoundFields": ["method"], "rawFieldsRetainedPrivately": true},
-    {"operation": "friendship.changeSequence", "projection": "ordered-ruby-state-changes-to-ts-plans-v1", "fields": ["steps", "after"], "inputBoundFields": ["name", "method"], "rawFieldsRetainedPrivately": true},
+    {"operation": "friendship.change", "projection": "ruby-state-change-to-ts-plan-numeric-v2", "fields": ["status", "before", "after", "delta"], "inputBoundFields": ["method"], "rawFieldsRetainedPrivately": true},
+    {"operation": "friendship.changeSequence", "projection": "ordered-ruby-state-changes-to-ts-plans-numeric-v2", "fields": ["steps", "after"], "inputBoundFields": ["name", "method"], "rawFieldsRetainedPrivately": true},
     {"operation": "friendship.affection", "projection": "derived-affection-v1", "rawFieldsRetainedPrivately": true}
   ]
 }

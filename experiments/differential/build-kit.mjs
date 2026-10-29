@@ -94,10 +94,10 @@ const logical = {
 };
 const hashes = Object.fromEntries(Object.entries(logical).map(([name, path]) => [name, sha256File(join(out, path))]));
 const freeze = {
-  protocol: "ruby-ts-differential/freeze-v1",
+  protocol: "ruby-ts-differential/freeze-v2",
   frozenAtUTC: args[7],
-  schemaVersion: "wp30-r2-schema-v1",
-  normalizerVersion: "wp30-r2-normalizer-v1",
+  schemaVersion: "wp30-r2-schema-v2",
+  normalizerVersion: "wp30-r2-normalizer-v2",
   mappingVersion: "wp30-r2-mapping-v1",
   selectionVersion: "wp30-r2-v1",
   randomPolicy: "seed-null-draws-0-otherwise-block-v1",

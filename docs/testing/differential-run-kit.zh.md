@@ -44,7 +44,7 @@ node "$KIT/compare.mjs" --kit "$KIT" --expected-freeze "$FREEZE_SHA256" --handof
 
 私有 raw case 保留 `kind=class=raw` 三元组：正常 `value`、返回的 `error-object`、抛出的 `raised` 分开；过程 `process-error`、`timeout`、`protocol-error` 位于执行层，不转换成 case 值。异常 class 原始保留，私有 raw 可含完整错误对象/诊断。
 
-公开包只含操作白名单投影：数值、friendship before/after/delta、有序 steps、affection、闭合错误 code 与 raw kind/class。Ruby 状态变化到 TS plan.after 的投影已事前登记为 `ruby-state-change-to-ts-plan-after-v1`。额外 raw 字段、未知形状或不能闭合表示的自由文本使整端 protocol/gate 失败，不做关键词删除。
+公开包只含操作白名单投影：数值、friendship before/after/delta、有序 steps、affection、闭合错误 code 与 raw kind/class。本批公开合同显式升级为 `behavior-package-v2` / `normalizer-v2` / `freeze-v2`（`schemaVersion=wp30-r2-schema-v2`）；friendship 投影为 `ruby-state-change-to-ts-plan-numeric-v2` 与 `ordered-ruby-state-changes-to-ts-plans-numeric-v2`。其 before/after/delta 与 sequence 最终 after 复用同一有限、安全范围数字载体，可为分数或越出 0..255 的值，delta 仍须等于 after-before，链式 before/after 与数组顺序不变；JSON 十进制词法身份门仍在投影前拒绝精度损失、下溢、负零和 unsafe integer。该表示能力不批准、夹紧或拒绝任何产品行为，旧 v1 包/freeze 不得冒充本合同。额外 raw 字段、未知形状或不能闭合表示的自由文本使整端 protocol/gate 失败，不做关键词删除。
 
 本批无随机输入：`seed=null, drawCount=0, draws=[]`。若实际 reference 发生随机消费，私有 response 保留真实 bound/value/order，该侧公开行为包和整次 handoff 均不发布，run-dual 返回 `RUN_BLOCKED`；先另定可复现输入契约，不得伪填 0 或兜底发布空 trace。
 

@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "ruby-ts-differential/behavior-package-v1",
+  "$id": "ruby-ts-differential/behavior-package-v2",
   "type": "object",
   "additionalProperties": false,
   "required": ["protocol", "role", "entryId", "requestHash", "freezeHash", "observedAtUTC", "source", "runtime", "execution", "random", "cases"],
   "properties": {
-    "protocol": {"const": "ruby-ts-differential/behavior-package-v1"},
+    "protocol": {"const": "ruby-ts-differential/behavior-package-v2"},
     "role": {"enum": ["reference", "candidate"]},
     "entryId": {"enum": ["reference-rules-v1", "ts-core-v1"]},
     "requestHash": {"$ref": "#/$defs/hash"},
@@ -59,9 +59,10 @@
         "timedOut": {"type": "boolean"}, "outputLimitExceeded": {"type": "boolean"}
       }
     },
+    "friendshipStateNumber": {"type": "number", "minimum": -9007199254740991, "maximum": 9007199254740991},
     "friendshipPlan": {
       "type": "object", "additionalProperties": false, "required": ["status", "before", "after", "delta"],
-      "properties": {"status": {"const": "ready"}, "before": {"type": "integer", "minimum": 0, "maximum": 255}, "after": {"type": "integer", "minimum": 0, "maximum": 255}, "delta": {"type": "integer", "minimum": -255, "maximum": 255}}
+      "properties": {"status": {"const": "ready"}, "before": {"$ref": "#/$defs/friendshipStateNumber"}, "after": {"$ref": "#/$defs/friendshipStateNumber"}, "delta": {"$ref": "#/$defs/friendshipStateNumber"}}
     },
     "value": {
       "oneOf": [
@@ -69,7 +70,7 @@
         {"type": "object", "additionalProperties": false, "required": ["after", "steps"], "properties": {"after": {"type": "integer"}, "steps": {"type": "array", "maxItems": 8, "items": {"type": "integer"}}}},
         {"$ref": "#/$defs/friendshipPlan"},
         {"type": "object", "additionalProperties": false, "required": ["status", "affection"], "properties": {"status": {"const": "ready"}, "affection": {"type": "integer", "minimum": 0, "maximum": 5}}},
-        {"type": "object", "additionalProperties": false, "required": ["steps", "after"], "properties": {"steps": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"$ref": "#/$defs/friendshipPlan"}}, "after": {"type": "integer", "minimum": 0, "maximum": 255}}}
+        {"type": "object", "additionalProperties": false, "required": ["steps", "after"], "properties": {"steps": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"$ref": "#/$defs/friendshipPlan"}}, "after": {"$ref": "#/$defs/friendshipStateNumber"}}}
       ]
     },
     "errorValue": {

@@ -5,12 +5,15 @@ import { publicExecution } from "./process.mjs";
 const exact = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) &&
   Object.keys(value).sort().join(",") === [...keys].sort().join(",");
 const integer = (value) => Number.isSafeInteger(value);
-const clampedInteger = (value) => integer(value) && value >= 0 && value <= 255;
+// Exact JSON lexical identity is enforced by parseJson before this projection.
+// This carrier only adds finite, safe-range numeric state; it never rounds or clamps it.
+const friendshipStateNumber = (value) => typeof value === "number" && Number.isFinite(value) &&
+  !Object.is(value, -0) && Math.abs(value) <= Number.MAX_SAFE_INTEGER;
 const normalizationError = (code) => Object.assign(new Error(code), { code });
 
 function publicPlan(raw, method) {
   if (!exact(raw, ["status", "method", "before", "after", "delta"])) throw normalizationError("FRIENDSHIP_RAW_PLAN_SHAPE");
-  if (raw.status !== "ready" || raw.method !== method || !clampedInteger(raw.before) || !clampedInteger(raw.after) || raw.delta !== raw.after - raw.before) {
+  if (raw.status !== "ready" || raw.method !== method || !friendshipStateNumber(raw.before) || !friendshipStateNumber(raw.after) || !friendshipStateNumber(raw.delta) || raw.delta !== raw.after - raw.before) {
     throw normalizationError("FRIENDSHIP_RAW_PLAN_CONTENT");
   }
   return { status: "ready", before: raw.before, after: raw.after, delta: raw.delta };
@@ -46,7 +49,7 @@ export function sanitizeOutcome(outcome, testCase) {
       if (!exact(raw, ["after", "steps"]) || !integer(raw.after) || !Array.isArray(raw.steps) || raw.steps.length !== testCase.input.amounts.length || !raw.steps.every(integer)) throw normalizationError("GROWTH_SEQUENCE_RAW_SHAPE");
       return { kind: "value", value: { after: raw.after, steps: [...raw.steps] } };
     case "friendship.changeSequence": {
-      if (!exact(raw, ["steps", "after"]) || !Array.isArray(raw.steps) || raw.steps.length !== testCase.input.steps.length || !clampedInteger(raw.after)) throw normalizationError("FRIENDSHIP_SEQUENCE_RAW_SHAPE");
+      if (!exact(raw, ["steps", "after"]) || !Array.isArray(raw.steps) || raw.steps.length !== testCase.input.steps.length || !friendshipStateNumber(raw.after)) throw normalizationError("FRIENDSHIP_SEQUENCE_RAW_SHAPE");
       const steps = raw.steps.map((step, index) => publicPlan(step, testCase.input.steps[index]));
       let before = testCase.input.initial;
       for (const step of steps) {
@@ -96,7 +99,7 @@ export function makeBehaviorPackage({ execution, request, freezeHash, publicMeta
     }));
   }
   const behavior = {
-    protocol: "ruby-ts-differential/behavior-package-v1",
+    protocol: "ruby-ts-differential/behavior-package-v2",
     role: execution.role,
     entryId: execution.entryId,
     requestHash: request.requestHash,
