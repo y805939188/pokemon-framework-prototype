@@ -667,6 +667,7 @@ test("RDIFF-ULTRA-03: real child/raw/publication/compare can no longer turn raw 
 test("RDIFF-ULTRA-01: case aliases use physical identity, with zero-child markers or legal sensitive-volume separation", () => {
   const probe = join(testRoot, "case-volume-probe");
   mkdirSync(join(probe, "CaseDir"), { recursive: true });
+  mkdirSync(join(probe, "casedir"), { recursive: true });
   const mixed = statSync(join(probe, "CaseDir"), { bigint: true });
   const lower = statSync(join(probe, "casedir"), { bigint: true });
   const sameInode = mixed.dev === lower.dev && mixed.ino === lower.ino;
