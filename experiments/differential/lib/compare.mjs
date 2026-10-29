@@ -1,5 +1,5 @@
 import { canonicalStringify, sha256Json } from "./json.mjs";
-import { gateBehaviorPackage, GateError } from "./protocol.mjs";
+import { gateBehaviorPackage, GateError, validateMapping } from "./protocol.mjs";
 
 function classMapping(mapping, testCase, referenceOutcome, candidateOutcome) {
   if (referenceOutcome.kind !== candidateOutcome.kind || referenceOutcome.kind === "value") return null;
@@ -45,6 +45,7 @@ export function compareBehaviorPackages({ reference, candidate, request, freeze,
   // No outcome field is read before BOTH independent clean-side gates succeed.
   gateBehaviorPackage(reference, { request, freezeHash: freeze.hash, role: "reference", manifest });
   gateBehaviorPackage(candidate, { request, freezeHash: freeze.hash, role: "candidate", manifest });
+  validateMapping(mapping);
 
   const byId = new Map(request.cases.map((testCase) => [testCase.caseId, testCase]));
   const approvalIssues = [];

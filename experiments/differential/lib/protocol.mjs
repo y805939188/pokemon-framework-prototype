@@ -201,6 +201,17 @@ export function gateBehaviorPackage(behavior, { request, freezeHash, role, manif
   return behavior;
 }
 
+function isValidUtcDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?Z$/.exec(value);
+  if (!match) return false;
+  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
+  if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59) return false;
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (day < 1 || day > days[month - 1]) return false;
+  return Number.isFinite(Date.parse(value));
+}
+
 export function validateMapping(mapping) {
   const result = validateSchema(schemas.mapping(), mapping);
   if (!result.valid) throw new GateError("MAPPING_SCHEMA_REJECTED", result.errors);
@@ -211,6 +222,7 @@ export function validateMapping(mapping) {
     requireGate(entry.kind !== "value", "MAPPING_CANNOT_TOUCH_VALUE");
     requireGate(entry.referenceClass !== entry.candidateClass, "MAPPING_IDENTITY_CLASS_NOT_ALLOWED");
   }
+  for (const approval of mapping.approvedDifferences) requireGate(isValidUtcDate(approval.expiresUTC), "APPROVAL_EXPIRY_INVALID_UTC");
   return mapping;
 }
 

@@ -497,3 +497,47 @@ for (const [name, mutate, code] of kitMutations) test(`kit rejection: ${name}`, 
 test("kit rejection: externally supplied freeze hash is authoritative", () => {
   assertGate(() => verifyKit(kit.root, { expectedFreezeHash: "0".repeat(64) }), "KIT_EXTERNAL_FREEZE_HASH_MISMATCH");
 });
+
+test("DIFF-C06: synthetic approvals accept valid future UTC, reject expiry, and fail closed on invalid dates", () => {
+  const target = kit.request.cases.find((testCase) => testCase.operation === "growth.maximumExp");
+  const reference = clone(referencePackage);
+  const candidate = clone(candidatePackage);
+  const ref = reference.cases.find((testCase) => testCase.caseId === target.caseId);
+  const cand = candidate.cases.find((testCase) => testCase.caseId === target.caseId);
+  ref.outcome.value = cand.outcome.value + 1;
+  const approval = {
+    caseId: target.caseId,
+    requestHash: target.requestHash,
+    referenceOutcomeHash: sha256Json(ref.outcome),
+    candidateOutcomeHash: sha256Json(cand.outcome),
+    expiresUTC: "2999-01-01T00:00:00Z",
+    review: { decision: "INDEPENDENT_APPROVED_DIVERGENCE", reviewHash: "1".repeat(64) }
+  };
+  const withExpiry = (expiresUTC) => ({ ...kit.mapping, approvedDifferences: [{ ...approval, expiresUTC }] });
+  const futureMapping = withExpiry("2999-01-01T00:00:00Z");
+  assert.equal(validateMapping(futureMapping), futureMapping);
+  const future = compare(reference, candidate, futureMapping);
+  assert.equal(future.status, "PASS_WITH_APPROVED_DIVERGENCE"); // Synthetic marker only; no real approval.
+  assert.deepEqual(future.approvalIssues, []);
+  assert.equal(validateMapping(withExpiry("2028-02-29T23:59:59.999Z")).approvedDifferences[0].expiresUTC, "2028-02-29T23:59:59.999Z");
+  const expired = compare(reference, candidate, withExpiry("2020-01-01T00:00:00Z"));
+  assert.equal(expired.status, "FAIL");
+  assert.equal(expired.approvalIssues[0].code, "APPROVAL_EXPIRED");
+  for (const expiresUTC of ["2026-99-99T00:00:00Z", "2026-02-30T00:00:00Z", "2025-02-29T00:00:00Z", "2026-01-01T24:00:00Z"]) {
+    const invalid = withExpiry(expiresUTC);
+    assertGate(() => validateMapping(invalid), "APPROVAL_EXPIRY_INVALID_UTC");
+    assertGate(() => compare(reference, candidate, invalid), "APPROVAL_EXPIRY_INVALID_UTC");
+  }
+});
+
+test("DIFF-C07: inherited array toJSON is rejected before invocation and ordinary arrays remain lossless", () => {
+  let hookCalls = 0;
+  class Hooked extends Array {
+    toJSON() { hookCalls++; return 0; }
+  }
+  const hooked = new Hooked(1, 2);
+  assert.throws(() => strictStringify(hooked), (error) => error.code === "JSON_ARRAY_PROTOTYPE");
+  assert.equal(hookCalls, 0);
+  assert.equal(strictStringify([1, 2]), "[1,2]");
+  assert.deepEqual(parseJson("[1,2]"), [1, 2]);
+});

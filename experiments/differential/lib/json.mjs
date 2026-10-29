@@ -42,6 +42,11 @@ export function assertJsonValue(value, path = "$", ancestors = new Set(), depth 
 
   ancestors.add(value);
   if (Array.isArray(value)) {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Array.prototype) fail("JSON_ARRAY_PROTOTYPE", path);
+    for (let current = prototype; current !== null; current = Object.getPrototypeOf(current)) {
+      if (Object.hasOwn(current, "toJSON")) fail("JSON_SERIALIZATION_HOOK", path);
+    }
     for (const key of Reflect.ownKeys(value)) {
       if (key === "length") continue;
       if (typeof key !== "string" || !/^(0|[1-9][0-9]*)$/.test(key) || !Number.isSafeInteger(Number(key)) || Number(key) >= 4294967295 || String(Number(key)) !== key) {
