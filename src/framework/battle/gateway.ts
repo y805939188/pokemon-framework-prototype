@@ -79,6 +79,11 @@ export class BattleGateway implements BattleDriver {
       if (opts.noBall) battle.rpg.noBall = true;
       if (opts.noRun) battle.rpg.noRun = true;
     }
+    if (opts.obedience) {
+      if (!battle.rpg) throw new Error("obedience needs the RPG format and its serialized battle context");
+      // Plain own JSON data is included in Battle#toJSON; owner/generation/content authority was established by the app.
+      battle.rpg.obedience = JSON.parse(JSON.stringify(opts.obedience));
+    }
     gw._pump();
     return gw;
   }

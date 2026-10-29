@@ -16,6 +16,7 @@ import { allMembers, locateMember } from "../rules/storage";
 import type { MemberCollection } from "../rules/storage";
 import { own, setOwn } from "../rules/own";
 import { battleNameOf, memberKey } from "../rules/species-key";
+import { checkTrainerInputs, trainerSpeciesKeys } from "../content/trainer-input";
 
 /** Strong compiled identity only; id/inputsHash/anonymous fallbacks are diagnostics, never effects authority. */
 export function validatedContentIdentity(content: Content): string | null {
@@ -74,6 +75,9 @@ export function loadCompiled(json: unknown): CompiledContent {
     }
   }
   if(json.grants!==undefined&&(!dense(json.grants)||json.grants.some(g=>!obj(g)||!dense(g.members)||g.members.some(m=>!obj(m))||!obj(g.items))))report("compiled","$.grants","invalid grant records");
+  const trainerOrder = dense(json.registrationOrder) ? json.registrationOrder as unknown as import("../rules/types").SpeciesKey[] : [];
+  const trainerCatalog = checkItemInputs(json.items, json.shops, usable).catalog;
+  problems.push(...checkTrainerInputs(json.trainerTypes, json.trainers, { speciesKeys: trainerSpeciesKeys(trainerOrder), catalog: trainerCatalog, usable }).errors);
   if(problems.length)throw new Error(problems.map(p=>`${p.file} ${p.path}: ${p.message}`).join("; "));
   return json as unknown as CompiledContent;
 }
@@ -174,6 +178,28 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
       members.push({ species: name, level: m.level, ...(m.form !== undefined ? { form: m.form } : {}), ...(m.item !== undefined ? { item: m.item } : {}) });
     }
     if (ok) setOwn(content.grants!, g.id, { id: g.id, members, items: { ...g.items }, money: g.money });
+  }
+  if (compiled.trainerTypes && compiled.trainers) {
+    content.trainerTypeOrder = compiled.trainerTypes.map(type => type.id);
+    content.trainerTypes = {};
+    content.trainers = {};
+    for (const type of compiled.trainerTypes) setOwn(content.trainerTypes, type.id, JSON.parse(JSON.stringify(type)) as typeof type);
+    for (const record of compiled.trainers) {
+      for (const [index, member] of record.party.entries()) {
+        const path = `trainers/${record.id}@${record.version}.party[${index}]`;
+        const formName = own(own(content.forms, member.species), String(member.form ?? 0));
+        if (!formName || !own(content.species, formName)) errors.push({ file: "assembly", path: `${path}.species`, message: "missing exact assembled species/form" });
+        for (const [moveIndex, move] of (member.moves ?? []).entries()) if (!dex.move(move)) errors.push({ file: "assembly", path: `${path}.moves[${moveIndex}]`, message: `unknown move ${move}` });
+        if (member.ability !== undefined && !dex.abilityInfo?.(member.ability)) errors.push({ file: "assembly", path: `${path}.ability`, message: `unknown ability ${member.ability}` });
+        if (member.item !== undefined) {
+          const item = dex.heldItem?.(member.item);
+          if (!item?.holdable || item.mail) errors.push({ file: "assembly", path: `${path}.item`, message: "unsupported held item; validation does not open the B battle gate" });
+        }
+      }
+      const versions = own(content.trainers, record.id) ?? [];
+      versions.push(JSON.parse(JSON.stringify(record)) as typeof record);
+      setOwn(content.trainers, record.id, versions);
+    }
   }
   return { content, errors };
 }

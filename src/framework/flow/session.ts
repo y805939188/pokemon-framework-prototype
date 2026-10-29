@@ -19,6 +19,7 @@ import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, itemEligibility } from "../rules/
 import * as S from "../rules/state";
 import type { BattleResult, GameState } from "../rules/state";
 import type { Content, Member } from "../rules/types";
+import type { ObedienceContext } from "../rules/obedience";
 import type { BattleEvent, SessionMessage } from "../battle/protocol";
 import type { LogLevel, LogSink } from "./log";
 import { EvidenceRecorder } from "./battle-evidence";
@@ -99,6 +100,8 @@ export interface CreateOptions {
   driver?: BattleDriverFactory;
   /** App-owned companion authority, not a player flag or protocol-v1 field. */
   evidence?: BattleEvidenceContext;
+  /** Formal application obedience control; omitted only by legacy direct-session callers. */
+  obedience?: ObedienceContext;
 }
 
 export type Refusal = { ok: false; reason: string };
@@ -180,7 +183,7 @@ export class BattleSession {
   _friendUnavailable: string[] = [];
   _pendingFriendFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
 
-  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, evidence }: CreateOptions): Promise<BattleSession> {
+  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, evidence, obedience }: CreateOptions): Promise<BattleSession> {
     if (!experimentalHeldBattle && [...game.party, ...foe.team].some((m) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成");
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
     for (const m of [...game.party, ...foe.team]) {
@@ -213,6 +216,7 @@ export class BattleSession {
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
     s.gw = await driver.create({
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
+      ...(obedience ? { obedience } : {}),
       players: [{ name: "Player", team: lead.map((m) => toSet(m, moveName)) }, { name: foe.kind === "wild" ? "Wild" : "Trainer", team: s.foeTeam.map((m) => toSet(m, moveName)) }],
     });
     s._effects?.startControl(!doubles && !!s.gw.drainFriendshipFaints && !!s.gw.validateFriendshipFaints && !!s.gw.applyFriendship && !!s.gw.checkpointFriendship && !!s.gw.restoreFriendship);

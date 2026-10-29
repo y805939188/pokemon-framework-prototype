@@ -1,0 +1,18 @@
+[
+  {
+    "id": "youngster",
+    "nameKey": "trainer.type.youngster",
+    "gender": 0,
+    "baseMoney": 20,
+    "skillLevel": 3,
+    "flags": ["NoName"],
+    "items": [],
+    "battleBgm": "Battle trainer",
+    "victoryBgm": "Battle victory",
+    "introBgm": "",
+    "openingText": "Let's have a fair battle.",
+    "winText": "That was a good match.",
+    "loseText": "You won this time.",
+    "source": "author-placeholder"
+  }
+]

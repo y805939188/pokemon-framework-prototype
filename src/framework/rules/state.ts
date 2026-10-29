@@ -33,7 +33,7 @@ export { PROTOCOL_VERSION, MEMBER_WRITE_SET } from "./battle-result";
 export type { BattleResult, BattleOutcome, MemberPatch, WriteKey, Dex } from "./battle-result";
 
 /** Version of the PERSISTENT game state document (rules/save-schema.ts migrates older ones). Not the battle protocol version. */
-export const GAME_SCHEMA = 7;
+export const GAME_SCHEMA = 8;
 
 export interface GameState {
   schema: number;
@@ -45,7 +45,9 @@ export interface GameState {
   badges: boolean[];
   money: number;
   dex: DexState;
-  appliedBattles: Record<string, { hash: string }>;
+  appliedBattles: Record<string, { hash: string; trainer?: { id: string; version: number } }>;
+  /** Won trainer records keyed id@version (schema 8); versions stay distinct and intentional rematches remain allowed. */
+  defeatedTrainers: Record<string, { id: string; version: number }>;
   /** One-time claims (schema 3): a claimed grant id can never be granted again on this save timeline. */
   claims: Record<string, Claim>;
   /** Statistics record (schema 4; WP06 §4.2, 74 fields). */
@@ -128,7 +130,7 @@ export function protocolMember(member: Member): Member {
  */
 export function newGame({ party, bag = {}, money = 0, player = { ...COMPATIBLE_PLAYER }, content }: { party: NewMemberInput[]; bag?: Record<string, number>; money?: number; player?: Owner; content?: Content }): GameState {
   const members = party.map((m) => ({...completeIndividual(newMember({ ...m, form: m.form ?? 0 }), {}), statNature: m.statNature ?? null, moves: m.moves.map(move => ({...clone(move),ppUps:move.ppUps ?? 0}))}));
-  return { schema: GAME_SCHEMA, party: members, storage: newStorage(), player: { ...player }, nextMemberOrdinal: initialOrdinal(members.map((m) => m.id)), inventory: inventoryFromBag(bag, catalogOf(content), inventoryPolicy(content)), badges: Array(8).fill(false) as boolean[], money, dex: createDexState(content), appliedBattles: {}, claims: {}, stats: newStats(), steps: 0 };
+  return { schema: GAME_SCHEMA, party: members, storage: newStorage(), player: { ...player }, nextMemberOrdinal: initialOrdinal(members.map((m) => m.id)), inventory: inventoryFromBag(bag, catalogOf(content), inventoryPolicy(content)), badges: Array(8).fill(false) as boolean[], money, dex: createDexState(content), appliedBattles: {}, defeatedTrainers: {}, claims: {}, stats: newStats(), steps: 0 };
 }
 
 /** Stable hash of a result, used for idempotency (same battleId + same hash => no-op). */

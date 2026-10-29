@@ -23,7 +23,7 @@ function fullWorld() {
 function measure(chain) {
   const w = fullWorld(), counts = { memberDescriptorScans: 0, moveDirectoryValues: 0, stateJsonStringifyCalls: 0 };
   const descriptors = Object.getOwnPropertyDescriptors, values = Object.values, stringify = JSON.stringify;
-  const isState = value => !!value && typeof value === 'object' && !Array.isArray(value) && value.schema === 7 && Array.isArray(value.party) && !!value.storage && Array.isArray(value.storage.boxes);
+  const isState = value => !!value && typeof value === 'object' && !Array.isArray(value) && value.schema === E.state.GAME_SCHEMA && Array.isArray(value.party) && !!value.storage && Array.isArray(value.storage.boxes);
   try {
     Object.getOwnPropertyDescriptors = function(value) {
       const result = descriptors.call(this, value);

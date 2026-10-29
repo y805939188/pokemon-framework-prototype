@@ -15,7 +15,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EVID="${1:?new evidence directory required}"; MODE="${2:-inventory}"
-case "$MODE" in inventory|all|verify-save|empty-source|perf|matrix|driver-selftest|capability|progression-data|postbattle|learning|triggered|trade|acquisition|viewing|m1|learning-ui|evolution-ui|trade-ui|battle-entry|item-evolution-ui|pokedex-ui|closeout|closeout-continue|closeout-lifecycle|step5-sample|step5-fixture|step5-continue) ;; *) echo "unsupported mode: $MODE" >&2; exit 2;; esac
+case "$MODE" in inventory|all|verify-save|empty-source|perf|matrix|driver-selftest|capability|progression-data|postbattle|learning|triggered|trade|acquisition|viewing|m1|m1-trainer|learning-ui|evolution-ui|trade-ui|battle-entry|item-evolution-ui|pokedex-ui|closeout|closeout-continue|closeout-lifecycle|step5-sample|step5-fixture|step5-continue) ;; *) echo "unsupported mode: $MODE" >&2; exit 2;; esac
 mkdir -p "$EVID"; EVID="$(cd "$EVID" && pwd)"
 [[ ! -e "$EVID/report.json" && ! -e "$EVID/launch.json" ]] || { echo 'existing evidence: choose another directory' >&2; exit 2; }
 NW="${PF_OWNED_NW:-$HOME/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.app/Contents/Resources/nwjs-mac/nwjs.app/Contents/MacOS/nwjs}"

@@ -16,6 +16,7 @@ import { baseMovePp, totalPp } from "./member-metadata";
  *   5  individual metadata and fixed 40×30 storage.
  *   6  ordered inventory, badges and persistent move PP metadata.
  *   7  readiness certainty, cannotTrade, complete dex history and stable layout identity.
+ *   8  stable trainer id + author-version defeat records and optional trainer battle-ledger identity.
  * Anything else is refused with a diagnosable error ("unknown-version"/"corrupt"/"invalid") — never silently reset.
  * 3 -> 4 needs the content's species mapping (Showdown name -> content id + form): without it the migration refuses
  * ("needs-content"), and a name the content cannot map refuses the WHOLE migration ("unmapped-species", every place
@@ -34,7 +35,7 @@ import type { SpeciesKeyResolver } from "./species-key";
 import { newStats, validateStats } from "./stats";
 
 const SAVE_SCHEMA = GAME_SCHEMA;
-export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
+export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export interface Problem { path: string; message: string }
 export interface SaveErrorInfo {
@@ -242,6 +243,7 @@ function validateGameView(input: unknown): GameValidationView {
   if (schema >= 7) { const checked = validatedOwnDataCopy(x, "$", out); if (out.length) return { problems: out, view: x }; x = checked; }
   const allowedTop = schema >= 5 ? [...TOP_KEYS.filter((k) => k !== "boxes"), "storage", "player", "nextMemberOrdinal"] : TOP_KEYS;
   if (schema >= 6) { allowedTop.splice(allowedTop.indexOf("bag"),1); allowedTop.push("inventory","badges"); }
+  if (schema >= 8) allowedTop.push("defeatedTrainers");
   knownKeys(x, allowedTop, "$", out);
   if (schema >= 7 && out.length) return { problems: out, view: x };
   const seen = new Set<string>();
@@ -300,7 +302,20 @@ function validateGameView(input: unknown): GameValidationView {
   }
   if (!isObj(x["appliedBattles"])) out.push({ path: "$.appliedBattles", message: "must be an object" });
   else for (const [id, v] of Object.entries(x["appliedBattles"])) if (!isObj(v) || !Object.hasOwn(v, "hash") || typeof v["hash"] !== "string" || !/^[0-9a-f]{64}$/.test(v["hash"])) out.push({ path: `$.appliedBattles["${id}"]`, message: "must be {hash: 64 hex characters}" });
-  if (schema >= 7 && isObj(x["appliedBattles"])) for (const [id, record] of Object.entries(x["appliedBattles"])) if (isObj(record)) knownKeys(record, ["hash"], `$.appliedBattles[${JSON.stringify(id)}]`, out);
+  if (schema >= 7 && isObj(x["appliedBattles"])) for (const [id, record] of Object.entries(x["appliedBattles"])) if (isObj(record)) {
+    knownKeys(record, schema >= 8 ? ["hash", "trainer"] : ["hash"], `$.appliedBattles[${JSON.stringify(id)}]`, out);
+    const trainer = record["trainer"];
+    if (trainer !== undefined && (!isObj(trainer) || typeof trainer["id"] !== "string" || !/^[a-z][a-z0-9-]{0,62}$/.test(trainer["id"]) || !isInt(trainer["version"], 0, 255))) out.push({ path: `$.appliedBattles[${JSON.stringify(id)}].trainer`, message: "must be stable trainer id + author version" });
+    if (isObj(trainer)) knownKeys(trainer, ["id", "version"], `$.appliedBattles[${JSON.stringify(id)}].trainer`, out);
+  }
+  if (schema >= 8) {
+    const defeated = x["defeatedTrainers"];
+    if (!isObj(defeated)) out.push({ path: "$.defeatedTrainers", message: "must be id@version -> {id,version}" });
+    else for (const [key, record] of Object.entries(defeated)) {
+      if (!isObj(record) || typeof record["id"] !== "string" || !/^[a-z][a-z0-9-]{0,62}$/.test(record["id"]) || !isInt(record["version"], 0, 255) || key !== `${record["id"]}@${record["version"]}`) out.push({ path: `$.defeatedTrainers[${JSON.stringify(key)}]`, message: "key and value must be the same stable trainer id + author version" });
+      else knownKeys(record, ["id", "version"], `$.defeatedTrainers[${JSON.stringify(key)}]`, out);
+    }
+  }
   if (schema >= 3) {
     const claims = x["claims"];
     if (!isObj(claims)) out.push({ path: "$.claims", message: "must be an object (claim id -> {kind})" });
@@ -321,8 +336,8 @@ export function validateGameContent(state: unknown, content: Content): Problem[]
   const checked = validateGameView(state), out = checked.problems;
   if (out.length) return out;
   const doc = checked.view!;
-  if (doc["schema"] !== SAVE_SCHEMA) return [{ path: "$.schema", message: "must migrate to schema 7 before installation or saving" }];
-  // Schema 7 validation already made this detached own-data view. Reuse it only within this synchronous gate.
+  if (doc["schema"] !== SAVE_SCHEMA) return [{ path: "$.schema", message: `must migrate to schema ${SAVE_SCHEMA} before installation or saving` }];
+  // Current-schema validation already made this detached own-data view. Reuse it only within this synchronous gate.
   out.push(...dexContentProblems(content));
   if (out.length) return out;
   const contentIndex = createMemberContentIndex(content), catalog = contentIndex.catalog;
@@ -480,6 +495,11 @@ const MIGRATIONS: Record<number, Migrator> = {
     doc["dex"] = createDexState(content, doc["dex"] as { seen: string[]; owned: string[] }, "migration");
     doc["schema"] = 7;
     notes.push("schema 7: existing readiness is known; cannotTrade defaults false; old seen/owned remain independent, no forms or counts were inferred; dex unlocks follow the declared legacy truth table");
+  },
+  7: (doc, notes) => {
+    doc["defeatedTrainers"] = {};
+    doc["schema"] = 8;
+    notes.push("schema 8: an empty stable trainer defeat record was added; no victory was inferred from old battle hashes");
   },
 };
 

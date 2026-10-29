@@ -18,16 +18,16 @@ test('B08: all six party and 40×30 storage slots preserve every previous value'
   raw.storage.currentBox=39;raw.storage.unlockedWallpapers=[16,39];
   const bytes=JSON.stringify(raw),start=performance.now(),out=good(raw,C),elapsed=performance.now()-start;
   assert.equal(members(out).length,1206);
-  const stripped=F.clone(out);stripped.schema=6;stripped.dex=F.clone(raw.dex);
+  const stripped=F.clone(out);stripped.schema=6;stripped.dex=F.clone(raw.dex);delete stripped.defeatedTrainers;
   for(const m of members(stripped)){assert.equal(m.evolutionReadiness,'known');assert.equal(m.cannotTrade,false);delete m.evolutionReadiness;delete m.cannotTrade;}
   assert.deepEqual(stripped,raw);assert.equal(JSON.stringify(raw),bytes);
   assert.equal(out.party[0].hp,0);assert.equal(out.party[0].readyToEvolve,true);
   t.diagnostic(JSON.stringify({members:1206,inputBytes:Buffer.byteLength(bytes),outputBytes:Buffer.byteLength(JSON.stringify(out)),migrationAndValidationMs:Math.round(elapsed*100)/100,oneMemberMigrationAndValidationMs:Math.round(smallMs*100)/100}));
 });
 
-for(const version of [1,2,3,4,5,6])test(`B09: schema ${version} follows the existing chain to 7 without mutating input`,()=>{
+for(const version of [1,2,3,4,5,6])test(`B09: schema ${version} follows the existing chain to the current schema without mutating input`,()=>{
   const C=F.content(E),raw=F.version(E,version,C),out=good(raw,C);
-  assert.equal(out.schema,7);assert.equal(out.party[0].friendship,256);assert.deepEqual(out.appliedBattles,raw.appliedBattles);
+  assert.equal(out.schema,E.state.GAME_SCHEMA);assert.equal(out.party[0].friendship,256);assert.deepEqual(out.appliedBattles,raw.appliedBattles);
   assert.equal(out.party[0].evolutionReadiness,'known');assert.equal(out.party[0].cannotTrade,false);
 });
 
@@ -72,7 +72,7 @@ test('B10/X-SAVE-01 pure gate: required readiness pair and cannotTrade are stric
   const unknown=F.clone(base);unknown.party[0].evolutionReadiness='unknown';assert.deepEqual(good(unknown,C),unknown);
 });
 test('B10: future versions refuse explicitly, and incomplete seven never receives defaults',()=>{
-  const C=F.content(E),base=current(C);refuse({...F.clone(base),schema:8},C,'unknown-version');
+  const C=F.content(E),base=current(C);refuse({...F.clone(base),schema:E.state.GAME_SCHEMA+1},C,'unknown-version');
   for(const field of ['hasDex','seenForms','lastSeenForm','capturedCounts','defeatedCounts','unlocked','view','layoutIdentity']){const bad=F.clone(base);delete bad.dex[field];refuse(bad,C);}
   refuse(F.clone(base),undefined,'needs-content');
 });

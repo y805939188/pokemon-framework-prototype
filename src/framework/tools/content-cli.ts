@@ -36,14 +36,16 @@ function readInputs(dir: string): { inputs: ContentInputs; errors: ContentError[
     try { return JSON.parse(fs.readFileSync(path.join(dir, file), "utf8")); }
     catch (e) { errors.push({ file, path: "$", message: `cannot read as JSON: ${(e as Error).message}` }); return undefined; }
   };
-  // grants.json (step 4) and settings.json (step 5.0) are optional; every other file is required
+  // Optional feature files are absent from legacy content; every file named by the base pipeline remains required.
   const grants = fs.existsSync(path.join(dir, "grants.json")) ? read("grants.json") : undefined;
   const settings = fs.existsSync(path.join(dir, "settings.json")) ? read("settings.json") : undefined;
   const items = fs.existsSync(path.join(dir, "items.json")) ? read("items.json") : undefined;
   const shops = fs.existsSync(path.join(dir, "shops.json")) ? read("shops.json") : undefined;
   const regionalDex = fs.existsSync(path.join(dir, "regional-dex.json")) ? read("regional-dex.json") : undefined;
   const mapMetadata = fs.existsSync(path.join(dir, "map-metadata.json")) ? read("map-metadata.json") : undefined;
-  const inputs = { ...(regionalDex !== undefined ? {regionalDex} : {}), ...(mapMetadata !== undefined ? {mapMetadata} : {}), ...(items !== undefined ? {items} : {}), ...(shops !== undefined ? {shops} : {}), manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json"), ...(grants !== undefined ? { grants } : {}), ...(settings !== undefined ? { settings } : {}) };
+  const trainerTypes = fs.existsSync(path.join(dir, "trainer-types.json")) ? read("trainer-types.json") : undefined;
+  const trainers = fs.existsSync(path.join(dir, "trainers.json")) ? read("trainers.json") : undefined;
+  const inputs = { ...(regionalDex !== undefined ? {regionalDex} : {}), ...(mapMetadata !== undefined ? {mapMetadata} : {}), ...(items !== undefined ? {items} : {}), ...(shops !== undefined ? {shops} : {}), manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json"), ...(grants !== undefined ? { grants } : {}), ...(settings !== undefined ? { settings } : {}), ...(trainerTypes !== undefined ? {trainerTypes} : {}), ...(trainers !== undefined ? {trainers} : {}) };
   return { inputs, errors };
 }
 

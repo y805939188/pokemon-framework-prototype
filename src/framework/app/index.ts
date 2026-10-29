@@ -2,7 +2,7 @@
 export { GameApplication, outcomeCode } from "./game-application";
 export type { CommitResultStatus, GameApplicationOptions, GameApplicationPorts } from "./game-application";
 export type {
-  BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ClockPort,
+  BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, TrainerBattleStartRequest, ClaimOutcome, ClockPort,
   EncounterPlan, ContentPort, CreationContext, GameStatePort, GiftOutcome, GiftRequest, HealOutcome,
   OutcomeProjection, PartyView, RandomPort, StepsOutcome,
 } from "./ports";

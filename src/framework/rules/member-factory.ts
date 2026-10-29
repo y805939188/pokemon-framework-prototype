@@ -58,6 +58,10 @@ export interface CreateMemberInput {
   owner?: Owner;
   /** Explicit 0 suppresses creation recheck, as does an explicit nonzero form. */
   form?: number;
+  /** NPC loading uses ordinary creation without automatic moves, then applies its own ordered overrides. */
+  withMoves?: boolean;
+  /** Defaults to the historical creation-form recheck; NPC explicit forms use simple storage instead. */
+  recheckForm?: boolean;
   context?: CreationEnvironment & { playerId?: number; map?: number; receivedAt?: number; fateful?: boolean };
   nature?: string;
   gender?: string;
@@ -89,7 +93,7 @@ export function createMember(input: CreateMemberInput, content: Content, random:
   const nature = input.nature ?? NATURE_ORDER[pid % 25]!;
   const contentId = sp.contentId ?? species;
   // Rule family, battle form name and author ID are separate. Legacy fixtures may use a canonical base name.
-  const form = input.form ?? (sp.form || creationForm(sp.ruleSpecies ?? species, nature, input.context?.playerId ?? owner.id, random, input.context));
+  const form = input.form ?? (sp.form || (input.recheckForm === false ? (sp.form ?? 0) : creationForm(sp.ruleSpecies ?? species, nature, input.context?.playerId ?? owner.id, random, input.context)));
   let finalName = species;
   if (form !== (sp.form ?? 0)) {
     const record = own(content.forms, contentId);
@@ -102,7 +106,7 @@ export function createMember(input: CreateMemberInput, content: Content, random:
   const derived = deriveIndividual(pid, { ...sp, gender: sp.gender ?? "N" }, input.abilityIndex);
   const gender = typeof sp.gender === "string" ? sp.gender : input.gender ?? derived.gender;
   const ability = input.ability ?? derived.ability;
-  const moves = initialMoves(sp, level, content);
+  const moves = input.withMoves === false ? [] : initialMoves(sp, level, content);
   const colors = shinyFromPersonalId(pid, owner.id);
   const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
   const stats = computeStats(sp.base, ivs, evs, level, nature);

@@ -148,6 +148,75 @@ export interface Grant {
   money: number;
 }
 
+export interface TrainerItemResource {
+  item: string;
+  count: number;
+}
+
+/** Author data for one ordinary NPC member (WP18 §4.3.1 / WP24 §5). */
+export interface TrainerMember {
+  species: string;
+  level: number;
+  form?: number;
+  item?: string;
+  moves?: string[];
+  abilityIndex?: number;
+  ability?: string;
+  gender?: "M" | "F";
+  shiny?: boolean;
+  superShiny?: boolean;
+  nature?: string;
+  ivs?: PartialStats;
+  evs?: PartialStats;
+  friendship?: number;
+  nickname?: string;
+  ball?: string;
+  /** C2 excludes Shadow; false is explicit data, true is refused by the compiler. */
+  shadow?: boolean;
+}
+
+export interface TrainerType {
+  id: string;
+  nameKey: string;
+  gender: 0 | 1 | 2;
+  baseMoney: number;
+  /** C consumer: strategy input projection only in A-M1. */
+  skillLevel: number;
+  /** C consumer: strategy/name projection only in A-M1. */
+  flags: string[];
+  /** C consumer: trainer-owned session resources, never the player's bag. */
+  items: TrainerItemResource[];
+  /** D logical request projections; A-M1 does not play or present them. */
+  battleBgm?: string;
+  victoryBgm?: string;
+  introBgm?: string;
+  openingText?: string;
+  winText?: string;
+  loseText?: string;
+  source: string;
+}
+
+export interface TrainerRecord {
+  id: string;
+  type: string;
+  name: string;
+  version: number;
+  language?: number;
+  party: TrainerMember[];
+  items?: TrainerItemResource[];
+  source: string;
+}
+
+export interface TrainerBattleProjection {
+  id: string;
+  version: number;
+  type: string;
+  name: string;
+  baseMoney: number;
+  ai: { skillLevel: number; flags: string[]; items: TrainerItemResource[] };
+  presentation: { battleBgm?: string; victoryBgm?: string; introBgm?: string; openingText?: string; winText?: string; loseText?: string };
+}
+
 export interface Content {
   /** Absent = explicit legacy compatibility catalog; an empty catalog stays empty. */
   items?: import('./item-catalog').ItemCatalog;
@@ -168,6 +237,11 @@ export interface Content {
   /** Showdown name -> persistent key (the reverse of `forms`). Absent in fixture content (see `forms`). */
   speciesKeys?: Record<string, SpeciesKey>;
   grants?: Record<string, Grant>;
+  /** Explicit author registration order for PD7; never inferred from object/national-dex keys. */
+  trainerTypeOrder?: string[];
+  trainerTypes?: Record<string, TrainerType>;
+  /** Stable record id -> all author versions. */
+  trainers?: Record<string, TrainerRecord[]>;
   /** Rule configuration overrides of the content (rules/config.ts); absent = the Gen 8 defaults. */
   settings?: import("./settings-types").RuleOverrides;
 }

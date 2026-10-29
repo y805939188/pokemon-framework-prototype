@@ -4,7 +4,8 @@
  * battle session factory. Types only.
  */
 import type { BattleResult, GameState } from "../rules/state";
-import type { Content, DexLookup, Member } from "../rules/types";
+import type { Content, DexLookup, Member, TrainerBattleProjection } from "../rules/types";
+import type { ObedienceContext } from "../rules/obedience";
 import type { BattleEvidence, BattleEvidenceContext, EvidenceBinding } from "../rules/battle-evidence";
 import type { EffectsBindingV2, EffectsSealV2 } from "../rules/battle-consumption";
 
@@ -44,12 +45,19 @@ export interface BattleStartRequest {
   canLose?: boolean;
   /** Scripted battle rule, explicit priority over the player receive preference. */
   forceParty?: boolean;
+  /** A-M1 stable trainer record; when present, foes are built from that record rather than free-form foe specs. */
+  trainer?: { id: string; version: number };
 }
+
+export type TrainerBattleStartRequest = Omit<BattleStartRequest, "kind" | "foes" | "trainer"> & { trainer: { id: string; version: number } };
 
 /** What the application decided before a session exists: the created foes and the effective flags. */
 export interface BattleSetup {
   /** Internal application authority for a transient companion; never read from a save or UI request. */
   evidenceContext?: BattleEvidenceContext;
+  /** Formal application path always supplies authoritative player/badges/content/generation; legacy direct sessions may omit it. */
+  obedience?: ObedienceContext;
+  trainer?: TrainerBattleProjection;
   experimentalHeldBattle?: boolean;
   diagnostics?: string[];
   foes: Member[];
@@ -150,6 +158,8 @@ export interface BattleOutcome {
   error?: string;
   /** A lost or drawn battle that was just committed: money lost and the party healed in the same state replacement (D3). */
   defeat?: { moneyLost: number; healed: true };
+  /** Actual A-M1 base-prize delta, not a nominal amulet/HappyHour/PayDay claim. */
+  trainerReward?: { id: string; version: number; nominal: number; before: number; after: number; actual: number; normalizationLoss: number };
   /** Whether the host was told. "failed" means the projection threw; `commit` separately says whether state was committed. */
   projection?: "ok" | "failed";
   projectionError?: string;

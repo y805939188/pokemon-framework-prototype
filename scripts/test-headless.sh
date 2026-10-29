@@ -130,6 +130,9 @@ SUITES=(
   experiments/step5/3/test-member-bridges7.cjs
   experiments/step5/3/test-save-gates7.cjs
   experiments/step5/3/test-perf-write-regression.cjs
+  experiments/step5/4/test-trainer-m1.cjs
+  experiments/step5/4/test-trainer-app-m1.cjs
+  experiments/step5/4/test-obedience-m1.cjs
 )
 fail=0
 for s in "${SUITES[@]}"; do

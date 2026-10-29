@@ -13,6 +13,7 @@ import {
 import { CONTENT_SHOWDOWN_SHA } from "./showdown-pin";
 import { PROGRESSION_FIELDS, progressionFieldProblem, inheritSpecies, deriveSpeciesFields, checkProgressionReferences, checkRegionalDex, checkMapMetadata } from "./progression-input";
 import type { CompiledContent, ContentError, ContentInputs, GrantSource, Overlay, SourceEntry, SpeciesSource } from "./schema";
+import { checkTrainerInputs, trainerSpeciesKeys } from "./trainer-input";
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -25,8 +26,8 @@ export function canonicalJson(v: unknown, indent = 0): string {
 }
 
 export function hashInputs(inputs: ContentInputs): string {
-  // grants/settings are undefined for content without those files: JSON drops the key, so older hashes are unchanged
-  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants, settings: inputs.settings, items: inputs.items, shops: inputs.shops, regionalDex: inputs.regionalDex, mapMetadata: inputs.mapMetadata }));
+  // Optional files are undefined for older content: JSON drops those keys, so legacy input hashes stay unchanged.
+  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants, settings: inputs.settings, items: inputs.items, shops: inputs.shops, regionalDex: inputs.regionalDex, mapMetadata: inputs.mapMetadata, trainerTypes: inputs.trainerTypes, trainers: inputs.trainers }));
 }
 
 const ID = /^[a-z][a-z0-9-]{0,30}$/;
@@ -290,6 +291,8 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
 
   if (errors.length) return {ok:false,errors};
   const registrationOrder = species.map(sp => ({species: sp.id, form: sp.form ?? 0}));
+  const trainerData = checkTrainerInputs(inputs.trainerTypes, inputs.trainers, { speciesKeys: trainerSpeciesKeys(registrationOrder), catalog: itemInputs.catalog, usable });
+  errors.push(...trainerData.errors);
   const effective = [...merged.values()];
   const warnings: ContentError[] = [];
   deriveSpeciesFields(effective, report, (file,path,message)=>warnings.push({file,path,message}));
@@ -313,6 +316,8 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
     ...(inputs.shops !== undefined ? { shops: itemInputs.shops } : {}),
     ...(inputs.grants !== undefined ? { grants: [...grants].sort((a, b) => a.id.localeCompare(b.id)) } : {}),
     ...(inputs.settings !== undefined ? { settings: { ...(inputs.settings as import("../rules/config").RuleOverrides) } } : {}),
+    ...(trainerData.types ? { trainerTypes: trainerData.types } : {}),
+    ...(trainerData.records ? { trainers: trainerData.records } : {}),
   };
   return { ok: true, data, errors: [], warnings };
 }

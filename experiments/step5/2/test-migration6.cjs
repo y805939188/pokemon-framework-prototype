@@ -3,13 +3,13 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const E=require('../../../js/engine/build/engine.cjs'),H=require('../1/legacy-test-support.cjs');
 const F=E.fixtures,S=E.state,I=E.inventory,clone=x=>structuredClone(x);
 const options={content:F.content,speciesKey:E.speciesKey.identityKeys};
-function old5(){const game=clone(F.makeGame());game.schema=5;game.bag=I.aggregateBag(game.inventory);delete game.inventory;delete game.badges;game.dex={seen:clone(game.dex.seen),owned:clone(game.dex.owned)};for(const m of E.storage.allMembers(game)){delete m.evolutionReadiness;delete m.cannotTrade;delete m.statNature;for(const move of m.moves)delete move.ppUps;}return game;}
+function old5(){const game=clone(F.makeGame());game.schema=5;delete game.defeatedTrainers;game.bag=I.aggregateBag(game.inventory);delete game.inventory;delete game.badges;game.dex={seen:clone(game.dex.seen),owned:clone(game.dex.owned)};for(const m of E.storage.allMembers(game)){delete m.evolutionReadiness;delete m.cannotTrade;delete m.statNature;for(const move of m.moves)delete move.ppUps;}return game;}
 const migrate=raw=>E.saveSchema.migrateGame(raw,options);
 test('P52-04 FR180: schema1..5 through6 to7 is deterministic, no data loss and no source mutation',()=>{
  for(const version of [1,2,3,4,5]){
   const raw=version===5?old5():H.legacyGame(F.makeGame(),version);raw.bag.potion=1500;raw.money=2000000;
   const before=clone(raw),one=migrate(raw),two=migrate(raw);assert.equal(one.ok,true,JSON.stringify(one));assert.deepEqual(one,two);assert.deepEqual(raw,before);
-  assert.equal(one.state.schema,7);assert.equal(I.aggregateBag(one.state.inventory).potion,1500);assert.equal(one.state.money,2000000);assert.deepEqual(one.state.badges,Array(8).fill(false));assert.equal('bag'in one.state,false);assert.equal(E.saveSchema.validateGame(one.state).length,0);
+  assert.equal(one.state.schema,S.GAME_SCHEMA);assert.equal(I.aggregateBag(one.state.inventory).potion,1500);assert.equal(one.state.money,2000000);assert.deepEqual(one.state.badges,Array(8).fill(false));assert.equal('bag'in one.state,false);assert.equal(E.saveSchema.validateGame(one.state).length,0);
   assert.deepEqual(migrate(one.state).state,one.state);assert.deepEqual(one.state.appliedBattles,raw.appliedBattles);assert.equal(one.state.party[0].moves[0].ppUps,0);
  }
 });

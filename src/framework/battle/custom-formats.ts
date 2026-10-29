@@ -9,6 +9,8 @@ import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, captureNumbers, escapeRate, healR
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types";
 import type { FormatObserver, FormatObservation } from "../rules/battle-evidence";
 import type { BattleActor, BattleDisplaySnapshot } from "../rules/battle-evidence";
+import { obedienceEligible, obedienceLevelLimit } from "../rules/obedience";
+import { own } from "../rules/own";
 
 interface Payload { kind: string; item?: string; target?: string; ball?: string; catchRate?: number; ctx?: Record<string, unknown> }
 
@@ -170,7 +172,107 @@ function hit(b: ShowdownBattle, domain: "body" | "substitute", loss: number, tar
     move: move.id, hit: move.hit ?? 1, critical: !!move.moveHitData?.[target.getSlot()]?.crit }));
 }
 
+interface ObedienceRuntime {
+  depth: number;
+  draws: number;
+  traceDropped: number;
+  trace: Record<string, unknown>[];
+}
+
+function obedienceRuntime(battle: ShowdownBattle): ObedienceRuntime {
+  const rpg = battle.rpg;
+  if (!rpg.obedienceRuntime) rpg.obedienceRuntime = { depth: 0, draws: 0, traceDropped: 0, trace: [] };
+  return rpg.obedienceRuntime as ObedienceRuntime;
+}
+function obedienceTrace(battle: ShowdownBattle, kind: string, pokemon: ShowdownPokemon, move: ShowdownPokemon, details: Record<string, unknown> = {}): void {
+  const runtime = obedienceRuntime(battle);
+  if (runtime.trace.length >= 256) { runtime.traceDropped++; return; }
+  runtime.trace.push({ kind, turn: battle.turn, side: pokemon.side.id, memberId: pokemon.name, move: move.id, level: pokemon.level, ...details });
+}
+function obedienceRandom(battle: ShowdownBattle, n: number): number {
+  obedienceRuntime(battle).draws++;
+  return battle.random(n) as number;
+}
+function obedienceMessage(battle: ShowdownBattle, pokemon: ShowdownPokemon, result: string, detail: string | number): void {
+  battle.add("rpg", "obedience", pokemon.side.id, pokemon.name, result, detail);
+}
+
+/** Real WP40 branch selection. Returning false is before deductPP; a nested selected move pays its own PP once. */
+function checkObedience(battle: ShowdownBattle, pokemon: ShowdownPokemon, target: ShowdownPokemon, move: ShowdownPokemon): boolean | undefined {
+  const control = battle.rpg?.obedience;
+  if (!control || pokemon.side.id !== "p1") return;
+  const runtime = obedienceRuntime(battle);
+  if (runtime.depth > 0) { obedienceTrace(battle, "recursive", pokemon, move); return; }
+  // Showdown external/called moves skip the ordinary status/obedience stage; Struggle deliberately does not.
+  if (move.isExternal && move.id !== "struggle") { obedienceTrace(battle, "special-skip", pokemon, move, { draws: 0 }); return; }
+  const locked = pokemon.getLockedMove();
+  const owner: import("../rules/types").Owner | undefined = own(control.members, pokemon.name);
+  if (!owner) throw new Error(`obedience-owner-context-missing:${pokemon.name}`);
+  const limit = obedienceLevelLimit(control.badges);
+  if (!obedienceEligible({ level: pokemon.level, owner, player: control.player, badges: control.badges,
+    anyHighLevel: control.anyHighLevel, foreignHighLevel: control.foreignHighLevel, locked: !!locked })) {
+    obedienceTrace(battle, "ineligible", pokemon, move, { limit, lockedMove: locked || null, draws: 0 });
+    return;
+  }
+  const first = obedienceRandom(battle, 256);
+  const a = Math.floor((pokemon.level + limit) * first / 256);
+  obedienceTrace(battle, "eligible", pokemon, move, { limit, roll: first, a, draws: 1 });
+  if (a < limit) return;
+  runtime.depth = 1;
+  try {
+    if (pokemon.status === "slp" && move.sleepUsable) {
+      obedienceTrace(battle, "sleep-usable-refusal", pokemon, move);
+      obedienceMessage(battle, pokemon, "sleep", move.id);
+      return false;
+    }
+    const second = obedienceRandom(battle, 256), b = Math.floor((pokemon.level + limit) * second / 256);
+    if (b < limit) {
+      const candidates = pokemon.moveSlots.filter((slot: ShowdownPokemon) => slot.id !== move.id && slot.pp > 0 && !slot.disabled);
+      if (!candidates.length || pokemon.side.activeRequest?.wait) {
+        obedienceTrace(battle, "no-other-move", pokemon, move, { roll: second, b });
+        obedienceMessage(battle, pokemon, "ignored", "no-other-move");
+        return false;
+      }
+      const selected = candidates[obedienceRandom(battle, candidates.length)]!;
+      const targetLoc = target ? pokemon.getLocOf(target) : 0;
+      obedienceTrace(battle, "change", pokemon, move, { roll: second, b, newMove: selected.id, targetLoc });
+      obedienceMessage(battle, pokemon, "change", selected.id);
+      battle.actions.runMove(selected.id, pokemon, targetLoc, {});
+      return false;
+    }
+    const c = pokemon.level - limit, roll = obedienceRandom(battle, 256);
+    if (roll < c && !pokemon.status) {
+      const applied = !!pokemon.trySetStatus("slp", pokemon);
+      obedienceTrace(battle, "self-sleep", pokemon, move, { roll, c, applied });
+      if (applied) {
+        obedienceMessage(battle, pokemon, "self-sleep", roll);
+        return false;
+      }
+    }
+    if (roll - c < c && !pokemon.status) {
+      obedienceTrace(battle, "self-hit", pokemon, move, { roll, c });
+      obedienceMessage(battle, pokemon, "self-hit", roll);
+      battle.activeTarget = pokemon;
+      const damage = battle.actions.getConfusionDamage(pokemon, 40);
+      if (typeof damage !== "number") throw new Error("obedience confusion damage not dealt");
+      const activeMove = { id: battle.toID("confused"), effectType: "Move", type: "???" };
+      battle.damage(damage, pokemon, pokemon, activeMove);
+      return false;
+    }
+    const refusal = obedienceRandom(battle, 4);
+    obedienceTrace(battle, "refuse", pokemon, move, { roll, c, refusal });
+    obedienceMessage(battle, pokemon, "refuse", refusal);
+    return false;
+  } finally {
+    runtime.depth = 0;
+  }
+}
+
 const rpgHandlers = {
+  onBeforeMovePriority: 9.5,
+  onBeforeMove(this: ShowdownBattle, pokemon: ShowdownPokemon, target: ShowdownPokemon, move: ShowdownPokemon): boolean | undefined {
+    return checkObedience(this, pokemon, target, move);
+  },
   onDamagingHitPriority: -100000,
   onDamagingHit(this: ShowdownBattle, loss: number, target: ShowdownPokemon, source: ShowdownPokemon, move: ShowdownPokemon): void { hit(this, "body", loss, target, source, move); },
   onAfterSubDamagePriority: -100000,

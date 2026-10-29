@@ -40,7 +40,7 @@ test('with the content mapping it migrates: content id + form, the original kept
   const f = copy('full.json'); const bytes = fs.readFileSync(f);
   const store = new SaveStore(f, {}, keys, content);
   const info = store.loadInfo();
-  assert.deepEqual([info.from, info.to, info.migrated], [3, 7, true]);
+  assert.deepEqual([info.from, info.to, info.migrated], [3, E.state.GAME_SCHEMA, true]);
   assert.ok(info.state.party.every(m => E.speciesKey.battleNameOf(content, m) !== null), 'every member resolves in the content');
   assert.ok(fs.readFileSync(f).equals(bytes), 'loading migrates in memory only');
   const committed = JSON.parse(bytes).appliedBattles;
@@ -48,7 +48,7 @@ test('with the content mapping it migrates: content id + form, the original kept
   assert.deepEqual(store.commit(results[first], H.templatesFor(info.state, results[first])), { status: 'already-applied', migratedFrom: 3 });
   assert.ok(fs.readFileSync(f + '.v3.bak').equals(bytes), 'the step 4 file is kept byte for byte');
   const now = store.loadInfo();
-  assert.deepEqual([now.from, now.migrated, now.state.party.map(m => m.species)], [7, false, info.state.party.map(m => m.species)]);
+  assert.deepEqual([now.from, now.migrated, now.state.party.map(m => m.species)], [E.state.GAME_SCHEMA, false, info.state.party.map(m => m.species)]);
   for (const id of Object.keys(committed)) assert.equal(store.commit(results[id], H.templatesFor(info.state, results[id])).status, 'already-applied', id);
 });
 
@@ -59,7 +59,7 @@ test('a current store requires content; content without a result mapping refuses
   assert.throws(() => new SaveStore(f).loadInfo(), e => e instanceof SaveError && e.info.code === 'needs-content');
   assert.ok(fs.readFileSync(f).equals(bytes), 'missing current content writes nothing');
   const store = new SaveStore(f, {}, undefined, content); // current content is required; a result mapping remains a separate explicit capability
-  assert.equal(store.loadInfo().from, 7);
+  assert.equal(store.loadInfo().from, E.state.GAME_SCHEMA);
   const caught = Object.values(results).find(r => r.captured && r.captured.length);
   assert.throws(() => store.commit({ ...caught, battleId: 'new#1' }), /names species \(.*\) and the store was given no species mapping/);
   assert.ok(fs.readFileSync(f).equals(bytes), 'nothing was written');

@@ -85,7 +85,7 @@ test('a save written by the step 4 code loads: migrated to schema 4 with the con
   const h = host(J(raw));
   h.load();
   assert.equal(h.sys._psSaveError, undefined, JSON.stringify(h.sys._psSaveError));
-  assert.deepEqual(J(h.sys._psSaveInfo).from, 3); assert.equal(h.sys._psSaveInfo.to, 7); assert.equal(h.sys._psSaveInfo.migrated, true);
+  assert.deepEqual(J(h.sys._psSaveInfo).from, 3); assert.equal(h.sys._psSaveInfo.to, E.state.GAME_SCHEMA); assert.equal(h.sys._psSaveInfo.migrated, true);
   const g = J(h.sys._psGame);
   assert.deepEqual(g.party.map(m => [m.species, m.form]), raw.party.map(m => [E.speciesKey.keyOfBattleName(content, m.species).species, 0]));
   assert.deepEqual(E.saveSchema.validateGame(g), []);
@@ -114,7 +114,7 @@ test('current schema7 and empty legacy host both require current content before 
   const raw = h.sys._psGame; h.flow.content = () => {throw Error('content unavailable');}; h.load();
   assert.equal(h.sys._psGame,raw); assert.equal(h.sys._psSaveError.code,'needs-content');
   const e = host(undefined); e.load();
-  assert.deepEqual([e.sys._psGame.schema,e.sys._psSaveInfo.created],[7,'empty']);
+  assert.deepEqual([e.sys._psGame.schema,e.sys._psSaveInfo.created],[E.state.GAME_SCHEMA,'empty']);
 });
 
 test('P4-2: loading a save (or starting a new game) releases a battle the application still held', async () => {

@@ -56,14 +56,17 @@ import { isDefeat, settleDefeat } from "../rules/defeat";
 import { battleView, speciesKeyResolver, toBattleMember, toPersistentMember } from "../rules/species-key";
 import { addSteps, bumpStat } from "../rules/stats";
 import type { GameStats, StatCounter } from "../rules/stats";
-import type { Member } from "../rules/types";
+import type { Member, TrainerBattleProjection } from "../rules/types";
+import { buildTrainerTeam, findTrainerRecord, trainerBattleProjection } from "../rules/trainer-team";
+import { applyTrainerPrize } from "../rules/trainer-reward";
+import type { TrainerPrizeResult } from "../rules/trainer-reward";
 import { allocateMemberId, ownerLanguage } from "../rules/member-identity";
 import { assertCapturedHeldSources, hasForcedPartyPlan, fallbackDecisions, receiveMembers, ReceivingRefused } from "../rules/receiving";
 import type { ReceivingDecision, ReceivingProfile } from "../rules/receiving";
 import { validateGameContent } from "../rules/save-schema";
 import { own } from "../rules/own";
 import { findDanglingReferences, resolveSpecies, validatedContentIdentity } from "../flow/content-runtime";
-import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ClockPort, ContentPort, CreationContext, EncounterPlan, GameStatePort, GiftOutcome, GiftRequest, HealOutcome, OutcomeProjection, PartyView, RandomPort, StepsOutcome } from "./ports";
+import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, TrainerBattleStartRequest, ClaimOutcome, ClockPort, ContentPort, CreationContext, EncounterPlan, GameStatePort, GiftOutcome, GiftRequest, HealOutcome, OutcomeProjection, PartyView, RandomPort, StepsOutcome } from "./ports";
 
 export interface GameApplicationPorts<S extends BattleHandle> {
   state: GameStatePort;
@@ -109,7 +112,7 @@ export function outcomeCode(result: BattleResult): number {
 }
 
 /** What a commit needs to know about the battle beyond its result: for the statistics (WP06 §4.2, WP53 §183, WP61 §7). */
-interface BattleFacts { kind: "wild" | "trainer"; canLose: boolean; experimentalHeld?: boolean }
+interface BattleFacts { kind: "wild" | "trainer"; canLose: boolean; experimentalHeld?: boolean; trainer?: { projection: TrainerBattleProjection; levels: number[] } }
 
 /**
  * Battle statistics of one committed result (host code: 1 win, 2 caught, 3 ran, 4 lost or drawn). Wild: a win or a
@@ -135,6 +138,7 @@ interface PreparedBattle {
   rawHash: string; generation: number; before: GameState; effects: ResolvedBattleEffects; captureMembers: Member[];
   sourceIdentity: string | null; sourceInvalidated: boolean; expectedContext: EffectsContextV2;
   next?: GameState; nextIdentity?: string | null; defeat?: { moneyLost: number; healed: true }; attempted: boolean; indeterminate: boolean; completed: boolean;
+  trainerReward?: TrainerPrizeResult & { id: string; version: number };
   diagnostics: string[];
   entries?: DexEntryIntent[];
 }
@@ -666,6 +670,17 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * Only one battle at a time: while another is open (also while its session is still being created) this throws. When
    * the battle is aborted before its session exists, a session that arrives later is not kept or returned (rejects).
    */
+  /** Stable id + author-version query; C/D receive projections only, not behavior claims. */
+  trainerRecord(id: string, version: number): TrainerBattleProjection | null {
+    if (typeof id !== "string" || !Number.isSafeInteger(version) || version < 0 || version > 255) throw new Error("invalid trainer record identity");
+    const found = findTrainerRecord(this.ports.content().content, id, version);
+    return found ? trainerBattleProjection(found.record, found.type) : null;
+  }
+
+  async startTrainerBattle(request: TrainerBattleStartRequest): Promise<S> {
+    return this.startBattle({ ...request, kind: "trainer", foes: [], trainer: { ...request.trainer } });
+  }
+
   async startBattle(request: BattleStartRequest): Promise<S> {
     if (this.management.active || this.reception || this.inventory.active) throw new Error("operation-active");
     if (this.op) throw new Error(`a battle is already open (${this.op.battleId})`);
@@ -681,38 +696,63 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       op.facts.experimentalHeld = game.party.some(m => !!m.item);
       if (!this.capabilities.allowExperimentalHeldItemBattle && game.party.some((m) => !!m.item)) throw new Error("held-item-battle-disabled: battle item write-back is incomplete");
       const { content, dex } = this.ports.content(); assertCurrent();
+      const trainer = request.trainer ? findTrainerRecord(content, request.trainer.id, request.trainer.version) : null;
+      if (request.trainer && (request.kind !== "trainer" || !trainer)) throw new Error(`missing trainer record "${request.trainer.id}" version ${request.trainer.version}`);
+      if (trainer) op.facts.trainer = { projection: trainerBattleProjection(trainer.record, trainer.type), levels: trainer.record.party.map(member => member.level) };
+      assertCurrent();
       const dangling = findDanglingReferences(game, content, dex); assertCurrent();
       if (dangling.length) throw new Error("the save refers to content that no longer exists: " + dangling.slice(0, 3).map((d) => `${d.path} ${d.message}`).join("; "));
       if (!game.party.some((m) => !m.isEgg && m.hp > 0)) throw new Error("no party member can battle");
       const sourceRandom = this.ports.random;
       if (!sourceRandom) throw new Error("no random source is configured for this application (needed to create the foes)");
       const random = (n: number) => { assertCurrent(); const value = sourceRandom(n); assertCurrent(); return value; };
-      if (!request.foes.length) throw new Error("a battle needs at least one foe");
+      if (!trainer && !request.foes.length) throw new Error("a battle needs at least one foe");
       const templates: Record<string, Member> = {};
       let ordinal = game.nextMemberOrdinal;
       const taken = new Set(allMembers(game).map((m) => m.id));
+      const allocate = (): string => { const allocated = allocateMemberId(ordinal, taken); ordinal = allocated.nextMemberOrdinal; taken.add(allocated.id); return allocated.id; };
       const createdAt = Math.floor(this.now() / 1000); assertCurrent();
       const creationContext = this.ports.creationContext?.() ?? {}; assertCurrent();
-      const foes: Member[] = request.foes.map((f, i) => {
+      const foes: Member[] = [];
+      if (trainer) {
+        if (!content.registrationOrder || !content.trainerTypeOrder) throw new Error("trainer content requires explicit species and trainer-type registration orders");
+        const generatedOwner = personalId(random), ownerId = generatedOwner === game.player.id ? (generatedOwner ^ 1) >>> 0 : generatedOwner;
+        const owner = { id: ownerId, name: trainer.record.name, gender: trainer.type.gender, language: trainer.record.language ?? 2 };
+        const built = buildTrainerTeam({ content, registrationOrder: content.registrationOrder, trainerTypeOrder: content.trainerTypeOrder,
+          record: trainer.record, type: trainer.type, owner, random, receivedAt: createdAt, allocateId: () => allocate(), context: creationContext });
+        for (const [i, member] of built.entries()) {
+          if (!member.moves.length) throw new Error(`trainer foe ${i + 1}: ${member.species} at level ${member.level} knows no move`);
+          templates[member.id] = toPersistentMember(member, content);
+          foes.push(toBattleMember(templates[member.id]!, content));
+        }
+      } else for (const [i, f] of request.foes.entries()) {
         const species = resolveSpecies(content, f.species);
         if (!species) throw new Error(`foe ${i + 1}: species "${f.species}" is not in the content`);
-        const allocated = allocateMemberId(ordinal, taken); ordinal = allocated.nextMemberOrdinal; taken.add(allocated.id);
-        const m = createMember({ id: allocated.id, species, level: f.level, owner: game.player, context: { ...creationContext, receivedAt: createdAt, playerId: game.player.id } }, content, random);
+        const m = createMember({ id: allocate(), species, level: f.level, owner: game.player, context: { ...creationContext, receivedAt: createdAt, playerId: game.player.id } }, content, random);
         if (!m.moves.length) throw new Error(`foe ${i + 1}: ${species} at level ${f.level} knows no move in the content (its learnset has nothing at or below that level)`);
         templates[m.id] = toPersistentMember(m, content);
-        return toBattleMember(templates[m.id]!, content);
-      });
+        foes.push(toBattleMember(templates[m.id]!, content));
+      }
       assertCurrent();
       const context = this.newReceptionContext({ templates, decisions: {}, profile: request.forceParty ? { ...this.profile, mode: 2 } : this.profile, nextMemberOrdinal: ordinal });
       const full = storageFull(game, this.limits);
       const forcedNoRoom = context.profile?.mode === 2 && !Object.values(templates).every((member) => hasForcedPartyPlan(game, member, { limits: this.limits, content, profile: context.profile!, depositHeal: this.depositHeal }));
       const diagnostics = [...(forcedNoRoom ? ["forced-party-no-target"] : []), ...(game.party.some((m) => !!m.item) ? ["战后持物写回未完成"] : [])];
-      const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full, ...(diagnostics.length ? { diagnostics } : {}), ...(game.party.some((m) => !!m.item) ? { experimentalHeldBattle: true } : {}) };
+      const config = resolveConfig(content.settings), contentIdentity = validatedContentIdentity(content) ?? content.meta?.inputsHash ?? content.meta?.id ?? "anonymous-content";
+      const memberOwners = Object.fromEntries(game.party.map(member => {
+        if (!member.owner) throw new Error(`player member ${member.id} has no authoritative owner for obedience`);
+        return [member.id, { ...member.owner }];
+      }));
+      const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full,
+        obedience: { player: { ...game.player }, members: memberOwners, badges: badgeCount(game.badges), anyHighLevel: config.ANY_HIGH_LEVEL_POKEMON_CAN_DISOBEY,
+          foreignHighLevel: config.FOREIGN_HIGH_LEVEL_POKEMON_CAN_DISOBEY, generation, contentIdentity },
+        ...(op.facts.trainer ? { trainer: op.facts.trainer.projection } : {}),
+        ...(diagnostics.length ? { diagnostics } : {}), ...(game.party.some((m) => !!m.item) ? { experimentalHeldBattle: true } : {}) };
       let mapId: number | undefined;
       try { mapId = this.ports.itemWorld?.().mapId ?? creationContext.map; } catch { /* optional companion context unavailable */ }
       assertCurrent(); // a swallowed optional-port failure must not swallow a timeline/owner replacement
       setup.evidenceContext = {
-        battleId: request.battleId, generation, contentIdentity: validatedContentIdentity(content) ?? content.meta?.inputsHash ?? content.meta?.id ?? "anonymous-content",
+        battleId: request.battleId, generation, contentIdentity,
         playerIds: game.party.map(m => m.id), initialLevels: Object.fromEntries(game.party.map(m => [m.id, m.level])),
         ...(Number.isSafeInteger(mapId) && mapId! >= 0 ? { mapId } : {}),
       };
@@ -791,7 +831,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * lost or drawn battle the defeat settlement (money loss and party heal, D3), and the battle statistics. All are
    * identified by the result's battleId + hash in appliedBattles, so a repeat (already-applied) never settles again.
    */
-  private commit(result: BattleResult, facts: BattleFacts | undefined, context: ReceptionContext, handle?: S): { status: ApplyStatus; defeat?: { moneyLost: number; healed: true }; diagnostics?: string[] } {
+  private commit(result: BattleResult, facts: BattleFacts | undefined, context: ReceptionContext, handle?: S): { status: ApplyStatus; defeat?: { moneyLost: number; healed: true }; trainerReward?: TrainerPrizeResult & { id: string; version: number }; diagnostics?: string[] } {
     assertBattleResultShape(result);
     this.assertBattleContext(context);
     const authority = handle ? this.ownedBattleEffects.get(handle) : undefined;
@@ -807,13 +847,14 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const previous = own(current.appliedBattles, result.battleId);
     if (previous) {
       if (previous.hash !== hash) throw new Error(`battle ${result.battleId} already applied with a different result`);
+      if (previous.trainer && facts?.trainer && (previous.trainer.id !== facts.trainer.projection.id || previous.trainer.version !== facts.trainer.projection.version)) throw new Error("trainer battle ledger identity conflict");
       if (prepared?.attempted && !prepared.completed && prepared.next) {
         if (stateIdentity(current) !== stateIdentity(prepared.next)) { prepared.indeterminate = true; throw new StateInstallFailed("state-install-indeterminate: reload the last complete save", true); }
         prepared.completed = true; prepared.indeterminate = false;
         this.noteReception(context, result.captured, current); this.reception = null;
-        return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), diagnostics: [...prepared.diagnostics, "状态已完整安装，已核定原提交"] };
+        return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), ...(prepared.trainerReward ? { trainerReward: prepared.trainerReward } : {}), diagnostics: [...prepared.diagnostics, "状态已完整安装，已核定原提交"] };
       }
-      // Exact replay is content-independent and never fetches a newer effects seal.
+      // Exact replay is content-independent and never fetches a newer effects seal or a second prize.
       return { status: "already-applied" };
     }
     // This fresh-only closed-source guard must not load current content or an external item catalog.
@@ -879,6 +920,19 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         return entry ? [{ ...entry, previouslyOwned: capture.previouslyOwned }] : [];
       });
       const eligibleHp = Object.fromEntries(next.party.map(member => [member.id, member.hp]));
+      if (facts?.trainer && code === 1) {
+        const { id, version, baseMoney } = facts.trainer.projection;
+        const prize = applyTrainerPrize(next, [{ baseMoney, levels: facts.trainer.levels }], content, this.limits);
+        next = prize.state;
+        const key = `${id}@${version}`, prior = own(next.defeatedTrainers, key);
+        if (prior && (prior.id !== id || prior.version !== version)) throw new Error("defeated trainer record conflict");
+        next.defeatedTrainers[key] = { id, version };
+        const ledger = own(next.appliedBattles, result.battleId);
+        if (!ledger) throw new Error("trainer battle ledger was not prepared");
+        ledger.trainer = { id, version };
+        prepared.trainerReward = { id, version, ...prize.reward };
+        if (prize.reward.normalizationLoss > 0) prepared.diagnostics.push(`旧钱包超过上限，规范化下降 ${prize.reward.normalizationLoss}；不计负奖金`);
+      }
       if (isDefeat(result)) {
         const settled = settleDefeat(next, content, { noMoneyLoss: this.noMoneyLoss, badges: badgeCount(next.badges), moneyLimit: this.limits.money });
         next = settled.state; prepared.defeat = { moneyLost: settled.moneyLost, healed: true };
@@ -927,7 +981,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (failure) prepared.diagnostics.push(`状态已完整安装，宿主确认失败: ${message(failure)}`);
     prepared.completed = true; prepared.indeterminate = false;
     this.noteReception(context, result.captured, next); this.reception = null;
-    return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), ...(prepared.diagnostics.length ? { diagnostics: [...prepared.diagnostics] } : {}) };
+    return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), ...(prepared.trainerReward ? { trainerReward: prepared.trainerReward } : {}), ...(prepared.diagnostics.length ? { diagnostics: [...prepared.diagnostics] } : {}) };
   }
 
   /**
@@ -976,7 +1030,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       const outcome: BattleOutcome & { result?: BattleResult } = { code, battleId, commit: committed.status, kind,
         ...(facts?.experimentalHeld ? { diagnostics: ["战后持物写回未完成"] } : {}),
         ...(committed.diagnostics?.length ? { diagnostics: [...(facts?.experimentalHeld ? ["战后持物写回未完成"] : []), ...committed.diagnostics] } : {}),
-        ...(committed.defeat ? { defeat: committed.defeat } : {}) };
+        ...(committed.defeat ? { defeat: committed.defeat } : {}), ...(committed.trainerReward ? { trainerReward: committed.trainerReward } : {}) };
       // Legacy diagnostics are optional and supply no authority to the V2 consumer or public options.
       if (committed.status === "applied" && this.ports.sessions.evidence) {
         try {

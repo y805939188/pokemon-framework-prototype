@@ -24,6 +24,7 @@ export function createBattleSessionFactory(options: BattleSessionFactoryOptions)
     create: (request, game, setup) => BattleSession.create({
       game, battleId: request.battleId, content: options.content(), experimentalHeldBattle: setup.experimentalHeldBattle ?? false,
       ...(setup.evidenceContext ? { evidence: setup.evidenceContext } : {}),
+      ...(setup.obedience ? { obedience: setup.obedience } : {}),
       ...(options.seed ? { seed: options.seed() } : {}),
       ...(options.logger ? { logger: options.logger() } : {}),
       ...(options.driver ? { driver: options.driver } : {}),

@@ -7,6 +7,7 @@ import type { BattleEvent } from "./protocol";
 import type { MonView } from "../rules/rules";
 import type { PartialStats, Stats } from "../rules/types";
 import type { ObservationBatch, BattleObservation } from "../rules/battle-evidence";
+import type { ObedienceContext } from "../rules/obedience";
 
 export interface PlayerSpec {
   name: string;
@@ -21,6 +22,8 @@ export interface GatewayOptions {
   wild?: boolean;
   noBall?: boolean;
   noRun?: boolean;
+  /** Formal app-owned control; absence is the explicit legacy direct-session compatibility path. */
+  obedience?: ObedienceContext;
   restored?: boolean;
 }
 

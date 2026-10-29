@@ -48,6 +48,8 @@ const { developmentCapabilities } = RuleConfig;
   interface BattleOutcomeView { code: number; battleId: string | null; commit: string; kind?: string; aborted?: true; error?: string; projection?: string; projectionError?: string; pending?: boolean }
   interface GameAppView {
     startBattle(request: unknown): Promise<any>;
+    startTrainerBattle(request: unknown): Promise<any>;
+    trainerRecord(id: string, version: number): any;
     finishBattle(session: unknown, request: unknown): BattleOutcomeView & { result?: unknown };
     abortBattle(request: unknown, error: unknown): BattleOutcomeView;
     commitResult(result: unknown, options?: unknown): string;
@@ -362,7 +364,7 @@ const { developmentCapabilities } = RuleConfig;
       const current = PSFlow.game(); assertCurrent();
       const limits = PSFlow.limits(); assertCurrent();
       op.request.storageFull = engine().B.limits.storageFull(current, limits); // only refusal text; application decides noBall
-      const session = await app.startBattle(op.request); assertCurrent();
+      const session = await (op.request.trainer ? app.startTrainerBattle(op.request) : app.startBattle(op.request)); assertCurrent();
       const elapsed = performance.now() - tCreate; assertCurrent();
       op.session = session;
       if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round(elapsed * 10) / 10;
@@ -384,6 +386,11 @@ const { developmentCapabilities } = RuleConfig;
       if (op.hostCompleted) return outcome;
       op.hostCompleted = true; // duplicate receive callbacks never repeat transfer/message side effects
       PSFlow.close(outcome.code, op);
+      if (outcome.trainerReward && outcome.commit !== "none") PSFlow.afterCommit(outcome, "trainer-reward-message", () => {
+        const tr = PSFlow.translator(), reward = outcome.trainerReward;
+        if (reward.actual > 0) G.$gameMessage.add(tr.t("trainer.reward", { money: reward.actual }));
+        if (reward.normalizationLoss > 0) G.$gameMessage.add(tr.t("trainer.rewardNormalized", { money: reward.normalizationLoss }));
+      });
       if(outcome.code===2&&outcome.commit!=='none'&&result?.captured?.length)PSFlow.afterCommit(outcome,'receiving-message',()=>PSFlow.notifyReceived(result.captured.map((m:any)=>m.id),outcome.battleId));
       // D3: after a committed defeat the host takes the player home (unless the author allowed losing). The money and the
       // heal were settled in the commit; this is only the trip, it can fail and be retried without settling again. The
@@ -573,6 +580,30 @@ const { developmentCapabilities } = RuleConfig;
     });
     if(!opened){if(G.$gameMessage.isBusy())this.setWaitMode('message');return;}
     this._psBattleId = battleId; // this interpreter waits for THIS battle (see updateWaitMode below)
+    this.setWaitMode("psBattle");
+  });
+
+  G.PluginManager.registerCommand(NAME, "StartTrainerBattle", function (this: any, args: any) {
+    if (PSFlow.running) throw new Error("a battle is already running");
+    const id = String(args.trainerId || args.id || ""), version = Number(args.version ?? 0), seq = PSFlow.nextSeq();
+    const battleId = `${args.battleId || `trainer-${id}-v${version}`}#${seq}`;
+    let known = true;
+    try { known = !!PSFlow.app().trainerRecord(id, version); } catch { /* the normal start path reports the actual content/save failure */ }
+    if (!known) {
+      const resultVariable = Number(args.resultVariable) || 0;
+      if (resultVariable) G.$gameVariables.setValue(resultVariable, 0);
+      G.$gameMessage.add(PSFlow.translator().t("trainer.missing", { id, version }));
+      if (G.$gameMessage.isBusy()) this.setWaitMode("message");
+      return;
+    }
+    const opened = PSFlow.tryOpenBattle({
+      kind: "trainer", trainer: { id, version }, foes: [], seq, battleId,
+      resultVariable: Number(args.resultVariable) || 0,
+      canLose: String(args.canLose) === "true",
+      forceParty: String(args.forceParty) === "true",
+    });
+    if (!opened) { if (G.$gameMessage.isBusy()) this.setWaitMode("message"); return; }
+    this._psBattleId = battleId;
     this.setWaitMode("psBattle");
   });
 

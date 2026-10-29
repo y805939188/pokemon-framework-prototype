@@ -17,17 +17,17 @@ const v1 = () => clone(require('../step3/fixtures/legacy-v1-flow-state.json'));
 // a schema 2 document has none of what schemas 3 and 4 added (claims; statistics, step counter, form)
 const asV2 = () => H.legacyGame(F.makeGame(), 2);
 
-test('schema 3 added the claims ledger (current schema 7 retains it): a new game has an empty one and validates', () => {
-  assert.equal(S.GAME_SCHEMA, 7); assert.deepEqual(SUPPORTED_SCHEMAS, [1, 2, 3, 4, 5, 6, 7]);
+test('schema 3 added the claims ledger (current schema retains it): a new game has an empty one and validates', () => {
+  assert.deepEqual(SUPPORTED_SCHEMAS, Array.from({ length: S.GAME_SCHEMA }, (_, i) => i + 1));
   const g = S.newGame({ party: [], content: F.content });
-  assert.deepEqual([g.schema, g.claims, g.party, E.storage.boxedMembers(g), I6.bagOf(g), g.money], [7, {}, [], [], {}, 0]);
+  assert.deepEqual([g.schema, g.claims, g.party, E.storage.boxedMembers(g), I6.bagOf(g), g.money], [S.GAME_SCHEMA, {}, [], [], {}, 0]);
   assert.deepEqual(validateGame(g), []);
 });
 
 test('2 -> 3 adds an empty claims ledger and nothing else (3 -> 4 then adds its own fields); the input is not touched', () => {
   const raw = asV2(), pristine = clone(raw);
   const r = migrateGame(raw);
-  assert.equal(r.ok, true); assert.deepEqual([r.from, r.to, r.migrated], [2, 7, true]);
+  assert.equal(r.ok, true); assert.deepEqual([r.from, r.to, r.migrated], [2, S.GAME_SCHEMA, true]);
   assert.deepEqual(raw, pristine);
   const by4 = ['stats', 'steps', ...raw.party.map((_, i) => `party.${i}.form`)];
   assert.deepEqual(S.diffPaths(raw, H.legacyGame(r.state, 4)).sort(), ['claims', 'schema', ...by4].sort());
@@ -37,7 +37,7 @@ test('2 -> 3 adds an empty claims ledger and nothing else (3 -> 4 then adds its 
 
 test('1 -> 2 -> 3 (-> 4) runs as one chain from the real step 2 state', () => {
   const r = migrateGame(v1());
-  assert.equal(r.ok, true); assert.deepEqual([r.from, r.to], [1, 7]); assert.deepEqual(r.state.claims, {});
+  assert.equal(r.ok, true); assert.deepEqual([r.from, r.to], [1, S.GAME_SCHEMA]); assert.deepEqual(r.state.claims, {});
   assert.deepEqual(validateGame(r.state), []);
 });
 
