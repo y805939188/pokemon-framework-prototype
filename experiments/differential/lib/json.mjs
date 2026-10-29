@@ -101,6 +101,20 @@ export function sha256File(path) {
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
+// Exact decimal identity for round-trip validation, not a decimal arithmetic implementation.
+function decimalIdentity(token) {
+  const [mantissa, exponentText] = token.split(/[eE]/);
+  const exponent = exponentText === undefined ? 0 : Number(exponentText);
+  const negative = mantissa.startsWith("-");
+  const unsigned = negative ? mantissa.slice(1) : mantissa;
+  const [whole, fraction = ""] = unsigned.split(".");
+  let digits = (whole + fraction).replace(/^0+/, "");
+  if (digits === "") return "0:0:0";
+  let scale = fraction.length - exponent;
+  digits = digits.replace(/0+$/, (zeros) => { scale -= zeros.length; return ""; });
+  return `${negative ? -1 : 1}:${digits}:${scale}`;
+}
+
 /**
  * Parse exactly one JSON text. No prefix/suffix logging, duplicate object keys,
  * non-finite numbers or lossy integer coercion is accepted.
@@ -183,6 +197,7 @@ export function parseJson(text) {
       if (!Number.isFinite(value)) error("JSON_NON_FINITE");
       if (Object.is(value, -0)) error("JSON_NEGATIVE_ZERO");
       if (Number.isInteger(value) && !Number.isSafeInteger(value)) error("JSON_UNSAFE_INTEGER");
+      if (decimalIdentity(match[0]) !== decimalIdentity(String(value))) error("JSON_NUMERIC_PRECISION_LOSS");
       return value;
     }
     error("JSON_VALUE_EXPECTED");

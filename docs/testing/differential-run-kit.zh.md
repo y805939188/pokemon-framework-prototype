@@ -8,7 +8,7 @@
 - 两个 runner 都用 argv 数组直接启动，`shell:false`；不使用 shell 命令字符串。
 - 默认每端 timeout 30,000 ms、stdout 16,777,216 bytes、stderr 1,048,576 bytes。私有配置可在 schema 允许范围内收窄/调整，实际值写入每端收据。
 - timeout/输出超限只 SIGKILL 回收该 runner 自己创建的进程组。任何 timeout、signal、非零退出、输出超限或非空 stderr 都失败，合法 JSON 不能覆盖。
-- stdout 只允许一个完整 JSON envelope；日志拼接、多 JSON、空输出、schema 错、重复/缺失/额外 case 均失败。超限 raw 流只保留已接收前缀并标记 truncated，仍不得 PASS。
+- stdout 只允许一个完整 JSON envelope；日志拼接、多 JSON、空输出、schema 错、重复/缺失/额外 case 均失败。数字 token 在转换前后还必须保持十进制身份，下溢、分数精度舍入、非有限值、负零和 unsafe integer 均拒绝，不能先变成 0/整数再比较。超限 raw 流只保留已接收前缀并标记 truncated，仍不得 PASS。
 - 退出码：`0` 仅对应命令定义的成功；`1` 为行为差异或运行失败；`2` 为 kit/schema/gate/config 拒绝；`64` 为命令行用法错误。`run-dual` 的执行失败不是 PASS，仍须另跑 compare 固定失败报告。
 
 ## 文件与封印
@@ -20,10 +20,11 @@
 ## 独立 observer 准备
 
 1. 将 kit 复制到 observer 自有的新目录；不要从作者工作树引用任何运行文件。
-2. 将 `config/runners.template.json` 复制到 observer 私有目录，替换全部 `{}` 占位符、零 hash 和 `UNVERIFIED`。该私有配置包含两个完整 argv、cwd、输出目录和公开元数据。
+2. 将 `config/runners.template.json` 复制到 observer 私有目录，替换 reference 的 `{}` 占位符、零 hash 和 `UNVERIFIED`。该私有配置包含两个完整 argv、cwd、输出目录和公开元数据；candidate 公开元数据由 run-dual 从实际 verified kit manifest/artifacts 派生，不信任外部声明。
 3. reference 适配器从文件加载，接受 `--request <request.json>`，stdout 写唯一 `runner-response-v1`。不要使用 `-e`、`--eval`、`-c` 内联实现；完整 reference argv、原文件路径、替身细节、stdout/stderr 和异常诊断只留私有收据，绝不写入公开包或公开报告。
 4. observer 独立核验固定 reference commit/tag、实际运行时版本、loaded-file role hash 和替身边界。无法核验或宿主不支持即 `BLOCKED/NOT_RUN`；不改业务 oracle、不改输入或映射求收敛。
-5. candidate argv 使用 kit 内相对路径并以 kit 为 cwd；reference argv 完全由 observer 私有配置。两边都必须产生同一 request 的全量 case。
+5. candidate 只接受约定 Node 与固定 argv `runners/ts-runner.mjs --request requests/wp30-r2.json --core core/core.cjs`，且 cwd 的 realpath 必须等于 verified kit 根；外部 runner/core/request/fixture 或错 cwd 在任何 runner 启动前拒绝。reference argv 完全由 observer 私有配置，两边都必须产生同一 request 的全量 case。
+6. private/public 输出目录先建空再按 realpath 检查，必须不同且互不包含；同路径、相对/symlink 别名、双方祖先嵌套（含缺失末级）均零 child 拒绝。公开目录发布 handoff 前只允许 `reference.json` 与 `candidate.json`，完成后只增加 `handoff.json`，RNG/其他阻塞仍不伪造 handoff。
 
 公开元数据只允许中立 entry ID、角色化文件 hash、闭合运行时/依赖版本与执行计数/hash。公开包没有 argv、路径、消息、堆栈或自由文本字段。公开关联仅 `caseId + requestHash`，clean 输入由 comparator 自己从 kit 加载。`run-dual` 另发布闭合 `handoff.json`，只列 reference/candidate entry ID 与两个行为文件的 SHA-256；observer 发布其文件 hash，接收方固定为 `HANDOFF_SHA256`，比较报告关联这些已核行为工件。
 

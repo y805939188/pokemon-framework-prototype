@@ -1,6 +1,6 @@
 // INFRASTRUCTURE_SELF_TEST_ONLY_NOT_RUBY. Never use this file as reference behavior or coverage.
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { readJson, strictStringify } from "../lib/json.mjs";
 
 const [mode, requestPath, markerPath] = process.argv.slice(2);
@@ -16,6 +16,7 @@ const hang = () => { setInterval(() => {}, 1000); };
 
 switch (mode) {
   case "success": output(response()); break;
+  case "relay-file": process.stdout.write(readFileSync(markerPath, "utf8")); break;
   case "success-two": output(response(2)); break;
   case "random-success": { const value = response(); value.random = { seed: null, drawCount: 1, draws: [{ order: 0, bound: 2, value: 1 }] }; output(value); break; }
   case "nonzero-valid-response": output(response()); process.exitCode = 7; break;

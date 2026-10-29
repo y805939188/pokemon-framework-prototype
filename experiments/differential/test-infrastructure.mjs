@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { executeArgv, attachRunnerResponse, writePrivateExecution, DEFAULT_LIMITS } from "./lib/process.mjs";
@@ -79,6 +79,43 @@ function runDualSynthetic(name, referenceMode, timeoutMs = 1000) {
   const result = spawnSync(process.execPath, [join(kit.root, "run-dual.mjs"), "--kit", kit.root, "--expected-freeze", kit.freeze.hash, "--config", configPath], { encoding: "utf8", shell: false, timeout: 120000, maxBuffer: 16 * 1024 * 1024 });
   return { directory, result, summary: result.stdout.trim() ? parseJson(result.stdout) : null, privateDirectory: join(directory, "private"), publicDirectory: join(directory, "public") };
 }
+function runDualPreflight(name, { privateDir = "private", publicDir = "public", candidateArgv = null, candidateCwd = kit.root, setup = null } = {}) {
+  const directory = join(testRoot, `preflight-${name}`);
+  mkdirSync(directory, { recursive: true });
+  if (setup) setup(directory);
+  const actualTsArgv = [process.execPath, "runners/ts-runner.mjs", "--request", "requests/wp30-r2.json", "--core", "core/core.cjs"];
+  const config = {
+    protocol: "ruby-ts-differential/runner-config-v1",
+    request: requestPath,
+    freezeHash: kit.freeze.hash,
+    privateDirectory: privateDir,
+    publicDirectory: publicDir,
+    limits: { timeoutMs: 1000, maxStdoutBytes: DEFAULT_LIMITS.maxStdoutBytes, maxStderrBytes: DEFAULT_LIMITS.maxStderrBytes },
+    runners: [
+      { role: "reference", entryId: "reference-rules-v1", argv: actualTsArgv, cwd: kit.root, publicMetadata: syntheticReferenceMetadata() },
+      { role: "candidate", entryId: "ts-core-v1", argv: candidateArgv ?? actualTsArgv, cwd: candidateCwd, publicMetadata: candidateMetadata() }
+    ]
+  };
+  const configPath = join(directory, "config.json");
+  writeFileSync(configPath, strictStringify(config, true) + "\n", { flag: "wx" });
+  const result = spawnSync(process.execPath, [join(kit.root, "run-dual.mjs"), "--kit", kit.root, "--expected-freeze", kit.freeze.hash, "--config", configPath], { encoding: "utf8", shell: false, timeout: 120000, maxBuffer: 16 * 1024 * 1024 });
+  return { directory, result, summary: result.stdout.trim() ? parseJson(result.stdout) : null, privatePath: join(directory, privateDir), publicPath: join(directory, publicDir) };
+}
+function filesUnder(root) {
+  if (!existsSync(root)) return [];
+  return readdirSync(root, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(root, entry.name);
+    return entry.isDirectory() ? filesUnder(path) : [path];
+  });
+}
+function assertPreflightRejectedWithoutChild(run, code) {
+  assert.equal(run.result.status, 2, run.result.stderr);
+  assert.ok(run.result.stderr.includes(code), run.result.stderr);
+  assert.equal(existsSync(join(run.privatePath, "reference")), false);
+  assert.equal(existsSync(join(run.privatePath, "candidate")), false);
+  assert.deepEqual(filesUnder(run.publicPath), []);
+}
+
 function dualHandoff(run) {
   const handoffPath = join(run.publicDirectory, "handoff.json");
   return {
@@ -540,4 +577,88 @@ test("DIFF-C07: inherited array toJSON is rejected before invocation and ordinar
   assert.equal(hookCalls, 0);
   assert.equal(strictStringify([1, 2]), "[1,2]");
   assert.deepEqual(parseJson("[1,2]"), [1, 2]);
+});
+
+test("RDIFF-ULTRA-01: identical/relative/nested/symlink output aliases reject before any child or public raw", () => {
+  const symlinkSetup = (directory) => {
+    mkdirSync(join(directory, "actual"));
+    symlinkSync("actual", join(directory, "alias"), "dir");
+  };
+  const variants = [
+    ["identical", "same", "same", null],
+    ["private-ancestor", "tree/private", "tree/private/public", null],
+    ["public-ancestor", "tree/private/deep", "tree/private", null],
+    ["relative-alias", "actual/nested", "actual/./nested/../nested", null],
+    ["symlink-alias", "alias", "actual", symlinkSetup],
+    ["symlink-missing-leaf", "alias/missing", "actual/missing", symlinkSetup]
+  ];
+  for (const [name, privateDir, publicDir, setup] of variants) {
+    const run = runDualPreflight(`overlap-${name}`, { privateDir, publicDir, setup });
+    assertPreflightRejectedWithoutChild(run, "OUTPUT_DIRECTORIES_OVERLAP");
+  }
+});
+
+test("RDIFF-ULTRA-01/02: separated adjacent paths and the formal kit candidate remain valid with a closed public file set", () => {
+  const run = runDualPreflight("separated-adjacent", { privateDir: "output/private", publicDir: "output/private-public" });
+  assert.equal(run.result.status, 0, run.result.stderr);
+  assert.equal(run.summary.status, "RUNNERS_COMPLETE");
+  assert.deepEqual(readdirSync(run.publicPath).sort(), ["candidate.json", "handoff.json", "reference.json"]);
+  assert.ok(filesUnder(run.privatePath).some((path) => path.endsWith("stdout.bin")));
+  const candidate = readJson(join(run.publicPath, "candidate.json"));
+  assert.equal(candidate.source.commit, kit.manifest.source.commit);
+  assert.equal(candidate.source.tree, kit.manifest.source.tree);
+  assert.deepEqual(candidate.source.files, [
+    { role: "core-bundle", sha256: kit.hashes.get("core/core.cjs") },
+    { role: "runner", sha256: kit.hashes.get("runners/ts-runner.mjs") }
+  ]);
+  const compared = runCompareCli({ directory: run.directory, handoffPath: join(run.publicPath, "handoff.json"), handoffHash: sha256File(join(run.publicPath, "handoff.json")), referencePath: join(run.publicPath, "reference.json"), candidatePath: join(run.publicPath, "candidate.json") });
+  assert.equal(compared.result.status, 0, compared.result.stderr);
+  assert.equal(readJson(compared.out).status, "PASS"); // Synthetic reference calibration only; no Ruby coverage.
+});
+
+test("RDIFF-ULTRA-02: external fixture and wrong cwd/runner/core/request/Node reject before either runner", () => {
+  const actual = [process.execPath, "runners/ts-runner.mjs", "--request", "requests/wp30-r2.json", "--core", "core/core.cjs"];
+  const variants = [
+    ["external-fixture", [process.execPath, fixturePath, "success", requestPath], kit.root, "CANDIDATE_COMMAND_MISMATCH"],
+    ["wrong-cwd", actual, testRoot, "CANDIDATE_CWD_MISMATCH"],
+    ["wrong-runner", [process.execPath, "runners/other.mjs", "--request", "requests/wp30-r2.json", "--core", "core/core.cjs"], kit.root, "CANDIDATE_COMMAND_MISMATCH"],
+    ["wrong-core", [process.execPath, "runners/ts-runner.mjs", "--request", "requests/wp30-r2.json", "--core", "core/other.cjs"], kit.root, "CANDIDATE_COMMAND_MISMATCH"],
+    ["wrong-request", [process.execPath, "runners/ts-runner.mjs", "--request", "requests/other.json", "--core", "core/core.cjs"], kit.root, "CANDIDATE_COMMAND_MISMATCH"],
+    ["wrong-node", ["/bin/false", "runners/ts-runner.mjs", "--request", "requests/wp30-r2.json", "--core", "core/core.cjs"], kit.root, "CANDIDATE_COMMAND_MISMATCH"]
+  ];
+  for (const [name, candidateArgv, candidateCwd, code] of variants) {
+    const run = runDualPreflight(`candidate-${name}`, { candidateArgv, candidateCwd });
+    assertPreflightRejectedWithoutChild(run, code);
+  }
+});
+
+test("RDIFF-ULTRA-03: JSON numeric tokens reject underflow/precision loss and keep supported numeric forms", () => {
+  for (const token of ["1e-400", "1.0000000000000001", "9007199254740991.1", "0.10000000000000001"]) {
+    assert.throws(() => parseJson(token), (error) => error.code === "JSON_NUMERIC_PRECISION_LOSS");
+  }
+  for (const [token, expected] of [["0", 0], ["1", 1], ["1.0", 1], ["1e0", 1], ["1.5", 1.5], ["-1.5", -1.5], ["9007199254740991.0", 9007199254740991]]) {
+    assert.equal(parseJson(token), expected, token);
+  }
+});
+
+test("RDIFF-ULTRA-03: real child/raw/publication/compare can no longer turn raw 1e-400 into a PASS", async () => {
+  const directory = join(testRoot, "numeric-loss-e2e");
+  mkdirSync(directory);
+  const original = tsExecution.stdout.toString("utf8");
+  const altered = original.replace('"raw":0', '"raw":1e-400');
+  assert.notEqual(altered, original);
+  const payload = join(directory, "synthetic-reference-response.json");
+  writeFileSync(payload, altered, { flag: "wx" });
+  const execution = await runFixture("relay-file", DEFAULT_LIMITS, payload, "reference");
+  assert.equal(execution.status, "protocol-error");
+  assert.equal(execution.protocolCode, "JSON_NUMERIC_PRECISION_LOSS");
+  assert.equal(execution.response, null);
+  assert.ok(execution.stdout.toString("utf8").includes('"raw":1e-400'));
+  const failedReference = makeBehaviorPackage({ execution, request: kit.request, freezeHash: kit.freeze.hash, publicMetadata: syntheticReferenceMetadata(), limits: DEFAULT_LIMITS, manifest: kit.manifest });
+  const handoff = writeSyntheticHandoff(directory, failedReference, candidatePackage);
+  const compared = runCompareCli(handoff);
+  assert.equal(compared.result.status, 1);
+  const report = readJson(compared.out);
+  assert.equal(report.status, "RUN_FAILED");
+  assert.notEqual(report.status, "PASS");
 });

@@ -1,12 +1,40 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { readJson, sha256File, strictStringify } from "./lib/json.mjs";
 import { validateSchema } from "./lib/schema.mjs";
 import { loadSchema, makeHandoff, validateRawResponse, validateRequest } from "./lib/protocol.mjs";
 import { attachRunnerResponse, executeArgv, writePrivateExecution } from "./lib/process.mjs";
 import { makeBehaviorPackage } from "./lib/normalize.mjs";
 import { verifyKit } from "./lib/kit.mjs";
+
+const configReject = (code) => {
+  console.error(JSON.stringify({ status: "CONFIG_REJECTED", code }));
+  process.exit(2);
+};
+const candidateMetadataFromKit = (kit) => ({
+  source: {
+    ...kit.manifest.source,
+    tag: null,
+    files: [
+      { role: "core-bundle", sha256: kit.hashes.get("core/core.cjs") },
+      { role: "runner", sha256: kit.hashes.get("runners/ts-runner.mjs") }
+    ]
+  },
+  runtime: {
+    name: "node",
+    version: process.version,
+    dependencies: [
+      { name: "node", version: process.version },
+      { name: "vite", version: kit.manifest.viteVersion },
+      { name: "typescript", version: kit.manifest.typescriptVersion }
+    ]
+  }
+});
+const isContained = (ancestor, path) => {
+  const rel = relative(ancestor, path);
+  return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+};
 
 const args = process.argv.slice(2);
 if (args.length !== 6 || args[0] !== "--kit" || args[2] !== "--expected-freeze" || args[4] !== "--config") {
@@ -31,14 +59,34 @@ for (const runner of config.runners) {
   if (runner.entryId !== (runner.role === "reference" ? "reference-rules-v1" : "ts-core-v1")) throw new Error("CONFIG_ENTRY_ROLE_MISMATCH");
 }
 
-const prepareEmpty = (pathArgument) => {
+// The fixed TS side must execute the verified kit itself. This preflight precedes either child, including reference.
+const candidateRunner = config.runners.find((runner) => runner.role === "candidate");
+const expectedCandidateArgv = [process.execPath, "runners/ts-runner.mjs", "--request", "requests/wp30-r2.json", "--core", "core/core.cjs"];
+if (process.version !== kit.manifest.nodeVersion || candidateRunner.argv.length !== expectedCandidateArgv.length || !expectedCandidateArgv.every((arg, index) => candidateRunner.argv[index] === arg)) {
+  configReject("CANDIDATE_COMMAND_MISMATCH");
+}
+let candidateCwd;
+try {
+  candidateCwd = realpathSync(resolve(dirname(configPath), candidateRunner.cwd));
+} catch {
+  configReject("CANDIDATE_CWD_MISMATCH");
+}
+if (candidateCwd !== realpathSync(kit.root)) configReject("CANDIDATE_CWD_MISMATCH");
+const verifiedCandidateMetadata = candidateMetadataFromKit(kit);
+
+const prepareDirectory = (pathArgument) => {
   const path = resolve(dirname(configPath), pathArgument);
-  if (existsSync(path) && readdirSync(path).length !== 0) throw new Error("RUN_OUTPUT_DIRECTORY_NOT_EMPTY");
   mkdirSync(path, { recursive: true });
   return path;
 };
-const privateDirectory = prepareEmpty(config.privateDirectory);
-const publicDirectory = prepareEmpty(config.publicDirectory);
+const privateDirectory = prepareDirectory(config.privateDirectory);
+const publicDirectory = prepareDirectory(config.publicDirectory);
+// Both directories now exist, so realpath also covers symlink aliases and previously missing leaf components.
+const canonicalPrivate = realpathSync(privateDirectory);
+const canonicalPublic = realpathSync(publicDirectory);
+if (isContained(canonicalPrivate, canonicalPublic) || isContained(canonicalPublic, canonicalPrivate)) configReject("OUTPUT_DIRECTORIES_OVERLAP");
+if ((existsSync(privateDirectory) && readdirSync(privateDirectory).length !== 0) || (existsSync(publicDirectory) && readdirSync(publicDirectory).length !== 0)) throw new Error("RUN_OUTPUT_DIRECTORY_NOT_EMPTY");
+
 const summary = [];
 const behaviorArtifacts = [];
 let exitCode = 0;
@@ -55,7 +103,8 @@ for (const runner of config.runners) {
   writePrivateExecution(execution, privateRoleDirectory, config.limits);
   let behavior;
   try {
-    behavior = makeBehaviorPackage({ execution, request: configuredRequest, freezeHash: kit.freeze.hash, publicMetadata: runner.publicMetadata, limits: config.limits, manifest: kit.manifest });
+    const publicMetadata = runner.role === "candidate" ? verifiedCandidateMetadata : runner.publicMetadata;
+    behavior = makeBehaviorPackage({ execution, request: configuredRequest, freezeHash: kit.freeze.hash, publicMetadata, limits: config.limits, manifest: kit.manifest });
   } catch (error) {
     writeFileSync(resolve(privateRoleDirectory, "sanitize-error.json"), strictStringify({ code: error.code ?? "SANITIZE_OR_METADATA_REJECTED" }, true) + "\n", { flag: "wx" });
     publicationBlocked = true;
@@ -70,6 +119,11 @@ for (const runner of config.runners) {
   summary.push({ role: runner.role, entryId: runner.entryId, status: behavior.execution.status, infrastructureCode: execution.infrastructureCode, protocolCode: execution.protocolCode });
 }
 let handoffSHA256 = null;
+if (!publicationBlocked && readdirSync(publicDirectory).sort().join(",") !== "candidate.json,reference.json") {
+  publicationBlocked = true;
+  exitCode = 1;
+  summary.push({ role: "publication", entryId: "publication-file-set", status: "blocked", sanitizeCode: "PUBLIC_FILE_SET_MISMATCH" });
+}
 if (!publicationBlocked) {
   const handoff = makeHandoff({ request: configuredRequest, freezeHash: kit.freeze.hash, artifacts: behaviorArtifacts });
   const handoffPath = resolve(publicDirectory, "handoff.json");
