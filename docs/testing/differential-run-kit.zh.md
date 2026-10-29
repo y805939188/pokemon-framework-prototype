@@ -20,11 +20,11 @@
 ## 独立 observer 准备
 
 1. 将 kit 复制到 observer 自有的新目录；不要从作者工作树引用任何运行文件。
-2. 将 `config/runners.template.json` 复制到 observer 私有目录，替换 reference 的 `{}` 占位符、零 hash 和 `UNVERIFIED`。该私有配置包含两个完整 argv、cwd、输出目录和公开元数据；candidate 公开元数据由 run-dual 从实际 verified kit manifest/artifacts 派生，不信任外部声明。
+2. 将 `config/runners.template.json` 复制到 observer 私有目录，填入全部实际 request/freeze、private/public 输出目录、candidate `{NODE22}`/cwd 以及 reference argv/cwd/来源占位。candidate publicMetadata 中的 40 位 commit/tree 零占位只用于满足配置 schema，实际 source/runtime 仍由 run-dual 从 verified kit manifest/artifacts 派生，不信任外部声明；不得把占位当成真实来源。
 3. reference 适配器从文件加载，接受 `--request <request.json>`，stdout 写唯一 `runner-response-v1`。不要使用 `-e`、`--eval`、`-c` 内联实现；完整 reference argv、原文件路径、替身细节、stdout/stderr 和异常诊断只留私有收据，绝不写入公开包或公开报告。
 4. observer 独立核验固定 reference commit/tag、实际运行时版本、loaded-file role hash 和替身边界。无法核验或宿主不支持即 `BLOCKED/NOT_RUN`；不改业务 oracle、不改输入或映射求收敛。
 5. candidate 只接受约定 Node 与固定 argv `runners/ts-runner.mjs --request requests/wp30-r2.json --core core/core.cjs`，且 cwd 的 realpath 必须等于 verified kit 根；外部 runner/core/request/fixture 或错 cwd 在任何 runner 启动前拒绝。reference argv 完全由 observer 私有配置，两边都必须产生同一 request 的全量 case。
-6. private/public 输出目录先建空再按 realpath 检查，必须不同且互不包含；同路径、相对/symlink 别名、双方祖先嵌套（含缺失末级）均零 child 拒绝。公开目录发布 handoff 前只允许 `reference.json` 与 `candidate.json`，完成后只增加 `handoff.json`，RNG/其他阻塞仍不伪造 handoff。
+6. private/public 输出目录先建空再按 realpath 与实际目录 `dev/inode` 祖先身份检查，必须不同且互不包含；同路径、相对/symlink/大小写物理别名、双方祖先嵌套（含缺失末级）均零 child 拒绝，不做一律 lowercase。大小写敏感卷上身份不同的独立目录仍合法。公开目录发布 handoff 前只允许 `reference.json` 与 `candidate.json`，完成后只增加 `handoff.json`，RNG/其他阻塞仍不伪造 handoff。
 
 公开元数据只允许中立 entry ID、角色化文件 hash、闭合运行时/依赖版本与执行计数/hash。公开包没有 argv、路径、消息、堆栈或自由文本字段。公开关联仅 `caseId + requestHash`，clean 输入由 comparator 自己从 kit 加载。`run-dual` 另发布闭合 `handoff.json`，只列 reference/candidate entry ID 与两个行为文件的 SHA-256；observer 发布其文件 hash，接收方固定为 `HANDOFF_SHA256`，比较报告关联这些已核行为工件。
 

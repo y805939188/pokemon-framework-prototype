@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { executeArgv, attachRunnerResponse, writePrivateExecution, DEFAULT_LIMITS } from "./lib/process.mjs";
@@ -79,11 +79,12 @@ function runDualSynthetic(name, referenceMode, timeoutMs = 1000) {
   const result = spawnSync(process.execPath, [join(kit.root, "run-dual.mjs"), "--kit", kit.root, "--expected-freeze", kit.freeze.hash, "--config", configPath], { encoding: "utf8", shell: false, timeout: 120000, maxBuffer: 16 * 1024 * 1024 });
   return { directory, result, summary: result.stdout.trim() ? parseJson(result.stdout) : null, privateDirectory: join(directory, "private"), publicDirectory: join(directory, "public") };
 }
-function runDualPreflight(name, { privateDir = "private", publicDir = "public", candidateArgv = null, candidateCwd = kit.root, setup = null } = {}) {
+function runDualPreflight(name, { privateDir = "private", publicDir = "public", candidateArgv = null, candidateCwd = kit.root, setup = null, referenceMarker = null } = {}) {
   const directory = join(testRoot, `preflight-${name}`);
   mkdirSync(directory, { recursive: true });
   if (setup) setup(directory);
   const actualTsArgv = [process.execPath, "runners/ts-runner.mjs", "--request", "requests/wp30-r2.json", "--core", "core/core.cjs"];
+  const referenceArgv = referenceMarker === null ? actualTsArgv : [process.execPath, fixturePath, "marker-success", requestPath, referenceMarker];
   const config = {
     protocol: "ruby-ts-differential/runner-config-v1",
     request: requestPath,
@@ -92,7 +93,7 @@ function runDualPreflight(name, { privateDir = "private", publicDir = "public", 
     publicDirectory: publicDir,
     limits: { timeoutMs: 1000, maxStdoutBytes: DEFAULT_LIMITS.maxStdoutBytes, maxStderrBytes: DEFAULT_LIMITS.maxStderrBytes },
     runners: [
-      { role: "reference", entryId: "reference-rules-v1", argv: actualTsArgv, cwd: kit.root, publicMetadata: syntheticReferenceMetadata() },
+      { role: "reference", entryId: "reference-rules-v1", argv: referenceArgv, cwd: kit.root, publicMetadata: syntheticReferenceMetadata() },
       { role: "candidate", entryId: "ts-core-v1", argv: candidateArgv ?? actualTsArgv, cwd: candidateCwd, publicMetadata: candidateMetadata() }
     ]
   };
@@ -661,4 +662,66 @@ test("RDIFF-ULTRA-03: real child/raw/publication/compare can no longer turn raw 
   const report = readJson(compared.out);
   assert.equal(report.status, "RUN_FAILED");
   assert.notEqual(report.status, "PASS");
+});
+
+test("RDIFF-ULTRA-01: case aliases use physical identity, with zero-child markers or legal sensitive-volume separation", () => {
+  const probe = join(testRoot, "case-volume-probe");
+  mkdirSync(join(probe, "CaseDir"), { recursive: true });
+  const mixed = statSync(join(probe, "CaseDir"), { bigint: true });
+  const lower = statSync(join(probe, "casedir"), { bigint: true });
+  const sameInode = mixed.dev === lower.dev && mixed.ino === lower.ino;
+  if (sameInode) {
+    for (const [name, privateDir, publicDir] of [
+      ["same", "CaseDir", "casedir"],
+      ["private-ancestor", "CaseDir", "casedir/nested"],
+      ["public-ancestor", "CaseDir/nested", "casedir"]
+    ]) {
+      const referenceMarker = join(testRoot, `preflight-case-${name}/reference-started.txt`);
+      const run = runDualPreflight(`case-${name}`, { privateDir, publicDir, referenceMarker });
+      assertPreflightRejectedWithoutChild(run, "OUTPUT_DIRECTORIES_OVERLAP");
+      assert.equal(existsSync(referenceMarker), false, `${name}: reference actually started`);
+    }
+    writeFileSync(join(testRoot, "case-alias-result.json"), strictStringify({ sameInode, outcome: "THREE_CONFIGS_REJECTED_ZERO_CHILD_ZERO_PUBLIC_RAW" }));
+  } else {
+    const run = runDualPreflight("case-sensitive-independent", { privateDir: "CaseDir", publicDir: "casedir" });
+    assert.equal(run.result.status, 0, run.result.stderr);
+    assert.deepEqual(readdirSync(run.publicPath).sort(), ["candidate.json", "handoff.json", "reference.json"]);
+    writeFileSync(join(testRoot, "case-alias-result.json"), strictStringify({ sameInode, outcome: "INDEPENDENT_CASE_SENSITIVE_DIRECTORIES_ALLOWED" }));
+  }
+});
+
+test("RDIFF-ULTRA-02: schema-valid template placeholders support the formal candidate while metadata derives from kit", () => {
+  const directory = join(testRoot, "template-formal-candidate");
+  mkdirSync(directory);
+  const config = readJson(join(kit.root, "config/runners.template.json"));
+  const reference = config.runners.find((runner) => runner.role === "reference");
+  const candidate = config.runners.find((runner) => runner.role === "candidate");
+  assert.equal(candidate.publicMetadata.source.commit.length, 40);
+  assert.equal(candidate.publicMetadata.source.tree.length, 40);
+  config.request = requestPath;
+  config.freezeHash = kit.freeze.hash;
+  config.privateDirectory = "private";
+  config.publicDirectory = "public";
+  const actualTsArgv = [process.execPath, "runners/ts-runner.mjs", "--request", "requests/wp30-r2.json", "--core", "core/core.cjs"];
+  reference.argv = actualTsArgv;
+  reference.cwd = kit.root;
+  reference.publicMetadata = syntheticReferenceMetadata();
+  candidate.argv[0] = process.execPath;
+  candidate.cwd = kit.root;
+  // Candidate commit/tree/schema placeholders are deliberately left untouched; runtime derives their real values.
+  const configPath = join(directory, "config.json");
+  writeFileSync(configPath, strictStringify(config, true) + "\n", { flag: "wx" });
+  const result = spawnSync(process.execPath, [join(kit.root, "run-dual.mjs"), "--kit", kit.root, "--expected-freeze", kit.freeze.hash, "--config", configPath], { encoding: "utf8", shell: false, timeout: 120000, maxBuffer: 16 * 1024 * 1024 });
+  assert.equal(result.status, 0, result.stderr);
+  const published = readJson(join(directory, "public/candidate.json"));
+  assert.equal(published.source.commit, kit.manifest.source.commit);
+  assert.equal(published.source.tree, kit.manifest.source.tree);
+  assert.notEqual(published.source.commit, "0".repeat(40));
+  assert.deepEqual(published.source.files, [
+    { role: "core-bundle", sha256: kit.hashes.get("core/core.cjs") },
+    { role: "runner", sha256: kit.hashes.get("runners/ts-runner.mjs") }
+  ]);
+  const compared = runCompareCli({ directory, handoffPath: join(directory, "public/handoff.json"), handoffHash: sha256File(join(directory, "public/handoff.json")), referencePath: join(directory, "public/reference.json"), candidatePath: join(directory, "public/candidate.json") });
+  assert.equal(compared.result.status, 0, compared.result.stderr);
+  assert.equal(readJson(compared.out).status, "PASS"); // Synthetic reference calibration only; no Ruby coverage.
 });

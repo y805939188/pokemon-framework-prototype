@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { readJson, sha256File, strictStringify } from "./lib/json.mjs";
 import { validateSchema } from "./lib/schema.mjs";
@@ -34,6 +34,25 @@ const candidateMetadataFromKit = (kit) => ({
 const isContained = (ancestor, path) => {
   const rel = relative(ancestor, path);
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+};
+const directoryIdentity = (path) => {
+  const stats = statSync(path, { bigint: true });
+  return stats.ino === 0n ? null : `${stats.dev}:${stats.ino}`;
+};
+const ancestorIdentities = (path) => {
+  const identities = new Set();
+  let current = path;
+  while (true) {
+    const identity = directoryIdentity(current);
+    if (identity !== null) identities.add(identity);
+    const parent = dirname(current);
+    if (parent === current) return identities;
+    current = parent;
+  }
+};
+const isPhysicallyContained = (ancestor, path) => {
+  const identity = directoryIdentity(ancestor);
+  return identity !== null && ancestorIdentities(path).has(identity);
 };
 
 const args = process.argv.slice(2);
@@ -84,7 +103,7 @@ const publicDirectory = prepareDirectory(config.publicDirectory);
 // Both directories now exist, so realpath also covers symlink aliases and previously missing leaf components.
 const canonicalPrivate = realpathSync(privateDirectory);
 const canonicalPublic = realpathSync(publicDirectory);
-if (isContained(canonicalPrivate, canonicalPublic) || isContained(canonicalPublic, canonicalPrivate)) configReject("OUTPUT_DIRECTORIES_OVERLAP");
+if (isContained(canonicalPrivate, canonicalPublic) || isContained(canonicalPublic, canonicalPrivate) || isPhysicallyContained(canonicalPrivate, canonicalPublic) || isPhysicallyContained(canonicalPublic, canonicalPrivate)) configReject("OUTPUT_DIRECTORIES_OVERLAP");
 if ((existsSync(privateDirectory) && readdirSync(privateDirectory).length !== 0) || (existsSync(publicDirectory) && readdirSync(publicDirectory).length !== 0)) throw new Error("RUN_OUTPUT_DIRECTORY_NOT_EMPTY");
 
 const summary = [];

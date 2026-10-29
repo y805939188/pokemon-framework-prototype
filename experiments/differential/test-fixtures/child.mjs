@@ -16,6 +16,7 @@ const hang = () => { setInterval(() => {}, 1000); };
 
 switch (mode) {
   case "success": output(response()); break;
+  case "marker-success": writeFileSync(markerPath, "reference-started\n"); output(response()); break;
   case "relay-file": process.stdout.write(readFileSync(markerPath, "utf8")); break;
   case "success-two": output(response(2)); break;
   case "random-success": { const value = response(); value.random = { seed: null, drawCount: 1, draws: [{ order: 0, bound: 2, value: 1 }] }; output(value); break; }
