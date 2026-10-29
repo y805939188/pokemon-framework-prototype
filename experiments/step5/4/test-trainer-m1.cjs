@@ -97,6 +97,29 @@ test('AM1-ULTRA-05 canonical and hyphenated trainer references agree through cac
   }
 });
 
+test('AM1-ULTRA-05 registered Dex aliases fail at the content gate while canonical targets remain consumable', () => {
+  const dex = E.dex.createDexLookup();
+  for (const [alias, canonical, name, pp] of [['tbolt', 'thunderbolt', 'Thunderbolt', 15], ['eq', 'earthquake', 'Earthquake', 10]]) {
+    assert.deepEqual(dex.move(alias), { id: canonical, name, pp }, 'the negative input is a real registered Dex alias');
+    const compiled = compile({ trainerTypes: [trainerType()], trainers: [{ ...trainerRecord(), party: [{ species: 'pidgey', level: 19, moves: [alias] }] }] });
+    const cached = E.contentRuntime.loadCompiled(clone(compiled)), before = clone(cached);
+    const rejected = E.contentRuntime.assembleContent(cached, dex);
+    assert.ok(rejected.errors.some(e => e.path === 'trainers/route-1-rival@2.party[0].moves[0]' && e.message.includes('canonical') && e.message.includes(canonical)), 'an accepted Dex alias must not pass the content gate with an unusable stored ID');
+    assert.deepEqual(cached, before, 'diagnostics do not rewrite the compiled input or its hash');
+
+    const supported = compile({ trainerTypes: [trainerType()], trainers: [{ ...trainerRecord(), party: [{ species: 'pidgey', level: 19, moves: [canonical, 'tackle', canonical], ability: 'keen-eye' }] }] });
+    const loaded = E.contentRuntime.loadCompiled(clone(supported)), content = assembled(loaded);
+    assert.equal(E.contentRuntime.validatedContentIdentity(content), loaded.contentIdentity);
+    for (const record of [loaded.trainers[0], content.trainers['route-1-rival'][0]]) {
+      const member = build(content, loaded, record)[0];
+      assert.deepEqual(member.moves.map(m => m.id), ['tackle', canonical]);
+      assert.equal(member.moves[1].pp, pp);
+      assert.equal(member.ability, 'Keen Eye');
+    }
+    assert.deepEqual(loaded, supported, 'successful runtime assembly also leaves the cache unchanged');
+  }
+});
+
 test('A-M1 content is optional and preserves the legacy input hash when absent', () => {
   const before = compile();
   assert.equal(before.trainers, undefined);

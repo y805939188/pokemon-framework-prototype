@@ -189,8 +189,19 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
         const path = `trainers/${record.id}@${record.version}.party[${index}]`;
         const formName = own(own(content.forms, member.species), String(member.form ?? 0));
         if (!formName || !own(content.species, formName)) errors.push({ file: "assembly", path: `${path}.species`, message: "missing exact assembled species/form" });
-        for (const [moveIndex, move] of (member.moves ?? []).entries()) if (!dex.move(move)) errors.push({ file: "assembly", path: `${path}.moves[${moveIndex}]`, message: `unknown move ${move}` });
-        if (member.ability !== undefined && !dex.abilityInfo?.(member.ability)) errors.push({ file: "assembly", path: `${path}.ability`, message: `unknown ability ${member.ability}` });
+        for (const [moveIndex, move] of (member.moves ?? []).entries()) {
+          const resolved = dex.move(move);
+          if (!resolved) errors.push({ file: "assembly", path: `${path}.moves[${moveIndex}]`, message: `unknown move ${move}` });
+          // Dex aliases need not be registry IDs. Accept only references the pure team consumer can use.
+          else if (!Object.values(content.moves!).some(entry => entry.id === move.replace(/-/g, "") && entry.name === resolved.name))
+            errors.push({ file: "assembly", path: `${path}.moves[${moveIndex}]`, message: `unsupported trainer move reference ${move}; use canonical move id ${resolved.id ?? resolved.name}` });
+        }
+        if (member.ability !== undefined) {
+          const resolved = dex.abilityInfo?.(member.ability);
+          if (!resolved) errors.push({ file: "assembly", path: `${path}.ability`, message: `unknown ability ${member.ability}` });
+          else if (own(content.abilities, member.ability.replace(/-/g, ""))?.name !== resolved.name)
+            errors.push({ file: "assembly", path: `${path}.ability`, message: `unsupported trainer ability reference ${member.ability}; use a canonical assembled ability id for ${resolved.name}` });
+        }
         if (member.item !== undefined) {
           const item = dex.heldItem?.(member.item);
           if (!item?.holdable || item.mail) errors.push({ file: "assembly", path: `${path}.item`, message: "unsupported held item; validation does not open the B battle gate" });
