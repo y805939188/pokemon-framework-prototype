@@ -149,6 +149,26 @@ export class GateError extends Error {
 const validTime = (value) => Number.isFinite(Date.parse(value));
 function requireGate(condition, code) { if (!condition) throw new GateError(code); }
 
+/** Closed metadata only: actual original-file loading still needs the independent observer's audit. */
+export function gateReferenceMetadata({ source, runtime }) {
+  const schema = schemas.behavior();
+  for (const [name, value] of [["source", source], ["runtime", runtime]]) {
+    const result = validateSchema({ $ref: `#/$defs/${name}` }, value, schema);
+    if (!result.valid) throw new GateError("REFERENCE_METADATA_SCHEMA_REJECTED", result.errors);
+  }
+  requireGate(runtime.name === "reference" && source.commit === "8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b" && source.tag === "v21.1" && source.tree === null && source.dirty === null, "REFERENCE_PROVENANCE_MISMATCH");
+  const roles = source.files.map((file) => file.role);
+  requireGate(new Set(roles).size === roles.length, "BEHAVIOR_SOURCE_ROLE_DUPLICATE");
+  for (const role of ["growth-rules", "friendship-rules", "adapter"]) requireGate(roles.includes(role), "REFERENCE_SOURCE_HASH_MISSING");
+  requireGate(source.files.every((file) => file.sha256 !== "0".repeat(64)), "REFERENCE_SOURCE_HASH_PLACEHOLDER");
+  const dependencies = runtime.dependencies.map((dependency) => dependency.name);
+  requireGate(new Set(dependencies).size === dependencies.length, "BEHAVIOR_DEPENDENCY_DUPLICATE");
+  for (const name of ["reference-runtime", "adapter"]) requireGate(dependencies.includes(name), "REFERENCE_DEPENDENCY_VERSION_MISSING");
+  const placeholder = /^(?:UNVERIFIED|UNKNOWN|NOT_RUN|PLACEHOLDER|TODO|TBD)$/i;
+  requireGate(!placeholder.test(runtime.version) && runtime.dependencies.every((dependency) => !placeholder.test(dependency.version)), "REFERENCE_VERSION_PLACEHOLDER");
+  return { source, runtime };
+}
+
 /** This function must complete before any caller reads or compares case outcomes. */
 export function gateBehaviorPackage(behavior, { request, freezeHash, role, manifest = null }) {
   const schemaResult = validateSchema(schemas.behavior(), behavior);
@@ -167,8 +187,7 @@ export function gateBehaviorPackage(behavior, { request, freezeHash, role, manif
   const dependencyNames = behavior.runtime.dependencies.map((dependency) => dependency.name);
   requireGate(new Set(dependencyNames).size === dependencyNames.length, "BEHAVIOR_DEPENDENCY_DUPLICATE");
   if (role === "reference") {
-    requireGate(behavior.runtime.name === "reference" && source.commit === "8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b" && source.tag === "v21.1" && source.tree === null && source.dirty === null, "REFERENCE_PROVENANCE_MISMATCH");
-    for (const required of ["growth-rules", "friendship-rules", "adapter"]) requireGate(fileRoles.includes(required), "REFERENCE_SOURCE_HASH_MISSING");
+    gateReferenceMetadata(behavior);
   } else {
     requireGate(behavior.runtime.name === "node" && source.commit !== null && source.tree !== null && source.tag === null && typeof source.dirty === "boolean", "CANDIDATE_PROVENANCE_INCOMPLETE");
     for (const required of ["core-bundle", "runner"]) requireGate(fileRoles.includes(required), "CANDIDATE_SOURCE_HASH_MISSING");
@@ -233,11 +252,15 @@ export function validateNormalizer(normalizer) {
   return normalizer;
 }
 
-export function validateHandoff(handoff, { request, freezeHash }) {
+export function validateHandoff(handoff, { request, freezeHash, manifest = null, manifestSha256 = null }) {
   const result = validateSchema(schemas.handoff(), handoff);
   if (!result.valid) throw new GateError("HANDOFF_SCHEMA_REJECTED", result.errors);
   requireGate(handoff.requestHash === request.requestHash, "HANDOFF_REQUEST_HASH_MISMATCH");
   requireGate(handoff.freezeHash === freezeHash, "HANDOFF_FREEZE_HASH_MISMATCH");
+  if (manifest !== null) {
+    requireGate(handoff.producer.manifestSha256 === manifestSha256, "HANDOFF_HARNESS_MANIFEST_MISMATCH");
+    requireGate(handoff.producer.entrySha256 === manifest.files.find((file) => file.path === "run-dual.mjs")?.sha256, "HANDOFF_HARNESS_ENTRY_MISMATCH");
+  }
   const roles = handoff.artifacts.map((artifact) => artifact.role).sort();
   requireGate(roles.join(",") === "candidate,reference", "HANDOFF_ROLE_SET_MISMATCH");
   for (const artifact of handoff.artifacts) {
@@ -246,21 +269,22 @@ export function validateHandoff(handoff, { request, freezeHash }) {
   return handoff;
 }
 
-export function makeHandoff({ request, freezeHash, artifacts }) {
+export function makeHandoff({ request, freezeHash, artifacts, producer }) {
   const order = { reference: 0, candidate: 1 };
   return validateHandoff({
-    protocol: "ruby-ts-differential/handoff-v1",
+    protocol: "ruby-ts-differential/handoff-v2",
     requestHash: request.requestHash,
     freezeHash,
+    producer,
     artifacts: [...artifacts].sort((a, b) => order[a.role] - order[b.role]).map(({ role, entryId, sha256 }) => ({ role, entryId, sha256 }))
   }, { request, freezeHash });
 }
 
 /** Verify the externally fixed handoff and raw behavior artifact bytes before parsing either behavior body. */
-export function verifyHandoff({ handoffPath, expectedHandoffHash, referencePath, candidatePath, request, freezeHash }) {
+export function verifyHandoff({ handoffPath, expectedHandoffHash, referencePath, candidatePath, request, freezeHash, manifest, manifestSha256 }) {
   const hash = sha256File(handoffPath);
   requireGate(hash === expectedHandoffHash, "HANDOFF_EXTERNAL_HASH_MISMATCH");
-  const value = validateHandoff(readJson(handoffPath, 1024 * 1024), { request, freezeHash });
+  const value = validateHandoff(readJson(handoffPath, 1024 * 1024), { request, freezeHash, manifest, manifestSha256 });
   for (const artifact of value.artifacts) {
     const path = artifact.role === "reference" ? referencePath : candidatePath;
     requireGate(sha256File(path) === artifact.sha256, "HANDOFF_ARTIFACT_HASH_MISMATCH");

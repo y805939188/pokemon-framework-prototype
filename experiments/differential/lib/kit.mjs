@@ -1,13 +1,44 @@
-import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { canonicalStringify, readJson, sha256File } from "./json.mjs";
 import { validateSchema } from "./schema.mjs";
 import { GateError, loadSchema, validateMapping, validateNormalizer, validateRequest } from "./protocol.mjs";
 import { KIT_METADATA, KIT_PAYLOAD, safeKitPath } from "./kit-policy.mjs";
 import { generateCoverage } from "./cases.mjs";
+import { NODE_EXECUTION_POLICY } from "./process.mjs";
 
 const requireKit = (condition, code) => { if (!condition) throw new GateError(code); };
 const payloadSet = new Set(KIT_PAYLOAD);
+
+/** Formal CLI only; builders and library self-tests deliberately keep using verifyKit. */
+export function verifyCliKit(rootArgument, { expectedFreezeHash, entryURL, entryRole }) {
+  requireKit(!process.env.NODE_OPTIONS && !process.env.NODE_PATH, "NODE_LOADER_ENVIRONMENT_REJECTED");
+  // The supported formal command is bare Node + the kit entry. This includes rejecting
+  // --require/-r, --import and --loader, rather than claiming hashes over injected semantics.
+  requireKit(process.execArgv.length === 0, "NODE_EXEC_ARGV_REJECTED");
+  const entries = { "verify-kit": "verify-kit.mjs", "run-dual": "run-dual.mjs", compare: "compare.mjs" };
+  requireKit(Object.hasOwn(entries, entryRole), "HARNESS_ENTRY_ROLE_REJECTED");
+  const root = realpathSync(resolve(rootArgument));
+  const moduleRoot = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
+  requireKit(moduleRoot === root, "HARNESS_KIT_ROOT_MISMATCH");
+  const entry = realpathSync(fileURLToPath(entryURL));
+  requireKit(entry === realpathSync(join(root, entries[entryRole])), "HARNESS_ENTRY_ROOT_MISMATCH");
+  // Also bind Node's launched main file, not a caller-supplied URL naming an unloaded entry.
+  requireKit(process.argv[1] && realpathSync(resolve(process.argv[1])) === entry, "HARNESS_PROCESS_ENTRY_MISMATCH");
+  // Every fixed relative dependency is in this exact, symlink-free verified payload.
+  // Merely declaring an entry path or hashing a different --kit cannot satisfy this check.
+  const kit = verifyKit(root, { expectedFreezeHash });
+  const entrySha256 = sha256File(entry);
+  requireKit(entrySha256 === kit.hashes.get(entries[entryRole]), "HARNESS_ENTRY_HASH_MISMATCH");
+  return { ...kit, harness: {
+    policy: "verified-kit-cli-v1", entryRole, entrySha256,
+    manifestSha256: sha256File(join(root, "artifacts.manifest.json")),
+    dependencyPolicy: "verified-relative-payload-v1",
+    environmentPolicy: NODE_EXECUTION_POLICY,
+    nodeOptions: "absent-or-empty", nodePath: "absent-or-empty", execArgv: "none"
+  } };
+}
 
 function listFiles(root, relative = "") {
   const output = [];

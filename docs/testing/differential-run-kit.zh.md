@@ -17,16 +17,20 @@
 
 实际文件集必须等于静态 allowlist。额外文件、符号链接、`.ts/.tsx/.mts/.cts`、`.map`、inline/external `sourceMappingURL` 均拒绝。kit 含编译后的 `core/core.cjs` 和 `runners/ts-runner.mjs`，不含产品 TS 源或 source map。`requests/wp30-r2.json` 是完整冻结输入，不含期望输出；`requests/selection-coverage.json` 是逐 API/方法/配置/边界的完整 caseId 清单。
 
+正式 `verify-kit`、`run-dual`、`compare` 必须从被验证的同一真实 kit 内执行。入口的实际文件 hash、所属模块根、全量固定相对依赖的 payload hash 都受 manifest／外部 freeze 约束；kit 外的开发树或旧 parser 不能借 `--kit` 标签冒充。允许完整复制 kit 后在新位置从该副本执行并验证该副本。源目录 `build-kit` 和库自测不属于正式 CLI，其库比较报告明确不提供正式入口运行证明。
+
+正式命令只支持裸 Node 加 kit 入口，不支持非空 `NODE_OPTIONS`、`NODE_PATH` 或任何 Node `execArgv`（包括 `--require/-r`、`--import`、`--loader`）；检测到即 gate/config 拒绝、零 child，不修改用户全局环境。所有 runner child 显式移除上述两个环境变量，其余 observer 已准备的运行环境保留。私有 receipt 只记录去除策略及布尔事实，不记录全环境或其值。此限制针对已知装载入口，不是防御被篡改 Node、内核或任意全局对象的安全平台。
+
 ## 独立 observer 准备
 
 1. 将 kit 复制到 observer 自有的新目录；不要从作者工作树引用任何运行文件。
 2. 将 `config/runners.template.json` 复制到 observer 私有目录，填入全部实际 request/freeze、private/public 输出目录、candidate `{NODE22}`/cwd 以及 reference argv/cwd/来源占位。candidate publicMetadata 中的 40 位 commit/tree 零占位只用于满足配置 schema，实际 source/runtime 仍由 run-dual 从 verified kit manifest/artifacts 派生，不信任外部声明；不得把占位当成真实来源。
 3. reference 适配器从文件加载，接受 `--request <request.json>`，stdout 写唯一 `runner-response-v1`。不要使用 `-e`、`--eval`、`-c` 内联实现；完整 reference argv、原文件路径、替身细节、stdout/stderr 和异常诊断只留私有收据，绝不写入公开包或公开报告。
-4. observer 独立核验固定 reference commit/tag、实际运行时版本、loaded-file role hash 和替身边界。无法核验或宿主不支持即 `BLOCKED/NOT_RUN`；不改业务 oracle、不改输入或映射求收敛。
+4. observer 独立核验固定 reference commit/tag、实际运行时版本、loaded-file role hash 和替身边界。每个必需角色的 hash 均不得为全零，runtime 以及 `reference-runtime`／`adapter` 的版本不能缺失或为 `UNVERIFIED` 等哨兵；`tree/dirty=null` 仍是合法参考合同。run-dual 在任一 child 前执行同一门，clean comparator 再独立重复。非零 hash 只通过闭合元数据门，不能证明真正加载原文件，仍需观察侧来源资格与封存审计；自测须使用实际合成 fixture 文件 hash 并明确标记 synthetic。无法核验或宿主不支持即 `BLOCKED/NOT_RUN`；不改业务 oracle、不改输入或映射求收敛。
 5. candidate 只接受约定 Node 与固定 argv `runners/ts-runner.mjs --request requests/wp30-r2.json --core core/core.cjs`，且 cwd 的 realpath 必须等于 verified kit 根；外部 runner/core/request/fixture 或错 cwd 在任何 runner 启动前拒绝。reference argv 完全由 observer 私有配置，两边都必须产生同一 request 的全量 case。
 6. private/public 输出目录先建空再按 realpath 与实际目录 `dev/inode` 祖先身份检查，必须不同且互不包含；同路径、相对/symlink/大小写物理别名、双方祖先嵌套（含缺失末级）均零 child 拒绝，不做一律 lowercase。大小写敏感卷上身份不同的独立目录仍合法。公开目录发布 handoff 前只允许 `reference.json` 与 `candidate.json`，完成后只增加 `handoff.json`，RNG/其他阻塞仍不伪造 handoff。
 
-公开元数据只允许中立 entry ID、角色化文件 hash、闭合运行时/依赖版本与执行计数/hash。公开包没有 argv、路径、消息、堆栈或自由文本字段。公开关联仅 `caseId + requestHash`，clean 输入由 comparator 自己从 kit 加载。`run-dual` 另发布闭合 `handoff.json`，只列 reference/candidate entry ID 与两个行为文件的 SHA-256；observer 发布其文件 hash，接收方固定为 `HANDOFF_SHA256`，比较报告关联这些已核行为工件。
+公开元数据只允许中立 entry ID、角色化文件 hash、闭合运行时/依赖版本与执行计数/hash。公开包没有 argv、路径、消息、堆栈或自由文本字段。公开关联仅 `caseId + requestHash`，clean 输入由 comparator 自己从 kit 加载。`run-dual` 另发布闭合 `handoff-v2`，列两个行为文件 SHA-256、实际 producer 入口角色/hash、manifest hash 和执行策略；新 freeze 为 v3，normalizer 和数值行为投影仍为 v2，旧 handoff/freeze 不混用。observer 发布 handoff 文件 hash，接收方固定为 `HANDOFF_SHA256`。比较器先验此 hash／行为字节，再验 producer 与本 kit manifest，才解析行为作比较；报告同时列双方已经过门的 source/runtime，以及 producer 和本次 comparator 的实际入口身份。真实 Ruby 来源资格不能从一个 PASS 标签自动推导。
 
 ## 准确启动顺序
 

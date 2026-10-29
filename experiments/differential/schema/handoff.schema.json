@@ -1,13 +1,24 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "ruby-ts-differential/handoff-v1",
+  "$id": "ruby-ts-differential/handoff-v2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["protocol", "requestHash", "freezeHash", "artifacts"],
+  "required": ["protocol", "requestHash", "freezeHash", "artifacts", "producer"],
   "properties": {
-    "protocol": {"const": "ruby-ts-differential/handoff-v1"},
+    "protocol": {"const": "ruby-ts-differential/handoff-v2"},
     "requestHash": {"$ref": "#/$defs/hash"},
     "freezeHash": {"$ref": "#/$defs/hash"},
+    "producer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policy", "entryRole", "entrySha256", "manifestSha256", "dependencyPolicy", "environmentPolicy", "nodeOptions", "nodePath", "execArgv"],
+      "properties": {
+        "policy": {"const": "verified-kit-cli-v1"}, "entryRole": {"const": "run-dual"},
+        "entrySha256": {"$ref": "#/$defs/hash"}, "manifestSha256": {"$ref": "#/$defs/hash"},
+        "dependencyPolicy": {"const": "verified-relative-payload-v1"},
+        "environmentPolicy": {"const": "node-loader-free-v1"},
+        "nodeOptions": {"const": "absent-or-empty"}, "nodePath": {"const": "absent-or-empty"}, "execArgv": {"const": "none"}
+      }
+    },
     "artifacts": {
       "type": "array",
       "minItems": 2,

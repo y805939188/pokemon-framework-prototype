@@ -141,8 +141,8 @@ test("infrastructure self-test: changed public numeric values remain unexplained
 test("numeric carrier v2: old behavior, normalizer and freeze contracts cannot masquerade as current", () => {
   assert.equal(referencePackage.protocol, "ruby-ts-differential/behavior-package-v2");
   assert.equal(kit.normalizer.version, "wp30-r2-normalizer-v2");
-  assert.equal(kit.freeze.value.protocol, "ruby-ts-differential/freeze-v2");
-  assert.equal(kit.freeze.value.schemaVersion, "wp30-r2-schema-v2");
+  assert.equal(kit.freeze.value.protocol, "ruby-ts-differential/freeze-v3");
+  assert.equal(kit.freeze.value.schemaVersion, "wp30-r2-schema-v3");
   assert.equal(kit.freeze.value.normalizerVersion, "wp30-r2-normalizer-v2");
 
   const oldBehavior = clone(referencePackage);

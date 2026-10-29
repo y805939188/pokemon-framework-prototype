@@ -3,3 +3,4 @@
 import "./test-infrastructure.mjs";
 import "./test-runner.mjs";
 import "./test-numeric-carrier.mjs";
+import "./test-source-gates.mjs";

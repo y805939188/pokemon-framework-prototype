@@ -5,6 +5,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { verifyKit } from "./lib/kit.mjs";
+import { sha256File } from "./lib/json.mjs";
 
 export const experimentRoot = dirname(fileURLToPath(import.meta.url));
 export const worktreeRoot = resolve(experimentRoot, "../..");
@@ -51,7 +52,17 @@ export const candidateMetadata = () => ({
 export const syntheticReferenceMetadata = () => ({
   source: {
     commit: "8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b", tree: null, tag: "v21.1", dirty: null,
-    files: [{ role: "growth-rules", sha256: "0".repeat(64) }, { role: "friendship-rules", sha256: "0".repeat(64) }, { role: "adapter", sha256: "0".repeat(64) }]
+    // These roles are synthetic data/adapter fixtures, never original Ruby sources.
+    files: ["growth-rules", "friendship-rules", "adapter"].map((role) => ({ role, sha256: sha256File(fixturePath) }))
   },
   runtime: { name: "reference", version: "INFRASTRUCTURE-SELF-TEST", dependencies: [{ name: "reference-runtime", version: "INFRASTRUCTURE-SELF-TEST" }, { name: "adapter", version: "1" }] }
+});
+
+// Nominal handoff fixture for library tests. It does not attest that a formal CLI ran.
+export const syntheticProducer = () => ({
+  policy: "verified-kit-cli-v1", entryRole: "run-dual",
+  entrySha256: kit.hashes.get("run-dual.mjs"),
+  manifestSha256: kit.freeze.value.artifactsManifestSha256,
+  dependencyPolicy: "verified-relative-payload-v1", environmentPolicy: "node-loader-free-v1",
+  nodeOptions: "absent-or-empty", nodePath: "absent-or-empty", execArgv: "none"
 });

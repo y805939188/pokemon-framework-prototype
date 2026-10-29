@@ -30,3 +30,9 @@ Fluctuating max101 的 L100→L101 登记非单调以及 Erratic/Fluctuating 表
 作者真实 TS 子进程已对同一冻结请求产生 5,066 个协议完整 outcome，正式 TS/基础设施自测会重跑此矩阵；这仅标 `TS author self-test`。独立 observer、原版 Ruby 和 actual dual run 均为 `NOT_RUN`，approved divergence 为 0，host unsupported 尚未评估。缺端、gate 失败、过程失败、timeout、case 不完整或缺 provenance/hash 都不得转为 PASS。
 
 本批只含 growth 四 API 与确定性的 friendship change/affection 投影，不包含行走机会抽选、学习替换、完整战斗/获得/进化流程或 WP30 其他能力。真实差异不自动批准；历史 frozen replay、TS 单端、自测合成 reference 和未来 actual dual run 始终分列。
+
+本投影比较精确 JSON 数值，不保存原数字词法，也不比较 Ruby `Integer`／`Float` 运行时类型身份；`1`、`1.0`、`1e0` 的数值相同是已定义的有限合同，不代表原生数值类型等价。以后若需要该类差异，另定 schema／freeze，不悄改本轮输入或映射。数值下溢、负零、unsafe 值或十进制身份丢失仍拒绝；friendship v2 载体对支持的分数、域外状态只保留原值，不夹紧、舍入或消差。
+
+第一批 d9 与 carrier789 的旧结果保留为历史设施证据。新增来源／harness／Node 装载环境反例已暂停旧 PASS 作为后继发布准入；必须在整改后的新 SHA、kit 与外部 freeze 下独立复审，再由隔离 observer 安排真实执行和来源审计。格式资格的27条额外域记录不是已接受的双端覆盖。非占位元数据门和报告中的来源字段便于审计，不替代观察侧证明真实文件加载、替身边界及原始结果关联。
+
+设施套件会保留每次独立输出（含失败），通常约一分钟并产生约百 MiB 证据，不能沿用早期 quick 自检约十秒的估计。评审／CI 应显式指定全新 `DIFFERENTIAL_TEST_ROOT`，结束后按证据保留规则人工归档或可恢复清理，勿自动删除失败。

@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { readJson, sha256File, strictStringify } from "./lib/json.mjs";
 import { validateSchema } from "./lib/schema.mjs";
-import { loadSchema, makeHandoff, validateRawResponse, validateRequest } from "./lib/protocol.mjs";
+import { gateReferenceMetadata, loadSchema, makeHandoff, validateRawResponse, validateRequest } from "./lib/protocol.mjs";
 import { attachRunnerResponse, executeArgv, writePrivateExecution } from "./lib/process.mjs";
 import { makeBehaviorPackage } from "./lib/normalize.mjs";
-import { verifyKit } from "./lib/kit.mjs";
+import { verifyCliKit } from "./lib/kit.mjs";
 
 const configReject = (code) => {
   console.error(JSON.stringify({ status: "CONFIG_REJECTED", code }));
@@ -60,7 +61,8 @@ if (args.length !== 6 || args[0] !== "--kit" || args[2] !== "--expected-freeze" 
   console.error("usage: node run-dual.mjs --kit <kit> --expected-freeze <sha256> --config <private-runners.json>");
   process.exit(64);
 }
-const kit = verifyKit(args[1], { expectedFreezeHash: args[3] });
+try {
+const kit = verifyCliKit(args[1], { expectedFreezeHash: args[3], entryURL: import.meta.url, entryRole: "run-dual" });
 const configPath = resolve(args[5]);
 const config = readJson(configPath, 1024 * 1024);
 const configSchema = validateSchema(loadSchema("runner-config.schema.json"), config);
@@ -77,6 +79,9 @@ if (roles.join(",") !== "candidate,reference") throw new Error("CONFIG_TWO_DISTI
 for (const runner of config.runners) {
   if (runner.entryId !== (runner.role === "reference" ? "reference-rules-v1" : "ts-core-v1")) throw new Error("CONFIG_ENTRY_ROLE_MISMATCH");
 }
+// The same closed source/version check is repeated by the independent comparator.
+// Non-placeholder metadata alone is not proof that the original source was actually loaded.
+gateReferenceMetadata(config.runners.find((runner) => runner.role === "reference").publicMetadata);
 
 // The fixed TS side must execute the verified kit itself. This preflight precedes either child, including reference.
 const candidateRunner = config.runners.find((runner) => runner.role === "candidate");
@@ -144,7 +149,7 @@ if (!publicationBlocked && readdirSync(publicDirectory).sort().join(",") !== "ca
   summary.push({ role: "publication", entryId: "publication-file-set", status: "blocked", sanitizeCode: "PUBLIC_FILE_SET_MISMATCH" });
 }
 if (!publicationBlocked) {
-  const handoff = makeHandoff({ request: configuredRequest, freezeHash: kit.freeze.hash, artifacts: behaviorArtifacts });
+  const handoff = makeHandoff({ request: configuredRequest, freezeHash: kit.freeze.hash, artifacts: behaviorArtifacts, producer: kit.harness });
   const handoffPath = resolve(publicDirectory, "handoff.json");
   writeFileSync(handoffPath, strictStringify(handoff, true) + "\n", { flag: "wx" });
   handoffSHA256 = sha256File(handoffPath);
@@ -153,6 +158,8 @@ writeFileSync(resolve(privateDirectory, "run-summary.json"), strictStringify({
   protocol: "ruby-ts-differential/private-dual-run-v1",
   kitRoot: kit.root,
   configPath,
+  harnessEntryPath: fileURLToPath(import.meta.url),
+  harness: kit.harness,
   requestPath: configuredRequestPath,
   requestHash: configuredRequest.requestHash,
   freezeHash: kit.freeze.hash,
@@ -161,5 +168,11 @@ writeFileSync(resolve(privateDirectory, "run-summary.json"), strictStringify({
   runners: summary,
   rubyExecution: "OBSERVER_ONLY"
 }, true) + "\n", { flag: "wx" });
-console.log(JSON.stringify({ status: publicationBlocked ? "RUN_BLOCKED" : (exitCode === 0 ? "RUNNERS_COMPLETE" : "RUN_FAILED"), requestHash: configuredRequest.requestHash, freezeHash: kit.freeze.hash, handoffSHA256, runners: summary }));
+console.log(JSON.stringify({ status: publicationBlocked ? "RUN_BLOCKED" : (exitCode === 0 ? "RUNNERS_COMPLETE" : "RUN_FAILED"), requestHash: configuredRequest.requestHash, freezeHash: kit.freeze.hash, handoffSHA256, harness: kit.harness, runners: summary }));
 process.exitCode = exitCode;
+} catch (error) {
+  const candidateCode = error.code ?? error.message;
+  const code = typeof candidateCode === "string" && /^[A-Z][A-Z0-9_]{1,95}$/.test(candidateCode) ? candidateCode : "RUN_CONFIGURATION_REJECTED";
+  console.error(JSON.stringify({ status: "CONFIG_REJECTED", code }));
+  process.exitCode = 2;
+}

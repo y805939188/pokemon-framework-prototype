@@ -10,7 +10,7 @@ import { makeBehaviorPackage } from "./lib/normalize.mjs";
 import { compareBehaviorPackages } from "./lib/compare.mjs";
 import { parseJson, readJson, sha256File, sha256Json, strictStringify } from "./lib/json.mjs";
 import { verifyKit } from "./lib/kit.mjs";
-import { kit, testRoot, requestPath, fixturePath, candidateMetadata, syntheticReferenceMetadata } from "./test-helpers.mjs";
+import { kit, testRoot, requestPath, fixturePath, candidateMetadata, syntheticReferenceMetadata, syntheticProducer } from "./test-helpers.mjs";
 
 const clone = (value) => structuredClone(value);
 const smallLimits = { timeoutMs: 150, maxStdoutBytes: 1024, maxStderrBytes: 1024 };
@@ -40,7 +40,7 @@ function writeSyntheticHandoff(directory, reference = referencePackage, candidat
   const candidatePath = join(directory, "candidate.json");
   writeFileSync(referencePath, strictStringify(reference, true) + "\n");
   writeFileSync(candidatePath, strictStringify(candidate, true) + "\n");
-  const handoff = makeHandoff({ request: kit.request, freezeHash: kit.freeze.hash, artifacts: [
+  const handoff = makeHandoff({ request: kit.request, freezeHash: kit.freeze.hash, producer: syntheticProducer(), artifacts: [
     { role: "reference", entryId: "reference-rules-v1", sha256: sha256File(referencePath) },
     { role: "candidate", entryId: "ts-core-v1", sha256: sha256File(candidatePath) }
   ] });

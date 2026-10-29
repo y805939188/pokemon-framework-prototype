@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { parseJson, strictStringify, JsonProtocolError } from "./json.mjs";
 
 export const DEFAULT_LIMITS = Object.freeze({ timeoutMs: 30000, maxStdoutBytes: 16 * 1024 * 1024, maxStderrBytes: 1024 * 1024 });
+export const NODE_EXECUTION_POLICY = "node-loader-free-v1";
 
 function validateArgv(argv) {
   if (!Array.isArray(argv) || argv.length === 0 || argv.length > 64) throw new Error("ARGV_ARRAY_REQUIRED");
@@ -22,9 +23,22 @@ export async function executeArgv({ argv, cwd, env, role = "candidate", entryId 
   const startedAtUTC = new Date().toISOString();
   const started = performance.now();
   const detached = process.platform !== "win32";
+  // Preserve the observer's own runtime preparation without inheriting Node loader overrides.
+  // Never record the full environment: it can contain credentials or private reference details.
+  const suppliedEnvironment = env === undefined ? process.env : env;
+  const childEnvironment = { ...suppliedEnvironment };
+  delete childEnvironment.NODE_OPTIONS;
+  delete childEnvironment.NODE_PATH;
+  const environment = {
+    policy: NODE_EXECUTION_POLICY,
+    nodeOptions: "absent-in-child",
+    nodePath: "absent-in-child",
+    suppliedNodeOptions: Boolean(suppliedEnvironment.NODE_OPTIONS),
+    suppliedNodePath: Boolean(suppliedEnvironment.NODE_PATH)
+  };
   const child = spawn(argv[0], argv.slice(1), {
     cwd,
-    env: env === undefined ? process.env : env,
+    env: childEnvironment,
     shell: false,
     detached,
     stdio: ["ignore", "pipe", "pipe"]
@@ -96,7 +110,7 @@ export async function executeArgv({ argv, cwd, env, role = "candidate", entryId 
   else if (stderrBytes !== 0) { status = "process-error"; infrastructureCode = "STDERR_NONEMPTY"; }
 
   return {
-    role, entryId, argv: [...argv], cwd: cwd ?? null,
+    role, entryId, argv: [...argv], cwd: cwd ?? null, environment,
     startedAtUTC, endedAtUTC, durationMs: Math.max(0, Math.round(performance.now() - started)),
     exitCode, signal, timedOut, outputLimitExceeded, outputLimitStream,
     stdoutBytes, stderrBytes,
@@ -160,6 +174,7 @@ export function writePrivateExecution(execution, directory, limits) {
     entryId: execution.entryId,
     argv: execution.argv,
     cwd: execution.cwd,
+    environment: execution.environment,
     limits,
     execution: publicExecution(execution, limits),
     retainedStdoutBytes: execution.retainedStdoutBytes,

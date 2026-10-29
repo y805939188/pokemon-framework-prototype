@@ -1,5 +1,5 @@
 import { canonicalStringify, sha256Json } from "./json.mjs";
-import { gateBehaviorPackage, GateError, validateMapping } from "./protocol.mjs";
+import { gateBehaviorPackage, GateError, validateHandoff, validateMapping } from "./protocol.mjs";
 
 function classMapping(mapping, testCase, referenceOutcome, candidateOutcome) {
   if (referenceOutcome.kind !== candidateOutcome.kind || referenceOutcome.kind === "value") return null;
@@ -41,11 +41,12 @@ function executionSummary(behavior) {
   };
 }
 
-export function compareBehaviorPackages({ reference, candidate, request, freeze, mapping, normalizer, manifest, handoff = null }) {
+export function compareBehaviorPackages({ reference, candidate, request, freeze, mapping, normalizer, manifest, handoff = null, comparatorHarness = null }) {
   // No outcome field is read before BOTH independent clean-side gates succeed.
   gateBehaviorPackage(reference, { request, freezeHash: freeze.hash, role: "reference", manifest });
   gateBehaviorPackage(candidate, { request, freezeHash: freeze.hash, role: "candidate", manifest });
   validateMapping(mapping);
+  if (handoff !== null) validateHandoff(handoff.value, { request, freezeHash: freeze.hash, manifest, manifestSha256: freeze.value.artifactsManifestSha256 });
 
   const byId = new Map(request.cases.map((testCase) => [testCase.caseId, testCase]));
   const approvalIssues = [];
@@ -63,6 +64,13 @@ export function compareBehaviorPackages({ reference, candidate, request, freeze,
     mappingVersion: mapping.version,
     evaluatedAtUTC,
     equivalenceScope: "under-frozen-reviewed-projection-only",
+    provenanceScope: "closed-metadata-gated-observer-qualification-still-required-v1",
+    participants: [reference, candidate].map((behavior) => ({ role: behavior.role, entryId: behavior.entryId, source: structuredClone(behavior.source), runtime: structuredClone(behavior.runtime) })),
+    harness: {
+      mode: comparatorHarness === null ? "library-only-no-formal-entry-attestation" : "formal-kit-cli",
+      producer: handoff?.value.producer ?? null,
+      comparator: comparatorHarness
+    },
     handoffSHA256: handoff?.hash ?? null,
     behaviorArtifacts: handoff?.value.artifacts ?? [],
     reproduction: { entryId: "compare-v1", requestHash: request.requestHash, freezeHash: freeze.hash, handoffSHA256: handoff?.hash ?? null },
