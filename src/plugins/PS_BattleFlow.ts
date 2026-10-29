@@ -585,6 +585,7 @@ const { developmentCapabilities } = RuleConfig;
 
   G.PluginManager.registerCommand(NAME, "StartTrainerBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
+    if (args.moneyGain !== undefined && ![true, false, "true", "false"].includes(args.moneyGain)) throw new Error("moneyGain must be true or false");
     const id = String(args.trainerId || args.id || ""), version = Number(args.version ?? 0), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || `trainer-${id}-v${version}`}#${seq}`;
     let known = true;
@@ -598,6 +599,7 @@ const { developmentCapabilities } = RuleConfig;
     }
     const opened = PSFlow.tryOpenBattle({
       kind: "trainer", trainer: { id, version }, foes: [], seq, battleId,
+      moneyGain: args.moneyGain !== false && args.moneyGain !== "false",
       resultVariable: Number(args.resultVariable) || 0,
       canLose: String(args.canLose) === "true",
       forceParty: String(args.forceParty) === "true",

@@ -197,7 +197,13 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
         }
       }
       const versions = own(content.trainers, record.id) ?? [];
-      versions.push(JSON.parse(JSON.stringify(record)) as typeof record);
+      const assembledRecord = JSON.parse(JSON.stringify(record)) as typeof record;
+      // The content gate resolves these spellings through Dex; retain its canonical reference at consumption too.
+      for (const member of assembledRecord.party) {
+        if (member.moves) member.moves = member.moves.map(id => id.replace(/-/g, ""));
+        if (member.ability !== undefined) member.ability = member.ability.replace(/-/g, "");
+      }
+      versions.push(assembledRecord);
       setOwn(content.trainers, record.id, versions);
     }
   }

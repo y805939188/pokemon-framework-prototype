@@ -60,7 +60,7 @@ export interface CreateMemberInput {
   form?: number;
   /** NPC loading uses ordinary creation without automatic moves, then applies its own ordered overrides. */
   withMoves?: boolean;
-  /** Defaults to the historical creation-form recheck; NPC explicit forms use simple storage instead. */
+  /** Defaults to the historical creation-form recheck. NPC creation retains that default before its later overrides. */
   recheckForm?: boolean;
   context?: CreationEnvironment & { playerId?: number; map?: number; receivedAt?: number; fateful?: boolean };
   nature?: string;

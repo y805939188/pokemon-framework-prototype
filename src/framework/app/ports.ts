@@ -43,6 +43,8 @@ export interface BattleStartRequest {
   noBall?: boolean;
   /** The author lets the player lose this battle (story battle): a defeat then is not a blackout (WP61 §7, statistics). */
   canLose?: boolean;
+  /** Victory money settlement (WP42). Defaults to true; false does not normalize the wallet. */
+  moneyGain?: boolean;
   /** Scripted battle rule, explicit priority over the player receive preference. */
   forceParty?: boolean;
   /** A-M1 stable trainer record; when present, foes are built from that record rather than free-form foe specs. */

@@ -112,7 +112,7 @@ export function outcomeCode(result: BattleResult): number {
 }
 
 /** What a commit needs to know about the battle beyond its result: for the statistics (WP06 §4.2, WP53 §183, WP61 §7). */
-interface BattleFacts { kind: "wild" | "trainer"; canLose: boolean; experimentalHeld?: boolean; trainer?: { projection: TrainerBattleProjection; levels: number[] } }
+interface BattleFacts { kind: "wild" | "trainer"; canLose: boolean; moneyGain: boolean; experimentalHeld?: boolean; trainer?: { projection: TrainerBattleProjection; levels: number[] } }
 
 /**
  * Battle statistics of one committed result (host code: 1 win, 2 caught, 3 ran, 4 lost or drawn). Wild: a win or a
@@ -688,10 +688,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.evolutions.active) throw new Error("evolution-operation-active");
     if (this.battleBusy) throw new Error("operation-active");
     const generation = this.generation;
-    const op: { battleId: string; session: S | null; facts: BattleFacts } = { battleId: request.battleId, session: null, facts: { kind: request.kind, canLose: !!request.canLose } };
+    const op: { battleId: string; session: S | null; facts: BattleFacts } = { battleId: request.battleId, session: null, facts: { kind: request.kind, canLose: !!request.canLose, moneyGain: true } };
     this.op = op; // reserve before synchronous host ports, not merely before the first await
     const assertCurrent = () => { if (this.op !== op || this.generation !== generation) throw new Error(`battle ${request.battleId} was aborted while its session was being created; the late session is not used`); };
     try {
+      const moneyGain = request.moneyGain; assertCurrent();
+      if (moneyGain !== undefined && typeof moneyGain !== "boolean") throw new Error("moneyGain must be boolean when provided");
+      op.facts.moneyGain = moneyGain ?? true;
       const game = this.ports.state.read(); assertCurrent();
       op.facts.experimentalHeld = game.party.some(m => !!m.item);
       if (!this.capabilities.allowExperimentalHeldItemBattle && game.party.some((m) => !!m.item)) throw new Error("held-item-battle-disabled: battle item write-back is incomplete");
@@ -746,7 +749,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full,
         obedience: { player: { ...game.player }, members: memberOwners, badges: badgeCount(game.badges), anyHighLevel: config.ANY_HIGH_LEVEL_POKEMON_CAN_DISOBEY,
           foreignHighLevel: config.FOREIGN_HIGH_LEVEL_POKEMON_CAN_DISOBEY, generation, contentIdentity },
-        ...(op.facts.trainer ? { trainer: op.facts.trainer.projection } : {}),
+        // This host-facing DTO must never alias the private settlement facts.
+        ...(op.facts.trainer ? { trainer: clone(op.facts.trainer.projection) } : {}),
         ...(diagnostics.length ? { diagnostics } : {}), ...(game.party.some((m) => !!m.item) ? { experimentalHeldBattle: true } : {}) };
       let mapId: number | undefined;
       try { mapId = this.ports.itemWorld?.().mapId ?? creationContext.map; } catch { /* optional companion context unavailable */ }
@@ -922,16 +926,18 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       const eligibleHp = Object.fromEntries(next.party.map(member => [member.id, member.hp]));
       if (facts?.trainer && code === 1) {
         const { id, version, baseMoney } = facts.trainer.projection;
-        const prize = applyTrainerPrize(next, [{ baseMoney, levels: facts.trainer.levels }], content, this.limits);
-        next = prize.state;
+        if (facts.moneyGain) {
+          const prize = applyTrainerPrize(next, [{ baseMoney, levels: facts.trainer.levels }], content, this.limits);
+          next = prize.state;
+          prepared.trainerReward = { id, version, ...prize.reward };
+          if (prize.reward.normalizationLoss > 0) prepared.diagnostics.push(`旧钱包超过上限，规范化下降 ${prize.reward.normalizationLoss}；不计负奖金`);
+        }
         const key = `${id}@${version}`, prior = own(next.defeatedTrainers, key);
         if (prior && (prior.id !== id || prior.version !== version)) throw new Error("defeated trainer record conflict");
         next.defeatedTrainers[key] = { id, version };
         const ledger = own(next.appliedBattles, result.battleId);
         if (!ledger) throw new Error("trainer battle ledger was not prepared");
         ledger.trainer = { id, version };
-        prepared.trainerReward = { id, version, ...prize.reward };
-        if (prize.reward.normalizationLoss > 0) prepared.diagnostics.push(`旧钱包超过上限，规范化下降 ${prize.reward.normalizationLoss}；不计负奖金`);
       }
       if (isDefeat(result)) {
         const settled = settleDefeat(next, content, { noMoneyLoss: this.noMoneyLoss, badges: badgeCount(next.badges), moneyLimit: this.limits.money });

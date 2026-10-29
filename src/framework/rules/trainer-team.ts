@@ -31,18 +31,20 @@ function battleSpecies(content: Content, id: string, form: number): string {
 }
 
 function moveById(content: Content, id: string): { id: string; name: string; pp: number } {
-  for (const move of Object.values(content.moves ?? {})) if (move.id === id) return move;
+  const canonical = id.replace(/-/g, ""); // Same normalization as the validated trainer/Dex reference.
+  for (const move of Object.values(content.moves ?? {})) if (move.id === canonical) return move;
   throw new Error(`trainer move "${id}" is not assembled`);
 }
 
 function abilityById(content: Content, id: string): string {
-  const ability = own(content.abilities, id);
+  const ability = own(content.abilities, id.replace(/-/g, ""));
   if (!ability) throw new Error(`trainer ability "${id}" is not assembled`);
   return ability.name;
 }
 
 /** Silent learning preserves an existing slot's PP metadata, moves it to the end, and keeps only the last four. */
 function learn(slots: MoveSlot[], id: string, content: Content): MoveSlot[] {
+  id = id.replace(/-/g, "");
   const out = [...slots], existing = out.findIndex(move => move.id === id);
   let slot: MoveSlot;
   if (existing >= 0) slot = out.splice(existing, 1)[0]!;
@@ -67,12 +69,12 @@ export function buildTrainerTeam(input: BuildTrainerTeamInput): Member[] {
   const team: Member[] = [];
   for (const [index, entry] of record.party.entries()) {
     if (entry.shadow === true) throw new Error("Shadow trainer members are unsupported (C2)");
-    const form = entry.form ?? 0;
+    // Ordinary base-species creation comes first, including its creation-form draw even when Form is explicit.
+    const created = createMember({ id: input.allocateId(index), species: battleSpecies(content, entry.species, 0), level: entry.level, owner: input.owner,
+      withMoves: false, context: { ...input.context, receivedAt: input.receivedAt, playerId: input.owner.id } }, content, input.random);
+    const form = entry.form ?? created.form ?? 0;
     const speciesName = battleSpecies(content, entry.species, form);
     const species = content.species[speciesName]!;
-    // Ordinary creation with the NPC owner, no automatic moves and no committing form-recheck side effects.
-    const created = createMember({ id: input.allocateId(index), species: speciesName, level: entry.level, owner: input.owner,
-      withMoves: false, recheckForm: false, form, context: { ...input.context, receivedAt: input.receivedAt, playerId: input.owner.id } }, content, input.random);
     // Simple stored form (including explicit 0), then item, then explicit non-empty moves or level defaults.
     let moves: MoveSlot[] = [];
     if (entry.moves !== undefined && entry.moves.length > 0) for (const id of entry.moves) moves = learn(moves, id, content);
@@ -94,14 +96,14 @@ export function buildTrainerTeam(input: BuildTrainerTeamInput): Member[] {
     const ivs = allStats(Math.min(Math.floor(entry.level / 2), 31), entry.ivs);
     const evs = allStats(Math.min(Math.floor((3 * entry.level) / 2), 85), entry.evs);
     const friendship = entry.friendship ?? created.friendship ?? 70;
-    if (!Number.isSafeInteger(friendship) || friendship < 0 || friendship > 255) throw new Error("trainer friendship must be an integer from 0 to 255");
+    if (!Number.isSafeInteger(friendship) || friendship < 0 || (entry.friendship !== undefined && friendship > 255)) throw new Error("trainer friendship override must be an integer from 0 to 255; inherited friendship must be nonnegative and safe");
     if (entry.nickname !== undefined && (!entry.nickname.trim() || Array.from(entry.nickname).length > 10)) throw new Error("trainer nickname must be non-empty and at most 10 characters");
     if (entry.ball !== undefined && content.items?.[entry.ball]?.battleUse !== "ball") throw new Error(`unknown trainer ball "${entry.ball}"`);
     // Final recalculation uses the overridden form, nature, IV and EV. Creation was at full HP, so the result stays full.
-    const oldMax = computeStats(species.base, created.ivs, created.evs, entry.level, created.nature).hp;
+    const oldMax = computeStats(content.species[created.species]!.base, created.ivs, created.evs, entry.level, created.nature).hp;
     const stats = computeStats(species.base, ivs, evs, entry.level, nature);
     const member: Member = {
-      ...created, form, item: entry.item ?? "", moves, ability, abilityIndex, effectiveAbilityIndex,
+      ...created, species: speciesName, form, item: entry.item ?? "", moves, ability, abilityIndex, effectiveAbilityIndex,
       gender, shiny, superShiny, nature, ivs, evs, friendship,
       nickname: entry.nickname ?? null, ball: entry.ball ?? "pokeball",
       owner: { ...input.owner }, origin: created.origin ? { ...created.origin } : created.origin,

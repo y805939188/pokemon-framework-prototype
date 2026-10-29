@@ -43,6 +43,69 @@ function fakeApp({ content = contentWith(), game, result = win(), random = lcg(9
   return { app, state, sessions, projection, content };
 }
 
+for (const timing of ['factory', 'after-start']) test(`AM1-ULTRA-01 private reward facts survive ${timing} setup mutation`, async () => {
+  const w = fakeApp();
+  const original = w.sessions.create;
+  let escaped;
+  const corrupt = setup => {
+    Object.assign(setup.trainer, { id: 'forged-trainer', version: 7, baseMoney: 2000 });
+    setup.foes[0].level = 100;
+    setup.trainer.ai.items[0].count = 999;
+  };
+  w.sessions.create = function(req, game, setup) {
+    escaped = setup;
+    if (timing === 'factory') corrupt(setup);
+    req.moneyGain = false; // The host cannot change the qualification captured before this callback either.
+    return original.call(this, req, game, setup);
+  };
+  const req = request(); const session = await w.app.startTrainerBattle(req);
+  if (timing === 'after-start') corrupt(escaped);
+  const out = w.app.finishBattle(session, req), next = w.state.current();
+  assert.equal(out.commit, 'applied');
+  assert.equal(next.money, 1380);
+  assert.deepEqual(next.defeatedTrainers, { 'route-1-rival@2': { id: record.id, version: 2 } });
+  assert.deepEqual(next.appliedBattles[req.battleId].trainer, { id: record.id, version: 2 });
+  assert.equal(w.state.replaced.length, 1);
+  assert.equal(w.app.finishBattle(session, req).commit, 'already-applied');
+  assert.equal(w.state.replaced.length, 1);
+});
+
+test('AM1-ULTRA-02 disabled money gain is sealed, does not normalize old wallets, and preserves atomic retry/replay', async () => {
+  for (const money of [0, 1000, 1000000]) {
+    const content = contentWith(), w = fakeApp({ content, game: gameWith(content, money) });
+    const original = w.sessions.create;
+    w.sessions.create = function(req, game, setup) { req.moneyGain = true; return original.call(this, req, game, setup); };
+    const req = { ...request(), moneyGain: false }, session = await w.app.startTrainerBattle(req);
+    const before = clone(w.state.current());
+    w.state.failReplace = new Error('money-disabled-zero-write');
+    const failed = w.app.finishBattle(session, req);
+    assert.equal(failed.commit, 'none'); assert.equal(failed.pending, true);
+    assert.deepEqual(w.state.current(), before);
+    w.state.failReplace = null;
+    const out = w.app.finishBattle(session, req), next = w.state.current();
+    assert.equal(out.commit, 'applied');
+    assert.equal(out.trainerReward, undefined, 'no amount or normalization message is projected');
+    assert.equal(next.money, money);
+    assert.equal(next.stats.battle_money_gained, before.stats.battle_money_gained);
+    assert.deepEqual(next.defeatedTrainers['route-1-rival@2'], { id: record.id, version: 2 });
+    assert.equal(w.state.replaced.length, 1);
+    assert.equal(w.app.finishBattle(session, req).commit, 'already-applied');
+    assert.equal(w.state.replaced.length, 1);
+    assert.deepEqual(E.saveSchema.validateGame(next), []);
+  }
+});
+
+test('AM1-ULTRA-02 validates the public money-gain qualification before invoking ports', async () => {
+  const w = fakeApp(); let reads = 0; const original = w.state.read;
+  w.state.read = function() { reads++; return original.call(this); };
+  for (const moneyGain of ['false', 0, null]) await assert.rejects(w.app.startTrainerBattle({ ...request(), moneyGain }), /moneyGain must be boolean/);
+  assert.equal(reads, 0);
+  assert.equal(w.sessions.created.length, 0);
+  assert.equal(w.state.replaced.length, 0);
+  await w.app.startTrainerBattle({ ...request(), moneyGain: true });
+  assert.equal(w.sessions.created.length, 1);
+});
+
 test('A-M1 trainer query/start uses NPC owner, deterministic team, projections and authoritative obedience context', async () => {
   const w = fakeApp();
   const before = JSON.stringify(w.state.current());

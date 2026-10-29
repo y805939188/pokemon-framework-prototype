@@ -2423,9 +2423,9 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
 
   /** 5.4 A-M1 production contacts in the actual NW/MZ host. All input is synthetic DOM/service automation. */
   async function runAM1Trainer() {
-    const command = (id: string, version: number): any => {
+    const command = (id: string, version: number, extra: Record<string, string> = {}): any => {
       const interpreter = new G.Game_Interpreter();
-      G.PluginManager.callCommand(interpreter, "PS_BattleFlow", "StartTrainerBattle", { trainerId: id, version: String(version), canLose: "true" });
+      G.PluginManager.callCommand(interpreter, "PS_BattleFlow", "StartTrainerBattle", { trainerId: id, version: String(version), canLose: "true", ...extra });
       return interpreter;
     };
     await scenario("A-M1-01 StartTrainerBattle missing data has bilingual feedback; cancel has no reward or defeated record", async () => {
@@ -2498,6 +2498,30 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       assert(found, "a natural fixed seed reaches the real change-move branch");
       return found;
     });
+
+    await scenario("A-M1-04 moneyGain=false event preserves an over-cap wallet, records the win and saves without reward", async () => {
+      await slice(504); game().money = 1000000;
+      let rejected = false;
+      try { command("route-1-rival", 2, { moneyGain: "invalid" }); } catch { rejected = true; }
+      assert(rejected && !W.PSFlow.running, "invalid money qualifier is rejected before opening");
+      const beforeMoneyStat = game().stats.battle_money_gained;
+      command("route-1-rival", 2, { moneyGain: "false" }); await inMode("main");
+      await fightUntilEnd(/ember/i, 20); await finishBattle();
+      eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit], [1, "applied"], "normal trainer win remains committed");
+      eq(game().money, 1000000, "disabled settlement does not normalize the old wallet");
+      eq(game().stats.battle_money_gained, beforeMoneyStat, "no money income statistic");
+      assert(!W.PSFlow.lastOutcome.trainerReward, "no amount/normalization message result");
+      eq(game().defeatedTrainers["route-1-rival@2"], { id: "route-1-rival", version: 2 }, "the real opponent is still defeated");
+      const before = clone(game());
+      eq(W.PSFlow.app().commitResult(W.PSFlow.lastResult), "already-applied", "disabled prize replay is a no-op");
+      eq(game(), before, "no reward or ledger rewrite on replay");
+      await settledSave(24);
+      const file = path.join(path.dirname(OUT || "."), "ps-flow-expected-a-m1-trainer.json");
+      const expected = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { slot: 24, state: clone(game()), result: clone(W.PSFlow.lastResult) };
+      expected.moneyDisabled = { slot: 24, state: clone(game()), result: clone(W.PSFlow.lastResult) };
+      fs.writeFileSync(file, JSON.stringify(expected));
+      return { money: game().money, income: game().stats.battle_money_gained, slot: 24, moneyGain: false };
+    });
   }
 
   async function verifySave() {
@@ -2529,6 +2553,14 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         eq(W.PSFlow.app().commitResult(expected.result), "already-applied", "raw replay after fresh load");
         eq(game(), before, "no second prize, defeated write or primary result");
         assert(!W.PSFlow.app().saveBlocked, "no transient battle owner is saved");
+        if (expected.moneyDisabled) {
+          await G.DataManager.loadGame(expected.moneyDisabled.slot);
+          eq(game(), expected.moneyDisabled.state, "fresh process restores complete no-money state");
+          const disabledBefore = clone(game());
+          eq(W.PSFlow.app().commitResult(expected.moneyDisabled.result), "already-applied", "no-money replay after fresh load");
+          eq(game(), disabledBefore, "no delayed money normalization or income after restart");
+          assert(!W.PSFlow.app().saveBlocked, "no-money save contains no transient owner");
+        }
         return { slot: expected.slot, money: game().money, defeated: game().defeatedTrainers, input: "fresh actual NW/MZ JsonEx; no physical input" };
       });
       return;

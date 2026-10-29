@@ -37,6 +37,66 @@ function build(content, compiled, record = compiled.trainers[0]) {
     owner: { id: 7, name: record.name, gender: type.gender, language: 2 }, random: lcg(42), receivedAt: 1234, allocateId: index => `T${index + 1}` });
 }
 
+test('AM1-ULTRA-03 ordinary form creation precedes omitted/explicit overrides and preserves the next member RNG', () => {
+  const pumpkins = ['pumpkaboo', 'pumpkaboosmall', 'pumpkaboolarge', 'pumpkaboosuper'].map((showdownId, form) => ({
+    id: 'pumpkin', form, showdownId, nameKey: 'species.pumpkin', growth: 'medium', baseExp: 67, evYield: { def: 1 }, catchRate: 120,
+    learnset: [{ level: 1, move: form === 1 ? 'tackle' : 'astonish' }], source: 'author-placeholder',
+  }));
+  function random() { const calls = []; return { calls, next(n) { const i = calls.length; calls.push(n); return i === 8 ? 0 : (i * 17) % n; } }; }
+  for (const form of [undefined, 0, 1, 3]) {
+    const input = baseInputs(); input.species.push(...pumpkins);
+    const npc = { ...trainerRecord(), party: [{ species: 'pumpkin', level: 5, ...(form === undefined ? {} : { form }) }, { species: 'caterpie', level: 5 }] };
+    const compiled = E.contentCompile.compileContent({ ...input, trainerTypes: [trainerType()], trainers: [npc] });
+    assert.equal(compiled.ok, true, JSON.stringify(compiled.errors));
+    const content = assembled(compiled.data), expected = random(), actual = random();
+    const owner = { id: 7, name: npc.name, gender: 0, language: 2 }, context = { map: 9, receivedAt: 1234, playerId: 7 };
+    const normal = E.memberFactory.createMember({ id: 'C1', species: 'Pumpkaboo', level: 5, owner, withMoves: false, context }, content, n => expected.next(n));
+    const next = E.memberFactory.createMember({ id: 'C2', species: 'Caterpie', level: 5, owner, withMoves: false, context }, content, n => expected.next(n));
+    const team = E.trainerTeam.buildTrainerTeam({ content, registrationOrder: compiled.data.registrationOrder, trainerTypeOrder: ['youngster'],
+      record: compiled.data.trainers[0], type: compiled.data.trainerTypes[0], owner, random: n => actual.next(n), receivedAt: 1234, allocateId: i => `T${i + 1}`, context: { map: 9 } });
+    assert.equal(normal.form, 3);
+    assert.equal(team[0].form, form ?? normal.form);
+    assert.equal(team[0].species, content.forms.pumpkin[form ?? normal.form]);
+    assert.deepEqual(actual.calls, expected.calls);
+    assert.equal(actual.calls[8], 100, 'explicit Form must not remove ordinary creation RNG');
+    assert.equal(team[1].personalID, next.personalID);
+    assert.deepEqual(team[0].moves.map(m => m.id), [form === 1 ? 'tackle' : 'astonish']);
+    const species = content.species[team[0].species];
+    assert.equal(team[0].hp, E.growth.computeStats(species.base, team[0].ivs, team[0].evs, 5, team[0].nature).hp);
+  }
+});
+
+test('AM1-ULTRA-04 omitted friendship inherits legal 256 while explicit overrides retain their own domain', () => {
+  const input = baseInputs(); input.species.find(s => s.id === 'pidgey' && (s.form ?? 0) === 0).happiness = 256;
+  for (const friendship of [undefined, 0]) {
+    const npc = { ...trainerRecord(), party: [{ species: 'pidgey', level: 5, ...(friendship === undefined ? {} : { friendship }) }] };
+    const result = E.contentCompile.compileContent({ ...input, trainerTypes: [trainerType()], trainers: [npc] });
+    assert.equal(result.ok, true); const team = build(assembled(result.data), result.data);
+    assert.equal(team[0].friendship, friendship ?? 256);
+  }
+  for (const friendship of [-1, 256]) {
+    const result = E.contentCompile.compileContent({ ...input, trainerTypes: [trainerType()], trainers: [{ ...trainerRecord(), party: [{ species: 'pidgey', level: 5, friendship }] }] });
+    assert.equal(result.ok, false); assert.ok(result.errors.some(e => e.path.endsWith('.friendship')));
+  }
+});
+
+test('AM1-ULTRA-05 canonical and hyphenated trainer references agree through cache, assembly and construction', () => {
+  for (const [move, ability] of [['quick-attack', 'keen-eye'], ['quickattack', 'keeneye']]) {
+    const compiled = compile({ trainerTypes: [trainerType()], trainers: [{ ...trainerRecord(), party: [{ species: 'pidgey', level: 19, moves: [move, 'quickattack'], ability }] }] });
+    const loaded = E.contentRuntime.loadCompiled(clone(compiled)), content = assembled(loaded);
+    assert.deepEqual(content.trainers['route-1-rival'][0].party[0].moves, ['quickattack', 'quickattack']);
+    assert.equal(content.trainers['route-1-rival'][0].party[0].ability, 'keeneye');
+    const team = build(content, loaded);
+    assert.deepEqual(team[0].moves.map(m => m.id), ['quickattack']);
+    assert.equal(team[0].ability, 'Keen Eye');
+  }
+  for (const member of [{ moves: ['missing-move'] }, { ability: 'missing-ability' }]) {
+    const compiled = compile({ trainerTypes: [trainerType()], trainers: [{ ...trainerRecord(), party: [{ species: 'pidgey', level: 19, ...member }] }] });
+    const result = E.contentRuntime.assembleContent(E.contentRuntime.loadCompiled(clone(compiled)), E.dex.createDexLookup());
+    assert.ok(result.errors.some(e => member.moves ? e.path.includes('.moves[') : e.path.endsWith('.ability')));
+  }
+});
+
 test('A-M1 content is optional and preserves the legacy input hash when absent', () => {
   const before = compile();
   assert.equal(before.trainers, undefined);

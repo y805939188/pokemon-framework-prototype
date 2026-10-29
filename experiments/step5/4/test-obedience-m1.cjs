@@ -15,11 +15,11 @@ function set(name, species, level, moves, ability = 'Immunity') {
 async function create(seed, options = {}) {
   const level = options.level ?? 60;
   const player = set('player', options.species ?? 'Snorlax', level, options.moves ?? ['Tackle', 'Scratch'], options.ability ?? 'Immunity');
-  const foe = set('foe', options.foeSpecies ?? 'Caterpie', options.foeLevel ?? 5, ['Tackle'], 'Shield Dust');
+  const foe = set('foe', options.foeSpecies ?? 'Caterpie', options.foeLevel ?? 5, options.foeMoves ?? ['Tackle'], options.foeAbility ?? 'Shield Dust');
   const gw = await E.gateway.BattleGateway.create({ formatid: 'gen8rpgcustomgame', seed: [seed, 22, 33, 44], wild: true,
     players: [{ name: 'Player', team: [player] }, { name: 'Wild', team: [foe] }], obedience: options.control ?? context() });
   await gw.choose('p1', 'team 1'); await gw.choose('p2', 'team 1');
-  if (options.status) gw.seedState('p1', [{ id: 'player', hp: gw.readState('p1')[0].maxhp, status: options.status, statusCount: options.status === 'slp' ? 2 : 0 }]);
+  if (options.status) gw.seedState('p1', [{ id: 'player', hp: gw.readState('p1')[0].maxhp, status: options.status, statusCount: options.statusCount ?? (options.status === 'slp' ? 2 : 0) }]);
   if (options.volatile) gw._debugBattle().getSide('p1').active[0].addVolatile(options.volatile);
   gw.drain();
   return gw;
@@ -98,6 +98,35 @@ test('A-M1 real engine: self-sleep uses engine status and replays without extra 
   await assertReplay(sample);
 });
 function gwStatus(gw) { return gw.readState('p1')[0].status; }
+
+test('AM1-ULTRA-06 non-sleep statuses retain natural disobedience self-hit, zero PP and full checkpoint semantics', async () => {
+  for (const [status, statusCount] of [['psn', 0], ['brn', 0], ['par', 0], ['psn', 1]]) {
+    const gw = await create(3, { ability: 'Thick Fat', status, statusCount, foeSpecies: 'Snorlax', foeLevel: 50, foeMoves: ['Splash'], foeAbility: 'Thick Fat' });
+    const beforePp = pp(gw), token = gw.checkpoint(), beforeHp = gw.readState('p1')[0].hp, messages = await turn(gw);
+    const hit = trace(gw).find(entry => entry.kind === 'self-hit');
+    assert.ok(hit, JSON.stringify({ status, statusCount, trace: trace(gw) }));
+    assert.equal(hit.roll, 3); assert.equal(hit.c, 50);
+    assert.equal(runtime(gw).draws, 3, 'do not draw a fourth refusal message');
+    assert.ok(!trace(gw).some(entry => entry.kind === 'refuse'));
+    assert.ok(gw.readState('p1')[0].hp < beforeHp);
+    assert.deepEqual(pp(gw), beforePp);
+    assert.ok(messages.flatMap(m => m.events ?? []).some(e => e.raw.includes('|rpg|obedience|p1|player|self-hit|')));
+    await assertReplay({ gw, token });
+  }
+});
+
+test('AM1-ULTRA-06 no-status and sleep-immunity neighbors retain sleep then self-hit ordering', async () => {
+  const ordinary = await create(3, { ability: 'Thick Fat' });
+  await turn(ordinary);
+  assert.equal(trace(ordinary).find(e => e.kind === 'self-sleep').applied, true);
+  assert.ok(!trace(ordinary).some(e => e.kind === 'self-hit'));
+  const immune = await create(3, { ability: 'Insomnia', foeSpecies: 'Snorlax', foeLevel: 50, foeMoves: ['Splash'] });
+  const token = immune.checkpoint(), beforePp = pp(immune); await turn(immune);
+  assert.equal(trace(immune).find(e => e.kind === 'self-sleep').applied, false);
+  assert.ok(trace(immune).some(e => e.kind === 'self-hit'));
+  assert.deepEqual(pp(immune), beforePp);
+  await assertReplay({ gw: immune, token });
+});
 
 test('A-M1 real engine: disobedience self-hit uses engine damage and checkpoint replay', async () => {
   const sample = await findScenario('self-hit');

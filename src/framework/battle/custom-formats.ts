@@ -249,7 +249,7 @@ function checkObedience(battle: ShowdownBattle, pokemon: ShowdownPokemon, target
         return false;
       }
     }
-    if (roll - c < c && !pokemon.status) {
+    if (roll - c < c && pokemon.status !== "slp") {
       obedienceTrace(battle, "self-hit", pokemon, move, { roll, c });
       obedienceMessage(battle, pokemon, "self-hit", roll);
       battle.activeTarget = pokemon;
