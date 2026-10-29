@@ -1,9 +1,10 @@
 import { lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { readJson, sha256File } from "./json.mjs";
+import { canonicalStringify, readJson, sha256File } from "./json.mjs";
 import { validateSchema } from "./schema.mjs";
 import { GateError, loadSchema, validateMapping, validateNormalizer, validateRequest } from "./protocol.mjs";
 import { KIT_METADATA, KIT_PAYLOAD, safeKitPath } from "./kit-policy.mjs";
+import { generateCoverage } from "./cases.mjs";
 
 const requireKit = (condition, code) => { if (!condition) throw new GateError(code); };
 const payloadSet = new Set(KIT_PAYLOAD);
@@ -65,6 +66,8 @@ export function verifyKit(rootArgument, { expectedFreezeHash = null } = {}) {
   requireKit(freezeValue.artifactsManifestSha256 === artifactsManifestSha256, "KIT_MANIFEST_SEAL_MISMATCH");
 
   const request = validateRequest(readJson(join(root, "requests/wp30-r2.json")));
+  const coverage = readJson(join(root, "requests/selection-coverage.json"));
+  requireKit(canonicalStringify(coverage) === canonicalStringify(generateCoverage(request)), "KIT_COVERAGE_MISMATCH");
   const mapping = validateMapping(readJson(join(root, "config/mapping.json"), 1024 * 1024));
   const normalizer = validateNormalizer(readJson(join(root, "config/normalizer.json"), 1024 * 1024));
   requireKit(freezeValue.requestHash === request.requestHash, "KIT_REQUEST_FREEZE_MISMATCH");
@@ -72,10 +75,12 @@ export function verifyKit(rootArgument, { expectedFreezeHash = null } = {}) {
   requireKit(freezeValue.mappingApprovalCount === mapping.approvedDifferences.length, "KIT_APPROVAL_COUNT_MISMATCH");
   const logical = {
     request: "requests/wp30-r2.json",
+    selectionCoverage: "requests/selection-coverage.json",
     requestSchema: "schema/request.schema.json",
     rawResponseSchema: "schema/runner-response.schema.json",
     behaviorSchema: "schema/behavior-package.schema.json",
     runnerConfigSchema: "schema/runner-config.schema.json",
+    handoffSchema: "schema/handoff.schema.json",
     artifactManifestSchema: "schema/artifact-manifest.schema.json",
     freezeSchema: "schema/freeze.schema.json",
     mappingSchema: "schema/mapping.schema.json",

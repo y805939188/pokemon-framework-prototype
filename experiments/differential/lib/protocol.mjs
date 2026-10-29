@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { readJson, sha256Json } from "./json.mjs";
+import { readJson, sha256File, sha256Json } from "./json.mjs";
 import { validateSchema } from "./schema.mjs";
 
 const schemaPath = (name) => fileURLToPath(new URL(`../schema/${name}`, import.meta.url));
@@ -9,6 +9,7 @@ export const schemas = {
   rawResponse: () => loadSchema("runner-response.schema.json"),
   behavior: () => loadSchema("behavior-package.schema.json"),
   config: () => loadSchema("runner-config.schema.json"),
+  handoff: () => loadSchema("handoff.schema.json"),
   mapping: () => loadSchema("mapping.schema.json"),
   normalizer: () => loadSchema("normalizer.schema.json")
 };
@@ -149,7 +150,7 @@ const validTime = (value) => Number.isFinite(Date.parse(value));
 function requireGate(condition, code) { if (!condition) throw new GateError(code); }
 
 /** This function must complete before any caller reads or compares case outcomes. */
-export function gateBehaviorPackage(behavior, { request, freezeHash, role }) {
+export function gateBehaviorPackage(behavior, { request, freezeHash, role, manifest = null }) {
   const schemaResult = validateSchema(schemas.behavior(), behavior);
   if (!schemaResult.valid) throw new GateError("BEHAVIOR_SCHEMA_REJECTED", schemaResult.errors);
   requireGate(behavior.role === role, "BEHAVIOR_ROLE_MISMATCH");
@@ -166,11 +167,19 @@ export function gateBehaviorPackage(behavior, { request, freezeHash, role }) {
   const dependencyNames = behavior.runtime.dependencies.map((dependency) => dependency.name);
   requireGate(new Set(dependencyNames).size === dependencyNames.length, "BEHAVIOR_DEPENDENCY_DUPLICATE");
   if (role === "reference") {
-    requireGate(behavior.runtime.name === "reference" && source.commit !== null && source.tag === "v21.1" && source.tree === null && source.dirty === null, "REFERENCE_PROVENANCE_INCOMPLETE");
+    requireGate(behavior.runtime.name === "reference" && source.commit === "8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b" && source.tag === "v21.1" && source.tree === null && source.dirty === null, "REFERENCE_PROVENANCE_MISMATCH");
     for (const required of ["growth-rules", "friendship-rules", "adapter"]) requireGate(fileRoles.includes(required), "REFERENCE_SOURCE_HASH_MISSING");
   } else {
     requireGate(behavior.runtime.name === "node" && source.commit !== null && source.tree !== null && source.tag === null && typeof source.dirty === "boolean", "CANDIDATE_PROVENANCE_INCOMPLETE");
     for (const required of ["core-bundle", "runner"]) requireGate(fileRoles.includes(required), "CANDIDATE_SOURCE_HASH_MISSING");
+    requireGate(manifest !== null, "CANDIDATE_PROVENANCE_BINDING_REQUIRED");
+    requireGate(source.commit === manifest.source.commit && source.tree === manifest.source.tree && source.dirty === manifest.source.dirty, "CANDIDATE_SOURCE_MISMATCH");
+    requireGate(fileRoles.length === 2, "CANDIDATE_ARTIFACT_ROLE_MISMATCH");
+    for (const [fileRole, artifactPath] of [["core-bundle", "core/core.cjs"], ["runner", "runners/ts-runner.mjs"]]) {
+      const declared = source.files.find((file) => file.role === fileRole)?.sha256;
+      const expected = manifest.files.find((file) => file.path === artifactPath)?.sha256;
+      requireGate(declared === expected, "CANDIDATE_ARTIFACT_HASH_MISMATCH");
+    }
   }
   if (execution.status === "success") {
     requireGate(execution.exitCode === 0 && execution.signal === null && !execution.timedOut && !execution.outputLimitExceeded && execution.stderrBytes === 0, "SUCCESS_PREDICATE_VIOLATION");
@@ -210,4 +219,39 @@ export function validateNormalizer(normalizer) {
   if (!result.valid) throw new GateError("NORMALIZER_SCHEMA_REJECTED", result.errors);
   requireGate(new Set(normalizer.projections.map((entry) => entry.operation)).size === 8, "NORMALIZER_OPERATION_SET_MISMATCH");
   return normalizer;
+}
+
+export function validateHandoff(handoff, { request, freezeHash }) {
+  const result = validateSchema(schemas.handoff(), handoff);
+  if (!result.valid) throw new GateError("HANDOFF_SCHEMA_REJECTED", result.errors);
+  requireGate(handoff.requestHash === request.requestHash, "HANDOFF_REQUEST_HASH_MISMATCH");
+  requireGate(handoff.freezeHash === freezeHash, "HANDOFF_FREEZE_HASH_MISMATCH");
+  const roles = handoff.artifacts.map((artifact) => artifact.role).sort();
+  requireGate(roles.join(",") === "candidate,reference", "HANDOFF_ROLE_SET_MISMATCH");
+  for (const artifact of handoff.artifacts) {
+    requireGate(artifact.entryId === (artifact.role === "reference" ? "reference-rules-v1" : "ts-core-v1"), "HANDOFF_ENTRY_MISMATCH");
+  }
+  return handoff;
+}
+
+export function makeHandoff({ request, freezeHash, artifacts }) {
+  const order = { reference: 0, candidate: 1 };
+  return validateHandoff({
+    protocol: "ruby-ts-differential/handoff-v1",
+    requestHash: request.requestHash,
+    freezeHash,
+    artifacts: [...artifacts].sort((a, b) => order[a.role] - order[b.role]).map(({ role, entryId, sha256 }) => ({ role, entryId, sha256 }))
+  }, { request, freezeHash });
+}
+
+/** Verify the externally fixed handoff and raw behavior artifact bytes before parsing either behavior body. */
+export function verifyHandoff({ handoffPath, expectedHandoffHash, referencePath, candidatePath, request, freezeHash }) {
+  const hash = sha256File(handoffPath);
+  requireGate(hash === expectedHandoffHash, "HANDOFF_EXTERNAL_HASH_MISMATCH");
+  const value = validateHandoff(readJson(handoffPath, 1024 * 1024), { request, freezeHash });
+  for (const artifact of value.artifacts) {
+    const path = artifact.role === "reference" ? referencePath : candidatePath;
+    requireGate(sha256File(path) === artifact.sha256, "HANDOFF_ARTIFACT_HASH_MISMATCH");
+  }
+  return { value, hash };
 }

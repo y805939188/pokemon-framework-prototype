@@ -43,8 +43,13 @@ export function assertJsonValue(value, path = "$", ancestors = new Set(), depth 
   ancestors.add(value);
   if (Array.isArray(value)) {
     for (const key of Reflect.ownKeys(value)) {
-      if (key === "length" || /^(0|[1-9][0-9]*)$/.test(key)) continue;
-      fail("JSON_ARRAY_PROPERTY", path);
+      if (key === "length") continue;
+      if (typeof key !== "string" || !/^(0|[1-9][0-9]*)$/.test(key) || !Number.isSafeInteger(Number(key)) || Number(key) >= 4294967295 || String(Number(key)) !== key) {
+        fail("JSON_ARRAY_PROPERTY", path);
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      // Reject accessors before reading any index; JSON.stringify must never invoke a getter or drop an own property.
+      if (!descriptor?.enumerable || !("value" in descriptor)) fail("JSON_NON_DATA_PROPERTY", path);
     }
     for (let index = 0; index < value.length; index++) {
       if (!Object.hasOwn(value, index)) fail("JSON_SPARSE_ARRAY", `${path}[${index}]`);

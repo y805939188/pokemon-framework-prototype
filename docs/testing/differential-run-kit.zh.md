@@ -13,9 +13,9 @@
 
 ## 文件与封印
 
-`artifacts.manifest.json` 对全部 payload 记录 path/bytes/SHA-256；`freeze.json` 再封印 manifest、完整 request、schema、normalizer 和 mapping。交付方另给 `freeze.json` 的文件 SHA-256（下称 `FREEZE_SHA256`），observer 必须显式传入，不能只信包内自报 hash。
+`artifacts.manifest.json` 对全部 payload 记录 path/bytes/SHA-256；`freeze.json` 再封印 manifest、完整 request、selection-coverage、schema、normalizer 和 mapping。交付方另给 `freeze.json` 的文件 SHA-256（下称 `FREEZE_SHA256`），observer 必须显式传入，不能只信包内自报 hash。candidate 行为包的 commit/tree/dirty 与 core/runner hash 必须逐项等于此 manifest；reference commit/tag 固定为本轮 `8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b` / `v21.1` 目标，实际 loaded-file hash 由 observer 产生。
 
-实际文件集必须等于静态 allowlist。额外文件、符号链接、`.ts/.tsx/.mts/.cts`、`.map`、inline/external `sourceMappingURL` 均拒绝。kit 含编译后的 `core/core.cjs` 和 `runners/ts-runner.mjs`，不含产品 TS 源或 source map。`requests/wp30-r2.json` 是完整冻结输入，不含期望输出。
+实际文件集必须等于静态 allowlist。额外文件、符号链接、`.ts/.tsx/.mts/.cts`、`.map`、inline/external `sourceMappingURL` 均拒绝。kit 含编译后的 `core/core.cjs` 和 `runners/ts-runner.mjs`，不含产品 TS 源或 source map。`requests/wp30-r2.json` 是完整冻结输入，不含期望输出；`requests/selection-coverage.json` 是逐 API/方法/配置/边界的完整 caseId 清单。
 
 ## 独立 observer 准备
 
@@ -25,7 +25,7 @@
 4. observer 独立核验固定 reference commit/tag、实际运行时版本、loaded-file role hash 和替身边界。无法核验或宿主不支持即 `BLOCKED/NOT_RUN`；不改业务 oracle、不改输入或映射求收敛。
 5. candidate argv 使用 kit 内相对路径并以 kit 为 cwd；reference argv 完全由 observer 私有配置。两边都必须产生同一 request 的全量 case。
 
-公开元数据只允许中立 entry ID、角色化文件 hash、闭合运行时/依赖版本与执行计数/hash。公开包没有 argv、路径、消息、堆栈或自由文本字段。公开关联仅 `caseId + requestHash`，clean 输入由 comparator 自己从 kit 加载。
+公开元数据只允许中立 entry ID、角色化文件 hash、闭合运行时/依赖版本与执行计数/hash。公开包没有 argv、路径、消息、堆栈或自由文本字段。公开关联仅 `caseId + requestHash`，clean 输入由 comparator 自己从 kit 加载。`run-dual` 另发布闭合 `handoff.json`，只列 reference/candidate entry ID 与两个行为文件的 SHA-256；observer 发布其文件 hash，接收方固定为 `HANDOFF_SHA256`，比较报告关联这些已核行为工件。
 
 ## 准确启动顺序
 
@@ -34,10 +34,10 @@
 ```bash
 node "$KIT/verify-kit.mjs" --kit "$KIT" --expected-freeze "$FREEZE_SHA256"
 node "$KIT/run-dual.mjs" --kit "$KIT" --expected-freeze "$FREEZE_SHA256" --config "$PRIVATE_CONFIG"
-node "$KIT/compare.mjs" --kit "$KIT" --expected-freeze "$FREEZE_SHA256" --reference "$PUBLIC_RUN/reference.json" --candidate "$PUBLIC_RUN/candidate.json" --out "$REPORT"
+node "$KIT/compare.mjs" --kit "$KIT" --expected-freeze "$FREEZE_SHA256" --handoff "$PUBLIC_RUN/handoff.json" --expected-handoff "$HANDOFF_SHA256" --reference "$PUBLIC_RUN/reference.json" --candidate "$PUBLIC_RUN/candidate.json" --out "$REPORT"
 ```
 
-第一条和第三条是各自独立的机器 gate；第二条生成公开包前也自检，但不能替代第三条 clean 端复核。第二条若因执行失败返回 1，仍保存 raw/公开失败包，并执行第三条以固定 `RUN_FAILED`；若第二条在配置/元数据门拒绝，则修复配置后使用全新输出目录，不挑选旧包中的可用部分。
+第一条和第三条是各自独立的机器 gate；第二条生成公开包前也自检，但不能替代第三条 clean 端复核。compare 在解析任何行为正文前先核 expected-handoff 与两个行为文件的实际 SHA-256。第二条若因过程执行失败返回 1 但仍产生完整 handoff，则执行第三条固定 `RUN_FAILED`；若显示 `RUN_BLOCKED` 或缺 handoff，则整次保持 BLOCKED，不挑选单侧包或旧 handoff 消费。配置/元数据门拒绝后使用全新输出目录，不修改期望消差。
 
 ## raw outcome 与公开投影
 
@@ -45,10 +45,10 @@ node "$KIT/compare.mjs" --kit "$KIT" --expected-freeze "$FREEZE_SHA256" --refere
 
 公开包只含操作白名单投影：数值、friendship before/after/delta、有序 steps、affection、闭合错误 code 与 raw kind/class。Ruby 状态变化到 TS plan.after 的投影已事前登记为 `ruby-state-change-to-ts-plan-after-v1`。额外 raw 字段、未知形状或不能闭合表示的自由文本使整端 protocol/gate 失败，不做关键词删除。
 
-本批无随机输入：`seed=null, drawCount=0, draws=[]`。若实际 reference 发生随机消费，私有保留 bound/value/order，公开端整侧 protocol-error，保持 BLOCKED；先另定可复现输入契约，不得伪填 0 后继续 PASS。
+本批无随机输入：`seed=null, drawCount=0, draws=[]`。若实际 reference 发生随机消费，私有 response 保留真实 bound/value/order，该侧公开行为包和整次 handoff 均不发布，run-dual 返回 `RUN_BLOCKED`；先另定可复现输入契约，不得伪填 0 或兜底发布空 trace。
 
 ## 比较与覆盖口径
 
-只有 kit/freeze/hash/schema/白名单/request 关联全部通过，compare 才读取行为字段。任一侧缺失、过程失败、case 不完整或元数据不全均不 PASS。value/error-object/raised/process-error 永不合并；只有 mapping 中具体操作+输入域+raw kind+双方 class 的冻结映射可按具名粒度比较，raw class 仍在报告保留。当前 approved differences 与 classifications 均为空，作者不能批准真实差异。
+只有 kit/freeze/handoff/行为工件 hash/schema/白名单/request 关联全部通过，compare 才读取行为字段。任一侧缺失、过程失败、case 不完整或元数据不全均不 PASS。value/error-object/raised/process-error 永不合并；只有 mapping 中具体操作+输入域+raw kind+双方 class 的冻结映射可按具名粒度比较，raw class 仍在报告保留。当前 approved differences 与 classifications 均为空，作者不能批准真实差异。
 
 覆盖以 growth 四 API、friendship 13 方法×13 初值×16 配置、affection 256 输入和具名序列为分母，另列额外/拒绝域。请求条数不是 WP30、FR 或 routing 736 单元的功能覆盖百分比；未执行、gate 失败、timeout 和 host unsupported 均不计 actual dual run。

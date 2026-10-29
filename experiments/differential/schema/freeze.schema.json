@@ -11,9 +11,9 @@
     "requestHash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "artifactsManifestSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "hashes": {
       "type": "object", "additionalProperties": false,
-      "required": ["request", "requestSchema", "rawResponseSchema", "behaviorSchema", "runnerConfigSchema", "artifactManifestSchema", "freezeSchema", "mappingSchema", "normalizerSchema", "mapping", "normalizer"],
+      "required": ["request", "selectionCoverage", "requestSchema", "rawResponseSchema", "behaviorSchema", "runnerConfigSchema", "handoffSchema", "artifactManifestSchema", "freezeSchema", "mappingSchema", "normalizerSchema", "mapping", "normalizer"],
       "properties": {
-        "request": {"$ref": "#/$defs/hash"}, "requestSchema": {"$ref": "#/$defs/hash"}, "rawResponseSchema": {"$ref": "#/$defs/hash"}, "behaviorSchema": {"$ref": "#/$defs/hash"}, "runnerConfigSchema": {"$ref": "#/$defs/hash"}, "artifactManifestSchema": {"$ref": "#/$defs/hash"}, "freezeSchema": {"$ref": "#/$defs/hash"}, "mappingSchema": {"$ref": "#/$defs/hash"}, "normalizerSchema": {"$ref": "#/$defs/hash"}, "mapping": {"$ref": "#/$defs/hash"}, "normalizer": {"$ref": "#/$defs/hash"}
+        "request": {"$ref": "#/$defs/hash"}, "selectionCoverage": {"$ref": "#/$defs/hash"}, "requestSchema": {"$ref": "#/$defs/hash"}, "rawResponseSchema": {"$ref": "#/$defs/hash"}, "behaviorSchema": {"$ref": "#/$defs/hash"}, "runnerConfigSchema": {"$ref": "#/$defs/hash"}, "handoffSchema": {"$ref": "#/$defs/hash"}, "artifactManifestSchema": {"$ref": "#/$defs/hash"}, "freezeSchema": {"$ref": "#/$defs/hash"}, "mappingSchema": {"$ref": "#/$defs/hash"}, "normalizerSchema": {"$ref": "#/$defs/hash"}, "mapping": {"$ref": "#/$defs/hash"}, "normalizer": {"$ref": "#/$defs/hash"}
       }
     }
   },

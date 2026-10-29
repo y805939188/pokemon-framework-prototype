@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ruby-ts-differential/handoff-v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "requestHash", "freezeHash", "artifacts"],
+  "properties": {
+    "protocol": {"const": "ruby-ts-differential/handoff-v1"},
+    "requestHash": {"$ref": "#/$defs/hash"},
+    "freezeHash": {"$ref": "#/$defs/hash"},
+    "artifacts": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "entryId", "sha256"],
+        "properties": {
+          "role": {"enum": ["reference", "candidate"]},
+          "entryId": {"enum": ["reference-rules-v1", "ts-core-v1"]},
+          "sha256": {"$ref": "#/$defs/hash"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

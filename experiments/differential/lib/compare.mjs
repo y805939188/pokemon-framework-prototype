@@ -20,7 +20,7 @@ function outcomeDifference(testCase, referenceOutcome, candidateOutcome, mapping
     applied = classMapping(mapping, testCase, referenceOutcome, candidateOutcome);
     if (!applied) fields.push("class");
   }
-  if (referenceOutcome.kind !== "raised" && canonicalStringify(referenceOutcome.value) !== canonicalStringify(candidateOutcome.value)) fields.push("value");
+  if (referenceOutcome.kind !== "raised" && candidateOutcome.kind !== "raised" && canonicalStringify(referenceOutcome.value) !== canonicalStringify(candidateOutcome.value)) fields.push("value");
   return { fields, applied };
 }
 
@@ -41,10 +41,10 @@ function executionSummary(behavior) {
   };
 }
 
-export function compareBehaviorPackages({ reference, candidate, request, freeze, mapping, normalizer }) {
+export function compareBehaviorPackages({ reference, candidate, request, freeze, mapping, normalizer, manifest, handoff = null }) {
   // No outcome field is read before BOTH independent clean-side gates succeed.
-  gateBehaviorPackage(reference, { request, freezeHash: freeze.hash, role: "reference" });
-  gateBehaviorPackage(candidate, { request, freezeHash: freeze.hash, role: "candidate" });
+  gateBehaviorPackage(reference, { request, freezeHash: freeze.hash, role: "reference", manifest });
+  gateBehaviorPackage(candidate, { request, freezeHash: freeze.hash, role: "candidate", manifest });
 
   const byId = new Map(request.cases.map((testCase) => [testCase.caseId, testCase]));
   const approvalIssues = [];
@@ -62,7 +62,9 @@ export function compareBehaviorPackages({ reference, candidate, request, freeze,
     mappingVersion: mapping.version,
     evaluatedAtUTC,
     equivalenceScope: "under-frozen-reviewed-projection-only",
-    reproduction: { entryId: "compare-v1", requestHash: request.requestHash, freezeHash: freeze.hash },
+    handoffSHA256: handoff?.hash ?? null,
+    behaviorArtifacts: handoff?.value.artifacts ?? [],
+    reproduction: { entryId: "compare-v1", requestHash: request.requestHash, freezeHash: freeze.hash, handoffSHA256: handoff?.hash ?? null },
     executions: [executionSummary(reference), executionSummary(candidate)]
   };
   if (reference.execution.status !== "success" || candidate.execution.status !== "success") {

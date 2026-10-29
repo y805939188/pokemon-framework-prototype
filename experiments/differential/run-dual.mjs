@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, resolve } from "node:path";
 import { readJson, sha256File, strictStringify } from "./lib/json.mjs";
 import { validateSchema } from "./lib/schema.mjs";
-import { loadSchema, validateRawResponse, validateRequest } from "./lib/protocol.mjs";
+import { loadSchema, makeHandoff, validateRawResponse, validateRequest } from "./lib/protocol.mjs";
 import { attachRunnerResponse, executeArgv, writePrivateExecution } from "./lib/process.mjs";
 import { makeBehaviorPackage } from "./lib/normalize.mjs";
 import { verifyKit } from "./lib/kit.mjs";
@@ -40,9 +40,11 @@ const prepareEmpty = (pathArgument) => {
 const privateDirectory = prepareEmpty(config.privateDirectory);
 const publicDirectory = prepareEmpty(config.publicDirectory);
 const summary = [];
+const behaviorArtifacts = [];
 let exitCode = 0;
+let publicationBlocked = false;
 for (const runner of config.runners) {
-  const execution = executeArgv({
+  const execution = await executeArgv({
     argv: runner.argv,
     cwd: resolve(dirname(configPath), runner.cwd),
     role: runner.role,
@@ -53,15 +55,26 @@ for (const runner of config.runners) {
   writePrivateExecution(execution, privateRoleDirectory, config.limits);
   let behavior;
   try {
-    behavior = makeBehaviorPackage({ execution, request: configuredRequest, freezeHash: kit.freeze.hash, publicMetadata: runner.publicMetadata, limits: config.limits });
+    behavior = makeBehaviorPackage({ execution, request: configuredRequest, freezeHash: kit.freeze.hash, publicMetadata: runner.publicMetadata, limits: config.limits, manifest: kit.manifest });
   } catch (error) {
     writeFileSync(resolve(privateRoleDirectory, "sanitize-error.json"), strictStringify({ code: error.code ?? "SANITIZE_OR_METADATA_REJECTED" }, true) + "\n", { flag: "wx" });
-    const failedExecution = { ...execution, status: "protocol-error", response: null };
-    behavior = makeBehaviorPackage({ execution: failedExecution, request: configuredRequest, freezeHash: kit.freeze.hash, publicMetadata: runner.publicMetadata, limits: config.limits });
+    publicationBlocked = true;
+    exitCode = 1;
+    summary.push({ role: runner.role, entryId: runner.entryId, status: "blocked", infrastructureCode: execution.infrastructureCode, protocolCode: execution.protocolCode, sanitizeCode: error.code ?? "SANITIZE_OR_METADATA_REJECTED" });
+    continue;
   }
-  writeFileSync(resolve(publicDirectory, `${runner.role}.json`), strictStringify(behavior, true) + "\n", { flag: "wx" });
+  const publicPath = resolve(publicDirectory, `${runner.role}.json`);
+  writeFileSync(publicPath, strictStringify(behavior, true) + "\n", { flag: "wx" });
+  behaviorArtifacts.push({ role: runner.role, entryId: runner.entryId, sha256: sha256File(publicPath) });
   if (behavior.execution.status !== "success") exitCode = 1;
   summary.push({ role: runner.role, entryId: runner.entryId, status: behavior.execution.status, infrastructureCode: execution.infrastructureCode, protocolCode: execution.protocolCode });
+}
+let handoffSHA256 = null;
+if (!publicationBlocked) {
+  const handoff = makeHandoff({ request: configuredRequest, freezeHash: kit.freeze.hash, artifacts: behaviorArtifacts });
+  const handoffPath = resolve(publicDirectory, "handoff.json");
+  writeFileSync(handoffPath, strictStringify(handoff, true) + "\n", { flag: "wx" });
+  handoffSHA256 = sha256File(handoffPath);
 }
 writeFileSync(resolve(privateDirectory, "run-summary.json"), strictStringify({
   protocol: "ruby-ts-differential/private-dual-run-v1",
@@ -70,8 +83,10 @@ writeFileSync(resolve(privateDirectory, "run-summary.json"), strictStringify({
   requestPath: configuredRequestPath,
   requestHash: configuredRequest.requestHash,
   freezeHash: kit.freeze.hash,
+  handoffSHA256,
+  publicationBlocked,
   runners: summary,
   rubyExecution: "OBSERVER_ONLY"
 }, true) + "\n", { flag: "wx" });
-console.log(JSON.stringify({ status: exitCode === 0 ? "RUNNERS_COMPLETE" : "RUN_FAILED", requestHash: configuredRequest.requestHash, freezeHash: kit.freeze.hash, runners: summary }));
+console.log(JSON.stringify({ status: publicationBlocked ? "RUN_BLOCKED" : (exitCode === 0 ? "RUNNERS_COMPLETE" : "RUN_FAILED"), requestHash: configuredRequest.requestHash, freezeHash: kit.freeze.hash, handoffSHA256, runners: summary }));
 process.exitCode = exitCode;

@@ -78,23 +78,22 @@ function cleanMetadata(metadata) {
   };
 }
 
-export function makeBehaviorPackage({ execution, request, freezeHash, publicMetadata, limits }) {
+export function makeBehaviorPackage({ execution, request, freezeHash, publicMetadata, limits, manifest = null }) {
   const metadata = cleanMetadata(publicMetadata);
   const executionReceipt = publicExecution(execution, limits);
   let cases = [];
   if (execution.status === "success") {
     if (!execution.response) throw normalizationError("SUCCESS_WITHOUT_RAW_RESPONSE");
     if (execution.response.random.seed !== null || execution.response.random.drawCount !== 0 || execution.response.random.draws.length !== 0) {
-      // The raw response remains private. This batch has no reproducible RNG input contract, so fail the whole side.
-      executionReceipt.status = "protocol-error";
-    } else {
-      const expected = new Map(request.cases.map((testCase) => [testCase.caseId, testCase]));
-      cases = execution.response.cases.map((rawCase) => ({
-        caseId: rawCase.caseId,
-        requestHash: rawCase.requestHash,
-        outcome: sanitizeOutcome(rawCase.outcome, expected.get(rawCase.caseId))
-      }));
+      // Unsupported RNG blocks publication. Never replace a private non-empty trace with a public zero.
+      throw normalizationError("RANDOM_UNSUPPORTED");
     }
+    const expected = new Map(request.cases.map((testCase) => [testCase.caseId, testCase]));
+    cases = execution.response.cases.map((rawCase) => ({
+      caseId: rawCase.caseId,
+      requestHash: rawCase.requestHash,
+      outcome: sanitizeOutcome(rawCase.outcome, expected.get(rawCase.caseId))
+    }));
   }
   const behavior = {
     protocol: "ruby-ts-differential/behavior-package-v1",
@@ -109,7 +108,7 @@ export function makeBehaviorPackage({ execution, request, freezeHash, publicMeta
     cases
   };
   // Observer-side self-gate. The clean comparator independently repeats this gate before reading outcomes.
-  gateBehaviorPackage(behavior, { request, freezeHash, role: execution.role });
+  gateBehaviorPackage(behavior, { request, freezeHash, role: execution.role, manifest });
   return behavior;
 }
 

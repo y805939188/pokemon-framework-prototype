@@ -96,3 +96,52 @@ export function generateRequest(core) {
 
   return sealRequest({ protocol: "ruby-ts-differential/request-v1", selectionVersion: "wp30-r2-v1", thresholdSource: "clean-ts-minExp-v1", capabilities: ["growth", "friendship"], cases });
 }
+
+/** Selection denominators and complete caseId mapping only; no outcome or functional percentage. */
+export function generateCoverage(request) {
+  const ids = (operation, predicate = () => true) => request.cases.filter((testCase) => testCase.operation === operation && predicate(testCase)).map((testCase) => testCase.caseId);
+  const additionalIds = (additionalClass) => request.cases.filter((testCase) => testCase.additionalClass === additionalClass).map((testCase) => testCase.caseId);
+  const api = (operations, extra = {}) => ({
+    operations,
+    caseIds: request.cases.filter((testCase) => operations.includes(testCase.operation)).map((testCase) => testCase.caseId),
+    ...extra
+  });
+  return {
+    protocol: "ruby-ts-differential/selection-coverage-v1",
+    requestHash: request.requestHash,
+    sources: [
+      { id: "WP30", path: "deliverables/final-specification-set/creature-rpg/wp30-growth-learning-and-friendship.md", sections: ["3.1", "3.2", "7.2", "7.3"] },
+      { id: "BOUNDARY-MATRIX-R2", sha256: "c07907c053b5c4ac4a91e93f73611e3c5a8785967102b2dc05aebfc8edb68f7f" },
+      { id: "ROUTING-736", path: "planning/implementation-routing/r8-20261017/", unitCount: 736, usage: "traceability-denominator-not-a-percentage" },
+      { id: "HISTORICAL-GROWTH-3504", path: "docs/step3/differential-growth.md", usage: "frozen-replay-separate-from-this-run" }
+    ],
+    growth: {
+      apiDenominator: 4,
+      curveDenominator: 6,
+      configurationDenominator: 18,
+      apis: [
+        api(["growth.minimumExpForLevel"], { defaultTableCaseIds: ids("growth.minimumExpForLevel", (testCase) => testCase.domain === "common" && testCase.input.maxLevel === 100 && testCase.input.level >= 1 && testCase.input.level <= 100) }),
+        api(["growth.maximumExp"]),
+        api(["growth.addExp", "growth.addExpSequence"], { compositeSequenceCaseIds: ids("growth.addExpSequence") }),
+        api(["growth.levelFromExp"], { explicitAnchorCaseIds: ids("growth.levelFromExp", (testCase) => [0, 1, 999999, 1000000, 1640000, 20504, 20505, 20506, 618473, 618474, 618475].includes(testCase.input.exp)) })
+      ]
+    },
+    friendship: {
+      methodDenominator: 13,
+      initialValues: [...FRIENDSHIP_VALUES],
+      configurationDenominator: 16,
+      methods: FRIENDSHIP_METHODS.map((method) => ({ method, commonCaseIds: ids("friendship.change", (testCase) => testCase.domain === "common" && testCase.input.method === method) })),
+      affection: { inputDenominator: 256, thresholds: [99, 100, 149, 150, 199, 200, 229, 230, 254, 255], commonCaseIds: ids("friendship.affection", (testCase) => testCase.domain === "common") },
+      sequences: request.cases.filter((testCase) => testCase.operation === "friendship.changeSequence").map((testCase) => ({ name: testCase.input.name, caseId: testCase.caseId, stepCount: testCase.input.steps.length }))
+    },
+    additionalDomains: {
+      "growth-invalid-level": additionalIds("growth-invalid-level"),
+      "growth-invalid-exp": additionalIds("growth-invalid-exp"),
+      "unknown-friendship-method": additionalIds("unknown-friendship-method"),
+      "friendship-out-of-domain": additionalIds("friendship-out-of-domain")
+    },
+    atFreeze: { referenceExecution: "NOT_RUN", actualDualRun: "NOT_RUN", approvedDivergence: 0, hostUnsupported: "NOT_EVALUATED" },
+    historicalFrozenReplay: { growth3504: "SEPARATE_NOT_ACTUAL_DUAL_RUN" },
+    percentage: "NOT_COMPUTED_CASE_COUNTS_ARE_NOT_FUNCTIONAL_COVERAGE"
+  };
+}
