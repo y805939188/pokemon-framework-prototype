@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ruby-ts-differential/request-v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol", "selectionVersion", "thresholdSource", "requestId", "requestHash", "capabilities", "cases"],
+  "properties": {
+    "protocol": {"const": "ruby-ts-differential/request-v1"},
+    "selectionVersion": {"const": "wp30-r2-v1"},
+    "thresholdSource": {"const": "clean-ts-minExp-v1"},
+    "requestId": {"type": "string", "pattern": "^wp30-r2-[0-9a-f]{16}$"},
+    "requestHash": {"$ref": "#/$defs/hash"},
+    "capabilities": {"type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": {"enum": ["growth", "friendship"]}},
+    "cases": {"type": "array", "minItems": 1, "maxItems": 100000, "items": {"$ref": "#/$defs/case"}}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "curve": {"enum": ["medium", "fast", "slow", "parabolic", "erratic", "fluctuating"]},
+    "maxLevel": {"enum": [50, 100, 101]},
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["caseId", "requestHash", "capability", "operation", "domain", "additionalClass", "input"],
+      "properties": {
+        "caseId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9.-]{2,95}$"},
+        "requestHash": {"$ref": "#/$defs/hash"},
+        "capability": {"enum": ["growth", "friendship"]},
+        "operation": {"enum": ["growth.minimumExpForLevel", "growth.maximumExp", "growth.addExp", "growth.addExpSequence", "growth.levelFromExp", "friendship.change", "friendship.changeSequence", "friendship.affection"]},
+        "domain": {"enum": ["common", "additional"]},
+        "additionalClass": {"enum": ["none", "growth-invalid-level", "growth-invalid-exp", "unknown-friendship-method", "friendship-out-of-domain"]},
+        "input": {
+          "oneOf": [
+            {"$ref": "#/$defs/minimumInput"},
+            {"$ref": "#/$defs/maximumInput"},
+            {"$ref": "#/$defs/addInput"},
+            {"$ref": "#/$defs/addSequenceInput"},
+            {"$ref": "#/$defs/levelInput"},
+            {"$ref": "#/$defs/changeInput"},
+            {"$ref": "#/$defs/changeSequenceInput"},
+            {"$ref": "#/$defs/affectionInput"}
+          ]
+        }
+      }
+    },
+    "minimumInput": {
+      "type": "object", "additionalProperties": false, "required": ["curve", "maxLevel", "level"],
+      "properties": {"curve": {"$ref": "#/$defs/curve"}, "maxLevel": {"$ref": "#/$defs/maxLevel"}, "level": {"type": ["integer", "null"], "minimum": -1000, "maximum": 1000}}
+    },
+    "maximumInput": {
+      "type": "object", "additionalProperties": false, "required": ["curve", "maxLevel"],
+      "properties": {"curve": {"$ref": "#/$defs/curve"}, "maxLevel": {"$ref": "#/$defs/maxLevel"}}
+    },
+    "addInput": {
+      "type": "object", "additionalProperties": false, "required": ["curve", "maxLevel", "current", "amount"],
+      "properties": {"curve": {"$ref": "#/$defs/curve"}, "maxLevel": {"$ref": "#/$defs/maxLevel"}, "current": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}, "amount": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991}}
+    },
+    "addSequenceInput": {
+      "type": "object", "additionalProperties": false, "required": ["curve", "maxLevel", "current", "amounts"],
+      "properties": {"curve": {"$ref": "#/$defs/curve"}, "maxLevel": {"$ref": "#/$defs/maxLevel"}, "current": {"type": "integer", "minimum": 0, "maximum": 9007199254740991}, "amounts": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991}}}
+    },
+    "levelInput": {
+      "type": "object", "additionalProperties": false, "required": ["curve", "maxLevel", "exp"],
+      "properties": {"curve": {"$ref": "#/$defs/curve"}, "maxLevel": {"$ref": "#/$defs/maxLevel"}, "exp": {"type": ["integer", "null"], "minimum": -9007199254740991, "maximum": 9007199254740991}}
+    },
+    "method": {"enum": ["walking", "levelup", "groom", "evberry", "vitamin", "wing", "machine", "battleitem", "faint", "faintbad", "powder", "energyroot", "revivalherb", "unknown"]},
+    "changeInput": {
+      "type": "object", "additionalProperties": false,
+      "required": ["method", "friendship", "originMap", "mapId", "ball", "item", "AFFECTION_EFFECTS"],
+      "properties": {
+        "method": {"$ref": "#/$defs/method"}, "friendship": {"type": "number", "minimum": -1000, "maximum": 1000},
+        "originMap": {"const": 1}, "mapId": {"enum": [1, 2]}, "ball": {"enum": ["pokeball", "luxuryball"]},
+        "item": {"enum": ["", "soothebell"]}, "AFFECTION_EFFECTS": {"type": "boolean"}
+      }
+    },
+    "changeSequenceInput": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "initial", "steps", "originMap", "mapId", "ball", "item", "AFFECTION_EFFECTS"],
+      "properties": {
+        "name": {"enum": ["cross-99-100", "soft-cap-178-179", "cross-199-200", "clamp-255-up-down", "clamp-0-lower"]},
+        "initial": {"type": "integer", "minimum": 0, "maximum": 255},
+        "steps": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"$ref": "#/$defs/method"}},
+        "originMap": {"const": 1}, "mapId": {"enum": [1, 2]}, "ball": {"enum": ["pokeball", "luxuryball"]},
+        "item": {"enum": ["", "soothebell"]}, "AFFECTION_EFFECTS": {"type": "boolean"}
+      }
+    },
+    "affectionInput": {
+      "type": "object", "additionalProperties": false, "required": ["friendship"],
+      "properties": {"friendship": {"type": "number", "minimum": -1000, "maximum": 1000}}
+    }
+  }
+}

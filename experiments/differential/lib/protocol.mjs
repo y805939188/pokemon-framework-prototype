@@ -1,0 +1,213 @@
+import { fileURLToPath } from "node:url";
+import { readJson, sha256Json } from "./json.mjs";
+import { validateSchema } from "./schema.mjs";
+
+const schemaPath = (name) => fileURLToPath(new URL(`../schema/${name}`, import.meta.url));
+export const loadSchema = (name) => readJson(schemaPath(name));
+export const schemas = {
+  request: () => loadSchema("request.schema.json"),
+  rawResponse: () => loadSchema("runner-response.schema.json"),
+  behavior: () => loadSchema("behavior-package.schema.json"),
+  config: () => loadSchema("runner-config.schema.json"),
+  mapping: () => loadSchema("mapping.schema.json"),
+  normalizer: () => loadSchema("normalizer.schema.json")
+};
+
+export const caseRequestHash = (testCase) => sha256Json({
+  caseId: testCase.caseId,
+  capability: testCase.capability,
+  operation: testCase.operation,
+  domain: testCase.domain,
+  additionalClass: testCase.additionalClass,
+  input: testCase.input
+});
+
+export function requestBody(request) {
+  return {
+    protocol: request.protocol,
+    selectionVersion: request.selectionVersion,
+    thresholdSource: request.thresholdSource,
+    capabilities: request.capabilities,
+    cases: request.cases
+  };
+}
+
+export function sealRequest(body) {
+  const cases = body.cases.map((testCase) => ({ ...testCase, requestHash: caseRequestHash(testCase) }));
+  const unsigned = { ...body, cases };
+  const requestHash = sha256Json(requestBody(unsigned));
+  return { ...unsigned, requestId: `wp30-r2-${requestHash.slice(0, 16)}`, requestHash };
+}
+
+const operationShapes = {
+  "growth.minimumExpForLevel": ["curve", "maxLevel", "level"],
+  "growth.maximumExp": ["curve", "maxLevel"],
+  "growth.addExp": ["curve", "maxLevel", "current", "amount"],
+  "growth.addExpSequence": ["curve", "maxLevel", "current", "amounts"],
+  "growth.levelFromExp": ["curve", "maxLevel", "exp"],
+  "friendship.change": ["method", "friendship", "originMap", "mapId", "ball", "item", "AFFECTION_EFFECTS"],
+  "friendship.changeSequence": ["name", "initial", "steps", "originMap", "mapId", "ball", "item", "AFFECTION_EFFECTS"],
+  "friendship.affection": ["friendship"]
+};
+const knownMethods = new Set(["walking", "levelup", "groom", "evberry", "vitamin", "wing", "machine", "battleitem", "faint", "faintbad", "powder", "energyroot", "revivalherb"]);
+const exactKeys = (value, keys) => {
+  const actual = Object.keys(value).sort();
+  return actual.length === keys.length && actual.every((key, index) => key === [...keys].sort()[index]);
+};
+const validFriendship = (value) => Number.isSafeInteger(value) && value >= 0 && value <= 255;
+
+function validateCaseSemantics(testCase) {
+  const expectedCapability = testCase.operation.split(".")[0];
+  if (testCase.capability !== expectedCapability || !operationShapes[testCase.operation] || !exactKeys(testCase.input, operationShapes[testCase.operation])) return "CASE_OPERATION_INPUT_MISMATCH";
+  if (testCase.domain === "common" && testCase.additionalClass !== "none") return "COMMON_CASE_HAS_ADDITIONAL_CLASS";
+  if (testCase.domain === "additional" && testCase.additionalClass === "none") return "ADDITIONAL_CLASS_REQUIRED";
+  const input = testCase.input;
+  if (testCase.operation === "growth.minimumExpForLevel") {
+    const valid = Number.isInteger(input.level) && input.level >= 1;
+    if (testCase.domain === "common" && !valid) return "COMMON_LEVEL_OUTSIDE_DOMAIN";
+    if (testCase.domain === "additional" && (testCase.additionalClass !== "growth-invalid-level" || valid)) return "INVALID_LEVEL_CLASS_MISMATCH";
+  }
+  if (testCase.operation === "growth.levelFromExp") {
+    const valid = Number.isInteger(input.exp) && input.exp >= 0;
+    if (testCase.domain === "common" && !valid) return "COMMON_EXP_OUTSIDE_DOMAIN";
+    if (testCase.domain === "additional" && (testCase.additionalClass !== "growth-invalid-exp" || valid)) return "INVALID_EXP_CLASS_MISMATCH";
+  }
+  if (!["growth.minimumExpForLevel", "growth.levelFromExp", "friendship.change", "friendship.affection"].includes(testCase.operation) && testCase.domain !== "common") return "OPERATION_HAS_NO_ADDITIONAL_DOMAIN";
+  if (testCase.operation === "friendship.change") {
+    const methodKnown = knownMethods.has(input.method);
+    const friendshipValid = validFriendship(input.friendship);
+    if (testCase.domain === "common" && (!methodKnown || !friendshipValid)) return "COMMON_FRIENDSHIP_CHANGE_INVALID";
+    if (testCase.domain === "additional") {
+      if (testCase.additionalClass === "unknown-friendship-method" && (methodKnown || !friendshipValid)) return "UNKNOWN_METHOD_DOMAIN_MISMATCH";
+      if (testCase.additionalClass === "friendship-out-of-domain" && (!methodKnown || friendshipValid)) return "FRIENDSHIP_DOMAIN_MISMATCH";
+    }
+  }
+  if (testCase.operation === "friendship.affection") {
+    const friendshipValid = validFriendship(input.friendship);
+    if (testCase.domain === "common" && !friendshipValid) return "COMMON_AFFECTION_INVALID";
+    if (testCase.domain === "additional" && (testCase.additionalClass !== "friendship-out-of-domain" || friendshipValid)) return "AFFECTION_DOMAIN_MISMATCH";
+  }
+  return null;
+}
+
+function schemaFailure(label, result) {
+  const error = new Error(`${label}_SCHEMA_REJECTED`);
+  error.code = `${label}_SCHEMA_REJECTED`;
+  error.details = result.errors.map(({ code, path, schemaPath }) => ({ code, path, schemaPath }));
+  return error;
+}
+
+export function validateRequest(request) {
+  const schemaResult = validateSchema(schemas.request(), request);
+  if (!schemaResult.valid) throw schemaFailure("REQUEST", schemaResult);
+  const ids = new Set();
+  for (const testCase of request.cases) {
+    if (ids.has(testCase.caseId)) throw Object.assign(new Error("REQUEST_DUPLICATE_CASE_ID"), { code: "REQUEST_DUPLICATE_CASE_ID" });
+    ids.add(testCase.caseId);
+    if (caseRequestHash(testCase) !== testCase.requestHash) throw Object.assign(new Error("REQUEST_CASE_HASH_MISMATCH"), { code: "REQUEST_CASE_HASH_MISMATCH" });
+    const semantic = validateCaseSemantics(testCase);
+    if (semantic) throw Object.assign(new Error(semantic), { code: semantic });
+  }
+  const expected = sealRequest(requestBody(request));
+  if (expected.requestHash !== request.requestHash || expected.requestId !== request.requestId) throw Object.assign(new Error("REQUEST_HASH_MISMATCH"), { code: "REQUEST_HASH_MISMATCH" });
+  return request;
+}
+
+export function validateRawResponse(response, request) {
+  const schemaResult = validateSchema(schemas.rawResponse(), response);
+  if (!schemaResult.valid) return { status: "protocol-error", code: "RUNNER_RESPONSE_SCHEMA_REJECTED", details: schemaResult.errors };
+  if (response.error) return { status: "protocol-error", code: response.error.code };
+  if (response.requestHash !== request.requestHash) return { status: "protocol-error", code: "RUNNER_REQUEST_HASH_MISMATCH" };
+  if (response.random.drawCount !== response.random.draws.length) return { status: "protocol-error", code: "RANDOM_DRAW_COUNT_MISMATCH" };
+  for (let index = 0; index < response.random.draws.length; index++) {
+    const draw = response.random.draws[index];
+    if (draw.order !== index || draw.value >= draw.bound) return { status: "protocol-error", code: "RANDOM_DRAW_ORDER_OR_BOUND" };
+  }
+  const expected = new Map(request.cases.map((testCase) => [testCase.caseId, testCase.requestHash]));
+  const actual = new Set();
+  for (const result of response.cases) {
+    if (actual.has(result.caseId)) return { status: "protocol-error", code: "RUNNER_DUPLICATE_CASE_ID" };
+    actual.add(result.caseId);
+    if (!expected.has(result.caseId)) return { status: "protocol-error", code: "RUNNER_EXTRA_CASE_ID" };
+    if (expected.get(result.caseId) !== result.requestHash) return { status: "protocol-error", code: "RUNNER_CASE_HASH_MISMATCH" };
+  }
+  for (const id of expected.keys()) if (!actual.has(id)) return { status: "protocol-error", code: "RUNNER_MISSING_CASE_ID" };
+  if (actual.size !== expected.size) return { status: "protocol-error", code: "RUNNER_CASE_COUNT_MISMATCH" };
+  return { status: "success" };
+}
+
+export class GateError extends Error {
+  constructor(code, details = []) {
+    super(code);
+    this.name = "GateError";
+    this.code = code;
+    this.details = details.map(({ code, path, schemaPath }) => ({ code, path, schemaPath }));
+  }
+}
+
+const validTime = (value) => Number.isFinite(Date.parse(value));
+function requireGate(condition, code) { if (!condition) throw new GateError(code); }
+
+/** This function must complete before any caller reads or compares case outcomes. */
+export function gateBehaviorPackage(behavior, { request, freezeHash, role }) {
+  const schemaResult = validateSchema(schemas.behavior(), behavior);
+  if (!schemaResult.valid) throw new GateError("BEHAVIOR_SCHEMA_REJECTED", schemaResult.errors);
+  requireGate(behavior.role === role, "BEHAVIOR_ROLE_MISMATCH");
+  requireGate(behavior.entryId === (role === "reference" ? "reference-rules-v1" : "ts-core-v1"), "BEHAVIOR_ENTRY_MISMATCH");
+  requireGate(behavior.requestHash === request.requestHash, "BEHAVIOR_REQUEST_HASH_MISMATCH");
+  requireGate(behavior.freezeHash === freezeHash, "BEHAVIOR_FREEZE_HASH_MISMATCH");
+  requireGate(validTime(behavior.observedAtUTC), "BEHAVIOR_OBSERVED_TIME_INVALID");
+  const execution = behavior.execution;
+  requireGate(validTime(execution.startedAtUTC) && validTime(execution.endedAtUTC), "BEHAVIOR_EXECUTION_TIME_INVALID");
+  requireGate(Date.parse(execution.startedAtUTC) <= Date.parse(execution.endedAtUTC), "BEHAVIOR_EXECUTION_TIME_ORDER");
+  const source = behavior.source;
+  const fileRoles = source.files.map((file) => file.role);
+  requireGate(new Set(fileRoles).size === fileRoles.length, "BEHAVIOR_SOURCE_ROLE_DUPLICATE");
+  const dependencyNames = behavior.runtime.dependencies.map((dependency) => dependency.name);
+  requireGate(new Set(dependencyNames).size === dependencyNames.length, "BEHAVIOR_DEPENDENCY_DUPLICATE");
+  if (role === "reference") {
+    requireGate(behavior.runtime.name === "reference" && source.commit !== null && source.tag === "v21.1" && source.tree === null && source.dirty === null, "REFERENCE_PROVENANCE_INCOMPLETE");
+    for (const required of ["growth-rules", "friendship-rules", "adapter"]) requireGate(fileRoles.includes(required), "REFERENCE_SOURCE_HASH_MISSING");
+  } else {
+    requireGate(behavior.runtime.name === "node" && source.commit !== null && source.tree !== null && source.tag === null && typeof source.dirty === "boolean", "CANDIDATE_PROVENANCE_INCOMPLETE");
+    for (const required of ["core-bundle", "runner"]) requireGate(fileRoles.includes(required), "CANDIDATE_SOURCE_HASH_MISSING");
+  }
+  if (execution.status === "success") {
+    requireGate(execution.exitCode === 0 && execution.signal === null && !execution.timedOut && !execution.outputLimitExceeded && execution.stderrBytes === 0, "SUCCESS_PREDICATE_VIOLATION");
+    const expected = new Map(request.cases.map((testCase) => [testCase.caseId, testCase.requestHash]));
+    const actual = new Set();
+    for (const result of behavior.cases) {
+      requireGate(!actual.has(result.caseId), "BEHAVIOR_DUPLICATE_CASE_ID");
+      actual.add(result.caseId);
+      requireGate(expected.has(result.caseId), "BEHAVIOR_EXTRA_CASE_ID");
+      requireGate(expected.get(result.caseId) === result.requestHash, "BEHAVIOR_CASE_HASH_MISMATCH");
+    }
+    requireGate(actual.size === expected.size, "BEHAVIOR_CASE_COUNT_MISMATCH");
+    for (const id of expected.keys()) requireGate(actual.has(id), "BEHAVIOR_MISSING_CASE_ID");
+  } else {
+    requireGate(behavior.cases.length === 0, "FAILED_EXECUTION_CONTAINS_BEHAVIOR");
+    if (execution.status === "timeout") requireGate(execution.timedOut, "TIMEOUT_FLAG_MISMATCH");
+    if (execution.outputLimitExceeded) requireGate(execution.status === "process-error", "OUTPUT_LIMIT_STATUS_MISMATCH");
+  }
+  return behavior;
+}
+
+export function validateMapping(mapping) {
+  const result = validateSchema(schemas.mapping(), mapping);
+  if (!result.valid) throw new GateError("MAPPING_SCHEMA_REJECTED", result.errors);
+  const ids = new Set();
+  for (const entry of mapping.errorClassMappings) {
+    requireGate(!ids.has(entry.mappingId), "MAPPING_ID_DUPLICATE");
+    ids.add(entry.mappingId);
+    requireGate(entry.kind !== "value", "MAPPING_CANNOT_TOUCH_VALUE");
+    requireGate(entry.referenceClass !== entry.candidateClass, "MAPPING_IDENTITY_CLASS_NOT_ALLOWED");
+  }
+  return mapping;
+}
+
+export function validateNormalizer(normalizer) {
+  const result = validateSchema(schemas.normalizer(), normalizer);
+  if (!result.valid) throw new GateError("NORMALIZER_SCHEMA_REJECTED", result.errors);
+  requireGate(new Set(normalizer.projections.map((entry) => entry.operation)).size === 8, "NORMALIZER_OPERATION_SET_MISMATCH");
+  return normalizer;
+}

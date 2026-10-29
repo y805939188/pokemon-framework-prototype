@@ -1,0 +1,24 @@
+{
+  "protocol": "ruby-ts-differential/mapping-v1",
+  "version": "wp30-r2-mapping-v1",
+  "errorClassMappings": [
+    {
+      "mappingId": "growth-minimum-invalid-level-argument-error-v1",
+      "operation": "growth.minimumExpForLevel",
+      "additionalClass": "growth-invalid-level",
+      "kind": "error-object",
+      "referenceClass": "ArgumentError",
+      "candidateClass": null
+    },
+    {
+      "mappingId": "growth-level-invalid-exp-name-error-v1",
+      "operation": "growth.levelFromExp",
+      "additionalClass": "growth-invalid-exp",
+      "kind": "raised",
+      "referenceClass": "NameError",
+      "candidateClass": "RangeError"
+    }
+  ],
+  "approvedDifferences": [],
+  "classifications": []
+}

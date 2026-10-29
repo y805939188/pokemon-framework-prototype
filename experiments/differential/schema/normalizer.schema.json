@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ruby-ts-differential/normalizer-v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["protocol", "version", "rawRetention", "arrayOrder", "objectEquality", "projections"],
+  "properties": {
+    "protocol": {"const": "ruby-ts-differential/normalizer-v1"},
+    "version": {"const": "wp30-r2-normalizer-v1"},
+    "rawRetention": {"const": "private-full-json-and-streams-v1"},
+    "arrayOrder": {"const": "preserve"},
+    "objectEquality": {"const": "canonical-keys-without-field-removal"},
+    "projections": {"type": "array", "minItems": 8, "maxItems": 8, "items": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operation", "projection", "rawFieldsRetainedPrivately"],
+      "properties": {
+        "operation": {"enum": ["growth.minimumExpForLevel", "growth.maximumExp", "growth.addExp", "growth.addExpSequence", "growth.levelFromExp", "friendship.change", "friendship.changeSequence", "friendship.affection"]},
+        "projection": {"enum": ["integer-or-invalid-level-v1", "integer-v1", "integer-or-raised-class-v1", "ordered-after-and-steps-v1", "ruby-state-change-to-ts-plan-after-v1", "ordered-ruby-state-changes-to-ts-plans-v1", "derived-affection-v1"]},
+        "fields": {"type": "array", "maxItems": 4, "uniqueItems": true, "items": {"enum": ["status", "before", "after", "delta", "steps"]}},
+        "inputBoundFields": {"type": "array", "maxItems": 2, "uniqueItems": true, "items": {"enum": ["method", "name"]}},
+        "rawFieldsRetainedPrivately": {"const": true}
+      }
+    }}
+  }
+}
