@@ -4,3 +4,6 @@ import "./test-infrastructure.mjs";
 import "./test-runner.mjs";
 import "./test-numeric-carrier.mjs";
 import "./test-source-gates.mjs";
+// Closed pre-5.4 profile and TS/synthetic infrastructure tests; no original Ruby coverage.
+import './test-pre54.mjs';
+import './test-pre54-integration.mjs';

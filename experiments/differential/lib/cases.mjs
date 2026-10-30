@@ -1,3 +1,4 @@
+import {isPre54, generatePre54Coverage} from '../profiles/pre54-batch2.mjs';
 import { canonicalStringify, sha256Json } from "./json.mjs";
 import { sealRequest } from "./protocol.mjs";
 
@@ -99,6 +100,7 @@ export function generateRequest(core) {
 
 /** Selection denominators and complete caseId mapping only; no outcome or functional percentage. */
 export function generateCoverage(request) {
+  if (isPre54(request)) return generatePre54Coverage(request);
   const ids = (operation, predicate = () => true) => request.cases.filter((testCase) => testCase.operation === operation && predicate(testCase)).map((testCase) => testCase.caseId);
   const additionalIds = (additionalClass) => request.cases.filter((testCase) => testCase.additionalClass === additionalClass).map((testCase) => testCase.caseId);
   const api = (operations, extra = {}) => ({

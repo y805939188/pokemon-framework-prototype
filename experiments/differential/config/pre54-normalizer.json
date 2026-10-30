@@ -1,0 +1,39 @@
+{
+  "protocol": "ruby-ts-differential/normalizer-pre54-batch2-v1",
+  "version": "pre54-batch2-normalizer-v1",
+  "rawRetention": "private-full-json-and-streams-v1",
+  "arrayOrder": "preserve",
+  "objectEquality": "canonical-keys-without-field-removal",
+  "projections": [
+    {
+      "operation": "learning.relearningCandidates",
+      "projection": "pre54-learning.relearningCandidates-v1",
+      "rawFieldsRetainedPrivately": true
+    },
+    {
+      "operation": "learning.forgetting",
+      "projection": "pre54-learning.forgetting-v1",
+      "rawFieldsRetainedPrivately": true
+    },
+    {
+      "operation": "pokedex.recordSequence",
+      "projection": "pre54-pokedex.recordSequence-v1",
+      "rawFieldsRetainedPrivately": true
+    },
+    {
+      "operation": "pokedex.recentSequence",
+      "projection": "pre54-pokedex.recentSequence-v1",
+      "rawFieldsRetainedPrivately": true
+    },
+    {
+      "operation": "stats.computeStats",
+      "projection": "pre54-stats.computeStats-v1",
+      "rawFieldsRetainedPrivately": true
+    },
+    {
+      "operation": "stats.hpAfterRecalc",
+      "projection": "pre54-stats.hpAfterRecalc-v1",
+      "rawFieldsRetainedPrivately": true
+    }
+  ]
+}

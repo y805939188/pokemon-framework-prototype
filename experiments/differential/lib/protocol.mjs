@@ -2,12 +2,14 @@ import { fileURLToPath } from "node:url";
 import { readJson, sha256File, sha256Json } from "./json.mjs";
 import { validateSchema } from "./schema.mjs";
 
+import {isPre54, sealPre54, validatePre54Case, sanitizePre54Outcome, gatePre54Outcome, OPERATIONS, REFERENCE_ROLES, NORMALIZER_PROTOCOL, BEHAVIOR_PROTOCOL} from '../profiles/pre54-batch2.mjs';
+
 const schemaPath = (name) => fileURLToPath(new URL(`../schema/${name}`, import.meta.url));
 export const loadSchema = (name) => readJson(schemaPath(name));
 export const schemas = {
-  request: () => loadSchema("request.schema.json"),
+  request: (request = null) => loadSchema(isPre54(request) ? "pre54-request.schema.json" : "request.schema.json"),
   rawResponse: () => loadSchema("runner-response.schema.json"),
-  behavior: () => loadSchema("behavior-package.schema.json"),
+  behavior: (request = null) => loadSchema(isPre54(request) ? "pre54-behavior-package.schema.json" : "behavior-package.schema.json"),
   config: () => loadSchema("runner-config.schema.json"),
   handoff: () => loadSchema("handoff.schema.json"),
   mapping: () => loadSchema("mapping.schema.json"),
@@ -34,6 +36,7 @@ export function requestBody(request) {
 }
 
 export function sealRequest(body) {
+  if (isPre54(body)) return sealPre54(body);
   const cases = body.cases.map((testCase) => ({ ...testCase, requestHash: caseRequestHash(testCase) }));
   const unsigned = { ...body, cases };
   const requestHash = sha256Json(requestBody(unsigned));
@@ -99,14 +102,14 @@ function schemaFailure(label, result) {
 }
 
 export function validateRequest(request) {
-  const schemaResult = validateSchema(schemas.request(), request);
+  const schemaResult = validateSchema(schemas.request(request), request);
   if (!schemaResult.valid) throw schemaFailure("REQUEST", schemaResult);
   const ids = new Set();
   for (const testCase of request.cases) {
     if (ids.has(testCase.caseId)) throw Object.assign(new Error("REQUEST_DUPLICATE_CASE_ID"), { code: "REQUEST_DUPLICATE_CASE_ID" });
     ids.add(testCase.caseId);
     if (caseRequestHash(testCase) !== testCase.requestHash) throw Object.assign(new Error("REQUEST_CASE_HASH_MISMATCH"), { code: "REQUEST_CASE_HASH_MISMATCH" });
-    const semantic = validateCaseSemantics(testCase);
+    const semantic = isPre54(request) ? (validatePre54Case(testCase), null) : validateCaseSemantics(testCase);
     if (semantic) throw Object.assign(new Error(semantic), { code: semantic });
   }
   const expected = sealRequest(requestBody(request));
@@ -126,7 +129,8 @@ export function validateRawResponse(response, request) {
   }
   const expected = new Map(request.cases.map((testCase) => [testCase.caseId, testCase.requestHash]));
   const actual = new Set();
-  for (const result of response.cases) {
+  for (const [index, result] of response.cases.entries()) {
+    if (isPre54(request) && request.cases[index]?.caseId !== result.caseId) return {status:"protocol-error", code:"PRE54_CASE_ORDER"};
     if (actual.has(result.caseId)) return { status: "protocol-error", code: "RUNNER_DUPLICATE_CASE_ID" };
     actual.add(result.caseId);
     if (!expected.has(result.caseId)) return { status: "protocol-error", code: "RUNNER_EXTRA_CASE_ID" };
@@ -150,8 +154,8 @@ const validTime = (value) => Number.isFinite(Date.parse(value));
 function requireGate(condition, code) { if (!condition) throw new GateError(code); }
 
 /** Closed metadata only: actual original-file loading still needs the independent observer's audit. */
-export function gateReferenceMetadata({ source, runtime }) {
-  const schema = schemas.behavior();
+export function gateReferenceMetadata({ source, runtime }, request = null, manifest = null) {
+  const schema = schemas.behavior(request);
   for (const [name, value] of [["source", source], ["runtime", runtime]]) {
     const result = validateSchema({ $ref: `#/$defs/${name}` }, value, schema);
     if (!result.valid) throw new GateError("REFERENCE_METADATA_SCHEMA_REJECTED", result.errors);
@@ -159,8 +163,12 @@ export function gateReferenceMetadata({ source, runtime }) {
   requireGate(runtime.name === "reference" && source.commit === "8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b" && source.tag === "v21.1" && source.tree === null && source.dirty === null, "REFERENCE_PROVENANCE_MISMATCH");
   const roles = source.files.map((file) => file.role);
   requireGate(new Set(roles).size === roles.length, "BEHAVIOR_SOURCE_ROLE_DUPLICATE");
-  for (const role of ["growth-rules", "friendship-rules", "adapter"]) requireGate(roles.includes(role), "REFERENCE_SOURCE_HASH_MISSING");
+  for (const role of (isPre54(request) ? REFERENCE_ROLES : ["growth-rules", "friendship-rules", "adapter"])) requireGate(roles.includes(role), "REFERENCE_SOURCE_HASH_MISSING");
   requireGate(source.files.every((file) => file.sha256 !== "0".repeat(64)), "REFERENCE_SOURCE_HASH_PLACEHOLDER");
+  if (isPre54(request)) {
+    requireGate(roles.length === REFERENCE_ROLES.length, "PRE54_REFERENCE_ROLE_SET");
+    requireGate(manifest && source.files.find(f => f.role === "fixture-directory")?.sha256 === manifest.files.find(f => f.path === "profiles/pre54-batch2.mjs")?.sha256, "PRE54_DIRECTORY_BINDING");
+  }
   const dependencies = runtime.dependencies.map((dependency) => dependency.name);
   requireGate(new Set(dependencies).size === dependencies.length, "BEHAVIOR_DEPENDENCY_DUPLICATE");
   for (const name of ["reference-runtime", "adapter"]) requireGate(dependencies.includes(name), "REFERENCE_DEPENDENCY_VERSION_MISSING");
@@ -171,7 +179,7 @@ export function gateReferenceMetadata({ source, runtime }) {
 
 /** This function must complete before any caller reads or compares case outcomes. */
 export function gateBehaviorPackage(behavior, { request, freezeHash, role, manifest = null }) {
-  const schemaResult = validateSchema(schemas.behavior(), behavior);
+  const schemaResult = validateSchema(schemas.behavior(request), behavior);
   if (!schemaResult.valid) throw new GateError("BEHAVIOR_SCHEMA_REJECTED", schemaResult.errors);
   requireGate(behavior.role === role, "BEHAVIOR_ROLE_MISMATCH");
   requireGate(behavior.entryId === (role === "reference" ? "reference-rules-v1" : "ts-core-v1"), "BEHAVIOR_ENTRY_MISMATCH");
@@ -187,7 +195,7 @@ export function gateBehaviorPackage(behavior, { request, freezeHash, role, manif
   const dependencyNames = behavior.runtime.dependencies.map((dependency) => dependency.name);
   requireGate(new Set(dependencyNames).size === dependencyNames.length, "BEHAVIOR_DEPENDENCY_DUPLICATE");
   if (role === "reference") {
-    gateReferenceMetadata(behavior);
+    gateReferenceMetadata(behavior, request, manifest);
   } else {
     requireGate(behavior.runtime.name === "node" && source.commit !== null && source.tree !== null && source.tag === null && typeof source.dirty === "boolean", "CANDIDATE_PROVENANCE_INCOMPLETE");
     for (const required of ["core-bundle", "runner"]) requireGate(fileRoles.includes(required), "CANDIDATE_SOURCE_HASH_MISSING");
@@ -204,11 +212,13 @@ export function gateBehaviorPackage(behavior, { request, freezeHash, role, manif
     requireGate(execution.exitCode === 0 && execution.signal === null && !execution.timedOut && !execution.outputLimitExceeded && execution.stderrBytes === 0, "SUCCESS_PREDICATE_VIOLATION");
     const expected = new Map(request.cases.map((testCase) => [testCase.caseId, testCase.requestHash]));
     const actual = new Set();
-    for (const result of behavior.cases) {
+    for (const [index, result] of behavior.cases.entries()) {
+      if (isPre54(request)) requireGate(request.cases[index]?.caseId === result.caseId, "PRE54_CASE_ORDER");
       requireGate(!actual.has(result.caseId), "BEHAVIOR_DUPLICATE_CASE_ID");
       actual.add(result.caseId);
       requireGate(expected.has(result.caseId), "BEHAVIOR_EXTRA_CASE_ID");
       requireGate(expected.get(result.caseId) === result.requestHash, "BEHAVIOR_CASE_HASH_MISMATCH");
+      if (isPre54(request)) gatePre54Outcome(result.outcome, request.cases.find(c => c.caseId === result.caseId));
     }
     requireGate(actual.size === expected.size, "BEHAVIOR_CASE_COUNT_MISMATCH");
     for (const id of expected.keys()) requireGate(actual.has(id), "BEHAVIOR_MISSING_CASE_ID");
@@ -232,7 +242,7 @@ function isValidUtcDate(value) {
 }
 
 export function validateMapping(mapping) {
-  const result = validateSchema(schemas.mapping(), mapping);
+  const result = validateSchema(mapping?.version === "pre54-batch2-mapping-v1" ? loadSchema("pre54-mapping.schema.json") : schemas.mapping(), mapping);
   if (!result.valid) throw new GateError("MAPPING_SCHEMA_REJECTED", result.errors);
   const ids = new Set();
   for (const entry of mapping.errorClassMappings) {
@@ -246,9 +256,10 @@ export function validateMapping(mapping) {
 }
 
 export function validateNormalizer(normalizer) {
-  const result = validateSchema(schemas.normalizer(), normalizer);
+  const result = validateSchema(normalizer?.protocol === NORMALIZER_PROTOCOL ? loadSchema("pre54-normalizer.schema.json") : schemas.normalizer(), normalizer);
   if (!result.valid) throw new GateError("NORMALIZER_SCHEMA_REJECTED", result.errors);
-  requireGate(new Set(normalizer.projections.map((entry) => entry.operation)).size === 8, "NORMALIZER_OPERATION_SET_MISMATCH");
+  const operations = normalizer.projections.map(entry => entry.operation);
+  requireGate(normalizer.protocol === NORMALIZER_PROTOCOL ? operations.length === OPERATIONS.length && new Set(operations).size === OPERATIONS.length && OPERATIONS.every(op => operations.includes(op)) && normalizer.projections.every(p => p.projection === "pre54-" + p.operation + "-v1") : new Set(operations).size === 8, "NORMALIZER_OPERATION_SET_MISMATCH");
   return normalizer;
 }
 

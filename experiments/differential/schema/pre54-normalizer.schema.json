@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ruby-ts-differential/normalizer-pre54-batch2-v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "version",
+    "rawRetention",
+    "arrayOrder",
+    "objectEquality",
+    "projections"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "ruby-ts-differential/normalizer-pre54-batch2-v1"
+    },
+    "version": {
+      "const": "pre54-batch2-normalizer-v1"
+    },
+    "rawRetention": {
+      "const": "private-full-json-and-streams-v1"
+    },
+    "arrayOrder": {
+      "const": "preserve"
+    },
+    "objectEquality": {
+      "const": "canonical-keys-without-field-removal"
+    },
+    "projections": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation",
+          "projection",
+          "rawFieldsRetainedPrivately"
+        ],
+        "properties": {
+          "operation": {
+            "enum": [
+              "learning.relearningCandidates",
+              "learning.forgetting",
+              "pokedex.recordSequence",
+              "pokedex.recentSequence",
+              "stats.computeStats",
+              "stats.hpAfterRecalc"
+            ]
+          },
+          "projection": {
+            "enum": [
+              "pre54-learning.relearningCandidates-v1",
+              "pre54-learning.forgetting-v1",
+              "pre54-pokedex.recordSequence-v1",
+              "pre54-pokedex.recentSequence-v1",
+              "pre54-stats.computeStats-v1",
+              "pre54-stats.hpAfterRecalc-v1"
+            ]
+          },
+          "rawFieldsRetainedPrivately": {
+            "const": true
+          }
+        }
+      }
+    }
+  }
+}

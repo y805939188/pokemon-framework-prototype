@@ -1,0 +1,150 @@
+{
+  "profile": "pre54-batch2-v1",
+  "requestHash": "19c09762f7166fef2a7b540c159ded9bd76cbde25903c44a5c3171338a90c133",
+  "directoryIdentity": "842ea92117741ad3ea28fdbef7513651d8fd4dadcac09f332485d3f3148c1afe",
+  "referenceRoles": [
+    "learning-rules",
+    "pokedex-rules",
+    "stats-rules",
+    "adapter",
+    "fixture-directory"
+  ],
+  "allReferenceQualifications": "NOT_RUN",
+  "actualDualRun": 0,
+  "productCommit": "d6aae8cfa4d706cf976c42aeb3dcc683a252aa03",
+  "facilityBase": "10e8b9811991d9d9aad4d348cf1f775ce6692832",
+  "operations": [
+    {
+      "operation": "learning.relearningCandidates",
+      "status": "NOT_RUN",
+      "sourceMethodBinding": "PRIVATE_OBSERVER_TO_VERIFY_NOT_GUESSED_BY_TS_AUTHOR",
+      "normalAndBoundaryProbes": [
+        {
+          "caseId": "pre54-0021",
+          "requestHash": "f6aea53d4745e9d600ae22108f4645f5dbbd5ba519162f5869bfd5c5fdf953d7"
+        },
+        {
+          "caseId": "pre54-0002",
+          "requestHash": "f1b063b0d100ffcb572564f800d0c2b331d5b5b87de60698e40946304b032191"
+        }
+      ],
+      "conditions": [
+        "actual original method/file loaded, not a replacement business implementation",
+        "minimal external data/choice fixtures identified",
+        "raw return/state/exception retained privately",
+        "RNG actual trace empty or BLOCKED contract gap",
+        "independent source audit; only gated closed behavior published"
+      ]
+    },
+    {
+      "operation": "learning.forgetting",
+      "status": "NOT_RUN",
+      "sourceMethodBinding": "PRIVATE_OBSERVER_TO_VERIFY_NOT_GUESSED_BY_TS_AUTHOR",
+      "normalAndBoundaryProbes": [
+        {
+          "caseId": "pre54-0070",
+          "requestHash": "9f4d228832cb0a1df3ab4b0475f7aa87fa4d82819b53b2101b0bb7913875f907"
+        },
+        {
+          "caseId": "pre54-0064",
+          "requestHash": "27d7e6bbf462a1369069347e6ade0fb9f871ec9e29315c1e20075dc78f7df5ed"
+        }
+      ],
+      "conditions": [
+        "actual original method/file loaded, not a replacement business implementation",
+        "minimal external data/choice fixtures identified",
+        "raw return/state/exception retained privately",
+        "RNG actual trace empty or BLOCKED contract gap",
+        "independent source audit; only gated closed behavior published"
+      ]
+    },
+    {
+      "operation": "pokedex.recordSequence",
+      "status": "NOT_RUN",
+      "sourceMethodBinding": "PRIVATE_OBSERVER_TO_VERIFY_NOT_GUESSED_BY_TS_AUTHOR",
+      "normalAndBoundaryProbes": [
+        {
+          "caseId": "pre54-0078",
+          "requestHash": "3219dc69483067797925aebba8ae89a24d282422de40ff66842a029bd50fe814"
+        },
+        {
+          "caseId": "pre54-0077",
+          "requestHash": "ef86381ed85c32cef3d41129c87b52556ac18e1b52b7f2106bda2fa00ff09402"
+        }
+      ],
+      "conditions": [
+        "actual original method/file loaded, not a replacement business implementation",
+        "minimal external data/choice fixtures identified",
+        "raw return/state/exception retained privately",
+        "RNG actual trace empty or BLOCKED contract gap",
+        "independent source audit; only gated closed behavior published"
+      ]
+    },
+    {
+      "operation": "pokedex.recentSequence",
+      "status": "NOT_RUN",
+      "sourceMethodBinding": "PRIVATE_OBSERVER_TO_VERIFY_NOT_GUESSED_BY_TS_AUTHOR",
+      "normalAndBoundaryProbes": [
+        {
+          "caseId": "pre54-0094",
+          "requestHash": "c22c966b46ce6ae7300e747d6aea503c77ed1c11ba783ab8ba5388260ab9ef00"
+        },
+        {
+          "caseId": "pre54-0096",
+          "requestHash": "395559722e601637ddc3b7e7708efe929f8661867d77bf1f2273f453d34956c9"
+        }
+      ],
+      "conditions": [
+        "actual original method/file loaded, not a replacement business implementation",
+        "minimal external data/choice fixtures identified",
+        "raw return/state/exception retained privately",
+        "RNG actual trace empty or BLOCKED contract gap",
+        "independent source audit; only gated closed behavior published"
+      ]
+    },
+    {
+      "operation": "stats.computeStats",
+      "status": "NOT_RUN",
+      "sourceMethodBinding": "PRIVATE_OBSERVER_TO_VERIFY_NOT_GUESSED_BY_TS_AUTHOR",
+      "normalAndBoundaryProbes": [
+        {
+          "caseId": "pre54-0101",
+          "requestHash": "3954a68d8e4727d368bbaea709e7c680270308e482944013f048125a6ea67fe6"
+        },
+        {
+          "caseId": "pre54-0322",
+          "requestHash": "4ea8af3548b7e4efddad13f9ad28107e9f1afbc3f28008930c3fd75a66cf2136"
+        }
+      ],
+      "conditions": [
+        "actual original method/file loaded, not a replacement business implementation",
+        "minimal external data/choice fixtures identified",
+        "raw return/state/exception retained privately",
+        "RNG actual trace empty or BLOCKED contract gap",
+        "independent source audit; only gated closed behavior published"
+      ]
+    },
+    {
+      "operation": "stats.hpAfterRecalc",
+      "status": "NOT_RUN",
+      "sourceMethodBinding": "PRIVATE_OBSERVER_TO_VERIFY_NOT_GUESSED_BY_TS_AUTHOR",
+      "normalAndBoundaryProbes": [
+        {
+          "caseId": "pre54-0345",
+          "requestHash": "76519fb8c2e3815a4c3fcbcdefe7025fa2258c87274e49c35f41ce0cb4da63cf"
+        },
+        {
+          "caseId": "pre54-0330",
+          "requestHash": "c73d3e2d88bb8d4c8507d53588721bf28964dd16c573e643ba2e20e214a94868"
+        }
+      ],
+      "conditions": [
+        "actual original method/file loaded, not a replacement business implementation",
+        "minimal external data/choice fixtures identified",
+        "raw return/state/exception retained privately",
+        "RNG actual trace empty or BLOCKED contract gap",
+        "independent source audit; only gated closed behavior published"
+      ]
+    }
+  ]
+}

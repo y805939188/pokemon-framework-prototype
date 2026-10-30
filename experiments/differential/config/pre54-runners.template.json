@@ -1,0 +1,118 @@
+{
+  "protocol": "ruby-ts-differential/runner-config-v1",
+  "request": "{KIT_DIR}/requests/wp30-r2.json",
+  "freezeHash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "privateDirectory": "{PRIVATE_RUN_DIR}",
+  "publicDirectory": "{PUBLIC_RUN_DIR}",
+  "limits": {
+    "timeoutMs": 30000,
+    "maxStdoutBytes": 16777216,
+    "maxStderrBytes": 1048576
+  },
+  "runners": [
+    {
+      "role": "reference",
+      "entryId": "reference-rules-v1",
+      "argv": [
+        "{PRIVATE_REFERENCE_EXECUTABLE}",
+        "{PRIVATE_REFERENCE_RUNNER}",
+        "--request",
+        "{KIT_DIR}/requests/wp30-r2.json"
+      ],
+      "cwd": "{PRIVATE_REFERENCE_CWD}",
+      "publicMetadata": {
+        "source": {
+          "commit": "8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b",
+          "tree": null,
+          "tag": "v21.1",
+          "dirty": null,
+          "files": [
+            {
+              "role": "learning-rules",
+              "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+              "role": "pokedex-rules",
+              "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+              "role": "stats-rules",
+              "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+              "role": "adapter",
+              "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+              "role": "fixture-directory",
+              "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          ]
+        },
+        "runtime": {
+          "name": "reference",
+          "version": "UNKNOWN",
+          "dependencies": [
+            {
+              "name": "reference-runtime",
+              "version": "UNKNOWN"
+            },
+            {
+              "name": "adapter",
+              "version": "UNKNOWN"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "role": "candidate",
+      "entryId": "ts-core-v1",
+      "argv": [
+        "{NODE22}",
+        "runners/ts-runner.mjs",
+        "--request",
+        "requests/wp30-r2.json",
+        "--core",
+        "core/core.cjs"
+      ],
+      "cwd": "{KIT_DIR}",
+      "publicMetadata": {
+        "source": {
+          "commit": "0000000000000000000000000000000000000000",
+          "tree": "0000000000000000000000000000000000000000",
+          "tag": null,
+          "dirty": true,
+          "files": [
+            {
+              "role": "core-bundle",
+              "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+              "role": "runner",
+              "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          ]
+        },
+        "runtime": {
+          "name": "node",
+          "version": "v22.21.1",
+          "dependencies": [
+            {
+              "name": "node",
+              "version": "v22.21.1"
+            },
+            {
+              "name": "vite",
+              "version": "8.3.1"
+            },
+            {
+              "name": "typescript",
+              "version": "7.0.2"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

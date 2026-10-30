@@ -1,4 +1,10 @@
 export const KIT_PAYLOAD = Object.freeze([
+  "profiles/pre54-batch2.mjs",
+  "schema/pre54-request.schema.json",
+  "schema/pre54-behavior-package.schema.json",
+  "schema/pre54-freeze.schema.json",
+  "schema/pre54-mapping.schema.json",
+  "schema/pre54-normalizer.schema.json",
   "RUN-KIT.md",
   "compare.mjs",
   "config/mapping.json",

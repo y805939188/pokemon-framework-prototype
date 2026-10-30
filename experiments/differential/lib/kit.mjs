@@ -1,3 +1,4 @@
+import {isPre54, PROFILE} from '../profiles/pre54-batch2.mjs';
 import { lstatSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -91,12 +92,13 @@ export function verifyKit(rootArgument, { expectedFreezeHash = null } = {}) {
   const artifactsManifestSha256 = sha256File(manifestPath);
   const freezePath = join(root, "freeze.json");
   const freezeValue = readJson(freezePath, 1024 * 1024);
-  schemaCheck(loadSchema("freeze.schema.json"), freezeValue, "KIT_FREEZE_SCHEMA_REJECTED");
+  const request = validateRequest(readJson(join(root, "requests/wp30-r2.json")));
+  const pre54 = isPre54(request);
+  schemaCheck(loadSchema(pre54 ? "pre54-freeze.schema.json" : "freeze.schema.json"), freezeValue, "KIT_FREEZE_SCHEMA_REJECTED");
   const freezeHash = sha256File(freezePath);
   requireKit(expectedFreezeHash === null || freezeHash === expectedFreezeHash, "KIT_EXTERNAL_FREEZE_HASH_MISMATCH");
   requireKit(freezeValue.artifactsManifestSha256 === artifactsManifestSha256, "KIT_MANIFEST_SEAL_MISMATCH");
 
-  const request = validateRequest(readJson(join(root, "requests/wp30-r2.json")));
   const coverage = readJson(join(root, "requests/selection-coverage.json"));
   requireKit(canonicalStringify(coverage) === canonicalStringify(generateCoverage(request)), "KIT_COVERAGE_MISMATCH");
   const mapping = validateMapping(readJson(join(root, "config/mapping.json"), 1024 * 1024));
@@ -107,15 +109,15 @@ export function verifyKit(rootArgument, { expectedFreezeHash = null } = {}) {
   const logical = {
     request: "requests/wp30-r2.json",
     selectionCoverage: "requests/selection-coverage.json",
-    requestSchema: "schema/request.schema.json",
+    requestSchema: pre54 ? "schema/pre54-request.schema.json" : "schema/request.schema.json",
     rawResponseSchema: "schema/runner-response.schema.json",
-    behaviorSchema: "schema/behavior-package.schema.json",
+    behaviorSchema: pre54 ? "schema/pre54-behavior-package.schema.json" : "schema/behavior-package.schema.json",
     runnerConfigSchema: "schema/runner-config.schema.json",
     handoffSchema: "schema/handoff.schema.json",
     artifactManifestSchema: "schema/artifact-manifest.schema.json",
-    freezeSchema: "schema/freeze.schema.json",
-    mappingSchema: "schema/mapping.schema.json",
-    normalizerSchema: "schema/normalizer.schema.json",
+    freezeSchema: pre54 ? "schema/pre54-freeze.schema.json" : "schema/freeze.schema.json",
+    mappingSchema: pre54 ? "schema/pre54-mapping.schema.json" : "schema/mapping.schema.json",
+    normalizerSchema: pre54 ? "schema/pre54-normalizer.schema.json" : "schema/normalizer.schema.json",
     mapping: "config/mapping.json",
     normalizer: "config/normalizer.json"
   };

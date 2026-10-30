@@ -1,3 +1,4 @@
+import {isPre54, sanitizePre54Outcome, BEHAVIOR_PROTOCOL} from '../profiles/pre54-batch2.mjs';
 import { strictStringify, sha256Json } from "./json.mjs";
 import { gateBehaviorPackage } from "./protocol.mjs";
 import { publicExecution } from "./process.mjs";
@@ -33,6 +34,7 @@ function publicError(raw, testCase) {
 }
 
 export function sanitizeOutcome(outcome, testCase) {
+  if (Object.hasOwn(testCase, "operation") && ["learning", "pokedex", "stats"].includes(testCase.capability)) return sanitizePre54Outcome(outcome, testCase);
   if (outcome.kind === "raised") return { kind: "raised", class: outcome.class };
   if (outcome.kind === "error-object") return { kind: "error-object", class: outcome.class, value: publicError(outcome.raw, testCase) };
   if (outcome.kind !== "value") throw normalizationError("UNKNOWN_RAW_OUTCOME_KIND");
@@ -99,7 +101,7 @@ export function makeBehaviorPackage({ execution, request, freezeHash, publicMeta
     }));
   }
   const behavior = {
-    protocol: "ruby-ts-differential/behavior-package-v2",
+    protocol: isPre54(request) ? BEHAVIOR_PROTOCOL : "ruby-ts-differential/behavior-package-v2",
     role: execution.role,
     entryId: execution.entryId,
     requestHash: request.requestHash,

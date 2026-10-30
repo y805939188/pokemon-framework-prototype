@@ -81,7 +81,7 @@ for (const runner of config.runners) {
 }
 // The same closed source/version check is repeated by the independent comparator.
 // Non-placeholder metadata alone is not proof that the original source was actually loaded.
-gateReferenceMetadata(config.runners.find((runner) => runner.role === "reference").publicMetadata);
+gateReferenceMetadata(config.runners.find((runner) => runner.role === "reference").publicMetadata, kit.request, kit.manifest);
 
 // The fixed TS side must execute the verified kit itself. This preflight precedes either child, including reference.
 const candidateRunner = config.runners.find((runner) => runner.role === "candidate");
