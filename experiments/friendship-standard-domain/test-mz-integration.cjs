@@ -41,3 +41,8 @@ test('a pending ordinary save/load blocks preview; its late callback cannot race
  const load=G.DataManager.loadGame(1);assert.equal((await G.PSState.previewFriendshipMigration(1)).status,'refused');await load;
  assert.equal(G.$gameSystem._psGame.party[0].friendship,256);
 });
+
+test('duplicate confirmation refuses host progress after the original verified commit',async()=>{
+ const h=host(),G=h.ctx;await h.save(1);const p=await G.PSState.previewFriendshipMigration(1);assert.equal((await G.PSState.confirmFriendshipMigration(p.handle)).status,'applied');G.$gameParty.progress++;
+ assert.equal((await G.PSState.confirmFriendshipMigration(p.handle)).status,'refused');
+});

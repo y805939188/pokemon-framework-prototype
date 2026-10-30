@@ -203,7 +203,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   #friendshipOwner: { invalid: boolean } | null = null;
   readonly #friendshipPreviews = new WeakMap<FriendshipMigrationHandle, {
     generation: number; revision: number; content: Content; contentHash: string; before: string; target: FriendshipPersistenceSnapshot;
-    plan: FriendshipMigrationPlan; persistence: FriendshipPersistencePort; result?: FriendshipApplicationResult;
+    plan: FriendshipMigrationPlan; persistence: FriendshipPersistencePort; result?: FriendshipApplicationResult; completedHostIdentity?: string;
   }>();
   private generation = 0;
   private readonly bornIn = new WeakMap<object, number>();
@@ -682,7 +682,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
           || semanticFingerprint(JSON.parse(JSON.stringify(preview.content)) as unknown) !== preview.contentHash
           || friendshipMigrationSnapshot(this.ports.state.read()) !== preview.plan.afterSnapshot
           || friendshipMigrationSnapshot(now.state) !== preview.plan.afterSnapshot || now.target !== preview.target.target
-          || now.rawHash !== preview.result.persistence?.rawHash || owner.invalid) throw Error("friendship-replay-stale");
+          || now.rawHash !== preview.result.persistence?.rawHash || now.hostIdentity !== preview.completedHostIdentity || owner.invalid) throw Error("friendship-replay-stale");
         return {...preview.result,status:preview.result.status === "unchanged" ? "unchanged" : "already-applied"};
       }
       assertCurrent();
@@ -694,7 +694,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       if (!candidate.ok || friendshipMigrationSnapshot(candidate.state) !== preview.plan.afterSnapshot) throw Error("friendship-candidate-invalid");
       if (applied.status === "unchanged") {
         const result: FriendshipApplicationResult = {status:"unchanged",persistence:{status:"committed",rawHash:target.rawHash}};
-        preview.result = result; return clone(result);
+        preview.result = result; preview.completedHostIdentity = target.hostIdentity; return clone(result);
       }
       let persisted;
       try { persisted = await preview.persistence.commit({before:clone(preview.target),next:clone(candidate.state),plan:clone(preview.plan),receipt:clone(applied.receipt),contentHash:preview.contentHash,contentIdentity:validatedContentIdentity(preview.content),assertCurrent}); }
@@ -704,12 +704,19 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       committed = true;
       assertCurrent();
       const installedFile = await preview.persistence.preview(); assertCurrent();
-      if (installedFile.target !== preview.target.target || installedFile.rawHash !== persisted.rawHash || friendshipMigrationSnapshot(installedFile.state) !== preview.plan.afterSnapshot) throw Error("friendship-persistence-readback-mismatch");
+      if (installedFile.target !== preview.target.target || installedFile.rawHash !== persisted.rawHash || installedFile.hostIdentity !== preview.target.hostIdentity || friendshipMigrationSnapshot(installedFile.state) !== preview.plan.afterSnapshot) throw Error("friendship-persistence-readback-mismatch");
       let installError: unknown;
       try { this.#friendshipRawState.replace(clone(candidate.state)); } catch (error) { installError = error; }
       if (owner.invalid || preview.generation !== this.generation || this.ports.content().content !== preview.content
         || semanticFingerprint(JSON.parse(JSON.stringify(preview.content)) as unknown) !== preview.contentHash
         || friendshipMigrationSnapshot(this.#friendshipRawState.read()) !== preview.plan.afterSnapshot || owner.invalid) throw Error("friendship-install-readback-mismatch");
+      const completed = await preview.persistence.preview();
+      if (owner.invalid || preview.generation !== this.generation || this.ports.content().content !== preview.content
+        || semanticFingerprint(JSON.parse(JSON.stringify(preview.content)) as unknown) !== preview.contentHash
+        || friendshipMigrationSnapshot(this.#friendshipRawState.read()) !== preview.plan.afterSnapshot
+        || completed.target !== preview.target.target || completed.rawHash !== persisted.rawHash
+        || friendshipMigrationSnapshot(completed.state) !== preview.plan.afterSnapshot || owner.invalid) throw Error("friendship-completed-host-unverified");
+      preview.completedHostIdentity = completed.hostIdentity;
       this.#friendshipRevision++; preview.revision = this.#friendshipRevision;
       this.inventory.stateChanged(candidate.state);
       const result: FriendshipApplicationResult = {status:"applied",persistence:persisted,...(installError?{error:message(installError)}:{})};

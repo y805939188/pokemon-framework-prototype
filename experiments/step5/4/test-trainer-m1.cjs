@@ -66,8 +66,8 @@ test('AM1-ULTRA-03 ordinary form creation precedes omitted/explicit overrides an
   }
 });
 
-test('AM1-ULTRA-04 omitted friendship inherits legal 256 while explicit overrides retain their own domain', () => {
-  const input = baseInputs(); input.species.find(s => s.id === 'pidgey' && (s.form ?? 0) === 0).happiness = 256;
+test('AM1-ULTRA-04 explicit legacy omitted friendship inherits legal 256 while explicit overrides retain their own domain', () => {
+  const input = baseInputs(); input.manifest.schema = 1; input.species.find(s => s.id === 'pidgey' && (s.form ?? 0) === 0).happiness = 256;
   for (const friendship of [undefined, 0]) {
     const npc = { ...trainerRecord(), party: [{ species: 'pidgey', level: 5, ...(friendship === undefined ? {} : { friendship }) }] };
     const result = E.contentCompile.compileContent({ ...input, trainerTypes: [trainerType()], trainers: [npc] });
