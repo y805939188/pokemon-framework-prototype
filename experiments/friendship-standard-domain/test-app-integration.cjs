@@ -65,3 +65,23 @@ test('migration preserves an actual B paired settlement and permits the next req
 test('an intervening application write invalidates even an equal current snapshot',async()=>{
  const w=fixture(),p=await w.app.previewFriendshipMigration(w.store.friendshipMigration());assert.equal(w.app.recordSteps(0).status,'counted');assert.equal((await w.app.confirmFriendshipMigration(p.handle)).status,'refused');
 });
+
+test('completed durable handles cannot be cancelled, including repeats and a subsequently replaced game',async()=>{
+ const w=fixture(),p=await w.app.previewFriendshipMigration(w.store.friendshipMigration());
+ assert.equal((await w.app.confirmFriendshipMigration(p.handle)).status,'applied');
+ const bytes=fs.readFileSync(w.file),game=J(w.read());
+ for(let n=0;n<2;n++)assert.deepEqual(w.app.cancelFriendshipMigration(p.handle),{status:'refused',reason:'preview-completed'});
+ assert.equal((await w.app.confirmFriendshipMigration(p.handle)).status,'already-applied');
+ assert.deepEqual(fs.readFileSync(w.file),bytes);assert.deepEqual(w.read(),game);
+ w.app.stateReplacedByHost();w.read().party[0].friendship=71;
+ assert.deepEqual(w.app.cancelFriendshipMigration(p.handle),{status:'refused',reason:'preview-completed'});
+ assert.equal((await w.app.confirmFriendshipMigration(p.handle)).status,'refused');
+ assert.equal(w.read().party[0].friendship,71);assert.deepEqual(fs.readFileSync(w.file),bytes);
+});
+test('ordinary cancellation and repeated late cancellation perform zero persistent writes',async()=>{
+ const w=fixture(),bytes=fs.readFileSync(w.file),game=J(w.read()),p=await w.app.previewFriendshipMigration(w.store.friendshipMigration());
+ assert.equal(w.app.cancelFriendshipMigration(p.handle).status,'cancelled');
+ assert.deepEqual(w.app.cancelFriendshipMigration(p.handle),{status:'refused',reason:'unknown-preview'});
+ assert.equal((await w.app.confirmFriendshipMigration(p.handle)).status,'refused');
+ assert.deepEqual(fs.readFileSync(w.file),bytes);assert.deepEqual(fs.readdirSync(w.dir),['player.json']);assert.deepEqual(w.read(),game);
+});

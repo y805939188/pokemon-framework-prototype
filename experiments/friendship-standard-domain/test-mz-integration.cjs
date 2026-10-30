@@ -7,6 +7,9 @@ test('actual JsonEx/compression/slot: preview/cancel zero writes; one-file commi
  const p2=await G.PSState.previewFriendshipMigration(1),r=await G.PSState.confirmFriendshipMigration(p2.handle);assert.equal(r.status,'applied',JSON.stringify(r));assert.equal(G.$gameSystem._psGame.party[0].friendship,255);old.party[0].friendship=255;assert.deepEqual(J(G.$gameSystem._psGame),old);
  assert.deepEqual(fs.readFileSync(r.persistence.bundle+'/original.raw'),before);assert.deepEqual(fs.readFileSync(G.StorageManager.filePath('global')),global);assert.deepEqual(J(G.$gameParty),other);
  assert.equal((await G.PSState.confirmFriendshipMigration(p2.handle)).status,'already-applied');assert.equal(fs.existsSync(h.file(1)+'_'),false);
+ const committedBytes=fs.readFileSync(h.file(1));
+ assert.equal(G.PSState.cancelFriendshipMigration(p2.handle).reason,'preview-completed');
+ assert.equal(G.PSState.cancelFriendshipMigration(p2.handle).reason,'preview-completed');assert.deepEqual(fs.readFileSync(h.file(1)),committedBytes);
  const contents=await G.StorageManager.loadObject(G.DataManager.makeSavename(1));assert.equal(contents.system.constructor.name,'Game_System');assert.equal(contents.system._psGame.encoding,'pokemon-framework-json');assert.equal(contents.system._psGame.version,1);
  await G.DataManager.loadGame(1);assert.equal(G.$gameSystem._psGame.party[0].friendship,255);assert.equal(G.$gameSystem._psSaveError,undefined);
 });
@@ -57,4 +60,17 @@ test('official confirmation reports a committed slot and recovery bundle when ho
  assert.equal(G.PSState.lastMigration.status,'reload-required',JSON.stringify(G.PSState.lastMigration));assert.equal(G.PSState.lastMigration.persistence.status,'committed');
  assert.ok(fs.existsSync(G.PSState.lastMigration.persistence.bundle+'/receipt.json'));assert.match(messages.at(-1),/存档已写入.*重新启动/);assert.equal(h.app.saveBlocked,true);
  const raw=await G.StorageManager.loadObject(G.DataManager.makeSavename(1));assert.equal(JSON.parse(raw.system._psGame.data).party[0].friendship,255);assert.equal(original.party[0].friendship,256);
+});
+
+test('official choice owns ordinary host save/load gates and releases them on cancellation',async()=>{
+ const h=host(),G=h.ctx;await h.save(1);const before=fs.readFileSync(h.file(1));let choose;
+ G.$gameMessage={add(){},setChoices(){},setChoiceCallback:fn=>{choose=fn;}};
+ const i={setWaitMode(){}};h.commands.MigrateFriendship.call(i,{slot:'1'});
+ for(let n=0;n<100&&!choose;n++)await new Promise(r=>setImmediate(r));assert.equal(typeof choose,'function');
+ await assert.rejects(G.DataManager.saveGame(2),/friendship-preview-active/);
+ assert.throws(()=>G.DataManager.createGameObjects(),/friendship-preview-active/);
+ assert.equal((await G.PSState.previewFriendshipMigration(1)).status,'refused');
+ choose(1);for(let n=0;n<100&&i._psFriendshipMigrationPending;n++)await new Promise(r=>setImmediate(r));
+ assert.equal(G.PSState.lastMigration.status,'cancelled');assert.equal(i._psFriendshipMigrationPending,false);
+ assert.deepEqual(fs.readFileSync(h.file(1)),before);await h.save(2);assert.equal(fs.existsSync(h.file(2)),true);
 });

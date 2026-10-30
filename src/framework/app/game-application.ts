@@ -657,7 +657,12 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
   cancelFriendshipMigration(handle: FriendshipMigrationHandle): FriendshipApplicationResult {
     this.assertNoFriendshipWrite();
-    if (!this.#friendshipPreviews.delete(handle)) return {status:"refused",reason:"unknown-preview"};
+    const preview = this.#friendshipPreviews.get(handle);
+    if (!preview) return {status:"refused",reason:"unknown-preview"};
+    // This describes the historical operation, without making a claim about a subsequently loaded save.
+    // Retain the handle so repeated confirmation still performs its full current-state verification.
+    if (preview.result) return {status:"refused",reason:"preview-completed"};
+    this.#friendshipPreviews.delete(handle);
     return {status:"cancelled"};
   }
   /** Confirm only the opaque handle. Caller-supplied plans, signatures and candidates confer no authority. */
