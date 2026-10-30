@@ -53,3 +53,7 @@ runner 串行执行 framework/core/app 三层 types、边界、runtime/custom-fo
 4. 全 quick、全 SDK/消费者、完整插件、NW/Docker/跨平台及完整产品长测本批未执行；独立 ultra、CI、推送/合并均未执行。没有自签通过。
 
 外部 C：`/Users/dingshinn/Desktop/pokemon-framework/.verify/ruby-ts-differential-20261029T093035Z/friendship-exclusive-sol-xhigh-20261030T041032Z`。作者最终报告 `AUTHOR-RESULT.zh.md`；不更新共享 STATUS/PARENT-checkpoint，不封印 CLI 最后回写的 final.md 或运行中顶层 stdout/stderr。
+
+## 2026-10-30 后继组合接线
+
+App/Store/MZ及作者目录入口已在独立后继树实现，具体目标写集、预览确认、prepared原字节包/收据、显式恢复、SDK和测试入口见 [友好度存档接线](friendship-save-integration.zh.md)。上文OPEN及48/8描述是原纯批次的历史范围，不覆盖或改写其封印；组合作者结果与独立ultra仍须分别核验。

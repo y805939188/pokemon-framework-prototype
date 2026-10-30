@@ -34,6 +34,7 @@
   // JsonEx reserves `constructor` and `@` for class metadata. Framework dictionaries allow both as data IDs.
   // Keep the validated plain snapshot opaque to JsonEx; Game_System itself retains its normal class envelope.
   // This is a host encoding version, independent of the game schema. Older unwrapped saves still load below.
+  let ordinaryWrites = 0, ordinaryLoads = 0;
   const encoding = "pokemon-framework-json";
   const unpack = (raw: any): any => {
     if (!raw || typeof raw !== "object" || Object.getOwnPropertyDescriptor(raw, "encoding")?.value !== encoding) return raw;
@@ -93,7 +94,7 @@
       const sys = G.$gameSystem;
       if (!sys || sys._psGame === undefined) throw new Error("state-unusable: framework state is missing");
       if (sys._psSaveError) throw new Error(`state-unusable: ${sys._psSaveError.code}: ${sys._psSaveError.message}`);
-      if (W.PSFlow && (W.PSFlow.running || W.PSFlow.operationPending?.())) throw new Error("operation-pending: saving is not allowed while a framework operation is running");
+      if (W.PSFlow && (W.PSFlow.running || W.PSFlow.operationPending?.())) { W.PSFlow._app?.assertHostStateReplacementAllowed?.(); throw new Error("operation-pending: saving is not allowed while a framework operation is running"); }
       let content: any;
       try { content = W.PSFlow.content(); } catch (error) { throw new Error(`needs-content: ${String(error instanceof Error ? error.message : error)}`); }
       if (!content?.regionalDex) throw new Error("needs-content: validated layout is unavailable");
@@ -107,6 +108,7 @@
 
   const baseExtract = G.DataManager.extractSaveContents;
   G.DataManager.extractSaveContents = function (this: any, contents: any) {
+    assertReplacement();
     baseExtract.call(this, contents);
     PSState.afterLoad();
   };
@@ -125,15 +127,16 @@
       return Promise.reject(e);
     }
     if (W.PSFlow && (W.PSFlow.running || W.PSFlow.operationPending?.())) {
+      try { W.PSFlow._app?.assertHostStateReplacementAllowed?.(); } catch(error) { fail("operation-pending",error); return Promise.reject(error); }
       const e = new Error("saving is not allowed while a battle is running");
       fail(W.PSFlow.running ? "battle-running" : "operation-pending", e);
       return Promise.reject(e);
     }
     // No await between this check and MZ's synchronous makeSaveContents recheck.
     try { PSState.beforeSave(); } catch (error) { fail("state-invalid", error); return Promise.reject(error); }
-    let p: any;
-    try { p = baseSaveGame.call(this, savefileId); } catch (e) { fail("write-failed", e); return Promise.reject(e); }
-    return Promise.resolve(p).then((r: any) => { PSState.lastSaveError = null; PSState.lastSave = { savefileId, at: Date.now() }; return r; }, (e: unknown) => { fail("write-failed", e); throw e; });
+    let p: any; ordinaryWrites++;
+    try { p = baseSaveGame.call(this, savefileId); } catch (e) { ordinaryWrites--; fail("write-failed", e); return Promise.reject(e); }
+    return Promise.resolve(p).finally(()=>{ordinaryWrites--;}).then((r: any) => { PSState.lastSaveError = null; PSState.lastSave = { savefileId, at: Date.now() }; return r; }, (e: unknown) => { fail("write-failed", e); throw e; });
   };
   // the save menu and autosave follow the same rule (the game's own save permission is never written)
   if (G.Game_System && G.Game_System.prototype && G.Game_System.prototype.isSaveEnabled) {
@@ -151,10 +154,140 @@
       throw error;
     }
     const contents = baseMake.call(this);
+    return encodeContents(contents,snapshot);
+  };
+  // JsonEx mutates class envelopes while encoding. Clone the host first so previews do not add '@' to live objects.
+  const detachHost = (value: any, active = new Set<any>()): any => {
+    if (!value || typeof value !== "object") return value;
+    if (active.has(value)) throw new Error("cyclic host save contents");
+    active.add(value);
+    const out = Array.isArray(value) ? [] : Object.create(Object.getPrototypeOf(value));
+    for (const key of Object.keys(value)) {
+      const d = Object.getOwnPropertyDescriptor(value,key)!;
+      if (!Object.hasOwn(d,"value")) throw new Error("host save accessors are unsupported for migration");
+      Object.defineProperty(out,key,{value:detachHost(d.value,active),enumerable:true,writable:true,configurable:true});
+    }
+    active.delete(value); return out;
+  };
+  const encodeContents = (contents: any, snapshot: any): any => {
     if (!contents?.system || typeof contents.system !== "object") throw new Error("state-unusable: save contents have no Game_System");
     const descriptors = Object.getOwnPropertyDescriptors(contents.system);
-    descriptors._psGame = {value: {encoding, version: 1, data: JSON.stringify(snapshot)}, enumerable: true, configurable: true, writable: true};
-    contents.system = Object.create(Object.getPrototypeOf(contents.system), descriptors);
+    descriptors._psGame = {value:{encoding,version:1,data:JSON.stringify(snapshot)},enumerable:true,configurable:true,writable:true};
+    contents.system = Object.create(Object.getPrototypeOf(contents.system),descriptors);
     return contents;
   };
+  const assertReplacement = (): void => { W.PSFlow?._app?.assertHostStateReplacementAllowed?.(); };
+  const hostIdentity = (): string => {
+    const content = W.PSFlow.content(), prepared = schema().snapshotForSave(W.PSFlow.game(),content);
+    if (!prepared.ok) throw new Error("invalid framework state for host migration capture");
+    const contents = detachHost(encodeContents(baseMake.call(G.DataManager),prepared.state));
+    delete contents.system._psSaveInfo; delete contents.system._psSaveWarning; delete contents.system._psSaveError;
+    return nodeRequire("./js/engine/build/production.cjs").store.friendshipRawHash(G.JsonEx.stringify({contents,globalInfo:detachHost(G.DataManager._globalInfo)}));
+  };
+  const migrationPort = (slot: number): any => {
+    if (!Number.isSafeInteger(slot) || slot < 1 || slot > G.DataManager.maxSavefiles()) throw new Error("choose an existing manual save slot");
+    if (!G.StorageManager.isLocalMode()) throw new Error("friendship migration requires a local desktop save");
+    const B = nodeRequire("./js/engine/build/production.cjs");
+    const file = G.StorageManager.filePath(G.DataManager.makeSavename(slot));
+    const assertTarget = (): void => {
+      if (G.StorageManager.filePath(G.DataManager.makeSavename(slot)) !== file) throw new Error("friendship slot location changed");
+    };
+    const read = async (): Promise<any> => {
+      assertTarget();
+      const live = hostIdentity(), raw = B.store.readFriendshipBytes(file);
+      const text = await G.StorageManager.zipToJson(raw.bytes.toString("utf8"));
+      assertTarget();
+      if (hostIdentity() !== live || B.store.readFriendshipBytes(file).rawHash !== raw.rawHash) throw new Error("friendship host or slot changed during preview");
+      // Keep original host class envelopes as data; do not load or install them during a preview.
+      const contents = JSON.parse(text);
+      const migrated = schema().migrateGame(unpack(contents?.system?._psGame),{content:W.PSFlow.content(),speciesKey:W.PSFlow.speciesKeyResolver()});
+      if (!migrated.ok) throw new Error("selected slot cannot be fully validated: "+migrated.error.message);
+      return {target:raw.target,rawHash:raw.rawHash,sourceSchema:migrated.from,state:migrated.state,hostIdentity:live};
+    };
+    return {preview:read,commit:async (request: any): Promise<any> => {
+      // All awaits precede the sync local commit; after each, recheck both application owner and whole host capture.
+      const assertCurrent = (): void => {
+        request.assertCurrent(); assertTarget();
+        if (hostIdentity() !== request.before.hostIdentity) throw new Error("friendship-host-stale");
+      };
+      try {
+        assertCurrent();
+        const raw = B.store.readFriendshipBytes(file);
+        if (raw.rawHash !== request.before.rawHash) throw new Error("friendship-slot-stale");
+        const text = await G.StorageManager.zipToJson(raw.bytes.toString("utf8")); assertCurrent();
+        const contents = JSON.parse(text), prepared = schema().snapshotForSave(request.next,W.PSFlow.content());
+        if (!prepared.ok) throw new Error("friendship candidate failed complete validation");
+        // Reuse the exact existing host payload; replace only the validated framework envelope.
+        contents.system._psGame = {encoding,version:1,data:JSON.stringify(prepared.state)};
+        const encoded = JSON.stringify(contents);
+        // Actual host decoding must reconstruct the normal classes and the wrapped framework JSON before committing.
+        const decoded = await G.StorageManager.jsonToObject(encoded); assertCurrent();
+        const check = schema().snapshotForSave(unpack(decoded.system._psGame),W.PSFlow.content());
+        if (!check.ok || JSON.stringify(check.state) !== JSON.stringify(prepared.state)) throw new Error("friendship host decoding mismatch");
+        const zip = await G.StorageManager.jsonToZip(encoded); assertCurrent();
+        const roundtrip = await G.StorageManager.zipToJson(zip); assertCurrent();
+        if (roundtrip !== encoded) throw new Error("friendship compression mismatch");
+        // StorageManager.fsWriteFile uses UTF-8 when zip is a string; preserve that exact actual on-disk encoding.
+        const bytes = nodeRequire("node:buffer").Buffer.from(zip,"utf8");
+        return B.store.commitFriendshipFile(file,raw.rawHash,bytes,{codec:"mz-jsonex-pokemon-framework-json-v1/utf8-zip",contentHash:request.contentHash,contentIdentity:request.contentIdentity,sourceSchema:request.before.sourceSchema,plan:request.plan,pure:request.receipt},assertCurrent);
+      } catch(error) {return {status:"not-committed",error:String(error instanceof Error?error.message:error)};}
+    }};
+  };
+  PSState.previewFriendshipMigration = async (slot: number, paths?: readonly string[]): Promise<any> => {
+    if (ordinaryWrites || ordinaryLoads) return {status:"refused",reason:"host-save-or-load-pending"};
+    return W.PSFlow.app().previewFriendshipMigration(migrationPort(slot),paths);
+  };
+  PSState.confirmFriendshipMigration = (handle: any): Promise<any> => W.PSFlow.app().confirmFriendshipMigration(handle);
+  PSState.cancelFriendshipMigration = (handle: any): any => W.PSFlow.app().cancelFriendshipMigration(handle);
+  // Recovery is explicit and hash guarded; never invoked by load/Continue. Reload after a complete/restore action.
+  PSState.inspectFriendshipRecovery = (bundle: string): any => nodeRequire("./js/engine/build/production.cjs").store.inspectFriendshipRecovery(bundle);
+  PSState.recoverFriendshipMigration = (bundle: string, action: "complete" | "restore-original"): any => {
+    assertReplacement();
+    if (W.PSFlow.operationPending()) throw new Error("operation-pending");
+    const B = nodeRequire("./js/engine/build/production.cjs"), info = B.store.inspectFriendshipRecovery(bundle);
+    const path = nodeRequire("node:path");
+    if (path.dirname(info.target) !== path.resolve(G.StorageManager.fileDirectoryPath())) throw new Error("recovery target belongs to another save directory");
+    const result = B.store.recoverFriendshipFile(bundle,action);
+    G.$gameSystem._psSaveError = {code:"reload-required",message:"Explicit save recovery completed. Reload that slot before continuing."};
+    return result;
+  };
+  const baseCreateObjects = G.DataManager.createGameObjects;
+  if (baseCreateObjects) G.DataManager.createGameObjects = function(this: any) { assertReplacement(); return baseCreateObjects.call(this); };
+  const baseSaveObject = G.StorageManager?.saveObject;
+  if (baseSaveObject) G.StorageManager.saveObject = function(this: any, ...args: any[]) {
+    assertReplacement(); ordinaryWrites++;
+    try {return Promise.resolve(baseSaveObject.apply(this,args)).finally(()=>{ordinaryWrites--;});}
+    catch(error) {ordinaryWrites--;throw error;}
+  };
+  const baseSaveZip = G.StorageManager?.saveZip;
+  if (baseSaveZip) G.StorageManager.saveZip = function(this: any, ...args: any[]) {assertReplacement();return baseSaveZip.apply(this,args);};
+  const baseLoadGame = G.DataManager.loadGame;
+  if (baseLoadGame) G.DataManager.loadGame = function(this: any, slot: number) {
+    assertReplacement(); ordinaryLoads++;
+    try {return Promise.resolve(baseLoadGame.call(this,slot)).finally(()=>{ordinaryLoads--;});}
+    catch(error) {ordinaryLoads--;throw error;}
+  };
+  const baseSetup = G.DataManager.setupNewGame;
+  if (baseSetup) G.DataManager.setupNewGame = function(this: any, ...args: any[]) { assertReplacement(); return baseSetup.apply(this,args); };
+  if (G.PluginManager?.registerCommand) G.PluginManager.registerCommand("PS_SaveState","MigrateFriendship",function(this: any,args: any) {
+    if (this._psFriendshipMigrationPending) throw new Error("friendship preview already open");
+    this._psFriendshipMigrationPending = true; this.setWaitMode("psFriendshipMigration");
+    const finish = (result: any) => { PSState.lastMigration = result; this._psFriendshipMigrationPending = false; G.$gameMessage.add(result.status === "applied" || result.status === "already-applied" ? "友好度迁移已保存。" : result.status === "cancelled" ? "已取消，存档未更改。" : "迁移未完成："+(result.error || result.reason || result.status)); };
+    PSState.previewFriendshipMigration(Number(args.slot)).then((p: any)=>{
+      if (p.status !== "ready") {finish(p);return;}
+      G.$gameMessage.add(`将存档 ${Number(args.slot)} 中选中的 ${p.targets.length} 项友好度从 256 改为 255。保留原档备份。其它超范围项 ${p.outOfScope.length} 项保持原值。`);
+      G.$gameMessage.setChoices(["确认迁移并保存","取消"],1,1);
+      G.$gameMessage.setChoiceCallback((choice: number)=>{
+        if (choice !== 0) {finish(PSState.cancelFriendshipMigration(p.handle));return;}
+        PSState.confirmFriendshipMigration(p.handle).then(finish,(e: unknown)=>finish({status:"refused",error:String(e)}));
+      });
+    },(e: unknown)=>finish({status:"refused",error:String(e)}));
+  });
+  if (G.Game_Interpreter?.prototype.updateWaitMode) {
+    const baseWait = G.Game_Interpreter.prototype.updateWaitMode;
+    G.Game_Interpreter.prototype.updateWaitMode = function(this: any) {
+      if (this._waitMode === "psFriendshipMigration") {if (this._psFriendshipMigrationPending) return true;this._waitMode="";return false;}
+      return baseWait.call(this);
+    };
+  }
 })();

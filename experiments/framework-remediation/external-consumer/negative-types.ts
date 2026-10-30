@@ -6,3 +6,7 @@ const invalidPort: production.app.GameStatePort = {
   replace: () => {},
 };
 void invalidPort;
+
+// Callers cannot mint an application migration handle from a plan or string.
+const forgedFriendshipHandle: production.app.FriendshipMigrationHandle = {};
+void forgedFriendshipHandle;

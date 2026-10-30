@@ -82,6 +82,10 @@ const { developmentCapabilities } = RuleConfig;
     recordSteps(n?: number): { status: string; steps?: number; reason?: string; error?: string };
     now(): number;
     stateReplacedByHost(): void;
+    assertHostStateReplacementAllowed(): void;
+    previewFriendshipMigration(port: any, paths?: readonly string[]): Promise<any>;
+    confirmFriendshipMigration(handle: any): Promise<any>;
+    cancelFriendshipMigration(handle: any): any;
   }
 
   // ---------------------------------------------------------------- shared flow state / API
@@ -181,6 +185,7 @@ const { developmentCapabilities } = RuleConfig;
      * forgets it, so a late finish/abort/close of the old scene can neither close nor project into a later battle.
      */
     stateReplaced(): void {
+      PSFlow._app?.assertHostStateReplacementAllowed?.();
       openingBattle = null;
       if (PSFlow._app) PSFlow._app.stateReplacedByHost();
       PSFlow._receiveNoticeHistory.clear();PSFlow.lastReceivingNotice=null;

@@ -178,6 +178,21 @@ async function main() {
   assert.equal((await realSession.run()).ok, true);
   assert.deepEqual([realApp.finishBattle(realSession, realRequest).commit, realApp.finishBattle(realSession, realRequest).commit], ["applied", "already-applied"]);
 
+  // Public migration uses an application-owned opaque preview and a real local Store adapter.
+  const migrationFile = path.join(process.cwd(), "consumer-output/friendship.json");
+  fs.mkdirSync(path.dirname(migrationFile), {recursive:true});
+  const migrationGame = JSON.parse(JSON.stringify(state.read())) as GameState;
+  migrationGame.party[0]!.friendship = 256;
+  const migrationState = new MemoryState(migrationGame);
+  const migrationStore = new production.store.SaveStore(migrationFile, {}, production.speciesKey.speciesKeyResolver(content), content);
+  migrationStore.save(migrationGame);
+  const migrationApp = new production.app.GameApplication({state:migrationState,content:()=>({content}),sessions:production.composition.createBattleSessionFactory({content:()=>content}),projection:{project(){}}});
+  const migrationPreview = await migrationApp.previewFriendshipMigration(migrationStore.friendshipMigration());
+  if (migrationPreview.status !== "ready") throw Error(JSON.stringify(migrationPreview));
+  assert.equal((await migrationApp.confirmFriendshipMigration(migrationPreview.handle)).status,"applied");
+  assert.equal((await migrationApp.confirmFriendshipMigration(migrationPreview.handle)).status,"already-applied");
+  assert.equal(migrationState.read().party[0]!.friendship,255);
+
   // The author CLI is resolved through package exports and runs from this external cwd.
   const cli = require.resolve("@pokemon-framework/engine/content-cli");
   const output = path.join(process.cwd(), "consumer-output/progression.json");

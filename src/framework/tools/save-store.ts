@@ -1,3 +1,9 @@
+import { commitFriendshipFile, readFriendshipBytes, friendshipRawHash } from "./friendship-file";
+import type { FriendshipFilePoint } from "./friendship-file";
+import type { FriendshipPersistencePort, FriendshipPersistenceRequest, FriendshipPersistenceResult, FriendshipPersistenceSnapshot } from "../app/friendship-migration-operation";
+import { friendshipMigrationSnapshot } from "../rules/friendship-migration";
+export { inspectFriendshipRecovery, recoverFriendshipFile } from "./friendship-file";
+export type { FriendshipFilePoint } from "./friendship-file";
 /**
  * Durable single-file store for headless runs and tests: one JSON document replaced atomically (write temp, fsync,
  * rename). Reading goes through the schema migration; a document that cannot be understood (damaged, newer, invalid)
@@ -59,6 +65,38 @@ export class SaveStore {
     this.hooks = hooks; // test-only fault injection: hooks.at(point) may throw or exit the process
     this.speciesKey = speciesKey;
     this.content = content;
+  }
+  /** Explicit adapter for GameApplication.previewFriendshipMigration; preview never cleans temp files or writes. */
+  friendshipMigration(at: (point: FriendshipFilePoint) => void = () => {}): FriendshipPersistencePort {
+    const originalFile = this.file, originalContent = this.content;
+    const capture = (): FriendshipPersistenceSnapshot => {
+      if (this.file !== originalFile || this.content !== originalContent || !originalContent) throw Error("friendship-store-target-or-content-changed");
+      const raw = readFriendshipBytes(originalFile);
+      const migrated = migrateGame(JSON.parse(Buffer.from(raw.bytes).toString("utf8")) as unknown,{...(this.speciesKey?{speciesKey:this.speciesKey}:{}),content:originalContent});
+      if (!migrated.ok) throw new SaveError(migrated.error);
+      const prepared = snapshotForSave(migrated.state,originalContent);
+      if (!prepared.ok) throw Error("friendship-store-state-invalid");
+      return {target:raw.target,rawHash:raw.rawHash,sourceSchema:migrated.from,state:prepared.state,hostIdentity:"single-json-file"};
+    };
+    return {
+      preview: async () => { if (this.committing) throw Error("store-commit-active"); return capture(); },
+      commit: async (request: FriendshipPersistenceRequest): Promise<FriendshipPersistenceResult> => {
+        if (this.committing) return {status:"not-committed",error:"store-commit-active"};
+        this.committing = true;
+        try {
+          request.assertCurrent();
+          if (friendshipMigrationSnapshot(capture()) !== friendshipMigrationSnapshot(request.before)) return {status:"not-committed",error:"friendship-store-stale"};
+          const prepared = snapshotForSave(request.next,originalContent!);
+          if (!prepared.ok || friendshipMigrationSnapshot(prepared.state) !== request.plan.afterSnapshot) return {status:"not-committed",error:"friendship-candidate-invalid"};
+          const next = Buffer.from(JSON.stringify(prepared.state),"utf8");
+          return commitFriendshipFile(originalFile,request.before.rawHash,next,{codec:"framework-json",contentHash:request.contentHash,contentIdentity:request.contentIdentity,sourceSchema:request.before.sourceSchema,plan:request.plan,pure:request.receipt},()=>{
+            request.assertCurrent();
+            if (this.file !== originalFile || this.content !== originalContent || friendshipRawHash(fs.readFileSync(originalFile)) !== request.before.rawHash) throw Error("friendship-store-stale");
+          },at);
+        } catch (error) { return {status:"not-committed",error:error instanceof Error?error.message:String(error)}; }
+        finally { this.committing = false; }
+      },
+    };
   }
   private _at(point: FaultPoint): void { this.hooks.at?.(point); }
 
@@ -149,3 +187,5 @@ export class SaveStore {
     return { status: r.status, ...(info.migrated ? { migratedFrom: info.from } : {}) };
   }
 }
+
+export { commitFriendshipFile, readFriendshipBytes, friendshipRawHash } from "./friendship-file";

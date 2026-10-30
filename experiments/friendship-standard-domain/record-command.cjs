@@ -1,0 +1,7 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:child_process');
+const [dir,label,...args]=process.argv.slice(2),ROOT=path.resolve(__dirname,'../..');if(!dir||!label||!args.length)throw Error('record-command <fresh-dir> <label> <command> [args]');
+fs.mkdirSync(dir,{recursive:true});const prefix=path.join(dir,label);if(fs.existsSync(prefix+'.json'))throw Error('refusing evidence overwrite');
+const git=args=>spawnSync('git',args,{cwd:ROOT,encoding:'utf8'}).stdout.trim();const stdout=fs.openSync(prefix+'.stdout','wx'),stderr=fs.openSync(prefix+'.stderr','wx');
+const row={command:args,cwd:ROOT,start:new Date().toISOString(),node:process.version,execPath:process.execPath,head:git(['rev-parse','HEAD']),tree:git(['rev-parse','HEAD^{tree}']),statusBefore:git(['status','--porcelain']),env:Object.fromEntries(['PATH','TMPDIR','PF_NO_SKIP','GIT_CEILING_DIRECTORIES','PF_STEP1_CONSUMER_DIR'].filter(k=>process.env[k]).map(k=>[k,process.env[k]]))};
+const r=spawnSync(args[0],args.slice(1),{cwd:ROOT,env:process.env,stdio:['ignore',stdout,stderr]});fs.closeSync(stdout);fs.closeSync(stderr);Object.assign(row,{end:new Date().toISOString(),exit:r.status,signal:r.signal,error:r.error?.message,statusAfter:git(['status','--porcelain'])});fs.writeFileSync(prefix+'.json',JSON.stringify(row,null,2)+'\n');console.log(label+': '+r.status);process.exitCode=r.status??1;

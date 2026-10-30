@@ -17,3 +17,7 @@ export type {
 } from "./triggered-evolution";
 export type { TradeDecision, TradeDraftView, TradeIntent, TradeOutcome } from "./trade-operation";
 export type { DexDecision, DexEntryIntent, DexEntryOwner, DexOperationView, DexResolution, DexViewingCommand } from "./pokedex-operation";
+export type {
+  FriendshipMigrationHandle, FriendshipPersistencePort, FriendshipPersistenceSnapshot, FriendshipPersistenceRequest,
+  FriendshipPersistenceResult, FriendshipApplicationPreview, FriendshipApplicationResult,
+} from "./friendship-migration-operation";

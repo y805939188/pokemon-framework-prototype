@@ -40,8 +40,8 @@ if (process.argv[2] === '--cold-held') {
   const SRC = path.resolve(__dirname, '../../../content/sample');
   const read = name => JSON.parse(fs.readFileSync(path.join(SRC, name + '.json'), 'utf8'));
   const base = read('species').find(s => s.id === 'snorlax');
-  function assemble(species = read('species')) {
-    const built = E.contentCompile.compileContent({ manifest: read('manifest'), sources: read('sources'), species: species.map(sp => ({ ...sp, nameKey: `species.${sp.id}.${sp.form ?? 0}` })), overlays: [], grants: [] });
+  function assemble(species = read('species'), authorSchema = read('manifest').schema) {
+    const built = E.contentCompile.compileContent({ manifest: {...read('manifest'), schema: authorSchema}, sources: read('sources'), species: species.map(sp => ({ ...sp, nameKey: `species.${sp.id}.${sp.form ?? 0}` })), overlays: [], grants: [] });
     assert.equal(built.ok, true, JSON.stringify(built.errors));
     const result = E.contentRuntime.assembleContent(built.data, E.dex.createDexLookup());
     assert.deepEqual(result.errors, []); return result.content;
@@ -184,10 +184,10 @@ if (process.argv[2] === '--cold-held') {
     }
   });
 
-  test('M06: full pipeline form Happiness inherits omitted base, explicit 0/256 survives every record order', () => {
+  test('M06: explicit legacy full pipeline form Happiness inherits omitted base, explicit 0/256 survives every record order', () => {
     for (const initial of [undefined, 256]) for (const override of [undefined, 0, 256]) for (const reversed of [false, true]) {
       const records = [{ ...base, id: 'cloak', showdownId: 'burmy', ...(initial !== undefined ? { happiness: initial } : {}) }, { ...base, id: 'cloak', form: 1, showdownId: 'burmysandy', ...(override !== undefined ? { happiness: override } : {}) }];
-      const c = assemble(reversed ? records.reverse() : records); const m = E.memberFactory.createMember({ id: 'B', species: 'Burmy', form: 1, level: 5 }, c, () => 0);
+      const c = assemble(reversed ? records.reverse() : records, 1); const m = E.memberFactory.createMember({ id: 'B', species: 'Burmy', form: 1, level: 5 }, c, () => 0);
       assert.equal(m.friendship, override ?? initial ?? 70, JSON.stringify({ initial, override, reversed }));
       assert.equal(E.memberFactory.createMember({ id: 'D', species: 'Burmy-Sandy', level: 5 }, c, () => 0).friendship, override ?? initial ?? 70);
     }

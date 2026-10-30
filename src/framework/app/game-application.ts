@@ -1,3 +1,7 @@
+import { planPlayerFriendshipMigration, applyPlayerFriendshipMigration, friendshipMigrationSnapshot } from "../rules/friendship-migration";
+import type { FriendshipMigrationPlan } from "../rules/friendship-migration";
+import type { Content } from "../rules/types";
+import type { FriendshipPersistencePort, FriendshipPersistenceSnapshot, FriendshipMigrationHandle, FriendshipApplicationPreview, FriendshipApplicationResult } from "./friendship-migration-operation";
 import { normalizeMemberDexAppearance } from "../rules/acquisition-dex";
 import { PokedexOperation } from "./pokedex-operation";
 import type { DexEntryIntent, DexDecision, DexViewingCommand, DexResolution } from "./pokedex-operation";
@@ -63,7 +67,7 @@ import type { TrainerPrizeResult } from "../rules/trainer-reward";
 import { allocateMemberId, ownerLanguage } from "../rules/member-identity";
 import { assertCapturedHeldSources, hasForcedPartyPlan, fallbackDecisions, receiveMembers, ReceivingRefused } from "../rules/receiving";
 import type { ReceivingDecision, ReceivingProfile } from "../rules/receiving";
-import { validateGameContent } from "../rules/save-schema";
+import { snapshotForSave, validateGameContent } from "../rules/save-schema";
 import { own } from "../rules/own";
 import { findDanglingReferences, resolveSpecies, validatedContentIdentity } from "../flow/content-runtime";
 import { planHeldWriteback, resolveRequiredFacts } from "../rules/held-facts";
@@ -194,6 +198,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private dexBattleCompletion: { parentToken: string; generation: number; outcome: BattleOutcome & { result?: BattleResult } } | null = null;
   private readonly acquisition: AcquisitionOperation;
   private evolutionCompletion: { token: string; generation: number; outcome: BattleOutcome & { result?: BattleResult } } | null = null;
+  readonly #friendshipRawState: GameStatePort;
+  #friendshipRevision = 0;
+  #friendshipOwner: { invalid: boolean } | null = null;
+  readonly #friendshipPreviews = new WeakMap<FriendshipMigrationHandle, {
+    generation: number; revision: number; content: Content; contentHash: string; before: string; target: FriendshipPersistenceSnapshot;
+    plan: FriendshipMigrationPlan; persistence: FriendshipPersistencePort; result?: FriendshipApplicationResult;
+  }>();
   private generation = 0;
   private readonly bornIn = new WeakMap<object, number>();
   private readonly completedEvidence = new WeakMap<object, BattleEvidence>();
@@ -206,7 +217,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private battleCommitOwner: ReceptionContext | null = null;
   private readonly finishing = new WeakSet<object>();
   private readonly terminatedBattles = new WeakSet<ReceptionContext>();
-  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active || !!this.triggered?.active || !!this.trade?.active || !!this.acquisition?.active || !!this.pokedex?.active || !!this.dexBattleCompletion; }
+  private get battleBusy(): boolean { return !!this.#friendshipOwner || !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active || !!this.triggered?.active || !!this.trade?.active || !!this.acquisition?.active || !!this.pokedex?.active || !!this.dexBattleCompletion; }
   private assertBattleContext(context: ReceptionContext, requireOwner = false): void {
     if (context.generation !== this.generation || this.terminatedBattles.has(context)
       || requireOwner && this.battleCommitOwner !== context) throw new Error("stale battle commit generation or owner");
@@ -234,8 +245,9 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
 
   constructor(ports: GameApplicationPorts<S>, options: GameApplicationOptions = {}) {
     this.#settlementFactoryRoot = settlementFactorySource(ports.sessions);
-    this.battleStatePort = ports.state;
-    this.ports = {...ports,state:{read:()=>ports.state.read(),replace:next=>{const problems=validateGameContent(next,ports.content().content);if(problems.length)throw new Error(`invalid next state: ${problems[0]!.path} ${problems[0]!.message}`);ports.state.replace(next);this.inventory?.stateChanged(next);}}};
+    this.#friendshipRawState = ports.state;
+    this.battleStatePort = {read:()=>ports.state.read(),replace:next=>{this.assertNoFriendshipWrite();this.#friendshipRevision++;ports.state.replace(next);}};
+    this.ports = {...ports,state:{read:()=>ports.state.read(),replace:next=>{this.assertNoFriendshipWrite();const problems=validateGameContent(next,ports.content().content);if(problems.length)throw new Error(`invalid next state: ${problems[0]!.path} ${problems[0]!.message}`);this.#friendshipRevision++;ports.state.replace(next);this.inventory?.stateChanged(next);}}};
     const contentPort = ports.content;
     this.ports.content = () => {
       const result = contentPort.call(this.ports), admission = this.#currentSettlementAdmission;
@@ -361,8 +373,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         moreOften: resolveConfig(content.settings).SHOW_NEW_SPECIES_POKEDEX_ENTRY_MORE_OFTEN }) };
   }
   get pendingPokedex() { return this.pokedex.view; }
-  beginSummaryPokedex(parentToken:string,memberId:string):DexResolution {return this.pokedex.beginSummary(parentToken,memberId);}
-  updatePokedex(command: DexViewingCommand): DexResolution { return this.pokedex.begin(command); }
+  beginSummaryPokedex(parentToken:string,memberId:string):DexResolution { this.assertNoFriendshipWrite();return this.pokedex.beginSummary(parentToken,memberId);}
+  updatePokedex(command: DexViewingCommand): DexResolution { this.assertNoFriendshipWrite(); return this.pokedex.begin(command); }
   /** Read-only directory from the source-checked adapter, never inferred from species currently in the dex. */
   pokedexSearchDirectory(locale: string) {
     const generation = this.generation, source = this.ports.content();
@@ -398,7 +410,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (generation !== this.generation || current?.token !== token || current.revision !== revision) throw Error("stale-trade-entry-query");
     return pokedexEntryWithMeasurements(info, locale);
   }
-  resolvePokedex(token: string, revision: number, decision: DexDecision) {
+  resolvePokedex(token: string, revision: number, decision: DexDecision) { this.assertNoFriendshipWrite();
     const generation = this.generation, before = this.pokedex.view, outcome = this.pokedex.resolve(token, revision, decision);
     if (generation !== this.generation) return { status: "refused" as const, reason: "stale-pokedex-operation" };
     if (outcome.status === "pending" || outcome.status === "refused" || !before) return outcome;
@@ -428,19 +440,19 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const { content, dex } = this.ports.content();
     return learningMoveView(content, dex, id);
   }
-  beginLearning(intent: LearningIntent, parent?: LearningParent) { return this.learning.begin(intent, parent); }
-  resolveLearning(token: string, revision: number, decision: LearningDecision) { return this.learning.resolve(token, revision, decision); }
+  beginLearning(intent: LearningIntent, parent?: LearningParent) { this.assertNoFriendshipWrite(); return this.learning.begin(intent, parent); }
+  resolveLearning(token: string, revision: number, decision: LearningDecision) { this.assertNoFriendshipWrite(); return this.learning.resolve(token, revision, decision); }
   get pendingTrade() { return this.trade.view; }
-  beginTrade(requestId: string, intent: TradeIntent) { return this.trade.begin(requestId, intent); }
-  resolveTrade(token: string, revision: number, decision: TradeDecision) { return this.trade.resolve(token, revision, decision); }
+  beginTrade(requestId: string, intent: TradeIntent) { this.assertNoFriendshipWrite(); return this.trade.begin(requestId, intent); }
+  resolveTrade(token: string, revision: number, decision: TradeDecision) { this.assertNoFriendshipWrite(); return this.trade.resolve(token, revision, decision); }
   tradeCandidates(requiredSpecies?: string) {
     const game = this.ports.state.read(), world = clone(this.ports.itemWorld?.() ?? {});
     return tradeCandidateViews(game, world, requiredSpecies);
   }
   get pendingTriggeredEvolution() { return this.triggered.view; }
-  beginEvolutionItem(parent: string, requestId: string, intent: EvolutionItemIntent) { return this.triggered.beginItem(parent, requestId, intent); }
-  beginEventEvolution(intent: EventEvolutionIntent = {}) { return this.triggered.beginEvent(intent); }
-  resolveTriggeredEvolution(token: string, revision: number, decision: TriggeredDecision) { return this.triggered.resolve(token, revision, decision); }
+  beginEvolutionItem(parent: string, requestId: string, intent: EvolutionItemIntent) { this.assertNoFriendshipWrite(); return this.triggered.beginItem(parent, requestId, intent); }
+  beginEventEvolution(intent: EventEvolutionIntent = {}) { this.assertNoFriendshipWrite(); return this.triggered.beginEvent(intent); }
+  resolveTriggeredEvolution(token: string, revision: number, decision: TriggeredDecision) { this.assertNoFriendshipWrite(); return this.triggered.resolve(token, revision, decision); }
   private evolutionOutcome(outcome: BattleOutcome & { result?: BattleResult }, resolved: EvolutionResolution): BattleOutcome & { result?: BattleResult } {
     if (resolved.status === "refused") return { ...outcome, error: resolved.reason };
     const next = { ...clone(outcome), ...(resolved.diagnostics.length ? { diagnostics: [...new Set([...(outcome.diagnostics ?? []), ...resolved.diagnostics])] } : {}) };
@@ -449,7 +461,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (resolved.status === "technically-terminated") next.diagnostics = [...(next.diagnostics ?? []), "战后进化后续已技术终止，已提交战果保留"];
     return next;
   }
-  resolveEvolution(token: string, revision: number, decision: EvolutionDecision): (BattleOutcome & { result?: BattleResult }) | TriggeredEvolutionOutcome | TradeOutcome | { status: "refused"; reason: string } {
+  resolveEvolution(token: string, revision: number, decision: EvolutionDecision): (BattleOutcome & { result?: BattleResult }) | TriggeredEvolutionOutcome | TradeOutcome | { status: "refused"; reason: string } { this.assertNoFriendshipWrite();
     if (this.trade.matchesContinuation(token)) return this.trade.resolveEvolution(token, revision, decision);
     if (this.triggered.matchesContinuation(token)) return this.triggered.resolveContinuation(token, revision, decision);
     const completion = this.evolutionCompletion;
@@ -462,32 +474,32 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     return outcome;
   }
 
-  beginInventoryOperation(kind:'bag'|'item'|'shop'='bag',parent?:InventoryParent):string { return this.inventory.begin(kind,parent); }
-  endInventoryOperation(token:string):InventoryOutcome { return this.inventory.end(token); }
+  beginInventoryOperation(kind:'bag'|'item'|'shop'='bag',parent?:InventoryParent):string { this.assertNoFriendshipWrite(); return this.inventory.begin(kind,parent); }
+  endInventoryOperation(token:string):InventoryOutcome { this.assertNoFriendshipWrite(); return this.inventory.end(token); }
   inventorySnapshot(token:string,filter?:Parameters<InventorySession['snapshot']>[1]) { return this.inventory.snapshot(token,filter); }
   queryInventoryItemQuantity(token:string,itemId:string):number { return this.inventory.quantity(token,itemId); }
   inventoryTicket(token:string,pocket:number,index:number) { return this.inventory.ticket(token,pocket,index); }
-  inventoryRequest(token:string,requestId:string,request:InventoryRequest,present?:(outcome:InventoryOutcome)=>void):InventoryOutcome { return this.inventory.execute(token,requestId,request,present); }
-  beginInventorySort(token:string,pocket:number,index:number,filtered=false):InventoryOutcome { return this.inventory.beginSort(token,pocket,index,filtered); }
-  moveInventorySort(token:string,to:number):InventoryOutcome { return this.inventory.moveSort(token,to); }
-  endInventorySort(token:string,cancel=false):InventoryOutcome { return this.inventory.endSort(token,cancel); }
+  inventoryRequest(token:string,requestId:string,request:InventoryRequest,present?:(outcome:InventoryOutcome)=>void):InventoryOutcome { this.assertNoFriendshipWrite(); return this.inventory.execute(token,requestId,request,present); }
+  beginInventorySort(token:string,pocket:number,index:number,filtered=false):InventoryOutcome { this.assertNoFriendshipWrite(); return this.inventory.beginSort(token,pocket,index,filtered); }
+  moveInventorySort(token:string,to:number):InventoryOutcome { this.assertNoFriendshipWrite(); return this.inventory.moveSort(token,to); }
+  endInventorySort(token:string,cancel=false):InventoryOutcome { this.assertNoFriendshipWrite(); return this.inventory.endSort(token,cancel); }
   queryItemUse(token:string,itemId:string,quantity=1,memberId?:string) { return this.inventory.queryUse(token,itemId,quantity,memberId); }
-  beginMoneyShop(input:Parameters<InventorySession['configureShop']>[1]):string {const token=this.inventory.begin('shop');try{this.inventory.configureShop(token,input);return token;}catch(error){this.inventory.end(token);throw error;}}
+  beginMoneyShop(input:Parameters<InventorySession['configureShop']>[1]):string { this.assertNoFriendshipWrite();const token=this.inventory.begin('shop');try{this.inventory.configureShop(token,input);return token;}catch(error){this.inventory.end(token);throw error;}}
   shopView(token:string){return this.inventory.shopView(token);}
   shopQuote(token:string,itemId:string,selling=false){return this.inventory.quote(token,itemId,selling);}
-  setShopPrices(token:string,itemId:string,buy:number,sell?:number):void{this.inventory.setPrices(token,itemId,buy,sell);}
-  clearShopPrices(token:string):void{this.inventory.clearPrices(token);}
-  beginItemSelection(...args:Parameters<InventorySession['beginSelection']>){return this.inventory.beginSelection(...args);}
+  setShopPrices(token:string,itemId:string,buy:number,sell?:number):void{ this.assertNoFriendshipWrite();this.inventory.setPrices(token,itemId,buy,sell);}
+  clearShopPrices(token:string):void{ this.assertNoFriendshipWrite();this.inventory.clearPrices(token);}
+  beginItemSelection(...args:Parameters<InventorySession['beginSelection']>){ this.assertNoFriendshipWrite();return this.inventory.beginSelection(...args);}
   itemSelectionView(...args:Parameters<InventorySession['selectionView']>){return this.inventory.selectionView(...args);}
-  browseItemSelection(...args:Parameters<InventorySession['selectionBrowse']>){return this.inventory.selectionBrowse(...args);}
-  finishItemSelection(...args:Parameters<InventorySession['finishSelection']>){return this.inventory.finishSelection(...args);}
-  tossItems(...args:Parameters<InventorySession['toss']>){return this.inventory.toss(...args);}
+  browseItemSelection(...args:Parameters<InventorySession['selectionBrowse']>){ this.assertNoFriendshipWrite();return this.inventory.selectionBrowse(...args);}
+  finishItemSelection(...args:Parameters<InventorySession['finishSelection']>){ this.assertNoFriendshipWrite();return this.inventory.finishSelection(...args);}
+  tossItems(...args:Parameters<InventorySession['toss']>){ this.assertNoFriendshipWrite();return this.inventory.toss(...args);}
   queryBadges(index?:number):{count:number;owned?:boolean}{const game=this.ports.state.read();return {count:badgeCount(game.badges),...(index===undefined?{}:{owned:hasBadge(game.badges,index)})};}
   hasBoxLink():boolean {return this.inventory.hasBoxLink();}
   heldItemSourcesEnabled():boolean {return this.capabilities.allowHeldItemSources;}
 
   /** A new game: the formal empty state (no members; the player receives them through grants). Throws only if the store refuses. */
-  startNewGame(): { status: "started"; state: GameState } {
+  startNewGame(): { status: "started"; state: GameState } { this.assertNoFriendshipWrite();
     const random = this.ports.random;
     if (!random) throw new Error("no-random: a new player's trainer ID needs an injected random source");
     const content = this.ports.content().content;
@@ -499,20 +511,20 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   /** Give a content grant once per save timeline. Never throws; a refusal commits nothing (and writes no claim). */
-  claimGrant(grantId: string, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): ClaimOutcome {
+  claimGrant(grantId: string, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): ClaimOutcome { this.assertNoFriendshipWrite();
     const refused = (reason: string, error: unknown): ClaimOutcome => ({ status: "refused", grantId, reason, error: message(error) });
     if (this.reception?.grantId === grantId) return { status: "pending", grantId, token: this.reception.context.token };
     if (this.battleBusy || this.management.active || this.reception || this.inventory.active) return refused(this.battleBusy ? "battle-active" : "operation-active", "another operation is open");
     return this.acquisition.claimGrant(grantId, options);
   }
 
-  receiveGift(request: GiftRequest, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): GiftOutcome {
+  receiveGift(request: GiftRequest, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): GiftOutcome { this.assertNoFriendshipWrite();
     if (this.battleBusy || this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "operation-active" };
     return this.acquisition.receiveGift(request, options);
   }
 
   /** Discard only a proved uninstalled acquisition. An installed result is acknowledged, never rolled back. */
-  terminateAcquisition(token: string): { status: "aborted" | "already-installed" | "refused" | "reload-required"; reason?: string } {
+  terminateAcquisition(token: string): { status: "aborted" | "already-installed" | "refused" | "reload-required"; reason?: string } { this.assertNoFriendshipWrite();
     const pending = this.reception;
     if (!pending || pending.context.token !== token || pending.context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
     if (!this.acquisition.hasPrepared(pending.context)) return { status: "refused", reason: "not-an-acquisition" };
@@ -551,7 +563,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     return { ...clone(options), profile, token: `receive:${this.generation}:${++this.operationSequence}`, generation: this.generation };
   }
   get pendingReceiving(): { token: string; members: Member[]; profile: ReceivingProfile } | null { return this.reception ? { token: this.reception.context.token, members: clone(this.reception.members), profile: { ...(this.reception.context.profile ?? this.profile) } } : null; }
-  resolveReceiving(token: string, decisions: Record<string, ReceivingDecision> = {}, signal?: "scene-aborted" | "rebuild-failed"): ReturnType<ReceptionPending["resume"]> {
+  resolveReceiving(token: string, decisions: Record<string, ReceivingDecision> = {}, signal?: "scene-aborted" | "rebuild-failed"): ReturnType<ReceptionPending["resume"]> { this.assertNoFriendshipWrite();
     const receipt = this.receptionReceipts.get(token); if (receipt) return clone(receipt);
     const pending = this.reception;
     if (!pending || pending.context.token !== token || pending.context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
@@ -578,7 +590,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   /** Technical termination of a proved zero-write battle attempt. It never rolls back an installed primary result. */
-  terminateBattleCommit(token: string): { status: "aborted" | "refused" | "reload-required"; reason?: string } {
+  terminateBattleCommit(token: string): { status: "aborted" | "refused" | "reload-required"; reason?: string } { this.assertNoFriendshipWrite();
     const context = this.battleCommitOwner;
     if (!context || context.token !== token || context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
     const prepared = this.preparedBattles.get(context);
@@ -607,7 +619,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   /** Heal the party (HP, status, PP). Safe to repeat: an already healed party writes nothing. Never throws. */
-  healParty(): HealOutcome {
+  healParty(): HealOutcome { this.assertNoFriendshipWrite();
     if (this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "management-active" };
     if (this.battleBusy) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
     let game: GameState;
@@ -617,6 +629,102 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (JSON.stringify(next.party) === JSON.stringify(game.party)) return { status: "unchanged" };
     try { this.ports.state.replace(next); } catch (error) { return { status: "refused", reason: "commit-failed", error: message(error) }; }
     return { status: "healed" };
+  }
+
+  /** Read-only preview over an application-owned plan and an explicitly selected persistence adapter. */
+  async previewFriendshipMigration(persistence: FriendshipPersistencePort, paths?: readonly string[]): Promise<FriendshipApplicationPreview | FriendshipApplicationResult> {
+    this.assertNoFriendshipWrite();
+    if (this.encounterBlocked || this.saveBlocked) return {status:"refused",reason:"operation-active"};
+    const owner = {invalid:false}; this.#friendshipOwner = owner;
+    try {
+      const generation = this.generation, revision = this.#friendshipRevision, content = this.ports.content().content;
+      const contentHash = semanticFingerprint(JSON.parse(JSON.stringify(content)) as unknown);
+      const current = snapshotForSave(this.ports.state.read(),content);
+      if (!current.ok) throw Error("friendship-state-invalid");
+      const before = friendshipMigrationSnapshot(current.state);
+      const target = clone(await persistence.preview());
+      if (owner.invalid || generation !== this.generation || revision !== this.#friendshipRevision || this.ports.content().content !== content || semanticFingerprint(JSON.parse(JSON.stringify(content)) as unknown) !== contentHash
+        || friendshipMigrationSnapshot(this.ports.state.read()) !== before || owner.invalid) throw Error("friendship-preview-stale");
+      if (friendshipMigrationSnapshot(target.state) !== before) throw Error("friendship-selected-save-mismatch");
+      const preview = planPlayerFriendshipMigration(current.state,paths);
+      if (preview.status !== "ready") throw Error(preview.reason);
+      const handle = Object.freeze({}) as FriendshipMigrationHandle;
+      this.#friendshipPreviews.set(handle,{generation,revision,content,contentHash,before,target,plan:preview.plan,persistence});
+      return {status:"ready",handle,target:target.target,rawHash:target.rawHash,planHash:preview.plan.planHash,
+        targets:clone(preview.plan.targets),candidates:clone(preview.plan.candidates),outOfScope:clone(preview.plan.outOfScope)};
+    } catch (error) { return {status:"refused",reason:"preview-rejected",error:message(error)}; }
+    finally { if (this.#friendshipOwner === owner) this.#friendshipOwner = null; }
+  }
+  cancelFriendshipMigration(handle: FriendshipMigrationHandle): FriendshipApplicationResult {
+    this.assertNoFriendshipWrite();
+    if (!this.#friendshipPreviews.delete(handle)) return {status:"refused",reason:"unknown-preview"};
+    return {status:"cancelled"};
+  }
+  /** Confirm only the opaque handle. Caller-supplied plans, signatures and candidates confer no authority. */
+  async confirmFriendshipMigration(handle: FriendshipMigrationHandle): Promise<FriendshipApplicationResult> {
+    this.assertNoFriendshipWrite();
+    const preview = this.#friendshipPreviews.get(handle);
+    if (!preview) return {status:"refused",reason:"unknown-preview"};
+    if (this.encounterBlocked || this.saveBlocked) return {status:"refused",reason:"operation-active"};
+    const owner = {invalid:false}; this.#friendshipOwner = owner;
+    let committed = false, release = true;
+    const assertCurrent = () => {
+      const content = this.ports.content().content;
+      const contentHash = semanticFingerprint(JSON.parse(JSON.stringify(content)) as unknown);
+      const before = friendshipMigrationSnapshot(this.ports.state.read());
+      if (owner.invalid || this.#friendshipOwner !== owner || preview.generation !== this.generation || preview.revision !== this.#friendshipRevision || content !== preview.content
+        || contentHash !== preview.contentHash || before !== preview.before) throw Error("friendship-confirmation-stale");
+    };
+    try {
+      if (preview.result) {
+        const now = await preview.persistence.preview();
+        if (preview.generation !== this.generation || preview.revision !== this.#friendshipRevision || this.ports.content().content !== preview.content
+          || semanticFingerprint(JSON.parse(JSON.stringify(preview.content)) as unknown) !== preview.contentHash
+          || friendshipMigrationSnapshot(this.ports.state.read()) !== preview.plan.afterSnapshot
+          || friendshipMigrationSnapshot(now.state) !== preview.plan.afterSnapshot || now.target !== preview.target.target
+          || now.rawHash !== preview.result.persistence?.rawHash || owner.invalid) throw Error("friendship-replay-stale");
+        return {...preview.result,status:preview.result.status === "unchanged" ? "unchanged" : "already-applied"};
+      }
+      assertCurrent();
+      const target = clone(await preview.persistence.preview()); assertCurrent();
+      if (friendshipMigrationSnapshot(target) !== friendshipMigrationSnapshot(preview.target)) throw Error("friendship-selected-save-stale");
+      const applied = applyPlayerFriendshipMigration(JSON.parse(preview.before) as unknown,preview.plan,{planHash:preview.plan.planHash,targetPaths:preview.plan.targets.map(t=>t.path)});
+      if (applied.status === "refused") throw Error(applied.reason);
+      const candidate = snapshotForSave(applied.data,preview.content);
+      if (!candidate.ok || friendshipMigrationSnapshot(candidate.state) !== preview.plan.afterSnapshot) throw Error("friendship-candidate-invalid");
+      if (applied.status === "unchanged") {
+        const result: FriendshipApplicationResult = {status:"unchanged",persistence:{status:"committed",rawHash:target.rawHash}};
+        preview.result = result; return clone(result);
+      }
+      let persisted;
+      try { persisted = await preview.persistence.commit({before:clone(preview.target),next:clone(candidate.state),plan:clone(preview.plan),receipt:clone(applied.receipt),contentHash:preview.contentHash,contentIdentity:validatedContentIdentity(preview.content),assertCurrent}); }
+      catch (error) { release = false; return {status:"reload-required",reason:"persistence-unknown",error:message(error)}; }
+      if (persisted.status === "unknown") { release = false; return {status:"reload-required",reason:"persistence-unknown",persistence:persisted}; }
+      if (persisted.status === "not-committed") return {status:"refused",reason:"persistence-not-committed",persistence:persisted};
+      committed = true;
+      assertCurrent();
+      const installedFile = await preview.persistence.preview(); assertCurrent();
+      if (installedFile.target !== preview.target.target || installedFile.rawHash !== persisted.rawHash || friendshipMigrationSnapshot(installedFile.state) !== preview.plan.afterSnapshot) throw Error("friendship-persistence-readback-mismatch");
+      let installError: unknown;
+      try { this.#friendshipRawState.replace(clone(candidate.state)); } catch (error) { installError = error; }
+      if (owner.invalid || preview.generation !== this.generation || this.ports.content().content !== preview.content
+        || semanticFingerprint(JSON.parse(JSON.stringify(preview.content)) as unknown) !== preview.contentHash
+        || friendshipMigrationSnapshot(this.#friendshipRawState.read()) !== preview.plan.afterSnapshot || owner.invalid) throw Error("friendship-install-readback-mismatch");
+      this.#friendshipRevision++; preview.revision = this.#friendshipRevision;
+      this.inventory.stateChanged(candidate.state);
+      const result: FriendshipApplicationResult = {status:"applied",persistence:persisted,...(installError?{error:message(installError)}:{})};
+      preview.result = clone(result);
+      return result;
+    } catch (error) {
+      if (committed) { release = false; return {status:"reload-required",reason:"committed-install-unverified",error:message(error)}; }
+      return {status:"refused",reason:"confirmation-rejected",error:message(error)};
+    } finally { if (release && this.#friendshipOwner === owner) { this.#friendshipOwner = null; if (owner.invalid && !preview.result) this.#friendshipPreviews.delete(handle); } }
+  }
+  /** Host must call BEFORE replacing any host objects, including asynchronous load callbacks. */
+  assertHostStateReplacementAllowed(): void { this.assertNoFriendshipWrite(); }
+  get friendshipMigrationPending(): boolean { return !!this.#friendshipOwner; }
+  private assertNoFriendshipWrite(): void {
+    if (this.#friendshipOwner) { this.#friendshipOwner.invalid = true; throw Error("friendship-migration-active"); }
   }
 
   /** Root management sessions may contain independent edits and one pending movement chain. */
@@ -644,16 +752,16 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (!this.capabilities.allowHeldItemSources) throw new Error("held-item-source-disabled");
     return Object.entries(aggregateBag(this.ports.state.read().inventory)).filter(([id, count]) => { const item = this.describeHeldItem(id); return count > 0 && item?.holdable && !item.mail; }).map(([id, count]) => ({ id, count }));
   }
-  beginManagement(): string { if (this.battleBusy || this.reception || this.inventory.active) throw new Error("operation-active"); return this.management.begin(); }
-  manage(token: string, requestId: string, request: ManagementRequest): ManagementOutcome {
+  beginManagement(): string { this.assertNoFriendshipWrite(); if (this.battleBusy || this.reception || this.inventory.active) throw new Error("operation-active"); return this.management.begin(); }
+  manage(token: string, requestId: string, request: ManagementRequest): ManagementOutcome { this.assertNoFriendshipWrite();
     if (this.battleBusy) return { status: "refused", reason: "battle-active" };
     return this.management.execute(token, requestId, request);
   }
-  endManagement(token: string): ManagementOutcome { return this.management.end(token); }
+  endManagement(token: string): ManagementOutcome { this.assertNoFriendshipWrite(); return this.management.end(token); }
   heldMemberReference(token: string): MemberReference | null { return this.management.heldReference(token); }
   get encounterBlocked(): boolean { return this.battleBusy || !!this.reception || this.management.active || this.inventory.active; }
   get saveBlocked(): boolean { return this.battleBusy || !!this.reception || this.management.saveBlocked || this.inventory.saveBlocked; }
-  recoverAll(): HealOutcome {
+  recoverAll(): HealOutcome { this.assertNoFriendshipWrite();
     if (this.battleBusy || this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: this.battleBusy ? "battle-active" : "management-active" };
     try { const game = this.ports.state.read(); const next = recoverAll(game, this.ports.content().content, this.depositHeal); if (JSON.stringify(next) === JSON.stringify(game)) return { status: "unchanged" }; this.ports.state.replace(next); return { status: "healed" }; }
     catch (error) { return { status: "refused", reason: "invalid", error: message(error) }; }
@@ -674,7 +782,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   /** Count steps the player took (WP06 §4.1: the global counter, wrapping at 2^31). The host applies the guards of that step. */
-  recordSteps(n = 1): StepsOutcome {
+  recordSteps(n = 1): StepsOutcome { this.assertNoFriendshipWrite();
     if (this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "management-active" };
     if (this.battleBusy) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
     let game: GameState;
@@ -690,7 +798,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * still open belongs to the replaced state: its operation is released (otherwise grants, heals and battles would stay
    * refused for good, final review P4-2), and its session, should it still finish, commits nothing.
    */
-  stateReplacedByHost(): void {
+  stateReplacedByHost(): void { this.assertNoFriendshipWrite();
     this.generation++;
     if (this.#currentSettlementAdmission) this.#currentSettlementAdmission.invalid = true;
     this.#currentSettlementAdmission = null;
@@ -724,11 +832,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     return found ? trainerBattleProjection(found.record, found.type) : null;
   }
 
-  async startTrainerBattle(request: TrainerBattleStartRequest): Promise<S> {
+  async startTrainerBattle(request: TrainerBattleStartRequest): Promise<S> { this.assertNoFriendshipWrite();
     return this.startBattle({ ...request, kind: "trainer", foes: [], trainer: { ...request.trainer } });
   }
 
-  async startBattle(request: BattleStartRequest): Promise<S> {
+  async startBattle(request: BattleStartRequest): Promise<S> { this.assertNoFriendshipWrite();
     if (this.management.active || this.reception || this.inventory.active) throw new Error("operation-active");
     if (this.op) throw new Error(`a battle is already open (${this.op.battleId})`);
     if (this.battleCommitOwner) throw new Error("battle-commit-active");
@@ -876,7 +984,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * same battle is refused. Throws on a contract violation and then the state is exactly as it was. Without a battle
    * operation the application does not know the battle's kind, so no battle statistics are counted (finishBattle does).
    */
-  commitResult(result: BattleResult, options: BattleCommitOptions = {}): CommitResultStatus {
+  commitResult(result: BattleResult, options: BattleCommitOptions = {}): CommitResultStatus { this.assertNoFriendshipWrite();
     if (this.management.active || this.inventory.active) throw new Error("management-active");
     if (this.battleBusy) throw new Error("battle-active: use the current battle/receiving operation");
     if (this.reception) throw new Error("receiving-active: use its receiving token");
@@ -1166,7 +1274,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * (unfinished, closed after a failure) or committed ends aborted with the persistent state untouched; once the state
    * is committed a failing host projection is reported on the outcome and does not undo or repeat the commit.
    */
-  finishBattle(handle: S, request: Pick<BattleStartRequest, "battleId"> | null): BattleOutcome & { result?: BattleResult } {
+  finishBattle(handle: S, request: Pick<BattleStartRequest, "battleId"> | null): BattleOutcome & { result?: BattleResult } { this.assertNoFriendshipWrite();
     if ((typeof handle !== "object" || handle === null) && typeof handle !== "function") return this.abortBattle(request, new Error("invalid battle handle"));
     const born = typeof handle === "object" && handle !== null ? this.bornIn.get(handle) : undefined;
     if (born !== undefined && born !== this.generation) return { code: 0, battleId: request?.battleId ?? null, commit: "none", aborted: true, error: "the game state was replaced while this battle was open (a save was loaded or a new game started); its result is not committed" };
@@ -1261,7 +1369,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * End without a result (a failure, a cancelled scene). Nothing is committed. Never throws. Ends the open operation when
    * it is this battle (same battleId), also while its session is still being created.
    */
-  abortBattle(request: Pick<BattleStartRequest, "battleId"> | null, error: unknown): BattleOutcome {
+  abortBattle(request: Pick<BattleStartRequest, "battleId"> | null, error: unknown): BattleOutcome { this.assertNoFriendshipWrite();
     const operation = this.op;
     const context = operation?.session ? this.battleContexts.get(operation.session) : !operation ? this.battleCommitOwner : undefined;
     const admission = context ? this.#settlementAdmissions.get(context) : this.#currentSettlementAdmission;

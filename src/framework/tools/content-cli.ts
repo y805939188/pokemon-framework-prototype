@@ -1,3 +1,4 @@
+import { migrateFriendshipAuthorFiles } from "./friendship-author-files";
 /**
  * Content tooling entry (built to js/engine/build/content-cli.cjs): `build`, `check`, `check-item-pockets`, `inventory`, `import-pbs`.
  *   build      compile content/<src> into data/framework/content.json (a failed build REMOVES the old output, so a
@@ -247,7 +248,21 @@ export function importPbsFiles(src: string, sourceId: string, report: string, re
 
 const cmd = process.argv[2];
 const SRC = arg("src", "content/sample");
-if (cmd === "build") process.exit(build(SRC, arg("out", "data/framework/content.json")));
+if (cmd === "friendship-preview" || cmd === "friendship-migrate") {
+  try {
+    const schema = process.argv.find(a=>a.startsWith("--author-schema="))?.slice(16) ?? "2";
+    if (schema !== "1" && schema !== "2") throw Error("choose --author-schema=1 or 2");
+    const confirm = process.argv.find(a=>a.startsWith("--confirm="))?.slice(10);
+    const output = process.argv.find(a=>a.startsWith("--out="))?.slice(6);
+    if (cmd === "friendship-migrate" && (!confirm || !output)) throw Error("friendship-migrate requires --out=<NEW directory> --confirm=<previewHash>");
+    if (cmd === "friendship-preview" && confirm) throw Error("preview does not accept confirmation");
+    const result = migrateFriendshipAuthorFiles(SRC,output?path.resolve(ROOT,output):undefined,confirm,Number(schema) as 1|2,
+      src=>{const r=readInputs(src);if(r.errors.length)throw Error(JSON.stringify(r.errors));return r.inputs;},
+      inputs=>{const r=compileContent(inputs,{}, {showdownSha:buildPin()});if(!r.ok)throw Error(JSON.stringify(r.errors));const assembled=assembleContent(r.data,createDexLookup());if(assembled.errors.length)throw Error(JSON.stringify(assembled.errors));warn(r.warnings);});
+    console.log(JSON.stringify(result,null,2)); process.exit(0);
+  } catch(error) {console.error(error instanceof Error?error.message:String(error));process.exit(1);}
+}
+else if (cmd === "build") process.exit(build(SRC, arg("out", "data/framework/content.json")));
 else if (cmd === "check") process.exit(check(SRC, arg("out", "data/framework/content.json")));
 else if (cmd === "check-item-pockets") {
   const previous=process.argv.find(a=>a.startsWith("--previous-items="))?.slice(17);
