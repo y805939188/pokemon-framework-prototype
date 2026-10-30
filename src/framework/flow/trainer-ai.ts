@@ -81,6 +81,10 @@ function current(c:Channel,driver:BattleDriver,retire=true):void {
 function owned(c:Channel,gate:Gate):void {
   if(c.gate!==gate||gate.cancelled)throw new Error(gate.cancelled??'trainer-ai-operation-retired');
 }
+/** Source ports may synchronously cancel or restore; ownership must survive their callbacks. */
+function qualified(c:Channel,driver:BattleDriver,gate:Gate):void {
+  owned(c,gate);current(c,driver);owned(c,gate);
+}
 function begin(c:Channel):Gate {if(c.gate||c.restoring)throw new Error('trainer-ai-operation-in-progress');return c.gate={cancelled:null};}
 function end(c:Channel,gate:Gate):void {if(c.gate===gate)c.gate=null;}
 function capture(c:Channel):Cache {
@@ -101,7 +105,7 @@ function fallback(snapshot:TrainerAiSnapshot):DecisionPlan {
 }
 /** Returns synchronously for rule policies; only the scheduling layer waits for native Promise capabilities. */
 function decide(c:Channel,cache:Cache,gate:Gate,allowFallback:boolean):DecisionPlan|Promise<DecisionPlan> {
-  owned(c,gate);current(c,c.driver);
+  qualified(c,c.driver,gate);
   if(cache.plan)return clone(cache.plan);
   const input=c.validate(cache.capture.snapshot); // collector faults are outside the strategy-fault boundary
   if(input.request.kind==='wait'||input.request.kind==='finished')return {kind:'none',binding:clone(input.binding),reason:input.request.kind};
@@ -115,33 +119,38 @@ function decide(c:Channel,cache:Cache,gate:Gate,allowFallback:boolean):DecisionP
   if(c.testFull||c.decided.size>=4096)throw new Error('trainer-ai-journal-full');
   const epoch=++c.epoch,before=clone(c.state.random),local=clone(before),started=c.timing.now();let open=true,calls=0,sourceFault:{error:unknown}|null=null;
   if(!Number.isFinite(started))throw new Error('trainer-ai-invalid-timing');
+  const attemptOwned=():void=>{
+    owned(c,gate);if(sourceFault)throw sourceFault.error;
+    if(c.epoch!==epoch)throw new Error('trainer-ai-operation-retired');
+  };
   const random=(n:number):number=>{
     if(!open||c.epoch!==epoch||c.gate!==gate||gate.cancelled)throw new Error('trainer-ai-random-closed');
     let elapsed:number;
     try {
-      current(c,c.driver);elapsed=c.timing.now()-started;
+      qualified(c,c.driver,gate);elapsed=c.timing.now()-started;attemptOwned();
       if(!Number.isFinite(elapsed)||elapsed<0)throw new Error('trainer-ai-invalid-timing');
     }catch(error){sourceFault={error};throw error;}
     if(elapsed>=1000)throw new Error('trainer-ai-timeout');
     if(++calls>256)throw new Error('trainer-ai-random-budget');return trainerRandomN(local,n);
   };
   const finish=(ok:boolean,value:unknown):DecisionPlan=>{
-    open=false;owned(c,gate);if(sourceFault)throw sourceFault.error;if(c.epoch!==epoch)throw new Error('trainer-ai-operation-retired');current(c,c.driver);key(c,cache);
+    open=false;attemptOwned();qualified(c,c.driver,gate);attemptOwned();key(c,cache);
     let plan:DecisionPlan,fault:string|null=null;
     if(ok){try{plan=validateTrainerAiIntent(value,input);if(plan.kind==='error')throw new Error('trainer-ai-policy-'+plan.reason);}catch(error){ok=false;value=error;}}
     if(!ok){
       if(!allowFallback)throw value;
       // Recheck genuine authority even when a strategy throws a source-looking error string.
-      current(c,c.driver);key(c,cache);fault=value instanceof Error?value.message:'strategy-rejected';plan=fallback(input);
+      qualified(c,c.driver,gate);attemptOwned();key(c,cache);fault=value instanceof Error?value.message:'strategy-rejected';plan=fallback(input);
     }
     const after=ok?clone(local):clone(before);
     if(c.testFull||c.decided.size>=4096)throw new Error('trainer-ai-journal-full');
     const saved=freezeStrategyData({key:identity,snapshotHash,bindingHash:c.bindingHash,plan:clone(plan!),before,after,fallbackReason:fault});
+    attemptOwned();key(c,cache); // last callback has returned; no publication by a cancelled attempt
     c.decided.add(identity);c.journal.set(identity,saved); // fixed before RNG publication and the first driver callback
     c.state.random=clone(after);cache.plan=clone(saved.plan);return clone(saved.plan);
   };
   let output:DecisionPlan|Promise<DecisionPlan>;
-  try{output=c.invoke(input,random);}catch(error){return finish(false,error);}
+  try{attemptOwned();output=c.invoke(input,random);}catch(error){return finish(false,error);}
   if(!(output instanceof Promise)){
     const elapsed=c.timing.now()-started;if(!Number.isFinite(elapsed)||elapsed<0){open=false;throw new Error('trainer-ai-invalid-timing');}
     return elapsed>=1000?finish(false,new Error('trainer-ai-timeout')):finish(true,output);
@@ -175,20 +184,20 @@ function refund(c:Channel,entry:Reservation,advanceRevision=true):void {
 export async function runTrainerAi(session:object,driver:BattleDriver):Promise<boolean> {
   const c=CHANNELS.get(session);if(!c)return false;const gate=begin(c);
   try{
-    current(c,driver);let cache=capture(c),rebuilds=0;
+    qualified(c,driver,gate);let cache=capture(c),rebuilds=0;
     for(;;){try{
       owned(c,gate);if(cache.submitted)throw new Error('trainer-ai-request-already-submitted');
       let selected:readonly string[],extra:readonly string[]=[];
       if(cache.capture.automaticCandidateId)selected=[cache.capture.automaticCandidateId];
       else {
-        const decision=decide(c,cache,gate,true),plan=decision instanceof Promise?await decision:decision;owned(c,gate);current(c,driver);
+        const decision=decide(c,cache,gate,true),plan=decision instanceof Promise?await decision:decision;qualified(c,driver,gate);
         if(plan.kind==='none')return true;if(plan.kind==='error')throw new Error('trainer-ai-policy-'+plan.reason);
         selected=plan.kind==='choose'?plan.retryOrder:plan.candidateIds;
         const r=cache.capture.snapshot.request;extra=r.kind==='move'?r.legalMoves.map(x=>x.candidateId):r.kind==='force-switch'?r.legalSwitches.map(x=>x.candidateId):[];
       }
       for(const candidateId of new Set([...selected,...extra])){
         if(cache.attempted.includes(candidateId))continue;
-        owned(c,gate);current(c,driver);
+        qualified(c,driver,gate);
         const action=trainerCandidate(driver,c.owner,cache.capture.ticket,candidateId,c.state.resourceRevision);cache.attempted.push(candidateId);
         let reservation:Reservation|undefined;
         if(action.kind==='item'){
@@ -198,7 +207,7 @@ export async function runTrainerAi(session:object,driver:BattleDriver):Promise<b
           c.state.resources=c.state.resources.map(r=>r===resource?{...r,count:r.count-1}:r);c.state.ledger.push(reservation);
         }
         const result=await submitTrainerCandidate(driver,c.owner,cache.capture.ticket,candidateId,c.state.resourceRevision);
-        owned(c,gate);current(c,driver);
+        qualified(c,driver,gate);
         if(result==='accepted'&&cache.key)c.lastAccepted.set(cache.key,candidateId);
         if(result==='accepted'){cache.submitted=true;if(reservation)c.state.resourceRevision++;return true;}
         if(reservation){if(reservation.state!=='reserved')throw new Error('trainer-ai-item-registration-uncertain');refund(c,reservation,false);}
@@ -207,7 +216,7 @@ export async function runTrainerAi(session:object,driver:BattleDriver):Promise<b
     }catch(error){
       const reason=error instanceof Error?error.message:'';
       if((reason==='trainer-ai-request-revision-changed'||reason==='trainer-ai-resource-revision-changed')&&rebuilds++===0){
-        owned(c,gate);current(c,driver);const next=capture(c);
+        qualified(c,driver,gate);const next=capture(c);
         if(next.capture.snapshot.binding.requestKey!==cache.capture.snapshot.binding.requestKey)throw error;
         cache=next;continue;
       }
@@ -283,18 +292,18 @@ export function faultTrainerAiJournalForTest(session:object,fault:'missing-recor
 export function inspectTrainerAiRequest(session:object,driver:BattleDriver):{ticket:TrainerRequestTicket;snapshot:TrainerAiSnapshot;plan:DecisionPlan} {
   const c=CHANNELS.get(session);if(!c)throw new Error('trainer-ai-operation-in-progress');const gate=begin(c);
   try{
-    current(c,driver);const cache=capture(c),plan=decide(c,cache,gate,false);
+    qualified(c,driver,gate);const cache=capture(c),plan=decide(c,cache,gate,false);
     if(plan instanceof Promise){invalidate(c,'trainer-ai-async-inspection-required');void plan.catch(()=>{});throw new Error('trainer-ai-async-inspection-required');}
     return {ticket:cache.capture.ticket,snapshot:clone(cache.capture.snapshot),plan};
   }finally{end(c,gate);}
 }
 export async function inspectTrainerAiRequestAsync(session:object,driver:BattleDriver):Promise<{snapshot:TrainerAiSnapshot;plan:DecisionPlan}> {
   const c=CHANNELS.get(session);if(!c)throw new Error('trainer-ai-operation-in-progress');const gate=begin(c);
-  try{current(c,driver);const cache=capture(c);return {snapshot:clone(cache.capture.snapshot),plan:await decide(c,cache,gate,false)};}finally{end(c,gate);}
+  try{qualified(c,driver,gate);const cache=capture(c);return {snapshot:clone(cache.capture.snapshot),plan:await decide(c,cache,gate,false)};}finally{end(c,gate);}
 }
 export function captureTrainerAiRequest(session:object,driver:BattleDriver):TrainerCapture {
   const c=CHANNELS.get(session);if(!c)throw new Error('trainer-ai-operation-in-progress');const gate=begin(c);
-  try{current(c,driver);const value=capture(c).capture;return {ticket:value.ticket,snapshot:clone(value.snapshot)};}finally{end(c,gate);}
+  try{qualified(c,driver,gate);const value=capture(c).capture;return {ticket:value.ticket,snapshot:clone(value.snapshot)};}finally{end(c,gate);}
 }
 export function validateTrainerAiTicket(session:object,driver:BattleDriver,ticket:TrainerRequestTicket,candidateId:string):void {
   const c=CHANNELS.get(session);if(!c)throw new Error('trainer-ai-operation-in-progress');const gate=begin(c);

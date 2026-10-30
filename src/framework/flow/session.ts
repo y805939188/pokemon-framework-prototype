@@ -332,7 +332,11 @@ export class BattleSession {
   async _restoreCheckpoint(checkpoint: ReturnType<BattleSession["_checkpoint"]>,ownedEpoch?:number): Promise<void> {
     if(this._restoring)throw new Error('battle session restore already in progress');
     if(ownedEpoch!==undefined&&ownedEpoch!==this._operationEpoch)throw new Error('battle session operation retired');
-    preflightTrainerAiRestore(this,this.gw,checkpoint.engine);
+    const entryEpoch=this._operationEpoch,entryDriver=this.gw;
+    preflightTrainerAiRestore(this,entryDriver,checkpoint.engine);
+    // Preflight is read-only but calls trusted ports: a reentrant restore/operation may now own the Session.
+    if(this._restoring)throw new Error('battle session restore already in progress');
+    if(this._operationEpoch!==entryEpoch||this.gw!==entryDriver)throw new Error('battle session operation retired during restore preflight');
     const external=ownedEpoch===undefined;
     const epoch=external?++this._operationEpoch:this._operationEpoch;
     let complete:()=>void=()=>{},done:Promise<void>|null=null;
