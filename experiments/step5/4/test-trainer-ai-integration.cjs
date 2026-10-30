@@ -58,7 +58,11 @@ test('C-L03 application generation replacement refuses late ticket and preserves
  const w=await fixture(),x=capture(w);w.app.stateReplacedByHost();assert.throws(()=>D.validateTrainerAiTicket(w.session,w.gw,x.ticket,candidate(x)),/stale-generation/);assert.equal(draws(w),0);
  const next=await w.app.startTrainerBattle({...w.request,battleId:'successor',seq:2});assert.ok(next);assert.throws(()=>inspect(w),/stale-generation/);assert.equal(w.app.healParty().reason,'battle-active');
 });
-test('C-L04 independent same-state real driver cannot borrow original ticket/decision',async()=>{const a=await fixture(),b=await fixture(),x=capture(a);assert.equal(a.gw.snapshot(),b.gw.snapshot());assert.throws(()=>D.validateTrainerAiTicket(a.session,b.gw,x.ticket,candidate(x)),/source-mismatch/);assert.throws(()=>D.validateTrainerAiTicket(b.session,b.gw,x.ticket,candidate(x)),/unknown-source/);assert.equal(draws(a)+draws(b),0);});
+test('C-L04 independent same-state real driver cannot borrow original ticket/decision',async(t)=>{
+ // Both fixtures must receive the same wall clock as well as seed: the protocol includes |t:| logs.
+ t.mock.method(Date,'now',()=>1793350000000);
+ const a=await fixture(),b=await fixture(),x=capture(a);assert.equal(a.gw.snapshot(),b.gw.snapshot());assert.throws(()=>D.validateTrainerAiTicket(a.session,b.gw,x.ticket,candidate(x)),/source-mismatch/);assert.throws(()=>D.validateTrainerAiTicket(b.session,b.gw,x.ticket,candidate(x)),/unknown-source/);assert.equal(draws(a)+draws(b),0);
+});
 test('C-L05 one opaque engine checkpoint pairs AI cache/RNG/reveals/resources, repeated full session replay exact',async(t)=>{
  t.mock.method(Date,'now',()=>1793350000000);
  const w=await fixture({items:[{item:'fullrestore',count:2}]});state(active(w),{hp:20,status:'psn',confusion:2});capture(w);const cp=w.session._checkpoint(),before=diag(w);const first=await w.session.chooseMove(1);assert.equal(first.ok,true);const engine=w.session.gw.snapshot(),after=diag(w);
