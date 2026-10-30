@@ -50,7 +50,11 @@ export function schemas(binding){
 
 /** Parent-owned admission, not observer output. The parent also pins controlCandidate
  * and actual native task identity out of band. Schema validity cannot prove isolation. */
-export function auditorAdmissionSchema(binding,bindingSHA256){
+export function auditorAdmissionSchema(binding,bindingSHA256,expectedManifestPath){
+ // A trusted parent supplies this before O executes, never from observer JSON.
+ // Validate the literal spelling; normalization must not hide traversal or aliases.
+ const selected=typeof expectedManifestPath==='string'&&/^\/Users\/dingshinn\/Desktop\/pokemon-framework\/observation-pre54-batch2-8c9951c-20261030\/readiness-v2-collections-20261030\/collection-([0-9]{4})\/manifest\.json$/.exec(expectedManifestPath);
+ requireGate(selected&&selected[0]===expectedManifestPath&&selected[1]!=='0000','PARENT_MANIFEST_PATH_REJECTED');
  const proof={type:'string',pattern:'^(?!0{64}$)[0-9a-f]{64}$'};
  return record({
   protocol:{const:'pre54-native-auditor-admission-v2'},state:{const:'READY_FOR_INDEPENDENT_SOURCE_AUDIT'},
@@ -64,7 +68,7 @@ export function auditorAdmissionSchema(binding,bindingSHA256){
   parentReceiverExit:{const:0},parentReceiverStatus:{const:'SEALED'},
   parentReceiverScope:{const:'READINESS_METADATA_NOT_SOURCE_ACCEPTANCE'},parentReadinessArtifactSHA256:proof,
   observerPrivateRoot:{const:'/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030'},
-  observerReadinessManifestPath:{const:'/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030/readiness-v2-sealed-20261030/manifest.json'},
+  observerReadinessManifestPath:{const:expectedManifestPath},
   tagPrimaryFilesComparison:{enum:['IDENTICAL','DIFFERENT']},
   observerEvidence:record(Object.fromEntries(evidenceKeys.map(k=>[k,proof]))),
   roles:record(Object.fromEntries(REFERENCE_ROLES.map(k=>[k,proof]))),

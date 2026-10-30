@@ -59,3 +59,20 @@ PRE54_TEST_KIT=<frozen-8c-kit> DIFFERENTIAL_TEST_ROOT=<new-clean-test-output> no
 ```
 
 合成对照明确标 `INFRASTRUCTURE-SELF-TEST`，参考包由 TS 输出构造，仅测试门/比较器。覆盖 I/D 接受、NOT_CHECKED 终态拒绝、空/零摘要、缺调用/强检查/RNG、身份替换、审计失效、v1 互斥、闭合 CLI/父准入，以及原业务值/来源/完整集合/进程门。不会执行 Ruby、O 或 A；私有导出/loaded 混源、集合漏比和实际 Ruby 差异的 A01/A02/A03 必须留待 O/A 真实运行，不以这些控制计覆盖。
+
+
+## 最终12项：父指定不可变collection，未封存工作区可追加
+
+本批采用最终adapter完整新跑12，不复用旧10的调用资格。旧成功、旧阻塞、诊断和repair运行原字节保留。repair DONE不等于最终12或A通过；正式354仍待A与父另行准入。
+
+`auditorAdmissionSchema(binding, bindingSHA256, expectedManifestPath)` 要求父端显式提供第三参数，无默认路径/fallback。只接受固定O根下 `readiness-v2-collections-20261030/collection-NNNN/manifest.json`，NNNN为0001–9999。仅检查原始字符串，不normalize路径；拒绝旧目的地、越根、..、重复分隔、非法编号/文件名及末尾换行。返回schema始终是该次**精确路径const**，不是整个命名族的pattern授权。
+
+本次父端选择固定 `collection-0001`；本目录分发admission JSON即其具体schema。未来若父明确选另一编号，父可用同一已审factory生成新的具体const并带外固定该schema/hash；旧const/schema/准入不改。函数不能辨认调用者身份：真实父选择来自父自有调度/固定路径与hash。O的readiness/audit不允许携带路径字段，不能把O自行生成的schema当父准入。
+
+当前准确路径：`/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030/readiness-v2-collections-20261030/collection-0001/manifest.json`。clean不读取/检查私有目录。O/A负责核真实父目录无链接/别名、所选目标无未知内容；A还须核实际manifest bytes/hash与父已接收readiness一致。
+
+collection在最终manifest写入前是同一O的追加工作区，可记录修复准备/完整12的新运行、失败和必要版本，文件独占创建，原sealed对象只读。首次目标须不存在；同一O中断后只有精确run-context标记一致、没有manifest且确认均属本工作区的已知文件才可继续追加，未知内容或已有manifest停止，不能自动换号或覆盖。marker只是工作区归属/恢复记录，不作来源证据。
+
+先固定最终adapter及依赖闭包、输入/初始化/观测/RNG策略，再完整新跑12。若adapter或共享初始化/观测发生任何变化，保留该次失败/旧运行并用最终版本完整再跑12；不混10+2。全部来源/loaded/method/原返回与完整状态/零RNG/完整tag比较及每项实际证据就绪、自检满足SEALED谓词后，**最后只用独占创建写一次collection manifest**，其闭包覆盖已关闭文件和同一次最终资格批；不预建空manifest、不写未来hash。封存后不再追加/修改collection。
+
+公共readiness在封存后按真实工件更新，A准入仍等父clean独立接收，再以精确manifest路径和七实际摘要生成。工作区标记、路径选择和代码自测均不代表来源通过。A私审后才可授权354。本路径实现阶段不创建O私有目录、不运行Ruby、不续接O。

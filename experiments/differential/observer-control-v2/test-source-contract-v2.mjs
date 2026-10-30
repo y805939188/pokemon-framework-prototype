@@ -11,6 +11,7 @@ import {compareBehaviorPackages} from '../lib/compare.mjs';
 import {strictStringify,sha256File} from '../lib/json.mjs';
 import {createControlGate as createV1Gate} from '../observer-control/gate.mjs';
 import {validateSchema} from '../lib/schema.mjs';
+const PARENT_MANIFEST='/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030/readiness-v2-collections-20261030/collection-0001/manifest.json';
 const hash=v=>createHash('sha256').update(v).digest('hex');
 export function registerObserverV2Tests({testRoot,experimentRoot,kitRoot,kit,candidate,syntheticPeer}){
  let n=0;const qualification=JSON.parse(readFileSync(join(experimentRoot,'requests/pre54-qualification.json'),'utf8'));
@@ -140,9 +141,24 @@ export function registerObserverV2Tests({testRoot,experimentRoot,kitRoot,kit,can
   f.ready.tagPrimaryFilesComparison='NOT_CHECKED';f.writeReady();r=spawnSync(process.execPath,args,{encoding:'utf8'});assert.equal(r.status,2);assert.equal(r.stderr,'');
   f.ready.protocol='pre54-observer-status-v1';f.writeReady();r=spawnSync(process.execPath,args,{encoding:'utf8'});assert.equal(r.status,2);assert.equal(r.stdout.includes('/PRIVATE'),false);
  });
+ test('final12 parent manifest selection is mandatory, literal and restricted to the fixed collection family',()=>{
+  const b=JSON.parse(readFileSync(join(experimentRoot,'observer-control-v2/binding.json'),'utf8')),pin=hash('SYNTHETIC-parent-binding');
+  const bad=[undefined,null,{},42,PARENT_MANIFEST.replace('collection-0001','collection-0000'),PARENT_MANIFEST.replace('collection-0001','collection-latest'),PARENT_MANIFEST.replace('collection-0001','collection-00001'),PARENT_MANIFEST.replace('/collection-0001/','/collection-0001/../collection-0001/'),PARENT_MANIFEST.replace('/collection-0001/','//collection-0001/'),PARENT_MANIFEST.replace('/readiness-v2-collections-20261030/collection-0001','/readiness-v2-sealed-20261030'),PARENT_MANIFEST.replace('/readiness-v2-collections-20261030/collection-0001','/readiness-sealed'),PARENT_MANIFEST.replace('/Users/dingshinn/','/tmp/'),PARENT_MANIFEST.replace('manifest.json','other.json'),PARENT_MANIFEST+'/',PARENT_MANIFEST+'\n',PARENT_MANIFEST+'\r',PARENT_MANIFEST.replace('0001','０００１'),PARENT_MANIFEST.replace('/collection-0001/','/%2e%2e/collection-0001/'),PARENT_MANIFEST.replaceAll('/','\\')];
+  for(const path of bad)assert.throws(()=>auditorAdmissionSchema(b,pin,path),e=>e.code==='PARENT_MANIFEST_PATH_REJECTED');
+  for(const number of ['0001','0002','9999']){const path=PARENT_MANIFEST.replace('0001',number),schema=auditorAdmissionSchema(b,pin,path);assert.deepEqual(schema.properties.observerReadinessManifestPath,{const:path});}
+ });
+ test('final12 each generated admission pins one exact parent choice, not all allowed family members',()=>{
+  const b=JSON.parse(readFileSync(join(experimentRoot,'observer-control-v2/binding.json'),'utf8')),schema=auditorAdmissionSchema(b,hash('SYNTHETIC-parent-binding'),PARENT_MANIFEST),field=schema.properties.observerReadinessManifestPath;
+  assert.equal(validateSchema(field,PARENT_MANIFEST).valid,true);
+  for(const path of [PARENT_MANIFEST.replace('0001','0002'),PARENT_MANIFEST.replace('/collection-0001/','/unknown/'),PARENT_MANIFEST.replace('/readiness-v2-collections-20261030/collection-0001','/readiness-v2-sealed-20261030')])assert.equal(validateSchema(field,path).valid,false);
+ });
+ test('final12 observer cannot inject its own private manifest path into public readiness or audit',()=>{
+  const f=fixture();f.ready.observerReadinessManifestPath=PARENT_MANIFEST;f.writeReady();fail(()=>f.gate().inspect('readiness'),'OBSERVER_STATUS_SCHEMA_REJECTED');
+  const g=fixture();g.audit.observerReadinessManifestPath=PARENT_MANIFEST;g.writeAudit();fail(()=>g.gate().inspect('audit'),'AUDIT_SCHEMA_REJECTED');
+ });
  test('v2 parent admission schema binds exact pins and complete comparison without claiming OS isolation',()=>{
-  const f=fixture(),schema=auditorAdmissionSchema(f.binding,sha256File(f.bindingFile));
-  const admission={protocol:'pre54-native-auditor-admission-v2',state:'READY_FOR_INDEPENDENT_SOURCE_AUDIT',controlCandidate:'9'.repeat(40),businessCandidate:f.binding.source.commit,bindingSHA256:sha256File(f.bindingFile),freezeHash:f.binding.freezeHash,requestHash:f.binding.requestHash,referenceTargetCommit:f.binding.referenceCommit,referenceReleaseTag:f.binding.referenceReleaseTag,referenceReleaseTagCommit:f.binding.referenceReleaseTagCommit,observerTaskId:'SYNTHETIC_TASK',observerTurnId:'SYNTHETIC_TURN',parentCreatedUTC:'2026-10-30T00:00:00Z',parentReceiverExit:0,parentReceiverStatus:'SEALED',parentReceiverScope:'READINESS_METADATA_NOT_SOURCE_ACCEPTANCE',parentReadinessArtifactSHA256:hash('SYNTHETIC-status'),observerPrivateRoot:'/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030',observerReadinessManifestPath:'/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030/readiness-v2-sealed-20261030/manifest.json',tagPrimaryFilesComparison:'DIFFERENT',observerEvidence:f.ready.evidence,roles:f.ready.roles,nativeIsolation:{noHistoryInherited:true,rawTaskOutputsNotReadByClean:true,oneShotDedicatedContext:true,osSandboxClaimed:false},sourceAuditAcceptance:'NOT_YET_ACCEPTED'};
+  const f=fixture(),schema=auditorAdmissionSchema(f.binding,sha256File(f.bindingFile),PARENT_MANIFEST);
+  const admission={protocol:'pre54-native-auditor-admission-v2',state:'READY_FOR_INDEPENDENT_SOURCE_AUDIT',controlCandidate:'9'.repeat(40),businessCandidate:f.binding.source.commit,bindingSHA256:sha256File(f.bindingFile),freezeHash:f.binding.freezeHash,requestHash:f.binding.requestHash,referenceTargetCommit:f.binding.referenceCommit,referenceReleaseTag:f.binding.referenceReleaseTag,referenceReleaseTagCommit:f.binding.referenceReleaseTagCommit,observerTaskId:'SYNTHETIC_TASK',observerTurnId:'SYNTHETIC_TURN',parentCreatedUTC:'2026-10-30T00:00:00Z',parentReceiverExit:0,parentReceiverStatus:'SEALED',parentReceiverScope:'READINESS_METADATA_NOT_SOURCE_ACCEPTANCE',parentReadinessArtifactSHA256:hash('SYNTHETIC-status'),observerPrivateRoot:'/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030',observerReadinessManifestPath:PARENT_MANIFEST,tagPrimaryFilesComparison:'DIFFERENT',observerEvidence:f.ready.evidence,roles:f.ready.roles,nativeIsolation:{noHistoryInherited:true,rawTaskOutputsNotReadByClean:true,oneShotDedicatedContext:true,osSandboxClaimed:false},sourceAuditAcceptance:'NOT_YET_ACCEPTED'};
   assert.equal(validateSchema(schema,admission).valid,true);
   for(const change of [a=>a.tagPrimaryFilesComparison='NOT_CHECKED',a=>a.observerReadinessManifestPath='/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030/readiness-sealed/manifest.json',a=>a.observerReadinessManifestPath='/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030/unknown/manifest.json',a=>a.bindingSHA256=hash('wrong'),a=>a.referenceTargetCommit=a.referenceReleaseTagCommit,a=>a.nativeIsolation.osSandboxClaimed=true,a=>a.sourceAuditAcceptance='PASS_SCOPED',a=>a.observerEvidence.tagPrimaryFilesComparisonSHA256=null,a=>a.private='/PRIVATE']){const a=structuredClone(admission);change(a);assert.equal(validateSchema(schema,a).valid,false);}
  });
@@ -175,6 +191,6 @@ const syntheticPeer=()=>makeBehaviorPackage({execution:{...execution,role:'refer
 registerObserverV2Tests({testRoot,experimentRoot,kitRoot,kit,candidate,syntheticPeer});
 test('v2 distributed admission schema matches fixed binding',()=>{
  const base=join(experimentRoot,'observer-control-v2'),binding=JSON.parse(readFileSync(join(base,'binding.json'),'utf8'));
- assert.deepEqual(JSON.parse(readFileSync(join(base,'auditor-admission.schema.json'),'utf8')),auditorAdmissionSchema(binding,sha256File(join(base,'binding.json'))));
+ assert.deepEqual(JSON.parse(readFileSync(join(base,'auditor-admission.schema.json'),'utf8')),auditorAdmissionSchema(binding,sha256File(join(base,'binding.json')),PARENT_MANIFEST));
 });
 writeFileSync(join(testRoot,'SCOPE.json'),JSON.stringify({scope:'SYNTHETIC_METADATA_SELF_TEST_ONLY',RubyCalls:0,sourceAudit:'NOT_RUN',actual354Dual:'NOT_RUN',privateSourceScenarios:{A01:'NOT_RUN',A02:'NOT_RUN',A03:'NOT_RUN'},fixedKitUnchanged:true,TSOnlyCases:354},null,2)+'\n');

@@ -61,7 +61,7 @@
       "const": "/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030"
     },
     "observerReadinessManifestPath": {
-      "const": "/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030/readiness-v2-sealed-20261030/manifest.json"
+      "const": "/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030/readiness-v2-collections-20261030/collection-0001/manifest.json"
     },
     "tagPrimaryFilesComparison": {
       "enum": [
