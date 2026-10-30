@@ -64,7 +64,7 @@ export function auditorAdmissionSchema(binding,bindingSHA256){
   parentReceiverExit:{const:0},parentReceiverStatus:{const:'SEALED'},
   parentReceiverScope:{const:'READINESS_METADATA_NOT_SOURCE_ACCEPTANCE'},parentReadinessArtifactSHA256:proof,
   observerPrivateRoot:{const:'/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030'},
-  observerReadinessManifestPath:{const:'/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030/readiness-sealed/manifest.json'},
+  observerReadinessManifestPath:{const:'/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030/readiness-v2-sealed-20261030/manifest.json'},
   tagPrimaryFilesComparison:{enum:['IDENTICAL','DIFFERENT']},
   observerEvidence:record(Object.fromEntries(evidenceKeys.map(k=>[k,proof]))),
   roles:record(Object.fromEntries(REFERENCE_ROLES.map(k=>[k,proof]))),
