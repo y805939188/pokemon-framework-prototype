@@ -1,0 +1,12 @@
+{
+  "name": "pokemon-framework-showdown-build-deps",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "sql-template-strings": "2.2.2"
+  },
+  "showdown": {
+    "commit": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+    "lockSHA256": "fd89ae0129d1855edb63f9d23d99bf67bc894a3f5be882f8c486041d8662b702"
+  }
+}

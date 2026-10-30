@@ -32,6 +32,7 @@ SUITES=(
   experiments/step2/s5/test-protocol-freeze.cjs
   experiments/step2/s5/test-engine-contract.cjs
   scripts/tests/reactor-install.test.cjs
+  scripts/tests/showdown-build.test.cjs
   scripts/tests/check-boundaries.test.cjs
   experiments/framework-remediation/test-step1-public-api.cjs
   experiments/framework-remediation/test-step1-distribution.cjs
