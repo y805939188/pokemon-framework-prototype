@@ -1,0 +1,582 @@
+{
+  "schema": "C-preparation-vectors-v1",
+  "group": "selection",
+  "basisB": "995599b0f9d7014416172c921f1a38b80801a9be",
+  "productionExecution": "NOT_EXECUTED",
+  "cases": [
+    {
+      "id": "C-W01",
+      "entry": "select-scored",
+      "input": {
+        "skill": 100,
+        "candidates": [
+          {
+            "id": "A",
+            "score": 100,
+            "requestOrder": 0
+          },
+          {
+            "id": "B",
+            "score": 90,
+            "requestOrder": 1
+          }
+        ]
+      },
+      "randomScript": [
+        {
+          "n": 5,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "q": 95,
+        "weights": [
+          5,
+          0
+        ],
+        "total": 5,
+        "kind": "choose",
+        "candidateId": "A"
+      },
+      "sourceRefs": [
+        "WP51:5",
+        "AI-M01/M02/M04"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W02",
+      "entry": "select-scored",
+      "input": {
+        "skill": 0,
+        "candidates": [
+          {
+            "id": "A",
+            "score": 100,
+            "requestOrder": 0
+          },
+          {
+            "id": "B",
+            "score": 90,
+            "requestOrder": 1
+          }
+        ]
+      },
+      "randomScript": [
+        {
+          "n": 70,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "q": 60,
+        "weights": [
+          40,
+          30
+        ],
+        "total": 70,
+        "kind": "choose",
+        "candidateId": "A"
+      },
+      "sourceRefs": [
+        "WP51:5",
+        "AI-M01/M02/M04"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W03",
+      "entry": "select-scored",
+      "input": {
+        "skill": 0,
+        "candidates": [
+          {
+            "id": "A",
+            "score": 100,
+            "requestOrder": 0
+          },
+          {
+            "id": "B",
+            "score": 90,
+            "requestOrder": 1
+          }
+        ]
+      },
+      "randomScript": [
+        {
+          "n": 70,
+          "value": 39
+        }
+      ],
+      "expected": {
+        "q": 60,
+        "weights": [
+          40,
+          30
+        ],
+        "total": 70,
+        "kind": "choose",
+        "candidateId": "A"
+      },
+      "sourceRefs": [
+        "WP51:5",
+        "AI-M01/M02/M04"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W04",
+      "entry": "select-scored",
+      "input": {
+        "skill": 0,
+        "candidates": [
+          {
+            "id": "A",
+            "score": 100,
+            "requestOrder": 0
+          },
+          {
+            "id": "B",
+            "score": 90,
+            "requestOrder": 1
+          }
+        ]
+      },
+      "randomScript": [
+        {
+          "n": 70,
+          "value": 40
+        }
+      ],
+      "expected": {
+        "q": 60,
+        "weights": [
+          40,
+          30
+        ],
+        "total": 70,
+        "kind": "choose",
+        "candidateId": "B"
+      },
+      "sourceRefs": [
+        "WP51:5",
+        "AI-M01/M02/M04"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W05",
+      "entry": "select-scored",
+      "input": {
+        "skill": 0,
+        "candidates": [
+          {
+            "id": "A",
+            "score": 100,
+            "requestOrder": 0
+          },
+          {
+            "id": "B",
+            "score": 90,
+            "requestOrder": 1
+          }
+        ]
+      },
+      "randomScript": [
+        {
+          "n": 70,
+          "value": 69
+        }
+      ],
+      "expected": {
+        "q": 60,
+        "weights": [
+          40,
+          30
+        ],
+        "total": 70,
+        "kind": "choose",
+        "candidateId": "B"
+      },
+      "sourceRefs": [
+        "WP51:5",
+        "AI-M01/M02/M04"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W06",
+      "entry": "select-scored",
+      "input": {
+        "skill": 32,
+        "candidates": [
+          {
+            "id": "A",
+            "score": 100,
+            "requestOrder": 0
+          },
+          {
+            "id": "B",
+            "score": 90,
+            "requestOrder": 1
+          }
+        ]
+      },
+      "randomScript": [
+        {
+          "n": 32,
+          "value": 21
+        }
+      ],
+      "expected": {
+        "q": 79,
+        "weights": [
+          21,
+          11
+        ],
+        "total": 32,
+        "kind": "choose",
+        "candidateId": "B"
+      },
+      "sourceRefs": [
+        "WP51:5",
+        "AI-M01/M02/M04"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W07",
+      "entry": "select-scored",
+      "input": {
+        "skill": 400,
+        "candidates": [
+          {
+            "id": "A",
+            "score": 100,
+            "requestOrder": 0
+          },
+          {
+            "id": "B",
+            "score": 90,
+            "requestOrder": 1
+          }
+        ]
+      },
+      "randomScript": [
+        {
+          "n": 5,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "q": 95,
+        "weights": [
+          5,
+          0
+        ],
+        "total": 5,
+        "kind": "choose",
+        "candidateId": "A"
+      },
+      "sourceRefs": [
+        "WP51:5",
+        "AI-M01/M02/M04"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W08",
+      "entry": "select-scored",
+      "input": {
+        "skill": 100,
+        "candidates": [
+          {
+            "id": "A",
+            "score": 20,
+            "requestOrder": 0
+          },
+          {
+            "id": "B",
+            "score": 20,
+            "requestOrder": 1
+          }
+        ]
+      },
+      "randomScript": [
+        {
+          "n": 2,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "q": 19,
+        "weights": [
+          1,
+          1
+        ],
+        "total": 2,
+        "kind": "choose",
+        "candidateId": "B"
+      },
+      "sourceRefs": [
+        "WP51:5",
+        "AI-M01/M02/M04"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W09",
+      "entry": "select-scored",
+      "input": {
+        "skill": 100,
+        "candidates": [
+          {
+            "id": "A",
+            "score": 100,
+            "requestOrder": 0
+          }
+        ]
+      },
+      "randomScript": [
+        {
+          "n": 5,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "q": 95,
+        "weights": [
+          5
+        ],
+        "total": 5,
+        "kind": "choose",
+        "candidateId": "A"
+      },
+      "sourceRefs": [
+        "WP51:5",
+        "AI-M01/M02/M04"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W10",
+      "entry": "select-scored",
+      "input": {
+        "skill": 100,
+        "candidates": [
+          {
+            "id": "A",
+            "score": 0,
+            "requestOrder": 0
+          },
+          {
+            "id": "B",
+            "score": 0,
+            "requestOrder": 1
+          }
+        ]
+      },
+      "randomScript": [],
+      "expected": {
+        "q": 0,
+        "weights": [
+          0,
+          0
+        ],
+        "total": 0,
+        "kind": "fallback",
+        "candidateIds": [
+          "A",
+          "B"
+        ],
+        "reason": "zero-total-weight"
+      },
+      "sourceRefs": [
+        "WP51:5",
+        "r2:C-3"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": "No random(0); explicit finite fallback differs from unresolved reference M06."
+    },
+    {
+      "id": "C-W11",
+      "entry": "select-scored",
+      "input": {
+        "skill": -1,
+        "candidates": [
+          {
+            "id": "A",
+            "score": 100,
+            "requestOrder": 0
+          }
+        ]
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "error",
+        "reason": "invalid-snapshot"
+      },
+      "sourceRefs": [
+        "r2:C-3"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W12",
+      "entry": "select-scored",
+      "input": {
+        "skill": 100,
+        "candidates": [
+          {
+            "id": "A",
+            "score": 100,
+            "requestOrder": 0
+          }
+        ]
+      },
+      "randomScript": [
+        {
+          "n": 5,
+          "value": 5
+        }
+      ],
+      "expected": {
+        "kind": "error",
+        "reason": "invalid-random-result"
+      },
+      "sourceRefs": [
+        "r2:C-2/3"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": "One consumed bad provider response; never silently clamp or redraw."
+    },
+    {
+      "id": "C-W13",
+      "entry": "request-routing",
+      "input": {
+        "kind": "wait"
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "none",
+        "reason": "wait"
+      },
+      "sourceRefs": [
+        "r2:C-1..3"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W14",
+      "entry": "request-routing",
+      "input": {
+        "kind": "finished"
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "none",
+        "reason": "finished"
+      },
+      "sourceRefs": [
+        "r2:C-1..3"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W15",
+      "entry": "request-routing",
+      "input": {
+        "kind": "move",
+        "normalMoves": [],
+        "engineConfirmedAutoStruggle": "S"
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "fallback",
+        "candidateIds": [
+          "S"
+        ],
+        "reason": "no-normal-move"
+      },
+      "sourceRefs": [
+        "r2:C-3",
+        "AI-M05"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W16",
+      "entry": "request-routing",
+      "input": {
+        "kind": "move",
+        "normalMoves": [],
+        "engineConfirmedAutoStruggle": null
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "error",
+        "reason": "no-legal-action"
+      },
+      "sourceRefs": [
+        "r2:C-3"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W17",
+      "entry": "request-routing",
+      "input": {
+        "kind": "move",
+        "normalMoves": [
+          "A"
+        ],
+        "engineConfirmedAutoStruggle": "S"
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "error",
+        "reason": "invalid-snapshot"
+      },
+      "sourceRefs": [
+        "r2:C-1..3"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-W18",
+      "entry": "request-validation",
+      "input": {
+        "legalMove": {
+          "slot": 1,
+          "pp": 0,
+          "mode": "normal"
+        }
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "error",
+        "reason": "invalid-snapshot"
+      },
+      "sourceRefs": [
+        "r2:C-3"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": "Own actual legal request must exclude zero-PP normal slot; no fake automatic struggle."
+    }
+  ]
+}
