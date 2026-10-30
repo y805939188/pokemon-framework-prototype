@@ -689,7 +689,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
           || friendshipMigrationSnapshot(this.ports.state.read()) !== preview.plan.afterSnapshot
           || friendshipMigrationSnapshot(now.state) !== preview.plan.afterSnapshot || now.target !== preview.target.target
           || now.rawHash !== preview.result.persistence?.rawHash || now.hostIdentity !== preview.completedHostIdentity || owner.invalid) throw Error("friendship-replay-stale");
-        return {...preview.result,status:preview.result.status === "unchanged" ? "unchanged" : "already-applied"};
+        return clone({...preview.result,status:preview.result.status === "unchanged" ? "unchanged" : "already-applied"});
       }
       assertCurrent();
       const target = clone(await preview.persistence.preview()); assertCurrent();

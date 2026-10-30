@@ -85,3 +85,52 @@ test('ordinary cancellation and repeated late cancellation perform zero persiste
  assert.equal((await w.app.confirmFriendshipMigration(p.handle)).status,'refused');
  assert.deepEqual(fs.readFileSync(w.file),bytes);assert.deepEqual(fs.readdirSync(w.dir),['player.json']);assert.deepEqual(w.read(),game);
 });
+
+for(const unchanged of [false,true])for(const repeat of [false,true])test(`completed ${unchanged?'unchanged':'applied'} ${repeat?'repeat':'first'} returns detached public facts`,async t=>{
+ let installs=0;
+ const w=fixture({install:(next,set)=>{installs++;set(next);throw Error('installed-with-diagnostic');}});
+ const port=w.store.friendshipMigration(point=>{if(point==='after-rename')throw Error('persisted-with-diagnostic');});
+ const p=await w.app.previewFriendshipMigration(port,unchanged?[]:undefined);
+ assert.equal(p.status,'ready');
+ const first=await w.app.confirmFriendshipMigration(p.handle);assert.equal(first.status,unchanged?'unchanged':'applied');
+ if(!unchanged){assert.match(first.error,/installed-with-diagnostic/);assert.match(first.persistence.error,/persisted-with-diagnostic/);}
+ const expected={...J(first),status:unchanged?'unchanged':'already-applied'},bytes=fs.readFileSync(w.file),state=J(w.read());
+ let returned=repeat?await w.app.confirmFriendshipMigration(p.handle):first;
+ for(const field of ['status','reason','error','persistence.rawHash','persistence.bundle','persistence.status','persistence.error']){
+  const parts=field.split('.'),object=parts.length===2?returned.persistence:returned;
+  assert.equal(Object.isFrozen(object),false,'public values remain mutable');
+  object[parts.at(-1)]='caller-mutated-'+field;
+  const next=await w.app.confirmFriendshipMigration(p.handle);
+  assert.deepEqual(next,expected,field+' must not alter private completion facts');
+  assert.notStrictEqual(next.persistence,returned.persistence);
+  t.diagnostic(field+': mutable public value; subsequent complete result matches original facts');
+  returned=repeat?next:first;
+ }
+ assert.equal(installs,unchanged?0:1);assert.deepEqual(w.read(),state);assert.deepEqual(fs.readFileSync(w.file),bytes);
+ assert.deepEqual(w.app.cancelFriendshipMigration(p.handle),{status:'refused',reason:'preview-completed'});
+ assert.deepEqual(await w.app.confirmFriendshipMigration(p.handle),expected);assert.equal(w.app.saveBlocked,false);
+});
+
+for(const unchanged of [false,true])test(`real Store ${unchanged?'unchanged':'applied'} raw whitespace change stays refused after old public facts are mutated`,async t=>{
+ let installs=0;
+ const w=fixture({install:(next,set)=>{installs++;set(next);}}),original=fs.readFileSync(w.file);
+ const p=await w.app.previewFriendshipMigration(w.store.friendshipMigration(),unchanged?[]:undefined);
+ assert.equal(p.status,'ready');
+ const first=await w.app.confirmFriendshipMigration(p.handle),repeat=await w.app.confirmFriendshipMigration(p.handle);
+ assert.equal(first.status,unchanged?'unchanged':'applied');assert.equal(repeat.status,unchanged?'unchanged':'already-applied');
+ const state=J(w.read()),bundle=first.persistence.bundle,receipt=bundle&&fs.readFileSync(bundle+'/receipt.json');
+ fs.appendFileSync(w.file,' \n');const bytes=fs.readFileSync(w.file),rawHash=w.E.store.friendshipRawHash(bytes);
+ assert.notEqual(rawHash,repeat.persistence.rawHash);assert.deepEqual(w.store.load(),state);
+ const refused=async label=>{const r=await w.app.confirmFriendshipMigration(p.handle);assert.equal(r.status,'refused',JSON.stringify(r));assert.match(r.error,/friendship-replay-stale/);t.diagnostic(label+': '+JSON.stringify(r));};
+ await refused('normal raw identity control');
+ for(const [label,returned]of [['first',first],['repeat',repeat]]){
+  returned.status='unchanged';returned.error='caller-error';
+  Object.assign(returned.persistence,{rawHash,bundle:'caller-bundle',status:'committed',error:'caller-persistence-error'});
+  await refused(label+' public rawHash/bundle/status/error mutated');
+ }
+ await refused('repeated stale confirmation');
+ assert.deepEqual(w.app.cancelFriendshipMigration(p.handle),{status:'refused',reason:'preview-completed'});
+ assert.equal(installs,unchanged?0:1);assert.deepEqual(w.read(),state);assert.deepEqual(fs.readFileSync(w.file),bytes);assert.equal(w.app.saveBlocked,false);
+ if(bundle){assert.deepEqual(fs.readFileSync(bundle+'/original.raw'),original);assert.deepEqual(fs.readFileSync(bundle+'/receipt.json'),receipt);}
+ else assert.equal(fs.existsSync(w.file+'.friendship'),false);
+});
