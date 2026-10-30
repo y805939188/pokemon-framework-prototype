@@ -38,6 +38,19 @@ function resolveItem(battle: ShowdownBattle, user: ShowdownPokemon, payload: Pay
   const side = user.side;
   const item = payload.item as string;
   const target = side.pokemon.find((p: ShowdownPokemon) => p.name === payload.target);
+  if (item === "fullrestore") {
+    if (!target || target.fainted || target.hp <= 0) { emit(battle, "item", side.id, item, payload.target || "-", "noeffect"); return; }
+    const confused = target.isActive && !!target.volatiles.confusion;
+    if (target.hp === target.maxhp && !target.status && !confused) { emit(battle, "item", side.id, item, target.name, "noeffect"); return; }
+    // WP28 full restore: actual max HP request when damaged, zero for a status-only cure. Never AI estimate 999.
+    const request = target.hp < target.maxhp ? target.maxhp : 0;
+    const healed = request ? target.heal(request) : 0;
+    if (request && target.isActive) battle.add("-heal", target, target.getHealth);
+    if (target.status) target.cureStatus(!target.isActive);
+    if (confused) target.removeVolatile("confusion");
+    emit(battle, "item", side.id, item, target.name, "ok", healed, target.hp, target.maxhp, request);
+    return;
+  }
   const spec = HEAL_ITEMS[item];
   const status = STATUS_ITEMS[item];
   const stat = STAT_ITEMS[item];

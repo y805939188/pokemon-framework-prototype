@@ -60,6 +60,8 @@ export interface BattleSetup {
   /** Formal application path always supplies authoritative player/badges/content/generation; legacy direct sessions may omit it. */
   obedience?: ObedienceContext;
   trainer?: TrainerBattleProjection;
+  /** Transient application operation/generation guard, bound before a formal trainer factory can reenter. */
+  isCurrentBattle?: () => boolean;
   experimentalHeldBattle?: boolean;
   diagnostics?: string[];
   foes: Member[];

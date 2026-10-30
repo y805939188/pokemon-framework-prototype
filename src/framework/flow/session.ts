@@ -30,6 +30,8 @@ import type { BattleEvidenceContext, EvidenceBinding, BattleEvidence, FriendEvid
 import { resolveConfig } from "../rules/config";
 import { own, setOwn } from "../rules/own";
 import { bindRequiredSettlement, checkpointRequiredSettlement, finalizeRequiredSettlement, requiredCaptureItem, restoreRequiredSettlement } from "./required-settlement";
+import { bindTrainerAi, runTrainerAi, trainerAiEvent, checkpointTrainerAi, restoreTrainerAi } from './trainer-ai';
+import type { TrainerAiConfiguration } from './trainer-ai';
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
 export const END_REASONS = ["caught", "run", "tie", "win"] as const;
@@ -63,7 +65,7 @@ export function sealBattleEffects(session: BattleSession, binding: EffectsBindin
   return session._effects.seal(session.result(), binding, session._pendingFriendFaints.length ? session.party.map(m => m.id) : session._friendUnavailable);
 }
 
-const ITEM_IDS = new Set([...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS)]);
+const ITEM_IDS = new Set(["fullrestore", ...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS)]);
 
 function toSet(m: Member, moveName: (id: string) => string): Record<string, unknown> {
   return {
@@ -105,6 +107,8 @@ export interface CreateOptions {
   evidence?: BattleEvidenceContext;
   /** Formal application obedience control; omitted only by legacy direct-session callers. */
   obedience?: ObedienceContext;
+  /** Selected only by the formal trainer composition, never by wild/defaultAi callers. */
+  trainerAi?: TrainerAiConfiguration;
 }
 
 export type Refusal = { ok: false; reason: string };
@@ -186,7 +190,7 @@ export class BattleSession {
   _friendUnavailable: string[] = [];
   _pendingFriendFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
 
-  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience }: CreateOptions): Promise<BattleSession> {
+  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi }: CreateOptions): Promise<BattleSession> {
     if (!experimentalHeldBattle && [...game.party, ...foe.team].some((m) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成");
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
     for (const m of [...game.party, ...foe.team]) {
@@ -235,6 +239,10 @@ export class BattleSession {
     s.gw.seedState("p1", lead);
     s.gw.seedState("p2", s.foeTeam);
     s.gw.refreshRequests();
+    if (trainerAi) {
+      if (foe.kind !== 'trainer' || doubles || !requiredSettlement || ai) throw new Error('trainer-ai-formal-composition-required');
+      bindTrainerAi(s, s.gw, content, trainerAi);
+    }
     s._ingest();
     s._finishTurn();
     s._log("info", "session.create", { content: content.meta ? { kind: content.meta.kind, id: content.meta.id, hash: content.meta.inputsHash?.slice(0, 12) } : null, format: formatid, doubles, foe: { kind: foe.kind, members: foe.team.length }, party: party.map((m) => m.id), seed: seed ?? null });
@@ -296,6 +304,7 @@ export class BattleSession {
   _checkpoint() {
     const engine = this.gw.checkpoint();
     checkpointRequiredSettlement(this, engine);
+    checkpointTrainerAi(this, this.gw, engine);
     return {
       engine,
       state: S.clone({
@@ -313,7 +322,8 @@ export class BattleSession {
 
   async _restoreCheckpoint(checkpoint: ReturnType<BattleSession["_checkpoint"]>): Promise<void> {
     this.gw = await restoreRequiredSettlement(this, checkpoint.engine, () => this._driver.fromCheckpoint(checkpoint.engine));
-    const { participants, ...state } = checkpoint.state;
+    restoreTrainerAi(this, this.gw, checkpoint.engine);
+    const { participants, ...state } = S.clone(checkpoint.state);
     Object.assign(this, state);
     this.participants = Object.fromEntries(participants.map(([id, members]) => [id, new Set(members)]));
     // JSON omits undefined properties, so explicitly clear these after a failed first assignment.
@@ -513,8 +523,10 @@ export class BattleSession {
     // auto-choose the foe from its own pending request, then process whatever the engine produced
     const foeRequest = this.gw.awaitingChoice("p2");
     if (foeRequest) {
-      const c = this.ai(foeRequest);
-      if (!c || !await this.gw.choose("p2", c)) throw new Error("foe AI did not provide a legal choice");
+      if (!await runTrainerAi(this, this.gw)) {
+        const c = this.ai(foeRequest);
+        if (!c || !await this.gw.choose("p2", c)) throw new Error("foe AI did not provide a legal choice");
+      }
     }
     this._ingest();
     await this._continueGrowth();
@@ -662,6 +674,7 @@ export class BattleSession {
       (this.activeNow[side] ??= [])[arg0.charCodeAt(2) - 97] = null; // off the field: not a participant for later arrivals
       if (side === "p2") this.growthQueue.push({ kind: "award", foeId: id });
     } else if (e.type === "rpg") {
+      trainerAiEvent(this, e);
       const [what, side, itemId, , res] = e.args;
       if (side !== "p1") return;
       if (what === "item") {
@@ -714,6 +727,7 @@ export class BattleSession {
   async _autoFoeReplacement(): Promise<boolean> {
     const req = this.gw.awaitingChoice("p2");
     if (!req || !req.forceSwitch) return false;
+    if (await runTrainerAi(this, this.gw)) return true;
     const choice = this.ai(req);
     if (!choice || !await this.gw.choose("p2", choice)) throw new Error("foe AI did not provide a legal replacement");
     return true;

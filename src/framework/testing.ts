@@ -10,3 +10,5 @@ export * as matrix from "./tools/matrix";
 export * as fakes from "./tools/fakes";
 export * as heldDiagnostics from "./tools/held-diagnostics";
 export * as scripted from "./tools/scripted-driver";
+
+export * as trainerAiDiagnostics from "./tools/trainer-ai-diagnostics";

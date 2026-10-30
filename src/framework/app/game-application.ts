@@ -928,7 +928,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         obedience: { player: { ...game.player }, members: memberOwners, badges: badgeCount(game.badges), anyHighLevel: config.ANY_HIGH_LEVEL_POKEMON_CAN_DISOBEY,
           foreignHighLevel: config.FOREIGN_HIGH_LEVEL_POKEMON_CAN_DISOBEY, generation, contentIdentity },
         // This host-facing DTO must never alias the private settlement facts.
-        ...(op.facts.trainer ? { trainer: clone(op.facts.trainer.projection) } : {}),
+        ...(op.facts.trainer ? { trainer: clone(op.facts.trainer.projection), isCurrentBattle: () => this.op === op && this.generation === generation } : {}),
         ...(diagnostics.length ? { diagnostics } : {}), ...(heldBattle ? { experimentalHeldBattle: true } : {}) };
       let mapId: number | undefined;
       try { mapId = this.ports.itemWorld?.().mapId ?? creationContext.map; } catch { /* optional companion context unavailable */ }

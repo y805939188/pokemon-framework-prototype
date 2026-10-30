@@ -11,7 +11,7 @@ export const BALLS: readonly string[] = [
   "beastball", "heavyball",
 ];
 
-export const BAG_ITEMS: readonly string[] = [...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS), ...BALLS];
+export const BAG_ITEMS: readonly string[] = ["fullrestore", ...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS), ...BALLS];
 
 export function isBagItem(id: string): boolean {
   return BAG_ITEMS.includes(id);

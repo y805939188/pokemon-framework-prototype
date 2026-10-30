@@ -37,16 +37,22 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
   // Selecting the producer mode and the actual driver is one composition-time choice. Later mutable options cannot
   // retain required authority while substituting another engine. Callback receivers/content lookup stay unchanged.
   const driver = selectedDriver ?? showdownDriverFactory;
+  const currentContent = options.content.bind(options);
   const factory: BattleSessionFactory<BattleSession> = {
     // the application has created the foes (rules/member-factory) and decided the flags; this only wires the engine
     create: (request, game, setup) => {
       const content = options.content();
       if (required && (!setup.evidenceContext || validatedContentIdentity(content) !== setup.evidenceContext.contentIdentity)) throw new Error("required-settlement-factory-content-mismatch");
+      if (required && setup.trainer && !setup.isCurrentBattle) throw new Error('trainer-ai-app-owner-missing');
       return CREATE_BATTLE_SESSION({
       game, battleId: request.battleId, content, experimentalHeldBattle: setup.experimentalHeldBattle ?? false,
       requiredSettlement: required,
       ...(setup.evidenceContext ? { evidence: setup.evidenceContext } : {}),
       ...(setup.obedience ? { obedience: setup.obedience } : {}),
+      ...(required && setup.trainer && setup.evidenceContext && setup.isCurrentBattle ? { trainerAi: {
+        projection: setup.trainer, generation: setup.evidenceContext.generation, contentIdentity: setup.evidenceContext.contentIdentity,
+        currentContent, isCurrent: setup.isCurrentBattle,
+      } } : {}),
       ...(options.seed ? { seed: options.seed() } : {}),
       ...(options.logger ? { logger: options.logger() } : {}),
       driver,

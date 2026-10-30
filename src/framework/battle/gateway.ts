@@ -17,6 +17,7 @@ import type { FormatObservation } from "../rules/battle-evidence";
 import { HeldTracker } from "./held-tracker";
 import type { HeldTrackerSnapshot } from "./held-tracker";
 import type { HeldBinding, HeldRosterMember, RequiredFacts } from "../rules/held-facts";
+import { attachTrainerSource, trainerSourceRequest, trainerSourcePublic, checkpointTrainerSource, restoreTrainerSource } from './trainer-ai-source';
 
 /** Version tag of the engine-level message stream used by the 2.2 harness only; NOT the game protocol (state.ts PROTOCOL_VERSION = 1). */
 export const PROTOCOL_VERSION = 0;
@@ -79,6 +80,7 @@ export class BattleGateway implements BattleDriver {
       send: (type: string, data: string | string[]) => gw._onSend(type, data),
     });
     gw._battle = battle;
+    gw.#attachTrainerSource();
     gw._attachObservations();
     for (const [i, p] of (opts.players ?? []).entries()) {
       battle.setPlayer(`p${i + 1}`, { name: p.name, team: sim.Teams.pack(p.team) });
@@ -110,6 +112,7 @@ export class BattleGateway implements BattleDriver {
   static async restore(snapshot: string, opts: GatewayOptions = {}): Promise<BattleGateway> {
     const gw = new BattleGateway(opts);
     gw._battle = gw._env.sim.Battle.fromJSON(snapshot);
+    gw.#attachTrainerSource();
     gw._attachObservations();
     gw._battle.restart((type: string, data: string | string[]) => gw._onSend(type, data));
     gw._opts = { ...opts, restored: true };
@@ -133,6 +136,7 @@ export class BattleGateway implements BattleDriver {
       faintSequence: this._faintSequence,
       ...(source ? { settlement: { state: source.tracker.snapshot(), lineage: source.lineage, wild: source.wild } } : {}),
     });
+    checkpointTrainerSource(this, token);
     return token;
   }
 
@@ -148,7 +152,15 @@ export class BattleGateway implements BattleDriver {
     gw._friendshipFaintOrigins = JSON.parse(JSON.stringify(data.friendshipFaintOrigins)) as typeof gw._friendshipFaintOrigins;
     gw._faintSequence = data.faintSequence;
     if (data.settlement) gw.#attachSettlement(new HeldTracker(gw._battle, data.settlement.wild, [], data.settlement.state), data.settlement.lineage, data.settlement.wild);
+    restoreTrainerSource(gw, token);
     return gw;
+  }
+
+  #attachTrainerSource(): void {
+    // Retain the actual operations before caller-visible callbacks or later public-method replacement.
+    const choose = this.choose.bind(this), act = this.act.bind(this);
+    attachTrainerSource(this, this._battle, this._env, action => action.kind === 'item'
+      ? act('p2', {kind:'item',item:action.battleId,target:action.target}) : choose('p2', action.choice));
   }
 
   #attachSettlement(tracker: HeldTracker, lineage: object, wild: boolean): void {
@@ -592,6 +604,7 @@ export class BattleGateway implements BattleDriver {
       const { extractChannelMessages } = this._env;
       const ch = extractChannelMessages(text, [0]);
       const lines = (ch[0] ?? []).filter((l) => l !== "");
+      trainerSourcePublic(this, lines);
       this._emit({ kind: "events", events: lines.map(parseLine) });
     } else if (type === "sideupdate") {
       const nl = text.indexOf("\n");
@@ -599,6 +612,7 @@ export class BattleGateway implements BattleDriver {
       const body = text.slice(nl + 1);
       for (const line of body.split("\n")) {
         if (line.startsWith("|request|")) {
+          if (side === 'p2') trainerSourceRequest(this);
           this._emit({ kind: "request", side, request: JSON.parse(line.slice("|request|".length)) });
         } else if (line.startsWith("|error|")) {
           this._emit({ kind: "error", side, message: line.slice("|error|".length) });

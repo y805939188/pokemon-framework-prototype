@@ -11,6 +11,8 @@ pnpm --dir src typecheck:framework
 node scripts/check-boundaries.cjs
 pnpm --dir src build:distribution > /dev/null
 SUITES=(
+  experiments/step5/4/test-trainer-ai.cjs
+  experiments/step5/4/test-trainer-ai-integration.cjs
   experiments/friendship-standard-domain/test-author.cjs
   experiments/friendship-standard-domain/test-pbs-cli.cjs
   experiments/friendship-standard-domain/test-migration.cjs

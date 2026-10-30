@@ -78,3 +78,5 @@ export * as acquisitionDex from "./rules/acquisition-dex";
 export * as trainerTeam from "./rules/trainer-team";
 export * as trainerReward from "./rules/trainer-reward";
 export * as obedience from "./rules/obedience";
+
+export * as trainerAi from "./rules/trainer-ai-public";

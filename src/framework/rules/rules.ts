@@ -213,6 +213,8 @@ export type Eligibility = { ok: true } | { ok: false; reason: "unknown-target" |
 export function itemEligibility(item: string, mon: MonView | undefined): Eligibility {
   if (!mon) return { ok: false, reason: "unknown-target" };
   if (mon.fainted || mon.hp <= 0) return { ok: false, reason: "item-no-effect" };
+  if (item === "fullrestore") return mon.hp < mon.maxhp || !!mon.status || !!(mon.active && mon.confused)
+    ? { ok: true } : { ok: false, reason: "item-no-effect" };
   if (HEAL_ITEMS[item]) return mon.hp < mon.maxhp ? { ok: true } : { ok: false, reason: "item-no-effect" };
   const st = STATUS_ITEMS[item];
   if (st) {

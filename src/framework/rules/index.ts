@@ -63,3 +63,5 @@ export * as pokedexQuery from "./pokedex-query";
 
 export * as acquisitionDex from "./acquisition-dex";
 export * as heldFacts from "./held-facts";
+
+export * as trainerAi from "./trainer-ai-public";
