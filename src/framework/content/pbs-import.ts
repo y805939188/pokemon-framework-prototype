@@ -5,7 +5,9 @@ import { DEX_COLORS as COLORS, DEX_SHAPES as SHAPES } from "../rules/pokedex-que
  */
 import type { CurveId, PartialStats, SpeciesKey, StatKey } from '../rules/types';
 import { own } from '../rules/own';
-import type { LearnEntry, SpeciesSource } from './schema';
+import { AUTHOR_SCHEMA_VERSION } from './schema';
+import type { AuthorSchema, LearnEntry, SpeciesSource } from './schema';
+import { authorCompatibilityDiagnostics, authorSchemaProblem } from './friendship-author-domain';
 import { parsePbsEvolutions, progressionCsv } from './pbs-progression';
 import type { EvolutionProperty } from './pbs-progression';
 import { importPbsRegionalDex } from './pbs-regional-dex';
@@ -18,9 +20,11 @@ export interface PbsRecordReport {
   showdown: string[]; later: { field: string; batch: string }[]; ignored: string[]; overridden: string[]; defaults: string[];
 }
 export interface PbsTextProposal { key: string; text: string; file?: string; line: number; field: string; source: string }
-export interface PbsImport { ok: boolean; species: SpeciesSource[]; records: PbsRecordReport[]; errors: PbsProblem[]; texts?: PbsTextProposal[] }
+export interface PbsImport { ok: boolean; species: SpeciesSource[]; records: PbsRecordReport[]; errors: PbsProblem[]; warnings: PbsProblem[]; texts?: PbsTextProposal[] }
 export interface PbsIdentity { symbol: string; species: string; form: number; showdownId: string }
 export interface PbsBundleOptions {
+  /** Default is standard schema 2. Legacy values require an explicit 1; CLI passes the owning manifest version. */
+  authorSchema?: AuthorSchema;
   sourceId: string; sourceProblem: PbsSourceGate; baseFiles: readonly PbsFile[]; formFiles?: readonly PbsFile[];
   regionalFiles?: readonly PbsFile[]; regionNameKeys?: readonly RegionNameKey[];
   /** Author-provided adapter identity, checked after the source gate; never inferred from a PBS form number. */
@@ -84,7 +88,7 @@ function sectionsFrom(text: string, file: string | undefined, forms: boolean, er
 }
 
 interface Conversion { species: SpeciesSource[]; records: PbsRecordReport[]; texts: PbsTextProposal[] }
-function convert(sections: Section[], sourceId: string, errors: PbsProblem[], resolveSpecies: (symbol: string) => SpeciesKey | null, bases: Map<string, SpeciesSource>): Conversion {
+function convert(sections: Section[], sourceId: string, errors: PbsProblem[], resolveSpecies: (symbol: string) => SpeciesKey | null, bases: Map<string, SpeciesSource>, authorSchema: AuthorSchema): Conversion {
   const species: SpeciesSource[] = [], records: PbsRecordReport[] = [], texts: PbsTextProposal[] = [];
   for (const section of sections) {
     const s = section, derived = deriveIds(s.name)!;
@@ -118,7 +122,7 @@ function convert(sections: Section[], sourceId: string, errors: PbsProblem[], re
     if (!base && value('CatchRate') === undefined) { out.catchRate=255; report.defaults.push('CatchRate = 255 (WP03 §4.3 class default)'); }
     else if (value('CatchRate') !== undefined) { const n=int(value('CatchRate'),0,255); if(n===null)fail('CatchRate','must be an integer from 0 to 255');else out.catchRate=n; }
     if (!base && value('Happiness') === undefined) out.happiness=70;
-    else if (value('Happiness') !== undefined) { const n=int(value('Happiness'),0,Number.MAX_SAFE_INTEGER); if(n===null)fail('Happiness','must be a nonnegative safe integer (no creation clamp at 255)');else out.happiness=n; }
+    else if (value('Happiness') !== undefined) { const n=int(value('Happiness'),0,authorSchema===2?255:Number.MAX_SAFE_INTEGER); if(n===null)fail('Happiness',authorSchema===2?'must be an integer from 0 to 255 (author schema 2)':'must be a nonnegative safe integer (explicit legacy author schema 1)');else out.happiness=n; }
     if (!base || value('EVs') !== undefined) {
       const evYield: PartialStats={}, ev=csv('EVs');
       if(value('EVs')===undefined)fail('EVs','missing: the framework needs the EV yield and the spec records no default for it');
@@ -164,21 +168,28 @@ function convert(sections: Section[], sourceId: string, errors: PbsProblem[], re
   return {species,records,texts};
 }
 
-/** Compatibility text entry: caller owns its existing pre-use source gate; accepted records remain in diagnostics. */
-export function importPbsSpecies(text: string, sourceId: string): PbsImport {
+/** Caller owns the pre-use source gate. Standard by default; legacy 256 requires explicit authorSchema=1. */
+export function importPbsSpecies(text: string, sourceId: string, authorSchema: AuthorSchema = AUTHOR_SCHEMA_VERSION): PbsImport {
+  const warnings = authorCompatibilityDiagnostics(authorSchema).map(w => ({...w,line:0}));
+  const schemaProblem = authorSchemaProblem(authorSchema);
+  if (schemaProblem) return {ok:false,species:[],records:[],errors:[{file:'manifest.json',line:0,path:'$.schema',message:schemaProblem}],warnings};
   const errors:PbsProblem[]=[], sections=sectionsFrom(text,undefined,false,errors), known=new Map<string,SpeciesKey>(), ids=new Set<string>();
   const unique:Section[]=[];
   for(const s of sections){const identity=deriveIds(s.name)!;if(known.has(s.name)){problem(errors,s,s.line,'',`section "${s.name}" is used twice`);continue;}if(ids.has(identity.id)){problem(errors,s,s.line,'$',`section "${s.name}" gives the content id "${identity.id}" of an earlier section`);continue;}known.set(s.name,{species:identity.id,form:0});ids.add(identity.id);unique.push(s);}
   // This text-only adapter may be importing into an existing JSON catalog: existence is checked by compile.
-  const converted=convert(unique,sourceId,errors,symbol=>{const identity=deriveIds(symbol);return known.get(symbol)??(identity?{species:identity.id,form:0}:null);},new Map());
-  return {ok:errors.length===0,species:converted.species,records:converted.records,errors,...(converted.texts.length?{texts:converted.texts}:{})};
+  const converted=convert(unique,sourceId,errors,symbol=>{const identity=deriveIds(symbol);return known.get(symbol)??(identity?{species:identity.id,form:0}:null);},new Map(),authorSchema);
+  return {ok:errors.length===0,species:converted.species,records:converted.records,errors,warnings,...(converted.texts.length?{texts:converted.texts}:{})};
 }
 
 /** Atomic, ordered, source-gated author proposal. A rejected proposal never exposes a usable record prefix. */
 export function importPbsBundle(options: PbsBundleOptions): PbsBundleImport {
-  const errors:PbsProblem[]=[],empty=():PbsBundleImport=>({ok:false,species:[],records:[],errors,identities:[],texts:[]});
+  const authorSchema = options.authorSchema === undefined ? AUTHOR_SCHEMA_VERSION : options.authorSchema;
+  const warnings = authorCompatibilityDiagnostics(authorSchema).map(w => ({...w,line:0}));
+  const errors:PbsProblem[]=[],empty=():PbsBundleImport=>({ok:false,species:[],records:[],errors,warnings,identities:[],texts:[]});
   const gate=!options.sourceId?'sourceId is required':typeof options.sourceProblem!=='function'?'a checked source validator is required':options.sourceProblem(options.sourceId);
   if(gate){errors.push({file:'sources.json',line:0,path:options.sourceId||'$.sourceId',message:gate});return empty();}
+  const schemaProblem = authorSchemaProblem(authorSchema);
+  if(schemaProblem){errors.push({file:'manifest.json',line:0,path:'$.schema',message:schemaProblem});return empty();}
   const read=(files:readonly PbsFile[],forms:boolean):Section[]=>{
     const sections:Section[]=[];
     for(const file of files){try{sections.push(...sectionsFrom(file.read(),file.file,forms,errors));}catch(error){errors.push({file:file.file,line:0,path:'$',message:`cannot read input: ${error instanceof Error?error.message:String(error)}`});}}
@@ -201,10 +212,10 @@ export function importPbsBundle(options: PbsBundleOptions): PbsBundleImport {
   for(const s of formSections)register(s);
   if(errors.length)return empty();
   const bases=new Map<string,SpeciesSource>(),resolve=(symbol:string):SpeciesKey|null=>known.get(symbol)??null;
-  const base=convert(baseSections,options.sourceId,errors,resolve,bases),forms=convert(formSections,options.sourceId,errors,resolve,bases);
+  const base=convert(baseSections,options.sourceId,errors,resolve,bases,authorSchema),forms=convert(formSections,options.sourceId,errors,resolve,bases,authorSchema);
   if(errors.length)return empty();
   let regionalDex:RegionalDexProposal|undefined;
   if(options.regionalFiles!==undefined){const regional=importPbsRegionalDex({files:options.regionalFiles,sourceId:options.sourceId,sourceProblem:options.sourceProblem,resolveSpecies:symbol=>{const key=resolve(symbol);return key?.form===0?key.species:null;},regionNameKeys:options.regionNameKeys??[]});errors.push(...regional.errors);regionalDex=regional.regionalDex;}
   if(errors.length)return empty();
-  return {ok:true,species:[...base.species,...forms.species],records:[...base.records,...forms.records],errors,identities,texts:[...base.texts,...forms.texts],...(regionalDex?{regionalDex}:{})};
+  return {ok:true,species:[...base.species,...forms.species],records:[...base.records,...forms.records],errors,warnings,identities,texts:[...base.texts,...forms.texts],...(regionalDex?{regionalDex}:{})};
 }

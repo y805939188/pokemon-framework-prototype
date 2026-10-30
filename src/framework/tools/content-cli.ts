@@ -19,7 +19,8 @@ import { checkItemInputs } from "../content/item-input";
 import { importPbsBundle, importPbsSpecies } from "../content/pbs-import";
 import { importPbsRegionalDex } from "../content/pbs-regional-dex";
 import type { PbsFile } from "../content/pbs-regional-dex";
-import type { CompiledContent, ContentError, ContentInputs } from "../content/schema";
+import type { AuthorSchema, CompiledContent, ContentError, ContentInputs } from "../content/schema";
+import { authorCompatibilityDiagnostics, authorSchemaProblem } from "../content/friendship-author-domain";
 import { createDexLookup } from "../battle/dex";
 import { CONTENT_SHOWDOWN_SHA } from "../content/showdown-pin";
 import { loadCompiled, assembleContent } from "../flow/content-runtime";
@@ -55,6 +56,15 @@ function buildPin(): string {
   return sha;
 }
 const show = (errors: ContentError[]): void => { for (const e of errors) console.error(`${e.file} ${e.path}: ${e.message}`); };
+const warn = (warnings: ContentError[]): void => { for (const w of warnings) console.warn(`WARNING ${w.file} ${w.path}: ${w.message}`); };
+/** Importers must choose from the owning manifest before reading PBS; never infer legacy from data. */
+function authorContext(inputs: ContentInputs): AuthorSchema | null {
+  const schema = (inputs.manifest as {schema?: unknown} | null)?.schema;
+  const problem = authorSchemaProblem(schema);
+  if (problem) { show([{file:"manifest.json",path:"$.schema",message:problem}]); return null; }
+  warn(authorCompatibilityDiagnostics(schema));
+  return schema as AuthorSchema;
+}
 
 export function build(src: string, out: string): number {
   const fail = (errors: ContentError[]): number => {
@@ -74,9 +84,9 @@ export function build(src: string, out: string): number {
     const { inputs, errors } = readInputs(src);
     const r = errors.length ? { ok: false as const, errors } : compileContent(inputs, {}, {showdownSha:buildPin()});
     if (!r.ok) return fail(r.errors);
+    warn(r.warnings);
     const assembled = assembleContent(r.data, createDexLookup());
     if (assembled.errors.length) return fail(assembled.errors);
-    for (const warning of r.warnings) console.warn(`WARNING ${warning.file} ${warning.path}: ${warning.message}`);
     const text = canonicalJson(r.data, 2) + "\n";
     fs.mkdirSync(path.dirname(out), { recursive: true });
     if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== text) fs.writeFileSync(out, text);
@@ -90,6 +100,7 @@ export function build(src: string, out: string): number {
 export function check(src: string, out: string): number {
   const { inputs, errors } = readInputs(src);
   if (errors.length) { show(errors); return 1; }
+  if (authorContext(inputs) === null) return 1;
   let compiled: unknown;
   try { compiled = JSON.parse(fs.readFileSync(out, "utf8")); } catch { compiled = undefined; }
   const stale = checkFresh(compiled, inputs);
@@ -104,6 +115,7 @@ export function inventory(src: string, report: string): number {
   const { inputs, errors } = readInputs(src);
   const r = errors.length ? { ok: false as const, errors } : compileContent(inputs, {}, {showdownSha:buildPin()});
   if (!r.ok) { show(r.errors); return 1; }
+  warn(r.warnings);
   const dex = createDexLookup();
   const assembled = assembleContent(r.data as CompiledContent, dex);
   if (assembled.errors.length) { show(assembled.errors); return 1; }
@@ -140,6 +152,7 @@ export function checkItemPockets(src:string,previousFile:string):number {
   const {inputs,errors}=readInputs(src);
   const compiled=errors.length?{ok:false as const,errors}:compileContent(inputs, {}, {showdownSha:buildPin()});
   if(!compiled.ok){show(compiled.errors);return 1;}
+  warn(compiled.warnings);
   let previous:unknown;
   try{previous=JSON.parse(fs.readFileSync(previousFile,"utf8"));}catch(error){console.error(`previous items: cannot read JSON: ${(error as Error).message}`);return 1;}
   if(!Array.isArray(previous)){console.error("previous items: supply an explicit published items.json array; historical fallback pockets cannot be inferred");return 1;}
@@ -164,6 +177,8 @@ export function importPbs(src: string, file: string, sourceId: string, report: s
   if (problems.length) { show(problems); console.error("sources.json has problems: nothing was imported"); return 1; }
   const gate = preUseProblem(sources, sourceId);
   if (gate) { console.error(`sources.json ${sourceId}: ${gate}; nothing was imported`); return 1; }
+  const authorSchema = authorContext(inputs);
+  if (authorSchema === null) return 1;
   let text: string;
   try { text = fs.readFileSync(file, "utf8"); } catch (e) { console.error(`cannot read ${file}: ${(e as Error).message}`); return 1; }
   if (itemMode) {
@@ -173,10 +188,10 @@ export function importPbs(src: string, file: string, sourceId: string, report: s
     fs.writeFileSync(report, canonicalJson({schema:1,source:sourceId,...r,ok,items:checked.items,contentErrors:checked.errors},2)+'\n');
     return ok ? 0 : 1;
   }
-  const r = importPbsSpecies(text, sourceId);
+  const r = importPbsSpecies(text, sourceId, authorSchema);
   for (const e of r.errors) console.error(`${path.basename(file)}:${e.line} ${e.path}: ${e.message}`);
   fs.mkdirSync(path.dirname(report), { recursive: true });
-  fs.writeFileSync(report, canonicalJson({ schema: 1, file: path.basename(file), source: sourceId, ok: r.ok, species: r.species, records: r.records, errors: r.errors }, 2) + "\n");
+  fs.writeFileSync(report, canonicalJson({ schema: 1, authorSchema, file: path.basename(file), source: sourceId, ok: r.ok, species: r.species, records: r.records, errors: r.errors, warnings:r.warnings }, 2) + "\n");
   console.log(`import-pbs: ${r.species.length} species record(s), ${r.errors.length} problem(s) -> ${path.relative(ROOT, report)}`);
   return r.ok ? 0 : 1;
 }
@@ -190,6 +205,8 @@ export function importPbsFiles(src: string, sourceId: string, report: string, re
   const gate=preUseProblem(sources,sourceId);
   if(gate)problems.push({file:"sources.json",path:sourceId,message:gate});
   if(problems.length){show(problems);return 1;}
+  const authorSchema = authorContext(inputs);
+  if(authorSchema === null)return 1;
   const values=(name:string):string[]=>argv.filter(value=>value.startsWith(`--${name}=`)).map(value=>value.slice(name.length+3));
   const files=(names:readonly string[]):PbsFile[]=>names.map(name=>({file:name,read:()=>fs.readFileSync(path.resolve(ROOT,name),"utf8")}));
   const regionNameKeys=values("region-name").map(value=>{const at=value.indexOf(":");return {id:/^[0-9]+$/.test(value.slice(0,at))?Number(value.slice(0,at)):NaN,nameKey:at<0?"":value.slice(at+1)};});
@@ -207,13 +224,13 @@ export function importPbsFiles(src: string, sourceId: string, report: string, re
   const formFiles=files(values("form-file"));
   const regionalFiles=files(regionalOnly?(plainFiles.length?plainFiles:["regional_dexes.txt"]):values("regional-file"));
   const sourceProblem=(id:string):string|null=>preUseProblem(sources,id);
-  const bundle=importPbsBundle({sourceId,sourceProblem,baseFiles,formFiles,...(!regionalOnly?{regionalFiles,regionNameKeys}:{}),resolveFormShowdownId:(symbol,form)=>formIds.get(`${symbol},${form}`)??null});
+  const bundle=importPbsBundle({authorSchema,sourceId,sourceProblem,baseFiles,formFiles,...(!regionalOnly?{regionalFiles,regionNameKeys}:{}),resolveFormShowdownId:(symbol,form)=>formIds.get(`${symbol},${form}`)??null});
   if(!regionalOnly){
     const checked=bundle.ok?compileContent({manifest:inputs.manifest,sources:inputs.sources,species:bundle.species,overlays:[],...(inputs.items!==undefined?{items:inputs.items}:{}),...(bundle.regionalDex!==undefined?{regionalDex:bundle.regionalDex}:{})}, {}, {showdownSha:buildPin()}):null;
     const ok=bundle.ok&&checked?.ok===true;
     if(!bundle.ok)for(const error of bundle.errors)console.error(`${error.file??"PBS"}:${error.line} ${error.path}: ${error.message}`);
     if(checked&&!checked.ok)show(checked.errors);
-    write({schema:1,source:sourceId,...bundle,ok,...(!ok?{species:[],regionalDex:undefined}:{}),contentErrors:checked&&!checked.ok?checked.errors:[]});
+    write({schema:1,authorSchema,source:sourceId,...bundle,ok,...(!ok?{species:[],regionalDex:undefined}:{}),contentErrors:checked&&!checked.ok?checked.errors:[]});
     return ok?0:1;
   }
   if(!bundle.ok){write({schema:1,source:sourceId,ok:false,errors:bundle.errors});return 1;}

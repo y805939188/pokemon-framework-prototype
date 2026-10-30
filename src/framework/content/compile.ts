@@ -8,12 +8,14 @@ import { DEFAULT_LIMITS } from "../rules/limits";
 import { MAX_FORM } from "../rules/species-key";
 import { checkOverrides, developmentCapabilities } from "../rules/config";
 import {
-  CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, AUTHOR_SCHEMA_VERSION, COMPILED_SCHEMA_VERSION, SOURCE_KINDS, STAT_KEYS_ALLOWED, USAGE_DECISIONS,
+  CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, COMPILED_SCHEMA_VERSION, SOURCE_KINDS, STAT_KEYS_ALLOWED, USAGE_DECISIONS,
 } from "./schema";
 import { CONTENT_SHOWDOWN_SHA } from "./showdown-pin";
 import { PROGRESSION_FIELDS, progressionFieldProblem, inheritSpecies, deriveSpeciesFields, checkProgressionReferences, checkRegionalDex, checkMapMetadata } from "./progression-input";
 import type { CompiledContent, ContentError, ContentInputs, GrantSource, Overlay, SourceEntry, SpeciesSource } from "./schema";
 import { checkTrainerInputs, trainerSpeciesKeys } from "./trainer-input";
+import { authorCompatibilityDiagnostics, authorHappinessProblem, authorSchemaProblem } from "./friendship-author-domain";
+import type { AuthorSchema } from "./schema";
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -136,15 +138,19 @@ export function showdownDependencyProblem(sources: readonly SourceEntry[]): stri
 export function compileContent(inputs: ContentInputs, developerCapabilities: unknown = {}, context: { showdownSha: string } = { showdownSha: CONTENT_SHOWDOWN_SHA }): CompileResult {
   const capabilities = developmentCapabilities(developerCapabilities);
   const errors: ContentError[] = [];
+  const warnings: ContentError[] = [];
   const report: Report = (file, path, message) => { errors.push({ file, path, message }); };
 
   // ---- manifest
   let contentId = "";
+  let authorSchema: AuthorSchema | undefined;
   if (!isObj(inputs.manifest)) report("manifest.json", "$", "must be an object");
   else {
     const m = inputs.manifest;
     checkKnownKeys(m, ["schema", "id", "title"], "manifest.json", "$", report);
-    if (m["schema"] !== AUTHOR_SCHEMA_VERSION) report("manifest.json", "$.schema", `must be ${AUTHOR_SCHEMA_VERSION} (this compiler only knows schema ${AUTHOR_SCHEMA_VERSION})`);
+    const problem = authorSchemaProblem(m["schema"]);
+    if (problem) report("manifest.json", "$.schema", problem);
+    else { authorSchema = m["schema"] as AuthorSchema; warnings.push(...authorCompatibilityDiagnostics(authorSchema)); }
     if (typeof m["id"] !== "string" || !ID.test(m["id"])) report("manifest.json", "$.id", "must be an id like \"sample\"");
     else contentId = m["id"];
     if (typeof m["title"] !== "string" || !m["title"]) report("manifest.json", "$.title", "must be a non-empty string");
@@ -183,7 +189,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
       else { keys.add(key); if (!form) ids.add(s["id"]); }
     }
     if (typeof s["showdownId"] !== "string" || !SHOWDOWN_ID.test(s["showdownId"])) report("species.json", `${p}.showdownId`, "must be a Showdown species id (lowercase letters and digits)");
-    if (s["happiness"] !== undefined) { const issue = FIELD_CHECK["happiness"]!(s["happiness"]); if (issue) report("species.json", `${p}.happiness`, issue); }
+    if (s["happiness"] !== undefined && authorSchema !== undefined) { const issue = authorHappinessProblem(s["happiness"], authorSchema); if (issue) report("species.json", `${p}.happiness`, issue); }
     for (const f of ["nameKey", "growth", "baseExp", "catchRate", "evYield", "learnset"] as const) {
       if (!(f in s)) { if (form !== 0) continue; report("species.json", `${p}.${f}`, `missing required field "${f}" in ${label}`); continue; }
       const problem = FIELD_CHECK[f]!(s[f]);
@@ -220,7 +226,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
     let ok = true;
     for (const [f, v] of Object.entries(o["set"])) {
       if (!(OVERRIDABLE as readonly string[]).includes(f)) { report("overlays.json", `${p}.set.${f}`, `field "${f}" cannot be overridden (allowed: ${OVERRIDABLE.join(", ")})`); ok = false; continue; }
-      const problem = FIELD_CHECK[f]!(v);
+      const problem = f === "happiness" && authorSchema !== undefined ? authorHappinessProblem(v, authorSchema) : FIELD_CHECK[f]!(v);
       if (problem) { report("overlays.json", `${p}.set.${f}`, problem); ok = false; continue; }
       const key = `${o["target"]}#${f}`;
       if (setBy.has(key)) { report("overlays.json", `${p}.set.${f}`, `conflicts with overlay [${setBy.get(key)}]: both replace ${f} of ${o["target"]}`); ok = false; continue; }
@@ -294,7 +300,6 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
   const trainerData = checkTrainerInputs(inputs.trainerTypes, inputs.trainers, { speciesKeys: trainerSpeciesKeys(registrationOrder), catalog: itemInputs.catalog, usable });
   errors.push(...trainerData.errors);
   const effective = [...merged.values()];
-  const warnings: ContentError[] = [];
   deriveSpeciesFields(effective, report, (file,path,message)=>warnings.push({file,path,message}));
   const effectiveByKey = new Map(effective.map(sp=>[recordKey(sp.id,sp.form??0),sp]));
   for (const [i,sp] of effective.entries()) for (const [j,entry] of (sp.evolutions??[]).entries()) {
