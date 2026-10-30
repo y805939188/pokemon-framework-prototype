@@ -21,6 +21,28 @@ assert.deepEqual(strategyPin.parameters,strategyRef.parameters);
 assert.equal(production.composition.createTrainerAiStrategyRegistry,legacy.composition.createTrainerAiStrategyRegistry);
 assert.equal(trainerProjection.version,37);
 
+// Ordinary methods and private-field classes are part of the public extension contract.
+class ReceiverRegistration implements production.composition.TrainerAiStrategyRegistration {
+  #slot = 2;
+  id = "consumer-receiver"; version = "1"; implementationIdentity = "consumer/receiver/1";
+  validateParameters(parameters: production.composition.StrategyParameters): void { assert.equal(parameters.slot,this.#slot); }
+  create(catalog: production.trainerAi.TrainerAiCatalog): production.composition.TrainerAiStrategy {
+    assert.equal(this.#slot,2);
+    const policy = production.trainerAi.createTrainerAiPolicy(catalog);
+    return {decide: (snapshot,_parameters,random) => policy.decide(snapshot,random)};
+  }
+}
+class ReceiverRegistry implements production.composition.TrainerAiStrategyRegistry {
+  #backing = production.composition.createTrainerAiStrategyRegistry();
+  register(entry: production.composition.TrainerAiStrategyRegistration,active = true): void { this.#backing.register(entry,active); }
+  setActive(id: string,version: string): void { this.#backing.setActive(id,version); }
+  resolve(reference?: production.composition.TrainerAiStrategyReference) { return this.#backing.resolve(reference); }
+}
+const receiverRegistry = new ReceiverRegistry();
+receiverRegistry.register(new ReceiverRegistration());
+const receiverCatalog: production.trainerAi.TrainerAiCatalog = {gen:8,moves:{},types:{Normal:{Normal:{numerator:1,denominator:1}}},items:{}};
+assert.equal(receiverRegistry.resolve({id:"consumer-receiver",parameters:{slot:2}}).instantiate(receiverCatalog,"consumer-value-only").binding.version,"1");
+
 type GameState = production.state.GameState;
 type BattleResult = production.state.BattleResult;
 

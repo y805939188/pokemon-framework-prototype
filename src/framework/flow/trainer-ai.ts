@@ -1,6 +1,6 @@
 /** Session-owned trainer resources, one-decision entitlement and rollback state. No engine objects cross here. */
 import type { BattleDriver, DriverCheckpoint } from '../battle/driver';
-import { bindTrainerSource, captureTrainerRequest, trainerCandidate, submitTrainerCandidate, rebindTrainerSource } from '../battle/trainer-ai-source';
+import { bindTrainerSource, captureTrainerRequest, trainerCandidate, submitTrainerCandidate, rebindTrainerSource, trainerSourceFinished } from '../battle/trainer-ai-source';
 import type { TrainerCapture, TrainerRequestTicket } from '../battle/trainer-ai-source';
 import type { AssembledTrainerCatalog } from '../battle/trainer-ai-catalog';
 import type { PinnedTrainerAiStrategy, BoundTrainerAiStrategy } from './trainer-ai-strategy';
@@ -25,7 +25,7 @@ interface Channel {
   cache:Cache|null; busy:boolean; retired:string|null;
 }
 const CHANNELS=new WeakMap<object,Channel>();
-const CHECKPOINTS=new WeakMap<DriverCheckpoint,{session:object;lineage:object;state:AiState;cache:{snapshot:TrainerAiSnapshot;plan:DecisionPlan|null;attempted:string[];submitted:boolean}|null}>();
+const CHECKPOINTS=new WeakMap<DriverCheckpoint,{session:object;lineage:object;terminal:boolean;state:AiState;cache:{snapshot:TrainerAiSnapshot;plan:DecisionPlan|null;attempted:string[];submitted:boolean}|null}>();
 const clone=<T>(v:T):T=>JSON.parse(JSON.stringify(v)) as T;
 function fingerprint(content:Content):string{return semanticFingerprint(clone(content));}
 export function bindTrainerAi(session:object,driver:BattleDriver,content:Content,config:TrainerAiConfiguration):void {
@@ -53,10 +53,10 @@ function decide(c:Channel,cache:Cache):DecisionPlan {
   cache.plan=c.policy.decide(cache.capture.snapshot,n=>trainerRandomN(c.state.random,n));
   return clone(cache.plan);
 }
-function refund(c:Channel,entry:Reservation):void {
+function refund(c:Channel,entry:Reservation,advanceRevision=true):void {
   if(entry.state!=='reserved')return;
   const resource=c.state.resources.find(r=>r.resourceKey===entry.key);if(!resource)throw new Error('trainer-ai-refund-resource-missing');
-  c.state.resources=c.state.resources.map(r=>r.resourceKey===entry.key?{...r,count:r.count+1}:r);entry.state='refunded';c.state.resourceRevision++;
+  c.state.resources=c.state.resources.map(r=>r.resourceKey===entry.key?{...r,count:r.count+1}:r);entry.state='refunded';if(advanceRevision)c.state.resourceRevision++;
 }
 /** The busy gate and all actual source bindings exist before any supplied content/host callback can reenter. */
 export async function runTrainerAi(session:object,driver:BattleDriver):Promise<boolean> {
@@ -65,9 +65,19 @@ export async function runTrainerAi(session:object,driver:BattleDriver):Promise<b
   try{
     current(c,driver);let cache=capture(c),rebuilds=0;
     for(;;){
-      const plan=decide(c,cache);if(plan.kind==='error')throw new Error('trainer-ai-policy-'+plan.reason);if(plan.kind==='none')return true;
+      let selected:readonly string[],fallback:readonly string[]=[];
+      if(cache.capture.automaticCandidateId){
+        selected=[cache.capture.automaticCandidateId];
+      }else{
+        const plan=decide(c,cache);if(plan.kind==='error')throw new Error('trainer-ai-policy-'+plan.reason);if(plan.kind==='none')return true;
+        selected=plan.kind==='choose'?plan.retryOrder:plan.candidateIds;
+        const request=cache.capture.snapshot.request;
+        // A strategy may prefer a legal subset. Exact no-effect refusal still permits the untried
+        // original legal moves (or forced replacements), without another strategy call or draw.
+        fallback=request.kind==='move'?request.legalMoves.map(x=>x.candidateId):request.kind==='force-switch'?request.legalSwitches.map(x=>x.candidateId):[];
+      }
       if(cache.submitted)throw new Error('trainer-ai-request-already-submitted');
-      const order=plan.kind==='choose'?plan.retryOrder:plan.candidateIds;
+      const order=[...new Set([...selected,...fallback])];
       try{
         for(const candidateId of order){
           if(cache.attempted.includes(candidateId))continue;
@@ -85,7 +95,12 @@ export async function runTrainerAi(session:object,driver:BattleDriver):Promise<b
           const result=await submitTrainerCandidate(driver,c.owner,cache.capture.ticket,candidateId,c.state.resourceRevision);
           current(c,driver);
           if(result==='accepted'){cache.submitted=true;if(reservation)c.state.resourceRevision++;return true;}
-          if(reservation){refund(c,reservation);throw new Error('trainer-ai-item-registration-refused');}
+          if(reservation){
+            if(reservation.state!=='reserved')throw new Error('trainer-ai-item-registration-uncertain');
+            // No engine effect and no registration: restore the temporary reservation exactly.
+            // The public resource state never advanced, so this original ticket stays usable.
+            refund(c,reservation,false);
+          }
         }
         throw new Error('trainer-ai-legal-candidates-exhausted');
       }catch(error){
@@ -107,8 +122,10 @@ export function trainerAiEvent(session:object,event:BattleEvent):void {
   if(result==='ok'){entry.state='consumed';}else if(result==='noeffect'||result==='invalid'){refund(c,entry);}else{c.retired='trainer-ai-unknown-item-outcome';throw new Error(c.retired);}
 }
 export function checkpointTrainerAi(session:object,driver:BattleDriver,token:DriverCheckpoint):void {
-  const c=CHANNELS.get(session);if(!c)return;current(c,driver);capture(c);
-  CHECKPOINTS.set(token,{session,lineage:c.lineage,state:clone(c.state),cache:c.cache?clone({snapshot:c.cache.capture.snapshot,plan:c.cache.plan,attempted:c.cache.attempted,submitted:c.cache.submitted}):null});
+  const c=CHANNELS.get(session);if(!c)return;current(c,driver);
+  const terminal=trainerSourceFinished(driver,c.owner);
+  if(!terminal)capture(c);
+  CHECKPOINTS.set(token,{session,lineage:c.lineage,terminal,state:clone(c.state),cache:!terminal&&c.cache?clone({snapshot:c.cache.capture.snapshot,plan:c.cache.plan,attempted:c.cache.attempted,submitted:c.cache.submitted}):null});
 }
 export function restoreTrainerAi(session:object,driver:BattleDriver,token:DriverCheckpoint):void {
   const c=CHANNELS.get(session);if(!c)return;
@@ -116,6 +133,7 @@ export function restoreTrainerAi(session:object,driver:BattleDriver,token:Driver
   // A source/generation retirement cannot be undone by rolling back numeric state.
   if(c.retired)throw new Error(c.retired);
   rebindTrainerSource(driver,c.owner,c.lineage,c.catalog);c.driver=driver;current(c,driver);
+  if(trainerSourceFinished(driver,c.owner)!==cp.terminal)throw new Error('trainer-ai-restore-terminal-mismatch');
   c.state=clone(cp.state);c.cache=null;
   if(cp.cache){const value=capture(c);if(!cp.cache.submitted && semanticFingerprint(value.capture.snapshot)!==semanticFingerprint(cp.cache.snapshot))throw new Error('trainer-ai-restore-request-mismatch');value.plan=clone(cp.cache.plan);value.attempted=[...cp.cache.attempted];value.submitted=cp.cache.submitted;}
 }

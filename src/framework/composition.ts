@@ -42,7 +42,8 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
   // Selecting the producer mode and the actual driver is one composition-time choice. Later mutable options cannot
   // retain required authority while substituting another engine. Callback receivers/content lookup stay unchanged.
   const driver = selectedDriver ?? showdownDriverFactory;
-  const resolveStrategy = (options.trainerAiStrategies ?? createTrainerAiStrategyRegistry()).resolve;
+  const strategies = options.trainerAiStrategies ?? createTrainerAiStrategyRegistry();
+  const resolveStrategy = strategies.resolve.bind(strategies);
   const currentContent = options.content.bind(options);
   const factory: BattleSessionFactory<BattleSession> = {
     // the application has created the foes (rules/member-factory) and decided the flags; this only wires the engine

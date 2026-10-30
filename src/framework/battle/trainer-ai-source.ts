@@ -11,9 +11,10 @@ import { itemEligibility } from '../rules/rules';
 
 type Action = {kind:'move'|'switch'; choice:string} | {kind:'item'; itemId:string; battleId:string; target:string; resourceKey:string};
 export interface TrainerRequestTicket { readonly opaque?: never }
-export interface TrainerCapture { ticket:TrainerRequestTicket; snapshot:TrainerAiSnapshot }
+/** Automatic engine responses are private execution data, never a made-up learned move in the policy DTO. */
+export interface TrainerCapture { ticket:TrainerRequestTicket; snapshot:TrainerAiSnapshot; automaticCandidateId?:string }
 interface RequestIdentity { object:object|null; turn:number; seq:number; revision:number; signature:string }
-interface TicketData { source:Source; owner:object; request:RequestIdentity; resourceRevision:number; actions:Map<string,Action>; spent:boolean }
+interface TicketData { source:Source; owner:object; request:RequestIdentity; resourceRevision:number; actions:Map<string,Action>; spent:boolean; automaticCandidateId?:string }
 type MutableOpponent = {-readonly [K in keyof PublicOpponent]:PublicOpponent[K]};
 interface Source {
   driver:BattleDriver; battle:ShowdownBattle; env:LoadedSim; lineage:object; seed:number[]|string;
@@ -107,16 +108,20 @@ export function bindTrainerSource(driver:BattleDriver,owner:object,content:Conte
 function sourceFor(driver:BattleDriver,owner:object):Source {
   const s=SOURCES.get(driver);if(!s||s.owner!==owner||!s.catalog)throw new Error('trainer-ai-source-mismatch');return s;
 }
+/** Terminal growth still checkpoints trainer state, but has no executable engine request. */
+export function trainerSourceFinished(driver:BattleDriver,owner:object):boolean {
+  return sourceFor(driver,owner).battle.ended;
+}
 export function captureTrainerRequest(driver:BattleDriver,owner:object,generation:number,profile:TrainerAiSnapshot['profile'],resources:readonly TrainerResource[],resourceRevision:number):TrainerCapture {
   const s=sourceFor(driver,owner),b=s.battle,side=b.sides[1],req=side.activeRequest,r=s.request,catalog=s.catalog!.catalog;
   if(req!==r.object || b.turn!==r.turn)throw new Error('trainer-ai-original-request-mismatch');
   const signature=requestSignature(s);
   if(signature!==r.signature){s.request={...r,revision:r.revision+1,signature};s.ticket=null;}
-  if(s.ticket){const t=TICKETS.get(s.ticket);if(t&&t.request===s.request&&t.resourceRevision===resourceRevision)return {ticket:s.ticket,snapshot:copy((t as TicketData & {snapshot:TrainerAiSnapshot}).snapshot)};}
+  if(s.ticket){const t=TICKETS.get(s.ticket);if(t&&t.request===s.request&&t.resourceRevision===resourceRevision)return {ticket:s.ticket,snapshot:copy((t as TicketData & {snapshot:TrainerAiSnapshot}).snapshot),...(t.automaticCandidateId?{automaticCandidateId:t.automaticCandidateId}:{})};}
   const party:OwnMember[]=side.pokemon.map((p:ShowdownPokemon)=>({memberId:p.name,partyOrder:side.team.findIndex((set:any)=>set.name===p.name),active:!!p.isActive,hp:p.hp,maxhp:p.maxhp,status:status(p.status,p.hp===0&&p.fainted),confusionTurns:p.isActive?(p.volatiles.confusion?.time??0):0,types:[...p.getTypes()],knownAbility:p.ability,knownHeldItem:p.item,moves:p.moveSlots.map((m:any,i:number)=>({slot:i+1,moveId:m.id,pp:m.pp,maxpp:m.maxpp}))}));
   const actions=new Map<string,Action>();
   const key='p2:'+s.request.seq+':'+s.request.revision;
-  let request:TrainerAiSnapshot['request'];
+  let request:TrainerAiSnapshot['request'],automaticCandidateId:string|undefined;
   if(b.ended)request={kind:'finished'};
   else if(!req||req.wait||(!side.choice.forcedSwitchesLeft&&side.choice.actions.length>=side.active.length))request={kind:'wait'};
   else if(req.forceSwitch){
@@ -124,30 +129,42 @@ export function captureTrainerRequest(driver:BattleDriver,owner:object,generatio
     request={kind:'force-switch',legalSwitches:switches};
   }else{
     const actor=side.active[0];if(!actor||actor.fainted||!req.active?.[0])throw new Error('trainer-ai-invalid-move-request');
+    const requested=req.active[0].moves;
+    // Fixed Gen8 emits only {move,id} for hard-locked turns. Verify that actual lock on
+    // this owner before responding at its request command position, with no policy/RNG.
+    // Ordinary single-move and PP-less Struggle requests retain their normal DTO path.
+    if(requested.length===1&&requested[0].pp===undefined&&requested[0].target===undefined){
+      const locked=actor.getLockedMove();
+      if(!locked||id(locked)!==requested[0].id||req.active[0].trapped!==true)throw new Error('trainer-ai-invalid-automatic-request');
+      automaticCandidateId=key+':automatic:'+requested[0].id;
+      actions.set(automaticCandidateId,{kind:'move',choice:'move 1'});
+    }
     const legalMoves:LegalMoveCandidate[]=[];
-    for(const [i,m]of req.active[0].moves.entries()){
+    if(!automaticCandidateId)for(const [i,m]of requested.entries()){
       if(m.disabled || m.pp===0)continue;
       const meta=catalog.moves[m.id];if(!meta)throw new Error('trainer-ai-move-catalog-missing:'+m.id);
       const self=['self','allySide','allyTeam','all','field'].includes(m.target),opponent=s.public;
       if(!self&&(!opponent||opponent.fainted))throw new Error('trainer-ai-public-target-missing');
       const target=self?{kind:'self' as const}:{kind:'opponent' as const,appearanceKey:opponent!.appearanceKey};
-      let mult:Ratio={numerator:1,denominator:1};for(const t of self?actor.getTypes():opponent!.shownTypes){const v=catalog.types[meta.moveType]?.[t];if(!v)throw new Error('trainer-ai-public-type-missing');mult={numerator:mult.numerator*v.numerator,denominator:mult.denominator*v.denominator};}
+      let mult:Ratio={numerator:1,denominator:1};for(const t of self?actor.getTypes():opponent!.shownTypes){if(t==='???')continue;const v=catalog.types[meta.moveType]?.[t];if(!v)throw new Error('trainer-ai-public-type-missing');mult={numerator:mult.numerator*v.numerator,denominator:mult.denominator*v.denominator};}
       while(mult.numerator%2===0&&mult.denominator%2===0&&mult.denominator>1){mult={numerator:mult.numerator/2,denominator:mult.denominator/2};}
       const candidateId=key+':m:'+i;actions.set(candidateId,{kind:'move',choice:'move '+(i+1)});
-      legalMoves.push({candidateId,slot:i+1,moveId:m.id,mode:m.id==='struggle'?'engine-auto-struggle':'normal',target,metadata:{...copy(meta),publicTypeMultiplier:mult,publicFailure:meta.family==='basic-damage'&&mult.numerator===0?'type-immune':'none',omittedModifiers:['other-move-effects']}});
+      const slot=m.id==='struggle'?i+1:actor.moveSlots.findIndex((own:any)=>own.id===m.id)+1;
+      if(slot<1)throw new Error('trainer-ai-requested-move-not-owned');
+      legalMoves.push({candidateId,slot,moveId:m.id,mode:m.id==='struggle'?'engine-auto-struggle':'normal',target,metadata:{...copy(meta),publicTypeMultiplier:mult,publicFailure:meta.family==='basic-damage'&&mult.numerator===0?'type-immune':'none',omittedModifiers:['other-move-effects']}});
     }
     const legalItems:LegalItemCandidate[]=[];
-    for(const res of resources){const meta=catalog.items[res.itemId];if(!meta)throw new Error('trainer-ai-item-catalog-missing');if(res.count<1||meta.family==='unsupported')continue;
+    if(!automaticCandidateId)for(const res of resources){const meta=catalog.items[res.itemId];if(!meta)throw new Error('trainer-ai-item-catalog-missing');if(res.count<1||meta.family==='unsupported')continue;
       const battleId=s.catalog!.battleItems[res.itemId]!;
       if(!itemEligibility(battleId,{id:actor.name,hp:actor.hp,maxhp:actor.maxhp,fainted:actor.fainted,status:actor.status,active:true,confused:!!actor.volatiles.confusion}).ok)continue;
       const candidateId=key+':i:'+res.resourceKey;actions.set(candidateId,{kind:'item',itemId:res.itemId,battleId,target:actor.name,resourceKey:res.resourceKey});
       legalItems.push({candidateId,resourceKey:res.resourceKey,itemId:res.itemId,targetMemberId:actor.name,...copy(meta),family:meta.family});
     }
-    request={kind:'move',actorId:actor.name,legalMoves,legalItems};
+    request=automaticCandidateId?{kind:'wait'}:{kind:'move',actorId:actor.name,legalMoves,legalItems};
   }
   const snapshot:TrainerAiSnapshot={schema:'trainer-ai-public-v1',gen:8,format:'gen8rpgcustomgame',binding:{requestKey:'p2:'+s.request.seq,requestRevision:String(s.request.revision),generation,turn:b.turn,ownResourceRevision:resourceRevision},profile:copy(profile),own:{side:'p2',party,resources:copy([...resources])},opponent:{active:s.public?[copy(s.public)]:[]},field:{weather:s.weather,terrain:s.terrain,publicConditions:[...s.conditions]},request};
-  const ticket=Object.freeze({});TICKETS.set(ticket,{source:s,owner,request:s.request,resourceRevision,actions,spent:false,snapshot:copy(snapshot)} as TicketData);s.ticket=ticket;
-  return {ticket,snapshot};
+  const ticket=Object.freeze({});TICKETS.set(ticket,{source:s,owner,request:s.request,resourceRevision,actions,spent:false,snapshot:copy(snapshot),automaticCandidateId} as TicketData);s.ticket=ticket;
+  return {ticket,snapshot,...(automaticCandidateId?{automaticCandidateId}:{})};
 }
 export function trainerCandidate(driver:BattleDriver,owner:object,ticket:TrainerRequestTicket,candidateId:string,resourceRevision:number):Action {
   const s=sourceFor(driver,owner),t=TICKETS.get(ticket);
@@ -155,6 +172,7 @@ export function trainerCandidate(driver:BattleDriver,owner:object,ticket:Trainer
   if(t.spent)throw new Error('trainer-ai-request-already-submitted');
   if(t.resourceRevision!==resourceRevision)throw new Error('trainer-ai-resource-revision-changed');
   if(t.request!==s.request || t.request.object!==s.battle.sides[1].activeRequest || t.request.signature!==requestSignature(s)||t.request.turn!==s.battle.turn)throw new Error('trainer-ai-request-revision-changed');
+  if(t.automaticCandidateId&&id(s.battle.sides[1].active[0]?.getLockedMove()||'')!==s.battle.sides[1].activeRequest?.active?.[0]?.moves?.[0]?.id)throw new Error('trainer-ai-request-revision-changed');
   const action=t.actions.get(candidateId);if(!action)throw new Error('trainer-ai-unknown-candidate');return copy(action);
 }
 export async function submitTrainerCandidate(driver:BattleDriver,owner:object,ticket:TrainerRequestTicket,candidateId:string,resourceRevision:number):Promise<'accepted'|'safe-rejected'> {

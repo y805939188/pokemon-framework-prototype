@@ -51,7 +51,7 @@ export function createTrainerAiStrategyRegistry():TrainerAiStrategyRegistry {
       if(!entry.implementationIdentity||typeof entry.implementationIdentity!=='string'||typeof entry.create!=='function'||typeof entry.validateParameters!=='function')throw new Error('trainer-ai-invalid-registration');
       if(entries.get(entry.id)?.has(entry.version)||identities.has(entry.implementationIdentity))throw new Error('trainer-ai-strategy-already-registered');
       // Capture actual functions now; later changes to the caller's descriptor cannot replace this implementation.
-      const fixed=Object.freeze({id:entry.id,version:entry.version,implementationIdentity:entry.implementationIdentity,create:entry.create,validateParameters:entry.validateParameters});
+      const fixed=Object.freeze({id:entry.id,version:entry.version,implementationIdentity:entry.implementationIdentity,create:entry.create.bind(entry),validateParameters:entry.validateParameters.bind(entry)});
       let versions=entries.get(entry.id);if(!versions){versions=new Map();entries.set(entry.id,versions);}versions.set(entry.version,fixed);identities.add(entry.implementationIdentity);
       if(makeActive)active.set(entry.id,entry.version);
     },
