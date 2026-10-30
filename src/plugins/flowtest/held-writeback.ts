@@ -27,6 +27,9 @@ function setup(p: any, content: any, empty = false): any {
   W.PSFlow.developerCapabilities = { allowHeldItemSources: true, allowExperimentalHeldItemBattle: true };
   W.PSFlow.receiveOptions = { mode: 1, naming: 1 }; W.PSFlow.seed = [1, 2, 3, 4]; W.PSFlow.rng = (n: number) => 0;
   const game = E.state.newGame({ content, party: [], money: 1000, bag: { oranberry: 2, leftovers: 1, masterball: 2 } });
+  // This held-source test requires obedient level-50 trade members; the zero-badge disobedience control is separate.
+  // Preserve real ownership/obedience/RNG behavior rather than disabling it or retrying the random result to green.
+  game.badges.fill(true);
   if (!empty) {
     game.party.push(E.speciesKey.toPersistentMember(E.memberFactory.createMember({ id: "P1", species: "Snorlax", level: 50 }, content, (n: number) => 0), content));
     game.nextMemberOrdinal = "2";
