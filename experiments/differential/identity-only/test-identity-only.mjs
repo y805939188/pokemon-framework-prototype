@@ -53,6 +53,25 @@ test('blocked unknown facts preserve nulls instead of inventing observed hashes'
 test('blocked partial tag query may preserve a genuinely unknown peel',()=>{
  const f=fixture();modify(f,v=>{v.status='BLOCKED';v.code='OBJECT_QUERY_FAILED';v.facts.tag.peeledCommitSHA=null;});assert.equal(inspect(f.p).facts.tag.peeledCommitSHA,null);
 });
+for(const status of ['OBSERVED','BLOCKED']){
+ test('same tag object rejects two known different peels even when '+status,()=>{
+  const f=fixture();assert.equal(inspect(f.p).metadataGate,'VALID_IDENTITY_ONLY_METADATA');
+  modify(f,v=>{v.status=status;v.code=status==='BLOCKED'?'OBJECT_QUERY_FAILED':'NONE';v.facts.target={exists:true,objectType:'tag',peeledCommitSHA:fake('target-peel')};v.facts.tag={exists:true,objectType:'tag',objectSHA:target,peeledCommitSHA:fake('other-peel')};v.facts.headCommitSHA=fake('other-peel');});
+  const {r,v}=cli(f.p);assert.equal(r.status,2);assert.equal(v.code,'IDENTITY_FACTS_INCONSISTENT');assert.equal(v.sourceQualificationAccepted,false);
+ });
+ test('same tag object accepts the same known peel when '+status,()=>{
+  const f=fixture();modify(f,v=>{v.status=status;v.code=status==='BLOCKED'?'OBJECT_QUERY_FAILED':'NONE';v.facts.target={exists:true,objectType:'tag',peeledCommitSHA:fake('same-peel')};v.facts.tag={exists:true,objectType:'tag',objectSHA:target,peeledCommitSHA:fake('same-peel')};v.facts.headCommitSHA=fake('same-peel');});
+  const {r,v}=cli(f.p);assert.equal(r.status,0);assert.equal(v.relations.targetEqualsTagObject,true);assert.equal(v.relations.targetPeelsToTagCommit,true);assert.equal(v.sourceQualificationAccepted,false);
+ });
+}
+test('different tag objects may have different known peels',()=>{
+ const f=fixture();modify(f,v=>{v.facts.target={exists:true,objectType:'tag',peeledCommitSHA:fake('target-peel')};v.facts.tag={exists:true,objectType:'tag',objectSHA:fake('other-tag'),peeledCommitSHA:fake('other-peel')};v.facts.headCommitSHA=fake('other-peel');});
+ const {r,v}=cli(f.p);assert.equal(r.status,0);assert.equal(v.relations.targetEqualsTagObject,false);assert.equal(v.relations.targetPeelsToTagCommit,false);
+});
+for(const unknown of ['target','tag'])test('same tag object retains one unknown '+unknown+' peel when blocked',()=>{
+ const f=fixture();modify(f,v=>{v.status='BLOCKED';v.code='OBJECT_QUERY_FAILED';v.facts.target={exists:true,objectType:'tag',peeledCommitSHA:fake('known-peel')};v.facts.tag={exists:true,objectType:'tag',objectSHA:target,peeledCommitSHA:fake('known-peel')};v.facts[unknown].peeledCommitSHA=null;v.facts.headCommitSHA=fake('known-peel');});
+ const {r,v}=cli(f.p);assert.equal(r.status,0);assert.equal(v.facts[unknown].peeledCommitSHA,null);assert.equal(v.relations.targetPeelsToTagCommit,null);assert.equal(v.sourceQualificationAccepted,false);
+});
 for(const field of ['privateSource','path','raw','reason','sourceQualificationAccepted'])rejected('closed top-level rejects '+field,v=>{v[field]='SYNTHETIC_PRIVATE_TOKEN';});
 rejected('closed nested facts reject path',v=>{v.facts.tag.path='SYNTHETIC_PRIVATE_TOKEN';});
 rejected('free text cannot be a reason code',v=>{v.code='SYNTHETIC_PRIVATE_TOKEN';});

@@ -55,6 +55,13 @@ export function validateFacts(value,schema){
  if(tag.exists===true)known(tag.objectSHA,tag.objectType);
  known(target.peeledCommitSHA,'commit');known(tag.peeledCommitSHA,'commit');known(headCommitSHA,'commit');
  if(target.exists===false)need(!types.has(value.targetObjectSHA),'IDENTITY_FACTS_INCONSISTENT');
+ // Repeated descriptions of one object must agree whenever both peels are known.
+ const peels=new Map();
+ for(const [sha,object]of [[value.targetObjectSHA,target],[tag.objectSHA,tag]]){
+  if(object.exists!==true||object.peeledCommitSHA===null)continue;
+  need(!peels.has(sha)||peels.get(sha)===object.peeledCommitSHA,'IDENTITY_FACTS_INCONSISTENT');
+  peels.set(sha,object.peeledCommitSHA);
+ }
  if(value.status==='OBSERVED'){
   need(value.code==='NONE','IDENTITY_STATUS_CODE_MISMATCH');
   need(target.exists!==null&&tag.exists!==null&&headCommitSHA!==null&&(![target,tag].some(x=>x.objectType==='tag'&&x.peeledCommitSHA===null)),'IDENTITY_OBSERVATION_INCOMPLETE');

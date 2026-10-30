@@ -8,7 +8,7 @@
 
 OBSERVED表示查询事实已取得，不是目标已合格。不同tag或当前HEAD不造成自动拒绝：存在的固定commit可以与tag/HEAD不同，tag缺失也可作为真实诊断事实接收。tag或commit的peel语义必须自洽；同一ID不能报两种类型；missing不能同时被其它已观察commit事实证明存在。BLOCKED须非NONE原因码；未知/未完成peel不得冒作OBSERVED。关系由接收器计算，不接受agent自签匹配字段。
 
-schema SHA256 `9a929f1e0ef6f53fef214d69743e7cf2b8fc2f1ae4508fe84d63ef0e162deb44`；receiver SHA256 `be74d40185f32f3fd5f7588268d5f057af2f0aae1565b1b41a0b45f38d06974d`。固定候选的两个哈希必须由父端带外取得，不能O改schema后现算现信。生产调用：
+schema SHA256 `9a929f1e0ef6f53fef214d69743e7cf2b8fc2f1ae4508fe84d63ef0e162deb44`；receiver SHA256 `3802dc7cac21d75f2c1b544e66a365c3e90811941da111971311e0ee909fb4cd`。固定候选的两个哈希必须由父端带外取得，不能O改schema后现算现信。生产调用：
 
 ```sh
 /Users/dingshinn/.nvm/versions/node/v22.21.1/bin/node /Users/dingshinn/Desktop/pokemon-framework/.worktrees/ruby-ts-pre54-identity-only-20261030/experiments/differential/identity-only/receive.mjs --public-root /Users/dingshinn/Desktop/pokemon-framework/.verify/ruby-ts-pre54-observation-8c9951c-20261030/identity-public --expected-schema 9a929f1e0ef6f53fef214d69743e7cf2b8fc2f1ae4508fe84d63ef0e162deb44
