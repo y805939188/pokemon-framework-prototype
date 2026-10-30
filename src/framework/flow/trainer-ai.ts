@@ -113,14 +113,20 @@ function decide(c:Channel,cache:Cache,gate:Gate,allowFallback:boolean):DecisionP
     c.state.random=clone(record.after);cache.plan=clone(record.plan);return clone(record.plan);
   }
   if(c.testFull||c.decided.size>=4096)throw new Error('trainer-ai-journal-full');
-  const epoch=++c.epoch,before=clone(c.state.random),local=clone(before),started=c.timing.now();let open=true,calls=0;
+  const epoch=++c.epoch,before=clone(c.state.random),local=clone(before),started=c.timing.now();let open=true,calls=0,sourceFault:{error:unknown}|null=null;
   if(!Number.isFinite(started))throw new Error('trainer-ai-invalid-timing');
   const random=(n:number):number=>{
     if(!open||c.epoch!==epoch||c.gate!==gate||gate.cancelled)throw new Error('trainer-ai-random-closed');
-    current(c,c.driver);if(c.timing.now()-started>=1000)throw new Error('trainer-ai-timeout');if(++calls>256)throw new Error('trainer-ai-random-budget');return trainerRandomN(local,n);
+    let elapsed:number;
+    try {
+      current(c,c.driver);elapsed=c.timing.now()-started;
+      if(!Number.isFinite(elapsed)||elapsed<0)throw new Error('trainer-ai-invalid-timing');
+    }catch(error){sourceFault={error};throw error;}
+    if(elapsed>=1000)throw new Error('trainer-ai-timeout');
+    if(++calls>256)throw new Error('trainer-ai-random-budget');return trainerRandomN(local,n);
   };
   const finish=(ok:boolean,value:unknown):DecisionPlan=>{
-    open=false;owned(c,gate);if(c.epoch!==epoch)throw new Error('trainer-ai-operation-retired');current(c,c.driver);key(c,cache);
+    open=false;owned(c,gate);if(sourceFault)throw sourceFault.error;if(c.epoch!==epoch)throw new Error('trainer-ai-operation-retired');current(c,c.driver);key(c,cache);
     let plan:DecisionPlan,fault:string|null=null;
     if(ok){try{plan=validateTrainerAiIntent(value,input);if(plan.kind==='error')throw new Error('trainer-ai-policy-'+plan.reason);}catch(error){ok=false;value=error;}}
     if(!ok){
