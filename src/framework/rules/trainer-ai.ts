@@ -482,6 +482,9 @@ export function createTrainerAiPolicy(publicCatalog:TrainerAiCatalog):TrainerAiP
         if(chosen.kind==='error')return {...chosen,binding};
         return {...chosen,binding,diagnostics};
       }
+      // A normal request must provide its move/explicit auto candidate set before any item gate.
+      // Otherwise declining a legal item's probability could consume RNG and only then report no action.
+      if(req.legalMoves.length===0)return {kind:'error',binding,reason:req.legalItems.length?'invalid-snapshot':'no-legal-action'};
       const actor=x.own.party.find(m=>m.memberId===req.actorId)!;
       // Compute all deterministic scores before the first RNG call, including any overflow checks.
       const scored=req.legalMoves.map((c,requestOrder)=>{

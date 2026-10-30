@@ -5,6 +5,7 @@ const root=path.resolve(__dirname,'../../../..'),modulePath=path.join(root,'src/
 const output=process.argv[2];if(!output)throw Error('supply a fresh evidence output directory');fs.mkdirSync(output,{recursive:false});
 const original=fs.readFileSync(modulePath,'utf8'),hash=s=>crypto.createHash('sha256').update(s).digest('hex');
 const mutations=[
+ ['incomplete-moves-before-item',"if(req.legalMoves.length===0)return {kind:'error',binding,reason:req.legalItems.length?'invalid-snapshot':'no-legal-action'};",''],
  ['extra-field-admission','actual.length === expected.length && expected.every','expected.every'],
  ['invalid-rng-clamp','if (!Number.isSafeInteger(x) || x < 0 || x >= n) throw new BadRandom();','x = Math.max(0, Math.min(n-1, Number(x)||0));'],
  ['selection-input-alias','return select(c.skill, c.candidates, random);','return select(skill, candidates, random);'],

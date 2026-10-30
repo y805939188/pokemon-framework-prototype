@@ -136,3 +136,21 @@ test('selection seam snapshots input before RNG; callback cannot rewrite IDs or 
  const r=ai.selectTrainerMove(0,candidates,n=>{assert.equal(n,70);candidates[0].candidateId='injected';candidates[1].score=999;return 0;});
  assert.equal(r.kind,'choose');assert.equal(r.candidateId,'A');assert.deepEqual(r.retryOrder,['A','B']);
 });
+// C-PURE-ULTRA-01: incomplete normal enumeration is refused before all item probability/mandatory paths.
+for(const[family,hp,status,values]of [
+ ['hp-quarter',25,'none',[]],['hp-gate-accept',30,'none',[29]],['hp-gate-decline',30,'none',[30]],
+ ['status-gate-accept',100,'psn',[39]],['status-gate-decline',100,'psn',[40]],['sleep-mandatory',100,'slp',[]],
+])test('incomplete moves refuse with zero draws: '+family,()=>{
+ const s=snapshot();s.own.party[0].hp=hp;s.own.party[0].status=status;addItem(s,status==='slp'?'awakening':status==='psn'?'antidote':'potion');s.request.legalMoves=[];
+ const before=structuredClone(s),r=decide(s,values);assert.equal(r.result.kind,'error');assert.equal(r.result.reason,'invalid-snapshot');assert.deepEqual(r.calls,[]);assert.deepEqual(s,before);
+});
+function withAuto(s){s.request.legalMoves=[{candidateId:'AUTO',slot:1,moveId:'struggle',mode:'engine-auto-struggle',target:{kind:'opponent',appearanceKey:'shown1'},metadata:{...catalog().moves.struggle,publicTypeMultiplier:{numerator:1,denominator:1},publicFailure:'none',omittedModifiers:[]}}];}
+for(const[name,hp,status,values,kind,chosen]of [
+ ['hp-quarter',25,'none',[],'choose','potion'],['hp-accept',30,'none',[29],'choose','potion'],['hp-decline',30,'none',[30],'fallback','AUTO'],
+ ['status-accept',100,'psn',[39],'choose','antidote'],['status-decline',100,'psn',[40],'fallback','AUTO'],['sleep',100,'slp',[],'choose','awakening'],
+])test('explicit engine auto candidate preserves item behavior: '+name,()=>{
+ const s=snapshot();s.own.party[0].hp=hp;s.own.party[0].status=status;addItem(s,status==='slp'?'awakening':status==='psn'?'antidote':'potion');withAuto(s);
+ const before=structuredClone(s),r=decide(s,values);assert.equal(r.result.kind,kind);assert.deepEqual(r.calls,values.map(()=>100));assert.deepEqual(s,before);
+ if(kind==='choose')assert.equal(r.result.candidateId,chosen);else{assert.deepEqual(r.result.candidateIds,[chosen]);assert.equal(r.result.reason,'no-normal-move');}
+});
+test('incomplete move enumeration with no item remains no-legal-action and zero draws',()=>{const s=snapshot();s.request.legalMoves=[];const before=structuredClone(s),r=decide(s,[]);assert.equal(r.result.reason,'no-legal-action');assert.deepEqual(r.calls,[]);assert.deepEqual(s,before);});
