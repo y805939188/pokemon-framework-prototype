@@ -33,7 +33,7 @@ export { PROTOCOL_VERSION, MEMBER_WRITE_SET } from "./battle-result";
 export type { BattleResult, BattleOutcome, MemberPatch, WriteKey, Dex } from "./battle-result";
 
 /** Version of the PERSISTENT game state document (rules/save-schema.ts migrates older ones). Not the battle protocol version. */
-export const GAME_SCHEMA = 8;
+export const GAME_SCHEMA = 9;
 
 export interface GameState {
   schema: number;
@@ -45,7 +45,7 @@ export interface GameState {
   badges: boolean[];
   money: number;
   dex: DexState;
-  appliedBattles: Record<string, { hash: string; trainer?: { id: string; version: number } }>;
+  appliedBattles: Record<string, { hash: string; trainer?: { id: string; version: number }; settlement?: { version: 1; pairHash: string } }>;
   /** Won trainer records keyed id@version (schema 8); versions stay distinct and intentional rematches remain allowed. */
   defeatedTrainers: Record<string, { id: string; version: number }>;
   /** One-time claims (schema 3): a claimed grant id can never be granted again on this save timeline. */

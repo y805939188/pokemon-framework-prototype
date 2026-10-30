@@ -10,6 +10,7 @@ function setup({evolution=false,hasDex=false}={}){
  const counts={create:0,random:0,replace:0},hooks={};let app;
  const call=(key,value)=>{const f=hooks[key];if(f){delete hooks[key];f();}return value();};
  const ports={state:{read:()=>call('state',()=>w.state.read()),replace:n=>{counts.replace++;w.state.replace(n);}},content:()=>call('content',()=>({content:w.content,dex:E.dex.createDexLookup()})),sessions:{create:async(...args)=>{counts.create++;return w.sessions.create(...args);},effects:(...a)=>w.sessions.effects(...a)},projection:w.projection,clock:()=>call('clock',()=>0),random:n=>{counts.random++;return call('random',()=>0);},creationContext:()=>call('creationContext',()=>({})),itemWorld:()=>call('itemWorld',()=>({mapId:5}))};
+ ports.sessions=E.composition.createLegacyNoHeldSessionFactory(ports.sessions);
  app=new E.app.GameApplication(ports,{receivingProfile:{mode:1,naming:1}});
  return {...w,app,counts,hooks,ports,id:g.party[0].id,request:{...w.request,battleId:'guard-test'}};
 }

@@ -263,7 +263,7 @@ export interface DexLookup {
   abilityInfo?(id: string): { name: string; description: string } | null;
   moveDetails?(id: string): { name: string; type: string; category: string; power: number | null; accuracy: number; description: string } | null;
   /** Controlled held-item sources only; never queried before source/capability checks. */
-  heldItem?(id: string): { holdable: boolean; mail: boolean } | null;
+  heldItem?(id: string): { id?: string; holdable: boolean; mail: boolean } | null;
 }
 
 /** Where a Content object came from; carried so logs and reports say which one a battle used. */

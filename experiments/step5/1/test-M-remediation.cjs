@@ -30,7 +30,9 @@ if (process.argv[2] === '--cold-held') {
     if (mode === 'malformed') sd.usageCheck = { decision: 'internal-use' };
     const dex = E.dex.createDexLookup(), assembled = E.contentRuntime.assembleContent(compiled, dex);
     const controlled = new E.app.GameApplication({ state, sessions: E.fakes.createFakeSessions({}), projection: E.fakes.createRecordingProjection(), content: () => ({ content: assembled.content, dex }) }, { capabilities: { allowHeldItemSources: true } });
-    assert.throws(() => controlled.commitResult(raw, { templates: { NEW: template }, profile: auto }), /held-item-source-unchecked/);
+    assert.throws(() => controlled.commitResult(raw, { templates: { NEW: template }, profile: auto }), /legacy-no-held-source-gate/);
+    const sourceProbe = controlled.receiveGift({ kind:'normal', member:{existing:template} }, {profile:auto});
+    assert.equal(sourceProbe.status,'refused');assert.match(sourceProbe.error,/held-item-source-unchecked/);
   } else assert.throws(() => app.commitResult(raw, { templates: { NEW: template }, profile: auto }), expected);
   assert.equal(loads, 0); assert.equal(state.replaced.length, 0);
   assert.equal(Object.keys(require.cache).filter(p => p.includes('/showdown/dist/data/')).length, 0);
@@ -96,16 +98,20 @@ if (process.argv[2] === '--cold-held') {
       assert.equal(loads, 0); assert.equal(lookups, 0); assert.equal(x.state.replaced.length, 0); assert.deepEqual(x.state.current(), before); assert.deepEqual(c.raw, rawBefore);
     }
   });
-  test('M02: explicit source capability permits checked held item, independently of battle capability', async () => {
+  test('M02/B: source capability permits actual checked acquisition independently of battle capability; naked held battle JSON no longer grants provenance', async () => {
     const x = setup(undefined, { capabilities: { allowHeldItemSources: true } }), { raw, options } = capture();
-    assert.equal(x.app.commitResult(raw, options), 'applied'); assert.equal(x.state.current().party[1].item, 'leftovers');
-    assert.equal(x.state.current().appliedBattles[raw.battleId].hash, E.state.resultHash(raw)); assert.equal(x.state.replaced.length, 1);
+    assert.throws(()=>x.app.commitResult(raw,options),/legacy-no-held-source-gate/);assert.equal(x.state.replaced.length,0);
+    const received=x.app.receiveGift({kind:'normal',member:{existing:options.templates.NEW}},{profile:auto});
+    assert.equal(received.status,'applied');assert.equal(x.state.current().party[1].item,'leftovers');assert.equal(x.state.replaced.length,1);
+    assert.equal(Object.hasOwn(x.state.current().appliedBattles,raw.battleId),false,'acquisition does not fabricate a battle ledger');
     await assert.rejects(x.app.startBattle({ battleId: 'held', kind: 'wild', seq: 1, foes: [{ species: 'pidgey', level: 3 }] }), /held-item-battle-disabled/);
     const core = setup(), source = { allowed: true, describe: id => id === 'leftovers' ? { holdable: true, mail: false } : null };
     assert.equal(E.state.applyBattleResult(core.state.current(), raw, E.limits.DEFAULT_LIMITS, E.speciesKey.speciesKeyResolver(content), { ...options, content, heldItemSource: source }).state.party[1].item, 'leftovers');
   });
-  test('M02: installed held capture exact replay ignores the now-closed source without content or item lookup', () => {
-    const x = setup(undefined, { capabilities: { allowHeldItemSources: true } }), c = capture(); assert.equal(x.app.commitResult(c.raw, c.options), 'applied');
+  test('M02/B: historical installed raw-only held ledger replay ignores the now-closed source without content or item lookup', () => {
+    const x = setup(undefined, { capabilities: { allowHeldItemSources: true } }), c = capture();
+    const historical=E.state.applyBattleResult(x.state.current(),c.raw,E.limits.DEFAULT_LIMITS,E.speciesKey.speciesKeyResolver(content),{...c.options,content,heldItemSource:{allowed:true,describe:()=>({holdable:true,mail:false})}});
+    x.state.replace(historical.state); // explicit pre-existing raw-only ledger; not a new application admission.
     const before = clone(x.state.current()); let loads = 0, lookups = 0;
     const app = new E.app.GameApplication({ state: x.state, sessions: E.fakes.createFakeSessions({}), projection: E.fakes.createRecordingProjection(), content: () => { loads++; throw Error('unexpected replay content'); } }, { describeHeldItem: () => { lookups++; throw Error('unexpected replay item lookup'); } });
     assert.equal(app.commitResult(c.raw), 'already-applied');
@@ -115,20 +121,23 @@ if (process.argv[2] === '--cold-held') {
   test('M02: controlled capture still rejects unknown/nonholdable/mail and unchecked external source before data', () => {
     for (const [item, descriptor, mail] of [['unknown', null, null], ['key', { holdable: false }, null], ['letter', { holdable: true, mail: true }, null], ['leftovers', { holdable: true }, 'letter']]) {
       const x = setup(undefined, { capabilities: { allowHeldItemSources: true }, describeHeldItem: () => descriptor }); const c = capture('NEW', item); c.template.mail = mail;
-      const before = clone(x.state.current()); assert.throws(() => x.app.commitResult(c.raw, c.options), /invalid-held-item|mail-not-supported/); assert.equal(x.state.replaced.length, 0); assert.deepEqual(x.state.current(), before);
+      const before = clone(x.state.current());const out=x.app.receiveGift({kind:'normal',member:{existing:c.template}},{profile:auto});
+      assert.equal(out.status,'refused');assert.match(out.reason,/invalid-held-item|mail-not-supported/);assert.equal(x.state.replaced.length, 0); assert.deepEqual(x.state.current(), before);
+      assert.throws(()=>E.state.applyBattleResult(before,c.raw,E.limits.DEFAULT_LIMITS,E.speciesKey.speciesKeyResolver(content),{...c.options,content,heldItemSource:{allowed:true,describe:()=>descriptor}}),/invalid-held-item|mail-not-supported/);
     }
     const c = capture(); let dataCalls = 0; const unchecked = clone(content); delete unchecked.meta.showdownSourceChecked;
     const x = setup(undefined, { capabilities: { allowHeldItemSources: true } }, { content: () => ({ content: unchecked, dex: { heldItem() { dataCalls++; throw Error('unexpected external data'); } } }) });
-    assert.throws(() => x.app.commitResult(c.raw, c.options), /held-item-source-unchecked/); assert.equal(dataCalls, 0); assert.equal(x.state.replaced.length, 0);
+    const out=x.app.receiveGift({kind:'normal',member:{existing:c.template}},{profile:auto});assert.equal(out.status,'refused');assert.match(out.error,/held-item-source-unchecked/);assert.equal(dataCalls, 0); assert.equal(x.state.replaced.length, 0);
   });
-  test('M02: finish rejects anomalous raw held capture; pending resume revalidates held source', async () => {
+  test('M02/B: finish rejects anomalous raw held capture; unsafe old direct held pending entry is closed', async () => {
     const x = setup(undefined, { receivingProfile: auto }); const request = { battleId: 'finish-held', kind: 'wild', seq: 1, foes: [{ species: 'pidgey', level: 3 }] };
     let ended; x.sessions.next = () => ended; const handle = await x.app.startBattle(request), foe = x.sessions.created[0].setup.foes[0]; const raw = capture(foe.id).raw; raw.battleId = request.battleId;
     ended = raw; const outcome = x.app.finishBattle(handle, request); assert.equal(outcome.aborted, true); assert.match(outcome.error, /held-item-source-disabled/); assert.equal(x.state.replaced.length, 0); assert.equal(x.app.saveBlocked, false);
     let allowed = true; const y = setup(undefined, { capabilities: { allowHeldItemSources: true }, describeHeldItem: () => allowed ? { holdable: true } : null }); const c = capture();
-    assert.equal(y.app.commitResult(c.raw, { templates: c.options.templates }), 'pending'); const token = y.app.pendingReceiving.token; allowed = false;
-    assert.throws(() => y.app.resolveReceiving(token, { NEW: { nickname: { kind: 'keep' } } }), /invalid-held-item/); assert.equal(y.state.replaced.length, 0); assert.equal(y.app.saveBlocked, true);
-    allowed = true; assert.equal(y.app.resolveReceiving(token, {}).status, 'applied'); assert.equal(y.state.replaced.length, 1);
+    assert.throws(()=>y.app.commitResult(c.raw,{templates:c.options.templates}),/legacy-no-held-source-gate/);
+    assert.equal(y.state.replaced.length,0);assert.equal(y.app.pendingReceiving,null);
+    // Same-source actual-engine held capture pending/revalidation now lives in test-held-app.cjs, with the new
+    // required source and permanent retirement rule; it is not replaced by a different expectation on naked JSON.
   });
 
   test('M04: every present legacy metadata field is checked before defaults, strings never become char lists', () => {

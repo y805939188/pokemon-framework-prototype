@@ -58,7 +58,7 @@ test('P51-11: give/take/swap items is atomic, capacity checked after spending, c
 }));
 test('P51-12: independent runtime capabilities, no capability in state, battle gate precedes content/session load',async()=>{
  for(const source of [false,true])for(const battle of [false,true]){const x=setup({capabilities:{allowHeldItemSources:source,allowExperimentalHeldItemBattle:battle}});const token=x.app.beginManagement(),r=ref(x.state.current(),x.game.party[0].id);assert.equal(x.app.manage(token,'g',{kind:'give-item',source:r,item:'oranberry'}).status,source?'unchanged':'refused');x.app.endManagement(token);const before=x.contentCalls;
- const start=x.app.startBattle({battleId:'held-probe',kind:'wild',foes:[{species:'Pidgey',level:3}],seq:1});if(battle){await start;assert.equal(x.sessions.created.length,1);}else{await assert.rejects(start,/held-item-battle-disabled/);assert.equal(x.contentCalls,before);assert.equal(x.sessions.created.length,0);}assert.equal(JSON.stringify(x.state.current()).includes('allowHeldItem'),false);
+ const start=x.app.startBattle({battleId:'held-probe',kind:'wild',foes:[{species:'Pidgey',level:3}],seq:1});if(battle){await assert.rejects(start,/legacy-no-held-source-gate/);assert.equal(x.sessions.created.length,0,'the old synthetic legacy root may not open held battles; normal required positive is in test-held-app');}else{await assert.rejects(start,/held-item-battle-disabled/);assert.equal(x.contentCalls,before);assert.equal(x.sessions.created.length,0);}assert.equal(JSON.stringify(x.state.current()).includes('allowHeldItem'),false);
  }
  assert.throws(()=>E.config.developmentCapabilities({allowHeldItemSources:1}),/invalid/);assert.ok(E.config.checkOverrides({allowHeldItemSources:true}).length);
 });

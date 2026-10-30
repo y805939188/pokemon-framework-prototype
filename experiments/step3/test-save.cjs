@@ -19,7 +19,7 @@ const migrateGame = (raw, o = { speciesKey: E.speciesKey.identityKeys, content: 
 const addedByNewerSchemas = s => ['claims', 'schema', 'stats', 'steps', ...['party', 'boxes'].flatMap(k => s[k].map((_, i) => `${k}.${i}.form`))].sort();
 const { SaveStore, SaveError } = E.store;
 // the fixture world (content ids = Showdown names) is chosen explicitly: the store guesses no species keys (step 5.0 review F03)
-const store = (f, hooks = {}) => new SaveStore(f, hooks, E.speciesKey.identityKeys, E.fixtures.content);
+const store = (f, hooks = {}) => E.fakes.createFixtureSaveStore(f, hooks, E.speciesKey.identityKeys, E.fixtures.content);
 const S = E.state;
 const F = E.fixtures;
 

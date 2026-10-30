@@ -62,3 +62,4 @@ export * as pokedex from "./pokedex";
 export * as pokedexQuery from "./pokedex-query";
 
 export * as acquisitionDex from "./acquisition-dex";
+export * as heldFacts from "./held-facts";

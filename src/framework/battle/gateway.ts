@@ -14,6 +14,9 @@ import { own, setOwn } from "../rules/own";
 import type { PartialStats, Stats } from "../rules/types";
 import type { BattleObservation, EvidenceIssue, ObservationBatch } from "../rules/battle-evidence";
 import type { FormatObservation } from "../rules/battle-evidence";
+import { HeldTracker } from "./held-tracker";
+import type { HeldTrackerSnapshot } from "./held-tracker";
+import type { HeldBinding, HeldRosterMember, RequiredFacts } from "../rules/held-facts";
 
 /** Version tag of the engine-level message stream used by the 2.2 harness only; NOT the game protocol (state.ts PROTOCOL_VERSION = 1). */
 export const PROTOCOL_VERSION = 0;
@@ -35,8 +38,16 @@ interface ObservationState {
   records: BattleObservation[]; issues: EvidenceIssue[]; displays: Record<string, string>;
   pending: Record<string, Extract<FormatObservation, { kind: "before-loss" }>>;
 }
-interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[]; friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[]; faintSequence: number }
+interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[]; friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[]; faintSequence: number; settlement?: { state: HeldTrackerSnapshot; lineage: object; wild: boolean } }
 const CHECKPOINTS = new WeakMap<GatewayCheckpoint, CheckpointData>();
+const SETTLEMENTS = new WeakMap<object, { tracker: HeldTracker; lineage: object; wild: boolean }>();
+/** Internal companion queries: a look-alike driver or arbitrary restored JSON has no entry. */
+export function gatewaySettlementLineage(driver: BattleDriver): object | null { return SETTLEMENTS.get(driver)?.lineage ?? null; }
+export function gatewaySettlementFacts(driver: BattleDriver, lineage: object, binding: HeldBinding): RequiredFacts {
+  const source = SETTLEMENTS.get(driver);
+  if (!source || source.lineage !== lineage) throw new Error("required-settlement-driver-source-mismatch");
+  return source.tracker.facts(binding);
+}
 const FRIEND_CHECKPOINTS = new WeakMap<DriverCheckpoint, { owner: BattleGateway; side: string; id: string; member: ShowdownPokemon; live: number; setHad: boolean; stored: unknown }>();
 
 export class BattleGateway implements BattleDriver {
@@ -84,6 +95,13 @@ export class BattleGateway implements BattleDriver {
       // Plain own JSON data is included in Battle#toJSON; owner/generation/content authority was established by the app.
       battle.rpg.obedience = JSON.parse(JSON.stringify(opts.obedience));
     }
+    if (opts.requiredSettlement) {
+      const roster: HeldRosterMember[] = (opts.players ?? []).flatMap((player, index) => player.team.map(value => {
+        const set = value as { name: string; item?: string };
+        return { id: set.name, side: index === 0 ? "p1" as const : "p2" as const, initial: set.item || "" };
+      }));
+      gw.#attachSettlement(new HeldTracker(battle, !!opts.wild, roster), {}, !!opts.wild);
+    }
     gw._pump();
     return gw;
   }
@@ -105,6 +123,7 @@ export class BattleGateway implements BattleDriver {
   /** An opaque rollback point of everything this gateway owns (see GatewayCheckpoint). */
   checkpoint(): GatewayCheckpoint {
     const token = new GatewayCheckpoint();
+    const source = SETTLEMENTS.get(this);
     CHECKPOINTS.set(token, {
       snapshot: this.snapshot(), engineRoot: this._env.root,
       queue: JSON.parse(JSON.stringify(this._queue)) as GatewayMessage[], seq: this._seq, closed: this._closed,
@@ -112,6 +131,7 @@ export class BattleGateway implements BattleDriver {
       friendshipFaints: JSON.parse(JSON.stringify(this._friendshipFaints)) as typeof this._friendshipFaints,
       friendshipFaintOrigins: JSON.parse(JSON.stringify(this._friendshipFaintOrigins)) as typeof this._friendshipFaintOrigins,
       faintSequence: this._faintSequence,
+      ...(source ? { settlement: { state: source.tracker.snapshot(), lineage: source.lineage, wild: source.wild } } : {}),
     });
     return token;
   }
@@ -120,14 +140,22 @@ export class BattleGateway implements BattleDriver {
   static async fromCheckpoint(token: GatewayCheckpoint): Promise<BattleGateway> {
     const data = CHECKPOINTS.get(token);
     if (!data) throw new Error("not a gateway checkpoint");
-    const gw = await BattleGateway.restore(data.snapshot, { engineRoot: data.engineRoot });
+    const gw = await RESTORE_GATEWAY(data.snapshot, { engineRoot: data.engineRoot });
     gw._queue = JSON.parse(JSON.stringify(data.queue)) as GatewayMessage[];
     gw._seq = data.seq; gw._closed = data.closed;
     gw._observation = JSON.parse(JSON.stringify(data.observation)) as ObservationState;
     gw._friendshipFaints = JSON.parse(JSON.stringify(data.friendshipFaints)) as typeof gw._friendshipFaints;
     gw._friendshipFaintOrigins = JSON.parse(JSON.stringify(data.friendshipFaintOrigins)) as typeof gw._friendshipFaintOrigins;
     gw._faintSequence = data.faintSequence;
+    if (data.settlement) gw.#attachSettlement(new HeldTracker(gw._battle, data.settlement.wild, [], data.settlement.state), data.settlement.lineage, data.settlement.wild);
     return gw;
+  }
+
+  #attachSettlement(tracker: HeldTracker, lineage: object, wild: boolean): void {
+    const extension = loadFormatExtension(this._env.root);
+    if (!extension.settlements || !["gen8rpgcustomgame", "gen8rpgdoublescustomgame"].includes(this._battle.format.id)) throw new Error("required-settlement-extension-unavailable");
+    extension.settlements.set(this._battle, tracker);
+    SETTLEMENTS.set(this, { tracker, lineage, wild });
   }
 
   _observationIssue(group: EvidenceIssue["group"], reason: string, memberId?: string): void {
@@ -548,6 +576,7 @@ export class BattleGateway implements BattleDriver {
   _pump(): void {
     // Showdown batches output until sendUpdates(); BattleStream does this after each write.
     this._battle.sendUpdates();
+    SETTLEMENTS.get(this)?.tracker.boundary();
   }
 
   _emit(msg: Unsequenced): void {
@@ -612,14 +641,19 @@ export class BattleGateway implements BattleDriver {
   }
 }
 
+// Retain the supported restoration implementation, rather than looking it up on a mutable public class later.
+const RESTORE_GATEWAY = BattleGateway.restore.bind(BattleGateway);
+const CREATE_GATEWAY = BattleGateway.create.bind(BattleGateway);
+const CHECKPOINT_GATEWAY = BattleGateway.fromCheckpoint.bind(BattleGateway);
+
 /** The Showdown implementation of the driver factory: what the game uses unless a test supplies another one. */
-export const showdownDriverFactory: BattleDriverFactory = {
-  create: (options) => BattleGateway.create(options),
-  fromCheckpoint: (token) => BattleGateway.fromCheckpoint(token),
+export const showdownDriverFactory: BattleDriverFactory = Object.freeze<BattleDriverFactory>({
+  create: CREATE_GATEWAY,
+  fromCheckpoint: CHECKPOINT_GATEWAY,
   async moveNames(formatid, seed) {
     // a throw-away battle of the same format is the cheapest way to reach the engine's move data; the cost is the one the
     // session always paid for this check
-    const probe = await BattleGateway.create({ formatid, seed, players: [{ name: "p", team: [{ name: "x", species: "Pidgey", moves: ["Tackle"] }] }, { name: "q", team: [{ name: "y", species: "Pidgey", moves: ["Tackle"] }] }] });
+    const probe = await CREATE_GATEWAY({ formatid, seed, players: [{ name: "p", team: [{ name: "x", species: "Pidgey", moves: ["Tackle"] }] }, { name: "q", team: [{ name: "y", species: "Pidgey", moves: ["Tackle"] }] }] });
     return (id: string): string => probe.moveInfo(id).name;
   },
-};
+});

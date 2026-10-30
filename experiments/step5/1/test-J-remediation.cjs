@@ -5,7 +5,7 @@ const fs=require('node:fs'),path=require('node:path'),read=n=>JSON.parse(fs.read
 const clone=E.state.clone,content=E.contentRuntime.assembleContent(E.contentCompile.compileContent(Object.fromEntries(['manifest','sources','species','overlays','grants'].map(n=>[n,read(n)]))).data,E.dex.createDexLookup()).content,auto={mode:1,naming:1};
 const fresh=()=>E.fixtures.savedFor(E.fixtures.makeGame(),content);
 const result=id=>({protocol:1,battleId:id,outcome:{kind:'run',winner:null},members:{},bag:{},captured:[],dex:{seen:[],owned:[]}});
-function setup(state=E.fakes.createMemoryState(fresh()),ports={},options={}){return new E.app.GameApplication({state,sessions:E.fakes.createFakeSessions({}),content:()=>({content}),random:()=>0,clock:()=>1000,projection:E.fakes.createRecordingProjection(),...ports},options)}
+function setup(state=E.fakes.createMemoryState(fresh()),ports={},options={}){const p={state,sessions:E.fakes.createFakeSessions({}),content:()=>({content}),random:()=>0,clock:()=>1000,projection:E.fakes.createRecordingProjection(),...ports};p.sessions=E.composition.createLegacyNoHeldSessionFactory(p.sessions);return new E.app.GameApplication(p,options)}
 test('J03: pending creation and live battle reject same/different ID manual commits; original session alone installs once',async()=>{
  const state=E.fakes.createMemoryState(fresh());let resume;const app=setup(state,{sessions:{create:()=>new Promise(r=>resume=r)}}),request={battleId:'J03',kind:'wild',foes:[{species:'Pidgey',level:5}],seq:1},before=clone(state.current());
  const opening=app.startBattle(request),template={...clone(before.party[0]),id:'FOREIGN'},raw={...result('J03'),outcome:{kind:'caught',winner:null},captured:[E.state.protocolMember(E.speciesKey.toBattleMember(template,content))]};
@@ -15,7 +15,7 @@ test('J03: pending creation and live battle reject same/different ID manual comm
  for(const r of [raw,result('J03'),result('other')])assert.throws(()=>app.commitResult(r,{templates:{FOREIGN:template},profile:auto}),/battle-active/);
  assert.equal(state.replaced.length,0);assert.equal(app.finishBattle(session,request).commit,'applied');assert.equal(state.replaced.length,1);
  assert.equal(app.commitResult(result('J03')),'already-applied');assert.equal(state.replaced.length,1);
- assert.equal(app.commitResult(result('manual')),'applied');assert.equal(state.replaced.length,2);
+ assert.throws(()=>app.commitResult(result('manual')),/source-unknown-or-retired/);assert.equal(state.replaced.length,1,'B requires a preselected direct producer; the manually supplied JSON grants none');
 });
 for(const invalidate of ['abort','load'])test(`J03: ${invalidate} invalidates pending create; late session cannot commit into new generation`,async()=>{
  const state=E.fakes.createMemoryState(fresh());let resume;const app=setup(state,{sessions:{create:()=>new Promise(r=>resume=r)}}),request={battleId:'late',kind:'wild',foes:[{species:'Pidgey',level:5}],seq:1};

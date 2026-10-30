@@ -17,10 +17,10 @@ async function make({ doubles = false } = {}) {
 }
 // the operation fails after the engine accepted the choice, then the rollback itself fails
 async function breakSession(s) {
-  const act = s.gw.act.bind(s.gw); const restore = Gateway.restore;
+  const act = s.gw.act.bind(s.gw); const driver = s._driver;
   s.gw.act = async (...args) => { await act(...args); throw new Error('operation failed'); };
-  Gateway.restore = async () => { throw new Error('rollback failed'); };
-  try { await s.useItem('potion', 'A-0001'); assert.fail('must reject'); } catch (error) { return error; } finally { Gateway.restore = restore; }
+  s._driver = { ...driver, fromCheckpoint: async () => { throw new Error('rollback failed'); } };
+  try { await s.useItem('potion', 'A-0001'); assert.fail('must reject'); } catch (error) { return error; } finally { s._driver = driver; }
 }
 const snapshot = s => JSON.stringify({ bag: I6.bagOf(s), ledger: s.ledger, party: s.party, engine: s.gw.snapshot() });
 

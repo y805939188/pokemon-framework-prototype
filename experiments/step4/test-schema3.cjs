@@ -42,7 +42,7 @@ test('1 -> 2 -> 3 (-> 4) runs as one chain from the real step 2 state', () => {
 });
 
 test('a newer schema is still refused with nothing changed; 3 without claims, or a malformed claim, is invalid', () => {
-  for (const schema of [S.GAME_SCHEMA + 1, 9]) { const r = migrateGame({ ...clone(F.makeGame()), schema }); assert.equal(r.ok, false); assert.equal(r.error.code, 'unknown-version'); assert.match(r.error.message, /Nothing was changed/); }
+  for (const schema of [S.GAME_SCHEMA + 1, S.GAME_SCHEMA + 2]) { const r = migrateGame({ ...clone(F.makeGame()), schema }); assert.equal(r.ok, false); assert.equal(r.error.code, 'unknown-version'); assert.match(r.error.message, /Nothing was changed/); }
   const noClaims = clone(F.makeGame()); delete noClaims.claims; // (schema 4 keeps the claims ledger of schema 3)
   assert.ok(validateGame(noClaims).some(p => p.path === '$.claims'));
   for (const [claims, re] of [[[], /must be an object/], [{ starter: true }, /\{kind/], [{ starter: { kind: 'other' } }, /\{kind/], [{ 'bad key!': { kind: 'grant' } }, /claim id/]]) {

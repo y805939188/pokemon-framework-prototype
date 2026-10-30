@@ -39,8 +39,11 @@ test('Leppa restoration respects each persistent cap; the result commits and rel
     await s.run(); assert.equal(s.finished, true);
     assert.deepEqual(s.result().members['A-0001'].moves[0], { id: 'hydropump', pp: 5 + ups, maxpp: 5 + ups });
     const file = path.join(dir, `${ups}.json`); fs.writeFileSync(file, JSON.stringify(game));
-    const store = new E.store.SaveStore(file, {}, E.speciesKey.identityKeys, F.content); // fixture world, chosen explicitly
-    assert.equal(store.commit(s.result()).status, 'applied');
+    // Historical session-only PP oracle: the pure planner verifies PP, while Store.save validates durability.
+    // This anonymous held session is deliberately NOT a fresh authenticated application settlement.
+    const store = new E.store.SaveStore(file, {}, E.speciesKey.identityKeys, F.content);
+    const planned = E.state.applyBattleResult(store.load(), s.result(), undefined, E.speciesKey.identityKeys, {content:F.content});
+    assert.equal(planned.status, 'applied'); store.save(planned.state);
     assert.deepEqual(E.saveSchema.validateGame(store.load()), []);
     assert.equal(store.commit(s.result()).status, 'already-applied');
   }

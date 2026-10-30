@@ -69,7 +69,7 @@ const sessions: production.app.BattleSessionFactory<production.app.BattleHandle>
 function application(state: MemoryState, projection: RecordingProjection) {
   return new production.app.GameApplication({
     state,
-    sessions,
+    sessions: production.composition.createLegacyNoHeldSessionFactory(sessions),
     projection,
     content: () => ({ content }),
     random: lcg(11),

@@ -5,6 +5,11 @@
 import { clone } from "../rules/state";
 import type { BattleResult, GameState } from "../rules/state";
 import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, GameStatePort, OutcomeProjection } from "../app/ports";
+import { registerSettlementFactory } from "../app/settlement-source";
+import { createLegacyNoHeldSaveStore } from "./save-store";
+import type { FaultPoint, SaveStore } from "./save-store";
+import type { Content } from "../rules/types";
+import type { SpeciesKeyResolver } from "../rules/species-key";
 
 /** Recursively freeze, so any in-place write by the code under test throws instead of passing silently. */
 export function deepFreeze<T>(value: T): T {
@@ -63,5 +68,17 @@ export function createFakeSessions(first: BattleResult | (() => BattleResult)): 
       return { result: () => (typeof source === "function" ? source() : source) };
     },
   };
+  registerSettlementFactory(factory, "legacy-no-held", undefined, () => {
+    const source = factory.next; return typeof source === "function" ? source() : source;
+  });
   return factory;
+}
+
+/** Explicit historical synthetic store fixture. New required/default-store admission tests must use the real API. */
+export function createFixtureSaveStore(file: string, hooks: { at?: (point: FaultPoint) => void } = {}, speciesKey?: SpeciesKeyResolver, content?: Content): SaveStore {
+  let input: BattleResult | null = null;
+  const store = createLegacyNoHeldSaveStore(file, () => { if (!input) throw new Error("no synthetic store result selected"); return input; }, hooks, speciesKey, content);
+  const commit = store.commit.bind(store);
+  store.commit = (result, options = {}) => { input = result; return commit(result, options); };
+  return store;
 }

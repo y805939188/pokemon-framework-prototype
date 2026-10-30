@@ -24,6 +24,8 @@ export interface GatewayOptions {
   noRun?: boolean;
   /** Formal app-owned control; absence is the explicit legacy direct-session compatibility path. */
   obedience?: ObedienceContext;
+  /** Records a complete required channel. A boolean is not source authority; the composition/app own that binding. */
+  requiredSettlement?: boolean;
   restored?: boolean;
 }
 

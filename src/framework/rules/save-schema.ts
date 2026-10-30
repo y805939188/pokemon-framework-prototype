@@ -35,7 +35,7 @@ import type { SpeciesKeyResolver } from "./species-key";
 import { newStats, validateStats } from "./stats";
 
 const SAVE_SCHEMA = GAME_SCHEMA;
-export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8];
+export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 export interface Problem { path: string; message: string }
 export interface SaveErrorInfo {
@@ -303,10 +303,16 @@ function validateGameView(input: unknown): GameValidationView {
   if (!isObj(x["appliedBattles"])) out.push({ path: "$.appliedBattles", message: "must be an object" });
   else for (const [id, v] of Object.entries(x["appliedBattles"])) if (!isObj(v) || !Object.hasOwn(v, "hash") || typeof v["hash"] !== "string" || !/^[0-9a-f]{64}$/.test(v["hash"])) out.push({ path: `$.appliedBattles["${id}"]`, message: "must be {hash: 64 hex characters}" });
   if (schema >= 7 && isObj(x["appliedBattles"])) for (const [id, record] of Object.entries(x["appliedBattles"])) if (isObj(record)) {
-    knownKeys(record, schema >= 8 ? ["hash", "trainer"] : ["hash"], `$.appliedBattles[${JSON.stringify(id)}]`, out);
+    knownKeys(record, schema >= 9 ? ["hash", "trainer", "settlement"] : schema >= 8 ? ["hash", "trainer"] : ["hash"], `$.appliedBattles[${JSON.stringify(id)}]`, out);
     const trainer = record["trainer"];
     if (trainer !== undefined && (!isObj(trainer) || typeof trainer["id"] !== "string" || !/^[a-z][a-z0-9-]{0,62}$/.test(trainer["id"]) || !isInt(trainer["version"], 0, 255))) out.push({ path: `$.appliedBattles[${JSON.stringify(id)}].trainer`, message: "must be stable trainer id + author version" });
     if (isObj(trainer)) knownKeys(trainer, ["id", "version"], `$.appliedBattles[${JSON.stringify(id)}].trainer`, out);
+    const settlement = record["settlement"];
+    if (settlement !== undefined) {
+      const path = `$.appliedBattles[${JSON.stringify(id)}].settlement`;
+      if (!isObj(settlement) || settlement["version"] !== 1 || typeof settlement["pairHash"] !== "string" || !/^[a-f0-9]{64}$/.test(settlement["pairHash"])) out.push({ path, message: "must be version 1 + paired settlement hash" });
+      if (isObj(settlement)) knownKeys(settlement, ["version", "pairHash"], path, out);
+    }
   }
   if (schema >= 8) {
     const defeated = x["defeatedTrainers"];
@@ -500,6 +506,10 @@ const MIGRATIONS: Record<number, Migrator> = {
     doc["defeatedTrainers"] = {};
     doc["schema"] = 8;
     notes.push("schema 8: an empty stable trainer defeat record was added; no victory was inferred from old battle hashes");
+  },
+  8: (doc, notes) => {
+    doc["schema"] = 9;
+    notes.push("schema 9: required settlement hashes are optional installed facts; no proof was fabricated for old raw-only battle ledgers");
   },
 };
 

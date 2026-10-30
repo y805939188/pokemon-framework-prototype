@@ -11,6 +11,10 @@ import type { FormatObserver, FormatObservation } from "../rules/battle-evidence
 import type { BattleActor, BattleDisplaySnapshot } from "../rules/battle-evidence";
 import { obedienceEligible, obedienceLevelLimit } from "../rules/obedience";
 import { own } from "../rules/own";
+import type { HeldRuntimeObserver } from "../rules/held-facts";
+
+/** Private actual-battle hooks. No JSON field, save setting or public log can install one. */
+export const settlements = new WeakMap<object, HeldRuntimeObserver>();
 
 interface Payload { kind: string; item?: string; target?: string; ball?: string; catchRate?: number; ctx?: Record<string, unknown> }
 
@@ -269,8 +273,33 @@ function checkObedience(battle: ShowdownBattle, pokemon: ShowdownPokemon, target
 }
 
 const rpgHandlers = {
+  onModifyMove(this: ShowdownBattle, move: ShowdownPokemon, pokemon: ShowdownPokemon): void {
+    const observer = settlements.get(this);
+    if (!observer) return;
+    if (move.id === "payday") {
+      const prior = move.onHit;
+      let paid = false;
+      move.onHit = function(this: ShowdownBattle, target: ShowdownPokemon, source: ShowdownPokemon, ...args: unknown[]) {
+        const result = prior?.call(this, target, source, ...args);
+        if (!paid && result !== false && result !== null) { paid = true; settlements.get(this)?.moneyMove(source, "payday"); }
+        return result;
+      };
+    } else if (move.id === "happyhour") {
+      // Showdown's display-only move has no RPG consumer. Install its actual successful primary effect.
+      const prior = move.onHitSide;
+      move.onHitSide = function(this: ShowdownBattle, target: ShowdownPokemon, source: ShowdownPokemon) {
+        const result = prior?.call(this, target, source);
+        if (result === false || result === null) return result;
+        settlements.get(this)?.moneyMove(source, "happyhour");
+        return true;
+      };
+    }
+    // WP47-B: a wild user cannot steal/remove the player's item; the damaging move itself still executes.
+    if (this.rpg.wild && pokemon.side.id === "p2" && ["thief", "covet", "knockoff"].includes(move.id)) move.onAfterHit = undefined;
+  },
   onBeforeMovePriority: 9.5,
   onBeforeMove(this: ShowdownBattle, pokemon: ShowdownPokemon, target: ShowdownPokemon, move: ShowdownPokemon): boolean | undefined {
+    if (settlements.has(this) && this.rpg.wild && pokemon.side.id === "p2" && ["trick", "switcheroo"].includes(move.id)) return false;
     return checkObedience(this, pokemon, target, move);
   },
   onDamagingHitPriority: -100000,
@@ -287,6 +316,7 @@ const rpgHandlers = {
   onTryHeal(this: ShowdownBattle, _amount: number, target: ShowdownPokemon): void { observe(this, () => ({ kind: "healing", target: actor(target) })); },
   onSwitchInPriority: -100000,
   onSwitchIn(this: ShowdownBattle, target: ShowdownPokemon): void {
+    settlements.get(this)?.entered(target);
     observe(this, () => ({ kind: "appearance", target: actor(target), details: String((target.illusion || target).details), display: display(target) }));
   },
   onUpdatePriority: -100000,

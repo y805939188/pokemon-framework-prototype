@@ -261,7 +261,8 @@ const { developmentCapabilities } = RuleConfig;
         PSFlow._app = new B.app.GameApplication({
           state: { read: () => PSFlow.game(), replace: (next: unknown) => { G.$gameSystem._psGame = next; } },
           content: () => ({ content: PSFlow.content(), dex: PSFlow._dex }),
-          sessions: B.composition.createBattleSessionFactory({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger.sink }),
+          sessions: ((G.PluginManager.parameters(NAME).contentSource || "sample") === "fixture"
+            ? B.composition.createLegacyNoHeldBattleSessionFactory : B.composition.createBattleSessionFactory)({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger.sink }),
           projection: { project: (outcome: { code: number }) => PSFlow.projectOutcome(outcome) },
           random: (n: number) => PSFlow.random(n),
           clock: () => PSFlow.now(),

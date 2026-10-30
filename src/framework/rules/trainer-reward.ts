@@ -28,8 +28,16 @@ export function trainerPrizeBase(opponents: readonly TrainerPrizeOpponent[]): nu
 }
 
 /** One logical stage in the caller's single candidate next state; this function performs no host replacement. */
-export function applyTrainerPrize(state: GameState, opponents: readonly TrainerPrizeOpponent[], content: Content | undefined, limits: Limits = DEFAULT_LIMITS): { state: GameState; reward: TrainerPrizeResult } {
-  const nominal = trainerPrizeBase(opponents), before = state.money;
+export function applyTrainerPrize(state: GameState, opponents: readonly TrainerPrizeOpponent[], content: Content | undefined, limits: Limits = DEFAULT_LIMITS, multiplier = 1): { state: GameState; reward: TrainerPrizeResult } {
+  const nominal = trainerPrizeBase(opponents) * multiplier;
+  if (![1, 2, 4].includes(multiplier)) throw new Error("invalid battle money multiplier");
+  return applyBattleMoneyAmount(state, nominal, content, limits);
+}
+
+/** A second independent cap/write stage (Pay Day), composed before the caller's one host installation. */
+export function applyBattleMoneyAmount(state: GameState, nominal: number, content: Content | undefined, limits: Limits = DEFAULT_LIMITS): { state: GameState; reward: TrainerPrizeResult } {
+  if (!Number.isSafeInteger(nominal) || nominal < 0) throw new Error("invalid battle money amount");
+  const before = state.money;
   if (!Number.isSafeInteger(before) || before < 0) throw new Error("invalid-money");
   const after = changeMoney(before, nominal, moneyCap(content, limits.money));
   const actual = Math.max(0, after - before), normalizationLoss = Math.max(0, before - after);

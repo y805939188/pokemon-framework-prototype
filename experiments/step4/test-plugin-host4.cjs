@@ -81,6 +81,11 @@ function host({ interpreter = false, saveEnabled = true, failMessage = false, ga
   vm.runInContext(plugin, ctx, { filename: 'PS_BattleFlow.js (built)' });
   const flow = ctx.PSFlow;
   flow._content = content; flow._dex = E.dex.createDexLookup(); flow.rng = lcg(1);
+  // This suite explicitly substitutes synthetic results for begin(), so select the historical no-held producer root.
+  // Actual required default composition is covered separately by B and real-host runners.
+  const Legacy = require('../step5/1/legacy-test-support.cjs').AutomaticApplication;
+  flow._app = new Legacy({ state: {read:()=>flow.game(),replace:next=>{sys._psGame=next;}},
+    content:()=>({content,dex:flow._dex}),sessions:E.fakes.createFakeSessions({}),projection:{project:out=>flow.projectOutcome(out)},random:n=>flow.random(n) });
   return { ctx, flow, sys, vars, transfers, messages, errors, game: () => sys._psGame };
 }
 /** Start a battle the way the plugin does (the scene is a stub) and end it with `result` through the scene's onEnd. */

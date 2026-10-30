@@ -29,6 +29,7 @@ import { battleFriendshipValue } from "../rules/battle-evidence";
 import type { BattleEvidenceContext, EvidenceBinding, BattleEvidence, FriendEvidence, BattleObservation } from "../rules/battle-evidence";
 import { resolveConfig } from "../rules/config";
 import { own, setOwn } from "../rules/own";
+import { bindRequiredSettlement, checkpointRequiredSettlement, finalizeRequiredSettlement, requiredCaptureItem, restoreRequiredSettlement } from "./required-settlement";
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
 export const END_REASONS = ["caught", "run", "tie", "win"] as const;
@@ -91,6 +92,8 @@ export interface CreateOptions {
   doubles?: boolean;
   /** Explicit controlled test/developer path; held-item write-back is incomplete. Never a player/save setting. */
   experimentalHeldBattle?: boolean;
+  /** Composition-owned complete settlement channel; arbitrary custom drivers do not acquire it. */
+  requiredSettlement?: boolean;
   formatid?: string;
   ai?: FoeAi;
   rules?: G.ExpRules;
@@ -183,7 +186,7 @@ export class BattleSession {
   _friendUnavailable: string[] = [];
   _pendingFriendFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
 
-  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, evidence, obedience }: CreateOptions): Promise<BattleSession> {
+  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience }: CreateOptions): Promise<BattleSession> {
     if (!experimentalHeldBattle && [...game.party, ...foe.team].some((m) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成");
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
     for (const m of [...game.party, ...foe.team]) {
@@ -216,9 +219,16 @@ export class BattleSession {
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
     s.gw = await driver.create({
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
+      requiredSettlement,
       ...(obedience ? { obedience } : {}),
       players: [{ name: "Player", team: lead.map((m) => toSet(m, moveName)) }, { name: foe.kind === "wild" ? "Wild" : "Trainer", team: s.foeTeam.map((m) => toSet(m, moveName)) }],
     });
+    if (requiredSettlement) {
+      if (!evidence) throw new Error("required-settlement-app-context-missing");
+      // Retain the chosen supported restorer before any user action can replace a public factory method.
+      const restore = driver.fromCheckpoint.bind(driver);
+      bindRequiredSettlement(s, s.gw, { battleId, generation: evidence.generation, contentIdentity: evidence.contentIdentity }, restore);
+    }
     s._effects?.startControl(!doubles && !!s.gw.drainFriendshipFaints && !!s.gw.validateFriendshipFaints && !!s.gw.applyFriendship && !!s.gw.checkpointFriendship && !!s.gw.restoreFriendship);
     await s.gw.choose("p1", "team " + lead.map((_, i) => i + 1).join(""));
     await s.gw.choose("p2", "team " + s.foeTeam.map((_, i) => i + 1).join(""));
@@ -284,8 +294,10 @@ export class BattleSession {
 
   /** In-memory operation rollback, not a battle-time save. Include PRNG, pending choices and undelivered messages. */
   _checkpoint() {
+    const engine = this.gw.checkpoint();
+    checkpointRequiredSettlement(this, engine);
     return {
-      engine: this.gw.checkpoint(),
+      engine,
       state: S.clone({
         party: this.party, bag: this.bag, ledger: this.ledger, out: this.out, held: this.held,
         growthQueue: this.growthQueue, pendingLearn: this.pendingLearn, activeNow: this.activeNow,
@@ -300,7 +312,7 @@ export class BattleSession {
   }
 
   async _restoreCheckpoint(checkpoint: ReturnType<BattleSession["_checkpoint"]>): Promise<void> {
-    this.gw = await this._driver.fromCheckpoint(checkpoint.engine);
+    this.gw = await restoreRequiredSettlement(this, checkpoint.engine, () => this._driver.fromCheckpoint(checkpoint.engine));
     const { participants, ...state } = checkpoint.state;
     Object.assign(this, state);
     this.participants = Object.fromEntries(participants.map(([id, members]) => [id, new Set(members)]));
@@ -789,10 +801,12 @@ export class BattleSession {
       const curve = this.content.species[c.species]!.growth;
       result.captured.push(S.protocolMember({
         ...c, exp: G.minExp(curve, c.level), hp: eng.hp, ...persistentStatus(eng.status, eng.statusCount),
+        item: requiredCaptureItem(this, this.gw, c.id) ?? c.item,
         moves: c.moves.map((mv) => ({ id: mv.id, pp: eng.pp[mv.id] ?? mv.pp, maxpp: mv.maxpp })), ball: outcomeInfo!.ball,
       }));
       result.dex.owned.push(c.species);
     }
     this._result = result;
+    finalizeRequiredSettlement(this, this.gw, result);
   }
 }

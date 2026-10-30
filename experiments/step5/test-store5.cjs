@@ -29,16 +29,16 @@ const ls = f => fs.readdirSync(path.dirname(f)).sort();
 
 test('without a species mapping a step 4 save is refused (needs-content): nothing is upgraded, written or backed up', () => {
   const f = copy('full.json'); const bytes = fs.readFileSync(f);
-  assert.throws(() => new SaveStore(f).loadInfo(), e => e instanceof SaveError && e.info.code === 'needs-content');
+  assert.throws(() => E.fakes.createFixtureSaveStore(f).loadInfo(), e => e instanceof SaveError && e.info.code === 'needs-content');
   const someResult = results[Object.keys(results)[0]];
-  assert.throws(() => new SaveStore(f).commit(someResult), e => e instanceof SaveError && e.info.code === 'needs-content');
+  assert.throws(() => E.fakes.createFixtureSaveStore(f).commit(someResult), e => e instanceof SaveError && e.info.code === 'needs-content');
   assert.ok(fs.readFileSync(f).equals(bytes), 'the file is byte for byte unchanged');
   assert.deepEqual(ls(f), ['save.json'], 'no backup, no temp file');
 });
 
 test('with the content mapping it migrates: content id + form, the original kept as .v3.bak, and every committed result is still a repeat', () => {
   const f = copy('full.json'); const bytes = fs.readFileSync(f);
-  const store = new SaveStore(f, {}, keys, content);
+  const store = E.fakes.createFixtureSaveStore(f, {}, keys, content);
   const info = store.loadInfo();
   assert.deepEqual([info.from, info.to, info.migrated], [3, E.state.GAME_SCHEMA, true]);
   assert.ok(info.state.party.every(m => E.speciesKey.battleNameOf(content, m) !== null), 'every member resolves in the content');
@@ -54,11 +54,11 @@ test('with the content mapping it migrates: content id + form, the original kept
 
 test('a current store requires content; content without a result mapping refuses named species while species-free results apply', () => {
   const f = copy('full.json');
-  const initial = new SaveStore(f, {}, keys, content); const migrated = initial.loadInfo().state; const prior = results[Object.keys(results)[0]]; initial.commit(prior, H.templatesFor(migrated, prior)); // now a current schema 7 file
+  const initial = E.fakes.createFixtureSaveStore(f, {}, keys, content); const migrated = initial.loadInfo().state; const prior = results[Object.keys(results)[0]]; initial.commit(prior, H.templatesFor(migrated, prior)); // now a current schema 7 file
   const bytes = fs.readFileSync(f);
-  assert.throws(() => new SaveStore(f).loadInfo(), e => e instanceof SaveError && e.info.code === 'needs-content');
+  assert.throws(() => E.fakes.createFixtureSaveStore(f).loadInfo(), e => e instanceof SaveError && e.info.code === 'needs-content');
   assert.ok(fs.readFileSync(f).equals(bytes), 'missing current content writes nothing');
-  const store = new SaveStore(f, {}, undefined, content); // current content is required; a result mapping remains a separate explicit capability
+  const store = E.fakes.createFixtureSaveStore(f, {}, undefined, content); // current content is required; a result mapping remains a separate explicit capability
   assert.equal(store.loadInfo().from, E.state.GAME_SCHEMA);
   const caught = Object.values(results).find(r => r.captured && r.captured.length);
   assert.throws(() => store.commit({ ...caught, battleId: 'new#1' }), /names species \(.*\) and the store was given no species mapping/);
@@ -71,9 +71,9 @@ test('a current store requires content; content without a result mapping refuses
 test('the fixture world chooses the identity mapping explicitly; with it, the step 4 save would NOT resolve in the real content', () => {
   const f = copy('full.json');
   const bytes = fs.readFileSync(f);
-  assert.throws(() => new SaveStore(f, {}, E.speciesKey.identityKeys, E.fixtures.content).loadInfo(), e => e.info.code === 'unmapped-species', '5.1 additionally rejects unknown individual content during 4→5');
+  assert.throws(() => E.fakes.createFixtureSaveStore(f, {}, E.speciesKey.identityKeys, E.fixtures.content).loadInfo(), e => e.info.code === 'unmapped-species', '5.1 additionally rejects unknown individual content during 4→5');
   assert.ok(fs.readFileSync(f).equals(bytes));
   fs.writeFileSync(f, JSON.stringify(H.legacyGame(E.fixtures.makeGame(), 3)));
-  const fixtureView = new SaveStore(f, {}, E.speciesKey.identityKeys, E.fixtures.content).loadInfo().state;
+  const fixtureView = E.fakes.createFixtureSaveStore(f, {}, E.speciesKey.identityKeys, E.fixtures.content).loadInfo().state;
   assert.ok(fixtureView.party.every(m => E.speciesKey.battleNameOf(content, m) === null), 'Showdown names kept as content ids: unusable with the sample content');
 });

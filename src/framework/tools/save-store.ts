@@ -15,7 +15,8 @@
  * (a capture, the dex) is refused: nothing is guessed.
  */
 import fs from "node:fs";
-import { applyBattleResult } from "../rules/state";
+import { applyBattleResult, resultHash } from "../rules/state";
+import { assertBattleResultShape } from "../rules/battle-result-validation";
 import type { BattleCommitOptions, BattleResult, GameState } from "../rules/state";
 import type { Content } from "../rules/types";
 import { migrateGame, snapshotForSave } from "../rules/save-schema";
@@ -36,8 +37,17 @@ export class SaveError extends Error {
 }
 
 export type LoadInfo = Extract<MigrationResult, { ok: true }>;
+const LEGACY_PRODUCERS = new WeakMap<object, (battleId: string) => BattleResult>();
+
+/** Explicit old no-held composition root. A normal store never infers fresh battle authority from caller JSON. */
+export function createLegacyNoHeldSaveStore(file: string, producer: (battleId: string) => BattleResult, hooks: { at?: (point: FaultPoint) => void } = {}, speciesKey?: SpeciesKeyResolver, content?: Content): SaveStore {
+  const store = new SaveStore(file, hooks, speciesKey, content);
+  LEGACY_PRODUCERS.set(store, producer);
+  return store;
+}
 
 export class SaveStore {
+  private committing = false;
   file: string;
   hooks: { at?: (point: FaultPoint) => void };
   /** Showdown name -> persistent key for older documents and results (D5-3); none = refuse instead of guessing. */
@@ -67,6 +77,10 @@ export class SaveStore {
   load(): GameState { return this.loadInfo().state; }
 
   save(state: GameState): void {
+    if (this.committing) throw new Error("store-commit-active");
+    this.savePrepared(state);
+  }
+  private savePrepared(state: GameState): void {
     const version = state && typeof state === "object" ? Object.getOwnPropertyDescriptor(state, "schema") : undefined;
     if (version && "value" in version && version.value !== GAME_SCHEMA) throw new SaveError({ code: "invalid", message: "save requires a current state; migrate explicitly before saving; original file untouched" });
     if (!this.content) throw new SaveError({code: "needs-content", message: "saving requires validated content; no file was written"});
@@ -94,15 +108,34 @@ export class SaveStore {
 
   /** Apply a battle result durably and idempotently. Returns {status}. */
   commit(result: BattleResult, options: BattleCommitOptions = {}): { status: "applied" | "already-applied"; migratedFrom?: number } {
+    if (this.committing) throw new Error("store-commit-active");
+    this.committing = true;
+    try { return this.commitOwned(result, options); }
+    finally { this.committing = false; }
+  }
+  private commitOwned(result: BattleResult, options: BattleCommitOptions): { status: "applied" | "already-applied"; migratedFrom?: number } {
     this._at("start");
     const info = this.loadInfo();
+    assertBattleResultShape(result);
+    const originalFile = this.file, originalBytes = fs.readFileSync(originalFile, "utf8");
+    const previous = Object.hasOwn(info.state.appliedBattles, result.battleId) ? info.state.appliedBattles[result.battleId] : undefined;
+    if (!previous) {
+      const producer = LEGACY_PRODUCERS.get(this);
+      if (!producer) throw new Error("store-battle-source-unknown: use the application for required settlement and save its complete candidate state");
+      if (info.state.party.some(m => !!m.item) || result.captured.some(m => !!m.item)
+        || result.captured.some(m => !!options.templates?.[m.id]?.item)) throw new Error("legacy-no-held-store-source-gate");
+      const actual = producer(result.battleId); assertBattleResultShape(actual);
+      if (resultHash(actual) !== resultHash(result)) throw new Error("legacy-store-producer-result-mismatch");
+      if (this.file !== originalFile || fs.readFileSync(originalFile, "utf8") !== originalBytes) throw new Error("store-state-changed-during-producer");
+    }
     const names = [...(result.captured || []).map((c) => c.species), ...(result.dex?.seen || []), ...(result.dex?.owned || [])];
     if (!this.speciesKey && names.length) throw new Error(`this result names species (${[...new Set(names)].slice(0, 3).join(", ")}) and the store was given no species mapping: pass the content's resolver (or identityKeys for a fixture world); nothing was written`);
     const r = applyBattleResult(info.state, result, undefined, this.speciesKey ?? (() => null), { ...options, ...(this.content ? { content: this.content } : {}) });
     if (info.migrated) { this._backup(info.from); this._at("afterBackup"); }
     if (r.status === "already-applied" && !info.migrated) return { status: r.status };
     this._at("beforeSave");
-    this.save(r.state);
+    if (this.file !== originalFile || fs.readFileSync(originalFile, "utf8") !== originalBytes) throw new Error("store-state-changed-before-install");
+    this.savePrepared(r.state);
     return { status: r.status, ...(info.migrated ? { migratedFrom: info.from } : {}) };
   }
 }

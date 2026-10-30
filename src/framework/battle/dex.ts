@@ -43,7 +43,12 @@ export function createDexLookup(engineRoot?: string): DexLookup {
     },
     abilityInfo(id) { const dex = use().gen8, ability = dex.abilities.get(id), text = ability?.exists ? dex.text.get(ability) : null; return text ? { name: ability.name, description: text.shortDesc || text.desc || "" } : null; },
     moveDetails(id) { const dex = use().gen8, move = dex.moves.get(id), text = move?.exists ? dex.text.get(move) : null; return text ? { name: move.name, type: move.type, category: move.category, power: move.basePowerCallback ? null : move.basePower, accuracy: move.accuracy === true ? 0 : move.accuracy, description: text.shortDesc || text.desc || "" } : null; },
-    heldItem(id) { const item = use().gen8.items.get(id); return item && item.exists ? { holdable: true, mail: item.isMail === true } : null; },
+    heldItem(id) {
+      const item = use().gen8.items.get(id);
+      // WP45 §6.1 RPG money holders have no Showdown effect/data. Their only behavior is the actual entry hook.
+      if (id === "amuletcoin" || id === "luckincense") return { id, holdable: true, mail: false };
+      return item && item.exists ? { id: item.id, holdable: true, mail: item.isMail === true } : null;
+    },
     sha: () => use().sha,
   };
 }

@@ -415,7 +415,7 @@ test('M04: present bad legacy metadata keeps raw hash and blocks menu plus every
 });
 
 test('P51-21/F: an unusable save opens the contained failure scene; begin/abort reports diagnosis without crashing the map interpreter',async()=>{
- const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.load({...h.sys._psGame,schema:9});const before=JSON.stringify(h.sys._psGame),request={kind:'wild',foes:[{species:'pidgey',level:3}],seq:1,battleId:'unusable-host#1',resultVariable:7};
+ const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.load({...h.sys._psGame,schema:E.state.GAME_SCHEMA+1});const before=JSON.stringify(h.sys._psGame),request={kind:'wild',foes:[{species:'pidgey',level:3}],seq:1,battleId:'unusable-host#1',resultVariable:7};
  assert.doesNotThrow(()=>h.flow.openBattle(request));assert.equal(h.flow.running,true);let failure;try{await h.flow.begin();}catch(e){failure=e;}assert.match(String(failure),/unknown-version/);h.flow.abort(failure,h.flow._op);assert.equal(h.flow.lastOutcome.aborted,true);assert.match(h.flow.lastOutcome.error,/unknown-version/);assert.equal(h.flow.running,false);assert.equal(JSON.stringify(h.sys._psGame),before);assert.equal(h.sys.isSaveEnabled(),false,'unusable save remains blocked after battle root closes');
 });
 test('P51-12/F: player-facing battle entry contains a closed held-item refusal, writes result0 and opens no scene/data',()=>{
@@ -447,4 +447,14 @@ test('O51-1: 120 held-map frames retain one cold diagnostic; state/map/party/cap
 });
 test('P52-28: every inventory root and management browse refuse automatic encounters before counter RNG or content',()=>{
  for(const kind of ['bag','shop','item','management']){const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content)),app=h.flow.app();const token=kind==='management'?app.beginManagement():app.beginInventoryOperation(kind);let counts=0,draws=0,loads=0;const original=h.flow.content;h.flow.content=()=>{loads++;return original();};h.player.makeEncounterCount=()=>counts++;h.flow.rng=()=>{draws++;return 0;};h.flow.mapEncounters=()=>({data:{table:{regions:[],slots:[{species:'pidgey',weight:1,minLevel:3,maxLevel:3}]}}});h.player._encounterCount=0;assert.equal(h.player.executeEncounter(),false);assert.deepEqual([counts,draws,loads,h.player._encounterCount],[0,0,0,0],kind);kind==='management'?app.endManagement(token):app.endInventoryOperation(token);}
+});
+
+test('HF-04 PSFlow.commit grants no fresh authority from legacy/required booleans or detached raw after abort',async()=>{
+ const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.load();const before=J(h.sys._psGame),raw={protocol:1,battleId:'HF04',outcome:{kind:'win',winner:'Player'},members:{},bag:{},captured:[],dex:{seen:[],owned:[]}};
+ for(const options of [{},{legacy:true,required:false},{heldFactsRequired:false}]){
+   assert.throws(()=>h.flow.commit(raw,options),/source-unknown-or-retired/);assert.deepEqual(J(h.sys._psGame),before);assert.deepEqual(h.writes,[]);
+ }
+ const request={battleId:'HF04-owned',kind:'wild',seq:1,foes:[{species:'caterpie',level:5}]},app=h.flow.app(),session=await app.startBattle(request);
+ await session.run();const received=session.result();app.abortBattle(request,Error('retired control'));
+ assert.throws(()=>h.flow.commit(received,{legacy:true,required:false}),/source-unknown-or-retired/);assert.deepEqual(J(h.sys._psGame),before);assert.deepEqual(h.writes,[]);
 });

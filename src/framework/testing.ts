@@ -8,4 +8,5 @@ export * as fixtures from "./tools/fixtures/game";
 export * as harness from "./tools/harness";
 export * as matrix from "./tools/matrix";
 export * as fakes from "./tools/fakes";
+export * as heldDiagnostics from "./tools/held-diagnostics";
 export * as scripted from "./tools/scripted-driver";
