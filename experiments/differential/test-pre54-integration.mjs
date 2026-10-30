@@ -172,3 +172,24 @@ test('exception proof includes excluded metadata and partial compound state, not
 test('missing compatible core API is process failure, never354 synthetic TypeError business results',()=>{
  const file=join(testRoot,'pre54-incompatible-core.cjs');writeFileSync(file,'module.exports={};\n');const r=spawnSync(process.execPath,[join(kitRoot,'runners/ts-runner.mjs'),'--request',join(kitRoot,'requests/wp30-r2.json'),'--core',file],{cwd:kitRoot,encoding:'utf8'});assert.notEqual(r.status,0);assert.equal(r.stdout,'');assert.match(r.stderr,/PRE54_CORE_INCOMPATIBLE/);
 });
+test('headless bootstrap drains async setup before synchronous tests; original static entry fails the control',()=>{
+ const directory=join(testRoot,'bootstrap-order');mkdirSync(directory);
+ const processModule=new URL('./lib/process.mjs',import.meta.url).href;
+ const modules=['test-infrastructure.mjs','test-runner.mjs','test-numeric-carrier.mjs','test-source-gates.mjs','test-pre54.mjs','test-pre54-integration.mjs'];
+ const receipts={};
+ for(const [name,entrySource]of [['old',readFileSync(new URL('./test-fixtures/static-headless-entry.mjs',import.meta.url),'utf8')],['current',readFileSync(new URL('./test-headless.mjs',import.meta.url),'utf8')]]){
+  const root=join(directory,name);mkdirSync(root);const ready=join(root,'ready'),receipt=join(root,'setup.json');
+  const child=join(root,'writer.cjs');writeFileSync(child,`require('node:fs').writeFileSync(${JSON.stringify(ready)},'ready');process.stdout.write(Buffer.alloc(2*1024*1024,120));`);
+  const setup=join(root,'setup.mjs');writeFileSync(setup,`import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import {executeArgv,DEFAULT_LIMITS} from ${JSON.stringify(processModule)};const r=await executeArgv({argv:[process.execPath,${JSON.stringify(child)}],cwd:${JSON.stringify(root)}},{...DEFAULT_LIMITS,timeoutMs:1500});fs.writeFileSync(${JSON.stringify(receipt)},JSON.stringify({status:r.status,stdoutBytes:r.stdoutBytes,timedOut:r.timedOut}));assert.equal(r.status,'success');test('async initialization drained',()=>assert.equal(r.stdoutBytes,2*1024*1024));`);
+  const blocking=join(root,'blocking.mjs');writeFileSync(blocking,`import test from 'node:test';import assert from 'node:assert/strict';import {spawnSync} from 'node:child_process';test('synchronous callback',()=>{const r=spawnSync(process.execPath,['-e',${JSON.stringify(`const fs=require('node:fs'),a=new Int32Array(new SharedArrayBuffer(4)),until=Date.now()+5000;while(!fs.existsSync(${JSON.stringify(ready)})&&Date.now()<until)Atomics.wait(a,0,0,10);if(!fs.existsSync(${JSON.stringify(ready)}))process.exit(2);Atomics.wait(a,0,0,2200);`)}],{timeout:10000});assert.equal(r.status,0);});`);
+  const empty=join(root,'empty.mjs');writeFileSync(empty,'export {};\n');let source=entrySource;
+  for(const [index,module]of modules.entries()){const target=index===0?setup:index===1?blocking:empty;source=source.replaceAll('./'+module,'file://'+target);}
+  const entry=join(root,'entry.mjs');writeFileSync(entry,source);
+  const env={...process.env};delete env.NODE_TEST_CONTEXT; // This control starts an independent test runner, not a recursive run() in the parent worker.
+  const r=spawnSync(process.execPath,['--test','--test-reporter=tap',entry],{env,encoding:'utf8',timeout:15000,maxBuffer:2*1024*1024});writeFileSync(join(root,'stdout'),r.stdout);writeFileSync(join(root,'stderr'),r.stderr);
+  const observed=readJson(receipt);receipts[name]={exit:r.status,...observed};
+  if(name==='old'){assert.notEqual(r.status,0);assert.equal(observed.status,'timeout');assert.equal(observed.timedOut,true);}
+  else{assert.equal(r.status,0,r.stdout+r.stderr);assert.deepEqual(observed,{status:'success',stdoutBytes:2*1024*1024,timedOut:false});}
+ }
+ writeFileSync(join(directory,'RESULT.json'),JSON.stringify({scope:'synthetic bootstrap/process ordering only; actual entry with module paths redirected to controls',receipts,productionDefaultTimeoutMs:DEFAULT_LIMITS.timeoutMs},null,2)+'\n');
+});
