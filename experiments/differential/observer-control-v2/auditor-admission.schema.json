@@ -1,0 +1,203 @@
+{
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "const": "pre54-native-auditor-admission-v2"
+    },
+    "state": {
+      "const": "READY_FOR_INDEPENDENT_SOURCE_AUDIT"
+    },
+    "controlCandidate": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[0-9a-f]{40}$"
+    },
+    "businessCandidate": {
+      "const": "8c9951c16cad74a595dfd30ac63aa307a5d13eae"
+    },
+    "bindingSHA256": {
+      "const": "decb1dd74349715b769e6782be13b4350199f9250fe465209525c71b115270b7"
+    },
+    "freezeHash": {
+      "const": "ebda61d9abdbc43cb7d3b27857b9b9a0deb5da6877068db105959b41c151555d"
+    },
+    "requestHash": {
+      "const": "19c09762f7166fef2a7b540c159ded9bd76cbde25903c44a5c3171338a90c133"
+    },
+    "referenceTargetCommit": {
+      "const": "8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b"
+    },
+    "referenceReleaseTag": {
+      "const": "v21.1"
+    },
+    "referenceReleaseTagCommit": {
+      "const": "ea7b5d56d2436591160983c4e641a2ceee2d875a"
+    },
+    "observerTaskId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_:-]{1,128}$"
+    },
+    "observerTurnId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_:-]{1,128}$"
+    },
+    "parentCreatedUTC": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.+-]+Z?$"
+    },
+    "parentReceiverExit": {
+      "const": 0
+    },
+    "parentReceiverStatus": {
+      "const": "SEALED"
+    },
+    "parentReceiverScope": {
+      "const": "READINESS_METADATA_NOT_SOURCE_ACCEPTANCE"
+    },
+    "parentReadinessArtifactSHA256": {
+      "type": "string",
+      "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+    },
+    "observerPrivateRoot": {
+      "const": "/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030"
+    },
+    "observerReadinessManifestPath": {
+      "const": "/Users/dingshinn/Desktop/pokemon-framework/observation-pre54-batch2-8c9951c-20261030/readiness-sealed/manifest.json"
+    },
+    "tagPrimaryFilesComparison": {
+      "enum": [
+        "IDENTICAL",
+        "DIFFERENT"
+      ]
+    },
+    "observerEvidence": {
+      "type": "object",
+      "properties": {
+        "adapterSHA256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "privateSourceManifestSHA256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "loadedFileEvidenceSHA256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "sourceMethodTraceSHA256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "readinessResponseSHA256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "readinessExecutionManifestSHA256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "tagPrimaryFilesComparisonSHA256": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "adapterSHA256",
+        "privateSourceManifestSHA256",
+        "loadedFileEvidenceSHA256",
+        "sourceMethodTraceSHA256",
+        "readinessResponseSHA256",
+        "readinessExecutionManifestSHA256",
+        "tagPrimaryFilesComparisonSHA256"
+      ],
+      "additionalProperties": false
+    },
+    "roles": {
+      "type": "object",
+      "properties": {
+        "learning-rules": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "pokedex-rules": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "stats-rules": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "adapter": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        },
+        "fixture-directory": {
+          "type": "string",
+          "pattern": "^(?!0{64}$)[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "learning-rules",
+        "pokedex-rules",
+        "stats-rules",
+        "adapter",
+        "fixture-directory"
+      ],
+      "additionalProperties": false
+    },
+    "nativeIsolation": {
+      "type": "object",
+      "properties": {
+        "noHistoryInherited": {
+          "const": true
+        },
+        "rawTaskOutputsNotReadByClean": {
+          "const": true
+        },
+        "oneShotDedicatedContext": {
+          "const": true
+        },
+        "osSandboxClaimed": {
+          "const": false
+        }
+      },
+      "required": [
+        "noHistoryInherited",
+        "rawTaskOutputsNotReadByClean",
+        "oneShotDedicatedContext",
+        "osSandboxClaimed"
+      ],
+      "additionalProperties": false
+    },
+    "sourceAuditAcceptance": {
+      "const": "NOT_YET_ACCEPTED"
+    }
+  },
+  "required": [
+    "protocol",
+    "state",
+    "controlCandidate",
+    "businessCandidate",
+    "bindingSHA256",
+    "freezeHash",
+    "requestHash",
+    "referenceTargetCommit",
+    "referenceReleaseTag",
+    "referenceReleaseTagCommit",
+    "observerTaskId",
+    "observerTurnId",
+    "parentCreatedUTC",
+    "parentReceiverExit",
+    "parentReceiverStatus",
+    "parentReceiverScope",
+    "parentReadinessArtifactSHA256",
+    "observerPrivateRoot",
+    "observerReadinessManifestPath",
+    "tagPrimaryFilesComparison",
+    "observerEvidence",
+    "roles",
+    "nativeIsolation",
+    "sourceAuditAcceptance"
+  ],
+  "additionalProperties": false
+}

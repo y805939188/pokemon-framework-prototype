@@ -1,0 +1,317 @@
+{
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "const": "pre54-source-audit-v2"
+    },
+    "candidateSHA": {
+      "const": "8c9951c16cad74a595dfd30ac63aa307a5d13eae"
+    },
+    "freezeHash": {
+      "const": "ebda61d9abdbc43cb7d3b27857b9b9a0deb5da6877068db105959b41c151555d"
+    },
+    "requestHash": {
+      "const": "19c09762f7166fef2a7b540c159ded9bd76cbde25903c44a5c3171338a90c133"
+    },
+    "referenceTargetCommit": {
+      "const": "8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b"
+    },
+    "referenceReleaseTag": {
+      "const": "v21.1"
+    },
+    "referenceReleaseTagCommit": {
+      "const": "ea7b5d56d2436591160983c4e641a2ceee2d875a"
+    },
+    "role": {
+      "const": "source-auditor"
+    },
+    "runId": {
+      "const": "pre54-8c-source-auditor-20261030"
+    },
+    "observerRunId": {
+      "const": "pre54-8c-observer-20261030"
+    },
+    "verdict": {
+      "enum": [
+        "PASS_SCOPED",
+        "NEEDS_CHANGES",
+        "BLOCKED"
+      ]
+    },
+    "code": {
+      "enum": [
+        "NONE",
+        "TOOL_DENIED",
+        "REFERENCE_IDENTITY_UNVERIFIED",
+        "RUBY_UNAVAILABLE",
+        "DEPENDENCY_UNSUPPORTED",
+        "UNSUPPORTED_HOST",
+        "UNSUPPORTED_INPUT_MAPPING",
+        "ACTUAL_EXECUTION_FAILED",
+        "PROTOCOL_GATE_FAILED",
+        "PUBLICATION_BLOCKED",
+        "UNEXPECTED_RANDOMNESS",
+        "CLEANROOM_BOUNDARY",
+        "REFERENCE_ADAPTER_NOT_QUALIFIED",
+        "SOURCE_TRACE_UNVERIFIED",
+        "SOURCE_PIN_MISMATCH",
+        "NODE_EXECUTION_POLICY_REJECTED",
+        "PARTIAL_STATE",
+        "OUTPUT_CONTRACT_UNSUPPORTED"
+      ]
+    },
+    "readinessStatusSHA256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "tagPrimaryFilesComparison": {
+      "enum": [
+        "IDENTICAL",
+        "DIFFERENT",
+        "NOT_CHECKED"
+      ]
+    },
+    "roles": {
+      "type": "object",
+      "properties": {
+        "learning-rules": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "pokedex-rules": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "stats-rules": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "adapter": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "fixture-directory": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "learning-rules",
+        "pokedex-rules",
+        "stats-rules",
+        "adapter",
+        "fixture-directory"
+      ],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "adapterSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "privateSourceManifestSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "loadedFileEvidenceSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "sourceMethodTraceSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "readinessResponseSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "readinessExecutionManifestSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "tagPrimaryFilesComparisonSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "adapterSHA256",
+        "privateSourceManifestSHA256",
+        "loadedFileEvidenceSHA256",
+        "sourceMethodTraceSHA256",
+        "readinessResponseSHA256",
+        "readinessExecutionManifestSHA256",
+        "tagPrimaryFilesComparisonSHA256"
+      ],
+      "additionalProperties": false
+    },
+    "operations": {
+      "type": "object",
+      "properties": {
+        "learning.relearningCandidates": {
+          "enum": [
+            "PASS_SCOPED",
+            "NEEDS_CHANGES",
+            "BLOCKED",
+            "NOT_RUN"
+          ]
+        },
+        "learning.forgetting": {
+          "enum": [
+            "PASS_SCOPED",
+            "NEEDS_CHANGES",
+            "BLOCKED",
+            "NOT_RUN"
+          ]
+        },
+        "pokedex.recordSequence": {
+          "enum": [
+            "PASS_SCOPED",
+            "NEEDS_CHANGES",
+            "BLOCKED",
+            "NOT_RUN"
+          ]
+        },
+        "pokedex.recentSequence": {
+          "enum": [
+            "PASS_SCOPED",
+            "NEEDS_CHANGES",
+            "BLOCKED",
+            "NOT_RUN"
+          ]
+        },
+        "stats.computeStats": {
+          "enum": [
+            "PASS_SCOPED",
+            "NEEDS_CHANGES",
+            "BLOCKED",
+            "NOT_RUN"
+          ]
+        },
+        "stats.hpAfterRecalc": {
+          "enum": [
+            "PASS_SCOPED",
+            "NEEDS_CHANGES",
+            "BLOCKED",
+            "NOT_RUN"
+          ]
+        }
+      },
+      "required": [
+        "learning.relearningCandidates",
+        "learning.forgetting",
+        "pokedex.recordSequence",
+        "pokedex.recentSequence",
+        "stats.computeStats",
+        "stats.hpAfterRecalc"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "protocol",
+    "candidateSHA",
+    "freezeHash",
+    "requestHash",
+    "referenceTargetCommit",
+    "referenceReleaseTag",
+    "referenceReleaseTagCommit",
+    "role",
+    "runId",
+    "observerRunId",
+    "verdict",
+    "code",
+    "readinessStatusSHA256",
+    "tagPrimaryFilesComparison",
+    "roles",
+    "evidence",
+    "operations"
+  ],
+  "additionalProperties": false
+}
