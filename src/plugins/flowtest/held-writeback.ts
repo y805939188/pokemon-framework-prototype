@@ -184,7 +184,7 @@ async function runHeldRemediation(p: any, content: any): Promise<void> {
     const changed = heldContent(E, assert, { MAX_MONEY: 555555 }), state = port();
     app = new E.app.GameApplication({ state: { read: state.read, replace: (next: any) => { writes++; state.replace(next); } },
       sessions: E.composition.createBattleSessionFactory({ content: () => supplied, seed: () => [1, 2, 3, 4] }),
-      content: () => ({ content: supplied, dex: E.dex.createDexLookup() }), random: () => 0,
+      content: () => ({ content: supplied, dex: E.dex.createDexLookup() }), random: () => 0, clock: () => 12345,
       projection: { project() { supplied = changed; app.describeParty(); } } },
       { receivingProfile: { mode: 1, naming: 1 }, capabilities: { allowHeldItemSources: true, allowExperimentalHeldItemBattle: true } });
     const request = { battleId: "B-installed-content", kind: "wild", seq: 1, foes: [{ species: "pidgey", level: 5 }] };
