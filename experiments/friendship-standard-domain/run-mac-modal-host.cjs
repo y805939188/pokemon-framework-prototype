@@ -32,10 +32,16 @@ const rows=[];async function check(id,fn){try{const value=await fn();rows.push({
  for(const [f,h]of Object.entries(pi.artifacts))assert.equal(hash(fs.readFileSync(path.join(ROOT,f))),h);
  const signBefore=spawnSync('codesign',['--verify','--deep','--strict',app],{encoding:'utf8'});fs.writeFileSync(path.join(out,'signature-before.log'),signBefore.stdout+signBefore.stderr);assert.equal(signBefore.status,0);
  let c=await launch(4);
- const until=async(expression,label)=>{for(let n=0;n<300;n++){const v=await c.evaluate(expression);if(v)return v;await delay(50);}throw Error('timeout: '+label);};
+ const until=async(expression,label)=>{for(let n=0;n<300;n++){const v=await c.evaluate(expression);if(v)return v;await delay(50);}const diagnostic=await c.evaluate(`(()=>{const s=SceneManager._scene,w=s?._messageWindow,c=s?._choiceListWindow,i=window.__actualInterpreter;return {frame:Graphics.frameCount,scene:s?.constructor.name,result:PSState.lastMigration,interpreter:{index:i?._index,wait:i?._waitMode,pending:i?._psFriendshipMigrationPending},message:{busy:$gameMessage.isBusy(),choice:$gameMessage.isChoice(),texts:$gameMessage._texts},window:{pause:w?.pause,text:w?._textState,open:w?.openness},choice:{active:c?.active,open:c?.openness}};})()`);fs.writeFileSync(path.join(out,'timeout-diagnostic.json'),JSON.stringify({label,diagnostic},null,2));throw Error('timeout: '+label);};
  const frames=async(n=30)=>c.evaluate(`(async()=>{const f=Graphics.frameCount;while(Graphics.frameCount<f+${n})await new Promise(r=>setTimeout(r,10));return {from:f,to:Graphics.frameCount,world:window.__worldUpdates,playerStop:$gamePlayer._stopCount};})()`);
  const instrument=()=>c.evaluate(`(()=>{SceneManager.isGameActive=()=>true;window.__worldUpdates=0;const u=Game_Player.prototype.update;Game_Player.prototype.update=function(...args){window.__worldUpdates++;return u.apply(this,args);};return true;})()`);
- const clearResult=async()=>{await c.evaluate(`(()=>{const w=SceneManager._scene._messageWindow;if(w)w.terminateMessage();return true;})()`);};
+ const clearResult=async()=>{
+  if(!await c.evaluate('$gameMessage.isBusy()'))return;
+  // Dismiss through normal message input only after text has finished. Premature terminateMessage leaves pause set.
+  await until('!!(SceneManager._scene._messageWindow?.isOpen() && SceneManager._scene._messageWindow.pause && !SceneManager._scene._messageWindow._textState)','result message ready');
+  await c.evaluate('(Input._currentState.ok=true,true)');await frames(2);await c.evaluate('(Input._currentState.ok=false,true)');await frames(2);
+  await until('!$gameMessage.isBusy()','result message dismissed');
+ };
  const start=async(slot=1)=>{
   await c.evaluate(`(()=>{if($gameMessage.isBusy()||$gameMap._interpreter.isRunning())throw Error('test started while event/message busy');PSState.lastMigration=null;window.__eventFinished=false;const i=$gameMap._interpreter;i.setup([{code:357,indent:0,parameters:['PS_SaveState','MigrateFriendship','',{slot:'${slot}'}]},{code:355,indent:0,parameters:['window.__eventFinished=true;']},{code:0,indent:0,parameters:[]}],0);window.__actualInterpreter=i;return true;})()`);
   return until(`(()=>{const w=SceneManager._scene._choiceListWindow;if(PSState.lastMigration)return {result:PSState.lastMigration};if(w?.active&&w.isOpen())return {frame:Graphics.frameCount,world:window.__worldUpdates,index:window.__actualInterpreter._index,wait:window.__actualInterpreter._waitMode,pending:window.__actualInterpreter._psFriendshipMigrationPending,windowClass:w.constructor.name,defaultIndex:w.index()};return false;})()`,'active real choice or preview result');
