@@ -175,6 +175,7 @@ async function runHeldRemediation(p: any, content: any): Promise<void> {
     const next = E.composition.createLegacyNoHeldBattleHandle(app, raw.battleId);
     eq(app.finishBattle(old, raw).commit, "none", "old cannot consume successor"); eq(app.saveBlocked, true, "successor still owns");
     eq(app.finishBattle(next, raw).commit, "applied", "new legitimate source usable"); eq([calls, writes], [1, 1], "successor installs once");
+    eq(app.finishBattle(next, raw).commit, "already-applied", "installed original legacy handle is an exact query"); eq([calls, writes], [1, 1], "query skips producer/replace");
     return { calls, writes, contract: "MZ state, explicit legacy composition, default capabilities closed" };
   });
   await scenario("B-FIX-02 post-install content observation preserves original exact replay", async () => {

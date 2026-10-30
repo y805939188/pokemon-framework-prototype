@@ -253,3 +253,12 @@ test('HF06 legacy abort retires only its reservation; old callback cannot releas
   assert.equal(w.app.finishBattle(next,{battleId:w.raw.battleId}).commit,'applied');assert.equal(w.produced(),1);
   assert.equal(w.state.replaced.length,1);assert.equal(w.app.saveBlocked,false);
 });
+
+test('HF06/11 legacy installed completion is not a zero-write cancel; original exact query keeps one producer call',()=>{
+  const w=legacyWorld();let observed=false;
+  w.projection.project=()=>{if(!observed){observed=true;w.app.abortBattle(w.raw,Error('late projection cancel'));}};
+  const h=E.composition.createLegacyNoHeldBattleHandle(w.app,w.raw.battleId);
+  assert.equal(w.app.finishBattle(h,w.raw).commit,'applied');const installed=J(w.state.current());
+  assert.equal(w.app.finishBattle(h,w.raw).commit,'already-applied');assert.equal(w.produced(),1);
+  assert.equal(w.state.replaced.length,1);assert.deepEqual(w.state.current(),installed);assert.equal(w.app.saveBlocked,false);
+});

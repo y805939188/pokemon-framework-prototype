@@ -911,12 +911,18 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.battleBusy || this.reception || this.management.active || this.inventory.active || generation !== this.generation) throw new Error("operation-active");
     this.battleCommitOwner = context;
     const produce = source.legacyProduce;
+    let produced: BattleResult | undefined;
     const handle: BattleHandle = { result: () => {
+      this.assertBattleContext(context);
+      if (produced) return clone(produced); // Original exact query never invokes a newer producer or needs fresh ownership.
       this.assertBattleContext(context, true);
       const game = this.ports.state.read(); this.assertBattleContext(context, true);
       if (game.party.some(m => !!m.item)) { admission.invalid = true; throw new Error("legacy-no-held-source-gate"); }
       admission.roster = game.party.filter(m => !m.isEgg).map(m => ({ id: m.id, side: "p1", initial: "" }));
-      return produce(battleId);
+      const received = produce(battleId); assertBattleResultShape(received);
+      this.assertBattleContext(context, true);
+      produced = clone(received);
+      return clone(produced);
     } };
     const admission: SettlementAdmission = { source,
       generation, battleId, contentIdentity: null, roster: [], wild: false, handle, invalid: false, read: false };
@@ -1265,12 +1271,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       // The unowned legacy producer also reserves an operation identity. Retire exactly that reservation;
       // incomplete/unknown installation keeps its barrier, and no callback may clear a successor owner.
       if (!context || !this.preparedBattles.get(context)?.indeterminate) {
-        if (admission) admission.invalid = true;
+        const installed = context && this.preparedBattles.get(context)?.completed;
+        if (admission && !installed) admission.invalid = true;
         if (this.#currentSettlementAdmission === admission) this.#currentSettlementAdmission = null;
         if (context) {
           this.evolutions.cancelPrepared(context.token);
           this.pokedex.discardReserved(context.token);
-          this.terminatedBattles.add(context);
+          if (!installed) this.terminatedBattles.add(context);
           if (this.reception?.context === context) this.reception = null;
           if (this.battleCommitOwner === context) this.battleCommitOwner = null;
         }
