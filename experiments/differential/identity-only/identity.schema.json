@@ -1,0 +1,175 @@
+{
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "const": "pre54-reference-object-identity-v1"
+    },
+    "observerRunId": {
+      "const": "pre54-8c-observer-20261030"
+    },
+    "candidateSHA": {
+      "const": "8c9951c16cad74a595dfd30ac63aa307a5d13eae"
+    },
+    "freezeHash": {
+      "const": "ebda61d9abdbc43cb7d3b27857b9b9a0deb5da6877068db105959b41c151555d"
+    },
+    "requestHash": {
+      "const": "19c09762f7166fef2a7b540c159ded9bd76cbde25903c44a5c3171338a90c133"
+    },
+    "targetObjectSHA": {
+      "const": "8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b"
+    },
+    "targetTag": {
+      "const": "v21.1"
+    },
+    "status": {
+      "enum": [
+        "OBSERVED",
+        "BLOCKED"
+      ]
+    },
+    "code": {
+      "enum": [
+        "NONE",
+        "TOOL_DENIED",
+        "OBJECT_QUERY_FAILED",
+        "REFERENCE_IDENTITY_UNVERIFIED"
+      ]
+    },
+    "facts": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "object",
+          "properties": {
+            "exists": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "objectType": {
+              "enum": [
+                "commit",
+                "tag",
+                "tree",
+                "blob",
+                "missing",
+                "unknown"
+              ]
+            },
+            "peeledCommitSHA": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!0{40}$)[0-9a-f]{40}$"
+                }
+              ]
+            }
+          },
+          "required": [
+            "exists",
+            "objectType",
+            "peeledCommitSHA"
+          ],
+          "additionalProperties": false
+        },
+        "tag": {
+          "type": "object",
+          "properties": {
+            "exists": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "objectType": {
+              "enum": [
+                "commit",
+                "tag",
+                "tree",
+                "blob",
+                "missing",
+                "unknown"
+              ]
+            },
+            "objectSHA": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!0{40}$)[0-9a-f]{40}$"
+                }
+              ]
+            },
+            "peeledCommitSHA": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!0{40}$)[0-9a-f]{40}$"
+                }
+              ]
+            }
+          },
+          "required": [
+            "exists",
+            "objectType",
+            "objectSHA",
+            "peeledCommitSHA"
+          ],
+          "additionalProperties": false
+        },
+        "headCommitSHA": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^(?!0{40}$)[0-9a-f]{40}$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "tag",
+        "headCommitSHA"
+      ],
+      "additionalProperties": false
+    },
+    "rubyExecuted": {
+      "const": false
+    }
+  },
+  "required": [
+    "protocol",
+    "observerRunId",
+    "candidateSHA",
+    "freezeHash",
+    "requestHash",
+    "targetObjectSHA",
+    "targetTag",
+    "status",
+    "code",
+    "facts",
+    "rubyExecuted"
+  ],
+  "additionalProperties": false
+}
