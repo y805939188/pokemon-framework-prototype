@@ -10,6 +10,8 @@ function heldContent(E: any, assert: any, settings: any = {}): any {
   input.species.find((s: any) => s.id === "snorlax").learnset = ["payday", "trick", "recycle", "splash"].map(move => ({ level: 1, move }));
   input.species.find((s: any) => s.id === "pidgey").learnset = [{ level: 1, move: "knockoff" }];
   input.items = Object.values(E.itemCatalog.legacyCatalog()).map((item: any) => ({ ...item, source: "author-placeholder" }));
+  // Explicit RPG author item for the initial-holder money test; no engine/catalog fallback is invented.
+  input.items.push({ id: "amuletcoin", name: "Amulet Coin", namePlural: "Amulet Coins", pocket: 1, price: 0, source: "author-placeholder" });
   input.grants = [{ id: "held-grant", source: "author-placeholder", members: [{ species: "snorlax", level: 50, item: "oranberry" }], items: {}, money: 0 }];
   input.trainerTypes = [{ id: "held-npc", nameKey: "trainer.held", gender: 0, baseMoney: 0, skillLevel: 0, flags: [], items: [], battleBgm: "", victoryBgm: "", introBgm: "", openingText: "", winText: "", loseText: "", source: "author-placeholder" }];
   input.trainers = [{ id: "held-source-npc", type: "held-npc", name: "Held NPC", version: 0, source: "author-placeholder", items: [], party: [{ species: "pidgey", level: 5, moves: ["knockoff"] }] }];
@@ -189,7 +191,8 @@ async function runHeldRemediation(p: any, content: any): Promise<void> {
       { receivingProfile: { mode: 1, naming: 1 }, capabilities: { allowHeldItemSources: true, allowExperimentalHeldItemBattle: true } });
     const request = { battleId: "B-installed-content", kind: "wild", seq: 1, foes: [{ species: "pidgey", level: 5 }] };
     const h = await app.startBattle(request); assert((await h.chooseMove(1)).ok && h.finished, "actual terminal Pay Day");
-    eq(app.finishBattle(h, request).commit, "applied", "main and pair installed"); const installed = clone(game());
+    const first = app.finishBattle(h, request);
+    eq(first.commit, "applied", `main and pair installed: ${JSON.stringify(first)}`); const installed = clone(game());
     eq(app.finishBattle(h, request).commit, "already-applied", "same handle is a query"); eq(game(), installed, "whole state unchanged");
     eq([writes, game().money], [1, 1500], "one install and one reward");
     return { writes, money: game().money, pairHash: game().appliedBattles[request.battleId].settlement.pairHash };
