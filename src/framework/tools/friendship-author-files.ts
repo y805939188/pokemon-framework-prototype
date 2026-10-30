@@ -22,8 +22,10 @@ function originalFiles(src: string): Map<string, Buffer> {
 }
 export function migrateFriendshipAuthorFiles(src: string, out: string | undefined, confirmation: string | undefined, schema: 1 | 2,
   readInputs: (src: string) => ContentInputs, validate: (inputs: ContentInputs) => void): unknown {
-  const original = originalFiles(src), inputs = readInputs(src), preview = planAuthorFriendshipMigration(inputs);
+  if (path.resolve(src) !== fs.realpathSync(src)) throw Error("author-source-alias");
+  const inputs = readInputs(src), preview = planAuthorFriendshipMigration(inputs);
   if (preview.status !== "ready") throw Error(JSON.stringify(preview));
+  const original = originalFiles(src); // Preserve other source bytes only after the normal author/source gates.
   const raw = [...original].map(([file,bytes])=>({file,sha256:hash(bytes)}));
   const body = {version:1,kind:"author-directory-friendship-256-to-255",source:path.resolve(src),schema,raw,plan:preview.plan};
   const previewHash = hash(friendshipMigrationSnapshot(body));

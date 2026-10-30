@@ -4,7 +4,7 @@ const {workspace,ROOT}=require('./helpers.cjs');
 const cli=path.join(ROOT,'js/engine/build/content-cli.cjs');
 function fixture(value=256){const dir=workspace(),src=path.join(dir,'source');fs.cpSync(path.join(ROOT,'content/sample'),src,{recursive:true});const m=JSON.parse(fs.readFileSync(src+'/manifest.json'));m.schema=1;fs.writeFileSync(src+'/manifest.json',JSON.stringify(m,null,3)+'\n');const s=JSON.parse(fs.readFileSync(src+'/species.json'));s[0].happiness=value;fs.writeFileSync(src+'/species.json',JSON.stringify(s,null,3)+'\n');return {dir,src,out:path.join(dir,'standard')};}
 const run=(...args)=>spawnSync(process.execPath,[cli,...args],{encoding:'utf8'});
-const preview=w=>{const r=run('friendship-preview','--src='+w.src);assert.equal(r.status,0,r.stderr);return JSON.parse(r.stdout);};
+const preview=w=>{const r=run('friendship-preview','--src='+w.src);assert.equal(r.status,0,r.stderr);assert.match(r.stderr,/legacy-author-schema/);return JSON.parse(r.stdout);};
 test('CLI preview zero writes then explicit new-directory standard migration preserves raw originals/receipt and builds normally',()=>{
  const w=fixture(),p=preview(w),original=fs.readFileSync(w.src+'/species.json');assert.deepEqual(fs.readdirSync(w.dir),['source']);
  const r=run('friendship-migrate','--src='+w.src,'--out='+w.out,'--confirm='+p.previewHash);assert.equal(r.status,0,r.stderr);assert.equal(JSON.parse(fs.readFileSync(w.out+'/manifest.json')).schema,2);

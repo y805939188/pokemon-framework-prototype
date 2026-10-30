@@ -257,7 +257,7 @@ if (cmd === "friendship-preview" || cmd === "friendship-migrate") {
     if (cmd === "friendship-migrate" && (!confirm || !output)) throw Error("friendship-migrate requires --out=<NEW directory> --confirm=<previewHash>");
     if (cmd === "friendship-preview" && confirm) throw Error("preview does not accept confirmation");
     const result = migrateFriendshipAuthorFiles(SRC,output?path.resolve(ROOT,output):undefined,confirm,Number(schema) as 1|2,
-      src=>{const r=readInputs(src);if(r.errors.length)throw Error(JSON.stringify(r.errors));return r.inputs;},
+      src=>{const r=readInputs(src);if(r.errors.length)throw Error(JSON.stringify(r.errors));if(authorContext(r.inputs)===null)throw Error("invalid author version");return r.inputs;},
       inputs=>{const r=compileContent(inputs,{}, {showdownSha:buildPin()});if(!r.ok)throw Error(JSON.stringify(r.errors));const assembled=assembleContent(r.data,createDexLookup());if(assembled.errors.length)throw Error(JSON.stringify(assembled.errors));warn(r.warnings);});
     console.log(JSON.stringify(result,null,2)); process.exit(0);
   } catch(error) {console.error(error instanceof Error?error.message:String(error));process.exit(1);}
@@ -278,4 +278,4 @@ else if (cmd === "import-pbs-items") {
   const source = process.argv.find((a) => a.startsWith("--source="))?.slice(9) ?? "";
   process.exit(importPbs(SRC, arg("file", "pokemon.txt"), source, arg("report", "build/pbs-import.json"), cmd === "import-pbs-items"));
 }
-else { console.error("usage: content-cli.cjs build|check|check-item-pockets|inventory|import-pbs|import-pbs-regional [--src=content/sample] [--out=...] [--report=...] [--file=... --source=<id>] [--base-file=pokemon.txt (repeat; required for nonempty regional symbols)] [--form-file=pokemon_forms.txt --form-id=SYMBOL,N:showdownid] [--regional-file=regional_dexes.txt --region-name=0:region.kanto (repeat)]"); process.exit(2); }
+else { console.error("usage: content-cli.cjs friendship-preview|friendship-migrate (--out=<new-directory> --confirm=<previewHash> --author-schema=1|2)|build|check|check-item-pockets|inventory|import-pbs|import-pbs-regional [--src=content/sample] [--out=...] [--report=...] [--file=... --source=<id>] [--base-file=pokemon.txt (repeat; required for nonempty regional symbols)] [--form-file=pokemon_forms.txt --form-id=SYMBOL,N:showdownid] [--regional-file=regional_dexes.txt --region-name=0:region.kanto (repeat)]"); process.exit(2); }
