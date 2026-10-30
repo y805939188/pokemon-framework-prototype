@@ -17,7 +17,8 @@ export interface PinnedTrainerAiStrategy {
 }
 export interface BoundTrainerAiStrategy {
   readonly binding:PinnedTrainerAiStrategy['binding'] & {readonly catalogIdentity:string};
-  decide(snapshot:TrainerAiSnapshot,random:RandomN):DecisionPlan;
+  decide(snapshot:TrainerAiSnapshot,random:RandomN):DecisionPlan | Promise<DecisionPlan>;
+  isAvailable?():boolean;
 }
 export interface TrainerAiStrategyRegistry {
   register(entry:TrainerAiStrategyRegistration,active?:boolean):void;
@@ -25,7 +26,7 @@ export interface TrainerAiStrategyRegistry {
   resolve(reference?:TrainerAiStrategyReference):PinnedTrainerAiStrategy;
 }
 const diagnostics=['unmodeled-move-family','omitted-public-modifier','unsupported-trainer-item-family','zero-total-weight','first-legal-fallback','no-voluntary-switch-in-basic-profile'];
-function intent(value:unknown,snapshot:TrainerAiSnapshot):DecisionPlan {
+export function validateTrainerAiIntent(value:unknown,snapshot:TrainerAiSnapshot):DecisionPlan {
   const x=copyStrategyData(value,32768,8) as unknown as DecisionPlan;
   const reject=():never=>{throw new Error('trainer-ai-invalid-strategy-intent');};
   if(!x||Array.isArray(x)||typeof x!=='object')return reject();
@@ -67,7 +68,8 @@ export function createTrainerAiStrategyRegistry():TrainerAiStrategyRegistry {
         const validate=createTrainerAiSnapshotValidator(catalog);
         const instance=entry.create(freezeStrategyData(copyStrategyData(catalog,2_000_000,12)) as unknown as TrainerAiCatalog);
         const decide=instance.decide.bind(instance);
-        return Object.freeze({binding:Object.freeze({...binding,catalogIdentity}),decide(snapshot:TrainerAiSnapshot,random:RandomN):DecisionPlan {
+        const isAvailable=instance.isAvailable?.bind(instance)??(()=>true);
+        return Object.freeze({binding:Object.freeze({...binding,catalogIdentity}),isAvailable,decide(snapshot:TrainerAiSnapshot,random:RandomN):DecisionPlan | Promise<DecisionPlan> {
           // Collector failures precede strategy execution. They must never become strategy fallback.
           const input=freezeStrategyData(validate(snapshot));
           if(input.request.kind==='wait'||input.request.kind==='finished')return {kind:'none',binding:input.binding,reason:input.request.kind};
@@ -75,9 +77,14 @@ export function createTrainerAiStrategyRegistry():TrainerAiStrategyRegistry {
           const localRandom:RandomN=n=>{if(!open)throw new Error('trainer-ai-random-closed');return random(n);};
           try {
             const result=decide(input,parameters,localRandom);
-            if(result instanceof Promise){void Promise.prototype.then.call(result,()=>{},()=>{});throw new Error('trainer-ai-async-not-supported-batch1');}
-            return intent(result,input);
-          } finally {open=false;}
+            if(result instanceof Promise){
+              return new Promise<DecisionPlan>((resolve,reject)=>{
+                // Observe the native capability directly, never read a returned thenable getter.
+                Promise.prototype.then.call(result,(value:unknown)=>{open=false;try{resolve(validateTrainerAiIntent(value,input));}catch(error){reject(error);}},(error:unknown)=>{open=false;reject(error);});
+              });
+            }
+            open=false;return validateTrainerAiIntent(result,input);
+          } catch(error) {open=false;throw error;}
         }});
       }});
     },

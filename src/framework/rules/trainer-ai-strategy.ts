@@ -4,8 +4,9 @@ export type StrategyValue = null | boolean | number | string | readonly Strategy
 export type StrategyParameters = { readonly [key:string]:StrategyValue };
 export interface TrainerAiStrategyReference { id:string; version?:string; parameters:StrategyParameters }
 export interface TrainerAiStrategy {
-  /** Batch 1 executes synchronous implementations. Promise scheduling is a later, separately gated batch. */
-  decide(snapshot:TrainerAiSnapshot, parameters:StrategyParameters, random:RandomN):DecisionPlan;
+  decide(snapshot:TrainerAiSnapshot, parameters:StrategyParameters, random:RandomN):DecisionPlan | Promise<DecisionPlan>;
+  /** Optional trusted backend-lifetime probe; never supplied by authored trainer data. */
+  isAvailable?():boolean;
 }
 export function freezeStrategyData<T>(value:T):T {
   if(value && typeof value==='object'){for(const v of Object.values(value))freezeStrategyData(v);Object.freeze(value);}return value;

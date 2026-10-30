@@ -93,6 +93,8 @@ export interface BattleSessionFactory<S extends BattleHandle = BattleHandle> {
   evidence?(handle: S, binding: EvidenceBinding): BattleEvidence | null;
   /** V2 source-isolated receipts; E consumer owns binding, preparation and eventual installation. */
   effects?(handle: S, binding: EffectsBindingV2): EffectsSealV2 | null;
+  /** Retire only this handle's transient asynchronous work after application ownership has ended. */
+  retire?(handle:S):void;
 }
 
 /** The content a battle uses and, when available, the engine's data to check moves against. */

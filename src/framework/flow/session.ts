@@ -30,7 +30,7 @@ import type { BattleEvidenceContext, EvidenceBinding, BattleEvidence, FriendEvid
 import { resolveConfig } from "../rules/config";
 import { own, setOwn } from "../rules/own";
 import { bindRequiredSettlement, checkpointRequiredSettlement, finalizeRequiredSettlement, requiredCaptureItem, restoreRequiredSettlement } from "./required-settlement";
-import { bindTrainerAi, runTrainerAi, trainerAiEvent, checkpointTrainerAi, restoreTrainerAi } from './trainer-ai';
+import { bindTrainerAi, runTrainerAi, trainerAiEvent, checkpointTrainerAi, restoreTrainerAi, preflightTrainerAiRestore, prepareTrainerAiRestore, failTrainerAiRestore, assertTrainerAiCheckpointReady, cancelTrainerAiDecision } from './trainer-ai';
 import type { TrainerAiConfiguration } from './trainer-ai';
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
@@ -183,6 +183,9 @@ export class BattleSession {
   _result?: BattleResult;
   logger?: LogSink;
   _operation = false;
+  _operationEpoch = 0;
+  _operationDone: Promise<void> | null = null;
+  _restoring = false;
   _staged = false;
   _broken: SessionBrokenError | null = null;
   _evidence: EvidenceRecorder | null = null;
@@ -269,19 +272,24 @@ export class BattleSession {
     this._assertUsable();
     if (this._operation) throw new Error("battle session operation already in progress");
     this._operation = true;
+    const epoch=++this._operationEpoch;
+    let complete!:()=>void;
+    const done=new Promise<void>(resolve=>{complete=resolve;});this._operationDone=done;
     try {
       const checkpoint = this._checkpoint();
       try { return await action(); }
       catch (error) {
-        try { await this._restoreCheckpoint(checkpoint); }
+        if(this._operationEpoch!==epoch)throw error;
+        try { await this._restoreCheckpoint(checkpoint,epoch); }
         catch (restoreError) {
+          if(this._operationEpoch!==epoch)throw error;
           this._broken = new SessionBrokenError(error, restoreError);
           this._log("error", "session.broken", { original: error instanceof Error ? error.message : String(error), rollback: restoreError instanceof Error ? restoreError.message : String(restoreError) });
           throw this._broken;
         }
         throw error;
       }
-    } finally { this._operation = false; }
+    } finally { complete();if(this._operationDone===done)this._operationDone=null;if(this._operationEpoch===epoch)this._operation = false; }
   }
 
   /** Protocol-v1 action refusal; no new reason or request-id semantics are introduced. */
@@ -302,6 +310,7 @@ export class BattleSession {
 
   /** In-memory operation rollback, not a battle-time save. Include PRNG, pending choices and undelivered messages. */
   _checkpoint() {
+    assertTrainerAiCheckpointReady(this);
     const engine = this.gw.checkpoint();
     checkpointRequiredSettlement(this, engine);
     checkpointTrainerAi(this, this.gw, engine);
@@ -320,7 +329,16 @@ export class BattleSession {
     };
   }
 
-  async _restoreCheckpoint(checkpoint: ReturnType<BattleSession["_checkpoint"]>): Promise<void> {
+  async _restoreCheckpoint(checkpoint: ReturnType<BattleSession["_checkpoint"]>,ownedEpoch?:number): Promise<void> {
+    if(this._restoring)throw new Error('battle session restore already in progress');
+    if(ownedEpoch!==undefined&&ownedEpoch!==this._operationEpoch)throw new Error('battle session operation retired');
+    preflightTrainerAiRestore(this,this.gw,checkpoint.engine);
+    const external=ownedEpoch===undefined;
+    const epoch=external?++this._operationEpoch:this._operationEpoch;
+    let complete:()=>void=()=>{},done:Promise<void>|null=null;
+    if(external){this._operation=true;done=new Promise<void>(resolve=>{complete=resolve;});this._operationDone=done;}
+    this._restoring=true;prepareTrainerAiRestore(this);
+    try {
     this.gw = await restoreRequiredSettlement(this, checkpoint.engine, () => this._driver.fromCheckpoint(checkpoint.engine));
     restoreTrainerAi(this, this.gw, checkpoint.engine);
     const { participants, ...state } = S.clone(checkpoint.state);
@@ -330,6 +348,8 @@ export class BattleSession {
     this.requests = state.requests; this._result = state._result;
     if (checkpoint.evidence) this._evidence?.restore(checkpoint.evidence);
     if (checkpoint.effects) this._effects?.restore(checkpoint.effects);
+    }catch(error){failTrainerAiRestore(this);throw error;}
+    finally{this._restoring=false;if(external){complete?.();if(this._operationDone===done)this._operationDone=null;if(this._operationEpoch===epoch)this._operation=false;}}
   }
 
   static defaultAi(request: Req): string {
@@ -472,6 +492,8 @@ export class BattleSession {
 
   /** Cancel the registered (not yet executed) choice; reserved items return to the bag. */
   async cancel(): Promise<void> {
+    const interrupted=cancelTrainerAiDecision(this),running=this._operationDone;
+    if(interrupted&&running)await running;
     return this._exclusive(async () => {
       await this.gw.cancel("p1");
       for (const e of this.ledger.filter((x) => x.state === "reserved")) this._refund(e, "cancelled");

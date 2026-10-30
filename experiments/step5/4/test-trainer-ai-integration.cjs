@@ -100,7 +100,8 @@ test('C-L12 original resolved seed domain stream is independent of current engin
 });
 test('C-L13 revision variant: same owner request gets at most one rebuild, a second change is a controlled error',async()=>{
  const w=await fixture({moves:['tackle','growl','splash'],skill:0});capture(w);let checks=0;w.setOnContent(()=>{checks++;if(checks===2||checks===4){const req=w.gw._debugBattle().sides[1].activeRequest;req.active[0].moves[checks===2?0:1].disabled=true;}});
- await assert.rejects(D.runTrainerAi(w.session,w.gw),/request-revision-changed/);assert.equal(w.gw._debugBattle().sides[1].choice.actions.length,0);assert.equal(draws(w),2);w.setOnContent(null);
+ await assert.rejects(D.runTrainerAi(w.session,w.gw),/request-revision-changed/);assert.equal(w.gw._debugBattle().sides[1].choice.actions.length,0);// C2 publishes no RNG for either stale attempt (batch1 advanced both).
+ assert.equal(draws(w),0);w.setOnContent(null);
 });
 test('C-L13 content ABA variant: observed changed content permanently retires original operation, zero draws',async()=>{
  const w=await fixture(),x=capture(w),original=w.content,changed=clone(original);changed.meta.contentIdentity='0'.repeat(64);w.setContent(changed);assert.throws(()=>inspect(w),/content-source-retired/);w.setContent(original);assert.throws(()=>D.validateTrainerAiTicket(w.session,w.gw,x.ticket,candidate(x)),/content-source-retired/);assert.throws(()=>inspect(w),/content-source-retired/);assert.equal(draws(w),0);
@@ -109,5 +110,6 @@ test('production catalog uses complete pinned Gen8 metadata, bound author items;
  const w=await fixture({items:[{item:'fullrestore',count:1},{item:'ether',count:1}]});const d=diag(w);assert.ok(d.moveCount>800);assert.equal(d.typeCount,18);assert.match(d.catalogIdentity,/^[a-f0-9]{64}$/);assert.match(d.authorIdentity,/^[a-f0-9]{64}$/);assert.deepEqual(Object.keys(E.trainerAi),['createTrainerAiPolicy']);const x=inspect(w);assert.ok(x.plan.diagnostics.includes('unsupported-trainer-item-family'));
 });
 test('first reentrant callback cannot draw/submit another entitlement',async()=>{
- const w=await fixture();let attempts=0;w.setOnContent(()=>{attempts++;assert.throws(()=>inspect(w),/operation-in-progress/);});const x=inspect(w);assert.equal(x.plan.kind,'choose');assert.equal(attempts,1);assert.equal(draws(w),1);w.setOnContent(null);
+ const w=await fixture();let attempts=0;w.setOnContent(()=>{attempts++;assert.throws(()=>inspect(w),/operation-in-progress/);});const x=inspect(w);assert.equal(x.plan.kind,'choose');// C2 checks authority before invoke, random, publication and submission; every callback rejects reentry.
+ assert.equal(attempts,4);assert.equal(draws(w),1);w.setOnContent(null);
 });

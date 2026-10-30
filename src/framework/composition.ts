@@ -1,4 +1,7 @@
 import { createTrainerAiStrategyRegistry } from "./flow/trainer-ai-strategy";
+import { retireTrainerAi } from './flow/trainer-ai';
+import type { TrainerAiTiming } from './flow/trainer-ai';
+export type { TrainerAiTiming } from './flow/trainer-ai';
 import type { TrainerAiStrategyRegistry } from "./flow/trainer-ai-strategy";
 export { createTrainerAiStrategyRegistry } from "./flow/trainer-ai-strategy";
 export type { TrainerAiStrategyRegistry, TrainerAiStrategyRegistration, TrainerAiStrategy, StrategyParameters, TrainerAiStrategyReference } from "./flow/trainer-ai-strategy";
@@ -23,6 +26,7 @@ const CREATE_BATTLE_SESSION = BattleSession.create.bind(BattleSession);
 export interface BattleSessionFactoryOptions {
   content: () => Content;
   trainerAiStrategies?: TrainerAiStrategyRegistry;
+  trainerAiTiming?: TrainerAiTiming;
   /** Pins the engine seed (tests); undefined lets the engine pick one. */
   seed?: () => number[] | string | undefined;
   logger?: () => LogSink | undefined;
@@ -44,6 +48,7 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
   const driver = selectedDriver ?? showdownDriverFactory;
   const strategies = options.trainerAiStrategies ?? createTrainerAiStrategyRegistry();
   const resolveStrategy = strategies.resolve.bind(strategies);
+  const timing=options.trainerAiTiming;
   const currentContent = options.content.bind(options);
   const factory: BattleSessionFactory<BattleSession> = {
     // the application has created the foes (rules/member-factory) and decided the flags; this only wires the engine
@@ -58,7 +63,7 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
       ...(setup.obedience ? { obedience: setup.obedience } : {}),
       ...(required && setup.trainer && setup.evidenceContext && setup.isCurrentBattle ? { trainerAi: {
         strategy: resolveStrategy(setup.trainer.ai.aiStrategy), projection: setup.trainer, generation: setup.evidenceContext.generation, contentIdentity: setup.evidenceContext.contentIdentity,
-        currentContent, isCurrent: setup.isCurrentBattle,
+        currentContent, isCurrent: setup.isCurrentBattle, ...(timing?{timing}:{}),
       } } : {}),
       ...(options.seed ? { seed: options.seed() } : {}),
       ...(options.logger ? { logger: options.logger() } : {}),
@@ -67,6 +72,7 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
     }); },
     evidence: (handle, binding) => sealBattleEvidence(handle, binding),
     effects: (handle, binding) => sealBattleEffects(handle, binding),
+    retire: handle => retireTrainerAi(handle),
   };
   if (required) registerSettlementFactory(factory, "required", sealRequiredSettlement);
   return factory;
@@ -78,6 +84,7 @@ export function createLegacyNoHeldSessionFactory<S extends BattleHandle>(origina
     create: (request, game, setup) => original.create(request, game, setup),
     evidence: (handle, binding) => original.evidence?.(handle, binding) ?? null,
     effects: (handle, binding) => original.effects?.(handle, binding) ?? null,
+    ...(original.retire?{retire:original.retire.bind(original)}:{}),
   };
   const previous = settlementFactorySource(original);
   registerSettlementFactory(wrapper, "legacy-no-held", undefined, previous?.mode === "legacy-no-held" ? previous.legacyProduce : undefined);

@@ -243,7 +243,9 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     return value?.context.generation === this.generation ? clone(value) : null;
   }
 
+  private readonly retireSession:((handle:S)=>void)|null;
   constructor(ports: GameApplicationPorts<S>, options: GameApplicationOptions = {}) {
+    this.retireSession=ports.sessions?.retire?.bind(ports.sessions)??null;
     this.#settlementFactoryRoot = settlementFactorySource(ports.sessions);
     this.#friendshipRawState = ports.state;
     this.battleStatePort = {read:()=>ports.state.read(),replace:next=>{this.assertNoFriendshipWrite();this.#friendshipRevision++;ports.state.replace(next);}};
@@ -811,6 +813,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * refused for good, final review P4-2), and its session, should it still finish, commits nothing.
    */
   stateReplacedByHost(): void { this.assertNoFriendshipWrite();
+    const retiring=this.op?.session;
     this.generation++;
     if (this.#currentSettlementAdmission) this.#currentSettlementAdmission.invalid = true;
     this.#currentSettlementAdmission = null;
@@ -827,6 +830,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.reception = null;
     this.receptionReceipts.clear();
     this.receptionNotices.clear();
+    if(retiring)try{this.retireSession?.(retiring);}catch{/* generation already retired; host completion stays authoritative */}
   }
 
   /**
@@ -1404,6 +1408,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       }
       if (this.op === operation) this.op = null;
     }
+    if(matches&&operation?.session)try{this.retireSession?.(operation.session);}catch{/* the old operation is already retired */}
     const outcome: BattleOutcome = { code: 0, battleId: request ? request.battleId : null, commit: "none", aborted: true, error: message(error) };
     this.project(outcome);
     return outcome;

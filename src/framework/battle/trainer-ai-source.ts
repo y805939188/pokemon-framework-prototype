@@ -47,7 +47,7 @@ export function trainerSourceRequest(driver:BattleDriver):void {
 function requestSignature(s:Source):string {
   const p=s.battle.sides[1],r=p?.activeRequest;
   if(!r)return 'none';
-  return canonicalJson({turn:s.battle.turn,wait:!!r.wait,force:r.forceSwitch??null,active:(r.active??[]).map((a:any)=>({moves:a.moves.map((m:any)=>({id:m.id,pp:m.pp??null,disabled:!!m.disabled,target:m.target??null})),trapped:!!a.trapped})),public:s.public,field:[s.weather,s.terrain,s.conditions],own:p.pokemon.map((m:ShowdownPokemon)=>({id:m.name,hp:m.hp,maxhp:m.maxhp,active:!!m.isActive,status:m.status,moves:m.moveSlots.map((x:any)=>({id:x.id,pp:x.pp,maxpp:x.maxpp})),confusion:m.volatiles.confusion?.time??0}))});
+  return canonicalJson({turn:s.battle.turn,wait:!!r.wait,force:r.forceSwitch??null,active:(r.active??[]).map((a:any)=>({moves:a.moves.map((m:any)=>({id:m.id,pp:m.pp??null,disabled:!!m.disabled,target:m.target??null})),trapped:!!a.trapped})),public:s.public,field:[s.weather,s.terrain,s.conditions],own:p.pokemon.map((m:ShowdownPokemon)=>({id:m.name,hp:m.hp,maxhp:m.maxhp,active:!!m.isActive,status:m.status,item:m.item,ability:m.ability,types:m.getTypes(),moves:m.moveSlots.map((x:any)=>({id:x.id,pp:x.pp,maxpp:x.maxpp})),confusion:m.volatiles.confusion?.time??0}))});
 }
 function hpBar(value:string):{parts:number;scale:100} {
   if(value.startsWith('0 fnt'))return {parts:0,scale:100};
@@ -174,6 +174,14 @@ export function trainerCandidate(driver:BattleDriver,owner:object,ticket:Trainer
   if(t.request!==s.request || t.request.object!==s.battle.sides[1].activeRequest || t.request.signature!==requestSignature(s)||t.request.turn!==s.battle.turn)throw new Error('trainer-ai-request-revision-changed');
   if(t.automaticCandidateId&&id(s.battle.sides[1].active[0]?.getLockedMove()||'')!==s.battle.sides[1].activeRequest?.active?.[0]?.moves?.[0]?.id)throw new Error('trainer-ai-request-revision-changed');
   const action=t.actions.get(candidateId);if(!action)throw new Error('trainer-ai-unknown-candidate');return copy(action);
+}
+/** Internal journal identity. Only an actual owner/ticket may query it; DTO strings cannot mint authority. */
+export function trainerDecisionKey(driver:BattleDriver,owner:object,ticket:TrainerRequestTicket,resourceRevision:number):string {
+  const s=sourceFor(driver,owner),t=TICKETS.get(ticket);
+  if(!t||t.source!==s||t.owner!==owner)throw new Error('trainer-ai-unknown-source');
+  if(t.resourceRevision!==resourceRevision)throw new Error('trainer-ai-resource-revision-changed');
+  if(t.request!==s.request||t.request.object!==s.battle.sides[1].activeRequest||t.request.signature!==requestSignature(s)||t.request.turn!==s.battle.turn)throw new Error('trainer-ai-request-revision-changed');
+  return s.request.seq+':'+s.request.revision+':'+resourceRevision;
 }
 export async function submitTrainerCandidate(driver:BattleDriver,owner:object,ticket:TrainerRequestTicket,candidateId:string,resourceRevision:number):Promise<'accepted'|'safe-rejected'> {
   const action=trainerCandidate(driver,owner,ticket,candidateId,resourceRevision),s=sourceFor(driver,owner),t=TICKETS.get(ticket)!;

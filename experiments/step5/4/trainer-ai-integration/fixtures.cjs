@@ -27,7 +27,7 @@ async function fixture(options={}){
  game.party=[E.speciesKey.toPersistentMember(member,c)];game.nextMemberOrdinal='2';
  const state=T.fakes.createMemoryState(game),projection=T.fakes.createRecordingProjection();
  let onContent=null;
- const factory=E.composition.createBattleSessionFactory({trainerAiStrategies:options.registry,content:()=>{if(onContent)onContent();return c;},...(options.unseeded?{}:{seed:()=>options.seed??[1,2,3,4]})});
+ const factory=E.composition.createBattleSessionFactory({trainerAiStrategies:options.registry,trainerAiTiming:options.timing,content:()=>{if(onContent)onContent();return c;},...(options.unseeded?{}:{seed:()=>options.seed??[1,2,3,4]})});
  const app=new E.app.GameApplication({state,projection,sessions:factory,content:()=>({content:c}),random:n=>{worldDraws++;return 0;},clock:()=>12345});
  const request={battleId:options.battleId??'C-integration',trainer:{id:options.trainerId??'c-basic',version:options.trainerVersion??1},seq:1,canLose:true};
  const session=await app.startTrainerBattle(request);
