@@ -26,13 +26,17 @@ export interface BattleSessionFactoryOptions {
 }
 
 export function createBattleSessionFactory(options: BattleSessionFactoryOptions): BattleSessionFactory<BattleSession> {
-  return buildSessionFactory(options, !options.driver || options.driver === showdownDriverFactory);
+  const driver = options.driver;
+  return buildSessionFactory(options, !driver || driver === showdownDriverFactory, driver);
 }
 /** Explicit real-engine legacy root for old no-held content without a verified compiled identity. */
 export function createLegacyNoHeldBattleSessionFactory(options: BattleSessionFactoryOptions): BattleSessionFactory<BattleSession> {
-  return createLegacyNoHeldSessionFactory(buildSessionFactory(options, false));
+  return createLegacyNoHeldSessionFactory(buildSessionFactory(options, false, options.driver));
 }
-function buildSessionFactory(options: BattleSessionFactoryOptions, required: boolean): BattleSessionFactory<BattleSession> {
+function buildSessionFactory(options: BattleSessionFactoryOptions, required: boolean, selectedDriver: BattleDriverFactory | undefined): BattleSessionFactory<BattleSession> {
+  // Selecting the producer mode and the actual driver is one composition-time choice. Later mutable options cannot
+  // retain required authority while substituting another engine. Callback receivers/content lookup stay unchanged.
+  const driver = selectedDriver ?? showdownDriverFactory;
   const factory: BattleSessionFactory<BattleSession> = {
     // the application has created the foes (rules/member-factory) and decided the flags; this only wires the engine
     create: (request, game, setup) => {
@@ -45,7 +49,7 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
       ...(setup.obedience ? { obedience: setup.obedience } : {}),
       ...(options.seed ? { seed: options.seed() } : {}),
       ...(options.logger ? { logger: options.logger() } : {}),
-      ...(options.driver ? { driver: options.driver } : {}),
+      driver,
       foe: { kind: request.kind, team: setup.foes, noRun: setup.noRun, noBall: setup.noBall },
     }); },
     evidence: (handle, binding) => sealBattleEvidence(handle, binding),

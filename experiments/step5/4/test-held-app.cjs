@@ -207,3 +207,10 @@ test('B PD6 capture: Pay Day waits for the same authenticated receiving decision
  assert.deepEqual([w.state.current().money,w.state.current().stats.battle_money_gained,w.state.replaced.length],[1500,500,1]);assert.ok(E.storage.locateMember(w.state.current(),id));
  const after=J(w.state.current());assert.equal(w.app.commitResult(raw),'already-applied');assert.deepEqual(w.state.current(),after);assert.equal(w.state.replaced.length,1);
 });
+
+test('B required composition pins its selected real driver before app construction; options cannot swap it later',async()=>{
+ const w=fixture(),options={content:()=>w.c,seed:()=>[1,2,3,4]},sessions=E.composition.createBattleSessionFactory(options);let calls=0;
+ const app=new E.app.GameApplication({state:w.state,content:()=>({content:w.c,dex:E.dex.createDexLookup()}),sessions,projection:w.projection,random:n=>0,clock:()=>12345},{receivingProfile:{mode:1,naming:1},capabilities:{allowHeldItemSources:true,allowExperimentalHeldItemBattle:true}});
+ options.driver={...E.gateway.showdownDriverFactory,create:opts=>{calls++;return E.gateway.showdownDriverFactory.create({...opts,wild:false});}};
+ const h=await app.startBattle(w.request);assert.equal(calls,0);await h.chooseMove(2);assert.equal(app.finishBattle(h,w.request).commit,'applied');assert.equal(w.state.replaced.length,1);
+});
