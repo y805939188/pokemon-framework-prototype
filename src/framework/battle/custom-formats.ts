@@ -277,12 +277,18 @@ const rpgHandlers = {
     const observer = settlements.get(this);
     if (!observer) return;
     if (move.id === "payday") {
-      const prior = move.onHit;
+      const prior = move.onHit, priorSub = move.onAfterSubDamage;
       let paid = false;
       move.onHit = function(this: ShowdownBattle, target: ShowdownPokemon, source: ShowdownPokemon, ...args: unknown[]) {
         const result = prior?.call(this, target, source, ...args);
         if (!paid && result !== false && result !== null) { paid = true; settlements.get(this)?.moneyMove(source, "payday"); }
         return result;
+      };
+      // Substitute bypasses onHit. Its actual damage hook shares the per-use latch with body hits, so
+      // a successful hit is counted once without inferring success from protocol messages or RNG.
+      move.onAfterSubDamage = function(this: ShowdownBattle, damage: number, target: ShowdownPokemon, source: ShowdownPokemon, effect: ShowdownPokemon) {
+        priorSub?.call(this, damage, target, source, effect);
+        if (!paid && damage > 0) { paid = true; settlements.get(this)?.moneyMove(source, "payday"); }
       };
     } else if (move.id === "happyhour") {
       // Showdown's display-only move has no RPG consumer. Install its actual successful primary effect.
@@ -296,10 +302,11 @@ const rpgHandlers = {
     }
     // WP47-B: a wild user cannot steal/remove the player's item; the damaging move itself still executes.
     if (this.rpg.wild && pokemon.side.id === "p2" && ["thief", "covet", "knockoff"].includes(move.id)) move.onAfterHit = undefined;
+    // Fail an attempted exchange after the engine's ordinary PP deduction, not at BeforeMove.
+    if (this.rpg.wild && pokemon.side.id === "p2" && ["trick", "switcheroo"].includes(move.id)) move.onTry = () => false;
   },
   onBeforeMovePriority: 9.5,
   onBeforeMove(this: ShowdownBattle, pokemon: ShowdownPokemon, target: ShowdownPokemon, move: ShowdownPokemon): boolean | undefined {
-    if (settlements.has(this) && this.rpg.wild && pokemon.side.id === "p2" && ["trick", "switcheroo"].includes(move.id)) return false;
     return checkObedience(this, pokemon, target, move);
   },
   onDamagingHitPriority: -100000,

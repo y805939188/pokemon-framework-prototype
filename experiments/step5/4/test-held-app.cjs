@@ -214,3 +214,42 @@ test('B required composition pins its selected real driver before app constructi
  options.driver={...E.gateway.showdownDriverFactory,create:opts=>{calls++;return E.gateway.showdownDriverFactory.create({...opts,wild:false});}};
  const h=await app.startBattle(w.request);assert.equal(calls,0);await h.chooseMove(2);assert.equal(app.finishBattle(h,w.request).commit,'applied');assert.equal(w.state.replaced.length,1);
 });
+
+// Original independent HF06/HF11 regressions; assertions retained.
+function legacyWorld() {
+  const c=content(),state=T.fakes.createMemoryState(E.state.newGame({content:c.content,party:[],money:123}));let produced=0;
+  const raw={protocol:1,battleId:'legacy-abort',outcome:{kind:'win',winner:'Player'},members:{},bag:{},captured:[],dex:{seen:[],owned:[]}};
+  const sessions=E.composition.createLegacyNoHeldResultFactory(id=>{produced++;assert.equal(id,raw.battleId);return J(raw);});
+  const projection=T.fakes.createRecordingProjection(),app=new E.app.GameApplication({state,sessions,projection,content:()=>c});
+  return {app,state,raw,projection,produced:()=>produced};
+}
+
+
+test('HF06 independent explicitly registered unowned legacy handle loses fresh permission on abort',()=>{
+  const w=legacyWorld(),before=J(w.state.current()),h=E.composition.createLegacyNoHeldBattleHandle(w.app,w.raw.battleId);
+  const aborted=w.app.abortBattle({battleId:w.raw.battleId},Error('caller cancelled before producer'));
+  assert.equal(aborted.aborted,true);
+  const late=w.app.finishBattle(h,{battleId:w.raw.battleId});
+  assert.equal(late.commit,'none','abort must retire the original unowned fresh source');
+  assert.deepEqual(w.state.current(),before);assert.equal(w.state.replaced.length,0);assert.equal(w.app.saveBlocked,false);
+});
+
+
+test('HF11 independent installed required handle remains an exact no-op if post-install projection observed new content',async()=>{
+  const w=fixture({item:'amuletcoin'}),B=content({settings:{MAX_MONEY:555555}});
+  w.projection.project=()=>{w.setContent(B);w.app.describeParty();};
+  const {h,raw,out}=await finishWild(w);assert.equal(out.commit,'applied');const installed=J(w.state.current());
+  assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied','installed pair replay must precede retired-fresh source checks');
+  assert.equal(w.app.commitResult(raw),'already-applied');assert.equal(w.state.replaced.length,1);assert.deepEqual(w.state.current(),installed);
+});
+
+
+test('HF06 legacy abort retires only its reservation; old callback cannot release same-id successor',()=>{
+  const w=legacyWorld(), old=E.composition.createLegacyNoHeldBattleHandle(w.app,w.raw.battleId);
+  assert.equal(w.app.abortBattle({battleId:w.raw.battleId},Error('cancel')).aborted,true);
+  assert.equal(w.app.saveBlocked,false);assert.equal(w.produced(),0);
+  const next=E.composition.createLegacyNoHeldBattleHandle(w.app,w.raw.battleId);
+  assert.equal(w.app.finishBattle(old,{battleId:w.raw.battleId}).commit,'none');assert.equal(w.app.saveBlocked,true);
+  assert.equal(w.app.finishBattle(next,{battleId:w.raw.battleId}).commit,'applied');assert.equal(w.produced(),1);
+  assert.equal(w.state.replaced.length,1);assert.equal(w.app.saveBlocked,false);
+});

@@ -117,20 +117,30 @@ export class SaveStore {
     this._at("start");
     const info = this.loadInfo();
     assertBattleResultShape(result);
+    // Producer callbacks can retain aliases to caller data. Authenticate and plan one private value,
+    // never two aliases that a callback can change together between the source gate and hash check.
+    result = structuredClone(result);
+    const inputHash = resultHash(result), keys = this.speciesKey;
+    let ownedOptions: BattleCommitOptions = {};
     const originalFile = this.file, originalBytes = fs.readFileSync(originalFile, "utf8");
     const previous = Object.hasOwn(info.state.appliedBattles, result.battleId) ? info.state.appliedBattles[result.battleId] : undefined;
     if (!previous) {
       const producer = LEGACY_PRODUCERS.get(this);
       if (!producer) throw new Error("store-battle-source-unknown: use the application for required settlement and save its complete candidate state");
+      const inputTemplates = options.templates ?? {}, templates = structuredClone(inputTemplates);
+      ownedOptions = structuredClone({ ...options, heldItemSource: undefined, templates,
+        ...(this.content ? { content: this.content } : {}) });
+      const templatesJSON = JSON.stringify(templates);
       if (info.state.party.some(m => !!m.item) || result.captured.some(m => !!m.item)
-        || result.captured.some(m => !!options.templates?.[m.id]?.item)) throw new Error("legacy-no-held-store-source-gate");
+        || result.captured.some(m => !!templates[m.id]?.item)) throw new Error("legacy-no-held-store-source-gate");
       const actual = producer(result.battleId); assertBattleResultShape(actual);
-      if (resultHash(actual) !== resultHash(result)) throw new Error("legacy-store-producer-result-mismatch");
+      if (actual.captured.some(m => !!m.item) || actual.captured.some(m => !!inputTemplates[m.id]?.item)) throw new Error("legacy-no-held-store-source-gate");
+      if (resultHash(actual) !== inputHash || JSON.stringify(inputTemplates) !== templatesJSON) throw new Error("legacy-store-producer-result-mismatch");
       if (this.file !== originalFile || fs.readFileSync(originalFile, "utf8") !== originalBytes) throw new Error("store-state-changed-during-producer");
     }
     const names = [...(result.captured || []).map((c) => c.species), ...(result.dex?.seen || []), ...(result.dex?.owned || [])];
-    if (!this.speciesKey && names.length) throw new Error(`this result names species (${[...new Set(names)].slice(0, 3).join(", ")}) and the store was given no species mapping: pass the content's resolver (or identityKeys for a fixture world); nothing was written`);
-    const r = applyBattleResult(info.state, result, undefined, this.speciesKey ?? (() => null), { ...options, ...(this.content ? { content: this.content } : {}) });
+    if (!keys && names.length) throw new Error(`this result names species (${[...new Set(names)].slice(0, 3).join(", ")}) and the store was given no species mapping: pass the content's resolver (or identityKeys for a fixture world); nothing was written`);
+    const r = applyBattleResult(info.state, result, undefined, keys ?? (() => null), { ...ownedOptions, heldItemSource: { allowed: false, describe: () => null } });
     if (info.migrated) { this._backup(info.from); this._at("afterBackup"); }
     if (r.status === "already-applied" && !info.migrated) return { status: r.status };
     this._at("beforeSave");

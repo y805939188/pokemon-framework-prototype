@@ -21,3 +21,25 @@ test('B store: legacy producer mismatch/held state are rejected without installi
   const blocked=E.store.createLegacyNoHeldSaveStore(file,()=>{calls++;return input;},{},E.speciesKey.identityKeys,content);
   assert.throws(()=>blocked.commit(input),/legacy-no-held-store-source-gate/);assert.equal(calls,0);assert.deepEqual(files(dir),held);
 }));
+
+test('B-ULTRA-06 legacy producer cannot mutate raw/template aliases after the no-held gate',()=>{
+  for(const mode of ['normal','early-held','raw-only','template-only','both','different-result'])fixture(({dir,file,content,store})=>{
+    const template=structuredClone(T.fixtures.makeGame().party[0]);template.id='Caught-1';template.nickname='Caught';template.item=mode==='early-held'?'leftovers':'';
+    const captured=E.state.protocolMember(template),input={protocol:1,battleId:'callback-'+mode,outcome:{kind:'caught',winner:null,target:captured.id,ball:'pokeball'},members:{},bag:{},captured:[captured],dex:{seen:['Charizard'],owned:['Charizard']}};
+    const options={decisions:{[template.id]:{nickname:{kind:'keep'}}},templates:{[template.id]:template},heldItemSource:{allowed:true,describe:()=>({holdable:true,mail:false})}};
+    let calls=0;const legacy=E.store.createLegacyNoHeldSaveStore(file,()=>{
+      calls++;if(['raw-only','both'].includes(mode))captured.item='leftovers';
+      if(['template-only','both'].includes(mode))template.item='leftovers';
+      return mode==='different-result'?{...input,bag:{potion:-1}}:input;
+    },{},E.speciesKey.identityKeys,content),before=files(dir);
+    if(mode==='normal'){
+      assert.equal(legacy.commit(input,options).status,'applied');const installed=files(dir);
+      assert.equal(legacy.commit(input,{get templates(){throw Error('installed replay must not read current templates');}}).status,'already-applied');assert.equal(calls,1);assert.deepEqual(files(dir),installed);
+      assert.equal(store.load().party.find(m=>m.id==='Caught-1').item,'');
+    }else{
+      assert.throws(()=>legacy.commit(input,options),/legacy-no-held-store-source-gate|producer-result-mismatch/);
+      assert.equal(calls,mode==='early-held'?0:1);assert.deepEqual(files(dir),before);
+      assert.equal(Object.hasOwn(store.load().appliedBattles,input.battleId),false);
+    }
+  });
+});

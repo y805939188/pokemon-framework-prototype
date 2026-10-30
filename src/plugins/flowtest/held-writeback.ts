@@ -4,8 +4,9 @@
  */
 import { progressionDonorInputs } from "./source-fixture";
 
-function heldContent(E: any, assert: any): any {
+function heldContent(E: any, assert: any, settings: any = {}): any {
   const input = progressionDonorInputs();
+  input.settings = { ...input.settings, ...settings };
   input.species.find((s: any) => s.id === "snorlax").learnset = ["payday", "trick", "recycle", "splash"].map(move => ({ level: 1, move }));
   input.species.find((s: any) => s.id === "pidgey").learnset = [{ level: 1, move: "knockoff" }];
   input.items = Object.values(E.itemCatalog.legacyCatalog()).map((item: any) => ({ ...item, source: "author-placeholder" }));
@@ -110,6 +111,7 @@ export async function runHeldWriteback(p: any): Promise<void> {
     fs.writeFileSync(path.join(path.dirname(OUT), "ps-flow-expected-B-held.json"), JSON.stringify({ kind: "B-held", version: 1, cases }));
     return { active, slot, input: "actual engine Trick/capture and MZ save; controlled content/capabilities, no physical input" };
   });
+  await runHeldRemediation(p, content);
 }
 
 export async function continueHeldWriteback(p: any): Promise<void> {
@@ -153,5 +155,84 @@ export async function continueHeldWriteback(p: any): Promise<void> {
     } else await battle(p, `B-${item.source}-next`, item.active, false);
     G.$gameMessage.clear(); eq(hashFile(file), item.fileHash, "next battle did not overwrite producer checkpoint");
     return { source: item.source, slot: item.slot, input: "real fresh NW/MZ Title/Continue/load and next engine battle; synthetic DOM/service choices" };
+  });
+}
+
+/** New-candidate B fixes, executed in the packaged NW runtime. Gateway-only cases are explicitly diagnostic
+ * effects/replay checks; the two applications below use real MZ state, not independent fake state ports. */
+async function runHeldRemediation(p: any, content: any): Promise<void> {
+  const { G, W, api, assert, eq, game, clone, scenario, path } = p, E = api();
+  const port = () => ({ read: () => game(), replace: (next: any) => { G.$gameSystem._psGame = next; } });
+  await scenario("B-FIX-01 legacy cancellation retires source and preserves successor", async () => {
+    setup(p, content); let calls = 0, writes = 0;
+    const raw = { protocol: 1, battleId: "B-cancel-legacy", outcome: { kind: "win", winner: "Player" }, members: {}, bag: {}, captured: [], dex: { seen: [], owned: [] } };
+    const sessions = E.composition.createLegacyNoHeldResultFactory(() => { calls++; return clone(raw); });
+    const state = port(), app = new E.app.GameApplication({ state: { read: state.read, replace: (next: any) => { writes++; state.replace(next); } }, sessions, content: () => ({ content, dex: E.dex.createDexLookup() }), projection: { project() {} } });
+    const before = clone(game()), old = E.composition.createLegacyNoHeldBattleHandle(app, raw.battleId);
+    eq(app.saveBlocked, true, "original source reserved"); app.abortBattle(raw, Error("controlled cancel"));
+    eq(app.saveBlocked, false, "cancel releases original owner"); eq(app.finishBattle(old, raw).commit, "none", "late original is retired");
+    eq(game(), before, "cancel is zero write"); eq([calls, writes], [0, 0], "no producer/replace");
+    const next = E.composition.createLegacyNoHeldBattleHandle(app, raw.battleId);
+    eq(app.finishBattle(old, raw).commit, "none", "old cannot consume successor"); eq(app.saveBlocked, true, "successor still owns");
+    eq(app.finishBattle(next, raw).commit, "applied", "new legitimate source usable"); eq([calls, writes], [1, 1], "successor installs once");
+    return { calls, writes, contract: "MZ state, explicit legacy composition, default capabilities closed" };
+  });
+  await scenario("B-FIX-02 post-install content observation preserves original exact replay", async () => {
+    setup(p, content); game().party[0].item = "amuletcoin"; // disclosed initial item fixture, source flows covered above
+    let supplied = content, writes = 0, app: any;
+    const changed = heldContent(E, assert, { MAX_MONEY: 555555 }), state = port();
+    app = new E.app.GameApplication({ state: { read: state.read, replace: (next: any) => { writes++; state.replace(next); } },
+      sessions: E.composition.createBattleSessionFactory({ content: () => supplied, seed: () => [1, 2, 3, 4] }),
+      content: () => ({ content: supplied, dex: E.dex.createDexLookup() }), random: () => 0,
+      projection: { project() { supplied = changed; app.describeParty(); } } },
+      { receivingProfile: { mode: 1, naming: 1 }, capabilities: { allowHeldItemSources: true, allowExperimentalHeldItemBattle: true } });
+    const request = { battleId: "B-installed-content", kind: "wild", seq: 1, foes: [{ species: "pidgey", level: 5 }] };
+    const h = await app.startBattle(request); assert((await h.chooseMove(1)).ok && h.finished, "actual terminal Pay Day");
+    eq(app.finishBattle(h, request).commit, "applied", "main and pair installed"); const installed = clone(game());
+    eq(app.finishBattle(h, request).commit, "already-applied", "same handle is a query"); eq(game(), installed, "whole state unchanged");
+    eq([writes, game().money], [1, 1500], "one install and one reward");
+    return { writes, money: game().money, pairHash: game().appliedBattles[request.battleId].settlement.pairHash };
+  });
+  const T = G.require("./js/engine/build/testing.cjs"), gateway = { ...E.gateway, ...T.heldDiagnostics };
+  const gameDir = path.dirname(path.dirname(path.dirname(path.dirname(G.require.resolve("./js/engine/game/session.cjs")))));
+  const make = (name: string, species: string, moves: string[], item = "", level = 50) => ({ name, species, moves, item, level, nature: "Hardy", ability: species === "Zoroark" ? "Illusion" : "Run Away" });
+  const create = async (players: any[], wild = false) => {
+    const gw = await gateway.BattleGateway.create({ engineRoot: path.join(gameDir, "js/engine/showdown"), formatid: "gen8rpgcustomgame", requiredSettlement: true, wild, seed: [1, 2, 3, 4], players });
+    await gw.choose("p1", `team ${players[0].team.map((_: any, i: number) => i + 1).join("")}`); await gw.choose("p2", "team 1"); gw.drain(); return gw;
+  };
+  const turn = async (gw: any, a = "move 1", b = "move 1") => { assert(await gw.choose("p1", a), "player choice"); assert(await gw.choose("p2", b), "foe choice"); return gw.drain(); };
+  const binding = { battleId: "NW-diagnostic-pair", generation: 1, rawHash: "a".repeat(64), contentIdentity: "b".repeat(64) };
+  const facts = (gw: any) => {
+    if (!gw.ended) { gw._debugBattle().tie(); gw._pump(); } // disclosed diagnostic terminal for isolated effects
+    return gateway.gatewaySettlementFacts(gw, gateway.gatewaySettlementLineage(gw), binding);
+  };
+  await scenario("B-FIX-03 actual Substitute Pay Day", async () => {
+    const gw = await create([{ name: "Player", team: [make("P1", "Snorlax", ["Splash", "Pay Day"])] }, { name: "Trainer", team: [make("F1", "Snorlax", ["Substitute", "Splash"])] }]);
+    await turn(gw); const target = gw._debugBattle().sides[1].active[0], before = target.volatiles.substitute.hp;
+    const pp = gw.readState("p1")[0].pp.payday; await turn(gw, "move 2", "move 2");
+    assert((target.volatiles.substitute?.hp ?? 0) < before, "real substitute damage"); eq(gw.readState("p1")[0].pp.payday, pp - 1, "ordinary PP");
+    const result = facts(gw); eq(result.money.payDay, 250, "successful global effect counted once");
+    return { money: result.money, diagnosticTerminal: true };
+  });
+  await scenario("B-FIX-04 wild exchange spends PP before normal failure", async () => {
+    const rows = [];
+    for (const move of ["Trick", "Switcheroo"]) {
+      const gw = await create([{ name: "Player", team: [make("P1", "Snorlax", ["Splash"], "leftovers")] }, { name: "Wild", team: [make("F1", "Persian", [move], "blacksludge")] }], true);
+      const pp = gw.readState("p2")[0].pp[move.toLowerCase()], messages = await turn(gw);
+      eq(gw.readState("p2")[0].pp[move.toLowerCase()], pp - 1, "engine PP deduction"); assert(/-fail/.test(JSON.stringify(messages)), "normal failure feedback");
+      const result = facts(gw); eq(result.events, [], "no transfer"); eq(result.members.map((m: any) => [m.current, m.recovery]), [["leftovers", "leftovers"], ["blacksludge", "blacksludge"]], "C/I retained"); rows.push({ move, ppBefore: pp, ppAfter: pp - 1 });
+    }
+    return { rows, diagnosticTerminal: true };
+  });
+  await scenario("B-FIX-05 switched Illusion checkpoint retains ordered pair", async () => {
+    const players = [{ name: "Player", team: [make("P1", "Zoroark", ["Splash"], "leftovers"), make("P2", "Persian", ["Tackle"], "oranberry", 100)] }, { name: "Trainer", team: [make("F1", "Caterpie", ["Splash"], "", 1)] }];
+    const gw = await create(players); eq(gw._debugBattle().sides[0].active[0].illusion?.set.name, "P2", "real Illusion");
+    await turn(gw, "switch 2"); const token = gw.checkpoint(); await turn(gw); assert(gw.ended, "natural terminal"); const original = facts(gw);
+    const restored = await gateway.showdownDriverFactory.fromCheckpoint(token); await turn(restored); assert(restored.ended, "restored natural terminal"); const replayed = facts(restored);
+    eq(replayed, original, "complete ordered facts"); eq(restored._debugBattle().prng.getSeed(), gw._debugBattle().prng.getSeed(), "same RNG");
+    const roster = players.flatMap((s: any, i: number) => s.team.map((m: any) => ({ id: m.name, side: i ? "p2" : "p1", initial: m.item })));
+    const resolve = (f: any) => E.heldFacts.resolveRequiredFacts(f, { binding, roster, wild: false });
+    const a = resolve(original), b = resolve(replayed); assert(a.ok && b.ok, "complete validated facts"); eq(a.pairHash, b.pairHash, "same pair hash");
+    return { pairHash: a.pairHash, naturalTerminal: true, diagnosticBindingOnly: true };
   });
 }

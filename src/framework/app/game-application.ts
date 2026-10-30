@@ -936,6 +936,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         const binding = { battleId: admission.battleId, generation: admission.generation, rawHash: hash, contentIdentity: admission.contentIdentity };
         const sealed = admission.source.collect?.(handle, binding);
         this.assertBattleContext(context);
+        if (admission.invalid) throw new Error("required-settlement-source-permanently-invalidated");
         const resolved = resolveRequiredFacts(sealed, { binding, roster: admission.roster, wild: admission.wild });
         if (!resolved.ok) throw new Error(resolved.reason);
         admission.facts = resolved.facts; admission.pairHash = resolved.pairHash;
@@ -966,6 +967,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     let admission = this.#settlementAdmissions.get(context);
     if (previous) {
       if (previous.hash !== hash) throw new Error(`battle ${result.battleId} already applied with a different result`);
+      if (previous.settlement && admission?.source?.mode === "required") {
+        // Only this original, authenticated cached pair may outlive fresh-source invalidation. A new handle
+        // must still authenticate its own seal before querying a ledger with a paired identity.
+        if (!admission.facts) this.readRequiredSettlement(admission, hash, context, handle!);
+        if (admission.handle !== handle || admission.generation !== this.generation
+          || admission.facts?.binding.rawHash !== hash || !admission.pairHash) throw new Error("required-settlement-paired-result-changed");
+      }
       if (previous.settlement && admission?.pairHash && previous.settlement.pairHash !== admission.pairHash) throw new Error("battle settlement pair conflict");
       if (previous.trainer && facts?.trainer && (previous.trainer.id !== facts.trainer.projection.id || previous.trainer.version !== facts.trainer.projection.version)) throw new Error("trainer battle ledger identity conflict");
       if (prepared?.attempted && !prepared.completed && prepared.next) {
@@ -1180,8 +1188,6 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       assertBattleResultShape(received); // Before outcome, copying, hash or any source callback.
       const hash = resultHash(received);
       this.assertBattleContext(context);
-      const admission = this.#settlementAdmissions.get(context);
-      if (admission) this.readRequiredSettlement(admission, hash, context, handle);
       this.battleContexts.set(handle, context); this.bornIn.set(handle, context.generation);
       result = clone(received);
       const code = outcomeCode(result), kind = result.outcome.kind, battleId = request?.battleId ?? result.battleId;
@@ -1250,20 +1256,26 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * it is this battle (same battleId), also while its session is still being created.
    */
   abortBattle(request: Pick<BattleStartRequest, "battleId"> | null, error: unknown): BattleOutcome {
-    if (this.op && request && this.op.battleId === request.battleId) {
-      const context = this.op.session ? this.battleContexts.get(this.op.session) : undefined;
+    const operation = this.op;
+    const context = operation?.session ? this.battleContexts.get(operation.session) : !operation ? this.battleCommitOwner : undefined;
+    const admission = context ? this.#settlementAdmissions.get(context) : this.#currentSettlementAdmission;
+    const matches = request && (operation ? operation.battleId === request.battleId
+      : admission?.source?.mode === "legacy-no-held" && admission.battleId === request.battleId);
+    if (matches) {
+      // The unowned legacy producer also reserves an operation identity. Retire exactly that reservation;
+      // incomplete/unknown installation keeps its barrier, and no callback may clear a successor owner.
       if (!context || !this.preparedBattles.get(context)?.indeterminate) {
-        if (this.#currentSettlementAdmission) this.#currentSettlementAdmission.invalid = true;
-        this.#currentSettlementAdmission = null;
+        if (admission) admission.invalid = true;
+        if (this.#currentSettlementAdmission === admission) this.#currentSettlementAdmission = null;
+        if (context) {
+          this.evolutions.cancelPrepared(context.token);
+          this.pokedex.discardReserved(context.token);
+          this.terminatedBattles.add(context);
+          if (this.reception?.context === context) this.reception = null;
+          if (this.battleCommitOwner === context) this.battleCommitOwner = null;
+        }
       }
-      if (context && !this.preparedBattles.get(context)?.indeterminate) {
-        this.evolutions.cancelPrepared(context.token);
-        this.pokedex.discardReserved(context.token);
-        this.terminatedBattles.add(context);
-        if (this.reception?.context === context) this.reception = null;
-        if (this.battleCommitOwner === context) this.battleCommitOwner = null;
-      }
-      this.op = null;
+      if (this.op === operation) this.op = null;
     }
     const outcome: BattleOutcome = { code: 0, battleId: request ? request.battleId : null, commit: "none", aborted: true, error: message(error) };
     this.project(outcome);

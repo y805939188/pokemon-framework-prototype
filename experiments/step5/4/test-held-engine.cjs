@@ -136,3 +136,53 @@ test('B effective Gen8 unsupported transfer/removal families refuse the complete
  ];
  for(const input of inputs){const s=await create(input),api=await G;if(input.p.ability==='Pickup')s.gw.seedState('p2',[{id:'F1',hp:1}]);await turn(s.gw);s.gw._debugBattle().tie();s.gw._pump();assert.throws(()=>api.gatewaySettlementFacts(s.gw,s.lineage,binding),/required-held-facts-unavailable/);}
 });
+
+test('B-ULTRA-03 real Substitute Pay Day counts once; body/protect/immunity and RNG match uninstrumented engine',async()=>{
+  const api=await G;
+  for(const [label,species,foeMoves,first] of [
+    ['substitute','Snorlax',['Substitute','Splash'],true],['body','Snorlax',['Splash'],false],
+    ['protect','Snorlax',['Protect'],false],['immune','Gastly',['Splash'],false],
+  ]){
+    const p=set('P1','Snorlax',['Splash','Pay Day']),f=set('F1',species,foeMoves);
+    const sample=await create({p,f}), control=await api.BattleGateway.create({...sample.opts,requiredSettlement:false});
+    await control.choose('p1','team 1');await control.choose('p2','team 1');control.drain();
+    if(first){await turn(sample.gw);await turn(control);}
+    const target=sample.gw._debugBattle().sides[1].active[0],before=first?target.volatiles.substitute.hp:null;
+    const pp=sample.gw.readState('p1')[0].pp.payday;
+    const messages=await turn(sample.gw,'move 2',first?'move 2':'move 1');await turn(control,'move 2',first?'move 2':'move 1');
+    if(first)assert.ok((target.volatiles.substitute?.hp??0)<before,'real substitute damage');
+    assert.equal(sample.gw.readState('p1')[0].pp.payday,pp-1);
+    for(const side of ['p1','p2'])assert.deepEqual(sample.gw.readState(side),control.readState(side),label);
+    assert.equal(sample.gw._debugBattle().prng.getSeed(),control._debugBattle().prng.getSeed(),label);
+    assert.equal((await finish(sample)).money.payDay,['protect','immune'].includes(label)?0:250,label+JSON.stringify(messages));
+  }
+});
+
+test('B-ULTRA-04 wild Trick/Switcheroo attempts spend ordinary PP and fail without changing C/I/R',async()=>{
+  for(const move of ['Trick','Switcheroo']){
+    const s=await create({wild:true,p:set('P1','Snorlax',['Splash'],'leftovers'),f:set('F1','Persian',[move],'blacksludge')});
+    const id=move.toLowerCase(),pp=s.gw.readState('p2')[0].pp[id];const messages=await turn(s.gw);
+    assert.equal(s.gw.readState('p2')[0].pp[id],pp-1);assert.match(JSON.stringify(messages),/-fail/,'normal attempted-move failure feedback');
+    const facts=await finish(s);assert.equal(facts.events.length,0);
+    assert.deepEqual(facts.members.map(m=>[m.current,m.recovery,m.recycle]),[['leftovers','leftovers',''],['blacksludge','blacksludge','']]);
+    const trainer=await create({p:set('P1','Snorlax',['Splash'],'leftovers'),f:set('F1','Persian',[move],'oranberry')});
+    await turn(trainer.gw);assert.equal((await finish(trainer)).members.find(m=>m.id==='P1').current,'oranberry','trainer exchange still executes');
+  }
+});
+
+test('B-ULTRA-05 same opaque checkpoint after switching/Illusion preserves complete ordered facts and pair hash',async()=>{
+  const api=await G;
+  for(const illusion of [false,true]){
+    const p=illusion?{...set('P1','Zoroark',['Splash'],'leftovers'),ability:'Illusion'}:set('P1','Snorlax',['Splash'],'leftovers');
+    const s=await create({p,rest:[set('P2','Persian',['Tackle'],'oranberry',100)],f:set('F1','Caterpie',['Splash'],'',1)});
+    if(illusion)assert.equal(s.gw._debugBattle().sides[0].active[0].illusion?.set.name,'P2');
+    await turn(s.gw,'switch 2');const token=s.gw.checkpoint();await turn(s.gw);assert.equal(s.gw.ended,true);
+    const original=await finish(s,false),resolved=E.heldFacts.resolveRequiredFacts(original,{binding,roster:s.roster,wild:false});
+    for(let repeat=0;repeat<2;repeat++){
+      const restored=await api.showdownDriverFactory.fromCheckpoint(token);await turn(restored);assert.equal(restored.ended,true);
+      const next=await finish({...s,gw:restored},false);assert.deepEqual(next,original);
+      assert.equal(E.heldFacts.resolveRequiredFacts(next,{binding,roster:s.roster,wild:false}).pairHash,resolved.pairHash);
+      assert.equal(restored._debugBattle().prng.getSeed(),s.gw._debugBattle().prng.getSeed());
+    }
+  }
+});

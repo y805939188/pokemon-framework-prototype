@@ -32,9 +32,13 @@ export class HeldTracker {
     this.battle = battle; this.wild = wild;
     if (restore) {
       this.events = copy(restore.events); this.invalid = [...restore.invalid]; this.money = { ...restore.money };
-      for (const [sideIndex, ids] of restore.positions.entries()) for (const [position, id] of ids.entries()) {
-        const member = restore.members.find(m => m.id === id), pokemon = battle.sides[sideIndex]?.pokemon[position];
-        if (!member || !pokemon) throw new Error("held-checkpoint-object-binding-missing");
+      // Position arrays follow the engine's switched team. They only locate restored objects; the sealed
+      // logical roster order remains part of the facts/pair identity, independent of that physical order.
+      for (const member of restore.members) {
+        const sideIndex = member.side === "p1" ? 0 : 1;
+        const position = restore.positions[sideIndex]?.indexOf(member.id) ?? -1;
+        const pokemon = battle.sides[sideIndex]?.pokemon[position];
+        if (!pokemon) throw new Error("held-checkpoint-object-binding-missing");
         this.bind(pokemon, member);
       }
     } else {
