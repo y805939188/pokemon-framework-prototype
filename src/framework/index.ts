@@ -80,3 +80,5 @@ export * as trainerReward from "./rules/trainer-reward";
 export * as obedience from "./rules/obedience";
 
 export * as trainerAi from "./rules/trainer-ai-public";
+
+export * as trainerAiDiagnostics from "./tools/trainer-ai-diagnostics";

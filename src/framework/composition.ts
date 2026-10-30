@@ -1,3 +1,7 @@
+import { createTrainerAiStrategyRegistry } from "./flow/trainer-ai-strategy";
+import type { TrainerAiStrategyRegistry } from "./flow/trainer-ai-strategy";
+export { createTrainerAiStrategyRegistry } from "./flow/trainer-ai-strategy";
+export type { TrainerAiStrategyRegistry, TrainerAiStrategyRegistration, TrainerAiStrategy, StrategyParameters, TrainerAiStrategyReference } from "./flow/trainer-ai-strategy";
 /**
  * Composition root: the one place that wires the Showdown-backed battle session to the application's ports.
  * Everything here is a choice of implementation, not logic: change the engine by changing this file (or by passing
@@ -18,6 +22,7 @@ const CREATE_BATTLE_SESSION = BattleSession.create.bind(BattleSession);
 
 export interface BattleSessionFactoryOptions {
   content: () => Content;
+  trainerAiStrategies?: TrainerAiStrategyRegistry;
   /** Pins the engine seed (tests); undefined lets the engine pick one. */
   seed?: () => number[] | string | undefined;
   logger?: () => LogSink | undefined;
@@ -37,6 +42,7 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
   // Selecting the producer mode and the actual driver is one composition-time choice. Later mutable options cannot
   // retain required authority while substituting another engine. Callback receivers/content lookup stay unchanged.
   const driver = selectedDriver ?? showdownDriverFactory;
+  const resolveStrategy = (options.trainerAiStrategies ?? createTrainerAiStrategyRegistry()).resolve;
   const currentContent = options.content.bind(options);
   const factory: BattleSessionFactory<BattleSession> = {
     // the application has created the foes (rules/member-factory) and decided the flags; this only wires the engine
@@ -50,7 +56,7 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
       ...(setup.evidenceContext ? { evidence: setup.evidenceContext } : {}),
       ...(setup.obedience ? { obedience: setup.obedience } : {}),
       ...(required && setup.trainer && setup.evidenceContext && setup.isCurrentBattle ? { trainerAi: {
-        projection: setup.trainer, generation: setup.evidenceContext.generation, contentIdentity: setup.evidenceContext.contentIdentity,
+        strategy: resolveStrategy(setup.trainer.ai.aiStrategy), projection: setup.trainer, generation: setup.evidenceContext.generation, contentIdentity: setup.evidenceContext.contentIdentity,
         currentContent, isCurrent: setup.isCurrentBattle,
       } } : {}),
       ...(options.seed ? { seed: options.seed() } : {}),

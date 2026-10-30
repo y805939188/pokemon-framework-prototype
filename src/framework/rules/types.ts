@@ -176,6 +176,7 @@ export interface TrainerMember {
 }
 
 export interface TrainerType {
+  aiStrategy?: import("./trainer-ai-strategy").TrainerAiStrategyReference;
   id: string;
   nameKey: string;
   gender: 0 | 1 | 2;
@@ -197,6 +198,7 @@ export interface TrainerType {
 }
 
 export interface TrainerRecord {
+  aiStrategy?: import("./trainer-ai-strategy").TrainerAiStrategyReference;
   id: string;
   type: string;
   name: string;
@@ -213,7 +215,7 @@ export interface TrainerBattleProjection {
   type: string;
   name: string;
   baseMoney: number;
-  ai: { skillLevel: number; flags: string[]; items: TrainerItemResource[] };
+  ai: { aiStrategy?: import("./trainer-ai-strategy").TrainerAiStrategyReference; skillLevel: number; flags: string[]; items: TrainerItemResource[] };
   presentation: { battleBgm?: string; victoryBgm?: string; introBgm?: string; openingText?: string; winText?: string; loseText?: string };
 }
 

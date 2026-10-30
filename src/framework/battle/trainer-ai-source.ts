@@ -27,7 +27,7 @@ interface SourceCheckpoint {lineage:object;seed:number[]|string;public:MutableOp
 const CHECKPOINTS = new WeakMap<DriverCheckpoint,SourceCheckpoint>();
 const copy = <T>(v:T):T => JSON.parse(JSON.stringify(v)) as T;
 const id = (v:string):string => v.toLowerCase().replace(/[^a-z0-9]/g,'');
-const status = (v:string):PersistentStatus => (v || 'none') as PersistentStatus;
+const status = (v:string,fainted=false):PersistentStatus => (v === 'fnt' && fainted ? 'none' : v || 'none') as PersistentStatus;
 const stages = ():PublicOpponent['stages'] => ({atk:0,def:0,spa:0,spd:0,spe:0,accuracy:0,evasion:0});
 /** Called only by the gateway constructor, before setPlayer can emit callbacks. */
 export function attachTrainerSource(driver:BattleDriver,battle:ShowdownBattle,env:LoadedSim,submit:Source['submit']):void {
@@ -46,7 +46,7 @@ export function trainerSourceRequest(driver:BattleDriver):void {
 function requestSignature(s:Source):string {
   const p=s.battle.sides[1],r=p?.activeRequest;
   if(!r)return 'none';
-  return canonicalJson({turn:s.battle.turn,wait:!!r.wait,force:r.forceSwitch??null,active:(r.active??[]).map((a:any)=>({moves:a.moves.map((m:any)=>({id:m.id,pp:m.pp,disabled:!!m.disabled,target:m.target})),trapped:!!a.trapped})),public:s.public,field:[s.weather,s.terrain,s.conditions],own:p.pokemon.map((m:ShowdownPokemon)=>({id:m.name,hp:m.hp,maxhp:m.maxhp,active:!!m.isActive,status:m.status,moves:m.moveSlots.map((x:any)=>({id:x.id,pp:x.pp,maxpp:x.maxpp})),confusion:m.volatiles.confusion?.time??0}))});
+  return canonicalJson({turn:s.battle.turn,wait:!!r.wait,force:r.forceSwitch??null,active:(r.active??[]).map((a:any)=>({moves:a.moves.map((m:any)=>({id:m.id,pp:m.pp??null,disabled:!!m.disabled,target:m.target??null})),trapped:!!a.trapped})),public:s.public,field:[s.weather,s.terrain,s.conditions],own:p.pokemon.map((m:ShowdownPokemon)=>({id:m.name,hp:m.hp,maxhp:m.maxhp,active:!!m.isActive,status:m.status,moves:m.moveSlots.map((x:any)=>({id:x.id,pp:x.pp,maxpp:x.maxpp})),confusion:m.volatiles.confusion?.time??0}))});
 }
 function hpBar(value:string):{parts:number;scale:100} {
   if(value.startsWith('0 fnt'))return {parts:0,scale:100};
@@ -75,11 +75,13 @@ export function trainerSourcePublic(driver:BattleDriver,lines:readonly string[])
     if(type==='switch'||type==='drag'||type==='replace'){
       const speciesName=b.split(',')[0]!,species=s.env.sim.Dex.forGen(8).species.get(speciesName);
       if(!species.exists)throw new Error('trainer-ai-unknown-public-species');
-      const level=Number(/(?:^|, )L(\d+)/.exec(b)?.[1]??100),bar=hpBar(c);
-      s.public={appearanceKey:'p1a:'+ ++s.appearance,displayedSpecies:species.id,displayedForm:0,level,shownTypes:[...species.types],hpBar:bar,status:status(c.split(' ')[1]??''),stages:stages(),revealedMoves:[],lastPublicMove:null,fainted:bar.parts===0,revealedAbility:null,revealedItem:null};
+      const previous=type==='replace'?s.public:null;
+      const level=Number(/(?:^|, )L(\d+)/.exec(b)?.[1]??100),bar=c?hpBar(c):previous?.hpBar;
+      if(!bar)throw new Error('trainer-ai-invalid-public-health');
+      s.public={appearanceKey:previous?.appearanceKey??'p1a:'+ ++s.appearance,displayedSpecies:species.id,displayedForm:0,level,shownTypes:[...species.types],hpBar:bar,status:c?status(c.split(' ')[1]??'',bar.parts===0):previous!.status,stages:previous?copy(previous.stages):stages(),revealedMoves:previous?[...previous.revealedMoves]:[],lastPublicMove:previous?copy(previous.lastPublicMove):null,fainted:bar.parts===0,revealedAbility:previous?.revealedAbility??null,revealedItem:previous?.revealedItem??null};
     }
     const p=s.public;if(!p)continue;
-    if(type==='-damage'||type==='-heal'){p.hpBar=hpBar(b);p.fainted=p.hpBar.parts===0;p.status=status(b.split(' ')[1]??'');}
+    if(type==='-damage'||type==='-heal'){p.hpBar=hpBar(b);p.fainted=p.hpBar.parts===0;p.status=status(b.split(' ')[1]??'',p.fainted);}
     if(type==='faint'){p.hpBar={parts:0,scale:100};p.fainted=true;}
     if(type==='-status')p.status=status(b);
     if(type==='-curestatus')p.status='none';
@@ -111,12 +113,12 @@ export function captureTrainerRequest(driver:BattleDriver,owner:object,generatio
   const signature=requestSignature(s);
   if(signature!==r.signature){s.request={...r,revision:r.revision+1,signature};s.ticket=null;}
   if(s.ticket){const t=TICKETS.get(s.ticket);if(t&&t.request===s.request&&t.resourceRevision===resourceRevision)return {ticket:s.ticket,snapshot:copy((t as TicketData & {snapshot:TrainerAiSnapshot}).snapshot)};}
-  const party:OwnMember[]=side.pokemon.map((p:ShowdownPokemon)=>({memberId:p.name,partyOrder:side.team.findIndex((set:any)=>set.name===p.name),active:!!p.isActive,hp:p.hp,maxhp:p.maxhp,status:status(p.status),confusionTurns:p.isActive?(p.volatiles.confusion?.time??0):0,types:[...p.getTypes()],knownAbility:p.ability,knownHeldItem:p.item,moves:p.moveSlots.map((m:any,i:number)=>({slot:i+1,moveId:m.id,pp:m.pp,maxpp:m.maxpp}))}));
+  const party:OwnMember[]=side.pokemon.map((p:ShowdownPokemon)=>({memberId:p.name,partyOrder:side.team.findIndex((set:any)=>set.name===p.name),active:!!p.isActive,hp:p.hp,maxhp:p.maxhp,status:status(p.status,p.hp===0&&p.fainted),confusionTurns:p.isActive?(p.volatiles.confusion?.time??0):0,types:[...p.getTypes()],knownAbility:p.ability,knownHeldItem:p.item,moves:p.moveSlots.map((m:any,i:number)=>({slot:i+1,moveId:m.id,pp:m.pp,maxpp:m.maxpp}))}));
   const actions=new Map<string,Action>();
   const key='p2:'+s.request.seq+':'+s.request.revision;
   let request:TrainerAiSnapshot['request'];
   if(b.ended)request={kind:'finished'};
-  else if(!req||req.wait||side.isChoiceDone())request={kind:'wait'};
+  else if(!req||req.wait||(!side.choice.forcedSwitchesLeft&&side.choice.actions.length>=side.active.length))request={kind:'wait'};
   else if(req.forceSwitch){
     const switches=b.possibleSwitches(side).filter((p:ShowdownPokemon)=>!p.fainted&&!p.isActive).sort((a:ShowdownPokemon,z:ShowdownPokemon)=>party.find(m=>m.memberId===a.name)!.partyOrder-party.find(m=>m.memberId===z.name)!.partyOrder).map((p:ShowdownPokemon)=>{const candidateId=key+':s:'+p.position;actions.set(candidateId,{kind:'switch',choice:'switch '+(p.position+1)});return {candidateId,memberId:p.name as string};});
     request={kind:'force-switch',legalSwitches:switches};

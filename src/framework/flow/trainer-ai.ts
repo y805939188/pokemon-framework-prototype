@@ -3,8 +3,8 @@ import type { BattleDriver, DriverCheckpoint } from '../battle/driver';
 import { bindTrainerSource, captureTrainerRequest, trainerCandidate, submitTrainerCandidate, rebindTrainerSource } from '../battle/trainer-ai-source';
 import type { TrainerCapture, TrainerRequestTicket } from '../battle/trainer-ai-source';
 import type { AssembledTrainerCatalog } from '../battle/trainer-ai-catalog';
-import { createTrainerAiPolicy } from '../rules/trainer-ai';
-import type { DecisionPlan, TrainerAiPolicy, TrainerAiSnapshot, TrainerResource } from '../rules/trainer-ai';
+import type { PinnedTrainerAiStrategy, BoundTrainerAiStrategy } from './trainer-ai-strategy';
+import type { DecisionPlan, TrainerAiSnapshot, TrainerResource } from '../rules/trainer-ai';
 import { deriveTrainerRandom, trainerRandomN } from '../rules/trainer-ai-random';
 import type { TrainerRandomState } from '../rules/trainer-ai-random';
 import type { Content, TrainerBattleProjection } from '../rules/types';
@@ -13,14 +13,14 @@ import { validatedContentIdentity } from './content-runtime';
 import type { BattleEvent } from '../battle/protocol';
 
 export interface TrainerAiConfiguration {
-  projection:TrainerBattleProjection; generation:number; contentIdentity:string;
+  strategy:PinnedTrainerAiStrategy; projection:TrainerBattleProjection; generation:number; contentIdentity:string;
   currentContent:()=>Content; isCurrent:()=>boolean;
 }
 interface Reservation { key:string; itemId:string; battleId:string; target:string; state:'reserved'|'consumed'|'refunded' }
 interface Cache { capture:TrainerCapture; plan:DecisionPlan|null; attempted:string[]; submitted:boolean }
 interface AiState { random:TrainerRandomState; resources:TrainerResource[]; resourceRevision:number; ledger:Reservation[] }
 interface Channel {
-  owner:object; driver:BattleDriver; lineage:object; catalog:AssembledTrainerCatalog; policy:TrainerAiPolicy;
+  owner:object; driver:BattleDriver; lineage:object; catalog:AssembledTrainerCatalog; policy:BoundTrainerAiStrategy;
   config:TrainerAiConfiguration; contentFingerprint:string; profile:TrainerAiSnapshot['profile']; state:AiState;
   cache:Cache|null; busy:boolean; retired:string|null;
 }
@@ -32,7 +32,7 @@ export function bindTrainerAi(session:object,driver:BattleDriver,content:Content
   if(CHANNELS.has(session))throw new Error('trainer-ai-already-bound');
   const owner={},source=bindTrainerSource(driver,owner,content,config.contentIdentity);
   const resources=config.projection.ai.items.map((r,i)=>({resourceKey:'trainer-resource:'+i,itemId:r.item,count:r.count}));
-  CHANNELS.set(session,{owner,driver,lineage:source.lineage,catalog:source.catalog,policy:createTrainerAiPolicy(source.catalog.catalog),config:{...config,projection:clone(config.projection)},profile:clone({skillLevel:config.projection.ai.skillLevel,flags:config.projection.ai.flags}),contentFingerprint:fingerprint(content),state:{random:deriveTrainerRandom(source.seed),resources,resourceRevision:0,ledger:[]},cache:null,busy:false,retired:null});
+  CHANNELS.set(session,{owner,driver,lineage:source.lineage,catalog:source.catalog,policy:config.strategy.instantiate(source.catalog.catalog,source.catalog.identity),config:{...config,projection:clone(config.projection)},profile:clone({skillLevel:config.projection.ai.skillLevel,flags:config.projection.ai.flags}),contentFingerprint:fingerprint(content),state:{random:deriveTrainerRandom(source.seed),resources,resourceRevision:0,ledger:[]},cache:null,busy:false,retired:null});
 }
 function current(c:Channel,driver:BattleDriver):void {
   if(c.retired)throw new Error(c.retired);
@@ -121,7 +121,7 @@ export function restoreTrainerAi(session:object,driver:BattleDriver,token:Driver
 }
 /** Detached diagnostics through the explicit testing entry; contains no owner, source or executable ticket. */
 export function trainerAiDiagnostics(session:object):unknown {
-  const c=CHANNELS.get(session);return c?clone({catalogIdentity:c.catalog.identity,authorIdentity:c.catalog.authorIdentity,moveCount:Object.keys(c.catalog.catalog.moves).length,typeCount:Object.keys(c.catalog.catalog.types).length,state:c.state,cache:c.cache?{snapshot:c.cache.capture.snapshot,plan:c.cache.plan,attempted:c.cache.attempted,submitted:c.cache.submitted}:null,retired:c.retired}):null;
+  const c=CHANNELS.get(session);return c?clone({strategyBinding:c.policy.binding,catalogIdentity:c.catalog.identity,authorIdentity:c.catalog.authorIdentity,moveCount:Object.keys(c.catalog.catalog.moves).length,typeCount:Object.keys(c.catalog.catalog.types).length,state:c.state,cache:c.cache?{snapshot:c.cache.capture.snapshot,plan:c.cache.plan,attempted:c.cache.attempted,submitted:c.cache.submitted}:null,retired:c.retired}):null;
 }
 /** Explicit diagnostic operations for capability tests. Production only calls runTrainerAi. */
 export function inspectTrainerAiRequest(session:object,driver:BattleDriver):{ticket:TrainerRequestTicket;snapshot:TrainerAiSnapshot;plan:DecisionPlan} {

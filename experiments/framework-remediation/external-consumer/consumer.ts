@@ -9,6 +9,18 @@ import legacy = require("@pokemon-framework/engine/legacy");
 import legacyStore = require("@pokemon-framework/engine/legacy/game/store.cjs");
 import compiledSample = require("@pokemon-framework/engine/content/sample.json");
 
+const strategyRef: production.composition.TrainerAiStrategyReference = {id: "basic-gen8", version: "1", parameters: {}};
+const trainerType: production.trainerTeam.BuildTrainerTeamInput["type"] = {id:"sdk-type",nameKey:"sdk.type",gender:0,baseMoney:1,skillLevel:0,flags:[],items:[],source:"sdk",aiStrategy:strategyRef};
+const trainerRecord: production.trainerTeam.BuildTrainerTeamInput["record"] = {id:"sdk-record",type:"sdk-type",name:"SDK",version:37,party:[],source:"sdk"};
+const trainerProjection = production.trainerTeam.trainerBattleProjection(trainerRecord,trainerType);
+assert.deepEqual(trainerProjection.ai.aiStrategy,strategyRef);
+const strategyPin = production.composition.createTrainerAiStrategyRegistry().resolve(trainerProjection.ai.aiStrategy);
+assert.equal(strategyPin.binding.id,"basic-gen8");
+assert.equal(strategyPin.binding.version,"1");
+assert.deepEqual(strategyPin.parameters,strategyRef.parameters);
+assert.equal(production.composition.createTrainerAiStrategyRegistry,legacy.composition.createTrainerAiStrategyRegistry);
+assert.equal(trainerProjection.version,37);
+
 type GameState = production.state.GameState;
 type BattleResult = production.state.BattleResult;
 

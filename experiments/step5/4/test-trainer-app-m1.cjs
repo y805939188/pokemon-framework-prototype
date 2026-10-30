@@ -111,7 +111,7 @@ test('A-M1 trainer query/start uses NPC owner, deterministic team, projections a
   const before = JSON.stringify(w.state.current());
   const projection = w.app.trainerRecord(record.id, record.version);
   assert.equal(projection.baseMoney, 20);
-  assert.deepEqual(projection.ai, { skillLevel: 3, flags: ['NoName'], items: [{ item: 'potion', count: 2 }] });
+  assert.deepEqual(projection.ai, { aiStrategy: {id:'basic-gen8',version:'1',parameters:{}}, skillLevel: 3, flags: ['NoName'], items: [{ item: 'potion', count: 2 }] });
   assert.equal(projection.presentation.introBgm, 'Intro');
   assert.equal(w.app.trainerRecord(record.id, 99), null);
   const session = await w.app.startTrainerBattle(request());

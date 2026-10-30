@@ -2,13 +2,14 @@
 import type { ContentError, TrainerRecordSource, TrainerTypeSource } from "./schema";
 import type { ItemCatalog } from "../rules/item-catalog";
 import type { PartialStats, SpeciesKey } from "../rules/types";
+import { strategyReference } from "../rules/trainer-ai-strategy";
 import { NATURE_ORDER } from "../rules/member-identity";
 
 const ID = /^[a-z][a-z0-9-]{0,62}$/;
 const SHOWDOWN_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const STAT_KEYS = ["hp", "atk", "def", "spa", "spd", "spe"] as const;
-const TYPE_KEYS = ["id", "nameKey", "gender", "baseMoney", "skillLevel", "flags", "items", "battleBgm", "victoryBgm", "introBgm", "openingText", "winText", "loseText", "source"];
-const RECORD_KEYS = ["id", "type", "name", "version", "language", "party", "items", "source"];
+const TYPE_KEYS = ["id", "nameKey", "gender", "baseMoney", "skillLevel", "flags", "items", "battleBgm", "victoryBgm", "introBgm", "openingText", "winText", "loseText", "source", "aiStrategy"];
+const RECORD_KEYS = ["id", "type", "name", "version", "language", "party", "items", "source", "aiStrategy"];
 const MEMBER_KEYS = ["species", "level", "form", "item", "moves", "abilityIndex", "ability", "gender", "shiny", "superShiny", "nature", "ivs", "evs", "friendship", "nickname", "ball", "shadow"];
 const isObj = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const isInt = (value: unknown, lo = 0, hi = Number.MAX_SAFE_INTEGER): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= lo && value <= hi;
@@ -27,6 +28,13 @@ function known(value: Record<string, unknown>, allowed: readonly string[], file:
 function string(value: unknown): value is string { return typeof value === "string" && value.length > 0; }
 function id(value: unknown): value is string { return typeof value === "string" && ID.test(value); }
 function showdownId(value: unknown): value is string { return typeof value === "string" && SHOWDOWN_ID.test(value); }
+
+function strategy(value: Record<string, unknown>, file: ContentError["file"], path: string, errors: ContentError[]): void {
+  const d = Object.getOwnPropertyDescriptor(value, "aiStrategy");
+  if (!d) return;
+  try { if (!("value" in d) || !d.enumerable) throw new Error(); strategyReference(d.value); }
+  catch { errors.push({ file, path: `${path}.aiStrategy`, message: "must be a pure {id,version?,parameters} reference (8 KiB, depth 8)" }); }
+}
 
 function resources(value: unknown, file: ContentError["file"], path: string, context: TrainerInputContext, errors: ContentError[]): void {
   if (!dense(value)) { errors.push({ file, path, message: "must be a dense array of {item,count}" }); return; }
@@ -88,6 +96,7 @@ export function checkTrainerInputs(rawTypes: unknown, rawRecords: unknown, conte
   for (const [index, value] of rawTypes.entries()) {
     const path = `[${index}]`;
     if (!isObj(value)) { errors.push({ file: "trainer-types.json", path, message: "must be a trainer type" }); continue; }
+    strategy(value, "trainer-types.json", path, errors);
     known(value, TYPE_KEYS, "trainer-types.json", path, errors);
     if (!id(value["id"])) errors.push({ file: "trainer-types.json", path: `${path}.id`, message: "must be a stable lowercase trainer type id" });
     else if (typeIds.has(value["id"])) errors.push({ file: "trainer-types.json", path: `${path}.id`, message: "duplicate trainer type id" });
@@ -111,6 +120,7 @@ export function checkTrainerInputs(rawTypes: unknown, rawRecords: unknown, conte
   for (const [index, value] of rawRecords.entries()) {
     const path = `[${index}]`;
     if (!isObj(value)) { errors.push({ file: "trainers.json", path, message: "must be a trainer record" }); continue; }
+    strategy(value, "trainers.json", path, errors);
     known(value, RECORD_KEYS, "trainers.json", path, errors);
     if (!id(value["id"])) errors.push({ file: "trainers.json", path: `${path}.id`, message: "must be a stable lowercase trainer record id" });
     if (!isInt(value["version"], 0, 255)) errors.push({ file: "trainers.json", path: `${path}.version`, message: "author version must be an integer from 0 to 255" });

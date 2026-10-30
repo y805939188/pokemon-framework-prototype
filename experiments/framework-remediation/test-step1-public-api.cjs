@@ -14,7 +14,7 @@ const entries = {
   testing: path.join(BUILD, 'testing.cjs'),
   legacy: path.join(BUILD, 'engine.cjs'),
 };
-const testingNames = ['fixtures', 'harness', 'matrix', 'fakes', 'scripted', 'heldDiagnostics'];
+const testingNames = ['fixtures', 'harness', 'matrix', 'fakes', 'scripted', 'heldDiagnostics', 'trainerAiDiagnostics'];
 
 function load(order = ['production', 'testing', 'legacy']) {
   const loaded = {};

@@ -504,3 +504,8 @@ export function createTrainerAiPolicy(publicCatalog:TrainerAiCatalog):TrainerAiP
     }catch(error){return {...failure(error),binding};}
   }};
 }
+
+/** Internal composition boundary: identical validation to basic, without invoking a strategy or drawing RNG. */
+export function createTrainerAiSnapshotValidator(publicCatalog:TrainerAiCatalog):(input:unknown)=>TrainerAiSnapshot {
+  const catalog=validateCatalog(publicCatalog);return input=>{try{return validateSnapshot(input,catalog);}catch{throw new Error('trainer-ai-invalid-public-snapshot');}};
+}

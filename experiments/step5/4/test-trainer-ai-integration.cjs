@@ -59,9 +59,10 @@ test('C-L03 application generation replacement refuses late ticket and preserves
  const next=await w.app.startTrainerBattle({...w.request,battleId:'successor',seq:2});assert.ok(next);assert.throws(()=>inspect(w),/stale-generation/);assert.equal(w.app.healParty().reason,'battle-active');
 });
 test('C-L04 independent same-state real driver cannot borrow original ticket/decision',async()=>{const a=await fixture(),b=await fixture(),x=capture(a);assert.equal(a.gw.snapshot(),b.gw.snapshot());assert.throws(()=>D.validateTrainerAiTicket(a.session,b.gw,x.ticket,candidate(x)),/source-mismatch/);assert.throws(()=>D.validateTrainerAiTicket(b.session,b.gw,x.ticket,candidate(x)),/unknown-source/);assert.equal(draws(a)+draws(b),0);});
-test('C-L05 one opaque engine checkpoint pairs AI cache/RNG/reveals/resources, repeated full session replay exact',async()=>{
+test('C-L05 one opaque engine checkpoint pairs AI cache/RNG/reveals/resources, repeated full session replay exact',async(t)=>{
+ t.mock.method(Date,'now',()=>1793350000000);
  const w=await fixture({items:[{item:'fullrestore',count:2}]});state(active(w),{hp:20,status:'psn',confusion:2});capture(w);const cp=w.session._checkpoint(),before=diag(w);const first=await w.session.chooseMove(1);assert.equal(first.ok,true);const engine=w.session.gw.snapshot(),after=diag(w);
- for(let i=0;i<3;i++){await w.session._restoreCheckpoint(cp);assert.deepEqual(diag(w),before);assert.equal((await w.session.chooseMove(1)).ok,true);assert.equal(w.session.gw.snapshot(),engine);assert.deepEqual(diag(w),after);}assert.equal(resources(w)[0].count,1);
+ for(let i=0;i<3;i++){await w.session._restoreCheckpoint(cp);assert.deepEqual(diag(w),before);assert.equal((await w.session.chooseMove(1)).ok,true);assert.deepEqual(JSON.parse(w.session.gw.snapshot()),JSON.parse(engine));assert.deepEqual(diag(w),after);}assert.equal(resources(w)[0].count,1);
 });
 test('C-L06 caller restorer substitution and cross-source opaque checkpoint cannot authorize restore',async()=>{
  const a=await fixture(),b=await fixture(),cp=a.session._checkpoint(),other=b.session._checkpoint();let called=0;a.session._driver={...a.session._driver,fromCheckpoint:async()=>{called++;return b.gw;}};
@@ -94,7 +95,7 @@ test('C-L12 original resolved seed domain stream is independent of current engin
  const c=await fixture({unseeded:true});const resolved=c.gw.prngSeed(),before=c.gw.snapshot();inspect(c);assert.equal(c.gw.snapshot(),before);assert.ok(resolved);assert.match(diag(c).state.random.root,/^[a-f0-9]{64}$/);
 });
 test('C-L13 revision variant: same owner request gets at most one rebuild, a second change is a controlled error',async()=>{
- const w=await fixture({moves:['tackle','growl','splash'],skill:0});capture(w);let checks=0;w.setOnContent(()=>{checks++;if(checks===2||checks===3){const req=w.gw._debugBattle().sides[1].activeRequest;req.active[0].moves[checks-2].disabled=true;}});
+ const w=await fixture({moves:['tackle','growl','splash'],skill:0});capture(w);let checks=0;w.setOnContent(()=>{checks++;if(checks===2||checks===4){const req=w.gw._debugBattle().sides[1].activeRequest;req.active[0].moves[checks===2?0:1].disabled=true;}});
  await assert.rejects(D.runTrainerAi(w.session,w.gw),/request-revision-changed/);assert.equal(w.gw._debugBattle().sides[1].choice.actions.length,0);assert.equal(draws(w),2);w.setOnContent(null);
 });
 test('C-L13 content ABA variant: observed changed content permanently retires original operation, zero draws',async()=>{

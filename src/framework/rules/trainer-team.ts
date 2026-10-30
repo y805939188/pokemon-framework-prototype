@@ -1,3 +1,4 @@
+import { strategyReference, defaultStrategyReference } from "./trainer-ai-strategy";
 /** Host-free ordinary NPC team construction (WP18 §4.3.1, WP19, WP24). */
 import { computeStats, hpAfterRecalc } from "./growth";
 import { createMember, initialMoves } from "./member-factory";
@@ -118,7 +119,7 @@ export function buildTrainerTeam(input: BuildTrainerTeamInput): Member[] {
 export function trainerBattleProjection(record: TrainerRecord, type: TrainerType): TrainerBattleProjection {
   return {
     id: record.id, version: record.version, type: type.id, name: record.name, baseMoney: type.baseMoney,
-    ai: { skillLevel: type.skillLevel, flags: [...type.flags], items: (record.items ?? type.items).map(item => ({ ...item })) },
+    ai: { aiStrategy: strategyReference(record.aiStrategy ?? type.aiStrategy ?? defaultStrategyReference()), skillLevel: type.skillLevel, flags: [...type.flags], items: (record.items ?? type.items).map(item => ({ ...item })) },
     presentation: Object.fromEntries(["battleBgm", "victoryBgm", "introBgm", "openingText", "winText", "loseText"]
       .filter(key => type[key as keyof TrainerType] !== undefined)
       .map(key => [key, type[key as keyof TrainerType]])) as TrainerBattleProjection["presentation"],
