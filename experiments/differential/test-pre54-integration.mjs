@@ -44,6 +44,50 @@ test('forgetting named slot preserves survivor PP; wrapper-only qualification no
  assert.ok(cases('learning.forgetting').every(c=>c.domain==='additional'&&c.additionalClass==='wrapper-qualification'));
  const one=find('learning.forgetting',i=>i.member?.moves.length===1&&i.slot===0);assert.equal(result(one).kind,'error-object');assert.equal(result(one).value.code,'last-move');
 });
+// Direct runner fault injection checks adapter fidelity, not formal source provenance or Ruby behavior.
+function forgettingFault(name,transform,c){
+ const core=join(kitRoot,'core/core.cjs'),shim=join(testRoot,'pre54-forgetting-'+name+'.cjs'),witness=join(testRoot,'pre54-forgetting-'+name+'.witness.json');
+ writeFileSync(shim,`const core=require(${JSON.stringify(core)}),fs=require('node:fs');module.exports={...core,learning:{...core.learning,planMoveForgetting(member,slot){const before=JSON.stringify(member),result=core.learning.planMoveForgetting(member,slot);${transform};fs.writeFileSync(${JSON.stringify(witness)},JSON.stringify({before:JSON.parse(before??'null'),after:member??null,result}));return result;}}};`);
+ const r=spawnSync(process.execPath,[join(kitRoot,'runners/ts-runner.mjs'),'--request',join(kitRoot,'requests/wp30-r2.json'),'--core',shim],{cwd:kitRoot,encoding:'utf8'});
+ writeFileSync(join(testRoot,'pre54-forgetting-'+name+'.stdout'),r.stdout);writeFileSync(join(testRoot,'pre54-forgetting-'+name+'.stderr'),r.stderr);
+ assert.equal(r.status,0,r.stderr);assert.equal(r.stderr,'');const response=parseJson(r.stdout);assert.equal(validateRawResponse(response,request).status,'success');
+ return {outcome:response.cases.find(x=>x.caseId===c.caseId).outcome,witness:readJson(witness)};
+}
+for(const[name,change]of [['pp','result.moves[0].pp++'],['order','result.moves.reverse()']])test('pending forgetting preserves actual returned '+name+' through raw/public/comparator',()=>{
+ const c=find('learning.forgetting',i=>i.member?.moves.length===2&&i.slot==='pending'),originalInput=canonicalStringify(c.input);
+ const {outcome}=forgettingFault('pending-'+name,`if(result.status==='pending'&&result.moves.length===2){${change};}`,c);
+ const baseline=rawExecution.response.cases.find(x=>x.caseId===c.caseId).outcome;
+ assert.notDeepEqual(outcome,baseline);const projected=sanitizeOutcome(outcome,c);assert.notDeepEqual(projected,result(c));
+ const expected=structuredClone(result(c).value.moves);if(name==='pp')expected[0].pp++;else expected.reverse();assert.deepEqual(projected.value.moves,expected);
+ const reference=peer();reference.cases.find(x=>x.caseId===c.caseId).outcome=projected;const diff=compare(reference);assert.equal(diff.status,'FAIL');assert.equal(diff.differences.length,1);
+ assert.equal(canonicalStringify(c.input),originalInput);
+});
+test('ready forgetting still preserves actual returned PP',()=>{
+ const c=find('learning.forgetting',i=>i.member?.moves.length===2&&i.slot===0),{outcome}=forgettingFault('ready-pp',"if(result.status==='ready')result.patch.moves[0].pp++;",c);
+ const projected=sanitizeOutcome(outcome,c),expected=structuredClone(result(c));expected.value.moves[0].pp++;assert.deepEqual(projected,expected);
+});
+test('cancelled forgetting retains the frozen original state projection when no moves are returned',()=>{
+ const c=find('learning.forgetting',i=>i.member?.moves.length===2&&i.slot==='cancel'),core=createRequire(import.meta.url)(join(kitRoot,'core/core.cjs'));
+ const plan=core.learning.planMoveForgetting(structuredClone(c.input.member),null);assert.equal(plan.status,'cancelled');assert.equal(Object.hasOwn(plan,'moves'),false);
+ assert.deepEqual(result(c),{kind:'value',value:{status:'cancelled',moves:c.input.member.moves,forgotten:null}});
+});
+test('normal last-move refusal preserves the original error kind/code and measured unchanged proof',()=>{
+ const c=find('learning.forgetting',i=>i.member?.moves.length===1&&i.slot===0),outcome=rawExecution.response.cases.find(x=>x.caseId===c.caseId).outcome;
+ assert.deepEqual(outcome,{kind:'error-object',class:null,raw:{code:'last-move',stateUnchanged:true}});assert.deepEqual(sanitizeOutcome(outcome,c),result(c));
+});
+for(const[name,change]of [['pp','member.moves[0].pp--'],['other-member-field',"member.isEgg=true"]])test('refused forgetting measures complete input after '+name+' mutation and blocks publication',()=>{
+ const c=find('learning.forgetting',i=>i.member?.moves.length===1&&i.slot===0);
+ const {outcome}=forgettingFault('refused-'+name,`if(result.status==='refused'&&result.reason==='last-move'){${change};}`,c);
+ assert.equal(outcome.kind,'error-object');assert.equal(outcome.raw.code,'last-move');assert.equal(outcome.raw.stateUnchanged,false);assert.throws(()=>sanitizeOutcome(outcome,c));
+ const execution={...rawExecution,response:structuredClone(rawExecution.response)};execution.response.cases.find(x=>x.caseId===c.caseId).outcome=outcome;
+ assert.throws(()=>makeBehaviorPackage({execution,request,freezeHash:kit.freeze.hash,publicMetadata:candidateMetadata,limits:DEFAULT_LIMITS,manifest:kit.manifest}));
+});
+for(const partial of [false,true])test('forgetting exception state proof remains '+(partial?'partial/rejected':'unchanged/sanitizable'),()=>{
+ const c=find('learning.forgetting',i=>i.member?.moves.length===1&&i.slot===0);
+ const {outcome}=forgettingFault('raised-'+partial,`if(result.status==='refused'&&result.reason==='last-move'){${partial?'member.moves[0].pp--;':''}throw new Error('synthetic forgetting fault');}`,c);
+ assert.equal(outcome.kind,'raised');assert.equal(outcome.raw.stateUnchanged,!partial);
+ if(partial)assert.throws(()=>sanitizeOutcome(outcome,c));else assert.deepEqual(sanitizeOutcome(outcome,c),{kind:'raised',class:'Error'});
+});
 test('register vs recent: gender and display-name rules differ; duplicate counters count calls',()=>{
  const c=find('pokedex.recordSequence',i=>i.calls[0].source==='capture'&&i.calls[0].internalBattle);const v=result(c).value;assert.equal(v.state.capturedCounts.alpha,2);assert.equal(v.state.seenForms.alpha[0].gender,0);assert.equal(v.state.lastSeenForm.alpha.form,1);
  const non=find('pokedex.recordSequence',i=>i.calls[0].source==='capture'&&!i.calls[0].internalBattle);assert.equal(result(non).value.state.capturedCounts.alpha,undefined);assert.ok(result(non).value.state.owned.includes('alpha'));

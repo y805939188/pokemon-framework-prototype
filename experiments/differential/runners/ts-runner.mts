@@ -76,8 +76,9 @@ function executePre54(testCase: TestCase, core: Core): RawOutcome {
         return value({moves:core.learning.relearningCandidates(input.member,input.levelMoves,{moreMoves:input.moreMoves,shadow:input.shadow})});
       case "learning.forgetting": {
         const result = core.learning.planMoveForgetting(input.member,input.slot === "pending" ? undefined : input.slot === "cancel" ? null : input.slot);
-        if (result.status === "refused") return errorObject({code:result.reason,stateUnchanged:true});
-        return value({status:result.status,moves:result.status === "ready" ? result.patch.moves : input.member?.moves ?? [],forgotten:result.status === "ready" ? result.forgotten : null});
+        if (result.status === "refused") return errorObject({code:result.reason,stateUnchanged:canonicalStringify(input)===inputBefore});
+        const moves = result.status === "ready" ? result.patch.moves : result.status === "pending" ? result.moves : input.member?.moves ?? [];
+        return value({status:result.status,moves,forgotten:result.status === "ready" ? result.forgotten : null});
       }
       case "stats.computeStats": return value(core.growth.computeStats(input.base,input.ivs,input.evs,input.level,input.nature));
       case "stats.hpAfterRecalc": return value(core.growth.hpAfterRecalc(input.hp,input.oldMax,input.newMax,{reviveFainted:input.reviveFainted}));
