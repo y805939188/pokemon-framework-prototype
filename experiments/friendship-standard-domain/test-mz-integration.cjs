@@ -46,3 +46,15 @@ test('duplicate confirmation refuses host progress after the original verified c
  const h=host(),G=h.ctx;await h.save(1);const p=await G.PSState.previewFriendshipMigration(1);assert.equal((await G.PSState.confirmFriendshipMigration(p.handle)).status,'applied');G.$gameParty.progress++;
  assert.equal((await G.PSState.confirmFriendshipMigration(p.handle)).status,'refused');
 });
+test('official confirmation reports a committed slot and recovery bundle when host installation fails',async()=>{
+ const h=host(),G=h.ctx;await h.save(1);const messages=[];let choose;
+ G.$gameMessage={add:s=>messages.push(s),setChoices(){},setChoiceCallback:fn=>{choose=fn;}};
+ const interpreter={setWaitMode(){}};h.commands.MigrateFriendship.call(interpreter,{slot:'1'});
+ for(let n=0;n<100&&!choose;n++)await new Promise(r=>setImmediate(r));assert.equal(typeof choose,'function');
+ const original=G.$gameSystem._psGame;
+ Object.defineProperty(G.$gameSystem,'_psGame',{configurable:true,enumerable:true,get:()=>original,set:()=>{throw Error('host install failure');}});
+ choose(0);for(let n=0;n<100&&interpreter._psFriendshipMigrationPending;n++)await new Promise(r=>setImmediate(r));
+ assert.equal(G.PSState.lastMigration.status,'reload-required',JSON.stringify(G.PSState.lastMigration));assert.equal(G.PSState.lastMigration.persistence.status,'committed');
+ assert.ok(fs.existsSync(G.PSState.lastMigration.persistence.bundle+'/receipt.json'));assert.match(messages.at(-1),/存档已写入.*重新启动/);assert.equal(h.app.saveBlocked,true);
+ const raw=await G.StorageManager.loadObject(G.DataManager.makeSavename(1));assert.equal(JSON.parse(raw.system._psGame.data).party[0].friendship,255);assert.equal(original.party[0].friendship,256);
+});

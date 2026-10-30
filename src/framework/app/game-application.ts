@@ -1,7 +1,7 @@
 import { planPlayerFriendshipMigration, applyPlayerFriendshipMigration, friendshipMigrationSnapshot } from "../rules/friendship-migration";
 import type { FriendshipMigrationPlan } from "../rules/friendship-migration";
 import type { Content } from "../rules/types";
-import type { FriendshipPersistencePort, FriendshipPersistenceSnapshot, FriendshipMigrationHandle, FriendshipApplicationPreview, FriendshipApplicationResult } from "./friendship-migration-operation";
+import type { FriendshipPersistencePort, FriendshipPersistenceSnapshot, FriendshipMigrationHandle, FriendshipApplicationPreview, FriendshipApplicationResult, FriendshipPersistenceResult } from "./friendship-migration-operation";
 import { normalizeMemberDexAppearance } from "../rules/acquisition-dex";
 import { PokedexOperation } from "./pokedex-operation";
 import type { DexEntryIntent, DexDecision, DexViewingCommand, DexResolution } from "./pokedex-operation";
@@ -668,6 +668,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.encounterBlocked || this.saveBlocked) return {status:"refused",reason:"operation-active"};
     const owner = {invalid:false}; this.#friendshipOwner = owner;
     let committed = false, release = true;
+    let persisted: FriendshipPersistenceResult | undefined;
     const assertCurrent = () => {
       const content = this.ports.content().content;
       const contentHash = semanticFingerprint(JSON.parse(JSON.stringify(content)) as unknown);
@@ -696,9 +697,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         const result: FriendshipApplicationResult = {status:"unchanged",persistence:{status:"committed",rawHash:target.rawHash}};
         preview.result = result; preview.completedHostIdentity = target.hostIdentity; return clone(result);
       }
-      let persisted;
       try { persisted = await preview.persistence.commit({before:clone(preview.target),next:clone(candidate.state),plan:clone(preview.plan),receipt:clone(applied.receipt),contentHash:preview.contentHash,contentIdentity:validatedContentIdentity(preview.content),assertCurrent}); }
-      catch (error) { release = false; return {status:"reload-required",reason:"persistence-unknown",error:message(error)}; }
+      catch (error) { release = false; return {status:"reload-required",reason:"persistence-unknown",persistence:{status:"unknown",error:message(error)},error:message(error)}; }
       if (persisted.status === "unknown") { release = false; return {status:"reload-required",reason:"persistence-unknown",persistence:persisted}; }
       if (persisted.status === "not-committed") return {status:"refused",reason:"persistence-not-committed",persistence:persisted};
       committed = true;
@@ -723,7 +723,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       preview.result = clone(result);
       return result;
     } catch (error) {
-      if (committed) { release = false; return {status:"reload-required",reason:"committed-install-unverified",error:message(error)}; }
+      if (committed) { release = false; return {status:"reload-required",reason:"committed-install-unverified",persistence:persisted,error:message(error)}; }
       return {status:"refused",reason:"confirmation-rejected",error:message(error)};
     } finally { if (release && this.#friendshipOwner === owner) { this.#friendshipOwner = null; if (owner.invalid && !preview.result) this.#friendshipPreviews.delete(handle); } }
   }

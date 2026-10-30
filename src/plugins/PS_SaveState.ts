@@ -272,7 +272,13 @@
   if (G.PluginManager?.registerCommand) G.PluginManager.registerCommand("PS_SaveState","MigrateFriendship",function(this: any,args: any) {
     if (this._psFriendshipMigrationPending) throw new Error("friendship preview already open");
     this._psFriendshipMigrationPending = true; this.setWaitMode("psFriendshipMigration");
-    const finish = (result: any) => { PSState.lastMigration = result; this._psFriendshipMigrationPending = false; G.$gameMessage.add(result.status === "applied" || result.status === "already-applied" ? "友好度迁移已保存。" : result.status === "cancelled" ? "已取消，存档未更改。" : "迁移未完成："+(result.error || result.reason || result.status)); };
+    const finish = (result: any) => { PSState.lastMigration = result; this._psFriendshipMigrationPending = false; G.$gameMessage.add(result.status === "applied" || result.status === "already-applied" ? "友好度迁移已保存。"
+      : result.status === "cancelled" ? "已取消，存档未更改。"
+      : result.status === "unchanged" ? "所选存档没有需要迁移的项目。"
+      : result.status === "reload-required" ? (result.persistence?.status === "committed"
+        ? "存档已写入，当前游戏状态未能核实。请停止操作，重新启动后载入该存档。"
+        : "保存结果尚未核定。请停止操作，重新启动后检查该存档及保留的原档备份。")
+      : "迁移未更改所选存档。请检查存档状态并重新预览。"); };
     PSState.previewFriendshipMigration(Number(args.slot)).then((p: any)=>{
       if (p.status !== "ready") {finish(p);return;}
       G.$gameMessage.add(`将存档 ${Number(args.slot)} 中选中的 ${p.targets.length} 项友好度从 256 改为 255。保留原档备份。其它超范围项 ${p.outOfScope.length} 项保持原值。`);

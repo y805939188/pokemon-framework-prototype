@@ -38,7 +38,7 @@ for(const mode of ['throws-before','no-install','wrong-install','throws-after'])
  const w=fixture({install:(next,set)=>{if(mode==='throws-before')throw Error('before');if(mode==='no-install')return;if(mode==='wrong-install'){next.money++;set(next);return;}set(next);throw Error('after');}});
  const p=await w.app.previewFriendshipMigration(w.store.friendshipMigration()),r=await w.app.confirmFriendshipMigration(p.handle);
  assert.equal(JSON.parse(fs.readFileSync(w.file)).party[0].friendship,255);
- assert.equal(r.status,mode==='throws-after'?'applied':'reload-required',JSON.stringify(r));assert.equal(w.app.saveBlocked,mode!=='throws-after');
+ assert.equal(r.status,mode==='throws-after'?'applied':'reload-required',JSON.stringify(r));assert.equal(w.app.saveBlocked,mode!=='throws-after');assert.equal(r.persistence.status,'committed');assert.ok(fs.existsSync(r.persistence.bundle+'/receipt.json'));
 });
 test('post rename exception is committed and verified, not a zero-write failure',async()=>{
  const w=fixture(),p=await w.app.previewFriendshipMigration(w.store.friendshipMigration(point=>{if(point==='after-rename')throw Error('post commit injected');}));
