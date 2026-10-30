@@ -3,6 +3,8 @@ import type { DecisionPlan, TrainerAiSnapshot, RandomN } from './trainer-ai';
 export type StrategyValue = null | boolean | number | string | readonly StrategyValue[] | { readonly [key:string]:StrategyValue };
 export type StrategyParameters = { readonly [key:string]:StrategyValue };
 export interface TrainerAiStrategyReference { id:string; version?:string; parameters:StrategyParameters }
+/** Host scheduling capability; no timer implementation crosses into the portable rules. */
+export interface TrainerAiTiming { now():number; after(milliseconds:number,callback:()=>void):()=>void }
 export interface TrainerAiStrategy {
   decide(snapshot:TrainerAiSnapshot, parameters:StrategyParameters, random:RandomN):DecisionPlan | Promise<DecisionPlan>;
   /** Optional trusted backend-lifetime probe; never supplied by authored trainer data. */

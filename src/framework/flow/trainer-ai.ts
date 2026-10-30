@@ -10,16 +10,16 @@ import type { DecisionPlan, TrainerAiSnapshot, TrainerResource } from '../rules/
 import { deriveTrainerRandom, trainerRandomN } from '../rules/trainer-ai-random';
 import type { TrainerRandomState } from '../rules/trainer-ai-random';
 import { freezeStrategyData } from '../rules/trainer-ai-strategy';
+import type { TrainerAiTiming } from '../rules/trainer-ai-strategy';
+export type { TrainerAiTiming } from '../rules/trainer-ai-strategy';
 import type { Content, TrainerBattleProjection } from '../rules/types';
 import { semanticFingerprint } from '../rules/semantic';
 import { validatedContentIdentity } from './content-runtime';
 import type { BattleEvent } from '../battle/protocol';
 
-export interface TrainerAiTiming { now():number; after(milliseconds:number,callback:()=>void):()=>void }
-const DEFAULT_TIMING:TrainerAiTiming={now:()=>performance.now(),after:(ms,callback)=>{const id=setTimeout(callback,ms);return ()=>clearTimeout(id);}};
 export interface TrainerAiConfiguration {
   strategy:PinnedTrainerAiStrategy; projection:TrainerBattleProjection; generation:number; contentIdentity:string;
-  currentContent:()=>Content; isCurrent:()=>boolean; timing?:TrainerAiTiming;
+  currentContent:()=>Content; isCurrent:()=>boolean; timing:TrainerAiTiming;
 }
 interface Reservation {key:string;itemId:string;battleId:string;target:string;state:'reserved'|'consumed'|'refunded'}
 interface Cache {capture:TrainerCapture;plan:DecisionPlan|null;attempted:string[];submitted:boolean;key:string|null}
@@ -61,7 +61,7 @@ export function cancelTrainerAiDecision(session:object):boolean {
 export function bindTrainerAi(session:object,driver:BattleDriver,content:Content,config:TrainerAiConfiguration):void {
   if(CHANNELS.has(session))throw new Error('trainer-ai-already-bound');
   const owner={},source=bindTrainerSource(driver,owner,content,config.contentIdentity);
-  const policy=config.strategy.instantiate(source.catalog.catalog,source.catalog.identity),timing=config.timing??DEFAULT_TIMING;
+  const policy=config.strategy.instantiate(source.catalog.catalog,source.catalog.identity),timing=config.timing;
   const resources=config.projection.ai.items.map((r,i)=>({resourceKey:'trainer-resource:'+i,itemId:r.item,count:r.count}));
   CHANNELS.set(session,{owner,driver,lineage:source.lineage,catalog:source.catalog,policy,invoke:policy.decide.bind(policy),available:policy.isAvailable?.bind(policy)??(()=>true),bindingHash:fingerprint(policy.binding),validate:createTrainerAiSnapshotValidator(source.catalog.catalog),timing:{now:timing.now.bind(timing),after:timing.after.bind(timing)},config:{...config,projection:clone(config.projection)},profile:clone({skillLevel:config.projection.ai.skillLevel,flags:config.projection.ai.flags}),contentFingerprint:fingerprint(clone(content)),state:{random:deriveTrainerRandom(source.seed),resources,resourceRevision:0,ledger:[]},cache:null,gate:null,retired:null,epoch:0,pending:null,journal:new Map(),decided:new Set(),lastAccepted:new Map(),testFull:false,restoring:false});
 }

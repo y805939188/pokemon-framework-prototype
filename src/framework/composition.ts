@@ -1,5 +1,6 @@
 import { createTrainerAiStrategyRegistry } from "./flow/trainer-ai-strategy";
 import { retireTrainerAi } from './flow/trainer-ai';
+import { trainerAiTiming } from './battle/trainer-ai-timing';
 import type { TrainerAiTiming } from './flow/trainer-ai';
 export type { TrainerAiTiming } from './flow/trainer-ai';
 import type { TrainerAiStrategyRegistry } from "./flow/trainer-ai-strategy";
@@ -48,7 +49,7 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
   const driver = selectedDriver ?? showdownDriverFactory;
   const strategies = options.trainerAiStrategies ?? createTrainerAiStrategyRegistry();
   const resolveStrategy = strategies.resolve.bind(strategies);
-  const timing=options.trainerAiTiming;
+  const timing=options.trainerAiTiming??trainerAiTiming;
   const currentContent = options.content.bind(options);
   const factory: BattleSessionFactory<BattleSession> = {
     // the application has created the foes (rules/member-factory) and decided the flags; this only wires the engine
@@ -63,7 +64,7 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
       ...(setup.obedience ? { obedience: setup.obedience } : {}),
       ...(required && setup.trainer && setup.evidenceContext && setup.isCurrentBattle ? { trainerAi: {
         strategy: resolveStrategy(setup.trainer.ai.aiStrategy), projection: setup.trainer, generation: setup.evidenceContext.generation, contentIdentity: setup.evidenceContext.contentIdentity,
-        currentContent, isCurrent: setup.isCurrentBattle, ...(timing?{timing}:{}),
+        currentContent, isCurrent: setup.isCurrentBattle, timing,
       } } : {}),
       ...(options.seed ? { seed: options.seed() } : {}),
       ...(options.logger ? { logger: options.logger() } : {}),
