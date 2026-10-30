@@ -13,6 +13,7 @@ import {executeArgv,attachRunnerResponse,DEFAULT_LIMITS} from './lib/process.mjs
 import {makeBehaviorPackage,sanitizeOutcome} from './lib/normalize.mjs';
 import {compareBehaviorPackages} from './lib/compare.mjs';
 import {PROFILE,DIRECTORY,REFERENCE_ROLES,generatePre54Request} from './profiles/pre54-batch2.mjs';
+import {registerObserverControlTests} from './test-observer-control-cases.mjs';
 const kitRoot=join(testRoot,'pre54-kit');
 const build=spawnSync(process.execPath,[join(experimentRoot,'build-kit.mjs'),'--core',join(worktreeRoot,'js/engine/build/core.cjs'),'--runner',join(testRoot,'compiled/runners/ts-runner.mjs'),'--out',kitRoot,'--frozen-at','2026-10-30T00:00:00Z','--source-metadata',join(testRoot,'source-metadata.json'),'--profile',PROFILE],{cwd:worktreeRoot,encoding:'utf8'});
 writeFileSync(join(testRoot,'pre54-build.stdout'),build.stdout);writeFileSync(join(testRoot,'pre54-build.stderr'),build.stderr);assert.equal(build.status,0,build.stdout+build.stderr);
@@ -193,3 +194,4 @@ test('headless bootstrap drains async setup before synchronous tests; original s
  }
  writeFileSync(join(directory,'RESULT.json'),JSON.stringify({scope:'synthetic bootstrap/process ordering only; actual entry with module paths redirected to controls',receipts,productionDefaultTimeoutMs:DEFAULT_LIMITS.timeoutMs},null,2)+'\n');
 });
+registerObserverControlTests({testRoot,experimentRoot,kitRoot,kit,candidate,syntheticPeer:peer});

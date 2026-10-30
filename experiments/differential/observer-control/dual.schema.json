@@ -1,0 +1,950 @@
+{
+  "type": "object",
+  "properties": {
+    "protocol": {
+      "const": "pre54-observer-status-v1"
+    },
+    "candidateSHA": {
+      "const": "8c9951c16cad74a595dfd30ac63aa307a5d13eae"
+    },
+    "freezeHash": {
+      "const": "ebda61d9abdbc43cb7d3b27857b9b9a0deb5da6877068db105959b41c151555d"
+    },
+    "requestHash": {
+      "const": "19c09762f7166fef2a7b540c159ded9bd76cbde25903c44a5c3171338a90c133"
+    },
+    "referenceTargetCommit": {
+      "const": "8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b"
+    },
+    "referenceTargetTag": {
+      "const": "v21.1"
+    },
+    "role": {
+      "const": "reference-observer"
+    },
+    "runId": {
+      "const": "pre54-8c-observer-20261030"
+    },
+    "stage": {
+      "const": "FULL_DUAL"
+    },
+    "status": {
+      "enum": [
+        "NOT_RUN",
+        "IN_PROGRESS",
+        "SEALED",
+        "BLOCKED",
+        "FAILED"
+      ]
+    },
+    "code": {
+      "enum": [
+        "NONE",
+        "TOOL_DENIED",
+        "REFERENCE_IDENTITY_UNVERIFIED",
+        "RUBY_UNAVAILABLE",
+        "DEPENDENCY_UNSUPPORTED",
+        "UNSUPPORTED_HOST",
+        "UNSUPPORTED_INPUT_MAPPING",
+        "ACTUAL_EXECUTION_FAILED",
+        "PROTOCOL_GATE_FAILED",
+        "PUBLICATION_BLOCKED",
+        "UNEXPECTED_RANDOMNESS",
+        "CLEANROOM_BOUNDARY",
+        "REFERENCE_ADAPTER_NOT_QUALIFIED",
+        "SOURCE_TRACE_UNVERIFIED",
+        "SOURCE_PIN_MISMATCH",
+        "NODE_EXECUTION_POLICY_REJECTED",
+        "PARTIAL_STATE",
+        "OUTPUT_CONTRACT_UNSUPPORTED"
+      ]
+    },
+    "observedReferenceCommit": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      ]
+    },
+    "observedTagCommit": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      ]
+    },
+    "referenceRuntime": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "const": "3.1.3"
+        }
+      ]
+    },
+    "hostMode": {
+      "enum": [
+        "UNKNOWN",
+        "ORIGINAL_CONFIG_ONLY",
+        "ORIGINAL_WITH_MINIMAL_EXTERNAL_FIXTURES"
+      ]
+    },
+    "checks": {
+      "type": "object",
+      "properties": {
+        "referenceVersionVerified": {
+          "type": "boolean"
+        },
+        "tagPrimaryFilesIdentical": {
+          "type": "boolean"
+        },
+        "originalBusinessMethodsLoaded": {
+          "type": "boolean"
+        },
+        "adapterBusinessRulesNotReimplemented": {
+          "type": "boolean"
+        },
+        "sourceMethodLocationsVerified": {
+          "type": "boolean"
+        },
+        "actualLoadedFilesVerified": {
+          "type": "boolean"
+        },
+        "sourceExecutedMethodTraceVerified": {
+          "type": "boolean"
+        },
+        "nodeLoaderPolicyVerified": {
+          "type": "boolean"
+        },
+        "randomTraceVerified": {
+          "type": "boolean"
+        },
+        "privateFactsPreserved": {
+          "type": "boolean"
+        },
+        "originalSourceUnmodified": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "referenceVersionVerified",
+        "tagPrimaryFilesIdentical",
+        "originalBusinessMethodsLoaded",
+        "adapterBusinessRulesNotReimplemented",
+        "sourceMethodLocationsVerified",
+        "actualLoadedFilesVerified",
+        "sourceExecutedMethodTraceVerified",
+        "nodeLoaderPolicyVerified",
+        "randomTraceVerified",
+        "privateFactsPreserved",
+        "originalSourceUnmodified"
+      ],
+      "additionalProperties": false
+    },
+    "roles": {
+      "type": "object",
+      "properties": {
+        "learning-rules": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "pokedex-rules": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "stats-rules": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "adapter": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "fixture-directory": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "learning-rules",
+        "pokedex-rules",
+        "stats-rules",
+        "adapter",
+        "fixture-directory"
+      ],
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "adapterSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "privateSourceManifestSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "loadedFileEvidenceSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "sourceMethodTraceSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "readinessResponseSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "readinessExecutionManifestSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "adapterSHA256",
+        "privateSourceManifestSHA256",
+        "loadedFileEvidenceSHA256",
+        "sourceMethodTraceSHA256",
+        "readinessResponseSHA256",
+        "readinessExecutionManifestSHA256"
+      ],
+      "additionalProperties": false
+    },
+    "qualifications": {
+      "type": "object",
+      "properties": {
+        "learning.relearningCandidates": {
+          "type": "object",
+          "properties": {
+            "normal": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "const": "pre54-0021"
+                },
+                "requestHash": {
+                  "const": "f6aea53d4745e9d600ae22108f4645f5dbbd5ba519162f5869bfd5c5fdf953d7"
+                },
+                "called": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "enum": [
+                    "NOT_RUN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "BLOCKED"
+                  ]
+                }
+              },
+              "required": [
+                "caseId",
+                "requestHash",
+                "called",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            "boundary": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "const": "pre54-0002"
+                },
+                "requestHash": {
+                  "const": "f1b063b0d100ffcb572564f800d0c2b331d5b5b87de60698e40946304b032191"
+                },
+                "called": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "enum": [
+                    "NOT_RUN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "BLOCKED"
+                  ]
+                }
+              },
+              "required": [
+                "caseId",
+                "requestHash",
+                "called",
+                "result"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "normal",
+            "boundary"
+          ],
+          "additionalProperties": false
+        },
+        "learning.forgetting": {
+          "type": "object",
+          "properties": {
+            "normal": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "const": "pre54-0070"
+                },
+                "requestHash": {
+                  "const": "9f4d228832cb0a1df3ab4b0475f7aa87fa4d82819b53b2101b0bb7913875f907"
+                },
+                "called": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "enum": [
+                    "NOT_RUN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "BLOCKED"
+                  ]
+                }
+              },
+              "required": [
+                "caseId",
+                "requestHash",
+                "called",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            "boundary": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "const": "pre54-0064"
+                },
+                "requestHash": {
+                  "const": "27d7e6bbf462a1369069347e6ade0fb9f871ec9e29315c1e20075dc78f7df5ed"
+                },
+                "called": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "enum": [
+                    "NOT_RUN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "BLOCKED"
+                  ]
+                }
+              },
+              "required": [
+                "caseId",
+                "requestHash",
+                "called",
+                "result"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "normal",
+            "boundary"
+          ],
+          "additionalProperties": false
+        },
+        "pokedex.recordSequence": {
+          "type": "object",
+          "properties": {
+            "normal": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "const": "pre54-0078"
+                },
+                "requestHash": {
+                  "const": "3219dc69483067797925aebba8ae89a24d282422de40ff66842a029bd50fe814"
+                },
+                "called": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "enum": [
+                    "NOT_RUN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "BLOCKED"
+                  ]
+                }
+              },
+              "required": [
+                "caseId",
+                "requestHash",
+                "called",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            "boundary": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "const": "pre54-0077"
+                },
+                "requestHash": {
+                  "const": "ef86381ed85c32cef3d41129c87b52556ac18e1b52b7f2106bda2fa00ff09402"
+                },
+                "called": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "enum": [
+                    "NOT_RUN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "BLOCKED"
+                  ]
+                }
+              },
+              "required": [
+                "caseId",
+                "requestHash",
+                "called",
+                "result"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "normal",
+            "boundary"
+          ],
+          "additionalProperties": false
+        },
+        "pokedex.recentSequence": {
+          "type": "object",
+          "properties": {
+            "normal": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "const": "pre54-0094"
+                },
+                "requestHash": {
+                  "const": "c22c966b46ce6ae7300e747d6aea503c77ed1c11ba783ab8ba5388260ab9ef00"
+                },
+                "called": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "enum": [
+                    "NOT_RUN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "BLOCKED"
+                  ]
+                }
+              },
+              "required": [
+                "caseId",
+                "requestHash",
+                "called",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            "boundary": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "const": "pre54-0096"
+                },
+                "requestHash": {
+                  "const": "395559722e601637ddc3b7e7708efe929f8661867d77bf1f2273f453d34956c9"
+                },
+                "called": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "enum": [
+                    "NOT_RUN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "BLOCKED"
+                  ]
+                }
+              },
+              "required": [
+                "caseId",
+                "requestHash",
+                "called",
+                "result"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "normal",
+            "boundary"
+          ],
+          "additionalProperties": false
+        },
+        "stats.computeStats": {
+          "type": "object",
+          "properties": {
+            "normal": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "const": "pre54-0101"
+                },
+                "requestHash": {
+                  "const": "3954a68d8e4727d368bbaea709e7c680270308e482944013f048125a6ea67fe6"
+                },
+                "called": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "enum": [
+                    "NOT_RUN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "BLOCKED"
+                  ]
+                }
+              },
+              "required": [
+                "caseId",
+                "requestHash",
+                "called",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            "boundary": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "const": "pre54-0322"
+                },
+                "requestHash": {
+                  "const": "4ea8af3548b7e4efddad13f9ad28107e9f1afbc3f28008930c3fd75a66cf2136"
+                },
+                "called": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "enum": [
+                    "NOT_RUN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "BLOCKED"
+                  ]
+                }
+              },
+              "required": [
+                "caseId",
+                "requestHash",
+                "called",
+                "result"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "normal",
+            "boundary"
+          ],
+          "additionalProperties": false
+        },
+        "stats.hpAfterRecalc": {
+          "type": "object",
+          "properties": {
+            "normal": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "const": "pre54-0345"
+                },
+                "requestHash": {
+                  "const": "76519fb8c2e3815a4c3fcbcdefe7025fa2258c87274e49c35f41ce0cb4da63cf"
+                },
+                "called": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "enum": [
+                    "NOT_RUN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "BLOCKED"
+                  ]
+                }
+              },
+              "required": [
+                "caseId",
+                "requestHash",
+                "called",
+                "result"
+              ],
+              "additionalProperties": false
+            },
+            "boundary": {
+              "type": "object",
+              "properties": {
+                "caseId": {
+                  "const": "pre54-0330"
+                },
+                "requestHash": {
+                  "const": "c73d3e2d88bb8d4c8507d53588721bf28964dd16c573e643ba2e20e214a94868"
+                },
+                "called": {
+                  "type": "boolean"
+                },
+                "result": {
+                  "enum": [
+                    "NOT_RUN",
+                    "SUCCEEDED",
+                    "FAILED",
+                    "BLOCKED"
+                  ]
+                }
+              },
+              "required": [
+                "caseId",
+                "requestHash",
+                "called",
+                "result"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "normal",
+            "boundary"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "learning.relearningCandidates",
+        "learning.forgetting",
+        "pokedex.recordSequence",
+        "pokedex.recentSequence",
+        "stats.computeStats",
+        "stats.hpAfterRecalc"
+      ],
+      "additionalProperties": false
+    },
+    "randomDrawCount": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        }
+      ]
+    },
+    "dual": {
+      "type": "object",
+      "properties": {
+        "acceptedAuditSHA256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "readinessStatusSHA256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "referenceCaseCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 354
+        },
+        "candidateCaseCount": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 354
+        },
+        "referenceStatus": {
+          "enum": [
+            "NOT_RUN",
+            "success",
+            "process-error",
+            "timeout",
+            "protocol-error",
+            "blocked"
+          ]
+        },
+        "candidateStatus": {
+          "enum": [
+            "NOT_RUN",
+            "success",
+            "process-error",
+            "timeout",
+            "protocol-error",
+            "blocked"
+          ]
+        },
+        "referenceExit": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          ]
+        },
+        "candidateExit": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          ]
+        },
+        "referenceSealedBeforeCandidate": {
+          "type": "boolean"
+        },
+        "referenceBehaviorSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "candidateBehaviorSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "handoffSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "producerEntrySHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "producerManifestSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "fullExecutionManifestSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "fullLoadedFileEvidenceSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "fullSourceMethodTraceSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        },
+        "fullRandomTraceSHA256": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          ]
+        }
+      },
+      "required": [
+        "acceptedAuditSHA256",
+        "readinessStatusSHA256",
+        "referenceCaseCount",
+        "candidateCaseCount",
+        "referenceStatus",
+        "candidateStatus",
+        "referenceExit",
+        "candidateExit",
+        "referenceSealedBeforeCandidate",
+        "referenceBehaviorSHA256",
+        "candidateBehaviorSHA256",
+        "handoffSHA256",
+        "producerEntrySHA256",
+        "producerManifestSHA256",
+        "fullExecutionManifestSHA256",
+        "fullLoadedFileEvidenceSHA256",
+        "fullSourceMethodTraceSHA256",
+        "fullRandomTraceSHA256"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "protocol",
+    "candidateSHA",
+    "freezeHash",
+    "requestHash",
+    "referenceTargetCommit",
+    "referenceTargetTag",
+    "role",
+    "runId",
+    "stage",
+    "status",
+    "code",
+    "observedReferenceCommit",
+    "observedTagCommit",
+    "referenceRuntime",
+    "hostMode",
+    "checks",
+    "roles",
+    "evidence",
+    "qualifications",
+    "randomDrawCount",
+    "dual"
+  ],
+  "additionalProperties": false
+}
