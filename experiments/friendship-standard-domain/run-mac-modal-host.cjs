@@ -38,8 +38,8 @@ const rows=[];async function check(id,fn){try{const value=await fn();rows.push({
  const clearResult=async()=>{
   if(!await c.evaluate('$gameMessage.isBusy()'))return;
   // Dismiss through normal message input only after text has finished. Premature terminateMessage leaves pause set.
-  await until('!!(SceneManager._scene._messageWindow?.isOpen() && SceneManager._scene._messageWindow.pause && !SceneManager._scene._messageWindow._textState)','result message ready');
-  await c.evaluate('(Input._currentState.ok=true,true)');await frames(2);await c.evaluate('(Input._currentState.ok=false,true)');await frames(2);
+  await until('!!(SceneManager._scene._messageWindow?.isOpen() && SceneManager._scene._messageWindow.pause && SceneManager._scene._messageWindow._waitCount===0 && !SceneManager._scene._messageWindow._textState)','result message ready');
+  await c.evaluate(`(document.dispatchEvent(new KeyboardEvent('keydown',{keyCode:13,which:13,bubbles:true})),true)`);await frames(3);await c.evaluate(`(document.dispatchEvent(new KeyboardEvent('keyup',{keyCode:13,which:13,bubbles:true})),true)`);await frames(3);
   await until('!$gameMessage.isBusy()','result message dismissed');
  };
  const start=async(slot=1)=>{
@@ -58,7 +58,7 @@ const rows=[];async function check(id,fn){try{const value=await fn();rows.push({
  await instrument();
  await c.evaluate(`(()=>{DataManager.setupNewGame();PSFlow.rng=n=>0;PSFlow.seed=[1,2,3,4];PSFlow.resetGame();PSFlow.game().party[0].friendship=256;PSFlow.game().party[1].friendship=257;PSFlow.game().party[0].hp=1;const t=PSFlow.app().beginInventoryOperation();const r=PSFlow.app().inventoryRequest(t,'modal-energyroot',{kind:'add-items',itemId:'energyroot',quantity:1});PSFlow.app().endInventoryOperation(t);if(r.status!=='committed')throw Error(JSON.stringify(r));SceneManager.goto(Scene_Map);return true;})()`);
  await until('SceneManager._scene instanceof Scene_Map && SceneManager._scene.isActive() && !$gamePlayer.isTransferring()','normal map');await frames(15);
- await c.evaluate('(async()=>{await DataManager.saveGame(1);await new Promise(r=>setTimeout(r,150));return true;})()');
+ await c.evaluate('(async()=>{$gameSystem.onBeforeSave();await DataManager.saveGame(1);await new Promise(r=>setTimeout(r,150));return true;})()');
  const original=fs.readFileSync(file()),global=fs.readFileSync(path.join(save,'global.rmmzsave'));
  await check('actual-interpreter-cancel-60-frames-zero-writes-resumes',async()=>{
   const offered=await start();assert.equal(offered.result,undefined,JSON.stringify(offered));assert.equal(offered.index,1);assert.equal(offered.wait,'psFriendshipMigration');assert.equal(offered.defaultIndex,1);
@@ -90,7 +90,7 @@ const rows=[];async function check(id,fn){try{const value=await fn();rows.push({
  const migrated=fs.readFileSync(file());
  await check('repeat-formal-command-is-unchanged-with-real-window-and-resumes',async()=>{const offered=await start(),waited=await waitChoice();const result=await choose(0);assert.equal(result.status,'unchanged',JSON.stringify(result));assert.deepEqual(fs.readFileSync(file()),migrated);return {offered,waited,result,recovery:await resumed()};});
  await check('committed-install-fault-releases-world-retains-app-guard',async()=>{
-  await c.evaluate('(async()=>{PSFlow.game().party[0].friendship=256;await DataManager.saveGame(3);await new Promise(r=>setTimeout(r,150));return true;})()');
+  await c.evaluate('(async()=>{PSFlow.game().party[0].friendship=256;$gameSystem.onBeforeSave();await DataManager.saveGame(3);await new Promise(r=>setTimeout(r,150));return true;})()');
   const offered=await start(3),waited=await waitChoice();
   await c.evaluate(`(()=>{const old=$gameSystem._psGame;Object.defineProperty($gameSystem,'_psGame',{configurable:true,enumerable:true,get:()=>old,set:()=>{throw Error('modal-host-install-fault');}});return true;})()`);
   const result=await choose(0);assert.equal(result.status,'reload-required',JSON.stringify(result));assert.equal(result.persistence.status,'committed');assert.ok(fs.existsSync(path.join(result.persistence.bundle,'receipt.json')));
@@ -98,7 +98,7 @@ const rows=[];async function check(id,fn){try{const value=await fn();rows.push({
  });
  await stop();c=await launch(5);await instrument();
  await check('fresh-ordinary-title-continue-normal-frames',async()=>{
-  await c.evaluate('(SceneManager._scene.commandContinue(),true)');await until('SceneManager._scene instanceof Scene_Load && SceneManager._scene._listWindow','load scene');await c.evaluate('(()=>{const s=SceneManager._scene;s._listWindow.selectSavefile(3);s.onSavefileOk();return true;})()');await until('SceneManager._scene instanceof Scene_Map && SceneManager._scene.isActive() && !$gameSystem._psSaveError','continued map');
+  await c.evaluate('(SceneManager._scene.commandContinue(),true)');await until('!!(SceneManager._scene instanceof Scene_Load && SceneManager._scene.isActive() && SceneManager._scene._listWindow?.active)','load scene');await c.evaluate('(()=>{const s=SceneManager._scene;s._listWindow.selectSavefile(3);s.onSavefileOk();return true;})()');await until('SceneManager._scene instanceof Scene_Map && SceneManager._scene.isActive() && !$gameSystem._psSaveError','continued map');
   const state=await c.evaluate('({value:PSFlow.game().party[0].friendship,other:PSFlow.game().party[1].friendship,error:$gameSystem._psSaveError})');assert.equal(state.value,255);assert.equal(state.other,257);const a=await c.evaluate('window.__worldUpdates');const progress=await frames(30);assert.ok(progress.world>a);return {state,progress};
  });
  await check('fresh-normal-query-item-and-next-required-source-battle',async()=>await c.evaluate(`(async()=>{const B=require('./js/engine/build/production.cjs'),m=PSFlow.game().party[0],query=B.friendship.deriveAffection(m),change=B.friendship.planFriendshipChange(m,'faint',{AFFECTION_EFFECTS:false});if(query.status!=='ready'||change.after!==254)throw Error('query/change');const t=PSFlow.app().beginInventoryOperation(),used=PSFlow.app().inventoryRequest(t,'fresh-modal-energyroot',{kind:'use-item',itemId:'energyroot',memberId:m.id,quantity:1});PSFlow.app().endInventoryOperation(t);if(used.status!=='committed'||PSFlow.game().party[0].friendship!==240)throw Error(JSON.stringify(used));const afterQuery=B.friendship.deriveAffection(PSFlow.game().party[0]);if(afterQuery.affection!==4)throw Error('item query');const req={battleId:'friendship-modal-next',kind:'wild',seq:47,foes:[{species:'Pidgey',level:2}],canLose:true};PSFlow.rng=n=>0;PSFlow.seed=[1,2,3,4];const h=await PSFlow.app().startBattle(req);if(!(await h.run()).ok)throw Error('run');const result=PSFlow.app().finishBattle(h,req);if(result.commit!=='applied')throw Error(JSON.stringify(result));return {query,change,used,afterQuery,result,pair:PSFlow.game().appliedBattles[req.battleId].settlement};})()`));
