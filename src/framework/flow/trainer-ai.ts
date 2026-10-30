@@ -192,8 +192,8 @@ export async function runTrainerAi(session:object,driver:BattleDriver):Promise<b
           c.state.resources=c.state.resources.map(r=>r===resource?{...r,count:r.count-1}:r);c.state.ledger.push(reservation);
         }
         const result=await submitTrainerCandidate(driver,c.owner,cache.capture.ticket,candidateId,c.state.resourceRevision);
-        if(result==='accepted'&&cache.key)c.lastAccepted.set(cache.key,candidateId);
         owned(c,gate);current(c,driver);
+        if(result==='accepted'&&cache.key)c.lastAccepted.set(cache.key,candidateId);
         if(result==='accepted'){cache.submitted=true;if(reservation)c.state.resourceRevision++;return true;}
         if(reservation){if(reservation.state!=='reserved')throw new Error('trainer-ai-item-registration-uncertain');refund(c,reservation,false);}
       }
