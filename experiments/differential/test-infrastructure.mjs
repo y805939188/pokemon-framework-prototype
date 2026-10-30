@@ -13,17 +13,72 @@ import { verifyKit } from "./lib/kit.mjs";
 import { kit, testRoot, requestPath, fixturePath, candidateMetadata, syntheticReferenceMetadata, syntheticProducer } from "./test-helpers.mjs";
 
 const clone = (value) => structuredClone(value);
-const smallLimits = { timeoutMs: 150, maxStdoutBytes: 1024, maxStderrBytes: 1024 };
+// Ordinary fault controls must reach their fault before the end-to-end deadline.
+// Keep timeout controls separate: their readiness/output assertions prevent startup-only false passes.
+const fixtureLimits = { ...DEFAULT_LIMITS, timeoutMs: 5000 };
+const timeoutLimits = { ...DEFAULT_LIMITS, timeoutMs: 1500 };
+const shortTimeoutLimits = { timeoutMs: 150, maxStdoutBytes: 1024, maxStderrBytes: 1024 };
 let processSequence = 0;
-async function runFixture(mode, limits = DEFAULT_LIMITS, marker = null, role = "candidate") {
-  const argv = [process.execPath, fixturePath, mode, requestPath];
-  if (marker !== null) argv.push(marker);
+async function runFixture(mode, limits = fixtureLimits, marker = null, role = "candidate", startupDelayMs = 0) {
+  const argv = [process.execPath, fixturePath, mode, requestPath, marker ?? "-", String(startupDelayMs)];
   const execution = await executeArgv({ argv, cwd: dirname(fixturePath), role, entryId: role === "reference" ? "reference-rules-v1" : "ts-core-v1" }, limits);
   attachRunnerResponse(execution, execution.stdout.toString("utf8"), (response) => validateRawResponse(response, kit.request));
   writePrivateExecution(execution, join(testRoot, `fixture-${String(processSequence++)}-${mode}`), limits);
   return execution;
 }
 const actualTs = await runFixture("success", DEFAULT_LIMITS, null, "candidate");
+assert.equal(actualTs.status, "success");
+const validFixtureText = actualTs.stdout.toString("utf8");
+function assertFixtureRaw(execution, mode, limits) {
+  let stdout = "";
+  let stderr = "";
+  if (["nonzero-valid-response", "stderr-valid-response", "timeout-valid-response", "stderr-limit"].includes(mode)) stdout = validFixtureText;
+  else if (mode === "output-valid-response") stdout = (validFixtureText + "x".repeat(4 * 1024 * 1024)).slice(0, limits.maxStdoutBytes);
+  else if (mode === "output-limit") stdout = "x".repeat(limits.maxStdoutBytes);
+  else if (["valid-json-nonzero", "valid-json-signal", "stderr", "timeout", "timeout-tree"].includes(mode)) stdout = "{}\n";
+  else if (mode === "invalid") stdout = "not-json\n";
+  else if (mode === "multiple") stdout = "{}\n{}\n";
+  else if (mode === "logging") stdout = "log\n{}\n";
+  else if (["duplicate", "missing", "extra", "wrong-request", "schema-error"].includes(mode)) {
+    const value = parseJson(validFixtureText);
+    if (mode === "duplicate") value.cases[1] = value.cases[0];
+    if (mode === "missing") value.cases.pop();
+    if (mode === "extra") value.cases.push({ ...value.cases[0], caseId: "infrastructure-extra-case" });
+    if (mode === "wrong-request") value.requestHash = "0".repeat(64);
+    if (mode === "schema-error") value.cases[0].unexpected = true;
+    stdout = strictStringify(value) + "\n";
+  } else assert.ok(["crash", "uncaught", "empty"].includes(mode), `raw expectation missing for ${mode}`);
+  if (mode === "stderr-valid-response") stderr = "infrastructure warning\n";
+  if (mode === "stderr-limit") stderr = "x".repeat(limits.maxStderrBytes);
+  if (mode === "stderr") stderr = "infrastructure stderr\n";
+  assert.equal(execution.stdout.toString("utf8"), stdout, `${mode}: retained raw stdout`);
+  if (mode === "uncaught") assert.match(execution.stderr.toString("utf8"), /Error: INFRASTRUCTURE_SELF_TEST_CRASH\n/);
+  else assert.equal(execution.stderr.toString("utf8"), stderr, `${mode}: retained raw stderr`);
+  assert.equal(execution.response, null, "failure must not expose a usable parsed response");
+}
+function assertTimeoutReady(execution, marker, state) {
+  const ready = readJson(marker); // Missing readiness is a failure, even when status is TIMEOUT.
+  assert.equal(ready.state, state);
+  assert.ok(Number.isSafeInteger(ready.pid) && ready.pid > 0);
+  assert.ok(ready.readyAtMs >= Date.parse(execution.startedAtUTC));
+  assert.ok(Date.parse(execution.endedAtUTC) - ready.readyAtMs >= 20, "fixture must actually hang before timeout");
+  assert.equal(execution.status, "timeout");
+  assert.equal(execution.infrastructureCode, "TIMEOUT");
+  assert.equal(execution.timedOut, true);
+  assert.equal(execution.signal, "SIGKILL");
+  assert.equal(execution.response, null);
+  return ready;
+}
+function ownedProcessStates(pids) {
+  const result = spawnSync("ps", ["-o", "pid=,ppid=,pgid=,stat=", "-p", pids.join(",")], { encoding: "utf8", shell: false, timeout: 1000 });
+  assert.equal(result.error, undefined);
+  assert.equal(result.stderr, "");
+  assert.ok(result.status === 0 || (result.status === 1 && result.stdout.trim() === ""), `owned PID inspection failed: ${result.error ?? result.stderr}`);
+  return result.stdout.trim().split("\n").filter(Boolean).map((line) => {
+    const [pid, ppid, pgid, state] = line.trim().split(/\s+/);
+    return { pid: Number(pid), ppid: Number(ppid), pgid: Number(pgid), state };
+  });
+}
 // Replace the fake response with an actual TS child for the base packages; the fake above is only an executor positive control.
 const tsExecution = await executeArgv({ argv: [process.execPath, "runners/ts-runner.mjs", "--request", "requests/wp30-r2.json", "--core", "core/core.cjs"], cwd: kit.root, role: "candidate", entryId: "ts-core-v1" }, DEFAULT_LIMITS);
 attachRunnerResponse(tsExecution, tsExecution.stdout.toString("utf8"), (response) => validateRawResponse(response, kit.request));
@@ -197,39 +252,108 @@ for (const [mode, expectedStatus, expectedCode] of [
   ["schema-error", "protocol-error", "RUNNER_RESPONSE_SCHEMA_REJECTED"]
 ]) test(`infrastructure child rejection: ${mode}`, async () => {
   const limits = mode === "output-valid-response"
-    ? { timeoutMs: 150, maxStdoutBytes: 2 * 1024 * 1024, maxStderrBytes: 1024 }
+    ? { ...fixtureLimits, maxStdoutBytes: 2 * 1024 * 1024, maxStderrBytes: 1024 }
     : mode === "stderr-limit"
-      ? { timeoutMs: 150, maxStdoutBytes: DEFAULT_LIMITS.maxStdoutBytes, maxStderrBytes: 1024 }
-      : mode === "output-limit" ? smallLimits : { ...DEFAULT_LIMITS, timeoutMs: 150 };
-  const execution = await runFixture(mode, limits);
+      ? { ...fixtureLimits, maxStderrBytes: 1024 }
+      : mode === "output-limit" ? { ...fixtureLimits, maxStdoutBytes: 1024, maxStderrBytes: 1024 }
+        : mode === "timeout-valid-response" ? timeoutLimits : fixtureLimits;
+  const marker = mode === "timeout-valid-response" ? join(testRoot, "timeout-valid-response-ready.json") : null;
+  const execution = await runFixture(mode, limits, marker);
   assert.equal(execution.status, expectedStatus);
   assert.equal(execution.infrastructureCode ?? execution.protocolCode, expectedCode);
-  if (expectedStatus !== "success") assert.equal(execution.response, null, "failure must not expose a usable parsed response");
+  assertFixtureRaw(execution, mode, limits);
+  assert.equal(execution.timedOut, mode === "timeout-valid-response");
+  const outputLimited = ["output-valid-response", "stderr-limit", "output-limit"].includes(mode);
+  assert.equal(execution.outputLimitExceeded, outputLimited);
+  const expectedExit = ["nonzero-valid-response", "valid-json-nonzero"].includes(mode) ? 7
+    : mode === "crash" ? 3 : mode === "uncaught" ? 1
+      : outputLimited || ["valid-json-signal", "timeout-valid-response"].includes(mode) ? null : 0;
+  assert.equal(execution.exitCode, expectedExit);
+  assert.equal(execution.signal, mode === "valid-json-signal" ? "SIGTERM" : outputLimited || mode === "timeout-valid-response" ? "SIGKILL" : null);
+  if (marker) {
+    assertTimeoutReady(execution, marker, "hanging-after-response");
+    assert.equal(validateRawResponse(parseJson(execution.stdout.toString("utf8")), kit.request).status, "success");
+  }
+});
+
+for (const [mode, status, code] of [
+  ["nonzero-valid-response", "process-error", "PROCESS_NONZERO_EXIT"],
+  ["invalid", "protocol-error", "JSON_VALUE_EXPECTED"]
+]) test(`infrastructure child: deterministic slow startup still detects ${mode}`, async () => {
+  const oldBudget = await runFixture(mode, shortTimeoutLimits, null, "candidate", 350);
+  assert.equal(oldBudget.status, "timeout");
+  assert.equal(oldBudget.infrastructureCode, "TIMEOUT");
+  assert.equal(oldBudget.stdoutBytes, 0);
+  assert.equal(oldBudget.stderrBytes, 0);
+  assert.equal(oldBudget.response, null);
+  const execution = await runFixture(mode, fixtureLimits, null, "candidate", 350);
+  assert.equal(execution.status, status);
+  assert.equal(execution.infrastructureCode ?? execution.protocolCode, code);
+  assert.equal(execution.exitCode, mode === "nonzero-valid-response" ? 7 : 0);
+  assert.equal(execution.signal, null);
+  assert.equal(execution.timedOut, false);
+  assertFixtureRaw(execution, mode, fixtureLimits);
+});
+
+test("infrastructure child: short timeout reaches JSON and hang without loading the matrix", async () => {
+  const marker = join(testRoot, "short-timeout-ready.json");
+  const execution = await runFixture("timeout", shortTimeoutLimits, marker);
+  assertTimeoutReady(execution, marker, "hanging-after-json");
+  assertFixtureRaw(execution, "timeout", shortTimeoutLimits);
+  assert.deepEqual(parseJson(execution.stdout.toString("utf8")), {});
 });
 
 test("infrastructure child: missing executable and missing core dependency are process failures", async () => {
-  const missing = await executeArgv({ argv: [join(testRoot, "no-such-executable")], cwd: testRoot }, smallLimits);
+  const missing = await executeArgv({ argv: [join(testRoot, "no-such-executable")], cwd: testRoot }, fixtureLimits);
   assert.equal(missing.status, "process-error");
-  assert.match(missing.infrastructureCode, /^SPAWN_/);
-  writePrivateExecution(missing, join(testRoot, "missing-executable-private"), smallLimits);
-  const missingCore = await executeArgv({ argv: [process.execPath, "runners/ts-runner.mjs", "--request", "requests/wp30-r2.json", "--core", "core/missing.cjs"], cwd: kit.root }, smallLimits);
+  assert.equal(missing.infrastructureCode, "SPAWN_ENOENT");
+  assert.equal(missing.stdoutBytes, 0);
+  assert.equal(missing.response, null);
+  writePrivateExecution(missing, join(testRoot, "missing-executable-private"), fixtureLimits);
+  const missingCore = await executeArgv({ argv: [process.execPath, "runners/ts-runner.mjs", "--request", "requests/wp30-r2.json", "--core", "core/missing.cjs"], cwd: kit.root }, fixtureLimits);
   assert.equal(missingCore.status, "process-error");
-  assert.equal(missingCore.exitCode !== 0, true);
-  writePrivateExecution(missingCore, join(testRoot, "missing-core-private"), smallLimits);
+  assert.equal(missingCore.infrastructureCode, "PROCESS_NONZERO_EXIT");
+  assert.equal(missingCore.exitCode, 1);
+  assert.equal(missingCore.stdoutBytes, 0);
+  assert.ok(missingCore.stderr.toString("utf8").includes(`Cannot find module '${join(kit.root, "core/missing.cjs")}'`));
+  assert.match(missingCore.stderr.toString("utf8"), /code: 'MODULE_NOT_FOUND'/);
+  assert.equal(missingCore.response, null);
+  writePrivateExecution(missingCore, join(testRoot, "missing-core-private"), fixtureLimits);
 });
 
 test("infrastructure child: timeout reclaims the complete owned process group", async () => {
-  const marker = join(testRoot, "owned-grandchild.pid");
-  const execution = await runFixture("timeout-tree", smallLimits, marker);
-  assert.equal(execution.status, "timeout");
-  await delay(120);
-  const pid = Number(readFileSync(marker, "utf8"));
-  let alive = true;
-  try { process.kill(pid, 0); } catch (error) { if (error.code === "ESRCH") alive = false; else throw error; }
-  if (alive) {
-    try { process.kill(pid, "SIGKILL"); } catch { /* only this self-test grandchild */ }
+  const marker = join(testRoot, "owned-tree-ready.json");
+  const pending = runFixture("timeout-tree", timeoutLimits, marker);
+  let completed = false;
+  pending.then(() => { completed = true; }, () => { completed = true; });
+  let pids = [];
+  try {
+    while (!existsSync(marker) && !completed) await delay(10);
+    assert.ok(existsSync(marker), "runner and grandchild must become ready before timeout");
+    const ready = readJson(marker);
+    assert.ok(Number.isSafeInteger(ready.pid) && ready.pid > 0);
+    assert.ok(Number.isSafeInteger(ready.grandchildPid) && ready.grandchildPid > 0 && ready.grandchildPid !== ready.pid);
+    pids = [ready.pid, ready.grandchildPid];
+    const before = ownedProcessStates(pids);
+    writeFileSync(join(testRoot, "owned-tree-before.json"), strictStringify(before));
+    assert.deepEqual(before.map((item) => item.pid).sort((a, b) => a - b), [...pids].sort((a, b) => a - b));
+    assert.ok(before.every((item) => item.pgid === ready.pid && !item.state.startsWith("Z")), "both live processes must belong to the owned group");
+    assert.equal(before.find((item) => item.pid === ready.grandchildPid).ppid, ready.pid);
+    const execution = await pending;
+    assertTimeoutReady(execution, marker, "tree-hanging");
+    assertFixtureRaw(execution, "timeout-tree", timeoutLimits);
+    let after = ownedProcessStates(pids);
+    for (let attempt = 0; after.length && attempt < 50; attempt++) { await delay(20); after = ownedProcessStates(pids); }
+    writeFileSync(join(testRoot, "owned-tree-after.json"), strictStringify(after));
+    if (after.length === 0) pids = [];
+    assert.deepEqual(after, [], "owned runner/grandchild remain after timeout; see PID/PPID/PGID/state evidence");
+  } finally {
+    await pending;
+    // A survivor fails the assertion above; clean only these self-test PIDs, never conceal it.
+    for (const pid of pids) {
+      try { process.kill(pid, "SIGKILL"); } catch (error) { if (error.code !== "ESRCH") throw error; }
+    }
   }
-  assert.equal(alive, false, "grandchild survived its runner process-group timeout");
 });
 
 for (const [mode, code] of [

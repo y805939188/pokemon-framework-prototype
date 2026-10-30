@@ -1,18 +1,30 @@
 // INFRASTRUCTURE_SELF_TEST_ONLY_NOT_RUBY. Never use this file as reference behavior or coverage.
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { setTimeout as delay } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 import { readJson, strictStringify } from "../lib/json.mjs";
 
-const [mode, requestPath, markerPath] = process.argv.slice(2);
-const request = requestPath ? readJson(requestPath) : null;
+const [mode, requestPath, markerPath, startupDelay = "0"] = process.argv.slice(2);
+const startupDelayMs = Number(startupDelay);
+if (!Number.isInteger(startupDelayMs) || startupDelayMs < 0 || startupDelayMs > 2000) throw new Error("SELF_TEST_STARTUP_DELAY_INVALID");
+if (startupDelayMs) await delay(startupDelayMs);
+// Pure timeout/process-tree controls do not need the 5,066-case request.
+const request = requestPath && !["timeout", "timeout-tree", "grandchild"].includes(mode) ? readJson(requestPath) : null;
 const response = (raw = 1) => ({
   protocol: "ruby-ts-differential/runner-response-v1",
   requestHash: request.requestHash,
   random: { seed: null, drawCount: 0, draws: [] },
   cases: request.cases.map((testCase) => ({ caseId: testCase.caseId, requestHash: testCase.requestHash, outcome: { kind: "value", class: null, raw } }))
 });
-const output = (value) => process.stdout.write(strictStringify(value) + "\n");
+const output = (value, callback) => process.stdout.write(strictStringify(value) + "\n", callback);
 const hang = () => { setInterval(() => {}, 1000); };
+const ready = (state, extra = {}) => {
+  if (markerPath && markerPath !== "-") {
+    writeFileSync(`${markerPath}.tmp`, strictStringify({ pid: process.pid, state, readyAtMs: Date.now(), ...extra }), { flag: "wx" });
+    renameSync(`${markerPath}.tmp`, markerPath);
+  }
+};
 
 switch (mode) {
   case "success": output(response()); break;
@@ -21,25 +33,29 @@ switch (mode) {
   case "success-two": output(response(2)); break;
   case "random-success": { const value = response(); value.random = { seed: null, drawCount: 1, draws: [{ order: 0, bound: 2, value: 1 }] }; output(value); break; }
   case "nonzero-valid-response": output(response()); process.exitCode = 7; break;
-  case "timeout-valid-response": output(response()); hang(); break;
+  case "timeout-valid-response": hang(); output(response(), () => ready("hanging-after-response")); break;
   case "output-valid-response": output(response()); process.stdout.write("x".repeat(4 * 1024 * 1024)); break;
-  case "stderr-limit": output(response()); process.stderr.write("x".repeat(4096)); break;
+  case "stderr-limit": output(response(), () => process.stderr.write("x".repeat(4096))); break;
   case "stderr-valid-response": output(response()); process.stderr.write("infrastructure warning\n"); break;
   case "valid-json-nonzero": process.stdout.write("{}\n"); process.exitCode = 7; break;
   case "valid-json-signal": process.stdout.write("{}\n", () => process.kill(process.pid, "SIGTERM")); break;
   case "crash": process.exitCode = 3; break;
   case "uncaught": throw new Error("INFRASTRUCTURE_SELF_TEST_CRASH");
-  case "timeout": process.stdout.write("{}\n"); hang(); break;
+  case "timeout": hang(); process.stdout.write("{}\n", () => ready("hanging-after-json")); break;
   case "timeout-tree": {
-    const child = spawn(process.execPath, [new URL(import.meta.url).pathname, "grandchild", "", markerPath], { stdio: "ignore" });
+    const child = spawn(process.execPath, [fileURLToPath(import.meta.url), "grandchild"], { stdio: ["ignore", "ignore", "ignore", "ipc"] });
     if (!child.pid) throw new Error("SELF_TEST_CHILD_NOT_STARTED");
-    process.stdout.write("{}\n");
     hang();
+    child.on("error", (error) => { throw error; });
+    child.once("message", (message) => {
+      if (message.pid !== child.pid) throw new Error("SELF_TEST_GRANDCHILD_READY_INVALID");
+      process.stdout.write("{}\n", () => ready("tree-hanging", { grandchildPid: child.pid }));
+    });
     break;
   }
   case "grandchild":
-    writeFileSync(markerPath, String(process.pid));
-    setInterval(() => writeFileSync(markerPath, String(process.pid)), 20);
+    hang();
+    process.send({ pid: process.pid });
     break;
   case "output-limit": process.stdout.write("x".repeat(4096)); break;
   case "stderr": process.stdout.write("{}\n"); process.stderr.write("infrastructure stderr\n"); break;
