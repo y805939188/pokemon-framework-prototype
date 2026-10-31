@@ -1,7 +1,7 @@
 'use strict';
 // Real controller/compiled host code, controlled render/session ports. Native MZ evidence is separate.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
-const ROOT=path.resolve(__dirname,'../../..');let dir,Controller,plugin;
+const ROOT=path.resolve(__dirname,'../../..');let dir,Controller,plugin,backdropFixture,backdropPrefix;
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return{promise,resolve,reject};}
 test.before(()=>{
@@ -12,8 +12,12 @@ test.before(()=>{
  Controller=require(path.join(dir,'pure/controller.js')).BattleSceneController;
  const built=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',path.join(dir,'plugin')],{cwd:ROOT,env:{...process.env,RR_PLUGIN:'PS_BattleFlow'},encoding:'utf8'});assert.equal(built.status,0,built.stdout+built.stderr);
  plugin=fs.readFileSync(path.join(dir,'plugin/PS_BattleFlow.js'),'utf8');
+ const parent=path.join(ROOT,'img/pokemon/battlebacks/__tests__');fs.mkdirSync(parent,{recursive:true});
+ backdropFixture=fs.mkdtempSync(path.join(parent,'scene-ready-'));backdropPrefix='__tests__/'+path.basename(backdropFixture)+'/pending';
+ // Real filesystem resolution; decoding is an explicitly controlled Image port.
+ for(const suffix of ['_bg','_message','_stone_base0','_stone_base1'])fs.writeFileSync(path.join(backdropFixture,'pending'+suffix+'.png'),'controlled Image fixture, not a decoded PNG');
 });
-test.after(()=>{if(dir)fs.rmSync(dir,{recursive:true,force:true});});
+test.after(()=>{if(backdropFixture)fs.rmSync(backdropFixture,{recursive:true,force:true});if(dir)fs.rmSync(dir,{recursive:true,force:true});});
 function fixture(){
  const f={current:true,active:true,trace:[],aborts:[],time:0};
  const ports={current:()=>f.current,active:()=>f.active,closedFailure:()=>Error('external end'),hideInput:()=>f.trace.push('hide'),appendLine:x=>f.trace.push(x),refreshStatus:()=>f.trace.push('status'),afterMessages:()=>{f.trace.push('route');f.c.phase='main';},abort:e=>{f.aborts.push(e);f.active=false;},unusableView:()=>f.trace.push('unusable'),now:()=>++f.time,actionMeasured:(k,t)=>f.trace.push(['measure',k,t])};
@@ -242,4 +246,46 @@ test('compiled author commands pass image choices separately from application ba
 test('compiled openBattle freezes only host presentation while preserving the original request object',()=>{
  const h=host(),request={battleId:'visual-context'},visual={background:'woods',platform:'water',time:2};h.flow.running=false;h.flow._op=null;h.G.$gameSystem._psSaveError='controlled test skips unrelated domain eligibility';h.flow.openBattle(request,visual);
  assert.equal(h.flow._op.request,request);assert(Object.isFrozen(h.flow._op.visualContext));visual.background='changed';assert.equal(h.flow._op.visualContext.background,'woods');assert(!('visualContext'in request));h.flow.stateReplaced();
+});
+
+function pendingBackdropHost(options={}){
+ const h=host({display:true,...options}),images=[];
+ h.flow._op.visualContext=Object.freeze({background:backdropPrefix,platform:'stone',time:0});
+ h.G.Image=class{constructor(){images.push(this);this.naturalWidth=0;this.naturalHeight=0;this.onload=null;this.onerror=null;}set src(value){this._src=value;}get src(){return this._src;}};
+ return{...h,images,decode(index){const image=images[index];image.naturalWidth=4;image.naturalHeight=4;assert.equal(typeof image.onload,'function');image.onload();}};
+}
+test('compiled Scene is not ready while any real local backdrop decision is pending',async()=>{
+ const h=pendingBackdropHost(),s=h.scene;
+ try{
+  s.create();await flush();assert.equal(s.isReady(),false);assert.equal(h.images.length,4);
+  for(let i=0;i<3;i++)assert.equal(s.isReady(),false);
+  assert.equal(h.counts.choose,0);assert.equal(s._menu.active,false);
+  for(const index of [2,0,3]){h.decode(index);assert.equal(s.isReady(),false,'the remaining role must still hold readiness');}
+  h.decode(1);assert.equal(s.isReady(),true);assert.equal(s.battlebackState().rows.filter(x=>x.status==='ready').length,4);
+  s.start();drainScene(s);assert(s.inputState().ready);assert.equal(h.counts.choose,0);
+ }finally{s.terminate();}
+});
+test('compiled Scene decode errors remain gated until every other role has a declared outcome',async()=>{
+ const h=pendingBackdropHost(),s=h.scene;
+ try{
+  s.create();await flush();assert.equal(s.isReady(),false);h.images[0].onerror();assert.equal(s.isReady(),false);
+  h.decode(1);h.decode(3);assert.equal(s.isReady(),false);h.images[2].onerror();assert.equal(s.isReady(),true);
+  const rows=s.battlebackState().rows;assert.equal(rows.filter(x=>x.status==='fallback'&&x.reason==='load-error').length,2);assert.equal(rows.filter(x=>x.status==='ready').length,2);
+ }finally{s.terminate();}
+});
+test('compiled Scene holds pending decode at 4999ms and uses explicit timeout at 5000ms',async()=>{
+ let time=0;const h=pendingBackdropHost({now:()=>time}),s=h.scene;
+ try{
+  s.create();await flush();assert.equal(s.isReady(),false);time=4999;assert.equal(s.isReady(),false);
+  time=5000;assert.equal(s.isReady(),true);assert(s.battlebackState().rows.every(x=>x.status==='fallback'&&x.reason==='timeout'));
+  assert(h.images.every(x=>x.onload===null&&x.onerror===null));s.start();drainScene(s);assert(s.inputState().ready);
+ }finally{s.terminate();}
+});
+test('compiled Scene terminate during decode prevents late listeners allocating or painting a successor',async()=>{
+ const h=pendingBackdropHost(),s=h.scene;let allocations=0;const Base=h.G.Bitmap;h.G.Bitmap=class extends Base{constructor(...args){super(...args);allocations++;}};
+ try{
+  s.create();await flush();assert.equal(s.isReady(),false);const late=h.images.map(image=>image.onload);s.terminate();const before=allocations,paint=JSON.stringify(h.counts.paint);
+  h.G.SceneManager._scene={successor:true};for(let i=0;i<late.length;i++){h.images[i].naturalWidth=4;h.images[i].naturalHeight=4;assert.equal(h.images[i].onload,null);late[i]();}
+  assert.equal(allocations,before);assert.equal(JSON.stringify(h.counts.paint),paint);assert.equal(s.battlebackState().ownedAssets,0);assert(s.battlebackState().retired);
+ }finally{s.terminate();}
 });
