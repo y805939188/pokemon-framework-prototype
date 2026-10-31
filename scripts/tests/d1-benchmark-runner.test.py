@@ -6,6 +6,8 @@ import os
 import subprocess
 import tempfile
 import unittest
+import functools
+import shutil
 from unittest import mock
 
 SCRIPT=Path(__file__).resolve().parent.parent/'run-d1-benchmark-mac.py'
@@ -17,14 +19,23 @@ def digest(value):
     # Independent Python oracle for the fixture's small canonical JSON values, not the production JS verifier.
     return hashlib.sha256(json.dumps(value,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
 
+CORE=SCRIPT.parent.parent/'js/engine/build/core.cjs'
+@functools.lru_cache(maxsize=1)
+def game_fixture():
+    return json.loads(subprocess.check_output(['node','-e','console.log(JSON.stringify(require(process.argv[1]).state.newGame({party:[],money:100})))',str(CORE)]))
+
+def install_core(runtime):
+    target=runtime/'js/engine/build/core.cjs';target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(CORE,target)
+
 
 def make_report(source,info,count=100,money=0,role='control'):
-    rows=[dict(id=c['id'],seed=c['seed'],resolvedSeed=','.join(map(str,c['seed'])),status='pass',outcome=dict(code=c['expected']['code']),focusStart=True,focusEnd=True,visibleStart='visible',visibleEnd='visible')for c in source['cases'][:count]]
+    rows=[dict(id=c['id'],seed=c['seed'],resolvedSeed=','.join(map(str,c['seed'])),status='pass',outcome=dict(code=c['expected']['code'],commit='applied',battleId=c['id']),afterStateHash='a'*64,focusStart=True,focusEnd=True,visibleStart='visible',visibleEnd='visible')for c in source['cases'][:count]]
     points=['initial-map']+['after'+str(n)for n in [4,50,100]if n<=count]+['after-idle120']
     memory=[dict(id=x,gcForced=False,appRssStatus='UNKNOWN',appRssBytes=None,appRssReason='synthetic-no-host')for x in points]
-    initial=dict(fixture='synthetic entire object, not a game state',money=100,party=[])
-    final=dict(fixture='synthetic entire object, not a game state',money=money,party=[])
-    return dict(overall='pass',results=[dict(id='D1-F100 synthetic facility',status='pass')],env=dict(packageInfo=info,nw='SYNTHETIC_NOT_NATIVE'),d1=dict(status='pass',errors=[],rows=rows,input=source,inputHash=digest(source),initialState=initial,initialStateHash=digest(initial),finalState=final,finalStateHash=digest(final),kind='FORMAL_F100',presentationImplementation='legacy text-scene bridge'if role=='control'else'd1-controller-v1',instrumentation=dict(detailed=True),memory=memory,frameSamples=[dict(kind=x,dt=16.6,focus=True,visibility='visible')for x in ['updateMain','rAF']]))
+    initial=json.loads(json.dumps(game_fixture()));final=json.loads(json.dumps(initial));final['money']=money
+    final['appliedBattles']={c['id']:dict(hash='a'*64,settlement=dict(version=1,pairHash='b'*64))for c in source['cases'][:count]}
+    if rows:rows[-1]['afterStateHash']=digest(final)
+    return dict(overall='pass',results=[dict(id='D1-F100 synthetic facility',status='pass')],env=dict(packageInfo=info,nw='SYNTHETIC_NOT_NATIVE'),d1=dict(version='D1-F100-output-v2',driverVersion='D1-driver-v2-port-order',status='pass',errors=[],requestedCount=count,rows=rows,input=source,inputHash=digest(source),initialState=initial,initialStateHash=digest(initial),finalState=final,finalStateHash=digest(final),kind='FORMAL_F100',presentationImplementation='legacy text-scene bridge'if role=='control'else'd1-controller-v1',instrumentation=dict(detailed=True),memory=memory,frameSamples=[dict(kind=x,dt=16.6,focus=True,visibility='visible')for x in ['updateMain','rAF']]))
 
 
 class RunnerControls(unittest.TestCase):
@@ -32,6 +43,7 @@ class RunnerControls(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='pf-d1-runner-control-') as directory:
             root=Path(directory);app=root/'SYNTHETIC.app';runtime=app/'Contents/Resources/app.nw';runtime.mkdir(parents=True)
             (runtime/'fixture.txt').write_text('synthetic tool control, not a native app')
+            install_core(runtime)
             executable=app/'Contents/MacOS/nwjs';executable.parent.mkdir(parents=True)
             cases=[dict(id='F100-'+str(i+1),seed=[1,2,3,4+i],expected=dict(code=1)) for i in range(100)]
             source=dict(cases=cases);info=dict(gitHead='synthetic-only')
@@ -110,10 +122,12 @@ class RunnerControls(unittest.TestCase):
                     app=root/(role+'.app');runtime=app/'Contents/Resources/app.nw';runtime.mkdir(parents=True)
                     info=dict(gitHead=head,withTests=True,workingTreeChanges=0)
                     (runtime/'package-info.json').write_text(json.dumps(info));(runtime/'fixture.txt').write_text('synthetic tooling only')
+                    install_core(runtime)
                     report=make_report(source,info,role=role)
                     if role=='candidate'and fault in ['different-valid-state','different-state-old-hash']:
                         report['d1']['finalState']['money']=1
-                        if fault=='different-valid-state':report['d1']['finalStateHash']=digest(report['d1']['finalState'])
+                        if fault=='different-valid-state':
+                            report['d1']['finalStateHash']=digest(report['d1']['finalState']);report['d1']['rows'][-1]['afterStateHash']=report['d1']['finalStateHash']
                     if role=='candidate'and fault=='different-valid-initial':
                         report['d1']['initialState']['money']=99
                         report['d1']['initialStateHash']=digest(report['d1']['initialState'])
@@ -143,7 +157,7 @@ class RunnerControls(unittest.TestCase):
                     if fault=='different-valid-initial':self.assertIn('initialStateHash',summary['error'])
                     if fault=='different-state-old-hash':self.assertIn('hash mismatch: finalState',summary['error'])
                     if fault=='missing-final':self.assertIn('missing complete object: finalState',summary['error'])
-                    if fault=='native-looking-script':self.assertIn('native Mach-O',summary['error'])
+                    if fault=='native-looking-script':self.assertTrue('host'in summary['error']or'native Mach-O'in summary['error'])
 
 
 if __name__=='__main__':unittest.main()

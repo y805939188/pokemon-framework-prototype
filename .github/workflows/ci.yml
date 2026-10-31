@@ -41,6 +41,11 @@ jobs:
         env:
           PF_NO_SKIP: '1'
         run: ./scripts/ci-run.sh headless-suites ./scripts/test-headless.sh
+      - name: D1 collector synthetic controls (no native host or P-4 claim)
+        run: |
+          python3 --version
+          ./scripts/ci-run.sh d1-collector python3 scripts/tests/d1-benchmark-runner.test.py -v
+          ./scripts/ci-run.sh d1-hardening python3 scripts/tests/d1-hardening.test.py -v
   plugins:
     name: plugins (Reactor types at the pinned commit, type check, build)
     runs-on: ubuntu-latest
