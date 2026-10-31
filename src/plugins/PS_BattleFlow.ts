@@ -9,6 +9,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { config as RuleConfig } from "../framework/rules/index";
 import { BattleSceneController } from "./battleflow/controller";
+import type { BattleScenePresentation } from "./battleflow/controller";
+import { BattleDisplayPlayback } from "./battleflow/display";
+import type { BattleDisplayCard } from "./battleflow/display";
+import { hpColour } from "./battleflow/visual-timing";
 const { developmentCapabilities } = RuleConfig;
 
 (() => {
@@ -793,16 +797,34 @@ const { developmentCapabilities } = RuleConfig;
     if (font) this.contents.fontFace = font;
   };
   /** One line must fit the window: auxiliary lines (status, bag summary) are shortened with an ellipsis, never overflow. */
-  Window_PSText.prototype.fitText = function (text: string) {
-    if (this.textWidth(text) <= this.innerWidth) return text;
-    let t = text;
-    while (t.length > 1 && this.textWidth(t + "…") > this.innerWidth) t = t.slice(0, -1);
-    return t + "…";
+  Window_PSText.prototype.fitText = function (this: any, text: string, width = this.innerWidth) {
+    if (this.textWidth(text) <= width) return text;
+    const points = Array.from(text);
+    while (points.length && this.textWidth(points.join('') + "…") > width) points.pop();
+    return points.join('') + "…";
   };
   Window_PSText.prototype.setLines = function (lines: string[]) { this._lines = lines.slice(-this._max); this.refresh(); };
   Window_PSText.prototype.add = function (line: string) { this._lines.push(line); this._lines = this._lines.slice(-this._max); this.refresh(); };
   Window_PSText.prototype.refresh = function () {
     this.contents.clear();
+    if (this._d2Cards) {
+      const width = this.innerWidth / 2 - 12;
+      for (const [index, side] of ['p1', 'p2'].entries()) {
+        const card = this._d2Cards.find((member: BattleDisplayCard) => member.side === side && member.active);
+        if (!card) continue;
+        const x = index * (this.innerWidth / 2), colour = hpColour(card.hp, card.maxhp);
+        this.drawText(this.fitText(`${card.name}  Lv.${card.level}`, width), x, 0, width);
+        this.drawText(this.fitText(card.status || '', width / 2), x, 24, width / 2);
+        if (side === 'p1') this.drawText(`${Math.ceil(card.hp)} / ${card.maxhp}`, x + width / 2, 24, width / 2, 'right');
+        this.contents.fillRect?.(x, 52, width, 8, '#343b43');
+        this.contents.fillRect?.(x, 52, width * card.hp / card.maxhp, 8, { red: '#d65353', yellow: '#dec253', green: '#55b77d' }[colour]);
+        if (side === 'p1' && card.ratio !== null) {
+          this.contents.fillRect?.(x, 72, width, 6, '#343b43');
+          this.contents.fillRect?.(x, 72, width * card.ratio, 6, card.flash ? '#ffffff' : '#589eda');
+        }
+      }
+      return;
+    }
     this._lines.forEach((t: string, i: number) => this.drawText(t, 0, i * this.lineHeight(), this.innerWidth));
   };
 
@@ -845,6 +867,42 @@ const { developmentCapabilities } = RuleConfig;
   Scene_PSBattle.prototype.constructor = Scene_PSBattle;
 
   const P = Scene_PSBattle.prototype;
+  function initialDisplay(session: any, names: Record<string, string>): BattleDisplayCard[] {
+    return ['p1', 'p2'].flatMap(side => session.gw.readState(side).map((state: any) => {
+      const member = (side === 'p1' ? session.party : session.foeTeam).find((item: any) => item.id === state.id);
+      let ratio: number | null = null;
+      const curve = member && session.content?.species[member.species]?.growth;
+      if (side === 'p1' && curve && Number.isFinite(member.exp)) {
+        const growth = engine().B.growth, floor = growth.minExp(curve, state.level), ceiling = growth.minExp(curve, state.level + 1);
+        ratio = ceiling > floor ? (member.exp - floor) / (ceiling - floor) : 1;
+      }
+      return { id: state.id, side: side as 'p1' | 'p2', name: member ? PSFlow.speciesName(member.species) : names[state.id] || state.id,
+        level: state.level, hp: state.hp, maxhp: state.maxhp, status: state.status || '', active: state.active, ratio };
+    }));
+  }
+  function battleCue(scene: any, kind: 'exp-gain' | 'exp-full'): (() => void) | undefined {
+    const name = kind === 'exp-gain' ? 'Pkmn exp gain' : 'Pkmn exp full';
+    const record: any = { kind, name, t: performance.now(), status: 'unavailable' };
+    scene._displayAudio.push(record);
+    const audio = G.AudioManager; let buffer: any = null;
+    try {
+      if (!audio?.createBuffer || !audio?.updateBufferParameters) return;
+      const encrypted = typeof G.Utils.hasEncryptedAudio === 'function' ? G.Utils.hasEncryptedAudio() : G.Utils.hasEncryptedAudio;
+      const extension = audio.audioFileExt(), file = nodeRequire('path').join(engine().root, 'audio', 'se', name + extension + (encrypted ? '_' : ''));
+      if (!nodeRequire('fs').existsSync(file)) { record.status = 'missing'; return; }
+      buffer = audio.createBuffer('se/', name);
+      let released = false;
+      const release = () => { if (!released) { released = true; buffer.stop(); buffer.destroy?.(); record.stoppedAt = performance.now(); } };
+      buffer.addStopListener?.(release);
+      audio.updateBufferParameters(buffer, audio.seVolume, { name, volume: 80, pitch: 100, pan: 0 }); buffer.play(false);
+      record.status = 'requested';
+      return release;
+    } catch (error) {
+      record.status = 'failed'; record.error = String(error);
+      try { buffer?.stop(); buffer?.destroy?.(); } catch { /* only this optional media handle is owned here */ }
+      return;
+    }
+  }
   function sceneController(scene: any, initialized = false): BattleSceneController<any> {
     if (!initialized && scene._controller) return scene._controller;
     const op = scene._psOp === undefined ? PSFlow._op : scene._psOp;
@@ -889,7 +947,7 @@ const { developmentCapabilities } = RuleConfig;
     this._psBattle = true; // marker for the test driver (constructor identity is wrapped by pixi_compat)
     this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
     sceneController(this, true);
-    this._D = null; this._names = {};
+    this._D = null; this._names = {}; this._display = null; this._displayAudio = [];
   };
   P.create = function () {
     const c = sceneController(this);
@@ -918,7 +976,14 @@ const { developmentCapabilities } = RuleConfig;
     for (const m of [...s.party, ...s.foeTeam]) { if (!c.isCurrent()) return; this._names[m.id] = PSFlow.speciesName(m.species); }
     if (!c.isCurrent()) return;
     this._D = engine().D.make(this._names, PSFlow.translator());
+    this._display = new BattleDisplayPlayback(initialDisplay(s, this._names), {
+      current: () => c.isCurrent() && PSFlow.running,
+      paint: cards => { if (c.isCurrent()) { this._status._d2Cards = cards.map(card => ({ ...card })); this._status.setLines([]); } },
+      afterPaintNow: () => performance.now(),
+      cue: kind => c.isCurrent() && PSFlow.running ? battleCue(this, kind) : undefined,
+    });
     this._mode = "messages";
+    c.enqueue([this._display.initial()]);
     this.pushMessages(s.take());
     if(developmentCapabilities(PSFlow.developerCapabilities).allowExperimentalHeldItemBattle&&s.party.some((m:any)=>!!m.item))this._log.add(PSFlow.translator().t("management.experimental"));
     this.refreshStatus();
@@ -933,10 +998,32 @@ const { developmentCapabilities } = RuleConfig;
   // --- message pacing
   P.pushMessages = function (msgs: any[]) {
     const c = sceneController(this);
-    c.present(() => { const lines: string[] = []; for (const m of msgs) { if (!c.isCurrent()) return; lines.push(...this._D.message(m)); } if (c.isCurrent()) c.enqueue(lines); });
+    c.present(() => {
+      const steps: BattleScenePresentation[] = [];
+      for (const message of msgs) {
+        if (!c.isCurrent()) return;
+        const growth = message.kind === 'growth' ? engine().B.battlePresentation.readGrowthDisplay(this._session, message) : null;
+        if (this._display && message.kind === 'events') {
+          for (const event of message.events) { steps.push(...this._display.event(event), ...this._D.event(event)); }
+        } else if (this._display && growth?.version === 1) {
+          steps.push(...this._D.message({ ...message, exp: growth.toExp - growth.fromExp, levelUps: [] }));
+          for (const segment of growth.segments) {
+            const animation = this._display.experience(message.member, segment); if (animation) steps.push(animation);
+            if (segment.levelUp) {
+              const level = this._display.growth(message.member, { toLevel: segment.levelUp.level, hp: segment.levelUp.hp, maxhp: segment.levelUp.maxhp, ratio: 0 }); if (level) steps.push(level);
+              steps.push(...this._D.message({ ...message, exp: 0, levelUps: [segment.levelUp.level] }));
+            }
+          }
+          const final = this._display.growth(message.member, growth); if (final) steps.push(final);
+        } else steps.push(...this._D.message(message));
+      }
+      if (c.isCurrent()) c.enqueue(steps);
+    });
   };
   P.updateQueue = function () {
-    sceneController(this).tick(G.Input.isTriggered('ok'), PSFlow.fast ? 0 : 24);
+    const c = sceneController(this);
+    if (!c.isCurrent() || !PSFlow.running) this._display?.dispose();
+    c.tick(G.Input.isTriggered('ok'), PSFlow.fast ? 0 : 24);
   };
   P.afterMessages = function () {
     const s = this._session;
@@ -950,6 +1037,7 @@ const { developmentCapabilities } = RuleConfig;
   P.refreshStatus = function () {
     const c = sceneController(this); if (!c.isCurrent()) return;
     const s = this._session; if (!s) return;
+    if (this._display) { this._status._d2Cards = this._display.snapshot(); this._status.setLines([]); return; }
     const tr = PSFlow.translator();
     const line = (side: string, who: string) => s.gw.readState(side).filter((x: any) => x.active).map((x: any) =>
       tr.t("ui.status.line", { who, name: this._names[x.id] || x.id, level: x.level, hp: x.hp, maxhp: x.maxhp,
@@ -975,7 +1063,12 @@ const { developmentCapabilities } = RuleConfig;
     const c = sceneController(this), menu = this._menu;
     const interactive = c.canChoose() && !!menu?.isOpenAndActive();
     const items = (menu?._items || []).map((item: any) => ({ key: item.ext === null || typeof item.ext === 'string' || typeof item.ext === 'number' ? item.ext : null, enabled: item.enabled !== false }));
-    return { phase: c.phase, ready: !!interactive && c.canChoose(), items, implementation: 'd1-controller-v1' };
+    return { phase: c.phase, ready: !!interactive && c.canChoose(), items, implementation: 'd2-status-v1' };
+  };
+  P.presentationState = function () {
+    const c = sceneController(this);
+    return { version: 'd2-status-v1', current: c.isCurrent(), cards: this._display?.snapshot() || [],
+      pending: c.queue.filter(step => typeof step !== 'string').length, audio: (this._displayAudio || []).map((row: any) => ({ ...row })) };
   };
   P.showMain = function () {
     const tr = PSFlow.translator();
@@ -1090,10 +1183,10 @@ const { developmentCapabilities } = RuleConfig;
   P.onEnd = function () {
     // A delayed callback from an old scene must not pop the current scene's global SceneManager stack.
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // bare API callers refer to the current operation
-    if (op !== PSFlow._op) { PSFlow.stale("finish", op); return; }
+    if (op !== PSFlow._op) { this._display?.dispose(); PSFlow.stale("finish", op); return; }
     const c = this._controller as BattleSceneController<any> | undefined;
     if (c && !c.isCurrent()) return;
-    c?.dispose();
+    this._display?.dispose(); c?.dispose();
     if (!this._aborted && !this._failure) {
       try { const outcome=PSFlow.finish(this._session, this._psOp);if(c&&!c.ownsHost())return;if(outcome?.continuationToken){this._evolutionTransferred=true;this.popScene();return;}if(outcome?.pending&&W.PSManagement){this._menu.deactivate();if(c&&!c.ownsHost())return;this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
     }
@@ -1102,6 +1195,7 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.terminate = function () {
     const c = this._controller as BattleSceneController<any> | undefined;
+    this._display?.dispose();
     c?.dispose(); // retire callbacks before host teardown can reenter application code
     try { G.Scene_MenuBase.prototype.terminate.call(this); }
     finally {

@@ -15,6 +15,7 @@ export * as heldFacts from "./rules/held-facts";
 export * as moveRequests from "./battle/move-requests";
 export * as describe from "./flow/describe";
 export * as session from "./flow/session";
+export * as battlePresentation from "./flow/public-presentation";
 export * as contentSchema from "./content/schema";
 export * as contentCompile from "./content/compile";
 export * as pbsImport from "./content/pbs-import";

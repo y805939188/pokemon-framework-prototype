@@ -12,12 +12,15 @@ export interface BattleScenePorts {
   now(): number;
   actionMeasured(kind: string, milliseconds: number): void;
 }
+/** A host-owned display step. It may paint, but never submits a battle action or writes game state. */
+export interface BattleSceneVisualStep { kind: 'visual'; advance(now: number): boolean; cancel(): void; }
+export type BattleScenePresentation = string | BattleSceneVisualStep;
 
 export class BattleSceneController<Session = unknown> {
   phase = 'boot';
   ready = false;
   failure: unknown = null;
-  queue: string[] = [];
+  queue: BattleScenePresentation[] = [];
   wait = 0;
   busy = false;
   session: Session | null = null;
@@ -28,6 +31,14 @@ export class BattleSceneController<Session = unknown> {
   private choosing = false;
   private failing = false;
   private abortSent = false;
+  private clearing = false;
+
+  private clearQueue(): void {
+    const pending = this.queue.splice(0); this.clearing = true;
+    try { for (const step of pending) if (typeof step !== 'string') {
+      try { step.cancel(); } catch (error) { this.failure ||= error; }
+    } } finally { this.clearing = false; }
+  }
 
   constructor(private readonly ports: BattleScenePorts) {}
   /** Cleanup may inspect the captured host owner after retiring callbacks. It never adopts a successor. */
@@ -69,12 +80,12 @@ export class BattleSceneController<Session = unknown> {
     ++this.epoch; this.opening = false; this.ready = true; this.busy = false;
     this.abortSent = true; // The host already closed this operation; never abort its application twice.
     this.failure ||= reason;
-    this.queue.length = 0; this.wait = 0; this.phase = 'messages';
+    this.clearQueue(); this.wait = 0; this.phase = 'messages';
     this.ports.hideInput();
   }
 
-  enqueue(lines: readonly string[]): boolean {
-    if (!this.isCurrent()) return false;
+  enqueue(lines: readonly BattleScenePresentation[]): boolean {
+    if (!this.isCurrent() || this.clearing) return false;
     this.queue.push(...lines); this.phase = 'messages';
     this.ports.hideInput();
     return this.isCurrent();
@@ -107,16 +118,24 @@ export class BattleSceneController<Session = unknown> {
       this.observeClosedHost();
       if (!this.isCurrent() || this.busy || this.phase !== 'messages') return;
       if (this.queue.length) {
+        const first = this.queue[0];
+        if (typeof first !== 'string') {
+          const epoch = this.epoch;
+          const complete = first.advance(this.ports.now());
+          if (this.at(epoch) && this.ports.active() && this.phase === 'messages' && this.queue[0] === first && complete) this.queue.shift();
+          return;
+        }
         if (fastForward) {
           // A reentrant renderer may append new text. Drain this batch, never an unbounded callback loop.
           const count = this.queue.length;
           for (let i = 0; i < count && this.queue.length; i++) {
             if (!this.isCurrent() || this.phase !== 'messages') return;
-            this.ports.appendLine(this.queue.shift()!);
+            if (typeof this.queue[0] !== 'string') break;
+            this.ports.appendLine(this.queue.shift() as string);
           }
         } else if (this.wait > 0) this.wait--;
         else {
-          const line = this.queue.shift()!;
+          const line = this.queue.shift() as string;
           this.wait = delay;
           this.ports.appendLine(line);
         }
@@ -156,7 +175,7 @@ export class BattleSceneController<Session = unknown> {
     if (!this.isCurrent() || this.failing) return false;
     this.failing = true;
     ++this.epoch; this.opening = false; this.busy = false; this.ready = true;
-    this.failure = error || new Error(String(error)); this.queue.length = 0; this.wait = 0; this.phase = 'messages';
+    this.failure = error || new Error(String(error)); this.clearQueue(); this.wait = 0; this.phase = 'messages';
     try {
       if (!this.abortSent) { this.abortSent = true; if (this.ports.active()) this.ports.abort(error); }
       if (this.isCurrent()) this.ports.hideInput();
@@ -172,6 +191,6 @@ export class BattleSceneController<Session = unknown> {
   }
   dispose(): void {
     this.retired = true; ++this.epoch; this.opening = false; this.busy = false;
-    this.queue.length = 0; this.wait = 0;
+    this.clearQueue(); this.wait = 0;
   }
 }

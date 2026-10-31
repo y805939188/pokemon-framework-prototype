@@ -32,6 +32,8 @@ import { own, setOwn } from "../rules/own";
 import { bindRequiredSettlement, checkpointRequiredSettlement, finalizeRequiredSettlement, requiredCaptureItem, restoreRequiredSettlement } from "./required-settlement";
 import { bindTrainerAi, runTrainerAi, trainerAiEvent, checkpointTrainerAi, restoreTrainerAi, preflightTrainerAiRestore, prepareTrainerAiRestore, failTrainerAiRestore, assertTrainerAiCheckpointReady, cancelTrainerAiDecision } from './trainer-ai';
 import type { TrainerAiConfiguration } from './trainer-ai';
+import { _publishGrowthDisplay, _capturePresentation, _restorePresentation } from './presentation';
+import type { GrowthDisplay } from './presentation';
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
 export const END_REASONS = ["caught", "run", "tie", "win"] as const;
@@ -326,6 +328,7 @@ export class BattleSession {
       }),
       evidence: this._evidence?.snapshot(),
       effects: this._effects?.snapshot(),
+      presentation: _capturePresentation(this, this.out),
     };
   }
 
@@ -350,6 +353,7 @@ export class BattleSession {
     this.participants = Object.fromEntries(participants.map(([id, members]) => [id, new Set(members)]));
     // JSON omits undefined properties, so explicitly clear these after a failed first assignment.
     this.requests = state.requests; this._result = state._result;
+    _restorePresentation(this, this.out, checkpoint.presentation);
     if (checkpoint.evidence) this._evidence?.restore(checkpoint.evidence);
     if (checkpoint.effects) this._effects?.restore(checkpoint.effects);
     }catch(error){failTrainerAiRestore(this);throw error;}
@@ -787,7 +791,21 @@ export class BattleSession {
         this.grew = true;
       }
       this._log("info", "growth", { member: m.id, foe: foeId, exp: amount, level: res.member.level, levelUps: res.log.levels.length });
-      this.out.push({ kind: "growth", member: m.id, foe: foeId, exp: amount, level: res.member.level, levelUps: res.log.levels.map((l) => l.level), hp: res.member.hp });
+      // Publish the already computed interval, so the view never reconstructs growth from mutable live state.
+      const segments: GrowthDisplay['segments'] = [];
+      const curve = this.content.species[m.species]!.growth;
+      for (let level = res.before.level; level <= res.after.level; level++) {
+        const floor = G.minExp(curve, level), ceiling = G.minExp(curve, level + 1);
+        const start = Math.max(floor, res.before.exp), stop = Math.min(ceiling, res.after.exp);
+        const levelUp = res.log.levels.find(item => item.level === level + 1);
+        if (ceiling > floor && stop > start) segments.push({ level, from: (start - floor) / (ceiling - floor), to: (stop - floor) / (ceiling - floor),
+          ...(levelUp ? { levelUp: { level: levelUp.level, hp: levelUp.hp, maxhp: levelUp.maxhp } } : {}) });
+      }
+      const finalFloor = G.minExp(curve, res.after.level), finalCeiling = G.minExp(curve, res.after.level + 1);
+      const message: Extract<SessionMessage, { kind: 'growth' }> = { kind: "growth", member: m.id, foe: foeId, exp: amount, level: res.member.level, levelUps: res.log.levels.map((l) => l.level), hp: res.member.hp };
+      _publishGrowthDisplay(this, message, { version: 1, fromExp: res.before.exp, toExp: res.after.exp, fromLevel: res.before.level, toLevel: res.after.level, hp: res.after.hp, maxhp: res.after.stats.hp,
+        ratio: finalCeiling > finalFloor ? (res.after.exp - finalFloor) / (finalCeiling - finalFloor) : 1, segments });
+      this.out.push(message);
       for (const pm of res.log.pendingMoves) learns.push({ kind: "learn", memberId: m.id, move: this.gw.moveInfo(pm.move) });
     }
     this.growthQueue.unshift(...learns);

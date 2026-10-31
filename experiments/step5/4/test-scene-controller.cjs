@@ -67,22 +67,41 @@ test('formatting failure aborts once; a broken error view retires without a busy
 });
 test('an error thrown after owner replacement never aborts the successor',()=>{const f=fixture();assert(!f.c.present(()=>{f.current=false;throw Error('late view');}));assert.equal(f.aborts.length,0);});
 
-function host({opening}={}){
+function host({opening,display=false,audio,exists,now}={}){
  const counts={abort:0,finish:0,pop:0,hide:0,choose:0},session={party:[],foeTeam:[],bag:{},finished:false,pendingLearn:null,take:()=>[],currentRequest:()=>({active:[{moves:[{move:'Splash',id:'splash',pp:40,maxpp:40}]}]}),gw:{readState:()=>[]},chooseMove:()=>{counts.choose++;return {messages:[]};}};
+ counts.paint=[];
+ if(display){session.party=[{id:'P',species:'Pidgey',exp:125000}];session.foeTeam=[{id:'F',species:'Pidgey'}];session.content={species:{Pidgey:{growth:'medium'}}};session.gw.readState=side=>[{id:side==='p1'?'P':'F',level:50,hp:100,maxhp:100,status:'',active:true}];}
  function Base(){}Base.prototype={initialize(){},create(){},start(){},update(){},terminate(){},isReady(){return true;},addWindow(){},popScene(){counts.pop++;}};
- function Window(){}Window.prototype={initialize(rect){this.innerWidth=rect.width-24;this.innerHeight=rect.height-24;this.contents={clear(){}};this._index=0;this.active=false;this.visible=false;},resetFontSettings(){},lineHeight:()=>24,textWidth:x=>String(x).length*8,drawText(){},refresh(){this._list=[];this.makeCommandList?.();},addCommand(name,symbol,enabled,ext){this._list.push({name,symbol,enabled,ext});},select(i){this._index=i;},index(){return this._index;},setHandler(){},show(){this.visible=true;},hide(){this.visible=false;counts.hide++;},activate(){this.active=true;},deactivate(){this.active=false;},isOpenAndActive(){return this.visible&&this.active;}};
+ function Window(){}Window.prototype={initialize(rect){this.innerWidth=rect.width-24;this.innerHeight=rect.height-24;this.contents={clear(){},fillRect(...args){counts.paint.push(args);}};this._index=0;this.active=false;this.visible=false;},resetFontSettings(){},lineHeight:()=>24,textWidth:x=>String(x).length*8,drawText(){},refresh(){this._list=[];this.makeCommandList?.();},addCommand(name,symbol,enabled,ext){this._list.push({name,symbol,enabled,ext});},select(i){this._index=i;},index(){return this._index;},setHandler(){},show(){this.visible=true;},hide(){this.visible=false;counts.hide++;},activate(){this.active=true;},deactivate(){this.active=false;},isOpenAndActive(){return this.visible&&this.active;}};
  function System(){}System.prototype.isSaveEnabled=()=>true;
- const req=p=>{if(p==='path'||p==='fs')return require(p);if(p.includes('production.cjs'))return require(path.join(ROOT,'js/engine/build/production.cjs'));throw Error('unexpected require '+p);};req.resolve=p=>path.resolve(ROOT,p);
+ const req=p=>{if(p==='fs'&&exists)return{...require('fs'),existsSync:exists};if(p==='path'||p==='fs')return require(p);if(p.includes('production.cjs'))return require(path.join(ROOT,'js/engine/build/production.cjs'));throw Error('unexpected require '+p);};req.resolve=p=>path.resolve(ROOT,p);
  const G={Error,performance,require:req,console:{log(){},warn(){},error(){}},PluginManager:{parameters:()=>({}),registerCommand(){}},Game_Interpreter:Base,Game_System:System,Window_Base:Window,Window_Command:Window,Scene_MenuBase:Base,SceneManager:{_scene:null,push(){},isSceneChanging:()=>false},Graphics:{boxWidth:816,boxHeight:624,frameCount:0},Rectangle:function(x,y,width,height){Object.assign(this,{x,y,width,height});},Utils:{extractFileName:x=>x},Input:{isTriggered:()=>false},SoundManager:{playBuzzer(){}},$gameSystem:new System(),$gameMessage:{isBusy:()=>false,add(){}},$gameVariables:{setValue(){}}};
+ G.AudioManager=audio;G.Utils.hasEncryptedAudio=()=>false;if(now)G.performance={now};
  G.window=G;vm.createContext(G);vm.runInContext(plugin,G);
  const flow=G.PSFlow,app={stateGeneration:0,saveBlocked:false,pendingEvolution:null,pendingReceiving:null,pendingPokedex:null,stateReplacedByHost(){this.stateGeneration++;},finishBattle(){counts.finish++;return {code:1,commit:'applied',battleId:'scene#1'};},abortBattle(request,error){counts.abort++;return {code:0,commit:'none',battleId:request.battleId,aborted:true,error:String(error)};}};
- flow._app=app;flow._op={request:{battleId:'scene#1',canLose:true},session};flow.request=flow._op.request;flow.running=true;flow.perf.cur={battleId:'scene#1',t0:0,actions:[]};flow.begin=()=>opening??Promise.resolve(session);
+ flow._app=app;flow._op={request:{battleId:'scene#1',canLose:true},session};flow.request=flow._op.request;flow.running=true;flow.perf.cur={battleId:'scene#1',t0:0,actions:[]};flow.begin=()=>opening??Promise.resolve(session);if(display)flow.speciesName=x=>x;
  const scene=new G.Scene_PSBattle();G.SceneManager._scene=scene;
- return{G,flow,app,scene,session,counts,async ready(){scene.create();await flush();assert(scene.isReady());scene.start();scene.updateQueue();assert.equal(scene._mode,'main');return this;}};
+ return{G,flow,app,scene,session,counts,async ready(){scene.create();await flush();assert(scene.isReady());scene.start();for(let i=0;i<8&&!scene.inputState().ready;i++)scene.updateQueue();assert.equal(scene._mode,'main',String(scene._failure||''));assert(scene.inputState().ready);return this;}};
 }
 test('compiled scene exposes detached semantic-ready DTO; MZ-deactivated handler can act once',async()=>{
- const h=await host().ready(),s=h.scene;const view=s.inputState();assert.equal(view.implementation,'d1-controller-v1');assert(view.ready);view.items[0].enabled=false;assert.notEqual(s._menu._items[0].enabled,false);
+ const h=await host().ready(),s=h.scene;const view=s.inputState();assert.equal(view.implementation,'d2-status-v1');assert(view.ready);view.items[0].enabled=false;assert.notEqual(s._menu._items[0].enabled,false);
  s.onMenuOk();assert.equal(s._mode,'moves');s._menu.deactivate();assert(!s.inputState().ready);s.onMenuOk();s.onMenuOk();await flush();assert.equal(h.counts.choose,1);s.updateQueue();assert(s.inputState().ready);
+});
+test('compiled real status window paints late EXP flash for 200ms and releases only owned media',async()=>{
+ let time=0;const created=[],files=[],parameters=[];
+ const audio={seVolume:60,audioFileExt:()=>'.ogg',createBuffer(folder,name){const record={folder,name,plays:0,stops:0,destroys:0};created.push(record);return{play(){record.plays++;},stop(){record.stops++;},destroy(){record.destroys++;}};},updateBufferParameters(buffer,volume,input){parameters.push({volume,...input});},stopSe(){assert.fail('global SE cleanup');}};
+ const h=await host({display:true,audio,exists:file=>{files.push(file);return true;},now:()=>time}).ready(),s=h.scene;
+ // Presentation-only late-clock control; real Session metadata is exercised by growth-display and native S02.
+ s._controller.enqueue([s._display.experience('P',{level:50,from:0,to:1}),s._display.growth('P',{toLevel:50,hp:100,maxhp:100,ratio:1})]);
+ s.updateQueue();time=9000;s.updateQueue();assert(s.presentationState().cards.find(c=>c.id==='P').flash);assert(!s.inputState().ready);assert(h.counts.paint.some(row=>row[1]===72&&row.at(-1)==='#ffffff'));
+ time=9199;s.updateQueue();assert(!s.inputState().ready);time=9200;s.updateQueue();assert(!s.presentationState().cards.find(c=>c.id==='P').flash);s.updateQueue();s.updateQueue();assert(s.inputState().ready);
+ assert.equal(created.length,2);assert(created.every(r=>r.folder==='se/'&&r.plays===1));assert(files.every(f=>f.endsWith('.ogg')&&!f.endsWith('.ogg_')));assert(parameters.every(p=>p.volume===80));
+ s.terminate();assert(created.every(r=>r.stops===1&&r.destroys===1));s.terminate();assert(created.every(r=>r.stops===1));
+});
+test('compiled media absence keeps basic EXP feedback and does not attempt missing loads',async()=>{
+ let time=0,loads=0;const audio={audioFileExt:()=>'.ogg',createBuffer(){loads++;throw Error('must not load missing media');},updateBufferParameters(){}};
+ const h=await host({display:true,audio,exists:()=>false,now:()=>time}).ready(),s=h.scene;
+ s._controller.enqueue([s._display.experience('P',{level:50,from:.5,to:1})]);s.updateQueue();time=875;s.updateQueue();assert(s.presentationState().cards[0].flash);assert(!s.inputState().ready);time=1075;s.updateQueue();s.updateQueue();assert(s.inputState().ready);assert.equal(loads,0);assert.deepEqual(Array.from(s.presentationState().audio,row=>row.status),['missing','missing']);
 });
 for(const result of ['resolve','reject'])test(`compiled scene ignores ${result} after load/new owner, including perf and global pop`,async()=>{
  const h=await host().ready(),d=deferred(),s=h.scene;s.act(()=>d.promise,'move');await flush();
