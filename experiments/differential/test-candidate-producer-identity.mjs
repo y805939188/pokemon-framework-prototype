@@ -1,0 +1,27 @@
+// Actual frozen add-on admission controls; these negative invocations execute no business.
+import test,{after} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,realpathSync,rmSync,readFileSync,writeFileSync,cpSync,symlinkSync,linkSync,existsSync} from 'node:fs';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {spawnSync} from 'node:child_process';
+import {buildProducer} from './candidate-producer-v21/build.mjs';
+import {verifyProducer,hash} from './candidate-producer-v21/identity.mjs';
+const protocol=process.env.PF_CANDIDATE_PROTOCOL_BUNDLE;assert.ok(protocol,'explicit protocol bundle required');
+const temp=mkdtempSync(join(realpathSync(tmpdir()),'candidate-identity-'));after(()=>rmSync(temp,{recursive:true,force:true}));
+const fixed=buildProducer(protocol,join(temp,'fixed'));
+function copy(){const dir=join(temp,'copy-'+(++copy.n));cpSync(fixed.root,dir,{recursive:true});return dir;}copy.n=0;
+function cli(root=fixed.root,pin=fixed.producerFreezeHash,options={}){const out=join(temp,'output-'+(++cli.n));const r=spawnSync(process.execPath,[join(root,'producer/produce.mjs'),'--root',root,'--expected-producer',pin,'--plan','qualification37-v1','--out',out],{encoding:'utf8',...options});return {...r,out};}cli.n=0;
+test('complete closure freezes one core, original protocol and six producer files',()=>{const x=verifyProducer(fixed.root,fixed.producerFreezeHash);assert.equal(x.manifest.files.length,80);assert.equal(x.manifest.files.filter(f=>f.path.endsWith('/core/core.cjs')).length,1);assert.equal(x.manifest.files.filter(f=>f.path.startsWith('producer/')).length,6);});
+for(const path of ['producer/worker.mjs','producer/coordinator.mjs','protocol-bundle/legacy-kit/runners/ts-runner.mjs','protocol-bundle/legacy-kit/core/core.cjs','protocol-bundle/tools/observation-v2/protocol.mjs'])test('changed '+path+' rejected before child or output',()=>{const root=copy(),p=join(root,path);writeFileSync(p,readFileSync(p)+'\n// synthetic changed bytes\n');const r=cli(root);assert.equal(r.status,2);assert.match(r.stdout,/PAYLOAD_MISMATCH/);assert.equal(existsSync(r.out),false);});
+test('trusted pin mismatch rejects before output',()=>{const r=cli(fixed.root,'f'.repeat(64));assert.equal(r.status,2);assert.match(r.stdout,/FREEZE_MISMATCH/);assert.equal(existsSync(r.out),false);});
+test('unknown extra module is never loaded',()=>{const root=copy();writeFileSync(join(root,'extra.mjs'),'throw Error("must not run")');const r=cli(root);assert.equal(r.status,2);assert.match(r.stdout,/EXTRA_FILE/);assert.equal(existsSync(r.out),false);});
+test('symlink and hardlink dependencies reject',()=>{for(const kind of ['symbolic','hard']){const root=copy(),p=join(root,'extra');if(kind==='symbolic')symlinkSync(join(root,'producer/worker.mjs'),p);else linkSync(join(root,'producer/worker.mjs'),p);assert.throws(()=>verifyProducer(root,fixed.producerFreezeHash));}});
+test('a recomputed pin cannot substitute a different protocol version',()=>{const root=copy(),p=join(root,'producer-freeze.json'),m=JSON.parse(readFileSync(p));m.protocolFreezeSHA256='1'.repeat(64);writeFileSync(p,JSON.stringify(m));const r=cli(root,hash(readFileSync(p)));assert.equal(r.status,2);assert.match(r.stdout,/PRODUCER_MANIFEST/);});
+test('a recomputed malformed path manifest cannot expand the dependency set',()=>{const root=copy(),p=join(root,'producer-freeze.json'),m=JSON.parse(readFileSync(p));m.files[0].path='../escape';writeFileSync(p,JSON.stringify(m));const r=cli(root,hash(readFileSync(p)));assert.equal(r.status,2);assert.match(r.stdout,/MANIFEST_PATH/);});
+test('benign Node loader flag still refuses producer execution',()=>{const r=cli(fixed.root,fixed.producerFreezeHash,{env:{...process.env,NODE_OPTIONS:'--trace-warnings'}});assert.equal(r.status,2);assert.match(r.stdout,/NODE_LOADER_POLICY/);assert.equal(existsSync(r.out),false);});
+test('NODE_PATH never becomes a runtime fallback',()=>{const r=cli(fixed.root,fixed.producerFreezeHash,{env:{...process.env,NODE_PATH:'/nonexistent-synthetic-module-root'}});assert.equal(r.status,2);assert.match(r.stdout,/NODE_LOADER_POLICY/);});
+test('unknown plan rejects before creating output or children',()=>{const out=join(temp,'unknown-plan'),r=spawnSync(process.execPath,[join(fixed.root,'producer/produce.mjs'),'--root',fixed.root,'--expected-producer',fixed.producerFreezeHash,'--plan','caller-selected','--out',out],{encoding:'utf8'});assert.equal(r.status,2);assert.equal(existsSync(out),false);});
+test('existing output root is preserved and rejected',()=>{const r=spawnSync(process.execPath,[join(fixed.root,'producer/produce.mjs'),'--root',fixed.root,'--expected-producer',fixed.producerFreezeHash,'--plan','qualification12-v1','--out',temp],{encoding:'utf8'});assert.equal(r.status,2);assert.ok(existsSync(join(temp,'fixed','producer-freeze.json')));});
+
+test('recomputed add-on pin cannot substitute protocol payload under unchanged f100 freeze',()=>{const root=copy(),core=join(root,'protocol-bundle/legacy-kit/core/core.cjs'),p=join(root,'producer-freeze.json'),m=JSON.parse(readFileSync(p));writeFileSync(core,readFileSync(core)+'\n// synthetic altered core\n');const e=m.files.find(f=>f.path==='protocol-bundle/legacy-kit/core/core.cjs');e.bytes=readFileSync(core).length;e.sha256=hash(readFileSync(core));writeFileSync(p,JSON.stringify(m));const r=cli(root,hash(readFileSync(p)));assert.equal(r.status,2);assert.match(r.stdout,/PROTOCOL_PAYLOAD/);assert.equal(existsSync(r.out),false);});
