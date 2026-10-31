@@ -148,3 +148,43 @@ test('builder refuses existing output rather than rewriting an old seal',()=>ass
 test('technical failure normalizer preserves unavailable RNG and counts without fake cases',()=>{const p=normalizeFailure({metadata:metadata('reference'),execution:{...execution,status:'timeout',timedOut:true,exitCode:null,signal:'SIGTERM'},observedAtUTC:'2026-10-31T00:00:02Z'},context);assert.equal(p.random,null);assert.equal(p.cases.length,0);assert.equal(counts(p).attempted,null);p.random={seed:null,drawCount:0,draws:[]};assert.throws(()=>gatePackage(p,{...context,role:'reference'}));});
 test('unsupported random never becomes a fictitious zero trace',()=>{const p=notrunTail(pack(),index,'UNSUPPORTED_RANDOM');assert.throws(()=>gatePackage(p,{...context,role:'reference'}));p.random=null;assert.doesNotThrow(()=>gatePackage(p,{...context,role:'reference'}));assert.equal(comparePackages(p,pack('candidate'),context).status,'BLOCKED');});
 test('unknown random cannot accompany otherwise fully observed success',()=>{const p=pack();p.random=null;assert.throws(()=>gatePackage(p,{...context,role:'reference'}));});
+
+// OBS2-ULTRA-01: an invalid parent-pinned audit must fail before behavior parsing,
+// not merely before returning PASS. Bad JSON distinguishes parse order from gates.
+for(const [fault,expected]of [
+ ['old-freeze','OBS2_AUDIT_VERSION'],
+ ['zero-qualification','OBS2_ZERO_EVIDENCE_HASH'],
+ ['extra-audit-field','OBS2_ADMISSION_SHAPE']
+])for(const body of ['bad-json','wrong-role'])test('pre-parse audit '+fault+' precedes '+body+' in receive and compare',()=>{
+ for(const entry of ['receive.mjs','compare.mjs']){
+  const f=files();
+  if(fault==='old-freeze')f.a.observationFreezeHash=LEGACY_FREEZE;
+  if(fault==='zero-qualification')f.a.sourceQualificationSHA256='0'.repeat(64);
+  if(fault==='extra-audit-field')f.a.unapproved='synthetic';
+  let b;
+  if(body==='bad-json')b='{not-json';
+  else{const p=pack();p.role='candidate';b=strictStringify(p)+'\n';}
+  writeFileSync(join(f.root,'reference-observations.json'),b);f.a.referencePackageSHA256=byteHash(Buffer.from(b));writeFileSync(join(f.root,'execution-audit.json'),strictStringify(f.a)+'\n');
+  const p=cli(f,entry);assert.equal(p.status,2,p.stdout+p.stderr);assert.equal(parseJson(p.stdout).code,expected,entry+' consumed behavior before rejecting the audit');
+ }
+});
+for(const field of ['privateExecutionAuditSHA256','referenceAdapterSHA256','referencePackageSHA256','candidatePackageSHA256'])test('pre-parse nonzero evidence check covers '+field,()=>{
+ for(const entry of ['receive.mjs','compare.mjs']){
+  const f=files();writeFileSync(join(f.root,'reference-observations.json'),'{not-json');f.a.referencePackageSHA256=byteHash(Buffer.from('{not-json'));f.a[field]='0'.repeat(64);writeFileSync(join(f.root,'execution-audit.json'),strictStringify(f.a));
+  const p=cli(f,entry);assert.equal(p.status,2);assert.equal(parseJson(p.stdout).code,'OBS2_ZERO_EVIDENCE_HASH');
+ }
+});
+for(const body of ['bad-reference-json','bad-candidate-json','wrong-role'])test('valid audit still rejects '+body+' after admission',()=>{
+ for(const entry of ['receive.mjs','compare.mjs']){
+  const f=files(),role=body==='bad-candidate-json'?'candidate':'reference';let b;
+  if(body.startsWith('bad-'))b='{not-json';else{const p=pack();p.role='candidate';b=strictStringify(p)+'\n';}
+  writeFileSync(join(f.root,role+'-observations.json'),b);f.a[role+'PackageSHA256']=byteHash(Buffer.from(b));writeFileSync(join(f.root,'execution-audit.json'),strictStringify(f.a));
+  const p=cli(f,entry);assert.equal(p.status,2);assert.equal(parseJson(p.stdout).code,body==='wrong-role'?'OBS2_ROLE':'JSON_STRING_EXPECTED');
+ }
+});
+test('pre-parse byte binding rejects mismatch before bad behavior JSON',()=>{
+ for(const entry of ['receive.mjs','compare.mjs']){
+  const f=files();writeFileSync(join(f.root,'reference-observations.json'),'{not-json');
+  const p=cli(f,entry);assert.equal(p.status,2);assert.equal(parseJson(p.stdout).code,'OBS2_AUDIT_PACKAGE_BYTES');
+ }
+});

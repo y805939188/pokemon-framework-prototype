@@ -2,13 +2,13 @@ import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseJson} from '../lib/json.mjs';
 import {formalContext,publicFiles,byteHash} from './bundle.mjs';
-import {gatePackage,gateAdmission,counts,requireV2,shape} from './protocol.mjs';
+import {gatePackage,gateAdmission,counts,requireV2,gateAdmissionMetadata} from './protocol.mjs';
 export function receive(args,entryURL,name){
  requireV2(args.length===8&&args[0]==='--bundle'&&args[2]==='--expected-freeze'&&args[4]==='--public-root'&&args[6]==='--expected-audit','ARGUMENTS');
  const context=formalContext(args[1],args[3],entryURL,name);
  const b=publicFiles(args[5]);
  const ab=b['execution-audit.json'];requireV2(/^[0-9a-f]{64}$/.test(args[7])&&byteHash(ab)===args[7],'EXTERNAL_AUDIT_HASH');
- const a=shape('admission',parseJson(ab.toString('utf8')));
+ const a=gateAdmissionMetadata(parseJson(ab.toString('utf8')),context);
  // Pin public byte identities BEFORE parsing/consuming any behavior fields.
  requireV2(a.referencePackageSHA256===byteHash(b['reference-observations.json'])&&a.candidatePackageSHA256===byteHash(b['candidate-observations.json']),'AUDIT_PACKAGE_BYTES');
  const reference=parseJson(b['reference-observations.json'].toString('utf8')),candidate=parseJson(b['candidate-observations.json'].toString('utf8'));

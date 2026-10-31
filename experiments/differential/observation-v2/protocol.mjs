@@ -107,9 +107,15 @@ export function normalizeFailure({metadata,execution,observedAtUTC},context){
  const result={protocol:PUBLIC,role:metadata.role,entryId:metadata.entryId,requestHash:context.kit.request.requestHash,freezeHash:context.kit.freeze.hash,observationFreezeHash:context.freezeHash,observedAtUTC,source:structuredClone(metadata.source),runtime:structuredClone(metadata.runtime),execution:structuredClone(execution),random:null,cases:[]};
  return gatePackage(result,{...context,role:metadata.role});
 }
-export function gateAdmission(a,{freezeHash,referenceHash,candidateHash,reference}){
+// Must finish before parsing either behavior JSON. Only trusted context and closed
+// audit metadata are inspected here; final adapter cross-binding remains below.
+export function gateAdmissionMetadata(a,{freezeHash}){
  shape('admission',a);nonzeroHashes(a);
  requireV2(a.observationFreezeHash===freezeHash,'AUDIT_VERSION');
+ return a;
+}
+export function gateAdmission(a,{freezeHash,referenceHash,candidateHash,reference}){
+ gateAdmissionMetadata(a,{freezeHash});
  requireV2(a.referencePackageSHA256===referenceHash&&a.candidatePackageSHA256===candidateHash,'AUDIT_PACKAGE_BINDING');
  requireV2(a.referenceAdapterSHA256===reference.source.files.find(f=>f.role==='adapter')?.sha256,'AUDIT_ADAPTER_BINDING');
  return a;
