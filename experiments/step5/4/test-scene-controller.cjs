@@ -115,6 +115,9 @@ for(const phase of ['opening','messages','end'])test(`actual Scene.update extern
  h.flow.abort(Error('external adjacent'));if(phase==='opening'){d.resolve(h.session);await flush();assert(s.isReady());s.start();}
  for(let i=0;i<3;i++)s.update();assert.equal(s._mode,'end');assert(s.inputState().ready);s.onMenuCancel();assert(s.inputState().ready);assert.equal(h.counts.pop,0);s.onMenuOk();assert.equal(h.counts.pop,1);assert.equal(h.counts.abort,1);assert.equal(h.counts.finish,0);
 });
+test('external abort before an end handler cannot finish the closed application before the next update',async()=>{
+ const h=await host().ready(),s=h.scene;s.showEnd(false);h.flow.abort(Error('close before input'));s.onMenuOk();assert.equal(h.counts.finish,0);assert.equal(h.counts.pop,0);s.update();s.update();assert(s.inputState().ready);s.onMenuOk();assert.equal(h.counts.pop,1);assert.equal(h.counts.abort,1);assert.equal(h.counts.finish,0);
+});
 for(const mode of ['reject','throw-falsy'])test(`compiled ${mode} opening becomes an owned, usable aborted end`,async()=>{
  const d=deferred(),h=host({opening:d.promise});if(mode==='throw-falsy')h.flow.begin=()=>{throw 0;};h.scene.create();if(mode==='reject')d.reject(Error('opening rejected'));await flush();assert(h.scene.isReady());h.scene.start();h.scene.updateQueue();assert.equal(h.scene._mode,'end');assert(h.scene.inputState().ready);assert.equal(h.counts.abort,1);assert(!h.flow.running);assert(h.G.$gameSystem.isSaveEnabled());
 });

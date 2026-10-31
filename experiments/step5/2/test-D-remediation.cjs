@@ -159,11 +159,14 @@ test('D-04/D-05 source wiring guard: U52-06 starts its non-battle events with th
  assert.match(s,/async function startMapEvent\(id: number\) \{\n    await waitFor\(\(\) => scene\(\) && scene\(\)\._spriteset && !G\.SceneManager\.isSceneChanging\(\), "map scene"\);\n    G\.\$gameMap\.event\(id\)\.start\(\);\n    await frames\(3\);\n  \}/);
  assert.ok(body.includes("eq([G.$gameVariables._data[3],G.$gameVariables.value(3)],['',0],"),'raw empty ID and MZ public read 0 are both asserted');
 });
-test('D-06/D-07 source wiring guard: bag comparisons ignore key order, fixtures keep raw order, U51-14 builds a real schema-4 document (not a behaviour test)',()=>{
+test('D-06/D-07 bag source wiring and actual U51-14 schema4 fixture validation/capacity refusal',()=>{
  const s=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlowTest.ts'),'utf8');
  assert.ok(s.includes("const I6 = {rawBagOf:(game:any):any=>game.inventory?api().inventory.aggregateBag(game.inventory):game.bag,bagOf:(game:any):any=>{const bag=I6.rawBagOf(game);return bag&&Object.fromEntries(Object.keys(bag).sort().map(k=>[k,bag[k]]));},"),'sorted comparison view');
  assert.ok(s.includes('setItemCount:(game:any,id:string,n:number):number=>{const bag=I6.rawBagOf(game);')&&s.includes('bag: clone(I6.rawBagOf(g))'),'fixture edits and legacy documents keep the inventory order');
- assert.ok(s.includes('delete raw.nextMemberOrdinal;raw.bag=I6.rawBagOf(healthy);delete raw.inventory;delete raw.badges;'),'U51-14 schema-4 document');
+ const authored=s.match(/const healthy=clone\(game\(\)\),raw:any=(\{[^\n]*?\});\/\* Author a valid schema4/);assert(authored,'actual U51-14 document expression is present');
+ const E=require(path.join(ROOT,'js/engine/build/engine.cjs')),healthy=E.fixtures.makeGame(),before=JSON.stringify(healthy),api=()=>E,clone=structuredClone,I6={rawBagOf:g=>E.inventory.aggregateBag(g.inventory)};
+ const raw=vm.runInNewContext('('+authored[1].replaceAll(':any','')+')',{healthy,api,clone,I6});assert.equal(raw.schema,4);assert.equal(raw.boxes.length,1201);assert(!Object.hasOwn(raw,'defeatedTrainers'));assert.deepEqual(E.saveSchema.validateGame(raw),[],'authored old document is structurally valid');
+ const bytes=JSON.stringify(raw),migration=E.saveSchema.migrateGame(raw,{content:E.fixtures.content});assert.equal(migration.ok,false);assert.equal(migration.error.code,'capacity-exceeded');assert.equal(migration.error.boxMemberCount,1201);assert.equal(JSON.stringify(raw),bytes,'refusal preserves old document');assert.equal(JSON.stringify(healthy),before,'fixture authoring preserves current document');
 });
 
 test('F-03/F-04 hardening: a throwing clearTimer still resolves the capture; a stalled hold still releases the key',()=>{

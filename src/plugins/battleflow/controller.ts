@@ -89,9 +89,13 @@ export class BattleSceneController<Session = unknown> {
     catch (error) { this.fail(error); return false; }
   }
   input(callback: () => void): boolean {
-    if (this.choosing || !this.canChoose()) return false;
+    if (this.choosing || !this.isCurrent()) return false;
     this.choosing = true;
-    try { return this.present(callback); }
+    try {
+      // MZ dispatches window handlers inside the base update, before our scene tick.
+      if (!this.present(() => this.observeClosedHost()) || !this.canChoose()) return false;
+      return this.present(callback);
+    }
     finally { this.choosing = false; }
   }
 
