@@ -14,6 +14,7 @@ import { BattleDisplayPlayback } from "./battleflow/display";
 import type { BattleDisplayCard } from "./battleflow/display";
 import { hpColour } from "./battleflow/visual-timing";
 import { BattleMenuCursor, gridCursor } from "./battleflow/menu";
+import { battlebackContext, createBattlebackMZ } from "./battleflow/battleback-mz";
 const { developmentCapabilities } = RuleConfig;
 
 (() => {
@@ -497,7 +498,7 @@ const { developmentCapabilities } = RuleConfig;
       if (cur && !cur.totalMs) { cur.totalMs = Math.round((performance.now() - cur.t0) * 10) / 10; cur.code = code; PSFlow.perf.battles.push(cur); }
     },
     /** The single way a battle opens (StartBattle command and map encounters): the same application path, the same guards. */
-    openBattle(request: any): void {
+    openBattle(request: any, presentation?: any): void {
       if (PSFlow.running) throw new Error("a battle is already running");
       if (openingBattle || PSFlow.operationPending() || PSFlow._app?.encounterBlocked) throw new Error("operation-active");
       const opening = {}, app = PSFlow._app, generation = app?.stateGeneration;
@@ -511,7 +512,8 @@ const { developmentCapabilities } = RuleConfig;
         if(!G.$gameSystem._psSaveError&&G.$gameSystem._psGame)PSFlow.assertBattleAllowed();
         assertCurrent();
         const started = performance.now(); assertCurrent();
-        PSFlow._op = { request, session: null };
+        const visualContext = battlebackContext(presentation, G.PluginManager.parameters(NAME)); assertCurrent();
+        PSFlow._op = { request, session: null, visualContext };
         PSFlow.request = request;
         PSFlow.running = true;
         PSFlow.lastOutcome = null;
@@ -522,9 +524,9 @@ const { developmentCapabilities } = RuleConfig;
       } finally { if (openingBattle === opening) openingBattle = null; }
     },
     /** Player-facing entries contain a closed held-item gate; direct developer openBattle keeps its throwing contract. */
-    tryOpenBattle(request: any): boolean {
+    tryOpenBattle(request: any, presentation?: any): boolean {
       const previous=PSFlow._op;
-      try{PSFlow.openBattle(request);return true;}
+      try{PSFlow.openBattle(request, presentation);return true;}
       catch(error){
         if(PSFlow._op!==previous&&PSFlow._op?.request===request)PSFlow.abort(error,PSFlow._op);
         else if(!PSFlow.running){const outcome={code:0,battleId:request.battleId,commit:'none',aborted:true,error:String(error instanceof Error?error.message:error)};PSFlow.lastOutcome=outcome;if(request.resultVariable)G.$gameVariables.setValue(request.resultVariable,0);G.$gameMessage.add(PSFlow.translator().t('management.refused',{reason:outcome.error}));}
@@ -589,7 +591,7 @@ const { developmentCapabilities } = RuleConfig;
       resultVariable: Number(args.resultVariable) || 0,
       canLose: String(args.canLose) === "true",
       forceParty: String(args.forceParty) === "true",
-    });
+    }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime });
     if(!opened){if(G.$gameMessage.isBusy())this.setWaitMode('message');return;}
     this._psBattleId = battleId; // this interpreter waits for THIS battle (see updateWaitMode below)
     this.setWaitMode("psBattle");
@@ -615,7 +617,7 @@ const { developmentCapabilities } = RuleConfig;
       resultVariable: Number(args.resultVariable) || 0,
       canLose: String(args.canLose) === "true",
       forceParty: String(args.forceParty) === "true",
-    });
+    }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime });
     if (!opened) { if (G.$gameMessage.isBusy()) this.setWaitMode("message"); return; }
     this._psBattleId = battleId;
     this.setWaitMode("psBattle");
@@ -958,7 +960,7 @@ const { developmentCapabilities } = RuleConfig;
     this._psBattle = true; // marker for the test driver (constructor identity is wrapped by pixi_compat)
     this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
     sceneController(this, true);
-    this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._menuCursor = new BattleMenuCursor();
+    this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -968,14 +970,25 @@ const { developmentCapabilities } = RuleConfig;
     this._status = new (Window_PSText as any)(new G.Rectangle(0, 0, w, 120));
     this._log = new (Window_PSText as any)(new G.Rectangle(0, 120, w, 300));
     this._menu = new (Window_PSMenu as any)(new G.Rectangle(0, 420, w, h - 420));
-    for (const win of [this._status, this._log, this._menu]) this.addWindow(win);
+    for (const win of [this._status, this._log, this._menu]) { win.backOpacity = 96; this.addWindow(win); }
     this._menu.setHandler("ok", this.onMenuOk.bind(this));
     this._menu.setHandler("cancel", this.onMenuCancel.bind(this));
     this._menu.deactivate(); this._menu.hide();
     c.open(() => { this._psBindHost(); return PSFlow.begin(); });
     });
   };
-  P.isReady = function () { const c = sceneController(this); return G.Scene_MenuBase.prototype.isReady.call(this) && (c.ready || !c.isCurrent() || !PSFlow.running); };
+  P.isReady = function () {
+    const c = sceneController(this), base = G.Scene_MenuBase.prototype.isReady.call(this);
+    if (!c.isCurrent() || !PSFlow.running || G.SceneManager._scene !== this) this._backdrop?.dispose();
+    if (c.ready && c.isCurrent() && PSFlow.running && !c.failure) c.present(() => {
+      if (!this._backdrop) this._backdrop = createBattlebackMZ(G, nodeRequire, engine().root, this,
+        this._psOp?.visualContext ?? battlebackContext(undefined, G.PluginManager.parameters(NAME)),
+        () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, error => c.fail(error));
+      this._backdrop.poll();
+    });
+    return base && (c.ready || !c.isCurrent() || !PSFlow.running) && (!this._backdrop || this._backdrop.ready || !c.isCurrent() || !PSFlow.running);
+  };
+  P.battlebackState = function () { return this._backdrop?.snapshot() ?? null; };
   P.start = function () {
     const c = sceneController(this);
     c.present(() => {
@@ -1006,6 +1019,8 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.update = function () {
     G.Scene_MenuBase.prototype.update.call(this);
+    const c = sceneController(this);
+    if (!c.isCurrent()) this._backdrop?.dispose(); else c.present(() => this._backdrop?.poll());
     // Host abort may close this owner from main/boot/pending action. tick observes closure before phase/busy gates.
     this.updateQueue();
   };
@@ -1221,6 +1236,7 @@ const { developmentCapabilities } = RuleConfig;
     this._menuCursor?.clear();
     this._display?.dispose();
     c?.dispose(); // retire callbacks before host teardown can reenter application code
+    this._backdrop?.dispose();
     try { G.Scene_MenuBase.prototype.terminate.call(this); }
     finally {
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // (a scene always has one; a bare caller means the current one)

@@ -68,20 +68,23 @@ test('formatting failure aborts once; a broken error view retires without a busy
 test('an error thrown after owner replacement never aborts the successor',()=>{const f=fixture();assert(!f.c.present(()=>{f.current=false;throw Error('late view');}));assert.equal(f.aborts.length,0);});
 
 function host({opening,display=false,audio,exists,now,exp=125000}={}){
+ const commands={};
  const counts={abort:0,finish:0,pop:0,hide:0,choose:0},session={party:[],foeTeam:[],bag:{},finished:false,pendingLearn:null,take:()=>[],currentRequest:()=>({active:[{moves:[{move:'Splash',id:'splash',pp:40,maxpp:40}]}]}),gw:{readState:()=>[]},chooseMove:()=>{counts.choose++;return {messages:[]};}};
  counts.paint=[];
  if(display){session.party=[{id:'P',species:'Pidgey',exp}];session.foeTeam=[{id:'F',species:'Pidgey'}];session.content={species:{Pidgey:{growth:'medium'}}};session.gw.readState=side=>[{id:side==='p1'?'P':'F',level:50,hp:100,maxhp:100,status:'',active:true}];}
- function Base(){}Base.prototype={initialize(){},create(){},start(){},update(){},terminate(){},isReady(){return true;},addWindow(){},popScene(){counts.pop++;}};
+ function Base(){}Base.prototype={initialize(){this.children=[];},create(){this._windowLayer={};this.children.push(this._windowLayer);},start(){},update(){},terminate(){},isReady(){return true;},addWindow(){},addChild(s){this.children.push(s);s.parent=this;},addChildAt(s,i){this.children.splice(i,0,s);s.parent=this;},removeChild(s){this.children.splice(this.children.indexOf(s),1);s.parent=null;},popScene(){counts.pop++;}};
+ class Bitmap{constructor(w,h){this.width=w;this.height=h;this.context={drawImage(){}};}fillAll(){}blt(){}destroy(){}}
+ class Sprite{constructor(bitmap){this.bitmap=bitmap;}destroy(){}}
  function Window(){}Window.prototype={initialize(rect){this.innerWidth=rect.width-24;this.innerHeight=rect.height-24;this.contents={clear(){},fillRect(...args){counts.paint.push(args);}};this._index=0;this.active=false;this.visible=false;},resetFontSettings(){},lineHeight:()=>24,textWidth:x=>String(x).length*8,drawText(){},refresh(){this._list=[];this.makeCommandList?.();},addCommand(name,symbol,enabled,ext){this._list.push({name,symbol,enabled,ext});},select(i){this._index=i;},index(){return this._index;},setHandler(){},show(){this.visible=true;},hide(){this.visible=false;counts.hide++;},activate(){this.active=true;},deactivate(){this.active=false;},isOpenAndActive(){return this.visible&&this.active;}};
  function System(){}System.prototype.isSaveEnabled=()=>true;
- const req=p=>{if(p==='fs'&&exists)return{...require('fs'),existsSync:exists};if(p==='path'||p==='fs')return require(p);if(p.includes('production.cjs'))return require(path.join(ROOT,'js/engine/build/production.cjs'));throw Error('unexpected require '+p);};req.resolve=p=>path.resolve(ROOT,p);
- const G={Error,performance,require:req,console:{log(){},warn(){},error(){}},PluginManager:{parameters:()=>({}),registerCommand(){}},Game_Interpreter:Base,Game_System:System,Window_Base:Window,Window_Command:Window,Scene_MenuBase:Base,SceneManager:{_scene:null,push(){},isSceneChanging:()=>false},Graphics:{boxWidth:816,boxHeight:624,frameCount:0},Rectangle:function(x,y,width,height){Object.assign(this,{x,y,width,height});},Utils:{extractFileName:x=>x},Input:{isTriggered:()=>false},SoundManager:{playBuzzer(){}},$gameSystem:new System(),$gameMessage:{isBusy:()=>false,add(){}},$gameVariables:{setValue(){}}};
- G.AudioManager=audio;G.Utils.hasEncryptedAudio=()=>false;if(now)G.performance={now};
+ const req=p=>{if(p==='fs'&&exists)return{...require('fs'),existsSync:exists};if(p==='path'||p==='fs'||p==='url')return require(p);if(p.includes('production.cjs'))return require(path.join(ROOT,'js/engine/build/production.cjs'));throw Error('unexpected require '+p);};req.resolve=p=>path.resolve(ROOT,p);
+ const G={Error,performance,require:req,console:{log(){},warn(){},error(){}},PluginManager:{parameters:()=>({}),registerCommand(plugin,name,fn){commands[name]=fn;}},Game_Interpreter:Base,Game_System:System,Window_Base:Window,Window_Command:Window,Scene_MenuBase:Base,SceneManager:{_scene:null,push(){},isSceneChanging:()=>false},Graphics:{boxWidth:816,boxHeight:624,frameCount:0},Rectangle:function(x,y,width,height){Object.assign(this,{x,y,width,height});},Utils:{extractFileName:x=>x},Input:{isTriggered:()=>false},SoundManager:{playBuzzer(){}},$gameSystem:new System(),$gameMessage:{isBusy:()=>false,add(){}},$gameVariables:{setValue(){}}};
+ G.Bitmap=Bitmap;G.Sprite=Sprite;G.AudioManager=audio;G.Utils.hasEncryptedAudio=()=>false;if(now)G.performance={now};
  G.window=G;vm.createContext(G);vm.runInContext(plugin,G);
  const flow=G.PSFlow,app={stateGeneration:0,saveBlocked:false,pendingEvolution:null,pendingReceiving:null,pendingPokedex:null,stateReplacedByHost(){this.stateGeneration++;},finishBattle(){counts.finish++;return {code:1,commit:'applied',battleId:'scene#1'};},abortBattle(request,error){counts.abort++;return {code:0,commit:'none',battleId:request.battleId,aborted:true,error:String(error)};}};
  flow._app=app;flow._op={request:{battleId:'scene#1',canLose:true},session};flow.request=flow._op.request;flow.running=true;flow.perf.cur={battleId:'scene#1',t0:0,actions:[]};flow.begin=()=>opening??Promise.resolve(session);if(display)flow.speciesName=x=>x;
  const scene=new G.Scene_PSBattle();G.SceneManager._scene=scene;
- return{G,flow,app,scene,session,counts,async ready(){scene.create();await flush();assert(scene.isReady());scene.start();for(let i=0;i<8&&!scene.inputState().ready;i++)scene.updateQueue();assert.equal(scene._mode,'main',String(scene._failure||''));assert(scene.inputState().ready);return this;}};
+ return{G,flow,app,scene,session,counts,commands,async ready(){scene.create();await flush();assert(scene.isReady());scene.start();for(let i=0;i<8&&!scene.inputState().ready;i++)scene.updateQueue();assert.equal(scene._mode,'main',String(scene._failure||''));assert(scene.inputState().ready);return this;}};
 }
 test('compiled scene exposes detached semantic-ready DTO; MZ-deactivated handler can act once',async()=>{
  const h=await host().ready(),s=h.scene;const view=s.inputState();assert.equal(view.implementation,'d2-menu-grid-v1');assert(view.ready);view.items[0].enabled=false;assert.notEqual(s._menu._items[0].enabled,false);
@@ -229,4 +232,14 @@ test('late old send-out visual and message callbacks cannot reset successor Scen
  const s=new h.G.Scene_PSBattle();h.G.SceneManager._scene=s;s.create();await flush();assert(s.isReady());s.start();drainScene(s);await rememberBoth(s);
  late.advance(performance.now());old.pushMessages([sendOut('p1','Q','drag')]);old.updateQueue();old.terminate();
  assert.equal(s._menuCursor.index('main',4),2);assert.equal(s._menuCursor.index('moves',4),3);assert.equal(s.presentationState().cards.find(c=>c.side==='p1'&&c.active).id,'P');assert(s.inputState().ready);s.terminate();
+});
+test('compiled author commands pass image choices separately from application battle requests',()=>{
+ const h=host(),calls=[];h.flow.running=false;h.flow.nextSeq=()=>9;h.app.trainerRecord=()=>({});h.flow.tryOpenBattle=(request,presentation)=>{calls.push({request,presentation});return true;};
+ const interpreter={setWaitMode(mode){assert.equal(mode,'psBattle');}};
+ for(const name of ['StartBattle','StartTrainerBattle'])h.commands[name].call(interpreter,{trainerId:'trainer',version:'1',battleBackground:'woods',battlePlatform:'water',battleTime:'2'});
+ assert.equal(calls.length,2);for(const c of calls){assert.deepEqual(JSON.parse(JSON.stringify(c.presentation)),{background:'woods',platform:'water',time:'2'});assert(!('visualContext'in c.request));assert(!('background'in c.request));}
+});
+test('compiled openBattle freezes only host presentation while preserving the original request object',()=>{
+ const h=host(),request={battleId:'visual-context'},visual={background:'woods',platform:'water',time:2};h.flow.running=false;h.flow._op=null;h.G.$gameSystem._psSaveError='controlled test skips unrelated domain eligibility';h.flow.openBattle(request,visual);
+ assert.equal(h.flow._op.request,request);assert(Object.isFrozen(h.flow._op.visualContext));visual.background='changed';assert.equal(h.flow._op.visualContext.background,'woods');assert(!('visualContext'in request));h.flow.stateReplaced();
 });

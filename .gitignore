@@ -70,3 +70,6 @@ js/engine/build/
 
 # Compiled content (built from content/ by `pnpm --dir src content:build`)
 data/framework/
+
+# Explicitly generated test-only image fixtures, never game artwork.
+/img/pokemon/battlebacks/__tests__/

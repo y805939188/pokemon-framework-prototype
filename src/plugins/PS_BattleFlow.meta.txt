@@ -18,6 +18,29 @@
  * @option zh
  * @default en
  *
+ * @param battleBackground
+ * @text Default battle background
+ * @desc Resource identity under img/pokemon/battlebacks, without extension. Missing images use a declared code fallback.
+ * @type string
+ * @default plain
+ *
+ * @param battlePlatform
+ * @text Default battle platform
+ * @desc Optional platform identity. No world environment is inferred.
+ * @type string
+ * @default
+ *
+ * @param battleTime
+ * @text Default battle image time
+ * @type select
+ * @option Day
+ * @value 0
+ * @option Evening
+ * @value 1
+ * @option Night
+ * @value 2
+ * @default 0
+ *
  * @param startMoney
  * @text Start money
  * @desc Money of a new game (framework state, not MZ gold). Default 3000.
@@ -89,6 +112,24 @@
  * @type boolean
  * @default false
  *
+ * @arg battleBackground
+ * @text Battle background
+ * @desc Optional override; blank inherits the plugin default. Relative resource identity, without image extension.
+ * @type string
+ * @default
+ *
+ * @arg battlePlatform
+ * @text Battle platform
+ * @desc Optional override; blank explicitly means no platform.
+ * @type string
+ * @default
+ *
+ * @arg battleTime
+ * @text Battle image time
+ * @desc 0 day, 1 evening, 2 night; blank inherits the plugin default.
+ * @type string
+ * @default
+ *
  * @command ClaimGrant
  * @text Claim Grant
  * @desc Gives a content reward package (content/sample/grants.json) once per save. Shows what was received unless Message is off.
@@ -132,4 +173,55 @@
  * @command ResetGame
  * @text Reset to Test Fixture (testing aid)
  * @desc TESTING AID: replaces the framework state with the synthetic step 2 test party (three level 50 members). Not for real games.
+ * @command StartTrainerBattle
+ * @text Start Trainer Battle
+ * @desc Uses an existing authored trainer record and the same owned battle scene. Image choices do not change its team or rules.
+ *
+ * @arg trainerId
+ * @text Trainer record ID
+ * @type string
+ *
+ * @arg version
+ * @text Author version
+ * @type number
+ * @default 1
+ *
+ * @arg battleId
+ * @type string
+ * @default trainer
+ *
+ * @arg resultVariable
+ * @type variable
+ * @default 0
+ *
+ * @arg canLose
+ * @type boolean
+ * @default false
+ *
+ * @arg moneyGain
+ * @type boolean
+ * @default true
+ *
+ * @arg forceParty
+ * @type boolean
+ * @default false
+ *
+ * @arg battleBackground
+ * @text Battle background
+ * @desc Optional override; blank inherits the plugin default. Relative resource identity, without image extension.
+ * @type string
+ * @default
+ *
+ * @arg battlePlatform
+ * @text Battle platform
+ * @desc Optional override; blank explicitly means no platform.
+ * @type string
+ * @default
+ *
+ * @arg battleTime
+ * @text Battle image time
+ * @desc 0 day, 1 evening, 2 night; blank inherits the plugin default.
+ * @type string
+ * @default
+ *
  */
