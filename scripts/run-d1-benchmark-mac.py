@@ -115,7 +115,7 @@ def verify_report_hashes(raw,core=None):
     except (OSError,subprocess.TimeoutExpired) as error:
         raise RuntimeError('report hash verifier unavailable: '+str(error)) from error
     if checked.returncode:
-        raise RuntimeError(checked.stderr.decode('utf8',errors='replace').strip())
+        raise RuntimeError('report hash verifier failed (exit '+str(checked.returncode)+'): '+checked.stderr.decode('utf8',errors='replace').strip())
     hashes=json.loads(checked.stdout)
     if hashes['reportSHA256'] != hashlib.sha256(raw).hexdigest():
         raise RuntimeError('hash verifier did not bind the exact report bytes')
@@ -126,23 +126,23 @@ def cleanup_owned(process):
     errors=[]
     process.poll()  # Reap an exited leader before querying its group (macOS zombie EPERM).
     def exists():
-        try:os.killpg(process.pid,0);return True
-        except ProcessLookupError:return False
-        except PermissionError as error:
-            # The own leader can exit after poll but before killpg(0) on macOS.
-            # Only a fresh reap AND verified group absence settle that race.
-            if process.poll() is not None:
-                try:os.killpg(process.pid,0)
-                except ProcessLookupError:return False
-                except PermissionError:pass
-            errors.append(str(error));return None
+        # A departing leader need not be waitable at the first EPERM. Re-probe
+        # only this owned group, at most 50 times / 490ms of requested sleeps.
+        for attempt in range(50):
+            process.poll()
+            try:os.killpg(process.pid,0);return True
+            except ProcessLookupError:return False
+            except PermissionError as error:
+                if attempt==49:errors.append(str(error));return None
+                time.sleep(.01)
     present=exists();attempted=present is True
     if present:
         try:os.killpg(process.pid,signal.SIGTERM)
         except (ProcessLookupError,PermissionError)as error:errors.append(str(error))
         for _ in range(25):
             process.poll()
-            if not exists():break
+            state=exists()
+            if state is not True:break  # Unknown is a recorded failure, never absence.
             time.sleep(.1)
         else:
             try:os.killpg(process.pid,signal.SIGKILL)
@@ -165,7 +165,7 @@ def same_json(left,right):
     return left==right
 
 
-def run_group(app, info, out, group, count, formal, source_input, *, synthetic=False, cancellation=None):
+def _run_group(app, info, out, group, count, formal, source_input, *, synthetic=False, cancellation=None):
     if cancellation: cancellation.check()
     out.mkdir()
     if not synthetic:
@@ -334,6 +334,29 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
                 environment=result['env'], execution=row, reportSHA256=hashes['reportSHA256'])
 
 
+def run_group(app, info, out, group, count, formal, source_input, *, synthetic=False, cancellation=None):
+    try:
+        return _run_group(app,info,out,group,count,formal,source_input,synthetic=synthetic,cancellation=cancellation)
+    except BaseException as error:
+        execution=out/'EXECUTION.json'
+        row=json.loads(execution.read_text()) if execution.is_file() else None
+        failure=error
+        # A recorded native fatal remains primary. During later verification,
+        # terminal signals can also interrupt a synchronous helper in our group.
+        if cancellation and cancellation.signals and not(row and row.get('failure')):
+            failure=BenchmarkCancelled('benchmark cancelled by signal '+str(cancellation.signals[0]))
+        if row is not None:
+            if not row.get('failure'):
+                row['nativeFinishedUTC']=row.get('finishedUTC')
+                row['failure']=dict(type=type(failure).__name__,message=str(failure))
+            if failure is not error:
+                row['validationError']=dict(type=type(error).__name__,message=str(error)or type(error).__name__)
+            row['cancellationSignals']=list(cancellation.signals) if cancellation else []
+            row['finishedUTC']=utc();write(execution,row)
+        if failure is error:raise
+        raise failure from error
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('control');parser.add_argument('candidate');parser.add_argument('out')
@@ -372,7 +395,11 @@ def main():
     try:
         cancellation.check()
         if not args.synthetic_controls:
-            summary['hostIdentity']=_host.require_pair(apps['control'],apps['candidate'])
+            try:summary['hostIdentity']=_host.require_pair(apps['control'],apps['candidate'])
+            except BaseException as error:
+                summary['hostVerificationFailure']=dict(type=type(error).__name__,message=str(error)or type(error).__name__)
+                cancellation.check()
+                raise
             write(out/'SUMMARY.json',summary)
         for group in args.groups:
             cancellation.check()
