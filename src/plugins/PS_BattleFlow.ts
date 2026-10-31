@@ -989,7 +989,11 @@ const { developmentCapabilities } = RuleConfig;
     this._D = engine().D.make(this._names, PSFlow.translator());
     this._display = new BattleDisplayPlayback(initialDisplay(s, this._names), {
       current: () => c.isCurrent() && PSFlow.running,
-      paint: cards => { if (c.isCurrent()) { this._status._d2Cards = cards.map(card => ({ ...card })); this._status.setLines([]); } },
+      paint: cards => { if (c.isCurrent()) {
+        this._status._d2Cards = cards.map(card => ({ ...card })); this._status.setLines([]);
+        // Observe every owned, sequentially shown send-out, including A -> B -> A before another menu.
+        if (c.isCurrent()) this._menuCursor?.bindActive(cards.find(card => card.side === 'p1' && card.active)?.id ?? null);
+      } },
       afterPaintNow: () => performance.now(),
       cue: kind => c.isCurrent() && PSFlow.running ? battleCue(this, kind) : undefined,
     });

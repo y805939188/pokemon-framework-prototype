@@ -172,3 +172,61 @@ test('compiled Scene keeps command and move cursors separate across cancel and b
  const h=await host().ready(),s=h.scene;s._session.currentRequest=()=>({active:[{moves:['A','B','C','D'].map(id=>({id,move:id,pp:5,maxpp:5}))}]});
  s.showMoves();s._menu.select(3);s.onMenuCancel();assert.equal(s._mode,'main');assert.equal(s._menu.index(),0);s._menu.select(1);s.onMenuOk();assert.equal(s._mode,'bag');assert.equal(s._menu.maxCols(),1);s.onMenuCancel();assert.equal(s._menu.index(),1);s._menu.select(0);s.onMenuOk();assert.equal(s._mode,'moves');assert.equal(s._menu.index(),3);assert.equal(s._menu.maxCols(),2);assert.equal(h.counts.choose,0);
 });
+
+async function rememberBoth(s) {
+ s.showMoves();s._menu.select(3);s.onMenuCancel();s._menu.select(2);s.onMenuOk();s.onMenuCancel();
+ assert.equal(s._menu.index(),2);assert.equal(s._menuCursor.index('moves',4),3);
+}
+function drainScene(s) {
+ for(let i=0;i<1000&&!s.inputState().ready;i++)s.updateQueue();
+ assert(s.inputState().ready,String(s._failure));
+}
+for(const roar of [false,true])test(`real Session compiled Scene resets both cursors after ${roar?'same-turn A-B-A Roar':'ordinary A-B switch'}`,async()=>{
+ const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs'));
+ const game=F.makeGame();game.party=game.party.slice(0,2);
+ const foe=F.foeMember('F-1','Snorlax',50);foe.moves=[roar?{id:'roar',pp:20,maxpp:20}:{id:'splash',pp:40,maxpp:40}];
+ const session=await BattleSession.create({game,battleId:'menu-reset-'+roar,content:F.content,seed:[1,2,3,4],foe:{kind:'trainer',team:[foe]}});
+ const h=host({display:true});h.flow.begin=()=>Promise.resolve(session);h.flow._op.session=session;
+ const s=h.scene,painted=[],emitted=[];
+ try {
+  s.create();await flush();assert(s.isReady());s.start();drainScene(s);
+  const refresh=s._status.refresh;s._status.refresh=function(...args){const r=refresh.apply(this,args);const id=s.presentationState().cards.find(c=>c.side==='p1'&&c.active)?.id;if(painted.at(-1)!==id)painted.push(id);return r;};
+  const push=s.pushMessages;s.pushMessages=function(messages){emitted.push(...JSON.parse(JSON.stringify(messages)));return push.call(this,messages);};
+  await rememberBoth(s);s.onMenuOk();assert.equal(s._mode,'party');
+  s._menu.select(s._menu._items.findIndex(x=>x.ext===game.party[1].id));s.onMenuOk();
+  for(let i=0;i<100&&s._busy;i++)await flush();assert(!s._busy);assert.equal(s._failure,null);drainScene(s);
+  assert.equal(s._mode,'main');assert.equal(s._menu.index(),0);s.onMenuOk();assert.equal(s._mode,'moves');assert.equal(s._menu.index(),0);
+  assert(painted.includes(game.party[1].id));assert.equal(painted.at(-1),game.party[roar?0:1].id);
+  const switches=emitted.filter(m=>m.kind==='events').flatMap(m=>m.events).filter(e=>['switch','drag'].includes(e.type));
+  assert(switches.some(e=>e.type==='switch'&&e.args[0].includes(game.party[1].id)));
+  if(roar)assert(switches.some(e=>e.type==='drag'&&e.args[0].includes(game.party[0].id)));
+ } finally {s.terminate();}
+});
+async function projectionMenuHost() {
+ const h=host({display:true});h.session.party.push({id:'Q',species:'Pidgey',exp:125000});h.session.foeTeam.push({id:'G',species:'Pidgey'});
+ h.session.gw.readState=side=>(side==='p1'?['P','Q']:['F','G']).map((id,i)=>({id,level:50,hp:100,maxhp:100,status:'',active:i===0}));
+ h.session.currentRequest=()=>({active:[{moves:['A','B','C','D'].map(id=>({id,move:id,pp:5,maxpp:5}))}]});
+ await h.ready();await rememberBoth(h.scene);return h;
+}
+const sendOut=(side,id,type='switch')=>({kind:'events',events:[{type,args:[side+'a: '+id,'Pidgey, L50','100/100']}]});
+test('compiled forced drag resets only when its sequential public projection is shown',async()=>{
+ const h=await projectionMenuHost(),s=h.scene;s.pushMessages([sendOut('p1','Q','drag'),sendOut('p1','P','drag')]);
+ assert.equal(s._menuCursor.index('main',4),2);assert.equal(s._menuCursor.index('moves',4),3);
+ s.updateQueue();assert.equal(s.presentationState().cards.find(c=>c.side==='p1'&&c.active).id,'Q');assert.equal(s._menuCursor.index('main',4),0);assert.equal(s._menuCursor.index('moves',4),0);
+ drainScene(s);assert.equal(s._menu.index(),0);s.onMenuOk();assert.equal(s._menu.index(),0);s.terminate();
+});
+test('opponent switch and drag preserve both player menu memories',async()=>{
+ const h=await projectionMenuHost(),s=h.scene;s.pushMessages([sendOut('p2','G'),sendOut('p2','F','drag')]);drainScene(s);
+ assert.equal(s._menu.index(),2);s._menu.select(0);s.onMenuOk();assert.equal(s._menu.index(),3);s.terminate();
+});
+test('same-member status repaint preserves separate command and move memories',async()=>{
+ const h=await projectionMenuHost(),s=h.scene;s.pushMessages([{kind:'events',events:[{type:'-status',args:['p1a: P','par']},{type:'-curestatus',args:['p1a: P','par']}]}]);drainScene(s);
+ assert.equal(s._menu.index(),2);s._menu.select(0);s.onMenuOk();assert.equal(s._menu.index(),3);s.terminate();
+});
+test('late old send-out visual and message callbacks cannot reset successor Scene memories',async()=>{
+ const h=await projectionMenuHost(),old=h.scene;old.pushMessages([sendOut('p1','Q','drag')]);const late=old._queue[0];
+ h.flow.stateReplaced();h.flow._op={request:{battleId:'new-menu-owner',canLose:true},session:h.session};h.flow.request=h.flow._op.request;h.flow.running=true;
+ const s=new h.G.Scene_PSBattle();h.G.SceneManager._scene=s;s.create();await flush();assert(s.isReady());s.start();drainScene(s);await rememberBoth(s);
+ late.advance(performance.now());old.pushMessages([sendOut('p1','Q','drag')]);old.updateQueue();old.terminate();
+ assert.equal(s._menuCursor.index('main',4),2);assert.equal(s._menuCursor.index('moves',4),3);assert.equal(s.presentationState().cards.find(c=>c.side==='p1'&&c.active).id,'P');assert(s.inputState().ready);s.terminate();
+});
