@@ -204,20 +204,67 @@ class EvidenceGates(unittest.TestCase):
 
     def test_cleanup_permission_failure_is_explicit(self):
         process=SimpleNamespace(pid=12345,poll=lambda:0,wait=lambda timeout:0)
-        with mock.patch.object(base.SCOPE['os'],'killpg',side_effect=PermissionError('controlled EPERM')):
+        with mock.patch.object(base.SCOPE['time'],'sleep'),mock.patch.object(base.SCOPE['os'],'killpg',side_effect=PermissionError('controlled EPERM')):
             attempted,errors=base.SCOPE['cleanup_owned'](process)
         self.assertFalse(attempted);self.assertTrue(any('EPERM'in e for e in errors));self.assertIn('owned process group remains or cannot be verified',errors)
 
-    def test_cleanup_exit_race_requires_reaped_leader_and_absent_owned_group(self):
-        process=SimpleNamespace(pid=12345,poll=mock.Mock(side_effect=[None,0]),wait=lambda timeout:0)
-        with mock.patch.object(base.SCOPE['os'],'killpg',side_effect=[PermissionError('exit race'),ProcessLookupError(),ProcessLookupError()])as probe:
-            attempted,errors=base.SCOPE['cleanup_owned'](process)
-        self.assertFalse(attempted);self.assertEqual(errors,[])
-        self.assertEqual(probe.call_args_list,[mock.call(12345,0)]*3)
-        # Neither an unreaped/live leader nor a still-present group proves successful cleanup.
-        for leader,probes in [(None,[PermissionError('controlled EPERM')]*2),(0,[PermissionError('controlled EPERM'),None]*2)]:
-            with self.subTest(leader=leader),mock.patch.object(base.SCOPE['os'],'killpg',side_effect=probes):
-                attempted,errors=base.SCOPE['cleanup_owned'](SimpleNamespace(pid=12345,poll=lambda:leader,wait=lambda timeout:0))
-            self.assertFalse(attempted);self.assertTrue(any('EPERM'in e for e in errors));self.assertIn('owned process group remains or cannot be verified',errors)
+    def test_cleanup_transient_eperm_during_unreaped_exit_and_confirmed_live_group(self):
+        for queries in [[None,None,PermissionError('exit race'),ProcessLookupError(),ProcessLookupError()],
+                        [PermissionError('transient query'),None,None,ProcessLookupError(),ProcessLookupError()]]:
+            with self.subTest(queries=queries),mock.patch.object(base.SCOPE['time'],'sleep'),mock.patch.object(base.SCOPE['os'],'killpg',side_effect=queries)as probe:
+                attempted,errors=base.SCOPE['cleanup_owned'](SimpleNamespace(pid=12345,poll=lambda:None,wait=lambda timeout:0))
+            self.assertTrue(attempted);self.assertEqual(errors,[])
+            self.assertIn(mock.call(12345,signal.SIGTERM),probe.call_args_list)
+            self.assertEqual(probe.call_args_list[-1],mock.call(12345,0))
+
+    def test_cleanup_persistent_denial_is_bounded_and_surviving_group_never_passes(self):
+        with mock.patch.object(base.SCOPE['time'],'sleep'),mock.patch.object(base.SCOPE['os'],'killpg',side_effect=PermissionError('controlled EPERM'))as probe:
+            attempted,errors=base.SCOPE['cleanup_owned'](SimpleNamespace(pid=12345,poll=lambda:None,wait=lambda timeout:0))
+        self.assertFalse(attempted);self.assertTrue(any('EPERM'in e for e in errors));self.assertIn('owned process group remains or cannot be verified',errors)
+        self.assertLessEqual(probe.call_count,100);self.assertTrue(all(call==mock.call(12345,0)for call in probe.call_args_list))
+        with mock.patch.object(base.SCOPE['time'],'sleep'),mock.patch.object(base.SCOPE['os'],'killpg')as probe:
+            attempted,errors=base.SCOPE['cleanup_owned'](SimpleNamespace(pid=12345,poll=lambda:0,wait=lambda timeout:0))
+        self.assertTrue(attempted);self.assertIn('owned process group remains or cannot be verified',errors)
+        self.assertIn(mock.call(12345,signal.SIGKILL),probe.call_args_list)
+
+    def test_terminal_group_sigint_during_hash_verifier_updates_both_receipts(self):
+        with tempfile.TemporaryDirectory(prefix='pf-d1-group-int-')as folder:
+            root=Path(folder);apps=[];mark=root/'verifier-entered.json';shim=root/'shim';shim.mkdir()
+            source=json.loads((base.SCRIPT.parent.parent/'experiments/step5/4/d1/f100-v1.json').read_text())
+            for role in ['control','candidate']:
+                app=root/(role+'.app');nw=app/'Contents/Resources/app.nw';nw.mkdir(parents=True);base.install_core(nw)
+                info=dict(gitHead=role,withTests=True,workingTreeChanges=0);(nw/'package-info.json').write_text(json.dumps(info));report=base.make_report(source,info,count=1,role=role)
+                exe=app/'Contents/MacOS/nwjs';exe.parent.mkdir();exe.write_text('#!/usr/bin/env python3\nfrom pathlib import Path\nimport sys\np=Path(next(x.split("=",1)[1]for x in sys.argv if x.startswith("--ps-flow-out=")))\np.write_text('+repr(json.dumps(report))+')\n');exe.chmod(0o755);apps.append(app)
+            helper=shim/'node';helper.write_text('#!/usr/bin/env python3\nimport os,signal,time,json\nfrom pathlib import Path\nsignal.signal(signal.SIGINT,signal.default_int_handler)\nPath('+repr(str(mark))+').write_text(json.dumps(dict(nonce='+repr(str(root))+',pid=os.getpid(),parent=os.getppid(),pgid=os.getpgid(0))))\ntime.sleep(30)\n');helper.chmod(0o755)
+            env=dict(os.environ);env.pop('NODE_OPTIONS',None);env.pop('NODE_PATH',None);env['PATH']=str(shim)+os.pathsep+env['PATH']
+            proc=subprocess.Popen([sys.executable,str(base.SCRIPT),*map(str,apps),str(root/'out'),'--groups','control-natural1','--pilot-count','1','--synthetic-controls'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env,start_new_session=True)
+            receipt=root/'out/control-natural1/EXECUTION.json';pid=None
+            try:
+                deadline=time.monotonic()+10
+                while not mark.exists()and proc.poll()is None and time.monotonic()<deadline:time.sleep(.01)
+                self.assertTrue(mark.exists());identity=json.loads(mark.read_text());self.assertEqual(identity['nonce'],str(root));self.assertEqual(identity['parent'],proc.pid);self.assertEqual(identity['pgid'],proc.pid);self.assertEqual(os.getpgid(proc.pid),proc.pid)
+                pid=json.loads(receipt.read_text())['pid'];os.killpg(proc.pid,signal.SIGINT);proc.communicate(timeout=10);self.assertNotEqual(proc.returncode,0)
+                summary=json.loads((root/'out/SUMMARY.json').read_text());execution=json.loads(receipt.read_text())
+                self.assertEqual(summary['status'],'FAIL_STOP');self.assertIn('signal 2',summary['error']);self.assertEqual(summary['groups'],[])
+                self.assertEqual(summary['cancellationSignals'],[signal.SIGINT]);self.assertEqual(execution['cancellationSignals'],[signal.SIGINT]);self.assertEqual(execution['failure']['type'],'BenchmarkCancelled');self.assertEqual(execution['failure']['message'],summary['error']);self.assertTrue(execution['finishedUTC']);self.assertEqual(execution['cleanupErrors'],[])
+                self.assertIn('validationError',execution)
+                with self.assertRaises(ProcessLookupError):os.killpg(pid,0)
+                with self.assertRaises(ProcessLookupError):os.killpg(proc.pid,0)
+            finally:
+                if proc.poll()is None:os.killpg(proc.pid,signal.SIGKILL);proc.communicate(timeout=5)
+                if receipt.exists():pid=json.loads(receipt.read_text())['pid']
+                if pid:
+                    try:os.killpg(pid,signal.SIGKILL)
+                    except ProcessLookupError:pass
+
+    def test_host_verification_cancel_has_nonempty_reason_before_any_group_launch(self):
+        with tempfile.TemporaryDirectory(prefix='pf-d1-host-int-')as folder:
+            root=Path(folder);apps=[]
+            for role in ['control','candidate']:
+                app=root/(role+'.app');nw=app/'Contents/Resources/app.nw';nw.mkdir(parents=True);(nw/'package-info.json').write_text(json.dumps(dict(gitHead=role,withTests=True,workingTreeChanges=0)));apps.append(app)
+            def interrupted(*args):os.kill(os.getpid(),signal.SIGINT);raise RuntimeError('controlled signature helper interrupted')
+            argv=[str(base.SCRIPT),*map(str,apps),str(root/'out'),'--groups','control-natural1','--pilot-count','1']
+            with mock.patch.object(base.SCOPE['_host'],'require_pair',side_effect=interrupted),mock.patch.object(sys,'platform','darwin'),mock.patch.object(sys,'argv',argv),self.assertRaises(base.SCOPE['BenchmarkCancelled']):base.SCOPE['main']()
+            summary=json.loads((root/'out/SUMMARY.json').read_text());self.assertEqual(summary['status'],'FAIL_STOP');self.assertIn('signal 2',summary['error']);self.assertEqual(summary['groups'],[]);self.assertEqual(summary['cancellationSignals'],[signal.SIGINT]);self.assertIn('controlled signature helper',summary['hostVerificationFailure']['message']);self.assertFalse((root/'out/control-natural1').exists())
 
 if __name__=='__main__':unittest.main()
