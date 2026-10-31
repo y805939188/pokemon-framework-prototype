@@ -361,7 +361,7 @@ def main():
     write(out/'SUMMARY.json', summary)
     previous={};cancellation=Cancellation()
     summary['cancellationSignals']=cancellation.signals
-    for signum in [signal.SIGTERM,signal.SIGHUP]:previous[signum]=signal.signal(signum,cancellation.request)
+    for signum in [signal.SIGTERM,signal.SIGHUP,signal.SIGINT]:previous[signum]=signal.signal(signum,cancellation.request)
     try:
         cancellation.check()
         if not args.synthetic_controls:
