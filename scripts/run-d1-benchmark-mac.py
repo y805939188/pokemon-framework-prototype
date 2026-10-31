@@ -30,6 +30,12 @@ class BenchmarkCancelled(BaseException):
     """Raised at safe checkpoints only, never as an RSS UNKNOWN or asynchronously in cleanup."""
 
 
+class HashVerifierFailed(RuntimeError):
+    def __init__(self,command,checked):
+        self.helperFailure=dict(argv=command,exit=checked.returncode,stdoutHex=checked.stdout.hex(),stderrHex=checked.stderr.hex())
+        super().__init__('report hash verifier failed (exit '+str(checked.returncode)+'): '+checked.stderr.decode('utf8',errors='replace').strip())
+
+
 class Cancellation:
     def __init__(self):
         self.signals = []
@@ -115,25 +121,35 @@ def verify_report_hashes(raw,core=None):
     except (OSError,subprocess.TimeoutExpired) as error:
         raise RuntimeError('report hash verifier unavailable: '+str(error)) from error
     if checked.returncode:
-        raise RuntimeError('report hash verifier failed (exit '+str(checked.returncode)+'): '+checked.stderr.decode('utf8',errors='replace').strip())
+        raise HashVerifierFailed(command,checked)
     hashes=json.loads(checked.stdout)
     if hashes['reportSHA256'] != hashlib.sha256(raw).hexdigest():
         raise RuntimeError('hash verifier did not bind the exact report bytes')
     return hashes
 
 
-def cleanup_owned(process):
+def cleanup_owned(process,diagnostics=None):
     errors=[]
+    if diagnostics is None:diagnostics=[]
     process.poll()  # Reap an exited leader before querying its group (macOS zombie EPERM).
     def exists():
         # A departing leader need not be waitable at the first EPERM. Re-probe
         # only this owned group, at most 50 times / 490ms of requested sleeps.
+        query=None
         for attempt in range(50):
             process.poll()
-            try:os.killpg(process.pid,0);return True
-            except ProcessLookupError:return False
+            try:
+                os.killpg(process.pid,0)
+                if query is not None:query.update(attempts=attempt+1,outcome='present')
+                return True
+            except ProcessLookupError:
+                if query is not None:query.update(attempts=attempt+1,outcome='absent')
+                return False
             except PermissionError as error:
-                if attempt==49:errors.append(str(error));return None
+                if query is None:
+                    query=dict(pid=process.pid,signal=0,attempts=0,denials=0,outcome='pending',firstError=str(error));diagnostics.append(query)
+                query.update(attempts=attempt+1,denials=query['denials']+1,lastError=str(error))
+                if attempt==49:query['outcome']='UNKNOWN';errors.append(str(error));return None
                 time.sleep(.01)
     present=exists();attempted=present is True
     if present:
@@ -245,7 +261,7 @@ def _run_group(app, info, out, group, count, formal, source_input, *, synthetic=
         except BaseException as error:
             original_error=error;row['failure']=dict(type=type(error).__name__,message=str(error));raise
         finally:
-            row['ownGroupCleanup'],row['cleanupErrors']=cleanup_owned(process)
+            row['ownGroupCleanup'],row['cleanupErrors']=cleanup_owned(process,row.setdefault('cleanupQueryDiagnostics',[]))
             row['exit']=process.returncode
             row['finishedUTC'] = utc()
             row['reportExists'] = report.is_file()
@@ -351,6 +367,7 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
                 row['failure']=dict(type=type(failure).__name__,message=str(failure))
             if failure is not error:
                 row['validationError']=dict(type=type(error).__name__,message=str(error)or type(error).__name__)
+            if isinstance(error,HashVerifierFailed):row['helperFailure']=error.helperFailure
             row['cancellationSignals']=list(cancellation.signals) if cancellation else []
             row['finishedUTC']=utc();write(execution,row)
         if failure is error:raise
