@@ -255,6 +255,10 @@ test('compiled Scene cancels owned pictures on external abort and late visual ca
  late.advance(1000);late.cancel();old.terminate();old.terminate();
  assert.equal(h.counts.sprites.length,created);assert.equal(h.G.SceneManager._scene,successor);assert(owned.every(x=>x.destroys===1));assert(bitmaps.every(x=>x.destroys===1));assert.equal(h.counts.abort,1);
 });
+test('invalid picture ordinal fails visibly and keeps the owned aborted-end menu usable',async()=>{
+ const h=await host({display:true}).ready(),s=h.scene,images=h.counts.sprites.filter(x=>x._psPictureRole);
+ s._pictureUpdate=Number.MAX_SAFE_INTEGER;s.update();s.update();assert.equal(h.counts.abort,1);assert.equal(s._mode,'end');assert(s.inputState().ready);assert(images.every(x=>x.destroys===1));s.onMenuOk();assert.equal(h.counts.pop,1);s.terminate();
+});
 test('compiled forced drag resets only when its sequential public projection is shown',async()=>{
  const h=await projectionMenuHost(),s=h.scene;s.pushMessages([sendOut('p1','Q','drag'),sendOut('p1','P','drag')]);
  assert.equal(s._menuCursor.index('main',4),2);assert.equal(s._menuCursor.index('moves',4),3);

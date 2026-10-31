@@ -1025,12 +1025,12 @@ const { developmentCapabilities } = RuleConfig;
     });
   };
   P.update = function () {
-    if (!Number.isSafeInteger(this._pictureUpdate) || this._pictureUpdate >= Number.MAX_SAFE_INTEGER) {
-      sceneController(this).fail(new Error('invalid picture Scene.update ordinal')); return;
-    }
-    ++this._pictureUpdate;
-    G.Scene_MenuBase.prototype.update.call(this);
     const c = sceneController(this);
+    if (!Number.isSafeInteger(this._pictureUpdate) || this._pictureUpdate >= Number.MAX_SAFE_INTEGER) {
+      this._pictures?.dispose(); c.fail(new Error('invalid picture Scene.update ordinal'));
+    } else ++this._pictureUpdate;
+    // A rejected display clock still owes normal host/input updates for its aborted-end menu.
+    G.Scene_MenuBase.prototype.update.call(this);
     if (!c.isCurrent()) { this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
     // Host abort may close this owner from main/boot/pending action. tick observes closure before phase/busy gates.
     this.updateQueue();
