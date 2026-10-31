@@ -211,11 +211,13 @@ class EvidenceGates(unittest.TestCase):
     def test_cleanup_transient_eperm_during_unreaped_exit_and_confirmed_live_group(self):
         for queries in [[None,None,PermissionError('exit race'),ProcessLookupError(),ProcessLookupError()],
                         [PermissionError('transient query'),None,None,ProcessLookupError(),ProcessLookupError()]]:
+            diagnostics=[]
             with self.subTest(queries=queries),mock.patch.object(base.SCOPE['time'],'sleep'),mock.patch.object(base.SCOPE['os'],'killpg',side_effect=queries)as probe:
-                attempted,errors=base.SCOPE['cleanup_owned'](SimpleNamespace(pid=12345,poll=lambda:None,wait=lambda timeout:0))
+                attempted,errors=base.SCOPE['cleanup_owned'](SimpleNamespace(pid=12345,poll=lambda:None,wait=lambda timeout:0),diagnostics)
             self.assertTrue(attempted);self.assertEqual(errors,[])
             self.assertIn(mock.call(12345,signal.SIGTERM),probe.call_args_list)
             self.assertEqual(probe.call_args_list[-1],mock.call(12345,0))
+            self.assertEqual(len(diagnostics),1);self.assertEqual(diagnostics[0]['denials'],1);self.assertIn(diagnostics[0]['outcome'],['absent','present']);self.assertEqual(diagnostics[0]['pid'],12345);self.assertEqual(diagnostics[0]['signal'],0);self.assertEqual(diagnostics[0]['attempts'],2);self.assertTrue(diagnostics[0]['firstError'])
 
     def test_cleanup_persistent_denial_is_bounded_and_surviving_group_never_passes(self):
         with mock.patch.object(base.SCOPE['time'],'sleep'),mock.patch.object(base.SCOPE['os'],'killpg',side_effect=PermissionError('controlled EPERM'))as probe:
@@ -248,6 +250,7 @@ class EvidenceGates(unittest.TestCase):
                 self.assertEqual(summary['status'],'FAIL_STOP');self.assertIn('signal 2',summary['error']);self.assertEqual(summary['groups'],[])
                 self.assertEqual(summary['cancellationSignals'],[signal.SIGINT]);self.assertEqual(execution['cancellationSignals'],[signal.SIGINT]);self.assertEqual(execution['failure']['type'],'BenchmarkCancelled');self.assertEqual(execution['failure']['message'],summary['error']);self.assertTrue(execution['finishedUTC']);self.assertEqual(execution['cleanupErrors'],[])
                 self.assertIn('validationError',execution)
+                self.assertNotEqual(execution['helperFailure']['exit'],0);self.assertIn('stdoutHex',execution['helperFailure']);self.assertIn('stderrHex',execution['helperFailure'])
                 with self.assertRaises(ProcessLookupError):os.killpg(pid,0)
                 with self.assertRaises(ProcessLookupError):os.killpg(proc.pid,0)
             finally:
@@ -266,5 +269,29 @@ class EvidenceGates(unittest.TestCase):
             argv=[str(base.SCRIPT),*map(str,apps),str(root/'out'),'--groups','control-natural1','--pilot-count','1']
             with mock.patch.object(base.SCOPE['_host'],'require_pair',side_effect=interrupted),mock.patch.object(sys,'platform','darwin'),mock.patch.object(sys,'argv',argv),self.assertRaises(base.SCOPE['BenchmarkCancelled']):base.SCOPE['main']()
             summary=json.loads((root/'out/SUMMARY.json').read_text());self.assertEqual(summary['status'],'FAIL_STOP');self.assertIn('signal 2',summary['error']);self.assertEqual(summary['groups'],[]);self.assertEqual(summary['cancellationSignals'],[signal.SIGINT]);self.assertIn('controlled signature helper',summary['hostVerificationFailure']['message']);self.assertFalse((root/'out/control-natural1').exists())
+
+    def test_cleanup_send_denials_and_wait_timeout_survive_final_absence(self):
+        for fault in ['TERM','KILL','wait']:
+            sent=[];after=[False];queries=[0]
+            def killpg(pid,sig):
+                self.assertEqual(pid,12345)
+                if sig==0:
+                    queries[0]+=1
+                    if after[0]:raise ProcessLookupError()
+                    return
+                sent.append(sig)
+                if fault=='KILL'and sig==signal.SIGTERM:return
+                after[0]=True
+                if (fault=='TERM'and sig==signal.SIGTERM)or(fault=='KILL'and sig==signal.SIGKILL):raise PermissionError('controlled send EPERM')
+            def wait(timeout):
+                self.assertEqual(timeout,5)
+                if fault=='wait':raise subprocess.TimeoutExpired('own-child',timeout)
+                return 0
+            with self.subTest(fault=fault),mock.patch.object(base.SCOPE['time'],'sleep'),mock.patch.object(base.SCOPE['os'],'killpg',side_effect=killpg):
+                attempted,errors=base.SCOPE['cleanup_owned'](SimpleNamespace(pid=12345,poll=lambda:0,wait=wait))
+            self.assertTrue(attempted);self.assertTrue(errors)
+            self.assertTrue(any('EPERM'in e if fault!='wait'else'timed out'in e for e in errors))
+            self.assertIn(signal.SIGTERM,sent)
+            if fault=='KILL':self.assertIn(signal.SIGKILL,sent)
 
 if __name__=='__main__':unittest.main()
