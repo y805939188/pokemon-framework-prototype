@@ -8,7 +8,7 @@
 | 5.1 个体与仓库 | `step5/1-individual-storage` | 个体、40×30 仓库、schema 5、事务、接收与 UI | **已合并**（PR #4，`c5c51a6`，精确7fd候选及main双层CI通过）；[实施记录](5.1.md) |
 | 5.2 背包、道具与经济 | 已合并、作者树归档 | 八口袋/schema6/资源与事务及UI | **批准范围有条件收尾**（2026-10-25，PR #5，main `9a93b5c`，CI70 65套863通过）。CUA-F02真实FAIL/OPEN+条件DEFERRED、UI-MEM NEW_WARN/OPEN及未测项保留，不能写无条件全层PASS。 |
 | 5.3 成长、进化与图鉴 | 各有限批已合并；当前 `step5/3-H2-pokedex-search` | 内容/schema7迁移、C/D/F规则、E应用事务，后续学习/进化/交换/图鉴UI | **M1规则/事务中间门已接收**（PR #19，main `b977ed7`，CI126 98套1612通过）。G1经PR20/a289086、G2a经PR21/c70d441正式接收（CI134 101套1660）。G2b＋[AR01开战准入](5.3-AR01-battle-entry.md)经PR22/main34fecd8、双审与CI136/137/138接收（104套1747）；[G2c糖果／石头统一UI](5.3-G2c-item-evolution-ui.md)与AR01后续经PR23/main04a2f47正式接收（CI139/140/141，105套1816通过）；[H1默认图鉴](5.3-H1-pokedex-ui.md)整改913150a待Kimi增量／ultra，[H2完整搜索／摘要单条](5.3-H2-pokedex-search-summary.md)作者实现验证中。完整H、I包/性能/重启与J最终收口未完成。 |
-| 5.4 训练家、AI 与战斗界面 | 本整改分支由`03b3c58`继续 | D1骨架／P-4已限域接受，D2分批实现 | 精确CI180／179通过；GC增长WARN_OPEN。[D2a内部时钟已限域接受，D2b-1状态框接线中](5.4-D2-presentation.md)，新宿主／精确CI及完整D2／E／5.4未接受、未合main。 |
+| 5.4 训练家、AI 与战斗界面 | 本整改分支从已接收`6135e03`独立继续 | D1／P-4、D2a／D2b-1限域接受，D2c-1纯逻辑资源选择候选 | 精确CI184通过；[D2c-1边界](5.4-D2c-battlebacks.md)。菜单1520宿主79/80及输入UNKNOWN仍OPEN，不用诊断绿替代；GC WARN、新D2 P-4、完整D2／E／5.4未接受、未合main。 |
 | 5.5 世界与遭遇 | — | — | 未开始 |
 | 5.6 菜单、标题与存档流程 | — | — | 未开始 |
 
