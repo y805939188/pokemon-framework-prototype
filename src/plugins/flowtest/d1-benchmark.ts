@@ -117,13 +117,18 @@ export async function runD1Benchmark(p:any):Promise<void> {
     await ready(['end']);
     if(input.ordinal===2){
      const diagnostic=p.nodeRequire('./js/engine/build/testing.cjs').trainerAiDiagnostics.trainerAiDiagnostics(s);eq(diagnostic.state.resources[0].count,0,'NPC actual FullRestore once');
+     eq(diagnostic.state.ledger.length,1,'one NPC resource registration');eq(diagnostic.state.ledger[0].state,'consumed','NPC actual resource consumption');
+     assert(current.events.some((e:any)=>e.type==='rpg'&&e.args[0]==='item'&&e.args[1]==='p1'&&e.args[2]==='potion'&&e.args[4]==='ok'),'actual player Potion effect');
+     assert(current.events.some((e:any)=>e.type==='rpg'&&e.args[0]==='ball'&&e.args[1]==='p1'&&e.args[2]==='masterball'&&e.args[4]==='blocked'),'actual trainer ball block');
+     eq([s.bag.potion,s.bag.masterball],[4,4],'medicine and blocked ball spent once');
+     assert(current.events.some((e:any)=>e.type==='switch'&&/p1a: P2$/.test(e.args[0])),'actual voluntary P2 switch');
      assert(current.events.some((e:any)=>/enditem.*P2/.test(e.raw??'')),'actual held consumption observed');
      const live=s.gw._debugBattle().sides[0].pokemon.find((m:any)=>m.name==='P1');eq(live.item,'','actual temporary Knock Off before settlement');
      assert(current.learning,'real learning prompt reached');
     }
     await select('end','end');await p.dismissMessages();await waitFor(()=>!W.PSFlow.running&&scene() instanceof G.Scene_Map&&scene().isStarted()&&!!scene()._messageWindow&&!G.SceneManager.isSceneChanging()&&!scene().isBusy(),'back to fully started map');mark('return-map-ready');
     const out=W.PSFlow.lastOutcome;eq(out.code,input.expected.code,'expected actual outcome '+input.id);eq(out.commit,'applied','one actual commit');assert(game().appliedBattles[input.id]?.settlement?.pairHash,'paired ledger');eq(Object.keys(game().appliedBattles).length,beforeCount+1,'one new ledger entry, previous retained');
-    if(input.ordinal===2){eq(game().party.find((m:any)=>m.id==='P1').item,'oranberry','temporarily removed item restored by B');eq(game().party.find((m:any)=>m.id==='P2').item,'','consumed item not restored');}
+    if(input.ordinal===2){eq(game().party.find((m:any)=>m.id==='P1').item,'oranberry','temporarily removed item restored by B');eq(game().party.find((m:any)=>m.id==='P2').item,'','consumed item not restored');assert(game().party.find((m:any)=>m.id==='P2').moves.some((m:any)=>m.id==='growl'),'actual taught move persisted');}
     if(input.kind==='trainer-loss-D3'){assert(out.blackout&&out.defeat?.healed,'real D3');assert(game().party.every((m:any)=>m.hp>0&&!m.status),'D3 healed whole party');eq(W.PSFlow.lastReturn.status,'requested','actual home request');}
     current.outcome=clone(out);current.afterStateHash=hash(game());current.boundaryEnd=clock();current.focusEnd=document.hasFocus();current.visibleEnd=document.visibilityState;current.status='pass';current=null;write();
     if([4,50,100].includes(rows.length))await sample('after'+rows.length);
