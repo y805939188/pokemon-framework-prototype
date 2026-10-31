@@ -926,7 +926,8 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.update = function () {
     G.Scene_MenuBase.prototype.update.call(this);
-    if (this._mode === "messages") this.updateQueue();
+    // Host abort may close this owner from main/boot/pending action. tick observes closure before phase/busy gates.
+    this.updateQueue();
   };
 
   // --- message pacing

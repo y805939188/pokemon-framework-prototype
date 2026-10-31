@@ -15,6 +15,11 @@ import signal
 import subprocess
 import sys
 import time
+import importlib.util
+
+sys.dont_write_bytecode=True
+_host_spec=importlib.util.spec_from_file_location('d1_host_identity',Path(__file__).with_name('d1_host_identity.py'))
+_host=importlib.util.module_from_spec(_host_spec);_host_spec.loader.exec_module(_host)
 
 GROUPS = ['control-natural1', 'candidate-natural1', 'control-natural2', 'candidate-natural2',
           'control-natural3', 'candidate-natural3', 'control-instrumentOff', 'candidate-instrumentOff',
@@ -78,12 +83,14 @@ def app_memory(main_pid, app, request):
     return result
 
 
-def verify_report_hashes(raw):
+def verify_report_hashes(raw,core=None):
     env=dict(os.environ)
     for name in ['NODE_OPTIONS', 'NODE_PATH', 'NPM_TOKEN', 'NODE_AUTH_TOKEN']:
         env.pop(name,None)
     try:
-        checked=subprocess.run(['node',str(Path(__file__).with_name('d1-report-hashes.cjs'))],
+        command=['node',str(Path(__file__).with_name('d1-report-hashes.cjs'))]
+        if core is not None:command.extend(['--game-core',str(core)])
+        checked=subprocess.run(command,
                                input=raw,capture_output=True,env=env,timeout=30)
     except (OSError,subprocess.TimeoutExpired) as error:
         raise RuntimeError('report hash verifier unavailable: '+str(error)) from error
@@ -93,6 +100,31 @@ def verify_report_hashes(raw):
     if hashes['reportSHA256'] != hashlib.sha256(raw).hexdigest():
         raise RuntimeError('hash verifier did not bind the exact report bytes')
     return hashes
+
+
+def cleanup_owned(process):
+    errors=[]
+    process.poll()  # Reap an exited leader before querying its group (macOS zombie EPERM).
+    def exists():
+        try:os.killpg(process.pid,0);return True
+        except ProcessLookupError:return False
+        except PermissionError as error:errors.append(str(error));return None
+    present=exists();attempted=present is True
+    if present:
+        try:os.killpg(process.pid,signal.SIGTERM)
+        except (ProcessLookupError,PermissionError)as error:errors.append(str(error))
+        for _ in range(25):
+            process.poll()
+            if not exists():break
+            time.sleep(.1)
+        else:
+            try:os.killpg(process.pid,signal.SIGKILL)
+            except (ProcessLookupError,PermissionError)as error:errors.append(str(error))
+    try:process.wait(timeout=5)
+    except (subprocess.TimeoutExpired,PermissionError)as error:errors.append(str(error))
+    final=exists()
+    if final is not False:errors.append('owned process group remains or cannot be verified')
+    return attempted,errors
 
 
 def same_json(left,right):
@@ -132,6 +164,8 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
     row = dict(group=group, argv=args, startedUTC=utc(), deadlineSeconds=900, gc=gc, detailed=not off)
     before = payload(app)
     write(out/'PAYLOAD-BEFORE.json', before)
+    app_before=_host.complete_app(app)
+    write(out/'APP-BEFORE.json',app_before)
     samples, replied, last_progress, last_count = [], None, None, 0
     with (out/'native.log').open('x') as log:
         process = subprocess.Popen(args, cwd=app/'Contents/Resources/app.nw', env=env,
@@ -139,6 +173,7 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
         row['pid'] = process.pid
         write(out/'EXECUTION.json', row)
         deadline = time.monotonic()+900
+        original_error=None
         try:
             while process.poll() is None:
                 if time.monotonic() > deadline:
@@ -166,51 +201,42 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
                     last_count = completed
                 time.sleep(.05)
             row['exit'] = process.returncode
+            if (out/'report.json.fatal.json').exists():
+                raise RuntimeError(group+' fatal recorded at exit; retain evidence')
+        except BaseException as error:
+            original_error=error;row['failure']=dict(type=type(error).__name__,message=str(error));raise
         finally:
-            row['ownGroupCleanup'] = False
-            try:
-                os.killpg(process.pid, 0)
-                row['ownGroupCleanup'] = True
-                os.killpg(process.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-            for _ in range(25):
-                try:
-                    os.killpg(process.pid, 0)
-                except ProcessLookupError:
-                    break
-                time.sleep(.2)
-            else:
-                try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
-                process.wait(timeout=5)
+            row['ownGroupCleanup'],row['cleanupErrors']=cleanup_owned(process)
+            row['exit']=process.returncode
             row['finishedUTC'] = utc()
             row['reportExists'] = report.is_file()
             row['logSHA256'] = sha(out/'native.log')
+            try:
+                write(out/'APP-AFTER.json',_host.complete_app(app))
+                write(out/'PAYLOAD-AFTER.json',payload(app))
+            except (OSError,RuntimeError)as error:row['cleanupErrors'].append('post-exit manifest: '+str(error))
             write(out/'EXECUTION.json', row)
+            if row['cleanupErrors']and original_error is None:raise RuntimeError(group+' cleanup failed: '+repr(row['cleanupErrors']))
     if row.get('exit') != 0 or not report.is_file():
         raise RuntimeError(group+' process/report failed')
+    if (out/'report.json.fatal.json').exists():raise RuntimeError(group+' fatal recorded before final acceptance')
     report_bytes=report.read_bytes()
     result = json.loads(report_bytes)
-    hashes=verify_report_hashes(report_bytes)
+    hashes=verify_report_hashes(report_bytes,app/'Contents/Resources/app.nw/js/engine/build/core.cjs')
     write(out/'HASH-VERIFICATION.json',hashes)
     benchmark = result.get('d1', {})
+    if benchmark.get('version')!='D1-F100-output-v2' or benchmark.get('driverVersion')!='D1-driver-v2-port-order':
+        raise RuntimeError(group+' driver/output version mismatch')
     tests = result.get('results', [])
     if result.get('overall') != 'pass' or len(tests) != 1 or tests[0].get('status') != 'pass' or not tests[0].get('id', '').startswith('D1-F100 '):
         raise RuntimeError(group+' scenario failed/missing; stop, do not replace sample')
     rows = benchmark.get('rows', [])
-    if benchmark.get('status') != 'pass' or benchmark.get('errors') or len(rows) != count:
+    if benchmark.get('status') != 'pass' or benchmark.get('errors') or len(rows) != count or not same_json(benchmark.get('requestedCount'),count):
         raise RuntimeError(group+' workload failed/incomplete')
     if not same_json(benchmark.get('input'),source_input) or [r['id'] for r in rows] != [r['id'] for r in source_input['cases'][:count]]:
         raise RuntimeError(group+' frozen input/order mismatch')
     for actual, expected in zip(rows, source_input['cases']):
-        if actual.get('status') != 'pass' or not same_json(actual['seed'],expected['seed']) or actual.get('resolvedSeed') != ','.join(map(str,expected['seed'])) or not same_json(actual['outcome']['code'],expected['expected']['code']):
+        if actual.get('status') != 'pass' or not same_json(actual['seed'],expected['seed']) or actual.get('resolvedSeed') != ','.join(map(str,expected['seed'])) or not same_json(actual['outcome']['code'],expected['expected']['code']) or actual['outcome'].get('commit')!='applied' or actual['outcome'].get('battleId')!=actual['id']:
             raise RuntimeError(group+' actual case outcome/seed failed')
     if result.get('env', {}).get('packageInfo') != info or not result['env'].get('nw'):
         raise RuntimeError(group+' native package identity mismatch')
@@ -230,11 +256,17 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
     if not off:
         if [m['id'] for m in benchmark['memory']] != sample_ids:
             raise RuntimeError(group+' wrong memory sample order')
+        if samples and [m['id']for m in samples]!=sample_ids:raise RuntimeError(group+' collector sample ID/order mismatch')
         frames=benchmark.get('frameSamples', [])
         if {f.get('kind') for f in frames} != {'updateMain','rAF'} or any(
                 not isinstance(f.get('dt'), (int,float)) or not math.isfinite(f['dt']) or f['dt'] < 0 for f in frames):
             raise RuntimeError(group+' missing/invalid real game/rAF clock samples')
         for memory in benchmark['memory']:
+            sampled=next((s for s in samples if s['id']==memory['id']),None)
+            if sampled is None:
+                if not synthetic or memory.get('appRssStatus')=='value':raise RuntimeError(group+' app RSS has no collector sample')
+            elif any(not same_json(memory.get(k),sampled.get(k))for k in ['appRssStatus','appRssBytes','processes','appRssReason']):
+                raise RuntimeError(group+' app RSS differs from collector sample')
             if memory.get('appRssStatus') == 'value' and (not memory.get('processes') or not isinstance(memory.get('appRssBytes'),int) or memory['appRssBytes'] <= 0):
                 raise RuntimeError(group+' invalid claimed whole app RSS')
             if memory.get('appRssStatus') == 'UNKNOWN' and memory.get('appRssBytes') is not None:
@@ -247,6 +279,8 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
     write(out/'PAYLOAD-AFTER.json', after)
     if before != after:
         raise RuntimeError(group+' runtime payload changed')
+    app_after=_host.complete_app(app);write(out/'APP-AFTER.json',app_after)
+    if app_before!=app_after:raise RuntimeError(group+' complete app changed')
     return dict(group=group, count=count, finalStateHash=hashes['finalStateHash'], inputHash=hashes['inputHash'],
                 initialStateHash=hashes['initialStateHash'],stateHashesVerified=True,
                 evidenceKind='SYNTHETIC_TOOLING_NOT_NATIVE_NOT_P4' if synthetic else 'NATIVE_QUALIFICATION' if not formal else 'NATIVE_FORMAL_WORKLOAD',
@@ -263,7 +297,7 @@ def main():
     parser.add_argument('--pilot-count', type=int, default=0)
     parser.add_argument('--synthetic-controls',action='store_true',help='tooling fixtures only; never records native execution/P-4')
     args=parser.parse_args()
-    if sys.platform != 'darwin':
+    if sys.platform != 'darwin'and not args.synthetic_controls:
         raise SystemExit('actual macOS host required')
     out=Path(args.out).absolute()
     if out.exists() or out.is_symlink():
@@ -288,12 +322,22 @@ def main():
     summary=dict(kind='SYNTHETIC_TOOLING_NOT_NATIVE_NOT_P4' if args.synthetic_controls else 'FORMAL_TEN_GROUPS' if formal else 'QUALIFICATION_NOT_P4',startedUTC=utc(),packages=infos,
                  allowedPayloadDifferences=differences,input=source_input,groups=[],status='running')
     write(out/'SUMMARY.json', summary)
+    previous={};cancelled=False
+    def cancel(signum,frame):
+        nonlocal cancelled
+        if not cancelled:cancelled=True;raise RuntimeError('benchmark cancelled by signal '+str(signum))
+    for signum in [signal.SIGTERM,signal.SIGHUP]:previous[signum]=signal.signal(signum,cancel)
     try:
+        if not args.synthetic_controls:
+            summary['hostIdentity']=_host.require_pair(apps['control'],apps['candidate'])
+            write(out/'SUMMARY.json',summary)
         for group in args.groups:
             key=group.split('-')[0]
             result=run_group(apps[key],infos[key],out/group,group,count,formal,source_input,synthetic=args.synthetic_controls)
             summary['groups'].append(result)
             write(out/'SUMMARY.json', summary)
+            if not args.synthetic_controls:
+                summary['runtimeIdentity']=_host.require_runtime(summary.get('runtimeIdentity'),result['environment'])
         for field in ['initialStateHash','finalStateHash']:
             if len({r[field] for r in summary['groups']}) != 1:
                 raise RuntimeError('complete framework state differs ('+field+'); retain difference, do not normalize it away')
@@ -305,6 +349,7 @@ def main():
         raise
     finally:
         write(out/'SUMMARY.json', summary)
+        for signum,handler in previous.items():signal.signal(signum,handler)
     print(summary['kind'],summary['status'],summary['totalBattles'],flush=True)
 
 

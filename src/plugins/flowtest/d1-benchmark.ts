@@ -4,6 +4,7 @@
  */
 import INPUT from '../../../experiments/step5/4/d1/f100-v1.json';
 import { progressionDonorInputs } from './source-fixture';
+import { createD1Timing } from './d1-timing';
 
 function content(E:any,p:any):any {
  const input=progressionDonorInputs();
@@ -29,7 +30,7 @@ export async function runD1Benchmark(p:any):Promise<void> {
  assert(OUT,'D1 evidence output required');
  const hash=(v:any)=>p.nodeRequire('crypto').createHash('sha256').update(typeof v==='string'?v:JSON.stringify(v)).digest('hex');
  const clock=()=>performance.now(),rows:any[]=[],memory:any[]=[],frameSamples:any[]=[];let current:any=null,worldDraws=0,gameTick=0,rafTick=0,rafId=0,live=true;
- const result:any={version:'D1-F100-output-v1',kind:limit===100&&argv.includes('--ps-d1-formal')?'FORMAL_F100':'PILOT_NOT_P4',input:INPUT,inputHash:hash(INPUT),requestedCount:limit,instrumentation:{detailed,legacyPSFlowPerf:true,disabled:detailed?[]:['updateMain samples','rAF samples','scene/action/AI/prepare/install detailed spans','managed/memory sampling'],driver:'same semantic programmatic menu selection/fast-forward and boundary oracle in both versions; boundary clock/hash checks and existing PSFlow.perf remain in off mode; timing does not claim CPU attribution'},rows,memory,frameSamples,errors:[],fixture:'author RPG moves are explicit test data; normal Gen8 simulator, no engine patches; initial2 members/captures/ledger/stats retained',focus:[],phases:{transition:'NOT_APPLICABLE_D1_NO_D2_EFFECT'},window:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio}};
+ const result:any={version:'D1-F100-output-v2',driverVersion:'D1-driver-v2-port-order',kind:limit===100&&argv.includes('--ps-d1-formal')?'FORMAL_F100':'PILOT_NOT_P4',input:INPUT,inputHash:hash(INPUT),requestedCount:limit,instrumentation:{detailed,legacyPSFlowPerf:true,disabled:detailed?[]:['updateMain samples','rAF samples','scene/action/AI/prepare/install detailed spans','managed/memory sampling'],driver:'same semantic programmatic menu selection/fast-forward and boundary oracle in both versions; boundary clock/hash checks and existing PSFlow.perf remain in off mode; timing does not claim CPU attribution'},rows,memory,frameSamples,errors:[],fixture:'author RPG moves are explicit test data; normal Gen8 simulator, no engine patches; initial2 members/captures/ledger/stats retained',focus:[],phases:{transition:'NOT_APPLICABLE_D1_NO_D2_EFFECT'},window:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio}};
  p.report.d1=result;
  const mark=(name:string,data:any={})=>{if(detailed&&current)current.markers.push({name,t:clock(),gameTick,rafTick,...data});};
  const originalUpdate=G.SceneManager.updateMain;let lastGame:number|null=null,lastRaf:number|null=null;
@@ -78,7 +79,8 @@ export async function runD1Benchmark(p:any):Promise<void> {
   const initial=E.state.newGame({content:c,party:[],money:100000,bag:{masterball:5,potion:5}});initial.badges.fill(true);
   initial.party=['P1','P2'].map(id=>E.speciesKey.toPersistentMember(E.memberFactory.createMember({id,species:'Snorlax',level:50},c,()=>0),c));initial.nextMemberOrdinal='3';
   for(const m of initial.party)m.item='oranberry';initial.party[0].hp-=20;initial.party[1].hp=1;initial.party[1].exp=E.growth.minExp('slow',51)-1;G.$gameSystem._psGame=initial;
-  const app=new E.app.GameApplication({state:{read:()=>game(),replace:(next:any)=>{mark('install-start');G.$gameSystem._psGame=next;mark('install-end');}},content:()=>({content:c,dex:W.PSFlow._dex}),sessions:E.composition.createBattleSessionFactory({content:()=>c,seed:()=>W.PSFlow.seed,trainerAiTiming:{now(){const t=clock();if(detailed&&current)current.aiClock.push(t);return t;},after(fn:any,ms:number){const id=setTimeout(fn,ms);return()=>clearTimeout(id);}}}),projection:{project:(out:any)=>W.PSFlow.projectOutcome(out)},random:()=>{worldDraws++;return 0;},clock:()=>1793350000000},{capabilities:W.PSFlow.developerCapabilities,receivingProfile:{mode:1,naming:1}});W.PSFlow._app=app;
+  const timing=createD1Timing(clock,(ms,callback)=>setTimeout(callback,ms),id=>clearTimeout(id),t=>{if(detailed&&current)current.aiClock.push(t);});
+  const app=new E.app.GameApplication({state:{read:()=>game(),replace:(next:any)=>{mark('install-start');G.$gameSystem._psGame=next;mark('install-end');}},content:()=>({content:c,dex:W.PSFlow._dex}),sessions:E.composition.createBattleSessionFactory({content:()=>c,seed:()=>W.PSFlow.seed,trainerAiTiming:timing}),projection:{project:(out:any)=>W.PSFlow.projectOutcome(out)},random:()=>{worldDraws++;return 0;},clock:()=>1793350000000},{capabilities:W.PSFlow.developerCapabilities,receivingProfile:{mode:1,naming:1}});W.PSFlow._app=app;
   const finish=app.finishBattle.bind(app);app.finishBattle=(...args:any[])=>{mark('prepare-commit-start');try{return finish(...args);}finally{mark('prepare-commit-end');}};
   result.contentIdentity=c.meta;result.initialStateHash=hash(game());result.initialState=clone(game());result.actualCapabilities=clone(W.PSFlow.developerCapabilities);result.clock=1793350000000;
   sessionPrototype=W.Scene_PSBattle.prototype;oldPush=sessionPrototype.pushMessages;

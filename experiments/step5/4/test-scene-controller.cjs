@@ -102,6 +102,19 @@ for(const transfer of ['receiving','evolution'])test(`compiled ${transfer} hando
  if(transfer==='receiving')h.G.PSManagement={replaceBattleWithReceiving:()=>true};h.scene.onEnd();h.scene.terminate();assert(h.flow.running);assert(!h.G.$gameSystem.isSaveEnabled());assert.equal(h.counts.abort,0);assert.equal(h.counts.finish,1);
 });
 test('compiled abort releases only the battle mask and leaves the end menu usable',async()=>{const h=await host().ready();assert(!h.G.$gameSystem.isSaveEnabled());h.scene.abort(Error('action fault'));h.scene.updateQueue();assert.equal(h.scene._mode,'end');assert(h.scene.inputState().ready);assert(h.G.$gameSystem.isSaveEnabled());h.scene.onMenuOk();assert.equal(h.counts.pop,1);assert.equal(h.counts.abort,1);});
+for(const pending of ['idle','resolve','reject'])test(`actual Scene.update observes external abort while ${pending} without a second application abort`,async()=>{
+ const h=await host().ready(),s=h.scene,d=deferred();
+ if(pending!=='idle'){s.act(()=>d.promise);await flush();assert(s._busy);}
+ h.flow.abort(Error('external owner close'));
+ if(pending!=='idle'){d[pending](pending==='resolve'?{messages:[]}:Error('late rejected'));await flush();}
+ for(let i=0;i<3;i++)s.update();assert.equal(s._mode,'end');assert(!s._busy);assert(s.inputState().ready);assert(h.G.$gameSystem.isSaveEnabled());assert.equal(h.counts.abort,1);assert.equal(h.counts.finish,0);s.onMenuOk();assert.equal(h.counts.pop,1);assert.equal(h.counts.abort,1);
+});
+for(const phase of ['opening','messages','end'])test(`actual Scene.update external abort adjacent ${phase} remains usable`,async()=>{
+ const d=deferred(),h=phase==='opening'?host({opening:d.promise}):await host().ready(),s=h.scene;
+ if(phase==='opening')s.create();else if(phase==='messages')s.pushMessages([]);else s.showEnd(false);
+ h.flow.abort(Error('external adjacent'));if(phase==='opening'){d.resolve(h.session);await flush();assert(s.isReady());s.start();}
+ for(let i=0;i<3;i++)s.update();assert.equal(s._mode,'end');assert(s.inputState().ready);s.onMenuCancel();assert(s.inputState().ready);assert.equal(h.counts.pop,0);s.onMenuOk();assert.equal(h.counts.pop,1);assert.equal(h.counts.abort,1);assert.equal(h.counts.finish,0);
+});
 for(const mode of ['reject','throw-falsy'])test(`compiled ${mode} opening becomes an owned, usable aborted end`,async()=>{
  const d=deferred(),h=host({opening:d.promise});if(mode==='throw-falsy')h.flow.begin=()=>{throw 0;};h.scene.create();if(mode==='reject')d.reject(Error('opening rejected'));await flush();assert(h.scene.isReady());h.scene.start();h.scene.updateQueue();assert.equal(h.scene._mode,'end');assert(h.scene.inputState().ready);assert.equal(h.counts.abort,1);assert(!h.flow.running);assert(h.G.$gameSystem.isSaveEnabled());
 });

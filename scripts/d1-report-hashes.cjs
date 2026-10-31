@@ -46,6 +46,28 @@ try {
     reportSHA256: crypto.createHash('sha256').update(raw).digest('hex'),
     serialization: 'ECMAScript JSON.stringify, entire input/initialState/finalState; canonical native number tokens',
   };
+  if (process.argv[2] === '--game-core') {
+    const corePath = require('node:path').resolve(process.argv[3]);
+    const core = require(corePath);
+    for (const key of ['initialState', 'finalState']) {
+      const state = benchmark[key];
+      if (state.schema !== core.state.GAME_SCHEMA) throw new Error('current complete game schema required: ' + key);
+      const problems = core.saveSchema.validateGame(state);
+      if (problems.length) throw new Error('invalid complete game state: ' + key + ': ' + JSON.stringify(problems.slice(0, 3)));
+    }
+    const ids = benchmark.input.cases.slice(0, benchmark.requestedCount).map(row => row.id);
+    if (!Number.isInteger(benchmark.requestedCount) || benchmark.requestedCount < 1 || ids.length !== benchmark.requestedCount) throw new Error('invalid state case count');
+    if (Object.keys(benchmark.initialState.appliedBattles).length) throw new Error('initial fixture ledger must be empty');
+    const ledger = benchmark.finalState.appliedBattles;
+    if (Object.keys(ledger).length !== ids.length || ids.some(id => !Object.hasOwn(ledger, id) || !/^[a-f0-9]{64}$/.test(ledger[id].settlement?.pairHash ?? ''))) throw new Error('final case ledger/pair identity mismatch');
+    for (const row of benchmark.rows) {
+      if (row.outcome?.battleId !== row.id || row.outcome?.commit !== 'applied') throw new Error('case commit identity mismatch');
+      if (!/^[a-f0-9]{64}$/.test(row.afterStateHash ?? '')) throw new Error('invalid per-case state hash');
+    }
+    if (benchmark.rows.at(-1)?.afterStateHash !== hashes.finalStateHash) throw new Error('last case state differs from complete final state');
+    hashes.gameValidation = {corePath, coreSHA256: crypto.createHash('sha256').update(fs.readFileSync(corePath)).digest('hex'), schema: core.state.GAME_SCHEMA, cases: ids.length, intermediateStateHashes: 'format only; per-case complete states are not present'};
+  }
+  hashes.verifier = {node: process.version, executable: process.execPath, scriptSHA256: crypto.createHash('sha256').update(fs.readFileSync(__filename)).digest('hex')};
   process.stdout.write(JSON.stringify(hashes) + '\n');
 } catch (error) {
   process.stderr.write('D1 report hash verification failed: ' + error.message + '\n');

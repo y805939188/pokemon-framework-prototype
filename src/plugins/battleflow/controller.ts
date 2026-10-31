@@ -62,10 +62,13 @@ export class BattleSceneController<Session = unknown> {
 
   /** The host may close an operation without destroying its scene until the next update. */
   private observeClosedHost(): void {
-    if (!this.isCurrent() || this.ports.active() || this.phase === 'end'
+    if (!this.isCurrent() || this.ports.active()
       || (this.failure && !this.busy && !this.opening && this.phase !== 'boot')) return;
+    const reason = this.ports.closedFailure();
+    if (this.phase === 'end' && !reason) return; // An already committed successful end stays successful.
     ++this.epoch; this.opening = false; this.ready = true; this.busy = false;
-    this.failure ||= this.ports.closedFailure();
+    this.abortSent = true; // The host already closed this operation; never abort its application twice.
+    this.failure ||= reason;
     this.queue.length = 0; this.wait = 0; this.phase = 'messages';
     this.ports.hideInput();
   }
@@ -151,7 +154,7 @@ export class BattleSceneController<Session = unknown> {
     ++this.epoch; this.opening = false; this.busy = false; this.ready = true;
     this.failure = error || new Error(String(error)); this.queue.length = 0; this.wait = 0; this.phase = 'messages';
     try {
-      if (!this.abortSent) { this.abortSent = true; this.ports.abort(error); }
+      if (!this.abortSent) { this.abortSent = true; if (this.ports.active()) this.ports.abort(error); }
       if (this.isCurrent()) this.ports.hideInput();
     } catch (viewError) { this.unusable(viewError); }
     finally { this.failing = false; }
