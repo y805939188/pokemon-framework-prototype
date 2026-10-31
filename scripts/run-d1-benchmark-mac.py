@@ -26,6 +26,22 @@ GROUPS = ['control-natural1', 'candidate-natural1', 'control-natural2', 'candida
           'control-GC1', 'candidate-GC1']
 
 
+class BenchmarkCancelled(BaseException):
+    """Raised at safe checkpoints only, never as an RSS UNKNOWN or asynchronously in cleanup."""
+
+
+class Cancellation:
+    def __init__(self):
+        self.signals = []
+
+    def request(self, signum, frame):
+        self.signals.append(signum)  # Never interrupt receipt I/O or owned cleanup.
+
+    def check(self):
+        if self.signals:
+            raise BenchmarkCancelled('benchmark cancelled by signal '+str(self.signals[0]))
+
+
 def sha(file):
     return hashlib.sha256(file.read_bytes()).hexdigest()
 
@@ -45,25 +61,28 @@ def payload(app):
     return {p.relative_to(root).as_posix(): sha(p) for p in sorted(root.rglob('*')) if p.is_file()}
 
 
-def app_memory(main_pid, app, request):
+def app_memory(main_pid, app, request, cancellation=None):
     """No system-wide process table or substring sum: enumerate only this launched PID's descendants."""
     result = dict(id=request['id'], collectorUTC=utc(), collectorMonotonic=time.monotonic(),
                   appRssBytes=None, appRssStatus='UNKNOWN', appRssReason=None, processes=[])
     try:
         pending, pids = [main_pid], set()
         while pending:
+            if cancellation: cancellation.check()
             parent = pending.pop()
             if parent in pids:
                 continue
             pids.add(parent)
             if len(pids) > 64:
                 raise RuntimeError('owned process tree exceeds bounded sample')
-            children = subprocess.run(['pgrep', '-P', str(parent)], capture_output=True, text=True)
+            children = subprocess.run(['pgrep', '-P', str(parent)], capture_output=True, text=True, timeout=5)
+            if cancellation: cancellation.check()
             if children.returncode not in [0, 1]:
                 raise RuntimeError('direct-child enumeration denied/failed: ' + children.stderr.strip())
             pending.extend(int(p) for p in children.stdout.split())
         sample = subprocess.run(['ps', '-p', ','.join(map(str, sorted(pids))), '-o', 'pid=,ppid=,rss=,comm='],
-                                capture_output=True, text=True)
+                                capture_output=True, text=True, timeout=5)
+        if cancellation: cancellation.check()
         if sample.returncode:
             raise RuntimeError('owned PID sample denied/failed: ' + sample.stderr.strip())
         for line in sample.stdout.splitlines():
@@ -78,8 +97,9 @@ def app_memory(main_pid, app, request):
         if any(p['pid'] != main_pid and p['parent'] not in sampled for p in result['processes']):
             raise RuntimeError('process lineage changed during sample')
         result.update(appRssBytes=sum(p['rssBytes'] for p in result['processes']), appRssStatus='value')
-    except (OSError, ValueError, RuntimeError) as error:
+    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
         result['appRssReason'] = str(error)
+    if cancellation: cancellation.check()
     return result
 
 
@@ -138,7 +158,8 @@ def same_json(left,right):
     return left==right
 
 
-def run_group(app, info, out, group, count, formal, source_input, *, synthetic=False):
+def run_group(app, info, out, group, count, formal, source_input, *, synthetic=False, cancellation=None):
+    if cancellation: cancellation.check()
     out.mkdir()
     if not synthetic:
         # Normal measurement must launch a native Mach-O host, never a Python/shell fixture child.
@@ -162,6 +183,14 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
     for name in ['NODE_OPTIONS', 'NODE_PATH', 'NPM_TOKEN', 'NODE_AUTH_TOKEN']:
         env.pop(name, None)
     row = dict(group=group, argv=args, startedUTC=utc(), deadlineSeconds=900, gc=gc, detailed=not off)
+    def check_cancel():
+        if cancellation:
+            try: cancellation.check()
+            except BenchmarkCancelled as error:
+                row.setdefault('failure', dict(type=type(error).__name__, message=str(error)))
+                row['cancellationSignals'] = list(cancellation.signals)
+                if 'finishedUTC' in row: write(out/'EXECUTION.json', row)
+                raise
     before = payload(app)
     write(out/'PAYLOAD-BEFORE.json', before)
     app_before=_host.complete_app(app)
@@ -182,11 +211,13 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
                 fatal = out/'report.json.fatal.json'
                 if fatal.exists():
                     raise RuntimeError(group+' fatal recorded; stop this run, retain evidence')
+                check_cancel()
                 request = out/'report.json.memory-request.json'
                 if request.exists():
                     req = json.loads(request.read_text())
                     if req['id'] != replied:
-                        answer = app_memory(process.pid, app, req)
+                        answer = app_memory(process.pid, app, req, cancellation) if cancellation else app_memory(process.pid, app, req)
+                        check_cancel()
                         samples.append(answer)
                         write(out/'report.json.memory-reply.json', answer)
                         write(out/'OWNED-APP-MEMORY.json', samples)
@@ -203,6 +234,7 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
             row['exit'] = process.returncode
             if (out/'report.json.fatal.json').exists():
                 raise RuntimeError(group+' fatal recorded at exit; retain evidence')
+            check_cancel()
         except BaseException as error:
             original_error=error;row['failure']=dict(type=type(error).__name__,message=str(error));raise
         finally:
@@ -215,14 +247,18 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
                 write(out/'APP-AFTER.json',_host.complete_app(app))
                 write(out/'PAYLOAD-AFTER.json',payload(app))
             except (OSError,RuntimeError)as error:row['cleanupErrors'].append('post-exit manifest: '+str(error))
+            row['cancellationSignals'] = list(cancellation.signals) if cancellation else []
             write(out/'EXECUTION.json', row)
             if row['cleanupErrors']and original_error is None:raise RuntimeError(group+' cleanup failed: '+repr(row['cleanupErrors']))
+            if original_error is None: check_cancel()
+    check_cancel()
     if row.get('exit') != 0 or not report.is_file():
         raise RuntimeError(group+' process/report failed')
     if (out/'report.json.fatal.json').exists():raise RuntimeError(group+' fatal recorded before final acceptance')
     report_bytes=report.read_bytes()
     result = json.loads(report_bytes)
     hashes=verify_report_hashes(report_bytes,app/'Contents/Resources/app.nw/js/engine/build/core.cjs')
+    check_cancel()
     write(out/'HASH-VERIFICATION.json',hashes)
     benchmark = result.get('d1', {})
     if benchmark.get('version')!='D1-F100-output-v2' or benchmark.get('driverVersion')!='D1-driver-v2-port-order':
@@ -281,6 +317,7 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
         raise RuntimeError(group+' runtime payload changed')
     app_after=_host.complete_app(app);write(out/'APP-AFTER.json',app_after)
     if app_before!=app_after:raise RuntimeError(group+' complete app changed')
+    check_cancel()
     return dict(group=group, count=count, finalStateHash=hashes['finalStateHash'], inputHash=hashes['inputHash'],
                 initialStateHash=hashes['initialStateHash'],stateHashesVerified=True,
                 evidenceKind='SYNTHETIC_TOOLING_NOT_NATIVE_NOT_P4' if synthetic else 'NATIVE_QUALIFICATION' if not formal else 'NATIVE_FORMAL_WORKLOAD',
@@ -322,18 +359,19 @@ def main():
     summary=dict(kind='SYNTHETIC_TOOLING_NOT_NATIVE_NOT_P4' if args.synthetic_controls else 'FORMAL_TEN_GROUPS' if formal else 'QUALIFICATION_NOT_P4',startedUTC=utc(),packages=infos,
                  allowedPayloadDifferences=differences,input=source_input,groups=[],status='running')
     write(out/'SUMMARY.json', summary)
-    previous={};cancelled=False
-    def cancel(signum,frame):
-        nonlocal cancelled
-        if not cancelled:cancelled=True;raise RuntimeError('benchmark cancelled by signal '+str(signum))
-    for signum in [signal.SIGTERM,signal.SIGHUP]:previous[signum]=signal.signal(signum,cancel)
+    previous={};cancellation=Cancellation()
+    summary['cancellationSignals']=cancellation.signals
+    for signum in [signal.SIGTERM,signal.SIGHUP]:previous[signum]=signal.signal(signum,cancellation.request)
     try:
+        cancellation.check()
         if not args.synthetic_controls:
             summary['hostIdentity']=_host.require_pair(apps['control'],apps['candidate'])
             write(out/'SUMMARY.json',summary)
         for group in args.groups:
+            cancellation.check()
             key=group.split('-')[0]
-            result=run_group(apps[key],infos[key],out/group,group,count,formal,source_input,synthetic=args.synthetic_controls)
+            result=run_group(apps[key],infos[key],out/group,group,count,formal,source_input,synthetic=args.synthetic_controls,cancellation=cancellation)
+            cancellation.check()
             summary['groups'].append(result)
             write(out/'SUMMARY.json', summary)
             if not args.synthetic_controls:
@@ -341,6 +379,7 @@ def main():
         for field in ['initialStateHash','finalStateHash']:
             if len({r[field] for r in summary['groups']}) != 1:
                 raise RuntimeError('complete framework state differs ('+field+'); retain difference, do not normalize it away')
+        cancellation.check()
         summary.update(status='SYNTHETIC_CONTROLS_EXECUTED' if args.synthetic_controls else 'AUTHOR_EXECUTED',finishedUTC=utc(),totalBattles=0 if args.synthetic_controls else count*len(args.groups),
                        syntheticCaseRecords=count*len(args.groups) if args.synthetic_controls else 0,
                        limitations='P-4 performance acceptance requires report/review; foreground loss/UNKNOWN and historical WARN remain explicit')
@@ -348,8 +387,15 @@ def main():
         summary.update(status='FAIL_STOP',error=str(error),finishedUTC=utc())
         raise
     finally:
+        late_cancel=bool(cancellation.signals) and summary['status']!='FAIL_STOP'
+        if late_cancel:summary.update(status='FAIL_STOP',error='benchmark cancelled by signal '+str(cancellation.signals[0]),finishedUTC=utc())
         write(out/'SUMMARY.json', summary)
+        if cancellation.signals and summary['status']!='FAIL_STOP':
+            late_cancel=True
+            summary.update(status='FAIL_STOP',error='benchmark cancelled by signal '+str(cancellation.signals[0]),finishedUTC=utc())
+            write(out/'SUMMARY.json',summary)
         for signum,handler in previous.items():signal.signal(signum,handler)
+        if late_cancel:cancellation.check()
     print(summary['kind'],summary['status'],summary['totalBattles'],flush=True)
 
 
