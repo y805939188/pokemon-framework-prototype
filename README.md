@@ -4,7 +4,7 @@
 
 起点是 [rpg-maker-mz-initialize](https://github.com/y805939188/rpg-maker-mz-initialize) 模板（`b6fa1df`）；第二步（验证战斗接入）已完成，结论和证据在 `docs/step2/`。
 
-本整改分支的5.4进度：D1/P-4、D2a时钟及D2b-1状态框已限域接受；D2b与信号窄修精确CI184／182／183均双job成功。当前[D2后继网格导航小批](docs/step5/5.4-D2-presentation.md)实现主命令／招式2×2与游标记忆；完整菜单、消息／能力窗、资源／战前、完整D2与5.4及新P-4尚未接受。GC与历史WARN保持OPEN，本说明不表示main已整合。
+本整改分支以已接收菜单1520b91为基线整合已接收纯资源选择95a2b8d；前置精确CI185／186分别通过。当前继续[D2c-2静态资源加载／绘制](docs/step5/5.4-D2c-battlebacks.md)的独立组合候选，不能把纯选择通过当图片已显示。完整D2／5.4、新P-4和GC内存增长WARN仍OPEN，原U51-16超时FAIL／输入来源UNKNOWN保留。本说明不表示main已整合，当前组合尚未独立验收。
 
 ## 先读什么
 
