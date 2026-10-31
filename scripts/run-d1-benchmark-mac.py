@@ -10,6 +10,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -77,8 +78,30 @@ def app_memory(main_pid, app, request):
     return result
 
 
-def run_group(app, info, out, group, count, formal, source_input):
+def verify_report_hashes(raw):
+    env=dict(os.environ)
+    for name in ['NODE_OPTIONS', 'NODE_PATH', 'NPM_TOKEN', 'NODE_AUTH_TOKEN']:
+        env.pop(name,None)
+    try:
+        checked=subprocess.run(['node',str(Path(__file__).with_name('d1-report-hashes.cjs'))],
+                               input=raw,capture_output=True,env=env,timeout=30)
+    except (OSError,subprocess.TimeoutExpired) as error:
+        raise RuntimeError('report hash verifier unavailable: '+str(error)) from error
+    if checked.returncode:
+        raise RuntimeError(checked.stderr.decode('utf8',errors='replace').strip())
+    hashes=json.loads(checked.stdout)
+    if hashes['reportSHA256'] != hashlib.sha256(raw).hexdigest():
+        raise RuntimeError('hash verifier did not bind the exact report bytes')
+    return hashes
+
+
+def run_group(app, info, out, group, count, formal, source_input, *, synthetic=False):
     out.mkdir()
+    if not synthetic:
+        # Normal measurement must launch a native Mach-O host, never a Python/shell fixture child.
+        with (app/'Contents/MacOS/nwjs').open('rb') as launcher:
+            if launcher.read(4) not in [b'\xcf\xfa\xed\xfe',b'\xfe\xed\xfa\xcf',b'\xca\xfe\xba\xbe',b'\xbe\xba\xfe\xca',b'\xca\xfe\xba\xbf',b'\xbf\xba\xfe\xca']:
+                raise RuntimeError('native Mach-O launcher required; use explicit synthetic-controls mode for tool fixtures')
     report = out / 'report.json'
     gc, off = 'GC' in group, 'instrumentOff' in group
     args = [str(app / 'Contents/MacOS/nwjs'), '--user-data-dir='+str(out/'profile'), '--mute-audio',
@@ -162,7 +185,10 @@ def run_group(app, info, out, group, count, formal, source_input):
             write(out/'EXECUTION.json', row)
     if row.get('exit') != 0 or not report.is_file():
         raise RuntimeError(group+' process/report failed')
-    result = json.loads(report.read_text())
+    report_bytes=report.read_bytes()
+    result = json.loads(report_bytes)
+    hashes=verify_report_hashes(report_bytes)
+    write(out/'HASH-VERIFICATION.json',hashes)
     benchmark = result.get('d1', {})
     tests = result.get('results', [])
     if result.get('overall') != 'pass' or len(tests) != 1 or tests[0].get('status') != 'pass' or not tests[0].get('id', '').startswith('D1-F100 '):
@@ -177,6 +203,9 @@ def run_group(app, info, out, group, count, formal, source_input):
             raise RuntimeError(group+' actual case outcome/seed failed')
     if result.get('env', {}).get('packageInfo') != info or not result['env'].get('nw'):
         raise RuntimeError(group+' native package identity mismatch')
+    if not synthetic and (not re.fullmatch(r'\d+\.\d+\.\d+',str(result['env']['nw']))
+                          or result['env'].get('platform') != 'darwin' or result['env'].get('arch') != 'arm64'):
+        raise RuntimeError(group+' actual native runtime identity missing/unsupported')
     if formal and benchmark.get('kind') != 'FORMAL_F100':
         raise RuntimeError(group+' is not a formal100 run')
     expected_impl = 'legacy text-scene bridge' if group.startswith('control') else 'd1-controller-v1'
@@ -207,11 +236,13 @@ def run_group(app, info, out, group, count, formal, source_input):
     write(out/'PAYLOAD-AFTER.json', after)
     if before != after:
         raise RuntimeError(group+' runtime payload changed')
-    return dict(group=group, count=count, finalStateHash=benchmark['finalStateHash'], inputHash=benchmark['inputHash'],
+    return dict(group=group, count=count, finalStateHash=hashes['finalStateHash'], inputHash=hashes['inputHash'],
+                initialStateHash=hashes['initialStateHash'],stateHashesVerified=True,
+                evidenceKind='SYNTHETIC_TOOLING_NOT_NATIVE_NOT_P4' if synthetic else 'NATIVE_QUALIFICATION' if not formal else 'NATIVE_FORMAL_WORKLOAD',
                 foreground=all(r['focusStart'] and r['focusEnd'] and r['visibleStart']=='visible' and r['visibleEnd']=='visible' for r in rows)
                 and all(s['focus'] and s['visibility']=='visible' for s in benchmark['frameSamples']),
                 appRssStatus='UNKNOWN' if any(m.get('appRssStatus') != 'value' for m in benchmark['memory']) else ('NOT_SAMPLED' if off else 'value'),
-                environment=result['env'], execution=row, reportSHA256=sha(report))
+                environment=result['env'], execution=row, reportSHA256=hashes['reportSHA256'])
 
 
 def main():
@@ -219,6 +250,7 @@ def main():
     parser.add_argument('control');parser.add_argument('candidate');parser.add_argument('out')
     parser.add_argument('--groups', nargs='+', choices=GROUPS, default=GROUPS)
     parser.add_argument('--pilot-count', type=int, default=0)
+    parser.add_argument('--synthetic-controls',action='store_true',help='tooling fixtures only; never records native execution/P-4')
     args=parser.parse_args()
     if sys.platform != 'darwin':
         raise SystemExit('actual macOS host required')
@@ -242,18 +274,20 @@ def main():
     if any(p not in allowed for p in differences):
         raise SystemExit('unexpected bridge/controller payload differences: '+repr(differences))
     source_input=json.loads((Path(__file__).resolve().parent.parent/'experiments/step5/4/d1/f100-v1.json').read_text())
-    summary=dict(kind='FORMAL_TEN_GROUPS' if formal else 'QUALIFICATION_NOT_P4',startedUTC=utc(),packages=infos,
+    summary=dict(kind='SYNTHETIC_TOOLING_NOT_NATIVE_NOT_P4' if args.synthetic_controls else 'FORMAL_TEN_GROUPS' if formal else 'QUALIFICATION_NOT_P4',startedUTC=utc(),packages=infos,
                  allowedPayloadDifferences=differences,input=source_input,groups=[],status='running')
     write(out/'SUMMARY.json', summary)
     try:
         for group in args.groups:
             key=group.split('-')[0]
-            result=run_group(apps[key],infos[key],out/group,group,count,formal,source_input)
+            result=run_group(apps[key],infos[key],out/group,group,count,formal,source_input,synthetic=args.synthetic_controls)
             summary['groups'].append(result)
             write(out/'SUMMARY.json', summary)
-        if len({r['finalStateHash'] for r in summary['groups']}) != 1:
-            raise RuntimeError('complete final framework state differs; retain difference, do not normalize it away')
-        summary.update(status='AUTHOR_EXECUTED',finishedUTC=utc(),totalBattles=count*len(args.groups),
+        for field in ['initialStateHash','finalStateHash']:
+            if len({r[field] for r in summary['groups']}) != 1:
+                raise RuntimeError('complete framework state differs ('+field+'); retain difference, do not normalize it away')
+        summary.update(status='SYNTHETIC_CONTROLS_EXECUTED' if args.synthetic_controls else 'AUTHOR_EXECUTED',finishedUTC=utc(),totalBattles=0 if args.synthetic_controls else count*len(args.groups),
+                       syntheticCaseRecords=count*len(args.groups) if args.synthetic_controls else 0,
                        limitations='P-4 performance acceptance requires report/review; foreground loss/UNKNOWN and historical WARN remain explicit')
     except BaseException as error:
         summary.update(status='FAIL_STOP',error=str(error),finishedUTC=utc())
