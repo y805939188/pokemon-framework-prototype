@@ -5,6 +5,9 @@ import {assertJsonValue,parseJson} from '../lib/json.mjs';
 import {validateRequest,GateError} from '../lib/protocol.mjs';
 const plans=parseJson(readFileSync(new URL('./dispatch-plans.json',import.meta.url),'utf8'));
 const need=(ok,code)=>{if(!ok)throw new GateError('OBS21_'+code);};
+export function frozenPlanIds(planId){
+ need(Object.hasOwn(plans.plans,planId),'DISPATCH_PLAN_UNKNOWN');return [...plans.plans[planId]];
+}
 export function approvedDispatchPlan(planId,request){
  validateRequest(request);
  need(request.requestHash===plans.requestHash&&request.cases.length===354,'DISPATCH_REQUEST');

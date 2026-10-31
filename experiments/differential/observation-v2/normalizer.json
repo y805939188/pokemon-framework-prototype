@@ -1,8 +1,9 @@
 {
-  "protocol": "pre54-observation-normalizer-v2",
+  "protocol": "pre54-observation-normalizer-v2.1",
   "arrayOrder": "preserve",
   "lifecycleEquality": "strict-no-returned-wait-equivalence",
   "waitProjection": "forgetting-member-moves-v2",
   "unobservedPolicy": "retain-total-never-equivalent",
-  "returnedProjection": "pre54-batch2-v1-unchanged"
+  "returnedProjection": "pre54-v1-plus-native-integer-and-state-v1",
+  "dispatchPolicy": "parent-approved-plan-prefix-output354-order-v1"
 }

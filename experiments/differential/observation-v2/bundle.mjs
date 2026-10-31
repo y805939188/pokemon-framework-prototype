@@ -8,7 +8,7 @@ import {shape,requireV2} from './protocol.mjs';
 export const LEGACY_FREEZE='ebda61d9abdbc43cb7d3b27857b9b9a0deb5da6877068db105959b41c151555d';
 export const REQUEST_BYTES='d8ed3fc97db87148b29ed4a743c7417d182151f1dd4cdecce4c84a5fde9a1df2';
 export const REQUEST_HASH='19c09762f7166fef2a7b540c159ded9bd76cbde25903c44a5c3171338a90c133';
-export const NEW_FILES=Object.freeze(['bundle.mjs','build.mjs','receive.mjs','compare.mjs','protocol.mjs','schema.json','normalizer.json','CONTRACT.zh.md'].sort());
+export const NEW_FILES=Object.freeze(['bundle.mjs','build.mjs','receive.mjs','compare.mjs','protocol.mjs','schema.json','normalizer.json','CONTRACT.zh.md','dispatch.mjs','dispatch-plans.json'].sort());
 const deps=KIT_PAYLOAD.filter(p=>p.startsWith('lib/')||p.startsWith('schema/')||p==='profiles/pre54-batch2.mjs');
 export const PAYLOAD=Object.freeze([...KIT_PAYLOAD,...KIT_METADATA].map(p=>'legacy-kit/'+p).concat(deps.map(p=>'tools/'+p),NEW_FILES.map(p=>'tools/observation-v2/'+p)).sort());
 export const PUBLIC_FILES=Object.freeze(['candidate-observations.json','execution-audit.json','reference-observations.json']);
@@ -43,7 +43,7 @@ export function buildBundle(legacyRoot,out){
   const to=join(out,p);mkdirSync(dirname(to),{recursive:true});const data=readRegular(from);writeFileSync(to,data,{flag:'wx'});
  }
  const files=PAYLOAD.map(p=>{const b=readRegular(join(out,p));return {path:p,bytes:b.length,sha256:digest(b)};});
- const f={protocol:'pre54-observation-freeze-v2',version:'pre54-observation-v2.0.0',legacyFreezeSHA256:LEGACY_FREEZE,legacyRequestBytesSHA256:REQUEST_BYTES,requestHash:REQUEST_HASH,totalCaseCount:354,referenceCommit:'8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b',releaseTag:'v21.1',releaseTagCommit:'ea7b5d56d2436591160983c4e641a2ceee2d875a',files};
+ const f={protocol:'pre54-observation-freeze-v2.1',version:'pre54-observation-v2.1.0',legacyFreezeSHA256:LEGACY_FREEZE,legacyRequestBytesSHA256:REQUEST_BYTES,requestHash:REQUEST_HASH,totalCaseCount:354,referenceCommit:'8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b',releaseTag:'v21.1',releaseTagCommit:'ea7b5d56d2436591160983c4e641a2ceee2d875a',files};
  shape('freeze',f);writeFileSync(join(out,'observation-freeze.json'),strictStringify(f,true)+'\n',{flag:'wx'});
  return verifyBundle(out,digest(readRegular(join(out,'observation-freeze.json'))));
 }
@@ -72,7 +72,7 @@ export function formalContext(root,hash,entryURL,name){
  return verifyBundle(root,hash);
 }
 export function publicFiles(root){
- const p=resolve(root);requireV2(basename(p)==='public-observation-v2-0001'&&realpathSync(p)===p,'PUBLIC_ROOT');
+ const p=resolve(root);requireV2(basename(p)==='public-observation-v2-1-0001'&&realpathSync(p)===p,'PUBLIC_ROOT');
  const found=readdirSync(p).sort();requireV2(found.length===PUBLIC_FILES.length&&found.every((s,i)=>s===PUBLIC_FILES[i]),'PUBLIC_FILE_SET');
  return Object.fromEntries(PUBLIC_FILES.map(n=>[n,readRegular(join(p,n),16*1024*1024)]));
 }

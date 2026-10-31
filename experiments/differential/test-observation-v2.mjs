@@ -11,12 +11,13 @@ import {validateSchema} from './lib/schema.mjs';
 import {schemas} from './lib/protocol.mjs';
 import {REFERENCE_ROLES} from './profiles/pre54-batch2.mjs';
 import {RAW,PUBLIC,shape,gatePackage,normalizeResponse,normalizeFailure,validateRaw,comparePackages,counts,gateAdmission} from './observation-v2/protocol.mjs';
+import {approvedDispatchPlan} from './observation-v2/dispatch.mjs';
 import {buildBundle,verifyBundle,byteHash,readRegular,LEGACY_FREEZE,REQUEST_BYTES} from './observation-v2/bundle.mjs';
 const tmp=mkdtempSync(join(realpathSync(tmpdir()),'pre54-observation-v2-'));
 after(()=>rmSync(tmp,{recursive:true,force:true}));
 const legacy=process.env.PF_PRE54_LEGACY_KIT;
 assert.ok(legacy,'explicit PF_PRE54_LEGACY_KIT required; no residual/global fallback');
-const context=buildBundle(legacy,join(tmp,'bundle')),kit=context.kit,request=kit.request;
+const context={...buildBundle(legacy,join(tmp,'bundle')),dispatchPlanId:'formal354-v1'},kit=context.kit,request=kit.request;
 const H='1'.repeat(64),clone=structuredClone;
 const execution={status:'success',startedAtUTC:'2026-10-31T00:00:00Z',endedAtUTC:'2026-10-31T00:00:01Z',durationMs:1000,exitCode:0,signal:null,timeoutMs:5000,maxStdoutBytes:1048576,maxStderrBytes:1000,stdoutBytes:100,stderrBytes:0,stdoutSha256:H,stderrSha256:sha256Text(''),timedOut:false,outputLimitExceeded:false};
 const metadata=role=>role==='reference'?{role,entryId:'reference-rules-v1',source:{commit:'8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b',tree:null,tag:'v21.1',dirty:null,files:REFERENCE_ROLES.map(role=>({role,sha256:role==='fixture-directory'?kit.hashes.get('profiles/pre54-batch2.mjs'):H}))},runtime:{name:'reference',version:'INFRASTRUCTURE-SELF-TEST',dependencies:[{name:'reference-runtime',version:'SYNTHETIC'},{name:'adapter',version:'SYNTHETIC-V2'}]}}:{role,entryId:'ts-core-v1',source:{...kit.manifest.source,tag:null,files:[{role:'core-bundle',sha256:kit.hashes.get('core/core.cjs')},{role:'runner',sha256:kit.hashes.get('runners/ts-runner.mjs')}]},runtime:{name:'node',version:process.version,dependencies:[{name:'node',version:process.version}]}};
@@ -27,18 +28,18 @@ function value(c){
  if(c.operation==='stats.computeStats')return {hp:1,atk:1,def:1,spa:1,spd:1,spe:1};
  return 1;
 }
-function raw(){return {protocol:RAW,requestHash:request.requestHash,observationFreezeHash:context.freezeHash,random:{seed:null,drawCount:0,draws:[]},cases:request.cases.map(c=>({caseId:c.caseId,requestHash:c.requestHash,observation:{kind:'returned',outcome:{kind:'value',raw:value(c)}}}))};}
-function pack(role='reference',response=raw()){return normalizeResponse({response,metadata:metadata(role),execution:clone(execution),observedAtUTC:'2026-10-31T00:00:02Z'},context);}
+function raw(){return {protocol:RAW,requestHash:request.requestHash,observationFreezeHash:context.freezeHash,dispatch:{planId:context.dispatchPlanId,handledCaseIds:approvedDispatchPlan(context.dispatchPlanId,request)},random:{seed:null,drawCount:0,draws:[]},cases:request.cases.map(c=>({caseId:c.caseId,requestHash:c.requestHash,observation:{kind:'returned',outcome:{kind:'value',raw:value(c)}}}))};}
+function pack(role='reference',response=raw(),ctx=context){return normalizeResponse({response,metadata:metadata(role),execution:clone(execution),observedAtUTC:'2026-10-31T00:00:02Z'},ctx);}
 const index=request.cases.findIndex(c=>c.operation==='learning.forgetting'&&c.input.slot==='pending'&&c.input.member?.moves.length===2);
 const chosen=request.cases[index];
 function wait(c=chosen){const delivered=c.input.slot==='pending'?0:1,state={member:clone(c.input.member)};return {kind:'awaiting-input-not-returned',boundary:{id:'learning.forgetting.move-selection-v1',ordinal:delivered+1,deliveredInputCount:delivered},state,proof:{boundaryEvidenceSHA256:H,stateSHA256:sha256Json(state),fullStateEvidenceSHA256:H,sourceTraceSHA256:H,cleanupEvidenceSHA256:H,backgroundQuiescent:true,fullStateProjection:true},cleanup:{method:'observer-unwind',completed:true,nativeReturned:false,businessException:false}};}
 function withWait(role='reference'){const r=raw();r.cases[index].observation=wait();return pack(role,r);}
 function badWait(mutator){const p=withWait();mutator(p.cases[index].observation,p);assert.throws(()=>gatePackage(p,{...context,role:'reference'}));}
-function notrunTail(p,start,reason='UNSUPPORTED_ENTRY_SEMANTICS'){for(let i=start;i<p.cases.length;i++)p.cases[i].observation={kind:'unobserved',attempted:i===start,reason:i===start?reason:'NOT_RUN'};return p;}
+function notrunTail(p,start,reason='UNSUPPORTED_ENTRY_SEMANTICS'){p.dispatch.handledCaseIds=request.cases.slice(0,start+1).map(c=>c.caseId);for(let i=start;i<p.cases.length;i++)p.cases[i].observation={kind:'unobserved',attempted:i===start,reason:i===start?reason:'NOT_RUN'};return p;}
 function files(reference=pack(),candidate=pack('candidate')){
- const root=join(mkdtempSync(join(tmp,'public-')),'public-observation-v2-0001');mkdirSync(root);
+ const root=join(mkdtempSync(join(tmp,'public-')),'public-observation-v2-1-0001');mkdirSync(root);
  const rb=Buffer.from(strictStringify(reference)+'\n'),cb=Buffer.from(strictStringify(candidate)+'\n');
- const a={protocol:'pre54-observation-execution-audit-v2',observationFreezeHash:context.freezeHash,sourceQualificationSHA256:H,privateExecutionAuditSHA256:H,referencePackageSHA256:byteHash(rb),candidatePackageSHA256:byteHash(cb),referenceAdapterSHA256:H,observerTaskId:'01a18dc0-6ef3-74fe-ae95-0aae9e4350eb',auditorTaskId:'01a190ab-cc58-75b1-88c0-6bdae55f403f',verdict:'PASS_SCOPED',scope:'final-v2-adapter-source-and-execution-projection',freshV2Qualification:true,stableBoundaryAndCleanupAudited:true};
+ const a={protocol:'pre54-observation-execution-audit-v2.1',dispatchPlanId:reference.dispatch?.planId??context.dispatchPlanId,observationFreezeHash:context.freezeHash,sourceQualificationSHA256:H,privateExecutionAuditSHA256:H,referencePackageSHA256:byteHash(rb),candidatePackageSHA256:byteHash(cb),referenceAdapterSHA256:H,observerTaskId:'01a18dc0-6ef3-74fe-ae95-0aae9e4350eb',auditorTaskId:'01a190ab-cc58-75b1-88c0-6bdae55f403f',verdict:'PASS_SCOPED',scope:'final-v2.1-adapter-source-and-execution-projection',freshV2Qualification:true,stableBoundaryAndCleanupAudited:true};
  writeFileSync(join(root,'reference-observations.json'),rb);writeFileSync(join(root,'candidate-observations.json'),cb);writeFileSync(join(root,'execution-audit.json'),strictStringify(a)+'\n');return {root,a};
 }
 function cli(f,name='receive.mjs',opts={}){const audit=byteHash(readFileSync(join(f.root,'execution-audit.json')));return spawnSync(process.execPath,[join(context.root,'tools/observation-v2',name),'--bundle',context.root,'--expected-freeze',context.freezeHash,'--public-root',f.root,'--expected-audit',audit],{encoding:'utf8',...opts});}
@@ -93,7 +94,7 @@ test('cannot continue actual business observations after mandatory blocker',()=>
  const p=pack();p.cases[index].observation={kind:'unobserved',attempted:true,reason:'UNSUPPORTED_ENTRY_SEMANTICS'};assert.throws(()=>gatePackage(p,{...context,role:'reference'}),/CONTINUED_AFTER_BLOCK/);
 });
 test('top process timeout cannot carry a normal wait or claim no attempted calls',()=>{
- const p=withWait();p.execution={...p.execution,status:'timeout',timedOut:true,exitCode:null,signal:'SIGTERM'};assert.throws(()=>gatePackage(p,{...context,role:'reference'}));p.cases=[];p.random=null;const r=comparePackages(p,pack('candidate'),context);assert.equal(r.status,'BLOCKED');assert.equal(r.counts.reference.attempted,null);assert.equal(r.counts.reference.notRun,null);assert.equal(r.totalCaseCount,354);
+ const p=withWait();p.execution={...p.execution,status:'timeout',timedOut:true,exitCode:null,signal:'SIGTERM'};assert.throws(()=>gatePackage(p,{...context,role:'reference'}));p.cases=[];p.random=null;p.dispatch=null;const r=comparePackages(p,pack('candidate'),context);assert.equal(r.status,'BLOCKED');assert.equal(r.counts.reference.attempted,null);assert.equal(r.counts.reference.notRun,null);assert.equal(r.totalCaseCount,354);
 });
 test('raised business exception remains distinct and unchanged proof mandatory',()=>{
  const r=raw();r.cases[index].observation={kind:'raised',outcome:{kind:'raised',class:'RangeError',raw:{stateUnchanged:true}}};const p=pack('reference',r);assert.equal(counts(p).raised,1);assert.equal(comparePackages(p,pack('candidate'),context).status,'FAIL');r.cases[index].observation.outcome.raw.stateUnchanged=false;assert.throws(()=>pack('reference',r));
@@ -187,4 +188,74 @@ test('pre-parse byte binding rejects mismatch before bad behavior JSON',()=>{
   const f=files();writeFileSync(join(f.root,'reference-observations.json'),'{not-json');
   const p=cli(f,entry);assert.equal(p.status,2);assert.equal(parseJson(p.stdout).code,'OBS2_AUDIT_PACKAGE_BYTES');
  }
+});
+
+// v2.1 carriers are synthetic type/state controls, not observations or expected answers.
+function returnedInteger(n=17,c=chosen){
+ const nativeReturn={kind:'safe-integer',value:n},state={member:clone(c.input.member)};
+ return {kind:'returned',representation:'native-integer-and-state-v1',nativeReturn,state,proof:{nativeReturnSHA256:sha256Json(nativeReturn),returnEvidenceSHA256:H,stateSHA256:sha256Json(state),fullStateEvidenceSHA256:H,sourceTraceSHA256:H,fullStateProjection:true}};
+}
+function withInteger(role='reference',n=17){const r=raw();r.cases[index].observation=returnedInteger(n);return pack(role,r);}
+function badInteger(change){const p=withInteger();change(p.cases[index].observation,p);assert.throws(()=>gatePackage(p,{...context,role:'reference'}));}
+for(const n of [-Number.MAX_SAFE_INTEGER,-7,0,7,Number.MAX_SAFE_INTEGER])test('native safe integer '+n+' remains a returned fact and actual state',()=>{
+ const p=withInteger('reference',n),o=p.cases[index].observation;assert.equal(o.nativeReturn.value,n);assert.deepEqual(o.state.member,chosen.input.member);assert.equal(Object.hasOwn(o,'outcome'),false);assert.equal(counts(p).nativeCompleted,354);assert.equal(counts(p).businessCompletionUnattested,1);assert.equal(counts(p).returnedStateFacts,1);
+});
+test('native returned integer never infers ready/cancel/error from its sign or zero',()=>{
+ for(const n of [-1,0,1,4]){const o=withInteger('reference',n).cases[index].observation;assert.equal(Object.hasOwn(o,'status'),false);assert.equal(Object.hasOwn(o,'class'),false);assert.equal(Object.hasOwn(o,'forgotten'),false);assert.equal(Object.hasOwn(o,'outcome'),false);}
+});
+for(const [name,change]of [
+ ['fraction',o=>o.nativeReturn.value=0.5],['unsafe positive',o=>o.nativeReturn.value=Number.MAX_SAFE_INTEGER+1],['unsafe negative',o=>o.nativeReturn.value=-Number.MAX_SAFE_INTEGER-1],['NaN',o=>o.nativeReturn.value=NaN],['Infinity',o=>o.nativeReturn.value=Infinity],['negative zero',o=>o.nativeReturn.value=-0],
+ ['boolean',o=>o.nativeReturn.value=true],['string',o=>o.nativeReturn.value='17'],['array',o=>o.nativeReturn.value=[]],['guessed status',o=>o.status='ready'],['guessed error',o=>o.outcome={kind:'error-object',class:null,value:{code:'invalid-slot',stateUnchanged:true}}],
+ ['stale return hash',o=>o.nativeReturn.value++],['stale actual state',o=>o.state.member.moves[0].pp++],['extra actual state',o=>o.state.money=1],['incomplete actual state',o=>o.proof.fullStateProjection=false],['missing return evidence',o=>delete o.proof.returnEvidenceSHA256],['zero return evidence',o=>o.proof.returnEvidenceSHA256='0'.repeat(64)],['PP above max',o=>{o.state.member.moves[0].pp=64;o.proof.stateSHA256=sha256Json(o.state);}]
+])test('native return/state rejects '+name,()=>badInteger(change));
+test('native integer branch is limited to the stated forgetting operation',()=>{
+ const p=pack();p.cases[0].observation=returnedInteger();assert.throws(()=>gatePackage(p,{...context,role:'reference'}),/RETURN_STATE_OPERATION_UNSUPPORTED/);
+});
+test('normalizer preserves actual returned state PP/order instead of input',()=>{
+ const r=raw(),o=returnedInteger();o.state.member.moves[0].pp++;o.state.member.moves.reverse();o.proof.stateSHA256=sha256Json(o.state);r.cases[index].observation=o;
+ const p=pack('reference',r);assert.deepEqual(p.cases[index].observation,o);assert.notDeepEqual(p.cases[index].observation.state.member,chosen.input.member);
+});
+test('native integer result and state differences are both compared',()=>{
+ const a=withInteger(),b=withInteger('candidate');b.cases[index].observation.nativeReturn.value++;b.cases[index].observation.proof.nativeReturnSHA256=sha256Json(b.cases[index].observation.nativeReturn);b.cases[index].observation.state.member.moves.reverse();b.cases[index].observation.proof.stateSHA256=sha256Json(b.cases[index].observation.state);
+ const d=comparePackages(a,b,context);assert.equal(d.status,'FAIL');assert.deepEqual(d.differences[0].fields,['native-return','state']);
+});
+test('integer/state versus legacy returned result is a representation difference, not a lifecycle rewrite',()=>{
+ const d=comparePackages(withInteger(),pack('candidate'),context);assert.equal(d.status,'FAIL');assert.deepEqual(d.differences[0].fields,['return-representation']);
+});
+test('integer/state versus waiting remains native lifecycle difference',()=>assert.deepEqual(comparePackages(withInteger(),withWait('candidate'),context).differences[0].fields,['native-lifecycle']));
+function finite25(handled=3,block=false,role='reference'){
+ const ctx={...context,dispatchPlanId:'additional25-v1'},ids=approvedDispatchPlan(ctx.dispatchPlanId,request).slice(0,handled),r=raw();
+ r.dispatch={planId:ctx.dispatchPlanId,handledCaseIds:ids};for(const c of r.cases)c.observation={kind:'unobserved',attempted:false,reason:'NOT_RUN'};
+ for(let j=0;j<ids.length;j++){
+  const i=request.cases.findIndex(c=>c.caseId===ids[j]);r.cases[i].observation=j<2?wait(request.cases[i]):returnedInteger(17,request.cases[i]);
+ }
+ if(block){const last=r.cases.find(c=>c.caseId===ids.at(-1));last.observation={kind:'unobserved',attempted:true,reason:'OUTPUT_CONTRACT_UNSUPPORTED'};}
+ return {p:pack(role,r,ctx),ctx};
+}
+test('finite25 order keeps two prior waits and one real return in original354 output',()=>{
+ const {p}=finite25(),n=counts(p);assert.equal(p.cases[60].caseId,'pre54-0061');assert.equal(p.cases[64].caseId,'pre54-0065');assert.equal(p.cases[66].caseId,'pre54-0067');assert.equal(p.cases[66].observation.kind,'awaiting-input-not-returned');assert.equal(p.cases[64].observation.nativeReturn.value,17);
+ assert.equal(n.total,354);assert.equal(n.plannedCaseCount,25);assert.equal(n.attempted,3);assert.equal(n.returned,1);assert.equal(n.awaitingInput,2);assert.equal(n.plannedNotRun,22);assert.equal(n.outsidePlanNotRun,329);assert.equal(n.businessCompletionUnattested,1);
+});
+test('finite25 blocker cannot erase a previously dispatched higher-index wait',()=>{
+ const {p,ctx}=finite25(3,true),before=JSON.stringify(p);assert.doesNotThrow(()=>gatePackage(p,{...ctx,role:'reference'}));assert.equal(JSON.stringify(p),before);assert.equal(p.cases[66].observation.kind,'awaiting-input-not-returned');
+ const d=comparePackages(p,finite25(3,true,'candidate').p,ctx);assert.equal(d.status,'BLOCKED');assert.equal(d.totalCaseCount,354);assert.equal(d.comparedCaseCount,2);assert.equal(d.counts.reference.plannedNotRun,22);
+});
+test('partial qualification observations do not become full354 equivalence',()=>{
+ const {p,ctx}=finite25(),d=comparePackages(p,finite25(3,false,'candidate').p,ctx);assert.equal(d.status,'BLOCKED');assert.equal(d.comparedCaseCount,3);assert.equal(d.uncomparableCaseCount,351);assert.equal(d.equivalentNativeCompletedCaseCount,1);
+});
+test('parent-pinned plan must agree with public package and original approved sequence',()=>{
+ const {p,ctx}=finite25();assert.throws(()=>gatePackage(p,{...context,role:'reference'}),/DISPATCH_PLAN_MISMATCH/);
+ const bad=clone(p);bad.dispatch.handledCaseIds.sort();assert.throws(()=>gatePackage(bad,{...ctx,role:'reference'}),/DISPATCH_NOT_APPROVED_PREFIX/);
+ const erased=clone(p);erased.cases[66].observation={kind:'unobserved',attempted:false,reason:'NOT_RUN'};assert.throws(()=>gatePackage(erased,{...ctx,role:'reference'}),/HANDLED_RELABELED_NOT_RUN/);
+});
+test('formal gate accepts truthful finite observations with exact audit plan but compare remains BLOCKED',()=>{
+ const a=finite25(),b=finite25(3,false,'candidate'),f=files(a.p,b.p),got=cli(f);assert.equal(got.status,0,got.stdout+got.stderr);assert.equal(parseJson(got.stdout).counts.reference.plannedNotRun,22);const d=cli(f,'compare.mjs');assert.equal(d.status,3);assert.equal(parseJson(d.stdout).totalCaseCount,354);
+});
+test('wrong or unknown admitted plan rejects before behavior parsing in both entries',()=>{
+ for(const entry of ['receive.mjs','compare.mjs']){const f=files();f.a.dispatchPlanId='observer-chosen-plan';writeFileSync(join(f.root,'reference-observations.json'),'{not-json');f.a.referencePackageSHA256=byteHash(Buffer.from('{not-json'));writeFileSync(join(f.root,'execution-audit.json'),strictStringify(f.a));const p=cli(f,entry);assert.equal(p.status,2);assert.equal(parseJson(p.stdout).code,'OBS2_ADMISSION_SHAPE');}
+});
+test('oldv2 observation and audit versions are not silently upgraded',()=>{
+ const p=pack();p.protocol='ruby-ts-differential/behavior-pre54-observation-v2';assert.throws(()=>gatePackage(p,{...context,role:'reference'}));
+ const r=raw();r.protocol='ruby-ts-differential/runner-pre54-observation-v2';assert.throws(()=>validateRaw(r,context));
+ const f=files();f.a.protocol='pre54-observation-execution-audit-v2';writeFileSync(join(f.root,'execution-audit.json'),strictStringify(f.a));assert.equal(cli(f).status,2);
 });

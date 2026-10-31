@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "pre54-observation-contract-v2",
+  "$id": "pre54-observation-contract-v2.1",
   "$defs": {
     "hash": {
       "type": "string",
@@ -1647,10 +1647,14 @@
                 "UNSUPPORTED_RANDOM",
                 "TECHNICAL_FAILURE",
                 "TIMEOUT",
-                "ACCESS_BLOCKED"
+                "ACCESS_BLOCKED",
+                "OUTPUT_CONTRACT_UNSUPPORTED"
               ]
             }
           }
+        },
+        {
+          "$ref": "#/$defs/integerReturnObservation"
         }
       ]
     },
@@ -1806,10 +1810,14 @@
                 "UNSUPPORTED_RANDOM",
                 "TECHNICAL_FAILURE",
                 "TIMEOUT",
-                "ACCESS_BLOCKED"
+                "ACCESS_BLOCKED",
+                "OUTPUT_CONTRACT_UNSUPPORTED"
               ]
             }
           }
+        },
+        {
+          "$ref": "#/$defs/integerReturnObservation"
         }
       ]
     },
@@ -1872,11 +1880,12 @@
         "execution",
         "random",
         "cases",
-        "observationFreezeHash"
+        "observationFreezeHash",
+        "dispatch"
       ],
       "properties": {
         "protocol": {
-          "const": "ruby-ts-differential/behavior-pre54-observation-v2"
+          "const": "ruby-ts-differential/behavior-pre54-observation-v2.1"
         },
         "role": {
           "enum": [
@@ -1947,6 +1956,16 @@
         "observationFreezeHash": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
+        },
+        "dispatch": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/dispatch"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
@@ -1958,11 +1977,12 @@
         "requestHash",
         "observationFreezeHash",
         "random",
-        "cases"
+        "cases",
+        "dispatch"
       ],
       "properties": {
         "protocol": {
-          "const": "ruby-ts-differential/runner-pre54-observation-v2"
+          "const": "ruby-ts-differential/runner-pre54-observation-v2.1"
         },
         "requestHash": {
           "type": "string",
@@ -2008,6 +2028,9 @@
           "items": {
             "$ref": "#/$defs/rawCase"
           }
+        },
+        "dispatch": {
+          "$ref": "#/$defs/dispatch"
         }
       }
     },
@@ -2020,11 +2043,12 @@
         "lifecycleEquality",
         "waitProjection",
         "unobservedPolicy",
-        "returnedProjection"
+        "returnedProjection",
+        "dispatchPolicy"
       ],
       "properties": {
         "protocol": {
-          "const": "pre54-observation-normalizer-v2"
+          "const": "pre54-observation-normalizer-v2.1"
         },
         "arrayOrder": {
           "const": "preserve"
@@ -2039,7 +2063,10 @@
           "const": "retain-total-never-equivalent"
         },
         "returnedProjection": {
-          "const": "pre54-batch2-v1-unchanged"
+          "const": "pre54-v1-plus-native-integer-and-state-v1"
+        },
+        "dispatchPolicy": {
+          "const": "parent-approved-plan-prefix-output354-order-v1"
         }
       }
     },
@@ -2059,11 +2086,12 @@
         "verdict",
         "scope",
         "freshV2Qualification",
-        "stableBoundaryAndCleanupAudited"
+        "stableBoundaryAndCleanupAudited",
+        "dispatchPlanId"
       ],
       "properties": {
         "protocol": {
-          "const": "pre54-observation-execution-audit-v2"
+          "const": "pre54-observation-execution-audit-v2.1"
         },
         "observationFreezeHash": {
           "type": "string",
@@ -2099,13 +2127,21 @@
           "const": "PASS_SCOPED"
         },
         "scope": {
-          "const": "final-v2-adapter-source-and-execution-projection"
+          "const": "final-v2.1-adapter-source-and-execution-projection"
         },
         "freshV2Qualification": {
           "const": true
         },
         "stableBoundaryAndCleanupAudited": {
           "const": true
+        },
+        "dispatchPlanId": {
+          "enum": [
+            "qualification12-v1",
+            "additional25-v1",
+            "formal354-v1",
+            "qualification37-v1"
+          ]
         }
       }
     },
@@ -2126,10 +2162,10 @@
       ],
       "properties": {
         "protocol": {
-          "const": "pre54-observation-freeze-v2"
+          "const": "pre54-observation-freeze-v2.1"
         },
         "version": {
-          "const": "pre54-observation-v2.0.0"
+          "const": "pre54-observation-v2.1.0"
         },
         "legacyFreezeSHA256": {
           "type": "string",
@@ -2183,6 +2219,116 @@
               }
             }
           }
+        }
+      }
+    },
+    "dispatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planId",
+        "handledCaseIds"
+      ],
+      "properties": {
+        "planId": {
+          "enum": [
+            "qualification12-v1",
+            "additional25-v1",
+            "formal354-v1",
+            "qualification37-v1"
+          ]
+        },
+        "handledCaseIds": {
+          "type": "array",
+          "maxItems": 354,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^pre54-[0-9]{4}$"
+          }
+        }
+      }
+    },
+    "integerReturn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "const": "safe-integer"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "returnStateProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nativeReturnSHA256",
+        "returnEvidenceSHA256",
+        "stateSHA256",
+        "fullStateEvidenceSHA256",
+        "sourceTraceSHA256",
+        "fullStateProjection"
+      ],
+      "properties": {
+        "nativeReturnSHA256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "returnEvidenceSHA256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "stateSHA256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "fullStateEvidenceSHA256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "sourceTraceSHA256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "fullStateProjection": {
+          "const": true
+        }
+      }
+    },
+    "integerReturnObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "representation",
+        "nativeReturn",
+        "state",
+        "proof"
+      ],
+      "properties": {
+        "kind": {
+          "const": "returned"
+        },
+        "representation": {
+          "const": "native-integer-and-state-v1"
+        },
+        "nativeReturn": {
+          "$ref": "#/$defs/integerReturn"
+        },
+        "state": {
+          "$ref": "#/$defs/waitState"
+        },
+        "proof": {
+          "$ref": "#/$defs/returnStateProof"
         }
       }
     }
