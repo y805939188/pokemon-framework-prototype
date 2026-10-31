@@ -34,3 +34,7 @@ test('legacy checkpoint without presentation remains usable and never invents di
 test('public projection facade has no producer, restore hook or test capability',()=>{
  const api=require('../../../js/engine/build/production.cjs').battlePresentation,legacy=require('../../../js/engine/build/engine.cjs').battlePresentation;assert.deepEqual(Object.keys(api),['readGrowthDisplay']);assert.equal(api.readGrowthDisplay,legacy.readGrowthDisplay);
 });
+
+test('existing EXP ahead of held level preserves every applied level-up without fabricating earned intervals',async()=>{
+ const {s,growth:m}=await award(50,G.minExp('parabolic',53)-1),d=readGrowthDisplay(s,m);assert.deepEqual(m.levelUps,[51,52,53]);assert.deepEqual(d.segments.filter(x=>x.levelUp).map(x=>x.levelUp.level),m.levelUps);assert.deepEqual(d.segments.slice(0,2).map(x=>[x.from,x.to]),[[1,1],[1,1]]);const sum=d.segments.reduce((n,x)=>n+(x.to-x.from)*(G.minExp('parabolic',x.level+1)-G.minExp('parabolic',x.level)),0);assert(Math.abs(sum-(d.toExp-d.fromExp))<1e-6);assert(s.pendingLearn);
+});

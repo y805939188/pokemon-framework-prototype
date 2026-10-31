@@ -67,10 +67,10 @@ test('formatting failure aborts once; a broken error view retires without a busy
 });
 test('an error thrown after owner replacement never aborts the successor',()=>{const f=fixture();assert(!f.c.present(()=>{f.current=false;throw Error('late view');}));assert.equal(f.aborts.length,0);});
 
-function host({opening,display=false,audio,exists,now}={}){
+function host({opening,display=false,audio,exists,now,exp=125000}={}){
  const counts={abort:0,finish:0,pop:0,hide:0,choose:0},session={party:[],foeTeam:[],bag:{},finished:false,pendingLearn:null,take:()=>[],currentRequest:()=>({active:[{moves:[{move:'Splash',id:'splash',pp:40,maxpp:40}]}]}),gw:{readState:()=>[]},chooseMove:()=>{counts.choose++;return {messages:[]};}};
  counts.paint=[];
- if(display){session.party=[{id:'P',species:'Pidgey',exp:125000}];session.foeTeam=[{id:'F',species:'Pidgey'}];session.content={species:{Pidgey:{growth:'medium'}}};session.gw.readState=side=>[{id:side==='p1'?'P':'F',level:50,hp:100,maxhp:100,status:'',active:true}];}
+ if(display){session.party=[{id:'P',species:'Pidgey',exp}];session.foeTeam=[{id:'F',species:'Pidgey'}];session.content={species:{Pidgey:{growth:'medium'}}};session.gw.readState=side=>[{id:side==='p1'?'P':'F',level:50,hp:100,maxhp:100,status:'',active:true}];}
  function Base(){}Base.prototype={initialize(){},create(){},start(){},update(){},terminate(){},isReady(){return true;},addWindow(){},popScene(){counts.pop++;}};
  function Window(){}Window.prototype={initialize(rect){this.innerWidth=rect.width-24;this.innerHeight=rect.height-24;this.contents={clear(){},fillRect(...args){counts.paint.push(args);}};this._index=0;this.active=false;this.visible=false;},resetFontSettings(){},lineHeight:()=>24,textWidth:x=>String(x).length*8,drawText(){},refresh(){this._list=[];this.makeCommandList?.();},addCommand(name,symbol,enabled,ext){this._list.push({name,symbol,enabled,ext});},select(i){this._index=i;},index(){return this._index;},setHandler(){},show(){this.visible=true;},hide(){this.visible=false;counts.hide++;},activate(){this.active=true;},deactivate(){this.active=false;},isOpenAndActive(){return this.visible&&this.active;}};
  function System(){}System.prototype.isSaveEnabled=()=>true;
@@ -157,4 +157,8 @@ test('compiled cancel navigation preserves bag/party intent and is blocked while
 });
 test('compiled postcommit message failure preserves committed outcome and never aborts application state',async()=>{
  const h=await host().ready();h.session.finished=true;h.scene.showEnd(false);h.app.finishBattle=()=>{h.counts.finish++;return {code:1,commit:'applied',battleId:'scene#1',trainerReward:{actual:10,normalizationLoss:0}};};h.G.$gameMessage.add=()=>{throw Error('message after commit');};h.scene.onMenuOk();assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(h.flow.lastOutcome.code,1);assert.equal(h.counts.abort,0);assert.equal(h.counts.finish,1);assert.equal(h.flow.lastOutcome.hostErrors[0].step,'trainer-reward-message');assert.equal(h.counts.pop,1);assert(!h.flow.running);
+});
+
+test('compiled initial view does not abort or normalize author EXP outside the held level interval',async()=>{
+ for(const exp of [0,200000]){const h=await host({display:true,exp}).ready(),card=h.scene.presentationState().cards.find(x=>x.side==='p1');assert.equal(card.ratio,null);assert.equal(card.experienceUnavailable,'outside-level-interval');assert.equal(h.session.party[0].exp,exp);assert.equal(h.counts.abort,0);assert(h.scene.inputState().ready);h.scene.terminate();}
 });

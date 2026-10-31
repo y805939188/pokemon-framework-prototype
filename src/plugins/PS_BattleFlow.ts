@@ -871,13 +871,17 @@ const { developmentCapabilities } = RuleConfig;
     return ['p1', 'p2'].flatMap(side => session.gw.readState(side).map((state: any) => {
       const member = (side === 'p1' ? session.party : session.foeTeam).find((item: any) => item.id === state.id);
       let ratio: number | null = null;
+      let experienceUnavailable: 'outside-level-interval' | undefined;
       const curve = member && session.content?.species[member.species]?.growth;
       if (side === 'p1' && curve && Number.isFinite(member.exp)) {
         const growth = engine().B.growth, floor = growth.minExp(curve, state.level), ceiling = growth.minExp(curve, state.level + 1);
-        ratio = ceiling > floor ? (member.exp - floor) / (ceiling - floor) : 1;
+        const value = ceiling > floor ? (member.exp - floor) / (ceiling - floor) : 1;
+        // Existing author states may carry EXP outside their held level. The view must not reject or normalize them.
+        if (value >= 0 && value <= 1) ratio = value; else experienceUnavailable = 'outside-level-interval';
       }
       return { id: state.id, side: side as 'p1' | 'p2', name: member ? PSFlow.speciesName(member.species) : names[state.id] || state.id,
-        level: state.level, hp: state.hp, maxhp: state.maxhp, status: state.status || '', active: state.active, ratio };
+        level: state.level, hp: state.hp, maxhp: state.maxhp, status: state.status || '', active: state.active, ratio,
+        ...(experienceUnavailable ? { experienceUnavailable } : {}) };
     }));
   }
   function battleCue(scene: any, kind: 'exp-gain' | 'exp-full'): (() => void) | undefined {

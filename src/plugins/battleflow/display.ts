@@ -4,6 +4,7 @@ import type { BattleSceneVisualStep } from './controller';
 export interface BattleDisplayCard {
   id: string; side: 'p1' | 'p2'; name: string; level: number; hp: number; maxhp: number;
   status: string; active: boolean; ratio: number | null; flash?: boolean;
+  experienceUnavailable?: 'outside-level-interval';
 }
 export interface BattleDisplayPorts {
   current(): boolean;

@@ -798,7 +798,7 @@ export class BattleSession {
         const floor = G.minExp(curve, level), ceiling = G.minExp(curve, level + 1);
         const start = Math.max(floor, res.before.exp), stop = Math.min(ceiling, res.after.exp);
         const levelUp = res.log.levels.find(item => item.level === level + 1);
-        if (ceiling > floor && stop > start) segments.push({ level, from: (start - floor) / (ceiling - floor), to: (stop - floor) / (ceiling - floor),
+        if (ceiling > floor && (stop > start || levelUp)) segments.push({ level, from: stop > start ? (start - floor) / (ceiling - floor) : 1, to: stop > start ? (stop - floor) / (ceiling - floor) : 1,
           ...(levelUp ? { levelUp: { level: levelUp.level, hp: levelUp.hp, maxhp: levelUp.maxhp } } : {}) });
       }
       const finalFloor = G.minExp(curve, res.after.level), finalCeiling = G.minExp(curve, res.after.level + 1);

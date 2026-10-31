@@ -103,12 +103,15 @@ export class ExperiencePresentation {
 export type BasicPictureKind = 'send-out' | 'recall' | 'faint' | 'capture' | 'blocked-ball' | 'move-effect';
 export interface PictureTrackInput { id: string; kind: BasicPictureKind; startUnits: number; durationUnits: number; }
 export interface PictureFrame { id: string; kind: BasicPictureKind; progress: number; started: boolean; complete: boolean; }
+export interface PictureGroupFrame { frames: PictureFrame[]; complete: boolean; cancelled: boolean; }
 /** Only the parallel picture consumer uses WP67-A's next-update completion observation. */
 export class BasicPictureGroup {
   private readonly clock = new DisplayClock();
   private readonly tracks: { id: string; kind: BasicPictureKind; start: number; duration: number }[];
   private observedEnded = false;
   private cancelled = false;
+  private update = -1;
+  private cached: PictureGroupFrame | null = null;
   constructor(inputs: readonly PictureTrackInput[], effects: boolean) {
     if (typeof effects !== 'boolean') throw new Error('invalid battle effects flag');
     const ids = new Set<string>();
@@ -120,9 +123,15 @@ export class BasicPictureGroup {
     }).filter(input => effects || input.kind !== 'move-effect');
     if (this.tracks.some(input => !Number.isFinite(input.start + input.duration))) throw new Error('picture end overflow');
   }
-  sample(now: number): { frames: PictureFrame[]; complete: boolean; cancelled: boolean } {
-    const elapsed = this.clock.elapsed(now);
+  /** update is the owning Scene.update invocation ordinal, not a timestamp or display/rAF frame number.
+   * Multiple draw/busy reads in that update return copies of its first sample without advancing again.
+   */
+  sample(now: number, update: number): PictureGroupFrame {
+    finite(now, 'monotonic clock');
+    if (!Number.isSafeInteger(update) || update < 0 || update < this.update) throw new Error('invalid scene update ordinal');
     if (this.cancelled) return { frames: [], complete: true, cancelled: true };
+    if (update === this.update && this.cached) return { ...this.cached, frames: this.cached.frames.map(frame => ({ ...frame })) };
+    const elapsed = this.clock.elapsed(now);
     const frames = this.tracks.map(track => {
       const started = elapsed >= track.start;
       const progress = !started ? 0 : track.duration === 0 ? 1 : Math.min(1, (elapsed - track.start) / track.duration);
@@ -131,7 +140,8 @@ export class BasicPictureGroup {
     const allEnded = frames.every(frame => frame.complete);
     const complete = this.tracks.length === 0 || this.observedEnded;
     this.observedEnded = allEnded;
-    return { frames, complete, cancelled: false };
+    this.update = update; this.cached = { frames, complete, cancelled: false };
+    return { ...this.cached, frames: frames.map(frame => ({ ...frame })) };
   }
   cancel(): void { this.cancelled = true; }
 }

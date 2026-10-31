@@ -11,7 +11,8 @@ test.before(()=>{
 test.after(()=>{if(tmp)fs.rmSync(tmp,{recursive:true,force:true});});
 const hp=(from=100,to=0,total=100)=>new M.HpPresentation({memberId:'P1',from,to,total});
 const exp=(input={})=>new M.ExperiencePresentation({memberId:'P1',level:50,from:0,to:1,visible:true,...input});
-const group=(tracks,effects=true)=>new M.BasicPictureGroup(tracks,effects);
+// Existing cases model one consumer call per Scene.update; direct controls below repeat an update explicitly.
+const group=(tracks,effects=true)=>{const p=new M.BasicPictureGroup(tracks,effects);let update=0;return{sample:now=>p.sample(now,update++),cancel:()=>p.cancel()};};
 const track=(id,kind='send-out',durationUnits=20,startUnits=0)=>({id,kind,durationUnits,startUnits});
 
 for(const [from,to]of [[100,99],[100,0],[0,100]])test(`HP ${from}->${to} always uses 1 second from first actual sample`,()=>{
@@ -82,4 +83,11 @@ test('cancelled group publishes no late pictures, detached output cannot alter c
 test('picture input snapshots, IDs and monotonic time are validated without callbacks',()=>{
  const a=track('p'),p=group([a]);a.durationUnits=0;assert.equal(p.sample(0).frames[0].progress,0);assert(!p.sample(500).frames[0].complete);assert.throws(()=>p.sample(499));assert.equal(p.sample(750).frames[0].progress,.75);
  for(const items of [[track('x'),track('x')],[track('x','unknown')],[track('x','faint',-1)],[track('x','faint',1,Infinity)]])assert.throws(()=>group(items));assert.throws(()=>group([],0));assert(group([]).sample(0).complete);
+});
+
+test('picture draw and busy reads in one update are idempotent even with different now values',()=>{
+ const p=new M.BasicPictureGroup([track('p')],true);p.sample(0,0);const ended=p.sample(1000,1);assert(!ended.complete);ended.frames[0].progress=0;const read=p.sample(1000.01,1);assert(!read.complete);assert.equal(read.frames[0].progress,1);assert(p.sample(1000,2).complete,'next Scene.update may have exactly the same first timestamp');
+});
+test('picture group requires a monotonic explicit Scene.update ordinal and cancellation retires cached work',()=>{
+ const p=new M.BasicPictureGroup([track('p')],true);for(const id of [undefined,-1,.5,Infinity,NaN])assert.throws(()=>p.sample(0,id),/scene update ordinal/);p.sample(0,4);assert.throws(()=>p.sample(1,3),/scene update ordinal/);p.cancel();assert.deepEqual(p.sample(1,4),{frames:[],complete:true,cancelled:true});
 });
