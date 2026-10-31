@@ -4,6 +4,7 @@ import { bindTrainerSource, captureTrainerRequest, trainerCandidate, submitTrain
 import type { TrainerCapture, TrainerRequestTicket } from '../battle/trainer-ai-source';
 import type { AssembledTrainerCatalog } from '../battle/trainer-ai-catalog';
 import { validateTrainerAiIntent } from './trainer-ai-strategy';
+import { nativePromise } from './native-promise';
 import type { PinnedTrainerAiStrategy, BoundTrainerAiStrategy } from './trainer-ai-strategy';
 import { createTrainerAiSnapshotValidator } from '../rules/trainer-ai';
 import type { DecisionPlan, TrainerAiSnapshot, TrainerResource } from '../rules/trainer-ai';
@@ -151,7 +152,8 @@ function decide(c:Channel,cache:Cache,gate:Gate,allowFallback:boolean):DecisionP
   };
   let output:DecisionPlan|Promise<DecisionPlan>;
   try{attemptOwned();output=c.invoke(input,random);}catch(error){return finish(false,error);}
-  if(!(output instanceof Promise)){
+  const awaiting=nativePromise(output);
+  if(!awaiting){
     const elapsed=c.timing.now()-started;if(!Number.isFinite(elapsed)||elapsed<0){open=false;throw new Error('trainer-ai-invalid-timing');}
     return elapsed>=1000?finish(false,new Error('trainer-ai-timeout')):finish(true,output);
   }
@@ -168,7 +170,7 @@ function decide(c:Channel,cache:Cache,gate:Gate,allowFallback:boolean):DecisionP
     };
     const pending={cancel(reason:string):void{if(done)return;done=true;cleanup();reject(new Error(reason));}};
     c.pending=pending;
-    Promise.prototype.then.call(output,(value:unknown)=>settle(true,value),(error:unknown)=>settle(false,error));
+    Promise.prototype.then.call(awaiting,(box:{value:unknown})=>settle(true,box.value),(error:unknown)=>settle(false,error));
     try{
       const elapsed=c.timing.now()-started;if(!Number.isFinite(elapsed)||elapsed<0)throw new Error('trainer-ai-invalid-timing');
       if(elapsed>=1000)settle(false,new Error('trainer-ai-timeout'));

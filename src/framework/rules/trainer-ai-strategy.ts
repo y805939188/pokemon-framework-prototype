@@ -13,6 +13,18 @@ export interface TrainerAiStrategy {
 export function freezeStrategyData<T>(value:T):T {
   if(value && typeof value==='object'){for(const v of Object.values(value))freezeStrategyData(v);Object.freeze(value);}return value;
 }
+/** NW renderer and CommonJS have different intrinsics. Accept their actual JSON prototypes, never a named class. */
+function jsonPrototype(proto:object|null,kind:'Object'|'Array'):boolean {
+  const intrinsic=kind==='Object'?Object:Array;
+  if(proto===intrinsic.prototype)return true;
+  if(!proto)return false;
+  const constructor=Object.getOwnPropertyDescriptor(proto,'constructor');
+  if(!constructor||!('value'in constructor)||typeof constructor.value!=='function')return false;
+  if(Function.prototype.toString.call(constructor.value)!==Function.prototype.toString.call(intrinsic))return false;
+  if(Object.getOwnPropertyDescriptor(constructor.value,'prototype')?.value!==proto)return false;
+  const parent=Object.getPrototypeOf(proto);
+  return kind==='Object'?parent===null:jsonPrototype(parent,'Object');
+}
 /** Descriptor-only JSON copy, with finite size/depth and no getters, sparse arrays or aliases to the caller. */
 export function copyStrategyData(value:unknown, maxBytes=8192, maxDepth=8):StrategyValue {
   const parents=new Set<object>();let nodes=maxBytes;
@@ -24,7 +36,7 @@ export function copyStrategyData(value:unknown, maxBytes=8192, maxDepth=8):Strat
     if(typeof v==='number'){if(!Number.isFinite(v))return fail();return v;}
     if(!v||typeof v!=='object'||parents.has(v))return fail();
     const array=Array.isArray(v),proto=Object.getPrototypeOf(v);
-    if(array?proto!==Array.prototype:proto!==Object.prototype&&proto!==null)return fail();
+    if(array?!jsonPrototype(proto,'Array'):proto!==null&&!jsonPrototype(proto,'Object'))return fail();
     parents.add(v);const keys=Reflect.ownKeys(v);let result:StrategyValue;
     if(array){
       const length=Object.getOwnPropertyDescriptor(v,'length')?.value as unknown;

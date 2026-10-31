@@ -4,6 +4,7 @@ import type { TrainerAiCatalog, TrainerAiSnapshot, DecisionPlan, RandomN } from 
 import { copyStrategyData, freezeStrategyData, strategyReference, defaultStrategyReference } from '../rules/trainer-ai-strategy';
 import type { TrainerAiStrategyReference, TrainerAiStrategy, StrategyParameters } from '../rules/trainer-ai-strategy';
 import { semanticFingerprint } from '../rules/semantic';
+import { nativePromise } from './native-promise';
 export type { TrainerAiStrategyReference, TrainerAiStrategy, StrategyParameters } from '../rules/trainer-ai-strategy';
 export interface TrainerAiStrategyRegistration {
   id:string; version:string; implementationIdentity:string;
@@ -77,10 +78,11 @@ export function createTrainerAiStrategyRegistry():TrainerAiStrategyRegistry {
           const localRandom:RandomN=n=>{if(!open)throw new Error('trainer-ai-random-closed');return random(n);};
           try {
             const result=decide(input,parameters,localRandom);
-            if(result instanceof Promise){
+            const pending=nativePromise(result);
+            if(pending){
               return new Promise<DecisionPlan>((resolve,reject)=>{
                 // Observe the native capability directly, never read a returned thenable getter.
-                Promise.prototype.then.call(result,(value:unknown)=>{open=false;try{resolve(validateTrainerAiIntent(value,input));}catch(error){reject(error);}},(error:unknown)=>{open=false;reject(error);});
+                Promise.prototype.then.call(pending,(box:{value:unknown})=>{open=false;try{resolve(validateTrainerAiIntent(box.value,input));}catch(error){reject(error);}},(error:unknown)=>{open=false;reject(error);});
               });
             }
             open=false;return validateTrainerAiIntent(result,input);
