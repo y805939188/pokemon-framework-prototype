@@ -84,7 +84,7 @@ function host({opening,display=false,audio,exists,now,exp=125000}={}){
  return{G,flow,app,scene,session,counts,async ready(){scene.create();await flush();assert(scene.isReady());scene.start();for(let i=0;i<8&&!scene.inputState().ready;i++)scene.updateQueue();assert.equal(scene._mode,'main',String(scene._failure||''));assert(scene.inputState().ready);return this;}};
 }
 test('compiled scene exposes detached semantic-ready DTO; MZ-deactivated handler can act once',async()=>{
- const h=await host().ready(),s=h.scene;const view=s.inputState();assert.equal(view.implementation,'d2-status-v1');assert(view.ready);view.items[0].enabled=false;assert.notEqual(s._menu._items[0].enabled,false);
+ const h=await host().ready(),s=h.scene;const view=s.inputState();assert.equal(view.implementation,'d2-menu-grid-v1');assert(view.ready);view.items[0].enabled=false;assert.notEqual(s._menu._items[0].enabled,false);
  s.onMenuOk();assert.equal(s._mode,'moves');s._menu.deactivate();assert(!s.inputState().ready);s.onMenuOk();s.onMenuOk();await flush();assert.equal(h.counts.choose,1);s.updateQueue();assert(s.inputState().ready);
 });
 test('compiled real status window paints late EXP flash for 200ms and releases only owned media',async()=>{
@@ -161,4 +161,14 @@ test('compiled postcommit message failure preserves committed outcome and never 
 
 test('compiled initial view does not abort or normalize author EXP outside the held level interval',async()=>{
  for(const exp of [0,200000]){const h=await host({display:true,exp}).ready(),card=h.scene.presentationState().cards.find(x=>x.side==='p1');assert.equal(card.ratio,null);assert.equal(card.experienceUnavailable,'outside-level-interval');assert.equal(h.session.party[0].exp,exp);assert.equal(h.counts.abort,0);assert(h.scene.inputState().ready);h.scene.terminate();}
+});
+
+test('compiled command window uses two columns with occupied-grid edges and detached column metadata',async()=>{
+ const h=await host().ready(),s=h.scene,m=s._menu;assert.equal(m.maxCols(),2);const view=s.inputState();view.columns=9;assert.equal(s.inputState().columns,2);
+ for(const [method,index]of [['cursorRight',1],['cursorDown',3],['cursorRight',3],['cursorLeft',2],['cursorUp',0],['cursorLeft',0]]){m[method](true);assert.equal(m.index(),index);}
+ assert.equal(h.counts.choose,0);assert(s.inputState().ready);
+});
+test('compiled Scene keeps command and move cursors separate across cancel and bag return',async()=>{
+ const h=await host().ready(),s=h.scene;s._session.currentRequest=()=>({active:[{moves:['A','B','C','D'].map(id=>({id,move:id,pp:5,maxpp:5}))}]});
+ s.showMoves();s._menu.select(3);s.onMenuCancel();assert.equal(s._mode,'main');assert.equal(s._menu.index(),0);s._menu.select(1);s.onMenuOk();assert.equal(s._mode,'bag');assert.equal(s._menu.maxCols(),1);s.onMenuCancel();assert.equal(s._menu.index(),1);s._menu.select(0);s.onMenuOk();assert.equal(s._mode,'moves');assert.equal(s._menu.index(),3);assert.equal(s._menu.maxCols(),2);assert.equal(h.counts.choose,0);
 });

@@ -4,7 +4,7 @@
 
 起点是 [rpg-maker-mz-initialize](https://github.com/y805939188/rpg-maker-mz-initialize) 模板（`b6fa1df`）；第二步（验证战斗接入）已完成，结论和证据在 `docs/step2/`。
 
-本整改分支的5.4进度：D1骨架及冻结十进程／1000战P-4已限域接受，精确CI180／179通过；GC内存增长WARN仍OPEN，不能据此宣称无泄漏。当前开始[D2基础呈现分批](docs/step5/5.4-D2-presentation.md)，D2a内部数值与图片时钟已限域接受，D2b-1正接状态框与HP／经验显示，真实宿主／精确CI、完整默认UI、D2及整体5.4尚未接受。本说明不表示main已整合，也不改变既有PR边界。
+本整改分支的5.4进度：D1/P-4、D2a时钟及D2b-1状态框已限域接受；D2b与信号窄修精确CI184／182／183均双job成功。当前[D2后继网格导航小批](docs/step5/5.4-D2-presentation.md)实现主命令／招式2×2与游标记忆；完整菜单、消息／能力窗、资源／战前、完整D2与5.4及新P-4尚未接受。GC与历史WARN保持OPEN，本说明不表示main已整合。
 
 ## 先读什么
 

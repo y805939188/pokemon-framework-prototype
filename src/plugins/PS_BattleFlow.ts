@@ -13,6 +13,7 @@ import type { BattleScenePresentation } from "./battleflow/controller";
 import { BattleDisplayPlayback } from "./battleflow/display";
 import type { BattleDisplayCard } from "./battleflow/display";
 import { hpColour } from "./battleflow/visual-timing";
+import { BattleMenuCursor, gridCursor } from "./battleflow/menu";
 const { developmentCapabilities } = RuleConfig;
 
 (() => {
@@ -850,7 +851,13 @@ const { developmentCapabilities } = RuleConfig;
     this.select(first < 0 ? 0 : first);
   };
   Window_PSMenu.prototype.itemAt = function (i: number) { return this._items[i]; };
-  Window_PSMenu.prototype.maxCols = function () { return 1; };
+  Window_PSMenu.prototype.maxCols = function () { return this._phase === 'main' || this._phase === 'moves' ? 2 : 1; };
+  for (const [method, direction] of Object.entries({ cursorUp: 'up', cursorDown: 'down', cursorLeft: 'left', cursorRight: 'right' } as const)) {
+    Window_PSMenu.prototype[method] = function (wrap: boolean) {
+      if (this.maxCols() === 2) this.select(gridCursor(this.index(), direction, this._items.length));
+      else G.Window_Command.prototype[method].call(this, wrap);
+    };
+  }
 
   // ---------------------------------------------------------------- the scene
   /** Refusal text: per-action key first (a refused Ball is not a refused Run), then the generic key, then the default. */
@@ -951,7 +958,7 @@ const { developmentCapabilities } = RuleConfig;
     this._psBattle = true; // marker for the test driver (constructor identity is wrapped by pixi_compat)
     this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
     sceneController(this, true);
-    this._D = null; this._names = {}; this._display = null; this._displayAudio = [];
+    this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._menuCursor = new BattleMenuCursor();
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1059,7 +1066,13 @@ const { developmentCapabilities } = RuleConfig;
     const cur = PSFlow.perf.cur;
     if (cur && cur.firstMenuMs === undefined) { const ms = Math.round((performance.now() - cur.t0) * 10) / 10; if (c.isCurrent() && PSFlow.perf.cur === cur) cur.firstMenuMs = ms; }
     if (!c.isCurrent()) return;
+    this._menu._phase = mode;
     this._menu.setItems(items);
+    if (c.isCurrent() && this._menuCursor && (mode === 'main' || mode === 'moves')) {
+      const active = this._display?.snapshot().find((member: BattleDisplayCard) => member.side === 'p1' && member.active);
+      this._menuCursor.bindActive(active?.id ?? null);
+      this._menu.select(this._menuCursor.index(mode, items.length));
+    }
     if (!c.isCurrent()) return; this._menu.show();
     if (c.isCurrent()) this._menu.activate();
   };
@@ -1067,7 +1080,7 @@ const { developmentCapabilities } = RuleConfig;
     const c = sceneController(this), menu = this._menu;
     const interactive = c.canChoose() && !!menu?.isOpenAndActive();
     const items = (menu?._items || []).map((item: any) => ({ key: item.ext === null || typeof item.ext === 'string' || typeof item.ext === 'number' ? item.ext : null, enabled: item.enabled !== false }));
-    return { phase: c.phase, ready: !!interactive && c.canChoose(), items, implementation: 'd2-status-v1' };
+    return { phase: c.phase, ready: !!interactive && c.canChoose(), items, columns: menu?.maxCols?.() ?? 1, implementation: 'd2-menu-grid-v1' };
   };
   P.presentationState = function () {
     const c = sceneController(this);
@@ -1131,6 +1144,7 @@ const { developmentCapabilities } = RuleConfig;
 
   P.onMenuCancel = function () {
     sceneController(this).input(() => {
+    if (this._mode === 'moves') this._menuCursor?.remember('moves', this._menu.index(), this._menu._items.length);
     switch (this._mode) {
       case "moves": case "bag": this.showMain(); return;
       case "party": if (this._pendingItem) { this._pendingItem = null; this.showBag(); } else this.showMain(); return;
@@ -1140,6 +1154,7 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.onMenuOk = function () {
     sceneController(this).input(() => {
+    if (this._mode === 'main' || this._mode === 'moves') this._menuCursor?.remember(this._mode, this._menu.index(), this._menu._items.length);
     const it = this._menu.itemAt(this._menu.index());
     const ext = it && it.ext;
     switch (this._mode) {
@@ -1199,6 +1214,7 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.terminate = function () {
     const c = this._controller as BattleSceneController<any> | undefined;
+    this._menuCursor?.clear();
     this._display?.dispose();
     c?.dispose(); // retire callbacks before host teardown can reenter application code
     try { G.Scene_MenuBase.prototype.terminate.call(this); }

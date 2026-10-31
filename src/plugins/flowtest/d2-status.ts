@@ -26,7 +26,7 @@ export async function runD2Status(p: any): Promise<void> {
   };
   await scenario('D2-S01 real HP data box blocks input and never polls gateway during interpolation', async () => {
     const scene = await begin(), before = clone(game());
-    p.assert(scene.inputState().implementation === 'd2-status-v1', 'actual D2 scene');
+    p.assert(scene.inputState().implementation === 'd2-menu-grid-v1', 'actual D2 scene');
     await choose(/^Fight/); await inMode('moves'); await choose(/flamethrower/i);
     await waitFor(() => scene.presentationState().cards.some((card: any) => card.side === 'p2' && card.active && card.hp > 0 && card.hp < card.maxhp), 'actual intermediate published HP');
     const intermediate = scene.presentationState(); p.assert(!scene.inputState().ready && intermediate.pending > 0, 'visual wait keeps actual input gate closed');
