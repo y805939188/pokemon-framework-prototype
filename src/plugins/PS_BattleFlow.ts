@@ -8,6 +8,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { config as RuleConfig } from "../framework/rules/index";
+import { BattleSceneController } from "./battleflow/controller";
 const { developmentCapabilities } = RuleConfig;
 
 (() => {
@@ -844,15 +845,56 @@ const { developmentCapabilities } = RuleConfig;
   Scene_PSBattle.prototype.constructor = Scene_PSBattle;
 
   const P = Scene_PSBattle.prototype;
+  function sceneController(scene: any, initialized = false): BattleSceneController<any> {
+    if (!initialized && scene._controller) return scene._controller;
+    const op = scene._psOp === undefined ? PSFlow._op : scene._psOp;
+    const owner = { app: PSFlow._app, generation: PSFlow._app?.stateGeneration, bound: initialized && !!PSFlow._app };
+    // Bare prototype callers retain their existing API defaults. Every real initialize constructs a strict owner.
+    const current = () => initialized
+      ? !!op && op === PSFlow._op && (!owner.bound || PSFlow._app === owner.app && owner.app?.stateGeneration === owner.generation)
+      : scene._psOp === undefined || scene._psOp === PSFlow._op;
+    const c = new BattleSceneController<any>({
+      current, active: () => !initialized || PSFlow.running,
+      closedFailure: () => scene._session?.finished && PSFlow.lastOutcome?.commit && PSFlow.lastOutcome.commit !== 'none'
+        ? null : new Error(PSFlow.lastOutcome?.error || 'battle operation is no longer active'),
+      hideInput: () => { const menu = scene._menu; if (menu) { menu.deactivate(); if (current()) menu.hide(); } },
+      appendLine: line => scene._log.add(line),
+      refreshStatus: () => scene.refreshStatus(), afterMessages: () => scene.afterMessages(),
+      abort: error => PSFlow.abort(error, initialized ? op : scene._psOp === undefined ? PSFlow._op : scene._psOp),
+      unusableView: () => { if (current() && G.SceneManager._scene === scene) scene.popScene(); },
+      now: () => performance.now(),
+      actionMeasured: (kind, milliseconds) => {
+        const cur = PSFlow.perf.cur;
+        if (current() && cur && (!initialized || cur.battleId === op.request.battleId)) cur.actions.push({ kind, ms: Math.round(milliseconds * 10) / 10 });
+      },
+    });
+    scene._controller = c;
+    scene._psBindHost = () => {
+      const app = PSFlow.app();
+      if (!current() || owner.bound && (app !== owner.app || app.stateGeneration !== owner.generation)) throw new Error('stale-battle-scene');
+      owner.app = app; owner.generation = app.stateGeneration; owner.bound = true;
+    };
+    if (!initialized) c.ready = true;
+    return c;
+  }
+  // Compatibility seams for existing test IDs. These names forward to one controller; no parallel scene state.
+  for (const [name, field] of Object.entries({ _mode: 'phase', _ready: 'ready', _failure: 'failure', _queue: 'queue', _wait: 'wait', _busy: 'busy', _session: 'session' })) {
+    Object.defineProperty(P, name, { configurable: true,
+      get(this: any) { return (sceneController(this) as any)[field]; },
+      set(this: any, value: any) { (sceneController(this) as any)[field] = value; },
+    });
+  }
   P.initialize = function () {
     G.Scene_MenuBase.prototype.initialize.call(this);
     this._psBattle = true; // marker for the test driver (constructor identity is wrapped by pixi_compat)
     this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
-    this._ready = false; this._failure = null; this._queue = []; this._wait = 0; this._mode = "boot"; this._busy = false;
-    this._session = null; this._D = null; this._names = {};
+    sceneController(this, true);
+    this._D = null; this._names = {};
   };
   P.create = function () {
-    G.Scene_MenuBase.prototype.create.call(this);
+    const c = sceneController(this);
+    c.present(() => {
+    G.Scene_MenuBase.prototype.create.call(this); if (!c.isCurrent()) return;
     const w = G.Graphics.boxWidth, h = G.Graphics.boxHeight;
     this._status = new (Window_PSText as any)(new G.Rectangle(0, 0, w, 120));
     this._log = new (Window_PSText as any)(new G.Rectangle(0, 120, w, 300));
@@ -861,19 +903,26 @@ const { developmentCapabilities } = RuleConfig;
     this._menu.setHandler("ok", this.onMenuOk.bind(this));
     this._menu.setHandler("cancel", this.onMenuCancel.bind(this));
     this._menu.deactivate(); this._menu.hide();
-    PSFlow.begin().then((s: any) => { this._session = s; this._ready = true; }).catch((e: unknown) => { this._failure = e; this._ready = true; });
+    c.open(() => { this._psBindHost(); return PSFlow.begin(); });
+    });
   };
-  P.isReady = function () { return G.Scene_MenuBase.prototype.isReady.call(this) && this._ready; };
+  P.isReady = function () { const c = sceneController(this); return G.Scene_MenuBase.prototype.isReady.call(this) && (c.ready || !c.isCurrent() || !PSFlow.running); };
   P.start = function () {
+    const c = sceneController(this);
+    c.present(() => {
     G.Scene_MenuBase.prototype.start.call(this);
+    if (!c.isCurrent()) return;
+    if (!PSFlow.running) { c.tick(false, 0); return; }
     if (this._failure) { this.abort(this._failure); return; }
     const s = this._session;
-    for (const m of [...s.party, ...s.foeTeam]) this._names[m.id] = PSFlow.speciesName(m.species);
+    for (const m of [...s.party, ...s.foeTeam]) { if (!c.isCurrent()) return; this._names[m.id] = PSFlow.speciesName(m.species); }
+    if (!c.isCurrent()) return;
     this._D = engine().D.make(this._names, PSFlow.translator());
     this._mode = "messages";
     this.pushMessages(s.take());
     if(developmentCapabilities(PSFlow.developerCapabilities).allowExperimentalHeldItemBattle&&s.party.some((m:any)=>!!m.item))this._log.add(PSFlow.translator().t("management.experimental"));
     this.refreshStatus();
+    });
   };
   P.update = function () {
     G.Scene_MenuBase.prototype.update.call(this);
@@ -882,20 +931,11 @@ const { developmentCapabilities } = RuleConfig;
 
   // --- message pacing
   P.pushMessages = function (msgs: any[]) {
-    for (const m of msgs) this._queue.push(...this._D.message(m));
-    this._mode = "messages";
-    this._menu.deactivate(); this._menu.hide();
+    const c = sceneController(this);
+    c.present(() => { const lines: string[] = []; for (const m of msgs) { if (!c.isCurrent()) return; lines.push(...this._D.message(m)); } if (c.isCurrent()) c.enqueue(lines); });
   };
   P.updateQueue = function () {
-    if (this._busy) return;
-    if (this._queue.length) {
-      if (G.Input.isTriggered("ok")) { while (this._queue.length) this._log.add(this._queue.shift()); }
-      else if (this._wait > 0) this._wait--;
-      else { this._log.add(this._queue.shift()); this._wait = PSFlow.fast ? 0 : 24; }
-      return;
-    }
-    this.refreshStatus();
-    this.afterMessages();
+    sceneController(this).tick(G.Input.isTriggered('ok'), PSFlow.fast ? 0 : 24);
   };
   P.afterMessages = function () {
     const s = this._session;
@@ -907,22 +947,34 @@ const { developmentCapabilities } = RuleConfig;
     this.showMain();
   };
   P.refreshStatus = function () {
+    const c = sceneController(this); if (!c.isCurrent()) return;
     const s = this._session; if (!s) return;
     const tr = PSFlow.translator();
     const line = (side: string, who: string) => s.gw.readState(side).filter((x: any) => x.active).map((x: any) =>
       tr.t("ui.status.line", { who, name: this._names[x.id] || x.id, level: x.level, hp: x.hp, maxhp: x.maxhp,
         status: x.status ? tr.t("ui.status.tag", { status: x.status }) : "", fainted: x.fainted ? tr.t("ui.status.fainted") : "" }));
     const bagText = Object.entries(s.bag).map(([k, v]) => `${k} x${v}`).join(", ") || tr.t("ui.status.bag_empty");
-    this._status.setLines([...line("p2", tr.t("ui.who.foe")), ...line("p1", tr.t("ui.who.you")), tr.t("ui.status.bag", { items: bagText })].map((l: string) => this._status.fitText(l)));
+    const foe = line("p2", tr.t("ui.who.foe")); if (!c.isCurrent()) return;
+    const player = line("p1", tr.t("ui.who.you")); if (!c.isCurrent()) return;
+    const lines = [...foe, ...player, tr.t("ui.status.bag", { items: bagText })].map((l: string) => this._status.fitText(l));
+    if (c.isCurrent()) this._status.setLines(lines);
   };
 
   // --- menus
   P.show = function (mode: string, items: any[]) {
+    const c = sceneController(this); if (!c.show(mode)) return;
     const cur = PSFlow.perf.cur;
-    if (cur && cur.firstMenuMs === undefined) cur.firstMenuMs = Math.round((performance.now() - cur.t0) * 10) / 10;
-    this._mode = mode;
+    if (cur && cur.firstMenuMs === undefined) { const ms = Math.round((performance.now() - cur.t0) * 10) / 10; if (c.isCurrent() && PSFlow.perf.cur === cur) cur.firstMenuMs = ms; }
+    if (!c.isCurrent()) return;
     this._menu.setItems(items);
-    this._menu.show(); this._menu.activate();
+    if (!c.isCurrent()) return; this._menu.show();
+    if (c.isCurrent()) this._menu.activate();
+  };
+  P.inputState = function () {
+    const c = sceneController(this), menu = this._menu;
+    const interactive = c.canChoose() && !!menu?.isOpenAndActive();
+    const items = (menu?._items || []).map((item: any) => ({ key: item.ext === null || typeof item.ext === 'string' || typeof item.ext === 'number' ? item.ext : null, enabled: item.enabled !== false }));
+    return { phase: c.phase, ready: !!interactive && c.canChoose(), items, implementation: 'd1-controller-v1' };
   };
   P.showMain = function () {
     const tr = PSFlow.translator();
@@ -980,14 +1032,16 @@ const { developmentCapabilities } = RuleConfig;
   };
 
   P.onMenuCancel = function () {
+    sceneController(this).input(() => {
     switch (this._mode) {
       case "moves": case "bag": this.showMain(); return;
       case "party": if (this._pendingItem) { this._pendingItem = null; this.showBag(); } else this.showMain(); return;
       default: G.SoundManager.playBuzzer(); this._menu.activate();
     }
+    });
   };
   P.onMenuOk = function () {
-    if (this._busy) return;
+    sceneController(this).input(() => {
     const it = this._menu.itemAt(this._menu.index());
     const ext = it && it.ext;
     switch (this._mode) {
@@ -1011,45 +1065,45 @@ const { developmentCapabilities } = RuleConfig;
       case "learn": this.act(async () => ({ ok: true, messages: await this._session.decideLearn(ext) }), "learn"); return;
       case "end": this.onEnd(); return;
     }
+    });
   };
 
   /** Run one session action; refusals show a reason and return to the main menu (nothing consumed). */
   P.act = function (fn: () => Promise<any> | any, kind?: string) {
-    this._busy = true;
-    this._menu.deactivate(); this._menu.hide();
-    const tAct = performance.now();
-    Promise.resolve().then(fn).then((r: any) => {
-      this._busy = false;
-      const cur = PSFlow.perf.cur;
-      if (cur) cur.actions.push({ kind: kind || "other", ms: Math.round((performance.now() - tAct) * 10) / 10 });
+    const c = sceneController(this);
+    c.run(fn, (r: any) => {
       if (r && r.ok === false) {
-        this._queue.push(refusalText(kind, r.reason));
-        this._mode = "messages";
+        c.enqueue([refusalText(kind, r.reason)]);
         return;
       }
       this.pushMessages(r.messages || []);
-    }).catch((e: unknown) => { this._busy = false; this._failure = e; this.abort(e); });
+    }, kind);
   };
   P.abort = function (e: unknown) {
-    PSFlow.abort(e, this._psOp);
-    this._failure = e;
-    this._queue.length = 0;
-    this._mode = "messages";
-    this.refreshStatus && this._session && this.refreshStatus();
+    const c = sceneController(this); c.fail(e);
+    if (c.isCurrent() && this._session) c.present(() => this.refreshStatus());
   };
   P.onEnd = function () {
     // A delayed callback from an old scene must not pop the current scene's global SceneManager stack.
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // bare API callers refer to the current operation
     if (op !== PSFlow._op) { PSFlow.stale("finish", op); return; }
+    const c = this._controller as BattleSceneController<any> | undefined;
+    if (c && !c.isCurrent()) return;
+    c?.dispose();
     if (!this._aborted && !this._failure) {
-      try { const outcome=PSFlow.finish(this._session, this._psOp);if(outcome?.continuationToken){this._evolutionTransferred=true;this.popScene();return;}if(outcome?.pending&&W.PSManagement){this._menu.deactivate();this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
+      try { const outcome=PSFlow.finish(this._session, this._psOp);if(c&&!c.ownsHost())return;if(outcome?.continuationToken){this._evolutionTransferred=true;this.popScene();return;}if(outcome?.pending&&W.PSManagement){this._menu.deactivate();if(c&&!c.ownsHost())return;this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
     }
+    if (c && !c.ownsHost()) return;
     this.popScene();
   };
   P.terminate = function () {
-    G.Scene_MenuBase.prototype.terminate.call(this);
+    const c = this._controller as BattleSceneController<any> | undefined;
+    c?.dispose(); // retire callbacks before host teardown can reenter application code
+    try { G.Scene_MenuBase.prototype.terminate.call(this); }
+    finally {
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // (a scene always has one; a bare caller means the current one)
-    if (PSFlow.running && op === PSFlow._op && !(this._receivingTransferred&&PSFlow.app().pendingReceiving) && !(this._evolutionTransferred&&PSFlow.app().pendingEvolution)) PSFlow.abort(new Error("the battle scene closed without an outcome"), op); // transferred operations keep the same event and save lock
+    if (PSFlow.running && op === PSFlow._op && (!c || c.ownsHost()) && !(this._receivingTransferred&&PSFlow.app().pendingReceiving) && !(this._evolutionTransferred&&PSFlow.app().pendingEvolution) && (!c || c.ownsHost())) PSFlow.abort(new Error("the battle scene closed without an outcome"), op); // transferred operations keep the same event and save lock
+    }
   };
 
   // ---------------------------------------------------------------- read-only party / bag screen (no management in this version)
