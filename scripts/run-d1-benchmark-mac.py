@@ -8,6 +8,7 @@ import argparse
 import datetime
 import hashlib
 import json
+import math
 import os
 import signal
 import subprocess
@@ -185,6 +186,22 @@ def run_group(app, info, out, group, count, formal, source_input):
         raise RuntimeError(group+' instrumentation mode mismatch')
     if not off and (len(benchmark['memory']) != 5 or any(m['gcForced'] != gc for m in benchmark['memory'])):
         raise RuntimeError(group+' memory/GC sample contract mismatch')
+    if not off:
+        if [m['id'] for m in benchmark['memory']] != ['initial-map','after4','after50','after100','after-idle120']:
+            raise RuntimeError(group+' wrong memory sample order')
+        frames=benchmark.get('frameSamples', [])
+        if {f.get('kind') for f in frames} != {'updateMain','rAF'} or any(
+                not isinstance(f.get('dt'), (int,float)) or not math.isfinite(f['dt']) or f['dt'] < 0 for f in frames):
+            raise RuntimeError(group+' missing/invalid real game/rAF clock samples')
+        for memory in benchmark['memory']:
+            if memory.get('appRssStatus') == 'value' and (not memory.get('processes') or not isinstance(memory.get('appRssBytes'),int) or memory['appRssBytes'] <= 0):
+                raise RuntimeError(group+' invalid claimed whole app RSS')
+            if memory.get('appRssStatus') == 'UNKNOWN' and memory.get('appRssBytes') is not None:
+                raise RuntimeError(group+' UNKNOWN app RSS must stay null')
+            if memory.get('appRssStatus') not in ['value','UNKNOWN'] or memory.get('appRssStatus') == 'UNKNOWN' and not memory.get('appRssReason'):
+                raise RuntimeError(group+' missing explicit app RSS qualification/reason')
+    elif benchmark.get('frameSamples') or benchmark.get('memory'):
+        raise RuntimeError(group+' instrument-off unexpectedly sampled detailed probes')
     after = payload(app)
     write(out/'PAYLOAD-AFTER.json', after)
     if before != after:
