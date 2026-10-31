@@ -5,6 +5,7 @@ sys.dont_write_bytecode=True
 import importlib.util,json,os,shutil,subprocess,tempfile,unittest,plistlib,struct,signal,time
 from unittest import mock
 from types import SimpleNamespace
+CANCEL_SIGNALS=(signal.SIGTERM,signal.SIGHUP,signal.SIGINT)
 HERE=Path(__file__).resolve().parent
 spec=importlib.util.spec_from_file_location('d1_existing',HERE/'d1-benchmark-runner.test.py')
 base=importlib.util.module_from_spec(spec);spec.loader.exec_module(base)
@@ -93,8 +94,8 @@ class EvidenceGates(unittest.TestCase):
             with self.subTest(field=field),self.assertRaises(RuntimeError):host.require_runtime(initial,{**env,field:'different'})
             with self.subTest(missing=field),self.assertRaises(RuntimeError):host.require_runtime(None,{k:v for k,v in env.items()if k!=field})
 
-    def test_term_and_hup_cleanup_only_owned_group(self):
-        for sig in [signal.SIGTERM,signal.SIGHUP]:
+    def test_handled_signals_cleanup_only_owned_group(self):
+        for sig in CANCEL_SIGNALS:
             with self.subTest(signal=sig),tempfile.TemporaryDirectory(prefix='pf-d1-signal-')as folder:
                 root=Path(folder);apps=[]
                 for role in ['control','candidate']:
@@ -110,6 +111,7 @@ class EvidenceGates(unittest.TestCase):
                         time.sleep(.02)
                     self.assertTrue(receipt.exists());pid=json.loads(receipt.read_text())['pid'];process.send_signal(sig);stdout,stderr=process.communicate(timeout=10);self.assertNotEqual(process.returncode,0)
                     summary=json.loads((root/'out/SUMMARY.json').read_text());self.assertEqual(summary['status'],'FAIL_STOP');self.assertIn('signal',summary['error']);row=json.loads(receipt.read_text());self.assertIn('exit',row);self.assertIn('finishedUTC',row)
+                    self.assertEqual(summary['cancellationSignals'],[sig]);self.assertEqual(summary['groups'],[]);self.assertEqual(row['cancellationSignals'],[sig]);self.assertEqual(row['cleanupErrors'],[])
                     with self.assertRaises(ProcessLookupError):os.killpg(pid,0)
                 finally:
                     if process.poll()is None:process.kill();process.communicate(timeout=5)
@@ -159,11 +161,11 @@ class EvidenceGates(unittest.TestCase):
 
     def test_cancel_during_each_sampling_command_is_never_unknown_or_accepted(self):
         for window in ['pgrep','ps']:
-            for sig in [signal.SIGTERM,signal.SIGHUP]:
+            for sig in CANCEL_SIGNALS:
                 with self.subTest(window=window,signal=sig):self.signal_window(window,sig)
 
     def test_cancel_during_cleanup_preserves_fatal_and_finishes_owned_cleanup(self):
-        for sig in [signal.SIGTERM,signal.SIGHUP]:
+        for sig in CANCEL_SIGNALS:
             with self.subTest(signal=sig):self.signal_window('cleanup',sig)
 
     def test_real_sampling_unavailability_remains_explicit_unknown(self):
@@ -173,28 +175,32 @@ class EvidenceGates(unittest.TestCase):
         self.assertEqual(row['appRssStatus'],'UNKNOWN');self.assertIsNone(row['appRssBytes']);self.assertIn('unavailable',row['appRssReason'])
 
     def test_cancel_after_exit_during_verification_is_not_accepted(self):
-        with tempfile.TemporaryDirectory(prefix='pf-d1-late-cancel-') as folder:
-            root=Path(folder);app=root/'fixture.app';nw=app/'Contents/Resources/app.nw';nw.mkdir(parents=True);base.install_core(nw)
-            source=dict(cases=[dict(id='F100-1',seed=[1,2,3,4],expected=dict(code=1))]);info=dict(gitHead='synthetic');report=base.make_report(source,info,count=1)
-            exe=app/'Contents/MacOS/nwjs';exe.parent.mkdir();exe.write_text('#!/usr/bin/env python3\nimport sys\nfrom pathlib import Path\nPath(next(x.split("=",1)[1]for x in sys.argv if x.startswith("--ps-flow-out="))).write_text('+repr(json.dumps(report))+')\n');exe.chmod(0o755)
-            cancellation=base.SCOPE['Cancellation']();real=base.SCOPE['verify_report_hashes']
-            def checked(*args):
-                value=real(*args);cancellation.request(signal.SIGHUP,None);return value
-            with mock.patch.dict(base.SCOPE,{'verify_report_hashes':checked}),self.assertRaises(base.SCOPE['BenchmarkCancelled']):base.SCOPE['run_group'](app,info,root/'out','control-natural1',1,False,source,synthetic=True,cancellation=cancellation)
-            row=json.loads((root/'out/EXECUTION.json').read_text());self.assertEqual(row['cancellationSignals'],[signal.SIGHUP]);self.assertIn('signal',row['failure']['message']);self.assertIn('finishedUTC',row)
+        for sig in CANCEL_SIGNALS:
+            with self.subTest(signal=sig),tempfile.TemporaryDirectory(prefix='pf-d1-late-cancel-') as folder:
+                root=Path(folder);app=root/'fixture.app';nw=app/'Contents/Resources/app.nw';nw.mkdir(parents=True);base.install_core(nw)
+                source=dict(cases=[dict(id='F100-1',seed=[1,2,3,4],expected=dict(code=1))]);info=dict(gitHead='synthetic');report=base.make_report(source,info,count=1)
+                exe=app/'Contents/MacOS/nwjs';exe.parent.mkdir();exe.write_text('#!/usr/bin/env python3\nimport sys\nfrom pathlib import Path\nPath(next(x.split("=",1)[1]for x in sys.argv if x.startswith("--ps-flow-out="))).write_text('+repr(json.dumps(report))+')\n');exe.chmod(0o755)
+                cancellation=base.SCOPE['Cancellation']();real=base.SCOPE['verify_report_hashes']
+                def checked(*args):
+                    value=real(*args);cancellation.request(sig,None);return value
+                with mock.patch.dict(base.SCOPE,{'verify_report_hashes':checked}),self.assertRaises(base.SCOPE['BenchmarkCancelled']):base.SCOPE['run_group'](app,info,root/'out','control-natural1',1,False,source,synthetic=True,cancellation=cancellation)
+                row=json.loads((root/'out/EXECUTION.json').read_text());self.assertEqual(row['cancellationSignals'],[sig]);self.assertIn('signal',row['failure']['message']);self.assertIn('finishedUTC',row)
 
     def test_cancel_at_summary_publication_rewrites_fail_stop_and_exits_nonzero(self):
-        with tempfile.TemporaryDirectory(prefix='pf-d1-summary-cancel-') as folder:
-            root=Path(folder);apps=[]
-            for name in ['control','candidate']:
-                app=root/(name+'.app');nw=app/'Contents/Resources/app.nw';nw.mkdir(parents=True);(nw/'package-info.json').write_text(json.dumps(dict(gitHead=name,withTests=True,workingTreeChanges=0)));apps.append(app)
-            result=dict(initialStateHash='same',finalStateHash='same');write=base.SCOPE['write']
-            def publishing(file,value):
-                if file.name=='SUMMARY.json' and value['status']=='SYNTHETIC_CONTROLS_EXECUTED':os.kill(os.getpid(),signal.SIGTERM)
-                write(file,value)
-            argv=[str(base.SCRIPT),*map(str,apps),str(root/'out'),'--groups','control-natural1','--pilot-count','1','--synthetic-controls']
-            with mock.patch.dict(base.SCOPE,{'run_group':lambda *a,**k:result,'write':publishing}),mock.patch.object(sys,'argv',argv),self.assertRaises(base.SCOPE['BenchmarkCancelled']):base.SCOPE['main']()
-            summary=json.loads((root/'out/SUMMARY.json').read_text());self.assertEqual(summary['status'],'FAIL_STOP');self.assertEqual(summary['cancellationSignals'],[signal.SIGTERM]);self.assertIn('signal',summary['error'])
+        for sig in CANCEL_SIGNALS:
+            with self.subTest(signal=sig),tempfile.TemporaryDirectory(prefix='pf-d1-summary-cancel-') as folder:
+                root=Path(folder);apps=[]
+                for name in ['control','candidate']:
+                    app=root/(name+'.app');nw=app/'Contents/Resources/app.nw';nw.mkdir(parents=True);(nw/'package-info.json').write_text(json.dumps(dict(gitHead=name,withTests=True,workingTreeChanges=0)));apps.append(app)
+                result=dict(initialStateHash='same',finalStateHash='same');write=base.SCOPE['write']
+                def publishing(file,value):
+                    if file.name=='SUMMARY.json' and value['status']=='SYNTHETIC_CONTROLS_EXECUTED':os.kill(os.getpid(),sig)
+                    write(file,value)
+                argv=[str(base.SCRIPT),*map(str,apps),str(root/'out'),'--groups','control-natural1','--pilot-count','1','--synthetic-controls']
+                before={s:signal.getsignal(s)for s in CANCEL_SIGNALS}
+                with mock.patch.dict(base.SCOPE,{'run_group':lambda *a,**k:result,'write':publishing}),mock.patch.object(sys,'argv',argv),self.assertRaises(base.SCOPE['BenchmarkCancelled']):base.SCOPE['main']()
+                summary=json.loads((root/'out/SUMMARY.json').read_text());self.assertEqual(summary['status'],'FAIL_STOP');self.assertEqual(summary['cancellationSignals'],[sig]);self.assertIn('signal',summary['error'])
+                self.assertEqual({s:signal.getsignal(s)for s in CANCEL_SIGNALS},before)
 
     def test_cleanup_permission_failure_is_explicit(self):
         process=SimpleNamespace(pid=12345,poll=lambda:0,wait=lambda timeout:0)
