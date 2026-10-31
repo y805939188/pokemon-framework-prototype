@@ -2,6 +2,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const E = require('../../../js/engine/build/engine.cjs');
+// Full checkpoint equality includes protocol |t:|. Keep both turns on one test clock, not a wall-second race.
+test.beforeEach(t => t.mock.method(Date, 'now', () => 1793350000000));
 
 const PLAYER = { id: 0, name: 'player', gender: 2, language: 2 };
 const FOREIGN = { id: 1, name: 'other', gender: 0, language: 7 };
