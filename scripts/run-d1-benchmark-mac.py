@@ -184,10 +184,11 @@ def run_group(app, info, out, group, count, formal, source_input):
         raise RuntimeError(group+' wrong actual presentation implementation')
     if benchmark['instrumentation']['detailed'] == off:
         raise RuntimeError(group+' instrumentation mode mismatch')
-    if not off and (len(benchmark['memory']) != 5 or any(m['gcForced'] != gc for m in benchmark['memory'])):
+    sample_ids=['initial-map']+['after'+str(n) for n in [4,50,100] if n<=count]+['after-idle120']
+    if not off and (len(benchmark['memory']) != len(sample_ids) or any(m['gcForced'] != gc for m in benchmark['memory'])):
         raise RuntimeError(group+' memory/GC sample contract mismatch')
     if not off:
-        if [m['id'] for m in benchmark['memory']] != ['initial-map','after4','after50','after100','after-idle120']:
+        if [m['id'] for m in benchmark['memory']] != sample_ids:
             raise RuntimeError(group+' wrong memory sample order')
         frames=benchmark.get('frameSamples', [])
         if {f.get('kind') for f in frames} != {'updateMain','rAF'} or any(
