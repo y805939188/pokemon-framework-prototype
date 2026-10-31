@@ -1,0 +1,3552 @@
+{
+  "version": "F100-v1",
+  "fixtureVersion": "D1-donor-v1",
+  "count": 100,
+  "initial": {
+    "player": "P1 Snorlax50; PayDay/Splash/Memento/Roost, oranberry, HPmax-20",
+    "partner": "P2 Snorlax50 same moves, oranberry,HP1,exp(level51)-1; unused until firsttrainer",
+    "money": 100000,
+    "receiving": {
+      "mode": 1,
+      "naming": 1
+    },
+    "capabilities": {
+      "allowHeldItemSources": true,
+      "allowExperimentalHeldItemBattle": true
+    },
+    "worldRandom": "zero-valued finite RandomN, actual count recorded",
+    "clock": 1793350000000
+  },
+  "cases": [
+    {
+      "id": "F100-001",
+      "ordinal": 0,
+      "round": 1,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "request": {
+        "battleId": "F100-001",
+        "seq": 1,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-002",
+      "ordinal": 1,
+      "round": 1,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        5
+      ],
+      "request": {
+        "battleId": "F100-002",
+        "seq": 2,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-003",
+      "ordinal": 2,
+      "round": 1,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        6
+      ],
+      "request": {
+        "battleId": "F100-003",
+        "seq": 3,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5"
+      ],
+      "steps": [
+        "potion-P1",
+        "switch-P2",
+        "masterball-blocked",
+        "switch-P1",
+        "finish-payday-and-learn-slot3"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true,
+        "trainerFullRestore": 1,
+        "heldConsumed": "P2",
+        "heldRestored": "P1",
+        "learning": true
+      }
+    },
+    {
+      "id": "F100-004",
+      "ordinal": 3,
+      "round": 1,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        7
+      ],
+      "request": {
+        "battleId": "F100-004",
+        "seq": 4,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-005",
+      "ordinal": 4,
+      "round": 2,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        8
+      ],
+      "request": {
+        "battleId": "F100-005",
+        "seq": 5,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-006",
+      "ordinal": 5,
+      "round": 2,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        9
+      ],
+      "request": {
+        "battleId": "F100-006",
+        "seq": 6,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-007",
+      "ordinal": 6,
+      "round": 2,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        10
+      ],
+      "request": {
+        "battleId": "F100-007",
+        "seq": 7,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-008",
+      "ordinal": 7,
+      "round": 2,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        11
+      ],
+      "request": {
+        "battleId": "F100-008",
+        "seq": 8,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-009",
+      "ordinal": 8,
+      "round": 3,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        12
+      ],
+      "request": {
+        "battleId": "F100-009",
+        "seq": 9,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-010",
+      "ordinal": 9,
+      "round": 3,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        13
+      ],
+      "request": {
+        "battleId": "F100-010",
+        "seq": 10,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-011",
+      "ordinal": 10,
+      "round": 3,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        14
+      ],
+      "request": {
+        "battleId": "F100-011",
+        "seq": 11,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-012",
+      "ordinal": 11,
+      "round": 3,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        15
+      ],
+      "request": {
+        "battleId": "F100-012",
+        "seq": 12,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-013",
+      "ordinal": 12,
+      "round": 4,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        16
+      ],
+      "request": {
+        "battleId": "F100-013",
+        "seq": 13,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-014",
+      "ordinal": 13,
+      "round": 4,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        17
+      ],
+      "request": {
+        "battleId": "F100-014",
+        "seq": 14,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-015",
+      "ordinal": 14,
+      "round": 4,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        18
+      ],
+      "request": {
+        "battleId": "F100-015",
+        "seq": 15,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-016",
+      "ordinal": 15,
+      "round": 4,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        19
+      ],
+      "request": {
+        "battleId": "F100-016",
+        "seq": 16,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-017",
+      "ordinal": 16,
+      "round": 5,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        20
+      ],
+      "request": {
+        "battleId": "F100-017",
+        "seq": 17,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-018",
+      "ordinal": 17,
+      "round": 5,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        21
+      ],
+      "request": {
+        "battleId": "F100-018",
+        "seq": 18,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-019",
+      "ordinal": 18,
+      "round": 5,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        22
+      ],
+      "request": {
+        "battleId": "F100-019",
+        "seq": 19,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-020",
+      "ordinal": 19,
+      "round": 5,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        23
+      ],
+      "request": {
+        "battleId": "F100-020",
+        "seq": 20,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-021",
+      "ordinal": 20,
+      "round": 6,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        24
+      ],
+      "request": {
+        "battleId": "F100-021",
+        "seq": 21,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-022",
+      "ordinal": 21,
+      "round": 6,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        25
+      ],
+      "request": {
+        "battleId": "F100-022",
+        "seq": 22,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-023",
+      "ordinal": 22,
+      "round": 6,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        26
+      ],
+      "request": {
+        "battleId": "F100-023",
+        "seq": 23,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-024",
+      "ordinal": 23,
+      "round": 6,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        27
+      ],
+      "request": {
+        "battleId": "F100-024",
+        "seq": 24,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-025",
+      "ordinal": 24,
+      "round": 7,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        28
+      ],
+      "request": {
+        "battleId": "F100-025",
+        "seq": 25,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-026",
+      "ordinal": 25,
+      "round": 7,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        29
+      ],
+      "request": {
+        "battleId": "F100-026",
+        "seq": 26,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-027",
+      "ordinal": 26,
+      "round": 7,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        30
+      ],
+      "request": {
+        "battleId": "F100-027",
+        "seq": 27,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-028",
+      "ordinal": 27,
+      "round": 7,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        31
+      ],
+      "request": {
+        "battleId": "F100-028",
+        "seq": 28,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-029",
+      "ordinal": 28,
+      "round": 8,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        32
+      ],
+      "request": {
+        "battleId": "F100-029",
+        "seq": 29,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-030",
+      "ordinal": 29,
+      "round": 8,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        33
+      ],
+      "request": {
+        "battleId": "F100-030",
+        "seq": 30,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-031",
+      "ordinal": 30,
+      "round": 8,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        34
+      ],
+      "request": {
+        "battleId": "F100-031",
+        "seq": 31,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-032",
+      "ordinal": 31,
+      "round": 8,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        35
+      ],
+      "request": {
+        "battleId": "F100-032",
+        "seq": 32,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-033",
+      "ordinal": 32,
+      "round": 9,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        36
+      ],
+      "request": {
+        "battleId": "F100-033",
+        "seq": 33,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-034",
+      "ordinal": 33,
+      "round": 9,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        37
+      ],
+      "request": {
+        "battleId": "F100-034",
+        "seq": 34,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-035",
+      "ordinal": 34,
+      "round": 9,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        38
+      ],
+      "request": {
+        "battleId": "F100-035",
+        "seq": 35,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-036",
+      "ordinal": 35,
+      "round": 9,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        39
+      ],
+      "request": {
+        "battleId": "F100-036",
+        "seq": 36,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-037",
+      "ordinal": 36,
+      "round": 10,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        40
+      ],
+      "request": {
+        "battleId": "F100-037",
+        "seq": 37,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-038",
+      "ordinal": 37,
+      "round": 10,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        41
+      ],
+      "request": {
+        "battleId": "F100-038",
+        "seq": 38,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-039",
+      "ordinal": 38,
+      "round": 10,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        42
+      ],
+      "request": {
+        "battleId": "F100-039",
+        "seq": 39,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-040",
+      "ordinal": 39,
+      "round": 10,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        43
+      ],
+      "request": {
+        "battleId": "F100-040",
+        "seq": 40,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-041",
+      "ordinal": 40,
+      "round": 11,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        44
+      ],
+      "request": {
+        "battleId": "F100-041",
+        "seq": 41,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-042",
+      "ordinal": 41,
+      "round": 11,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        45
+      ],
+      "request": {
+        "battleId": "F100-042",
+        "seq": 42,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-043",
+      "ordinal": 42,
+      "round": 11,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        46
+      ],
+      "request": {
+        "battleId": "F100-043",
+        "seq": 43,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-044",
+      "ordinal": 43,
+      "round": 11,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        47
+      ],
+      "request": {
+        "battleId": "F100-044",
+        "seq": 44,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-045",
+      "ordinal": 44,
+      "round": 12,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        48
+      ],
+      "request": {
+        "battleId": "F100-045",
+        "seq": 45,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-046",
+      "ordinal": 45,
+      "round": 12,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        49
+      ],
+      "request": {
+        "battleId": "F100-046",
+        "seq": 46,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-047",
+      "ordinal": 46,
+      "round": 12,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        50
+      ],
+      "request": {
+        "battleId": "F100-047",
+        "seq": 47,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-048",
+      "ordinal": 47,
+      "round": 12,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        51
+      ],
+      "request": {
+        "battleId": "F100-048",
+        "seq": 48,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-049",
+      "ordinal": 48,
+      "round": 13,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        52
+      ],
+      "request": {
+        "battleId": "F100-049",
+        "seq": 49,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-050",
+      "ordinal": 49,
+      "round": 13,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        53
+      ],
+      "request": {
+        "battleId": "F100-050",
+        "seq": 50,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-051",
+      "ordinal": 50,
+      "round": 13,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        54
+      ],
+      "request": {
+        "battleId": "F100-051",
+        "seq": 51,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-052",
+      "ordinal": 51,
+      "round": 13,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        55
+      ],
+      "request": {
+        "battleId": "F100-052",
+        "seq": 52,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-053",
+      "ordinal": 52,
+      "round": 14,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        56
+      ],
+      "request": {
+        "battleId": "F100-053",
+        "seq": 53,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-054",
+      "ordinal": 53,
+      "round": 14,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        57
+      ],
+      "request": {
+        "battleId": "F100-054",
+        "seq": 54,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-055",
+      "ordinal": 54,
+      "round": 14,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        58
+      ],
+      "request": {
+        "battleId": "F100-055",
+        "seq": 55,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-056",
+      "ordinal": 55,
+      "round": 14,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        59
+      ],
+      "request": {
+        "battleId": "F100-056",
+        "seq": 56,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-057",
+      "ordinal": 56,
+      "round": 15,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        60
+      ],
+      "request": {
+        "battleId": "F100-057",
+        "seq": 57,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-058",
+      "ordinal": 57,
+      "round": 15,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        61
+      ],
+      "request": {
+        "battleId": "F100-058",
+        "seq": 58,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-059",
+      "ordinal": 58,
+      "round": 15,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        62
+      ],
+      "request": {
+        "battleId": "F100-059",
+        "seq": 59,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-060",
+      "ordinal": 59,
+      "round": 15,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        63
+      ],
+      "request": {
+        "battleId": "F100-060",
+        "seq": 60,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-061",
+      "ordinal": 60,
+      "round": 16,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        64
+      ],
+      "request": {
+        "battleId": "F100-061",
+        "seq": 61,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-062",
+      "ordinal": 61,
+      "round": 16,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        65
+      ],
+      "request": {
+        "battleId": "F100-062",
+        "seq": 62,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-063",
+      "ordinal": 62,
+      "round": 16,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        66
+      ],
+      "request": {
+        "battleId": "F100-063",
+        "seq": 63,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-064",
+      "ordinal": 63,
+      "round": 16,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        67
+      ],
+      "request": {
+        "battleId": "F100-064",
+        "seq": 64,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-065",
+      "ordinal": 64,
+      "round": 17,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        68
+      ],
+      "request": {
+        "battleId": "F100-065",
+        "seq": 65,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-066",
+      "ordinal": 65,
+      "round": 17,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        69
+      ],
+      "request": {
+        "battleId": "F100-066",
+        "seq": 66,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-067",
+      "ordinal": 66,
+      "round": 17,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        70
+      ],
+      "request": {
+        "battleId": "F100-067",
+        "seq": 67,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-068",
+      "ordinal": 67,
+      "round": 17,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        71
+      ],
+      "request": {
+        "battleId": "F100-068",
+        "seq": 68,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-069",
+      "ordinal": 68,
+      "round": 18,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        72
+      ],
+      "request": {
+        "battleId": "F100-069",
+        "seq": 69,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-070",
+      "ordinal": 69,
+      "round": 18,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        73
+      ],
+      "request": {
+        "battleId": "F100-070",
+        "seq": 70,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-071",
+      "ordinal": 70,
+      "round": 18,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        74
+      ],
+      "request": {
+        "battleId": "F100-071",
+        "seq": 71,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-072",
+      "ordinal": 71,
+      "round": 18,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        75
+      ],
+      "request": {
+        "battleId": "F100-072",
+        "seq": 72,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-073",
+      "ordinal": 72,
+      "round": 19,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        76
+      ],
+      "request": {
+        "battleId": "F100-073",
+        "seq": 73,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-074",
+      "ordinal": 73,
+      "round": 19,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        77
+      ],
+      "request": {
+        "battleId": "F100-074",
+        "seq": 74,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-075",
+      "ordinal": 74,
+      "round": 19,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        78
+      ],
+      "request": {
+        "battleId": "F100-075",
+        "seq": 75,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-076",
+      "ordinal": 75,
+      "round": 19,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        79
+      ],
+      "request": {
+        "battleId": "F100-076",
+        "seq": 76,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-077",
+      "ordinal": 76,
+      "round": 20,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        80
+      ],
+      "request": {
+        "battleId": "F100-077",
+        "seq": 77,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-078",
+      "ordinal": 77,
+      "round": 20,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        81
+      ],
+      "request": {
+        "battleId": "F100-078",
+        "seq": 78,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-079",
+      "ordinal": 78,
+      "round": 20,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        82
+      ],
+      "request": {
+        "battleId": "F100-079",
+        "seq": 79,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-080",
+      "ordinal": 79,
+      "round": 20,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        83
+      ],
+      "request": {
+        "battleId": "F100-080",
+        "seq": 80,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-081",
+      "ordinal": 80,
+      "round": 21,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        84
+      ],
+      "request": {
+        "battleId": "F100-081",
+        "seq": 81,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-082",
+      "ordinal": 81,
+      "round": 21,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        85
+      ],
+      "request": {
+        "battleId": "F100-082",
+        "seq": 82,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-083",
+      "ordinal": 82,
+      "round": 21,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        86
+      ],
+      "request": {
+        "battleId": "F100-083",
+        "seq": 83,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-084",
+      "ordinal": 83,
+      "round": 21,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        87
+      ],
+      "request": {
+        "battleId": "F100-084",
+        "seq": 84,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-085",
+      "ordinal": 84,
+      "round": 22,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        88
+      ],
+      "request": {
+        "battleId": "F100-085",
+        "seq": 85,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-086",
+      "ordinal": 85,
+      "round": 22,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        89
+      ],
+      "request": {
+        "battleId": "F100-086",
+        "seq": 86,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-087",
+      "ordinal": 86,
+      "round": 22,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        90
+      ],
+      "request": {
+        "battleId": "F100-087",
+        "seq": 87,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-088",
+      "ordinal": 87,
+      "round": 22,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        91
+      ],
+      "request": {
+        "battleId": "F100-088",
+        "seq": 88,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-089",
+      "ordinal": 88,
+      "round": 23,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        92
+      ],
+      "request": {
+        "battleId": "F100-089",
+        "seq": 89,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-090",
+      "ordinal": 89,
+      "round": 23,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        93
+      ],
+      "request": {
+        "battleId": "F100-090",
+        "seq": 90,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-091",
+      "ordinal": 90,
+      "round": 23,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        94
+      ],
+      "request": {
+        "battleId": "F100-091",
+        "seq": 91,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-092",
+      "ordinal": 91,
+      "round": 23,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        95
+      ],
+      "request": {
+        "battleId": "F100-092",
+        "seq": 92,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-093",
+      "ordinal": 92,
+      "round": 24,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        96
+      ],
+      "request": {
+        "battleId": "F100-093",
+        "seq": 93,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-094",
+      "ordinal": 93,
+      "round": 24,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        97
+      ],
+      "request": {
+        "battleId": "F100-094",
+        "seq": 94,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-095",
+      "ordinal": 94,
+      "round": 24,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        98
+      ],
+      "request": {
+        "battleId": "F100-095",
+        "seq": 95,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-096",
+      "ordinal": 95,
+      "round": 24,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        99
+      ],
+      "request": {
+        "battleId": "F100-096",
+        "seq": 96,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    },
+    {
+      "id": "F100-097",
+      "ordinal": 96,
+      "round": 25,
+      "kind": "wild-win",
+      "seed": [
+        1,
+        2,
+        3,
+        100
+      ],
+      "request": {
+        "battleId": "F100-097",
+        "seq": 97,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-098",
+      "ordinal": 97,
+      "round": 25,
+      "kind": "wild-capture",
+      "seed": [
+        1,
+        2,
+        3,
+        101
+      ],
+      "request": {
+        "battleId": "F100-098",
+        "seq": 98,
+        "canLose": true,
+        "kind": "wild",
+        "foes": [
+          {
+            "species": "pidgey",
+            "level": 1
+          }
+        ]
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "masterball"
+      ],
+      "expected": {
+        "code": 2,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-099",
+      "ordinal": 98,
+      "round": 25,
+      "kind": "trainer-win",
+      "seed": [
+        1,
+        2,
+        3,
+        102
+      ],
+      "request": {
+        "battleId": "F100-099",
+        "seq": 99,
+        "canLose": true,
+        "trainer": {
+          "id": "d1-win",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all"
+      ],
+      "steps": [
+        "finish-payday"
+      ],
+      "expected": {
+        "code": 1,
+        "commit": "applied",
+        "pairReceipt": true
+      }
+    },
+    {
+      "id": "F100-100",
+      "ordinal": 99,
+      "round": 25,
+      "kind": "trainer-loss-D3",
+      "seed": [
+        1,
+        2,
+        3,
+        103
+      ],
+      "request": {
+        "battleId": "F100-100",
+        "seq": 100,
+        "canLose": false,
+        "trainer": {
+          "id": "d1-loss",
+          "version": 1
+        }
+      },
+      "setup": [
+        "replenish-masterball5-potion5",
+        "normal-heal-all",
+        "controlled-input-nonP1-hp0"
+      ],
+      "steps": [
+        "memento-or-genuine-defeat"
+      ],
+      "expected": {
+        "code": 4,
+        "commit": "applied",
+        "pairReceipt": true,
+        "blackout": true,
+        "healed": true
+      }
+    }
+  ]
+}
