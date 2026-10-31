@@ -877,9 +877,9 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
 
     await scenario("T30 a battle id that is also \"__proto__\" is an ordinary ledger entry through MZ's own save and load: applied once, a repeat before and after the load spends nothing", async () => {
       await slice(30); I6.setItemCount(game(), "potion", 2);
-      game().party[0].hp = 50;
+      game().party[0].hp = 1;const targetName=W.PSFlow.speciesName(game().party[0].species);
       W.PSFlow.openBattle({battleId:"__proto__",kind:"wild",foes:[{species:"pidgey",level:1}],seq:30,canLose:true});await inMode("main");const handle=battle()._session;
-      await choose(/^Bag/);await inMode("bag");await choose(/^Potion\b/i);await inMode("party");await choose(/Charizard/i);await inMode("main");await choose(/^Run/);await inMode("end");const r=handle.result();await finishBattle();
+      await choose(/^Bag/);await inMode("bag");await choose(/^Potion\b/i);await inMode("party");await choose(new RegExp(targetName,'i'));await inMode("main");await choose(/^Run/);await inMode("end");const r=handle.result();await finishBattle();
       eq([W.PSFlow.lastOutcome.commit, W.PSFlow.commit(r), I6.bagOf(game()).potion], ["applied", "already-applied", 1], "applied once from the legitimate Session");
       assert(Object.hasOwn(game().appliedBattles, "__proto__"), "an own ledger entry");
       await G.DataManager.saveGame(12);
