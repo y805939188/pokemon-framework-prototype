@@ -128,7 +128,14 @@ def cleanup_owned(process):
     def exists():
         try:os.killpg(process.pid,0);return True
         except ProcessLookupError:return False
-        except PermissionError as error:errors.append(str(error));return None
+        except PermissionError as error:
+            # The own leader can exit after poll but before killpg(0) on macOS.
+            # Only a fresh reap AND verified group absence settle that race.
+            if process.poll() is not None:
+                try:os.killpg(process.pid,0)
+                except ProcessLookupError:return False
+                except PermissionError:pass
+            errors.append(str(error));return None
     present=exists();attempted=present is True
     if present:
         try:os.killpg(process.pid,signal.SIGTERM)

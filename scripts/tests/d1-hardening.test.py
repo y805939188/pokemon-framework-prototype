@@ -208,4 +208,16 @@ class EvidenceGates(unittest.TestCase):
             attempted,errors=base.SCOPE['cleanup_owned'](process)
         self.assertFalse(attempted);self.assertTrue(any('EPERM'in e for e in errors));self.assertIn('owned process group remains or cannot be verified',errors)
 
+    def test_cleanup_exit_race_requires_reaped_leader_and_absent_owned_group(self):
+        process=SimpleNamespace(pid=12345,poll=mock.Mock(side_effect=[None,0]),wait=lambda timeout:0)
+        with mock.patch.object(base.SCOPE['os'],'killpg',side_effect=[PermissionError('exit race'),ProcessLookupError(),ProcessLookupError()])as probe:
+            attempted,errors=base.SCOPE['cleanup_owned'](process)
+        self.assertFalse(attempted);self.assertEqual(errors,[])
+        self.assertEqual(probe.call_args_list,[mock.call(12345,0)]*3)
+        # Neither an unreaped/live leader nor a still-present group proves successful cleanup.
+        for leader,probes in [(None,[PermissionError('controlled EPERM')]*2),(0,[PermissionError('controlled EPERM'),None]*2)]:
+            with self.subTest(leader=leader),mock.patch.object(base.SCOPE['os'],'killpg',side_effect=probes):
+                attempted,errors=base.SCOPE['cleanup_owned'](SimpleNamespace(pid=12345,poll=lambda:leader,wait=lambda timeout:0))
+            self.assertFalse(attempted);self.assertTrue(any('EPERM'in e for e in errors));self.assertIn('owned process group remains or cannot be verified',errors)
+
 if __name__=='__main__':unittest.main()
