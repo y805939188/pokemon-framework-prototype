@@ -1080,7 +1080,10 @@ const { developmentCapabilities } = RuleConfig;
     }, kind);
   };
   P.abort = function (e: unknown) {
-    const c = sceneController(this); c.fail(e);
+    const op = this._psOp === undefined ? PSFlow._op : this._psOp;
+    const c = sceneController(this);
+    if (op !== PSFlow._op || !c.isCurrent()) { PSFlow.stale('abort', op, e); return; }
+    c.fail(e);
     if (c.isCurrent() && this._session) c.present(() => this.refreshStatus());
   };
   P.onEnd = function () {
