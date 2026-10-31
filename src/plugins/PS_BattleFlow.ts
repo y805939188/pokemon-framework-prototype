@@ -4,7 +4,7 @@
  * Responsibilities: plugin command that starts a battle and makes the map interpreter wait; a text
  * battle scene (windows are prototype-style like Reactor's own); game state kept inside the MZ save
  * (`G.$gameSystem._psGame`), changed ONLY by committing a BattleResult at the end (idempotent by battleId).
- * Not here: art, animation, full menu system, doubles UI.
+ * Basic owned presentation lives in battleflow modules; full art, animation databases and doubles UI remain outside this plugin.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { config as RuleConfig } from "../framework/rules/index";
@@ -15,6 +15,7 @@ import type { BattleDisplayCard } from "./battleflow/display";
 import { hpColour } from "./battleflow/visual-timing";
 import { BattleMenuCursor, gridCursor } from "./battleflow/menu";
 import { battlebackContext, createBattlebackMZ } from "./battleflow/battleback-mz";
+import { createBattlePicturesMZ } from "./battleflow/picture-mz";
 const { developmentCapabilities } = RuleConfig;
 
 (() => {
@@ -961,6 +962,7 @@ const { developmentCapabilities } = RuleConfig;
     this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
     sceneController(this, true);
     this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
+    this._pictures = null; this._pictureUpdate = 0;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1000,15 +1002,20 @@ const { developmentCapabilities } = RuleConfig;
     for (const m of [...s.party, ...s.foeTeam]) { if (!c.isCurrent()) return; this._names[m.id] = PSFlow.speciesName(m.species); }
     if (!c.isCurrent()) return;
     this._D = engine().D.make(this._names, PSFlow.translator());
+    this._pictures = createBattlePicturesMZ(G, this,
+      () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
+      () => this._pictureUpdate, error => c.fail(error));
     this._display = new BattleDisplayPlayback(initialDisplay(s, this._names), {
       current: () => c.isCurrent() && PSFlow.running,
       paint: cards => { if (c.isCurrent()) {
         this._status._d2Cards = cards.map(card => ({ ...card })); this._status.setLines([]);
         // Observe every owned, sequentially shown send-out, including A -> B -> A before another menu.
         if (c.isCurrent()) this._menuCursor?.bindActive(cards.find(card => card.side === 'p1' && card.active)?.id ?? null);
+        if (c.isCurrent()) this._pictures.sync(cards.filter(card => card.active && card.hp > 0).map(card => ({ id: card.id, side: card.side, name: card.name })));
       } },
       afterPaintNow: () => performance.now(),
       cue: kind => c.isCurrent() && PSFlow.running ? battleCue(this, kind) : undefined,
+      picture: (kind, actor) => this._pictures.step(kind, actor),
     });
     this._mode = "messages";
     c.enqueue([this._display.initial()]);
@@ -1018,9 +1025,13 @@ const { developmentCapabilities } = RuleConfig;
     });
   };
   P.update = function () {
+    if (!Number.isSafeInteger(this._pictureUpdate) || this._pictureUpdate >= Number.MAX_SAFE_INTEGER) {
+      sceneController(this).fail(new Error('invalid picture Scene.update ordinal')); return;
+    }
+    ++this._pictureUpdate;
     G.Scene_MenuBase.prototype.update.call(this);
     const c = sceneController(this);
-    if (!c.isCurrent()) this._backdrop?.dispose(); else c.present(() => this._backdrop?.poll());
+    if (!c.isCurrent()) { this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
     // Host abort may close this owner from main/boot/pending action. tick observes closure before phase/busy gates.
     this.updateQueue();
   };
@@ -1052,7 +1063,7 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.updateQueue = function () {
     const c = sceneController(this);
-    if (!c.isCurrent() || !PSFlow.running) this._display?.dispose();
+    if (!c.isCurrent() || !PSFlow.running) { this._display?.dispose(); this._pictures?.dispose(); }
     c.tick(G.Input.isTriggered('ok'), PSFlow.fast ? 0 : 24);
   };
   P.afterMessages = function () {
@@ -1106,6 +1117,7 @@ const { developmentCapabilities } = RuleConfig;
     return { version: 'd2-status-v1', current: c.isCurrent(), cards: this._display?.snapshot() || [],
       pending: c.queue.filter(step => typeof step !== 'string').length, audio: (this._displayAudio || []).map((row: any) => ({ ...row })) };
   };
+  P.pictureState = function () { return this._pictures?.snapshot() ?? null; };
   P.showMain = function () {
     const tr = PSFlow.translator();
     this.show("main", [
@@ -1221,10 +1233,10 @@ const { developmentCapabilities } = RuleConfig;
   P.onEnd = function () {
     // A delayed callback from an old scene must not pop the current scene's global SceneManager stack.
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // bare API callers refer to the current operation
-    if (op !== PSFlow._op) { this._display?.dispose(); PSFlow.stale("finish", op); return; }
+    if (op !== PSFlow._op) { this._display?.dispose(); this._pictures?.dispose(); PSFlow.stale("finish", op); return; }
     const c = this._controller as BattleSceneController<any> | undefined;
     if (c && !c.isCurrent()) return;
-    this._display?.dispose(); c?.dispose();
+    this._display?.dispose(); c?.dispose(); this._pictures?.dispose();
     if (!this._aborted && !this._failure) {
       try { const outcome=PSFlow.finish(this._session, this._psOp);if(c&&!c.ownsHost())return;if(outcome?.continuationToken){this._evolutionTransferred=true;this.popScene();return;}if(outcome?.pending&&W.PSManagement){this._menu.deactivate();if(c&&!c.ownsHost())return;this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
     }
@@ -1237,6 +1249,7 @@ const { developmentCapabilities } = RuleConfig;
     this._display?.dispose();
     c?.dispose(); // retire callbacks before host teardown can reenter application code
     this._backdrop?.dispose();
+    this._pictures?.dispose();
     try { G.Scene_MenuBase.prototype.terminate.call(this); }
     finally {
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // (a scene always has one; a bare caller means the current one)

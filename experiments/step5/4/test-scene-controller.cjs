@@ -2,6 +2,7 @@
 // Real controller/compiled host code, controlled render/session ports. Native MZ evidence is separate.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
 const ROOT=path.resolve(__dirname,'../../..');let dir,Controller,plugin,backdropFixture,backdropPrefix;
+const advanceSceneClock=new WeakMap();
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return{promise,resolve,reject};}
 test.before(()=>{
@@ -72,22 +73,25 @@ test('formatting failure aborts once; a broken error view retires without a busy
 test('an error thrown after owner replacement never aborts the successor',()=>{const f=fixture();assert(!f.c.present(()=>{f.current=false;throw Error('late view');}));assert.equal(f.aborts.length,0);});
 
 function host({opening,display=false,audio,exists,now,exp=125000}={}){
+ let sceneTime=0;
  const commands={};
  const counts={abort:0,finish:0,pop:0,hide:0,choose:0},session={party:[],foeTeam:[],bag:{},finished:false,pendingLearn:null,take:()=>[],currentRequest:()=>({active:[{moves:[{move:'Splash',id:'splash',pp:40,maxpp:40}]}]}),gw:{readState:()=>[]},chooseMove:()=>{counts.choose++;return {messages:[]};}};
  counts.paint=[];
  if(display){session.party=[{id:'P',species:'Pidgey',exp}];session.foeTeam=[{id:'F',species:'Pidgey'}];session.content={species:{Pidgey:{growth:'medium'}}};session.gw.readState=side=>[{id:side==='p1'?'P':'F',level:50,hp:100,maxhp:100,status:'',active:true}];}
  function Base(){}Base.prototype={initialize(){this.children=[];},create(){this._windowLayer={};this.children.push(this._windowLayer);},start(){},update(){},terminate(){},isReady(){return true;},addWindow(){},addChild(s){this.children.push(s);s.parent=this;},addChildAt(s,i){this.children.splice(i,0,s);s.parent=this;},removeChild(s){this.children.splice(this.children.indexOf(s),1);s.parent=null;},popScene(){counts.pop++;}};
- class Bitmap{constructor(w,h){this.width=w;this.height=h;this.context={drawImage(){}};}fillAll(){}blt(){}destroy(){}}
- class Sprite{constructor(bitmap){this.bitmap=bitmap;}destroy(){}}
+ counts.bitmaps=[];counts.sprites=[];
+ class Bitmap{constructor(w,h){this.width=w;this.height=h;this.context={drawImage(){}};this.destroys=0;counts.bitmaps.push(this);}fillAll(){}blt(){}drawText(){}destroy(){this.destroys++;}}
+ class Sprite{constructor(bitmap){this.bitmap=bitmap;this.anchor={x:0,y:0};this.scale={x:1,y:1};this.opacity=255;this.visible=true;this.destroys=0;counts.sprites.push(this);}destroy(){this.destroys++;this.destroyed=true;}}
  function Window(){}Window.prototype={initialize(rect){this.innerWidth=rect.width-24;this.innerHeight=rect.height-24;this.contents={clear(){},fillRect(...args){counts.paint.push(args);}};this._index=0;this.active=false;this.visible=false;},resetFontSettings(){},lineHeight:()=>24,textWidth:x=>String(x).length*8,drawText(){},refresh(){this._list=[];this.makeCommandList?.();},addCommand(name,symbol,enabled,ext){this._list.push({name,symbol,enabled,ext});},select(i){this._index=i;},index(){return this._index;},setHandler(){},show(){this.visible=true;},hide(){this.visible=false;counts.hide++;},activate(){this.active=true;},deactivate(){this.active=false;},isOpenAndActive(){return this.visible&&this.active;}};
  function System(){}System.prototype.isSaveEnabled=()=>true;
  const req=p=>{if(p==='fs'&&exists)return{...require('fs'),existsSync:exists};if(p==='path'||p==='fs'||p==='url')return require(p);if(p.includes('production.cjs'))return require(path.join(ROOT,'js/engine/build/production.cjs'));throw Error('unexpected require '+p);};req.resolve=p=>path.resolve(ROOT,p);
  const G={Error,performance,require:req,console:{log(){},warn(){},error(){}},PluginManager:{parameters:()=>({}),registerCommand(plugin,name,fn){commands[name]=fn;}},Game_Interpreter:Base,Game_System:System,Window_Base:Window,Window_Command:Window,Scene_MenuBase:Base,SceneManager:{_scene:null,push(){},isSceneChanging:()=>false},Graphics:{boxWidth:816,boxHeight:624,frameCount:0},Rectangle:function(x,y,width,height){Object.assign(this,{x,y,width,height});},Utils:{extractFileName:x=>x},Input:{isTriggered:()=>false},SoundManager:{playBuzzer(){}},$gameSystem:new System(),$gameMessage:{isBusy:()=>false,add(){}},$gameVariables:{setValue(){}}};
- G.Bitmap=Bitmap;G.Sprite=Sprite;G.AudioManager=audio;G.Utils.hasEncryptedAudio=()=>false;if(now)G.performance={now};
+ G.Bitmap=Bitmap;G.Sprite=Sprite;G.AudioManager=audio;G.Utils.hasEncryptedAudio=()=>false;G.performance={now:now??(()=>sceneTime)};
  G.window=G;vm.createContext(G);vm.runInContext(plugin,G);
  const flow=G.PSFlow,app={stateGeneration:0,saveBlocked:false,pendingEvolution:null,pendingReceiving:null,pendingPokedex:null,stateReplacedByHost(){this.stateGeneration++;},finishBattle(){counts.finish++;return {code:1,commit:'applied',battleId:'scene#1'};},abortBattle(request,error){counts.abort++;return {code:0,commit:'none',battleId:request.battleId,aborted:true,error:String(error)};}};
  flow._app=app;flow._op={request:{battleId:'scene#1',canLose:true},session};flow.request=flow._op.request;flow.running=true;flow.perf.cur={battleId:'scene#1',t0:0,actions:[]};flow.begin=()=>opening??Promise.resolve(session);if(display)flow.speciesName=x=>x;
  const scene=new G.Scene_PSBattle();G.SceneManager._scene=scene;
+ advanceSceneClock.set(scene,delta=>{sceneTime+=delta;});
  return{G,flow,app,scene,session,counts,commands,async ready(){scene.create();await flush();assert(scene.isReady());scene.start();for(let i=0;i<8&&!scene.inputState().ready;i++)scene.updateQueue();assert.equal(scene._mode,'main',String(scene._failure||''));assert(scene.inputState().ready);return this;}};
 }
 test('compiled scene exposes detached semantic-ready DTO; MZ-deactivated handler can act once',async()=>{
@@ -185,7 +189,7 @@ async function rememberBoth(s) {
  assert.equal(s._menu.index(),2);assert.equal(s._menuCursor.index('moves',4),3);
 }
 function drainScene(s) {
- for(let i=0;i<1000&&!s.inputState().ready;i++)s.updateQueue();
+ for(let i=0;i<1000&&!s.inputState().ready;i++){advanceSceneClock.get(s)?.(50);s.update();}
  assert(s.inputState().ready,String(s._failure));
 }
 for(const roar of [false,true])test(`real Session compiled Scene resets both cursors after ${roar?'same-turn A-B-A Roar':'ordinary A-B switch'}`,async()=>{
@@ -216,10 +220,47 @@ async function projectionMenuHost() {
  await h.ready();await rememberBoth(h.scene);return h;
 }
 const sendOut=(side,id,type='switch')=>({kind:'events',events:[{type,args:[side+'a: '+id,'Pidgey, L50','100/100']}]});
+test('production Scene.update owns the picture ordinal; repeated queue reads cannot advance an endpoint',async()=>{
+ let time=0;const h=await host({display:true,now:()=>time}).ready(),s=h.scene;
+ const before=JSON.stringify(h.session.party);s.pushMessages([sendOut('p1','P')]);s.update();
+ const body=h.counts.sprites.find(x=>x._psPictureKey==='p1:P'&&x._psPictureRole==='body');
+ assert.equal(s._pictureUpdate,1);assert.equal(body.scale.x,0);assert.equal(body.opacity,0);assert(!s.inputState().ready);
+ time=500;for(let i=0;i<5;i++)s.updateQueue();
+ assert.equal(s._pictureUpdate,1);assert.equal(body.scale.x,0);assert.equal(s.pictureState().runningGroups,1);
+ s.update();assert.equal(s._pictureUpdate,2);assert.equal(body.scale.x,1);assert.equal(body.opacity,255);assert.equal(s.pictureState().runningGroups,1);
+ for(let i=0;i<5;i++)s.updateQueue();assert.equal(s.pictureState().runningGroups,1);assert(!s.inputState().ready);
+ s.update();assert.equal(s._pictureUpdate,3);assert.equal(s.pictureState().runningGroups,0);
+ drainScene(s);assert(s.inputState().ready);assert.equal(h.counts.choose,0);assert.equal(JSON.stringify(h.session.party),before);s.terminate();
+});
+test('compiled picture recall precedes public replacement, without an early full-size successor paint',async()=>{
+ let time=0;
+ // Install the same published-card shape as a real two-member Session. No model reads occur during the animation.
+ const next=host({display:true,now:()=>time});next.session.party.push({id:'Q',species:'Pidgey',exp:125000});
+ next.session.gw.readState=side=>(side==='p1'?['P','Q']:['F']).map((id,i)=>({id,level:50,hp:100,maxhp:100,status:'',active:i===0}));
+ await next.ready();const scene=next.scene;scene.pushMessages([sendOut('p1','Q')]);scene.update();
+ const old=next.counts.sprites.find(x=>x._psPictureKey==='p1:P'&&x._psPictureRole==='body');
+ assert.equal(old.scale.x,1);assert(!next.counts.sprites.some(x=>x._psPictureKey==='p1:Q'));
+ time=125;scene.update();assert.equal(old.scale.x,.5);time=250;scene.update();assert.equal(old.scale.x,0);
+ assert.equal(scene.presentationState().cards.find(c=>c.side==='p1'&&c.active).id,'P');
+ scene.update();scene.update();
+ const replacement=next.counts.sprites.find(x=>x._psPictureKey==='p1:Q'&&x._psPictureRole==='body');
+ assert.equal(old.destroys,1);assert.equal(replacement.scale.x,0);assert.equal(replacement.opacity,0);assert.equal(scene.presentationState().cards.find(c=>c.side==='p1'&&c.active).id,'Q');
+ time=750;scene.update();scene.update();drainScene(scene);assert(next.scene.inputState().ready);next.scene.terminate();
+});
+test('compiled Scene cancels owned pictures on external abort and late visual callbacks cannot touch a successor',async()=>{
+ const h=await host({display:true}).ready(),old=h.scene;old.pushMessages([sendOut('p1','P')]);old.update();
+ const late=old._queue[0],owned=h.counts.sprites.filter(x=>x._psPictureRole),bitmaps=owned.map(x=>x.bitmap);
+ h.flow.abort(Error('picture cancellation'));old.update();assert(owned.every(x=>x.destroys===1));assert(bitmaps.every(x=>x.destroys===1));
+ const successor={untouched:true};h.G.SceneManager._scene=successor;const created=h.counts.sprites.length;
+ late.advance(1000);late.cancel();old.terminate();old.terminate();
+ assert.equal(h.counts.sprites.length,created);assert.equal(h.G.SceneManager._scene,successor);assert(owned.every(x=>x.destroys===1));assert(bitmaps.every(x=>x.destroys===1));assert.equal(h.counts.abort,1);
+});
 test('compiled forced drag resets only when its sequential public projection is shown',async()=>{
  const h=await projectionMenuHost(),s=h.scene;s.pushMessages([sendOut('p1','Q','drag'),sendOut('p1','P','drag')]);
  assert.equal(s._menuCursor.index('main',4),2);assert.equal(s._menuCursor.index('moves',4),3);
- s.updateQueue();assert.equal(s.presentationState().cards.find(c=>c.side==='p1'&&c.active).id,'Q');assert.equal(s._menuCursor.index('main',4),0);assert.equal(s._menuCursor.index('moves',4),0);
+ // The old actor first finishes its owned recall. Cursor reset still occurs at the first actual public projection of Q.
+ for(let i=0;i<30&&s.presentationState().cards.find(c=>c.side==='p1'&&c.active).id!=='Q';i++){advanceSceneClock.get(s)(50);s.update();}
+ assert.equal(s.presentationState().cards.find(c=>c.side==='p1'&&c.active).id,'Q');assert.equal(s._menuCursor.index('main',4),0);assert.equal(s._menuCursor.index('moves',4),0);
  drainScene(s);assert.equal(s._menu.index(),0);s.onMenuOk();assert.equal(s._menu.index(),0);s.terminate();
 });
 test('opponent switch and drag preserve both player menu memories',async()=>{

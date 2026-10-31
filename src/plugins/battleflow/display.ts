@@ -1,5 +1,6 @@
 import { HpPresentation, ExperiencePresentation, hpColour } from './visual-timing';
 import type { BattleSceneVisualStep } from './controller';
+import type { PictureActor } from './picture-playback';
 
 export interface BattleDisplayCard {
   id: string; side: 'p1' | 'p2'; name: string; level: number; hp: number; maxhp: number;
@@ -11,6 +12,7 @@ export interface BattleDisplayPorts {
   paint(cards: readonly BattleDisplayCard[]): void;
   afterPaintNow?(): number;
   cue(kind: 'exp-gain' | 'exp-full'): (() => void) | undefined;
+  picture?(kind: 'send-out' | 'recall', actor: PictureActor): BattleSceneVisualStep;
 }
 export interface DisplayEvent { type: string; args: readonly string[]; }
 const key = (side: string, id: string) => side + ':' + id;
@@ -59,6 +61,20 @@ export class BattleDisplayPlayback {
   }
   initial(): BattleSceneVisualStep { const cards = copy(this.planned); return this.step(() => this.paint(cards)); }
   private instant(): BattleSceneVisualStep { const cards = copy(this.planned); return this.step(() => this.paint(cards)); }
+  private picture(kind: 'send-out' | 'recall', card: BattleDisplayCard, before?: BattleSceneVisualStep): BattleSceneVisualStep {
+    const actor = { id: card.id, side: card.side, name: card.name };
+    let run: BattleSceneVisualStep | null = null, applied = false;
+    return this.step(now => {
+      if (!applied) {
+        if (before && !before.advance(now)) return false;
+        applied = true;
+      }
+      if (!this.current()) return true;
+      if (!run) run = this.ports.picture!(kind, { ...actor });
+      if (!this.current()) { run.cancel(); return true; }
+      return run.advance(now);
+    }, () => { before?.cancel(); run?.cancel(); });
+  }
   private changes(changes: { card: BattleDisplayCard; hp: number; maxhp: number; status: string }[]): BattleSceneVisualStep {
     const tweens = changes.map(change => {
       // A published max-HP change is a new display scale; it is not reconstructed from an engine object.
@@ -98,8 +114,14 @@ export class BattleDisplayPlayback {
       return [this.changes(changes)];
     }
     if (event.type === 'switch' || event.type === 'drag') {
+      const previous = this.planned.find(member => member.side === card.side && member.active);
+      const old = previous && { ...previous };
       for (const member of this.planned) if (member.side === card.side) member.active = member === card;
-      Object.assign(card, condition(event.args[2], card)); return [this.instant()];
+      Object.assign(card, condition(event.args[2], card));
+      const shown = this.instant();
+      if (!this.ports.picture) return [shown];
+      const steps = old && old.id !== card.id && old.hp > 0 ? [this.picture('recall', old)] : [];
+      return [...steps, this.picture('send-out', card, shown)];
     }
     if (event.type === '-status' || event.type === '-curestatus' || event.type === 'faint') {
       card.status = event.type === '-status' ? event.args[1] || '' : '';

@@ -17,6 +17,7 @@ SUITES=(
   experiments/step5/4/test-visual-timing.cjs
   experiments/step5/4/test-battleback-resources.cjs
   experiments/step5/4/test-battleback-view.cjs
+  experiments/step5/4/test-picture-playback.cjs
   experiments/step5/4/test-d1-timing.cjs
   experiments/step5/4/test-scene-controller.cjs
   experiments/step5/4/test-trainer-ai.cjs
