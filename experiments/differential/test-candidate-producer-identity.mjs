@@ -2,11 +2,12 @@
 import test,{after} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,realpathSync,rmSync,readFileSync,writeFileSync,cpSync,symlinkSync,linkSync,existsSync} from 'node:fs';
-import {join} from 'node:path';
+import {join,dirname} from 'node:path';
 import {tmpdir} from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {buildProducer} from './candidate-producer-v21/build.mjs';
-import {verifyProducer,hash} from './candidate-producer-v21/identity.mjs';
+import {verifyProducer,hash,inventory} from './candidate-producer-v21/identity.mjs';
+import {pathsOverlap} from './candidate-producer-v21/produce.mjs';
 const protocol=process.env.PF_CANDIDATE_PROTOCOL_BUNDLE;assert.ok(protocol,'explicit protocol bundle required');
 const temp=mkdtempSync(join(realpathSync(tmpdir()),'candidate-identity-'));after(()=>rmSync(temp,{recursive:true,force:true}));
 const fixed=buildProducer(protocol,join(temp,'fixed'));
@@ -25,3 +26,22 @@ test('unknown plan rejects before creating output or children',()=>{const out=jo
 test('existing output root is preserved and rejected',()=>{const r=spawnSync(process.execPath,[join(fixed.root,'producer/produce.mjs'),'--root',fixed.root,'--expected-producer',fixed.producerFreezeHash,'--plan','qualification12-v1','--out',temp],{encoding:'utf8'});assert.equal(r.status,2);assert.ok(existsSync(join(temp,'fixed','producer-freeze.json')));});
 
 test('recomputed add-on pin cannot substitute protocol payload under unchanged f100 freeze',()=>{const root=copy(),core=join(root,'protocol-bundle/legacy-kit/core/core.cjs'),p=join(root,'producer-freeze.json'),m=JSON.parse(readFileSync(p));writeFileSync(core,readFileSync(core)+'\n// synthetic altered core\n');const e=m.files.find(f=>f.path==='protocol-bundle/legacy-kit/core/core.cjs');e.bytes=readFileSync(core).length;e.sha256=hash(readFileSync(core));writeFileSync(p,JSON.stringify(m));const r=cli(root,hash(readFileSync(p)));assert.equal(r.status,2);assert.match(r.stdout,/PROTOCOL_PAYLOAD/);assert.equal(existsSync(r.out),false);});
+
+const snapshot=root=>inventory(root).map(path=>({path,sha256:hash(readFileSync(join(root,path)))}));
+for(const [label,target,existed] of [
+ ['double-dot prefix child',root=>join(root,'..candidate-output'),false],
+ ['double-dot adjacent child',root=>join(root,'..other'),false],
+ ['triple-dot prefix child',root=>join(root,'...candidate-output'),false],
+ ['normal child',root=>join(root,'ordinary-output'),false],
+ ['nested double-dot child',root=>join(root,'producer','..nested-output'),false],
+ ['normalized double-dot child',root=>join(root,'producer','..','..candidate-output'),false],
+ ['same root',root=>root,true],
+ ['ancestor',root=>dirname(root),true]
+])test('output overlap rejects '+label+' before mkdir or child records',()=>{
+ const root=copy(),out=target(root),before=snapshot(root),r=spawnSync(process.execPath,[join(root,'producer/produce.mjs'),'--root',root,'--expected-producer',fixed.producerFreezeHash,'--plan','qualification12-v1','--out',out],{encoding:'utf8'});
+ assert.equal(r.status,2,r.stdout+r.stderr);assert.match(r.stdout,/CANDIDATE_OUTPUT_OVERLAP/);assert.deepEqual(snapshot(root),before);assert.equal(existsSync(out),existed);assert.doesNotThrow(()=>verifyProducer(root,fixed.producerFreezeHash));
+});
+test('component containment permits package-external siblings including dot prefixes',()=>{
+ const root=join(temp,'component-only-package');for(const name of ['ordinary-output','..candidate-output','..other','...candidate-output','component-only-package-suffix'])assert.equal(pathsOverlap(root,join(temp,name)),false,name);
+ assert.equal(pathsOverlap(root,root),true);assert.equal(pathsOverlap(root,dirname(root)),true);assert.equal(pathsOverlap(root,join(root,'..candidate-output')),true);
+});

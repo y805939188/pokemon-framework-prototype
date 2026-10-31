@@ -1,14 +1,18 @@
 import {mkdirSync,writeFileSync,realpathSync} from 'node:fs';
-import {dirname,join,resolve,relative} from 'node:path';
+import {dirname,join,resolve,relative,isAbsolute,sep} from 'node:path';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import {verifyProducer,loaderPolicy,flags,readFile,hash,need,PROTOCOL_FREEZE,inventory} from './identity.mjs';
 import {boundedChild,LIMITS,executionView} from './bounded.mjs';
+export function pathsOverlap(a,b){
+ const within=r=>r===''||(!isAbsolute(r)&&r.split(sep)[0]!=='..');
+ return within(relative(a,b))||within(relative(b,a));
+}
 export async function produce(args){
  loaderPolicy();const a=flags(args,['root','expected-producer','plan','out']);const c=verifyProducer(a.root,a['expected-producer']);
  const lib=async p=>import(pathToFileURL(join(c.protocolRoot,'tools',p)));
  const {verifyBundle}=await lib('observation-v2/bundle.mjs'),{approvedDispatchPlan}=await lib('observation-v2/dispatch.mjs'),{normalizeResponse,normalizeFailure,counts}=await lib('observation-v2/protocol.mjs'),{parseJson,strictStringify}=await lib('lib/json.mjs');
  const ctx={...verifyBundle(c.protocolRoot,PROTOCOL_FREEZE),dispatchPlanId:a.plan};approvedDispatchPlan(a.plan,ctx.kit.request);
- const out=resolve(a.out);need(realpathSync(dirname(out))===dirname(out),'CANDIDATE_OUTPUT_LINK');need(relative(c.root,out).startsWith('..')&&relative(out,c.root).startsWith('..'),'CANDIDATE_OUTPUT_OVERLAP');mkdirSync(out);mkdirSync(join(out,'private'));
+ const out=resolve(a.out);need(realpathSync(dirname(out))===dirname(out),'CANDIDATE_OUTPUT_LINK');need(!pathsOverlap(c.root,out),'CANDIDATE_OUTPUT_OVERLAP');mkdirSync(out);mkdirSync(join(out,'private'));
  const metadata={role:'candidate',entryId:'ts-core-v1',source:{...ctx.kit.manifest.source,tag:null,files:[{role:'runner',sha256:ctx.kit.hashes.get('runners/ts-runner.mjs')},{role:'core-bundle',sha256:ctx.kit.hashes.get('core/core.cjs')}]},runtime:{name:'node',version:process.version,dependencies:[{name:'node',version:process.version}]}};
  const abort=new AbortController(),cancel=()=>abort.abort(),active=new Set();process.on('SIGINT',cancel);process.on('SIGTERM',cancel);
  const argv=[process.execPath,join(c.root,'producer/coordinator.mjs'),'--root',c.root,'--expected-producer',c.producerFreezeHash,'--plan',a.plan,'--run-dir',join(out,'private')];
