@@ -12,7 +12,7 @@ export interface BattleDisplayPorts {
   paint(cards: readonly BattleDisplayCard[]): void;
   afterPaintNow?(): number;
   cue(kind: 'exp-gain' | 'exp-full'): (() => void) | undefined;
-  picture?(kind: 'send-out' | 'recall', actor: PictureActor): BattleSceneVisualStep;
+  picture?(kind: 'send-out' | 'recall' | 'damage', actor: PictureActor): BattleSceneVisualStep;
 }
 export interface DisplayEvent { type: string; args: readonly string[]; }
 const key = (side: string, id: string) => side + ':' + id;
@@ -61,7 +61,7 @@ export class BattleDisplayPlayback {
   }
   initial(): BattleSceneVisualStep { const cards = copy(this.planned); return this.step(() => this.paint(cards)); }
   private instant(): BattleSceneVisualStep { const cards = copy(this.planned); return this.step(() => this.paint(cards)); }
-  private picture(kind: 'send-out' | 'recall', card: BattleDisplayCard, before?: BattleSceneVisualStep): BattleSceneVisualStep {
+  private picture(kind: 'send-out' | 'recall' | 'damage', card: BattleDisplayCard, before?: BattleSceneVisualStep): BattleSceneVisualStep {
     const actor = { id: card.id, side: card.side, name: card.name };
     let run: BattleSceneVisualStep | null = null, applied = false;
     return this.step(now => {
@@ -76,20 +76,29 @@ export class BattleDisplayPlayback {
     }, () => { before?.cancel(); run?.cancel(); });
   }
   private changes(changes: { card: BattleDisplayCard; hp: number; maxhp: number; status: string }[]): BattleSceneVisualStep {
+    const identities = changes.map(change => key(change.card.side, change.card.id));
+    if (new Set(identities).size !== identities.length) throw new Error('duplicate published HP target');
     const tweens = changes.map(change => {
       // A published max-HP change is a new display scale; it is not reconstructed from an engine object.
       const from = Math.min(change.card.hp, change.maxhp);
       const tween = new HpPresentation({ memberId: key(change.card.side, change.card.id), from, to: change.hp, total: change.maxhp });
       Object.assign(change.card, { hp: change.hp, maxhp: change.maxhp, status: change.status });
-      return { id: key(change.card.side, change.card.id), tween };
+      return { id: key(change.card.side, change.card.id), tween, card: change.card, damage: change.card.active && change.hp < from };
     });
+    const pictures = this.ports.picture ? tweens.filter(item => item.damage).map(item => this.picture('damage', item.card)) : [];
     const target = copy(this.planned);
     return this.step(now => {
       const frames = tweens.map(item => ({ id: item.id, value: item.tween.sample(now) }));
       const cards = copy(target);
       for (const frame of frames) cards.find(card => key(card.side, card.id) === frame.id)!.hp = frame.value.value;
-      return this.paint(cards) && frames.every(frame => frame.value.complete);
-    }, () => { for (const item of tweens) item.tween.cancel(); });
+      if (!this.paint(cards)) return false;
+      const completed: boolean[] = [];
+      for (const picture of pictures) { if (!this.current()) return false; completed.push(picture.advance(now)); }
+      return this.current() && frames.every(frame => frame.value.complete) && completed.every(Boolean);
+    }, () => {
+      for (const item of tweens) item.tween.cancel();
+      for (const picture of pictures) try { picture.cancel(); } catch (error) { this.cleanupErrors.push(String(error)); }
+    });
   }
   event(event: DisplayEvent): BattleSceneVisualStep[] {
     const actor = (ident: string | undefined): BattleDisplayCard | undefined => {

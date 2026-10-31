@@ -35,6 +35,22 @@ test('recall shrinks both owned images and does not release or write a battle mo
 test('mandatory send-out and recall run with effects off',()=>{
  for(const kind of ['send-out','recall']){const f=fixture({sendOut:0,recall:0},false),s=f.view.step(kind,actor());assert(!s.advance(0));assert.equal(f.created.length,1);f.update++;assert(s.advance(0));f.view.dispose();}
 });
+test('damage uses four fixed on/off cycles, leaves the shadow steady and restores its final pose',()=>{
+ const f=fixture(),s=f.view.step('damage',actor());
+ for(const [time,body]of [[0,1],[75,0],[150,1],[225,0],[300,1],[375,0],[450,1],[525,0],[600,1]]){
+  assert(!s.advance(time));assert.deepEqual(f.paints.at(-1).pose,{body,shadow:1});f.update++;
+ }
+ assert(s.advance(600));assert.equal(f.view.snapshot().runningGroups,0);s.cancel();assert.equal(f.released.length,0);f.view.dispose();
+});
+test('damage endpoint cannot finish from repeated reads in one actual update',()=>{
+ const f=fixture(),s=f.view.step('damage',actor());s.advance(0);f.update++;assert(!s.advance(600));assert(!s.advance(601));assert(!s.advance(9000));f.update++;assert(s.advance(9000));f.view.dispose();
+});
+test('damage is mandatory with effects off and cancellation prevents further poses',()=>{
+ const f=fixture(undefined,false),s=f.view.step('damage',actor());s.advance(0);f.update++;s.advance(75);assert.equal(f.paints.at(-1).pose.body,0);s.cancel();const count=f.paints.length;f.update++;assert(s.advance(600));assert.equal(f.paints.length,count);assert.equal(f.released.length,1);f.view.dispose();
+});
+test('released HP0 portrait cannot bypass damage completion observation or be recreated',()=>{
+ const f=fixture(),s=f.view.step('damage',actor());s.advance(0);f.view.sync([]);const paints=f.paints.length;f.update++;assert(!s.advance(9000));assert(!s.advance(9001));assert.equal(f.created.length,1);assert.equal(f.paints.length,paints);assert.equal(f.view.snapshot().runningGroups,1);f.update++;assert(s.advance(9001));assert.equal(f.released.length,1);f.view.dispose();
+});
 test('cancel before the first sample allocates no handle and cannot mutate later',()=>{
  const f=fixture(),s=f.view.step('send-out',actor());s.cancel();s.cancel();assert(s.advance(0));assert.equal(f.created.length,0);assert.equal(f.view.snapshot().runningGroups,0);f.view.dispose();
 });

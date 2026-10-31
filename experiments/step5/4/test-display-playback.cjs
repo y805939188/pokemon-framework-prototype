@@ -1,15 +1,15 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
-const ROOT=path.resolve(__dirname,'../../..');let tmp,M,C;
+const ROOT=path.resolve(__dirname,'../../..');let tmp,M,C,P;
 test.before(()=>{
  tmp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-d2-playback-'));const source=path.join(ROOT,'src/plugins/battleflow');
  fs.writeFileSync(path.join(tmp,'tsconfig.json'),JSON.stringify({compilerOptions:{target:'ES2022',module:'CommonJS',strict:true,types:[],lib:['ES2022'],rootDir:source,outDir:tmp,noEmitOnError:true},files:[path.join(source,'display.ts')]}));
- const r=spawnSync('pnpm',['--dir','src','exec','tsc','-p',path.join(tmp,'tsconfig.json')],{cwd:ROOT,encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);M=require(path.join(tmp,'display.js')).BattleDisplayPlayback;C=require(path.join(tmp,'controller.js')).BattleSceneController;
+ const r=spawnSync('pnpm',['--dir','src','exec','tsc','-p',path.join(tmp,'tsconfig.json')],{cwd:ROOT,encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);M=require(path.join(tmp,'display.js')).BattleDisplayPlayback;C=require(path.join(tmp,'controller.js')).BattleSceneController;P=require(path.join(tmp,'picture-playback.js')).BattlePicturePlayback;
 });
 test.after(()=>{if(tmp)fs.rmSync(tmp,{recursive:true,force:true});});
 const card=(id='P',side='p1')=>({id,side,name:id,level:50,hp:100,maxhp:100,status:'',active:true,ratio:side==='p1'?0:null});
-function fixture(cards=[card(),card('F','p2')]){
- const f={current:true,paint:[],cue:[],stops:[],time:0};f.p=new M(cards,{current:()=>f.current,paint:v=>{f.paint.push(v);f.onPaint?.(v);},cue:k=>{f.cue.push(k);f.onCue?.(k);return()=>f.stops.push(k);}});return f;
+function fixture(cards=[card(),card('F','p2')],picture){
+ const f={current:true,paint:[],cue:[],stops:[],time:0};f.p=new M(cards,{current:()=>f.current,paint:v=>{f.paint.push(v);f.onPaint?.(v);},cue:k=>{f.cue.push(k);f.onCue?.(k);return()=>f.stops.push(k);},...(picture?{picture:(kind,actor)=>picture(f,kind,actor)}:{})});return f;
 }
 const event=(type,...args)=>({type,args});
 test('initial and published projections are detached from inputs, snapshots and consumer mutations',()=>{
@@ -22,6 +22,36 @@ test('queued HP changes preserve publicly ordered intermediate values despite fu
 });
 test('one published sethp event animates both targets in parallel and leaves target input unchanged',()=>{
  const f=fixture(),input=event('-sethp','p1a: P','50/100','p2a: F','25/100'),before=JSON.stringify(input),step=f.p.event(input)[0];step.advance(0);step.advance(500);assert.deepEqual(f.p.snapshot().map(x=>x.hp),[75,62.5]);assert(step.advance(1000));assert.deepEqual(f.p.snapshot().map(x=>x.hp),[50,25]);assert.equal(JSON.stringify(input),before);
+});
+test('both damage targets advance together even when the first port is pending; a slower port keeps HP endpoint blocked',()=>{
+ const calls=[],f=fixture(undefined,(_,kind,actor)=>({kind:'visual',advance:now=>{calls.push([kind,actor.side,now]);return now>=(actor.side==='p1'?1100:1200);},cancel(){}}));
+ const step=f.p.event(event('-sethp','p1a: P','50/100','p2a: F','25/100'))[0];assert.equal(calls.length,0);assert(!step.advance(0));assert.deepEqual(calls,[['damage','p1',0],['damage','p2',0]]);assert(!step.advance(1000));assert.deepEqual(f.p.snapshot().map(x=>x.hp),[50,25]);assert(!step.advance(1100));assert(step.advance(1200));
+});
+test('healing, unchanged HP, max-HP scale alone and inactive loss do not invent damage flashes',()=>{
+ for(const [initial,type,text]of [[{...card(),hp:50},'-heal','100/100'],[{...card(),hp:50},'-damage','50/100'],[card(),'-sethp','50/50'],[{...card(),active:false},'-damage','30/100']]){
+  let count=0;const f=fixture([initial],()=>{count++;assert.fail('unexpected damage port');}),step=f.p.event(event(type,'p1a: P',text))[0];step.advance(0);step.advance(1000);assert.equal(count,0);
+ }
+});
+test('duplicate public HP target is refused before changing planned state or invoking a picture port',()=>{
+ let count=0;const f=fixture(undefined,()=>{count++;return{kind:'visual',advance:()=>true,cancel(){}};});
+ assert.throws(()=>f.p.event(event('-sethp','p1a: P','50/100','p1a: P','25/100')),/duplicate/);assert.equal(count,0);assert.equal(f.p.snapshot()[0].hp,100);const next=f.p.event(event('-damage','p1a: P','90/100'))[0];next.advance(0);next.advance(500);assert.equal(f.p.snapshot()[0].hp,95);
+});
+function rendered(){
+ const f={current:true,update:0,created:[],paints:[],released:[]};
+ f.view=new P({current:()=>f.current,updateOrdinal:()=>f.update,create:actor=>{const handle={...actor};f.created.push(handle);return handle;},paint:(handle,pose)=>f.paints.push({handle,pose:{...pose}}),release:h=>f.released.push(h),failed:e=>assert.fail(String(e))});
+ f.p=new M([card(),card('F','p2')],{current:()=>f.current,paint:cards=>{f.cards=cards;f.view.sync(cards.filter(x=>x.active&&x.hp>0).map(x=>({id:x.id,side:x.side,name:x.name})));f.onPaint?.();},picture:(kind,actor)=>f.view.step(kind,actor),cue:()=>undefined});f.p.initial().advance(0);return f;
+}
+test('actual display and picture consumers keep both targets parallel while HP still owns its full second',()=>{
+ const f=rendered(),step=f.p.event(event('-sethp','p1a: P','50/100','p2a: F','25/100'))[0];assert(!step.advance(0));f.update++;assert(!step.advance(75));assert(f.view.snapshot().actors.every(x=>x.body===0&&x.shadow===1));f.update++;assert(!step.advance(600));f.update++;assert(!step.advance(600));assert.equal(f.view.snapshot().runningGroups,0);assert(f.cards[0].hp>50);f.update++;assert(step.advance(1000));assert.deepEqual(f.cards.map(x=>x.hp),[50,25]);f.view.dispose();
+});
+test('late HP0 release still owes damage next-update observation with no extra allocation or repaint',()=>{
+ const f=rendered(),step=f.p.event(event('-damage','p1a: P','0 fnt'))[0];step.advance(0);f.update++;assert(!step.advance(9000));const count=f.created.length;assert.equal(f.cards[0].hp,0);assert(!step.advance(9001));assert.equal(f.created.length,count);assert.equal(f.view.snapshot().runningGroups,1);f.update++;assert(step.advance(9001));assert.equal(f.released.length,1);f.view.dispose();
+});
+test('composite cancellation attempts both picture cancellations and retains separate cleanup errors',()=>{
+ const cancelled=[],f=fixture(undefined,(_,kind,actor)=>({kind:'visual',advance:()=>false,cancel(){cancelled.push(actor.side);if(actor.side==='p1')throw Error('first port cleanup');}})),step=f.p.event(event('-sethp','p1a: P','50/100','p2a: F','25/100'))[0];step.advance(0);step.cancel();assert.deepEqual(cancelled,['p1','p2']);assert.equal(f.p.cleanupErrors.length,1);assert(step.advance(1000));step.cancel();assert.equal(cancelled.length,2);
+});
+test('owner replacement during HP paint prevents even allocating its damage picture port',()=>{
+ let created=0;const f=fixture(undefined,()=>{created++;assert.fail('stale picture');});f.onPaint=()=>{f.current=false;};const step=f.p.event(event('-damage','p1a: P','50/100'))[0];assert(!step.advance(0));assert(step.advance(9000));assert.equal(created,0);
 });
 test('published status/faint and side-qualified duplicate IDs do not cross sides',()=>{
  const f=fixture([card('same'),card('same','p2')]);f.p.event(event('-status','p2a: same','tox'))[0].advance(0);assert.deepEqual(f.p.snapshot().map(x=>x.status),['','tox']);f.p.event(event('faint','p2a: same'))[0].advance(1);assert.deepEqual(f.p.snapshot().map(x=>x.hp),[100,0]);

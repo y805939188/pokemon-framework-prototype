@@ -9,6 +9,9 @@ test.before(()=>{
  M=require(path.join(tmp,'visual-timing.js'));
 });
 test.after(()=>{if(tmp)fs.rmSync(tmp,{recursive:true,force:true});});
+test('basic damage track remains mandatory with optional move effects disabled',()=>{
+ const group=new M.BasicPictureGroup([{id:'body',kind:'damage',startUnits:0,durationUnits:12},{id:'optional',kind:'move-effect',startUnits:0,durationUnits:40}],false);assert.deepEqual(group.sample(0,1).frames.map(x=>x.kind),['damage']);assert(!group.sample(600,2).complete);assert(!group.sample(9000,2).complete);assert(group.sample(9000,3).complete);
+});
 const hp=(from=100,to=0,total=100)=>new M.HpPresentation({memberId:'P1',from,to,total});
 const exp=(input={})=>new M.ExperiencePresentation({memberId:'P1',level:50,from:0,to:1,visible:true,...input});
 // Existing cases model one consumer call per Scene.update; direct controls below repeat an update explicitly.

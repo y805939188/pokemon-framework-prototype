@@ -259,6 +259,23 @@ test('invalid picture ordinal fails visibly and keeps the owned aborted-end menu
  const h=await host({display:true}).ready(),s=h.scene,images=h.counts.sprites.filter(x=>x._psPictureRole);
  s._pictureUpdate=Number.MAX_SAFE_INTEGER;s.update();s.update();assert.equal(h.counts.abort,1);assert.equal(s._mode,'end');assert(s.inputState().ready);assert(images.every(x=>x.destroys===1));s.onMenuOk();assert.equal(h.counts.pop,1);s.terminate();
 });
+test('compiled Scene flashes two public damage targets together while HP keeps its full second and input gate',async()=>{
+ let time=0;const h=await host({display:true,now:()=>time}).ready(),s=h.scene,before=JSON.stringify(h.session.party);
+ s.pushMessages([{kind:'events',events:[{type:'-sethp',args:['p1a: P','50/100','p2a: F','25/100']}]}]);s.update();time=75;s.update();
+ const bodies=h.counts.sprites.filter(x=>x._psPictureRole==='body'),shadows=h.counts.sprites.filter(x=>x._psPictureRole==='shadow');assert.equal(bodies.length,2);assert(bodies.every(x=>x.opacity===0&&!x.visible));assert(shadows.every(x=>x.opacity===255&&x.visible));const ordinal=s._pictureUpdate;
+ for(let i=0;i<4;i++)s.updateQueue();assert.equal(s._pictureUpdate,ordinal);assert(bodies.every(x=>x.opacity===0));time=150;s.update();assert(bodies.every(x=>x.opacity===255&&x.visible));
+ time=600;s.update();s.update();assert.equal(s.pictureState().runningGroups,0);assert(!s.inputState().ready);assert(s.presentationState().cards.find(x=>x.id==='P').hp>50);
+ time=1000;s.update();drainScene(s);assert(s.inputState().ready);assert.equal(s.presentationState().cards.find(x=>x.id==='P').hp,50);assert.equal(s.presentationState().cards.find(x=>x.id==='F').hp,25);assert.equal(h.counts.choose,0);assert.equal(JSON.stringify(h.session.party),before);s.terminate();
+});
+test('compiled late KO releases its image but same-update reads cannot bypass the damage completion observation',async()=>{
+ let time=0;const h=await host({display:true,now:()=>time}).ready(),s=h.scene,body=h.counts.sprites.find(x=>x._psPictureKey==='p1:P'&&x._psPictureRole==='body');
+ s.pushMessages([{kind:'events',events:[{type:'-damage',args:['p1a: P','0 fnt']}]}]);s.update();time=9000;s.update();assert.equal(body.destroys,1);assert.equal(s.pictureState().runningGroups,1);const count=h.counts.sprites.length;
+ for(let i=0;i<5;i++)s.updateQueue();assert.equal(s.pictureState().runningGroups,1);assert(!s.inputState().ready);assert.equal(h.counts.sprites.length,count);s.update();assert.equal(s.pictureState().runningGroups,0);drainScene(s);assert(s.inputState().ready);s.terminate();assert.equal(body.destroys,1);
+});
+test('compiled abort cancels both damage pictures and their late composite work cannot change a successor',async()=>{
+ let time=0;const h=await host({display:true,now:()=>time}).ready(),old=h.scene;old.pushMessages([{kind:'events',events:[{type:'-sethp',args:['p1a: P','50/100','p2a: F','25/100']}]}]);old.update();time=75;old.update();const late=old._queue[0],images=h.counts.sprites.filter(x=>x._psPictureRole);
+ h.flow.abort(Error('damage cancel'));old.update();assert(images.every(x=>x.destroys===1));assert.equal(old.pictureState().runningGroups,0);const snapshot=JSON.stringify(old.pictureState());h.G.SceneManager._scene={successor:true};assert(late.advance(9000));late.cancel();old.updateQueue();old.terminate();assert.equal(JSON.stringify(old.pictureState()),snapshot);assert(images.every(x=>x.destroys===1));assert.equal(h.counts.abort,1);
+});
 test('compiled forced drag resets only when its sequential public projection is shown',async()=>{
  const h=await projectionMenuHost(),s=h.scene;s.pushMessages([sendOut('p1','Q','drag'),sendOut('p1','P','drag')]);
  assert.equal(s._menuCursor.index('main',4),2);assert.equal(s._menuCursor.index('moves',4),3);

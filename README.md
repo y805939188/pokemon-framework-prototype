@@ -4,7 +4,7 @@
 
 起点是 [rpg-maker-mz-initialize](https://github.com/y805939188/rpg-maker-mz-initialize) 模板（`b6fa1df`）；第二步（验证战斗接入）已完成，结论和证据在 `docs/step2/`。
 
-本整改分支继承已限域接受的菜单、静态背景加载／绘制、就绪回归与新A工具；前置精确CI190／191／192均通过。当前实施[D2c真实基础图片消费者第一批](docs/step5/5.4-D2c-pictures.md)：公开派出／非昏厥收回、每Scene.update一次序号及私有Bitmap／Sprite。新图片候选尚待宿主验证、独立复审和精确CI；完整D2／5.4、新P-4和GC内存增长WARN仍OPEN，原U51-16超时FAIL／输入来源UNKNOWN保留，main未合并。
+本整改分支从已限域接受的图片消费者5bc56c5继续：原ultra代码＋独立NW95及精确CI194双job均通过，旧拒绝／失败保留。当前独立小批为[伤害闪烁与HP条并行等待](docs/step5/5.4-D2c-damage-feedback.md)，新候选尚待固定验证、独立复审及新精确CI。完整D2／5.4、新P-4和GC内存增长WARN仍OPEN，原U51-16超时FAIL／输入来源UNKNOWN保留，main未合并。
 
 ## 先读什么
 

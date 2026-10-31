@@ -73,11 +73,11 @@ export class BattlePicturePlayback<T> {
       for (const actor of actors) { if (!this.current()) { this.dispose(); return; } this.ensure(actor); }
     } finally { this.syncing = false; }
   }
-  step(kind: 'send-out' | 'recall', input: PictureActor): BattleSceneVisualStep {
+  step(kind: 'send-out' | 'recall' | 'damage', input: PictureActor): BattleSceneVisualStep {
     const actor = actorCopy(input);
-    if (kind !== 'send-out' && kind !== 'recall') throw new Error('unsupported basic picture transition');
+    if (!['send-out', 'recall', 'damage'].includes(kind)) throw new Error('unsupported basic picture transition');
     if (!this.current()) return { kind: 'visual', advance: () => true, cancel() {} };
-    let group: BasicPictureGroup | null = null, entry: Entry<T> | null = null;
+    let group: BasicPictureGroup | null = null, entry: Entry<T> | null = null, origin: PicturePose | null = null;
     let cancelled = false, finished = false;
     const cancel = () => {
       if (cancelled || finished) return;
@@ -98,23 +98,28 @@ export class BattlePicturePlayback<T> {
         if (!entry) entry = this.ensure(actor, () => !cancelled);
         if (!entry || cancelled || !this.current()) { if (entry && cancelled) this.release(entry); cancel(); return true; }
         if (!group) {
-          const duration = kind === 'send-out' ? this.units.sendOut : this.units.recall;
+          // Simple default feedback: four 75ms on/off cycles. HP timing is owned separately.
+          const duration = kind === 'damage' ? 12 : kind === 'send-out' ? this.units.sendOut : this.units.recall;
+          origin = { ...entry.pose };
           group = new BasicPictureGroup(['body', 'shadow'].map(id => ({ id, kind, startUnits: 0, durationUnits: duration })), this.effects);
         }
         if (!this.current() || cancelled) { cancel(); return true; }
         const frame = group.sample(now, update); this.lastUpdate = update;
         const value = (id: string) => {
           const progress = frame.frames.find(item => item.id === id)!.progress;
+          if (kind === 'damage') return id === 'shadow' ? origin!.shadow : origin!.body * (progress >= 1 || Math.floor(progress * 8) % 2 === 0 ? 1 : 0);
           return kind === 'send-out' ? progress : 1 - progress;
         };
-        if (!this.paint(entry, { body: value('body'), shadow: value('shadow') }) || cancelled) { cancel(); return true; }
+        // HP0 may legitimately remove a portrait during this parallel group, including a late endpoint.
+        // Retain the group's completion observation without repainting/recreating the released image.
+        if (cancelled || (!(kind === 'damage' && entry.released) && !this.paint(entry, { body: value('body'), shadow: value('shadow') }))) { cancel(); return true; }
         if (frame.complete) { finished = true; this.runs.delete(cancel); }
         return finished;
       } finally { this.sampling = false; }
     } };
   }
   snapshot(): object {
-    return { version: 'd2-basic-picture-consumer-v1', preset: 'simple-default-pictures-v1', retired: this.retired,
+    return { version: 'd2-basic-picture-consumer-v2', preset: 'simple-default-pictures-v1', damagePreset: 'simple-damage-feedback-v1', retired: this.retired,
       lastUpdate: this.lastUpdate, runningGroups: this.runs.size, actors: [...this.entries.values()].map(entry => ({ ...entry.actor, ...entry.pose })), cleanupErrors: [...this.cleanupErrors] };
   }
   dispose(): void {

@@ -100,7 +100,7 @@ export class ExperiencePresentation {
   cancel(): void { this.cancelled = true; }
 }
 
-export type BasicPictureKind = 'send-out' | 'recall' | 'faint' | 'capture' | 'blocked-ball' | 'move-effect';
+export type BasicPictureKind = 'send-out' | 'recall' | 'damage' | 'faint' | 'capture' | 'blocked-ball' | 'move-effect';
 export interface PictureTrackInput { id: string; kind: BasicPictureKind; startUnits: number; durationUnits: number; }
 export interface PictureFrame { id: string; kind: BasicPictureKind; progress: number; started: boolean; complete: boolean; }
 export interface PictureGroupFrame { frames: PictureFrame[]; complete: boolean; cancelled: boolean; }
@@ -118,7 +118,7 @@ export class BasicPictureGroup {
     this.tracks = inputs.map(input => {
       const id = identity(input.id);
       if (ids.has(id)) throw new Error('duplicate picture identity'); ids.add(id);
-      if (!['send-out', 'recall', 'faint', 'capture', 'blocked-ball', 'move-effect'].includes(input.kind)) throw new Error('invalid basic picture kind');
+      if (!['send-out', 'recall', 'damage', 'faint', 'capture', 'blocked-ball', 'move-effect'].includes(input.kind)) throw new Error('invalid basic picture kind');
       return { id, kind: input.kind, start: pictureUnitsToMilliseconds(input.startUnits), duration: pictureUnitsToMilliseconds(input.durationUnits) };
     }).filter(input => effects || input.kind !== 'move-effect');
     if (this.tracks.some(input => !Number.isFinite(input.start + input.duration))) throw new Error('picture end overflow');
