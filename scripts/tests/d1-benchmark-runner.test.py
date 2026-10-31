@@ -55,6 +55,10 @@ class RunnerControls(unittest.TestCase):
             if fault=='wrong-final-hash':b['finalStateHash']='synthetic-only'
             if fault=='wrong-input-hash':b['inputHash']='0'*64
             if fault=='wrong-initial-hash':b['initialState']['money']=99
+            if fault=='bool-input-alias':
+                b['input']=json.loads(json.dumps(source));b['input']['cases'][0]['seed'][0]=True;b['inputHash']=digest(b['input'])
+            if fault=='bool-seed-alias':rows[0]['seed']=[True,2,3,4]
+            if fault=='bool-outcome-alias':rows[0]['outcome']['code']=True
             body='import sys,json\nfrom pathlib import Path\n'
             if fault=='exit':body+='raise SystemExit(9)\n'
             elif fault!='missing':body+='p=Path(next(x.split("=",1)[1]for x in sys.argv if x.startswith("--ps-flow-out=")))\np.write_text('+repr(json.dumps(report))+')\n'
@@ -79,7 +83,7 @@ class RunnerControls(unittest.TestCase):
                 self.check('memory-order',count)
 
     def test_complete_state_hash_refusals(self):
-        for fault in ['changed-final-old-hash','missing-final','empty-final','array-final','wrong-final-hash','wrong-input-hash','wrong-initial-hash']:
+        for fault in ['changed-final-old-hash','missing-final','empty-final','array-final','wrong-final-hash','wrong-input-hash','wrong-initial-hash','bool-input-alias','bool-seed-alias','bool-outcome-alias']:
             with self.subTest(fault=fault):self.check(fault)
 
     def test_ecmascript_serialization_and_numeric_aliases(self):

@@ -95,6 +95,17 @@ def verify_report_hashes(raw):
     return hashes
 
 
+def same_json(left,right):
+    # Python otherwise equates true with 1; frozen JSON input and declared case numbers retain their types.
+    if type(left) is not type(right):
+        return False
+    if isinstance(left,dict):
+        return left.keys()==right.keys() and all(same_json(value,right[key])for key,value in left.items())
+    if isinstance(left,list):
+        return len(left)==len(right) and all(same_json(a,b)for a,b in zip(left,right))
+    return left==right
+
+
 def run_group(app, info, out, group, count, formal, source_input, *, synthetic=False):
     out.mkdir()
     if not synthetic:
@@ -196,10 +207,10 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
     rows = benchmark.get('rows', [])
     if benchmark.get('status') != 'pass' or benchmark.get('errors') or len(rows) != count:
         raise RuntimeError(group+' workload failed/incomplete')
-    if benchmark.get('input') != source_input or [r['id'] for r in rows] != [r['id'] for r in source_input['cases'][:count]]:
+    if not same_json(benchmark.get('input'),source_input) or [r['id'] for r in rows] != [r['id'] for r in source_input['cases'][:count]]:
         raise RuntimeError(group+' frozen input/order mismatch')
     for actual, expected in zip(rows, source_input['cases']):
-        if actual.get('status') != 'pass' or actual['seed'] != expected['seed'] or actual.get('resolvedSeed') != ','.join(map(str,expected['seed'])) or actual['outcome']['code'] != expected['expected']['code']:
+        if actual.get('status') != 'pass' or not same_json(actual['seed'],expected['seed']) or actual.get('resolvedSeed') != ','.join(map(str,expected['seed'])) or not same_json(actual['outcome']['code'],expected['expected']['code']):
             raise RuntimeError(group+' actual case outcome/seed failed')
     if result.get('env', {}).get('packageInfo') != info or not result['env'].get('nw'):
         raise RuntimeError(group+' native package identity mismatch')
