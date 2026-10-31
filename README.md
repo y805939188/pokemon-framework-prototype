@@ -4,6 +4,8 @@
 
 起点是 [rpg-maker-mz-initialize](https://github.com/y805939188/rpg-maker-mz-initialize) 模板（`b6fa1df`）；第二步（验证战斗接入）已完成，结论和证据在 `docs/step2/`。
 
+本整改分支的5.4进度：D1骨架及冻结十进程／1000战P-4已限域接受，精确CI180／179通过；GC内存增长WARN仍OPEN，不能据此宣称无泄漏。当前开始[D2基础呈现分批](docs/step5/5.4-D2-presentation.md)，首批仅内部数值与图片时钟候选，真实默认UI、D2及整体5.4尚未接受。本说明不表示main已整合，也不改变既有PR边界。
+
 ## 先读什么
 
 1. [`docs/PROJECT-GUIDE.md`](docs/PROJECT-GUIDE.md) —— 目标、路线、铁律与授权边界、协作协议、架构、仓库地图、环境准备、常用命令、已知坑、文档地图。**所有人和 AI 动手前必读。**
