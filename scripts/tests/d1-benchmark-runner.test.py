@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib
 import json
 import os
+import sys
 import subprocess
 import tempfile
 import unittest
@@ -143,6 +144,12 @@ class RunnerControls(unittest.TestCase):
                 argv=['python3',str(SCRIPT),*map(str,apps),str(root/'result')]
                 if fault!='native-looking-script':argv.append('--synthetic-controls')
                 process=subprocess.run(argv,capture_output=True,text=True,env=env,timeout=30)
+                if fault=='native-looking-script'and sys.platform!='darwin':
+                    # Unsupported hosts refuse before creating any run/output. This is a negative assertion, not a skip.
+                    self.assertNotEqual(process.returncode,0)
+                    self.assertIn('actual macOS host required',process.stderr)
+                    self.assertFalse((root/'result').exists(),'no native run or SUMMARY may be created on an unsupported host')
+                    continue
                 summary=json.loads((root/'result/SUMMARY.json').read_text())
                 if fault is None:
                     self.assertEqual(process.returncode,0,process.stderr)
@@ -158,6 +165,15 @@ class RunnerControls(unittest.TestCase):
                     if fault=='different-state-old-hash':self.assertIn('hash mismatch: finalState',summary['error'])
                     if fault=='missing-final':self.assertIn('missing complete object: finalState',summary['error'])
                     if fault=='native-looking-script':self.assertTrue('host'in summary['error']or'native Mach-O'in summary['error'])
+
+    def test_unsupported_native_platform_refuses_before_output(self):
+        # Exercise the Linux preflight in every local test environment, without launching an actual native host.
+        with tempfile.TemporaryDirectory(prefix='pf-d1-platform-preflight-')as folder:
+            out=Path(folder)/'result'
+            with mock.patch.object(sys,'platform','linux'),mock.patch.object(sys,'argv',[str(SCRIPT),'unused-control','unused-candidate',str(out)]),mock.patch.object(SCOPE['subprocess'],'Popen')as launched:
+                with self.assertRaisesRegex(SystemExit,'actual macOS host required'):SCOPE['main']()
+                launched.assert_not_called()
+                self.assertFalse(out.exists())
 
 
 if __name__=='__main__':unittest.main()
