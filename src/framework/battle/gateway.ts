@@ -492,6 +492,10 @@ export class BattleGateway implements BattleDriver {
         p.ppUps[m.index] = m.ppUps;
       }
     }
+    // Carried-in faints were never emitted through Showdown's faint queue. Keep its live-roster
+    // counter coherent without reporting a new KO, firing faint effects or awarding friendship/XP.
+    const side = this._battle.getSide(sideId);
+    side.pokemonLeft = side.pokemon.filter((p: ShowdownPokemon) => !p.fainted).length;
   }
 
   /** Read back the engine-owned dynamic state per member: hp, persistent status, pp per move. */

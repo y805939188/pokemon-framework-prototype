@@ -17,6 +17,7 @@ SUITES=(
   experiments/step5/4/test-trainer-ai-async.cjs
   experiments/step5/4/test-trainer-ai-c2-remediation.cjs
   experiments/step5/4/test-trainer-ai-realms.cjs
+  experiments/step5/4/test-carried-faint.cjs
   experiments/step5/4/test-trainer-ai-remediation.cjs
   experiments/friendship-standard-domain/test-author.cjs
   experiments/friendship-standard-domain/test-pbs-cli.cjs
