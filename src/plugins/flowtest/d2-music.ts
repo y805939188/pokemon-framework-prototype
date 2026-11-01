@@ -92,17 +92,22 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
     mark('active-qualified', { ...value, ...playing }); return row;
   };
   const clearMessages = () => { G.$gameMessage.clear(); G.$gameMap._interpreter.clear(); };
+  const mapReady = () => {
+    const map = scene();
+    return map instanceof G.Scene_Map && map.isStarted() && !!map._messageWindow && !!map._spriteset && !G.SceneManager.isSceneChanging();
+  };
   const reset = async (kind: 'normal' | 'receiving' | 'evolution' = 'normal', options: any = {}) => {
+    await waitFor(mapReady, 'started map before fixture reset');
     assert(!flow._app?.saveBlocked, 'preceding scenario left no root owner');
     flow.stateReplaced(); flow._app = null; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.developerCapabilities = {}; flow.seed = [...PLAN.seed]; randomState = PLAN.worldSeed >>> 0; draws = 0; flow.rng = random; flow.fast = true; flow.receiveOptions = { mode: kind === 'receiving' ? 2 : 1, naming: 1 };
-    G.$gameSystem._psGame = musicNativeState(E, content, kind); settings = options; clearMessages(); await toMapId(PLAN.mapId, 8, 9); await press('shift'); return flow.app(); // normal MZ key/gesture resume route, no autoplay-policy or security flag changes
+    G.$gameSystem._psGame = musicNativeState(E, content, kind); settings = options; clearMessages(); await toMapId(PLAN.mapId, 8, 9); await waitFor(mapReady, 'started fixture map'); await press('shift'); return flow.app(); // normal MZ key/gesture resume route, no autoplay-policy or security flag changes
   };
   const world = async (none = false) => { audio.playBgm(track(none ? '' : named('world')), 0.25); if (none) { eq(audio._bgmBuffer, null, 'real host None buffer'); eq(audio._currentBgm.name, '', 'real host leaves empty registration'); } else await active(named('world')); };
   const open = async (trainer = false, presentation?: any) => {
     const request: any = { kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: PLAN.version + '/' + currentCase + '#' + (++ordinal), seq: ordinal, canLose: true };
     flow.openBattle(request, presentation); await inMode('main'); assert(battle()?._session, 'real Scene/App/Session'); return { scene: battle(), session: battle()._session, app: flow.app(), request, op: flow._op };
   };
-  const abortScene = async () => { flow.abort(Error('native qualification explicit cancellation')); G.SceneManager.goto(G.Scene_Map); await waitFor(() => scene() instanceof G.Scene_Map && !G.SceneManager.isSceneChanging(), 'leave cancelled Scene'); clearMessages(); };
+  const abortScene = async () => { flow.abort(Error('native qualification explicit cancellation')); G.SceneManager.goto(G.Scene_Map); await waitFor(mapReady, 'leave cancelled Scene'); clearMessages(); };
   const win = async () => { await fightUntilEnd(/tackle/i, 12); await inMode('end'); assert(battle()._session.finished, 'actual terminal Showdown result'); return battle()._session.result(); };
   const finish = async () => { const raw = await win(), old = battle(); await finishBattle(); assert(flow.lastOutcome.commit === 'applied', 'actual root installation'); return { raw, old }; };
   const drainDex = () => { let n = 0; while (flow.app().pendingPokedex && n++ < 12) { const view = flow.app().pendingPokedex; assert(view.phase !== 'failed', 'no unsolicited Pokedex recovery'); const result = flow.resolvePokedex(view.token, view.revision, { kind: view.phase === 'entry' ? 'close-entry' : 'message-complete' }); assert(result.status !== 'refused', 'public Pokedex decision accepted'); } assert(!flow.app().pendingPokedex, 'finite actual Pokedex completion'); };
@@ -129,7 +134,7 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
         scene()._commandWindow.selectSymbol('continue'); assert(scene()._commandWindow.isCurrentItemEnabled(), 'normal Continue enabled'); await press('ok');
         await waitFor(() => scene() instanceof G.Scene_Load && scene().isStarted() && scene()._listWindow.isOpenAndActive() && !scene().isBusy() && !G.SceneManager.isSceneChanging(), 'fresh normal load list');
         const load = scene(); load._listWindow.selectSavefile(PLAN.slot); eq(load._listWindow.savefileId(), PLAN.slot, 'actual selected producer slot'); await press('ok');
-        await waitFor(() => scene() instanceof G.Scene_Map && scene().isStarted() && !G.SceneManager.isSceneChanging(), 'fresh loaded map'); assert(load._loadSuccess, 'actual load succeeded'); eq(flow.game(), saved.state, 'whole saved business state');
+        await waitFor(mapReady, 'fresh loaded map'); assert(load._loadSuccess, 'actual load succeeded'); eq(flow.game(), saved.state, 'whole saved business state');
         eq(G.$gameSystem._bgmOnSave, saved.bgmOnSave, 'serialized host BGM record'); await active(named('world')); await frames(8); eq(flow.game(), saved.state, 'no duplicate installs');
         const before = clone(flow.game()); eq(flow.commit(saved.result), 'already-applied', 'exact replay after fresh Continue'); eq(flow.game(), before, 'no repeated reward/receipt');
         assert(!flow.running && !flow.app().saveBlocked && !flow.operationPending(), 'no persisted root owner'); assert(!flow.musicState()?.current, 'no prior music timeline'); assert(!G.$gameMap._interpreter._waitMode, 'no stale event wait'); eq(fileHash(file), saved.saveSHA256, 'Continue did not rewrite producer slot');
@@ -218,7 +223,7 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
         for (const action of ['load', 'newgame']) {
           await reset(); await world(); G.$gameSystem.onBeforeSave(); await settledSave(PLAN.loadControlSlot); const gate = holdNext(named('next')); flow.setNextBattleMusic({ battle: named('next') }); await open(); await waitFor(() => gate.assigned, 'old timeline buffer'); await nativeReady(gate.row);
           if (action === 'load') assert(await G.DataManager.loadGame(PLAN.loadControlSlot), 'real load control slot'); else { G.DataManager.setupNewGame(); G.$gameSystem._psGame = musicNativeState(E, content); }
-          assert(gate.row.destroyed > 0 && !flow.running, 'replacement retired old owner'); G.SceneManager.goto(G.Scene_Map); await toMapId(PLAN.mapId, 8, 9); clearMessages(); await world(); await open(); await active('Battle wild'); release(gate); await frames(2); eq(audio._currentBgm.name, 'Battle wild', 'old preset/timeline cannot replace new default'); eq(gate.row.plays.length, 0, 'late old timeline never plays'); await abortScene();
+          assert(gate.row.destroyed > 0 && !flow.running, 'replacement retired old owner'); G.SceneManager.goto(G.Scene_Map); await waitFor(mapReady, 'replacement map started'); await toMapId(PLAN.mapId, 8, 9); await waitFor(mapReady, 'transferred replacement map started'); clearMessages(); await world(); await open(); await active('Battle wild'); release(gate); await frames(2); eq(audio._currentBgm.name, 'Battle wild', 'old preset/timeline cannot replace new default'); eq(gate.row.plays.length, 0, 'late old timeline never plays'); await abortScene();
         }
         return { load: 'actual DataManager.loadGame/extract', newgame: 'actual setupNewGame; explicit valid test-party installation without an extra stateReplaced call' };
       });
@@ -248,7 +253,7 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
         await reset(); await world(); await open(); await active('Battle wild'); const { raw } = await finish(); await active(named('world')); const before = clone(flow.game()); eq(flow.commit(raw), 'already-applied', 'same exact result not installed twice'); eq(flow.game(), before, 'receipt/reward unchanged');
         const writes: Promise<any>[] = [], saveObject = G.StorageManager.saveObject;
         G.StorageManager.saveObject = function (this: any, ...args: any[]) { const promise = saveObject.apply(this, args); writes.push(Promise.resolve(promise)); return promise; };
-        try { G.SceneManager.push(G.Scene_Save); await waitFor(() => scene() instanceof G.Scene_Save && scene().isStarted() && scene()._listWindow.isOpenAndActive() && !scene().isBusy() && !G.SceneManager.isSceneChanging(), 'normal Save scene'); const saveScene = scene(); saveScene._listWindow.selectSavefile(PLAN.slot); eq(saveScene._listWindow.savefileId(), PLAN.slot, 'new producer slot'); await press('ok'); await waitFor(() => scene() instanceof G.Scene_Map && !G.SceneManager.isSceneChanging(), 'Save scene returns normally'); await Promise.all(writes); assert(writes.length >= 2, 'actual slot/global storage promises observed'); } finally { G.StorageManager.saveObject = saveObject; }
+        try { G.SceneManager.push(G.Scene_Save); await waitFor(() => scene() instanceof G.Scene_Save && scene().isStarted() && scene()._listWindow.isOpenAndActive() && !scene().isBusy() && !G.SceneManager.isSceneChanging(), 'normal Save scene'); const saveScene = scene(); saveScene._listWindow.selectSavefile(PLAN.slot); eq(saveScene._listWindow.savefileId(), PLAN.slot, 'new producer slot'); await press('ok'); await waitFor(mapReady, 'Save scene returns normally'); await Promise.all(writes); assert(writes.length >= 2, 'actual slot/global storage promises observed'); } finally { G.StorageManager.saveObject = saveObject; }
         const file = G.StorageManager.filePath(G.DataManager.makeSavename(PLAN.slot)), expectedFile = path.join(path.dirname(OUT), 'music-native-expected.v2.json');
         const saved = { version: PLAN.version, chain: input.chain, fixtureSHA256: hash(stable(content)), productCommit: PLAN.productCommit, packageHead: input.packageHead, slot: PLAN.slot, saveSHA256: fileHash(file), state: clone(flow.game()), result: raw, bgmOnSave: clone(G.$gameSystem._bgmOnSave), hostRegistration: clone(audio._currentBgm) };
         assert(saved.state.appliedBattles[raw.battleId], 'real producer settlement receipt'); eq(saved.bgmOnSave.name, named('world'), 'ordinary onBeforeSave captured world BGM'); fs.writeFileSync(expectedFile, JSON.stringify(saved, null, 2) + '\n', { flag: 'wx' }); details.producer = { expectedFile, expectedSHA256: fileHash(expectedFile), saveSHA256: saved.saveSHA256, slot: PLAN.slot }; return details.producer;

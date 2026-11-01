@@ -11,6 +11,54 @@ test.before(()=>{
  for(const name of ['PS_BattleFlow','PS_SaveState']){const r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',path.join(temp,name)],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);const s=fs.readFileSync(path.join(temp,name,name+'.js'),'utf8');if(name==='PS_BattleFlow')plugin=s;else savePlugin=s;}
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
+
+function nativeMapLifecycle(source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8')){
+ // Actual installed MZ/Reactor lifecycle methods; only renderer and map I/O are controlled.
+ const scenes=fs.readFileSync(path.join(ROOT,'js/reactor_scenes.js'),'utf8'),managers=fs.readFileSync(path.join(ROOT,'js/reactor_managers.js'),'utf8');
+ const method=(text,type,name)=>{const escaped=type.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),m=text.match(new RegExp(escaped+'\\.'+name+' = function\\([^)]*\\) \\{[\\s\\S]*?\\n\\};'));assert(m,type+'.'+name);return m[0];};
+ function Base(){}Base.prototype.initialize=function(){this._started=false;};Base.prototype.create=function(){};Base.prototype.isBusy=()=>false;
+ function Scene_Message(){}Scene_Message.prototype=Object.create(Base.prototype);Object.assign(Scene_Message.prototype,{initialize:Base.prototype.initialize,create:Base.prototype.create,isReady:()=>true});
+ function Scene_Map(){this.initialize();}Scene_Map.prototype=Object.create(Scene_Message.prototype);
+ const f={loaded:false,cleared:[],polls:[],starts:0},G={Scene_Base:Base,Scene_Message,Scene_Map,$gamePlayer:{isTransferring:()=>false},$dataMap:{},$gameMap:{mapId:()=>5},DataManager:{loadMapData(){f.loaded=false;},isMapLoaded:()=>f.loaded}};
+ G.SceneManager={_scene:null,_nextScene:null,isSceneChanging(){return !!this._nextScene;},clearStack(){},goto(Type){this._scene=new Type();this._scene.create();}};
+ vm.createContext(G);
+ for(const [type,name]of [['Scene_Base.prototype','start'],['Scene_Base.prototype','isStarted'],['Scene_Map.prototype','initialize'],['Scene_Map.prototype','create'],['Scene_Map.prototype','isReady'],['Scene_Map.prototype','onMapLoaded'],['Scene_Map.prototype','start'],['Scene_Map.prototype','isBusy'],['Scene_Message.prototype','isMessageWindowClosing']])vm.runInContext(method(scenes,type,name),G);
+ Scene_Message.prototype.start=Base.prototype.start;
+ Object.assign(Scene_Map.prototype,{needsFadeIn:()=>false,createDisplayObjects(){this._messageWindow={isClosing:()=>false};this._spriteset={};}});
+ vm.runInContext(method(managers,'SceneManager','isCurrentSceneBusy'),G);
+ const scene=()=>G.SceneManager._scene,flow={abort(){}},clearMessages=()=>f.cleared.push({started:scene().isStarted(),windows:!!scene()._messageWindow,spriteset:!!scene()._spriteset});
+ const waitFor=async predicate=>{for(let frame=0;frame<5;frame++){f.polls.push({frame,started:scene().isStarted(),windows:!!scene()._messageWindow});if(predicate())return;if(frame===0){f.loaded=true;assert(scene().isReady());}if(frame===2){scene().start();f.starts++;}}throw Error('controlled map lifecycle deadline');};
+ const ready=source.match(/  const mapReady = \(\) => \{[\s\S]*?\n  \};/),abort=source.match(/  const abortScene = async \(\) => \{[\s\S]*?\};/);
+ assert(abort,'execute actual native abort action');
+ const actions=vm.runInNewContext('(({G,scene,flow,waitFor,clearMessages})=>{'+(ready?.[0]??'')+abort[0]+';return {abortScene,mapReady:typeof mapReady==="undefined"?null:mapReady};})')({G,scene,flow,waitFor,clearMessages});
+ Object.assign(f,{G,scene,actions});return f;
+}
+test('native driver waits for actual Map start before a second transfer can query message-window busy',async()=>{
+ const f=nativeMapLifecycle();await f.actions.abortScene();
+ f.G.SceneManager._nextScene=new f.G.Scene_Map();
+ assert.doesNotThrow(()=>f.G.SceneManager.isCurrentSceneBusy(),'a created but unready Map must never escape the abort wait');
+ assert.equal(f.starts,1);assert.deepEqual(f.cleared,[{started:true,windows:true,spriteset:true}]);
+});
+test('native driver does not accept loaded windows while actual Map start is still delayed',async()=>{
+ const f=nativeMapLifecycle();await f.actions.abortScene();
+ assert(f.polls.some(p=>p.windows&&!p.started),'actual isReady created windows before delayed start');
+ assert.equal(f.polls.at(-1).started,true,'wait consumes the later real start, not just data readiness');
+});
+test('native map predicate rejects each incomplete lifecycle component and a queued successor',async()=>{
+ const f=nativeMapLifecycle();await f.actions.abortScene();const map=f.scene(),ready=f.actions.mapReady;
+ assert.equal(typeof ready,'function');assert.equal(ready(),true);
+ for(const key of ['_messageWindow','_spriteset']){const old=map[key];map[key]=undefined;assert.equal(ready(),false,key+' is required');map[key]=old;}
+ map._started=false;assert.equal(ready(),false);map.start();f.G.SceneManager._nextScene=new f.G.Scene_Map();assert.equal(ready(),false);
+ f.G.SceneManager._nextScene=null;assert.equal(ready(),true);f.G.SceneManager._scene={isStarted:()=>true,_messageWindow:{},_spriteset:{}};assert.equal(ready(),false,'non-Map is not a lifecycle substitute');
+});
+test('removing the actual native abort lifecycle gate revives the real host isClosing failure',async()=>{
+ const source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8'),marker="await waitFor(mapReady, 'leave cancelled Scene');";
+ assert.equal(source.split(marker).length,2,'mutate exactly the production test-driver abort gate');
+ const f=nativeMapLifecycle(source.replace(marker,"await waitFor(() => scene() instanceof G.Scene_Map && !G.SceneManager.isSceneChanging(), 'leave cancelled Scene');"));
+ await f.actions.abortScene();assert.equal(f.scene().isStarted(),false);f.G.SceneManager._nextScene=new f.G.Scene_Map();
+ assert.throws(()=>f.G.SceneManager.isCurrentSceneBusy(),/isClosing/);
+});
+
 function host({ready=true,settings={},intro='Intro',emptyBgm=false}={}){
  const root=fs.mkdtempSync(path.join(temp,'world-'));fs.mkdirSync(path.join(root,'audio/bgm'),{recursive:true});
  const f={root,time:0,timers:new Map(),seq:0,buffers:[],plays:[],queries:[],commands:{},hook:null,starts:0,finishes:0,aborts:0};
