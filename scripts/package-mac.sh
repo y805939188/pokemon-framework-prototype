@@ -52,10 +52,8 @@ rm -rf "$NW_RES"
 mkdir -p "$NW_RES"
 
 # ---- allow-list (nothing from src/, docs/, experiments/, scripts/, save/, build/, third_party/, .git) ----
-EXCLUDES=(--exclude '*.map' --exclude '.DS_Store')
-if [[ "$WITH_TESTS" -eq 0 ]]; then
-  EXCLUDES+=(--exclude 'PS_BattleSmoke.js' --exclude 'PS_BattleFlowTest.js')
-fi
+source "$ROOT/scripts/package-excludes.sh"
+package_excludes "$WITH_TESTS"
 cp "$ROOT/index.html" "$NW_RES/"
 # the manifest name decides the per-user data folder (~/Library/Application Support/<name>): make it per game
 node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));p.name=process.argv[3];fs.writeFileSync(process.argv[2],JSON.stringify(p,null,2)+"\n");' "$ROOT/package.json" "$NW_RES/package.json" "$NAME"

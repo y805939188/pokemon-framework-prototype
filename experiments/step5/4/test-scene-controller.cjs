@@ -292,6 +292,40 @@ test('compiled faint preserves HP0 portrait, fades its own box in parallel, and 
  assert.deepEqual(Array.from(s.presentationState().faintAudio,row=>row.kind),['faint-cry','faint-effect']);
  s.terminate();assert.equal(body.destroys,1);
 });
+for(const variant of [{name:'natural',reverse:false,prelude:false,fast:true},{name:'reversed-with-prefix',reverse:true,prelude:true,fast:true},{name:'paced-prefix',reverse:false,prelude:true,fast:false}])test(`real Session opening ${variant.name} keeps each queued first portrait hidden until its own send-out`,async()=>{
+ const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs'));
+ const saved=F.makeGame();saved.party=saved.party.slice(0,2);const foe=F.foeMember('F-1','Snorlax',50);foe.moves=[{id:'splash',pp:40,maxpp:40}];
+ const session=await BattleSession.create({game:saved,battleId:'r5-opening-'+variant.name,content:F.content,seed:[1,2,3,4],foe:{kind:'trainer',team:[foe]}});
+ const state=JSON.stringify(session.gw.snapshot()),take=session.take.bind(session);let takes=0;
+ session.take=()=>{takes++;return take().map(message=>{
+  if(!variant.reverse||message.kind!=='events')return message;
+  // Explicit public presentation-order control; domain state and seed stay fixed.
+  const positions=message.events.map((e,i)=>e.type==='switch'?i:-1).filter(i=>i>=0),values=positions.map(i=>message.events[i]).reverse(),events=[...message.events];
+  positions.forEach((position,i)=>events[position]=values[i]);return {...message,events};
+ });};
+ let now=0;const h=host({display:true,now:()=>now}),s=h.scene;h.flow.fast=variant.fast;h.flow.begin=()=>Promise.resolve(session);h.flow._op.session=session;
+ const started=new Map(),middle=new Set(),targets=['p1:A-0001','p2:F-1'];
+ try{
+  s.create();await flush();assert(s.isReady());
+  const push=s.pushMessages;if(variant.prelude)s.pushMessages=function(messages){this._controller.enqueue(['Opening prefix']);return push.call(this,messages);};
+  s.start();s.pushMessages=push;
+  const step=s._pictures.step.bind(s._pictures);s._pictures.step=function(kind,member){if(kind==='send-out')started.set(member.side+':'+member.id,s._pictureUpdate);return step(kind,member);};
+  for(let i=0;i<400&&!s.inputState().ready;i++){
+   now+=1000/60;s.update();
+   for(const sprite of h.counts.sprites.filter(x=>x._psPictureRole&&!x.destroyed&&targets.includes(x._psPictureKey))){
+    const start=started.get(sprite._psPictureKey);
+    if(start===undefined||s._pictureUpdate<start)assert(!sprite.parent||!sprite.visible||sprite.scale.x===0,'queued portrait painted before its public send-out: '+sprite._psPictureKey);
+    if(sprite._psPictureRole==='body'&&sprite.parent&&sprite.visible&&sprite.scale.x>0&&sprite.scale.x<1)middle.add(sprite._psPictureKey);
+   }
+  }
+  assert(s.inputState().ready,'opening drained');assert.equal(takes,1,'consume published opening exactly once');assert.deepEqual([...middle].sort(),targets.slice().sort(),'both actual send-outs have intermediate poses');
+  for(const key of targets){const bodies=h.counts.sprites.filter(x=>x._psPictureKey===key&&!x.destroyed);assert.equal(bodies.length,2);assert(bodies.every(x=>x.parent&&x.visible&&x.scale.x===1&&x.opacity===255));}
+  assert.equal(JSON.stringify(session.gw.snapshot()),state,'presentation never changes domain active state or consumes engine RNG');
+ }finally{s.terminate();}
+});
+test('an established display without queued opening switches still shows its current portraits',async()=>{
+ const h=await host({display:true}).ready();try{const images=h.counts.sprites.filter(x=>x._psPictureRole&&!x.destroyed);assert.equal(images.length,4);assert(images.every(x=>x.parent&&x.visible&&x.scale.x===1&&x.opacity===255));}finally{h.scene.terminate();}
+});
 test('compiled abort cancels both damage pictures and their late composite work cannot change a successor',async()=>{
  let time=0;const h=await host({display:true,now:()=>time}).ready(),old=h.scene;old.pushMessages([{kind:'events',events:[{type:'-sethp',args:['p1a: P','50/100','p2a: F','25/100']}]}]);old.update();time=75;old.update();const late=old._queue[0],images=h.counts.sprites.filter(x=>x._psPictureRole);
  h.flow.abort(Error('damage cancel'));old.update();assert(images.every(x=>x.destroys===1));assert.equal(old.pictureState().runningGroups,0);const snapshot=JSON.stringify(old.pictureState());h.G.SceneManager._scene={successor:true};assert(late.advance(9000));late.cancel();old.updateQueue();old.terminate();assert.equal(JSON.stringify(old.pictureState()),snapshot);assert(images.every(x=>x.destroys===1));assert.equal(h.counts.abort,1);

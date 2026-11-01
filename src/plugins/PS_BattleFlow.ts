@@ -1017,7 +1017,20 @@ const { developmentCapabilities } = RuleConfig;
           () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
           row => { if (c.isCurrent() && PSFlow.running) this._faintAudio.push({ ...row, t: performance.now() }); });
       });
-    this._display = new BattleDisplayPlayback(initialDisplay(s, this._names), {
+    // Active is already the engine's opening state; a queued public send-out
+    // still owns the first visible portrait. Consume the batch once, and hide
+    // only those identities until their own send-out step paints them.
+    const opening = s.take();
+    if (!c.isCurrent()) { this._pictures.dispose(); return; }
+    const waitingForOpening = new Set<string>();
+    for (const message of opening) if (message.kind === 'events') for (const event of message.events) {
+      if (event.type !== 'switch' && event.type !== 'drag') continue;
+      const match = /^(p[12])[a-z]?: (.+)$/.exec(event.args[0] || '');
+      if (match) waitingForOpening.add(match[1] + ':' + match[2]);
+    }
+    const initialCards = initialDisplay(s, this._names);
+    for (const card of initialCards) if (waitingForOpening.has(card.side + ':' + card.id)) card.portraitVisible = false;
+    this._display = new BattleDisplayPlayback(initialCards, {
       current: () => c.isCurrent() && PSFlow.running,
       paint: cards => { if (c.isCurrent()) {
         this._status._d2Cards = cards.map(card => ({ ...card })); this._status.setLines([]);
@@ -1034,7 +1047,7 @@ const { developmentCapabilities } = RuleConfig;
     });
     this._mode = "messages";
     c.enqueue([this._display.initial()]);
-    this.pushMessages(s.take());
+    this.pushMessages(opening);
     if(developmentCapabilities(PSFlow.developerCapabilities).allowExperimentalHeldItemBattle&&s.party.some((m:any)=>!!m.item))this._log.add(PSFlow.translator().t("management.experimental"));
     this.refreshStatus();
     });
