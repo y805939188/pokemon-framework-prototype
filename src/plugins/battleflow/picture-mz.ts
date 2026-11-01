@@ -1,11 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { BattlePicturePlayback } from './picture-playback';
 import type { PictureActor, PicturePose } from './picture-playback';
+import type { FaintMedia } from './faint-media';
 
-interface OwnedActor { body: any; shadow: any; bodyBitmap: any; shadowBitmap: any; released: boolean; }
+interface OwnedActor { body: any; shadow: any; bodyBitmap: any; shadowBitmap: any; released: boolean; bodyY: number; }
 
 /** Simple private code-generated portraits. Real media can replace this port without changing the timing consumer. */
-export function createBattlePicturesMZ(G: any, scene: any, current: () => boolean, updateOrdinal: () => number, failed: (error: unknown) => void): BattlePicturePlayback<OwnedActor> {
+export function createBattlePicturesMZ(G: any, scene: any, current: () => boolean, updateOrdinal: () => number, failed: (error: unknown) => void,
+  prepareFaint?: (actor: Readonly<PictureActor>) => FaintMedia): BattlePicturePlayback<OwnedActor> {
   const owned = new Set<OwnedActor>();
   const release = (actor: OwnedActor) => {
     if (actor.released) return; actor.released = true;
@@ -20,7 +22,7 @@ export function createBattlePicturesMZ(G: any, scene: any, current: () => boolea
     if (errors.length) throw new AggregateError(errors, 'owned battle picture cleanup failed');
   };
   const create = (actor: Readonly<PictureActor>): OwnedActor => {
-    const handle: OwnedActor = { body: null, shadow: null, bodyBitmap: null, shadowBitmap: null, released: false };
+    const handle: OwnedActor = { body: null, shadow: null, bodyBitmap: null, shadowBitmap: null, released: false, bodyY: 0 };
     const guard = () => { if (!current()) throw new Error('stale picture allocation'); };
     try {
       guard(); handle.bodyBitmap = new G.Bitmap(128, 80); guard();
@@ -39,6 +41,7 @@ export function createBattlePicturesMZ(G: any, scene: any, current: () => boolea
         if (index >= 0) scene.addChildAt(sprite, index); else scene.addChild(sprite);
         guard();
       }
+      handle.bodyY = handle.body.y;
       owned.add(handle); return handle;
     } catch (error) {
       try { release(handle); } catch (cleanup) { throw new AggregateError([error, cleanup], 'picture allocation and cleanup failed'); }
@@ -47,11 +50,13 @@ export function createBattlePicturesMZ(G: any, scene: any, current: () => boolea
   };
   const paint = (actor: OwnedActor, pose: Readonly<PicturePose>) => {
     if (actor.released || !current()) return;
+    actor.body.y = actor.bodyY + 80 * (pose.drop ?? 0);
+    if (actor.released || !current()) return;
     for (const [sprite, value] of [[actor.body, pose.body], [actor.shadow, pose.shadow]] as const) {
       for (const apply of [() => { sprite.scale.x = value; }, () => { sprite.scale.y = value; }, () => { sprite.opacity = Math.round(value * 255); }, () => { sprite.visible = value > 0; }]) {
         if (actor.released || !current()) return; apply();
       }
     }
   };
-  return new BattlePicturePlayback({ current, updateOrdinal, create, paint, release, failed });
+  return new BattlePicturePlayback({ current, updateOrdinal, create, paint, release, failed, prepareFaint });
 }

@@ -4,7 +4,7 @@
 
 起点是 [rpg-maker-mz-initialize](https://github.com/y805939188/rpg-maker-mz-initialize) 模板（`b6fa1df`）；第二步（验证战斗接入）已完成，结论和证据在 `docs/step2/`。
 
-本整改分支从已限域接受的伤害反馈da606a4继续：原ultra本地＋独立NW98及精确CI197双job均通过，旧拒绝／失败保留。当前小批为[倒下演出的纯选择与排期](docs/step5/5.4-D2c-faint-plan.md)，尚待固定验证与独立复审；本批不接Scene或实际音频。完整D2／5.4、新P-4和GC内存增长WARN仍OPEN，原U51-16超时FAIL／输入来源UNKNOWN保留，main未合并。
+本整改分支从已限域接受的倒下纯排期f4f5551继续：原ultra及精确CI198双job均通过，旧拒绝／失败保留。当前小批为[简单倒下的Scene／音频消费者](docs/step5/5.4-D2c-faint-view.md)，尚待固定验证与独立复审。完整D2／5.4、新P-4和GC内存增长WARN仍OPEN，原U51-16超时FAIL／输入来源UNKNOWN保留，main未合并。
 
 ## 先读什么
 

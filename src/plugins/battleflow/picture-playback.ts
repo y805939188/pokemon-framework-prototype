@@ -1,8 +1,10 @@
 import { BasicPictureGroup } from './visual-timing';
 import type { BattleSceneVisualStep } from './controller';
+import { planFaintSchedule } from './faint-schedule';
+import type { FaintMedia } from './faint-media';
 
 export interface PictureActor { id: string; side: 'p1' | 'p2'; name: string; }
-export interface PicturePose { body: number; shadow: number; }
+export interface PicturePose { body: number; shadow: number; drop?: number; }
 export interface PicturePlaybackPorts<T> {
   current(): boolean;
   updateOrdinal(): number;
@@ -10,6 +12,7 @@ export interface PicturePlaybackPorts<T> {
   paint(handle: T, pose: Readonly<PicturePose>): void;
   release(handle: T): void;
   failed(error: unknown): void;
+  prepareFaint?(actor: Readonly<PictureActor>): FaintMedia;
 }
 interface Entry<T> { actor: PictureActor; handle: T; released: boolean; pose: PicturePose; }
 const key = (actor: PictureActor) => actor.side + ':' + actor.id;
@@ -25,6 +28,7 @@ export class BattlePicturePlayback<T> {
   private sampling = false;
   private entries = new Map<string, Entry<T>>();
   private runs = new Set<() => void>();
+  private faintMedia = new Set<FaintMedia>();
   private lastUpdate = -1;
   readonly cleanupErrors: string[] = [];
   constructor(private readonly ports: PicturePlaybackPorts<T>, private readonly effects = true,
@@ -118,14 +122,88 @@ export class BattlePicturePlayback<T> {
       } finally { this.sampling = false; }
     } };
   }
+  /** Mandatory parallel faint tracks. The box callback belongs to the display
+   * projection; it never hides a later actor's status or mutates the model. */
+  faint(input: PictureActor, box: (opacity: number) => boolean): BattleSceneVisualStep {
+    const actor = actorCopy(input);
+    if (!this.current()) return { kind: 'visual', advance: () => true, cancel() {} };
+    let entry: Entry<T> | null = null, media: FaintMedia | null = null, group: BasicPictureGroup | null = null;
+    let cancelled = false, finished = false, effectSent = false, sampled = -1, lastNow = -1;
+    const cancel = () => {
+      if (cancelled || finished) return;
+      cancelled = true; group?.cancel(); this.runs.delete(cancel);
+      if (media) this.faintMedia.delete(media);
+      try { media?.dispose(); } catch (error) { this.cleanupErrors.push(String(error)); }
+      if (entry) this.release(entry);
+    };
+    this.runs.add(cancel);
+    return { kind: 'visual', cancel, advance: now => {
+      if (cancelled || finished) return true;
+      if (!this.current()) { cancel(); this.dispose(); return true; }
+      if (this.sampling) return false;
+      if (!Number.isFinite(now) || now < 0) throw new Error('invalid faint clock');
+      this.sampling = true;
+      try {
+        const update = this.ports.updateOrdinal();
+        if (!this.current() || cancelled) { cancel(); return true; }
+        if (!Number.isSafeInteger(update) || update < 0 || update < this.lastUpdate || update < sampled) throw new Error('invalid faint Scene.update ordinal');
+        if (update === sampled) return false;
+        if (now < lastNow) throw new Error('faint clock regressed');
+        lastNow = now;
+        sampled = update; this.lastUpdate = update;
+        if (!entry) entry = this.ensure(actor, () => !cancelled);
+        if (!entry || cancelled || !this.current()) { if (entry && cancelled) this.release(entry); cancel(); return true; }
+        if (!group) {
+          if (!media) {
+            const created = this.ports.prepareFaint?.({ ...actor });
+            if (created) {
+              if (cancelled || !this.current()) { try { created.dispose(); } finally { cancel(); } return true; }
+              media = created;
+              this.faintMedia.add(created);
+            }
+          }
+          const result = media ? media.poll(now) : planFaintSchedule({ battleEffects: this.effects, candidates: {
+            dedicatedForm: { state: 'missing' }, dedicatedBase: { state: 'missing' }, ordinaryForm: { state: 'missing' }, ordinaryBase: { state: 'missing' },
+          } });
+          if (cancelled || !this.current()) { cancel(); return true; }
+          if (result.state === 'pending') return false;
+          if (result.state === 'failed') throw new Error('faint media preparation: ' + (result.detail || result.code));
+          const d = result.plan.bodyDropStartUnits;
+          group = new BasicPictureGroup([
+            { id: 'body', kind: 'faint', startUnits: d, durationUnits: 10 },
+            { id: 'shadow', kind: 'faint', startUnits: d, durationUnits: 0 },
+            { id: 'box', kind: 'faint', startUnits: 0, durationUnits: 5 },
+          ], this.effects);
+          media?.playCry();
+        }
+        if (cancelled || !this.current()) { cancel(); return true; }
+        const frame = group.sample(now, update), body = frame.frames.find(x => x.id === 'body')!, shadow = frame.frames.find(x => x.id === 'shadow')!, dataBox = frame.frames.find(x => x.id === 'box')!;
+        if (body.started && !effectSent) { effectSent = true; media?.playEffect(); }
+        if (cancelled || !this.current()) { cancel(); return true; }
+        if (!this.paint(entry, { body: 1 - body.progress, shadow: shadow.started ? 0 : 1, drop: body.progress }, () => !cancelled)) { cancel(); return true; }
+        if (!box(1 - dataBox.progress) || cancelled || !this.current()) { cancel(); return true; }
+        if (frame.complete) {
+          finished = true; this.runs.delete(cancel);
+          // Independent SE tails do not lengthen the picture wait and are not
+          // cut at the visual endpoint. Their owner is this battle Scene.
+          this.release(entry);
+        }
+        return finished;
+      } finally { this.sampling = false; }
+    } };
+  }
   snapshot(): object {
     return { version: 'd2-basic-picture-consumer-v2', preset: 'simple-default-pictures-v1', damagePreset: 'simple-damage-feedback-v1', retired: this.retired,
-      lastUpdate: this.lastUpdate, runningGroups: this.runs.size, actors: [...this.entries.values()].map(entry => ({ ...entry.actor, ...entry.pose })), cleanupErrors: [...this.cleanupErrors] };
+      faintPreset: 'simple-faint-feedback-v1', faintAudio: [...this.faintMedia].map(media => media.snapshot()), lastUpdate: this.lastUpdate, runningGroups: this.runs.size, actors: [...this.entries.values()].map(entry => ({ ...entry.actor, ...entry.pose })), cleanupErrors: [...this.cleanupErrors] };
   }
   dispose(): void {
     if (this.retired) return;
     this.retired = true;
     for (const cancel of [...this.runs]) cancel();
+    for (const media of [...this.faintMedia]) {
+      this.faintMedia.delete(media);
+      try { media.dispose(); } catch (error) { this.cleanupErrors.push(String(error)); }
+    }
     for (const entry of [...this.entries.values()]) this.release(entry);
   }
 }

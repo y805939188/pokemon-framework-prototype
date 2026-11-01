@@ -267,10 +267,20 @@ test('compiled Scene flashes two public damage targets together while HP keeps i
  time=600;s.update();s.update();assert.equal(s.pictureState().runningGroups,0);assert(!s.inputState().ready);assert(s.presentationState().cards.find(x=>x.id==='P').hp>50);
  time=1000;s.update();drainScene(s);assert(s.inputState().ready);assert.equal(s.presentationState().cards.find(x=>x.id==='P').hp,50);assert.equal(s.presentationState().cards.find(x=>x.id==='F').hp,25);assert.equal(h.counts.choose,0);assert.equal(JSON.stringify(h.session.party),before);s.terminate();
 });
-test('compiled late KO releases its image but same-update reads cannot bypass the damage completion observation',async()=>{
+test('compiled HP0 retains its image for the later faint while damage still owes its completion observation',async()=>{
  let time=0;const h=await host({display:true,now:()=>time}).ready(),s=h.scene,body=h.counts.sprites.find(x=>x._psPictureKey==='p1:P'&&x._psPictureRole==='body');
- s.pushMessages([{kind:'events',events:[{type:'-damage',args:['p1a: P','0 fnt']}]}]);s.update();time=9000;s.update();assert.equal(body.destroys,1);assert.equal(s.pictureState().runningGroups,1);const count=h.counts.sprites.length;
+ s.pushMessages([{kind:'events',events:[{type:'-damage',args:['p1a: P','0 fnt']}]}]);s.update();time=9000;s.update();assert.equal(body.destroys,0);assert.equal(body.opacity,255);assert.equal(s.pictureState().runningGroups,1);const count=h.counts.sprites.length;
  for(let i=0;i<5;i++)s.updateQueue();assert.equal(s.pictureState().runningGroups,1);assert(!s.inputState().ready);assert.equal(h.counts.sprites.length,count);s.update();assert.equal(s.pictureState().runningGroups,0);drainScene(s);assert(s.inputState().ready);s.terminate();assert.equal(body.destroys,1);
+});
+test('compiled faint preserves HP0 portrait, fades its own box in parallel, and waits for the next actual update',async()=>{
+ let time=0;const h=await host({display:true,now:()=>time}).ready(),s=h.scene,before=JSON.stringify(h.session.party),body=h.counts.sprites.find(x=>x._psPictureKey==='p1:P'&&x._psPictureRole==='body'),shadow=h.counts.sprites.find(x=>x._psPictureKey==='p1:P'&&x._psPictureRole==='shadow');
+ s.pushMessages([{kind:'events',events:[{type:'faint',args:['p1a: P']}]}]);s.update();assert.equal(body.destroys,0);assert.equal(body.opacity,255);assert(!s.inputState().ready);
+ time=125;s.update();assert.equal(s.presentationState().cards.find(x=>x.id==='P').boxOpacity,.5);assert.equal(body.opacity,255);
+ time=250;s.update();assert.equal(s.presentationState().cards.find(x=>x.id==='P').boxOpacity,0);assert.equal(body.destroys,0);assert.equal(shadow.opacity,255);
+ time=600;s.update();assert.equal(shadow.opacity,0);assert.equal(body.opacity,255);const y=body.y;
+ time=850;s.update();assert.equal(body.y,y+40);assert.equal(body.opacity,128);time=1100;s.update();assert.equal(body.opacity,0);assert.equal(body.destroys,0);assert.equal(s.pictureState().runningGroups,1);
+ const epoch=s._pictureUpdate;for(let i=0;i<3;i++)s.updateQueue();assert.equal(s._pictureUpdate,epoch);assert.equal(body.destroys,0);assert(!s.inputState().ready);
+ s.update();assert.equal(body.destroys,1);assert.equal(shadow.destroys,1);drainScene(s);assert(s.inputState().ready);assert.equal(s.presentationState().cards.find(x=>x.id==='P').portraitVisible,false);assert.equal(JSON.stringify(h.session.party),before);s.terminate();assert.equal(body.destroys,1);
 });
 test('compiled abort cancels both damage pictures and their late composite work cannot change a successor',async()=>{
  let time=0;const h=await host({display:true,now:()=>time}).ready(),old=h.scene;old.pushMessages([{kind:'events',events:[{type:'-sethp',args:['p1a: P','50/100','p2a: F','25/100']}]}]);old.update();time=75;old.update();const late=old._queue[0],images=h.counts.sprites.filter(x=>x._psPictureRole);

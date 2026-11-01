@@ -6,6 +6,8 @@ export interface BattleDisplayCard {
   id: string; side: 'p1' | 'p2'; name: string; level: number; hp: number; maxhp: number;
   status: string; active: boolean; ratio: number | null; flash?: boolean;
   experienceUnavailable?: 'outside-level-interval';
+  boxOpacity?: number;
+  portraitVisible?: boolean;
 }
 export interface BattleDisplayPorts {
   current(): boolean;
@@ -13,6 +15,7 @@ export interface BattleDisplayPorts {
   afterPaintNow?(): number;
   cue(kind: 'exp-gain' | 'exp-full'): (() => void) | undefined;
   picture?(kind: 'send-out' | 'recall' | 'damage', actor: PictureActor): BattleSceneVisualStep;
+  faint?(actor: PictureActor, box: (opacity: number) => boolean): BattleSceneVisualStep;
 }
 export interface DisplayEvent { type: string; args: readonly string[]; }
 const key = (side: string, id: string) => side + ':' + id;
@@ -100,6 +103,22 @@ export class BattleDisplayPlayback {
       for (const picture of pictures) try { picture.cancel(); } catch (error) { this.cleanupErrors.push(String(error)); }
     });
   }
+  private faint(card: BattleDisplayCard): BattleSceneVisualStep {
+    const target = copy(this.planned), shown = target.find(x => key(x.side, x.id) === key(card.side, card.id))!;
+    card.boxOpacity = 0; card.portraitVisible = false;
+    let run: BattleSceneVisualStep | null = null;
+    return this.step(now => {
+      if (!run) run = this.ports.faint!({ id: card.id, side: card.side, name: card.name }, opacity => {
+        if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) throw new Error('invalid faint data-box opacity');
+        shown.boxOpacity = opacity; return this.paint(target);
+      });
+      if (!this.current()) { run.cancel(); return true; }
+      if (!run.advance(now)) return false;
+      if (!this.current()) return true;
+      shown.boxOpacity = 0; shown.portraitVisible = false;
+      return this.paint(target);
+    }, () => run?.cancel());
+  }
   event(event: DisplayEvent): BattleSceneVisualStep[] {
     const actor = (ident: string | undefined): BattleDisplayCard | undefined => {
       const match = /^(p[12])[a-z]?: (.+)$/.exec(ident || '');
@@ -126,7 +145,7 @@ export class BattleDisplayPlayback {
       const previous = this.planned.find(member => member.side === card.side && member.active);
       const old = previous && { ...previous };
       for (const member of this.planned) if (member.side === card.side) member.active = member === card;
-      Object.assign(card, condition(event.args[2], card));
+      Object.assign(card, condition(event.args[2], card), { boxOpacity: 1, portraitVisible: true });
       const shown = this.instant();
       if (!this.ports.picture) return [shown];
       const steps = old && old.id !== card.id && old.hp > 0 ? [this.picture('recall', old)] : [];
@@ -134,7 +153,10 @@ export class BattleDisplayPlayback {
     }
     if (event.type === '-status' || event.type === '-curestatus' || event.type === 'faint') {
       card.status = event.type === '-status' ? event.args[1] || '' : '';
-      if (event.type === 'faint') card.hp = 0;
+      if (event.type === 'faint') {
+        card.hp = 0;
+        if (this.ports.faint) return [this.faint(card)];
+      }
       return [this.instant()];
     }
     return [];

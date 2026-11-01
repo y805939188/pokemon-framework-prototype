@@ -73,3 +73,8 @@ data/framework/
 
 # Explicitly generated test-only image fixtures, never game artwork.
 /img/pokemon/battlebacks/__tests__/
+
+# Author-generated PCM tones used only in the isolated F2 qualification tree.
+# Fixture bytes/hashes and generation are recorded outside the product repository.
+/audio/se/Cries/Pidgey_faint.wav
+/audio/se/Pkmn faint.wav

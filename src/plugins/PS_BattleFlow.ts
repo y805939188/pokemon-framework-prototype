@@ -16,6 +16,7 @@ import { hpColour } from "./battleflow/visual-timing";
 import { BattleMenuCursor, gridCursor } from "./battleflow/menu";
 import { battlebackContext, createBattlebackMZ } from "./battleflow/battleback-mz";
 import { createBattlePicturesMZ } from "./battleflow/picture-mz";
+import { createFaintMediaMZ } from "./battleflow/faint-mz";
 const { developmentCapabilities } = RuleConfig;
 
 (() => {
@@ -815,7 +816,9 @@ const { developmentCapabilities } = RuleConfig;
       const width = this.innerWidth / 2 - 12;
       for (const [index, side] of ['p1', 'p2'].entries()) {
         const card = this._d2Cards.find((member: BattleDisplayCard) => member.side === side && member.active);
-        if (!card) continue;
+        if (!card || card.boxOpacity === 0) continue;
+        const previousOpacity = this.contents.paintOpacity;
+        this.contents.paintOpacity = Math.round((card.boxOpacity ?? 1) * 255);
         const x = index * (this.innerWidth / 2), colour = hpColour(card.hp, card.maxhp);
         this.drawText(this.fitText(`${card.name}  Lv.${card.level}`, width), x, 0, width);
         this.drawText(this.fitText(card.status || '', width / 2), x, 24, width / 2);
@@ -826,6 +829,7 @@ const { developmentCapabilities } = RuleConfig;
           this.contents.fillRect?.(x, 72, width, 6, '#343b43');
           this.contents.fillRect?.(x, 72, width * card.ratio, 6, card.flash ? '#ffffff' : '#589eda');
         }
+        this.contents.paintOpacity = previousOpacity;
       }
       return;
     }
@@ -1004,18 +1008,29 @@ const { developmentCapabilities } = RuleConfig;
     this._D = engine().D.make(this._names, PSFlow.translator());
     this._pictures = createBattlePicturesMZ(G, this,
       () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
-      () => this._pictureUpdate, error => c.fail(error));
+      () => this._pictureUpdate, error => c.fail(error), actor => {
+        const member = (actor.side === 'p1' ? s.party : s.foeTeam).find((x: any) => x.id === actor.id);
+        const mapped = member && s.content?.speciesKeys && Object.prototype.hasOwnProperty.call(s.content.speciesKeys, member.species)
+          ? s.content.speciesKeys[member.species] : null;
+        const identity = !member || member.egg ? null : mapped || { species: member.species, form: member.form ?? 0 };
+        return createFaintMediaMZ(G, nodeRequire, engine().root, identity,
+          () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
+          row => { if (c.isCurrent()) this._displayAudio.push({ ...row, t: performance.now() }); });
+      });
     this._display = new BattleDisplayPlayback(initialDisplay(s, this._names), {
       current: () => c.isCurrent() && PSFlow.running,
       paint: cards => { if (c.isCurrent()) {
         this._status._d2Cards = cards.map(card => ({ ...card })); this._status.setLines([]);
         // Observe every owned, sequentially shown send-out, including A -> B -> A before another menu.
         if (c.isCurrent()) this._menuCursor?.bindActive(cards.find(card => card.side === 'p1' && card.active)?.id ?? null);
-        if (c.isCurrent()) this._pictures.sync(cards.filter(card => card.active && card.hp > 0).map(card => ({ id: card.id, side: card.side, name: card.name })));
+        // HP0 is published before faint presentation. Keep the owned portrait
+        // until that display step actually finishes instead of inferring it from HP.
+        if (c.isCurrent()) this._pictures.sync(cards.filter(card => card.active && card.portraitVisible !== false).map(card => ({ id: card.id, side: card.side, name: card.name })));
       } },
       afterPaintNow: () => performance.now(),
       cue: kind => c.isCurrent() && PSFlow.running ? battleCue(this, kind) : undefined,
       picture: (kind, actor) => this._pictures.step(kind, actor),
+      faint: (actor, box) => this._pictures.faint(actor, box),
     });
     this._mode = "messages";
     c.enqueue([this._display.initial()]);
