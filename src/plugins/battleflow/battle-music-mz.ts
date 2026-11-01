@@ -5,7 +5,7 @@ import type { BattleMusicPort, MusicTrack, MusicObservation, MusicLease, RawMusi
 export interface MusicClock { now(): number; after(milliseconds: number, callback: () => void): unknown; clear(handle: unknown): void; }
 /** Only this adapter accesses MZ's BGM registration/buffer pair. Preparation uses a private
  * buffer without autoplay. Publication uses the normal MZ channel and volume control, never
- * global SE/BGS/ME stop, master context teardown or loader hooks. Not installed in Scene yet. */
+ * global SE/BGS/ME stop, master context teardown or loader hooks. */
 export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, current: () => boolean,
   options: { clock?: MusicClock; defaultBgm?: RawMusic } = {}): BattleMusicPort {
   const audio = G.AudioManager, fs = nodeRequire('fs'), path = nodeRequire('path');
@@ -13,6 +13,7 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
   const override = options.defaultBgm === undefined ? null : musicTrack(options.defaultBgm);
   if (override && !override.name) throw new Error('invalid battle music default override');
   let expectedBuffer = audio?._bgmBuffer, expectedRecord = audio?._currentBgm, ordinal = 0;
+  let transferPublished: (() => void) | null = null;
   const pending = new Set<() => void>();
   const channelCurrent = () => audio?._bgmBuffer === expectedBuffer && audio?._currentBgm === expectedRecord;
   const owned = () => current() && channelCurrent();
@@ -58,7 +59,12 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
       try {
         if (!Number.isFinite(position) || position < 0 || typeof terminal !== 'boolean') throw new Error('invalid battle music playback request');
         if (!live()) { state('superseded'); return lease; }
-        if (!logical && override) throw new Error('default BGM silent return requires the outer wrapper; not supported by this port batch');
+        if (!logical && terminal && override) {
+          // WP15 default override suppresses host stop. Transfer any still-owned
+          // default output to the world instead of destroying it during Scene cleanup.
+          transferPublished?.(); finished = true; handedOff = true;
+          state('requested', 'default BGM suppresses silent return stop'); return lease;
+        }
         if (!logical) {
           if (terminal && audio?.stopBgm) {
             audio.stopBgm();
@@ -103,7 +109,9 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
             registration = { ...track, pos: position }; expectedRecord = registration; audio._currentBgm = registration;
             if (!audio._meBuffer) buffer.play(true, position);
             if (!live()) { end('superseded', 'battle music owner changed during play'); return; }
-            finished = true; clear(); handedOff = terminal; state('requested');
+            finished = true; clear(); handedOff = terminal;
+            transferPublished = () => { if (audio._bgmBuffer === buffer && audio._currentBgm === registration) handedOff = true; };
+            state('requested');
           } catch (error) { end('failed', String(error instanceof Error ? error.message : error)); }
         };
         pending.add(cancel); state('loading');

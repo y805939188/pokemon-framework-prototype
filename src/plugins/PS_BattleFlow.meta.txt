@@ -24,6 +24,12 @@
  * @type string
  * @default plain
  *
+ * @param battleMusic
+ * @text Battle music context (JSON)
+ * @desc Explicit map/global/presets/defaultBgm records. {} uses declared logical defaults. No world terrain is inferred.
+ * @type multiline_string
+ * @default {}
+ *
  * @param battlePlatform
  * @text Default battle platform
  * @desc Optional platform identity. No world environment is inferred.
@@ -173,6 +179,31 @@
  * @command ResetGame
  * @text Reset to Test Fixture (testing aid)
  * @desc TESTING AID: replaces the framework state with the synthetic step 2 test party (three level 50 members). Not for real games.
+ *
+ * @command PlayTrainerIntro
+ * @text Play trainer intro
+ * @desc Separate event stage. Waits for audio preparation and a later frame; author dialogue/waits may follow before StartTrainerBattle.
+ * @arg trainerId
+ * @type string
+ * @arg version
+ * @type number
+ * @min 0
+ * @max 255
+ * @default 1
+ *
+ * @command SetNextBattleMusic
+ * @text Set next battle music
+ * @desc Sets three independent one-battle presets. Blank clears that slot. Normal root completion consumes only this version.
+ * @arg battle
+ * @type string
+ * @default
+ * @arg victory
+ * @type string
+ * @default
+ * @arg capture
+ * @type string
+ * @default
+ *
  * @command StartTrainerBattle
  * @text Start Trainer Battle
  * @desc Uses an existing authored trainer record and the same owned battle scene. Image choices do not change its team or rules.

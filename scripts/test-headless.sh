@@ -21,6 +21,7 @@ SUITES=(
   experiments/step5/4/test-faint-schedule.cjs
   experiments/step5/4/test-battle-audio-selection.cjs
   experiments/step5/4/test-battle-music.cjs
+  experiments/step5/4/test-battle-music-scene.cjs
   experiments/step5/4/test-faint-view.cjs
   experiments/step5/4/test-d1-timing.cjs
   experiments/step5/4/test-scene-controller.cjs
