@@ -1,0 +1,228 @@
+{
+  "provenance": "SOURCE_STATIC_DERIVED_VECTOR from clean WP67-A9.3 / WP15 6.4; not Ruby execution or actual media measurement",
+  "cases": [
+    {
+      "id": "F-01",
+      "title": "专用形态叫声命中1秒",
+      "input": {
+        "soundMatch": "dedicated-form",
+        "estimatedSeconds": 1
+      },
+      "expected": {
+        "cryPitch": 100,
+        "cryRequested": true,
+        "dropStartUnits": 22,
+        "shadowHideUnits": 22,
+        "faintSELogicalRequest": "Pkmn faint",
+        "faintSEAtUnits": 22,
+        "dataBoxStartUnits": 0,
+        "totalBlockingDuration": "NOT_DERIVED_FROM_d"
+      }
+    },
+    {
+      "id": "F-02",
+      "title": "专用形态缺失而专用基础命中，普通形态即使存在也不取代专用分支",
+      "input": {
+        "soundMatch": "dedicated-base",
+        "estimatedSeconds": 1,
+        "ordinaryFormAlsoExists": true
+      },
+      "expected": {
+        "cryPitch": 100,
+        "cryRequested": true,
+        "dropStartUnits": 22,
+        "shadowHideUnits": 22,
+        "faintSELogicalRequest": "Pkmn faint",
+        "faintSEAtUnits": 22,
+        "dataBoxStartUnits": 0,
+        "totalBlockingDuration": "NOT_DERIVED_FROM_d"
+      }
+    },
+    {
+      "id": "F-03",
+      "title": "专用全缺失，普通形态1秒按音高75排期",
+      "input": {
+        "soundMatch": "ordinary-form",
+        "estimatedSeconds": 1
+      },
+      "expected": {
+        "cryPitch": 75,
+        "cryRequested": true,
+        "dropStartUnits": 29,
+        "shadowHideUnits": 29,
+        "faintSELogicalRequest": "Pkmn faint",
+        "faintSEAtUnits": 29,
+        "dataBoxStartUnits": 0,
+        "totalBlockingDuration": "NOT_DERIVED_FROM_d"
+      }
+    },
+    {
+      "id": "F-04",
+      "title": "普通形态缺失，普通基础1秒按音高75排期",
+      "input": {
+        "soundMatch": "ordinary-base",
+        "estimatedSeconds": 1
+      },
+      "expected": {
+        "cryPitch": 75,
+        "cryRequested": true,
+        "dropStartUnits": 29,
+        "shadowHideUnits": 29,
+        "faintSELogicalRequest": "Pkmn faint",
+        "faintSEAtUnits": 29,
+        "dataBoxStartUnits": 0,
+        "totalBlockingDuration": "NOT_DERIVED_FROM_d"
+      }
+    },
+    {
+      "id": "F-05",
+      "title": "物种叫声均缺失，仍有独立倒下音效请求",
+      "input": {
+        "soundMatch": "missing",
+        "estimatedSeconds": null
+      },
+      "expected": {
+        "cryPitch": null,
+        "cryRequested": false,
+        "dropStartUnits": 12,
+        "shadowHideUnits": 12,
+        "faintSELogicalRequest": "Pkmn faint",
+        "faintSEAtUnits": 12,
+        "dataBoxStartUnits": 0,
+        "totalBlockingDuration": "NOT_DERIVED_FROM_d"
+      }
+    },
+    {
+      "id": "F-06",
+      "title": "专用已命中而估计零秒，保留音高请求",
+      "input": {
+        "soundMatch": "dedicated-form",
+        "estimatedSeconds": 0
+      },
+      "expected": {
+        "cryPitch": 100,
+        "cryRequested": true,
+        "dropStartUnits": 2,
+        "shadowHideUnits": 2,
+        "faintSELogicalRequest": "Pkmn faint",
+        "faintSEAtUnits": 2,
+        "dataBoxStartUnits": 0,
+        "totalBlockingDuration": "NOT_DERIVED_FROM_d"
+      }
+    },
+    {
+      "id": "F-07",
+      "title": "普通已命中而估计零秒，不能混同缺失",
+      "input": {
+        "soundMatch": "ordinary-form",
+        "estimatedSeconds": 0
+      },
+      "expected": {
+        "cryPitch": 75,
+        "cryRequested": true,
+        "dropStartUnits": 2,
+        "shadowHideUnits": 2,
+        "faintSELogicalRequest": "Pkmn faint",
+        "faintSEAtUnits": 2,
+        "dataBoxStartUnits": 0,
+        "totalBlockingDuration": "NOT_DERIVED_FROM_d"
+      }
+    },
+    {
+      "id": "F-08",
+      "title": "专用1/20秒恰在取整边界",
+      "input": {
+        "soundMatch": "dedicated-form",
+        "estimatedSeconds": 0.05,
+        "exactSeconds": "1/20"
+      },
+      "expected": {
+        "cryPitch": 100,
+        "cryRequested": true,
+        "dropStartUnits": 3,
+        "shadowHideUnits": 3,
+        "faintSELogicalRequest": "Pkmn faint",
+        "faintSEAtUnits": 3,
+        "dataBoxStartUnits": 0,
+        "totalBlockingDuration": "NOT_DERIVED_FROM_d"
+      }
+    },
+    {
+      "id": "F-09",
+      "title": "专用略过1/20秒边界",
+      "input": {
+        "soundMatch": "dedicated-form",
+        "estimatedSeconds": 0.0501,
+        "exactSeconds": "501/10000"
+      },
+      "expected": {
+        "cryPitch": 100,
+        "cryRequested": true,
+        "dropStartUnits": 4,
+        "shadowHideUnits": 4,
+        "faintSELogicalRequest": "Pkmn faint",
+        "faintSEAtUnits": 4,
+        "dataBoxStartUnits": 0,
+        "totalBlockingDuration": "NOT_DERIVED_FROM_d"
+      }
+    },
+    {
+      "id": "F-10",
+      "title": "普通3/4秒除75%后恰为1秒",
+      "input": {
+        "soundMatch": "ordinary-form",
+        "estimatedSeconds": 0.75,
+        "exactSeconds": "3/4"
+      },
+      "expected": {
+        "cryPitch": 75,
+        "cryRequested": true,
+        "dropStartUnits": 22,
+        "shadowHideUnits": 22,
+        "faintSELogicalRequest": "Pkmn faint",
+        "faintSEAtUnits": 22,
+        "dataBoxStartUnits": 0,
+        "totalBlockingDuration": "NOT_DERIVED_FROM_d"
+      }
+    },
+    {
+      "id": "F-11",
+      "title": "普通略过3/4秒边界",
+      "input": {
+        "soundMatch": "ordinary-form",
+        "estimatedSeconds": 0.7501,
+        "exactSeconds": "7501/10000"
+      },
+      "expected": {
+        "cryPitch": 75,
+        "cryRequested": true,
+        "dropStartUnits": 23,
+        "shadowHideUnits": 23,
+        "faintSELogicalRequest": "Pkmn faint",
+        "faintSEAtUnits": 23,
+        "dataBoxStartUnits": 0,
+        "totalBlockingDuration": "NOT_DERIVED_FROM_d"
+      }
+    },
+    {
+      "id": "F-12",
+      "title": "已解析资源的内部负时长先经公开入口夹到0",
+      "input": {
+        "soundMatch": "dedicated-base",
+        "estimatedSeconds": 0,
+        "rawDurationReaderSeconds": -1,
+        "durationBoundary": "provider clamps negative to zero before schedule; not treating read exception as missing"
+      },
+      "expected": {
+        "cryPitch": 100,
+        "cryRequested": true,
+        "dropStartUnits": 2,
+        "shadowHideUnits": 2,
+        "faintSELogicalRequest": "Pkmn faint",
+        "faintSEAtUnits": 2,
+        "dataBoxStartUnits": 0,
+        "totalBlockingDuration": "NOT_DERIVED_FROM_d"
+      }
+    }
+  ]
+}
