@@ -5,9 +5,9 @@ import {verifyFreeze} from './freeze.mjs';
 import {admit} from './admission.mjs';
 import {boundedChild,LIMITS} from './bounded.mjs';
 import {newOutput,need,readJSON,writeNew,sha,file,parse,validate,S,HASH} from './safe.mjs';
-import {gateRecord,BundleSchema} from './schema.mjs';
+import {gateRecord,BundleSchema,ParentPinsSchema} from './schema.mjs';
 import {PROFILE,BOUNDS} from './constants.mjs';
-export const ParentPinsSchema=S.obj({dispatchPath:S.str(4096,'^/'),dispatchSHA256:HASH,configPath:S.str(4096,'^/'),configSHA256:HASH,qualificationPath:S.nullable(S.str(4096,'^/')),qualificationSHA256:S.nullable(HASH),freezeSHA256:HASH,fixtureSHA256:HASH,producerSHA256:HASH});
+export {ParentPinsSchema} from './schema.mjs';
 export function preflight(root,pin,pins){const m=verifyFreeze(root,pin);validate(pins,ParentPinsSchema);need(pins.freezeSHA256===pin&&pins.fixtureSHA256===m.fixtureSHA256&&pins.producerSHA256===m.producerSHA256,'PINS_ARTIFACT');return admit(pins);}
 export async function produce(root,pin,pins,out,{signal}={}){
  const a=preflight(root,pin,pins);out=newOutput(root,out);fs.mkdirSync(out);fs.mkdirSync(path.join(out,'execution'));
