@@ -48,7 +48,7 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
       let displaced: any = null, resumeOwed = false;
       // Preparation can pause/duck before this lease occupies the ME channel.
       // Keep its exact identities separate from native post-publication resume.
-      type ResumeDebt = { buffer: any; record: any; fadePending: boolean };
+      type ResumeDebt = { buffer: any; record: any; sequence: any; fadePending: boolean };
       let paused: ResumeDebt | null = null, resuming: ResumeDebt | null = null;
       let ducked: { state: any; factor: number; expected: number } | null = null;
       let rollingBack = false, finishingResume = false, restoringBGM = false;
@@ -68,7 +68,7 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
       const owner = () => { try { return current(); } catch (error) { fault ??= 'ME owner check failed: ' + String(error); throw error; } };
       const live = () => !retired && id === sequence && owner() && (status !== 'loading' && status !== 'playing' || sameChannel());
       const restoreBGM = (debt: ResumeDebt) => {
-        const same = () => !audio._meBuffer && audio._bgmBuffer === debt.buffer && audio._currentBgm === debt.record;
+        const same = () => !audio._meBuffer && audio._bgmBuffer === debt.buffer && audio._currentBgm === debt.record && audio._bgmSequence === debt.sequence;
         if (!same()) return; // exact successor handoff, never touch its position/gain
         const playing = debt.buffer.isPlaying();
         if (!same()) return;
@@ -88,9 +88,14 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
         restoringBGM = true;
         try {
           if (audio._meBuffer) { resuming = null; return; }
-          if (audio._bgmSequence) { audio._duckBgmSequence(1); if (audio._meBuffer) { resuming = null; return; } }
+          if (resuming && (audio._bgmBuffer !== resuming.buffer || audio._currentBgm !== resuming.record || audio._bgmSequence !== resuming.sequence)) { resuming = null; return; }
+          const sequenceState = audio._bgmSequence;
+          if (sequenceState) {
+            audio._duckBgmSequence(1);
+            if (audio._meBuffer || audio._bgmSequence !== sequenceState) { resuming = null; return; }
+          }
           const bgm = audio._bgmBuffer, record = audio._currentBgm;
-          if (!resuming && bgm && record && !bgm.isPlaying()) resuming = { buffer: bgm, record, fadePending: false };
+          if (!resuming && bgm && record && !bgm.isPlaying()) resuming = { buffer: bgm, record, sequence: sequenceState, fadePending: false };
           if (resuming) { restoreBGM(resuming); resuming = null; }
         } finally { restoringBGM = false; }
       };
@@ -197,7 +202,7 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
               if (bgm && record) {
                 const position = bgm.seek(), wasPlaying = bgm.isPlaying();
                 if (!prepared()) return;
-                record.pos = position; paused = wasPlaying ? { buffer: bgm, record, fadePending: false } : null; bgm.stop();
+                record.pos = position; paused = wasPlaying ? { buffer: bgm, record, sequence: sequenceState, fadePending: false } : null; bgm.stop();
                 if (!prepared()) return;
               }
               if (sequenceState) {
