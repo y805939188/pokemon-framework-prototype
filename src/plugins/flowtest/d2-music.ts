@@ -163,6 +163,7 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
         eq(produced.overall, 'pass', 'producer actually completed'); eq(produced.results.map((r: any) => [r.id, r.status]), PLAN.groups.flatMap(g => g.ids).filter(id => id !== 'M17').map(id => [id, 'pass']), 'all 16 producer cases, no filter or replay');
         eq(produced.musicNative.inputSHA256, hash(inputBytes), 'same frozen input'); eq(produced.musicNative.chain, input.chain, 'same run chain'); eq(produced.env.packageInfo.gitHead, input.packageHead, 'same actual producer package'); eq(produced.musicNative.driverPluginSHA256, input.driverPluginSHA256, 'same driver bytes'); eq(produced.musicNative.producer.expectedSHA256, fileHash(expectedPath), 'producer emitted this expected file');
         eq(saved.version, PLAN.version, 'expected protocol'); eq(saved.chain, input.chain, 'saved chain'); eq(saved.packageHead, input.packageHead, 'expected producer code'); eq(saved.fixtureSHA256, hash(stable(content)), 'recompiled source fixture rather than expected content oracle');
+        eq(saved.slot, PLAN.slot, 'expected same-run slot'); eq(saved.productCommit, PLAN.productCommit, 'expected repaired product');
         flow.stateReplaced(); flow._app = null; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.developerCapabilities = {}; flow.seed = [...PLAN.seed]; flow.rng = random; flow.receiveOptions = { mode: 1, naming: 1 };
         const file = G.StorageManager.filePath(G.DataManager.makeSavename(PLAN.slot)); eq(fileHash(file), saved.saveSHA256, 'actual same-run compressed save bytes');
         G.SceneManager.goto(G.Scene_Title);
@@ -170,7 +171,8 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
         scene()._commandWindow.selectSymbol('continue'); assert(scene()._commandWindow.isCurrentItemEnabled(), 'normal Continue enabled'); await press('ok');
         await waitFor(() => scene() instanceof G.Scene_Load && scene().isStarted() && scene()._listWindow.isOpenAndActive() && !scene().isBusy() && !G.SceneManager.isSceneChanging(), 'fresh normal load list');
         const load = scene(); load._listWindow.selectSavefile(PLAN.slot); eq(load._listWindow.savefileId(), PLAN.slot, 'actual selected producer slot'); await press('ok');
-        await waitFor(mapReady, 'fresh loaded map'); assert(load._loadSuccess, 'actual load succeeded'); eq(flow.game(), saved.state, 'whole saved business state');
+        await waitFor(mapReady, 'fresh loaded map'); assert(load._loadSuccess, 'actual load succeeded');
+        assert(!G.$gameSystem._psSaveError && !!G.$gameSystem._psSaveInfo, 'fresh loaded framework validated without a diagnostic error'); eq(flow.game(), saved.state, 'whole saved business state');
         eq(G.$gameSystem._bgmOnSave, saved.bgmOnSave, 'serialized host BGM record'); await active(named('world')); await frames(8); eq(flow.game(), saved.state, 'no duplicate installs');
         const before = clone(flow.game()); eq(flow.commit(saved.result), 'already-applied', 'exact replay after fresh Continue'); eq(flow.game(), before, 'no repeated reward/receipt');
         assert(!flow.running && !flow.app().saveBlocked && !flow.operationPending(), 'no persisted root owner'); assert(!flow.musicState()?.current, 'no prior music timeline'); assert(!G.$gameMap._interpreter._waitMode, 'no stale event wait'); eq(fileHash(file), saved.saveSHA256, 'Continue did not rewrite producer slot');
@@ -263,8 +265,22 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
       });
       await run('M11', async () => {
         for (const action of ['load', 'newgame']) {
-          await reset(); await world(); G.$gameSystem.onBeforeSave(); await settledSave(PLAN.loadControlSlot); const gate = holdNext(named('next')); flow.setNextBattleMusic({ battle: named('next') }); await open(); await waitFor(() => gate.assigned, 'old timeline buffer'); await nativeReady(gate.row);
-          if (action === 'load') assert(await G.DataManager.loadGame(PLAN.loadControlSlot), 'real load control slot'); else { G.DataManager.setupNewGame(); G.$gameSystem._psGame = musicNativeState(E, content); }
+          await reset(); await world(); G.$gameSystem.onBeforeSave(); await settledSave(PLAN.loadControlSlot);
+          const savedState = clone(flow.game()), savedBgm = clone(G.$gameSystem._bgmOnSave), oldSystem = G.$gameSystem;
+          const gate = holdNext(named('next')); flow.setNextBattleMusic({ battle: named('next') }); const old = await open(); await waitFor(() => gate.assigned, 'old timeline buffer'); await nativeReady(gate.row);
+          const generation = old.app.stateGeneration;
+          if (action === 'load') {
+            eq(await G.DataManager.loadGame(PLAN.loadControlSlot), 0, 'real native load success code');
+            assert(!G.$gameSystem._psSaveError && !!G.$gameSystem._psSaveInfo, 'loaded framework validated without a diagnostic error');
+            eq(flow.game(), savedState, 'real load restores the complete saved business state');
+            eq(G.$gameSystem._bgmOnSave, savedBgm, 'real load restores the serialized host BGM record');
+          } else {
+            G.DataManager.setupNewGame();
+            assert(!G.$gameSystem._psInitError, 'real newgame initialized without a diagnostic error');
+            G.$gameSystem._psGame = musicNativeState(E, content);
+          }
+          assert(G.$gameSystem !== oldSystem && old.app.stateGeneration > generation, 'replacement installed a new host system and invalidated the old application generation');
+          assert(!old.app.saveBlocked && !flow.operationPending() && !flow.musicState()?.current, 'replacement released application and music owners');
           assert(gate.row.destroyed > 0 && !flow.running, 'replacement retired old owner'); G.SceneManager.goto(G.Scene_Map); await waitFor(mapReady, 'replacement map started'); await toMapId(PLAN.mapId, 8, 9); await waitFor(mapReady, 'transferred replacement map started'); clearMessages(); await world(); await open(); await active('Battle wild'); release(gate); await frames(2); eq(audio._currentBgm.name, 'Battle wild', 'old preset/timeline cannot replace new default'); eq(gate.row.plays.length, 0, 'late old timeline never plays'); await abortScene();
         }
         return { load: 'actual DataManager.loadGame/extract', newgame: 'actual setupNewGame; explicit valid test-party installation without an extra stateReplaced call' };

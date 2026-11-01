@@ -195,7 +195,7 @@ test('removing the actual native abort lifecycle gate revives the real host isCl
  assert.throws(()=>f.G.SceneManager.isCurrentSceneBusy(),/isClosing/);
 });
 
-function host({ready=true,settings={},intro='Intro',emptyBgm=false}={}){
+function host({ready=true,settings={},intro='Intro',emptyBgm=false,beforePlugins=()=>{}}={}){
  const root=fs.mkdtempSync(path.join(temp,'world-'));fs.mkdirSync(path.join(root,'audio/bgm'),{recursive:true});
  const f={root,time:0,timers:new Map(),seq:0,buffers:[],plays:[],queries:[],commands:{},hook:null,starts:0,finishes:0,aborts:0};
  f.write=name=>fs.writeFileSync(path.join(root,'audio/bgm',name+'.ogg'),'controlled decoder existence fixture');
@@ -214,7 +214,7 @@ function host({ready=true,settings={},intro='Intro',emptyBgm=false}={}){
  PluginManager:{parameters:()=>({battleMusic:JSON.stringify(settings)}),registerCommand(_plugin,name,fn){f.commands[name]=fn;}},Game_Interpreter:Base,Game_System:System,Window_Base:Win,Window_Command:Win,Scene_MenuBase:Base,
  SceneManager:{_scene:null,push(type){f.pushed=type;},isSceneChanging:()=>false},Graphics:{boxWidth:816,boxHeight:624,frameCount:0},Rectangle:function(x,y,width,height){Object.assign(this,{x,y,width,height});},Utils:{hasEncryptedAudio:()=>false},Input:{isTriggered:()=>false},SoundManager:{playBuzzer(){}},Bitmap,Sprite,AudioManager:audio,$gameSystem:new System(),$gameMessage:{isBusy:()=>false,add(){}},$gameVariables:{setValue(){}},
  DataManager:{setupNewGame(){},extractSaveContents(contents){G.$gameSystem=contents.system;},saveGame:async()=>true,makeSaveContents:()=>({system:G.$gameSystem})}};
- G.window=G;vm.createContext(G);vm.runInContext(plugin,G);vm.runInContext(savePlugin,G);
+ G.window=G;vm.createContext(G);beforePlugins(G,f);vm.runInContext(plugin,G);vm.runInContext(savePlugin,G);
  const flow=G.PSFlow,projection={id:'npc',version:1,presentation:{battleBgm:'Authored',victoryBgm:'V',introBgm:intro}};
  const session={party:[],foeTeam:[],content:{},bag:{},finished:false,pendingLearn:null,take:()=>[],currentRequest:()=>({active:[{moves:[{id:'splash',move:'Splash',pp:40,maxpp:40}]}]}),gw:{readState:()=>[]}};
  const app={stateGeneration:0,saveBlocked:false,pendingEvolution:null,pendingReceiving:null,pendingPokedex:null,assertHostStateReplacementAllowed(){f.hook?.('replacement-check');},stateReplacedByHost(){this.stateGeneration++;this.saveBlocked=false;this.pendingEvolution=this.pendingReceiving=this.pendingPokedex=null;},startNewGame(){f.newGames=(f.newGames||0)+1;},trainerRecord(id,version){f.queries.push({id,version});f.hook?.('trainer-query');return projection;},async startBattle(request){f.starts++;this.saveBlocked=true;f.hook?.('session-start');return f.opening??session;},async startTrainerBattle(request){return this.startBattle(request);},finishBattle(s,r){f.finishes++;if(f.pending){this[f.pending]={token:'pending',revision:1};return{code:2,commit:'none',battleId:r.battleId,pending:true,...(f.pending==='pendingEvolution'?{continuationToken:'pending'}:{})};}this.saveBlocked=false;return{code:1,commit:'applied',battleId:r.battleId};},abortBattle(r,error){f.aborts++;this.saveBlocked=false;return{code:0,commit:'none',battleId:r.battleId,aborted:true,error:String(error)};},resolveReceiving(){this.pendingReceiving=null;this.saveBlocked=false;return{code:1,commit:'applied',battleId:flow._op.request.battleId};},resolveEvolution(){this.pendingEvolution=null;this.saveBlocked=false;return{code:1,commit:'applied',battleId:flow._op.request.battleId};}};
@@ -320,4 +320,158 @@ test('native M13 actual action block establishes world after abort without reset
  const actual=await execute(body);assert.deepEqual(actual,{result:{futureSurvived:true,abortPreserved:true,normalConsumed:true},resets:1,worlds:2,selected:[named('preset'),named('world'),named('next'),named('next'),named('world'),'Battle wild']});
  const establish='        await world(); // M13 re-establish world explicitly without clearing the preserved preset.\n';assert.equal(body.split(establish).length,2);
  await assert.rejects(execute(body.replace(establish,'')),error=>error.code==='ERR_ASSERTION'&&error.actual===null&&error.expected===named('world'),'removing the new precondition must expose the old actual-null/expected-world mismatch');
+});
+
+// Execute the remaining native driver's actual action blocks. Native decode/render and
+// storage/clock ports are controlled; selected MZ API bodies and compiled ownership/
+// save wrappers are real. This is reachability/contract coverage, never NW evidence.
+function nativeTailSource(source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8')) {
+ const parse=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]})).parseAst,nodes=[];
+ (function walk(n){if(!n||typeof n!=='object')return;if(Array.isArray(n))return n.forEach(walk);nodes.push(n);Object.values(n).forEach(walk);})(parse(source,{lang:'ts'}));
+ return {source,nodes,run(id,deps){const n=nodes.find(n=>n.type==='CallExpression'&&n.callee.name==='run'&&n.arguments[0]?.value===id);assert(n,id);
+  return vm.runInThisContext(require('node:module').stripTypeScriptTypes('(async({'+Object.keys(deps).join(',')+'})=>'+source.slice(n.arguments[1].body.start,n.arguments[1].body.end)+')'),{filename:'actual-native-'+id})(deps);}};
+}
+function installHostMethod(G,file,left){
+ const text=fs.readFileSync(path.join(ROOT,'js',file),'utf8'),parse=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]})).parseAst;let found;
+ (function walk(n){if(!n||typeof n!=='object'||found)return;if(Array.isArray(n))return n.forEach(walk);if(n.type==='AssignmentExpression'&&text.slice(n.left.start,n.left.end)===left)found=n;else Object.values(n).forEach(walk);})(parse(text));
+ assert(found,left);vm.runInContext(text.slice(found.start,found.end)+';',G);
+}
+function nativeSavePorts(G,f){
+ // Controlled storage codec/I/O. Manager create/extract/correct/save/load and
+ // Scene_Save/Load promise semantics below are the installed MZ implementations.
+ const clone=x=>JSON.parse(JSON.stringify(x));f.ioError=null;f.extractError=null;f.savedNames=[];f.loadedNames=[];
+ installHostMethod(G,'reactor_core.js','String.prototype.format');
+ for(const type of ['Temp','Screen','Timer','Message','Switches','Variables','SelfSwitches','Actors','Party','Troop','Map','Player'])G['Game_'+type]=function(){};
+ Object.assign(G.Game_Party.prototype,{setupStartingMembers(){},removeInvalidMembers(){if(f.extractError)throw f.extractError;}});
+ Object.assign(G.Game_Player.prototype,{setupForNewGame(){},isTransferring:()=>false});G.Game_Map.prototype.mapId=()=>5;
+ G.$dataSystem={versionId:1};G.Game_System.prototype.setSavefileId=function(n){this._savefileId=n;};
+ G.StorageManager={fileDirectoryPath:()=>f.root,filePath:n=>path.join(f.root,n+'.rmmzsave'),
+  async saveObject(name,value){if(f.ioError)throw f.ioError;f.savedNames.push(name);fs.writeFileSync(this.filePath(name),JSON.stringify(value));},
+  async loadObject(name){if(f.ioError)throw f.ioError;f.loadedNames.push(name);const value=JSON.parse(fs.readFileSync(this.filePath(name),'utf8'));value.system=Object.assign(new G.Game_System(),value.system);value.party=Object.assign(new G.Game_Party(),value.party);value.map=Object.assign(new G.Game_Map(),value.map);value.player=Object.assign(new G.Game_Player(),value.player);return value;}};
+ Object.assign(G.DataManager,{_globalInfo:[],selectSavefileForNewGame(){},makeSavefileInfo:()=>({title:'controlled'}),saveGlobalInfo(info){return G.StorageManager.saveObject('global',info);}});
+ for(const name of ['createGameObjects','setupNewGame','makeSaveContents','extractSaveContents','correctDataErrors','makeSavename','saveGame','loadGame'])installHostMethod(G,'reactor_managers.js','DataManager.'+name);
+ for(const name of ['onBeforeSave','onAfterLoad'])installHostMethod(G,'reactor_objects.js','Game_System.prototype.'+name);
+ G.AudioManager.saveBgs=()=>({name:''});G.AudioManager.playBgs=()=>{};G.AudioManager._bgmVolume=50;G.AudioManager._meVolume=100;
+ G.AudioManager.stopBgmSequence=()=>{};
+ const originalCreate=G.AudioManager.createBuffer;
+ G.AudioManager.createBuffer=function(folder,name){const b=originalCreate.call(this,'bgm/',name);b.folder=folder;b.playing=false;b._sourceNodes=[];b.stops=[];const play=b.play;
+  b.play=function(...args){this.playing=true;this._sourceNodes=[{}];return play.apply(this,args);};b.stop=function(){this.playing=false;this._sourceNodes=[];};b.isPlaying=function(){return this.playing;};b.fadeIn=()=>{};b.addStopListener=fn=>b.stops.push(fn);return b;};
+ const params=G.AudioManager.updateBufferParameters;G.AudioManager.updateBufferParameters=function(buffer,...args){if(buffer)return params.call(this,buffer,...args);};
+ for(const name of ['playBgm','isCurrentBgm','updateCurrentBgm','stopBgm','updateBgmParameters','saveBgm','playMe','stopMe','updateMeParameters'])installHostMethod(G,'reactor_managers.js','AudioManager.'+name);
+ G.DataManager.createGameObjects();f.clone=clone;
+}
+function nativeTailHost({source,ioError=null,extractError=null,diagnostic=false,badReturn,staleState=false}={}){
+ const PLAN=require('./music-native-plan.json'),named=x=>PLAN.prefix+x,driver=nativeTailSource(source),f=host({ready:true,beforePlugins:nativeSavePorts}),G=f.G,clone=x=>JSON.parse(JSON.stringify(x));
+ const content=require('./trainer-ai-integration/fixtures.cjs').content({party:1});f.flow.content=()=>content;f.flow.speciesKeyResolver=()=>E.speciesKey.speciesKeyResolver(content);
+ G.Scene_Map=function(){this.map=true;};G.SceneManager.goto=Type=>{G.SceneManager._scene=new Type();};
+ const fresh=()=>E.state.newGame({content,party:[],money:123});G.$gameSystem._psGame=fresh();
+ f.app.startNewGame=()=>{f.newGames=(f.newGames??0)+1;G.$gameSystem._psGame=fresh();};
+ fs.mkdirSync(path.join(f.root,'audio/bgm',PLAN.prefix),{recursive:true});for(const name of ['world','next','trainer','preset','default','signal'])f.write(named(name));
+ f.projection.presentation.battleBgm=named('trainer');let gate=null,ordinal=0;const records=[];
+ const create=f.audio.createBuffer;f.audio.createBuffer=function(folder,name){const buffer=create.call(this,folder,name),play=buffer.play,row={name,buffer,plays:[],get destroyed(){return buffer.destroyed;}};records.push(row);buffer.play=function(loop,position){row.plays.push({loop,position});return play.call(this,loop,position);};if(gate&&!gate.assigned&&gate.name===name){gate.assigned=true;gate.row=row;buffer.ready=false;}return buffer;};
+ const realLoad=G.DataManager.loadGame;G.DataManager.loadGame=async function(slot){if(ioError)f.ioError=ioError;if(extractError)f.extractError=extractError;const saved=G.$gameSystem._psGame;const code=await realLoad.call(this,slot);if(diagnostic)G.$gameSystem._psSaveError={code:'controlled-invalid'};if(staleState)G.$gameSystem._psGame={...saved,money:999};return badReturn===undefined?code:badReturn;};
+ const actions={PLAN,G,flow:f.flow,content,E,clone,eq:(a,b,m)=>assert.equal(JSON.stringify(a),JSON.stringify(b),m),assert:(v,m)=>assert(v,m+' '+JSON.stringify({running:f.flow.running,buffers:records.map(r=>({name:r.name,destroyed:r.buffer.destroyed}))})),named,track:name=>({name,volume:100,pitch:100,pan:0}),
+  async reset(_kind='normal',options={}){f.flow.stateReplaced();G.$gameSystem._psGame=fresh();delete G.$gameSystem._psSaveError;f.flow._app=f.app;f.currentScene=null;G.SceneManager._scene={map:true};f.commands.ResetBattleMusic?.();G.PluginManager.parameters=name=>name==='PS_BattleFlow'?{battleMusic:JSON.stringify(options)}:{};return f.app;},
+  async world(none=false){f.audio.playBgm({name:none?'':named('world'),volume:100,pitch:100,pan:0},0.25);},
+  holdNext(name){return gate={name,assigned:false,row:null};},release(g){f.load(g.row.buffer);},
+  async nativeReady(row){assert(row);assert(!row.buffer.isError());},
+  async waitFor(predicate,label){for(let n=0;n<20;n++){await flush();if(predicate())return;if(label==='actual natural ME completion'){const me=f.audio._meBuffer;assert(me);for(const fn of me.stops)fn();}}throw Error('bounded tail wait: '+label);},
+  async frames(n){G.Graphics.frameCount+=n;await flush();},
+  async open(trainer=false){f.flow._app=f.app;f.session.finished=false;f.open(trainer);await f.scene();return{app:f.app,scene:f.currentScene,session:f.session,op:f.flow._op};},
+  async active(name){await flush();assert.equal(f.audio._currentBgm?.name,name,'actual compiled channel');assert(f.audio._bgmBuffer);return records.find(r=>r.buffer===f.audio._bgmBuffer);},
+  activeRow:()=>records.find(r=>r.buffer===f.audio._bgmBuffer),player:()=>f.flow.musicState()?.player,last:()=>f.flow.musicState()?.player.requests.at(-1),readNative:r=>({name:r.name}),unwrap:b=>records.find(r=>r.buffer===b),audio:f.audio,stopCounts:{stopMe:0,stopBgs:0,stopSe:0},battle:()=>G.SceneManager._scene instanceof G.Scene_PSBattle?f.currentScene:null,
+  async finish(){const old=f.currentScene,raw={battleId:'controlled-result-'+(++ordinal)};old.onEnd();old.terminate();G.SceneManager._scene={map:true};return{raw,old};},
+  async abortScene(){f.flow.abort(Error('controlled tail cancellation'));f.currentScene?.terminate();G.SceneManager._scene={map:true};},
+  mapReady:()=>G.SceneManager._scene?.map===true,toMapId:async()=>{},clearMessages(){},musicNativeState:()=>fresh(),
+  async settledSave(slot){const writes=[],base=G.StorageManager.saveObject;G.StorageManager.saveObject=function(...args){const p=base.apply(this,args);writes.push(p);return p;};try{await G.DataManager.saveGame(slot);await Promise.all(writes);}finally{G.StorageManager.saveObject=base;}}
+ };
+ f.G.Scene_PSBattle.prototype.popScene=function(){this.terminate();G.SceneManager._scene={map:true};};
+ f.session.chooseMove=async()=>{f.session.finished=true;return{ok:true};};
+ Object.assign(f,{actions,driver,records,run:id=>driver.run(id,actions)});return f;
+}
+
+test('actual M11 accepts native zero only with restored full state, diagnostics and released old ownership; newgame branch remains reachable',async()=>{
+ const f=nativeTailHost();const result=await f.run('M11');assert.match(result.load,/actual DataManager/);assert.equal(f.loadedNames.length,1);assert.equal(f.newGames,1);assert(!f.flow.running);assert(f.buffers.every(b=>b.name!==require('./music-native-plan.json').prefix+'next'||b.destroyed));
+});
+for(const kind of ['io','extract','diagnostic','state','return'])test('actual M11 refuses '+kind+' failure rather than accepting a zero-ish success',async()=>{
+ const failure=Error(kind),f=nativeTailHost(kind==='io'?{ioError:failure}:kind==='extract'?{extractError:failure}:kind==='diagnostic'?{diagnostic:true}:kind==='state'?{staleState:true}:{badReturn:true});
+ await assert.rejects(f.run('M11'),kind==='io'||kind==='extract'?e=>e===failure:/validated|business state|success code/);assert.equal(f.newGames??0,0);
+});
+test('old native truthiness oracle rejects the real successful zero while the new checks keep the loading goal',async()=>{
+ const source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8'),old=source.replace("eq(await G.DataManager.loadGame(PLAN.loadControlSlot), 0, 'real native load success code');","assert(await G.DataManager.loadGame(PLAN.loadControlSlot), 'real load control slot');");assert.notEqual(old,source);const f=nativeTailHost({source:old});await assert.rejects(f.run('M11'),/real load control slot/);assert.equal(f.loadedNames.length,1);
+});
+for(const id of ['M12','M13','M14','M15'])test('actual '+id+' tail driver completes against real host audio API and compiled Scene ownership',async()=>{
+ const f=nativeTailHost();await f.run(id);assert(!f.flow.running);f.flow.stateReplaced();
+});
+function nativeSaveScenes(f){
+ const G=f.G,install=(file,name)=>installHostMethod(G,file,name);
+ function MapScene(){this.map=true;}MapScene.prototype.isStarted=()=>true;G.Scene_Map=MapScene;
+ function List(){this._index=0;}List.prototype={index(){return this._index;},select(n){this._index=n;},setTopRow(){},savefileIdToIndex:n=>n,indexToSavefileId:n=>n,isEnabled:()=>true,isOpenAndActive:()=>true};G.Window_SavefileList=List;
+ for(const name of ['savefileId','selectSavefile'])install('reactor_windows.js','Window_SavefileList.prototype.'+name);
+ function FileScene(){this._listWindow=new List();}FileScene.prototype={isStarted:()=>true,isBusy:()=>false,terminate(){},activateListWindow(){f.fileFailure=true;},popScene(){G.SceneManager.goto(MapScene);}};G.Scene_File=FileScene;
+ for(const name of ['savefileId','isSavefileEnabled','onSavefileOk'])install('reactor_scenes.js','Scene_File.prototype.'+name);
+ function Save(){FileScene.call(this);}Save.prototype=Object.create(FileScene.prototype);G.Scene_Save=Save;
+ function Load(){FileScene.call(this);this._loadSuccess=false;}Load.prototype=Object.create(FileScene.prototype);G.Scene_Load=Load;
+ for(const name of ['onSavefileOk','executeSave','onSaveSuccess','onSaveFailure'])install('reactor_scenes.js','Scene_Save.prototype.'+name);
+ for(const name of ['onSavefileOk','executeLoad','onLoadSuccess','onLoadFailure','reloadMapIfUpdated','terminate'])install('reactor_scenes.js','Scene_Load.prototype.'+name);
+ Object.assign(Load.prototype,{fadeOutAll(){}});G.Game_System.prototype.versionId=function(){return this._versionId;};
+ function Title(){this._commandWindow={selectSymbol:s=>{f.titleSymbol=s;},isCurrentItemEnabled:()=>f.continueEnabled!==false,isOpenAndActive:()=>true,close(){}};}Title.prototype={isStarted:()=>true,isBusy:()=>false,closeCommandWindow(){}};G.Scene_Title=Title;
+ install('reactor_scenes.js','Scene_Title.prototype.commandContinue');
+ G.SceneManager.goto=Type=>{const old=G.SceneManager._scene,change=()=>{G.SceneManager._scene=new Type();old?.terminate?.();};if(old instanceof Load)queueMicrotask(change);else change();};G.SceneManager.push=Type=>G.SceneManager.goto(Type);
+ Object.assign(G.SoundManager,{playSave(){},playLoad(){}});
+ f.actions.scene=()=>G.SceneManager._scene;
+ f.actions.press=async key=>{assert.equal(key,'ok');const current=G.SceneManager._scene;if(current instanceof Title)current.commandContinue();else current.onSavefileOk();await flush();};
+ f.actions.mapReady=()=>G.SceneManager._scene instanceof MapScene;
+ G.Game_Map.prototype._interpreter={_waitMode:''};
+ const finish=f.actions.finish;f.actions.finish=async()=>{const result=await finish();G.$gameSystem._psGame.appliedBattles[result.raw.battleId]={hash:'a'.repeat(64)};return result;};
+ f.flow.commit=result=>G.$gameSystem._psGame.appliedBattles[result.battleId]?'already-applied':'invalid';
+ const crypto=require('node:crypto'),hash=b=>crypto.createHash('sha256').update(b).digest('hex'),fileHash=file=>hash(fs.readFileSync(file));
+ const input={chain:'controlled-pure-driver-chain',packageHead:'b'.repeat(40),driverPluginSHA256:'c'.repeat(64)},details={};
+ Object.assign(f.actions,{fs,path,OUT:path.join(f.root,'producer/report.json'),details,input,stable:v=>E.contentCompile.canonicalJson(v),hash,fileHash,random:()=>0,inputBytes:Buffer.from('controlled frozen input')});fs.mkdirSync(path.join(f.root,'producer'));
+ f.makeProducer=()=>{const result={overall:'pass',results:Array.from({length:16},(_,i)=>({id:'M'+String(i+1).padStart(2,'0'),status:'pass'})),env:{packageInfo:{gitHead:input.packageHead}},musicNative:{inputSHA256:hash(f.actions.inputBytes),chain:input.chain,driverPluginSHA256:input.driverPluginSHA256,producer:details.producer}};
+  const report=path.join(f.root,'producer/report.json');fs.writeFileSync(report,JSON.stringify(result));const expected=details.producer.expectedFile,argv={'ps-music-producer-report':report,'ps-music-expected':expected,'ps-music-producer-sha':fileHash(report),'ps-music-expected-sha':fileHash(expected)};f.actions.arg=name=>argv[name];f.producer={result,report,expected,argv};return f.producer;};
+ return f;
+}
+test('actual M16 Scene_Save emits slot/global promises and actual M17 Title Continue uses native zero-load and saved BGM',async()=>{
+ const f=nativeSaveScenes(nativeTailHost());await f.run('M16');const p=f.makeProducer();const state=f.actions.clone(f.flow.game());assert(f.savedNames.includes('file1')&&f.savedNames.includes('global'));assert(fs.existsSync(p.expected));
+ f.G.$gameSystem._psGame.money=999;f.audio.stopBgm();const out=await f.run('M17');assert.equal(out.saveSHA256,f.actions.fileHash(f.G.StorageManager.filePath('file1')));assert.equal(f.titleSymbol,'continue');assert.deepEqual(f.flow.game(),state);assert.deepEqual(f.loadedNames,['file1']);
+});
+for(const fault of ['slot-write','global-write','no-save-return'])test('actual M16 refuses '+fault+' rather than publishing consumer evidence',async()=>{
+ const f=nativeSaveScenes(nativeTailHost()),base=f.G.StorageManager.saveObject;
+ if(fault==='no-save-return')f.G.Scene_Save.prototype.onSaveSuccess=function(){};
+ else f.G.StorageManager.saveObject=function(name,...args){if(name===(fault==='slot-write'?'file1':'global'))return Promise.reject(Error(fault));return base.call(this,name,...args);};
+ // Observe deliberate fault promises immediately; actual driver's later Promise.all still rejects.
+ const wrap=f.G.StorageManager.saveObject;f.G.StorageManager.saveObject=function(...args){const p=wrap.apply(this,args);p.catch(()=>{});return p;};
+ await assert.rejects(f.run('M16'),/bounded tail wait|slot-write|global-write/);assert.equal(f.actions.details.producer,undefined);
+});
+for(const fault of ['report-hash','producer-incomplete','input','expected-hash','slot','save-bytes','load-io','load-invalid','replay','continued-save-mutation'])test('actual M17 rejects '+fault+' in the same-run consumer chain',async()=>{
+ const f=nativeSaveScenes(nativeTailHost());await f.run('M16');const p=f.makeProducer(),writeExpected=change=>{const value=JSON.parse(fs.readFileSync(p.expected));change(value);fs.writeFileSync(p.expected,JSON.stringify(value));p.argv['ps-music-expected-sha']=f.actions.fileHash(p.expected);p.result.musicNative.producer.expectedSHA256=p.argv['ps-music-expected-sha'];},writeReport=()=>{fs.writeFileSync(p.report,JSON.stringify(p.result));p.argv['ps-music-producer-sha']=f.actions.fileHash(p.report);};
+ if(fault==='report-hash')p.argv['ps-music-producer-sha']='0'.repeat(64);
+ if(fault==='producer-incomplete'){p.result.results.pop();writeReport();}
+ if(fault==='input'){p.result.musicNative.inputSHA256='0'.repeat(64);writeReport();}
+ if(fault==='expected-hash')p.argv['ps-music-expected-sha']='0'.repeat(64);
+ if(fault==='slot'){writeExpected(v=>{v.slot=9;});writeReport();}
+ if(fault==='save-bytes')fs.appendFileSync(f.G.StorageManager.filePath('file1'),' ');
+ if(fault==='load-io')f.ioError=Error('load-io');
+ if(fault==='load-invalid'){const base=f.G.DataManager.loadGame;f.G.DataManager.loadGame=async function(...args){const r=await base.apply(this,args);f.G.$gameSystem._psSaveError={code:'invalid'};return r;};}
+ if(fault==='replay')f.flow.commit=()=>{f.G.$gameSystem._psGame.money++;return'already-applied';};
+ if(fault==='continued-save-mutation'){const base=f.G.Game_System.prototype.onAfterLoad;f.G.Game_System.prototype.onAfterLoad=function(){base.call(this);fs.appendFileSync(f.G.StorageManager.filePath('file1'),' ');};}
+ const message={'report-hash':'producer report hash','producer-incomplete':'all 16 producer cases','input':'same frozen input','expected-hash':'producer expected hash','slot':'expected same-run slot','save-bytes':'actual same-run compressed save bytes','load-io':'bounded tail wait','load-invalid':'fresh loaded framework','replay':'no repeated reward/receipt','continued-save-mutation':'Continue did not rewrite producer slot'}[fault];
+ await assert.rejects(f.run('M17'),e=>e.message.includes(message));if(['report-hash','producer-incomplete','input','expected-hash','slot','save-bytes'].includes(fault))assert.equal(f.loadedNames.length,0);
+});
+test('native load wrapper preserves zero and balances ordinaryLoads on I/O and extract failures',async()=>{
+ // Execute the compiled actual PS_SaveState wrapper against the installed native body,
+ // also inspect the closure counter so a rejection cannot strand migration admission.
+ const f=nativeTailHost();await f.actions.settledSave(2);const text=savePlugin,parse=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]})).parseAst;let node;
+ (function walk(n){if(!n||typeof n!=='object'||node)return;if(Array.isArray(n))return n.forEach(walk);if(n.type==='AssignmentExpression'&&text.slice(n.left.start,n.left.end)==='G.DataManager.loadGame')node=n;else Object.values(n).forEach(walk);})(parse(text));assert(node);
+ const G={DataManager:{loadGame:f.G.DataManager.loadGame.bind(f.G.DataManager)}},context=vm.createContext({G,assertReplacement(){}});vm.runInContext('let ordinaryLoads=0;const baseLoadGame=G.DataManager.loadGame;'+text.slice(node.start,node.end)+';',context);
+ assert.equal(await G.DataManager.loadGame(2),0);assert.equal(vm.runInContext('ordinaryLoads',context),0);
+ for(const field of ['ioError','extractError']){const failure=Error(field);f[field]=failure;await assert.rejects(G.DataManager.loadGame(2),e=>e===failure);assert.equal(vm.runInContext('ordinaryLoads',context),0);f[field]=null;}
+});
+test('remaining native M11-M17 driver actions are reachable in declared order with a fresh controlled Continue chain',async()=>{
+ const f=nativeSaveScenes(nativeTailHost());for(const id of ['M11','M12','M13','M14','M15','M16'])await f.run(id);f.makeProducer();f.audio.stopBgm();await f.run('M17');assert.equal(f.loadedNames.at(-1),'file1');
+});
+test('actual M11 refuses a native success code when the real save wrapper diagnoses a corrupt framework document',async()=>{
+ const f=nativeTailHost(),base=f.G.StorageManager.loadObject;f.G.StorageManager.loadObject=async function(...args){const value=await base.apply(this,args);value.system._psGame={schema:-1};return value;};
+ await assert.rejects(f.run('M11'),/validated without a diagnostic/);assert(f.G.$gameSystem._psSaveError);assert(!f.flow.running);
 });
