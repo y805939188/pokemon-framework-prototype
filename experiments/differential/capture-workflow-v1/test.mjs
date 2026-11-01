@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+import {spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
-import {freezeInputs} from './fixtures.mjs';
+import {freezeInputs,makeInitial,definitions} from './fixtures.mjs';
 import {runCase} from './candidate.mjs';
 import {gateRecord,RecordSchema,gateQualification} from './schema.mjs';
 import {admit,makeParentFiles,receive,AuditSchema,prepareControls} from './admission.mjs';
@@ -85,3 +86,49 @@ test('candidate-only claims or native inventory mutation cannot be hidden by equ
 
 test('each real callee retains complete native return bytes with separate selected projection',async()=>{const evidence=[];const r=await runCase(E,fixtures.cases[0],{onNative:x=>evidence.push(x)});assert.equal(evidence.length,r.nativeCalls.length);evidence.forEach((x,i)=>assert.equal(sha(x.bytes),r.nativeCalls[i].evidenceSHA256));assert(evidence[0].bytes.length>0);});
 test('private native evidence hashes are verified provenance, never silently used as cross-role return equality',()=>{const r=clone(by('C01'));r.nativeCalls[0].evidenceSHA256='2'.repeat(64);assert.equal(compareRecords(by('C01'),r).nativeSelectedFactsEqual,true);assert.equal(compareRecords(by('C01'),r).nativeUnprojectedReturnValues,'NOT_COMPARED');});
+
+// CAPTURE-ULTRA-01: facts already present in the public record must agree before source acceptance.
+for(const [label,id,mutate]of [
+ ['party slot disagreement','C01',r=>r.workflow.placements[0].position.index=0],
+ ['box slot disagreement','C04',r=>r.workflow.placements[0].position.slot=1],
+ ['party position with box coordinates','C01',r=>r.workflow.placements[0].position.box=0],
+ ['box position with party coordinate','C04',r=>r.workflow.placements[0].position.index=0],
+ ['duplicate member receipts','C08',r=>r.workflow.placements[1]=clone(r.workflow.placements[0])],
+ ['duplicated original queue','C08',r=>r.workflow.queue.original=['Q01','Q01']],
+ ['omitted second placement','C08',r=>r.workflow.placements.pop()],
+ ['unrelated existing member claimed as received','C01',r=>r.workflow.placements=[{member:'P01',position:{kind:'party',index:0,box:null,slot:null}}]],
+ ['actual zero writes relabelled as complete','C09',r=>{r.workflow.completion='completed';r.integrity.primaryCommitObserved=true;r.integrity.saveBlocked=false;r.workflow.placements=[{member:'Q01',position:{kind:'party',index:0,box:null,slot:null}}];}],
+ ['zero writes despite otherwise plausible placement','C01',r=>{r.integrity.replacements=0;r.integrity.readbacksVerified=0;}],
+ ['no ledger change despite complete flag','C01',r=>r.integrity.candidateState.ledgerAfterSHA256=r.integrity.candidateState.ledgerBeforeSHA256]
+])test('CAPTURE-ULTRA-01 rejects '+label,()=>{const r=clone(by(id));mutate(r);assert.throws(()=>gateRecord(r));});
+test('CAPTURE-ULTRA-01 receives frozen upstream identities rather than a changed declared queue',()=>{const f=intakeFixture(),v=JSON.parse(file(f.candidatePath)),r=v.records[0];r.workflow.queue.original=['P01'];r.workflow.queue.remaining=['P01'];r.workflow.placements=[{member:'P01',position:{kind:'party',index:0,box:null,slot:null}}];gateRecord(r);fs.writeFileSync(f.candidatePath,JSON.stringify(v));f.audit.candidateSHA256=sha(file(f.candidatePath));fs.writeFileSync(f.auditPath,JSON.stringify(f.audit));f.auditSHA256=sha(file(f.auditPath));reject(()=>receive(f),'OBSERVATION_QUEUE_MISMATCH');});
+test('CAPTURE-ULTRA-01 incomplete legal partial placement prefix is retained without rollback fiction',()=>{const r=clone(by('C08'));r.integrity={...r.integrity,role:'reference',actualApp:false,candidateState:null,readCount:null,replacements:null,readbacksVerified:null};r.final.storage.boxes[0].slots[1]=null;r.final.members.Q02=clone(r.initial.members.Q02);r.workflow.placements=r.workflow.placements.slice(0,1);r.workflow.completion='incomplete';r.workflow.queue={...r.workflow.queue,carrier:'native-consumed-queue',remaining:['Q02'],pending:[]};r.workflow.events=[];r.workflow.decisionsConsumed=0;r.workflow.checkpoints=[{ordinal:0,atCall:0,phase:'initial',state:clone(r.initial)},{ordinal:1,atCall:1,phase:'final',state:clone(r.final)}];gateRecord(r);assert.equal(r.workflow.placements[0].member,'Q01');assert.equal(r.final.storage.boxes[0].slots[0],'Q01');});
+
+// Official subprocesses, never a copied caller's self-reported identity. All metadata below is SYNTHETIC.
+function official(argv,{env={}}={}){const clean={...process.env,...env};if(!Object.hasOwn(env,'NODE_OPTIONS'))delete clean.NODE_OPTIONS;if(!Object.hasOwn(env,'NODE_PATH'))delete clean.NODE_PATH;return spawnSync(process.execPath,argv,{cwd:scratch,env:clean,encoding:'utf8',timeout:30000});}
+const cli=path.join(freezeRoot,'tools/cli.mjs');
+const snap=p=>fs.readdirSync(p).sort().map(n=>[n,sha(file(path.join(p,n)))]);
+for(const command of ['receive','compare']){
+ for(const target of ['inside-freeze','dot-inside-freeze','inside-public','existing-input','ancestor','linked-parent'])test(`CAPTURE-ULTRA-02 ${command} rejects ${target} without input changes`,()=>{
+  const f=intakeFixture(),before=snap(f.dir),pinned=verifyFreeze(freezeRoot,built.freezeSHA256);const pinsPath=path.join(path.dirname(f.dir),'SYNTHETIC-parent-pins.json');writeNew(pinsPath,f.parent);let out;
+  if(target==='inside-freeze')out=path.join(freezeRoot,command+'-receipt.json');
+  if(target==='dot-inside-freeze')out=path.join(freezeRoot,'..'+command+'-receipt.json');
+  if(target==='inside-public')out=path.join(f.dir,command+'-receipt.json');
+  if(target==='existing-input')out=f.referencePath;
+  if(target==='ancestor')out=path.dirname(f.dir);
+  if(target==='linked-parent'){const link=path.join(path.dirname(f.dir),'link');fs.symlinkSync(f.dir,link);out=path.join(link,command+'-receipt.json');}
+  const r=official([cli,command,freezeRoot,built.freezeSHA256,pinsPath,f.referencePath,f.candidatePath,f.auditPath,f.auditSHA256,out]);assert.equal(r.status,2,r.stdout+r.stderr);const message=JSON.parse(r.stdout);assert.equal(message.status,'REJECTED');assert(['OUTPUT_OVERLAP','OUTPUT_EXISTS','PATH_LINK'].includes(message.code),r.stdout);assert.deepEqual(snap(f.dir),before);assert.equal(verifyFreeze(freezeRoot,built.freezeSHA256).producerSHA256,pinned.producerSHA256);if(!['existing-input','ancestor'].includes(target))assert(!fs.existsSync(out));
+ });
+ test(`CAPTURE-ULTRA-02 ${command} accepts external new dot-prefixed result with original files intact`,()=>{const f=intakeFixture(),before=snap(f.dir),pinsPath=path.join(path.dirname(f.dir),'SYNTHETIC-parent-pins.json');writeNew(pinsPath,f.parent);const out=path.join(path.dirname(f.dir),'..external-'+command+'.json');const r=official([cli,command,freezeRoot,built.freezeSHA256,pinsPath,f.referencePath,f.candidatePath,f.auditPath,f.auditSHA256,out]);assert.equal(r.status,command==='receive'?0:1,r.stdout+r.stderr);assert(fs.existsSync(out));assert.deepEqual(snap(f.dir),before);verifyFreeze(freezeRoot,built.freezeSHA256);if(command==='compare')assert.equal(JSON.parse(file(out)).denominator,9);});
+}
+
+const held=prepareControls({root:freezeRoot,pin:built.freezeSHA256,mode:'qualification',out:path.join(scratch,'SYNTHETIC-entry-HOLD'),authorized:false});
+const allow=prepareControls({root:freezeRoot,pin:built.freezeSHA256,mode:'qualification',out:path.join(scratch,'SYNTHETIC-entry-authorized'),authorized:true});
+test('CAPTURE-ULTRA-03 normal fixed CLI retains HOLD and plain authorized zero-business control',()=>{for(const [p,status,code]of [[held,2,'PARENT_NOT_AUTHORIZED'],[allow,0,'ADMITTED_ZERO_BUSINESS']]){const r=official([cli,'preflight',freezeRoot,built.freezeSHA256,p.pinsPath]);assert.equal(r.status,status,r.stdout+r.stderr);const v=JSON.parse(r.stdout);assert.equal(status?v.code:v.status,code);if(!status)assert.equal(v.businessCalls,0);}});
+const foreign=path.join(scratch,'SYNTHETIC-foreign-tools');fs.cpSync(path.join(freezeRoot,'tools'),foreign,{recursive:true});const foreignAdmission=path.join(foreign,'admission.mjs');const oldAdmission=fs.readFileSync(foreignAdmission,'utf8');assert(oldAdmission.includes("need(d.authorized===true,'PARENT_NOT_AUTHORIZED');"));fs.writeFileSync(foreignAdmission,oldAdmission.replace("need(d.authorized===true,'PARENT_NOT_AUTHORIZED');","need(d.authorized===false,'PARENT_NOT_AUTHORIZED');"));
+for(const name of ['cli.mjs','produce.mjs','worker.mjs'])test('CAPTURE-ULTRA-03 rejects actual foreign '+name+' and changed dependency before outputs',()=>{const out=path.join(scratch,'foreign-'+name.replace('.mjs','')),args=name==='cli.mjs'?['preflight',freezeRoot,built.freezeSHA256,held.pinsPath]:name==='produce.mjs'?[freezeRoot,built.freezeSHA256,held.pinsPath,out]:[freezeRoot,built.freezeSHA256,'C01',path.join(out,'execution/C01-native')];const r=official([path.join(foreign,name),...args]);assert.equal(r.status,2);assert((r.stdout+r.stderr).includes('FORMAL_ENTRY_MISMATCH'));assert(!fs.existsSync(out));verifyFreeze(freezeRoot,built.freezeSHA256);});
+test('CAPTURE-ULTRA-03 modified dependency inside actual root fails original external freeze pin',()=>{const copy=path.join(scratch,'SYNTHETIC-modified-dependency-root');fs.cpSync(freezeRoot,copy,{recursive:true});fs.appendFileSync(path.join(copy,'tools/admission.mjs'),'\n// deliberate mismatched dependency\n');const r=official([path.join(copy,'tools/cli.mjs'),'preflight',copy,built.freezeSHA256,held.pinsPath]);assert.equal(r.status,2);assert.equal(JSON.parse(r.stdout).code,'FREEZE_PAYLOAD');});
+for(const flag of ['--require','--import','--loader'])test('CAPTURE-ULTRA-03 rejects actual external '+flag+' after Node bootstrap before admission',()=>{const label=flag.slice(2),marker=path.join(scratch,'preload-'+label+'.marker'),preload=path.join(scratch,'preload-'+label+(flag==='--require'?'.cjs':'.mjs'));const body=flag==='--require'?`require('node:fs').writeFileSync(${JSON.stringify(marker)},'SYNTHETIC',{flag:'wx'});`:`import fs from 'node:fs';fs.writeFileSync(${JSON.stringify(marker)},'SYNTHETIC',{flag:'wx'});${flag==='--loader'?'export async function resolve(s,c,next){return next(s,c);}':''}`;fs.writeFileSync(preload,body);const r=official([flag,flag==='--require'?preload:pathToFileURL(preload).href,cli,'preflight',freezeRoot,built.freezeSHA256,allow.pinsPath]);assert.equal(r.status,2,r.stdout+r.stderr);assert.equal(JSON.parse(r.stdout).code,'FORMAL_LOADER_REJECTED');assert(fs.existsSync(marker));assert(!r.stdout.includes('ADMITTED_ZERO_BUSINESS'));});
+test('CAPTURE-ULTRA-03 producer and worker also reject executable flags before output allocation',()=>{const preload=path.join(scratch,'empty-preload.cjs');fs.writeFileSync(preload,'// no-op');for(const name of ['produce.mjs','worker.mjs']){const out=path.join(scratch,'preloaded-'+name),args=name==='produce.mjs'?[freezeRoot,built.freezeSHA256,allow.pinsPath,out]:[freezeRoot,built.freezeSHA256,'C01',path.join(out,'execution/C01-native')];const r=official(['--require',preload,path.join(freezeRoot,'tools',name),...args]);assert.equal(r.status,2);assert((r.stdout+r.stderr).includes('FORMAL_LOADER_REJECTED'));assert(!fs.existsSync(out));}});
+test('CAPTURE-ULTRA-03 NODE_OPTIONS remains rejected without disclosing its contents',()=>{const r=official([cli,'preflight',freezeRoot,built.freezeSHA256,allow.pinsPath],{env:{NODE_OPTIONS:'--no-warnings'}});assert.equal(r.status,2);assert.equal(JSON.parse(r.stdout).code,'FORMAL_LOADER_REJECTED');assert(!r.stdout.includes('--no-warnings'));});
+test('CAPTURE-ULTRA-04 actual fixture constructor RNG includes party and upstream without changing values',()=>{const draws=[];const counted={...E,memberFactory:{...E.memberFactory,createMember(input,c,rng){return E.memberFactory.createMember(input,c,n=>{draws.push({id:input.id,n});return rng(n);});}}};const f=makeInitial(counted,definitions[0]);assert.equal(f.fixtureDraws,16);assert.equal(draws.length,f.fixtureDraws);assert.equal(draws.filter(x=>x.id==='P01').length,8);assert.equal(draws.filter(x=>x.id==='Q01').length,8);assert.equal(canonical(f.upstream),canonical(fixtures.cases[0].upstream));});

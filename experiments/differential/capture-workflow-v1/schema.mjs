@@ -29,7 +29,25 @@ export function gateRecord(r){validate(r,RecordSchema);for(const state of [r.ini
  for(const n of r.nativeCalls)if(n.boundary){need(nonzero(n.boundary.requestEvidenceSHA256)&&n.boundary.cleanup==='controlled-after-boundary','NATIVE_WAIT_EVIDENCE');need(r.workflow.checkpoints.some(c=>c.atCall===n.ordinal&&hashJSON(c.state)===n.boundary.stateSHA256),'NATIVE_WAIT_STATE_BINDING');}
  const f=r.workflow.refresh;need(f.calls===f.callOrdinals.length,'REFRESH_COUNT');if(f.carrier==='derived-on-query-no-cache')need(f.calls===0,'REFRESH_NOT_BOOLEAN_INTENT');for(const n of f.callOrdinals)need(n<=r.nativeCalls.length,'REFRESH_CALL_BINDING');
  need(r.workflow.decisionsConsumed===r.workflow.events.filter(e=>e.kind==='decision').length,'DECISION_COUNT');
- if(r.workflow.completion==='completed'){need(r.workflow.queue.pending.length===0,'FALSE_COMPLETION');if(r.integrity.role==='candidate')need(r.integrity.primaryCommitObserved&&!r.integrity.saveBlocked&&r.workflow.placements.length===r.workflow.queue.original.length,'FALSE_CANDIDATE_COMPLETION');else need(r.workflow.queue.remaining.length===0&&r.nativeCalls.some(n=>n.role==='terminal-consumer'&&n.lifecycle==='returned'),'FALSE_REFERENCE_COMPLETION');}
+ const queue=r.workflow.queue, originals=new Set(queue.original);
+ need(originals.size===queue.original.length,'QUEUE_DUPLICATE');
+ for(const ids of [queue.remaining,queue.pending])need(new Set(ids).size===ids.length&&ids.every(id=>originals.has(id)),'QUEUE_MEMBERSHIP');
+ const placed=new Set(),locations=new Set();
+ for(const item of r.workflow.placements){
+  const p=item.position;need(originals.has(item.member)&&!placed.has(item.member),'PLACEMENT_MEMBER_UNIQUE');placed.add(item.member);
+  if(p.kind==='party')need(p.index!==null&&p.box===null&&p.slot===null&&r.final.partyOrder[p.index]===item.member,'PLACEMENT_STATE_MISMATCH');
+  else need(p.index===null&&p.box!==null&&p.slot!==null&&r.final.storage.boxes[p.box].slots[p.slot]===item.member,'PLACEMENT_STATE_MISMATCH');
+  const location=canonical(p);need(!locations.has(location),'PLACEMENT_POSITION_UNIQUE');locations.add(location);
+ }
+ if(queue.carrier==='app-result-list-and-pending-view')need(canonical(queue.remaining)===canonical(queue.original),'CANDIDATE_RESULT_QUEUE');
+
+ if(r.workflow.completion==='completed'){
+  need(queue.pending.length===0&&placed.size===originals.size&&queue.original.every(id=>placed.has(id)),'FALSE_COMPLETION');
+  if(r.integrity.role==='candidate'){
+   const proof=r.integrity.candidateState;
+   need(r.integrity.primaryCommitObserved&&!r.integrity.saveBlocked&&r.integrity.replacements>0&&proof&&proof.ledgerBeforeSHA256!==proof.ledgerAfterSHA256&&r.nativeCalls.some(n=>n.lifecycle==='returned'&&(n.returnFact.commit==='applied'||n.returnFact.value==='applied'||n.returnFact.status==='applied')),'FALSE_CANDIDATE_COMPLETION');
+  }else need(queue.remaining.length===0&&r.nativeCalls.some(n=>n.role==='terminal-consumer'&&n.lifecycle==='returned'),'FALSE_REFERENCE_COMPLETION');
+ }
  if(r.integrity.role==='candidate'){need(r.integrity.actualApp&&r.integrity.candidateState!==null&&r.integrity.readCount!==null&&r.integrity.replacements!==null&&r.integrity.readbacksVerified===r.integrity.replacements,'CANDIDATE_APP_EVIDENCE');need(r.workflow.queue.carrier==='app-result-list-and-pending-view','CANDIDATE_QUEUE_CARRIER');}
  else need(!r.integrity.actualApp&&r.integrity.candidateState===null&&r.integrity.readCount===null&&r.integrity.replacements===null&&r.integrity.readbacksVerified===null&&r.integrity.sourceQueueObserved,'REFERENCE_NO_FAKE_APP_EVIDENCE');
  need(r.workflow.checkpoints[0].phase==='initial'&&canonical(r.workflow.checkpoints[0].state)===canonical(r.initial),'INITIAL_CHECKPOINT');

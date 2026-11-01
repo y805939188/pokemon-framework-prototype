@@ -63,3 +63,13 @@ QUALIFICATION.json列12检查维度；每端仅C01正常＋C07必要边界真实
 最后一条先校验真实新Q再创建目录，写实际dispatch/config/parent-pins后立即对这些字节做零业务准入；父另行运行preflight并pin其回执，才派发。公共观察目录固定basename public-capture-workflow-v1-0001，闭合且仅三文件；额外文件/不同目录拒收。未收到真实资格或真实独立工具/候选报告hash，保持HOLD。
 
 逐callee未披露值必须留存而非丢弃。候选worker在execution/<case>-native下保留原生返回值的Node v8 lossless serialization（包括undefined），抛出值同样保留，单call≤1MiB；NATIVE-MANIFEST绑定顺序/role/生命周期/hash，公共nativeCalls仅evidenceSHA256。producer在公开包写出前机器核实际binary摘要。O使用其私有同版证据格式绑定真实caller/callee原生值，A独立核原件与公共hash；clean只读通过门的摘要及白名单字段，绝不读参考私有原值。证据hash只是来源绑定，比较器不将两端hash相同/不同当未披露返回值的语义等价/差异。候选私有执行证据不进入Git/public三文件，也不交Claude。
+
+## 2234833 独立复审整改（工具逻辑收口，未开放任何新执行）
+
+公开落位必须与final实际party/box槽位逐项一致，position的两种kind坐标互斥，成员／槽位不重复。completed须覆盖同一原队列的全部成员；候选还须至少一次真实安装／读回、改变的ledger证据和实际applied返回事实。receive把queue.original的有序身份绑定该case冻结upstream；不能靠改队列或只比数量追认完成。incomplete的真实部分落位前缀仍可接收，不要求失败回滚，不清空TS真实保留的result数组。
+
+receive和compare的写出前共用resultOutput边界：新文件必须在冻结root与公共三文件root之外，既有目标／链接／反向包含同样拒绝，仍用路径组件判断和wx。普通外部结果文件不受影响；不得用成功回执污染自身只读输入。
+
+正式cli/produce/worker要求plain Node：execArgv为空，NODE_OPTIONS/NODE_PATH为空；实际entry URL、process.argv入口与实际freeze模块URL都必须位于同一个已pin/link-free冻结根。该根全载荷逐字节核验；在无外部loader的标准Node解析下，工具显式相对.mjs依赖与worker指定的CJS闭包均来自这个根。纯导出的库函数仍可作单元控制，不可把未走正式入口的库测试当实际派发来源。外部preload可在Node自身bootstrap先执行，但含该flag的环境不得继续获得正式准入；本工具不宣称防御任意恶意Node/整套检查器替换或提供OS沙箱。
+
+fixtureDraws计全实际party/box和上游Q模板构造抽样；setup仍为实际App开战的独立阶段。更正只改变输入计数元数据／新freeze，不改变抽样值或业务初态／决策，旧freeze与红例保持。

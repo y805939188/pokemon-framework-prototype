@@ -15,6 +15,16 @@ export function verifyFreeze(root,pin){root=noLinks(root);need(/^[a-f0-9]{64}$/.
  need(OWN.every(p=>actual.includes('tools/'+p))&&m.fixtureSHA256===sha(file(path.join(root,'inputs.json')))&&m.producerSHA256===sha(file(path.join(root,'tools/produce.mjs'))),'FREEZE_BINDING');
  need(process.version===m.nodeVersion&&!process.env.NODE_OPTIONS&&!process.env.NODE_PATH,'RUNTIME_LOADER_POLICY');return m;
 }
+/** Formal commands use this exact entry and the normal Node resolver inside one verified, link-free closure.
+ * Pure exported-library tests remain usable; this does not authenticate an arbitrary modified Node/bootstrap.
+ */
+export function formalEntry(root,pin,entryURL,name){
+ need(process.execArgv.length===0&&!process.env.NODE_OPTIONS&&!process.env.NODE_PATH,'FORMAL_LOADER_REJECTED');
+ root=noLinks(root);need(['cli.mjs','produce.mjs','worker.mjs'].includes(name),'FORMAL_ENTRY_NAME');
+ const expected=path.join(root,'tools',name);
+ need(fileURLToPath(import.meta.url)===path.join(root,'tools/freeze.mjs')&&fileURLToPath(entryURL)===expected&&process.argv[1]&&path.resolve(process.argv[1])===expected,'FORMAL_ENTRY_MISMATCH');
+ return verifyFreeze(root,pin);
+}
 export function buildFreeze(repo,out){repo=noLinks(repo);out=newOutput(path.join(repo,'experiments/differential/capture-workflow-v1'),out);need(execFileSync('git',['rev-parse','HEAD:src'],{cwd:repo,encoding:'utf8'}).trim()==='1a7f69d39e47a7262a2f7a131d21fbb9ee70bfd5','PRODUCT_TREE');need(!execFileSync('git',['status','--porcelain','--','src'],{cwd:repo,encoding:'utf8'}).trim(),'PRODUCT_WIP');
  fs.mkdirSync(out);fs.mkdirSync(path.join(out,'tools'));fs.mkdirSync(path.join(out,'runtime'));
  const src=path.join(repo,'experiments/differential/capture-workflow-v1');for(const n of OWN)fs.writeFileSync(path.join(out,'tools',n),file(path.join(src,n)),{flag:'wx'});

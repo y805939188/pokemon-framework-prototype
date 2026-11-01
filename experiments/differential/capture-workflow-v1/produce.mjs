@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {verifyFreeze} from './freeze.mjs';
+import {verifyFreeze,formalEntry} from './freeze.mjs';
 import {admit} from './admission.mjs';
 import {boundedChild,LIMITS} from './bounded.mjs';
 import {newOutput,need,readJSON,writeNew,sha,file,parse,validate,S,HASH} from './safe.mjs';
@@ -27,7 +27,7 @@ export async function produce(root,pin,pins,out,{signal}={}){
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const ac=new AbortController(),cancel=()=>ac.abort();process.on('SIGINT',cancel);process.on('SIGTERM',cancel);
- try{need(process.argv.length===6,'PRODUCER_ARGS');const [root,pin,pinsPath,out]=process.argv.slice(2);const r=await produce(path.resolve(root),pin,readJSON(pinsPath),path.resolve(out),{signal:ac.signal});console.log(JSON.stringify(r));process.exitCode=r.stop?1:0;}
+ try{need(process.argv.length===6,'PRODUCER_ARGS');const [root,pin,pinsPath,out]=process.argv.slice(2);formalEntry(path.resolve(root),pin,import.meta.url,'produce.mjs');const r=await produce(path.resolve(root),pin,readJSON(pinsPath),path.resolve(out),{signal:ac.signal});console.log(JSON.stringify(r));process.exitCode=r.stop?1:0;}
  catch(e){console.log(JSON.stringify({status:'REJECTED',code:/^[A-Z0-9_]+$/.test(e.code??'')?e.code:'PRODUCER_ERROR'}));process.exitCode=2;}
  finally{process.removeListener('SIGINT',cancel);process.removeListener('SIGTERM',cancel);}
 }

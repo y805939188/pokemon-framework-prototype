@@ -15,6 +15,8 @@ export function noLinks(p){p=path.resolve(p);for(let q=p;;q=path.dirname(q)){nee
 export function inventory(root){const out=[];function walk(p){for(const n of fs.readdirSync(p).sort()){const q=path.join(p,n),s=fs.lstatSync(q);need(!s.isSymbolicLink(),'PAYLOAD_LINK');if(s.isDirectory())walk(q);else{need(s.isFile(),'PAYLOAD_TYPE');out.push(path.relative(root,q).split(path.sep).join('/'));}}}walk(root);return out;}
 export function outside(a,b){const r=path.relative(a,b);return r!==''&&(r==='..'||r.startsWith('..'+path.sep)||path.isAbsolute(r));}
 export function newOutput(root,out){root=noLinks(root);out=path.resolve(out);need(!fs.existsSync(out),'OUTPUT_EXISTS');noLinks(path.dirname(out));need(outside(root,out)&&outside(out,root),'OUTPUT_OVERLAP');return out;}
+/** Result receipts/comparisons must never alter any sealed input directory or its ancestor. */
+export function resultOutput(root,publicPaths,out){let target=newOutput(root,out);for(const input of publicPaths)target=newOutput(path.dirname(path.resolve(input)),target);return target;}
 // Small closed JSON-schema subset, shared by executable validation and the published schemas.
 export function validate(v,s){
  if(s.const!==undefined){need(canonical(v)===canonical(s.const),'SCHEMA_CONST');return;}

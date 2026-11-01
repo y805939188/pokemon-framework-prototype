@@ -21,7 +21,7 @@ export function makeInitial(E,def){
  for(let i=0;i<40;i++)state.storage.boxes[i].name=`Box${String(i+1).padStart(2,'0')}`;
  if(def.alreadyOwned){state.dex.seen=['Caterpie'];state.dex.owned=['Caterpie'];state.dex.capturedCounts={Caterpie:1};state.dex.seenForms={Caterpie:[{gender:0,shiny:false,form:0}]};}
  const upstream=Array.from({length:def.queueSize},(_,i)=>{
-  const m=E.speciesKey.toPersistentMember(E.memberFactory.createMember({id:`Q0${i+1}`,species:'Caterpie',form:0,level:5,owner:PLAYER,context:{map:1,receivedAt:0,playerId:PLAYER.id}},c,()=>0),c);
+  const m=E.speciesKey.toPersistentMember(E.memberFactory.createMember({id:`Q0${i+1}`,species:'Caterpie',form:0,level:5,owner:PLAYER,context:{map:1,receivedAt:0,playerId:PLAYER.id}},c,()=>{fixtureDraws++;return 0;}),c);
   m.hp=3;m.status='psn';m.statusCount=0;m.moves=m.moves.map(x=>({...x,pp:7}));return m;
  });
  return {content:c,state,fixtureDraws,upstream,setupRandom:Array(def.queueSize*8).fill(0),postSuccessInjected:true};
