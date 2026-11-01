@@ -84,7 +84,14 @@ function host({opening,display=false,audio,exists,now,exp=125000}={}){
  class Sprite{constructor(bitmap){this.bitmap=bitmap;this.anchor={x:0,y:0};this.scale={x:1,y:1};this.opacity=255;this.visible=true;this.destroys=0;counts.sprites.push(this);}destroy(){this.destroys++;this.destroyed=true;}}
  function Window(){}Window.prototype={initialize(rect){this.innerWidth=rect.width-24;this.innerHeight=rect.height-24;this.contents={clear(){},fillRect(...args){counts.paint.push(args);}};this._index=0;this.active=false;this.visible=false;},resetFontSettings(){},lineHeight:()=>24,textWidth:x=>String(x).length*8,drawText(){},refresh(){this._list=[];this.makeCommandList?.();},addCommand(name,symbol,enabled,ext){this._list.push({name,symbol,enabled,ext});},select(i){this._index=i;},index(){return this._index;},setHandler(){},show(){this.visible=true;},hide(){this.visible=false;counts.hide++;},activate(){this.active=true;},deactivate(){this.active=false;},isOpenAndActive(){return this.visible&&this.active;}};
  function System(){}System.prototype.isSaveEnabled=()=>true;
- const req=p=>{if(p==='fs'&&exists)return{...require('fs'),existsSync:exists};if(p==='path'||p==='fs'||p==='url')return require(p);if(p.includes('production.cjs'))return require(path.join(ROOT,'js/engine/build/production.cjs'));throw Error('unexpected require '+p);};req.resolve=p=>path.resolve(ROOT,p);
+ // This VM has no audio decoder. Its explicit media view is missing; local
+ // developer/NW PCM fixtures must not change this controlled host's contract.
+ const realFS=require('fs'),audioRoot=path.join(ROOT,'audio','se')+path.sep;counts.faintAudioPaths=[];
+ const controlledFS={...realFS,...(exists?{existsSync:exists}:{}),statSync(file,...args){
+  if(typeof file==='string'&&path.resolve(file).startsWith(audioRoot)){counts.faintAudioPaths.push(file);const error=Error('controlled audio absence');error.code='ENOENT';throw error;}
+  return realFS.statSync(file,...args);
+ }};
+ const req=p=>{if(p==='fs')return controlledFS;if(p==='path'||p==='url')return require(p);if(p.includes('production.cjs'))return require(path.join(ROOT,'js/engine/build/production.cjs'));throw Error('unexpected require '+p);};req.resolve=p=>path.resolve(ROOT,p);
  const G={Error,performance,require:req,console:{log(){},warn(){},error(){}},PluginManager:{parameters:()=>({}),registerCommand(plugin,name,fn){commands[name]=fn;}},Game_Interpreter:Base,Game_System:System,Window_Base:Window,Window_Command:Window,Scene_MenuBase:Base,SceneManager:{_scene:null,push(){},isSceneChanging:()=>false},Graphics:{boxWidth:816,boxHeight:624,frameCount:0},Rectangle:function(x,y,width,height){Object.assign(this,{x,y,width,height});},Utils:{extractFileName:x=>x},Input:{isTriggered:()=>false},SoundManager:{playBuzzer(){}},$gameSystem:new System(),$gameMessage:{isBusy:()=>false,add(){}},$gameVariables:{setValue(){}}};
  G.Bitmap=Bitmap;G.Sprite=Sprite;G.AudioManager=audio;G.Utils.hasEncryptedAudio=()=>false;G.performance={now:now??(()=>sceneTime)};
  G.window=G;vm.createContext(G);vm.runInContext(plugin,G);
@@ -274,7 +281,7 @@ test('compiled HP0 retains its image for the later faint while damage still owes
 });
 test('compiled faint preserves HP0 portrait, fades its own box in parallel, and waits for the next actual update',async()=>{
  let time=0;const h=await host({display:true,now:()=>time}).ready(),s=h.scene,before=JSON.stringify(h.session.party),body=h.counts.sprites.find(x=>x._psPictureKey==='p1:P'&&x._psPictureRole==='body'),shadow=h.counts.sprites.find(x=>x._psPictureKey==='p1:P'&&x._psPictureRole==='shadow');
- s.pushMessages([{kind:'events',events:[{type:'faint',args:['p1a: P']}]}]);s.update();assert.equal(body.destroys,0);assert.equal(body.opacity,255);assert(!s.inputState().ready);
+ s.pushMessages([{kind:'events',events:[{type:'faint',args:['p1a: P']}]}]);s.update();assert(h.counts.faintAudioPaths.some(file=>file.includes('Pidgey_faint')));assert.equal(body.destroys,0);assert.equal(body.opacity,255);assert(!s.inputState().ready);
  time=125;s.update();assert.equal(s.presentationState().cards.find(x=>x.id==='P').boxOpacity,.5);assert.equal(body.opacity,255);
  time=250;s.update();assert.equal(s.presentationState().cards.find(x=>x.id==='P').boxOpacity,0);assert.equal(body.destroys,0);assert.equal(shadow.opacity,255);
  time=600;s.update();assert.equal(shadow.opacity,0);assert.equal(body.opacity,255);const y=body.y;
