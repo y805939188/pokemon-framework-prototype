@@ -36,7 +36,7 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
     current: owned,
     currentTrack() { const track = audio?._currentBgm; return track && track.name ? musicTrack(track) : null; },
     position() { return audio?._bgmBuffer ? audio._bgmBuffer.seek() : 0; },
-    request(logical: MusicTrack | null, position: number, terminal: boolean, observe: (row: MusicObservation) => void): MusicLease {
+    request(logical: MusicTrack | null, position: number, terminal: boolean, observe: (row: MusicObservation) => void, valid: () => boolean = () => true): MusicLease {
       const id = ++ordinal;
       for (const cancel of [...pending]) cancel();
       let buffer: any = null, registration: any = null, timer: unknown, released = false, handedOff = false, finished = false;
@@ -54,10 +54,11 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
       };
       const cancel = () => { if (finished || released) return; released = true; clear(); dispose(); state('cancelled'); };
       const lease: MusicLease = { release() { if (handedOff || released) return; released = true; clear(); dispose(); if (!finished) state('cancelled'); } };
-      const live = () => !released && id === ordinal && owned();
+      const live = () => !released && id === ordinal && owned() && valid();
       try {
         if (!Number.isFinite(position) || position < 0 || typeof terminal !== 'boolean') throw new Error('invalid battle music playback request');
         if (!live()) { state('superseded'); return lease; }
+        if (!logical && override) throw new Error('default BGM silent return requires the outer wrapper; not supported by this port batch');
         if (!logical) {
           if (terminal && audio?.stopBgm) { audio.stopBgm(); expectedBuffer = audio._bgmBuffer; expectedRecord = audio._currentBgm; }
           finished = true; handedOff = terminal; state('requested'); return lease;
@@ -89,7 +90,7 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
             audio.updateBufferParameters(buffer, audio.bgmVolume, track);
             if (!live()) { end('superseded', 'battle music owner changed during preparation'); return; }
             audio.stopBgm();
-            if (!current() || id !== ordinal) { end('superseded', 'battle music owner changed during channel handoff'); return; }
+            if (!current() || !valid() || id !== ordinal) { end('superseded', 'battle music owner changed during channel handoff'); return; }
             // stopBgm is an external callback: do not overwrite any new channel it installed.
             if (audio._bgmBuffer || audio._currentBgm) { end('superseded', 'BGM channel replaced during handoff'); return; }
             expectedBuffer = buffer; audio._bgmBuffer = buffer;

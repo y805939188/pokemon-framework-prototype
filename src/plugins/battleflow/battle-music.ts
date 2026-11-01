@@ -17,7 +17,7 @@ export interface BattleMusicPort {
   currentTrack(): MusicTrack | null;
   position(): number;
   /** terminal transfers a successfully started return track to the world owner. */
-  request(track: MusicTrack | null, position: number, terminal: boolean, observe: (row: MusicObservation) => void): MusicLease;
+  request(track: MusicTrack | null, position: number, terminal: boolean, observe: (row: MusicObservation) => void, valid?: () => boolean): MusicLease;
 }
 export interface BattleMusicConfig {
   readonly context: BattleAudioContext;
@@ -114,7 +114,7 @@ export class BattleMusicPlayback {
     try {
       const lease = this.port.request(track, position, terminal, observation => {
         row.state = observation.state; row.detail = observation.detail;
-      });
+      }, () => !this.closed); // port itself owns op/channel checks, including its handoff critical section
       if (!this.live()) { try { lease.release(); } finally { this.cancel(); } }
       else this.leases.push(lease);
     } catch (error) { row.state = 'failed'; row.detail = String(error instanceof Error ? error.message : error); }

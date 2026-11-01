@@ -138,3 +138,9 @@ test('invalid adapter position and terminal routing never get to the MZ player',
 test('repeated undecoded callbacks retain one independent timer rather than multiplying poll loops',()=>{
  const f=host();f.write();const lease=f.request();const cb=f.buffers[0].listeners[0];for(let i=0;i<20;i++)cb();assert.equal(f.timers.size,1);f.advance(25);assert.equal(f.timers.size,1);lease.release();assert.equal(f.timers.size,0);
 });
+test('controller cancellation during synchronous buffer creation cannot publish before handle returns',()=>{
+ const f=host({ready:true});f.write();const p=new Playback(f.port);f.hook=event=>{if(event==='create')p.cancel();};p.start(config({global:{wildBattle:'B'}}));assert.equal(f.plays.length,0);assert.equal(f.buffers[0].destroyed,1);assert.equal(f.timers.size,0);
+});
+test('silent return under a default override remains explicit unsupported, never a successful stop',()=>{
+ const f=host({ready:true,override:'Default'});f.write('Default');f.request('B');const active=f.audio._bgmBuffer;f.request(null,true);assert.equal(f.rows.at(-1).state,'failed');assert.match(f.rows.at(-1).detail,/outer wrapper/);assert.equal(f.audio._bgmBuffer,active);assert.equal(active.destroyed,0);
+});
