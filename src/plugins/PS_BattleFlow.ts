@@ -20,6 +20,9 @@ import { createFaintMediaMZ } from "./battleflow/faint-mz";
 import { battleMusicConfig, musicTrack } from "./battleflow/battle-music";
 import { createBattleMusicMZ } from "./battleflow/battle-music-mz";
 import { BattleMusicOperations } from "./battleflow/battle-music-operation";
+import { captureMelodyPlan } from './battleflow/capture-melody';
+import { createCaptureMEMZ } from './battleflow/capture-me-mz';
+import { CaptureMelodySceneStep } from './battleflow/capture-me-scene';
 const { developmentCapabilities } = RuleConfig;
 
 (() => {
@@ -150,6 +153,7 @@ const { developmentCapabilities } = RuleConfig;
       catch (error) { op.musicError = String(error); battleMusic.finish(op, false); }
     },
     _closeBattleMusic(op: any, normal: boolean): void {
+      op?.captureMelody?.cancel(); // own ME retires before return BGM can take the channel
       const plan = op.musicPlan; if (!plan) return;
       if (plan.closed) { if (!normal) battleMusic.finish(op, false); return; }
       plan.closed = true;
@@ -254,6 +258,7 @@ const { developmentCapabilities } = RuleConfig;
       PSFlow._app?.assertHostStateReplacementAllowed?.();
       const replacement = {}; replacingState = true; openingBattle = replacement;
       try {
+      PSFlow._op?.captureMelody?.cancel();
       if (PSFlow._app) PSFlow._app.stateReplacedByHost();
       battleMusic.retire(); PSFlow._nextBattleMusic = null;
       PSFlow._receiveNoticeHistory.clear();PSFlow.lastReceivingNotice=null;
@@ -1169,7 +1174,24 @@ const { developmentCapabilities } = RuleConfig;
         if (!c.isCurrent()) return;
         const growth = message.kind === 'growth' ? engine().B.battlePresentation.readGrowthDisplay(this._session, message) : null;
         if (this._display && message.kind === 'events') {
-          for (const event of message.events) { steps.push(...this._display.event(event), ...this._D.event(event)); }
+          for (const event of message.events) {
+            steps.push(...this._display.event(event), ...this._D.event(event));
+            if (event.type === 'rpg' && event.args[0] === 'ball' && event.args[1] === 'p1' && event.args[4] === 'caught') {
+              const op = this._psOp;
+              if (!c.isCurrent() || !PSFlow.running || op !== PSFlow._op) return;
+              if (op.request.kind === 'wild' && !op.captureMelody) {
+                if (!op.musicPlan?.settings?.config) throw new Error('capture ME music context unavailable');
+                const plan = captureMelodyPlan('wild', op.musicPlan.settings.config)!;
+                let stage: CaptureMelodySceneStep;
+                const current = () => stage?.pending() !== false && c.isCurrent() && PSFlow.running && G.SceneManager._scene === this;
+                const port = createCaptureMEMZ(G, nodeRequire, engine().root, current);
+                stage = new CaptureMelodySceneStep(plan, { current,
+                  request: (track, startedAt) => port.request(track, startedAt) });
+                this._captureMelody = op.captureMelody = stage;
+                steps.push(stage); // next tick, after Gotcha is appended; never matched against localized text
+              }
+            }
+          }
         } else if (this._display && growth?.version === 1) {
           steps.push(...this._D.message({ ...message, exp: growth.toExp - growth.fromExp, levelUps: [] }));
           for (const segment of growth.segments) {
@@ -1243,6 +1265,7 @@ const { developmentCapabilities } = RuleConfig;
       faintAudio: (this._faintAudio || []).map((row: any) => ({ ...row })) };
   };
   P.pictureState = function () { return this._pictures?.snapshot() ?? null; };
+  P.captureMelodyState = function () { return this._captureMelody?.snapshot() ?? null; };
   P.showMain = function () {
     const tr = PSFlow.translator();
     this.show("main", [
@@ -1361,6 +1384,7 @@ const { developmentCapabilities } = RuleConfig;
     if (op !== PSFlow._op) { this._display?.dispose(); this._pictures?.dispose(); PSFlow.stale("finish", op); return; }
     const c = this._controller as BattleSceneController<any> | undefined;
     if (c && !c.isCurrent()) return;
+    if (!this._aborted && !this._failure && this._captureMelody?.pending()) return;
     this._display?.dispose(); c?.dispose(); this._pictures?.dispose();
     if (!this._aborted && !this._failure) {
       try { const outcome=PSFlow.finish(this._session, this._psOp);if(c&&!c.ownsHost())return;if(outcome?.continuationToken){this._evolutionTransferred=true;this.popScene();return;}if(outcome?.pending&&W.PSManagement){this._menu.deactivate();if(c&&!c.ownsHost())return;this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring

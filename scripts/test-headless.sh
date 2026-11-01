@@ -24,6 +24,7 @@ SUITES=(
   experiments/step5/4/test-battle-music-scene.cjs
   experiments/step5/4/test-capture-melody.cjs
   experiments/step5/4/test-capture-me-port.cjs
+  experiments/step5/4/test-capture-me-scene.cjs
   scripts/tests/music-native-assets.test.cjs
   experiments/step5/4/test-faint-view.cjs
   experiments/step5/4/test-d1-timing.cjs
