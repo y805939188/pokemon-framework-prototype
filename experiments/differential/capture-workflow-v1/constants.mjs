@@ -1,0 +1,10 @@
+export const PROFILE='pre54-capture-reception-workflow-v1';
+export const OPERATION='capture.completeReception';
+export const PRODUCT='d6aae8cfa4d706cf976c42aeb3dcc683a252aa03';
+export const REFERENCE='8c5911e4a4b07b07e832e4bb0d5d8859e88b4a9b';
+export const RELEASE='ea7b5d56d2436591160983c4e641a2ceee2d875a';
+export const O='01a18dc0-6ef3-74fe-ae95-0aae9e4350eb';
+export const A='01a190ab-cc58-75b1-88c0-6bdae55f403f';
+export const CASES=Object.freeze(Array.from({length:9},(_,i)=>`C0${i+1}`));
+export const SMOKE=Object.freeze(['C01','C07']);
+export const BOUNDS=Object.freeze({decisions:16,events:96,checkpoints:32,calls:32,recordBytes:16777216,bundleBytes:67108864,timeoutMs:30000});

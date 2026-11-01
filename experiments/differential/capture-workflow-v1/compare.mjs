@@ -1,0 +1,16 @@
+import {canonical,need} from './safe.mjs';
+import {gateRecord} from './schema.mjs';
+export function compareRecords(reference,candidate){gateRecord(reference);gateRecord(candidate);need(reference.caseId===candidate.caseId,'COMPARE_ID');
+ const deltas=[];function walk(a,b,p){if(a===undefined||b===undefined){deltas.push({path:p,referencePresent:a!==undefined,candidatePresent:b!==undefined,reference:a??null,candidate:b??null});return;}if(canonical(a)===canonical(b))return;if(a!==null&&b!==null&&typeof a==='object'&&typeof b==='object'&&!Array.isArray(a)&&!Array.isArray(b)){for(const k of new Set([...Object.keys(a),...Object.keys(b)]))walk(a[k],b[k],p+'.'+k);}else deltas.push({path:p,reference:a??null,candidate:b??null});}
+ // Actual order remains: never align/sort/replay an ideal sequence. No boolean refresh mapping.
+ for(const k of ['initial','final'])walk(reference[k],candidate[k],k);
+ for(const k of ['events','checkpoints','placements','queue','completion','refresh','decisionsConsumed'])walk(reference.workflow[k],candidate.workflow[k],'workflow.'+k);
+ const nativeEqual=canonical(reference.nativeCalls)===canonical(candidate.nativeCalls);
+ const complete=reference.workflow.completion==='completed'&&candidate.workflow.completion==='completed';
+ return {caseId:reference.caseId,workflowEqual:deltas.length===0,completeOnBoth:complete,rngBusinessEqual:reference.integrity.rng.business===candidate.integrity.rng.business,rngFacts:{reference:reference.integrity.rng,candidate:candidate.integrity.rng},nativeSelectedFactsEqual:nativeEqual,nativeUnprojectedReturnValues:'NOT_COMPARED',workflowDifferences:deltas,nativeSelectedFactsDifference:nativeEqual?null:{reference:reference.nativeCalls,candidate:candidate.nativeCalls}};
+}
+export function compareBundles(accepted){need(accepted.status==='VALID_CLOSED_CAPTURE_OBSERVATIONS','COMPARE_REQUIRES_GATE');const ref=new Map(accepted.reference.records.map(x=>[x.caseId,x])),can=new Map(accepted.candidate.records.map(x=>[x.caseId,x])),ids=accepted.reference.runId==='formal-0001'?['C01','C02','C03','C04','C05','C06','C07','C08','C09']:['C01','C07'];
+ const cases=ids.map(id=>ref.has(id)&&can.has(id)?compareRecords(ref.get(id),can.get(id)):{caseId:id,status:'NOT_COMPARABLE_NOT_OBSERVED'});
+ const comparable=cases.filter(x=>Object.hasOwn(x,'workflowEqual')),equal=comparable.filter(x=>x.workflowEqual),native=comparable.filter(x=>x.nativeSelectedFactsEqual);
+ return {schema:'capture-comparison-v1',status:equal.length===ids.length&&native.length===ids.length&&comparable.every(x=>x.rngBusinessEqual)?'PASS_SELECTED_FACTS_ONLY':'FAIL_OR_INCOMPLETE',denominator:ids.length,comparable:comparable.length,workflowEqual:equal.length,workflowDifferent:comparable.length-equal.length,nativeSelectedEqual:native.length,nativeSelectedDifferent:comparable.length-native.length,rngBusinessDifferent:comparable.filter(x=>!x.rngBusinessEqual).length,notComparable:ids.length-comparable.length,completeOnBoth:comparable.filter(x=>x.completeOnBoth).length,nativeUnprojectedReturnValues:'NOT_COMPARED',cases};
+}

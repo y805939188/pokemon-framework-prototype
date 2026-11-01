@@ -1,0 +1,24 @@
+{
+  "schema": "capture-qualification-plan-v1",
+  "status": "NOT_RUN",
+  "formalCases": ["C01","C02","C03","C04","C05","C06","C07","C08","C09"],
+  "businessSmokePerSide": ["C01","C07"],
+  "sameCoreRequired": true,
+  "onlyCaseSelectionVaries": true,
+  "requirements": [
+    "Fixed reference commit export and release tag independently identified; actual complete terminal consumer/caller loaded and called, never counter-only wrapper",
+    "Synthetic initial state and catalogue individually qualified; current box, all 40x30 slots, distinct mutable objects, member identity and all defaults explicitly fixed",
+    "UI transports only approved requests and decisions; never directly places or changes dex, never guesses an unexplained returned integer",
+    "Actual production GameApplication, owner path, finishBattle/resolveReceiving/resolvePokedex and actual state-port installation/readback; direct C02 uses explicit unowned commitResult",
+    "Per-callee native lifecycle and safe selected return facts; actual non-returned stable input request proof, no timeout/process-exit as wait",
+    "Actual refresh-cache call counts and ordinal carrier; candidate has derived-query/no-refresh-cache mechanism, zero cache refresh invocations, not boolean plan intent",
+    "HP cap and actual HP/statusCount/PP/maxpp/firstMoves observed at every required checkpoint; protected fields and all unexpected changes retained or block",
+    "Normal C01 and forced BACK then replacement C07 per side through the same final producer and closure as formal",
+    "RNG setup and business phases counted separately; lifecycle and all owned process groups reaped, no invented zero",
+    "Tools and actual candidate package independently reviewed; reference adapter/source/projection separately accepted by fresh independent A",
+    "Wrong identity, source role, state, extra field, false wait, missing audit and wrong final control files reject before business/behavior parsing",
+    "Parent supplies actual final D/Q/config byte pins; zero-business preflight over THOSE files must pass before nine cases. Template controls do not substitute"
+  ],
+  "full354Unchanged": true,
+  "ordinaryForgetting": "BLOCKED_MATERIAL_IDENTITY"
+}
