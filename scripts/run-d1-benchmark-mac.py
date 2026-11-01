@@ -362,8 +362,14 @@ def run_group(app, info, out, group, count, formal, source_input, *, synthetic=F
         if cancellation and cancellation.signals and not(row and row.get('failure')):
             failure=BenchmarkCancelled('benchmark cancelled by signal '+str(cancellation.signals[0]))
         if row is not None:
+            # The inner native-phase end is already recorded after cleanup.
+            # Preserve it before any failure branch and before the outer end
+            # advances to include hash verification/cancellation handling.
+            native_end=row.get('nativeFinishedUTC')
+            if not isinstance(native_end,str) or not native_end:
+                previous_end=row.get('finishedUTC')
+                if isinstance(previous_end,str) and previous_end:row['nativeFinishedUTC']=previous_end
             if not row.get('failure'):
-                row['nativeFinishedUTC']=row.get('finishedUTC')
                 row['failure']=dict(type=type(failure).__name__,message=str(failure))
             if failure is not error:
                 row['validationError']=dict(type=type(error).__name__,message=str(error)or type(error).__name__)

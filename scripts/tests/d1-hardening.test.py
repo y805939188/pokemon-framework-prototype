@@ -294,4 +294,76 @@ class EvidenceGates(unittest.TestCase):
             self.assertIn(signal.SIGTERM,sent)
             if fault=='KILL':self.assertIn(signal.SIGKILL,sent)
 
+class TimestampReceipts(unittest.TestCase):
+    """Controlled clock/I/O through real _run_group and run_group bodies.
+    No process or OS signal is launched; values distinguish native-phase end
+    after cleanup from later verification end, not a precise kernel exit time.
+    """
+    def check_timestamps(self, mode, existing=None):
+        native='2026-11-01T00:00:01+00:00';wrapper='2026-11-01T00:00:05+00:00'
+        with tempfile.TemporaryDirectory(prefix='pf-d1-time-')as folder:
+            root=Path(folder);app=root/'fixture.app';runtime=app/'Contents/Resources/app.nw';runtime.mkdir(parents=True);out=root/'out'
+            source=dict(cases=[dict(id='TIME-1',seed=[1,2,3,4],expected=dict(code=1))]);info=dict(gitHead='synthetic-time-only')
+            report=base.make_report(source,info,count=1);report['d1'].update(instrumentation=dict(detailed=False),frameSamples=[],memory=[])
+            cancellation=base.SCOPE['Cancellation']();clock=iter(['2026-11-01T00:00:00+00:00',native,wrapper])
+            process=SimpleNamespace(pid=424242,returncode=0,poll=lambda:0)
+            def popen(argv,**kwargs):
+                (out/'report.json').write_text(json.dumps(report))
+                if mode=='fatal':(out/'report.json.fatal.json').write_text('{"controlled":true}')
+                return process
+            def cleanup(*args):
+                if mode=='fatal':cancellation.request(signal.SIGINT,None)
+                return False,[]
+            def verify(raw,core):
+                if mode in ['INT','TERM','HUP']:cancellation.request(getattr(signal,'SIG'+mode),None)
+                if mode=='helper':
+                    cancellation.request(signal.SIGINT,None)
+                    raise base.SCOPE['HashVerifierFailed'](['node','controlled-helper'],SimpleNamespace(returncode=-2,stdout=b'out',stderr=b'err'))
+                if mode=='hash':raise RuntimeError('controlled hash failure')
+                return dict(reportSHA256='report',initialStateHash='initial',finalStateHash='final',inputHash='input')
+            original_write=base.SCOPE['write'];injected=False
+            def recording_write(path,value):
+                nonlocal injected
+                # Supply an already-recorded native stamp on the actual row,
+                # not by racing an external file edit that check_cancel replaces.
+                if existing is not None and not injected and path.name=='EXECUTION.json' and value.get('finishedUTC')==native:
+                    value['nativeFinishedUTC']=existing;injected=True
+                original_write(path,value)
+            ports=dict(utc=lambda:next(clock),subprocess=SimpleNamespace(Popen=popen,STDOUT=subprocess.STDOUT,TimeoutExpired=subprocess.TimeoutExpired),
+                _host=SimpleNamespace(complete_app=lambda app:{}),payload=lambda app:{},cleanup_owned=cleanup,verify_report_hashes=verify,write=recording_write)
+            caught=None
+            with mock.patch.dict(base.SCOPE,ports):
+                try:base.SCOPE['run_group'](app,info,out,'control-instrumentOff',1,False,source,synthetic=True,cancellation=cancellation)
+                except BaseException as error:caught=error
+            row=json.loads((out/'EXECUTION.json').read_text())
+            self.assertEqual(row['exit'],0);self.assertEqual(row['cleanupErrors'],[])
+            evidence=os.environ.get('PF_D1_TIMESTAMP_EVIDENCE')
+            if evidence:
+                destination=Path(evidence);destination.mkdir(parents=True,exist_ok=True)
+                name=mode+('' if existing is None else '-empty' if existing=='' else '-existing')+'.json'
+                (destination/name).write_text(json.dumps(dict(mode=mode,existing=existing,execution=row,caught=None if caught is None else dict(type=type(caught).__name__,message=str(caught)),actualProcesses=0,actualOSSignals=0),indent=2)+'\n')
+            if mode=='normal':
+                self.assertIsNone(caught);self.assertEqual(row['finishedUTC'],native);self.assertNotIn('nativeFinishedUTC',row);return
+            self.assertIsNotNone(caught);self.assertEqual(row['finishedUTC'],wrapper)
+            self.assertEqual(row.get('nativeFinishedUTC'),existing or native)
+            if mode in ['INT','TERM','HUP','helper']:
+                self.assertEqual(type(caught).__name__,'BenchmarkCancelled');self.assertEqual(row['failure']['type'],'BenchmarkCancelled')
+                self.assertEqual(row['cancellationSignals'],[int(getattr(signal,'SIG'+mode))]if mode!='helper'else[2])
+            elif mode=='fatal':
+                self.assertIn('fatal recorded at exit',str(caught));self.assertEqual(row['failure']['type'],'RuntimeError');self.assertEqual(row['cancellationSignals'],[2])
+            else:self.assertIn('hash failure',str(caught));self.assertEqual(row['cancellationSignals'],[])
+            if mode=='helper':
+                self.assertEqual(row['validationError']['type'],'HashVerifierFailed');self.assertEqual(row['helperFailure']['exit'],-2)
+                self.assertEqual(row['helperFailure']['stdoutHex'],b'out'.hex());self.assertEqual(row['helperFailure']['stderrHex'],b'err'.hex())
+
+    def test_normal_end_unchanged(self):self.check_timestamps('normal')
+    def test_pid_only_int_after_native_end(self):self.check_timestamps('INT')
+    def test_pid_only_term_after_native_end(self):self.check_timestamps('TERM')
+    def test_pid_only_hup_after_native_end(self):self.check_timestamps('HUP')
+    def test_helper_interruption_keeps_bytes_and_times(self):self.check_timestamps('helper')
+    def test_hash_failure_without_cancel_keeps_time(self):self.check_timestamps('hash')
+    def test_native_fatal_stays_primary_and_keeps_time(self):self.check_timestamps('fatal')
+    def test_earlier_native_stamp_is_never_replaced(self):self.check_timestamps('INT','2026-11-01T00:00:00+00:00')
+    def test_empty_native_stamp_does_not_hide_available_end(self):self.check_timestamps('INT','')
+
 if __name__=='__main__':unittest.main()
