@@ -206,3 +206,6 @@ test('failed native fade is not retried over successor BGM, ME or sequence owner
   const nextPlays=next.plays.length,stopped=next.stopped;fail=false;assert(l.release().stopConfirmed);assert.equal(media.ramps(),ramps);assert.equal(f.bgm.plays.length,plays);assert.equal(next.destroyed,0);assert.equal(next.stopped,stopped);assert.equal(next.plays.length,nextPlays);if(kind==='sequence'){assert.equal(f.audio._bgmSequence.duck,.7);assert.equal(next.volume,.7);}l.release();assert.equal(next.destroyed,0);
  }
 });
+test('sequence-only recovery failure keeps the exact owner until retry or successor transfer',()=>{
+ const{f,layer}=sequenceHost(),l=f.request();f.hook=(event,b)=>{if(event==='parameters'&&b===layer&&layer.volume===1)throw Error('sequence recovery before successor');};f.advance(3500);assert(!l.snapshot().stopConfirmed);const next=f.makeBuffer('successor sequence');next._rrBaseVolume=1;next._isPlaying=true;next.volume=.7;const state={buffers:[next],duck:.7};f.audio._bgmSequence=state;f.hook=null;assert(l.release().stopConfirmed);assert.equal(f.audio._bgmSequence,state);assert.equal(next.volume,.7);assert.equal(state.duck,.7);assert.equal(next.destroyed,0);assert.equal(next.stopped,0);const before=l.snapshot();assert.deepEqual(l.release(),before);
+});

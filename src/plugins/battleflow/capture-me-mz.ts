@@ -89,14 +89,14 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
         try {
           if (audio._meBuffer) { resuming = null; return; }
           if (resuming && (audio._bgmBuffer !== resuming.buffer || audio._currentBgm !== resuming.record || audio._bgmSequence !== resuming.sequence)) { resuming = null; return; }
-          const sequenceState = audio._bgmSequence;
-          if (sequenceState) {
+          if (!resuming) resuming = { buffer: audio._bgmBuffer, record: audio._currentBgm, sequence: audio._bgmSequence, fadePending: false };
+          const debt = resuming;
+          if (debt.sequence) {
             audio._duckBgmSequence(1);
-            if (audio._meBuffer || audio._bgmSequence !== sequenceState) { resuming = null; return; }
+            if (audio._meBuffer || audio._bgmSequence !== debt.sequence) { resuming = null; return; }
           }
-          const bgm = audio._bgmBuffer, record = audio._currentBgm;
-          if (!resuming && bgm && record && !bgm.isPlaying()) resuming = { buffer: bgm, record, sequence: sequenceState, fadePending: false };
-          if (resuming) { restoreBGM(resuming); resuming = null; }
+          if (debt.buffer && debt.record) restoreBGM(debt);
+          resuming = null;
         } finally { restoringBGM = false; }
       };
       const rollbackPreparation = () => {
