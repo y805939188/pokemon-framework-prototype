@@ -46,6 +46,11 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
       let status: CaptureMEStatus = 'loading', buffer: any = null, expected: any = null, published = false;
       let timer: unknown, retired = false, naturalEnded = false, destroying = false, stopConfirmed = true;
       let displaced: any = null, resumeOwed = false;
+      // Preparation can pause/duck before this lease occupies the ME channel.
+      // Keep its exact identities separate from native post-publication resume.
+      let paused: { buffer: any; record: any } | null = null;
+      let ducked: { state: any; factor: number; expected: number } | null = null;
+      let rollingBack = false;
       let last = start, playRequestedAt: number | null = null, deadlineReached = false, fault: string | null = null;
       const errors: string[] = [];
       const diagnostic = (error: unknown) => { if (errors.length < 32) errors.push(String(error instanceof Error ? error.message : error)); };
@@ -68,6 +73,35 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
           if (!audio._meBuffer && audio._bgmBuffer === bgm && audio._currentBgm === record) bgm.fadeIn(audio._replayFadeTime);
         }
       };
+      const rollbackPreparation = () => {
+        if (rollingBack) return;
+        if (audio._meBuffer) { paused = null; ducked = null; return; } // successor ME now owns the native resume
+        rollingBack = true;
+        try {
+          const duck = ducked;
+          if (duck) {
+            if (audio._bgmSequence !== duck.state || duck.state.duck !== duck.expected) ducked = null;
+            else {
+              duck.expected = duck.factor; // retain a retryable debt if restoration throws part-way
+              audio._duckBgmSequence(duck.factor);
+              if (audio._bgmSequence === duck.state && duck.state.duck !== duck.factor) throw new Error('MZ sequence duck restoration unconfirmed');
+              ducked = null;
+            }
+          }
+          const debt = paused;
+          if (debt) {
+            const same = () => !audio._meBuffer && audio._bgmBuffer === debt.buffer && audio._currentBgm === debt.record;
+            if (same() && !debt.buffer.isPlaying() && same()) {
+              debt.buffer.play(true, debt.record.pos);
+              if (same()) {
+                if (debt.buffer.isPlaying() !== true) throw new Error('MZ BGM pause restoration unconfirmed');
+                if (same()) debt.buffer.fadeIn(audio._replayFadeTime);
+              }
+            }
+            paused = null; // a changed buffer/registration belongs to its successor
+          }
+        } finally { rollingBack = false; }
+      };
       const cleanup = () => {
         if (!buffer || destroying) return;
         const value = buffer, claim = claims.get(audio);
@@ -83,8 +117,12 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
         finally { destroying = false; }
       };
       const finishResume = () => {
-        if (!resumeOwed || !stopConfirmed || displaced) return;
-        try { resumeBGM(); resumeOwed = false; if (fault?.startsWith('ME BGM resume failed:')) fault = null; }
+        if (!stopConfirmed || displaced) return;
+        try {
+          rollbackPreparation();
+          if (resumeOwed) { resumeBGM(); resumeOwed = false; }
+          if (fault?.startsWith('ME BGM resume failed:')) fault = null;
+        }
         catch (error) { const detail = 'ME BGM resume failed: ' + String(error); fault ??= detail; diagnostic(detail); }
       };
       const retire = (reason: CaptureMEStatus) => {
@@ -132,15 +170,30 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
                 try { resumeBGM(); } catch (error) { fault ??= 'preceding ME BGM resume failed: ' + String(error); throw error; }
                 if (!live() || now() >= deadline) { deadlineReached = last >= deadline; retire(deadlineReached ? 'timeout' : 'superseded'); return; }
               }
-              const bgm = audio._bgmBuffer, record = audio._currentBgm;
+              const bgm = audio._bgmBuffer, record = audio._currentBgm, sequenceState = audio._bgmSequence;
+              const prepared = () => {
+                const valid = live(), time = now();
+                if (!valid || time >= deadline || audio._bgmBuffer !== bgm || audio._currentBgm !== record || audio._bgmSequence !== sequenceState) {
+                  deadlineReached = time >= deadline; retire(deadlineReached ? 'timeout' : 'superseded'); return false;
+                }
+                return true;
+              };
               if (bgm && record) {
-                const position = bgm.seek();
-                if (!live() || audio._bgmBuffer !== bgm || audio._currentBgm !== record) { retire('superseded'); return; }
-                record.pos = position; bgm.stop();
+                const position = bgm.seek(), wasPlaying = bgm.isPlaying();
+                if (!prepared()) return;
+                record.pos = position; paused = wasPlaying ? { buffer: bgm, record } : null; bgm.stop();
+                if (!prepared()) return;
               }
-              if (audio._bgmSequence) audio._duckBgmSequence(audio.BGM_SEQUENCE_ME_DUCK);
-              if (!live() || now() >= deadline) { deadlineReached = last >= deadline; retire(deadlineReached ? 'timeout' : 'superseded'); return; }
+              if (sequenceState) {
+                const factor = sequenceState.duck, target = audio.BGM_SEQUENCE_ME_DUCK;
+                if (!Number.isFinite(factor) || !Number.isFinite(target)) throw new Error('invalid MZ BGM sequence duck');
+                ducked = { state: sequenceState, factor, expected: target }; audio._duckBgmSequence(target);
+                if (!prepared()) return;
+                if (sequenceState.duck !== target) { retire('superseded'); return; }
+              }
+              if (!prepared()) return;
               audio._meBuffer = buffer; claims.set(audio, { buffer, token }); published = true; stopConfirmed = false;
+              paused = null; ducked = null; // published ME cleanup now owns normal pending-BGM resume
               const value = buffer;
               // Never hand MZ an unguarded global stopMe callback. Defer natural end so
               // an outer native stopMe/playMe can finish publishing its successor first.

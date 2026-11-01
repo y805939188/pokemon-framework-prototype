@@ -130,3 +130,49 @@ test('a play call that returns past the deadline is retired immediately, without
 test('a retained old stop callback cannot stop a later external ME',()=>{
  const f=host({ready:true}),l=f.request(),old=f.audio._meBuffer,late=old._stopListeners[0];l.release();f.audio.playMe({name:'Successor',volume:100,pitch:100,pan:0});const next=f.audio._meBuffer;late();f.advance(0);assert.equal(f.audio._meBuffer,next);assert.equal(next.destroyed,0);
 });
+test('expiry in the actual BGM stop listener rolls back its unpublished pause',()=>{
+ const f=host({ready:true});f.time=3499;f.bgm.addStopListener(()=>{f.time=3500;});const l=f.request(0);
+ assert.equal(l.snapshot().status,'timeout');assert(l.snapshot().deadlineReached&&l.snapshot().stopConfirmed);assert.equal(f.audio._meBuffer,null);assert(f.bgm.isPlaying());assert.deepEqual(f.bgm.plays,[{loop:true,pos:7,at:3500}]);assert.equal(f.timers.size,0);const n=f.bgm.plays.length;l.release();assert.equal(f.bgm.plays.length,n);
+});
+test('owner loss in the actual BGM stop listener still rolls back its unpublished pause',()=>{
+ const f=host({ready:true});f.bgm.addStopListener(()=>{f.live=false;});const l=f.request();assert.equal(l.snapshot().status,'superseded');assert(l.snapshot().stopConfirmed);assert.equal(f.audio._meBuffer,null);assert(f.bgm.isPlaying());assert.equal(f.timers.size,0);
+});
+test('rollback does not start a BGM that was already stopped before preparation',()=>{
+ const f=host({ready:true});f.bgm._isPlaying=false;f.bgm.addStopListener(()=>{f.live=false;});const l=f.request();assert.equal(l.snapshot().status,'superseded');assert(l.snapshot().stopConfirmed);assert(!f.bgm.isPlaying());assert.equal(f.bgm.plays.length,0);l.release();assert.equal(f.bgm.plays.length,0);
+});
+test('real native playBgm in the stop listener preserves successor without overlapping ME',()=>{
+ const f=host({ready:true});let successor;f.bgm.addStopListener(()=>{f.audio.playBgm({name:'Successor world',volume:100,pitch:100,pan:0},19);successor=f.audio._bgmBuffer;});const l=f.request();
+ assert.equal(l.snapshot().status,'superseded');assert.equal(f.audio._meBuffer,null);assert.equal(f.audio._currentBgm.name,'Successor world');assert.equal(successor.destroyed,0);assert.deepEqual(successor.plays,[{loop:true,pos:19,at:0}]);assert.equal(successor.fade,undefined);l.release();assert.equal(successor.plays.length,1);assert.equal(f.timers.size,0);
+});
+test('same BGM buffer with a new native registration is also a successor',()=>{
+ const f=host({ready:true}),record=f.audio._currentBgm;f.bgm.addStopListener(()=>f.audio.playBgm({name:'World',volume:80,pitch:100,pan:0},19));const l=f.request();assert.equal(l.snapshot().status,'superseded');assert.equal(f.audio._meBuffer,null);assert.equal(f.audio._bgmBuffer,f.bgm);assert.notEqual(f.audio._currentBgm,record);assert.equal(f.audio._currentBgm.pos,19);assert.equal(f.bgm.plays.length,0);assert.equal(f.bgm.destroyed,0);l.release();assert.equal(f.bgm.plays.length,0);
+});
+function sequenceHost(){const f=host({ready:true});f.audio._bgmBuffer=null;f.audio._currentBgm=null;const layer=f.makeBuffer('sequence-layer');layer._isPlaying=true;layer._rrBaseVolume=1;layer.volume=1;f.audio._bgmSequence={buffers:[layer],duck:1};f.audio.BGM_SEQUENCE_ME_DUCK=.25;for(const name of ['_bgmSequenceBuffers','_duckBgmSequence','stopBgmSequence','_destroyBgmSequenceBuffer'])install(f.G,'reactor_managers.js','AudioManager.'+name);return{f,layer};}
+test('expiry inside actual sequence duck restores its original factor before ME publication',()=>{
+ const{f,layer}=sequenceHost();f.audio._bgmSequence.duck=.6;layer.volume=.6;f.time=3499;f.hook=(event,b)=>{if(event==='parameters'&&b===layer)f.time=3500;};const l=f.request(0);
+ assert(l.snapshot().retired&&l.snapshot().stopConfirmed&&l.snapshot().deadlineReached);assert.equal(f.audio._meBuffer,null);assert.equal(f.audio._bgmSequence.duck,.6);assert.equal(layer.volume,.6);assert.equal(f.timers.size,0);
+});
+test('owner cancellation in actual sequence duck compensates the same sequence',()=>{
+ const{f,layer}=sequenceHost();f.hook=(event,b)=>{if(event==='parameters'&&b===layer)f.live=false;};const l=f.request();assert.equal(l.snapshot().status,'superseded');assert(l.snapshot().stopConfirmed);assert.equal(f.audio._bgmSequence.duck,1);assert.equal(layer.volume,1);assert.equal(f.audio._meBuffer,null);l.release();assert.equal(layer.volume,1);
+});
+test('a replacement sequence is never unducked or published over by the stale request',()=>{
+ const{f,layer}=sequenceHost(),next=f.makeBuffer('new sequence');next._isPlaying=true;next._rrBaseVolume=1;next.volume=.7;const state={buffers:[next],duck:.7};f.hook=(event,b)=>{if(event==='parameters'&&b===layer)f.audio._bgmSequence=state;};const l=f.request();assert.equal(l.snapshot().status,'superseded');assert.equal(f.audio._meBuffer,null);assert.equal(f.audio._bgmSequence,state);assert.equal(next.volume,.7);assert.equal(state.duck,.7);assert.equal(next.destroyed,0);l.release();assert.equal(next.volume,.7);
+});
+test('BGM successor created during sequence duck is preserved without a capture ME',()=>{
+ const{f,layer}=sequenceHost();f.hook=(event,b)=>{if(event==='parameters'&&b===layer){f.hook=null;f.audio.playBgm({name:'After sequence',volume:100,pitch:100,pan:0},13);}};const l=f.request(),next=f.audio._bgmBuffer;assert.equal(l.snapshot().status,'superseded');assert.equal(f.audio._meBuffer,null);assert.equal(next.destroyed,0);assert.deepEqual(next.plays,[{loop:true,pos:13,at:0}]);assert.equal(f.audio._bgmSequence,null);assert.equal(layer.destroyed,1,'native successor owns retiring its prior sequence');l.release();assert.equal(next.plays.length,1);
+});
+test('a foreign ME installed during pause receives native resume ownership, not a competing BGM',()=>{
+ const f=host({ready:true});let next;f.bgm.addStopListener(()=>{next=f.makeBuffer('Foreign ME');next._isPlaying=true;f.audio._meBuffer=next;});const l=f.request();assert.equal(l.snapshot().status,'superseded');assert.equal(f.audio._meBuffer,next);assert.equal(next.destroyed,0);assert(!f.bgm.isPlaying());l.release();assert(!f.bgm.isPlaying());assert.equal(next.destroyed,0);
+});
+test('failed private destruction retains prepublication rollback until explicit release',()=>{
+ const f=host({ready:true});f.bgm.addStopListener(()=>{f.live=false;f.buffers.at(-1).failDestroy=1;});const l=f.request();assert(!l.snapshot().stopConfirmed);assert(!f.bgm.isPlaying());assert(l.snapshot().fault?.includes('ME stop failed'));assert(l.release().stopConfirmed);assert(f.bgm.isPlaying());assert.equal(f.bgm.plays.length,1);assert.equal(f.timers.size,0);
+});
+test('prepublication BGM resume failure is diagnosed and explicitly retryable',()=>{
+ const f=host({ready:true});f.bgm.addStopListener(()=>{f.live=false;});f.hook=(event,b)=>{if(event==='play'&&b===f.bgm)throw Error('resume blocked');};const l=f.request();assert(!l.snapshot().stopConfirmed);assert(l.snapshot().fault?.includes('ME BGM resume failed'));assert.equal(f.audio._meBuffer,null);f.hook=null;assert(l.release().stopConfirmed);assert(f.bgm.isPlaying());const n=f.bgm.plays.length;l.release();assert.equal(f.bgm.plays.length,n);assert.equal(f.timers.size,0);
+});
+test('partly failed sequence rollback retains a diagnostic and a bounded explicit retry',()=>{
+ const{f,layer}=sequenceHost();f.hook=(event,b)=>{if(event==='parameters'&&b===layer){if(layer.volume===.25)f.live=false;else if(layer.volume===1)throw Error('restore blocked');}};const l=f.request();assert(!l.snapshot().stopConfirmed);assert(l.snapshot().fault?.includes('ME BGM resume failed'));f.hook=null;assert(l.release().stopConfirmed);assert.equal(layer.volume,1);assert.equal(f.audio._bgmSequence.duck,1);assert.equal(f.timers.size,0);
+});
+test('a throwing BGM stop still rolls back its side effect without erasing the first fault',()=>{
+ const f=host({ready:true}),stop=f.bgm.stop;f.bgm.stop=function(){stop.call(this);throw Error('stop callback failure');};const l=f.request();assert.equal(l.snapshot().status,'failed');assert(f.bgm.isPlaying());assert(l.snapshot().fault?.includes('stop callback failure'));assert(!l.snapshot().stopConfirmed);assert.equal(f.audio._meBuffer,null);l.release();assert(l.snapshot().fault?.includes('stop callback failure'));assert.equal(f.bgm.plays.length,1);assert.equal(f.timers.size,0);
+});
