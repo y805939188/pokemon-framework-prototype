@@ -144,3 +144,9 @@ test('controller cancellation during synchronous buffer creation cannot publish 
 test('silent return under a default override remains explicit unsupported, never a successful stop',()=>{
  const f=host({ready:true,override:'Default'});f.write('Default');f.request('B');const active=f.audio._bgmBuffer;f.request(null,true);assert.equal(f.rows.at(-1).state,'failed');assert.match(f.rows.at(-1).detail,/outer wrapper/);assert.equal(f.audio._bgmBuffer,active);assert.equal(active.destroyed,0);
 });
+test('silent return stop callback cannot adopt a foreign channel as its own or permit a following overwrite',()=>{
+ const f=host({ready:true});f.write();f.request();const foreign={destroy(){assert.fail('foreign channel destroyed');}};f.hook=event=>{if(event==='stop'){f.audio._bgmBuffer=foreign;f.audio._currentBgm={name:'Other'};}};f.request(null,true);assert.equal(f.rows.at(-1).state,'superseded');assert(!f.port.current());f.request();assert.equal(f.rows.at(-1).state,'superseded');assert.equal(f.audio._bgmBuffer,foreign);assert.equal(f.plays.length,1);
+});
+test('silent return owner loss during stop cannot be reported as completed delivery',()=>{
+ const f=host({ready:true});f.write();f.request();f.hook=event=>{if(event==='stop')f.live=false;};f.request(null,true);assert.equal(f.rows.at(-1).state,'superseded');assert.equal(f.audio._bgmBuffer,null);
+});

@@ -60,7 +60,13 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
         if (!live()) { state('superseded'); return lease; }
         if (!logical && override) throw new Error('default BGM silent return requires the outer wrapper; not supported by this port batch');
         if (!logical) {
-          if (terminal && audio?.stopBgm) { audio.stopBgm(); expectedBuffer = audio._bgmBuffer; expectedRecord = audio._currentBgm; }
+          if (terminal && audio?.stopBgm) {
+            audio.stopBgm();
+            if (!current() || !valid() || id !== ordinal || audio._bgmBuffer || audio._currentBgm) {
+              finished = true; state('superseded', 'BGM owner or channel changed during silent return'); return lease;
+            }
+            expectedBuffer = audio._bgmBuffer; expectedRecord = audio._currentBgm;
+          }
           finished = true; handedOff = terminal; state('requested'); return lease;
         }
         const track = override ?? musicTrack(logical);
