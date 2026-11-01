@@ -22,6 +22,10 @@ export async function runD2Faint(p: any): Promise<void> {
   await scenario('D2-F01 natural KO keeps the real HP0 portrait, decodes owned PCM and observes parallel endpoints', async () => {
     const s = await begin(), before = clone(game()), foe = s.presentationState().cards.find((x: any) => x.side === 'p2' && x.active);
     const body = images(s).find((x: any) => x._psPictureRole === 'body' && x._psPictureKey === 'p2:' + foe.id);
+    const member = s._session.foeTeam.find((x: any) => x.id === foe.id);
+    const contentKey = s._session.content.speciesKeys?.[member.species]?.species ?? member.species;
+    const expectedCry = 'Cries/' + contentKey + '_faint';
+    eq(expectedCry, 'Cries/pidgey_faint', 'frozen formal content id matches the author PCM identity');
     const shadow = images(s).find((x: any) => x._psPictureRole === 'shadow' && x._psPictureKey === 'p2:' + foe.id), initialY = body.y;
     const rows: any[] = [], update = s.update; let endpoint: number | null = null;
     s.update = function (...args: any[]) {
@@ -41,14 +45,14 @@ export async function runD2Faint(p: any): Promise<void> {
     let attacks = 0;
     try {
       attacks = await naturalKO(s); const request = cry(s);
-      eq(request.assetId, 'Cries/Pidgey_faint', 'fixed Pidgey dedicated PCM selected'); eq(request.pitch, 100, 'dedicated pitch');
+      eq(request.assetId, expectedCry, 'fixed Pidgey dedicated PCM selected'); eq(request.pitch, 100, 'dedicated pitch');
       await waitFor(() => rows.some(r => r.box === 0 && !r.destroyed && r.opacity === 255 && r.shadow === 255), 'box gone while body and shadow still wait for d');
       assert(!s.inputState().ready, 'faint owns input');
       await waitFor(() => rows.some(r => !r.destroyed && r.y > initialY && r.opacity > 0 && r.opacity < 255 && r.shadow === 0), 'actual body down/fade after independent cue');
       await shot('d2-faint-natural-mid-drop');
       await waitFor(() => body.destroyed, 'faint portrait released after next update observation');
       assert(endpoint !== null, 'real endpoint was observed before release'); assert(rows.some(r => r.destroyed && r.update > endpoint!), 'later actual update releases portrait');
-      const start = s.presentationState().audio.find((r: any) => r.kind === 'faint-audio-start' && r.assetId === 'Cries/Pidgey_faint');
+      const start = s.presentationState().audio.find((r: any) => r.kind === 'faint-audio-start' && r.assetId === expectedCry);
       assert(start && start.fileSeconds === 1 && start.pitch === 100, 'real AudioContext decoded one-second PCM and started its owned node');
       const delayMs = cue(s).t - request.t;
       assert(delayMs >= 1075 && delayMs < 1600, 'real 22-unit start offset within host update opportunity; no wall-clock exactness claim');

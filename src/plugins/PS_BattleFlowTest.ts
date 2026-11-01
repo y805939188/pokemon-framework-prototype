@@ -47,7 +47,9 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   G.SceneManager.isGameActive = () => true;
 
   // No sound during scripted runs (opt back in with --ps-sound). Belt and braces: the run scripts also pass
-  // Chromium's --mute-audio; here the AudioManager play calls are swallowed so nothing is even decoded/started.
+  // Chromium's --mute-audio; AudioManager calls are swallowed here. The isolated
+  // F2 adapter still decodes/starts its own muted nodes to qualify ownership;
+  // neither that nor these counters proves audible physical output.
   const suppressedAudio: Record<string, number> = {};
   if (!argv.includes("--ps-sound")) {
     for (const fn of ["playBgm", "playBgs", "playMe", "playSe", "playStaticSe"]) {
