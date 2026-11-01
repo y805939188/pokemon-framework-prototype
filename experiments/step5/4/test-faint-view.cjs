@@ -56,7 +56,7 @@ test('pending consumer rejects clock regression between actual updates',()=>{
  const f=picture({pending:true});f.at(0);f.at(100);assert.throws(()=>f.at(50),/clock regressed/);f.step.cancel();
 });
 function wav(seconds=1){const rate=8000,bytes=Math.round(rate*seconds)*2,b=Buffer.alloc(44+bytes);b.write('RIFF');b.writeUInt32LE(36+bytes,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(rate,24);b.writeUInt32LE(rate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(bytes,40);return b;}
-function audio({pending=false,hook}={}){
+function audio({pending=false,hook,clock}={}){
  const root=fs.mkdtempSync(path.join(temp,'resources-'));fs.mkdirSync(path.join(root,'audio/se/Cries'),{recursive:true});
  const f={root,live:true,rows:[],sources:[],gains:[],decodes:[],pending:[],closeCalls:0,globalStops:0,hook};
  f.write=(name,seconds=1)=>fs.writeFileSync(path.join(root,'audio/se',name),typeof seconds==='number'?wav(seconds):seconds);
@@ -66,7 +66,7 @@ function audio({pending=false,hook}={}){
   const result={duration:bytes.readUInt32LE(40)/bytes.readUInt32LE(28)};
   if(!pending)return Promise.resolve(result);return new Promise((resolve,reject)=>f.pending.push({resolve:()=>resolve(result),reject}));
  }}}};
- f.make=(identity={species:'Bird',form:1})=>f.media=makeAudio(f.G,require,root,identity,()=>f.live,r=>f.rows.push(r));return f;
+ f.make=(identity={species:'Bird',form:1})=>f.media=makeAudio(f.G,require,root,identity,()=>f.live,r=>f.rows.push(r),clock);return f;
 }
 test('actual local files choose dedicated form, decode seconds and own a 100-percent cry plus independent effect',async()=>{
  const f=audio();for(const name of ['Cries/Bird_1_faint.wav','Cries/Bird_faint.wav','Cries/Bird_1.wav','Cries/Bird.wav'])f.write(name,2);f.write('Pkmn faint.wav',.2);
@@ -107,4 +107,67 @@ test('a cleanup error remains visible while all other owned nodes are still rele
 test('symlinked media outside the owned resource directory is rejected before decoding',()=>{
  const f=audio(),outside=path.join(temp,'outside.wav');fs.writeFileSync(outside,wav());fs.symlinkSync(outside,path.join(f.root,'audio/se/Cries/Bird_faint.wav'));
  assert.throws(()=>f.make().poll(0),/outside game resources/);assert.equal(f.decodes.length,0);
+});
+
+// This clock advances independently of Scene polls. Withheld timer delivery
+// represents a busy event loop: a late decode microtask must still check time.
+function audioClock(){
+ let now=0,next=0;const tasks=new Map();
+ return {now:()=>now,setTimeout(run,delay){const id=++next;tasks.set(id,{run,due:now+delay});return id;},clearTimeout(id){tasks.delete(id);},pending:()=>tasks.size,
+  at(time,deliver=false){assert(time>=now);now=time;if(deliver)for(const [id,task]of [...tasks])if(task.due<=now){tasks.delete(id);task.run();}}
+ };
+}
+function pendingEffectAfterPicture(){
+ const clock=audioClock(),f=audio({pending:true,clock});f.write('Pkmn faint.wav',.8);const m=f.make();let update=0;
+ const view=new Playback({current:()=>f.live,updateOrdinal:()=>update,create:()=>({}),paint(){},release(){},prepareFaint:()=>m,failed:e=>assert.fail(String(e))});
+ const step=view.faint(actor,()=>true),at=time=>{clock.at(time);update++;return step.advance(time);};
+ assert(!at(0));assert(!at(600));assert(!at(1100));assert(at(1101));assert.equal(f.sources.length,0,'unresolved independent effect did not hold the picture');
+ return {f,m,view,clock};
+}
+for(const lateAt of [5000,6001])test(`finished picture cannot start effect decoded at ${lateAt}ms even before timer delivery`,async()=>{
+ const {f,m,view,clock}=pendingEffectAfterPicture();
+ try{clock.at(lateAt);f.pending[0].resolve();await flush();assert.equal(f.sources.length,0,'expired effect must not allocate or start after its picture');assert.match(m.snapshot().effect.error || '',/timeout/);assert.equal(m.snapshot().effect.playPending,false);assert.equal(clock.pending(),0);}
+ finally{view.dispose();}
+});
+test('independent effect deadline reports timeout without further Scene polling',async()=>{
+ const {f,m,view,clock}=pendingEffectAfterPicture();
+ try{clock.at(5000,true);assert.match(m.snapshot().errors.join(','),/timeout/);assert.equal(m.snapshot().effect.state,'failed');assert(f.rows.some(r=>r.kind==='faint-audio-prepare-failed'&&r.assetId==='Pkmn faint'&&/timeout/.test(r.error)));f.pending[0].resolve();await flush();assert.equal(f.sources.length,0);assert.equal(clock.pending(),0);}
+ finally{view.dispose();}
+});
+test('independent effect rejection preserves a visible reason after the picture has finished',async()=>{
+ const {f,m,view,clock}=pendingEffectAfterPicture();
+ try{clock.at(1500);f.pending[0].reject(Error('independent effect codec failure'));await flush();assert.match(m.snapshot().errors.join(','),/independent effect codec failure/);assert.match(m.snapshot().effect.error,/independent effect codec failure/);assert(f.rows.some(r=>r.kind==='faint-audio-prepare-failed'&&/codec failure/.test(r.error)));assert.equal(f.sources.length,0);assert.equal(clock.pending(),0);}
+ finally{view.dispose();}
+});
+test('independent effect decode failure before its cue is diagnostic and does not fail the mandatory schedule',async()=>{
+ const clock=audioClock(),f=audio({clock});f.write('Pkmn faint.wav',Buffer.from('invalid effect bytes'));const m=f.make();
+ try{assert.equal(m.poll(0).state,'ready');await flush();m.playEffect();assert.equal(m.poll(600).state,'ready');assert.match(m.snapshot().errors.join(','),/decode failure/);assert.match(m.snapshot().effect.error,/decode failure/);assert.equal(f.sources.length,0);assert.equal(clock.pending(),0);}
+ finally{m.dispose();}
+});
+test('effect decoded just before deadline starts once and its normal tail survives the deadline',async()=>{
+ const {f,m,view,clock}=pendingEffectAfterPicture();
+ try{clock.at(4999);f.pending[0].resolve();await flush();assert.equal(f.sources.length,1);assert.equal(f.sources[0].starts,1);m.playEffect();clock.at(10000,true);assert.equal(f.sources[0].starts,1);assert.equal(f.sources[0].stops,0);assert.equal(clock.pending(),0);assert.equal(m.snapshot().voices,1);}
+ finally{view.dispose();}assert.equal(f.sources[0].stops,1);
+});
+test('effect prepared within deadline remains available for a later valid cue',async()=>{
+ const clock=audioClock(),f=audio({pending:true,clock});f.write('Pkmn faint.wav',.8);const m=f.make();
+ try{assert.equal(m.poll(0).state,'ready');clock.at(1);f.pending[0].resolve();await flush();clock.at(20000,true);m.playEffect();assert.equal(f.sources.length,1);assert.equal(f.sources[0].starts,1);assert.equal(f.sources[0].stops,0);assert.equal(clock.pending(),0);}
+ finally{m.dispose();}
+});
+for(const outcome of ['resolve','reject'])test(`owner cancellation clears pending effect deadline; late ${outcome} has no successor work`,async()=>{
+ const {f,m,view,clock}=pendingEffectAfterPicture();view.dispose();const before=JSON.stringify(f.rows);assert.equal(clock.pending(),0);clock.at(10000,true);
+ outcome==='resolve'?f.pending[0].resolve():f.pending[0].reject(Error('cancelled effect failure'));await flush();m.playEffect();assert.equal(f.sources.length,0);assert.equal(JSON.stringify(f.rows),before);assert.equal(m.snapshot().retired,true);
+});
+test('owner loss before independent decode prevents allocation and late failure diagnostics',async()=>{
+ const {f,m,view,clock}=pendingEffectAfterPicture();
+ try{f.live=false;const before=JSON.stringify(f.rows);clock.at(6001,true);f.pending[0].resolve();await flush();assert.equal(f.sources.length,0);assert.equal(JSON.stringify(f.rows),before);}
+ finally{view.dispose();}assert.equal(clock.pending(),0);
+});
+
+test('independent effect local read failure is retained without blocking the schedule',()=>{
+ const clock=audioClock(),f=audio({clock});f.write('Pkmn faint.wav',.8);
+ const requirePort=name=>name==='fs'?{...fs,readFileSync(){throw Error('independent effect read denied');}}:require(name);
+ const m=makeAudio(f.G,requirePort,f.root,{species:'Bird',form:1},()=>f.live,r=>f.rows.push(r),clock);
+ try{assert.equal(m.poll(0).state,'ready');m.playEffect();assert.match(m.snapshot().errors.join(','),/independent effect read denied/);assert.match(m.snapshot().effect.error,/independent effect read denied/);assert.equal(clock.pending(),0);assert.equal(f.sources.length,0);}
+ finally{m.dispose();}
 });

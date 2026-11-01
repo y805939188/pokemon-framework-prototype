@@ -3,12 +3,23 @@ import { planFaintSchedule } from './faint-schedule';
 import type { FaintCryObservation, FaintCrySlot, FaintScheduleResult } from './faint-schedule';
 import type { FaintMedia } from './faint-media';
 
+interface FaintAudioClock {
+  now(): number;
+  setTimeout(run: () => void, delay: number): unknown;
+  clearTimeout(timer: unknown): void;
+}
+const hostClock: FaintAudioClock = {
+  now: () => (globalThis as any).performance.now(),
+  setTimeout: (run, delay) => (globalThis as any).setTimeout(run, delay),
+  clearTimeout: timer => (globalThis as any).clearTimeout(timer),
+};
+
 /** Private adapter to the pinned MZ audio context. It never closes that borrowed
  * context or stops shared SEs. Decoded seconds are explicitly a host estimate;
  * this is not a replacement for every legacy file-header reader quirk. */
 export function createFaintMediaMZ(G: any, nodeRequire: any, root: string,
   identity: { species: string; form: number } | null, current: () => boolean,
-  trace: (row: any) => void = () => {}): FaintMedia {
+  trace: (row: any) => void = () => {}, clock: FaintAudioClock = hostClock): FaintMedia {
   identity = identity && { species: identity.species, form: identity.form };
   const fs = nodeRequire('fs'), path = nodeRequire('path');
   let retired = false, origin: number | null = null, selected: FaintCrySlot | null = null, lastNow = -1;
@@ -17,7 +28,8 @@ export function createFaintMediaMZ(G: any, nodeRequire: any, root: string,
     dedicatedForm: { state: 'missing' }, dedicatedBase: { state: 'missing' },
     ordinaryForm: { state: 'missing' }, ordinaryBase: { state: 'missing' },
   };
-  interface Sound { assetId: string; state: 'pending' | 'ready' | 'failed'; buffer: any; error?: string; playPending: boolean; pitch: number; }
+  interface Sound { assetId: string; state: 'pending' | 'ready' | 'failed'; buffer: any; error?: string; playPending: boolean; pitch: number;
+    independent: boolean; deadline: number | null; timer: unknown; }
   interface Voice { source: any; gain: any; released: boolean; started: boolean; }
   const voices = new Set<Voice>(), errors: string[] = [], cleanupErrors: string[] = [];
   let cry: Sound | null = null, effect: Sound | null = null;
@@ -48,8 +60,30 @@ export function createFaintMediaMZ(G: any, nodeRequire: any, root: string,
       try { run(); } catch (error) { cleanupErrors.push(String(error)); }
     }
   };
+  const clearTimer = (sound: Sound) => {
+    const timer = sound.timer; sound.timer = null;
+    if (timer !== null) try { clock.clearTimeout(timer); } catch (error) { cleanupErrors.push(String(error)); }
+  };
+  const failSound = (sound: Sound, error: unknown) => {
+    if (!live() || sound.state !== 'pending') return;
+    clearTimer(sound); sound.state = 'failed'; sound.error = String(error); sound.playPending = false; sound.buffer = null;
+    if (sound.independent) {
+      errors.push(sound.error);
+      try { trace({ kind: 'faint-audio-prepare-failed', assetId: sound.assetId, error: sound.error }); }
+      catch (diagnosticError) { errors.push('faint audio diagnostic: ' + String(diagnosticError)); }
+    }
+  };
+  const expirePending = (sound: Sound) => {
+    if (sound.state !== 'pending' || sound.deadline === null) return false;
+    try {
+      const now = clock.now();
+      if (!Number.isFinite(now) || now < 0) throw new Error('invalid faint audio deadline clock');
+      if (now >= sound.deadline) { failSound(sound, new Error('independent faint effect decode timeout')); return true; }
+    } catch (error) { failSound(sound, error); return true; }
+    return false;
+  };
   const play = (sound: Sound) => {
-    if (!live()) return;
+    if (!live() || expirePending(sound)) return;
     if (sound.state === 'pending') { sound.playPending = true; return; }
     if (sound.state !== 'ready') return;
     const voice: Voice = { source: null, gain: null, released: false, started: false }; voices.add(voice);
@@ -74,9 +108,19 @@ export function createFaintMediaMZ(G: any, nodeRequire: any, root: string,
         durationSource: 'mz-decoded-v1', fileSeconds: sound.buffer.duration });
     } catch (error) { release(voice); errors.push(String(error)); if (live()) trace({ kind: 'faint-audio-play-failed', assetId: sound.assetId, error: String(error) }); }
   };
-  const load = (assetId: string, file: string, pitch: number): Sound => {
-    const sound: Sound = { assetId, state: 'pending', buffer: null, playPending: false, pitch };
+  const load = (assetId: string, file: string, pitch: number, independent = false): Sound => {
+    const sound: Sound = { assetId, state: 'pending', buffer: null, playPending: false, pitch, independent, deadline: null, timer: null };
     try {
+      if (independent) {
+        const now = clock.now();
+        if (!Number.isFinite(now) || now < 0) throw new Error('invalid faint audio deadline clock');
+        sound.deadline = now + 5000;
+        // A picture may already be finished: expiry cannot depend on more polls.
+        sound.timer = clock.setTimeout(() => {
+          sound.timer = null;
+          failSound(sound, new Error('independent faint effect decode timeout'));
+        }, 5000);
+      }
       guard(); const bytes = fs.readFileSync(file); guard();
       let data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
       const encrypted = typeof G.Utils?.hasEncryptedAudio === 'function' ? G.Utils.hasEncryptedAudio() : G.Utils?.hasEncryptedAudio;
@@ -85,13 +129,15 @@ export function createFaintMediaMZ(G: any, nodeRequire: any, root: string,
       if (!context?.decodeAudioData) throw new Error('MZ audio decoding unavailable');
       const decoded = context.decodeAudioData(data);
       void Promise.resolve(decoded).then(buffer => {
-        if (!live()) return;
+        // A late decode microtask may precede a delayed timer task. Check the
+        // actual deadline too, before publishing ready or allocating a voice.
+        if (!live() || sound.state !== 'pending' || expirePending(sound)) return;
         if (!buffer || !Number.isFinite(buffer.duration) || buffer.duration < 0) throw new Error('invalid decoded audio duration');
-        sound.buffer = buffer; sound.state = 'ready';
+        sound.buffer = buffer; sound.state = 'ready'; clearTimer(sound);
         if (sound.playPending) { sound.playPending = false; play(sound); }
-      }).catch(error => { if (live()) { sound.state = 'failed'; sound.error = String(error); } });
+      }).catch(error => failSound(sound, error));
       guard();
-    } catch (error) { sound.state = 'failed'; sound.error = String(error); }
+    } catch (error) { failSound(sound, error); }
     return sound;
   };
   const prepare = () => {
@@ -110,7 +156,7 @@ export function createFaintMediaMZ(G: any, nodeRequire: any, root: string,
       }
     }
     const file = resolve('Pkmn faint');
-    if (file) effect = load('Pkmn faint', file, 100);
+    if (file) effect = load('Pkmn faint', file, 100, true);
   };
   return {
     poll(now) {
@@ -142,13 +188,15 @@ export function createFaintMediaMZ(G: any, nodeRequire: any, root: string,
     },
     dispose() {
       if (retired) return; retired = true;
-      if (cry) { cry.playPending = false; cry.buffer = null; }
-      if (effect) { effect.playPending = false; effect.buffer = null; }
+      if (cry) { clearTimer(cry); cry.playPending = false; cry.buffer = null; }
+      if (effect) { clearTimer(effect); effect.playPending = false; effect.buffer = null; }
       for (const voice of [...voices]) release(voice);
       if (cleanupErrors.length) throw new Error('owned faint audio cleanup: ' + cleanupErrors.join('; '));
     },
     snapshot: () => ({ version: 'faint-media-mz-v1', durationSource: 'mz-decoded-v1', retired, selected,
       cry: cry && { assetId: cry.assetId, state: cry.state, fileSeconds: cry.buffer?.duration ?? null },
+      effect: effect && { assetId: effect.assetId, state: effect.state, error: effect.error ?? null,
+        playPending: effect.playPending, deadline: effect.deadline, fileSeconds: effect.buffer?.duration ?? null },
       cryRequested, effectRequested, voices: voices.size, errors: [...errors], cleanupErrors: [...cleanupErrors] }),
   };
 }
