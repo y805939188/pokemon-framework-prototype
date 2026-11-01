@@ -12,7 +12,7 @@ test.before(()=>{
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
 
-function nativeIntroEventHost({decodeError=null,waitError=null,clearError=null,successor=false,source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8')}={}){
+function nativeIntroEventHost({decodeError=null,waitError=null,clearError=null,successor=false,rejectNull=false,source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8')}={}){
  // Real interpreter commands and compiled PSFlow; decode/render/session ports stay controlled.
  const PLAN=require('./music-native-plan.json'),named=x=>PLAN.prefix+x,f=host({ready:false,intro:named('intro')}),G={Graphics:f.G.Graphics,$gameMap:{mapId:()=>5},PluginManager:{},Utils:{extractFileName:x=>x}},details={};
  fs.mkdirSync(path.join(f.root,'audio/bgm',PLAN.prefix),{recursive:true});for(const name of ['world','intro','trainer'])f.write(named(name));f.projection.presentation.battleBgm=named('trainer');
@@ -26,7 +26,7 @@ function nativeIntroEventHost({decodeError=null,waitError=null,clearError=null,s
  const parseAst=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]})).parseAst,nodes=[];
  (function walk(n){if(!n||typeof n!=='object')return;if(Array.isArray(n)){n.forEach(walk);return;}nodes.push(n);for(const v of Object.values(n))walk(v);})(parseAst(source,{lang:'ts'}));
  const cleanup=nodes.find(n=>n.type==='VariableDeclarator'&&n.id.name==='retireIntroEvent');assert(cleanup,'actual event retirement helper');
- const retire=vm.runInNewContext('(({G,flow,details})=>(event,primary)=>'+source.slice(cleanup.init.body.start,cleanup.init.body.end)+')')({G,flow:f.flow,details});
+ const retire=vm.runInNewContext('(({G,flow,details})=>(event,hadPrimary)=>'+source.slice(cleanup.init.body.start,cleanup.init.body.end)+')')({G,flow:f.flow,details});
  const m03=nodes.find(n=>n.type==='CallExpression'&&n.callee.name==='run'&&n.arguments[0]?.value==='M03');assert(m03);
  const {stripTypeScriptTypes}=require('node:module'),records=[];let gate;
  const create=f.audio.createBuffer;f.audio.createBuffer=function(folder,name){const b=create.call(this,folder,name),rec={buffer:b,name,folder,plays:[]},play=b.play;b.play=function(...args){rec.plays.push({frame:f.G.Graphics.frameCount});return play.apply(this,args);};records.push(rec);if(gate&&!gate.assigned&&name===gate.name){gate.assigned=true;gate.row=rec;}return b;};
@@ -37,7 +37,7 @@ function nativeIntroEventHost({decodeError=null,waitError=null,clearError=null,s
  const installSuccessor=()=>{const fn=()=>{f.successorCalls=(f.successorCalls??0)+1;},list=[{code:355,parameters:['globalThis.__psMusicNativeMark();']},{code:0,parameters:[]}];interpreter.setup(list,0);G.__psMusicNativeMark=fn;const token=f.flow.playTrainerIntro('npc',1);interpreter._psMusicIntro=token;f.successor={fn,list,token};};
  const body=source.slice(m03.arguments[1].body.start,m03.arguments[1].body.end),code='(async ({reset,world,holdNext,named,G,flow,waitFor,nativeReady,assert,release,eq,inMode,active,player,activeRow,abortScene,retireIntroEvent,PLAN})=>{let ordinal=0;return await(async()=>'+body+')();})';
  const execute=vm.runInNewContext(stripTypeScriptTypes(code)) ;
- const actions={PLAN,reset:async()=>f.app,world:async()=>{f.audio._currentBgm.name=named('world');},holdNext:name=>(gate={name,assigned:false,row:null}),named,G,flow:f.flow,waitFor:async predicate=>{if(waitError)throw waitError;dispatch();assert(predicate());},nativeReady:async()=>{if(successor)installSuccessor();if(decodeError)throw decodeError;},assert,release:g=>f.load(g.row.buffer),eq:assert.deepEqual,inMode:async()=>{f.G.Graphics.frameCount++;assert.equal(interpreter.updateWaitMode(),false);dispatch();dispatch();await f.scene();},active:async name=>{const r=records.at(-1);assert.equal(r.name,name);f.load(r.buffer);return r;},player:()=>f.flow.musicState().player,activeRow:()=>records.at(-1),abortScene:async()=>{f.flow.abort(Error('controlled normal M03 abort'));f.currentScene?.terminate();interpreter.clear();},retireIntroEvent:retire};
+ const actions={PLAN,reset:async()=>f.app,world:async()=>{f.audio._currentBgm.name=named('world');},holdNext:name=>(gate={name,assigned:false,row:null}),named,G,flow:f.flow,waitFor:async predicate=>{if(waitError)throw waitError;dispatch();assert(predicate());},nativeReady:async()=>{if(successor)installSuccessor();if(rejectNull)throw null;if(decodeError)throw decodeError;},assert,release:g=>f.load(g.row.buffer),eq:assert.deepEqual,inMode:async()=>{f.G.Graphics.frameCount++;assert.equal(interpreter.updateWaitMode(),false);dispatch();dispatch();await f.scene();},active:async name=>{const r=records.at(-1);assert.equal(r.name,name);f.load(r.buffer);return r;},player:()=>f.flow.musicState().player,activeRow:()=>records.at(-1),abortScene:async()=>{f.flow.abort(Error('controlled normal M03 abort'));f.currentScene?.terminate();interpreter.clear();},retireIntroEvent:retire};
  Object.assign(f,{G,details,interpreter,records,runM03:()=>execute(actions),drain,eventStarts:()=>starts,late:()=>{if(gate?.row)f.load(gate.row.buffer);},retire});
  return f;
 }
@@ -52,13 +52,20 @@ test('actual M03 cleanup preserves the first decode error when interpreter clear
  const first=Error('first decode assertion'),cleanup=Error('clear failure'),f=nativeIntroEventHost({decodeError:first,clearError:cleanup});
  await assert.rejects(f.runM03(),e=>e===first);assert.equal(f.details.cleanupErrors[0].kind,'intro-event');assert.match(f.details.cleanupErrors[0].error,/clear failure/);assert.doesNotThrow(f.drain);assert.equal(f.eventStarts(),0);assert.equal(f.G.__psMusicNativeMark,undefined);
 });
+test('a null rejection still remains the first M03 failure when cleanup also fails',async()=>{
+ const f=nativeIntroEventHost({rejectNull:true,clearError:Error('cleanup')});let caught=Symbol('not rejected');try{await f.runM03();}catch(error){caught=error;}assert.equal(caught,null);assert.equal(f.details.cleanupErrors.length,1);assert.doesNotThrow(f.drain);
+});
+test('cleanup failure without a primary failure cannot be reported as success',()=>{
+ const f=nativeIntroEventHost({clearError:Error('cleanup')}),list=[{code:0,parameters:[]}],hook=()=>{};f.interpreter.setup(list,0);f.G.__psMusicNativeMark=hook;f.interpreter._psMusicIntro=f.flow.playTrainerIntro('npc',1);
+ assert.throws(()=>f.retire({interpreter:f.interpreter,list,hook,app:f.app,generation:0,retired:false},false),/cleanup failed/);assert.doesNotThrow(f.drain);assert.equal(f.G.__psMusicNativeMark,undefined);
+});
 test('genuine successor interpreter list, callback and intro token survive old M03 failure cleanup',async()=>{
  const failure=Error('old decode'),f=nativeIntroEventHost({decodeError:failure,successor:true});await assert.rejects(f.runM03(),e=>e===failure);
  assert.equal(f.interpreter._list,f.successor.list);assert.equal(f.G.__psMusicNativeMark,f.successor.fn);assert.equal(f.flow.musicState().token,f.successor.token);assert(f.flow.musicState().current);assert.doesNotThrow(f.drain);assert.equal(f.successorCalls,1);
 });
-test('removing actual event retirement revives the real command355 callback fatal',async()=>{
+test('restoring old queued-event teardown revives the real command355 callback fatal',async()=>{
  const source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8'),marker="trace.ownedList = true; token = event.interpreter._psMusicIntro;";assert.equal(source.split(marker).length,2);
- // Keep the exact queued native interpreter while removing only the retirement block.
+ // Restore the old combination: a queued consumer plus unconditional hook deletion.
  const broken=source.replace('if (event.interpreter._list === event.list) {\n        '+marker,'if (false) {\n        '+marker).replace("if (event.interpreter._list === event.list && event.interpreter._index < event.list.length) throw Error('owned intro event did not retire');",'');
  const f=nativeIntroEventHost({decodeError:Error('original'),source:broken});await assert.rejects(f.runM03(),/original/);assert.throws(f.drain,/__psMusicNativeMark/);
 });

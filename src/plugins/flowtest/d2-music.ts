@@ -92,7 +92,7 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
     mark('active-qualified', { ...value, ...playing }); return row;
   };
   const clearMessages = () => { G.$gameMessage.clear(); G.$gameMap._interpreter.clear(); };
-  const retireIntroEvent = (event: any, primary: any) => {
+  const retireIntroEvent = (event: any, hadPrimary: boolean) => {
     if (event.retired) return;
     event.retired = true;
     const errors = details.cleanupErrors ??= [], before = errors.length;
@@ -120,7 +120,7 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
         delete G.__psMusicNativeMark; trace.hookDeleted = true;
       }
     } catch (error) { errors.push({ kind: 'intro-hook', error: String(error) }); }
-    if (errors.length > before && primary == null) throw Error('native intro event cleanup failed: ' + JSON.stringify(errors.slice(before)));
+    if (errors.length > before && !hadPrimary) throw Error('native intro event cleanup failed: ' + JSON.stringify(errors.slice(before)));
   };
   let firstReset = true;
   const mapReady = () => {
@@ -196,7 +196,7 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
         await reset(); await world(); const gate = holdNext(named('intro')), interpreter = G.$gameMap._interpreter; let marker: any = null;
         const hook = () => { marker = { frame: G.Graphics.frameCount, music: flow.musicState() }; };
         const list = [{ code: 357, indent: 0, parameters: ['PS_BattleFlow', 'PlayTrainerIntro', 'intro', { trainerId: 'music-normal', version: '1' }] }, { code: 355, indent: 0, parameters: ['globalThis.__psMusicNativeMark();'] }, { code: 357, indent: 0, parameters: ['PS_BattleFlow', 'StartTrainerBattle', 'battle', { trainerId: 'music-normal', version: '1', battleId: PLAN.version + '/M03', canLose: 'true' }] }, { code: 0, indent: 0, parameters: [] }];
-        const event = { interpreter, list, hook, app: flow._app, generation: flow._app.stateGeneration, retired: false }; let primary: any = null;
+        const event = { interpreter, list, hook, app: flow._app, generation: flow._app.stateGeneration, retired: false }; let failed = false;
         G.__psMusicNativeMark = hook;
         try {
         interpreter.setup(list, 0);
@@ -205,8 +205,8 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
         let refused = false; try { flow.openBattle({ kind: 'trainer', trainer: { id: 'music-normal', version: 1 }, battleId: 'M03-forbidden', seq: ++ordinal }); } catch (error) { refused = String(error).includes('trainer-intro-not-ready'); } assert(refused, 'same-frame direct open refuses');
         await inMode('main'); await active(named('trainer')); assert(marker && marker.frame > settled, 'actual event advances only on later frame'); eq(player().memo.track.name, named('world'), 'world memo survives intro');
         const introPlay = gate.row.plays[0], battlePlay = activeRow().plays[0]; assert(battlePlay.frame > introPlay.frame, 'intro and battle have distinct actual starts'); await abortScene(); return { marker, settled, introPlay, battlePlay };
-        } catch (error) { primary = error; throw error; }
-        finally { retireIntroEvent(event, primary); }
+        } catch (error) { failed = true; throw error; }
+        finally { retireIntroEvent(event, failed); }
       });
       await run('M04', async () => {
         await reset(); await world(); const before = flow.musicState(), buffer = audio._bgmBuffer, record = audio._currentBgm;
