@@ -17,6 +17,14 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
   const pending = new Set<() => void>();
   const channelCurrent = () => audio?._bgmBuffer === expectedBuffer && audio?._currentBgm === expectedRecord;
   const owned = () => current() && channelCurrent();
+  const stopOwnedChannel = (): boolean => {
+    const beforeBuffer = audio._bgmBuffer, beforeRecord = audio._currentBgm;
+    audio.stopBgm();
+    // MZ only clears the registration when a buffer exists. Its unchanged,
+    // bufferless "BGM: None" record is not a successor installed by stopBgm.
+    // A retained buffer or a newly installed record must still block handoff.
+    return !audio._bgmBuffer && (!audio._currentBgm || (!beforeBuffer && audio._currentBgm === beforeRecord));
+  };
   const inside = (parent: string, child: string) => { const relative = path.relative(parent, child); return relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative); };
   const exists = (name: string): boolean => {
     if (!name || /[\u0000-\u001f\u007f\\:%?#]/.test(name) || name.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('invalid battle music resource identity');
@@ -67,10 +75,11 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
         }
         if (!logical) {
           if (terminal && audio?.stopBgm) {
-            audio.stopBgm();
-            if (!current() || !valid() || id !== ordinal || audio._bgmBuffer || audio._currentBgm) {
+            const stopped = stopOwnedChannel();
+            if (!current() || !valid() || id !== ordinal || !stopped) {
               finished = true; state('superseded', 'BGM owner or channel changed during silent return'); return lease;
             }
+            audio._currentBgm = null;
             expectedBuffer = audio._bgmBuffer; expectedRecord = audio._currentBgm;
           }
           finished = true; handedOff = terminal; state('requested'); return lease;
@@ -101,10 +110,10 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
             if (!buffer.isReady()) { timer = clock.after(Math.min(25, 5000 - (now - began)), poll); return; }
             audio.updateBufferParameters(buffer, audio.bgmVolume, track);
             if (!live()) { end('superseded', 'battle music owner changed during preparation'); return; }
-            audio.stopBgm();
+            const stopped = stopOwnedChannel();
             if (!current() || !valid() || id !== ordinal) { end('superseded', 'battle music owner changed during channel handoff'); return; }
             // stopBgm is an external callback: do not overwrite any new channel it installed.
-            if (audio._bgmBuffer || audio._currentBgm) { end('superseded', 'BGM channel replaced during handoff'); return; }
+            if (!stopped) { end('superseded', 'BGM channel replaced during handoff'); return; }
             expectedBuffer = buffer; audio._bgmBuffer = buffer;
             registration = { ...track, pos: position }; expectedRecord = registration; audio._currentBgm = registration;
             if (!audio._meBuffer) buffer.play(true, position);

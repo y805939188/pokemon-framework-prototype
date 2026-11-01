@@ -64,13 +64,14 @@ test('reentrant intro/start from a host position query does not recurse or dupli
 test('snapshots are detached; cancelled player no longer issues requests or clears caller presets/memo',()=>{
  const f=pure();f.player.start(config());const s=f.player.snapshot();s.memo.track.name='bad';s.requests[0].logical.name='bad';assert.equal(f.player.snapshot().memo.track.name,'A');assert.equal(f.player.snapshot().requests[0].logical.name,'Battle wild');f.player.cancel();f.player.intro('I');f.player.restore();assert.equal(f.rows.length,1);assert.equal(f.memory.memo.track.name,'A');
 });
-function host({ready=false,hasMap=true,override,requireOverride}={}){
+function host({ready=false,hasMap=true,emptyRecord=false,override,requireOverride}={}){
  const root=fs.mkdtempSync(path.join(temp,'mz-'));fs.mkdirSync(path.join(root,'audio/bgm'),{recursive:true});
  const f={root,live:true,time:0,timers:new Map(),seq:0,buffers:[],rows:[],stops:0,updates:[],plays:[],hook:null};
  f.write=(name='B')=>{const file=path.join(root,'audio/bgm',name+'.ogg');fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,'synthetic file; buffer is a controlled port');};
- const map=hasMap?{name:'Map',volume:80,pitch:100,pan:0,pos:17}:null;
+ // MZ playBgm({name:''}) leaves an empty registration without a buffer.
+ const map=hasMap?{name:'Map',volume:80,pitch:100,pan:0,pos:17}:emptyRecord?{name:'',volume:90,pitch:100,pan:0,pos:undefined}:null;
  const initial=hasMap?{seek:()=>17,destroy(){this.destroyed=(this.destroyed||0)+1;}}:null;
- f.audio={_currentBgm:map,_bgmBuffer:initial,_meBuffer:null,bgmVolume:50,audioFileExt:()=>'.ogg',createBuffer(folder,name){assert.equal(folder,'bgm/');const b={name,ready,error:false,destroyed:0,listeners:[],isReady(){return this.ready;},isError(){return this.error;},addLoadListener(fn){this.listeners.push(fn);f.hook?.('listener');if(this.ready)fn();},play(loop,pos){f.plays.push({b:this,loop,pos});f.hook?.('play');},destroy(){this.destroyed++;f.hook?.('destroy');},seek:()=>23};f.buffers.push(b);f.hook?.('create');return b;},updateBufferParameters(b,v,t){f.updates.push({b,volume:v*t.volume/100,track:{...t}});f.hook?.('parameters');},stopBgm(){f.stops++;this._bgmBuffer?.destroy();this._bgmBuffer=null;this._currentBgm=null;f.hook?.('stop');}};
+ f.audio={_currentBgm:map,_bgmBuffer:initial,_meBuffer:null,bgmVolume:50,audioFileExt:()=>'.ogg',createBuffer(folder,name){assert.equal(folder,'bgm/');const b={name,ready,error:false,destroyed:0,listeners:[],isReady(){return this.ready;},isError(){return this.error;},addLoadListener(fn){this.listeners.push(fn);f.hook?.('listener');if(this.ready)fn();},play(loop,pos){f.plays.push({b:this,loop,pos});f.hook?.('play');},destroy(){this.destroyed++;f.hook?.('destroy');},seek:()=>23};f.buffers.push(b);f.hook?.('create');return b;},updateBufferParameters(b,v,t){f.updates.push({b,volume:v*t.volume/100,track:{...t}});f.hook?.('parameters');},stopBgm(){f.stops++;if(this._bgmBuffer){this._bgmBuffer.destroy();this._bgmBuffer=null;this._currentBgm=null;}f.hook?.('stop');}};
  f.initial=initial;f.map=map;f.clock={now:()=>f.time,after(ms,cb){const id=++f.seq;f.timers.set(id,{at:f.time+ms,cb});return id;},clear(id){f.timers.delete(id);}};
  f.advance=now=>{f.time=now;for(let n=0;n<1000;n++){const entry=[...f.timers].find(([,x])=>x.at<=f.time);if(!entry)return;f.timers.delete(entry[0]);entry[1].cb();}assert.fail('unbounded timer loop');};
  f.load=(b=f.buffers.at(-1))=>{b.ready=true;for(const cb of [...b.listeners])cb();};
@@ -149,4 +150,22 @@ test('silent return stop callback cannot adopt a foreign channel as its own or p
 });
 test('silent return owner loss during stop cannot be reported as completed delivery',()=>{
  const f=host({ready:true});f.write();f.request();f.hook=event=>{if(event==='stop')f.live=false;};f.request(null,true);assert.equal(f.rows.at(-1).state,'superseded');assert.equal(f.audio._bgmBuffer,null);
+});
+for(const ready of [false,true])test(`host None registration permits battle playback and normal silent return (cached=${ready})`,()=>{
+ const f=host({hasMap:false,emptyRecord:true,ready});f.write();const original=f.audio._currentBgm;
+ f.audio.stopBgm();assert.equal(f.audio._currentBgm,original,'host stop without a buffer preserves its registration');
+ const p=new Playback(f.port);p.start(config({global:{wildBattle:'B'}}));if(!ready)f.load();
+ assert.equal(p.snapshot().memo.track,null);assert.deepEqual(f.plays.map(x=>x.b.name),['B']);assert.equal(p.snapshot().requests.at(-1).state,'requested');
+ p.restore();assert.equal(p.snapshot().requests.at(-1).state,'requested');assert.equal(f.audio._bgmBuffer,null);assert.equal(f.audio._currentBgm,null);assert(f.port.current());assert.equal(f.buffers[0].destroyed,1);
+ const stops=f.stops;p.cancel();assert.equal(f.stops,stops);assert.equal(f.audio._bgmBuffer,null);assert.equal(f.audio._currentBgm,null);assert.deepEqual(f.plays.map(x=>x.b.name),['B']);assert.equal(f.timers.size,0);
+});
+test('host None registration completes a direct silent return without a fictitious takeover',()=>{
+ const f=host({hasMap:false,emptyRecord:true});const lease=f.request(null,true);assert.equal(f.rows.at(-1).state,'requested');assert.equal(f.audio._bgmBuffer,null);assert.equal(f.audio._currentBgm,null);assert(f.port.current());lease.release();assert.equal(f.buffers.length,0);
+});
+for(const silent of [false,true])for(const replacement of ['record','buffer'])test(`stop handoff preserves a new ${replacement} even from host None (silent=${silent})`,()=>{
+ const f=host({hasMap:false,emptyRecord:true,ready:true});f.write();const registration=f.audio._currentBgm;
+ const successorRecord={...registration},successorBuffer={destroy(){assert.fail('successor destroyed');}};
+ f.hook=event=>{if(event==='stop'){if(replacement==='record')f.audio._currentBgm=successorRecord;else f.audio._bgmBuffer=successorBuffer;}};
+ const lease=f.request(silent?null:'B',silent);assert.equal(f.rows.at(-1).state,'superseded');assert(!f.port.current());lease.release();
+ assert.equal(f.audio._currentBgm,replacement==='record'?successorRecord:registration);assert.equal(f.audio._bgmBuffer,replacement==='buffer'?successorBuffer:null);assert.equal(f.plays.length,0);if(!silent)assert.equal(f.buffers[0].destroyed,1);assert.equal(f.timers.size,0);
 });

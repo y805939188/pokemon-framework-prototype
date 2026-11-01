@@ -15,7 +15,7 @@ test('formal vector denominator is frozen and does not silently include unimplem
  const requests=vectors.cases.reduce((n,row)=>n+({ 'trainer-pair':2,'from-type':1,'wild-triple':3,'wild-defaults':6,'wild-independent':9 }[row.kind]??0),0);assert.equal(requests,47);
 });
 for(const row of vectors.cases)test(`${row.id} formal ${row.kind}`,()=>{
- if(row.kind==='trainer-pair')for(const [i,entry]of trainerEntries.entries())check({entry,trainers:row.types.map(v=>({battleBgm:v,victoryBgm:v})),context:{presets:row.presets,map:row.map===null?null:metadata(trainerKeys,row.map),global:metadata(trainerKeys,row.globalName)}},row.expectedNames?.[i]??row.expectedName??(i?'Battle victory':'Battle trainer'),row.origin,slots[i],row.index);
+ if(row.kind==='trainer-pair')for(const [i,entry]of trainerEntries.entries())check({entry,trainers:row.trainers,context:{presets:row.presets,map:row.map,global:row.global}},row.expectedNames[i],row.origin,slots[i],row.index);
  else if(row.kind==='from-type')check({entry:'trainer-type-battle',trainer:{battleBgm:row.typeName},context:{map:{trainerBattle:row.map},global:{trainerBattle:row.globalName}}},row.expectedName,row.origin,'battle');
  else if(row.kind==='wild-triple')for(const [i,entry]of wildEntries.entries())check({entry,context:{presets:row.presets,map:row.map===null?null:metadata(wildKeys,row.map),global:metadata(wildKeys,row.globalNames)}},row.expectedNames[i],row.origin,slots[i]);
  else if(row.kind==='wild-defaults')for(const missing of row.missingVariants)for(const [i,entry]of wildEntries.entries())check({entry,context:{map:metadata(wildKeys,missing),global:metadata(wildKeys,missing)}},row.expectedNames[i],'default',slots[i]);
@@ -26,8 +26,27 @@ test('last non-null trainer field and fallback precedence over a finite exhausti
  const alphabet=[null,'','A','B'],arrays=[[]];for(let length=1;length<=3;length++){const build=prefix=>{if(prefix.length===length)arrays.push(prefix);else for(const value of alphabet)build([...prefix,value]);};build([]);}
  let count=0;for(const values of arrays)for(const [i,entry]of trainerEntries.entries())for(const map of [null,'','M'])for(const globalName of [null,'','G']){
   const last=values.filter(x=>x!==null).at(-1),chosen=last?{name:last,origin:'trainer',index:values.lastIndexOf(last)}:map?{name:map,origin:'map',index:null}:globalName?{name:globalName,origin:'global',index:null}:{name:i?'Battle victory':'Battle trainer',origin:'default',index:null};
-  check({entry,trainers:values.map(v=>({battleBgm:v,victoryBgm:v})),context:{map:metadata(trainerKeys,map),global:metadata(trainerKeys,globalName)}},chosen.name,chosen.origin,slots[i],chosen.index);count++;
+  const field=i?'victoryBgm':'battleBgm',other=i?'battleBgm':'victoryBgm',key=trainerKeys[i],otherKey=trainerKeys[1-i];
+  check({entry,trainers:values.map((v,index)=>({[field]:v,[other]:'wrong-trainer-'+index})),context:{map:{[key]:map,[otherKey]:'wrong-map'},global:{[key]:globalName,[otherKey]:'wrong-global'}}},chosen.name,chosen.origin,slots[i],chosen.index);count++;
  }assert.equal(count,1530);
+});
+test('trainer battle and victory vectors use independent fields at every selectable source',()=>{
+ assert.equal(vectors.version,'battle-audio-selection-formal-v2');
+ for(const row of vectors.cases.filter(row=>row.kind==='trainer-pair')){
+  for(const type of row.trainers)if(type.battleBgm)assert.notEqual(type.battleBgm,type.victoryBgm,row.id+' trainer fields');
+  if(row.map?.trainerBattle)assert.notEqual(row.map.trainerBattle,row.map.trainerVictory,row.id+' map fields');
+  if(row.global.trainerBattle)assert.notEqual(row.global.trainerBattle,row.global.trainerVictory,row.id+' global fields');
+  assert.notEqual(row.expectedNames[0],row.expectedNames[1],row.id+' selected roles');
+ }
+});
+test('trainer victory reads only victory fields at trainer, map and global precedence levels',()=>{
+ const wrong=()=>assert.fail('battle field used for victory');
+ for(const origin of ['trainer','map','global']){
+  const trainers=origin==='trainer'?[{get battleBgm(){return wrong();},victoryBgm:'Trainer victory'}]:[];
+  const map=origin==='map'?{get trainerBattle(){return wrong();},trainerVictory:'Map victory'}:null;
+  const global={get trainerBattle(){return wrong();},trainerVictory:'Global victory'};
+  assert.deepEqual(select({entry:'trainer-victory',trainers,context:{map,global}}),{version:'battle-audio-selection-v1',entry:'trainer-victory',slot:'victory',logicalName:origin[0].toUpperCase()+origin.slice(1)+' victory',origin,trainerIndex:origin==='trainer'?0:null});
+ }
 });
 test('winning preset reads only its own slot and no lower sources',()=>{
  for(const entry of [...wildEntries,...trainerEntries,'trainer-type-battle']){

@@ -11,15 +11,15 @@ test.before(()=>{
  for(const name of ['PS_BattleFlow','PS_SaveState']){const r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',path.join(temp,name)],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);const s=fs.readFileSync(path.join(temp,name,name+'.js'),'utf8');if(name==='PS_BattleFlow')plugin=s;else savePlugin=s;}
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
-function host({ready=true,settings={},intro='Intro'}={}){
+function host({ready=true,settings={},intro='Intro',emptyBgm=false}={}){
  const root=fs.mkdtempSync(path.join(temp,'world-'));fs.mkdirSync(path.join(root,'audio/bgm'),{recursive:true});
  const f={root,time:0,timers:new Map(),seq:0,buffers:[],plays:[],queries:[],commands:{},hook:null,starts:0,finishes:0,aborts:0};
  f.write=name=>fs.writeFileSync(path.join(root,'audio/bgm',name+'.ogg'),'controlled decoder existence fixture');
  for(const name of ['Battle wild','Battle trainer','Intro','Authored','Map','Next','Default','Custom'])f.write(name);
  const initial={seek:()=>17,destroyed:0,destroy(){this.destroyed++;f.hook?.('initial-destroy');}};
- const audio={_bgmBuffer:initial,_currentBgm:{name:'Map',volume:80,pitch:100,pan:0,pos:17},_meBuffer:null,bgmVolume:50,audioFileExt:()=>'.ogg',
+ const audio={_bgmBuffer:emptyBgm?null:initial,_currentBgm:{name:emptyBgm?'':'Map',volume:80,pitch:100,pan:0,pos:17},_meBuffer:null,bgmVolume:50,audioFileExt:()=>'.ogg',
  createBuffer(folder,name){assert.equal(folder,'bgm/');const b={name,ready:typeof ready==='function'?ready(name):ready,error:false,listeners:[],destroyed:0,isReady(){return this.ready;},isError(){return this.error;},addLoadListener(fn){this.listeners.push(fn);if(this.ready)fn();},play(loop,pos){f.plays.push({name:this.name,loop,pos,frame:G.Graphics.frameCount});f.hook?.('play');},seek:()=>24,destroy(){this.destroyed++;f.hook?.('destroy');}};f.buffers.push(b);f.hook?.('create');return b;},
- updateBufferParameters(buffer,volume,track){f.hook?.('parameters');buffer.params={volume:volume*track.volume/100,pitch:track.pitch};},stopBgm(){this._bgmBuffer?.destroy();this._bgmBuffer=null;this._currentBgm=null;f.hook?.('stop');}};
+ updateBufferParameters(buffer,volume,track){f.hook?.('parameters');buffer.params={volume:volume*track.volume/100,pitch:track.pitch};},stopBgm(){if(this._bgmBuffer){this._bgmBuffer.destroy();this._bgmBuffer=null;this._currentBgm=null;}f.hook?.('stop');}};
  function Base(){}Base.prototype={initialize(){this.children=[];},create(){this._windowLayer={};this.children.push(this._windowLayer);},start(){},update(){},terminate(){},isReady:()=>true,addWindow(){},addChild(s){this.children.push(s);s.parent=this;},addChildAt(s,i){this.children.splice(i,0,s);s.parent=this;},removeChild(s){this.children.splice(this.children.indexOf(s),1);s.parent=null;},popScene(){},updateWaitMode:()=>false,updateChild:()=>false,clear(){this._waitMode='';},setWaitMode(mode){this._waitMode=mode;}};
  function Win(){}Win.prototype={initialize(rect){this.innerWidth=rect.width-24;this.innerHeight=rect.height-24;this.contents={clear(){},fillRect(){}};this._index=0;},resetFontSettings(){},lineHeight:()=>24,textWidth:t=>String(t).length*8,drawText(){},refresh(){this._list=[];this.makeCommandList?.();},addCommand(name,symbol,enabled,ext){this._list.push({name,symbol,enabled,ext});},select(i){this._index=i;},index(){return this._index;},setHandler(){},show(){this.visible=true;},hide(){this.visible=false;},activate(){this.active=true;},deactivate(){this.active=false;},isOpenAndActive(){return this.active&&this.visible;}};
  class Bitmap{constructor(w,h){this.width=w;this.height=h;this.context={drawImage(){}};}fillAll(){}blt(){}drawText(){}destroy(){}}
@@ -45,6 +45,11 @@ function host({ready=true,settings={},intro='Intro'}={}){
 test('compiled real Scene starts a single declared BGM and normal root completion restores original position after Scene exit',async()=>{
  const f=host({ready:name=>name!=='Map'});f.open();const s=await f.scene();assert.deepEqual(f.names(),['Battle wild']);f.flow._startBattleMusic(f.flow._op);assert.equal(f.plays.length,1);
  s.onEnd();assert.equal(f.flow.running,false);assert.equal(f.flow.musicState().phase,'return');s.terminate();f.G.SceneManager._scene={world:true};assert.deepEqual(f.names(),['Battle wild']);const pending=f.buffers.at(-1);f.load(pending);assert.deepEqual(f.names(),['Battle wild','Map']);assert.equal(f.plays.at(-1).pos,17);s.terminate();assert.equal(pending.destroyed,0);
+});
+for(const ready of [false,true])test(`compiled Scene plays after host None and returns to silence (cached=${ready})`,async()=>{
+ const f=host({ready,emptyBgm:true});f.open();const s=await f.scene();if(!ready)f.load();
+ assert.deepEqual(f.names(),['Battle wild']);assert.equal(f.flow.musicState().player.requests.at(-1).state,'requested');assert.equal(f.flow.musicState().player.memo.track,null);
+ s.onEnd();s.terminate();assert.equal(f.flow.running,false);assert.equal(f.flow.musicState().player.requests.at(-1).state,'requested');assert.equal(f.audio._bgmBuffer,null);assert.equal(f.audio._currentBgm,null);assert.equal(f.buffers[0].destroyed,1);assert.equal(f.timers.size,0);
 });
 test('public trainer projection and author metadata are frozen before async session creation; config changes cannot replace the selected song',async()=>{
  const f=host();let release;f.opening=new Promise(r=>release=r);const context={music:{map:{trainerBattle:'M'},global:{trainerBattle:'G'},presets:{battle:'Custom:70:120'}}};f.open(true,context);const scene=new f.G.Scene_PSBattle();f.G.SceneManager._scene=scene;scene.create();await flush();f.projection.presentation.battleBgm='mutated';context.music.presets.battle='mutated';release(f.session);await flush();assert(scene.isReady());scene.start();assert.deepEqual(f.names(),['Custom']);assert.equal(f.buffers[0].params.volume,35);assert.equal(f.buffers[0].params.pitch,120);assert.deepEqual(f.queries,[{id:'npc',version:1}]);f.flow.abort(Error('cleanup'));
