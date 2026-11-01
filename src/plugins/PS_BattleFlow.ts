@@ -965,7 +965,7 @@ const { developmentCapabilities } = RuleConfig;
     this._psBattle = true; // marker for the test driver (constructor identity is wrapped by pixi_compat)
     this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
     sceneController(this, true);
-    this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
+    this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._faintAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
     this._pictures = null; this._pictureUpdate = 0;
   };
   P.create = function () {
@@ -1015,7 +1015,7 @@ const { developmentCapabilities } = RuleConfig;
         const identity = !member || member.egg ? null : mapped || { species: member.species, form: member.form ?? 0 };
         return createFaintMediaMZ(G, nodeRequire, engine().root, identity,
           () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
-          row => { if (c.isCurrent()) this._displayAudio.push({ ...row, t: performance.now() }); });
+          row => { if (c.isCurrent() && PSFlow.running) this._faintAudio.push({ ...row, t: performance.now() }); });
       });
     this._display = new BattleDisplayPlayback(initialDisplay(s, this._names), {
       current: () => c.isCurrent() && PSFlow.running,
@@ -1130,7 +1130,8 @@ const { developmentCapabilities } = RuleConfig;
   P.presentationState = function () {
     const c = sceneController(this);
     return { version: 'd2-status-v1', current: c.isCurrent(), cards: this._display?.snapshot() || [],
-      pending: c.queue.filter(step => typeof step !== 'string').length, audio: (this._displayAudio || []).map((row: any) => ({ ...row })) };
+      pending: c.queue.filter(step => typeof step !== 'string').length, audio: (this._displayAudio || []).map((row: any) => ({ ...row })),
+      faintAudio: (this._faintAudio || []).map((row: any) => ({ ...row })) };
   };
   P.pictureState = function () { return this._pictures?.snapshot() ?? null; };
   P.showMain = function () {

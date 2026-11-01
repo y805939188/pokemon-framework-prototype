@@ -3,13 +3,13 @@
  * controls have different labels; no claim of Ruby or audible-output parity. */
 export async function runD2Faint(p: any): Promise<void> {
   const { G, W, scenario, toMap, fresh, startEvent, inMode, battle, choose, frames, waitFor, game, clone, finishBattle, shot, report, assert, eq } = p;
-  report.d2Faint = { version: 'D2-faint-host-v1', preset: 'simple-faint-feedback-v1', durationSource: 'mz-decoded-v1', cases: [] };
+  report.d2Faint = { version: 'D2-faint-host-v2', preset: 'simple-faint-feedback-v1', durationSource: 'mz-decoded-v1', cases: [] };
   const record = (row: any) => { report.d2Faint.cases.push(row); return row; };
   const images = (s: any) => s.children.filter((x: any) => x._psPictureRole);
   const begin = async () => { await toMap(); fresh(); await startEvent(2); await inMode('main'); return battle(); };
   const abort = async () => { W.PSFlow.abort(Error('D2 faint controlled cleanup')); await finishBattle(); };
-  const cry = (s: any) => s.presentationState().audio.find((r: any) => r.kind === 'faint-cry');
-  const cue = (s: any) => s.presentationState().audio.find((r: any) => r.kind === 'faint-effect');
+  const cry = (s: any) => s.presentationState().faintAudio.find((r: any) => r.kind === 'faint-cry');
+  const cue = (s: any) => s.presentationState().faintAudio.find((r: any) => r.kind === 'faint-effect');
   const naturalKO = async (s: any) => {
     for (let n = 0; n < 12; n++) {
       await choose(/^Fight/); await inMode('moves'); await choose(/flamethrower/i);
@@ -52,7 +52,7 @@ export async function runD2Faint(p: any): Promise<void> {
       await shot('d2-faint-natural-mid-drop');
       await waitFor(() => body.destroyed, 'faint portrait released after next update observation');
       assert(endpoint !== null, 'real endpoint was observed before release'); assert(rows.some(r => r.destroyed && r.update > endpoint!), 'later actual update releases portrait');
-      const start = s.presentationState().audio.find((r: any) => r.kind === 'faint-audio-start' && r.assetId === expectedCry);
+      const start = s.presentationState().faintAudio.find((r: any) => r.kind === 'faint-audio-start' && r.assetId === expectedCry);
       assert(start && start.fileSeconds === 1 && start.pitch === 100, 'real AudioContext decoded one-second PCM and started its owned node');
       const delayMs = cue(s).t - request.t;
       assert(delayMs >= 1075 && delayMs < 1600, 'real 22-unit start offset within host update opportunity; no wall-clock exactness claim');
@@ -66,7 +66,7 @@ export async function runD2Faint(p: any): Promise<void> {
     s.pushMessages([{ kind: 'events', events: [{ type: 'faint', args: ['p1a: ' + card.id] }] }]);
     await waitFor(() => cry(s), 'public faint requested'); eq(cry(s).status, 'missing', 'no player fixture cry');
     await waitFor(() => cue(s), 'independent faint cue requested despite no species cry');
-    await waitFor(() => s.presentationState().audio.some((r: any) => r.kind === 'faint-audio-start' && r.assetId === 'Pkmn faint'), 'owned independent SE node started');
+    await waitFor(() => s.presentationState().faintAudio.some((r: any) => r.kind === 'faint-audio-start' && r.assetId === 'Pkmn faint'), 'owned independent SE node started');
     await inMode('main'); assert(s.presentationState().cards.find((x: any) => x.id === card.id && x.side === 'p1').portraitVisible === false, 'only this shown faint portrait hidden');
     eq(s._session.gw.snapshot(), engine, 'display control did not issue a battle command'); eq(game(), before, 'display control did not install state');
     await shot('d2-faint-missing-cry-control'); record({ id: 'D2-F02', input: 'display-only published faint; not natural battle equivalence', missingCry: true, independentOwnedSEStarted: true }); await abort();
