@@ -48,15 +48,18 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
       let displaced: any = null, resumeOwed = false;
       // Preparation can pause/duck before this lease occupies the ME channel.
       // Keep its exact identities separate from native post-publication resume.
-      let paused: { buffer: any; record: any } | null = null;
+      type ResumeDebt = { buffer: any; record: any; fadePending: boolean };
+      let paused: ResumeDebt | null = null, resuming: ResumeDebt | null = null;
       let ducked: { state: any; factor: number; expected: number } | null = null;
-      let rollingBack = false;
+      let rollingBack = false, finishingResume = false, restoringBGM = false;
       let last = start, playRequestedAt: number | null = null, deadlineReached = false, fault: string | null = null;
       const errors: string[] = [];
       const diagnostic = (error: unknown) => { if (errors.length < 32) errors.push(String(error instanceof Error ? error.message : error)); };
       const clear = () => { if (timer !== undefined) { const value = timer; timer = undefined; clock.clear(value); } };
       const snapshot = (): CaptureMEView => ({ version: 'capture-me-mz-v1', status, track: { ...track }, phaseStartedAt, deadline,
-        deadlineReached, playRequestedAt, retired, stopConfirmed: stopConfirmed && fault === null, fault, errors: [...errors] });
+        deadlineReached, playRequestedAt, retired, stopConfirmed: stopConfirmed && fault === null &&
+          !rollingBack && !finishingResume && !restoringBGM && !paused && !ducked && !resuming && !resumeOwed && !displaced,
+        fault, errors: [...errors] });
       const now = () => { const value = clock.now(); if (!Number.isFinite(value) || value < last || value > Number.MAX_SAFE_INTEGER) throw new Error('capture ME clock regressed or invalid'); last = value; return value; };
       const sameChannel = () => {
         if (!published && expected && !audio._meBuffer) expected = null; // preceding ME ended/cleared; no successor to overwrite
@@ -64,14 +67,32 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
       };
       const owner = () => { try { return current(); } catch (error) { fault ??= 'ME owner check failed: ' + String(error); throw error; } };
       const live = () => !retired && id === sequence && owner() && (status !== 'loading' && status !== 'playing' || sameChannel());
-      const resumeBGM = () => {
-        if (audio._meBuffer) return;
-        if (audio._bgmSequence) { audio._duckBgmSequence(1); if (audio._meBuffer) return; }
-        const bgm = audio._bgmBuffer, record = audio._currentBgm;
-        if (bgm && record && !bgm.isPlaying() && !audio._meBuffer && audio._bgmBuffer === bgm && audio._currentBgm === record) {
-          bgm.play(true, record.pos);
-          if (!audio._meBuffer && audio._bgmBuffer === bgm && audio._currentBgm === record) bgm.fadeIn(audio._replayFadeTime);
+      const restoreBGM = (debt: ResumeDebt) => {
+        const same = () => !audio._meBuffer && audio._bgmBuffer === debt.buffer && audio._currentBgm === debt.record;
+        if (!same()) return; // exact successor handoff, never touch its position/gain
+        const playing = debt.buffer.isPlaying();
+        if (!same()) return;
+        if (!playing) {
+          debt.fadePending = true; // play/fade can throw after partial side effects
+          debt.buffer.play(true, debt.record.pos);
         }
+        if (!same()) return;
+        if (debt.buffer.isPlaying() !== true) throw new Error('MZ BGM pause restoration unconfirmed');
+        if (same() && debt.fadePending) {
+          debt.buffer.fadeIn(audio._replayFadeTime);
+          debt.fadePending = false; // only successful scheduling discharges this step
+        }
+      };
+      const resumeBGM = () => {
+        if (restoringBGM) return;
+        restoringBGM = true;
+        try {
+          if (audio._meBuffer) { resuming = null; return; }
+          if (audio._bgmSequence) { audio._duckBgmSequence(1); if (audio._meBuffer) { resuming = null; return; } }
+          const bgm = audio._bgmBuffer, record = audio._currentBgm;
+          if (!resuming && bgm && record && !bgm.isPlaying()) resuming = { buffer: bgm, record, fadePending: false };
+          if (resuming) { restoreBGM(resuming); resuming = null; }
+        } finally { restoringBGM = false; }
       };
       const rollbackPreparation = () => {
         if (rollingBack) return;
@@ -90,14 +111,7 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
           }
           const debt = paused;
           if (debt) {
-            const same = () => !audio._meBuffer && audio._bgmBuffer === debt.buffer && audio._currentBgm === debt.record;
-            if (same() && !debt.buffer.isPlaying() && same()) {
-              debt.buffer.play(true, debt.record.pos);
-              if (same()) {
-                if (debt.buffer.isPlaying() !== true) throw new Error('MZ BGM pause restoration unconfirmed');
-                if (same()) debt.buffer.fadeIn(audio._replayFadeTime);
-              }
-            }
+            restoreBGM(debt);
             paused = null; // a changed buffer/registration belongs to its successor
           }
         } finally { rollingBack = false; }
@@ -117,13 +131,15 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
         finally { destroying = false; }
       };
       const finishResume = () => {
-        if (!stopConfirmed || displaced) return;
+        if (finishingResume || rollingBack || restoringBGM || !stopConfirmed || displaced) return;
+        finishingResume = true;
         try {
           rollbackPreparation();
-          if (resumeOwed) { resumeBGM(); resumeOwed = false; }
-          if (fault?.startsWith('ME BGM resume failed:')) fault = null;
+          if (resumeOwed || resuming) { resumeBGM(); resumeOwed = false; }
+          if (!paused && !ducked && !resuming && !resumeOwed && fault?.startsWith('ME BGM resume failed:')) fault = null;
         }
         catch (error) { const detail = 'ME BGM resume failed: ' + String(error); fault ??= detail; diagnostic(detail); }
+        finally { finishingResume = false; }
       };
       const retire = (reason: CaptureMEStatus) => {
         retired = true; status = reason; pending.delete(lease);
@@ -181,7 +197,7 @@ export function createCaptureMEMZ(G: any, nodeRequire: any, root: string, curren
               if (bgm && record) {
                 const position = bgm.seek(), wasPlaying = bgm.isPlaying();
                 if (!prepared()) return;
-                record.pos = position; paused = wasPlaying ? { buffer: bgm, record } : null; bgm.stop();
+                record.pos = position; paused = wasPlaying ? { buffer: bgm, record, fadePending: false } : null; bgm.stop();
                 if (!prepared()) return;
               }
               if (sequenceState) {
