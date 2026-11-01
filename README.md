@@ -38,3 +38,5 @@ pnpm --dir src build
 
 
 2026-11-01：默认F2 `9c045fb` 经独立纯路径、新包单轮81项与精确CI203限域接收；下一小批[战斗音频六入口纯选曲](docs/step5/5.4-D2c-audio-selection.md)待固定候选独立复审，只处理逻辑身份优先级，未播放／未接Scene。完整D2/5.4/E、新P4、GC WARN与旧UNKNOWN不关闭。
+
+后继音频：纯选曲 `47a84e2` 已独立 PASS_SCOPED（155套/2840项），精确分支发布另核；[BGM端口／引子记忆与MZ适配器](docs/step5/5.4-D2c-audio-host-port.md)为下一独立候选，尚未接正式 Scene 或事件，未运行新 NW，不等于实际音频或完整 WP15/16 已验收。
