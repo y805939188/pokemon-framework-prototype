@@ -61,3 +61,5 @@ QUALIFICATION.json列12检查维度；每端仅C01正常＋C07必要边界真实
     node tools/cli.mjs prepare <root> <freezeSHA> formal authorized <new-final-control-dir> <actual-Q-file> <external-QSHA>
 
 最后一条先校验真实新Q再创建目录，写实际dispatch/config/parent-pins后立即对这些字节做零业务准入；父另行运行preflight并pin其回执，才派发。公共观察目录固定basename public-capture-workflow-v1-0001，闭合且仅三文件；额外文件/不同目录拒收。未收到真实资格或真实独立工具/候选报告hash，保持HOLD。
+
+逐callee未披露值必须留存而非丢弃。候选worker在execution/<case>-native下保留原生返回值的Node v8 lossless serialization（包括undefined），抛出值同样保留，单call≤1MiB；NATIVE-MANIFEST绑定顺序/role/生命周期/hash，公共nativeCalls仅evidenceSHA256。producer在公开包写出前机器核实际binary摘要。O使用其私有同版证据格式绑定真实caller/callee原生值，A独立核原件与公共hash；clean只读通过门的摘要及白名单字段，绝不读参考私有原值。证据hash只是来源绑定，比较器不将两端hash相同/不同当未披露返回值的语义等价/差异。候选私有执行证据不进入Git/public三文件，也不交Claude。

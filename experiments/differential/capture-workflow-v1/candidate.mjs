@@ -1,5 +1,6 @@
+import {serialize} from 'node:v8';
 // Actual production GameApplication; only upstream captured-success facts and host ports are synthetic.
-import {clone,need,hashJSON,canonical} from './safe.mjs';
+import {clone,need,hashJSON,canonical,sha} from './safe.mjs';
 import {BOUNDS,OPERATION} from './constants.mjs';
 export function returnFact(v){
  const object=v!==null&&typeof v==='object';return {type:v===undefined?'undefined':v===null?'null':typeof v==='string'?'string':typeof v==='number'?'integer':typeof v==='boolean'?'boolean':'object',integerValue:typeof v==='number'?v:null,booleanValue:typeof v==='boolean'?v:null,value:typeof v==='string'?v:null,status:object?v.status??null:null,commit:object?v.commit??null:null,pending:object?v.pending??null:null,aborted:object?v.aborted??null:null,code:object?v.code??null:null,errorPresent:object&&Object.hasOwn(v,'error')};
@@ -13,7 +14,7 @@ function memberView(E,m,key,c){
 }
 const memberAllowed=['id','species','form','nickname','level','exp','hp','status','statusCount','moves','item','ability','nature','statNature','gender','ivs','evs','friendship','ball','ot','personalID','owner','ownerCompatibilityDefault','origin','abilityIndex','effectiveAbilityIndex','shiny','superShiny','firstMoves','markings','ribbons','cannotStore','cannotRelease','cannotTrade','isEgg','mail','readyToEvolve','evolutionReadiness'];
 const stateAllowed=['schema','party','storage','player','nextMemberOrdinal','inventory','badges','money','dex','appliedBattles','claims','stats','steps'];
-export async function runCase(E,fixture){
+export async function runCase(E,fixture,{onNative=()=>{}}={}){
  const {definition:d,content:c}=fixture;let installed=clone(fixture.state),app,handle,raw,templates={},idKeys=new Map(),keyIds=new Map(),reads=0,writes=0,readbacks=0,setupDraws=0,businessDraws=0,phase='setup',lastOutcome=null,decisionIndex=0,lastInstalled=null;
  const nativeCalls=[],events=[],checkpoints=[],decisions={};
  const originalMembers=new Map([...installed.party,...installed.storage.boxes.flatMap(b=>b.slots.filter(Boolean))].map(m=>[m.id,clone(m)]));
@@ -32,8 +33,9 @@ export async function runCase(E,fixture){
  }
  function checkpoint(phase){need(checkpoints.length<BOUNDS.checkpoints,'PROJECTION_UNSUPPORTED');checkpoints.push({ordinal:checkpoints.length,atCall:nativeCalls.length,phase,state:projection()});return checkpoints.length-1;}
  function event(kind,member=null,action='none',cp=null){need(events.length<BOUNDS.events,'PROJECTION_UNSUPPORTED');events.push({ordinal:events.length+1,kind,member,action,checkpoint:cp});}
- function call(role,fn){need(nativeCalls.length<BOUNDS.calls,'PROJECTION_UNSUPPORTED');let v;try{v=fn();need(!v?.then,'UNEXPECTED_ASYNC_BUSINESS');nativeCalls.push({ordinal:nativeCalls.length+1,role,lifecycle:'returned',returnFact:returnFact(v),errorClass:null,boundary:null});lastOutcome=v;}
-  catch(e){if(e.code)throw e;nativeCalls.push({ordinal:nativeCalls.length+1,role,lifecycle:'raised',returnFact:null,errorClass:e.constructor.name,boundary:null});lastOutcome=null;}
+ function saveNative(role,lifecycle,value){const bytes=serialize(value),ordinal=nativeCalls.length+1;need(bytes.length<=1048576,'NATIVE_EVIDENCE_LIMIT');onNative({ordinal,role,lifecycle,bytes});return sha(bytes);}
+ function call(role,fn){need(nativeCalls.length<BOUNDS.calls,'PROJECTION_UNSUPPORTED');let v;try{v=fn();need(!v?.then,'UNEXPECTED_ASYNC_BUSINESS');nativeCalls.push({ordinal:nativeCalls.length+1,role,lifecycle:'returned',returnFact:returnFact(v),errorClass:null,boundary:null,evidenceSHA256:saveNative(role,'returned',v)});lastOutcome=v;}
+  catch(e){if(e.code)throw e;nativeCalls.push({ordinal:nativeCalls.length+1,role,lifecycle:'raised',returnFact:null,errorClass:e.constructor.name,boundary:null,evidenceSHA256:saveNative(role,'raised',e)});lastOutcome=null;}
   checkpoint('after-call');return v;
  }
  const complete=value=>({status:'complete',value}),faint=()=>({coverage:{status:'complete'},positiveOccurrences:[]});
