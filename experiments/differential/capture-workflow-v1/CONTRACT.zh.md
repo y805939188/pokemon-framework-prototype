@@ -18,9 +18,9 @@ C01 内部新拥有/队伍有位/保留名；C02 非内部直接完整队列；C
 
 schema.mjs 是可执行的闭合JSON Schema子集；冻结 schemas.json 为同一来源导出。所有字段必须自有数据，拒绝额外键、getter、toJSON、重复JSON键、非有限/有损整数、链接/硬链接、路径逃逸或自由raw对象；未知必需字段/变化不可表达则技术BLOCKED，不能丢弃。
 
-StateSchema：party有序≤6；40×30实际槽位与当前盒；真实所有已存在成员及上游队列模板的稳定合成key、物种/形态/PID/性别/闪光、owner/origin/等级经验/昵称、实际HP及实际内容计算HP上限、statusCount、PP/maxpp/ppUps/firstMoves、能力/IV/EV/nature/保护标记/球；dex六事实加实际hasDex/unlocked/view；实际money/inventory/claims/player/badges/steps和储存外观摘要。初态、每次实际调用后/实际请求处和终态读取真实当前状态。不得hash输入代替读回。
+StateSchema：party有序≤6；40×30实际槽位与当前盒；真实所有已存在成员及上游队列模板的稳定合成key、物种/形态/PID/性别/闪光、owner/origin/等级经验/昵称、实际HP及实际内容计算HP上限、statusCount、PP/maxpp/ppUps/firstMoves、能力/IV/EV/nature/保护标记/球；dex六事实加实际hasDex/unlocked/view；实际money、共同语义inventory非零item-count（本fixture闭合pokeball/potion，意外其它item不可表达则阻塞）、player/badges/steps和储存外观摘要。初态、每次实际调用后/实际请求处和终态读取真实当前状态。不得hash输入代替读回。
 
-所有参与放置的成员和未涉及成员均明文保留核心字段，未声明的extra字段直接拒绝。不能投影的意外改变要阻塞披露而非压平为unchanged。TS专有ownerCompatibilityDefault/origin.compatibilityDefault/statNature/ot/evolutionReadiness的实际变化在unexpectedChanges逐字段记录实际安全标量和摘要；不要求参考有虚构同名内部字段。stats/nextMemberOrdinal/ledger是候选专属可审计提交事实，未纳入两端同表示比较；候选完整初态/执行闭包和实际安装由独立审查核验，不能声称这些内部表示等价。
+所有参与放置的成员和未涉及成员均明文保留核心字段，未声明的extra字段直接拒绝。不能投影的意外改变要阻塞披露而非压平为unchanged。TS专有ownerCompatibilityDefault/origin.compatibilityDefault/statNature/ot/evolutionReadiness的实际变化在unexpectedChanges逐字段记录实际安全标量和摘要；不要求参考有虚构同名内部字段。claims与原生inventory布局/游标不是参考端必须具备的TS内部对象：分别在candidateState保留实际前后摘要，任一变化为候选完整性问题，不能靠共同计数字典相同掩盖。stats/nextMemberOrdinal/ledger是候选专属可审计提交事实，未纳入两端同表示比较；候选完整初态/执行闭包和实际安装由独立审查核验，不能声称这些内部表示等价。
 
 刷新有明确 carrier/calls/callOrdinals。参考explicit-cache-refresh须包装真实刷新callee计数及其外层原生调用ordinal；候选生产无刷新缓存/刷新方法，按请求推导而非刷新，carrier=derived-on-query-no-cache、真实缓存刷新调用0。不把plan.refreshAccessible布尔转为次数，也不把源与目标carrier不同忽略；本carrier不声称统计所有纯函数计算次数或性能。
 
