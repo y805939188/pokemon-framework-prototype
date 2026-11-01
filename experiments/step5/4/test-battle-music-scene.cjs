@@ -12,6 +12,67 @@ test.before(()=>{
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
 
+function nativeIntroEventHost({decodeError=null,waitError=null,clearError=null,successor=false,source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8')}={}){
+ // Real interpreter commands and compiled PSFlow; decode/render/session ports stay controlled.
+ const PLAN=require('./music-native-plan.json'),named=x=>PLAN.prefix+x,f=host({ready:false,intro:named('intro')}),G={Graphics:f.G.Graphics,$gameMap:{mapId:()=>5},PluginManager:{},Utils:{extractFileName:x=>x}},details={};
+ fs.mkdirSync(path.join(f.root,'audio/bgm',PLAN.prefix),{recursive:true});for(const name of ['world','intro','trainer'])f.write(named(name));f.projection.presentation.battleBgm=named('trainer');
+ function Interpreter(){this.clear();}G.Game_Interpreter=Interpreter;vm.createContext(G);
+ const objects=fs.readFileSync(path.join(ROOT,'js/reactor_objects.js'),'utf8');
+ for(const name of ['clear','setup','loadImages','currentCommand','nextEventCode','command115','command355','command357','setWaitMode']){
+  const m=objects.match(new RegExp('Game_Interpreter\\.prototype\\.'+name+' = function\\([^)]*\\) \\{[\\s\\S]*?\\n\\};'));assert(m,name);vm.runInContext(m[0],G);
+ }
+ Interpreter.prototype.updateWaitMode=f.G.Game_Interpreter.prototype.updateWaitMode;
+ const interpreter=new Interpreter(),baseClear=interpreter.clear;interpreter.clear=function(){if(clearError&&this._list&&this._index>=this._list.length)throw clearError;return baseClear.call(this);};G.$gameMap._interpreter=interpreter;
+ const parseAst=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]})).parseAst,nodes=[];
+ (function walk(n){if(!n||typeof n!=='object')return;if(Array.isArray(n)){n.forEach(walk);return;}nodes.push(n);for(const v of Object.values(n))walk(v);})(parseAst(source,{lang:'ts'}));
+ const cleanup=nodes.find(n=>n.type==='VariableDeclarator'&&n.id.name==='retireIntroEvent');assert(cleanup,'actual event retirement helper');
+ const retire=vm.runInNewContext('(({G,flow,details})=>(event,primary)=>'+source.slice(cleanup.init.body.start,cleanup.init.body.end)+')')({G,flow:f.flow,details});
+ const m03=nodes.find(n=>n.type==='CallExpression'&&n.callee.name==='run'&&n.arguments[0]?.value==='M03');assert(m03);
+ const {stripTypeScriptTypes}=require('node:module'),records=[];let gate;
+ const create=f.audio.createBuffer;f.audio.createBuffer=function(folder,name){const b=create.call(this,folder,name),rec={buffer:b,name,folder,plays:[]},play=b.play;b.play=function(...args){rec.plays.push({frame:f.G.Graphics.frameCount});return play.apply(this,args);};records.push(rec);if(gate&&!gate.assigned&&name===gate.name){gate.assigned=true;gate.row=rec;}return b;};
+ let starts=0;
+ G.PluginManager.callCommand=(i,_plugin,command)=>{if(command==='PlayTrainerIntro'){i._psMusicIntro=f.flow.playTrainerIntro('npc',1);i.setWaitMode('psBattleIntro');}else if(command==='StartTrainerBattle'){starts++;f.open(true);}else assert.fail(command);};
+ const dispatch=()=>{const row=interpreter.currentCommand();if(row.code===355)interpreter.command355();else if(row.code===357)interpreter.command357(row.parameters);interpreter._index++;};
+ const drain=()=>{for(let n=0;interpreter._list&&interpreter._index<interpreter._list.length&&n<8;n++){if(interpreter.currentCommand().code===0)break;dispatch();}};
+ const installSuccessor=()=>{const fn=()=>{f.successorCalls=(f.successorCalls??0)+1;},list=[{code:355,parameters:['globalThis.__psMusicNativeMark();']},{code:0,parameters:[]}];interpreter.setup(list,0);G.__psMusicNativeMark=fn;const token=f.flow.playTrainerIntro('npc',1);interpreter._psMusicIntro=token;f.successor={fn,list,token};};
+ const body=source.slice(m03.arguments[1].body.start,m03.arguments[1].body.end),code='(async ({reset,world,holdNext,named,G,flow,waitFor,nativeReady,assert,release,eq,inMode,active,player,activeRow,abortScene,retireIntroEvent,PLAN})=>{let ordinal=0;return await(async()=>'+body+')();})';
+ const execute=vm.runInNewContext(stripTypeScriptTypes(code)) ;
+ const actions={PLAN,reset:async()=>f.app,world:async()=>{f.audio._currentBgm.name=named('world');},holdNext:name=>(gate={name,assigned:false,row:null}),named,G,flow:f.flow,waitFor:async predicate=>{if(waitError)throw waitError;dispatch();assert(predicate());},nativeReady:async()=>{if(successor)installSuccessor();if(decodeError)throw decodeError;},assert,release:g=>f.load(g.row.buffer),eq:assert.deepEqual,inMode:async()=>{f.G.Graphics.frameCount++;assert.equal(interpreter.updateWaitMode(),false);dispatch();dispatch();await f.scene();},active:async name=>{const r=records.at(-1);assert.equal(r.name,name);f.load(r.buffer);return r;},player:()=>f.flow.musicState().player,activeRow:()=>records.at(-1),abortScene:async()=>{f.flow.abort(Error('controlled normal M03 abort'));f.currentScene?.terminate();interpreter.clear();},retireIntroEvent:retire};
+ Object.assign(f,{G,details,interpreter,records,runM03:()=>execute(actions),drain,eventStarts:()=>starts,late:()=>{if(gate?.row)f.load(gate.row.buffer);},retire});
+ return f;
+}
+for(const kind of ['decode assertion','wait cancellation'])test('actual M03 '+kind+' retires its native interpreter before hook removal and preserves first error',async()=>{
+ const failure=Object.assign(Error(kind),{code:kind}),f=nativeIntroEventHost(kind==='decode assertion'?{decodeError:failure}:{waitError:failure});
+ await assert.rejects(f.runM03(),e=>e===failure);assert.doesNotThrow(f.drain);const played=f.plays.length;if(f.records.length)assert(f.records[0].buffer.destroyed>0,'owned pending native resource retired');f.late();assert.equal(f.plays.length,played,'late decode cannot play after retirement');assert.equal(f.eventStarts(),0);assert.equal(f.G.__psMusicNativeMark,undefined);assert(!f.flow.musicState()?.current);assert.equal(f.details.cleanupErrors?.length??0,0);
+});
+test('normal actual M03 completes original assertions and teardown without a second state replacement',async()=>{
+ const f=nativeIntroEventHost(),result=await f.runM03();assert(result.marker.frame>result.settled);assert.equal(f.eventStarts(),1);assert.equal(f.G.__psMusicNativeMark,undefined);assert.equal(f.app.stateGeneration,0);assert.doesNotThrow(f.drain);
+});
+test('actual M03 cleanup preserves the first decode error when interpreter clear also fails',async()=>{
+ const first=Error('first decode assertion'),cleanup=Error('clear failure'),f=nativeIntroEventHost({decodeError:first,clearError:cleanup});
+ await assert.rejects(f.runM03(),e=>e===first);assert.equal(f.details.cleanupErrors[0].kind,'intro-event');assert.match(f.details.cleanupErrors[0].error,/clear failure/);assert.doesNotThrow(f.drain);assert.equal(f.eventStarts(),0);assert.equal(f.G.__psMusicNativeMark,undefined);
+});
+test('genuine successor interpreter list, callback and intro token survive old M03 failure cleanup',async()=>{
+ const failure=Error('old decode'),f=nativeIntroEventHost({decodeError:failure,successor:true});await assert.rejects(f.runM03(),e=>e===failure);
+ assert.equal(f.interpreter._list,f.successor.list);assert.equal(f.G.__psMusicNativeMark,f.successor.fn);assert.equal(f.flow.musicState().token,f.successor.token);assert(f.flow.musicState().current);assert.doesNotThrow(f.drain);assert.equal(f.successorCalls,1);
+});
+test('removing actual event retirement revives the real command355 callback fatal',async()=>{
+ const source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8'),marker="trace.ownedList = true; token = event.interpreter._psMusicIntro;";assert.equal(source.split(marker).length,2);
+ // Keep the exact queued native interpreter while removing only the retirement block.
+ const broken=source.replace('if (event.interpreter._list === event.list) {\n        '+marker,'if (false) {\n        '+marker).replace("if (event.interpreter._list === event.list && event.interpreter._index < event.list.length) throw Error('owned intro event did not retire');",'');
+ const f=nativeIntroEventHost({decodeError:Error('original'),source:broken});await assert.rejects(f.runM03(),/original/);assert.throws(f.drain,/__psMusicNativeMark/);
+});
+test('native duration checker keeps exact granule boundary rejection, including shortened and mismatched decoded audio',async()=>{
+ const source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8'),from=source.indexOf('  const nativeReady = async '),a=source.indexOf('=> {',from)+4,b=source.indexOf('\n  };',a),body=source.slice(a,b);
+ const asset={logicalName:'synthetic',kind:'bgm',expectedNativeChannels:2,nativeDurationRangeSeconds:[(4000-2)/44100,(4000+2)/44100]},value={error:false,ready:true,decoded:[{tag:'[object AudioBuffer]',duration:4000/44100,sampleRate:44100,channels:2}]};
+ const run=vm.runInNewContext(require('node:module').stripTypeScriptTypes('(async({assert,waitFor,readNative,input,mark,row})=>{'+body+'})'));
+ const check=v=>run({assert,waitFor:async p=>assert(p()),readNative:()=>v,input:{assets:[asset]},mark(){},row:{name:'synthetic',folder:'bgm/',buffer:{isError:()=>v.error},ready:()=>true}});
+ await check(value);for(const duration of [(4000-2)/44100,(4000+2)/44100])await check({...value,decoded:[{...value.decoded[0],duration}]});
+ for(const duration of [(4000-3)/44100,(4000+3)/44100,(4000-1024)/44100,8000/44100])await assert.rejects(check({...value,decoded:[{...value.decoded[0],duration}]}),/native duration fits/);
+ await assert.rejects(check({...value,error:true}),/decoder ready/);await assert.rejects(check({...value,decoded:[{...value.decoded[0],channels:1}]}),/channel count/);
+});
+
+
 function nativeColdStartup(source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8')){
  // Actual Boot/Title/Map and driver control flow. Music/session/render ports are controlled: reachability only.
  const f=nativeMapLifecycle(source),G=f.G,parseAst=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]})).parseAst;

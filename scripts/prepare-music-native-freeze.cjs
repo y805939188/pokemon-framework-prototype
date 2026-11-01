@@ -2,6 +2,7 @@
 // Build/static preparation only. This script never launches NW or creates a save/profile.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),cp=require('node:child_process');
 const ROOT=path.resolve(__dirname,'..'),PLAN=require('../experiments/step5/4/music-native-plan.json');
+const {oggTiming,DURATION_CONTRACT,PAGE_DURATION_US}=require('./prepare-music-native-assets.cjs');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex'),hashFile=f=>sha(fs.readFileSync(f));
 const canonical=v=>JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const inside=(parent,child)=>{const p=path.relative(parent,child);return p!==''&&!p.startsWith('..'+path.sep)&&p!=='..'&&!path.isAbsolute(p);};
@@ -14,11 +15,15 @@ function prepare(app,assetFile,runRoot,out){
  assert.equal(cp.execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),info.gitHead,'actual source checkout head');assert.equal(cp.execFileSync('git',['status','--porcelain','-uall'],{cwd:ROOT,encoding:'utf8'}).trim(),'','actual checkout clean');cp.execFileSync('git',['merge-base','--is-ancestor',PLAN.productCommit,info.gitHead],{cwd:ROOT});
  assert.equal(hashFile(path.join(game,'js/plugins/PS_BattleFlowTest.js')),hashFile(path.join(ROOT,'js/plugins/PS_BattleFlowTest.js')),'package driver equals current compiled driver');
  assert.equal(media.version,PLAN.version);assert.equal(media.input,sha(Buffer.from(JSON.stringify(PLAN))));assert.equal(media.recipe,hashFile(path.join(ROOT,'scripts/prepare-music-native-assets.cjs')));
+ assert.equal(media.mediaQualificationVersion,3);assert.equal(media.pageDurationMicroseconds,PAGE_DURATION_US);
  const expected=PLAN.assets.map(r=>'audio/'+r.kind+'/'+PLAN.prefix+r.name+'.ogg').concat(PLAN.aliases.map(r=>r.path),PLAN.intentionalBadAsset);assert.equal(new Set(expected).size,expected.length);assert.deepEqual(media.files.map(r=>r.path).sort(),expected.sort());
  assert(!fs.existsSync(path.join(game,PLAN.intentionalMissingAsset)),'negative missing clip absent');
  const assetDir=path.dirname(assetFile);
  for(const row of media.files){assert(inside(game,path.resolve(game,row.path))&&inside(game,fs.realpathSync(path.join(game,row.path))),'sound stays in owned APP');assert.equal(hashFile(path.join(game,row.path)),row.sha256);assert.equal(hashFile(path.join(assetDir,row.path)),row.sha256);
-  if(row.sourceWav){assert.equal(hashFile(path.join(assetDir,row.sourceWav)),row.sourceSHA256);assert.equal(row.probe.streams[0].codec_name,'vorbis');assert.equal(row.probe.format.format_name,'ogg');assert.equal(Number(row.probe.streams[0].channels),PLAN.encodedChannels);assert.equal(Number(row.probe.streams[0].sample_rate),PLAN.sampleRate);assert(row.decodedFrames>0&&row.nativeDurationRangeSeconds.length===2);assert(row.nativeDurationRangeSeconds.every(Number.isFinite));assert(row.nativeDurationRangeSeconds[0]<row.nativeDurationRangeSeconds[1]);assert.equal(row.offlineDecode,'PASS_NATIVE_NW_NOT_RUN');}
+  if(row.sourceWav){assert.equal(hashFile(path.join(assetDir,row.sourceWav)),row.sourceSHA256);assert.equal(row.probe.streams[0].codec_name,'vorbis');assert.equal(row.probe.format.format_name,'ogg');assert.equal(Number(row.probe.streams[0].channels),PLAN.encodedChannels);assert.equal(Number(row.probe.streams[0].sample_rate),PLAN.sampleRate);assert(row.decodedFrames>0&&row.nativeDurationRangeSeconds.length===2);assert(row.nativeDurationRangeSeconds.every(Number.isFinite));assert(row.nativeDurationRangeSeconds[0]<row.nativeDurationRangeSeconds[1]);assert.equal(row.offlineDecode,'PASS_NATIVE_NW_NOT_RUN');
+   assert.equal(row.durationContract,DURATION_CONTRACT);assert.equal(row.decodedFrames,row.containerFrames);assert.deepEqual(row.nativeDurationRangeSeconds,[(row.containerFrames-2)/PLAN.sampleRate,(row.containerFrames+2)/PLAN.sampleRate]);
+   const actual=oggTiming(fs.readFileSync(path.join(game,row.path)));assert(actual.audioPages.length>1&&!actual.audioPages[0].eos&&actual.audioPages[0].granule>0);assert.equal(actual.audioPages.at(-1).granule,row.containerFrames);assert.equal(actual.audioPayloadSHA256,row.packetTiming.audioPayloadSHA256);assert.equal(row.packetTiming.verified,true);assert.equal(row.packetTiming.lastPacketEnd,row.containerFrames);
+  }
   else assert.equal(row.path,PLAN.intentionalBadAsset);
  }
  const ids=PLAN.groups.flatMap(g=>g.ids);assert.deepEqual(ids,Array.from({length:17},(_,i)=>'M'+String(i+1).padStart(2,'0')));assert.equal(PLAN.groups.length,6);
