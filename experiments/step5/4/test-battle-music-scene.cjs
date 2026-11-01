@@ -475,3 +475,8 @@ test('actual M11 refuses a native success code when the real save wrapper diagno
  const f=nativeTailHost(),base=f.G.StorageManager.loadObject;f.G.StorageManager.loadObject=async function(...args){const value=await base.apply(this,args);value.system._psGame={schema:-1};return value;};
  await assert.rejects(f.run('M11'),/validated without a diagnostic/);assert(f.G.$gameSystem._psSaveError);assert(!f.flow.running);
 });
+test('actual M11 propagates an extractSaveContents hook exception unchanged before diagnostic or newgame acceptance',async()=>{
+ const f=nativeTailHost(),failure=Error('controlled actual extractSaveContents hook');let entered=0;
+ f.G.DataManager.extractSaveContents=function(){entered++;throw failure;};
+ await assert.rejects(f.run('M11'),error=>error===failure);assert.equal(entered,1);assert.equal(f.loadedNames.length,1);assert.equal(f.newGames??0,0);
+});
