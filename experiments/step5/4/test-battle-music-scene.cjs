@@ -115,3 +115,25 @@ test('public trainer query reentry that replaces state cannot publish a projecti
 test('repeated intro replaces pending work but keeps the original world memo and invalidates only the older wait token',()=>{
  for(const ready of [true,false]){const f=host({ready}),first=f.flow.playTrainerIntro('npc',1),old=f.buffers[0],next=f.flow.playTrainerIntro('npc',1);assert.notEqual(first,next);assert(f.flow.isTrainerIntroReady(first));assert.equal(old.destroyed,1);assert.equal(f.flow.musicState().player.memo.track.name,'Map');assert.equal(f.flow.musicState().player.memo.position,17);if(!ready){f.load(old);assert.equal(f.plays.length,0);f.load();}assert(!f.flow.isTrainerIntroReady(next));f.G.Graphics.frameCount++;assert(f.flow.isTrainerIntroReady(next));f.flow.stateReplaced();}
 });
+test('native M13 actual action block establishes world after abort without resetting the preserved preset',async()=>{
+ // Execute the driver's own actions against the compiled production Scene/music path.
+ // Renderer/session/audio remain controlled; this is not a native playback claim.
+ const source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8'),start="await run('M13', async () => {",end="\n      });\n      await run('M14'";
+ assert.equal(source.split(start).length,2);const from=source.indexOf(start)+start.length,to=source.indexOf(end,from);assert(to>from);const body=source.slice(from,to);
+ const plan=require('./music-native-plan.json'),named=name=>plan.prefix+name;
+ async function execute(text){
+  let f,resets=0,worlds=0;const selected=[];
+  const actions={named,flow:new Proxy({},{get(_target,key){const value=f.flow[key];return typeof value==='function'?value.bind(f.flow):value;}}),
+   async reset(){resets++;f=host();fs.mkdirSync(path.join(f.root,'audio/bgm',plan.prefix),{recursive:true});for(const name of ['world','preset','next'])f.write(named(name));},
+   async world(){worlds++;f.audio.stopBgm();const buffer=f.audio.createBuffer('bgm/',named('world'));f.audio._bgmBuffer=buffer;f.audio._currentBgm={name:named('world'),volume:100,pitch:100,pan:0,pos:0};buffer.play(true,0);},
+   async open(){f.open();await f.scene();},
+   async active(name){assert.equal(f.audio._currentBgm?.name??null,name,'M13 requires its declared live song');selected.push(name);},
+   async finish(){const old=f.currentScene;old.onEnd();old.terminate();f.G.SceneManager._scene={map:true};},
+   async abortScene(){f.flow.abort(Error('M13 explicit abort'));f.currentScene.terminate();f.G.SceneManager._scene={map:true};assert.equal(f.audio._bgmBuffer,null,'abort does not restore a world song');assert.equal(f.audio._currentBgm,null,'same-map return without transfer/autoplay stays silent');}};
+  const run=vm.runInThisContext('(async ({reset,world,flow,open,active,finish,abortScene,named})=>{'+text+'})',{filename:'native-M13-action-block'}),result=await run(actions);
+  return {result,resets,worlds,selected};
+ }
+ const actual=await execute(body);assert.deepEqual(actual,{result:{futureSurvived:true,abortPreserved:true,normalConsumed:true},resets:1,worlds:2,selected:[named('preset'),named('world'),named('next'),named('next'),named('world'),'Battle wild']});
+ const establish='        await world(); // M13 re-establish world explicitly without clearing the preserved preset.\n';assert.equal(body.split(establish).length,2);
+ await assert.rejects(execute(body.replace(establish,'')),error=>error.code==='ERR_ASSERTION'&&error.actual===null&&error.expected===named('world'),'removing the new precondition must expose the old actual-null/expected-world mismatch');
+});

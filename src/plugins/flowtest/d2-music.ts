@@ -228,6 +228,7 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
       });
       await run('M13', async () => {
         await reset(); await world(); flow.setNextBattleMusic({ battle: named('preset') }); await open(); await active(named('preset')); flow.setNextBattleMusic({ battle: named('next') }); await finish(); await active(named('world')); await open(); await active(named('next')); await abortScene();
+        await world(); // M13 re-establish world explicitly without clearing the preserved preset.
         await open(); await active(named('next')); await finish(); await active(named('world')); await open(); await active('Battle wild'); await abortScene(); return { futureSurvived: true, abortPreserved: true, normalConsumed: true };
       });
       await run('M14', async () => {
