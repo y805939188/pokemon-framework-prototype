@@ -12,6 +12,74 @@ test.before(()=>{
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
 
+function nativeColdStartup(source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8')){
+ // Actual Boot/Title/Map and driver control flow. Music/session/render ports are controlled: reachability only.
+ const f=nativeMapLifecycle(source),G=f.G,parseAst=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]})).parseAst;
+ const scenes=fs.readFileSync(path.join(ROOT,'js/reactor_scenes.js'),'utf8'),managers=fs.readFileSync(path.join(ROOT,'js/reactor_managers.js'),'utf8'),core=fs.readFileSync(path.join(ROOT,'js/reactor_core.js'),'utf8'),ui=fs.readFileSync(path.join(ROOT,'js/reactor_ui.js'),'utf8');
+ function select(text,predicate){const found=[];function visit(n){if(!n||typeof n!=='object')return;if(Array.isArray(n)){n.forEach(visit);return;}if(predicate(n,text))found.push(n);for(const value of Object.values(n))visit(value);}visit(parseAst(text,{lang:'ts'}));return found;}
+ const assignments=(text,left)=>select(text,(n,s)=>n.type==='AssignmentExpression'&&s.slice(n.left.start,n.left.end)===left).map(n=>text.slice(n.start,n.end)+';');
+ const install=(text,left)=>{const value=assignments(text,left)[0];assert(value,left);vm.runInContext(value,G);};
+ const declaration=name=>select(source,n=>n.type==='VariableDeclarator'&&n.id.name===name)[0];
+ const initializer=name=>{const node=declaration(name);return node?source.slice(node.init.start,node.init.end):null;};
+ Object.assign(f,{sceneFrames:0,titleClosing:false,titleActive:true,holdTitleStart:false,holdMapStart:false,newGames:0,fixtureResets:0,transfers:0,battles:0,presses:[]});
+ function Title(){this.initialize();const self=this;this._commandWindow={isClosing:()=>f.titleClosing,isOpenAndActive:()=>self.isStarted()&&f.titleActive};}Title.prototype=Object.create(G.Scene_Base.prototype);
+ Object.assign(Title.prototype,{adjustBackground(){},playTitleMusic(){},startFadeIn(){},fadeSpeed:()=>24});
+ function Boot(){this.initialize();}Boot.prototype=Object.create(G.Scene_Base.prototype);Object.assign(Boot.prototype,{checkPlayerLocation(){},resizeScreen(){},updateDocumentTitle(){}});
+ Object.assign(G,{Scene_Title:Title,Scene_Boot:Boot,Scene_Battle:function(){},Utils:{isNwjs:()=>true},location:{search:''},nw:{App:{argv:['--ps-sound','--ps-flow-test=d2-music','--ps-flow-quit']}},Game_Action:{installMultiElementShim(){}},SoundManager:{preloadImportantSounds(){}},Window_TitleCommand:{initCommandPosition(){}},ConfigManager:{},$dataSystem:JSON.parse(fs.readFileSync(path.join(ROOT,'data/System.json'))),ReactorUI:{installSceneRouting(){},CAPTURE_OPTION:'rrcapture',CAPTURE_SCENES:{}},$gameSystem:{},$gameMessage:{clear(){}},$gameMap:{mapId:()=>5,_interpreter:{clear(){}}}});
+ Object.assign(G.DataManager,{isBattleTest:()=>false,isEventTest:()=>false,setupNewGame(){f.newGames++;}});
+ G.$gamePlayer.reserveTransfer=()=>{f.transfers++;};
+ G.SceneManager.goto=Type=>{G.SceneManager._scene=new Type();f.sceneFrames=0;G.SceneManager._scene.create?.();};
+ for(const [text,left]of [[core,'Utils.isOptionValid'],[managers,'DataManager.isTitleSkip'],[scenes,'Scene_Title.prototype.start'],[scenes,'Scene_Title.prototype.isBusy'],[scenes,'Scene_Boot.prototype.startNormalGame'],[scenes,'Scene_Boot.prototype.start']])install(text,left);
+ const wrap=(body,alias,member)=>vm.runInContext('(function(){const '+alias+'=Scene_Boot.prototype.'+member+';'+body+'})();',G);
+ wrap(assignments(scenes,'Scene_Boot.prototype.startNormalGame').at(-1),'_startNormalGame','startNormalGame');
+ wrap(assignments(scenes,'Scene_Boot.prototype.start').at(-1),'_start','start');
+ for(const name of ['launchTokens','captureRequest','bootInterfaceId'])install(ui,'ReactorUI.'+name);
+ wrap(assignments(ui,'Scene_Boot.prototype.start')[0],'_Scene_Boot_start','start');
+ assert.equal(require(path.join(ROOT,'package.json')).main,'index.html');assert.equal(G.$dataSystem.rrSkipTitle,undefined);assert.equal(G.ReactorUI.bootInterfaceId(),0);assert.equal(G.ReactorUI.captureRequest(),null);
+ new G.Scene_Boot().start();assert.equal(G.DataManager.isTitleSkip(),false);assert(f.scene() instanceof Title);assert.equal(f.newGames,1);
+ const step=()=>{f.sceneFrames++;const current=f.scene();if(current instanceof Title){if(f.sceneFrames>=2&&!f.holdTitleStart)current.start();}else if(current instanceof G.Scene_Map){if(f.sceneFrames===1){f.loaded=true;assert(current.isReady());}else if(f.sceneFrames>=2&&!f.holdMapStart)current.start();}};
+ const waitFor=async predicate=>{for(let i=0;i<12;i++){if(f.waitFailure)throw f.waitFailure;if(predicate())return;step();}throw Object.assign(Error('bounded native driver lifecycle wait'),{code:'WAIT_DRIVER_LIFECYCLE'});};
+ const frames=async count=>{for(let i=0;i<count;i++)step();},scene=f.scene;
+ const parent=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlowTest.ts'),'utf8'),transferNode=select(parent,n=>n.type==='FunctionDeclaration'&&n.id?.name==='toMapId')[0];
+ const toMapId=vm.runInNewContext('(({G,waitFor,scene,frames})=>async(mapId,x,y)=>'+parent.slice(transferNode.body.start,transferNode.body.end)+')')({G,waitFor,scene,frames});
+ const flow={stateReplaced(){f.fixtureResets++;},app:()=>({}),abort(){f.aborts=(f.aborts??0)+1;}},PLAN=require('./music-native-plan.json'),deps={G,scene,flow,waitFor,assert,E:{dex:{createDexLookup:()=>({})}},content:{},PLAN,musicNativeState:()=>({controlledFixture:true}),toMapId,press:async key=>f.presses.push(key)};
+ const resetNode=declaration('reset'),body=source.slice(resetNode.init.body.start,resetNode.init.body.end);
+ const factory='(({G,scene,flow,waitFor,assert,E,content,PLAN,musicNativeState,toMapId,press})=>{let randomState=0,draws=0,settings={};const random=()=>0;let firstReset='+(initializer('firstReset')??'true')+';const clearMessages='+initializer('clearMessages')+';const mapReady='+initializer('mapReady')+';'+(initializer('titleReady')?'const titleReady='+initializer('titleReady')+';':'')+'const reset=async(kind="normal",options={})=>'+body+';const abortScene='+initializer('abortScene')+';return{reset,abortScene,mapReady};})';
+ f.actions=vm.runInNewContext(factory) (deps);f.waitFor=waitFor;
+ f.runM01=async()=>{const call=select(source,n=>n.type==='CallExpression'&&n.callee.name==='run'&&n.arguments[0]?.value==='M01')[0],body=source.slice(call.arguments[1].body.start,call.arguments[1].body.end),objects=[];
+ const named=name=>PLAN.prefix+name,world=async()=>{assert(f.actions.mapReady(),'world setup occurs only after a started Map');},open=async trainer=>{assert(f.actions.mapReady());f.battles++;f.song=trainer?named('trainer'):'Battle wild';objects.push({name:f.song,plays:[{}]});G.SceneManager.goto(G.Scene_Battle);return{request:{kind:trainer?'trainer':'wild'}};};
+ return vm.runInNewContext('(async({reset,world,open,active,player,last,objects,abortScene,named,eq,assert})=>'+body+')')({...f.actions,world,open,active:async name=>assert.equal(f.song,name),player:()=>({logical:{name:f.song}}),last:()=>({state:'requested'}),objects,named,eq:assert.deepEqual,assert});};
+ return f;
+}
+test('normal installed Boot and wrappers reach actual M01 reset and both battles without tskip or a preplaced Map',async()=>{
+ const f=nativeColdStartup();assert.equal(f.scene().isStarted(),false);
+ const result=await f.runM01();assert.equal(result.wild.kind,'wild');assert.equal(result.trainer.kind,'trainer');
+ assert.equal(f.newGames,1);assert.equal(f.fixtureResets,2);assert.equal(f.transfers,2);assert.equal(f.battles,2);assert.equal(f.aborts,2);assert(f.actions.mapReady());assert.deepEqual(f.presses,['shift','shift']);
+});
+test('cold reset does not install a fixture before the actual Title has started',async()=>{
+ const f=nativeColdStartup();f.holdTitleStart=true;await assert.rejects(f.actions.reset(),{code:'WAIT_DRIVER_LIFECYCLE'});assert.equal(f.fixtureResets,0);assert.equal(f.transfers,0);
+});
+test('initial Title exception is consumed once and cannot admit a later Title or queued successor',async()=>{
+ const f=nativeColdStartup();await f.actions.reset();f.G.SceneManager.goto(f.G.Scene_Title);f.scene().start();
+ await assert.rejects(f.actions.reset(),{code:'WAIT_DRIVER_LIFECYCLE'});assert.equal(f.fixtureResets,1);assert.equal(f.transfers,1);
+ const pending=nativeColdStartup();pending.scene().start();pending.G.SceneManager._nextScene=new pending.G.Scene_Map();
+ await assert.rejects(pending.actions.reset(),{code:'WAIT_DRIVER_LIFECYCLE'});assert.equal(pending.fixtureResets,0);
+});
+test('initial and successor unfinished Maps still wait for real start and never borrow the Title exception',async()=>{
+ for(const afterFirst of [false,true]){const f=nativeColdStartup();if(afterFirst)await f.actions.reset();const before=f.fixtureResets;f.G.SceneManager.goto(f.G.Scene_Map);f.holdMapStart=true;
+ await assert.rejects(f.actions.reset(),{code:'WAIT_DRIVER_LIFECYCLE'});assert.equal(f.fixtureResets,before);}
+});
+test('cold reset propagates wait cancellation before fixture or transfer side effects',async()=>{
+ const f=nativeColdStartup(),failure=Object.assign(Error('controlled wait cancellation'),{code:'CANCELLED'});f.waitFailure=failure;
+ await assert.rejects(f.actions.reset(),error=>error===failure);assert.equal(f.fixtureResets,0);assert.equal(f.transfers,0);
+});
+test('disabling the actual first-Title exception revives the cold M01 reachability failure',async()=>{
+ const source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8'),marker='let firstReset = true;';assert.equal(source.split(marker).length,2);
+ const f=nativeColdStartup(source.replace(marker,'let firstReset = false;'));
+ await assert.rejects(f.runM01(),{code:'WAIT_DRIVER_LIFECYCLE'});assert.equal(f.fixtureResets,0);assert.equal(f.transfers,0);assert.equal(f.battles,0);
+});
+
+
 function nativeMapLifecycle(source=fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-music.ts'),'utf8')){
  // Actual installed MZ/Reactor lifecycle methods; only renderer and map I/O are controlled.
  const scenes=fs.readFileSync(path.join(ROOT,'js/reactor_scenes.js'),'utf8'),managers=fs.readFileSync(path.join(ROOT,'js/reactor_managers.js'),'utf8');

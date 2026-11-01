@@ -92,12 +92,18 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
     mark('active-qualified', { ...value, ...playing }); return row;
   };
   const clearMessages = () => { G.$gameMessage.clear(); G.$gameMap._interpreter.clear(); };
+  let firstReset = true;
   const mapReady = () => {
     const map = scene();
     return map instanceof G.Scene_Map && map.isStarted() && !!map._messageWindow && !!map._spriteset && !G.SceneManager.isSceneChanging();
   };
+  const titleReady = () => {
+    const title = scene();
+    return title instanceof G.Scene_Title && title.isStarted() && !!title._commandWindow && title._commandWindow.isOpenAndActive() && !title.isBusy() && !G.SceneManager.isSceneChanging();
+  };
   const reset = async (kind: 'normal' | 'receiving' | 'evolution' = 'normal', options: any = {}) => {
-    await waitFor(mapReady, 'started map before fixture reset');
+    await waitFor(() => mapReady() || (firstReset && titleReady()), 'ready initial Title or started map before fixture reset');
+    firstReset = false;
     assert(!flow._app?.saveBlocked, 'preceding scenario left no root owner');
     flow.stateReplaced(); flow._app = null; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.developerCapabilities = {}; flow.seed = [...PLAN.seed]; randomState = PLAN.worldSeed >>> 0; draws = 0; flow.rng = random; flow.fast = true; flow.receiveOptions = { mode: kind === 'receiving' ? 2 : 1, naming: 1 };
     G.$gameSystem._psGame = musicNativeState(E, content, kind); settings = options; clearMessages(); await toMapId(PLAN.mapId, 8, 9); await waitFor(mapReady, 'started fixture map'); await press('shift'); return flow.app(); // normal MZ key/gesture resume route, no autoplay-policy or security flag changes
