@@ -23,7 +23,7 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
     // MZ only clears the registration when a buffer exists. Its unchanged,
     // bufferless "BGM: None" record is not a successor installed by stopBgm.
     // A retained buffer or a newly installed record must still block handoff.
-    return !audio._bgmBuffer && (!audio._currentBgm || (!beforeBuffer && audio._currentBgm === beforeRecord));
+    return !audio._bgmBuffer && (!audio._currentBgm || (!beforeBuffer && beforeRecord?.name === '' && audio._currentBgm === beforeRecord));
   };
   const inside = (parent: string, child: string) => { const relative = path.relative(parent, child); return relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative); };
   const exists = (name: string): boolean => {

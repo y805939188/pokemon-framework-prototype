@@ -162,6 +162,10 @@ for(const ready of [false,true])test(`host None registration permits battle play
 test('host None registration completes a direct silent return without a fictitious takeover',()=>{
  const f=host({hasMap:false,emptyRecord:true});const lease=f.request(null,true);assert.equal(f.rows.at(-1).state,'requested');assert.equal(f.audio._bgmBuffer,null);assert.equal(f.audio._currentBgm,null);assert(f.port.current());lease.release();assert.equal(f.buffers.length,0);
 });
+for(const silent of [false,true])test(`a nonempty bufferless registration is not normalized as host None (silent=${silent})`,()=>{
+ const f=host({hasMap:false,emptyRecord:true,ready:true});f.write();const record=f.audio._currentBgm;record.name='Unsupported bufferless song';
+ const lease=f.request(silent?null:'B',silent);assert.equal(f.rows.at(-1).state,'superseded');lease.release();assert.equal(f.audio._bgmBuffer,null);assert.equal(f.audio._currentBgm,record);assert.equal(record.name,'Unsupported bufferless song');assert.equal(f.plays.length,0);assert.equal(f.timers.size,0);
+});
 for(const silent of [false,true])for(const replacement of ['record','buffer'])test(`stop handoff preserves a new ${replacement} even from host None (silent=${silent})`,()=>{
  const f=host({hasMap:false,emptyRecord:true,ready:true});f.write();const registration=f.audio._currentBgm;
  const successorRecord={...registration},successorBuffer={destroy(){assert.fail('successor destroyed');}};
