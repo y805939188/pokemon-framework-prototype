@@ -63,7 +63,7 @@ function world(opt = {}) {
   vm.runInContext(plugins.PS_SaveState, G, { filename: 'PS_SaveState.js' });
   G.PSManagement = { inputFrame: () => ({ pressed: new Set() }), presentationPending: () => false };
   if (opt.evolution === 'plugin') vm.runInContext(plugins.PS_Evolution, G, { filename: 'PS_Evolution.js' });
-  const flow = G.PSFlow, AM = G.AudioManager;
+  const flow = G.PSFlow, AM = G.AudioManager, applicationFactory = flow.app;
   const projection = { id: 'npc', version: 1, presentation: { battleBgm: 'Authored', victoryBgm: 'V', introBgm: opt.intro ?? 'Intro' } };
   const session = { party: [], foeTeam: [], content: {}, bag: {}, finished: false, pendingLearn: null, take: () => [], currentRequest: () => ({ active: [{ moves: [{ id: 'splash', move: 'Splash', pp: 40, maxpp: 40 }] }] }), gw: { readState: () => [] } };
   const app = { stateGeneration: 0, saveBlocked: false, encounterBlocked: false, pendingEvolution: null, pendingReceiving: null, pendingPokedex: null, pendingTrade: null, pendingTriggeredEvolution: null,
@@ -81,7 +81,7 @@ function world(opt = {}) {
   Object.assign(flow, { _app: app, app: () => app, content: () => ({}), game: () => G.$gameSystem._psGame, limits: () => ({ party: 6, boxes: 1200 }), speciesName: x => x,
     translator: () => ({ t: k => k, tOr: (_k, f) => f, has: () => false, font: () => 'sans-serif' }) });
   let battleSeq = 0;
-  Object.assign(w, { G, AM, flow, app, projection, manager, timers,
+  Object.assign(w, { G, AM, flow, app, projection, manager, timers, applicationFactory,
     get time() { return time; },
     tick(ms) { const target = time + ms; for (let guard = 0; guard < 10000; guard++) { const due = [...timers].filter(([, t]) => t.at <= target).sort((x, y) => x[1].at - y[1].at)[0]; if (!due) { time = target; return; } timers.delete(due[0]); time = Math.max(time, due[1].at); due[1].cb(); } throw Error('unbounded timers'); },
     find: name => created.filter(x => x.name === name),

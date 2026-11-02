@@ -1,0 +1,31 @@
+{
+  "version": "r8-music-native-v1",
+  "productCommit": "f021b33767fae6969d735ffde981f968a80d2218",
+  "productPlugins": {
+    "PS_BattleFlow": "3eaf336a57e9c9ad407f161bdf17ffc15f79f847dc1d4aeb506e2250fb3834d2",
+    "PS_SaveState": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "PS_Evolution": "294f6875f4f0d3b3e531c03b1ec387307f27b8b3f119b8bf60ba92a53843f0f4"
+  },
+  "prefix": "pf_capture_me_v1/",
+  "seed": [1,2,3,4],
+  "worldSeed": 817,
+  "mapId": 5,
+  "musicVolume": 47,
+  "initialPosition": 0.25,
+  "nativeExtension": ".ogg",
+  "sampleRate": 44100,
+  "seekToleranceFrames": 2,
+  "seekToleranceSamples": 2,
+  "deadlineSeconds": 420,
+  "intentionalMissingBgm": "audio/bgm/pf_capture_me_v1/missing.ogg",
+  "sequence": {"entries":[{"type":"track","name":"pf_capture_me_v1/world"},{"type":"silence","duration":1}]},
+  "sequenceKey": "library:1",
+  "sequenceFallback": {"volume":63,"pitch":92,"pan":-17},
+  "nativeSequenceScope": "active library track+silence restart only",
+  "nativeSequenceNotRun": ["pending map sequence","map sequence","looped/once","original sequence sample position or random history"],
+  "groups": [
+    {"name":"formal-evolution-root","ids":["R801","R802","R803"]},
+    {"name":"native-sequence-return","ids":["R804","R805"]},
+    {"name":"controlled-native-successor-boundary","ids":["R806"]}
+  ]
+}

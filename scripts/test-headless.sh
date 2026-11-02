@@ -27,6 +27,7 @@ SUITES=(
   experiments/step5/4/test-capture-me-port.cjs
   experiments/step5/4/test-capture-me-scene.cjs
   experiments/step5/4/test-capture-me-native.cjs
+  experiments/step5/4/test-r8-music-native.cjs
   scripts/tests/music-native-assets.test.cjs
   experiments/step5/4/test-faint-view.cjs
   experiments/step5/4/test-d1-timing.cjs

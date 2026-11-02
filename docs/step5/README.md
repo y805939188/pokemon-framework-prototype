@@ -38,3 +38,5 @@
 - [捕获ME原生验收配方v1](5.4-D2c-capture-me-native.md)：重新绑定已接受产品f021b33，原15项业务输入/seed/媒体保持；新包待静态审查，原生15项尚未执行，不构成完整D2接受。
 
 - [r8音乐组合合同](5.4-D2c-audio-r8-composition.md)：f021b33经原Ultra及精确CI214限定接受，进化P2与sequence剩余P3关闭；实际宿主新包/正式组合补证仍待，不把旧17/17或ME静态准备扩大为本组合实跑。
+
+- [R8独立六项宿主补证](5.4-D2c-r8-native-supplement.md)：正式进化和活跃library sequence的独立test driver/纯链/新包准备；未运行NW，与原ME15分开，不把两个准备记成已执行3/21。
