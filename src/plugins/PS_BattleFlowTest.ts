@@ -144,9 +144,11 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     return entry;
   }
   const names = (): string[] => battle()._menu._items.map((i: any) => i.name);
-  async function choose(re: RegExp, label?: string) {
+  async function choose(re: RegExp | { key: string | number | null }, label?: string) {
     const m = battle()._menu;
-    const idx = m._items.findIndex((i: any) => re.test(i.name));
+    const idx = "key" in re
+      ? battle().inputState().items.findIndex((i: any) => i.key === re.key)
+      : m._items.findIndex((i: any) => re.test(i.name));
     if (idx < 0) throw new Error(`menu item ${re} not found in [${names().join(" | ")}] (${label || ""})`);
     if (m._items[idx].enabled === false) throw new Error(`menu item ${re} is disabled`);
     let guard = 0;
@@ -213,7 +215,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   async function fightUntilEnd(moveRe: RegExp, max = 12) {
     for (let i = 0; i < max && mode_() !== "end"; i++) {
       if (mode_() === "learn") { await choose(/Don't learn|不学习/); continue; }
-      await choose(/^Fight/); await inMode("moves"); await choose(moveRe);
+      await choose({ key: "fight" }); await inMode("moves"); await choose(moveRe);
       await waitFor(() => ["main", "end", "learn"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after the move");
     }
   }
