@@ -1,0 +1,68 @@
+{
+  "version": "ball-feedback-native-v1",
+  "productCommit": "f0b54da03b1c7951d5fcc23744cab8f3f29c74b9",
+  "productPlugins": {
+    "PS_BattleFlow": "7817c4c731c3fc75787ebcfedd44987c24f854268a1494cc463a28f134a0e467",
+    "PS_SaveState": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "PS_Evolution": "294f6875f4f0d3b3e531c03b1ec387307f27b8b3f119b8bf60ba92a53843f0f4"
+  },
+  "prefix": "pf_capture_me_v1/",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "worldSeed": 817,
+  "mapId": 5,
+  "waitMs": 3500,
+  "hideMs": 1000,
+  "deadlineSeconds": 180,
+  "nativeExtension": ".ogg",
+  "sourceAssetsManifestSHA256": "14f3ce58ef377b65cc399fa31f3e495b40fb7fa5bba87702b5c9e5ca0a3eb748",
+  "requiredAssets": [
+    "audio/bgm/pf_capture_me_v1/world.ogg",
+    "audio/bgm/pf_capture_me_v1/battle.ogg",
+    "audio/me/pf_capture_me_v1/short.ogg"
+  ],
+  "groups": [
+    {
+      "name": "normal-capture-sequence",
+      "ids": [
+        "B01"
+      ]
+    },
+    {
+      "name": "breakout-and-trainer-block",
+      "ids": [
+        "B02",
+        "B03"
+      ]
+    },
+    {
+      "name": "normal-cancellation",
+      "ids": [
+        "B04",
+        "B05"
+      ]
+    }
+  ],
+  "renderStages": [
+    "B01-throw",
+    "B01-absorb",
+    "B01-retained",
+    "B01-hide",
+    "B02-burst",
+    "B03-block",
+    "B04-cancel-prefix"
+  ],
+  "renderEvidence": "actual Bitmap.snap composed scene PNGs and visible-vs-hidden local pixels at natural intermediate stages, plus bounded per-update pose/ME/log/commit ledger; not final-only screenshots",
+  "scopeNotProved": [
+    "art parity",
+    "hearing/physical input",
+    "Windows",
+    "newP4/GC absence",
+    "real NW signals",
+    "fullD2/E/5.4"
+  ]
+}
