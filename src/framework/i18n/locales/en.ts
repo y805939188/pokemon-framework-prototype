@@ -277,6 +277,7 @@ export const en: LocaleTable = {
     "ui.learn.forget": "Forget {move}",
     "ui.learn.skip": "Don't learn {move}",
     "ui.end.continue": "Continue",
+    "trainer.challenged": "You are challenged by {name}!",
     "trainer.defeated": "You defeated {name}!",
     "ui.end.no_more": "You have no more Pokémon that can fight!",
     "ui.end.back": "Back to the map",

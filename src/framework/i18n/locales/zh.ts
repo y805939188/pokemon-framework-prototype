@@ -276,6 +276,7 @@ export const zh: LocaleTable = {
     "ui.learn.forget": "忘记 {move}",
     "ui.learn.skip": "不学习 {move}",
     "ui.end.continue": "继续",
+    "trainer.challenged": "{name}向你发起了挑战！",
     "trainer.defeated": "你击败了{name}！",
     "ui.end.no_more": "你已经没有能够战斗的宝可梦了！",
     "ui.end.back": "回到地图",

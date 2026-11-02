@@ -24,6 +24,7 @@ SUITES=(
   experiments/step5/4/test-battle-music-scene.cjs
   experiments/step5/4/test-victory-bgm-scene.cjs
   experiments/step5/4/test-victory-music-native.cjs
+  experiments/step5/4/test-trainer-opening.cjs
   experiments/step5/4/test-result-native.cjs
   experiments/step5/4/test-result-feedback.cjs
   experiments/step5/4/test-ball-native.cjs

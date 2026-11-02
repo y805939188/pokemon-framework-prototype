@@ -461,7 +461,7 @@ const { developmentCapabilities } = RuleConfig;
         // Same public author-version projection as the music context; never requery after the fight.
         op.trainerPresentation = op.request.kind === 'trainer' && projection && typeof projection.name === 'string'
           ? Object.freeze({ id: projection.id, version: projection.version, name: projection.name,
-            loseText: projection.presentation.loseText }) : null;
+            openingText: projection.presentation.openingText, loseText: projection.presentation.loseText }) : null;
         op.musicPlan.owner = { app, generation };
         op.musicPlan.trainers = op.request.kind === 'trainer' ? Object.freeze(projection ? [Object.freeze({
           battleBgm: projection.presentation.battleBgm, victoryBgm: projection.presentation.victoryBgm,
@@ -1081,7 +1081,7 @@ const { developmentCapabilities } = RuleConfig;
     this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
     sceneController(this, true);
     this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._faintAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
-    this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false;
+    this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false; this._trainerOpeningQueued = false;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1162,6 +1162,29 @@ const { developmentCapabilities } = RuleConfig;
       faint: (actor, box) => this._pictures.faint(actor, box),
     });
     this._mode = "messages";
+    // The existing controller owns the opening pause, just as it owns display steps.
+    // No command or battle action is accepted until these messages and send-outs finish.
+    const trainer = this._psOp?.trainerPresentation;
+    if (!this._trainerOpeningQueued && this._psOp?.request.kind === 'trainer' && trainer) {
+      this._trainerOpeningQueued = true;
+      for (const text of [PSFlow.translator().t('trainer.challenged', { name: trainer.name }), trainer.openingText]) {
+        if (!text) continue; // No invented author speech for an omitted or explicitly empty field.
+        const log = this._log; let shown = false, done = false, fullyShownAt = 0;
+        const close = () => { done = true; log.pause = false; };
+        c.enqueue([{ kind: 'visual', cancel: close, advance: () => {
+          if (done || !c.isCurrent() || !PSFlow.running) { close(); return true; }
+          if (!shown) {
+            shown = true; log.add(log.fitText(text));
+            if (done || !c.isCurrent() || !PSFlow.running) { close(); return true; }
+            log.pause = true; fullyShownAt = performance.now(); return false;
+          }
+          // Nonterminal paused messages: confirm/back, or three seconds after the full line was drawn.
+          // fast is the existing explicit test-only no-pacing switch, never the Battle Effects option.
+          if (PSFlow.fast || G.Input.isTriggered('ok') || G.Input.isTriggered('cancel') || G.TouchInput?.isTriggered?.() || performance.now() - fullyShownAt >= 3000) { close(); return true; }
+          return false;
+        } }]);
+      }
+    }
     c.enqueue([this._display.initial()]);
     this.pushMessages(opening);
     if(developmentCapabilities(PSFlow.developerCapabilities).allowExperimentalHeldItemBattle&&s.party.some((m:any)=>!!m.item))this._log.add(PSFlow.translator().t("management.experimental"));
@@ -1175,7 +1198,7 @@ const { developmentCapabilities } = RuleConfig;
     } else ++this._pictureUpdate;
     // A rejected display clock still owes normal host/input updates for its aborted-end menu.
     G.Scene_MenuBase.prototype.update.call(this);
-    if (!c.isCurrent()) { this._ballFeedback?.cancel(); this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
+    if (!c.isCurrent()) { c.dispose(); this._ballFeedback?.cancel(); this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
     // Host abort may close this owner from main/boot/pending action. tick observes closure before phase/busy gates.
     this.updateQueue();
   };

@@ -28,7 +28,7 @@ test('native plan freezes exact product and15 ordered cases, two-process denomin
  // Headless CI does not install ignored generated plugin bundles. The package
  // freeze checks actual bundle bytes against f021. This digest pins only the new source,
  // not a new native qualification; the historical fifteen-case plan stays unchanged.
- const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),'f8525b141c0099beab122dbfdd1edc43aec5082ee0f51aa5e13955833fd2d28d','current source identity; historical native plan requires rebind');
+ const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),'a92a8dd66bdd07331873db957c9b1169466db9101052c1b038536f083d4b2e61','current source identity; historical native plan requires rebind');
 });
 for(const kind of ['map','title'])test('actual driver readiness rejects unstarted/changing/incomplete '+kind,()=>{
  class Map{}class Title{}let changing=false;const G={Scene_Map:Map,Scene_Title:Title,SceneManager:{isSceneChanging:()=>changing}},v=new(kind==='map'?Map:Title)();let started=false,active=true,busy=false;
