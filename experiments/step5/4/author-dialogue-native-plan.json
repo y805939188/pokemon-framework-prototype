@@ -1,0 +1,92 @@
+{
+  "prefix": "pf_victory_music_v1/",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "worldSeed": 817,
+  "mapId": 5,
+  "sourceAssetsManifestSHA256": "317e3c50b953f091156aee468bd0e76db1e7c143953c27cccfa25c44197cc083",
+  "mediaRecipe": "scripts/prepare-victory-music-native-assets.cjs",
+  "mediaPlan": "experiments/step5/4/victory-music-native-plan.json",
+  "nativeExtension": ".ogg",
+  "requiredAssets": [
+    "audio/bgm/pf_victory_music_v1/world.ogg",
+    "audio/bgm/pf_victory_music_v1/battle.ogg",
+    "audio/bgm/pf_victory_music_v1/victory.ogg",
+    "audio/bgm/pf_victory_music_v1/trainer-victory.ogg"
+  ],
+  "version": "author-dialogue-pages-native-v1",
+  "productCommit": "85778b1659ab9a8d0b737611663fa1a8b7dd925d",
+  "productRuntime": {
+    "js/plugins/PS_BattleFlow.js": "6473b8bc0782181c38be9de88e940ca96b561d50fbe5c46e179b2d90dc7f5253",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "js/plugins/PS_Evolution.js": "294f6875f4f0d3b3e531c03b1ec387307f27b8b3f119b8bf60ba92a53843f0f4",
+    "js/engine/build/engine.cjs": "bcfaf3860e1cdd18495e90e32a530a258dd84a91b88f8f78b30972acb23b396d",
+    "js/engine/build/production.cjs": "7a33b828cdafc4e24f695bf71036fe241ff524221c9b40868c8f5b56e1dfd415"
+  },
+  "deadlineSeconds": 180,
+  "groups": [
+    {
+      "name": "normal-english-author-pages",
+      "ids": [
+        "L01"
+      ]
+    },
+    {
+      "name": "normal-chinese-author-pages",
+      "ids": [
+        "L02"
+      ]
+    }
+  ],
+  "maximumPagesPerSection": 12,
+  "minimumAuthorPages": 2,
+  "cases": [
+    {
+      "id": "L01",
+      "language": "en",
+      "name": "Avery",
+      "openingText": "I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. I have trained my team with care, and I will keep learning from this battle. \n\nFINAL_OPENING_AUTHOR_TAIL",
+      "loseText": "You and your partners battled well today. I will keep training and look forward to our next battle. You and your partners battled well today. I will keep training and look forward to our next battle. You and your partners battled well today. I will keep training and look forward to our next battle. You and your partners battled well today. I will keep training and look forward to our next battle. You and your partners battled well today. I will keep training and look forward to our next battle. You and your partners battled well today. I will keep training and look forward to our next battle. You and your partners battled well today. I will keep training and look forward to our next battle. You and your partners battled well today. I will keep training and look forward to our next battle. You and your partners battled well today. I will keep training and look forward to our next battle. You and your partners battled well today. I will keep training and look forward to our next battle. You and your partners battled well today. I will keep training and look forward to our next battle. You and your partners battled well today. I will keep training and look forward to our next battle. \n\nFINAL_END_AUTHOR_TAIL",
+      "expectedMoney": 1060,
+      "expectedReward": 60
+    },
+    {
+      "id": "L02",
+      "language": "zh",
+      "name": "莉娜",
+      "openingText": "我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。我会认真照顾伙伴并继续努力训练，下次见面时我们会一起变得更强。\n\n开场作者最后一句",
+      "loseText": "今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。今天这场对战让我学到了很多，我会与伙伴一起继续练习，期待下一次再见。\n\n终局作者最后一句",
+      "expectedMoney": 1060,
+      "expectedReward": 60
+    }
+  ],
+  "renderStages": {
+    "perCase": "short challenge and every displayed opening/terminal author page, each shown/no-arrow/no-window PNG; exact page count is observed with the frozen real font, never guessed from the synthetic model",
+    "filenamePrefixes": [
+      "L01-challenge",
+      "L01-opening-",
+      "L01-terminal-",
+      "L02-challenge",
+      "L02-opening-",
+      "L02-terminal-"
+    ],
+    "pixelGate": "windowRGB>0, arrowRGB>0, glyphAlpha>0; actual measured lines fit inner width/visible rows; all three images persisted before rejection"
+  },
+  "notProved": [
+    "physical keyboard/touch or hearing",
+    "native first-update key injection (retained controlled regression only)",
+    "typewriter/brief/YesNo/list/full message platform",
+    "all Unicode/graphemes/rich text/dynamic screen layouts/all fonts",
+    "newP4/GC absence/native signal/Windows",
+    "fullD2/E/5.4"
+  ],
+  "fontResourcePaths": [
+    "data/System.json",
+    "fonts/mplus-1m-regular.woff",
+    "fonts/mplus-2p-bold-sub.woff"
+  ]
+}
