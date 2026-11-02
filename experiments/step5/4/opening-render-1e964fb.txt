@@ -1,0 +1,18 @@
+  const render = (h: any, id: string) => {
+    const log = h.scene._log, arrow = log._pauseSignSprite;
+    assert(log.visible && log.openness !== 0 && log.pause && arrow?.visible && arrow.alpha > .5, 'visible paused window and actual arrow');
+    assert(hidden(h.scene), 'both pending first portraits hidden');
+    let shown: any, noArrow: any, noLog: any; const visible = log.visible, arrowVisible = arrow.visible;
+    try {
+      shown = G.Bitmap.snap(h.scene); arrow.visible = false; noArrow = G.Bitmap.snap(h.scene); arrow.visible = arrowVisible; log.visible = false; noLog = G.Bitmap.snap(h.scene);
+      let textPixels = 0, arrowPixels = 0;
+      for (let y = 120; y < Math.min(shown.height, 420); y += 2) for (let x = 0; x < Math.min(shown.width, 816); x += 2) {
+        if (shown.getPixel(x, y) !== noLog.getPixel(x, y)) textPixels++;
+        if (shown.getPixel(x, y) !== noArrow.getPixel(x, y)) arrowPixels++;
+      }
+      assert(textPixels > 0 && arrowPixels > 0, 'actual text window and arrow composed pixels');
+      const png = p.nodeRequire('buffer').Buffer.from(shown.canvas.toDataURL('image/png').split(',')[1], 'base64'), file = path.join(path.dirname(OUT), id + '.png'); fs.writeFileSync(file, png, { flag: 'wx' });
+      const row = { id, file: path.basename(file), sha256: hash(png), textPixels, arrowPixels, lines: [...log._lines], arrow: { visible: arrowVisible, alpha: arrow.alpha }, frame: G.Graphics.frameCount, at: G.performance.now(), language, hiddenFirstPortraits: hidden(h.scene), installs: h.installs.length, stateSHA256: hash(stable(flow.game())) };
+      d.renders.push(row); return row;
+    } finally { arrow.visible = arrowVisible; log.visible = visible; shown?.destroy(); noArrow?.destroy(); noLog?.destroy(); }
+  };

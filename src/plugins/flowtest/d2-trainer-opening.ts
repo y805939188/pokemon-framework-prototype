@@ -49,19 +49,47 @@ export async function runD2TrainerOpening(p: any): Promise<void> {
     const log = h.scene._log, arrow = log._pauseSignSprite;
     assert(log.visible && log.openness !== 0 && log.pause && arrow?.visible && arrow.alpha > .5, 'visible paused window and actual arrow');
     assert(hidden(h.scene), 'both pending first portraits hidden');
-    let shown: any, noArrow: any, noLog: any; const visible = log.visible, arrowVisible = arrow.visible;
+    const original = { logVisible: log.visible, visible: arrow.visible, renderable: arrow.renderable, alpha: arrow.alpha };
+    const startedAt = G.performance.now(), startedFrame = G.Graphics.frameCount;
+    let shown: any, noArrow: any, noLog: any, row: any = null;
     try {
-      shown = G.Bitmap.snap(h.scene); arrow.visible = false; noArrow = G.Bitmap.snap(h.scene); arrow.visible = arrowVisible; log.visible = false; noLog = G.Bitmap.snap(h.scene);
-      let textPixels = 0, arrowPixels = 0;
+      shown = G.Bitmap.snap(h.scene);
+      const shownArrow = { visible: arrow.visible, renderable: arrow.renderable, alpha: arrow.alpha };
+      // Window.onRender refreshes visible from isOpen(); renderable is the temporary Pixi draw gate.
+      arrow.renderable = false; noArrow = G.Bitmap.snap(h.scene);
+      arrow.renderable = original.renderable; log.visible = false; noLog = G.Bitmap.snap(h.scene);
+      const snapshotsEndedAt = G.performance.now();
+      assert([noArrow, noLog].every(bitmap => bitmap.width === shown.width && bitmap.height === shown.height), 'same-size opening snapshots');
+      const rgba = [shown, noArrow, noLog].map(bitmap => bitmap.context.getImageData(0, 0, bitmap.width, bitmap.height).data);
+      const readbacksEndedAt = G.performance.now();
+      let textPixels = 0, arrowPixels = 0, gridCells = 0;
       for (let y = 120; y < Math.min(shown.height, 420); y += 2) for (let x = 0; x < Math.min(shown.width, 816); x += 2) {
-        if (shown.getPixel(x, y) !== noLog.getPixel(x, y)) textPixels++;
-        if (shown.getPixel(x, y) !== noArrow.getPixel(x, y)) arrowPixels++;
+        const offset = (y * shown.width + x) * 4; gridCells++;
+        // Match Bitmap.getPixel's RGB-only comparison on precisely the original 2-pixel grid.
+        if (rgba[0][offset] !== rgba[2][offset] || rgba[0][offset + 1] !== rgba[2][offset + 1] || rgba[0][offset + 2] !== rgba[2][offset + 2]) textPixels++;
+        if (rgba[0][offset] !== rgba[1][offset] || rgba[0][offset + 1] !== rgba[1][offset + 1] || rgba[0][offset + 2] !== rgba[1][offset + 2]) arrowPixels++;
       }
+      const comparisonsEndedAt = G.performance.now();
+      const images = [shown, noArrow, noLog].map((bitmap, index) => {
+        const file = path.join(path.dirname(OUT), id + ['', '-no-arrow', '-no-window'][index] + '.png');
+        const png = p.nodeRequire('buffer').Buffer.from(bitmap.canvas.toDataURL('image/png').split(',')[1], 'base64');
+        fs.writeFileSync(file, png, { flag: 'wx' });
+        return { kind: ['shown', 'no-arrow', 'no-window'][index], file: path.basename(file), sha256: hash(png) };
+      });
+      row = { id, file: images[0].file, sha256: images[0].sha256, comparisonPNGs: images.slice(1), textPixels, arrowPixels, pixelGate: textPixels > 0 && arrowPixels > 0 ? 'pass' : 'fail', lines: [...log._lines], arrow: shownArrow, frame: startedFrame, at: startedAt, language, hiddenFirstPortraits: hidden(h.scene), installs: h.installs.length, stateSHA256: hash(stable(flow.game())), sampling: { version: 'window-render-rgb-grid-v2', startedAt, snapshotsEndedAt, readbacksEndedAt, comparisonsEndedAt, persistedAt: G.performance.now(), gridCells, bulkReadbacks: 3, channelsCompared: 'RGB', stride: 2 } };
+      // Retain all images, counts and fixed report identities even when the unchanged pixel gate rejects.
+      d.renders.push(row); writeProgress();
       assert(textPixels > 0 && arrowPixels > 0, 'actual text window and arrow composed pixels');
-      const png = p.nodeRequire('buffer').Buffer.from(shown.canvas.toDataURL('image/png').split(',')[1], 'base64'), file = path.join(path.dirname(OUT), id + '.png'); fs.writeFileSync(file, png, { flag: 'wx' });
-      const row = { id, file: path.basename(file), sha256: hash(png), textPixels, arrowPixels, lines: [...log._lines], arrow: { visible: arrowVisible, alpha: arrow.alpha }, frame: G.Graphics.frameCount, at: G.performance.now(), language, hiddenFirstPortraits: hidden(h.scene), installs: h.installs.length, stateSHA256: hash(stable(flow.game())) };
-      d.renders.push(row); return row;
-    } finally { arrow.visible = arrowVisible; log.visible = visible; shown?.destroy(); noArrow?.destroy(); noLog?.destroy(); }
+      return row;
+    } finally {
+      arrow.visible = original.visible; arrow.renderable = original.renderable; arrow.alpha = original.alpha; log.visible = original.logVisible;
+      shown?.destroy(); noArrow?.destroy(); noLog?.destroy();
+      if (row) {
+        row.sampling.endedAt = G.performance.now(); row.sampling.elapsedMs = row.sampling.endedAt - startedAt;
+        row.sampling.cleanup = { logVisible: log.visible === original.logVisible, arrowVisible: arrow.visible === original.visible, arrowRenderable: arrow.renderable === original.renderable, arrowAlpha: arrow.alpha === original.alpha };
+        writeProgress();
+      }
+    }
   };
   const run = async (c: any) => {
     const began = G.performance.now();
