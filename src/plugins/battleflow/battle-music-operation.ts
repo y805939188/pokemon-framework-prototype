@@ -104,4 +104,9 @@ export class BattleMusicOperations {
     if (e.phase === 'return') return;
     e.phase = 'return'; e.player?.restore();
   }
+  victory(op: object, settings: MusicSettings, trainers?: readonly TrainerAudioFields[]): void {
+    const e = this.entry;
+    if (!e || e.op !== op || e.phase !== 'battle' || !this.current(e) || !e.port?.current()) return;
+    e.player?.victory(settings.config, trainers);
+  }
 }

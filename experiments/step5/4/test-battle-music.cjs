@@ -13,6 +13,21 @@ function pure(memory={memo:null,pending:null}){
  f.port={current:()=>f.live,currentTrack(){f.order.push('current');f.onCurrent?.();return f.current===null?null:resumeTrack(f.current);},position(){f.order.push('position');f.onPosition?.();if(f.positionError)throw Error('position');return f.position;},request(t,p,terminal,observe){f.order.push('request');f.onRequest?.();const l={released:0,release(){this.released++;}};f.leases.push(l);f.rows.push({t,p,terminal,observe});observe({state:f.mediaError?'failed':'requested',detail:f.mediaError?'media failure':undefined});return l;}};
  f.player=new Playback(f.port,memory);return f;
 }
+test('victory uses its own preset parameters once and returns the original world memo',()=>{
+ const f=pure(),c=config({presets:{battle:'Battle:30:90',victory:'Won:70:120'}});
+ f.player.start(c);f.player.victory(c);f.player.victory(c);f.player.restore();
+ assert.deepEqual(f.rows.map(r=>[r.t.name,r.p,r.terminal]),[['Battle',0,false],['Won',0,false],['A',17,true]]);
+ assert.equal(f.rows[1].t.volume,70);assert.equal(f.rows[1].t.pitch,120);assert.equal(f.memory.memo.track.name,'A');
+ assert(f.player.snapshot().victoryStarted);assert.equal(c.context.presets.victory,'Won');
+});
+test('victory shares the frozen wild/trainer selection and last-empty fallback',()=>{
+ for(const [trainers,expected]of [[undefined,'Wild'],[[{victoryBgm:'Authored'}],'Authored'],[[{victoryBgm:'Authored'},{victoryBgm:''}],'Trainer']]){
+  const f=pure(),c=config({map:{wildVictory:'Wild',trainerVictory:'Trainer'}});f.player.start(c,trainers);f.player.victory(c,trainers);assert.equal(f.rows[1].t.name,expected);assert.equal(f.rows[1].t.volume,100);
+ }
+});
+test('victory cannot begin before battle, after return, cancellation or owner replacement',()=>{
+ for(const mode of ['before','return','cancel','replace']){const f=pure(),c=config();if(mode!=='before')f.player.start(c);if(mode==='return')f.player.restore();if(mode==='cancel')f.player.cancel();if(mode==='replace')f.live=false;const n=f.rows.length;f.player.victory(c);assert.equal(f.rows.length,n,mode);}
+});
 test('parameters: direct strings default 100/100; parsed presets and records retain independent values',()=>{
  assert.deepEqual(track('Theme:70:120'),{name:'Theme',volume:100,pitch:100,pan:0});assert.deepEqual(track('Theme:70:120',true),{name:'Theme',volume:70,pitch:120,pan:0});assert.equal(track('Theme:120',true).pitch,100);
  assert.deepEqual(track({name:'A',volume:70,pitch:120,pan:-20}),{name:'A',volume:70,pitch:120,pan:-20});

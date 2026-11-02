@@ -22,6 +22,7 @@ SUITES=(
   experiments/step5/4/test-battle-audio-selection.cjs
   experiments/step5/4/test-battle-music.cjs
   experiments/step5/4/test-battle-music-scene.cjs
+  experiments/step5/4/test-victory-bgm-scene.cjs
   experiments/step5/4/test-battle-music-composition.cjs
   experiments/step5/4/test-capture-melody.cjs
   experiments/step5/4/test-capture-me-port.cjs

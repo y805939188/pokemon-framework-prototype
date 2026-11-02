@@ -89,6 +89,7 @@ export class BattleMusicPlayback {
   private closed = false;
   private restoring = false;
   private started = false;
+  private victoryStarted = false;
   private entering = false;
   private readonly leases: MusicLease[] = [];
   private readonly rows: { kind: string; logical: MusicTrack | null; position: number; state: MusicStatus; detail?: string }[] = [];
@@ -147,6 +148,17 @@ export class BattleMusicPlayback {
       this.started = true; this.deliver('battle', track);
     } finally { this.entering = false; }
   }
+  /** A presentation cue within the same battle owner; never memorize the battle song as the world. */
+  victory(config: BattleMusicConfig, trainers?: readonly TrainerAudioFields[]): void {
+    if (this.entering || !this.live() || this.restoring || !this.started || this.victoryStarted) return;
+    this.entering = true;
+    try {
+      const choice = trainers === undefined ? selectBattleAudio({ entry: 'wild-victory', context: config.context })
+        : selectBattleAudio({ entry: 'trainer-victory', context: config.context, trainers });
+      const track = choice.origin === 'preset' ? config.presets.victory! : musicTrack(choice.logicalName);
+      this.victoryStarted = true; this.deliver('victory', track);
+    } finally { this.entering = false; }
+  }
   /** Normal return only. Does not erase shared next-battle presets or claim the WP16 wrapper is complete. */
   restore(): void {
     if (this.entering || !this.live() || this.restoring || !this.memory.memo) return;
@@ -163,7 +175,7 @@ export class BattleMusicPlayback {
     }
   }
   snapshot() {
-    return { version: 'battle-music-playback-v1' as const, closed: this.closed, restoring: this.restoring, started: this.started,
+    return { version: 'battle-music-playback-v1' as const, closed: this.closed, restoring: this.restoring, started: this.started, victoryStarted: this.victoryStarted,
       logical: this.logical ? { ...this.logical } : null,
       memo: this.memory.memo ? { track: this.memory.memo.track ? { ...this.memory.memo.track } : null, position: this.memory.memo.position } : null,
       pending: !!this.memory.pending, requests: this.rows.map(row => ({ ...row, logical: row.logical ? { ...row.logical } : null })) };

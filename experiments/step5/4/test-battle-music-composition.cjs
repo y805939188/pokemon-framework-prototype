@@ -21,6 +21,17 @@ async function pending(options={}){
 }
 function ready(w){for(const b of w.created)if(!b.destroys&&!b._ready)b.load();w.tick(100);}
 function returned(w){ready(w);assert.equal(w.channel().buffer,'Map');assert(w.channel().playing);assert.equal(w.plays().at(-1).offset,17);assert(w.music().requests.some(r=>r.kind==='return'&&r.state==='requested'));assert(!w.flow.running&&!w.app.saveBlocked);}
+for(const mode of ['normal','cancel','technical'])test('victory BGM survives actual evolution plugin '+mode+' and next battle remembers the world',async()=>{
+ const w=world({evolution:'plugin',cancellable:mode==='cancel'});fs.writeFileSync(path.join(w.root,'audio/bgm/Battle victory.ogg'),'controlled decoder existence');
+ w.playWorld('Map',17);w.open();const battle=await w.scene();w.find('Battle wild')[0].load();
+ battle.pushMessages([{kind:'end',reason:'win',winner:'Player',outcome:null}]);
+ for(let i=0;i<10;i++){w.tick(100);battle.updateQueue();}
+ assert.equal(w.music().requests.at(-1).kind,'victory');w.find('Battle victory')[0].load();assert.equal(w.channel().buffer,'Battle victory');
+ battle.onEnd();battle.terminate();assert(w.flow.running&&w.app.pendingEvolution);assert.equal(w.music().memo.track.name,'Map');
+ w.G.PSEvolution.show();const c=w.manager._scene._controller;assert.equal(c.audioCaptured,false);assert.equal(w.channel().buffer,'Battle victory');
+ if(mode==='technical')c.dispose();else c.resolve('e',{kind:mode==='cancel'?'cancel':'animation-complete'});
+ returned(w);w.open();await w.scene();assert.equal(w.music().memo.track.name,'Map');assert.equal(w.music().memo.position,17);
+});
 for(const mode of ['normal','cancel','technical'])test('compiled three-plugin '+mode+' evolution retains root BGM until terminal, then restores world once',async()=>{
  const w=await pending({cancellable:mode==='cancel'}),r=w.G.PSEvolution.show(),c=w.manager._scene._controller;assert(r&&c);assert.equal(c.audioCaptured,false);assert.equal(c.savedBgm,undefined);assert.equal(w.channel().buffer,'Battle wild');assert(w.music().current);assert(!w.music().requests.some(r=>r.kind==='return'));
  if(mode==='technical')c.dispose();else c.resolve('e',{kind:mode==='cancel'?'cancel':'animation-complete'});

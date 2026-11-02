@@ -160,6 +160,13 @@ const { developmentCapabilities } = RuleConfig;
       if (normal && PSFlow._nextBattleMusic === plan.presetHolder) PSFlow._nextBattleMusic = null;
       try { battleMusic.finish(op, normal); } catch (error) { op.musicError = String(error); }
     },
+    _victoryBattleMusic(op: any): void {
+      if (!op || op !== PSFlow._op || !PSFlow.running || !op.musicPlan?.started || op.musicPlan.closed) return;
+      const plan = op.musicPlan, owner = plan.owner;
+      if (!owner || PSFlow._app !== owner.app || owner.app.stateGeneration !== owner.generation) return;
+      try { battleMusic.victory(op, plan.settings, plan.trainers); }
+      catch (error) { op.musicError = String(error); }
+    },
     developerCapabilities: {}, // explicit developer/test injection only; never plugin settings or save data
     operationPending(): boolean { return PSFlow.running || !!PSFlow._app?.saveBlocked || !!W.PSManagement?.presentationPending?.(); },
     /** Programmatic action bridges; formal learning screens/commands belong to G. */
@@ -1172,6 +1179,17 @@ const { developmentCapabilities } = RuleConfig;
       const steps: BattleScenePresentation[] = [];
       for (const message of msgs) {
         if (!c.isCurrent()) return;
+        // Queue the cue after earlier faint/EXP presentation, before the victory text.
+        // The same operation owns battle, victory and return; this does not end or commit it.
+        const op = this._psOp;
+        if (op && message.kind === 'end' && message.reason === 'win' && message.winner === 'Player' && !op.victoryQueued) {
+          op.victoryQueued = true;
+          let retired = false;
+          steps.push({ kind: 'visual', advance: () => {
+            if (!retired && c.isCurrent() && PSFlow.running && G.SceneManager._scene === this) PSFlow._victoryBattleMusic(op);
+            retired = true; return true;
+          }, cancel: () => { retired = true; } });
+        }
         const growth = message.kind === 'growth' ? engine().B.battlePresentation.readGrowthDisplay(this._session, message) : null;
         if (this._display && message.kind === 'events') {
           for (const event of message.events) {
