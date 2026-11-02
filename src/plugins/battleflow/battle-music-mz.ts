@@ -17,13 +17,15 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
   const pending = new Set<() => void>();
   const channelCurrent = () => audio?._bgmBuffer === expectedBuffer && audio?._currentBgm === expectedRecord && audio?._bgmSequence === expectedSequence && audio?._pendingBgmSequence === expectedPending;
   const owned = () => current() && channelCurrent();
+  const priorNone = () => !audio._bgmBuffer && audio._currentBgm?.name === '' ? audio._currentBgm : null;
+  const stoppedChannel = (none: any): boolean => !audio._bgmSequence && !audio._pendingBgmSequence && !audio._bgmBuffer && (!audio._currentBgm || (audio._currentBgm === none && none?.name === ''));
   const stopOwnedChannel = (): boolean => {
-    const beforeBuffer = audio._bgmBuffer, beforeRecord = audio._currentBgm;
+    const none = priorNone();
     audio.stopBgm();
     // MZ only clears the registration when a buffer exists. Its unchanged,
     // bufferless "BGM: None" record is not a successor installed by stopBgm.
     // A retained buffer or a newly installed record must still block handoff.
-    return !audio._bgmSequence && !audio._pendingBgmSequence && !audio._bgmBuffer && (!audio._currentBgm || (!beforeBuffer && beforeRecord?.name === '' && audio._currentBgm === beforeRecord));
+    return stoppedChannel(none);
   };
   const inside = (parent: string, child: string) => { const relative = path.relative(parent, child); return relative !== '..' && !relative.startsWith('..' + path.sep) && !path.isAbsolute(relative); };
   const exists = (name: string): boolean => {
@@ -97,9 +99,10 @@ export function createBattleMusicMZ(G: any, nodeRequire: any, root: string, curr
           const interrupted = new Error('sequence return interrupted');
           const stop = function (this: any, ...args: any[]) {
             if (stopping || advancing || playDepth > 1) return oldStop.apply(this, args); // a genuine nested successor uses the native operation
+            const none = priorNone();
             stopping = true; let value;
             try { value = oldStop.apply(this, args); } finally { stopping = false; }
-            if (lost() || audio._bgmBuffer || audio._currentBgm || audio._bgmSequence || audio._pendingBgmSequence) throw interrupted;
+            if (lost() || !stoppedChannel(none)) throw interrupted;
             return value;
           };
           const advance = function (this: any, ...args: any[]) {

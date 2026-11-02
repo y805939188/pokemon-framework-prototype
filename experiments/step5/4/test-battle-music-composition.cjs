@@ -8,6 +8,8 @@ test.before(()=>{
  const variant=process.env.PF_MUSIC_COMPOSITION_MUTATION;
  if(variant){
   const variants={evolution:['PS_Evolution','if (!(!!this.request.battleOp','if (!(false && !!this.request.battleOp'],memo:['PS_BattleFlow','const track = audio?._bgmSequence || audio?._pendingBgmSequence ? audio.saveBgm() : audio?._currentBgm;','const track = audio?._currentBgm;'],channel:['PS_BattleFlow',' && audio?._bgmSequence === expectedSequence && audio?._pendingBgmSequence === expectedPending',''],op:['PS_Evolution',' && (!this.request.battleOp || flow()._op === this.request.battleOp)','']};
+  variants['none-strict']=['PS_BattleFlow','if (lost() || !stoppedChannel(none)) throw interrupted;','if (lost() || audio._bgmBuffer || audio._currentBgm || audio._bgmSequence || audio._pendingBgmSequence) throw interrupted;'];
+  variants['none-loose']=['PS_BattleFlow','audio._currentBgm === none && none?.name === ""','audio._currentBgm?.name === ""'];
   const row=variants[variant];assert(row,'known explicit compiled mutation');const before=plugins[row[0]];assert.equal(before.split(row[1]).length-1,1,'exact compiled gate occurrence');plugins[row[0]]=before.replace(row[1],row[2]);const hash=s=>require('node:crypto').createHash('sha256').update(s).digest('hex');console.log(JSON.stringify({variant,plugin:row[0],before:hash(before),after:hash(plugins[row[0]])}));
  }
  world=createCompositionHostFactory({ROOT,work:temp,plugins});
@@ -50,9 +52,10 @@ test('non-battle evolution retains its original save/stop/replay behavior',()=>{
  const w=world({evolution:'plugin'});w.playWorld('Map',17);w.app.pendingEvolution={token:'standalone',revision:1,memberId:'m1',phase:'selection',selection:{cancellable:true,source:{species:'Charmeleon'},target:{species:'Charizard'}}};
  w.app.resolveEvolution=()=>{w.app.pendingEvolution=null;return {status:'committed'};};w.G.PSEvolution.show();const c=w.manager._scene._controller;assert(c.audioCaptured);assert.equal(c.savedBgm.name,'Map');assert.equal(w.AM._bgmBuffer,null);c.resolve('e',{kind:'animation-complete'});ready(w);assert.equal(w.channel().buffer,'Map');assert.equal(w.plays().at(-1).offset,17);
 });
-function sequenceWorld({map=false,looped=false,empty=false,evolution}={}){
+function sequenceWorld({map=false,looped=false,empty=false,noneBefore=false,evolution}={}){
  const sequence={enabled:true,entries:[{type:'track',name:'Map'},{type:'silence',duration:1}]};const w=world({evolution,dataSystem:{reactorMusicSequences:[null,{id:1,name:'Field',sequence}]}});
  if(map){w.G.$dataMap={bgmSequence:sequence,bgm:{name:empty?'':'Map',volume:80,pitch:100,pan:0}};w.G.$gameMap={mapId:()=>5};}
+ if(noneBefore)w.AM.playBgm({name:'',volume:100,pitch:100,pan:0});
  const key=map?5:'library:1';w.AM.playBgm({name:empty?'':'Map',volume:80,pitch:100,pan:0,sequence:key,looped});ready(w);assert.equal(w.AM.saveBgm().sequence,key);return {w,key};
 }
 for(const opt of [{},{looped:true},{map:true},{empty:true}])test('host world sequence survives normal battle/Scene return '+JSON.stringify(opt),async()=>{
@@ -100,4 +103,29 @@ for(const fail of [false,true])test('synchronous sequence restore restores nativ
 });
 test('world sequence return preserves an external ME and uses the native duck/resume policy',async()=>{
  const {w,key}=sequenceWorld();w.open();const s=await w.scene();w.find('Battle wild')[0].load();w.AM.playMe({name:'Foreign',volume:100,pitch:100,pan:0});const me=w.AM._meBuffer;me.load();s.onEnd();s.terminate();ready(w);assert.equal(w.AM._meBuffer,me);assert.equal(me.destroys,0);assert.equal(w.AM.saveBgm().sequence,key);assert.equal(w.AM._bgmSequence.duck,w.AM.BGM_SEQUENCE_ME_DUCK);w.AM.stopMe();assert.equal(w.AM._bgmSequence.duck,1);
+});
+for(const missing of [false,true])test('unchanged native None record permits world sequence return with missing battle='+missing,async()=>{
+ const {w,key}=sequenceWorld({noneBefore:true}),prior=w.AM._currentBgm;assert.equal(prior.name,'');assert.equal(w.AM._bgmBuffer,null);
+ w.open(false,missing?{music:{global:{wildBattle:'Absent'}}}:undefined);const s=await w.scene();if(!missing)w.find('Battle wild')[0].load();
+ assert.equal(w.music().memo.track.sequence,key);if(missing){assert.equal(w.music().requests.at(-1).state,'missing');assert.equal(w.AM._currentBgm,prior);}
+ s.onEnd();s.terminate();ready(w);assert.equal(w.AM.saveBgm().sequence,key);assert(w.find('Map').some(b=>b._isPlaying&&!b.destroys));assert.equal(w.music().requests.at(-1).state,'requested');if(missing)assert.equal(w.AM._currentBgm,prior,'native unchanged None registration is retained, not rewritten');
+ w.open();await w.scene();assert.equal(w.music().memo.track.sequence,key,'next battle remembers the restored world');
+});
+for(const at of [1,2])test('new same-valued None registration at return stop '+at+' is a genuine successor',async()=>{
+ const {w}=sequenceWorld({noneBefore:true}),prior=w.AM._currentBgm;w.open(false,{music:{global:{wildBattle:'Absent'}}});const s=await w.scene();let calls=0,next;const stop=w.AM.stopBgm;
+ w.AM.stopBgm=function(...a){const r=stop.apply(this,a);if(++calls===at){w.AM.playBgm({...prior});next=w.AM._currentBgm;}return r;};
+ s.onEnd();s.terminate();ready(w);assert(next);assert.notEqual(next,prior);assert.equal(w.AM._currentBgm,next);assert.equal(w.AM._bgmBuffer,null);assert.equal(w.AM._bgmSequence===null,true,'old return never installs a sequence over new None');assert.equal(w.music().requests.at(-1).state,'superseded');
+});
+for(const kind of ['bgm','sequence','pending','abort'])test('missing battle and prior None still protect second-stop '+kind+' takeover',async()=>{
+ const {w}=sequenceWorld({noneBefore:true});w.open(false,{music:{global:{wildBattle:'Absent'}}});const s=await w.scene();let calls=0,next;const stop=w.AM.stopBgm;
+ w.AM.stopBgm=function(...a){const r=stop.apply(this,a);if(++calls===2){
+  if(kind==='abort')w.flow.abort(Error('return cancelled'));
+  if(kind==='sequence'){w.G.$dataSystem.reactorMusicSequences.push({id:2,sequence:{entries:[{type:'track',name:'Foreign'},{type:'silence',duration:1}]}});w.AM.playBgm({name:'Foreign',volume:80,pitch:100,pan:0,sequence:'library:2'});next=w.AM._bgmSequence;}
+  else if(kind==='pending'){w.AM.playBgm({name:'Foreign',volume:80,pitch:100,pan:0,sequence:7});next=w.AM._pendingBgmSequence;}
+  else next=w.playWorld('Foreign',3);
+ }return r;};
+ s.onEnd();s.terminate();ready(w);assert(calls>=2);assert(next);assert.equal(kind==='sequence'?w.AM._bgmSequence:kind==='pending'?w.AM._pendingBgmSequence:w.AM._bgmBuffer,next);assert.equal(w.find('Map').length,1,'cancelled old return never allocates a new source');
+ // Abort retires the root snapshot; it must not acknowledge the stale return.
+ if(kind==='abort')assert(!w.music().requests.some(r=>r.kind==='return'&&r.state==='requested'));else assert.equal(w.music().requests.at(-1).state,'superseded');
+ if(kind==='bgm'||kind==='abort')assert.equal(next.destroys,0);
 });
