@@ -135,3 +135,30 @@ test('fresh consumer executes its whole Title-Continue-load-idempotence chain an
  produced.results.pop();write();await assert.rejects(run(),/all14 real producer/);assert.equal(loaded,1,'no load after incomplete producer');
  produced.results.push({id:'ME14',status:'pass'});write();actualFS.appendFileSync(slotPath,'changed');await assert.rejects(run(),/same-run compressed save/);assert.equal(loaded,1);
 });
+
+async function primaryDiagnosticControl({value,throws=true,cleanupFails=false}){
+ // Execute the actual run callback, outer catch and complete finally. Only
+ // the scenario and owned cleanup ports are controlled; no NW is launched.
+ const outer=nodes.find(n=>n.type==='TryStatement'&&n.finalizer&&source.slice(n.finalizer.start,n.finalizer.end).includes('details.primaryError'));
+ const declaration=nodes.find(n=>n.type==='VariableDeclaration'&&n.declarations.some(d=>d.id.name==='primary'));assert(outer&&declaration);
+ const details={cases:{}},results=[],trace=[],firstCleanup=Error('owned-root cleanup failed'),secondCleanup=Error('late-callback cleanup failed');
+ const flow={running:true,abort(){trace.push('abort');this.running=false;if(cleanupFails)throw firstCleanup;}},G={performance:{now:()=>100},Graphics:{frameCount:9},PluginManager:{parameters:()=>({})}},audio={};
+ const deps={details,results,trace,flow,G,audio,PLAN,holds:[{}],release(){trace.push('release');if(cleanupFails)throw secondCleanup;},unwrap:()=>undefined,objects:[],readNative(){assert.fail('no native buffer in this controlled case');},originals:{createBuffer(){},parameters(){},bgmVolume:47,meVolume:47},stopCounts:{},events:[],draws:0,stateHash:()=> 'controlled-state',writeProgress(){},value,throws};
+ const code='(async ({'+Object.keys(deps).join(',')+'})=>{let currentCase="";const run='+init('run')+';'+source.slice(declaration.start,declaration.end)+'try{await run("DIAGNOSTIC",async()=>{if(throws)throw value;return {controlled:true};});}'+source.slice(outer.handler.start,outer.handler.end)+'finally'+source.slice(outer.finalizer.start,outer.finalizer.end)+'})';
+ let rejected=false,actual;try{await vm.runInNewContext(stripTypeScriptTypes(code))(deps);}catch(error){rejected=true;actual=error;}
+ return {details,results,trace,rejected,actual,firstCleanup,secondCleanup};
+}
+for(const [label,value]of [['zero',0],['false',false],['empty string',''],['null',null],['Error',Error('original diagnostic Error')]])test('primary diagnostic preserves thrown '+label+' with and without later cleanup errors',async()=>{
+ for(const cleanupFails of [false,true]){
+  const r=await primaryDiagnosticControl({value,cleanupFails});assert(r.rejected);assert.strictEqual(r.actual,value,'original thrown value/object identity preserved');
+  assert.equal(r.details.primaryError,String(value),'set-vs-unset diagnostic uses hadPrimary');assert.equal(r.results.length,1);assert.equal(r.results[0].status,'fail');
+  assert.equal(r.results[0].error,String(value?.stack??value),'main failure record remains original');assert.deepEqual(r.trace,['abort','release']);assert.equal(r.details.cleanupErrors.length,cleanupFails?2:0);
+  if(cleanupFails){assert.match(r.details.cleanupErrors[0].error,/owned-root cleanup failed/);assert.match(r.details.cleanupErrors[1].error,/late-callback cleanup failed/);}
+ }
+});
+test('no primary exception keeps primaryError unset and succeeds after ordinary cleanup',async()=>{
+ const r=await primaryDiagnosticControl({throws:false});assert.equal(r.rejected,false);assert.equal(r.details.primaryError,null);assert.equal(r.results[0].status,'pass');assert.deepEqual(r.trace,['abort','release']);assert.equal(r.details.cleanupErrors.length,0);
+});
+test('cleanup-only errors still reject and keep primaryError unset',async()=>{
+ const r=await primaryDiagnosticControl({throws:false,cleanupFails:true});assert(r.rejected);assert.match(String(r.actual),/capture native cleanup failed/);assert.equal(r.details.primaryError,null);assert.equal(r.details.cleanupErrors.length,2);
+});

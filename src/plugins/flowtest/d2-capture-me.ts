@@ -217,7 +217,7 @@ export async function runD2CaptureME(p: any, continuing: boolean): Promise<void>
     clean('restore-createBuffer', () => { audio.createBuffer = originals.createBuffer; }); clean('restore-parameters', () => { G.PluginManager.parameters = originals.parameters; });
     clean('restore-options', () => { audio.bgmVolume = originals.bgmVolume; audio.meVolume = originals.meVolume; });
     for (const key of Object.keys(stopCounts)) clean('restore-' + key, () => { audio[key] = originals[key]; });
-    details.nativeBuffers = objects.map(row => { try { return readNative(row); } catch (error) { return { id: row.id, diagnosticError: String(error) }; } }); details.finishedFrame = G.Graphics.frameCount; details.primaryError = primary ? String(primary) : null;
+    details.nativeBuffers = objects.map(row => { try { return readNative(row); } catch (error) { return { id: row.id, diagnosticError: String(error) }; } }); details.finishedFrame = G.Graphics.frameCount; details.primaryError = hadPrimary ? String(primary) : null;
     if (errors.length && !hadPrimary) throw Error('capture native cleanup failed: ' + JSON.stringify(errors));
   }
 }
