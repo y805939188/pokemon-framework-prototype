@@ -1,0 +1,96 @@
+{
+  "version": "trainer-opening-native-v1",
+  "productCommit": "9f289b6856ae832f872a07770f124b0a6b42ec38",
+  "productRuntime": {
+    "js/plugins/PS_BattleFlow.js": "84dfaf960c400a31ef5f1192348bc85b3d8fe1014d6a915714f1875e7e6991f6",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "js/plugins/PS_Evolution.js": "294f6875f4f0d3b3e531c03b1ec387307f27b8b3f119b8bf60ba92a53843f0f4",
+    "js/engine/build/engine.cjs": "bcfaf3860e1cdd18495e90e32a530a258dd84a91b88f8f78b30972acb23b396d",
+    "js/engine/build/production.cjs": "7a33b828cdafc4e24f695bf71036fe241ff524221c9b40868c8f5b56e1dfd415"
+  },
+  "prefix": "pf_victory_music_v1/",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "worldSeed": 817,
+  "mapId": 5,
+  "deadlineSeconds": 120,
+  "sourceAssetsManifestSHA256": "317e3c50b953f091156aee468bd0e76db1e7c143953c27cccfa25c44197cc083",
+  "mediaRecipe": "scripts/prepare-victory-music-native-assets.cjs",
+  "mediaPlan": "experiments/step5/4/victory-music-native-plan.json",
+  "groups": [
+    {
+      "name": "normal-opening",
+      "ids": [
+        "O01",
+        "O02",
+        "O03"
+      ]
+    },
+    {
+      "name": "normal-owned-cancel",
+      "ids": [
+        "O04"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "O01",
+      "language": "en",
+      "name": "Avery",
+      "openingText": "Let us have a good battle!",
+      "challenge": "You are challenged by Avery!",
+      "advance": "input"
+    },
+    {
+      "id": "O02",
+      "language": "zh",
+      "name": "莉娜",
+      "openingText": "让我们来一场对战吧！",
+      "challenge": "莉娜向你发起了挑战！",
+      "advance": "auto"
+    },
+    {
+      "id": "O03",
+      "language": "zh",
+      "name": "阿明",
+      "openingText": "",
+      "challenge": "阿明向你发起了挑战！",
+      "advance": "input"
+    },
+    {
+      "id": "O04",
+      "language": "en",
+      "name": "Robin",
+      "openingText": "THIS_MUST_NOT_APPEAR_AFTER_CANCEL",
+      "challenge": "You are challenged by Robin!",
+      "advance": "abort"
+    }
+  ],
+  "notProved": [
+    "physical keyboard/touch and hearing",
+    "typewriter/multiline/brief/full message platform",
+    "trainer slide/lineup/prebattle and wild separate opening",
+    "Windows/newP4/GC absence/native signal lifecycle",
+    "fullD2/E/5.4"
+  ],
+  "nativeExtension": ".ogg",
+  "requiredAssets": [
+    "audio/bgm/pf_victory_music_v1/world.ogg",
+    "audio/bgm/pf_victory_music_v1/battle.ogg",
+    "audio/bgm/pf_victory_music_v1/victory.ogg",
+    "audio/bgm/pf_victory_music_v1/trainer-victory.ogg"
+  ],
+  "renderStages": [
+    "O01-challenge",
+    "O01-author",
+    "O02-challenge",
+    "O02-author",
+    "O03-challenge",
+    "O04-challenge"
+  ]
+}
