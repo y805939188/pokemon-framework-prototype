@@ -97,6 +97,20 @@ function compiledSceneHost(){
  const body=text.slice(before.expression.arguments[0].body.start,before.expression.arguments[0].body.end),deps={fs,path,os,vm,assert,E,ROOT,require,spawnSync,__dirname,process,flush:async()=>{for(let i=0;i<16;i++)await Promise.resolve();}};
  const result=vm.runInNewContext('(({'+Object.keys(deps).join(',')+'})=>{let temp,createHost,Step,planOf,config;(()=>'+body+')();return {createHost,temp};})')(deps);sceneHost=result.createHost;sceneTemp=result.temp;return sceneHost;
 }
+test('ME12 actual trainer Session and compiled Scene submit one blocked ball without capture or persistent writes',async()=>{
+ const T=require('../../../js/engine/build/testing.cjs'),state=T.fakes.createMemoryState(mod.captureMENativeState(E,content));let rng=PLAN.worldSeed;
+ const app=new E.app.GameApplication({state,projection:T.fakes.createRecordingProjection(),content:()=>({content,dex:E.dex.createDexLookup()}),sessions:E.composition.createBattleSessionFactory({content:()=>content,seed:()=>PLAN.seed}),random:n=>{rng=(Math.imul(rng,1664525)+1013904223)>>>0;return Math.floor(rng/4294967296*n);},clock:()=>12345});
+ const request={kind:'trainer',trainer:{id:'music-normal',version:1},battleId:PLAN.version+'/ME12#1',seq:1,canLose:true},session=await app.startTrainerBattle(request);session.take();
+ const f=compiledSceneHost()();f.open=()=>f.flow.openBattle(request);const s=await f.ready(true,session),before=clone(state.current()),beforeBall=session.bag.masterball,events=[];let aborted=0;
+ const waitFor=async(pred,label)=>{for(let i=0;i<100&&!pred();i++){f.tick(f.time+100);await new Promise(setImmediate);}assert(pred(),label);};
+ const h={scene:s,session,app,request,before},throwBall=helper('throwBall',{waitFor}),n=nodes.find(n=>n.type==='CallExpression'&&n.callee.name==='run'&&n.arguments[0]?.value==='ME12');assert(n);
+ const deps={reset:async()=>{},world:async()=>{},open:async kind=>{assert.equal(kind,'trainer');return h;},throwBall,assert,eq,clone,mark:(kind,value)=>events.push({kind,...value}),flow:{game:()=>state.current()},inMode:async mode=>waitFor(()=>s._mode===mode&&!s._busy&&s._queue.length===0,'actual '+mode),phase:()=>s.captureMelodyState(),objects:f.me().map(buffer=>({folder:'me/',name:'Capture',buffer})),named:()=> 'Capture',abortScene:async()=>{aborted++;f.cleanup();app.abortBattle(session,Error('own ME12 control cleanup'));}};
+ try{
+  const result=await vm.runInNewContext('(({'+Object.keys(deps).join(',')+'})=>('+stripTypeScriptTypes(source.slice(n.arguments[1].start,n.arguments[1].end))+'))')(deps)();
+  assert.equal(result.action.ok,true);assert.equal(session.bag.masterball,beforeBall-1);assert.equal(session.finished,false);assert.equal(app.pendingReceiving,null);assert.equal(app.pendingPokedex,null);eq(state.current(),before);
+  assert.equal(f.me().length,0);assert.equal(s.captureMelodyState(),null);assert.equal(aborted,1);assert(events.some(e=>e.kind==='trainer-blocked-ball-action'&&e.action.ok));
+ }finally{f.cleanup();app.abortBattle(session,Error('own ME12 control final cleanup'));}
+});
 test('single pre-destroy failure in compiled Scene cannot ACK and lifecycle retry releases its owner',async()=>{
  const f=compiledSceneHost()(),s=await f.ready(),start=f.caught(),b=f.me()[0];b.failDestroy=1;
  f.tick(start+3500);assert(s._failure);assert(!s.captureMelodyState().completed);assert.equal(f.finishes,0);assert.equal(f.aborts,1);assert(s.captureMelodyState().error);assert(b.destroyed>0,'actual own cleanup body eventually invoked');s.terminate();

@@ -200,7 +200,25 @@ export async function runD2CaptureME(p: any, continuing: boolean): Promise<void>
         assert(G.$gameSystem !== oldSystem && h.app.stateGeneration > generation && !h.app.saveBlocked && !flow.running && !flow.operationPending() && !flow.musicState()?.current, 'replacement invalidates all old owners');
         G.SceneManager.goto(G.Scene_Map); await waitFor(mapReady, 'replacement Map started'); await toMapId(PLAN.mapId, 8, 9); await waitFor(mapReady, 'transferred replacement Map started'); clearMessages(); await world(); release(gate); await frames(3); assert(!gate.row.plays.length && gate.row.destroyed > 0 && !audio._meBuffer, 'late replacement callback never plays'); return { phase: phase(h), kind };
       });
-      await run('ME12', async () => { await reset(); await world(); const h = await open('trainer'), action = await throwBall(h); assert(!action.ok, 'trainer ball refused'); await inMode('main'); assert(!phase(h) && objects.filter(r => r.folder === 'me/').every(r => r.name !== named('long') || r.destroyed), 'no capture phase from refusal'); await abortScene(); return { reason: action.reason }; });
+      await run('ME12', async () => {
+        await reset(); await world(); const h = await open('trainer'), beforeBag = clone(h.session.bag), allocations = objects.length;
+        const action = await throwBall(h), afterBag = clone(h.session.bag);
+        // Persist the actual action even if an oracle below rejects it. A
+        // submitted trainer ball is consumed, then blocked by the trainer.
+        mark('trainer-blocked-ball-action', { action: clone(action), beforeBag, afterBag, finished: h.session.finished });
+        const ballEvents = action.messages.flatMap((m: any) => m.kind === 'events' ? m.events : []).filter((e: any) => e.type === 'rpg' && e.args[0] === 'ball');
+        assert(action.ok && !h.session.finished, 'trainer ball successfully submitted and battle continues');
+        assert(ballEvents.some((e: any) => e.args[1] === 'p1' && e.args[2] === 'masterball' && e.args[4] === 'blocked'), 'actual trainer blocked masterball event');
+        assert(!ballEvents.some((e: any) => e.args[4] === 'caught') && !action.messages.some((m: any) => m.kind === 'end' && m.reason === 'caught'), 'trainer ball never captures or ends in capture');
+        const expectedBag = clone(beforeBag); expectedBag.masterball--;
+        eq(afterBag, expectedBag, 'exactly one masterball consumed in Session');
+        eq(flow.game(), h.before, 'blocked ball never installs persistent state');
+        assert(!h.app.pendingReceiving && !h.app.pendingPokedex, 'blocked ball never enters captured reception or dex');
+        await inMode('main');
+        assert(!phase(h) && !objects.slice(allocations).some(r => r.folder === 'me/'), 'blocked ball never creates capture phase or ME');
+        eq(flow.game(), h.before, 'normal menu return still has no persistent install');
+        await abortScene(); return { action: clone(action), beforeBag, afterBag };
+      });
       await run('ME13', async () => { await reset(); await world(); const before = objects.length, h = await open('wild', 'Snorlax', 100), action = await throwBall(h, 'pokeball'); assert(action.ok && !h.session.finished, 'frozen real seed produces ball breakout'); await inMode('main'); assert(!phase(h) && !objects.slice(before).some(r => r.folder === 'me/'), 'failed ball never starts captureME'); await abortScene(); return { messages: action.messages }; });
       await run('ME14', async () => { await reset(); await world(); const h = await open(); await caught(h); await nativeReady(h.captureRow); await waitFor(() => h.captureRow.plays.length > 0, 'actual ME before stop fault'); h.captureRow.failDestroy = 1; await waitFor(() => !!h.scene._failure, 'unconfirmed stop enters failure'); const v = phase(h); assert(!v.completed && v.error && !flow.running && !h.app.saveBlocked, 'failure not normalACK/commit'); eq(flow.game(), h.before, 'stop failure preserves business state'); assert(h.captureRow.destroyAttempts >= 2 && h.captureRow.destroyed === 1, 'explicit lifecycle cleanup retries actual own destroy after injected zero-side-effect failure'); await abortScene(); return { phase: v, attempts: h.captureRow.destroyAttempts, destroyed: h.captureRow.destroyed }; });
     }
