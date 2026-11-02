@@ -3,12 +3,17 @@
 // Gen8 App/Session. Rendering, keyboard, audio nodes and clocks are controlled.
 // These reports never qualify native execution; the native freezer rejects the
 // placeholder media and an external NW supervisor is still required.
-const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto'),vm=require('node:vm');
 const {createCompositionHostFactory}=require('./battle-music-composition-host.cjs');
 const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 const flush=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
-function createR8DriverHost({ROOT,work,plugins,driverText,PLAN,options={}}){
+function createR8DriverHost({ROOT,work,plugins,driverText,entryText,PLAN,options={}}){
  const world=createCompositionHostFactory({ROOT,work,plugins}),w=world({evolution:'plugin'}),G=w.G,M=w.manager,A=w.AM,E=require(path.join(ROOT,'js/engine/build/production.cjs'));
+ // Run the actual entry's presenter policy before unrelated global hooks. The
+ // complete driver must inherit this policy, not assume the plugin's default.
+ assert.equal(typeof entryText,'string');const stop=Symbol('entry boundary'),descriptor=Object.getOwnPropertyDescriptor(M,'isGameActive'),priorNW=G.nw;
+ Object.defineProperty(M,'isGameActive',{configurable:true,set(){throw stop;}});G.nw={App:{argv:['--ps-flow-test=d2-r8-music','--ps-sound']}};
+ try{vm.runInContext(entryText,G,{filename:'actual-PS_BattleFlowTest-entry.js'});}catch(e){if(e!==stop)throw e;}finally{if(descriptor)Object.defineProperty(M,'isGameActive',descriptor);else delete M.isGameActive;if(priorNW===undefined)delete G.nw;else G.nw=priorNW;}
  const duration=2.0259410430839,clipRate=44100;
  class AudioBuffer {get [Symbol.toStringTag](){return 'AudioBuffer';}constructor(){this.duration=options.badDuration?1:duration;this.sampleRate=clipRate;this.numberOfChannels=2;}}
  class Source {get [Symbol.toStringTag](){return 'AudioBufferSourceNode';}constructor(){this.buffer=null;this.loop=false;this.loopStart=0;this.loopEnd=0;this.playbackRate={value:1,setValueAtTime(v){this.value=v;}};}start(when,offset,d){this.started={when,offset,d};}stop(){this.stopped=true;}connect(){}}

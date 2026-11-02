@@ -1,21 +1,34 @@
 'use strict';
 // SYNTHETIC_CONTROL. Real compiled Scene/evolution/AudioManager and Gen8 App/
 // Session; native nodes, clock, rendering and keyboard are controlled doubles.
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),{spawnSync}=require('node:child_process');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
 const {createR8DriverHost}=require('./r8-music-driver-host.cjs');
-const ROOT=path.resolve(__dirname,'../../..');let temp,plugins,driverText,mod;
+const ROOT=path.resolve(__dirname,'../../..');let temp,plugins,driverText,entryText,mod;
 test.before(async()=>{
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-r8-native-'));plugins={};
- for(const name of ['PS_BattleFlow','PS_SaveState','PS_Evolution']){
+ for(const name of ['PS_BattleFlow','PS_SaveState','PS_Evolution','PS_BattleFlowTest']){
   const out=path.join(temp,name),r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});
-  assert.equal(r.status,0,r.stdout+r.stderr);plugins[name]=fs.readFileSync(path.join(out,name+'.js'),'utf8');
+  assert.equal(r.status,0,r.stdout+r.stderr);const text=fs.readFileSync(path.join(out,name+'.js'),'utf8');if(name==='PS_BattleFlowTest')entryText=text;else plugins[name]=text;
  }
  const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));
  await vite.build({configFile:false,root:ROOT,logLevel:'error',build:{outDir:path.join(temp,'driver'),emptyOutDir:false,minify:false,lib:{entry:path.join(ROOT,'src/plugins/flowtest/d2-r8-music.ts'),formats:['cjs'],fileName:()=> 'entry.cjs'}}});
  driverText=fs.readFileSync(path.join(temp,'driver/entry.cjs'),'utf8');mod=require(path.join(temp,'driver/entry.cjs'));
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
-function host(options={}){return createR8DriverHost({ROOT,work:temp,plugins,driverText,PLAN:mod.r8MusicNativePlan,options});}
+function host(options={}){return createR8DriverHost({ROOT,work:temp,plugins,driverText,entryText,PLAN:mod.r8MusicNativePlan,options});}
+function entryAutomatic(text,mode){
+ const stop=Symbol('prefix complete'),evolution={automatic:true},manager={};Object.defineProperty(manager,'isGameActive',{set(){throw stop;}});
+ const G={window:{PSEvolution:evolution},nw:{App:{argv:mode?['--ps-flow-test='+mode,'--ps-sound']:[]}},SceneManager:manager};
+ try{vm.runInNewContext(text,G,{filename:'actual-PS_BattleFlowTest-entry.js'});}catch(e){if(e!==stop)throw e;}
+ return evolution.automatic;
+}
+test('actual compiled flow-test entry retains the formal presenter for R8 only among backend music modes',()=>{
+ assert.equal(entryAutomatic(entryText,'d2-r8-music'),true);
+ for(const mode of ['d2-music','d2-capture-me'])assert.equal(entryAutomatic(entryText,mode),false);
+ for(const mode of ['evolution-ui','step5-sample',undefined])assert.equal(entryAutomatic(entryText,mode),true);
+ const gate='mode !== "d2-r8-music" &&';assert.equal(entryText.split(gate).length-1,1);
+ assert.equal(entryAutomatic(entryText.replace(gate,''),'d2-r8-music'),false,'removing the exemption reproduces the old entry regression');
+});
 test('full six-case driver reaches formal UI normal/cancel/technical, next battle and real native-method sequence controls',{timeout:30000},async()=>{
  const h=host();await mod.runD2R8Music(h.p);
  assert.deepEqual(h.report.results.map(r=>[r.id,r.status]),['R801','R802','R803','R804','R805','R806'].map(id=>[id,'pass']));
@@ -89,7 +102,7 @@ for(const [variant,plugin,needle,replacement,failedID,pattern]of [
  // Match the temporary test-module plan to the mutant payload so the assertion
  // exercises business/lifecycle evidence rather than failing the hash header.
  const expected=mod.r8MusicNativePlan.productPlugins[plugin];assert.equal(driverText.split(expected).length-1,1);const text=driverText.replace(expected,hash(changed)),file=path.join(temp,'driver',variant+'.cjs');fs.writeFileSync(file,text);const m=require(file);
- const h=createR8DriverHost({ROOT,work:temp,plugins:{...plugins,[plugin]:changed},driverText:text,PLAN:m.r8MusicNativePlan});
+  const h=createR8DriverHost({ROOT,work:temp,plugins:{...plugins,[plugin]:changed},driverText:text,entryText,PLAN:m.r8MusicNativePlan});
  await assert.rejects(m.runD2R8Music(h.p),pattern);assert.equal(h.report.results.at(-1).id,failedID);assert.equal(h.report.results.at(-1).status,'fail');assert(h.report.results.slice(0,-1).every(r=>r.status==='pass'));
  console.log(JSON.stringify({variant,plugin,before:hash(bytes),after:hash(changed),failedID,earlierPass:h.report.results.length-1,temporaryPlanPinPatched:true,native:'NOT_RUN'}));
 });

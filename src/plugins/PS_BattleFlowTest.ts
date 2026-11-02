@@ -37,7 +37,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   const mode = arg("ps-flow-test");
   if (!mode) return;
   // Backend contract modes drive their own answers; formal UI and the normal-sample integration use the default presenter.
-  if(mode!=="evolution-ui"&&mode!=="trade-ui"&&mode!=="closeout"&&mode!=="closeout-continue"&&mode!=="step5-sample"&&mode!=="step5-continue"&&W.PSEvolution)W.PSEvolution.automatic=false;
+  if(mode!=="d2-r8-music"&&mode!=="evolution-ui"&&mode!=="trade-ui"&&mode!=="closeout"&&mode!=="closeout-continue"&&mode!=="step5-sample"&&mode!=="step5-continue"&&W.PSEvolution)W.PSEvolution.automatic=false;
 
   const nodeRequire: any = G.require;
 
