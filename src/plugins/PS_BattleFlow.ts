@@ -1494,11 +1494,12 @@ const { developmentCapabilities } = RuleConfig;
     if (!this._aborted && !this._failure && this._ballFeedback?.pending()) return;
     if (!this._aborted && !this._failure && this._endFeedbackPages) {
       // A new terminal page needs a later Scene.update before another confirmation can advance or commit.
-      if (this._pictureUpdate === this._endPageShownUpdate) return;
+      // MZ processOk deactivates the menu before dispatch; keep Continue usable while more reading is owed.
+      if (this._pictureUpdate === this._endPageShownUpdate) { this._menu.activate(); return; }
       const next = this._endFeedbackPages[this._endFeedbackPage + 1];
       if (next) {
         this._endFeedbackPage++; this._log.setLines(next); if (c && !c.isCurrent()) return;
-        this._log.pause = true; this._endPageShownUpdate = this._pictureUpdate; return;
+        this._log.pause = true; this._endPageShownUpdate = this._pictureUpdate; this._menu.activate(); return;
       }
       this._endFeedbackPages = null; this._log.pause = false;
     }

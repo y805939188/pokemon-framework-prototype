@@ -30,6 +30,13 @@ async function open({lang='en',opening='',ending='You won this time.',fast=false
   flow.openBattle({kind:'trainer',trainer:{id:'music-normal',version:1},battleId:'author-pages-'+path.basename(h.w.root),seq:1,canLose:true});await h.waitFor(()=>!!h.p.battle()?._session,'actual Session');
   const s=h.p.battle(),app=flow.app(),shows=[];for(const method of ['add','setLines']){const fn=s._log[method];s._log[method]=function(...args){const result=fn.apply(this,args);shows.push({at:G.performance.now(),frame:G.Graphics.frameCount,lines:Array.from(this._lines)});return result;};}return {...h,s,flow,app,before,installs,content,shows,cleanup(){if(flow.running)flow.abort(Error('owned author-page test cleanup'));const d=Object.getOwnPropertyDescriptor(system,'_psGame');if(d?.get===get&&d?.set===set)Object.defineProperty(system,'_psGame',{...descriptor,value});}};
 }
+// Execute the installed processOk body: it deactivates the command window before calling our handler.
+function confirmThroughInstalledWindow(h){
+  const source=fs.readFileSync(path.join(ROOT,'js/reactor_windows.js'),'utf8'),start=source.indexOf('Window_Selectable.prototype.processOk = function() {'),end=source.indexOf('\n};',start);assert(start>=0&&end>start);
+  const body=source.slice(start,end+3).split(' = ')[1],dispatch=require('node:vm').runInNewContext('('+body.slice(0,-1)+')'),menu=h.s._menu;
+  assert(menu.active,'Continue is active before ordinary host confirmation');menu.isCurrentItemEnabled=()=>true;menu.playOkSound=menu.updateInputData=()=>{};menu.callOkHandler=()=>h.s.onMenuOk();dispatch.call(menu);
+  if(h.flow.running&&h.s._endFeedbackPages)assert(menu.active,'Continue remains active after processOk deactivated it');
+}
 const visible=h=>Array.from(h.s._log._lines),sameState=h=>{assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(h.installs.length,0);assert(h.app.saveBlocked);};
 async function collectOpening(h){
   await h.waitFor(()=>h.s._log.pause,'challenge pause');await h.p.press('ok');const pages=[];
@@ -61,11 +68,11 @@ for(const [lang,text]of [['en',EN],['zh',ZH]])test(lang+' long terminal feedback
       let lines=visible(h);if(!n){const at=lines.indexOf(header);if(at>=0)lines=lines.slice(at);}pages.push(lines);sameState(h);
       if(pages.flat().join('')===header+text){
         // A second callback in the update which drew the last page cannot finish before it was presented.
-        if(n){h.s.onMenuOk();sameState(h);assert.deepEqual(visible(h),lines);}
-        await h.frames(1);h.s.onMenuOk();await h.frames(2);break;
+        if(n){confirmThroughInstalledWindow(h);sameState(h);assert.deepEqual(visible(h),lines);}
+        await h.frames(1);confirmThroughInstalledWindow(h);await h.frames(2);break;
       }
-      await h.frames(1);h.s.onMenuOk();assert(h.flow.running,'cannot commit while the authored tail was never displayed');sameState(h);
-      const next=visible(h);h.s.onMenuOk();h.s.onEnd();sameState(h);assert.deepEqual(visible(h),next,'same-update callbacks cannot skip another page');
+      await h.frames(1);confirmThroughInstalledWindow(h);assert(h.flow.running,'cannot commit while the authored tail was never displayed');sameState(h);
+      const next=visible(h);confirmThroughInstalledWindow(h);h.s.onEnd();sameState(h);assert.deepEqual(visible(h),next,'same-update callbacks cannot skip another page');
     }
     assert.equal(pages.flat().join(''),header+text,'all terminal author text survives');assert(pages.length>1);assert(pages.every(p=>p.length<=h.s._log._max&&p.every(t=>h.s._log.textWidth(t)<=h.s._log.innerWidth)));
     assert.equal(h.installs.length,1);assert.equal(h.flow.game().money,1060);assert.equal(h.flow.lastOutcome.commit,'applied');assert(!h.app.saveBlocked);const after=JSON.stringify(h.flow.game());h.s.onMenuOk();h.s.onEnd();await h.frames(2);assert.equal(h.installs.length,1);assert.equal(JSON.stringify(h.flow.game()),after);assert.equal(rewards.filter(x=>x===E.i18n.translatorFor(lang).t('trainer.reward',{money:60})).length,1);
