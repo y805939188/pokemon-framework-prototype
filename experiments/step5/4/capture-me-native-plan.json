@@ -1,7 +1,7 @@
 {
   "version": "capture-me-native-v1",
-  "productCommit": "10d286a6dde6093107104ed3f67684ba3517fb22",
-  "productPluginSHA256": "f695ea29daea37d25abf2312635ded5eb4d10b425091660009ef3bcbf07f5101",
+  "productCommit": "f021b33767fae6969d735ffde981f968a80d2218",
+  "productPluginSHA256": "3eaf336a57e9c9ad407f161bdf17ffc15f79f847dc1d4aeb506e2250fb3834d2",
   "prefix": "pf_capture_me_v1/",
   "seed": [1,2,3,4],
   "worldSeed": 817,

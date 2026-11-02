@@ -8,7 +8,7 @@
 | 5.1 个体与仓库 | `step5/1-individual-storage` | 个体、40×30 仓库、schema 5、事务、接收与 UI | **已合并**（PR #4，`c5c51a6`，精确7fd候选及main双层CI通过）；[实施记录](5.1.md) |
 | 5.2 背包、道具与经济 | 已合并、作者树归档 | 八口袋/schema6/资源与事务及UI | **批准范围有条件收尾**（2026-10-25，PR #5，main `9a93b5c`，CI70 65套863通过）。CUA-F02真实FAIL/OPEN+条件DEFERRED、UI-MEM NEW_WARN/OPEN及未测项保留，不能写无条件全层PASS。 |
 | 5.3 成长、进化与图鉴 | 各有限批已合并；当前 `step5/3-H2-pokedex-search` | 内容/schema7迁移、C/D/F规则、E应用事务，后续学习/进化/交换/图鉴UI | **M1规则/事务中间门已接收**（PR #19，main `b977ed7`，CI126 98套1612通过）。G1经PR20/a289086、G2a经PR21/c70d441正式接收（CI134 101套1660）。G2b＋[AR01开战准入](5.3-AR01-battle-entry.md)经PR22/main34fecd8、双审与CI136/137/138接收（104套1747）；[G2c糖果／石头统一UI](5.3-G2c-item-evolution-ui.md)与AR01后续经PR23/main04a2f47正式接收（CI139/140/141，105套1816通过）；[H1默认图鉴](5.3-H1-pokedex-ui.md)整改913150a待Kimi增量／ultra，[H2完整搜索／摘要单条](5.3-H2-pokedex-search-summary.md)作者实现验证中。完整H、I包/性能/重启与J最终收口未完成。 |
-| 5.4 训练家、AI 与战斗界面 | 音乐`bcdefda`、ME纯核`4deec70`和端口`8bc8b40`已限域接受 | CI209/单轮17，CI210/159套3008，端口CI211/160套3068；[ME Scene接线](5.4-D2c-capture-me-scene.md)作者候选待审 | [ME端口边界](5.4-D2c-capture-me-port.md)；Scene尚无新实机，胜利仍BGM。原U51-16 FAIL/UNKNOWN、GC WARN、新D2 P-4及完整D2／E／5.4仍OPEN，未合main。 |
+| 5.4 训练家、AI 与战斗界面 | R8音乐`f021b33`纯组合、ME端口`8bc8b40`／Scene`10d286a`已限域接受；ME原生重绑定准备中 | R8精确CI214/163套3149；前置CI209–213及原单轮17保留原范围；[ME Scene接线](5.4-D2c-capture-me-scene.md)与driver静态接受 | [ME原生配方](5.4-D2c-capture-me-native.md)15项尚未实跑；R8正式进化／sequence宿主补证另列，胜利仍BGM。原U51-16 FAIL/UNKNOWN、GC WARN、新D2 P-4及完整D2／E／5.4仍OPEN，未合main。 |
 | 5.5 世界与遭遇 | — | — | 未开始 |
 | 5.6 菜单、标题与存档流程 | — | — | 未开始 |
 
@@ -35,6 +35,6 @@
 
 2026-11-01 R5 增补：[开场派出与临时资源打包边界](5.4-r5-opening-and-fixture-boundary.md)继承 F2 `87d0f50` 做 C1-R5-1/P2 与 B-R5-1/P3 窄修，候选待独立复审及精确 CI。原 F2 作者 101 项宿主记录保留，不冒充开场逐帧通过；完整 D2/5.4、E、新 P-4、GC WARN 与旧 UNKNOWN 不关闭。
 
-- [捕获ME原生验收配方v1](5.4-D2c-capture-me-native.md)：产品10d286a保持，新的driver/合成资源/冻结准备；原生15项尚未执行，不构成完整D2接受。
+- [捕获ME原生验收配方v1](5.4-D2c-capture-me-native.md)：重新绑定已接受产品f021b33，原15项业务输入/seed/媒体保持；新包待静态审查，原生15项尚未执行，不构成完整D2接受。
 
-- [r8音乐组合合同](5.4-D2c-audio-r8-composition.md)：战后正式进化根所有权与宿主世界sequence回程整改候选；待独立复核/精确CI/后继新包，不把旧17/17或ME静态准备扩大为本组合接受。
+- [r8音乐组合合同](5.4-D2c-audio-r8-composition.md)：f021b33经原Ultra及精确CI214限定接受，进化P2与sequence剩余P3关闭；实际宿主新包/正式组合补证仍待，不把旧17/17或ME静态准备扩大为本组合实跑。

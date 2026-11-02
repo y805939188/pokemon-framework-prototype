@@ -22,7 +22,7 @@ test.after(()=>{if(tmp)fs.rmSync(tmp,{recursive:true,force:true});if(sceneTemp)f
 function init(name){const n=nodes.find(n=>n.type==='VariableDeclarator'&&n.id.name===name);assert(n,name);return stripTypeScriptTypes(source.slice(n.init.start,n.init.end));}
 function helper(name,deps){return vm.runInNewContext('(({'+Object.keys(deps).join(',')+'})=>('+init(name)+'))')(deps);}
 test('native plan freezes exact product and15 ordered cases, two-process denominator',()=>{
- assert.equal(PLAN.productCommit,'10d286a6dde6093107104ed3f67684ba3517fb22');assert.equal(PLAN.waitMs,3500);
+ assert.equal(PLAN.productCommit,'f021b33767fae6969d735ffde981f968a80d2218');assert.equal(PLAN.waitMs,3500);
  assert.deepEqual(PLAN.groups.flatMap(g=>g.ids),Array.from({length:15},(_,i)=>'ME'+String(i+1).padStart(2,'0')));assert.equal(PLAN.groups.length,7);
  assert.equal(PLAN.assets.length,5);assert.equal(PLAN.assets.find(a=>a.name==='long').seconds/1.2,5);assert(PLAN.assets.find(a=>a.name==='short').seconds<3.5);
  // Headless CI does not install ignored generated plugin bundles. The package
