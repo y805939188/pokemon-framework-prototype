@@ -37,6 +37,12 @@ export class BattlePicturePlayback<T> {
     this.units = { ...units };
   }
   current(): boolean { return !this.retired && this.ports.current(); }
+  /** Ball visuals may scale an already shown foe, never create a missing/replaced portrait. */
+  captureScale(memberId: string, scale: number): boolean {
+    if (!Number.isFinite(scale) || scale < 0 || scale > 1) throw new Error('invalid captured portrait scale');
+    const entry = this.entries.get('p2:' + memberId);
+    return !!entry && this.paint(entry, { ...entry.pose, body: scale, shadow: scale });
+  }
   private release(entry: Entry<T>): void {
     if (entry.released) return;
     entry.released = true;

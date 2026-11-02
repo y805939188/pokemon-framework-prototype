@@ -40,6 +40,16 @@ export class BattleDisplayPlayback {
   }
   current(): boolean { return !this.retired && this.ports.current(); }
   snapshot(): BattleDisplayCard[] { return copy(this.shown); }
+  /** Separate post-ME/growth captured-ball hide; never writes the battle model. */
+  captureBox(memberId: string, opacity: number): boolean {
+    if (!this.current()) return false;
+    if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1) throw new Error('invalid captured data-box opacity');
+    const cards = copy(this.shown), card = cards.find(member => member.side === 'p2' && member.id === memberId && member.active);
+    if (!card) return false;
+    const planned = this.planned.find(member => member.side === 'p2' && member.id === memberId);
+    for (const value of [card, planned]) if (value) { value.boxOpacity = opacity; if (opacity === 0) value.portraitVisible = false; }
+    return this.paint(cards);
+  }
   private paint(cards: readonly BattleDisplayCard[]): boolean {
     if (!this.current()) return false;
     this.shown = copy(cards); this.ports.paint(copy(cards));

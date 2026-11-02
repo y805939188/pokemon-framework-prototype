@@ -23,6 +23,8 @@ import { BattleMusicOperations } from "./battleflow/battle-music-operation";
 import { captureMelodyPlan } from './battleflow/capture-melody';
 import { createCaptureMEMZ } from './battleflow/capture-me-mz';
 import { CaptureMelodySceneStep } from './battleflow/capture-me-scene';
+import { BallScenePresentation, simpleBallPlan } from './battleflow/ball-scene';
+import { createBallPortsMZ } from './battleflow/ball-mz';
 const { developmentCapabilities } = RuleConfig;
 
 (() => {
@@ -153,6 +155,7 @@ const { developmentCapabilities } = RuleConfig;
       catch (error) { op.musicError = String(error); battleMusic.finish(op, false); }
     },
     _closeBattleMusic(op: any, normal: boolean): void {
+      op?.ballFeedback?.cancel();
       op?.captureMelody?.cancel(); // own ME retires before return BGM can take the channel
       const plan = op.musicPlan; if (!plan) return;
       if (plan.closed) { if (!normal) battleMusic.finish(op, false); return; }
@@ -266,6 +269,7 @@ const { developmentCapabilities } = RuleConfig;
       const replacement = {}; replacingState = true; openingBattle = replacement;
       try {
       PSFlow._op?.captureMelody?.cancel();
+      PSFlow._op?.ballFeedback?.cancel();
       if (PSFlow._app) PSFlow._app.stateReplacedByHost();
       battleMusic.retire(); PSFlow._nextBattleMusic = null;
       PSFlow._receiveNoticeHistory.clear();PSFlow.lastReceivingNotice=null;
@@ -1073,7 +1077,7 @@ const { developmentCapabilities } = RuleConfig;
     this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
     sceneController(this, true);
     this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._faintAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
-    this._pictures = null; this._pictureUpdate = 0;
+    this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1167,7 +1171,7 @@ const { developmentCapabilities } = RuleConfig;
     } else ++this._pictureUpdate;
     // A rejected display clock still owes normal host/input updates for its aborted-end menu.
     G.Scene_MenuBase.prototype.update.call(this);
-    if (!c.isCurrent()) { this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
+    if (!c.isCurrent()) { this._ballFeedback?.cancel(); this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
     // Host abort may close this owner from main/boot/pending action. tick observes closure before phase/busy gates.
     this.updateQueue();
   };
@@ -1182,6 +1186,10 @@ const { developmentCapabilities } = RuleConfig;
         // Queue the cue after earlier faint/EXP presentation, before the victory text.
         // The same operation owns battle, victory and return; this does not end or commit it.
         const op = this._psOp;
+        if (op && message.kind === 'end' && message.reason === 'caught' && op.ballFeedback && !op.ballHideQueued) {
+          op.ballHideQueued = true;
+          steps.push(op.ballFeedback.hide()); // after capture ME/growth; before receiving/end
+        }
         if (op && message.kind === 'end' && message.reason === 'win' && message.winner === 'Player' && !op.victoryQueued) {
           op.victoryQueued = true;
           let retired = false;
@@ -1193,7 +1201,19 @@ const { developmentCapabilities } = RuleConfig;
         const growth = message.kind === 'growth' ? engine().B.battlePresentation.readGrowthDisplay(this._session, message) : null;
         if (this._display && message.kind === 'events') {
           for (const event of message.events) {
-            steps.push(...this._display.event(event), ...this._D.event(event));
+            steps.push(...this._display.event(event));
+            const lines = this._D.event(event), ballPlan = simpleBallPlan(event);
+            const shownTarget = ballPlan?.target === null || this._display.snapshot().some((card: BattleDisplayCard) => card.side === 'p2' && card.id === ballPlan?.target && card.active);
+            if (ballPlan && op && this._pictures && shownTarget && !(ballPlan.outcome === 'caught' && op.ballFeedback?.snapshot().plan.outcome === 'caught')) {
+              const current = () => c.isCurrent() && PSFlow.running && op === PSFlow._op && G.SceneManager._scene === this;
+              const ports = createBallPortsMZ(G, this, current, () => this._pictureUpdate,
+                scale => this._pictures.captureScale(ballPlan.target!, scale), opacity => this._display.captureBox(ballPlan.target!, opacity));
+              const stage = new BallScenePresentation(ballPlan, G.ConfigManager?.battleEffects !== false, ports);
+              this._ballFeedback = op.ballFeedback = stage;
+              // Normal results publish throw text first; trainer blocking has its own result text.
+              if (ballPlan.outcome !== 'blocked' && lines.length) steps.push(lines[0], stage, ...lines.slice(1));
+              else steps.push(stage, ...lines);
+            } else steps.push(...lines);
             if (event.type === 'rpg' && event.args[0] === 'ball' && event.args[1] === 'p1' && event.args[4] === 'caught') {
               const op = this._psOp;
               if (!c.isCurrent() || !PSFlow.running || op !== PSFlow._op) return;
@@ -1227,9 +1247,10 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.updateQueue = function () {
     const c = sceneController(this);
-    if (!c.isCurrent() || !PSFlow.running) { this._display?.dispose(); this._pictures?.dispose(); }
+    if (!c.isCurrent() || !PSFlow.running) { this._ballFeedback?.cancel(); this._display?.dispose(); this._pictures?.dispose(); }
     c.tick(G.Input.isTriggered('ok'), PSFlow.fast ? 0 : 24);
   };
+  P.ballFeedbackState = function () { return this._ballFeedback?.snapshot() ?? null; };
   P.afterMessages = function () {
     const s = this._session;
     if (this._failure) { this.showEnd(true); return; }
@@ -1403,6 +1424,7 @@ const { developmentCapabilities } = RuleConfig;
     const c = this._controller as BattleSceneController<any> | undefined;
     if (c && !c.isCurrent()) return;
     if (!this._aborted && !this._failure && this._captureMelody?.pending()) return;
+    if (!this._aborted && !this._failure && this._ballFeedback?.pending()) return;
     this._display?.dispose(); c?.dispose(); this._pictures?.dispose();
     if (!this._aborted && !this._failure) {
       try { const outcome=PSFlow.finish(this._session, this._psOp);if(c&&!c.ownsHost())return;if(outcome?.continuationToken){this._evolutionTransferred=true;this.popScene();return;}if(outcome?.pending&&W.PSManagement){this._menu.deactivate();if(c&&!c.ownsHost())return;this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
@@ -1413,6 +1435,7 @@ const { developmentCapabilities } = RuleConfig;
   P.terminate = function () {
     const c = this._controller as BattleSceneController<any> | undefined;
     this._menuCursor?.clear();
+    this._ballFeedback?.cancel();
     this._display?.dispose();
     c?.dispose(); // retire callbacks before host teardown can reenter application code
     this._backdrop?.dispose();

@@ -10,7 +10,10 @@ test.before(async()=>{
   assert.equal(r.status,0,r.stdout+r.stderr);const text=fs.readFileSync(path.join(out,name+'.js'),'utf8');if(name==='PS_BattleFlowTest')entryText=text;else plugins[name]=text;
  }
  const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));
- await vite.build({configFile:false,root:ROOT,logLevel:'error',build:{outDir:path.join(temp,'driver'),emptyOutDir:false,minify:false,lib:{entry:path.join(ROOT,'src/plugins/flowtest/d2-victory-music.ts'),formats:['cjs'],fileName:()=> 'entry.cjs'}}});
+ // Synthetic current-worktree composition only. Historical native JSON/freezer remain BBB and must reject changed production bytes.
+ const historical=require('./victory-music-native-plan.json');assert.equal(historical.productCommit,'bbb5b5dcefad25d6e2507779a55c9c3bc0711a85');
+ const synthetic={...historical,productCommit:'SYNTHETIC_CONTROL_ONLY_CURRENT_WORKTREE',productPlugins:Object.fromEntries(Object.entries(plugins).map(([name,text])=>[name,require('node:crypto').createHash('sha256').update(text).digest('hex')]))};
+ await vite.build({configFile:false,root:ROOT,logLevel:'error',plugins:[{name:'explicit-synthetic-current-product-identity',enforce:'pre',load(id){if(id===path.join(ROOT,'experiments/step5/4/victory-music-native-plan.json'))return JSON.stringify(synthetic);}}],build:{outDir:path.join(temp,'driver'),emptyOutDir:false,minify:false,lib:{entry:path.join(ROOT,'src/plugins/flowtest/d2-victory-music.ts'),formats:['cjs'],fileName:()=> 'entry.cjs'}}});
  driverText=fs.readFileSync(path.join(temp,'driver/entry.cjs'),'utf8');mod=require(path.join(temp,'driver/entry.cjs'));
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
@@ -20,7 +23,7 @@ test('compiled entry retains formal evolution presenter only for the explicitly 
  const G={window:{PSEvolution:evo},nw:{App:{argv:['--ps-flow-test=d2-victory-music','--ps-sound']}},SceneManager:M};
  try{vm.runInNewContext(entryText,G);}catch(e){if(e!==stop)throw e;}assert.equal(evo.automatic,true);
 });
-test('entire frozen normal six-case driver reaches actual Gen8 win/lose/run, formal evolution and sequence return',{timeout:30000},async()=>{
+test('entire synthetic current-product normal six-case driver reaches actual Gen8 win/lose/run, formal evolution and sequence return',{timeout:30000},async()=>{
  const h=host({battleReadyDelayFrames:12,delayStart:10});await mod.runD2VictoryMusic(h.p);
  assert.deepEqual(h.report.results.map(r=>[r.id,r.status]),['V01','V02','V03','V04','V05','V06'].map(id=>[id,'pass']));
  assert.deepEqual(h.report.victoryMusicNative.notRunIDs,[]);assert.equal(h.report.victoryMusicNative.nativeClaim,'NOT_SELF_QUALIFIED');assert.equal(h.report.victoryMusicNative.cleanupComplete,true);
