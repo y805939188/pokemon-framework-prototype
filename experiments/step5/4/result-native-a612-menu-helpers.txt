@@ -1,0 +1,35 @@
+// Historical test-only functions from a6125702970db45ed8490acb993d3893737af1cb; no runtime Git/history dependency.
+  async function choose(re: RegExp, label?: string) {
+    const m = battle()._menu;
+    const idx = m._items.findIndex((i: any) => re.test(i.name));
+    if (idx < 0) throw new Error(`menu item ${re} not found in [${names().join(" | ")}] (${label || ""})`);
+    if (m._items[idx].enabled === false) throw new Error(`menu item ${re} is disabled`);
+    let guard = 0;
+    while (m.index() !== idx && guard++ < 30) {
+      const at=m.index(),columns=battle().inputState().columns||1;
+      const row=Math.floor(at/columns),targetRow=Math.floor(idx/columns),vertical=at+(row<targetRow?columns:-columns);
+      if(row!==targetRow&&vertical>=0&&vertical<m._items.length)await press(row<targetRow?'down':'up');
+      else await press(at%columns<idx%columns?'right':'left');
+    }
+    assert(m.index()===idx,`navigation reached exact slot ${idx} (${label||re})`);
+    // A key event can be swallowed while the window is busy (e.g. right after a screenshot): confirm that OK
+    // had an effect (mode or item list changed, scene left, or a request is in flight) and press again if not.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const b0 = battle(); const before = { mode: b0._mode, items: b0._menu._items, index: m.index() };
+      await press("ok");
+      await frames(8);
+      const b1 = battle();
+      if (!b1 || b1._mode !== before.mode || b1._menu._items !== before.items || b1._busy || b1._queue.length) return;
+    }
+    throw new Error(`OK on ${re} had no effect after 4 presses`);
+  }
+  const mode_ = () => (battle() ? battle()._mode : "");
+  async function fightUntilEnd(moveRe: RegExp, max = 12) {
+    for (let i = 0; i < max && mode_() !== "end"; i++) {
+      if (mode_() === "learn") { await choose(/Don't learn|不学习/); continue; }
+      await choose(/^Fight/); await inMode("moves"); await choose(moveRe);
+      await waitFor(() => ["main", "end", "learn"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after the move");
+    }
+  }
+
+  /** Seeded random(n) for members created outside battles (grants, encounters). */
