@@ -36,6 +36,7 @@ test('full six-case driver reaches formal UI normal/cancel/technical, next battl
  assert.equal(h.report.r8MusicNative.sequenceScope,'active library track+silence restart only');
  for(const id of ['R801','R802','R803']){assert(h.report.r8MusicNative.cases[id].value.rootFrames>60);assert.equal(h.report.r8MusicNative.events.filter(e=>e.case===id&&e.kind==='independent-prebattle-memo').length,2,'each formal outcome checks the next battle too');}
  assert(h.report.r8MusicNative.events.some(e=>e.kind==='native-source-start'));assert(h.report.r8MusicNative.cases.R806.value.stopCalls>=2);
+ assert.equal(h.report.r8MusicNative.events.filter(e=>e.kind==='initial-title-handoff').length,1,'the actual configured Title song is handed off only once');
  assert(h.sourceNodes.every(n=>n.start===h.sourceStart));assert(h.w.created.every(b=>b.play===h.bufferMethods.play&&b.destroy===h.bufferMethods.destroy));
  if(process.env.PF_R8_CONTROL_REPORT){
   const out=path.resolve(process.env.PF_R8_CONTROL_REPORT);assert(path.relative(ROOT,out).startsWith('..'),'control evidence outside tracked tree');
@@ -53,6 +54,13 @@ test('payload mismatch refuses before any observer or audio side effect',async()
 });
 test('cold Title and delayed Scene.start reach all six cases without treating allocated windows as ready',async()=>{
  const h=host({delayStart:10});await mod.runD2R8Music(h.p);assert.equal(h.report.results.length,6);assert(h.report.r8MusicNative.events.find(e=>e.kind==='source-play').frame>10);
+});
+test('normal Title music and per-Battle 200ms readiness waits reach all six cases with the fixed seek tolerance',async()=>{
+ const h=host({battleReadyDelayFrames:12});await mod.runD2R8Music(h.p);
+ assert.deepEqual(h.report.results.map(r=>[r.id,r.status]),['R801','R802','R803','R804','R805','R806'].map(id=>[id,'pass']));
+ assert.equal(h.report.r8MusicNative.events.filter(e=>e.kind==='initial-title-handoff').length,1);
+ assert.equal(h.report.r8MusicNative.cleanupComplete,true);assert.deepEqual(h.report.r8MusicNative.cleanupErrors,[]);
+ for(const id of ['R801','R802','R803'])assert.equal(h.report.r8MusicNative.events.filter(e=>e.case===id&&e.kind==='independent-prebattle-memo').length,2);
 });
 for(const [options,pattern]of [[{badDuration:true},/frozen media duration/],[{stuckClock:true},/context advances/],[{badSourceOffset:true},/actual SourceNode start/]])test('native evidence control rejects '+JSON.stringify(options),async()=>{
  const h=host(options),before=[h.A.createBuffer,h.M.updateScene,h.context.createBufferSource];await assert.rejects(mod.runD2R8Music(h.p),pattern);

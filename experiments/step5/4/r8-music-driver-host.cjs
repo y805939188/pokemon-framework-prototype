@@ -33,6 +33,12 @@ function createR8DriverHost({ROOT,work,plugins,driverText,entryText,PLAN,options
  const Base=G.Scene_MenuBase,oldInit=Base.prototype.initialize;
  Base.prototype.initialize=function(...a){oldInit.apply(this,a);this._started=false;};Base.prototype.start=function(){this._started=true;};Base.prototype.isStarted=function(){return this._started;};Base.prototype.popScene=function(){M.pop();};
  function Title(){this.initialize();}Title.prototype=Object.create(Base.prototype);Title.prototype.constructor=Title;G.Scene_Title=Title;
+  const titleSource=fs.readFileSync(path.join(ROOT,'js/reactor_scenes.js'),'utf8'),titleBegin=titleSource.indexOf('Scene_Title.prototype.playTitleMusic = function'),titleEnd=titleSource.indexOf('\n};',titleBegin);
+  assert(titleBegin>=0&&titleEnd>titleBegin);vm.runInContext(titleSource.slice(titleBegin,titleEnd+3),G,{filename:'installed-reactor_scenes.js#playTitleMusic'});
+  G.$dataSystem.titleBgm=JSON.parse(fs.readFileSync(path.join(ROOT,'data/System.json'),'utf8')).titleBgm;
+  Title.prototype.start=function(){Base.prototype.start.call(this);this.playTitleMusic();};
+  const battleReady=G.Scene_PSBattle.prototype.isReady,seenReady=new WeakMap();
+  G.Scene_PSBattle.prototype.isReady=function(...a){const ready=battleReady.apply(this,a);if(!seenReady.has(this))seenReady.set(this,G.Graphics.frameCount);return ready&&G.Graphics.frameCount-seenReady.get(this)>=(options.battleReadyDelayFrames??0);};
  const evoUpdate=M.updateScene,stack=[];
  const install=C=>{const prior=M._scene;prior?.terminate?.();const s=new C();if(!s.children)s.initialize();M._scene=s;s.create();if(s instanceof G.Scene_Map){s._messageWindow={};s._spriteset={};}if(s instanceof Title){s._commandWindow={isOpenAndActive:()=>true};s.isBusy=()=>false;}return s;};
  M.goto=C=>install(C);M.push=C=>{const s=M._scene;stack.push(s instanceof G.Scene_Map?G.Scene_Map:s?.constructor??G.Scene_Map);return install(C);};M.pop=()=>install(stack.pop()??G.Scene_Map);

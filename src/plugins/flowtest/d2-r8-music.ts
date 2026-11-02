@@ -90,8 +90,16 @@ export async function runD2R8Music(p: any): Promise<void> {
   const clearMessages = () => { G.$gameMessage.clear(); G.$gameMap._interpreter.clear(); };
   let first = true;
   const reset = async (evolution: boolean, missing = false) => {
-    await wait(() => mapReady() || (first && titleReady()), 'initial started Title or subsequent started Map'); first = false;
+    await wait(() => mapReady() || (first && titleReady()), 'initial started Title or subsequent started Map');
+    const initialTitle = first && titleReady(); first = false;
     assert(!flow._app?.saveBlocked && !flow.running && !W.PSEvolution.current(), 'previous root actually finished');
+    // A normal cold Title owns its configured song before this test starts.
+    // Adopt only that exact initial channel once, not later case successors.
+    const titleOutput = channel(), title = G.$dataSystem.titleBgm;
+    if (initialTitle && !output && titleOutput.buffer && !titleOutput.sequence && !titleOutput.pending) {
+      for (const key of ['name', 'volume', 'pitch', 'pan']) eq(titleOutput.record?.[key], title?.[key], 'configured initial Title song ' + key);
+      output = titleOutput; mark('initial-title-handoff', { title: clone(title) });
+    }
     assert(same(output, channel()) || (!audio._bgmBuffer && !audio._bgmSequence && !audio._pendingBgmSequence), 'case boundary cannot discard an unknown successor');
     if (same(output, channel())) audio.stopBgm(); output = null;
     flow.stateReplaced(); flow._app = null; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.developerCapabilities = {}; flow.seed = [...PLAN.seed]; randomState = PLAN.worldSeed >>> 0; draws = 0;
@@ -121,9 +129,23 @@ export async function runD2R8Music(p: any): Promise<void> {
   };
   const open = async (missing = false) => {
     const request = { kind: 'wild', foes: [{ species: 'Pidgey', level: 3 }], seq: ++ordinal, battleId: PLAN.version + '/' + currentCase + '#' + ordinal, canLose: true };
-    const prior = { host: clone(audio.saveBgm()), buffer: audio._bgmBuffer, position: audio._bgmBuffer?.seek(), pitch: audio._bgmBuffer?.pitch, loopLength: audio._bgmBuffer?._loopLengthTime, at: G.WebAudio._context.currentTime };
-    flow.openBattle(request); const preparedAt = G.WebAudio._context.currentTime;
-    await inMode('main'); healthy(); const s = battle(), op = flow._op, app = flow.app();
+    // Scene readiness can legitimately take frames while the world song keeps
+    // advancing. Independently sample around its actual synchronous remember
+    // boundary, not around the earlier openBattle request.
+    let prior: any = null, preparedAt = 0;
+    const startMusic = flow._startBattleMusic;
+    const boundary = function (this: any, ...args: any[]) {
+      if (!prior && args[0] === flow._op) {
+        prior = { host: clone(audio.saveBgm()), buffer: audio._bgmBuffer, position: audio._bgmBuffer?.seek(), pitch: audio._bgmBuffer?.pitch, loopLength: audio._bgmBuffer?._loopLengthTime, at: G.WebAudio._context.currentTime };
+        try { return startMusic.apply(this, args); } finally { preparedAt = G.WebAudio._context.currentTime; }
+      }
+      return startMusic.apply(this, args);
+    };
+    flow._startBattleMusic = boundary;
+    try { flow.openBattle(request); await inMode('main'); healthy(); }
+    finally { if (flow._startBattleMusic === boundary) flow._startBattleMusic = startMusic; }
+    assert(prior, 'actual synchronous music memory boundary observed');
+    const s = battle(), op = flow._op, app = flow.app();
     assert(s?._session && op?.session === s._session, 'actual Scene/App/Gen8 Session');
     activeRoot = { op, app, generation: app.stateGeneration }; if (!missing) { await active(audio._bgmBuffer, named('battle')); observeOutput(); }
     else eq(flow.musicState().player.requests.at(-1).state, 'missing', 'real missing battle BGM');
