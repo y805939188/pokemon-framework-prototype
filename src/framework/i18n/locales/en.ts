@@ -277,6 +277,8 @@ export const en: LocaleTable = {
     "ui.learn.forget": "Forget {move}",
     "ui.learn.skip": "Don't learn {move}",
     "ui.end.continue": "Continue",
+    "trainer.defeated": "You defeated {name}!",
+    "ui.end.no_more": "You have no more Pokémon that can fight!",
     "ui.end.back": "Back to the map",
     "ui.end.aborted": "The battle was aborted. Nothing was saved.",
     // ---- grants and healing outside battle (plugin commands ClaimGrant / HealParty)

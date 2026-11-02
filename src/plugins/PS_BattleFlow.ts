@@ -458,6 +458,10 @@ const { developmentCapabilities } = RuleConfig;
         const trainer = op.request.trainer, identity = trainer ? { id: trainer.id, version: trainer.version } : null;
         const projection = identity ? app.trainerRecord(identity.id, identity.version) : null; assertCurrent();
         if (identity && !projection) throw new Error('missing trainer record for battle music');
+        // Same public author-version projection as the music context; never requery after the fight.
+        op.trainerPresentation = op.request.kind === 'trainer' && projection && typeof projection.name === 'string'
+          ? Object.freeze({ id: projection.id, version: projection.version, name: projection.name,
+            loseText: projection.presentation.loseText }) : null;
         op.musicPlan.owner = { app, generation };
         op.musicPlan.trainers = op.request.kind === 'trainer' ? Object.freeze(projection ? [Object.freeze({
           battleBgm: projection.presentation.battleBgm, victoryBgm: projection.presentation.victoryBgm,
@@ -1077,7 +1081,7 @@ const { developmentCapabilities } = RuleConfig;
     this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
     sceneController(this, true);
     this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._faintAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
-    this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null;
+    this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1345,6 +1349,7 @@ const { developmentCapabilities } = RuleConfig;
     this.show("learn", [...m.moves.map((mv: any, i: number) => ({ name: PSFlow.translator().t("ui.learn.forget", { move: mv.id }), ext: i })), { name: PSFlow.translator().t("ui.learn.skip", { move: p.move.name }), ext: null }]);
   };
   P.showEnd = function (aborted: boolean) {
+    const c = sceneController(this); if (!c.isCurrent()) return;
     if (aborted) this._log.add(PSFlow.translator().t("ui.end.aborted"));
     // Full-party reception still has a destination choice. Do not announce a box before that choice commits.
     const s = this._session;
@@ -1356,6 +1361,19 @@ const { developmentCapabilities } = RuleConfig;
         }
       } catch { /* the commit below reports any state problem */ }
     }
+    // The existing Continue command is the explicit final confirmation. These lines do not commit a result.
+    if (!aborted && !this._endFeedbackShown && s?.ended && this._psOp === PSFlow._op) {
+      this._endFeedbackShown = true;
+      const end = s.ended, trainer = this._psOp?.trainerPresentation, tr = PSFlow.translator(), lines: string[] = [];
+      if (end.reason === 'win' && end.winner === 'Player' && this._psOp?.request.kind === 'trainer' && trainer) {
+        lines.push(tr.t('trainer.defeated', { name: trainer.name }), trainer.loseText ?? '...');
+      } else if (end.reason === 'win' && end.winner !== 'Player') lines.push(tr.t('ui.end.no_more'));
+      for (const line of lines) {
+        if (!c.isCurrent() || !PSFlow.running) return;
+        if (line) this._log.add(this._log.fitText(line));
+      }
+    }
+    if (!c.isCurrent()) return;
     this._aborted = aborted;
     this.show("end", [{ name: PSFlow.translator().t(aborted ? "ui.end.back" : "ui.end.continue"), ext: "end" }]);
   };

@@ -276,6 +276,8 @@ export const zh: LocaleTable = {
     "ui.learn.forget": "忘记 {move}",
     "ui.learn.skip": "不学习 {move}",
     "ui.end.continue": "继续",
+    "trainer.defeated": "你击败了{name}！",
+    "ui.end.no_more": "你已经没有能够战斗的宝可梦了！",
     "ui.end.back": "回到地图",
     "ui.end.aborted": "对战被中止了，没有保存任何内容。",
     // ---- 战斗外的领取与治疗（插件命令 ClaimGrant / HealParty）
