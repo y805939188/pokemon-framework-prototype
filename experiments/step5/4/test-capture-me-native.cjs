@@ -25,11 +25,14 @@ test('native plan freezes exact product and15 ordered cases, two-process denomin
  assert.equal(PLAN.productCommit,'10d286a6dde6093107104ed3f67684ba3517fb22');assert.equal(PLAN.waitMs,3500);
  assert.deepEqual(PLAN.groups.flatMap(g=>g.ids),Array.from({length:15},(_,i)=>'ME'+String(i+1).padStart(2,'0')));assert.equal(PLAN.groups.length,7);
  assert.equal(PLAN.assets.length,5);assert.equal(PLAN.assets.find(a=>a.name==='long').seconds/1.2,5);assert(PLAN.assets.find(a=>a.name==='short').seconds<3.5);
- const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'js/plugins/PS_BattleFlow.js'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),PLAN.productPluginSHA256,'unchanged production bundle');
+ // Headless CI does not install ignored generated plugin bundles. The package
+ // freeze checks actual bundle bytes; here lock the tracked Scene source.
+ const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),'b9c08583b5624f82074b67bee6ae2135942cfc26c1a397d7e9da8ade4f51c745','unchanged production Scene source');
 });
 for(const kind of ['map','title'])test('actual driver readiness rejects unstarted/changing/incomplete '+kind,()=>{
  class Map{}class Title{}let changing=false;const G={Scene_Map:Map,Scene_Title:Title,SceneManager:{isSceneChanging:()=>changing}},v=new(kind==='map'?Map:Title)();let started=false,active=true,busy=false;
  Object.assign(v,{isStarted:()=>started,isBusy:()=>busy,_commandWindow:{isOpenAndActive:()=>active}});assert.equal(mod.captureHostReady(G,v,kind),false);started=true;
+ if(kind==='map'){v._messageWindow={};v._spriteset={};started=false;assert.equal(mod.captureHostReady(G,v,kind),false,'allocated windows do not imply Scene.start');started=true;delete v._messageWindow;delete v._spriteset;}
  if(kind==='map'){assert.equal(mod.captureHostReady(G,v,kind),false);v._messageWindow={};assert.equal(mod.captureHostReady(G,v,kind),false);v._spriteset={};}
  assert.equal(mod.captureHostReady(G,v,kind),true);changing=true;assert.equal(mod.captureHostReady(G,v,kind),false);changing=false;
  if(kind==='title'){active=false;assert.equal(mod.captureHostReady(G,v,kind),false);active=true;busy=true;assert.equal(mod.captureHostReady(G,v,kind),false);}
