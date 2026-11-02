@@ -63,7 +63,7 @@ function world(opt = {}) {
   vm.runInContext(plugins.PS_SaveState, G, { filename: 'PS_SaveState.js' });
   G.PSManagement = { inputFrame: () => ({ pressed: new Set() }), presentationPending: () => false };
   if (opt.evolution === 'plugin') vm.runInContext(plugins.PS_Evolution, G, { filename: 'PS_Evolution.js' });
-  const flow = G.PSFlow, AM = G.AudioManager, applicationFactory = flow.app;
+  const flow = G.PSFlow, AM = G.AudioManager, applicationFactory = flow.app, productionTranslator = flow.translator;
   const projection = { id: 'npc', version: 1, presentation: { battleBgm: 'Authored', victoryBgm: 'V', introBgm: opt.intro ?? 'Intro' } };
   const session = { party: [], foeTeam: [], content: {}, bag: {}, finished: false, pendingLearn: null, take: () => [], currentRequest: () => ({ active: [{ moves: [{ id: 'splash', move: 'Splash', pp: 40, maxpp: 40 }] }] }), gw: { readState: () => [] } };
   const app = { stateGeneration: 0, saveBlocked: false, encounterBlocked: false, pendingEvolution: null, pendingReceiving: null, pendingPokedex: null, pendingTrade: null, pendingTriggeredEvolution: null,
@@ -80,6 +80,7 @@ function world(opt = {}) {
   G.$gameSystem._psGame = { party: [], storage: { boxes: [] } };
   Object.assign(flow, { _app: app, app: () => app, content: () => ({}), game: () => G.$gameSystem._psGame, limits: () => ({ party: 6, boxes: 1200 }), speciesName: x => x,
     translator: () => ({ t: k => k, tOr: (_k, f) => f, has: () => false, font: () => 'sans-serif' }) });
+  if (opt.productionTranslator) flow.translator = productionTranslator;
   let battleSeq = 0;
   Object.assign(w, { G, AM, flow, app, projection, manager, timers, applicationFactory,
     get time() { return time; },
