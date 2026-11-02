@@ -923,6 +923,25 @@ const { developmentCapabilities } = RuleConfig;
     while (points.length && this.textWidth(points.join('') + "…") > width) points.pop();
     return points.join('') + "…";
   };
+  /** Plain authored dialogue: measured word/glyph wrapping and visible-height pages; no ellipsis. */
+  Window_PSText.prototype.textPages = function (this: any, text: string): string[][] {
+    const lines: string[] = [], width = Math.max(1, this.innerWidth);
+    for (const paragraph of text.split(/\r\n|\r|\n/)) {
+      const points = Array.from(paragraph);
+      if (!points.length) { lines.push(''); continue; }
+      for (let offset = 0; offset < points.length;) {
+        let count = 1;
+        while (offset + count < points.length && this.textWidth(points.slice(offset, offset + count + 1).join('')) <= width) count++;
+        if (offset + count < points.length) {
+          for (let i = count - 1; i > 0; i--) if (/\s/u.test(points[offset + i])) { count = i + 1; break; }
+        }
+        lines.push(points.slice(offset, offset + count).join('')); offset += count;
+      }
+    }
+    const pages: string[][] = [];
+    for (let i = 0; i < lines.length; i += this._max) pages.push(lines.slice(i, i + this._max));
+    return pages;
+  };
   Window_PSText.prototype.setLines = function (lines: string[]) { this._lines = lines.slice(-this._max); this.refresh(); };
   Window_PSText.prototype.add = function (line: string) { this._lines.push(line); this._lines = this._lines.slice(-this._max); this.refresh(); };
   Window_PSText.prototype.refresh = function () {
@@ -1081,7 +1100,7 @@ const { developmentCapabilities } = RuleConfig;
     this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
     sceneController(this, true);
     this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._faintAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
-    this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false; this._trainerOpeningQueued = false;
+    this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false; this._endFeedbackPages = null; this._endFeedbackPage = 0; this._endPageShownUpdate = -1; this._trainerOpeningQueued = false;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1168,21 +1187,23 @@ const { developmentCapabilities } = RuleConfig;
     if (!this._trainerOpeningQueued && this._psOp?.request.kind === 'trainer' && trainer) {
       this._trainerOpeningQueued = true;
       for (const text of [PSFlow.translator().t('trainer.challenged', { name: trainer.name }), trainer.openingText]) {
-        if (!text) continue; // No invented author speech for an omitted or explicitly empty field.
-        const log = this._log; let shown = false, done = false, fullyShownAt = 0;
-        const close = () => { done = true; log.pause = false; };
-        c.enqueue([{ kind: 'visual', cancel: close, advance: () => {
-          if (done || !c.isCurrent() || !PSFlow.running) { close(); return true; }
-          if (!shown) {
-            shown = true; log.add(log.fitText(text));
+        if (!text) continue;
+        for (const page of this._log.textPages(text)) {
+          const log = this._log; let shown = false, done = false, fullyShownAt = 0;
+          const close = () => { done = true; log.pause = false; };
+          c.enqueue([{ kind: 'visual', cancel: close, advance: () => {
             if (done || !c.isCurrent() || !PSFlow.running) { close(); return true; }
-            log.pause = true; fullyShownAt = performance.now(); return false;
-          }
-          // Nonterminal paused messages: confirm/back, or three seconds after the full line was drawn.
-          // fast is the existing explicit test-only no-pacing switch, never the Battle Effects option.
-          if (PSFlow.fast || G.Input.isTriggered('ok') || G.Input.isTriggered('cancel') || G.TouchInput?.isTriggered?.() || performance.now() - fullyShownAt >= 3000) { close(); return true; }
-          return false;
-        } }]);
+            if (!shown) {
+              shown = true;
+              if (page.length === 1 && page[0] === text) log.add(text); else log.setLines(page);
+              if (done || !c.isCurrent() || !PSFlow.running) { close(); return true; }
+              log.pause = true; fullyShownAt = performance.now(); return false;
+            }
+            // Every fully drawn nonterminal page gets its own three seconds or explicit input.
+            if (PSFlow.fast || G.Input.isTriggered('ok') || G.Input.isTriggered('cancel') || G.TouchInput?.isTriggered?.() || performance.now() - fullyShownAt >= 3000) { close(); return true; }
+            return false;
+          } }]);
+        }
       }
     }
     c.enqueue([this._display.initial()]);
@@ -1198,7 +1219,7 @@ const { developmentCapabilities } = RuleConfig;
     } else ++this._pictureUpdate;
     // A rejected display clock still owes normal host/input updates for its aborted-end menu.
     G.Scene_MenuBase.prototype.update.call(this);
-    if (!c.isCurrent()) { c.dispose(); this._ballFeedback?.cancel(); this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
+    if (!c.isCurrent()) { c.dispose(); this._log.pause = false; this._endFeedbackPages = null; this._ballFeedback?.cancel(); this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
     // Host abort may close this owner from main/boot/pending action. tick observes closure before phase/busy gates.
     this.updateQueue();
   };
@@ -1373,7 +1394,7 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.showEnd = function (aborted: boolean) {
     const c = sceneController(this); if (!c.isCurrent()) return;
-    if (aborted) this._log.add(PSFlow.translator().t("ui.end.aborted"));
+    if (aborted) { this._endFeedbackPages = null; this._log.pause = false; this._log.add(PSFlow.translator().t("ui.end.aborted")); }
     // Full-party reception still has a destination choice. Do not announce a box before that choice commits.
     const s = this._session;
     if (!aborted && s && s.ended && s.ended.reason === "caught") {
@@ -1391,9 +1412,14 @@ const { developmentCapabilities } = RuleConfig;
       if (end.reason === 'win' && end.winner === 'Player' && this._psOp?.request.kind === 'trainer' && trainer) {
         lines.push(tr.t('trainer.defeated', { name: trainer.name }), trainer.loseText ?? '...');
       } else if (end.reason === 'win' && end.winner !== 'Player') lines.push(tr.t('ui.end.no_more'));
-      for (const line of lines) {
+      const pages = lines.some(Boolean) ? this._log.textPages(lines.filter(Boolean).join('\n')) : [];
+      if (pages.length > 1) {
+        this._endFeedbackPages = pages; this._endFeedbackPage = 0;
+        this._log.setLines(pages[0]); if (!c.isCurrent()) return;
+        this._log.pause = true; this._endPageShownUpdate = this._pictureUpdate;
+      } else for (const line of pages[0] || []) {
         if (!c.isCurrent() || !PSFlow.running) return;
-        if (line) this._log.add(this._log.fitText(line));
+        this._log.add(line);
       }
     }
     if (!c.isCurrent()) return;
@@ -1466,6 +1492,16 @@ const { developmentCapabilities } = RuleConfig;
     if (c && !c.isCurrent()) return;
     if (!this._aborted && !this._failure && this._captureMelody?.pending()) return;
     if (!this._aborted && !this._failure && this._ballFeedback?.pending()) return;
+    if (!this._aborted && !this._failure && this._endFeedbackPages) {
+      // A new terminal page needs a later Scene.update before another confirmation can advance or commit.
+      if (this._pictureUpdate === this._endPageShownUpdate) return;
+      const next = this._endFeedbackPages[this._endFeedbackPage + 1];
+      if (next) {
+        this._endFeedbackPage++; this._log.setLines(next); if (c && !c.isCurrent()) return;
+        this._log.pause = true; this._endPageShownUpdate = this._pictureUpdate; return;
+      }
+      this._endFeedbackPages = null; this._log.pause = false;
+    }
     this._display?.dispose(); c?.dispose(); this._pictures?.dispose();
     if (!this._aborted && !this._failure) {
       try { const outcome=PSFlow.finish(this._session, this._psOp);if(c&&!c.ownsHost())return;if(outcome?.continuationToken){this._evolutionTransferred=true;this.popScene();return;}if(outcome?.pending&&W.PSManagement){this._menu.deactivate();if(c&&!c.ownsHost())return;this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
@@ -1476,6 +1512,7 @@ const { developmentCapabilities } = RuleConfig;
   P.terminate = function () {
     const c = this._controller as BattleSceneController<any> | undefined;
     this._menuCursor?.clear();
+    this._endFeedbackPages = null; if (this._log) this._log.pause = false;
     this._ballFeedback?.cancel();
     this._display?.dispose();
     c?.dispose(); // retire callbacks before host teardown can reenter application code
