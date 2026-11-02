@@ -1,4 +1,4 @@
-import { BattleMusicPlayback, musicTrack } from './battle-music';
+import { BattleMusicPlayback, musicTrack, savedWorldTrack } from './battle-music';
 import type { BattleMusicConfig, BattleMusicPort, IntroMemory, MusicMemo, MusicTrack, RawMusic } from './battle-music';
 import type { TrainerAudioFields } from './battle-audio-selection';
 
@@ -15,7 +15,7 @@ interface Ports {
   frame(): number;
   makePort(current: () => boolean, defaultBgm?: MusicTrack): BattleMusicPort;
 }
-const copyMemo = (memo: MusicMemo | null): MusicMemo | null => memo ? { track: memo.track ? musicTrack(memo.track) : null, position: memo.position } : null;
+const copyMemo = (memo: MusicMemo | null): MusicMemo | null => memo ? { track: memo.track ? savedWorldTrack(memo.track) : null, position: memo.position } : null;
 
 /** A single host timeline. Return ownership survives Scene exit, never app/generation or op replacement. */
 export class BattleMusicOperations {

@@ -2,7 +2,7 @@ import { selectBattleAudio } from './battle-audio-selection';
 import type { BattleAudioContext, BattleAudioMetadata, TrainerAudioFields } from './battle-audio-selection';
 
 /** Internal request DTOs. No audio backend, timer, application or save state in this module. */
-export interface MusicTrack { readonly name: string; readonly volume: number; readonly pitch: number; readonly pan: number; }
+export interface MusicTrack { readonly name: string; readonly volume: number; readonly pitch: number; readonly pan: number; readonly sequence?: number | string; readonly looped?: true; }
 export type RawMusic = string | { readonly name: string; readonly volume?: number; readonly pitch?: number; readonly pan?: number };
 export interface MusicMemo { track: MusicTrack | null; position: number; }
 export interface IntroMemory {
@@ -48,6 +48,15 @@ export function musicTrack(value: RawMusic, parseStringParameters = false): Musi
   if (typeof pan !== 'number' || !Number.isFinite(pan) || pan < -100 || pan > 100) throw new Error('invalid battle music pan');
   return Object.freeze({ name, volume: number(raw?.volume, volume, 'volume'), pitch: number(raw?.pitch, pitch, 'pitch'), pan });
 }
+/** Copy a host world memo without admitting sequence fields to author presets. */
+export function savedWorldTrack(value: RawMusic | MusicTrack): MusicTrack {
+  const plain = musicTrack(value), raw = typeof value === 'string' ? null : object(value);
+  const sequence = raw?.sequence;
+  if (sequence !== undefined && !(typeof sequence === 'number' && Number.isSafeInteger(sequence) && sequence > 0 ||
+      typeof sequence === 'string' && /^library:\d+$/.test(sequence) && Number(sequence.slice(8)) > 0 && Number.isSafeInteger(Number(sequence.slice(8))))) throw new Error('invalid battle music sequence');
+  if (sequence !== undefined && raw?.looped !== undefined && typeof raw.looped !== 'boolean') throw new Error('invalid battle music sequence looped');
+  return Object.freeze({ ...plain, ...(sequence === undefined ? {} : { sequence: sequence as number | string, ...(raw?.looped === true ? { looped: true as const } : {}) }) });
+}
 /** Author-provided metadata, not inferred map/terrain information. Snapshot only, no preset consumption. */
 export function battleMusicConfig(value: unknown = {}): BattleMusicConfig {
   const raw = object(value), presets: Partial<Record<'battle' | 'victory' | 'capture', MusicTrack>> = {};
@@ -91,7 +100,7 @@ export class BattleMusicPlayback {
     if (this.memory.memo) return true;
     const pending = this.memory.pending;
     if (pending) {
-      const track = musicTrack(pending.track);
+      const track = savedWorldTrack(pending.track);
       pending.cancel();
       if (!this.live()) return false;
       this.memory.pending = null;
@@ -102,7 +111,7 @@ export class BattleMusicPlayback {
       try { position = this.port.position(); } catch { /* only the position query has the formal zero fallback */ }
       if (!this.live()) return false;
       if (!Number.isFinite(position) || position < 0) throw new Error('invalid battle music position');
-      this.memory.memo = { track: track ? musicTrack(track) : null, position };
+      this.memory.memo = { track: track ? savedWorldTrack(track) : null, position };
     }
     return this.live();
   }

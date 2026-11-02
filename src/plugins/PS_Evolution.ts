@@ -11,7 +11,7 @@ const { publicIdText } = memberIdentity;
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Evolution',flow=()=>W.PSFlow,app=()=>flow().app();
  const tr=(key:string,p?:Record<string,string|number>)=>flow().translator().t('evolution.'+key,p);
- type Request={scene?:any;constructing?:boolean;application:any;generation:number;owner:string;trigger:boolean;battleId?:string;done:boolean;result?:string;outcome?:any;event?:{event:number;memberId?:string};item?:EvolutionItemIntent;trade?:true|{requestId:string;intent:any};selectorStage?:'selecting'|'ready';selectorScene?:any};
+ type Request={scene?:any;constructing?:boolean;application:any;generation:number;owner:string;trigger:boolean;battleId?:string;battleOp?:object;done:boolean;result?:string;outcome?:any;event?:{event:number;memberId?:string};item?:EvolutionItemIntent;trade?:true|{requestId:string;intent:any};selectorStage?:'selecting'|'ready';selectorScene?:any};
  let queued:Request|null=null,reserved:Request|null=null,active:Controller|null=null,feedbackRecovery:Request|null=null,recoveryChoice:{request:Request;title:boolean}|null=null;
  const waits=new WeakMap<object,Request>(),outcomes=new WeakMap<object,any>(),tradeOutcomes=new WeakMap<object,{request:Request;outcome:any}>(),tradeRequests=new WeakMap<object,Request>(),suppressed=new Set<string>();
  const suppress=(r:Request)=>{suppressed.add(r.generation+':'+r.owner);if(suppressed.size>32)suppressed.delete(suppressed.values().next().value!);};
@@ -38,7 +38,7 @@ const { publicIdText } = memberIdentity;
   get confirmedItem(){return this.itemFacts?structuredClone(this.itemFacts):null;}
   private confirmItem(primary:boolean,item?:NonNullable<GameApplication['pendingTriggeredEvolution']>['itemResult']){if(!this.request.item||!primary)return;this.itemFacts={primaryCommitted:true,...(item?{itemResult:structuredClone(item)}:this.itemFacts?.itemResult?{itemResult:structuredClone(this.itemFacts.itemResult)}:{})};}
   back(){if(this.ready)this.backRequested=true;}
-  valid(){return active===this&&!this.closed&&!this.request.done&&this.request.application===flow()._app&&this.request.generation===this.request.application.stateGeneration;}
+  valid(){return active===this&&!this.closed&&!this.request.done&&this.request.application===flow()._app&&this.request.generation===this.request.application.stateGeneration&&(!this.request.battleOp||flow()._op===this.request.battleOp);}
   views(){
    const a=this.request.application;if(!this.valid())return {e:null,d:null,t:null,q:null};
    if(this.request.trade){const q=a.pendingTrade?.token===this.request.owner?a.pendingTrade:null;return {q,e:q?.evolution??null,t:null,d:q?.entry?{token:q.token,revision:q.revision,parentToken:q.token,phase:q.entry.opened?'entry':'message',entry:q.entry}:null};}
@@ -51,7 +51,12 @@ const { publicIdText } = memberIdentity;
    return {e:e&&this.knownTokens.has(e.token)?e:null,d:d&&(d.parentToken===this.request.owner||this.knownTokens.has(d.parentToken))?d:null,t,q:null};
   }
   boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;this.latch.arm(W.PSManagement.inputFrame().pressed);G.Input.clear();G.TouchInput.clear();}
-  start(){if(!this.valid()){this.close('stale');return;}this.savedBgm=G.AudioManager?.saveBgm?.();this.audioCaptured=true;this.sync();}
+  start(){if(!this.valid()){this.close('stale');return;}
+   const f=flow(),op=f._op,owner=op?.musicPlan?.owner;
+   // A battle-bound continuation leaves save/stop/replay to its exact root.
+   // Delegation does not reclaim a channel that a real successor took over.
+   const delegated=!!this.request.battleOp&&this.request.battleOp===op&&f.running&&op.request?.battleId===this.request.battleId&&owner?.app===this.request.application&&owner.generation===this.request.generation&&op.musicPlan.started&&!op.musicPlan.closed;
+   if(!delegated){this.savedBgm=G.AudioManager?.saveBgm?.();this.audioCaptured=true;}this.sync();}
   move(id:string){if(!this.moves.has(id))this.moves.set(id,this.request.application.describeLearningMove(id));return this.moves.get(id);}
   dispatch(kind:'e'|'d'|'t'|'q',decision:any){
    if(!this.valid()){this.close('stale');return null;}
@@ -71,13 +76,13 @@ const { publicIdText } = memberIdentity;
    if(t?.primaryCommitted&&t.itemResult&&!this.growthShown){this.layer='item-growth';this.boundary();this.draw();return;}
    if(q?.phase==='failed'){this.key='q';this.layer='recovery';this.error=q.error??'trade-failed';}
    else if(q?.phase==='offer'){this.key='q';this.layer='trade-offer';}
-   else if(q?.phase==='presenting'){this.key='q';this.layer='trade';this.tradeTimeline=new TradeTimeline(clock());G.AudioManager?.stopBgm?.();}
+   else if(q?.phase==='presenting'){this.key='q';this.layer='trade';this.tradeTimeline=new TradeTimeline(clock());if(this.audioCaptured)G.AudioManager?.stopBgm?.();}
    else if(q?.phase==='ready'){const result=this.dispatch('q',{kind:'commit'});if(result?.status==='committed'){this.close('committed');return;}if(result?.status==='refused'){this.layer='recovery';this.key='q';this.error=result.reason;}else {this.sync();return;}}
    else if(d){this.key='d';this.layer=d.phase==='failed'?'recovery':d.phase==='entry'?'entry':'dex-message';this.error=d.error??'';}
    else if(e){this.key='e';if(e.phase==='failed'){this.layer='recovery';this.error=e.error??'';}
     else if(e.phase==='learning'&&e.learning){this.layer='learning';this.mountLesson(e);}
     else if(e.phase==='after-evolution'){this.layer='recovery';this.error='post-evolution-entry-owner-missing';}
-    else if(e.selection){this.selection=structuredClone(e.selection);this.timeline=new EvolutionTimeline(e.selection.cancellable,clock());this.layer='animation';G.AudioManager?.stopBgm?.();}
+    else if(e.selection){this.selection=structuredClone(e.selection);this.timeline=new EvolutionTimeline(e.selection.cancellable,clock());this.layer='animation';if(this.audioCaptured)G.AudioManager?.stopBgm?.();}
     else {this.layer='recovery';this.error='missing-evolution-selection';}}
    else if(t){this.key='t';if(t.phase==='growth'&&t.selection&&['learn','give-up'].includes(t.selection.kind)){this.layer='learning';this.mountGrowth(t);}else {this.layer='recovery';this.error=t.error??'missing-item-growth-selection';}}
    else {this.close('complete');return;}
@@ -191,7 +196,7 @@ const { publicIdText } = memberIdentity;
   }
   dispose(){if(this.closed)return;this.presentationError||='presentation-ended';if(this.valid())this.stopOwned();if(this.views().q||this.views().e||this.views().d||this.views().t)suppress(this.request);this.close('presentation-ended');}
  }
- function request(event?:Request['event']):Request|null{const application=app(),r=root(application);if(event&&(r||application.encounterBlocked))return null;if(!event&&!r){if(feedbackRecovery&&abandonedItem(feedbackRecovery))return {...feedbackRecovery,done:false,outcome:structuredClone(feedbackRecovery.outcome)};feedbackRecovery=null;return null;}return {application,generation:application.stateGeneration,owner:r?.owner??'',trigger:r?.trigger??!!event,...(flow().running&&flow().request?.battleId?{battleId:flow().request.battleId}:{}),done:false,...(event?{event}:{}),...(application.pendingTriggeredEvolution?.kind==='item'?{item:application.pendingTriggeredEvolution.intent}:{})};}
+ function request(event?:Request['event']):Request|null{const application=app(),r=root(application);if(event&&(r||application.encounterBlocked))return null;if(!event&&!r){if(feedbackRecovery&&abandonedItem(feedbackRecovery))return {...feedbackRecovery,done:false,outcome:structuredClone(feedbackRecovery.outcome)};feedbackRecovery=null;return null;}return {application,generation:application.stateGeneration,owner:r?.owner??'',trigger:r?.trigger??!!event,...(flow().running&&flow().request?.battleId?{battleId:flow().request.battleId,battleOp:flow()._op}:{}),done:false,...(event?{event}:{}),...(application.pendingTriggeredEvolution?.kind==='item'?{item:application.pendingTriggeredEvolution.intent}:{})};}
  function open(r:Request|null){retireOrphan();if(!r||active||reserved||queued||G.SceneManager.isSceneChanging()||G.$gameMessage?.isBusy?.())return null;queued=reserved=r;r.constructing=true;try{G.SceneManager.push(Scene_PSEvolution);}catch(error){if(queued===r)queued=null;if(reserved===r)reserved=null;const created=active as Controller|null;if(created?.request===r)created.dispose();r.done=true;r.result=String(error);}finally{r.constructing=false;}return r;}
  function Scene_PSEvolution(this:any){this.initialize(...(arguments as any));}
  const P=Scene_PSEvolution.prototype=Object.create(G.Scene_MenuBase.prototype);P.constructor=Scene_PSEvolution;
@@ -210,7 +215,7 @@ const { publicIdText } = memberIdentity;
  P.popScene=function(){if(this._controller&&!this._controller.closed){if(this._controller.ready)this._controller.backRequested=true;return;}G.Scene_MenuBase.prototype.popScene.call(this);};
  P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);if(this._controller)this._controller.dispose();else if(this._request)retire(this._request,'presentation-ended');};
  const ui:any=W.PSEvolution={automatic:true,show:()=>open(request()),event:(event=0,memberId?:string)=>open(request({event,...(memberId?{memberId}:{})})),current:()=>active&&!active.closed?{ready:active.ready,owner:active.request.owner,generation:active.request.generation,layer:active.layer,trade:active.views().q?{phase:active.views().q.phase,source:'trade-draft'}:null,tradeTimeline:active.tradeTimeline?{phase:active.tradeTimeline.phase,progress:active.tradeTimeline.progress}:null,timeline:active.timeline?{phase:active.timeline.phase,successReady:active.timeline.successReady,picture:active.timeline.picture}:null,lesson:active.lesson?structuredClone(active.lesson.page):null,error:active.error,text:[...active.text]}:null};
- const originalClose=flow().close;if(typeof originalClose==='function')flow().close=function(code:number,op:any){if(op&&active?.valid()&&active.request.battleId===op.request?.battleId){active.deferredClose={code,op};return;}return originalClose.call(this,code,op);};
+ const originalClose=flow().close;if(typeof originalClose==='function')flow().close=function(code:number,op:any){if(op&&active?.valid()&&active.request.battleOp===op&&active.request.battleId===op.request?.battleId){active.deferredClose={code,op};return;}return originalClose.call(this,code,op);};
  function tradeRequest(input?:{requestId:string;intent:any}):Request|null{const application=app(),q=application.pendingTrade;if(input&&application.encounterBlocked||!input&&!q)return null;return {application,generation:application.stateGeneration,owner:q?.token??'',trigger:false,trade:input??true,done:false};}
  function beginTradeUI(requestId:string,intent:any){retireOrphan();if(active||reserved||queued||G.SceneManager.isSceneChanging()||G.$gameMessage?.isBusy?.())return null;const r=tradeRequest({requestId,intent:structuredClone(intent)});if(!r)return null;if(intent.outgoingId)return open(r);reserved=r;r.selectorStage='selecting';const valid=()=>!r.done&&reserved===r&&r.application===flow()._app&&r.generation===r.application.stateGeneration;try{const opened=W.PSManagement.selectMember((m:any)=>valid()&&r.application.tradeCandidates(intent.requiredSpecies).some((c:any)=>c.memberId===m.id&&c.eligible),(result:any)=>{if(!valid())return;if(!result?.id){r.outcome={status:'cancelled',source:'selector'};retire(r,'cancelled');return;}if(r.trade&&r.trade!==true)r.trade.intent.outgoingId=result.id;r.selectorStage='ready';});if(!opened){retire(r,'selector-unavailable');return null;}r.selectorScene=G.SceneManager._nextScene??G.SceneManager._scene;return r;}catch(error){retire(r,String(error));return null;}}
  ui.attachItem=(win:any,parent:string,requestId:string,intent:EvolutionItemIntent)=>{

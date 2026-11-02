@@ -1,22 +1,31 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
-const ROOT=path.resolve(__dirname,'../../..');let temp,Playback,config,track,makeMZ;
+const ROOT=path.resolve(__dirname,'../../..');let temp,Playback,config,track,resumeTrack,makeMZ;
 test.before(()=>{
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-battle-music-'));const root=path.join(ROOT,'src/plugins/battleflow');
  fs.writeFileSync(path.join(temp,'tsconfig.json'),JSON.stringify({compilerOptions:{target:'ES2022',module:'CommonJS',strict:true,types:[],lib:['ES2022'],rootDir:root,outDir:path.join(temp,'out'),noEmitOnError:true},files:['battle-music.ts','battle-music-mz.ts'].map(f=>path.join(root,f))}));
  const r=spawnSync('pnpm',['--dir','src','exec','tsc','-p',path.join(temp,'tsconfig.json')],{cwd:ROOT,encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);
- ({BattleMusicPlayback:Playback,battleMusicConfig:config,musicTrack:track}=require(path.join(temp,'out/battle-music.js')));makeMZ=require(path.join(temp,'out/battle-music-mz.js')).createBattleMusicMZ;
+ ({BattleMusicPlayback:Playback,battleMusicConfig:config,musicTrack:track,savedWorldTrack:resumeTrack}=require(path.join(temp,'out/battle-music.js')));makeMZ=require(path.join(temp,'out/battle-music-mz.js')).createBattleMusicMZ;
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
 function pure(memory={memo:null,pending:null}){
  const f={live:true,memory,order:[],rows:[],leases:[],position:17,current:'A'};
- f.port={current:()=>f.live,currentTrack(){f.order.push('current');f.onCurrent?.();return f.current===null?null:track(f.current);},position(){f.order.push('position');f.onPosition?.();if(f.positionError)throw Error('position');return f.position;},request(t,p,terminal,observe){f.order.push('request');f.onRequest?.();const l={released:0,release(){this.released++;}};f.leases.push(l);f.rows.push({t,p,terminal,observe});observe({state:f.mediaError?'failed':'requested',detail:f.mediaError?'media failure':undefined});return l;}};
+ f.port={current:()=>f.live,currentTrack(){f.order.push('current');f.onCurrent?.();return f.current===null?null:resumeTrack(f.current);},position(){f.order.push('position');f.onPosition?.();if(f.positionError)throw Error('position');return f.position;},request(t,p,terminal,observe){f.order.push('request');f.onRequest?.();const l={released:0,release(){this.released++;}};f.leases.push(l);f.rows.push({t,p,terminal,observe});observe({state:f.mediaError?'failed':'requested',detail:f.mediaError?'media failure':undefined});return l;}};
  f.player=new Playback(f.port,memory);return f;
 }
 test('parameters: direct strings default 100/100; parsed presets and records retain independent values',()=>{
  assert.deepEqual(track('Theme:70:120'),{name:'Theme',volume:100,pitch:100,pan:0});assert.deepEqual(track('Theme:70:120',true),{name:'Theme',volume:70,pitch:120,pan:0});assert.equal(track('Theme:120',true).pitch,100);
  assert.deepEqual(track({name:'A',volume:70,pitch:120,pan:-20}),{name:'A',volume:70,pitch:120,pan:-20});
  for(const bad of [null,[],{name:2},'A:x','A:1:2:3',{name:'A',volume:Infinity},{name:'A',pitch:-1},{name:'A',pan:101},'A:'+('9'.repeat(400))])assert.throws(()=>track(bad,true),/invalid battle music/);
+});
+test('saved host sequence descriptors preserve safe keys/looped and reject malformed identities',()=>{
+ for(const sequence of [5,'library:1','library:01'])assert.deepEqual(resumeTrack({name:'',sequence,looped:true}),{name:'',volume:100,pitch:100,pan:0,sequence,looped:true});
+ for(const sequence of [0,-1,0.5,Infinity,'bad','library:0','library:-1','library:9007199254740992'])assert.throws(()=>resumeTrack({name:'Map',sequence}),/invalid battle music sequence/);
+ assert.throws(()=>resumeTrack({name:'Map',sequence:5,looped:'yes'}),/sequence looped/);
+ assert.deepEqual(track({name:'Map',sequence:'library:1',looped:true}),{name:'Map',volume:100,pitch:100,pan:0},'author music records retain prior plain-track semantics');
+});
+test('sequence memo is detached and copied through normal playback restore',()=>{
+ const f=pure();f.current={name:'Map',sequence:'library:1',looped:true};f.player.start(config());const view=f.player.snapshot();view.memo.track.sequence='library:2';assert.equal(f.player.snapshot().memo.track.sequence,'library:1');f.player.restore();assert.equal(f.rows.at(-1).t.sequence,'library:1');assert(f.rows.at(-1).t.looped);
 });
 test('raw presets empty/string/object are normalized once, three slots and metadata stay independent',()=>{
  const input={presets:{battle:'X:70:120',victory:'',capture:{name:'C',volume:80}},map:{wildBattle:'M'},global:{wildBattle:'G'}},c=config(input);input.presets.battle='new';input.map.wildBattle='new';assert(Object.isFrozen(c.context));
