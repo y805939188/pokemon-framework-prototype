@@ -3,7 +3,7 @@ import { progressionDonorInputs } from './source-fixture';
 import PLAN from '../../../experiments/step5/4/music-native-plan.json';
 
 /** Author-only Gen8 fixture. No saved content or observed result is an oracle. */
-export function musicNativeContent(E: any, assert: any): any {
+export function musicNativeContent(E: any, assert: any, tracks?: { battle: string; victory: string }): any {
   const input = progressionDonorInputs();
   input.manifest.id = 'native-music-v2';
   const bird = input.species.find((s: any) => s.id === 'pidgey');
@@ -15,7 +15,7 @@ export function musicNativeContent(E: any, assert: any): any {
   input.species.find((s: any) => s.id === 'snorlax').learnset = [{ level: 1, move: 'tackle' }];
   input.items = Object.values(E.itemCatalog.legacyCatalog()).map((item: any) => ({ ...item, source: 'author-placeholder' }));
   const variants: [string, string | null | undefined][] = [['normal', PLAN.prefix + 'intro'], ['nil', undefined], ['empty', ''], ['missing', PLAN.prefix + 'missing'], ['corrupt', PLAN.prefix + 'corrupt']];
-  input.trainerTypes = variants.map(([id, intro]) => ({ id: 'music-type-' + id, nameKey: 'trainer.music', gender: 0, source: 'author-placeholder', baseMoney: 0, skillLevel: 0, flags: [], items: [], battleBgm: PLAN.prefix + 'trainer', ...(intro === undefined ? {} : { introBgm: intro }) }));
+  input.trainerTypes = variants.map(([id, intro]) => ({ id: 'music-type-' + id, nameKey: 'trainer.music', gender: 0, source: 'author-placeholder', baseMoney: 0, skillLevel: 0, flags: [], items: [], battleBgm: tracks?.battle ?? PLAN.prefix + 'trainer', ...(tracks ? { victoryBgm: tracks.victory } : {}), ...(intro === undefined ? {} : { introBgm: intro }) }));
   input.trainers = variants.map(([id]) => ({ id: 'music-' + id, type: 'music-type-' + id, name: 'Native Music', version: 1, source: 'author-placeholder', party: [{ species: 'pidgey', level: 3, moves: ['tackle'] }] }));
   const compiled = E.contentCompile.compileContent(input);
   assert(compiled.ok, JSON.stringify(compiled.errors));
