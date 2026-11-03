@@ -40,3 +40,5 @@
 - [r8音乐组合合同](5.4-D2c-audio-r8-composition.md)：f021b33经原Ultra及精确CI214限定接受，进化P2与sequence剩余P3关闭；实际宿主新包/正式组合补证仍待，不把旧17/17或ME静态准备扩大为本组合实跑。
 
 2026-11-03：[普通战前V2](5.4-D2-prebattle-native.md)固定1a07/83与CI234五案独立单轮5/5限定接受，40真实图已目视；右/底约8px露边P3 OPEN/DEFERRED，不签完整WP16/D2。[下一招式菜单拒绝反馈](5.4-D2-move-menu-refusal.md)仅候选聚焦/真实拒绝后回原菜单和中英PP0提示，代码与编译Scene作者验证中，未独立接受/CI/NW。原暂停消息/类型PP配色等未完成清单保持。
+
+2026-11-03：招式拒绝9f已获独立代码/编译Scene限域通过，精确推送待批准；[中英两案驱动准备](../../experiments/step5/4/move-menu-native-contract.zh.md)复用真实Window与Session，六主图/六对照，仍未NW/CI/独立静态准入，不签完整招式菜单或D2。
