@@ -1,6 +1,7 @@
 'use strict';
 // Real compiled plugin/App/Gen8 paths; controlled clocks/input/raster/audio, never native evidence.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
+const vm=require('node:vm');
 const {createVictoryDriverHost}=require('./victory-music-driver-host.cjs');
 const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),PLAN=require('./victory-music-native-plan.json');
 let temp,plugins,entryText,fixture,core,adapter,host;
@@ -137,3 +138,43 @@ test('host input/interpreter gates are local and release after cancellation',()=
  const p=host.installPrebattleHost(G,flow,()=>{}),op={};flow._op=op;flow.running=true;assert(p.open(op,core.prebattlePlan('wild',{}, {},0)));assert.equal(new Player().canMove(),false);assert.equal(new MapWorld().updateInterpreter(),undefined);assert.equal(new Event().updateParallel(),undefined);
  p.cancel();flow.running=false;assert.equal(new Player().canMove(),true);assert.equal(new MapWorld().updateInterpreter(),42);assert.equal(new Event().updateParallel(),43);assert(!scene.isBusy());generation++;
 });
+
+// Use the installed Reactor scheduling/qualification bodies, not a replacement
+// updateEvents that might accidentally omit the parallel-common-event route.
+// Interpreter update is a counted stand-in: no real event commands, raster or NW claim.
+function actualReactorEvents(legacy){
+ const source=fs.readFileSync(path.join(ROOT,'js/reactor_objects.js'),'utf8');
+ function method(marker){const a=source.indexOf(marker),b=source.indexOf('\n};',a);assert(a>=0&&b>a,marker);return source.slice(a,b+3);}
+ const a=source.indexOf('function Game_CommonEvent() {'),b=source.indexOf('// Game_CharacterBase',a);assert(a>=0&&b>a);
+ const actual=['Game_Map.prototype.update = function(sceneActive)','Game_Map.prototype.updateEvents = function()','Game_Map.prototype.updateInterpreter = function()','Game_Event.prototype.update = function()','Game_Event.prototype.updateParallel = function()'].map(method).join('\n')+'\n'+source.slice(a,b);
+ const counts={main:0,mapParallel:0,common:0,character:0,scroll:0,vehicles:0,parallax:0},order=[];
+ function Interpreter(role='common'){this.role=role;this.running=false;this._index=0;this._waitCount=0;this.setups=0;}
+ Interpreter.prototype.isRunning=function(){return this.running;};Interpreter.prototype.setup=function(list){this.list=list;this.running=true;this._index=0;this.setups++;};Interpreter.prototype.update=function(){counts[this.role]++;order.push(this.role);if(this._waitCount>0)this._waitCount--;else this._index++;};
+ function MapWorld(){this._events=[];this._commonEvents=[];this._interpreter=new Interpreter('main');this._interpreter.running=true;}
+ MapWorld.prototype.events=function(){return this._events;};MapWorld.prototype.refreshIfNeeded=()=>{};
+ for(const[name,key]of [['updateScroll','scroll'],['updateVehicles','vehicles'],['updateParallax','parallax']])MapWorld.prototype[name]=()=>counts[key]++;
+ function Event(){this._eventId=1;this._interpreter=new Interpreter('mapParallel');}Event.prototype.checkEventTriggerAuto=()=>{};Event.prototype.list=()=>[{code:0}];
+ function Character(){}Character.prototype.update=()=>counts.character++;
+ const C={Game_Map:MapWorld,Game_Event:Event,Game_Character:Character,Game_Interpreter:Interpreter,$dataSystem:{rrLegacyEventOrder:legacy},$dataCommonEvents:[null,{id:1,trigger:2,switchId:1,list:[{code:0}]}],$gameSwitches:{value:id=>id===1}};
+ vm.createContext(C);vm.runInContext(actual,C,{filename:'installed-reactor_objects.js#actual-Map-Event-CommonEvent'});
+ const map=new MapWorld(),event=new Event(),common=new C.Game_CommonEvent(1);map._events=[event];map._commonEvents=[common];
+ class MapScene{constructor(){this._spriteset={};this._messageWindow={};}isStarted(){return true;}isBusy(){return false;}update(){}start(){}terminate(){}addChild(s){s.parent=this;}removeChild(s){s.parent=null;}}
+ class Bitmap{fillAll(){}destroy(){}}class Sprite{constructor(bitmap){this.bitmap=bitmap;this.scale={};}destroy(){}}
+ let now=0;const op={},flow={_app:{stateGeneration:0},_op:op,running:false,fast:false},G={...C,Scene_Map:MapScene,Scene_PSBattle:class BattleScene{},SceneManager:{_scene:new MapScene(),push(Type){this._scene=new Type();}},Bitmap,Sprite,Graphics:{boxWidth:816,boxHeight:624,frameCount:0},performance:{now:()=>now},AudioManager:{},$gamePlayer:{makeEncounterCount(){}}};
+ const p=host.installPrebattleHost(G,flow,()=>{}),refs=[map._interpreter,event._interpreter,common._interpreter];
+ function sample(){const before={...counts};map.update(true);return Object.fromEntries(Object.keys(counts).map(k=>[k,counts[k]-before[k]]));}
+ const advances={main:1,mapParallel:1,common:1,character:1,scroll:1,vehicles:1,parallax:1},held={...advances,main:0,mapParallel:0,common:0};
+ assert.deepEqual(sample(),advances,'non-wrapper map retains normal event/graphics updates');assert.deepEqual(order,legacy?['main','common','mapParallel']:['main','mapParallel','common']);
+ refs.forEach(i=>{i._waitCount=2;});const saved=refs.map(i=>({index:i._index,wait:i._waitCount,setups:i.setups,list:i.list}));
+ function unchanged(){assert.equal(map._interpreter,refs[0]);assert.equal(event._interpreter,refs[1]);assert.equal(common._interpreter,refs[2]);refs.forEach((i,k)=>{assert.equal(i._index,saved[k].index);assert.equal(i._waitCount,saved[k].wait);assert.equal(i.setups,saved[k].setups);assert.equal(i.list,saved[k].list);});}
+ return{G,flow,p,op,sample,advances,open(){flow.running=true;assert(p.open(op,core.prebattlePlan('wild',{}, {},0)));assert.equal(p.snapshot().phase,'flash');},held(label){assert(p.pending());assert.deepEqual(sample(),held,label);unchanged();},at(t){now=t;G.Graphics.frameCount++;G.SceneManager._scene.update();},resume(label){assert(!p.pending());assert.deepEqual(sample(),advances,label);refs.forEach((i,k)=>{assert.equal(i._waitCount,1);assert.equal(i._index,saved[k].index);assert.equal(i.setups,saved[k].setups);assert.equal(i.list,saved[k].list);});}};
+}
+for(const legacy of [false,true]){
+ test('actual Reactor '+(legacy?'legacy':'ordinary')+' parallel common events pause through entry and return, then continue',()=>{
+  const h=actualReactorEvents(legacy);h.open();h.held('flash holds every interpreter while characters/graphics continue');h.at(800);h.held('main transition holds every interpreter');h.at(2050);h.held('black handoff wait holds every interpreter');const source=h.G.SceneManager._scene;h.at(2150);assert.equal(h.p.snapshot().phase,'battle');source.terminate();
+  h.p.finish(h.op,true);h.flow.running=false;h.held('return-pending holds every interpreter');h.G.SceneManager._scene=new h.G.Scene_Map();h.G.SceneManager._scene.start();assert.equal(h.p.snapshot().phase,'return');h.held('return fade holds every interpreter');h.at(2549);h.held('return does not release early');h.at(2550);assert.equal(h.p.snapshot().phase,'done');h.resume('normal completion continues the same interpreter/index/wait');
+ });
+ test('actual Reactor '+(legacy?'legacy':'ordinary')+' cancellation resumes the same parallel common-event interpreter',()=>{
+  const h=actualReactorEvents(legacy);h.open();h.held('entry pauses all three event routes');h.p.cancel();h.flow.running=false;h.resume('cancel resumes without reset or lost wait');
+ });
+}

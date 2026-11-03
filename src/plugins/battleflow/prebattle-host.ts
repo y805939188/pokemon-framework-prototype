@@ -37,7 +37,7 @@ export function installPrebattleHost(G:any, flow:any, prepareAudio:(op:any)=>voi
   }
   // World graphics and characters continue to update. Interpreter commands wait,
   // as they would during the original synchronous wrapper; they cannot grant/heal while entering.
-  for(const [type,method]of [[G.Game_Map,'updateInterpreter'],[G.Game_Event,'updateParallel']]){
+  for(const [type,method]of [[G.Game_Map,'updateInterpreter'],[G.Game_Event,'updateParallel'],[G.Game_CommonEvent,'update']]){
     if(!type?.prototype?.[method])continue;
     const original=type.prototype[method];
     type.prototype[method]=function(...args:any[]){if(pending())return;return original.apply(this,args);};
