@@ -68,10 +68,13 @@ function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,op
  const waitFor=async(cond,label,max=2400)=>{for(let i=0;i<max;i++){if(cond())return;await frames(1);}throw Error('bounded wait: '+label+' '+JSON.stringify({mode:M._scene?._mode,evolution:G.PSEvolution.current(),errors:w.errors,flowError:w.flow.lastOutcome?.error}));};
  const scene=()=>M._scene,battle=()=>scene()?._psBattle?scene():null;
  const press=async(key)=>{input={triggered:{[key==='ok'?'use':key==='cancel'?'back':key]:true},repeated:{},pressed:{[key==='ok'?'use':key==='cancel'?'back':key]:true}};await frames(3);await frames(3);};
- const inMode=async mode=>waitFor(()=>battle()?._mode===mode&&!battle()._busy&&battle()._queue.length===0,'mode '+mode);
+ // Stock Window_Base has destroy; this controlled host models that lifecycle too.
+ G.Window_Base.prototype.destroy??=function(){this._destroyed=true;this.visible=false;};
+ const waitBattlePresentation=async(condition,label)=>{for(let count=0;count<200;count++){await waitFor(()=>condition()||!!battle()?.levelStatsState?.(),label);if(condition())return;const b=battle(),page=b.levelStatsState();await frames(1);await press('ok');(report.levelStatsConfirmations??=[]).push({level:page.level,phase:page.phase,frame:G.Graphics.frameCount,after:b.levelStatsState?.()?.phase??null});}throw Error('bounded level stats confirmations: '+label);};
+ const inMode=async mode=>waitBattlePresentation(()=>battle()?._mode===mode&&!battle()._busy&&battle()._queue.length===0,'mode '+mode);
  const fightUntilEnd=async()=>{
   const s=battle();for(let i=0;i<12&&!s._session.finished;i++){s.act(()=>s._session.chooseMove(1),'move');await waitFor(()=>!s._busy,'actual action');await frames(2);}
-  await waitFor(()=>s._mode==='end'&&!s._busy&&s._queue.length===0,'actual terminal Scene');
+  await waitBattlePresentation(()=>s._mode==='end'&&!s._busy&&s._queue.length===0,'actual terminal Scene');
  };
  const p={G,W:G,api:()=>E,fs,path,OUT:path.join(gameDir,'REPORT.json'),gameDir,arg:k=>args[k],argv:['--ps-sound'],assert:(v,label)=>assert(v,label),eq:(a,b,label)=>assert.equal(JSON.stringify(a),JSON.stringify(b),label),clone:v=>JSON.parse(JSON.stringify(v)),report,results:report.results,writeProgress:()=>progress++,frames,waitFor,scene,battle,inMode,fightUntilEnd,press,toMapId:async()=>{M.goto(G.Scene_Map);await frames(2);},nodeRequire:require};
  return {w,G,M,A,p,report,frames,waitFor,context,sourceNodes,sourceStart:Source.prototype.start,bufferMethods:{play:BP.play,destroy:BP.destroy},get progress(){return progress;},inputFile,saveRoot};

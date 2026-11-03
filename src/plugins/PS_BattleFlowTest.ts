@@ -175,7 +175,19 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     throw new Error(`OK on ${re} had no effect after 4 presses`);
   }
   const mode_ = () => (battle() ? battle()._mode : "");
-  async function inMode(m: string, label?: string) { await waitFor(() => battle() && battle()._mode === m && battle()._queue.length === 0 && !battle()._busy, `mode ${m} ${label || ""}`); }
+  // A new mandatory presentation is confirmed through the same USE input as a player.
+  // Existing scenario readiness/phase predicates still have to succeed afterwards.
+  async function waitBattlePresentation(condition: () => boolean, label: string) {
+    for (let count = 0; count < 200; count++) {
+      await waitFor(() => condition() || !!battle()?.levelStatsState?.(), label);
+      if (condition()) return;
+      const b = battle(), page = b.levelStatsState();
+      await frames(1); await press('ok');
+      (report.levelStatsConfirmations ??= []).push({ level: page.level, phase: page.phase, frame, after: b.levelStatsState?.()?.phase ?? null });
+    }
+    throw new Error('bounded level stats confirmations: ' + label);
+  }
+  async function inMode(m: string, label?: string) { await waitBattlePresentation(() => !!battle() && battle()._mode === m && battle()._queue.length === 0 && !battle()._busy, `mode ${m} ${label || ""}`); }
   async function dismissMessages() {
     for (let i = 0; i < 40 && (G.$gameMessage.isBusy() || G.$gameMap._interpreter.isRunning()); i++) { if (G.$gameMessage.isBusy()) await press("ok"); else await frames(5); }
     await waitFor(() => !G.$gameMap._interpreter.isRunning() && !G.$gameMessage.isBusy(), "interpreter idle");
@@ -220,7 +232,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     for (let i = 0; i < max && mode_() !== "end"; i++) {
       if (mode_() === "learn") { await choose(/Don't learn|不学习/); continue; }
       await choose({ key: "fight" }); await inMode("moves"); await choose(moveRe);
-      await waitFor(() => ["main", "end", "learn"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after the move");
+      await waitBattlePresentation(() => ["main", "end", "learn"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after the move");
     }
   }
 
