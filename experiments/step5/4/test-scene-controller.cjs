@@ -96,7 +96,8 @@ function host({opening,display=false,audio,exists,now,exp=125000}={}){
  G.Bitmap=Bitmap;G.Sprite=Sprite;G.AudioManager=audio;G.Utils.hasEncryptedAudio=()=>false;G.performance={now:now??(()=>sceneTime)};
  G.window=G;vm.createContext(G);vm.runInContext(plugin,G);
  const flow=G.PSFlow,app={stateGeneration:0,saveBlocked:false,pendingEvolution:null,pendingReceiving:null,pendingPokedex:null,stateReplacedByHost(){this.stateGeneration++;},finishBattle(){counts.finish++;return {code:1,commit:'applied',battleId:'scene#1'};},abortBattle(request,error){counts.abort++;return {code:0,commit:'none',battleId:request.battleId,aborted:true,error:String(error)};}};
- flow._app=app;flow._op={request:{battleId:'scene#1',canLose:true},session};flow.request=flow._op.request;flow.running=true;flow.perf.cur={battleId:'scene#1',t0:0,actions:[]};flow.begin=()=>opening??Promise.resolve(session);if(display)flow.speciesName=x=>x;
+ // This host isolates pictures/controller lifecycle from ordinary text pacing.
+ flow.fast=true;flow._app=app;flow._op={request:{battleId:'scene#1',canLose:true},session};flow.request=flow._op.request;flow.running=true;flow.perf.cur={battleId:'scene#1',t0:0,actions:[]};flow.begin=()=>opening??Promise.resolve(session);if(display)flow.speciesName=x=>x;
  const scene=new G.Scene_PSBattle();G.SceneManager._scene=scene;
  advanceSceneClock.set(scene,delta=>{sceneTime+=delta;});
  return{G,flow,app,scene,session,counts,commands,async ready(){scene.create();await flush();assert(scene.isReady());scene.start();for(let i=0;i<8&&!scene.inputState().ready;i++)scene.updateQueue();assert.equal(scene._mode,'main',String(scene._failure||''));assert(scene.inputState().ready);return this;}};

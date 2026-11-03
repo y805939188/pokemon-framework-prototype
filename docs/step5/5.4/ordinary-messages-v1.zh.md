@@ -9,3 +9,5 @@
 本批已接真实Scene，不改Session/引擎/RNG/背包/结算规则，也不改已接受的作者台词分页、训练家开场3秒等待、六维窗、终局确认后一次提交。brief、带中间停顿或音效同步块的消息、通用暂停/确认/命令包装及完整消息系统仍未完成；普通消息的纯路径通过不代签这些范围。本批没有新APP/NW/实体输入/真实字体或精确CI接受。历史拒绝、失败、GC WARN及U51 UNKNOWN保持。
 
 验证入口：`node --test experiments/step5/4/test-ordinary-message{,-scene}.cjs`；两套已登记 `scripts/test-headless.sh`。编译生产Scene测试使用真实App/Session/固定Gen8及生产中英翻译，窗口/输入/音频/时钟是明确受控宿主。旧产品对照通过 `PF_ORDINARY_SCENE_ROOT`仅改编译读取根，断言不变，不改旧源码。旧test-capture-me-native中的当前产品来源hash随新源准确更新；旧原生计划/APP/失败证据未改。
+
+相邻夹具兼容：胜利BGM、捕获ME和图片/controller三种受控宿主显式设置已有`PSFlow.fast=true`，保留它们原来的即时文本前提，不改变动画/3500ms/取消/写回断言；普通消息的新真实Scene测试显式为false。原始非加速全回归25红保留，并由同一组150项针对性回归验证修订，不以过滤/skip转绿。全显文本仍经现有`log.add`发布完成行；逐字前缀仅绘制，不误发为完整消息。首轮变异工具因Vite8没有独立esbuild未运行到断言，后用本机Node内置TS转换完成两种语义回退，不安装依赖。

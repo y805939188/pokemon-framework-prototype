@@ -11,7 +11,14 @@ export function createOrdinaryMessageMZ(G: any, scene: any, text: string, curren
       if (!current()) return;
       scene._ordinaryMessage = step;
       log.pause = false;
-      log.setLines(log.textPages(prefix).flat());
+      const lines = log.textPages(prefix).flat();
+      if (prefix !== text) log.setLines(lines);
+      else {
+        // Publish the completed lines through the existing log append seam.
+        // Partial prefixes remain paints, never completed-message notifications.
+        log.setLines([]);
+        for (const line of lines) { if (!current()) return; log.add(line); }
+      }
     },
     close: () => {
       if (scene._ordinaryMessage !== step) return;

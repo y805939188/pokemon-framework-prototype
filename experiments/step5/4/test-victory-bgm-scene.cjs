@@ -25,7 +25,8 @@ test.before(()=>{
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
 async function open({trainer=false,session=null,trainerVictory=undefined,...options}={}){
- const f=host(options);if(trainerVictory!==undefined)f.projection.presentation.victoryBgm=trainerVictory;for(const name of ['Battle victory','V','Wild win','Trainer win','Preset win'])f.write(name);
+ // This suite owns cue/order assertions; ordinary text pacing is covered separately.
+ const f=host(options);f.flow.fast=true;if(trainerVictory!==undefined)f.projection.presentation.victoryBgm=trainerVictory;for(const name of ['Battle victory','V','Wild win','Trainer win','Preset win'])f.write(name);
  if(session){f.session=session;f.app.startBattle=async()=>{f.starts++;f.app.saveBlocked=true;return session;};}
  f.open(trainer);const s=await f.scene();f.lines=[];const add=s._log.add;
  s._log.add=function(line){f.lines.push({line,time:f.time,names:f.names()});return add.call(this,line);};
