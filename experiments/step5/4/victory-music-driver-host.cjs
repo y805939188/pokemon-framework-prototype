@@ -14,6 +14,7 @@ function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,op
  assert.equal(typeof entryText,'string');const stop=Symbol('entry boundary'),descriptor=Object.getOwnPropertyDescriptor(M,'isGameActive'),priorNW=G.nw;
  Object.defineProperty(M,'isGameActive',{configurable:true,set(){throw stop;}});G.nw={App:{argv:['--ps-flow-test='+(options.prebattleWorld?'d2-prebattle-wrapper':'d2-victory-music'),'--ps-sound']}};
  try{vm.runInContext(entryText,G,{filename:'actual-PS_BattleFlowTest-entry.js'});}catch(e){if(e!==stop)throw e;}finally{if(descriptor)Object.defineProperty(M,'isGameActive',descriptor);else delete M.isGameActive;if(priorNW===undefined)delete G.nw;else G.nw=priorNW;}
+ if(options.prebattleWorld){function Menu(){this.initialize();}Menu.prototype=Object.create(G.Scene_MenuBase.prototype);Menu.prototype.constructor=Menu;G.Scene_Menu=Menu;G.Window_MenuCommand={initCommandPosition(){}};}
  const duration=2.0259410430839,clipRate=44100;
  class AudioBuffer {get [Symbol.toStringTag](){return 'AudioBuffer';}constructor(){this.duration=options.badDuration?1:duration;this.sampleRate=clipRate;this.numberOfChannels=2;}}
  class Source {get [Symbol.toStringTag](){return 'AudioBufferSourceNode';}constructor(){this.buffer=null;this.loop=false;this.loopStart=0;this.loopEnd=0;this.playbackRate={value:1,setValueAtTime(v){this.value=v;}};}start(when,offset,d){this.started={when,offset,d};}stop(){this.stopped=true;}connect(){}}
@@ -46,7 +47,7 @@ function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,op
  M.goto(Title);
  let input={triggered:{},repeated:{},pressed:{}};
  G.PSManagement.inputFrame=()=>input;G.PSManagement.current=()=>null;
- G.Input.isTriggered=k=>!!input.triggered[k==='ok'?'use':k==='cancel'?'back':k];
+ G.Input.isTriggered=k=>!!input.triggered[k==='ok'?'use':k==='cancel'||options.prebattleWorld&&k==='menu'?'back':k];
  G.Input.isRepeated=G.Input.isTriggered;
  G.$gameMessage.clear=()=>{};if(!options.prebattleWorld)G.$gameMap={mapId:()=>5,_interpreter:{clear(){},isRunning:()=>false}};G.$dataMap={};
  w.flow.limits=()=>({party:6,boxes:1200,bagPerItem:999,money:999999});w.flow.app=w.applicationFactory;w.flow._app=null;w.flow.content=()=>w.flow._content;w.flow.now=()=>12345;

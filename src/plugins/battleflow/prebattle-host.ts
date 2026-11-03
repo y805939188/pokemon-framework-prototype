@@ -30,6 +30,8 @@ export function installPrebattleHost(G:any, flow:any, prepareAudio:(op:any)=>voi
     prototype.start=function(...args:any[]){const r=start?.apply(this,args);poll(this);return r;};
     prototype.terminate=function(...args:any[]){let result;try{active?.operation.mapTerminated(this);}finally{result=terminate?.apply(this,args);}return result;};
     prototype.isBusy=function(...args:any[]){return !!baseBusy?.apply(this,args)||pending();};
+    const isMenuEnabled=prototype.isMenuEnabled;
+    if(isMenuEnabled)prototype.isMenuEnabled=function(...args:any[]){return !pending()&&isMenuEnabled.apply(this,args);};
   }
   if(G.Game_Player?.prototype?.canMove){
     const canMove=G.Game_Player.prototype.canMove;
