@@ -27,6 +27,7 @@ import { BallScenePresentation, simpleBallPlan } from './battleflow/ball-scene';
 import { createBallPortsMZ } from './battleflow/ball-mz';
 import { prebattlePlan } from './battleflow/prebattle';
 import { createLevelStatsMZ } from "./battleflow/level-stats-mz";
+import { createOrdinaryMessageMZ } from "./battleflow/ordinary-message-mz";
 import { installPrebattleHost } from './battleflow/prebattle-host';
 const { developmentCapabilities } = RuleConfig;
 
@@ -1322,9 +1323,18 @@ const { developmentCapabilities } = RuleConfig;
           const final = this._display.growth(message.member, growth); if (final) steps.push(final);
         } else steps.push(...this._D.message(message));
       }
-      if (c.isCurrent()) c.enqueue(steps);
+      if (c.isCurrent()) this.enqueueMessages(steps);
     });
   };
+  /** Ordinary battle text owns its typing/one-second dwell, independently of menus and modal author pages. */
+  P.enqueueMessages = function (steps: BattleScenePresentation[]) {
+    const c = sceneController(this);
+    c.enqueue(steps.map(step => typeof step === 'string' && !PSFlow.fast
+      ? createOrdinaryMessageMZ(G, this, step,
+        () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this)
+      : step)); // Explicit test-only fast mode retains its existing no-pacing contract.
+  };
+  P.ordinaryMessageState = function () { return this._ordinaryMessage?.snapshot() ?? null; };
   P.updateQueue = function () {
     const c = sceneController(this);
     if (!c.isCurrent() || !PSFlow.running) { this._ballFeedback?.cancel(); this._display?.dispose(); this._pictures?.dispose(); }
@@ -1512,7 +1522,7 @@ const { developmentCapabilities } = RuleConfig;
     c.run(fn, (r: any) => {
       if (r && r.ok === false) {
         this._retryMoveMenu = !!refusedMove;
-        c.enqueue([refusedMove?.pp === 0 && r.reason === 'choice-rejected'
+        this.enqueueMessages([refusedMove?.pp === 0 && r.reason === 'choice-rejected'
           ? PSFlow.translator().t('refusal.move.no-pp') : refusalText(kind, r.reason)]);
         return;
       }

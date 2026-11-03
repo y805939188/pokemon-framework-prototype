@@ -18,6 +18,8 @@ SUITES=(
   experiments/step5/4/test-move-menu-refusal.cjs
   experiments/step5/4/test-move-menu-native.cjs
   experiments/step5/4/test-growth-display.cjs
+  experiments/step5/4/test-ordinary-message.cjs
+  experiments/step5/4/test-ordinary-message-scene.cjs
   experiments/step5/4/test-levelup-stats.cjs
   experiments/step5/4/test-levelup-stats-scene.cjs
   experiments/step5/4/test-display-playback.cjs
