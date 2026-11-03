@@ -13,3 +13,7 @@
 实机未执行。只认prepare-author-dialogue-native-freeze输出的新INPUT/EXECUTION/APPmanifest，冻结阶段不得创建native-run/save/profile，不执行APP。原Ultra静态审查及新精确CI后，再由父端确认本新包单轮1进程2案/180秒的审批/宿主空闲/监督器准入，作者不启动。单轮首败停、余项NOT_RUN，不自动重跑；只回收本轮自有组、原fatal与清理错误分记、全APP前后核同。旧4案监督器有不同report/计数，不能仅换包名原样执行，应绑定本report.authorDialogueNative及逐页glyph/window/arrow/原文/尾页写回门。
 
 不证明物理键鼠/听感、原生首显示帧注键（保留原受控持久回归）、全字库/所有Unicode/富文本/动态尺寸、逐字/brief/YesNo/list完整平台、完整D2/E/5.4/Windows/newP4/无GC泄漏/真实NW信号。GC WARN、U51UNKNOWN及全部历史FAIL不消失。不推送APP/运行结果/审查/私有资料，不合main，不读Ruby私料或真实档，不改总网页。
+
+## CI控制夹具补充（2026-11-03）
+
+CI230在95fc205首次真实失败：Node控制直接复制ROOT/fonts的本机许可MZ字体，干净Git检出正常不含该素材，7项在host构造时ENOENT，尚未执行断言。此补修只在Node测试的Vite虚拟PLAN标SYNTHETIC_CONTROL_ONLY_CURRENT_WORKTREE、字体清单改为tracked data/System.json与临时pf-author-control-only.txt；后者明确是控制字节而非字体，布局/字形仍SYN模型，不能冒充native资格。字体字节篡改负例现具体篡改该控制文件，仍应由同一生产驱动拒绝；不skip、不放松文字/页序/结算/像素门。正式PLAN仍857产品及真实3字体资源，driver/freezer/Test入口和媒体不变。保留95/CI230及旧APP/input原证据，后继新SHA须独立复审/新精确CI；不得以合成结果替代真实字体。
