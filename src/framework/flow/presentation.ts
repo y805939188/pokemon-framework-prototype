@@ -1,9 +1,10 @@
+import type { Stats } from "../rules/types";
 import type { GrowthMessage, SessionMessage } from "../battle/protocol";
 
 /** Applied results only. Reading this projection grants no battle or persistence operation. */
 export interface GrowthDisplay {
   version: 1; fromExp: number; toExp: number; fromLevel: number; toLevel: number; hp: number; maxhp: number; ratio: number;
-  segments: { level: number; from: number; to: number; levelUp?: { level: number; hp: number; maxhp: number } }[];
+  segments: { level: number; from: number; to: number; levelUp?: { level: number; hp: number; maxhp: number; stats?: { before: Stats; after: Stats } } }[];
 }
 type Published = { wire: string; display: GrowthDisplay };
 type Bound = Published & { owner: object; epoch: number };

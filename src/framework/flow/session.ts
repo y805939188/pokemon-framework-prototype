@@ -799,7 +799,7 @@ export class BattleSession {
         const start = Math.max(floor, res.before.exp), stop = Math.min(ceiling, res.after.exp);
         const levelUp = res.log.levels.find(item => item.level === level + 1);
         if (ceiling > floor && (stop > start || levelUp)) segments.push({ level, from: stop > start ? (start - floor) / (ceiling - floor) : 1, to: stop > start ? (stop - floor) / (ceiling - floor) : 1,
-          ...(levelUp ? { levelUp: { level: levelUp.level, hp: levelUp.hp, maxhp: levelUp.maxhp } } : {}) });
+          ...(levelUp ? { levelUp: { level: levelUp.level, hp: levelUp.hp, maxhp: levelUp.maxhp, stats: { before: { ...(res.log.levels.find(item => item.level === level)?.stats ?? res.before.stats) }, after: { ...levelUp.stats } } } } : {}) });
       }
       const finalFloor = G.minExp(curve, res.after.level), finalCeiling = G.minExp(curve, res.after.level + 1);
       const message: Extract<SessionMessage, { kind: 'growth' }> = { kind: "growth", member: m.id, foe: foeId, exp: amount, level: res.member.level, levelUps: res.log.levels.map((l) => l.level), hp: res.member.hp };

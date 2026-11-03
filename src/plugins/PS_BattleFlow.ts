@@ -26,6 +26,7 @@ import { CaptureMelodySceneStep } from './battleflow/capture-me-scene';
 import { BallScenePresentation, simpleBallPlan } from './battleflow/ball-scene';
 import { createBallPortsMZ } from './battleflow/ball-mz';
 import { prebattlePlan } from './battleflow/prebattle';
+import { createLevelStatsMZ } from "./battleflow/level-stats-mz";
 import { installPrebattleHost } from './battleflow/prebattle-host';
 const { developmentCapabilities } = RuleConfig;
 
@@ -1313,6 +1314,9 @@ const { developmentCapabilities } = RuleConfig;
             if (segment.levelUp) {
               const level = this._display.growth(message.member, { toLevel: segment.levelUp.level, hp: segment.levelUp.hp, maxhp: segment.levelUp.maxhp, ratio: 0 }); if (level) steps.push(level);
               steps.push(...this._D.message({ ...message, exp: 0, levelUps: [segment.levelUp.level] }));
+              if (segment.levelUp.stats) steps.push(createLevelStatsMZ(G, this, segment.levelUp.level, segment.levelUp.stats,
+                () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, PSFlow.translator()));
+              else (this._growthDisplayDiagnostics ??= []).push({ member: message.member, level: segment.levelUp.level, reason: 'legacy-projection-without-stat-snapshots' });
             }
           }
           const final = this._display.growth(message.member, growth); if (final) steps.push(final);
@@ -1381,6 +1385,7 @@ const { developmentCapabilities } = RuleConfig;
       pending: c.queue.filter(step => typeof step !== 'string').length, audio: (this._displayAudio || []).map((row: any) => ({ ...row })),
       faintAudio: (this._faintAudio || []).map((row: any) => ({ ...row })) };
   };
+  P.levelStatsState = function () { const page = this._levelStatsWindow?._levelStatsPage; return page ? { ...page, rows: page.rows.map((row: any) => ({ ...row })) } : null; };
   P.pictureState = function () { return this._pictures?.snapshot() ?? null; };
   P.captureMelodyState = function () { return this._captureMelody?.snapshot() ?? null; };
   P.showMain = function () {

@@ -7,11 +7,12 @@ async function award(level=50,exp){const game=makeGame();game.party[0].level=lev
 test('real KO publishes the applied EXP interval and each level boundary, preserving the learning gate',async()=>{
  const from=G.minExp('parabolic',51)-1,{s,growth:m}=await award(50,from),d=readGrowthDisplay(s,m);
  assert.equal(d.version,1);assert.equal(d.fromExp,from);assert.equal(d.toExp,s.party[0].exp);assert.equal(d.fromLevel,50);assert.equal(d.toLevel,51);assert.equal(d.segments[0].level,50);assert.equal(d.segments[0].to,1);assert.equal(d.segments[0].levelUp.level,51);
+ const stats=d.segments[0].levelUp.stats;assert(stats,'new live projection retains computed stat snapshots');assert.deepEqual(Object.keys(stats.before).sort(),['atk','def','hp','spa','spd','spe']);assert.deepEqual(Object.keys(stats.after).sort(),['atk','def','hp','spa','spd','spe']);assert.equal(stats.after.hp,d.segments[0].levelUp.maxhp);
  assert.equal(d.hp,s.party[0].hp);assert.equal(d.maxhp,s.gw.readState('p1').find(p=>p.id===m.member).maxhp);assert(s.pendingLearn,'domain learning remains pending while UI presents growth');
  const sum=d.segments.reduce((n,x)=>n+(x.to-x.from)*(G.minExp('parabolic',x.level+1)-G.minExp('parabolic',x.level)),0);assert(Math.abs(sum-(d.toExp-d.fromExp))<1e-6);assert.equal(d.segments.at(-1).to,d.ratio);
 });
 test('published presentation objects cannot mutate battle members, engine state or later learning',async()=>{
- const {s,growth:m}=await award(50,G.minExp('parabolic',51)-1),before=JSON.stringify(s.party),engine=JSON.stringify(s.gw.readState('p1'));const d=readGrowthDisplay(s,m);d.hp=0;d.segments[0].levelUp.hp=0;d.segments.length=0;assert(readGrowthDisplay(s,m).segments.length>0);
+ const {s,growth:m}=await award(50,G.minExp('parabolic',51)-1),before=JSON.stringify(s.party),engine=JSON.stringify(s.gw.readState('p1'));const d=readGrowthDisplay(s,m);d.hp=0;d.segments[0].levelUp.hp=0;d.segments[0].levelUp.stats.before.hp=0;d.segments[0].levelUp.stats.after.atk=0;d.segments.length=0;assert(readGrowthDisplay(s,m).segments.length>0);
  assert.equal(JSON.stringify(s.party),before);assert.equal(JSON.stringify(s.gw.readState('p1')),engine);const after=await s.decideLearn(null);assert(after.some(x=>x.kind==='request'));assert.equal(s.party[0].level,51);
 });
 test('capped maximum-level EXP has no fabricated bar interval or level-up presentation',async()=>{
