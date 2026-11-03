@@ -1128,7 +1128,7 @@ const { developmentCapabilities } = RuleConfig;
     this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
     sceneController(this, true);
     this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._faintAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
-    this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false; this._endFeedbackPages = null; this._endFeedbackPage = 0; this._endPageShownUpdate = -1; this._trainerOpeningQueued = false;
+    this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false; this._endFeedbackPages = null; this._endFeedbackPage = 0; this._endPageShownUpdate = -1; this._trainerOpeningQueued = false; this._retryMoveMenu = false;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1328,12 +1328,14 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.ballFeedbackState = function () { return this._ballFeedback?.snapshot() ?? null; };
   P.afterMessages = function () {
-    const s = this._session;
+    const s = this._session, retryMoves = this._retryMoveMenu;
+    this._retryMoveMenu = false;
     if (this._failure) { this.showEnd(true); return; }
     if (s.finished) { this.showEnd(false); return; }
     if (s.pendingLearn) { this.showLearn(); return; }
     const req = s.currentRequest();
     if (req && req.forceSwitch) { this.showParty("forced"); return; }
+    if (retryMoves && req?.active?.[0]?.moves?.length) { this.showMoves(); return; }
     this.showMain();
   };
   P.refreshStatus = function () {
@@ -1392,7 +1394,8 @@ const { developmentCapabilities } = RuleConfig;
     const moves = req.active[0].moves;
     this.show("moves", moves.map((m: any, i: number) => ({
       name: m.pp === undefined ? m.move : PSFlow.translator().t("ui.moves.line", { move: m.move, pp: m.pp, maxpp: m.maxpp }),
-      ext: i + 1, enabled: engine().B.moveRequests.isSelectableMove(m),
+      // The menu offers a candidate; the Session/simulator accepts or rejects it.
+      ext: i + 1, enabled: true,
     })));
   };
   P.showBag = function () {
@@ -1477,7 +1480,11 @@ const { developmentCapabilities } = RuleConfig;
         else if (ext === "party") this.showParty("switch");
         else if (ext === "run") this.act(() => this._session.run(), "run");
         return;
-      case "moves": this.act(() => { if (PSFlow.debug.failNext === "move") { PSFlow.debug.failNext = null; throw new Error("injected failure"); } return this._session.chooseMove(ext); }, "move"); return;
+      case "moves": {
+        const move = this._session.currentRequest()?.active?.[0]?.moves?.[Number(ext) - 1];
+        this.act(() => { if (PSFlow.debug.failNext === "move") { PSFlow.debug.failNext = null; throw new Error("injected failure"); } return this._session.chooseMove(ext); }, "move", { pp: move?.pp });
+        return;
+      }
       case "bag":
         if (!ext) { this._menu.activate(); return; }
         if (/ball$/.test(ext)) this.act(() => this._session.throwBall(ext), "ball");
@@ -1494,12 +1501,14 @@ const { developmentCapabilities } = RuleConfig;
     });
   };
 
-  /** Run one session action; refusals show a reason and return to the main menu (nothing consumed). */
-  P.act = function (fn: () => Promise<any> | any, kind?: string) {
+  /** Refused hand-selected moves return to their menu; other actions retain their existing return path. */
+  P.act = function (fn: () => Promise<any> | any, kind?: string, refusedMove?: { pp?: number }) {
     const c = sceneController(this);
     c.run(fn, (r: any) => {
       if (r && r.ok === false) {
-        c.enqueue([refusalText(kind, r.reason)]);
+        this._retryMoveMenu = !!refusedMove;
+        c.enqueue([refusedMove?.pp === 0 && r.reason === 'choice-rejected'
+          ? PSFlow.translator().t('refusal.move.no-pp') : refusalText(kind, r.reason)]);
         return;
       }
       this.pushMessages(r.messages || []);

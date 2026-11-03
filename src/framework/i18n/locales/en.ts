@@ -246,6 +246,7 @@ export const en: LocaleTable = {
     "refusal.noactive": "There is no one to act.",
     "refusal.none-left": "You have none of that left.",
     "refusal.unknown-item": "That item can't be used in battle.",
+    "refusal.move.no-pp": "There's no PP left for this move!",
     "refusal.choice-rejected": "That choice isn't available right now.",
     "refusal.not-registered": "That isn't possible right now.",
     "refusal.invulnerable": "You can't aim at a target that can't be reached right now!",

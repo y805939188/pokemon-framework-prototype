@@ -43,11 +43,13 @@ async function make(game, foe, options = {}) {
 }
 const mon = (id, moves = ['protect']) => F.foeMember(id, 'Snorlax', 100, { moves });
 
-test('ordinary menu rejects empty/disabled moves and engine rejects an illegal index without advancing', async () => {
+test('ordinary menu exposes PP0 candidates while engine refuses them and illegal indices without advancing', async () => {
   const game = F.makeGame(); game.party[0].moves[0].pp = 0;
   const s = await make(game, mon('foe'));
-  assert.equal(menu(s)[0].enabled, false); assert.equal(menu(s)[1].enabled, true);
+  assert.equal(menu(s)[0].enabled, true); assert.equal(menu(s)[1].enabled, true);
   const before = s.gw._debugBattle().turn;
+  assert.equal((await s.chooseMove(1)).ok, false, 'focusable PP0 is still refused by the simulator');
+  assert.equal(s.gw._debugBattle().turn, before);
   assert.equal((await s.chooseMove(99)).ok, false);
   assert.equal(s.gw._debugBattle().turn, before);
   assert.equal((await s.chooseMove(4)).ok, true);
@@ -117,7 +119,7 @@ test('isSelectableMove: disabled wins over any PP; PP-less requests are selectab
   assert.equal(selectable({ pp: 0, disabled: false }), false);
 });
 
-test('real disabled moves: a Choice item locks the other moves in the menu and for the default AI', async () => {
+test('real Choice lock stays focusable in the menu but is rejected by the engine and skipped by default AI', async () => {
   const game = F.makeGame(); game.party[0].item = 'choiceband';
   const foe = mon('foe', ['protect', 'tackle']); foe.item = 'choiceband';
   const s = await make(game, foe);
@@ -125,7 +127,7 @@ test('real disabled moves: a Choice item locks the other moves in the menu and f
   await s.chooseMove(4); // the other three moves are now disabled although they have PP
   const moves = s.currentRequest().active[0].moves;
   assert.deepEqual(moves.map(m => [m.disabled, m.pp > 0]), [[true, true], [true, true], [true, true], [false, true]]);
-  assert.deepEqual(menu(s).map(m => m.enabled), [false, false, false, true]);
+  assert.deepEqual(menu(s).map(m => m.enabled), [true, true, true, true]);
   const foeRequest = s.gw._debugBattle().getSide('p2').activeRequest;
   assert.equal(foeRequest.active[0].moves[1].disabled, true);
   assert.equal(BattleSession.defaultAi(foeRequest), 'move 1', 'the AI skips the locked-out move');
