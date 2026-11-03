@@ -9,7 +9,15 @@ const controlPlan={...require('./author-dialogue-native-plan.json'),productCommi
 test.before(async()=>{
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-author-dialogue-native-'));plugins={};
  for(const name of ['PS_BattleFlow','PS_SaveState','PS_Evolution','PS_BattleFlowTest']){const out=path.join(temp,name),r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);const code=fs.readFileSync(path.join(out,name+'.js'),'utf8');if(name==='PS_BattleFlowTest')entryText=code;else plugins[name]=code;}
- const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));await vite.build({configFile:false,root:ROOT,logLevel:'error',plugins:[{name:'explicit-synthetic-font-resources',enforce:'pre',load(id){if(id===path.join(ROOT,'experiments/step5/4/author-dialogue-native-plan.json'))return JSON.stringify(controlPlan);}},{name:'author-dialogue-pixel-control',enforce:'pre',transform(code,id){if(id!==path.join(ROOT,'src/plugins/flowtest/d2-author-dialogue.ts')||!process.env.PF_AUTHOR_NATIVE_MUTATION)return;assert.equal(process.env.PF_AUTHOR_NATIVE_MUTATION,'omit-glyph-gate');const marker="assert(textPixels > 0 && arrowPixels > 0 && glyphPixels > 0 && fits, 'actual dialogue glyphs/window/arrow pixels and measured layout');";assert.equal(code.split(marker).length,2);return code.replace(marker,"assert(textPixels > 0 && arrowPixels > 0 && fits, 'actual dialogue glyphs/window/arrow pixels and measured layout');");}}],build:{outDir:path.join(temp,'driver'),emptyOutDir:false,minify:false,lib:{entry:path.join(ROOT,'src/plugins/flowtest/d2-author-dialogue.ts'),formats:['cjs'],fileName:()=> 'entry.cjs'}}});driverText=fs.readFileSync(path.join(temp,'driver/entry.cjs'),'utf8');mod=require(path.join(temp,'driver/entry.cjs'));
+ const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));await vite.build({configFile:false,root:ROOT,logLevel:'error',plugins:[{name:'explicit-synthetic-font-resources',enforce:'pre',load(id){if(id===path.join(ROOT,'experiments/step5/4/author-dialogue-native-plan.json'))return JSON.stringify(controlPlan);}},{name:'author-dialogue-pixel-control',enforce:'pre',transform(code,id){
+  if(id!==path.join(ROOT,'src/plugins/flowtest/d2-author-dialogue.ts')||!process.env.PF_AUTHOR_NATIVE_MUTATION)return;
+  const mutations={
+   'omit-glyph-gate':["assert(textPixels > 0 && arrowPixels > 0 && glyphPixels > 0 && fits, 'actual dialogue glyphs/window/arrow pixels and measured layout');","assert(textPixels > 0 && arrowPixels > 0 && fits, 'actual dialogue glyphs/window/arrow pixels and measured layout');"],
+   'omit-one-page-evidence':["const original = { logVisible: log.visible, visible: arrow.visible, renderable: arrow.renderable, alpha: arrow.alpha };","if (id === 'L01-opening-1') return { id };\n    const original = { logVisible: log.visible, visible: arrow.visible, renderable: arrow.renderable, alpha: arrow.alpha };"],
+   'duplicate-one-page-evidence':["d.renders.push(row); writeProgress();","d.renders.push(row); if (id === 'L01-opening-1') d.renders.push(row); writeProgress();"]
+  };
+  const mutation=mutations[process.env.PF_AUTHOR_NATIVE_MUTATION];assert(mutation,'known finite native control mutation');const [marker,replacement]=mutation;assert.equal(code.split(marker).length,2);return code.replace(marker,replacement);
+ }}],build:{outDir:path.join(temp,'driver'),emptyOutDir:false,minify:false,lib:{entry:path.join(ROOT,'src/plugins/flowtest/d2-author-dialogue.ts'),formats:['cjs'],fileName:()=> 'entry.cjs'}}});driverText=fs.readFileSync(path.join(temp,'driver/entry.cjs'),'utf8');mod=require(path.join(temp,'driver/entry.cjs'));
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
 function host(options={}){
@@ -42,12 +50,37 @@ function host(options={}){
   G.PSEvolution.automatic=false;return h;
 }
 
+function assertPageEvidence(h,d){
+ const expected=[];
+ for(const c of mod.authorDialogueNativePlan.cases){
+  const actual=d.cases[c.id];
+  expected.push({id:c.id+'-challenge'});
+  for(const [section,pages]of [['opening',actual.openingPages],['terminal',actual.terminalPages]]){
+   pages.forEach((page,index)=>{const id=c.id+'-'+section+'-'+(index+1);assert.equal(page.image,id,'each page names its own evidence');expected.push({id,rows:page.rows});});
+  }
+ }
+ // Derive the total from observed pages; never promote the synthetic font's page count to a native expectation.
+ assert.deepEqual(d.renders.map(row=>row.id),expected.map(page=>page.id),'every challenge and authored page has exactly one ordered render');
+ const files=new Set();
+ expected.forEach((page,index)=>{
+  const row=d.renders[index];if(page.rows)assert.deepEqual(row.lines,page.rows,'render rows equal the corresponding displayed page');
+  assert.equal(row.comparisonPNGs.length,2,'each page retains both controls');
+  const images=[row,...row.comparisonPNGs],suffixes=['','-no-arrow','-no-window'];
+  assert.deepEqual(row.comparisonPNGs.map(image=>image.kind),['no-arrow','no-window']);
+  images.forEach((image,role)=>{
+   assert.equal(image.file,page.id+suffixes[role]+'.png','each page and image role has its own file');
+   assert(!files.has(image.file),'no image file is reused by another page');files.add(image.file);
+   assert.equal(hash(fs.readFileSync(path.join(h.w.root,image.file))),image.sha256,'every declared page image exists with its actual bytes');
+  });
+ });
+}
+
 test('complete cold Title then Map bilingual long-page chain uses real stable command/Continue dispatch and single final commit',async()=>{
  assert.equal(mod.authorDialogueNativePlan.productCommit,'SYNTHETIC_CONTROL_ONLY_CURRENT_WORKTREE');assert.deepEqual(mod.authorDialogueNativePlan.fontResourcePaths,['data/System.json',SYNTHETIC_FONT]);
  const h=host({battleReadyDelayFrames:12,delayStart:10});await mod.runD2AuthorDialogue(h.p);const d=h.report.authorDialogueNative;
  assert.deepEqual(h.report.results.map(r=>[r.id,r.status]),[['L01','pass'],['L02','pass']]);assert.equal(d.nativeClaim,'NOT_SELF_QUALIFIED');assert.deepEqual(d.notRunIDs,[]);assert(d.cleanupComplete&&!d.remainingRootLocked);
  for(const c of Object.values(d.cases)){assert(c.openingPages.length>=2&&c.terminalPages.length>=2);assert.equal(c.installs.length,1);assert.equal(c.rewardCount,1);assert(c.returnedToMap);assert(c.commands.some(x=>x.phase==='main'&&x.key==='fight'));assert(c.commands.some(x=>x.phase==='moves'&&x.key===1));assert(c.commands.filter(x=>x.phase==='end').length===c.terminalPages.length);}
- assert(d.renders.length>10&&d.renders.every(r=>r.pixelGate==='pass'&&r.glyphPixels>0&&r.fits&&r.installs===0&&r.fontFace==='SYNTHETIC_HALF_FULL_WIDTH'));assert(d.renders.every(r=>Object.values(r.sampling.cleanup).every(Boolean)));assert(d.renders.flatMap(r=>[r,...r.comparisonPNGs]).every(r=>fs.existsSync(path.join(h.w.root,r.file))));assert(h.dispatched.filter(r=>r.phase==='end').length>=4);
+ assertPageEvidence(h,d);assert(d.renders.every(r=>r.pixelGate==='pass'&&r.glyphPixels>0&&r.fits&&r.installs===0&&r.fontFace==='SYNTHETIC_HALF_FULL_WIDTH'));assert(d.renders.every(r=>Object.values(r.sampling.cleanup).every(Boolean)));assert(h.dispatched.filter(r=>r.phase==='end').length>=4);
 });
 for(const [name,options]of [['no scene pixels',{noPixels:true}],['window without arrow',{noArrowPixels:true}],['window without glyphs',{noGlyphPixels:true}]])test(name+' rejects after saving three diagnostic images and leaves second case NOT_RUN',async()=>{
  const h=host(options);await assert.rejects(mod.runD2AuthorDialogue(h.p),/actual dialogue glyphs\/window\/arrow pixels and measured layout/);const d=h.report.authorDialogueNative;assert.deepEqual(h.report.results.map(r=>[r.id,r.status]),[['L01','fail']]);assert.deepEqual(d.notRunIDs,['L02']);assert(d.cleanupComplete&&!d.remainingRootLocked);assert.equal(d.renders[0].pixelGate,'fail');assert([d.renders[0],...d.renders[0].comparisonPNGs].every(r=>fs.existsSync(path.join(h.w.root,r.file))));assert(Object.values(d.renders[0].sampling.cleanup).every(Boolean));

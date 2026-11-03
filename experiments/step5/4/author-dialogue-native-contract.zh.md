@@ -17,3 +17,9 @@
 ## CI控制夹具补充（2026-11-03）
 
 CI230在95fc205首次真实失败：Node控制直接复制ROOT/fonts的本机许可MZ字体，干净Git检出正常不含该素材，7项在host构造时ENOENT，尚未执行断言。此补修只在Node测试的Vite虚拟PLAN标SYNTHETIC_CONTROL_ONLY_CURRENT_WORKTREE、字体清单改为tracked data/System.json与临时pf-author-control-only.txt；后者明确是控制字节而非字体，布局/字形仍SYN模型，不能冒充native资格。字体字节篡改负例现具体篡改该控制文件，仍应由同一生产驱动拒绝；不skip、不放松文字/页序/结算/像素门。正式PLAN仍857产品及真实3字体资源，driver/freezer/Test入口和媒体不变。保留95/CI230及旧APP/input原证据，后继新SHA须独立复审/新精确CI；不得以合成结果替代真实字体。
+
+## R10逐页采证回归补充（2026-11-03）
+
+R10-TEST-2指出旧Node正控仅要求renders>10，不能精确守住每页采证。有限受控变异已确认：只省略L01第一个开场页的全部采证（文字/正常结算仍完整），或只重复该页render记录，旧7项都通过。此后继仅补Node测试和本合同，正式产品/helper/PLAN/freezer/Test入口与已冻结2b包不变。
+
+正控从两案实际openingPages/terminalPages派生每个挑战和作者页的精确id与顺序，核page.image、唯一render、逐页rows、三图角色/独立路径及实际文件hash，不再使用>10或假模型固定页数。相同两个Vite临时变异须分别使完整正常链的逐页门转红；原字形门变异和无字体控制保持。合成文件仍明确非native PNG，不能用其hash通过冒充真实解码/字形；实机仍须原Ultra逐页核图及真实字体、尾页写回和自有进程门。
