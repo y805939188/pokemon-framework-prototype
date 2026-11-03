@@ -30,7 +30,7 @@ function world(opt = {}) {
     addStopListener(f) { this._stopListeners.push(f); }
   }
   function Base() {}
-  Base.prototype = { initialize() { this.children = []; }, create() { this._windowLayer = {}; this.children.push(this._windowLayer); }, start() {}, update() {}, terminate() {}, isReady: () => true, isStarted: () => true,
+  Base.prototype = { initialize() { this.children = []; this._started=false; }, create() { this._windowLayer = {}; this.children.push(this._windowLayer); }, start() { this._started=true; }, update() {}, terminate() {}, isReady: () => true, isStarted() { return this._started; },
     addWindow() {}, addChild(s) { this.children.push(s); s.parent = this; }, addChildAt(s, i) { this.children.splice(i, 0, s); s.parent = this; }, removeChild(s) { this.children.splice(this.children.indexOf(s), 1); s.parent = null; },
     popScene() { this.popped = (this.popped || 0) + 1; }, updateWaitMode: () => false, updateChild: () => false, clear() { this._waitMode = ''; }, setWaitMode(mode) { this._waitMode = mode; } };
   function SceneMap() {} SceneMap.prototype = Object.create(Base.prototype);

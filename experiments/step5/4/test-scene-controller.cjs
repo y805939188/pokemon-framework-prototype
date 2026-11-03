@@ -353,11 +353,11 @@ test('late old send-out visual and message callbacks cannot reset successor Scen
  late.advance(performance.now());old.pushMessages([sendOut('p1','Q','drag')]);old.updateQueue();old.terminate();
  assert.equal(s._menuCursor.index('main',4),2);assert.equal(s._menuCursor.index('moves',4),3);assert.equal(s.presentationState().cards.find(c=>c.side==='p1'&&c.active).id,'P');assert(s.inputState().ready);s.terminate();
 });
-test('compiled author commands pass image choices separately from application battle requests',()=>{
+test('compiled author commands pass image/transition choices separately from application battle requests',()=>{
  const h=host(),calls=[];h.flow.running=false;h.flow.nextSeq=()=>9;h.app.trainerRecord=()=>({});h.flow.tryOpenBattle=(request,presentation)=>{calls.push({request,presentation});return true;};
  const interpreter={setWaitMode(mode){assert.equal(mode,'psBattle');}};
- for(const name of ['StartBattle','StartTrainerBattle'])h.commands[name].call(interpreter,{trainerId:'trainer',version:'1',battleBackground:'woods',battlePlatform:'water',battleTime:'2'});
- assert.equal(calls.length,2);for(const c of calls){assert.deepEqual(JSON.parse(JSON.stringify(c.presentation)),{background:'woods',platform:'water',time:'2'});assert(!('visualContext'in c.request));assert(!('background'in c.request));}
+ for(const name of ['StartBattle','StartTrainerBattle'])for(const prebattleLocation of [undefined,'','3'])h.commands[name].call(interpreter,{trainerId:'trainer',version:'1',battleBackground:'woods',battlePlatform:'water',battleTime:'2',prebattleLocation});
+ assert.equal(calls.length,6);calls.forEach((c,index)=>{assert.deepEqual(JSON.parse(JSON.stringify(c.presentation)),{background:'woods',platform:'water',time:'2',transition:index%3===2?{location:'3'}:{}});assert(!('visualContext'in c.request));assert(!('background'in c.request));assert(!('transition'in c.request));assert(!('prebattleLocation'in c.request));});
 });
 test('compiled openBattle freezes only host presentation while preserving the original request object',()=>{
  const h=host(),request={battleId:'visual-context'},visual={background:'woods',platform:'water',time:2};h.flow.running=false;h.flow._op=null;h.G.$gameSystem._psSaveError='controlled test skips unrelated domain eligibility';h.flow.openBattle(request,visual);

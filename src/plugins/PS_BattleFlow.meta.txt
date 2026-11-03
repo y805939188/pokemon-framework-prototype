@@ -47,6 +47,20 @@
  * @value 2
  * @default 0
  *
+ * @param prebattleLocation
+ * @text Default prebattle location
+ * @desc Explicit context only. 0 outdoor, 1 indoor, 2 cave, 3 water; no map/encounter inference. Simple default cover renderer.
+ * @type select
+ * @option Outdoor
+ * @value 0
+ * @option Indoor
+ * @value 1
+ * @option Cave
+ * @value 2
+ * @option Water
+ * @value 3
+ * @default 0
+ *
  * @param startMoney
  * @text Start money
  * @desc Money of a new game (framework state, not MZ gold). Default 3000.
@@ -133,6 +147,12 @@
  * @arg battleTime
  * @text Battle image time
  * @desc 0 day, 1 evening, 2 night; blank inherits the plugin default.
+ * @type string
+ * @default
+ *
+ * @arg prebattleLocation
+ * @text Prebattle location
+ * @desc 0 outdoor, 1 indoor, 2 cave, 3 water; blank inherits the explicit plugin default. No terrain inference.
  * @type string
  * @default
  *
@@ -252,6 +272,12 @@
  * @arg battleTime
  * @text Battle image time
  * @desc 0 day, 1 evening, 2 night; blank inherits the plugin default.
+ * @type string
+ * @default
+ *
+ * @arg prebattleLocation
+ * @text Prebattle location
+ * @desc 0 outdoor, 1 indoor, 2 cave, 3 water; blank inherits the explicit plugin default. No terrain inference.
  * @type string
  * @default
  *

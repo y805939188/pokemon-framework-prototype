@@ -9,6 +9,9 @@ const controlPlan={...require('./author-dialogue-native-plan.json'),productCommi
 test.before(async()=>{
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-author-dialogue-native-'));plugins={};
  for(const name of ['PS_BattleFlow','PS_SaveState','PS_Evolution','PS_BattleFlowTest']){const out=path.join(temp,name),r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);const code=fs.readFileSync(path.join(out,name+'.js'),'utf8');if(name==='PS_BattleFlowTest')entryText=code;else plugins[name]=code;}
+ // Only this Node model follows the current compiled product. The frozen native
+ // PLAN/App remain tied to their reviewed historical hashes; identity refusal is still tested below.
+ controlPlan.productRuntime=Object.fromEntries(Object.keys(controlPlan.productRuntime).map(file=>[file,hash(file.startsWith('js/plugins/')?plugins[path.basename(file,'.js')]:fs.readFileSync(path.join(ROOT,file)))]));
  const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));await vite.build({configFile:false,root:ROOT,logLevel:'error',plugins:[{name:'explicit-synthetic-font-resources',enforce:'pre',load(id){if(id===path.join(ROOT,'experiments/step5/4/author-dialogue-native-plan.json'))return JSON.stringify(controlPlan);}},{name:'author-dialogue-pixel-control',enforce:'pre',transform(code,id){
   if(id!==path.join(ROOT,'src/plugins/flowtest/d2-author-dialogue.ts')||!process.env.PF_AUTHOR_NATIVE_MUTATION)return;
   const mutations={

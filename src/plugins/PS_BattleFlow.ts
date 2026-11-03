@@ -25,6 +25,8 @@ import { createCaptureMEMZ } from './battleflow/capture-me-mz';
 import { CaptureMelodySceneStep } from './battleflow/capture-me-scene';
 import { BallScenePresentation, simpleBallPlan } from './battleflow/ball-scene';
 import { createBallPortsMZ } from './battleflow/ball-mz';
+import { prebattlePlan } from './battleflow/prebattle';
+import { installPrebattleHost } from './battleflow/prebattle-host';
 const { developmentCapabilities } = RuleConfig;
 
 (() => {
@@ -171,7 +173,8 @@ const { developmentCapabilities } = RuleConfig;
       catch (error) { op.musicError = String(error); }
     },
     developerCapabilities: {}, // explicit developer/test injection only; never plugin settings or save data
-    operationPending(): boolean { return PSFlow.running || !!PSFlow._app?.saveBlocked || !!W.PSManagement?.presentationPending?.(); },
+    operationPending(): boolean { return PSFlow.running || prebattle.pending() || !!PSFlow._app?.saveBlocked || !!W.PSManagement?.presentationPending?.(); },
+    prebattleState(): any { return prebattle.snapshot(); },
     /** Programmatic action bridges; formal learning screens/commands belong to G. */
     beginLearning(intent: any, parent?: any): any { return PSFlow.app().beginLearning(intent, parent); },
     resolveLearning(token: string, revision: number, decision: any): any { return PSFlow.app().resolveLearning(token, revision, decision); },
@@ -271,6 +274,7 @@ const { developmentCapabilities } = RuleConfig;
       PSFlow._op?.captureMelody?.cancel();
       PSFlow._op?.ballFeedback?.cancel();
       if (PSFlow._app) PSFlow._app.stateReplacedByHost();
+      prebattle.cancel();
       battleMusic.retire(); PSFlow._nextBattleMusic = null;
       PSFlow._receiveNoticeHistory.clear();PSFlow.lastReceivingNotice=null;
       const old = PSFlow._op;
@@ -439,6 +443,39 @@ const { developmentCapabilities } = RuleConfig;
     },
     /** Apply a BattleResult to the persistent state. Safe to call twice. */
     commit(result: any, options: unknown = {}): string { return PSFlow.app().commitResult(result, options); },
+    _prepareBattlePresentation(op: any, app: any, assertCurrent: () => void): void {
+      const generation = app.stateGeneration;
+      if (op.musicPlan?.owner) {
+        const owner=op.musicPlan.owner, identity=op.preparedTrainerIdentity, trainer=op.request.trainer;
+        if (owner.app!==app || owner.generation!==generation) throw new Error('stale-battle-opening');
+        if(identity && (trainer!==identity.ref || trainer.id!==identity.id || trainer.version!==identity.version)) throw new Error('trainer-audio-context-changed');
+        assertCurrent(); return;
+      }
+      if (op.musicPlan) {
+        const trainer = op.request.trainer, identity = trainer ? { id: trainer.id, version: trainer.version } : null;
+        op.preparedTrainerIdentity = trainer ? { ref:trainer, id:trainer.id, version:trainer.version } : null;
+        const projection = identity ? app.trainerRecord(identity.id, identity.version) : null; assertCurrent();
+        if (identity && !projection) throw new Error('missing trainer record for battle music');
+        // Same public author-version projection as the music context; never requery after the fight.
+        op.trainerPresentation = op.request.kind === 'trainer' && projection && typeof projection.name === 'string'
+          ? Object.freeze({ id: projection.id, version: projection.version, name: projection.name,
+            openingText: projection.presentation.openingText, loseText: projection.presentation.loseText }) : null;
+        op.musicPlan.owner = { app, generation };
+        op.musicPlan.trainers = op.request.kind === 'trainer' ? Object.freeze(projection ? [Object.freeze({
+          battleBgm: projection.presentation.battleBgm, victoryBgm: projection.presentation.victoryBgm,
+        })] : []) : undefined;
+        assertCurrent();
+        if (identity && (op.request.trainer !== trainer || trainer.id !== identity.id || trainer.version !== identity.version)) throw new Error('trainer-audio-context-changed');
+      }
+    },
+    _preparePrebattleAudio(op: any): void {
+      const initial=PSFlow._app, oldGeneration=initial?.stateGeneration;
+      const assertHost=()=>{if(op!==PSFlow._op || !PSFlow.running || initial && (PSFlow._app!==initial || initial.stateGeneration!==oldGeneration))throw new Error('stale-battle-opening');};
+      assertHost();PSFlow.assertBattleAllowed();assertHost();
+      const app=PSFlow.app();assertHost();const generation=app.stateGeneration;
+      const current=()=>{assertHost();if(PSFlow._app!==app || app.stateGeneration!==generation)throw new Error('stale-battle-opening');};
+      PSFlow.content();current();PSFlow._prepareBattlePresentation(op,app,current);current();PSFlow._startBattleMusic(op);
+    },
     async begin(): Promise<any> {
       const op = PSFlow._op;
       if (!op) throw new Error("no battle was opened (openBattle)");
@@ -454,21 +491,7 @@ const { developmentCapabilities } = RuleConfig;
       const tCreate = performance.now(); assertCurrent();
       const current = PSFlow.game(); assertCurrent();
       const limits = PSFlow.limits(); assertCurrent();
-      if (op.musicPlan) {
-        const trainer = op.request.trainer, identity = trainer ? { id: trainer.id, version: trainer.version } : null;
-        const projection = identity ? app.trainerRecord(identity.id, identity.version) : null; assertCurrent();
-        if (identity && !projection) throw new Error('missing trainer record for battle music');
-        // Same public author-version projection as the music context; never requery after the fight.
-        op.trainerPresentation = op.request.kind === 'trainer' && projection && typeof projection.name === 'string'
-          ? Object.freeze({ id: projection.id, version: projection.version, name: projection.name,
-            openingText: projection.presentation.openingText, loseText: projection.presentation.loseText }) : null;
-        op.musicPlan.owner = { app, generation };
-        op.musicPlan.trainers = op.request.kind === 'trainer' ? Object.freeze(projection ? [Object.freeze({
-          battleBgm: projection.presentation.battleBgm, victoryBgm: projection.presentation.victoryBgm,
-        })] : []) : undefined;
-        assertCurrent();
-        if (identity && (op.request.trainer !== trainer || trainer.id !== identity.id || trainer.version !== identity.version)) throw new Error('trainer-audio-context-changed');
-      }
+      PSFlow._prepareBattlePresentation(op, app, assertCurrent);
       op.request.storageFull = engine().B.limits.storageFull(current, limits); // only refusal text; application decides noBall
       const session = await (op.request.trainer ? app.startTrainerBattle(op.request) : app.startBattle(op.request)); assertCurrent();
       const elapsed = performance.now() - tCreate; assertCurrent();
@@ -587,6 +610,7 @@ const { developmentCapabilities } = RuleConfig;
     close(code: number, op: any = PSFlow._op, normal = code !== 0): void {
       if (op !== PSFlow._op) { PSFlow.stale("close", op); return; }
       if (PSFlow._app?.pendingEvolution || PSFlow._app?.pendingReceiving || PSFlow._app?.pendingPokedex) return;
+      prebattle.finish(op, normal);
       PSFlow.running = false;
       PSFlow._closeBattleMusic(op, normal);
       const cur = PSFlow.perf.cur;
@@ -608,6 +632,7 @@ const { developmentCapabilities } = RuleConfig;
         assertCurrent();
         const started = performance.now(); assertCurrent();
         const visualContext = battlebackContext(presentation, G.PluginManager.parameters(NAME)); assertCurrent();
+        const transition = prebattlePlan(request.kind, presentation, G.PluginManager.parameters(NAME), visualContext.time); assertCurrent();
         const presetHolder = PSFlow._nextBattleMusic;
         const settings = musicSettings(presentation, G.PluginManager.parameters(NAME), presetHolder); assertCurrent();
         const prepared = battleMusic.capture({ app: PSFlow._app, generation: PSFlow._app?.stateGeneration }); assertCurrent();
@@ -618,7 +643,7 @@ const { developmentCapabilities } = RuleConfig;
         PSFlow.perf.cur = { battleId: request.battleId, t0: started, actions: [] as any[], encounter: !!request.encounter };
         if (PSFlow.perf.encounterT0 !== undefined && request.encounter) PSFlow.perf.cur.t0 = PSFlow.perf.encounterT0;
         openingBattle = null; // running now owns the host save/input barrier
-        G.SceneManager.push(W.Scene_PSBattle);
+        if (!prebattle.open(PSFlow._op, transition)) G.SceneManager.push(W.Scene_PSBattle);
       } finally { if (openingBattle === opening) openingBattle = null; }
     },
     /** Player-facing entries contain a closed held-item gate; direct developer openBattle keeps its throwing contract. */
@@ -675,6 +700,7 @@ const { developmentCapabilities } = RuleConfig;
     frame: () => G.Graphics.frameCount,
     makePort: (current, defaultBgm) => createBattleMusicMZ(G, nodeRequire, engine().root, current, { defaultBgm }),
   });
+  const prebattle = installPrebattleHost(G, PSFlow, op => PSFlow._preparePrebattleAudio(op));
 
   // ---------------------------------------------------------------- plugin commands + interpreter wait
   function parseFoes(text: string): { species: string; level: number }[] {
@@ -696,7 +722,8 @@ const { developmentCapabilities } = RuleConfig;
       resultVariable: Number(args.resultVariable) || 0,
       canLose: String(args.canLose) === "true",
       forceParty: String(args.forceParty) === "true",
-    }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime });
+    }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
+      transition: { location: args.prebattleLocation || undefined } });
     if(!opened){if(G.$gameMessage.isBusy())this.setWaitMode('message');return;}
     this._psBattleId = battleId; // this interpreter waits for THIS battle (see updateWaitMode below)
     this.setWaitMode("psBattle");
@@ -722,7 +749,8 @@ const { developmentCapabilities } = RuleConfig;
       resultVariable: Number(args.resultVariable) || 0,
       canLose: String(args.canLose) === "true",
       forceParty: String(args.forceParty) === "true",
-    }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime });
+    }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
+      transition: { location: args.prebattleLocation || undefined } });
     if (!opened) { if (G.$gameMessage.isBusy()) this.setWaitMode("message"); return; }
     this._psBattleId = battleId;
     this.setWaitMode("psBattle");
@@ -872,7 +900,7 @@ const { developmentCapabilities } = RuleConfig;
       this._waitMode = ""; delete this._psLearningToken; return false;
     }
     if (this._waitMode === "psBattle") {
-      if (PSFlow.running) return true;
+      if (PSFlow.running || prebattle.pending()) return true;
       this._waitMode = "";
       const o = PSFlow.lastOutcome;
       if (o && o.blackout && o.battleId === this._psBattleId) { this._index = this._list.length; this._psEndChain = true; }
