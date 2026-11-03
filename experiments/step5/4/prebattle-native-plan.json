@@ -1,0 +1,120 @@
+{
+  "version": "prebattle-wrapper-native-v1",
+  "productCommit": "8ec1dfc5cc2343313cd1f2de65d836f5258f7f72",
+  "productRuntime": {
+    "js/plugins/PS_BattleFlow.js": "9e04daed29980a888b9a76fa538b4beef067d36574d15ac53e957529374c2afd",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "js/plugins/PS_Evolution.js": "294f6875f4f0d3b3e531c03b1ec387307f27b8b3f119b8bf60ba92a53843f0f4",
+    "js/engine/build/engine.cjs": "bcfaf3860e1cdd18495e90e32a530a258dd84a91b88f8f78b30972acb23b396d",
+    "js/engine/build/production.cjs": "7a33b828cdafc4e24f695bf71036fe241ff524221c9b40868c8f5b56e1dfd415"
+  },
+  "prefix": "pf_victory_music_v1/",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "worldSeed": 817,
+  "mapId": 5,
+  "deadlineSeconds": 180,
+  "cases": [
+    {
+      "id": "PW01",
+      "kind": "wild",
+      "location": 0,
+      "time": 0,
+      "finish": "normal",
+      "flash": "white",
+      "mainMs": 1250
+    },
+    {
+      "id": "PW02",
+      "kind": "trainer",
+      "location": 2,
+      "time": 2,
+      "finish": "normal",
+      "flash": "black",
+      "mainMs": 900
+    },
+    {
+      "id": "PW03",
+      "kind": "wild",
+      "location": 0,
+      "time": 0,
+      "finish": "cancel",
+      "flash": "white",
+      "mainMs": 1250
+    },
+    {
+      "id": "PW04",
+      "kind": "wild",
+      "location": 0,
+      "time": 0,
+      "finish": "newgame",
+      "flash": "white",
+      "mainMs": 1250
+    }
+  ],
+  "groups": [
+    {
+      "name": "normal-enter-and-return",
+      "ids": [
+        "PW01",
+        "PW02"
+      ]
+    },
+    {
+      "name": "normal-owned-cancel-and-newgame",
+      "ids": [
+        "PW03",
+        "PW04"
+      ]
+    }
+  ],
+  "requiredAssets": [
+    "audio/bgm/pf_victory_music_v1/world.ogg",
+    "audio/bgm/pf_victory_music_v1/battle.ogg",
+    "audio/bgm/pf_victory_music_v1/victory.ogg",
+    "audio/bgm/pf_victory_music_v1/trainer-victory.ogg"
+  ],
+  "notProved": [
+    "full native load/decode roundtrip (PW04 exercises actual setupNewGame)",
+    "physical input and hearing",
+    "named transition visuals/special registry/snapshot fidelity",
+    "fullWP16/D2/E/5.4/P4, GC absence, U51 cause, Windows or native signals",
+    "native parallel map-event movement; this finite driver exercises main interpreter plus parallel common event and Map.updateEvents scheduling"
+  ],
+  "sourceAssetsManifestSHA256": "317e3c50b953f091156aee468bd0e76db1e7c143953c27cccfa25c44197cc083",
+  "mediaRecipe": "scripts/prepare-victory-music-native-assets.cjs",
+  "mediaPlan": "experiments/step5/4/victory-music-native-plan.json",
+  "worldFiles": [
+    "data/System.json",
+    "data/CommonEvents.json",
+    "data/Map005.json"
+  ],
+  "renderStages": {
+    "PW01": [
+      "flash",
+      "entry-mid",
+      "handoff-black",
+      "return-black",
+      "return-mid",
+      "return-complete"
+    ],
+    "PW02": [
+      "flash",
+      "entry-mid",
+      "handoff-black",
+      "return-black",
+      "return-mid",
+      "return-complete"
+    ],
+    "PW03": [
+      "flash"
+    ],
+    "PW04": [
+      "flash"
+    ]
+  }
+}

@@ -8,11 +8,11 @@ const {createCompositionHostFactory}=require('./battle-music-composition-host.cj
 const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 const flush=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
 function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,options={}}){
- const world=createCompositionHostFactory({ROOT,work,plugins}),w=world({evolution:'plugin',productionTranslator:options.productionTranslator===true}),G=w.G,M=w.manager,A=w.AM,E=require(path.join(ROOT,'js/engine/build/production.cjs'));
+ const world=createCompositionHostFactory({ROOT,work,plugins}),w=world({evolution:'plugin',productionTranslator:options.productionTranslator===true,prebattleWorld:options.prebattleWorld===true}),G=w.G,M=w.manager,A=w.AM,E=require(path.join(ROOT,'js/engine/build/production.cjs'));
  // Run the actual entry's presenter policy before unrelated global hooks. The
  // complete driver must inherit this policy, not assume the plugin's default.
  assert.equal(typeof entryText,'string');const stop=Symbol('entry boundary'),descriptor=Object.getOwnPropertyDescriptor(M,'isGameActive'),priorNW=G.nw;
- Object.defineProperty(M,'isGameActive',{configurable:true,set(){throw stop;}});G.nw={App:{argv:['--ps-flow-test=d2-victory-music','--ps-sound']}};
+ Object.defineProperty(M,'isGameActive',{configurable:true,set(){throw stop;}});G.nw={App:{argv:['--ps-flow-test='+(options.prebattleWorld?'d2-prebattle-wrapper':'d2-victory-music'),'--ps-sound']}};
  try{vm.runInContext(entryText,G,{filename:'actual-PS_BattleFlowTest-entry.js'});}catch(e){if(e!==stop)throw e;}finally{if(descriptor)Object.defineProperty(M,'isGameActive',descriptor);else delete M.isGameActive;if(priorNW===undefined)delete G.nw;else G.nw=priorNW;}
  const duration=2.0259410430839,clipRate=44100;
  class AudioBuffer {get [Symbol.toStringTag](){return 'AudioBuffer';}constructor(){this.duration=options.badDuration?1:duration;this.sampleRate=clipRate;this.numberOfChannels=2;}}
@@ -48,7 +48,7 @@ function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,op
  G.PSManagement.inputFrame=()=>input;G.PSManagement.current=()=>null;
  G.Input.isTriggered=k=>!!input.triggered[k==='ok'?'use':k==='cancel'?'back':k];
  G.Input.isRepeated=G.Input.isTriggered;
- G.$gameMessage.clear=()=>{};G.$gameMap={mapId:()=>5,_interpreter:{clear(){},isRunning:()=>false}};G.$dataMap={};
+ G.$gameMessage.clear=()=>{};if(!options.prebattleWorld)G.$gameMap={mapId:()=>5,_interpreter:{clear(){},isRunning:()=>false}};G.$dataMap={};
  w.flow.limits=()=>({party:6,boxes:1200,bagPerItem:999,money:999999});w.flow.app=w.applicationFactory;w.flow._app=null;w.flow.content=()=>w.flow._content;w.flow.now=()=>12345;
  const gameDir=w.root,saveRoot=path.join(work,'save-'+path.basename(gameDir));fs.mkdirSync(saveRoot);G.StorageManager={fileDirectoryPath:()=>saveRoot};
  fs.mkdirSync(path.join(gameDir,'js/plugins'),{recursive:true});

@@ -59,6 +59,7 @@ function world(opt = {}) {
   G.window = G; vm.createContext(G);
   vm.runInContext(audioSection, G, { filename: 'reactor_managers.js#AudioManager' });
   vm.runInContext(command241, G, { filename: 'reactor_objects.js#command241' });
+  if(opt.prebattleWorld)require('./prebattle-native-world.cjs').installPrebattleWorld(G,ROOT,commands);
   vm.runInContext(plugins.PS_BattleFlow, G, { filename: 'PS_BattleFlow.js' });
   vm.runInContext(plugins.PS_SaveState, G, { filename: 'PS_SaveState.js' });
   G.PSManagement = { inputFrame: () => ({ pressed: new Set() }), presentationPending: () => false };

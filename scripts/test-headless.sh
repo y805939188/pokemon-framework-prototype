@@ -12,6 +12,7 @@ node scripts/check-boundaries.cjs
 pnpm --dir src build:distribution > /dev/null
 SUITES=(
   experiments/step5/4/test-prebattle-wrapper.cjs
+  experiments/step5/4/test-prebattle-native.cjs
   experiments/step5/4/test-menu-grid.cjs
   experiments/step5/4/test-growth-display.cjs
   experiments/step5/4/test-display-playback.cjs
