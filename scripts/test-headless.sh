@@ -23,6 +23,7 @@ SUITES=(
   experiments/step5/4/test-ordinary-message-native.cjs
   experiments/step5/4/test-menu-capture-native.cjs
   experiments/step5/4/test-ordinary-message.cjs
+  experiments/step5/4/test-paused-message.cjs
   experiments/step5/4/test-ordinary-message-scene.cjs
   experiments/step5/4/test-levelup-stats.cjs
   experiments/step5/4/test-levelup-stats-scene.cjs

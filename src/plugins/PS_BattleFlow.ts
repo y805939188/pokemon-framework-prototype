@@ -28,7 +28,7 @@ import { BallScenePresentation, simpleBallPlan } from './battleflow/ball-scene';
 import { createBallPortsMZ } from './battleflow/ball-mz';
 import { prebattlePlan } from './battleflow/prebattle';
 import { createLevelStatsMZ } from "./battleflow/level-stats-mz";
-import { createOrdinaryMessageMZ, createSynchronizedMessageMZ } from "./battleflow/ordinary-message-mz";
+import { createOrdinaryMessageMZ, createPausedMessageMZ, createSynchronizedMessageMZ } from "./battleflow/ordinary-message-mz";
 import { installPrebattleHost } from './battleflow/prebattle-host';
 const { developmentCapabilities } = RuleConfig;
 
@@ -1246,20 +1246,9 @@ const { developmentCapabilities } = RuleConfig;
       for (const text of [PSFlow.translator().t('trainer.challenged', { name: trainer.name }), trainer.openingText]) {
         if (!text) continue;
         for (const page of this._log.textPages(text)) {
-          const log = this._log; let shown = false, done = false, fullyShownAt = 0;
-          const close = () => { done = true; log.pause = false; };
-          c.enqueue([{ kind: 'visual', cancel: close, advance: () => {
-            if (done || !c.isCurrent() || !PSFlow.running) { close(); return true; }
-            if (!shown) {
-              shown = true;
-              if (page.length === 1 && page[0] === text) log.add(text); else log.setLines(page);
-              if (done || !c.isCurrent() || !PSFlow.running) { close(); return true; }
-              log.pause = true; fullyShownAt = performance.now(); return false;
-            }
-            // Every fully drawn nonterminal page gets its own three seconds or explicit input.
-            if (PSFlow.fast || G.Input.isTriggered('ok') || G.Input.isTriggered('cancel') || G.TouchInput?.isTriggered?.() || performance.now() - fullyShownAt >= 3000) { close(); return true; }
-            return false;
-          } }]);
+          c.enqueue([createPausedMessageMZ(G, this, page.join('\n'),
+            () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
+            () => s.finished, () => PSFlow.fast)]);
         }
       }
     }

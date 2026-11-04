@@ -1,12 +1,12 @@
 'use strict';
 // Real App/Gen8/compiled Scene and translator; input/raster/audio clocks controlled, no native claim.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
-const {createVictoryDriverHost}=require('./victory-music-driver-host.cjs'),ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),PLAN=require('./victory-music-native-plan.json');let temp,plugins,entryText,fixture;
+const {createVictoryDriverHost}=require('./victory-music-driver-host.cjs'),ROOT=path.resolve(process.env.PF_PAUSE_SCENE_ROOT||path.resolve(__dirname,'../../..')),E=require(path.join(ROOT,'js/engine/build/production.cjs')),PLAN=require('./victory-music-native-plan.json');let temp,plugins,entryText,fixture;
 test.before(async()=>{temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-trainer-opening-'));plugins={};for(const name of ['PS_BattleFlow','PS_SaveState','PS_Evolution','PS_BattleFlowTest']){const out=path.join(temp,name),r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);const text=fs.readFileSync(path.join(out,name+'.js'),'utf8');if(name==='PS_BattleFlowTest')entryText=text;else plugins[name]=text;}
  if(process.env.PF_TRAINER_OPENING_MUTATION){
   const mode=process.env.PF_TRAINER_OPENING_MUTATION;
   if(mode==='omit-opening'){const marker='if (!this._trainerOpeningQueued &&';assert.equal(plugins.PS_BattleFlow.split(marker).length,2);plugins.PS_BattleFlow=plugins.PS_BattleFlow.replace(marker,'if (false && !this._trainerOpeningQueued &&');}
-  else {assert.equal(mode,'first-frame-close');const code=plugins.PS_BattleFlow,marker='fullyShownAt = performance.now();',at=code.indexOf(marker);assert.equal(code.split(marker).length,2);const tail=code.slice(at),g=tail.match(/([\w$]+)\.Input\.isTriggered\("ok"\)/);assert(g&&code.slice(at-1000,at).includes('const close ='));plugins.PS_BattleFlow=code.slice(0,at)+tail.replace('return false;',`if (${g[1]}.Input.isTriggered("ok")) { close(); return true; } return false;`);}
+  else {assert.equal(mode,'first-frame-close');const marker='if (count === this.points.length) this.fullAt = now;';assert.equal(plugins.PS_BattleFlow.split(marker).length,2);plugins.PS_BattleFlow=plugins.PS_BattleFlow.replace(marker,'if (count === this.points.length) { this.fullAt = now; if (this.ports.useOrBack()) { this.cancel(); return true; } }');}
  }
 
  const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));await vite.build({configFile:false,root:ROOT,logLevel:'error',build:{outDir:path.join(temp,'fixture'),emptyOutDir:false,minify:false,lib:{entry:path.join(ROOT,'src/plugins/flowtest/music-native-fixture.ts'),formats:['cjs'],fileName:()=> 'entry.cjs'}}});fixture=require(path.join(temp,'fixture/entry.cjs'));});
@@ -24,4 +24,18 @@ test('confirm in the first actual drawing update cannot skip the challenge or ex
  const h=await open(),input=h.G.Input.isTriggered,add=h.s._log.add,challenge=E.i18n.translatorFor('en').t('trainer.challenged',{name:'Avery'});let step=null;
  h.s._log.add=function(line){const result=add.call(this,line);if(line===challenge){step=h.s._queue[0];h.G.Input.isTriggered=key=>key==='ok';}return result;};
  try{await h.waitFor(()=>step!==null,'exact challenge drawing update');assert.equal(h.s._queue[0],step,'first-frame confirmation must not consume the step');assert(h.s._log.pause);assert(!h.s.inputState().ready);assert(!h.lines.some(r=>r.line==='Let us battle!'));assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.G.Input.isTriggered=input;h.s._log.add=add;h.cleanup();}
+});
+
+for(const lang of ['en','zh'])test(lang+' paused opening types before its arrow and requires a distinct later input to close',async()=>{
+ const h=await open({lang,text:lang==='en'?'We will do our best!':'我们会全力以赴！'});let sounds=0;h.G.SoundManager={...h.G.SoundManager,playOk:()=>sounds++};
+ try{
+  await h.waitFor(()=>h.s._log.pause||h.s.ordinaryMessageState?.(),'first actual paused draw');
+  const initial=h.s.ordinaryMessageState();assert(initial&&initial.implementation==='paused-message-v1','opening consumes the typed paused presenter');assert.equal(initial.phase,'typing');assert.equal(h.s._log.pause,false,'no continuation arrow while typing');assert(!h.s.inputState().ready);
+  await h.frames(3);assert(h.s.ordinaryMessageState().visible>0);assert(h.s.ordinaryMessageState().visible<initial.total);
+  const step=h.s._queue[0];await h.p.press('ok');assert.equal(h.s._queue[0],step,'revealing input cannot also consume the pause');assert.equal(h.s.ordinaryMessageState().phase,'full');assert.equal(h.s._log.pause,true);assert.equal(sounds,0);assert(!step.advance(h.G.performance.now()),'same update cannot consume revealing input');
+  await h.p.press('cancel');assert.equal(sounds,1);await h.waitFor(()=>h.s.ordinaryMessageState()?.phase==='typing','authored paused page');await h.p.press('cancel');assert.equal(h.s.ordinaryMessageState().phase,'full');assert.equal(h.s._log.pause,true);await h.p.press('ok');assert.equal(sounds,2);await h.p.inMode('main');assert.equal(h.s._log.pause,false);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
+});
+test('owner cancellation during typing clears the paused page without a late draw or state write',async()=>{
+ const h=await open();try{await h.waitFor(()=>h.s._log.pause||h.s.ordinaryMessageState?.(),'paused typing');assert.equal(h.s.ordinaryMessageState()?.phase,'typing');const step=h.s._queue[0];h.flow.abort(Error('normal cancellation during opening'));await h.frames(2);assert.equal(h.s.ordinaryMessageState(),null);assert.equal(h.s._log.pause,false);const lines=JSON.stringify(h.s._log._lines);step.advance(h.G.performance.now()+10000);assert.equal(JSON.stringify(h.s._log._lines),lines);assert.equal(JSON.stringify(h.flow.game()),h.before);assert(!h.app.saveBlocked);}finally{h.cleanup();}
 });

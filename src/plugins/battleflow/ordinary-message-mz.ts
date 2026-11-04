@@ -1,17 +1,28 @@
-import { OrdinaryMessageStep } from './ordinary-message';
+import { OrdinaryMessageStep, PausedMessageStep } from './ordinary-message';
 import type { BattleSceneVisualStep } from './controller';
 
 /** Uses the existing measured text window; never ellipsizes a battle message. */
 export function createOrdinaryMessageMZ(G: any, scene: any, text: string, current: () => boolean): OrdinaryMessageStep {
+  return createMessageMZ(G, scene, text, current);
+}
+
+/** Paused author pages share typing/input ownership; only a fully shown page gets an arrow. */
+export function createPausedMessageMZ(G: any, scene: any, text: string, current: () => boolean,
+  battleEnded: () => boolean, instant: () => boolean): PausedMessageStep {
+  return createMessageMZ(G, scene, text, current, { battleEnded, instant });
+}
+
+function createMessageMZ(G: any, scene: any, text: string, current: () => boolean,
+  paused?: { battleEnded(): boolean; instant(): boolean }): OrdinaryMessageStep {
   const log = scene._log;
   let step: OrdinaryMessageStep;
-  step = new OrdinaryMessageStep(text, {
+  const ports = {
     current, update: () => scene._pictureUpdate,
     useOrBack: () => G.Input.isTriggered('ok') || G.Input.isTriggered('cancel') || G.TouchInput?.isTriggered?.() === true,
-    paint: prefix => {
+    paint: (prefix: string) => {
       if (!current()) return;
       scene._ordinaryMessage = step;
-      log.pause = false;
+      log.pause = !!paused && prefix === text;
       const lines = log.textPages(prefix).flat();
       if (prefix !== text) log.setLines(lines);
       else {
@@ -26,7 +37,9 @@ export function createOrdinaryMessageMZ(G: any, scene: any, text: string, curren
       scene._ordinaryMessage = null;
       if (current()) { log.pause = false; log.setLines([]); }
     },
-  });
+  };
+  step = paused ? new PausedMessageStep(text, ports, { ...paused, confirmed: () => { if (current()) G.SoundManager?.playOk?.(); } })
+    : new OrdinaryMessageStep(text, ports);
   return step;
 }
 
