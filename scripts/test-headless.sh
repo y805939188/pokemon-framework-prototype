@@ -48,6 +48,7 @@ SUITES=(
   experiments/step5/4/test-wild-opening-scene.cjs
   experiments/step5/4/test-trainer-dispatch-scene.cjs
   experiments/step5/4/test-party-switch-menu-scene.cjs
+  experiments/step5/4/test-battle-summary-scene.cjs
   experiments/step5/4/test-author-dialogue-pages.cjs
   experiments/step5/4/test-author-dialogue-native.cjs
   experiments/step5/4/test-trainer-opening-native.cjs

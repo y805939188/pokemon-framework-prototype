@@ -1,5 +1,5 @@
 /** Required source channel, separate from frozen v1 results and optional V2 observations. */
-import { gatewaySettlementFacts, gatewaySettlementLineage } from "../battle/gateway";
+import { gatewaySettlementFacts, gatewaySettlementLineage, gatewayOwnSummaryItem } from "../battle/gateway";
 import type { BattleDriver, DriverCheckpoint } from "../battle/driver";
 import type { HeldBinding, RequiredFacts } from "../rules/held-facts";
 import { clone, resultHash } from "../rules/state";
@@ -12,6 +12,11 @@ interface Channel {
 }
 const CHANNELS = new WeakMap<object, Channel>();
 const CHECKPOINTS = new WeakMap<DriverCheckpoint, { session: object; sealed: Sealed }>();
+/** Own current item for a read-only battle view. No channel means unknown, not an empty item. */
+export function requiredOwnSummaryItem(session: object, driver: BattleDriver, id: string): string | undefined {
+  const channel = CHANNELS.get(session);
+  return channel ? gatewayOwnSummaryItem(driver, channel.lineage, id) : undefined;
+}
 export function bindRequiredSettlement(session: object, driver: BattleDriver, binding: Omit<HeldBinding, "rawHash">, restore: (token: DriverCheckpoint) => Promise<BattleDriver>): void {
   const lineage = gatewaySettlementLineage(driver);
   if (!lineage || CHANNELS.has(session)) throw new Error("required-settlement-driver-unavailable");

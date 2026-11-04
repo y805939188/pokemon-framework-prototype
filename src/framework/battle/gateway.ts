@@ -49,6 +49,16 @@ export function gatewaySettlementFacts(driver: BattleDriver, lineage: object, bi
   if (!source || source.lineage !== lineage) throw new Error("required-settlement-driver-source-mismatch");
   return source.tracker.facts(binding);
 }
+/** Internal own-side display read; a live query is not an ended settlement seal. */
+export function gatewayOwnSummaryItem(driver: BattleDriver, lineage: object, id: string): string {
+  const source = SETTLEMENTS.get(driver);
+  if (!source || source.lineage !== lineage) throw new Error("required-settlement-driver-source-mismatch");
+  const state = source.tracker.snapshot();
+  if (state.invalid.length) throw new Error("battle-summary-held-unavailable");
+  const member = state.members.find(m => m.side === "p1" && m.id === id);
+  if (!member) throw new Error("battle-summary-member-unavailable");
+  return member.current;
+}
 const FRIEND_CHECKPOINTS = new WeakMap<DriverCheckpoint, { owner: BattleGateway; side: string; id: string; member: ShowdownPokemon; live: number; setHad: boolean; stored: unknown }>();
 
 export class BattleGateway implements BattleDriver {

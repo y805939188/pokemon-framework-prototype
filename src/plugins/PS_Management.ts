@@ -11,7 +11,8 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
  const pending=(o:any)=>!!o&&(o.pending===true||o.status==='pending');
  type MenuItem={key:string;label:string;enabled?:boolean;run:()=>void};
  type View={kind:string;cursor:number;[key:string]:any};
- type OpenRequest={kind:'party'|'pc'|'summary'|'selector'|'receiving';id?:string;qualifier?:(m:Member)=>boolean;done?:(result:any)=>void};
+ type BattleSummarySource={views:IndividualView[];isCurrent:()=>boolean};
+ type OpenRequest={kind:'party'|'pc'|'summary'|'selector'|'receiving'|'battle-summary';id?:string;qualifier?:(m:Member)=>boolean;done?:(result:any)=>void;battleSummary?:BattleSummarySource};
  const KEY:Record<string,Action|Direction>={Enter:'use',Space:'use',KeyZ:'use',Escape:'back',KeyX:'back',Numpad0:'back',ShiftLeft:'action',ShiftRight:'action',ControlLeft:'special',ControlRight:'special',KeyA:'jumpup',PageUp:'jumpup',KeyS:'jumpdown',PageDown:'jumpdown',ArrowUp:'up',ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down'};
  const ALIAS:Record<Action|Direction,string>={use:'ok',back:'cancel',action:'shift',special:'control',jumpup:'pageup',jumpdown:'pagedown',up:'up',left:'left',right:'right',down:'down'};
  const LEGACY_KEY:Record<number,Action|Direction>={13:'use',32:'use',90:'use',27:'back',88:'back',96:'back',16:'action',17:'special',33:'jumpup',65:'jumpup',34:'jumpdown',83:'jumpdown',38:'up',37:'left',39:'right',40:'down'};
@@ -58,6 +59,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   openParty:()=>open({kind:'party'}),openStorage:()=>open({kind:'pc'}),openSummary:(id:string)=>open({kind:'summary',id}),
   selectMember:(qualifier:(m:Member)=>boolean,done:(result:any)=>void)=>open({kind:'selector',qualifier,done}),
   openReceiving:(done?:(result:any)=>void)=>open({kind:'receiving',done}),
+  attachBattleSummary:(scene:any,id:string,source:BattleSummarySource,done:(id:string)=>void)=>attachBattleSummary(scene,id,source,done),
   presentationPending,
   replaceBattleWithReceiving:()=>{if(current||presentationPending())return false;nextRequest={kind:'receiving'};G.SceneManager.goto(Scene_PSManagement);return true;},
   current:()=>current&&!current.closed&&current.top()?{token:current.token,generation:current.generation,ready:current.ready,text:[...current.renderedText],view:{...current.top(),items:current.top().items?.map((x:MenuItem)=>({key:x.key,label:x.label,enabled:x.enabled}))},heldId:current.snapshot?.held?.id??null,frames:[...debugFrames]}:null,
@@ -70,11 +72,12 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   renderedText:string[]=[];snapshot!:ManagementSnapshot;stack:View[]=[];latch=new InputLatch();physical=new Set<Action|Direction>();input:any=null;composition=false;error='';qualified=new Set<string>();
   storageQuick=false;inventoryChild:any=null;dexChild:any=null;
   reception:any=null;decisions:Record<string,ReceivingDecision>={};receiveIndex=0;readonly=false;completion:any=null;
+  summaryViews:Map<string,IndividualView>|null=null;
   onKeyDown=(e:any)=>{const key=eventKey(e);if(key)this.physical.add(key);};
   // keyup clears only its DOM source. The next merged frame releases the latch after gamepad polling.
   onKeyUp=(e:any)=>{const key=eventKey(e);if(key&&!Array.from(keyboardKeys.values()).includes(key)&&!Array.from(nativeConsumed.values()).includes(key)){this.physical.delete(key);}};
   constructor(scene:any,request:OpenRequest){this.scene=scene;this.request=request;this.application=app();this.generation=this.application.stateGeneration;this.token='ui:'+this.generation+':'+(++sequence);}
-  valid(){try{return !this.closed&&this.application===app()&&this.generation===this.application.stateGeneration&&current===this;}catch{return false;}}
+  valid(){try{return !this.closed&&this.application===app()&&this.generation===this.application.stateGeneration&&current===this&&(!this.request.battleSummary||this.request.battleSummary.isCurrent());}catch{return false;}}
   top():View{return this.stack[this.stack.length-1]!;}
   refresh(){this.snapshot=this.reception&&app().pendingReceiving?.token===this.reception.token?app().previewReceiving(this.reception.token,this.decisions,this.receiveIndex):app().managementSnapshot(this.readonly?undefined:this.managementToken);for(const view of this.stack)if(view.kind==='party'&&view.cursor!==6&&view.cursor>=this.snapshot.party.length)view.cursor=this.snapshot.party.length?this.snapshot.party.length-1:6;this.draw();}
   managementToken='';
@@ -87,7 +90,14 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    this.window=win;this.started=false;current=this;
    for(const key of keyboardKeys.values())this.physical.add(key);
    document.addEventListener('keydown',this.onKeyDown);document.addEventListener('keyup',this.onKeyUp);
-   if(this.request.kind==='receiving'){
+   if(this.request.kind==='battle-summary'){
+    const source=this.request.battleSummary;if(!source?.isCurrent())throw Error('stale-operation');
+    const views:IndividualView[]=structuredClone(source.views);
+    this.readonly=true;this.summaryViews=new Map(views.map(view=>[view.member.id,view]));
+    this.snapshot=app().managementSnapshot();this.snapshot.party=views.map(view=>view.member);this.snapshot.held=null;
+    const ids=views.map(view=>view.member.id),index=ids.indexOf(this.request.id!);if(index<0)throw Error('unknown-member');
+    this.stack=[];this.summary(ids,index);
+   }else if(this.request.kind==='receiving'){
     this.readonly=true;this.reception=app().pendingReceiving;if(!this.reception){this.close(null);return;}
     this.snapshot=app().managementSnapshot();this.nextReceive();
    }else{
@@ -205,7 +215,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    if(!this.ready){this.ready=true;record({token:this.token,event:'ready',frame,view:this.top()?.kind});return;}
    const v=this.top(),intent=inputIntent(filtered,v.kind==='box'?'box':v.kind==='panel'?'panel':v.kind==='marks'?v.summary?'mark-summary':'mark-storage':'ordinary',v.mode==='organize');
    if(!intent.direction&&!intent.action)return;record({token:this.token,event:'input',frame,view:v.kind,cursor:v.cursor,...intent});
-   try{if(intent.direction)this.direction(intent.direction);if(this.top()===v&&this.ready&&intent.action)this.action(intent.action);this.draw();}catch(e){try{this.fail(String(e));}catch(drawError){this.scene.rebuildFailed(drawError);}}
+   try{if(intent.direction)this.direction(intent.direction);if(this.top()===v&&this.ready&&intent.action)this.action(intent.action);this.draw();}catch(e){try{this.fail(String(e));}catch(drawError){if(this.request.kind==='battle-summary')throw drawError;this.scene.rebuildFailed(drawError);}}
   }
   direction(dir:Direction){const v=this.top();
    if(v.kind==='menu'||v.kind==='results'){const n=v.kind==='menu'?v.items.length:v.matches.length;v.cursor=n?(v.cursor+(dir==='up'||dir==='left'?-1:1)+n)%n:0;}
@@ -274,6 +284,10 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   exitStorage(){if(this.snapshot.held){this.fail(tr('heldBlock'));return;}const at=this.stack.findIndex(v=>v.kind==='box'||v.kind==='panel');if(at>=0)this.stack.splice(at);if(!this.stack.length)this.close(null);else{this.boundary();this.refresh();}}
   close(result:any){
    if(!this.valid())return;if(this.snapshot?.held){this.fail(tr('heldBlock'));return;}
+   if(this.request.kind==='battle-summary'){
+    const view=this.top(),id=view?.kind==='summary'?view.ids[view.cursor]:this.request.id;
+    this.closed=true;this.completion={id};this.dispose();this.request.done?.({id});return;
+   }
    if(this.reception&&app().pendingReceiving?.token===this.reception.token){this.fail('receiving-pending');return;}
    if(this.managementToken){const out=app().endManagement(this.managementToken);if(out.status==='refused'){this.fail(out.reason);return;}}
    this.closed=true;this.removeInput();this.completion=result;this.scene._result=result;this.scene._done=this.request.done;
@@ -306,16 +320,29 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    if(this.snapshot?.held)text(tr('held',{name:memberName(this.snapshot.held)}),4,h-84,w-8,'#ffe29a');
    b.fontSize=15;text(this.error||tr('help'),4,h-42,w-8,this.error?'#ffb5b5':'#ddd');
   }
-  drawSummary(v:View,text:any,cell:any,w:number){const m=this.find(v.ids[v.cursor]);if(!m)return;const view:IndividualView=app().describeIndividual(m.id),pages=['info','memo','skills','moves','ribbons'];text(memberName(m)+'  Lv.'+m.level+' '+m.gender+(m.shiny?' ★':''),4,32);text(tr(pages[v.page]!)+' '+(v.page+1)+'/'+(m.isEgg?1:5),w-180,32,180,'#b8e3ff');
+  drawSummary(v:View,text:any,cell:any,w:number){const m=this.find(v.ids[v.cursor]);if(!m)return;const view:IndividualView=this.summaryViews?this.summaryViews.get(m.id)!:app().describeIndividual(m.id),pages=['info','memo','skills','moves','ribbons'];text(memberName(m)+'  Lv.'+m.level+' '+m.gender+(m.shiny?' ★':''),4,32);text(tr(pages[v.page]!)+' '+(v.page+1)+'/'+(m.isEgg?1:5),w-180,32,180,'#b8e3ff');
    const row=(label:string,value:any,n:number,color?:string)=>text(label+': '+value,8,88+n*30,w-16,color);const paragraph=(value:string,y:number,maxLines:number)=>{const old=this.window.contents.fontSize;this.window.contents.fontSize=17;let line='',n=0;for(const ch of Array.from(value)){if(this.window.textWidth(line+ch)>w-24&&line){text(line,8,y+n*23,w-16);line='';n++;if(n>=maxLines)break;}line+=ch;}if(n<maxLines&&line)text(line,8,y+n*23,w-16);this.window.contents.fontSize=old;};
    if(m.isEgg){row(tr('egg'),tr('unknown'),0);row(tr('owner'),m.owner?.name||tr('unknown'),1);row(tr('id'),view.publicId,2);row(tr('origin'),m.origin?.text||tr('unknown'),3);return;}
-   if(v.page===0){row(tr('name'),flow().speciesName(m.species,m.form),0);row(tr('type'),view.types.join(' / ')||tr('unknown'),1);row(tr('owner'),m.owner?.name||tr('unknown'),2,m.owner?.gender===0?'#aabfff':m.owner?.gender===1?'#ffb0b0':undefined);row(tr('id'),view.publicId,3);row(tr('item'),m.item||tr('none'),4);row(tr('form'),m.form,5);row(tr('ball'),m.ball,6);row(tr('exp'),m.exp+' / '+(view.nextLevelExp===null?'—':Math.max(0,view.nextLevelExp-m.exp)),7);if(m.ownerCompatibilityDefault)row('',tr('compat'),8,'#ffe29a');if(view.nextLevelExp!==null&&view.currentLevelExp!==null){const ratio=Math.min(1,Math.max(0,(m.exp-view.currentLevelExp)/(view.nextLevelExp-view.currentLevelExp)));this.window.contents.fillRect(8,375,128,8,'#222');this.window.contents.fillRect(8,375,Math.floor(128*ratio/2)*2,8,'#66bdff');}}
+   if(v.page===0){row(tr('name'),flow().speciesName(m.species,m.form),0);row(tr('type'),view.types.join(' / ')||tr('unknown'),1);row(tr('owner'),m.owner?.name||tr('unknown'),2,m.owner?.gender===0?'#aabfff':m.owner?.gender===1?'#ffb0b0':undefined);row(tr('id'),view.publicId,3);row(tr('item'),view.heldItemKnown===false?tr('unavailable'):m.item||tr('none'),4);row(tr('form'),m.form,5);row(tr('ball'),m.ball,6);row(tr('exp'),m.exp+' / '+(view.nextLevelExp===null?'—':Math.max(0,view.nextLevelExp-m.exp)),7);if(m.ownerCompatibilityDefault)row('',tr('compat'),8,'#ffe29a');if(view.nextLevelExp!==null&&view.currentLevelExp!==null){const ratio=Math.min(1,Math.max(0,(m.exp-view.currentLevelExp)/(view.nextLevelExp-view.currentLevelExp)));this.window.contents.fillRect(8,375,128,8,'#222');this.window.contents.fillRect(8,375,Math.floor(128*ratio/2)*2,8,'#66bdff');}}
    else if(v.page===1){row(tr('nature'),tr('nature.'+m.nature.toLowerCase()),0);row(tr('origin'),m.origin?.text||String(m.origin?.map??tr('unknown')),1);row(tr('level'),m.origin?.level??tr('unknown'),2);row(tr('date'),m.origin?.receivedAt==null?tr('unknown'):new Date(m.origin.receivedAt*1000).toISOString().slice(0,10),3);row(tr('hatch'),m.origin?.hatchedAt==null?tr('unknown'):new Date(m.origin.hatchedAt*1000).toISOString().slice(0,10),4);row(tr('friendship'),m.friendship,5);row(tr('characteristic'),tr('characteristic.'+view.characteristic.stat+'.'+view.characteristic.variant),6);row(tr('method'),m.origin?.method??tr('unknown'),7);}
    else if(v.page===2){for(const [i,key]of['hp','atk','def','spa','spd','spe'].entries()){const k=key as keyof typeof view.modifiers;row(tr(key),key==='hp'?`${m.hp}/${view.stats?.hp??'?'}`:view.stats?.[k]??'?',i,key!=='hp'&&(view.modifiers?.[k]??100)>100?'#ffb0b0':key!=='hp'&&(view.modifiers?.[k]??100)<100?'#aabfff':undefined);}row(tr('ability'),view.ability.name,6);paragraph(view.ability.description||tr('unavailable'),290,3);row(tr('exp'),m.exp+' / '+(view.nextLevelExp??'—'),10);}
    else if(v.page===3){if(!m.moves.length)row(tr('moves'),tr('none'),0);for(const [i,move]of view.moves.entries()){cell(6,76+i*48,w-12,44,move.name+'  '+move.pp+'/'+move.maxpp+' PP',v.detail==='moves'&&v.detailCursor===i);if(v.selected===i)text('↔',w-35,78+i*48,30,'#ffe29a');}const move=view.moves[v.detailCursor];if(move){row(tr('type'),move.type+' / '+move.category,7);row(tr('power'),(move.power??'—')+'   '+tr('accuracy')+': '+(move.accuracy||'—'),8);paragraph(move.description||tr('unavailable'),350,6);}}
    else {const ribbons=m.ribbons??[],start=Math.floor(v.detailCursor/12)*12;for(let i=0;i<12;i++){const n=start+i;cell((i%4)*w/4+3,80+Math.floor(i/4)*70,w/4-6,63,ribbons[n]||'·',v.detail==='ribbons'&&v.detailCursor===n);if(v.selected===n)text('↔',(i%4)*w/4+8,105+Math.floor(i/4)*70,30);}row(tr('ribbons'),ribbons.length,8);}
    if(view.diagnostics.length)text(tr('unavailable'),4,390,w-8,'#ffb5b5');
   }
+ }
+ /** An attached viewer shares summary rendering/navigation, but acquires no management operation. */
+ function attachBattleSummary(scene:any,id:string,source:BattleSummarySource,done:(id:string)=>void){
+  if(current||presentationPending())throw Error('management-presentation-active');
+  if(!source.isCurrent())throw Error('stale-operation');
+  let released=false,win:any=null,c:Controller|null=null;
+  const release=()=>{if(released)return;released=true;c?.dispose();win?.parent?.removeChild(win);win?.destroy?.();if(source.isCurrent()){G.Input.clear();G.TouchInput.clear();}};
+  try{
+   c=new Controller(scene,{kind:'battle-summary',id,battleSummary:source,done:result=>{release();if(source.isCurrent())done(result.id);}});
+   win=new(Window_PSManagement as any)(new G.Rectangle(0,0,G.Graphics.boxWidth,G.Graphics.boxHeight));
+   scene.addWindow(win);c.start(win);if(!c.valid())release();
+  }catch(error){release();throw error;}
+  return {get closed(){return released||!c||c.closed;},update(){if(!source.isCurrent()){release();return;}try{c?.update();}catch(error){release();throw error;}},dispose:release};
  }
  function Window_PSManagement(this:any){this.initialize(...(arguments as any));}
  Window_PSManagement.prototype=Object.create(G.Window_Base.prototype);Window_PSManagement.prototype.constructor=Window_PSManagement;

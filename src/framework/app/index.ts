@@ -8,6 +8,7 @@ export type {
 } from "./ports";
 export type { ManagementRequest, ManagementOutcome } from "./management";
 export type { IndividualView, ManagementSnapshot, StorageMatch, StorageSearch } from "./management-query";
+export { individualView } from './management-query';
 export type { InventoryRequest, InventoryTicket, InventoryParent, InventoryOutcome } from "./inventory-session";
 export type { LearningDecision, LearningIntent, LearningOutcome, LearningParent, LearningView } from "./learning-operation";
 export type { BattleEvolutionSeed, EvolutionDecision, EvolutionResolution, EvolutionView, SelectedEvolutionSeed } from "./evolution-operation";

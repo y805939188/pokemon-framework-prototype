@@ -82,7 +82,8 @@ test('a real already-active registration refusal returns to the member list with
 test('a fainted reserve has no Switch In command and can return without registration', async () => {
   const h = await open({ reserveHP: 0 }); try {
     const id = h.s._session.party[1].id; await commands(h, id);
-    assert(!h.s._menu._items.some(r => r.ext === 'switch-in')); assert.equal(h.s._menu._items.length, 1);
+    assert(!h.s._menu._items.some(r => r.ext === 'switch-in')); assert.equal(h.s._menu._items.length, 2);
+    assert(h.s._menu._items.some(r => r.ext === 'summary'), 'the shared summary remains available for a fainted member');
     await pick(h, null); assert.equal(h.s._mode, 'party'); assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext, id);
     assert.equal(JSON.stringify(h.flow.game()), h.before);
   } finally { h.cleanup(); }

@@ -1707,9 +1707,40 @@ const { developmentCapabilities } = RuleConfig;
     this._partySelected = memberId;
     const tr = PSFlow.translator(), items: any[] = [];
     if (!member.isEgg && live.hp > 0 && !live.fainted) items.push({ name: tr.t('ui.party.switch_in'), ext: 'switch-in' });
+    items.push({ name: tr.t('management.summary'), ext: 'summary' });
     items.push({ name: tr.t('ui.party.cancel'), ext: null });
     this.show('party-command', items);
     if (c.isCurrent()) this._partyCommandShownUpdate = this._pictureUpdate;
+  };
+  P.showPartySummary = function (memberId: string) {
+    const c = sceneController(this), session = this._session;
+    if (!c.isCurrent()) return;
+    if (typeof W.PSManagement?.attachBattleSummary !== 'function') {
+      this._retryPartySelection = { memberId };
+      this.enqueueMessages([PSFlow.translator().t('management.unavailable')]); return;
+    }
+    let child: any = null;
+    c.enqueue([{ kind: 'visual', advance: () => {
+      if (!child) {
+        const B = engine().B, game = PSFlow.game(), app = PSFlow.app();
+        const views = session.party.map((member: any) => {
+          const state = B.battlePresentation.readBattleSummary(session, member.id);
+          if (!state) throw Error('battle-summary-state-unavailable');
+          const { stats, heldItemKnown, id: _id, ...dynamic } = state;
+          const own = { ...app.describeIndividual(member.id).member, ...dynamic };
+          const view = B.app.individualView(own, game, session.content, PSFlow._dex);
+          view.stats = stats; view.heldItemKnown = heldItemKnown;
+          if (!heldItemKnown) view.diagnostics.push('battle-held-unavailable');
+          return view;
+        });
+        if (!c.isCurrent() || !PSFlow.running || this._session !== session) return true;
+        child = W.PSManagement.attachBattleSummary(this, memberId, { views,
+          isCurrent: () => c.isCurrent() && PSFlow.running && this._session === session }, (id: string) => {
+            if (c.isCurrent()) this._retryPartySelection = { memberId: id };
+          });
+      }
+      child.update(); return child.closed;
+    }, cancel: () => { child?.dispose(); } }]);
   };
   P.showLearn = function () {
     const p = this._session.pendingLearn;
@@ -1801,6 +1832,7 @@ const { developmentCapabilities } = RuleConfig;
         if (ext === null) { this.showParty(this._partySub, this._partySelected); return; }
         if (Number.isSafeInteger(this._pictureUpdate) && this._pictureUpdate === this._partyCommandShownUpdate) { this._menu.activate(); return; }
         const id = this._partySelected, forced = this._partySub === 'forced';
+        if (ext === 'summary' && typeof id === 'string') { this.showPartySummary(id); return; }
         if (ext === 'switch-in' && typeof id === 'string') this.act(() => forced
           ? this._session.chooseForcedSwitch(id) : this._session.chooseSwitch(id), 'switch', undefined, { memberId: id });
         return;
