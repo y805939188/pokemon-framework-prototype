@@ -19,7 +19,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = suppliedContent ?? fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -35,8 +35,8 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   if (heldItem) { state.party[0].item = heldItem; flow.developerCapabilities = { allowHeldItemSources: true, allowExperimentalHeldItemBattle: true }; }
   if (mint) state.party[0].statNature = 'Timid';
   if (hurt) state.party[0].hp -= 40;
-  if (reserveHP !== null) state.party[1].hp = reserveHP;
-  if (egg) state.party[1].isEgg = true;
+  if (reserveHP !== null) state.party[egg ? 2 : 1].hp = reserveHP;
+  if (egg) { state.party[1].isEgg = true; state.party[1].shiny = eggShiny; state.party[1].nickname = 'Hidden Species'; }
   state.inventory = E.inventory.inventoryFromBag(bag, E.itemCatalog.catalogOf(content)); G.$gameSystem._psGame = state;
   G.Input.keyMapper ??= {}; G.Input.isPressed ??= () => false; G.TouchInput.isCancelled ??= () => false;
   const listeners = new Map(), globals = new Map();
@@ -195,5 +195,86 @@ test('a completed real level-up is reflected in the shared summary before the fi
     await summary(h, id); assert(text(h).some(line => line.includes('Lv.51')));
     await h.p.press('right'); await h.p.press('right'); assert(text(h).some(line => line.endsWith(`${live.hp}/${live.stats.hp}`)));
     await h.p.press('cancel'); await h.p.inMode('party'); assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { h.cleanup(); }
+});
+
+// Eggs exist in the application's party but are deliberately absent from BattleSession/Showdown.
+for (const lang of ['en', 'zh']) test(lang + ' battle Egg stays inspectable with hidden combat details and read-only single-page Summary', async () => {
+  const h = await open({ lang, members: 3, egg: true, eggShiny: true }); try {
+    const s = h.s._session, saved = JSON.parse(h.before), [lead, egg, reserve] = saved.party.map(m => m.id);
+    assert.deepEqual(s.party.map(m => m.id), [lead, reserve]);
+    const engineBefore = s.gw.snapshot(), sessionBefore = JSON.stringify(s.party);
+    assert.equal(E.battlePresentation.readBattleSummary(s, egg), null, 'Egg has no battle projection');
+    {
+      await commands(h, egg);
+      assert.deepEqual(Array.from(h.s._menu._items, r => r.ext), ['summary', null], 'Egg must never offer Switch In');
+      await pick(h, null); assert.equal(h.s._mode, 'party');
+      assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext, egg);
+      const row = h.s._menu._items.find(r => r.ext === egg);
+      assert.equal(row.name, lang === 'zh' ? '蛋' : 'Egg', 'Egg hides level/HP/species/gender/shiny metadata');
+      assert.equal(row.enabled, true);
+      await pick(h, egg); await pick(h, 'summary');
+      await h.waitFor(() => current(h)?.ready, 'Egg read-only shared Summary');
+      assert.deepEqual(Array.from(current(h).view.ids), [lead, egg, reserve]);
+      assert.equal(current(h).view.ids[current(h).view.cursor], egg);
+      assert(text(h).some(line => line.includes('1/1')));
+      assert(!text(h).some(line => /Lv\.|Hidden Species|★|Snorlax|卡比兽/.test(line)), 'Egg header must not disclose combat metadata');
+      for (const key of ['right', 'left', 'ok', 'shift']) await h.p.press(key);
+      assert.equal(current(h).view.page, 0); assert.equal(current(h).view.detail, null);
+      await h.p.press('down'); assert.equal(current(h).view.ids[current(h).view.cursor], reserve);
+      await h.p.press('right'); await h.p.press('up');
+      assert.equal(current(h).view.page, 1); assert.equal(current(h).view.ids[current(h).view.cursor], lead, 'non-INFO navigation skips Egg');
+      await h.p.press('left'); await h.p.press('down');
+      assert.equal(current(h).view.ids[current(h).view.cursor], egg, 'INFO can enter Egg again');
+      await h.p.press('cancel'); await h.p.inMode('party');
+      assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext, egg);
+      assert.equal(s.gw.snapshot(), engineBefore); assert.equal(JSON.stringify(s.party), sessionBefore);
+      assert.equal(JSON.stringify(h.flow.game()), h.before);
+      assert.deepEqual(h.managementCalls(), { beginManagement: 0, manage: 0 }); assert.equal(h.s._failure, null);
+    }
+  } finally { h.cleanup(); }
+});
+test('switching past an Egg uses the non-Egg stable member identity and current engine HP', async () => {
+  const h = await open({ members: 3, egg: true }); try {
+    const [lead, egg, reserve] = JSON.parse(h.before).party.map(m => m.id), s = h.s._session;
+    await commands(h, reserve); await pick(h, 'switch-in'); await h.p.inMode('main');
+    assert.equal(s.gw.activeId('p1'), reserve); assert(!s.party.some(m => m.id === egg));
+    const live = s.gw.readState('p1').find(m => m.id === reserve);
+    assert(live.hp < JSON.parse(h.before).party[2].hp);
+    await party(h); const row = h.s._menu._items.find(m => m.ext === reserve);
+    assert(row.name.includes(String(live.hp) + '/' + live.maxhp));
+    assert.equal(JSON.stringify(h.flow.game()), h.before); assert.equal(h.s._failure, null);
+  } finally { h.cleanup(); }
+});
+test('mandatory replacement can inspect an Egg but cannot deploy it or cancel replacement', async () => {
+  const h = await open({ members: 3, egg: true, reserveHP: 1 }); try {
+    const s = h.s._session, [lead, egg, reserve] = JSON.parse(h.before).party.map(m => m.id);
+    // The actual engine, rather than a fabricated request, produces fainted forced replacement.
+    await commands(h, reserve); await pick(h, 'switch-in'); await h.p.inMode('party-forced');
+    await pick(h, egg); assert.deepEqual(Array.from(h.s._menu._items, r => r.ext), ['summary', null]);
+    await pick(h, 'summary'); await h.waitFor(() => current(h)?.ready, 'forced Egg Summary');
+    await h.p.press('cancel'); await h.p.inMode('party-forced');
+    assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext, egg);
+    h.s.onMenuCancel(); await h.frames(1); assert.equal(h.s._mode, 'party-forced');
+    await pick(h, lead); await pick(h, 'switch-in'); await h.p.inMode('main');
+    assert.equal(s.gw.activeId('p1'), lead); assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { h.cleanup(); }
+});
+for (const retirement of ['abort', 'replace', 'terminate']) test('Egg Summary retires on owner ' + retirement + ' without writes', async () => {
+  const h = await open({ members: 3, egg: true }); try {
+    const id = JSON.parse(h.before).party[1].id; await summary(h, id);
+    const win = h.windows.at(-1);
+    if (retirement === 'abort') h.flow.abort(Error('owned Egg Summary abort'));
+    else if (retirement === 'replace') h.flow.stateReplaced();
+    else h.s.terminate();
+    await h.frames(3); assert.equal(current(h), null); assert(win._destroyed && !win.parent);
+    assert.equal(JSON.stringify(h.flow.game()), h.before); assert.deepEqual(h.managementCalls(), { beginManagement: 0, manage: 0 });
+  } finally { h.cleanup(); }
+});
+test('legacy item targeting keeps Session-only non-Egg eligibility', async () => {
+  const h = await open({ members: 3, egg: true }); try {
+    h.s._pendingItem = 'potion'; h.s.showParty('item');
+    assert.deepEqual(h.s._menu._items.map(m => m.ext), h.s._session.party.map(m => m.id));
+    assert.equal(JSON.stringify(h.flow.game()), h.before);
   } finally { h.cleanup(); }
 });

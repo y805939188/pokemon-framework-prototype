@@ -1684,15 +1684,24 @@ const { developmentCapabilities } = RuleConfig;
       }
     }, kind);
   };
+  // Session intentionally excludes Eggs. Only the current application's own Eggs are display-only rows;
+  // participating members retain the Session record and stable battle identity, never a display index.
+  const partyForDisplay = (scene: any): any[] => {
+    const party = scene._session.party, byId = new Map(party.map((m: any) => [m.id, m]));
+    let saved: any; try { saved = PSFlow.game().party; } catch { return party; }
+    if (!Array.isArray(saved) || !party.every((m: any) => saved.some((own: any) => own?.id === m.id))) return party;
+    return saved.flatMap((own: any) => byId.has(own?.id) ? [byId.get(own.id)] : own?.isEgg === true ? [own] : []);
+  };
   P.showParty = function (sub: string, selected: string | null = null) {
     this._partySub = sub; this._partySelected = selected;
     const s = this._session;
     const live = Object.fromEntries(s.gw.readState("p1").map((x: any) => [x.id, x]));
-    const items = s.party.map((m: any) => {
+    const items = (sub === "item" ? s.party : partyForDisplay(this)).map((m: any) => {
       const x = live[m.id];
       // an item that could not do anything is refused before it is registered (WP28 3.5): grey the target out
       const can = sub === "item" ? s.canUseItem(this._pendingItem, m.id).ok : true;
       const tr = PSFlow.translator();
+      if (m.isEgg) return { name: tr.t("management.egg"), ext: m.id, enabled: true };
       return { name: tr.t("ui.party.entry", { name: PSFlow.speciesName(m.species), level: x?.level ?? m.level, hp: x?.hp ?? 0, maxhp: x?.maxhp ?? 0,
         fainted: x?.fainted ? tr.t("ui.party.fainted") : "", active: x?.active ? tr.t("ui.party.active") : "", noEffect: sub === "item" && !can ? tr.t("ui.party.no_effect") : "" }), ext: m.id, enabled: can };
     });
@@ -1702,11 +1711,11 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.showPartyCommands = function (memberId: string) {
     const c = sceneController(this); if (!c.isCurrent()) return;
-    const member = this._session.party.find((m: any) => m.id === memberId), live = this._session.gw.readState('p1').find((m: any) => m.id === memberId);
-    if (!member || !live) { this.showParty(this._partySub); return; }
+    const member = partyForDisplay(this).find((m: any) => m.id === memberId), live = this._session.gw.readState('p1').find((m: any) => m.id === memberId);
+    if (!member || (!member.isEgg && !live)) { this.showParty(this._partySub); return; }
     this._partySelected = memberId;
     const tr = PSFlow.translator(), items: any[] = [];
-    if (!member.isEgg && live.hp > 0 && !live.fainted) items.push({ name: tr.t('ui.party.switch_in'), ext: 'switch-in' });
+    if (!member.isEgg && live?.hp > 0 && !live.fainted) items.push({ name: tr.t('ui.party.switch_in'), ext: 'switch-in' });
     items.push({ name: tr.t('management.summary'), ext: 'summary' });
     items.push({ name: tr.t('ui.party.cancel'), ext: null });
     this.show('party-command', items);
@@ -1723,7 +1732,8 @@ const { developmentCapabilities } = RuleConfig;
     c.enqueue([{ kind: 'visual', advance: () => {
       if (!child) {
         const B = engine().B, game = PSFlow.game(), app = PSFlow.app();
-        const views = session.party.map((member: any) => {
+        const views = partyForDisplay(this).map((member: any) => {
+          if (member.isEgg) return app.describeIndividual(member.id);
           const state = B.battlePresentation.readBattleSummary(session, member.id);
           if (!state) throw Error('battle-summary-state-unavailable');
           const { stats, heldItemKnown, id: _id, ...dynamic } = state;
