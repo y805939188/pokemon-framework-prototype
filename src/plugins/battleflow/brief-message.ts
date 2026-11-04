@@ -17,7 +17,8 @@ export interface BriefMessageOptions {
 /**
  * WP67-A 9.1: full text releases the visual step while its presentation stays.
  * The host retains this object until replacement/animation/owner cleanup.
- * Queue beforeNextMessage() before the next message; cancel() clears immediately.
+ * Queue beforeNextMessage() before the next message. Animation clearBrief()
+ * removes only the wait marker; owner cancel() clears the presentation immediately.
  * This module does not own a Scene, input mapping, battle state or message queue.
  */
 export class BriefMessageStep implements BattleSceneVisualStep {
@@ -26,6 +27,7 @@ export class BriefMessageStep implements BattleSceneVisualStep {
   private startedAt: number | null = null;
   private fullAt: number | null = null;
   private replacementAt: number | null = null;
+  private waitBeforeNext = true;
   private visible = 0;
   private lastUpdate = -1;
   private phase: 'typing' | 'resident' | 'waiting' | 'done' = 'typing';
@@ -41,7 +43,8 @@ export class BriefMessageStep implements BattleSceneVisualStep {
 
   snapshot() {
     return { implementation: 'brief-message-v1', phase: this.phase, visible: this.visible,
-      total: this.points.length, fullyShownAt: this.fullAt, replacementRequestedAt: this.replacementAt };
+      total: this.points.length, fullyShownAt: this.fullAt, replacementRequestedAt: this.replacementAt,
+      waitBeforeNext: this.waitBeforeNext };
   }
 
   advance(now: number): boolean {
@@ -71,12 +74,16 @@ export class BriefMessageStep implements BattleSceneVisualStep {
   /** One stable gate per brief. Its first eligible update starts a fresh 1 s wait. */
   beforeNextMessage(): BattleSceneVisualStep { return this.replacement; }
 
+  /** Send-out/recall/throw clear the brief marker, without erasing resident text. */
+  clearBrief(): void { if (this.phase !== 'done') this.waitBeforeNext = false; }
+
   private ownsPresentation(): boolean { return this.phase !== 'done' && this.ports.current(); }
 
   private advanceReplacement(now: number): boolean {
     if (this.phase === 'done') return true;
     if (!this.ports.current()) { this.cancel(); return true; }
     if (this.fullAt === null) throw new Error('brief text must finish before replacement');
+    if (!this.waitBeforeNext) { this.cancel(); return true; }
     const update = this.ports.update();
     if (update === this.lastUpdate) return false;
     this.lastUpdate = update;

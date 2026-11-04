@@ -102,16 +102,22 @@ test('late full paint and empty text both release immediately, then wait before 
   }
 });
 
-test('animation clearing bypasses the extra residency wait and is idempotent', () => {
-  const f = setup('Go!');
-  f.tick(0); f.tick(90);
-  const next = f.message.beforeNextMessage();
-  f.message.cancel(); // Send-out/recall/throw adapters may explicitly clear brief.
-  assert.equal(f.tick(91, false, next), true);
-  f.message.cancel(); next.cancel();
-  assert.equal(f.closes, 1);
-  assert.equal(f.message.snapshot().replacementRequestedAt, null);
-  assert.equal(f.displayed, null);
+test('animation clears only the brief marker, preserving text until replacement without a wait', () => {
+  for (const alreadyWaiting of [false, true]) {
+    const f = setup('Go!');
+    f.tick(0); f.tick(90);
+    const next = f.message.beforeNextMessage();
+    if (alreadyWaiting) assert.equal(f.tick(100, false, next), false);
+    f.message.clearBrief(); f.message.clearBrief();
+    assert.equal(f.message.snapshot().waitBeforeNext, false);
+    assert.equal(f.displayed, 'Go!');
+    assert.equal(f.closes, 0);
+    assert.equal(f.tick(101, false, next), true);
+    f.message.cancel(); next.cancel();
+    assert.equal(f.closes, 1);
+    assert.equal(f.message.snapshot().replacementRequestedAt, alreadyWaiting ? 100 : null);
+    assert.equal(f.displayed, null);
+  }
 });
 
 test('owner retirement clears partial, resident and waiting presentations once', () => {
