@@ -1,0 +1,98 @@
+{
+  "version": "ordinary-message-native-v1",
+  "productCommit": "c93e783bccbe42c13d6f1216b509f24d737f26d1",
+  "productRuntime": {
+    "js/plugins/PS_BattleFlow.js": "23a804e2801f332651d6e55247b598c86cc17e2460f65f816b6295143ebb7333",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "js/plugins/PS_Evolution.js": "294f6875f4f0d3b3e531c03b1ec387307f27b8b3f119b8bf60ba92a53843f0f4",
+    "js/engine/build/engine.cjs": "ff1b01d47122e07462c28bc52277629b75b13c134808afef4e2fda3cb7991734",
+    "js/engine/build/production.cjs": "ba805c45a55dcc50a600a2474e2342f71641aed72fff2b0771eb8efba0b4fc87"
+  },
+  "prefix": "pf_victory_music_v1/",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "mapId": 5,
+  "deadlineSeconds": 180,
+  "moves": [
+    {
+      "id": "tackle",
+      "pp": 0,
+      "maxpp": 35
+    },
+    {
+      "id": "growl",
+      "pp": 40,
+      "maxpp": 40
+    },
+    {
+      "id": "bodyslam",
+      "pp": 15,
+      "maxpp": 15
+    }
+  ],
+  "requiredAssets": [
+    "audio/bgm/pf_victory_music_v1/world.ogg",
+    "audio/bgm/pf_victory_music_v1/battle.ogg",
+    "audio/bgm/pf_victory_music_v1/victory.ogg",
+    "audio/bgm/pf_victory_music_v1/trainer-victory.ogg"
+  ],
+  "sourceAssetsManifestSHA256": "317e3c50b953f091156aee468bd0e76db1e7c143953c27cccfa25c44197cc083",
+  "mediaRecipe": "scripts/prepare-victory-music-native-assets.cjs",
+  "mediaPlan": "experiments/step5/4/victory-music-native-plan.json",
+  "fontResourcePaths": [
+    "data/System.json",
+    "fonts/mplus-1m-regular.woff",
+    "fonts/mplus-2p-bold-sub.woff"
+  ],
+  "worldFiles": [
+    "data/System.json",
+    "data/CommonEvents.json",
+    "data/Map005.json"
+  ],
+  "worldRNG": "constant zero; no unconsumed numeric seed label",
+  "cases": [
+    {
+      "id": "OM01",
+      "language": "en",
+      "advance": "natural",
+      "ending": "win"
+    },
+    {
+      "id": "OM02",
+      "language": "zh",
+      "advance": "inputs",
+      "ending": "abort"
+    }
+  ],
+  "groups": [
+    {
+      "name": "bilingual-ordinary-messages",
+      "ids": [
+        "OM01",
+        "OM02"
+      ]
+    }
+  ],
+  "renderStages": {
+    "OM01": [
+      "refusal-partial",
+      "refusal-full",
+      "returned-moves"
+    ],
+    "OM02": [
+      "refusal-partial",
+      "refusal-full",
+      "returned-moves"
+    ]
+  },
+  "notProved": [
+    "physical input/touch/hearing/Windows",
+    "brief/pause/command wrappers/sync blocks/noninteractive replay",
+    "fullD2/E/5.4/P4/GC/U51 and retained issues",
+    "no saveGame or cross-process Continue qualification"
+  ]
+}
