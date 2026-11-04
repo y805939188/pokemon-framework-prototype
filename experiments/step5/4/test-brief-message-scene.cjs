@@ -13,7 +13,8 @@ test.before(async () => {
     let code = fs.readFileSync(path.join(out, name + '.js'), 'utf8');
     if (name === 'PS_BattleFlow' && process.env.PF_BRIEF_SCENE_CONTROL) {
       const edits = { 'missing-replacement-wait': ['queued.push(this._briefTail.beforeNextMessage());', 'void this._briefTail;'],
-        'missing-resident-retirement': ['resident?.cancel();', 'void resident;'] };
+        'missing-resident-retirement': ['resident?.cancel();', 'void resident;'],
+        'hidden-player-body': ['sprite.visible = value > 0;', 'sprite.visible = value > 0 && !(sprite._psPictureRole === "body" && sprite._psPictureKey?.startsWith("p1:"));'] };
       const edit = edits[process.env.PF_BRIEF_SCENE_CONTROL]; assert(edit, 'known in-memory mutation');
       assert.equal(code.split(edit[0]).length, 2, 'one compiled product mutation'); code = code.replace(...edit);
     }
@@ -51,7 +52,10 @@ for (const lang of ['en', 'zh']) test(lang + ' opening paints a full brief befor
     const resident = h.s._residentBrief, fullAt = resident.snapshot().fullyShownAt, full = h.s._log._lines.join('');
     assert(full.length > 0); assert(!h.s.children.some(x => x._psPictureRole === 'body' && x._psPictureKey?.startsWith('p1:')));
     await h.frames(2);
-    assert(h.s.children.some(x => x._psPictureRole === 'body'));
+    const playerId = h.s.presentationState().cards.find(card => card.side === 'p1' && card.active).id;
+    const playerBody = h.s.children.find(x => x._psPictureRole === 'body' && x._psPictureKey === 'p1:' + playerId);
+    assert(playerBody?.visible && playerBody.scale.x > 0 && playerBody.scale.y > 0 && playerBody.opacity > 0,
+      'the current player body must actually be painted; the previously shown foe cannot satisfy this');
     assert(h.G.performance.now() - fullAt < 1000, 'animation begins without ordinary one-second dwell');
     assert.equal(h.s._log._lines.join(''), full, 'animation clears marker, not resident text');
     assert.equal(resident.snapshot().waitBeforeNext, false); assert(!h.s.inputState().ready);
