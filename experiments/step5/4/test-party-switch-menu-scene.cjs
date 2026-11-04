@@ -18,16 +18,18 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, fast = false, effects = true } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, fast = false, effects = true } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
   if (catalog) catalog(content.items);
   const trainerRecord = content.trainers['music-normal'][0];
   trainerRecord.party = Array.from({ length: trainerMembers }, (_, i) => ({ ...trainerRecord.party[0], level: 3 + i }));
+  if (shadowTag) trainerRecord.party[0].ability = 'shadowtag'; // Explicit author fixture; trapping itself is the real Gen8 engine.
   G.PluginManager.parameters = function (name) { const p = parameters.call(this, name); return name === 'PS_BattleFlow' ? { ...p, language: lang } : p; };
   flow.setLanguage(null); flow.stateReplaced(); flow._app = null; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.seed = [1, 2, 3, 4]; flow.rng = () => 0; flow.fast = fast; (G.ConfigManager ??= {}).battleEffects = effects;
   const state = fixture.musicNativeState(E, content, 'receiving'); state.party = state.party.slice(0, members); state.nextMemberOrdinal = String(members + 1);
+  if (ghost) state.party[0] = E.speciesKey.toPersistentMember(E.memberFactory.createMember({ id: state.party[0].id, species: 'Gengar', level: 100 }, content, () => 0), content);
   if (hurt) state.party[0].hp -= 40;
   if (reserveHP !== null) state.party[1].hp = reserveHP;
   if (egg) state.party[1].isEgg = true;
@@ -132,3 +134,51 @@ test('a full six-member list keeps stable identities across actual switches inst
   } finally { h.cleanup(); }
 });
 
+
+for (const lang of ['en', 'zh']) {
+  test(lang + ' a real already-active refusal names the member instead of displaying the generic choice error', async () => {
+    const h = await open({ lang, trainer: true, shadowTag: true }); try {
+      const s = h.s._session, id = s.gw.activeId('p1'), name = h.flow.speciesName(s.party.find(m => m.id === id).species);
+      const request = JSON.stringify(s.currentRequest()), live = JSON.stringify(s.gw.readState('p1'));
+      await commands(h, id); await pick(h, 'switch-in'); await h.p.inMode('party');
+      const expected = lang === 'zh' ? name + '已经在对战中了！' : name + ' is already in battle!';
+      assert(h.completed.includes(expected), 'actual refused switch must display the already-active reason: ' + expected);
+      assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext, id);
+      assert.equal(JSON.stringify(s.currentRequest()), request); assert.equal(JSON.stringify(s.gw.readState('p1')), live);
+      assert.equal(JSON.stringify(h.flow.game()), h.before);
+    } finally { h.cleanup(); }
+  });
+  test(lang + ' an actual engine trapping refusal names the outgoing member and returns selection without a turn', async () => {
+    const h = await open({ lang, trainer: true, shadowTag: true }); try {
+      const s = h.s._session, id = s.party[1].id, active = s.gw.activeId('p1'), name = h.flow.speciesName(s.party.find(m => m.id === active).species);
+      const live = JSON.stringify(s.gw.readState('p1')); let refused;
+      const choose = s.chooseSwitch.bind(s); s.chooseSwitch = async (...a) => { refused = await choose(...a); return refused; };
+      await commands(h, id); await pick(h, 'switch-in'); await h.p.inMode('party');
+      assert.equal(refused.ok, false, 'the real engine, not the UI, refused the switch'); assert.equal(refused.reason, 'choice-rejected');
+      assert.equal(s.gw.awaitingChoice('p1').active[0].trapped, true, 'classified trapping is present in the actual public request');
+      const expected = lang === 'zh' ? name + '现在无法被替换！' : name + " can't be switched out!";
+      assert(h.completed.includes(expected), 'actual refused switch must display the trapping reason: ' + expected);
+      assert.equal(s.gw.activeId('p1'), active); assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext, id);
+      assert.equal(JSON.stringify(s.gw.readState('p1')), live); assert.equal(JSON.stringify(h.flow.game()), h.before);
+      h.s.onMenuCancel(); await h.frames(1); assert.equal(h.s._mode, 'main');
+    } finally { h.cleanup(); }
+  });
+}
+test('a Ghost uses the actual Gen8 trapping exception without a speculative UI refusal', async () => {
+  const h = await open({ trainer: true, shadowTag: true, ghost: true }); try {
+    const s = h.s._session, id = s.party[1].id;
+    assert.notEqual(s.gw.awaitingChoice('p1').active[0].trapped, true);
+    await commands(h, id); await pick(h, 'switch-in'); await h.p.inMode('main');
+    assert.equal(s.gw.activeId('p1'), id); assert.equal(JSON.stringify(h.flow.game()), h.before);
+    assert(!h.completed.some(line => typeof line === 'string' && line.includes("can't be switched out")));
+  } finally { h.cleanup(); }
+});
+test('a different refusal reason retains its existing localized message even for an active member', async () => {
+  const h = await open(); try {
+    const s = h.s._session, id = s.gw.activeId('p1');
+    s.chooseSwitch = async () => ({ ok: false, reason: 'not-registered' }); // Controlled refusal-family compatibility check only.
+    await commands(h, id); await pick(h, 'switch-in'); await h.p.inMode('party');
+    assert(h.completed.includes("That isn't possible right now.")); assert(!h.completed.some(line => typeof line === 'string' && line.includes('already in battle')));
+    assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { h.cleanup(); }
+});

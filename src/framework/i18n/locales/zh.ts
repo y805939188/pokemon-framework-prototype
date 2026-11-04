@@ -248,6 +248,8 @@ export const zh: LocaleTable = {
     "refusal.none-left": "这个已经没有了。",
     "refusal.unknown-item": "这个道具不能在对战中使用。",
     "refusal.move.no-pp": "这个招式的 PP 已经用完了。",
+    "refusal.switch.already-active": "{name}已经在对战中了！",
+    "refusal.switch.trapped": "{name}现在无法被替换！",
     "refusal.choice-rejected": "现在不能选择这个。",
     "refusal.not-registered": "现在不能这样做。",
     "refusal.invulnerable": "现在无法瞄准这个目标！",

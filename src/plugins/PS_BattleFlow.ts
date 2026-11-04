@@ -1084,6 +1084,23 @@ const { developmentCapabilities } = RuleConfig;
       : tr.has(`refusal.${reason}`) ? tr.t(`refusal.${reason}`) : tr.t("refusal.default", { reason });
   }
 
+  /** Classify only an actual refused switch, from the engine's public member/request views. */
+  function switchRefusalText(session: any, memberId: string): string | null {
+    const live = session.gw.readState('p1'), selected = live.find((m: any) => m.id === memberId);
+    const nameOf = (id: string) => {
+      const member = session.party.find((m: any) => m.id === id);
+      return member?.nickname || PSFlow.speciesName(member?.species ?? id);
+    };
+    const tr = PSFlow.translator();
+    if (selected?.active) return tr.t('refusal.switch.already-active', { name: nameOf(memberId) });
+    const request = session.gw.awaitingChoice?.('p1') ?? session.currentRequest();
+    const outgoing = live.find((m: any) => m.active && !m.fainted);
+    if (!request?.forceSwitch && request?.active?.[0]?.trapped === true && outgoing) {
+      return tr.t('refusal.switch.trapped', { name: nameOf(outgoing.id) });
+    }
+    return null;
+  }
+
   function Scene_PSBattle(this: any) { this.initialize(...(arguments as any)); }
   W.Scene_PSBattle = Scene_PSBattle;
   Scene_PSBattle.prototype = Object.create(G.Scene_MenuBase.prototype);
@@ -1801,8 +1818,9 @@ const { developmentCapabilities } = RuleConfig;
       if (r && r.ok === false) {
         this._retryMoveMenu = !!refusedMove;
         this._retryPartySelection = refusedParty ? { ...refusedParty } : null;
-        this.enqueueMessages([refusedMove?.pp === 0 && r.reason === 'choice-rejected'
-          ? PSFlow.translator().t('refusal.move.no-pp') : refusalText(kind, r.reason)]);
+        const partyText = refusedParty && r.reason === 'choice-rejected' ? switchRefusalText(this._session, refusedParty.memberId) : null;
+        this.enqueueMessages([partyText ?? (refusedMove?.pp === 0 && r.reason === 'choice-rejected'
+          ? PSFlow.translator().t('refusal.move.no-pp') : refusalText(kind, r.reason))]);
         return;
       }
       this._retryPartySelection = null;
