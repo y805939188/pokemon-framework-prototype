@@ -60,6 +60,7 @@ function world(opt = {}) {
   vm.runInContext(audioSection, G, { filename: 'reactor_managers.js#AudioManager' });
   vm.runInContext(command241, G, { filename: 'reactor_objects.js#command241' });
   if(opt.prebattleWorld)require('./prebattle-native-world.cjs').installPrebattleWorld(G,ROOT,commands);
+  if(opt.beforeProduct)opt.beforeProduct(G); // Explicit controlled-host setup before product hooks capture native methods.
   vm.runInContext(plugins.PS_BattleFlow, G, { filename: 'PS_BattleFlow.js' });
   vm.runInContext(plugins.PS_SaveState, G, { filename: 'PS_SaveState.js' });
   G.PSManagement = { inputFrame: () => ({ pressed: new Set() }), presentationPending: () => false };

@@ -25,7 +25,7 @@ export async function runD2OrdinaryMessage(p: any): Promise<void> {
   eq(path.resolve(arg('ps-save-dir')), path.resolve(input.saveRoot), 'isolated save argument'); eq(path.resolve(G.StorageManager.fileDirectoryPath()), path.resolve(input.saveRoot), 'actual storage');
   const storageRel = path.relative(fs.realpathSync(gameDir), fs.realpathSync(input.saveRoot)); assert(storageRel === '..' || storageRel.startsWith('..' + path.sep), 'storage outside APP'); eq(fs.readdirSync(input.saveRoot), [], 'fresh storage');
   const ids = PLAN.cases.map(c => c.id); eq(ids, ['OM01', 'OM02'], 'two ordered normal cases');
-  const d: any = report.ordinaryMessageNative = { version: PLAN.version, productCommit: PLAN.productCommit, productRuntime: PLAN.productRuntime, packageHead: input.packageHead, driverPluginSHA256: input.driverPluginSHA256, inputSHA256: hash(bytes), expectedIDs: ids, notRunIDs: [...ids], nativeClaim: 'NOT_SELF_QUALIFIED', cases: {}, renders: [], cleanupErrors: [], physicalInput: 'NOT_VERIFIED' };
+  const d: any = report.ordinaryMessageNative = { version: PLAN.version, productCommit: PLAN.productCommit, productRuntime: PLAN.productRuntime, packageHead: input.packageHead, driverPluginSHA256: input.driverPluginSHA256, inputSHA256: hash(bytes), expectedIDs: ids, notRunIDs: [...ids], nativeClaim: 'NOT_SELF_QUALIFIED', cases: {}, entries: [], renders: [], cleanupErrors: [], physicalInput: 'NOT_VERIFIED' };
   report.hostDriverVersion = PLAN.version;
   const original = { parameters: G.PluginManager.parameters, language: flow.lang, fast: flow.fast, update: G.Scene_PSBattle.prototype.update, start: G.Scene_PSBattle.prototype.start };
   let first = true, language = 'en', active: any = null;
@@ -50,6 +50,14 @@ export async function runD2OrdinaryMessage(p: any): Promise<void> {
     return r;
   };
   const wait = (f: () => boolean, label: string) => waitFor(() => { unchanged(active); if (active?.scene?._failure && !active.controlledAbort) throw Error('actual message Scene failure: ' + active.scene._failure); return f(); }, label);
+  const entry = (h: any, stage: string) => {
+    d.entries.push({ id: h.id, stage, frame: G.Graphics.frameCount, at: G.performance.now(),
+      scene: scene()?.constructor?.name ?? null, mapBusy: scene() instanceof G.Scene_Map ? !!scene().isBusy?.() : null,
+      appInitialized: !!flow._app, preparedAppSame: h.app === flow._app, generationSame: h.generation === flow._app?.stateGeneration,
+      operationSame: !!h.op && h.op === flow._op, musicOwnerSame: !!h.op?.musicPlan?.owner && h.op.musicPlan.owner.app === flow._app,
+      prebattlePhase: flow.prebattleState?.()?.phase ?? null });
+    writeProgress();
+  };
   const command = (h: any, key: any) => {
     const view = h.scene.inputState(); assert(view.ready, 'actual semantic input ready'); const at = view.items.findIndex((x: any) => x.key === key); assert(at >= 0, 'stable command ' + String(key));
     h.commands.push({ key, source: 'Window_Command.processOk', frame: G.Graphics.frameCount }); h.scene._menu.select(at); unchanged(h); h.scene._menu.processOk();
@@ -118,8 +126,12 @@ export async function runD2OrdinaryMessage(p: any): Promise<void> {
       h = active = { id: c.id, system, descriptor, value: descriptor.value, before: clone(flow.game()), installs: [], updates: [], inputs: [], commands: [], refusals: [], choices: 0, stateChecks: 0, retired: false, commitAllowed: false };
       h.get = () => h.value; h.set = (v: any) => { assert(h.commitAllowed, 'no early state install'); h.installs.push({ frame: G.Graphics.frameCount, at: G.performance.now(), before: hash(stable(h.value)), after: hash(stable(v)) }); h.value = v; };
       Object.defineProperty(system, '_psGame', { configurable: true, enumerable: descriptor.enumerable, get: h.get, set: h.set });
-      flow.openBattle({ kind: 'wild', foes: [{ species: 'Pidgey', level: 3 }], battleId: PLAN.version + '/' + c.id, seq: ids.indexOf(c.id) + 1, canLose: true }); h.op = flow._op; h.app = flow.app(); h.generation = h.app.stateGeneration;
+      // Lazy application creation belongs before the operation captures its owner.
+      // Map fades may defer the wrapper's own audio/application preparation.
+      h.app = flow.app(); h.generation = h.app.stateGeneration; entry(h, 'before-open');
+      flow.openBattle({ kind: 'wild', foes: [{ species: 'Pidgey', level: 3 }], battleId: PLAN.version + '/' + c.id, seq: ids.indexOf(c.id) + 1, canLose: true }); h.op = flow._op; entry(h, 'after-open');
       await inMode('main'); h.scene = battle(); h.session = h.scene._session; assert(h.session === h.op.session && h.app.saveBlocked && flow.fast === false, 'real normal-speed App Session root'); eq(flow.translator().lang, c.language, 'actual production language'); unchanged(h);
+      entry(h, 'main-ready');
       h.oldChoose = h.session.chooseMove; h.choose = function (this: any, ...a: any[]) { h.choices++; return h.oldChoose.apply(this, a); }; h.session.chooseMove = h.choose;
       command(h, 'fight'); await inMode('moves');
       if (c.advance === 'natural') await refusal(h, undefined, undefined, true);
@@ -137,7 +149,10 @@ export async function runD2OrdinaryMessage(p: any): Promise<void> {
       eq(d.renders.filter((r: any) => r.id.startsWith(c.id + '-')).map((r: any) => r.stage), PLAN.renderStages[c.id as keyof typeof PLAN.renderStages], 'exact normal image set');
       d.cases[c.id] = { language, fast: false, before: h.before, after: clone(flow.game()), beforeSHA256: hash(stable(h.before)), afterSHA256: hash(stable(flow.game())), installs: h.installs, stateChecks: h.stateChecks, updates: h.updates, commands: h.commands, inputs: h.inputs, refusals: h.refusals, finalConfirmation: h.finalConfirmation ?? null, cancelled: c.ending === 'abort', rootReleased: !h.app.saveBlocked, renderIDs: d.renders.filter((r: any) => r.id.startsWith(c.id + '-')).map((r: any) => r.id) };
       retire(h); active = null; results.push({ id: c.id, status: 'pass', ms: G.performance.now() - began });
-    } catch (e) { results.push({ id: c.id, status: 'fail', error: String((e as any)?.stack ?? e) }); throw e; }
+    } catch (e) {
+      try { if (h) entry(h, 'failed'); } catch (diagnostic) { (d.entryErrors ??= []).push(String(diagnostic)); }
+      results.push({ id: c.id, status: 'fail', error: String((e as any)?.stack ?? e) }); throw e;
+    }
     finally { d.notRunIDs = ids.filter(id => !results.some((r: any) => r.id === id)); writeProgress(); }
   };
   let failed = false, primary: unknown;

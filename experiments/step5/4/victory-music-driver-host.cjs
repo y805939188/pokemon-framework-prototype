@@ -8,7 +8,7 @@ const {createCompositionHostFactory}=require('./battle-music-composition-host.cj
 const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 const flush=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
 function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,options={}}){
- const world=createCompositionHostFactory({ROOT,work,plugins}),w=world({evolution:'plugin',productionTranslator:options.productionTranslator===true,prebattleWorld:options.prebattleWorld===true}),G=w.G,M=w.manager,A=w.AM,E=require(path.join(ROOT,'js/engine/build/production.cjs'));
+ const world=createCompositionHostFactory({ROOT,work,plugins}),w=world({evolution:'plugin',productionTranslator:options.productionTranslator===true,prebattleWorld:options.prebattleWorld===true,beforeProduct:options.beforeProduct}),G=w.G,M=w.manager,A=w.AM,E=require(path.join(ROOT,'js/engine/build/production.cjs'));
  // Run the actual entry's presenter policy before unrelated global hooks. The
  // complete driver must inherit this policy, not assume the plugin's default.
  assert.equal(typeof entryText,'string');const stop=Symbol('entry boundary'),descriptor=Object.getOwnPropertyDescriptor(M,'isGameActive'),priorNW=G.nw;

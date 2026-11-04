@@ -13,3 +13,11 @@ before/after为完整合成状态；确认前每个观察更新比较完整持�
 静态冻结器只校验干净新提交、五产品运行载荷/实际驱动、世界和字体、实际Ogg/WAV资格及全部APP清单；不执行NW，不创建profile/save/run目录。执行前还需独立静态复审、新驱动精确CI、专用监督器及正常宿主空闲/隔离存档/自有组/执行授权准入。单轮失败即停、余案NOT_RUN，不自动重跑；原异常和清理异常分别留存。此准备不等于原生通过。
 
 brief、暂停/确认/命令包装、中间停顿/同步块、非交互回放和完整消息系统仍OPEN。K22/D2/E/5.4/P4、Windows/实体输入听感、GC WARN/U51 UNKNOWN及旧失败/拒绝/DEFER保持。不得读私有Ruby、接触真实玩家档、改全局或合并main。4ba专用分支待批与本批独立，不重试或借本批绕过。
+
+## 2026-11-04 入口次序修复
+
+旧bfa固定包独立单轮为OM01进入main前超时、OM02未运行，0/12图；旧失败不覆盖。有限离线对照用原冻结产品和安装版Map busy函数复现条件：Map暂忙导致wrapper延迟时，先openBattle后懒建App会使捕获的owner失配；预先建立App或不在pending期间创建App均可正常进入。原运行没有busy/owner记录，因此旧NW实际根因仍UNVERIFIED，不能把条件性复现写成旧运行已证因果或普通消息产品错误。
+
+新驱动在openBattle前建立并捕获App/generation，保留产品严格owner守卫，让正常地图淡入等待仍由原wrapper处理；不延长超时、不改fast=false、main门/种子/业务输入/12图断言。before-open/after-open/main-ready/failed仅新增有限非私有诊断（Map busy、同App/generation/op和阶段），不改变结果接收权威。测试宿主在产品hook安装前装入真实Scene_Base/Map isBusy/isFading方法，淡入绘制/倒计时仍明确受控；两案延迟入口完整通过，回退旧App次序能复现同型卡住并保留失败/余案NOT_RUN和释放。
+
+产品仍固定c93；新包/driver/input必须重新冻结、独立静态与精确CI后再由父端安排新单轮，未执行不记通过。暂停消息9cac及其他产品工作树不混入。
