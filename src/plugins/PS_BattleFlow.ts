@@ -1270,7 +1270,7 @@ const { developmentCapabilities } = RuleConfig;
     } else ++this._pictureUpdate;
     // A rejected display clock still owes normal host/input updates for its aborted-end menu.
     G.Scene_MenuBase.prototype.update.call(this);
-    if (!c.isCurrent()) { this.retireBrief(); c.dispose(); this._log.pause = false; this._endFeedbackPages = null; this._ballFeedback?.cancel(); this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
+    if (!c.isCurrent()) { retireBrief(this); c.dispose(); this._log.pause = false; this._endFeedbackPages = null; this._ballFeedback?.cancel(); this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
     // Host abort may close this owner from main/boot/pending action. tick observes closure before phase/busy gates.
     this.updateQueue();
   };
@@ -1372,11 +1372,12 @@ const { developmentCapabilities } = RuleConfig;
       return step.advance(now);
     }, cancel: () => step.cancel() };
   };
-  P.retireBrief = function () {
-    const resident = this._residentBrief, tail = this._briefTail;
-    this._briefTail = null;
+  function retireBrief(scene: any): void {
+    // Lifecycle seams may be borrowed by a minimal host object, before Scene initialization.
+    const resident = scene._residentBrief, tail = scene._briefTail;
+    scene._briefTail = null;
     resident?.cancel(); if (tail !== resident) tail?.cancel();
-  };
+  }
   P.briefMessageState = function () { return this._residentBrief?.snapshot() ?? null; };
   /** Every owned text entry passes the previous brief's replacement gate; arbitrary animations do not. */
   P.enqueueMessages = function (steps: BattleScenePresentation[]) {
@@ -1396,7 +1397,7 @@ const { developmentCapabilities } = RuleConfig;
   P.ordinaryMessageState = function () { return this._ordinaryMessage?.snapshot() ?? null; };
   P.updateQueue = function () {
     const c = sceneController(this);
-    if (!c.isCurrent() || !PSFlow.running) { this.retireBrief(); this._ballFeedback?.cancel(); this._display?.dispose(); this._pictures?.dispose(); }
+    if (!c.isCurrent() || !PSFlow.running) { retireBrief(this); this._ballFeedback?.cancel(); this._display?.dispose(); this._pictures?.dispose(); }
     c.tick(G.Input.isTriggered('ok'), PSFlow.fast ? 0 : 24);
   };
   P.ballFeedbackState = function () { return this._ballFeedback?.snapshot() ?? null; };
@@ -1605,7 +1606,7 @@ const { developmentCapabilities } = RuleConfig;
   P.onEnd = function () {
     // A delayed callback from an old scene must not pop the current scene's global SceneManager stack.
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // bare API callers refer to the current operation
-    if (op !== PSFlow._op) { this.retireBrief(); this._display?.dispose(); this._pictures?.dispose(); PSFlow.stale("finish", op); return; }
+    if (op !== PSFlow._op) { retireBrief(this); this._display?.dispose(); this._pictures?.dispose(); PSFlow.stale("finish", op); return; }
     const c = this._controller as BattleSceneController<any> | undefined;
     if (c && !c.isCurrent()) return;
     if (!this._aborted && !this._failure && this._captureMelody?.pending()) return;
@@ -1621,7 +1622,7 @@ const { developmentCapabilities } = RuleConfig;
       }
       this._endFeedbackPages = null; this._log.pause = false;
     }
-    this.retireBrief(); this._display?.dispose(); c?.dispose(); this._pictures?.dispose();
+    retireBrief(this); this._display?.dispose(); c?.dispose(); this._pictures?.dispose();
     if (!this._aborted && !this._failure) {
       try { const outcome=PSFlow.finish(this._session, this._psOp);if(c&&!c.ownsHost())return;if(outcome?.continuationToken){this._evolutionTransferred=true;this.popScene();return;}if(outcome?.pending&&W.PSManagement){this._menu.deactivate();if(c&&!c.ownsHost())return;this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
     }
@@ -1631,7 +1632,7 @@ const { developmentCapabilities } = RuleConfig;
   P.terminate = function () {
     const c = this._controller as BattleSceneController<any> | undefined;
     this._menuCursor?.clear();
-    this.retireBrief();
+    retireBrief(this);
     this._endFeedbackPages = null; if (this._log) this._log.pause = false;
     this._ballFeedback?.cancel();
     this._display?.dispose();
