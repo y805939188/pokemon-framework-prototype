@@ -28,7 +28,8 @@ import { BallScenePresentation, simpleBallPlan } from './battleflow/ball-scene';
 import { createBallPortsMZ } from './battleflow/ball-mz';
 import { prebattlePlan } from './battleflow/prebattle';
 import { createLevelStatsMZ } from "./battleflow/level-stats-mz";
-import { createOrdinaryMessageMZ, createPausedMessageMZ, createSynchronizedMessageMZ } from "./battleflow/ordinary-message-mz";
+import { createOrdinaryMessageMZ, createPausedMessageMZ, createSynchronizedMessageMZ, createBriefMessageMZ, isMessageStepMZ } from "./battleflow/ordinary-message-mz";
+import { BriefMessageStep } from './battleflow/brief-message';
 import { installPrebattleHost } from './battleflow/prebattle-host';
 const { developmentCapabilities } = RuleConfig;
 
@@ -1158,6 +1159,7 @@ const { developmentCapabilities } = RuleConfig;
     sceneController(this, true);
     this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._faintAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
     this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false; this._endFeedbackPages = null; this._endFeedbackPage = 0; this._endPageShownUpdate = -1; this._trainerOpeningQueued = false; this._retryMoveMenu = false;
+    this._residentBrief = null; this._briefTail = null;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1234,7 +1236,10 @@ const { developmentCapabilities } = RuleConfig;
       } },
       afterPaintNow: () => performance.now(),
       cue: kind => c.isCurrent() && PSFlow.running ? battleCue(this, kind) : undefined,
-      picture: (kind, actor) => this._pictures.step(kind, actor),
+      picture: (kind, actor) => {
+        const step = this._pictures.step(kind, actor);
+        return kind === 'damage' ? step : this.clearBriefFor(step);
+      },
       faint: (actor, box) => this._pictures.faint(actor, box),
     });
     this._mode = "messages";
@@ -1265,7 +1270,7 @@ const { developmentCapabilities } = RuleConfig;
     } else ++this._pictureUpdate;
     // A rejected display clock still owes normal host/input updates for its aborted-end menu.
     G.Scene_MenuBase.prototype.update.call(this);
-    if (!c.isCurrent()) { c.dispose(); this._log.pause = false; this._endFeedbackPages = null; this._ballFeedback?.cancel(); this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
+    if (!c.isCurrent()) { this.retireBrief(); c.dispose(); this._log.pause = false; this._endFeedbackPages = null; this._ballFeedback?.cancel(); this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
     // Host abort may close this owner from main/boot/pending action. tick observes closure before phase/busy gates.
     this.updateQueue();
   };
@@ -1295,8 +1300,14 @@ const { developmentCapabilities } = RuleConfig;
         const growth = message.kind === 'growth' ? engine().B.battlePresentation.readGrowthDisplay(this._session, message) : null;
         if (this._display && message.kind === 'events') {
           for (const event of message.events) {
-            steps.push(...this._display.event(event));
+            const visuals = this._display.event(event);
             const lines = this._D.event(event), ballPlan = simpleBallPlan(event);
+            if (!PSFlow.fast && (event.type === 'switch' || event.type === 'drag')) {
+              // Recall an existing member first; the next send-out starts only after its own brief is full.
+              steps.push(...visuals.slice(0, -1), ...this.briefMessages(lines), ...visuals.slice(-1));
+              continue;
+            }
+            steps.push(...visuals);
             const shownTarget = ballPlan?.target === null || this._display.snapshot().some((card: BattleDisplayCard) => card.side === 'p2' && card.id === ballPlan?.target && card.active);
             if (ballPlan && op && this._pictures && shownTarget && !(ballPlan.outcome === 'caught' && op.ballFeedback?.snapshot().plan.outcome === 'caught')) {
               const current = () => c.isCurrent() && PSFlow.running && op === PSFlow._op && G.SceneManager._scene === this;
@@ -1305,8 +1316,8 @@ const { developmentCapabilities } = RuleConfig;
               const stage = new BallScenePresentation(ballPlan, G.ConfigManager?.battleEffects !== false, ports);
               this._ballFeedback = op.ballFeedback = stage;
               // Normal results publish throw text first; trainer blocking has its own result text.
-              if (ballPlan.outcome !== 'blocked' && lines.length) steps.push(lines[0], stage, ...lines.slice(1));
-              else steps.push(stage, ...lines);
+              if (ballPlan.outcome !== 'blocked' && lines.length) steps.push(...this.briefMessages([lines[0]]), this.clearBriefFor(stage), ...lines.slice(1));
+              else steps.push(this.clearBriefFor(stage), ...lines);
             } else steps.push(...lines);
             if (event.type === 'rpg' && event.args[0] === 'ball' && event.args[1] === 'p1' && event.args[4] === 'caught') {
               const op = this._psOp;
@@ -1349,18 +1360,43 @@ const { developmentCapabilities } = RuleConfig;
       if (c.isCurrent()) this.enqueueMessages(steps);
     });
   };
-  /** Ordinary battle text owns its typing/one-second dwell, independently of menus and modal author pages. */
+  P.briefMessages = function (lines: string[]): BattleScenePresentation[] {
+    const c = sceneController(this);
+    return PSFlow.fast ? lines : lines.flatMap(line => this._log.textPages(line).map((page: string[]) =>
+      createBriefMessageMZ(G, this, page.join('\n'),
+        () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => PSFlow.fast)));
+  };
+  P.clearBriefFor = function (step: Exclude<BattleScenePresentation, string>) {
+    return { kind: 'visual', advance: (now: number) => {
+      this._residentBrief?.clearBrief(); // clear only when this animation actually runs, never while planning it
+      return step.advance(now);
+    }, cancel: () => step.cancel() };
+  };
+  P.retireBrief = function () {
+    const resident = this._residentBrief, tail = this._briefTail;
+    this._briefTail = null;
+    resident?.cancel(); if (tail !== resident) tail?.cancel();
+  };
+  P.briefMessageState = function () { return this._residentBrief?.snapshot() ?? null; };
+  /** Every owned text entry passes the previous brief's replacement gate; arbitrary animations do not. */
   P.enqueueMessages = function (steps: BattleScenePresentation[]) {
     const c = sceneController(this);
-    c.enqueue(steps.map(step => typeof step === 'string' && !PSFlow.fast
-      ? createOrdinaryMessageMZ(G, this, step,
-        () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this)
-      : step)); // Explicit test-only fast mode retains its existing no-pacing contract.
+    const queued: BattleScenePresentation[] = [];
+    for (const raw of steps) {
+      const step = typeof raw === 'string' && !PSFlow.fast
+        ? createOrdinaryMessageMZ(G, this, raw, () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this) : raw;
+      if (typeof step === 'string' || isMessageStepMZ(step)) {
+        if (this._briefTail) queued.push(this._briefTail.beforeNextMessage());
+        this._briefTail = step instanceof BriefMessageStep ? step : null;
+      }
+      queued.push(step);
+    }
+    c.enqueue(queued); // Explicit test-only fast strings retain their existing no-pacing contract.
   };
   P.ordinaryMessageState = function () { return this._ordinaryMessage?.snapshot() ?? null; };
   P.updateQueue = function () {
     const c = sceneController(this);
-    if (!c.isCurrent() || !PSFlow.running) { this._ballFeedback?.cancel(); this._display?.dispose(); this._pictures?.dispose(); }
+    if (!c.isCurrent() || !PSFlow.running) { this.retireBrief(); this._ballFeedback?.cancel(); this._display?.dispose(); this._pictures?.dispose(); }
     c.tick(G.Input.isTriggered('ok'), PSFlow.fast ? 0 : 24);
   };
   P.ballFeedbackState = function () { return this._ballFeedback?.snapshot() ?? null; };
@@ -1569,7 +1605,7 @@ const { developmentCapabilities } = RuleConfig;
   P.onEnd = function () {
     // A delayed callback from an old scene must not pop the current scene's global SceneManager stack.
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // bare API callers refer to the current operation
-    if (op !== PSFlow._op) { this._display?.dispose(); this._pictures?.dispose(); PSFlow.stale("finish", op); return; }
+    if (op !== PSFlow._op) { this.retireBrief(); this._display?.dispose(); this._pictures?.dispose(); PSFlow.stale("finish", op); return; }
     const c = this._controller as BattleSceneController<any> | undefined;
     if (c && !c.isCurrent()) return;
     if (!this._aborted && !this._failure && this._captureMelody?.pending()) return;
@@ -1585,7 +1621,7 @@ const { developmentCapabilities } = RuleConfig;
       }
       this._endFeedbackPages = null; this._log.pause = false;
     }
-    this._display?.dispose(); c?.dispose(); this._pictures?.dispose();
+    this.retireBrief(); this._display?.dispose(); c?.dispose(); this._pictures?.dispose();
     if (!this._aborted && !this._failure) {
       try { const outcome=PSFlow.finish(this._session, this._psOp);if(c&&!c.ownsHost())return;if(outcome?.continuationToken){this._evolutionTransferred=true;this.popScene();return;}if(outcome?.pending&&W.PSManagement){this._menu.deactivate();if(c&&!c.ownsHost())return;this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
     }
@@ -1595,6 +1631,7 @@ const { developmentCapabilities } = RuleConfig;
   P.terminate = function () {
     const c = this._controller as BattleSceneController<any> | undefined;
     this._menuCursor?.clear();
+    this.retireBrief();
     this._endFeedbackPages = null; if (this._log) this._log.pause = false;
     this._ballFeedback?.cancel();
     this._display?.dispose();
