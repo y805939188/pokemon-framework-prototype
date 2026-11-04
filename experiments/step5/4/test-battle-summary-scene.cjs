@@ -19,11 +19,12 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = suppliedContent ?? fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
   if (catalog) catalog(content.items);
+  if (integration) { assert(content.moves.Rest); content.species.Snorlax.learnset[51] = ['Rest']; }
   const trainerRecord = content.trainers?.['music-normal']?.[0];
   if (trainerRecord) trainerRecord.party = Array.from({ length: trainerMembers }, (_, i) => ({ ...trainerRecord.party[0], level: 3 + i }));
   if (shadowTag) trainerRecord.party[0].ability = 'shadowtag'; // Explicit author fixture; trapping itself is the real Gen8 engine.
@@ -32,6 +33,7 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   const state = fixture.musicNativeState(E, content, 'receiving'); state.party = state.party.slice(0, members); state.nextMemberOrdinal = String(members + 1);
   if (ghost) state.party[0] = E.speciesKey.toPersistentMember(E.memberFactory.createMember({ id: state.party[0].id, species: 'Gengar', level: 100 }, content, () => 0), content);
   if (grow) { state.party[0] = E.speciesKey.toPersistentMember(E.memberFactory.createMember({ id: state.party[0].id, species: 'Snorlax', level: 50 }, content, () => 0), content); state.party[0].exp = E.growth.minExp(content.species.Snorlax.growth, 51) - 1; }
+  if (integration) { state.party[0].moves = [{ id: 'tackle', pp: 35, maxpp: 35 }, { id: 'growl', pp: 40, maxpp: 40 }, { id: 'splash', pp: 40, maxpp: 40 }, { id: 'protect', pp: 10, maxpp: 10 }]; state.party[0].gender = 'F'; state.party[0].shiny = true; state.dex.owned.push('pidgey'); Object.assign(trainerRecord.party[0], { gender: 'M', shiny: false }); }
   if (heldItem) { state.party[0].item = heldItem; flow.developerCapabilities = { allowHeldItemSources: true, allowExperimentalHeldItemBattle: true }; }
   if (mint) state.party[0].statNature = 'Timid';
   if (hurt) state.party[0].hp -= 40;
@@ -277,4 +279,29 @@ test('legacy item targeting keeps Session-only non-Egg eligibility', async () =>
     assert.deepEqual(h.s._menu._items.map(m => m.ext), h.s._session.party.map(m => m.id));
     assert.equal(JSON.stringify(h.flow.game()), h.before);
   } finally { h.cleanup(); }
+});
+
+for (const lang of ['en', 'zh']) test(lang + ' combined public cards, full-slot learning, Egg Summary and final installation share one real battle', async () => {
+ const h = await open({ lang, members: 3, egg: true, grow: true, integration: true, trainer: true, trainerMembers: 2, fast: true }); try {
+  const s = h.s._session, lead = s.party[0].id, egg = JSON.parse(h.before).party[1].id;
+  const cards = () => h.s.statusCardState().filter(card => card.visible), player = cards().find(card => card.side === 'p1'), foe = cards().find(card => card.side === 'p2');
+  assert.equal(player.gender.kind, 'female'); assert.equal(player.shiny, true); assert.equal(foe.gender.kind, 'male'); assert.equal(foe.owned, true);
+  let installs = 0, doc = h.G.$gameSystem._psGame; Object.defineProperty(h.G.$gameSystem, '_psGame', { configurable: true, get: () => doc, set: value => { installs++; doc = value; } });
+  await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('learn-initial');
+  assert.equal(h.flow.game().party[0].level, 50); assert.equal(s.party[0].level, 51); assert.equal(installs, 0);
+  await h.frames(1); await pick(h, 'forget-move'); assert.equal(h.s._mode, 'learn'); h.s._menu.select(3); h.s.onMenuCancel(); await h.p.inMode('learn-giveup');
+  await h.frames(1); await pick(h, 'continue-learning'); assert.equal(h.s._mode, 'learn'); assert.equal(h.s._menu.index(), 3);
+  await pick(h, 3); await h.p.inMode('main'); assert.equal(s.party[0].moves[3].id, 'rest'); assert.equal(s.gw.readState('p1').find(m => m.id === lead).pp.rest, 10);
+  assert(!h.flow.app().describeIndividual(lead).member.moves.some(move => move.id === 'rest')); assert.equal(JSON.stringify(h.flow.game()), h.before);
+  await summary(h, lead); assert(text(h).some(line => line.includes('Lv.51'))); await h.p.press('right'); await h.p.press('right'); await h.p.press('right');
+  assert.equal(current(h).view.page, 3);
+  assert(text(h).some(line => /\brest\b.*10\/10 PP/i.test(line)), 'actual shared move row shows the newly learned Rest and its reset PP'); await h.p.press('left'); await h.p.press('left'); await h.p.press('left'); await h.p.press('down');
+  assert.equal(current(h).view.ids[current(h).view.cursor], egg); assert(text(h).some(line => line.includes('1/1')));
+  await h.p.press('cancel'); await h.p.inMode('party'); assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext, egg);
+  assert.equal(cards().find(card => card.side === 'p1').gender.kind, 'female'); assert.equal(cards().find(card => card.side === 'p1').shiny, true);
+  assert.equal(installs, 0); assert.equal(JSON.stringify(h.flow.game()), h.before); assert.deepEqual(h.managementCalls(), { beginManagement: 0, manage: 0 });
+  h.s.onMenuCancel(); await h.p.inMode('main'); await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('end');
+  assert.equal(installs, 0); await h.frames(1); h.s.onMenuOk(); await h.frames(3); assert.equal(h.flow.lastOutcome.commit, 'applied'); assert.equal(installs, 1);
+  assert.equal(h.flow.game().party[0].level, 51); assert(h.flow.game().party[0].moves.some(move => move.id === 'rest')); const after = JSON.stringify(h.flow.game()); h.s.onEnd(); assert.equal(installs, 1); assert.equal(JSON.stringify(h.flow.game()), after);
+ } finally { h.cleanup(); }
 });
