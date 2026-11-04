@@ -13,6 +13,7 @@ import type { BattleScenePresentation } from "./battleflow/controller";
 import { BattleDisplayPlayback } from "./battleflow/display";
 import type { BattleDisplayCard } from "./battleflow/display";
 import { BattleMenuCursor, gridCursor } from "./battleflow/menu";
+import { createMoveSelectionWindow } from "./progression/move-selection-window";
 import { moveChoice } from "./battleflow/move-choice";
 import { battlebackContext, createBattlebackMZ } from "./battleflow/battleback-mz";
 import { createBattlePicturesMZ } from "./battleflow/picture-mz";
@@ -1229,6 +1230,7 @@ const { developmentCapabilities } = RuleConfig;
     this._status = new (Window_PSText as any)(new G.Rectangle(0, 0, w, 120));
     this._log = new (Window_PSText as any)(new G.Rectangle(0, 120, w, 300));
     this._menu = new (Window_PSMenu as any)(new G.Rectangle(0, 420, w, h - 420));
+    this._commandMenu = this._menu; this._learningMenu = null;
     for (const win of [this._status, this._log, this._menu]) { win.backOpacity = 96; this.addWindow(win); }
     this._menu.setHandler("ok", this.onMenuOk.bind(this));
     this._menu.setHandler("cancel", this.onMenuCancel.bind(this));
@@ -1565,6 +1567,8 @@ const { developmentCapabilities } = RuleConfig;
     const cur = PSFlow.perf.cur;
     if (cur && cur.firstMenuMs === undefined) { const ms = Math.round((performance.now() - cur.t0) * 10) / 10; if (c.isCurrent() && PSFlow.perf.cur === cur) cur.firstMenuMs = ms; }
     if (!c.isCurrent()) return;
+    const menu = mode === 'learn' && this._learningMenu ? this._learningMenu : this._commandMenu ?? this._menu;
+    if (this._menu !== menu) { this._menu.deactivate(); this._menu.hide(); this._menu = menu; }
     this._menu._phase = mode;
     this._menu.setItems(items);
     if (c.isCurrent() && this._menuCursor && (mode === 'main' || mode === 'moves')) {
@@ -1835,11 +1839,30 @@ const { developmentCapabilities } = RuleConfig;
     }, 'learn');
   };
   P.showLearn = function (selected = 0) {
+    const c = sceneController(this), p = this._session.pendingLearn;
+    if (!c.isCurrent() || !p) return;
     this._learningGiveUp = null;
-    const p = this._session.pendingLearn;
-    const m = this._session.party.find((x: any) => x.id === p.memberId);
-    this.show("learn", [...m.moves.map((mv: any, i: number) => ({ name: PSFlow.translator().t("ui.learn.forget", { move: mv.id }), ext: i })), { name: PSFlow.translator().t("ui.learn.skip", { move: p.move.name }), ext: null }]);
-    this._menu.select(Math.max(0, Math.min(selected, m.moves.length)));
+    const m = this._session.party.find((x: any) => x.id === p.memberId), tr = PSFlow.translator();
+    const move = (id: string) => PSFlow.app().describeLearningMove(id);
+    const name = (id: string) => tr.tOr('move.name.' + id, move(id)?.name ?? id);
+    if (!this._learningMenu) {
+      this._learningMenu = createMoveSelectionWindow(G, new G.Rectangle(0, 0, G.Graphics.boxWidth, G.Graphics.boxHeight), {
+        font: tr.font(), text: (key, params) => tr.t('progression.' + key, params), textOr: (key, fallback) => tr.tOr(key, fallback), move,
+      });
+      this._learningMenu.setHandler('ok', this.onMenuOk.bind(this));
+      this._learningMenu.setHandler('cancel', this.onMenuCancel.bind(this));
+      this.addWindow(this._learningMenu);
+    }
+    this._learningMenu.page = { kind: 'moves', title: tr.t('progression.chooseMove', { move: name(p.move.id) }), cursor: selected,
+      rows: [...m.moves.map((mv: any, i: number) => ({ key: String(i), text: name(mv.id), details: `${mv.pp}/${mv.maxpp} PP`, moveId: mv.id })),
+        { key: 'new', text: name(p.move.id), details: tr.t('progression.keepOld'), moveId: p.move.id }] };
+    this.show('learn', this._learningMenu.page.rows.map((row: any, i: number) => ({ name: row.text, ext: i < m.moves.length ? i : null })));
+    if (c.isCurrent()) this._menu.select(Math.max(0, Math.min(selected, m.moves.length)));
+  };
+  P.learningMoveState = function () {
+    const c = sceneController(this), win = this._learningMenu;
+    return c.isCurrent() && this._mode === 'learn' && win?.visible
+      ? { page: structuredClone(win.page), text: [...win.rendered] } : null;
   };
   P.askLearningGiveUp = function () {
     const c = sceneController(this), pending = this._session.pendingLearn;
@@ -2033,6 +2056,11 @@ const { developmentCapabilities } = RuleConfig;
     this._ballFeedback?.cancel();
     this._display?.dispose();
     c?.dispose(); // retire callbacks before host teardown can reenter application code
+    const learning = this._learningMenu; this._learningMenu = null;
+    if (learning) {
+      if (this._menu === learning) this._menu = this._commandMenu;
+      learning.deactivate(); learning.hide(); learning.parent?.removeChild(learning); learning.destroy({ children: true });
+    }
     this._backdrop?.dispose();
     this._pictures?.dispose();
     try { G.Scene_MenuBase.prototype.terminate.call(this); }

@@ -9,6 +9,7 @@ test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
 async function open({lang='en',levels=1,atCap=false,evBoundary=false,expOffset=-1}={}){
  const h=createVictoryDriverHost({ROOT,work:temp,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true}}),G=h.G,flow=h.w.flow,content=fixture.musicNativeContent(E,assert),oldParameters=G.PluginManager.parameters;
  G.PluginManager.parameters=function(name){const v=oldParameters.call(this,name);return name==='PS_BattleFlow'?{...v,language:lang}:v;};
+ const refresh=G.Window_Base.prototype.refresh;G.Window_Base.prototype.refresh=function(...args){const r=refresh.apply(this,args);if(this.page&&this.drawAllItems)this.drawAllItems();return r;};
  const destroyed=[],draws=[],addWindow=G.Scene_MenuBase.prototype.addWindow;G.Scene_MenuBase.prototype.addWindow=function(view){addWindow.call(this,view);view.parent={removeChild(){}};};G.Window_Base.prototype.destroy=function(){destroyed.push(this);this._destroyed=true;};const draw=G.Window_Base.prototype.drawText;G.Window_Base.prototype.drawText=function(...args){draws.push({window:this,args});return draw.apply(this,args);};let sounds=0;G.SoundManager.playOk=()=>sounds++;
  flow.setLanguage(null);flow.stateReplaced();flow._app=null;flow._content=content;flow._dex=E.dex.createDexLookup();flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=true;
  const level=atCap?100:evBoundary?30:50;content.species.Snorlax.learnset[51]=['Rest'];assert(content.moves.Rest,'real learning fixture exists');const member=E.memberFactory.createMember({id:'LEVEL-P1',species:'Snorlax',level},content,()=>0);if(evBoundary){assert.equal(member.ivs.spe,0,'fixture has IV0, not an assumed31');assert.equal(member.nature,'hardy');member.evs={...member.evs,spe:15};}const state=E.state.newGame({content,party:[E.speciesKey.toPersistentMember(member,content)],money:1000,bag:{masterball:2}});state.badges.fill(true);state.nextMemberOrdinal='2';state.party[0].moves=[{id:'tackle',pp:35,maxpp:35},{id:'growl',pp:40,maxpp:40},{id:'splash',pp:40,maxpp:40},{id:'protect',pp:10,maxpp:10}];const curve=content.species.Snorlax.growth;if(!atCap)state.party[0].exp=E.growth.minExp(curve,level+levels)+expOffset;G.$gameSystem._psGame=state;const before=JSON.stringify(flow.game());
@@ -131,5 +132,32 @@ test('compiled generic inMode driver explicitly accepts the new question before 
  const report={},choose=async({key})=>{const i=h.s._menu._items.findIndex(row=>row.ext===key);assert(i>=0);h.s._menu.select(i);h.s.onMenuOk();await h.frames(1);};
  const wait=async(condition,label)=>h.waitFor(condition,label),inMode=new Function('waitBattlePresentation','battle','frames','choose','report','frame',entryText.slice(start,stop)+'\nreturn inMode;')(wait,h.p.battle,h.frames,choose,report,h.G.Graphics.frameCount);
  await inMode('learn');assert.equal(h.s._mode,'learn');assert.deepEqual(report.learningInitialConfirmations.map(row=>row.answer),['forget-move']);assert(h.s._session.pendingLearn);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
+});
+
+
+// Shared teaching renderer, original App/Session and compiled Battle Scene.
+// Window_Command refresh/raster/input are controlled, not native pixels or fonts.
+for(const lang of ['en','zh'])test(lang+' shared learning details show all five choices and live PP, then restore normal menus and commit once',async()=>{
+ const h=await open({lang});try{await learningRoot(h);const scene=h.s,session=scene._session,normal=scene._commandMenu,win=scene._menu;
+ assert.equal(typeof scene.learningMoveState,'function','production Scene must expose its actual move detail presentation');
+ let view=scene.learningMoveState();assert(view,'shared full-window move chooser is visible');assert.notEqual(win,normal);assert.equal(normal.visible,false);assert.equal(normal.active,false);assert.equal(win.page.kind,'moves');
+ assert.deepEqual(Array.from(view.page.rows,r=>r.moveId),['tackle','growl','splash','protect','rest']);assert.deepEqual(Array.from(scene.inputState().items,r=>r.key),[0,1,2,3,null]);
+ assert.equal(view.page.rows[0].details,session.party[0].moves[0].pp+'/35 PP');assert.equal(session.party[0].moves[0].pp,34,'real KO consumed Tackle PP');assert(view.text.includes(lang==='zh'?'招式详情':'Move details'));assert(view.text.includes(lang==='zh'?'属性：Normal':'Type: Normal'));assert(view.text.includes(lang==='zh'?'威力：40':'Power: 40'));
+ // Read-only observation is detached, and selecting a row redraws its actual description.
+ view.page.rows[0].text='changed observer';view.text.length=0;assert.notEqual(scene.learningMoveState().page.rows[0].text,'changed observer');
+ const draw=[];win.contents.drawText=(...args)=>draw.push(args);win.select(4);view=scene.learningMoveState();assert.equal(view.page.cursor,4);assert.equal(view.page.rows[4].details,lang==='zh'?'保留原有招式':'Keep the old moves');
+ assert(view.text.includes(lang==='zh'?'属性：Psychic':'Type: Psychic'));assert(view.text.includes(lang==='zh'?'分类：Status':'Category: Status'));assert(draw.some(args=>String(args[0]).includes('Rest')));assert(draw.some(args=>String(args[0]).includes('Psychic')));assert(view.text.some(t=>t.includes('User sleeps')||t.includes('fully heals')),'locked Gen8 description is rendered');
+ // Drawing and pointer rectangles share exactly the same row origin/height/width.
+ const rect=win.itemRect(4),left=Math.floor(win.contents.width*.46);assert.equal(rect.x,8);assert.equal(rect.y,124+4*34);assert.equal(rect.width,left-16);assert.equal(rect.height,32);assert.equal(win.maxScrollY(),0);assert.equal(win.maxCols(),1);
+ let decisions=0,installs=0,doc=h.G.$gameSystem._psGame;const decide=session.decideLearn.bind(session);session.decideLearn=(...a)=>{decisions++;return decide(...a);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+ scene.onMenuOk();await h.p.inMode('learn-giveup');assert.equal(scene._menu,normal);assert.equal(win.visible,false);assert.equal(win.active,false);assert.equal(scene.learningMoveState(),null);assert.equal(decisions,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ await answer(h,'continue-learning');assert.equal(scene._menu,win);assert.equal(win.index(),4);assert.equal(scene.learningMoveState().page.cursor,4);assert.equal(decisions,0);win.select(3);scene.onMenuOk();await h.p.inMode('end');assert.equal(scene._menu,normal);assert.equal(win.visible,false);assert.equal(win.active,false);assert.equal(session.party[0].moves[3].id,'rest');assert.equal(session.party[0].moves[3].pp,10);assert.equal(session.gw.readState('p1')[0].pp.rest,10);assert.equal(decisions,1);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ await h.frames(1);scene.onMenuOk();await h.frames(3);assert.equal(installs,1);assert.equal(h.flow.lastOutcome.commit,'applied');scene.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
+for(const how of ['abort','replace','terminate'])test(how+' retires shared learning details without a late choice and releases its owned window once',async()=>{
+ const h=await open();try{await learningRoot(h);const scene=h.s,win=scene._menu,session=scene._session;assert.equal(typeof scene.learningMoveState,'function','real shared detail window required');assert(scene.learningMoveState());let decisions=0;const decide=session.decideLearn.bind(session);session.decideLearn=(...args)=>{decisions++;return decide(...args);};const before=JSON.stringify(session.party);
+ if(how==='abort')h.flow.abort(Error('owned detail cancellation'));else if(how==='replace')h.flow.stateReplaced();else scene.terminate();win.select(1);scene.onMenuOk();scene.onMenuCancel();await h.frames(2);assert.equal(decisions,0);assert.equal(JSON.stringify(session.party),before);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(scene.learningMoveState(),null);if(how!=='terminate')scene.terminate();assert.equal(h.destroyed.filter(w=>w===win).length,1);assert.equal(win.visible,false);assert.equal(win.active,false);assert.equal(scene._learningMenu,null);
  }finally{h.cleanup();}
 });
