@@ -1457,12 +1457,12 @@ const { developmentCapabilities } = RuleConfig;
             }
           }
         } else if (this._display && growth?.version === 1) {
-          steps.push(...this._D.message({ ...message, exp: growth.toExp - growth.fromExp, levelUps: [] }));
+          steps.push(...this.pausedMessages(this._D.message({ ...message, exp: growth.toExp - growth.fromExp, levelUps: [] })));
           for (const segment of growth.segments) {
             const animation = this._display.experience(message.member, segment); if (animation) steps.push(animation);
             if (segment.levelUp) {
               const level = this._display.growth(message.member, { toLevel: segment.levelUp.level, hp: segment.levelUp.hp, maxhp: segment.levelUp.maxhp, ratio: 0 }); if (level) steps.push(level);
-              steps.push(...this._D.message({ ...message, exp: 0, levelUps: [segment.levelUp.level] }));
+              steps.push(...this.pausedMessages(this._D.message({ ...message, exp: 0, levelUps: [segment.levelUp.level] })));
               if (segment.levelUp.stats) steps.push(createLevelStatsMZ(G, this, segment.levelUp.level, segment.levelUp.stats,
                 () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, PSFlow.translator()));
               else (this._growthDisplayDiagnostics ??= []).push({ member: message.member, level: segment.levelUp.level, reason: 'legacy-projection-without-stat-snapshots' });
@@ -1479,6 +1479,13 @@ const { developmentCapabilities } = RuleConfig;
     return PSFlow.fast ? lines : lines.flatMap(line => this._log.textPages(line).map((page: string[]) =>
       createBriefMessageMZ(G, this, page.join('\n'),
         () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => PSFlow.fast)));
+  };
+  P.pausedMessages = function (lines: string[]): BattleScenePresentation[] {
+    const c = sceneController(this);
+    return PSFlow.fast ? lines : lines.flatMap(line => this._log.textPages(line).map((page: string[]) =>
+      createPausedMessageMZ(G, this, page.join('\n'),
+        () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
+        () => this._session.finished, () => PSFlow.fast)));
   };
   P.clearBriefFor = function (step: Exclude<BattleScenePresentation, string>) {
     return { kind: 'visual', advance: (now: number) => {
