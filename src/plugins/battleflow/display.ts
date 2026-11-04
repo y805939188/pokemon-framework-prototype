@@ -177,6 +177,7 @@ export class BattleDisplayPlayback {
     const visible = card.active && card.ratio !== null;
     const tween = new ExperiencePresentation({ memberId, ...segment, visible });
     card.level = segment.level; card.ratio = segment.to;
+    delete card.experienceUnavailable; // A validated published segment supersedes initial uncertainty.
     const target = copy(this.planned); let flashAt: number | null = null;
     const local: (() => void)[] = [];
     return this.step(now => {
@@ -203,6 +204,7 @@ export class BattleDisplayPlayback {
     hpColour(display.hp, display.maxhp);
     if (!Number.isFinite(display.ratio) || display.ratio < 0 || display.ratio > 1) throw new Error('invalid published final experience');
     Object.assign(card, { level: display.toLevel, hp: display.hp, maxhp: display.maxhp, ratio: display.ratio, flash: false });
+    delete card.experienceUnavailable; // Clear only after the replacement projection has passed validation.
     return this.instant();
   }
   dispose(): void {

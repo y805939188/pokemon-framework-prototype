@@ -104,3 +104,15 @@ test('real paint cost is outside the required 200ms full-bar exposure',()=>{
  let now=0;const paints=[],p=new M([card()],{current:()=>true,paint:cards=>{now+=35;paints.push(cards[0].flash);},afterPaintNow:()=>now,cue:()=>undefined}),step=p.experience('P',{level:50,from:0,to:1});
  assert(!step.advance(0));now=9000;assert(!step.advance(now));assert.equal(now,9035);now=9234;assert(!step.advance(now));assert.equal(p.snapshot()[0].flash,true);now=9235;assert(step.advance(now));assert.equal(p.snapshot()[0].flash,false);assert.deepEqual(paints,[false,true,true,false]);
 });
+
+for (const kind of ['experience','growth']) test(kind+' valid public replacement clears initial EXP uncertainty only when painted',()=>{
+ for(const ratio of [0,.25]){
+  const initial={...card(),ratio:null,experienceUnavailable:'outside-level-interval'},f=fixture([initial]);f.p.initial().advance(0);
+  const status=f.p.event(event('-status','p1a: P','par'))[0];status.advance(1);assert.equal(f.p.snapshot()[0].ratio,null);assert.equal(f.p.snapshot()[0].experienceUnavailable,'outside-level-interval');
+  assert.throws(()=>kind==='experience'?f.p.experience('P',{level:50,from:0,to:2}):f.p.growth('P',{toLevel:50,hp:100,maxhp:100,ratio:2}));
+  assert.equal(f.p.snapshot()[0].experienceUnavailable,'outside-level-interval');
+  const step=kind==='experience'?f.p.experience('P',{level:50,from:ratio,to:ratio}):f.p.growth('P',{toLevel:50,hp:100,maxhp:100,ratio});
+  assert.equal(f.p.snapshot()[0].ratio,null,'planning does not paint early');assert.equal(f.p.snapshot()[0].experienceUnavailable,'outside-level-interval');
+  assert(step.advance(2));assert.equal(f.p.snapshot()[0].ratio,ratio);assert.equal(f.p.snapshot()[0].experienceUnavailable,undefined);assert.deepEqual(f.cue,[]);
+ }
+});
