@@ -12,7 +12,6 @@ import { BattleSceneController } from "./battleflow/controller";
 import type { BattleScenePresentation } from "./battleflow/controller";
 import { BattleDisplayPlayback } from "./battleflow/display";
 import type { BattleDisplayCard } from "./battleflow/display";
-import { hpColour } from "./battleflow/visual-timing";
 import { BattleMenuCursor, gridCursor } from "./battleflow/menu";
 import { moveChoice } from "./battleflow/move-choice";
 import { battlebackContext, createBattlebackMZ } from "./battleflow/battleback-mz";
@@ -34,6 +33,7 @@ import { BattleBagSelection } from './battleflow/battle-bag';
 import type { BattleBagRequest } from './battleflow/battle-bag';
 import { catalogOf, itemForBattleId } from '../framework/rules/item-catalog';
 import { BALLS } from '../framework/rules/items';
+import { projectStatusCard } from './battleflow/status-card';
 import { installPrebattleHost } from './battleflow/prebattle-host';
 const { developmentCapabilities } = RuleConfig;
 
@@ -980,24 +980,35 @@ const { developmentCapabilities } = RuleConfig;
   };
   Window_PSText.prototype.setLines = function (lines: string[]) { this._lines = lines.slice(-this._max); this.refresh(); };
   Window_PSText.prototype.add = function (line: string) { this._lines.push(line); this._lines = this._lines.slice(-this._max); this.refresh(); };
+  Window_PSText.prototype.statusCardViews = function () {
+    const tr = PSFlow.translator();
+    const labels = Object.fromEntries(['psn', 'tox', 'brn', 'par', 'slp', 'frz', 'unknown'].map(key => [key, tr.t('ui.card.' + key)])) as Parameters<typeof projectStatusCard>[2];
+    // This consumer owns drawing only. No Session/private member metadata is a public appearance source.
+    return (this._d2Cards ?? []).map((card: BattleDisplayCard) => projectStatusCard(card, null, labels));
+  };
   Window_PSText.prototype.refresh = function () {
     this.contents.clear();
     if (this._d2Cards) {
       const width = this.innerWidth / 2 - 12;
+      const cards: ReturnType<typeof projectStatusCard>[] = this.statusCardViews(), tr = PSFlow.translator();
       for (const [index, side] of ['p1', 'p2'].entries()) {
-        const card = this._d2Cards.find((member: BattleDisplayCard) => member.side === side && member.active);
-        if (!card || card.boxOpacity === 0) continue;
+        const card = cards.find((member: ReturnType<typeof projectStatusCard>) => member.side === side && member.visible);
+        if (!card) continue;
         const previousOpacity = this.contents.paintOpacity;
-        this.contents.paintOpacity = Math.round((card.boxOpacity ?? 1) * 255);
-        const x = index * (this.innerWidth / 2), colour = hpColour(card.hp, card.maxhp);
-        this.drawText(this.fitText(`${card.name}  Lv.${card.level}`, width), x, 0, width);
-        this.drawText(this.fitText(card.status || '', width / 2), x, 24, width / 2);
-        if (side === 'p1') this.drawText(`${Math.ceil(card.hp)} / ${card.maxhp}`, x + width / 2, 24, width / 2, 'right');
+        this.contents.paintOpacity = Math.round(card.opacity * 255);
+        const x = index * (this.innerWidth / 2);
+        this.drawText(this.fitText(tr.t('ui.card.level', { name: card.name, level: card.level }), width), x, 0, width);
+        if (card.condition.label) {
+          const colour = { psn: '#a966b3', tox: '#6c3d83', brn: '#b74c42', par: '#8c721e', slp: '#596681', frz: '#397d99', unknown: '#59616b' }[card.condition.kind as Exclude<typeof card.condition.kind, 'none'>];
+          this.contents.fillRect?.(x, 24, width / 2, 20, colour);
+          this.drawText(this.fitText(card.condition.label, width / 2), x, 24, width / 2);
+        }
+        if (card.hp.numbers) this.drawText(`${card.hp.numbers.current} / ${card.hp.numbers.total}`, x + width / 2, 24, width / 2, 'right');
         this.contents.fillRect?.(x, 52, width, 8, '#343b43');
-        this.contents.fillRect?.(x, 52, width * card.hp / card.maxhp, 8, { red: '#d65353', yellow: '#dec253', green: '#55b77d' }[colour]);
-        if (side === 'p1' && card.ratio !== null) {
+        this.contents.fillRect?.(x, 52, width * card.hp.ratio, 8, { red: '#d65353', yellow: '#dec253', green: '#55b77d' }[card.hp.colour]);
+        if (card.experience) {
           this.contents.fillRect?.(x, 72, width, 6, '#343b43');
-          this.contents.fillRect?.(x, 72, width * card.ratio, 6, card.flash ? '#ffffff' : '#589eda');
+          this.contents.fillRect?.(x, 72, width * card.experience.ratio, 6, card.experience.flash ? '#ffffff' : '#589eda');
         }
         this.contents.paintOpacity = previousOpacity;
       }
@@ -1464,6 +1475,10 @@ const { developmentCapabilities } = RuleConfig;
       faintAudio: (this._faintAudio || []).map((row: any) => ({ ...row })) };
   };
   P.levelStatsState = function () { const page = this._levelStatsWindow?._levelStatsPage; return page ? { ...page, rows: page.rows.map((row: any) => ({ ...row })) } : null; };
+  P.statusCardState = function () {
+    const c = sceneController(this);
+    return c.isCurrent() && PSFlow.running && G.SceneManager._scene === this ? this._status?.statusCardViews?.() ?? [] : [];
+  };
   P.pictureState = function () { return this._pictures?.snapshot() ?? null; };
   P.captureMelodyState = function () { return this._captureMelody?.snapshot() ?? null; };
   P.showMain = function () {

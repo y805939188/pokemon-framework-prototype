@@ -64,3 +64,5 @@
 [Scope and remaining consumers](5.4-parallel-core-brief-integration.md): integrates the three reviewed pure cores and the first real brief Scene consumer. Independent integration review, exact CI and native presentation remain pending; battle-bag and status-card production consumers remain open. Historical failures, GC WARN and U51 UNKNOWN are retained.
 
 2026-11-04 后继独立候选：[战斗背包首批 Scene 消费者](5.4-battle-bag-scene.md)接入真实 Session 数量／catalog、口袋、使用／取消、目标返回及实际道具／球提交；资格与实际登记分离，保留中英、owner 取消与退款。仅作者本地回归，独立复核／精确 CI／新宿主未验；淡入淡出、完整目标效果、状态框及完整 D2 仍 OPEN。基线 93f 的独立整合复核已限域通过，但其批准后推送被 GitHub 服务端错误拒绝，尚无该 SHA 的 CI，不将 README 历史候选表述当发布记录。
+
+2026-11-04 后继独立候选：[状态框绘制及状态本地化](5.4-status-card-view.md)在背包96a之后复用已审投影接入真实窗口；六状态／未知徽标与两侧HP／EXP／透明度按显示值绘制。背包代码／受控Scene已独立限域接受，CI和NW仍OPEN。新绘制候选未独审；公开外观／伪装、性别／闪光／owned来源及完整状态框仍OPEN。93f新推送在启动前再次遭自动审批拒绝，已挂起，不绕过、不阻塞本地独立工作。
