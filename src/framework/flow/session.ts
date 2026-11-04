@@ -160,7 +160,8 @@ export class SessionBrokenError extends Error {
 
 export class BattleSession {
   /** Fixed for this session; not saved, checkpointed, or part of the result protocol. */
-  constructor(readonly canSwitch = true) {}
+  readonly canSwitch: boolean;
+  constructor(canSwitch = true) { this.canSwitch = canSwitch; }
   content!: Content;
   rules!: G.ExpRules;
   battleId!: string;
