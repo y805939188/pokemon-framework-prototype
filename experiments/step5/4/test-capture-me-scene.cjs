@@ -2,14 +2,14 @@
 // Actual compiled Scene and selected installed MZ audio bodies; renderer,
 // decoder/source, clock and application persistence remain controlled ports.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
-const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs');let temp,createHost,Step,planOf,config;
+const ROOT=path.resolve(__dirname,'../../..'),PLUGIN_ROOT=process.env.PF_CAPTURE_SYNC_PRODUCT_ROOT||ROOT,E=require('../../../js/engine/build/production.cjs');let temp,createHost,Step,planOf,config;
 const flush=async()=>{for(let i=0;i<16;i++)await Promise.resolve();};
 test.before(()=>{
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-capture-me-scene-'));const root=path.join(ROOT,'src/plugins/battleflow');
  const cfg={compilerOptions:{target:'ES2022',module:'CommonJS',strict:true,types:[],lib:['ES2022'],rootDir:root,outDir:path.join(temp,'pure'),noEmitOnError:true},files:[path.join(root,'capture-me-scene.ts')]};fs.writeFileSync(path.join(temp,'tsconfig.json'),JSON.stringify(cfg));
  const typed=spawnSync('pnpm',['--dir','src','exec','tsc','-p',path.join(temp,'tsconfig.json')],{cwd:ROOT,encoding:'utf8'});assert.equal(typed.status,0,typed.stdout+typed.stderr);
  Step=require(path.join(temp,'pure/capture-me-scene.js')).CaptureMelodySceneStep;planOf=require(path.join(temp,'pure/capture-melody.js')).captureMelodyPlan;config=require(path.join(temp,'pure/battle-music.js')).battleMusicConfig;
- const built={};for(const name of ['PS_BattleFlow','PS_SaveState']){const r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',path.join(temp,name)],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);built[name]=fs.readFileSync(path.join(temp,name,name+'.js'),'utf8');}
+ const built={};for(const name of ['PS_BattleFlow','PS_SaveState']){const r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',path.join(temp,name)],{cwd:PLUGIN_ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);built[name]=fs.readFileSync(path.join(temp,name,name+'.js'),'utf8');}
  const mutation=process.env.PF_CAPTURE_SCENE_MUTATION;
  if(mutation){const variants={duration:['var CAPTURE_ME_WAIT_MS = 3500;','var CAPTURE_ME_WAIT_MS = 0;',1],stop:['const view = this.lease.snapshot();','if (this.wait.advance(now).stopRequired) { this.wait.acknowledgeStop(); this.completed = true; return true; } const view = this.lease.snapshot();',1],cancel:['?.captureMelody?.cancel();','?.captureMelody;',2],end:['if (!this._aborted && !this._failure && this._captureMelody?.pending()) return;','if (false) return;',1]},row=variants[mutation];assert(row,'known explicit compiled-Scene mutation');const before=built.PS_BattleFlow;assert.equal(before.split(row[0]).length-1,row[2],'exact compiled gate occurrences');built.PS_BattleFlow=before.split(row[0]).join(row[1]);const hash=s=>require('node:crypto').createHash('sha256').update(s).digest('hex');console.log('compiled Scene mutation',mutation,hash(before),hash(built.PS_BattleFlow));}
  const parse=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]})).parseAst;
@@ -76,4 +76,30 @@ test('replacement operation and its ME survive all old Scene callbacks and termi
 });
 test('real Session capture messages reach the compiled Scene in Gotcha-ME-growth order',async()=>{
  const{BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs'));const game=F.makeGame();const session=await BattleSession.create({game,battleId:'capture-scene-real',content:F.content,seed:[1,2,3,4],foe:{kind:'wild',team:[F.foeMember('F-1','Pidgey',5)]}});const f=createHost(),s=await f.ready(false,session);try{const result=await session.throwBall('masterball');assert(result.ok);const growth=result.messages.find(m=>m.kind==='growth');assert(growth,'actual captured-target growth message required');const expected=s._D.message(growth)[0],start=f.caught(result.messages);assert(!f.lines.some(x=>x.line===expected));assert(f.flow.operationPending());f.tick(start+3500);for(let i=0;i<100&&!f.lines.some(x=>x.line===expected);i++)f.tick(start+3500+i*100);assert(f.lines.some(x=>x.line===expected));assert(s.captureMelodyState().completed);}finally{f.cleanup();}
+});
+async function normalCapture(f,s,messages,input=false){
+ f.flow.fast=false;f.G.Input.isTriggered=()=>input;const observed={full:null,start:null,end:null,visibleFrames:0},before=f.time;
+ s.pushMessages(messages??[{kind:'events',events:[{type:'rpg',args:['ball','p1','masterball','F-1','caught']}]},{kind:'end',reason:'caught',outcome:{target:'F-1',ball:'masterball'},winner:null}]);
+ for(let i=0;i<900;i++){
+  f.tick(before+(i+1)*1000/60);
+  const full=f.lines.find(r=>r.line==='ball.caught');if(full&&observed.full===null)observed.full=full.time;
+  const cap=s.captureMelodyState();if(cap?.started&&observed.start===null){observed.start=f.time;assert(observed.full!==null,'Gotcha must fully paint before ME');assert(f.time-observed.full<=1000/60+0.01,'ME starts the update after full Gotcha, without an extra one-second dwell');}
+  if(cap?.started&&!cap.completed){assert(s._log._lines.includes('ball.caught'),'Gotcha stays visible throughout the capture melody');assert.equal(s.ordinaryMessageState()?.phase,'full');observed.visibleFrames++;s.onEnd();assert.equal(f.finishes,0,'cannot finish during the capture block');}
+  if(cap?.completed){observed.end=f.time;break;}
+ }
+ assert(observed.start!==null&&observed.end!==null,'normal capture block completes');assert(observed.end-observed.start>=3500,'mandatory3500ms unchanged');assert(observed.visibleFrames>200);return observed;
+}
+for(const input of[false,true])test('production pacing '+(input?'with repeated advance':'without input')+' synchronizes full Gotcha and keeps it visible for the mandatory ME block',async()=>{
+ const f=createHost(),s=await f.ready();try{const r=await normalCapture(f,s,undefined,input);assert.equal(f.me().length,1);assert.equal(f.me()[0].plays.length,1);assert(s.captureMelodyState().completed);assert.equal(f.app.saveBlocked,true);assert.equal(f.finishes,0);assert(r.end-r.start>=3500);}finally{f.cleanup();}
+});
+test('real Session Master Ball success uses the normal full-text synchronization before growth without releasing the operation early',async()=>{
+ const{BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs'));const game=F.makeGame(),session=await BattleSession.create({game,battleId:'normal-capture-sync',content:F.content,seed:[1,2,3,4],foe:{kind:'wild',team:[F.foeMember('F-1','Pidgey',5)]}}),f=createHost(),s=await f.ready(false,session);
+ try{const result=await session.throwBall('masterball');assert(result.ok);const growth=result.messages.find(m=>m.kind==='growth');assert(growth);const text=s._D.message(growth)[0];await normalCapture(f,s,result.messages);assert(!f.lines.some(r=>r.line===text),'growth must not precede ME completion');assert(f.flow.operationPending());for(let i=0;i<250&&!f.lines.some(r=>r.line===text);i++)f.tick(f.time+1000/60);assert(f.lines.some(r=>r.line===text),'ordinary growth continues after the block');assert.equal(f.finishes,0);}finally{f.cleanup();}
+});
+test('missing capture media still preserves full Gotcha throughout the unchanged normal wait',async()=>{
+ const f=createHost({missing:true}),s=await f.ready();try{await normalCapture(f,s);assert.equal(f.me().length,0);assert(s.captureMelodyState().completed);assert.equal(s.captureMelodyState().lease.status,'missing');}finally{f.cleanup();}
+});
+test('normal capture text and stage retire together after an owner abort and old callbacks cannot paint or finish',async()=>{
+ const f=createHost(),s=await f.ready();f.flow.fast=false;f.G.Input.isTriggered=()=>false;s.pushMessages([{kind:'events',events:[{type:'rpg',args:['ball','p1','masterball','F-1','caught']}]}]);
+ for(let i=0;i<600&&!s.captureMelodyState()?.started;i++)f.tick(f.time+1000/60);assert(s.captureMelodyState()?.started);const owned=s._queue[0];f.flow.abort(Error('normal capture cancelled'));f.tick(f.time+1000/60);assert(s.captureMelodyState().cancelled);assert.equal(s.ordinaryMessageState(),null);const lines=JSON.stringify(s._log._lines);owned.advance(f.time+9000);assert.equal(JSON.stringify(s._log._lines),lines);assert.equal(f.finishes,0);s.terminate();
 });

@@ -8,18 +8,20 @@ test.before(async()=>{
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-move-menu-'));plugins={};
  for(const name of ['PS_BattleFlow','PS_SaveState','PS_Evolution','PS_BattleFlowTest']){
   const out=path.join(temp,name),r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);
-  const code=fs.readFileSync(path.join(out,name+'.js'),'utf8');if(name==='PS_BattleFlowTest')entryText=code;else plugins[name]=code;
+  let code=fs.readFileSync(path.join(out,name+'.js'),'utf8');
+  if(name==='PS_BattleFlow'&&process.env.PF_MOVE_CURSOR_TEST_MUTATION){assert.equal(process.env.PF_MOVE_CURSOR_TEST_MUTATION,'forget-confirm');const marker='this._menuCursor?.remember(this._mode, this._menu.index(), this._menu._items.length);';assert.equal(code.split(marker).length,2,'one actual compiled confirm memory');code=code.replace(marker,'void 0;');}
+  if(name==='PS_BattleFlowTest')entryText=code;else plugins[name]=code;
  }
  const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));
  await vite.build({configFile:false,root:ROOT,logLevel:'error',build:{outDir:path.join(temp,'fixture'),emptyOutDir:false,minify:false,lib:{entry:path.join(ROOT,'src/plugins/flowtest/music-native-fixture.ts'),formats:['cjs'],fileName:()=> 'entry.cjs'}}});
  fixture=require(path.join(temp,'fixture/entry.cjs'));
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
-async function open({lang='en',trainer=false}={}){
+async function open({lang='en',trainer=false,moves:chosenMoves}={}){
  const h=createVictoryDriverHost({ROOT,work:temp,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true}}),G=h.G,flow=h.w.flow,content=fixture.musicNativeContent(E,assert),parameters=G.PluginManager.parameters;
  G.PluginManager.parameters=function(name){const p=parameters.call(this,name);return name==='PS_BattleFlow'?{...p,language:lang}:p;};
  flow.setLanguage(null);flow.stateReplaced();flow._app=null;flow._content=content;flow._dex=E.dex.createDexLookup();flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=true;
- const state=fixture.musicNativeState(E,content);state.party[0].moves=[{id:'tackle',pp:0,maxpp:35},{id:'growl',pp:40,maxpp:40}];G.$gameSystem._psGame=state;
+ const state=fixture.musicNativeState(E,content);state.party[0].moves=chosenMoves??[{id:'tackle',pp:0,maxpp:35},{id:'growl',pp:40,maxpp:40}];G.$gameSystem._psGame=state;
  const before=JSON.stringify(flow.game());await h.p.toMapId(5,8,9);
  flow.openBattle({kind:trainer?'trainer':'wild',...(trainer?{trainer:{id:'music-normal',version:1}}:{foes:[{species:'Pidgey',level:3}]}),battleId:'move-menu-'+path.basename(h.w.root),seq:1,canLose:true});
  await h.p.inMode('main');const s=h.p.battle(),lines=[],add=s._log.add;s._log.add=function(line){lines.push(line);return add.call(this,line);};
@@ -76,4 +78,11 @@ test('closing the operation while a refused choice resolves cannot reopen its ol
   choose(h,1);await h.waitFor(()=>rejected,'engine refused before host close');h.flow.abort(Error('normal cancelled action'));
   await h.frames(2);release();await h.frames(4);assert.notEqual(h.s._mode,'moves');assert.equal(h.s.inputState().ready,h.s._mode==='end');assert.equal(JSON.stringify(h.flow.game()),h.before);
  }finally{release?.();h.cleanup();}
+});
+test('a real fourth-slot PP0 refusal restores that slot, including BACK and reentry, without consuming a choice twice',async()=>{
+ const h=await open({moves:[{id:'growl',pp:40,maxpp:40},{id:'protect',pp:10,maxpp:10},{id:'splash',pp:40,maxpp:40},{id:'tackle',pp:0,maxpp:35}]});try{
+  await moves(h);h.s._menu.cursorRight();h.s._menu.cursorDown();assert.equal(h.s._menu.index(),3);const before=snapshot(h),session=h.s._session,original=session.chooseMove,calls=[];session.chooseMove=function(...args){calls.push(args[0]);return original.apply(this,args);};
+  h.s.onMenuOk();await h.waitFor(()=>h.s.inputState().ready&&!h.s._busy,'fourth-slot refusal finished');assert.equal(h.s._mode,'moves');assert.equal(h.s._menu.index(),3,'rejected non-first slot is restored');assert.deepEqual(calls,[4]);assert.equal(snapshot(h),before);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  h.s.onMenuCancel();choose(h,'fight');assert.equal(h.s._menu.index(),3);assert.deepEqual(calls,[4]);
+ }finally{h.cleanup();}
 });

@@ -27,7 +27,7 @@ import { BallScenePresentation, simpleBallPlan } from './battleflow/ball-scene';
 import { createBallPortsMZ } from './battleflow/ball-mz';
 import { prebattlePlan } from './battleflow/prebattle';
 import { createLevelStatsMZ } from "./battleflow/level-stats-mz";
-import { createOrdinaryMessageMZ } from "./battleflow/ordinary-message-mz";
+import { createOrdinaryMessageMZ, createSynchronizedMessageMZ } from "./battleflow/ordinary-message-mz";
 import { installPrebattleHost } from './battleflow/prebattle-host';
 const { developmentCapabilities } = RuleConfig;
 
@@ -1304,7 +1304,14 @@ const { developmentCapabilities } = RuleConfig;
                 stage = new CaptureMelodySceneStep(plan, { current,
                   request: (track, startedAt) => port.request(track, startedAt) });
                 this._captureMelody = op.captureMelody = stage;
-                steps.push(stage); // next tick, after Gotcha is appended; never matched against localized text
+                const tail = steps[steps.length - 1];
+                if (!PSFlow.fast && lines.length && typeof tail === 'string' && tail === lines[lines.length - 1]) {
+                  // Full Gotcha text starts the capture block on the next update;
+                  // keep it visible throughout ME instead of waiting/clearing it first.
+                  steps.pop();
+                  steps.push(createSynchronizedMessageMZ(G, this, tail,
+                    () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, stage));
+                } else steps.push(stage); // Existing test-only fast string path.
               }
             }
           }

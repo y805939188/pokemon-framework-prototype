@@ -1,4 +1,5 @@
 import { OrdinaryMessageStep } from './ordinary-message';
+import type { BattleSceneVisualStep } from './controller';
 
 /** Uses the existing measured text window; never ellipsizes a battle message. */
 export function createOrdinaryMessageMZ(G: any, scene: any, text: string, current: () => boolean): OrdinaryMessageStep {
@@ -27,4 +28,35 @@ export function createOrdinaryMessageMZ(G: any, scene: any, text: string, curren
     },
   });
   return step;
+}
+
+/** A full-text synchronization block: start the dependent presentation on the
+ * following update, retaining the completed message until that block returns.
+ * Currently used only for Gotcha + the mandatory 3500ms capture melody.
+ */
+export function createSynchronizedMessageMZ(G: any, scene: any, text: string, current: () => boolean,
+  following: BattleSceneVisualStep): BattleSceneVisualStep {
+  const message = createOrdinaryMessageMZ(G, scene, text, current);
+  let retired = false, update = -1;
+  const cancel = () => {
+    if (retired) return;
+    retired = true;
+    try { following.cancel(); } finally { message.cancel(); }
+  };
+  return { kind: 'visual', advance(now) {
+    if (retired) return true;
+    if (!current()) { cancel(); return true; }
+    if (update === scene._pictureUpdate) return false;
+    update = scene._pictureUpdate;
+    if (message.snapshot().phase !== 'full') {
+      message.advance(now);
+      if (!current()) { cancel(); return true; }
+      return false;
+    }
+    // The same update that paints the full message never starts its block.
+    if (!following.advance(now)) return false;
+    retired = true;
+    message.cancel();
+    return true;
+  }, cancel };
 }
