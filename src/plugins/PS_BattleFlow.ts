@@ -1215,7 +1215,7 @@ const { developmentCapabilities } = RuleConfig;
     this._psOp = PSFlow._op; // the operation this scene belongs to: its finish/abort never reach a later one
     sceneController(this, true);
     this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._faintAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
-    this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false; this._endFeedbackPages = null; this._endFeedbackPage = 0; this._endPageShownUpdate = -1; this._trainerOpeningQueued = false; this._retryMoveMenu = false;
+    this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false; this._endFeedbackPages = null; this._endFeedbackPage = 0; this._endPageShownUpdate = -1; this._trainerOpeningQueued = false; this._retryMoveMenu = false; this._automaticMove = null;
     this._residentBrief = null; this._briefTail = null;
     this._wildOpeningQueued = false;
     this._battleBag = null; this._bagHidden = null; this._bagRetry = false; this._trainerDispatchQueued = false;
@@ -1529,8 +1529,8 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.ballFeedbackState = function () { return this._ballFeedback?.snapshot() ?? null; };
   P.afterMessages = function () {
-    const s = this._session, retryMoves = this._retryMoveMenu, retryParty = this._retryPartySelection;
-    this._retryMoveMenu = false; this._retryPartySelection = null;
+    const s = this._session, retryMoves = this._retryMoveMenu, retryParty = this._retryPartySelection, automaticMove = this._automaticMove;
+    this._retryMoveMenu = false; this._retryPartySelection = null; this._automaticMove = null;
     if (this._failure) { this.showEnd(true); return; }
     if (s.finished) { this.showEnd(false); return; }
     if (s.pendingLearn && this._learningGiveUp?.pending === s.pendingLearn) {
@@ -1553,6 +1553,11 @@ const { developmentCapabilities } = RuleConfig;
     this._learningInitial = null;
     const req = s.currentRequest();
     if (req && req.forceSwitch) { this.showParty("forced", retryParty?.memberId ?? null); return; }
+    if (automaticMove && automaticMove.session === s && automaticMove.request === JSON.stringify(req)) {
+      // The notice is a visual step only. Submit after it leaves the queue, through the normal action owner.
+      if (sceneController(this).show('automatic-move')) this.act(() => s.chooseMove(1), 'move');
+      return;
+    }
     if (this._bagFadeReturn) { this._bagFadeReturn = false; this.showBattleBagView(); return; }
     if (this._bagRetry && this._battleBag?.view().kind !== 'closed') { this._bagRetry = false; this.showBattleBagView(); return; }
     if (retryMoves && req?.active?.[0]?.moves?.length) { this.showMoves(); return; }
@@ -1621,6 +1626,19 @@ const { developmentCapabilities } = RuleConfig;
     const req = this._session.currentRequest();
     const moves = req.active[0].moves;
     const tr = PSFlow.translator(), checked = PSFlow.content().meta?.showdownSourceChecked;
+    // Pinned Gen8 Showdown publishes this PP-less fallback only when no move can be chosen.
+    // A normal one-move request (including an authored Struggle with PP) still opens the menu.
+    if (moves.length === 1 && moves[0].id === 'struggle' && moves[0].pp === undefined && !moves[0].disabled) {
+      const c = sceneController(this), s = this._session, id = s.gw.activeId('p1');
+      if (!c.isCurrent()) return;
+      this._automaticMove = { session: s, request: JSON.stringify(req) };
+      const text = tr.t('ui.moves.none-left', { name: this._names[id] ?? id });
+      c.enqueue(PSFlow.fast ? [text] : this._log.textPages(text).map((page: string[]) =>
+        createPausedMessageMZ(G, this, page.join('\n'),
+          () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
+          () => s.finished, () => PSFlow.fast)));
+      return;
+    }
     this.show("moves", moves.map((m: any, i: number) => ({
       name: m.pp === undefined ? m.move : PSFlow.translator().t("ui.moves.line", { move: m.move, pp: m.pp, maxpp: m.maxpp }),
       moveView: (() => {
@@ -2074,7 +2092,7 @@ const { developmentCapabilities } = RuleConfig;
     this.popScene();
   };
   P.terminate = function () {
-    this._learningGiveUp = null; this._learningInitial = null;
+    this._learningGiveUp = null; this._learningInitial = null; this._automaticMove = null;
     const c = this._controller as BattleSceneController<any> | undefined;
     this._menuCursor?.clear();
     retireBattleBag(this);
