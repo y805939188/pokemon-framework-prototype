@@ -6,13 +6,13 @@ const {createVictoryDriverHost}=require('./victory-music-driver-host.cjs');
 const ROOT=path.resolve(process.env.PF_LEVEL_STATS_ROOT||path.resolve(__dirname,'../../..')),E=require(path.join(ROOT,'js/engine/build/production.cjs')),PLAN=require(path.join(ROOT,'experiments/step5/4/victory-music-native-plan.json'));let temp,plugins,entryText,fixture;
 test.before(async()=>{temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-level-scene-'));plugins={};for(const n of ['PS_BattleFlow','PS_SaveState','PS_Evolution','PS_BattleFlowTest']){const out=path.join(temp,n),r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,env:{...process.env,RR_PLUGIN:n},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);const code=fs.readFileSync(path.join(out,n+'.js'),'utf8');if(n==='PS_BattleFlowTest')entryText=code;else plugins[n]=n==='PS_BattleFlow'&&process.env.PF_LEARNING_CANCEL_TEST_PLUGIN?fs.readFileSync(process.env.PF_LEARNING_CANCEL_TEST_PLUGIN,'utf8'):code;}const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));await vite.build({configFile:false,root:ROOT,logLevel:'error',build:{outDir:path.join(temp,'fixture'),minify:false,lib:{entry:path.join(ROOT,'src/plugins/flowtest/music-native-fixture.ts'),formats:['cjs'],fileName:()=> 'entry.cjs'}}});fixture=require(path.join(temp,'fixture/entry.cjs'));});
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
-async function open({lang='en',levels=1,atCap=false,evBoundary=false,expOffset=-1}={}){
+async function open({lang='en',levels=1,atCap=false,evBoundary=false,expOffset=-1,normalLearning=false}={}){
  const h=createVictoryDriverHost({ROOT,work:temp,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true}}),G=h.G,flow=h.w.flow,content=fixture.musicNativeContent(E,assert),oldParameters=G.PluginManager.parameters;
  G.PluginManager.parameters=function(name){const v=oldParameters.call(this,name);return name==='PS_BattleFlow'?{...v,language:lang}:v;};
  const destroyed=[],draws=[],addWindow=G.Scene_MenuBase.prototype.addWindow;G.Scene_MenuBase.prototype.addWindow=function(view){addWindow.call(this,view);view.parent={removeChild(){}};};G.Window_Base.prototype.destroy=function(){destroyed.push(this);this._destroyed=true;};const draw=G.Window_Base.prototype.drawText;G.Window_Base.prototype.drawText=function(...args){draws.push({window:this,args});return draw.apply(this,args);};let sounds=0;G.SoundManager.playOk=()=>sounds++;
  flow.setLanguage(null);flow.stateReplaced();flow._app=null;flow._content=content;flow._dex=E.dex.createDexLookup();flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=true;
  const level=atCap?100:evBoundary?30:50;content.species.Snorlax.learnset[51]=['Rest'];assert(content.moves.Rest,'real learning fixture exists');const member=E.memberFactory.createMember({id:'LEVEL-P1',species:'Snorlax',level},content,()=>0);if(evBoundary){assert.equal(member.ivs.spe,0,'fixture has IV0, not an assumed31');assert.equal(member.nature,'hardy');member.evs={...member.evs,spe:15};}const state=E.state.newGame({content,party:[E.speciesKey.toPersistentMember(member,content)],money:1000,bag:{masterball:2}});state.badges.fill(true);state.nextMemberOrdinal='2';state.party[0].moves=[{id:'tackle',pp:35,maxpp:35},{id:'growl',pp:40,maxpp:40},{id:'splash',pp:40,maxpp:40},{id:'protect',pp:10,maxpp:10}];const curve=content.species.Snorlax.growth;if(!atCap)state.party[0].exp=E.growth.minExp(curve,level+levels)+expOffset;G.$gameSystem._psGame=state;const before=JSON.stringify(flow.game());
- await h.p.toMapId(5,8,9);flow.openBattle({kind:'wild',foes:[{species:'Pidgey',level:3}],battleId:'level-'+path.basename(h.w.root),seq:1,canLose:true});await h.p.inMode('main');const s=h.p.battle(),initialCard=s.presentationState().cards.find(c=>c.side==='p1'),initialView=s.statusCardState?.().find(c=>c.side==='p1'),messages=[],push=s.pushMessages;s.pushMessages=function(msgs){messages.push(...msgs);return push.call(this,msgs);};s.act(()=>s._session.chooseMove(1),'move');await h.waitFor(()=>!s._busy,'real KO result');
+ await h.p.toMapId(5,8,9);flow.openBattle({kind:'wild',foes:[{species:'Pidgey',level:3}],battleId:'level-'+path.basename(h.w.root),seq:1,canLose:true});await h.p.inMode('main');const s=h.p.battle(),initialCard=s.presentationState().cards.find(c=>c.side==='p1'),initialView=s.statusCardState?.().find(c=>c.side==='p1'),messages=[],push=s.pushMessages;s.pushMessages=function(msgs){messages.push(...msgs);return push.call(this,msgs);};if(normalLearning)flow.fast=false;s.act(()=>s._session.chooseMove(1),'move');await h.waitFor(()=>!s._busy,'real KO result');
  await h.waitFor(()=>s.levelStatsState?.()||['learn','end'].includes(s._mode),'stat panel or old next menu');
  return{...h,G,flow,s,before,initialCard,initialView,destroyed,draws,messages,get sounds(){return sounds;},state(){return s.levelStatsState?.();},cleanup(){if(flow.running)flow.abort(Error('owned level stats cleanup'));s.terminate();}};
 }
@@ -131,5 +131,36 @@ test('compiled generic inMode driver explicitly accepts the new question before 
  const report={},choose=async({key})=>{const i=h.s._menu._items.findIndex(row=>row.ext===key);assert(i>=0);h.s._menu.select(i);h.s.onMenuOk();await h.frames(1);};
  const wait=async(condition,label)=>h.waitFor(condition,label),inMode=new Function('waitBattlePresentation','battle','frames','choose','report','frame',entryText.slice(start,stop)+'\nreturn inMode;')(wait,h.p.battle,h.frames,choose,report,h.G.Graphics.frameCount);
  await inMode('learn');assert.equal(h.s._mode,'learn');assert.deepEqual(report.learningInitialConfirmations.map(row=>row.answer),['forget-move']);assert(h.s._session.pendingLearn);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
+});
+
+
+// WP67-A 7.2: actual full-slot announcement uses the existing paused message,
+// separately from the subsequent permission question and final result commit.
+async function learningNotice(h){
+ for(let i=0;i<12&&h.state();i++)await h.p.press('ok');
+ await h.waitFor(()=>!!h.s.ordinaryMessageState(),'actual wants-to-learn text stage');
+ const view=h.s.ordinaryMessageState();assert.equal(view.implementation,'paused-message-v1','full-slot announcement is a paused message, not an ordinary one-second line');
+ assert.equal(h.s._mode,'messages');assert.equal(h.s.inputState().ready,false);assert.equal(h.s._learningInitial??null,null,'permission question must wait for the announcement');
+ return h.s._ordinaryMessage;
+}
+for(const lang of ['en','zh'])test(lang+' normal full-slot notification reveals then pauses before the separate permission question',async()=>{
+ const h=await open({lang,normalLearning:true});try{const step=await learningNotice(h),s=h.s._session,pending=s.pendingLearn,moves=JSON.stringify(s.party[0].moves),text=h.s._D.message(h.messages.find(m=>m.kind==='learn-prompt'))[0];let decisions=0;const decide=s.decideLearn.bind(s);s.decideLearn=(...args)=>{decisions++;return decide(...args);};
+ assert.equal(step.snapshot().phase,'typing');assert.equal(h.s._log.pause,false);assert(step.snapshot().visible<step.snapshot().total);assert.equal(step.snapshot().total,Array.from(text).length);
+ const sounds=h.sounds;h.s.onMenuOk();h.s.onMenuCancel();assert.equal(decisions,0);await h.p.press('ok');assert.equal(step.snapshot().phase,'full','the reveal input cannot also dismiss');assert.equal(h.s._log.pause,true);assert.equal(h.sounds,sounds,'revealing is not a confirmation sound');assert.equal(h.s._log._lines.join(' '),text);assert.equal(s.pendingLearn,pending);
+ await h.frames(120);assert.equal(step.snapshot().phase,'full','one-second ordinary dwell must not dismiss a paused learning notice');assert.equal(h.s._learningInitial??null,null);assert.equal(decisions,0);assert.equal(JSON.stringify(s.party[0].moves),moves);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ await h.p.press('ok');assert.equal(step.snapshot().phase,'done');assert.equal(h.sounds,sounds+1);await h.p.inMode('learn-initial');assert.equal(decisions,0);assert.equal(s.pendingLearn,pending);assert.equal(h.s._log.pause,false);assert(h.s._log._lines.join(' ').includes(lang==='zh'?'遗忘一个招式':'forget a move'));
+ await initialAnswer(h,'decline-learning');await h.p.inMode('end');assert.equal(decisions,1);assert.equal(JSON.stringify(s.party[0].moves),moves);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
+});
+test('normal full-slot notification uses its own three-second full-text dwell without choosing a learning answer',async()=>{
+ const h=await open({normalLearning:true});try{const step=await learningNotice(h);await h.waitFor(()=>step.snapshot().phase==='full','natural full learning notice');assert.equal(h.s._log.pause,true);const at=step.snapshot().fullyShownAt;
+ while(h.G.performance.now()-at<2960)await h.frames(1);assert.equal(step.snapshot().phase,'full');assert.equal(h.s._learningInitial??null,null);assert(h.G.performance.now()-at<3000);
+ await h.frames(4);assert.equal(step.snapshot().phase,'done');await h.p.inMode('learn-initial');assert.equal(h.s._menu.index(),0);assert(h.s._session.pendingLearn,'automatic text dwell is not an automatic Yes');assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
+});
+for(const how of ['abort','replace','terminate'])test(how+' retires a visible full-slot paused notification without a late permission or learn decision',async()=>{
+ const h=await open({normalLearning:true});try{const step=await learningNotice(h);await h.p.press('ok');assert.equal(step.snapshot().phase,'full');const s=h.s._session,pending=s.pendingLearn,working=JSON.stringify(s.party);let decisions=0;const decide=s.decideLearn.bind(s);s.decideLearn=(...args)=>{decisions++;return decide(...args);};
+ if(how==='abort')h.flow.abort(Error('owned learning notice abort'));else if(how==='replace')h.flow.stateReplaced();else h.s.terminate();h.s.onMenuOk();h.s.onMenuCancel();await h.frames(3);assert.equal(step.snapshot().phase,'done');assert.equal(h.s._log.pause,false);assert.equal(h.s.ordinaryMessageState(),null);assert.equal(h.s._learningInitial??null,null);assert.equal(decisions,0);assert.equal(s.pendingLearn,pending);assert.equal(JSON.stringify(s.party),working);assert.equal(JSON.stringify(h.flow.game()),h.before);
  }finally{h.cleanup();}
 });

@@ -1461,6 +1461,13 @@ const { developmentCapabilities } = RuleConfig;
             }
           }
           const final = this._display.growth(message.member, growth); if (final) steps.push(final);
+        } else if (message.kind === 'learn-prompt') {
+          // Full-slot learning announces the pending move through the existing pause contract,
+          // before the separate Yes/No question can become interactive.
+          steps.push(...this._D.message(message).flatMap((line: string) => this._log.textPages(line).map((page: string[]) =>
+            createPausedMessageMZ(G, this, page.join('\n'),
+              () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
+              () => this._session.finished, () => PSFlow.fast))));
         } else steps.push(...this._D.message(message));
       }
       if (c.isCurrent()) this.enqueueMessages(steps);
