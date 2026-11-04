@@ -2,9 +2,10 @@
 // Actual compiled Scene and selected installed MZ audio bodies; renderer,
 // decoder/source, clock and application persistence remain controlled ports.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
-const ROOT=path.resolve(__dirname,'../../..'),PLUGIN_ROOT=process.env.PF_CAPTURE_SYNC_PRODUCT_ROOT||ROOT,E=require('../../../js/engine/build/production.cjs');let temp,createHost,Step,planOf,config;
+const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs');let temp,createHost,Step,planOf,config;
 const flush=async()=>{for(let i=0;i<16;i++)await Promise.resolve();};
 test.before(()=>{
+ const PLUGIN_ROOT=process.env.PF_CAPTURE_SYNC_PRODUCT_ROOT||ROOT; // local: sibling suites extract this initializer into their explicit VM hosts
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-capture-me-scene-'));const root=path.join(ROOT,'src/plugins/battleflow');
  const cfg={compilerOptions:{target:'ES2022',module:'CommonJS',strict:true,types:[],lib:['ES2022'],rootDir:root,outDir:path.join(temp,'pure'),noEmitOnError:true},files:[path.join(root,'capture-me-scene.ts')]};fs.writeFileSync(path.join(temp,'tsconfig.json'),JSON.stringify(cfg));
  const typed=spawnSync('pnpm',['--dir','src','exec','tsc','-p',path.join(temp,'tsconfig.json')],{cwd:ROOT,encoding:'utf8'});assert.equal(typed.status,0,typed.stdout+typed.stderr);
