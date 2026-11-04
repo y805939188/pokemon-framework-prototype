@@ -371,3 +371,30 @@ test('existing doubles command API also rejects voluntary switch specs before ch
   assert.equal(s.gw.snapshot(), raw); assert.equal(JSON.stringify(s.bag), bag); assert.equal(JSON.stringify(s.ledger), ledger);
  } finally { h.cleanup(); }
 });
+
+// Accepted policies and details must coexist with the real Summary/growth owner.
+for (const lang of ['en', 'zh']) test(lang + ' combined disabled switching, shared learning details and live Egg Summary keep one battle and install once', async () => {
+ const h = await open({ lang, members: 3, egg: true, grow: true, integration: true, trainer: true, trainerMembers: 2, fast: true, canSwitch: false }); try {
+  const s = h.s._session, lead = s.party[0].id, reserve = s.party[1].id, egg = JSON.parse(h.before).party[1].id, app = h.flow.app();
+  assert.equal(s.canSwitch, false, 'typed policy must reach this actual mixed Session');
+  const beginLearning = app.beginLearning.bind(app); let learningTransactions = 0; app.beginLearning = (...args) => { learningTransactions++; return beginLearning(...args); };
+  let installs = 0, doc = h.G.$gameSystem._psGame; Object.defineProperty(h.G.$gameSystem, '_psGame', { configurable: true, get: () => doc, set: value => { installs++; doc = value; } });
+  await commands(h, reserve); assert.deepEqual(Array.from(h.s._menu._items, row => row.ext), ['summary', null]);
+  await pick(h, 'summary'); await h.waitFor(() => current(h)?.ready, 'mixed pre-growth read-only Summary'); await h.p.press('cancel'); await h.p.inMode('party'); h.s.onMenuCancel(); await h.p.inMode('main');
+  await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('learn-initial'); assert.equal(installs, 0); await h.frames(1); await pick(h, 'forget-move');
+  assert.equal(typeof h.s.learningMoveState, 'function', 'mixed Scene retains the accepted details consumer'); const win = h.s._menu, normal = h.s._commandMenu; assert.notEqual(win, normal); assert.equal(normal.visible, false);
+  let view = h.s.learningMoveState(); assert.equal(view.page.rows.length, 5); assert.equal(view.page.rows[0].details, '34/35 PP'); assert.equal(view.page.rows[4].moveId, 'rest');
+  win.select(4); assert(h.s.learningMoveState().text.includes(lang === 'zh' ? '属性：Psychic' : 'Type: Psychic'));
+  h.s.onMenuOk(); await h.p.inMode('learn-giveup'); assert.equal(h.s._menu, normal); assert.equal(win.visible, false); await h.frames(1); await pick(h, 'continue-learning'); assert.equal(h.s._menu, win); assert.equal(win.index(), 4);
+  await pick(h, 3); await h.p.inMode('main'); assert.equal(h.s._menu, normal); assert.equal(win.visible, false); assert.equal(win.active, false); assert.equal(s.party[0].moves[3].id, 'rest'); assert.equal(s.gw.readState('p1').find(m => m.id === lead).pp.rest, 10);
+  // Swapping the menu instance for learning must not reset the author policy.
+  await commands(h, reserve); assert.deepEqual(Array.from(h.s._menu._items, row => row.ext), ['summary', null]); h.s.onMenuCancel(); await h.p.inMode('party'); h.s.onMenuCancel(); await h.p.inMode('main');
+  const raw = s.gw.snapshot(), work = JSON.stringify(s.party); assert.deepEqual(await s.chooseSwitch(reserve), { ok: false, reason: 'choice-rejected' }); assert.equal(s.gw.snapshot(), raw); assert.equal(JSON.stringify(s.party), work);
+  await summary(h, lead); assert(text(h).some(line => line.includes('Lv.51'))); await h.p.press('right'); await h.p.press('right'); await h.p.press('right'); assert(text(h).some(line => /\brest\b.*10\/10 PP/i.test(line)));
+  await h.p.press('left'); await h.p.press('left'); await h.p.press('left'); await h.p.press('down'); assert.equal(current(h).view.ids[current(h).view.cursor], egg); assert(text(h).some(line => line.includes('1/1'))); await h.p.press('cancel'); await h.p.inMode('party'); assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext, egg);
+  const player = h.s.statusCardState().find(card => card.side === 'p1'); assert.equal(player.gender.kind, 'female'); assert.equal(player.shiny, true);
+  assert.equal(installs, 0); assert.equal(JSON.stringify(h.flow.game()), h.before); assert.deepEqual(h.managementCalls(), { beginManagement: 0, manage: 0 }); assert.equal(learningTransactions, 0); assert.equal(s.canSwitch, false);
+  h.s.onMenuCancel(); await h.p.inMode('main'); await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('end'); assert.equal(installs, 0); await h.frames(1); h.s.onMenuOk(); await h.frames(3); assert.equal(installs, 1); assert.equal(h.flow.lastOutcome.commit, 'applied'); assert.equal(h.flow.game().party[0].level, 51); assert(h.flow.game().party[0].moves.some(move => move.id === 'rest'));
+  const installed = JSON.stringify(h.flow.game()); h.s.onEnd(); assert.equal(installs, 1); assert.equal(JSON.stringify(h.flow.game()), installed);
+ } finally { h.cleanup(); }
+});
