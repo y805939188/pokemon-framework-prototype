@@ -180,6 +180,7 @@ export const en: LocaleTable = {
     // ---- battle events (flow/describe)
     "battle.go": "Go! {name}!",
     "battle.foe_sent_out": "The foe sent out {name}!",
+    "battle.wild_appeared": "Oh! A wild {name} appeared!",
     "battle.foe_prefix": "The foe's {name}",
     "battle.used_move": "{user} used {move}!",
     "battle.hurt": "{name} was hurt ({hp})",

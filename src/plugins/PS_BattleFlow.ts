@@ -1176,6 +1176,7 @@ const { developmentCapabilities } = RuleConfig;
     this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._faintAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
     this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false; this._endFeedbackPages = null; this._endFeedbackPage = 0; this._endPageShownUpdate = -1; this._trainerOpeningQueued = false; this._retryMoveMenu = false;
     this._residentBrief = null; this._briefTail = null;
+    this._wildOpeningQueued = false;
     this._battleBag = null; this._bagHidden = null; this._bagRetry = false;
   };
   P.create = function () {
@@ -1276,7 +1277,7 @@ const { developmentCapabilities } = RuleConfig;
       }
     }
     c.enqueue([this._display.initial()]);
-    this.pushMessages(opening);
+    this.pushMessages(opening, true);
     if(developmentCapabilities(PSFlow.developerCapabilities).allowExperimentalHeldItemBattle&&s.party.some((m:any)=>!!m.item))this._log.add(PSFlow.translator().t("management.experimental"));
     this.refreshStatus();
     });
@@ -1294,7 +1295,7 @@ const { developmentCapabilities } = RuleConfig;
   };
 
   // --- message pacing
-  P.pushMessages = function (msgs: any[]) {
+  P.pushMessages = function (msgs: any[], openingBatch = false) {
     const c = sceneController(this);
     c.present(() => {
       const steps: BattleScenePresentation[] = [];
@@ -1317,9 +1318,29 @@ const { developmentCapabilities } = RuleConfig;
         }
         const growth = message.kind === 'growth' ? engine().B.battlePresentation.readGrowthDisplay(this._session, message) : null;
         if (this._display && message.kind === 'events') {
-          for (const event of message.events) {
+          let events = message.events, wildEntrance: any = null;
+          if (openingBatch && op?.request.kind === 'wild' && this._session.foeTeam.length === 1 && !this._wildOpeningQueued) {
+            const switches = events.filter((event: any) => event.type === 'switch');
+            const player = switches.find((event: any) => /^p1a?: /.test(event.args[0] || ''));
+            const foe = switches.find((event: any) => /^p2a?: /.test(event.args[0] || ''));
+            if (switches.length === 2 && player && foe) {
+              // Presentation order only. Keep the owned Session messages and all non-switch events unchanged.
+              const first = events.indexOf(switches[0]);
+              events = [...events.slice(0, first), foe, player, ...events.slice(first).filter((event: any) => event !== player && event !== foe)];
+              wildEntrance = foe; this._wildOpeningQueued = true;
+            }
+          }
+          for (const event of events) {
             const visuals = this._display.event(event);
             const lines = this._D.event(event), ballPlan = simpleBallPlan(event);
+            if (event === wildEntrance) {
+              const species = String(event.args[1] || '').split(',')[0];
+              const text = PSFlow.translator().t('battle.wild_appeared', { name: PSFlow.speciesName(species) });
+              steps.push(...visuals, ...this._log.textPages(text).map((page: string[]) => createPausedMessageMZ(G, this, page.join('\n'),
+                () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
+                () => this._session.finished, () => PSFlow.fast)));
+              continue;
+            }
             if (!PSFlow.fast && (event.type === 'switch' || event.type === 'drag')) {
               // Recall an existing member first; the next send-out starts only after its own brief is full.
               steps.push(...visuals.slice(0, -1), ...this.briefMessages(lines), ...visuals.slice(-1));

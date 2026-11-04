@@ -44,11 +44,12 @@ for (const lang of ['en', 'zh']) test(lang + ' opening paints a full brief befor
   const h = await open(lang); try {
     await h.waitFor(() => h.s.briefMessageState?.()?.phase === 'typing', 'actual opening brief');
     assert.equal(h.s.ordinaryMessageState(), null, 'send-out uses brief rather than ordinary dwell');
-    assert(!h.s.children.some(x => x._psPictureRole === 'body'), 'pending first send-out remains hidden while text types');
+    assert(!h.s.children.some(x => x._psPictureRole === 'body' && x._psPictureKey?.startsWith('p1:')), 'player send-out remains hidden while its brief types');
+    assert(h.s.pictureState().actors.some(actor => actor.side === 'p2' && actor.body === 1), 'wild foe has already appeared before the player brief');
     assert(!h.s.inputState().ready); assert.equal(h.s._log.pause, false);
     await h.waitFor(() => h.s.briefMessageState()?.phase === 'resident', 'full send-out brief');
     const resident = h.s._residentBrief, fullAt = resident.snapshot().fullyShownAt, full = h.s._log._lines.join('');
-    assert(full.length > 0); assert(!h.s.children.some(x => x._psPictureRole === 'body'));
+    assert(full.length > 0); assert(!h.s.children.some(x => x._psPictureRole === 'body' && x._psPictureKey?.startsWith('p1:')));
     await h.frames(2);
     assert(h.s.children.some(x => x._psPictureRole === 'body'));
     assert(h.G.performance.now() - fullAt < 1000, 'animation begins without ordinary one-second dwell');

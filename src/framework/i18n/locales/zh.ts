@@ -183,6 +183,7 @@ export const zh: LocaleTable = {
     "inventory.reason.max-level": "此成员已达到等级上限。",
     "battle.go": "去吧！{name}！",
     "battle.foe_sent_out": "对手派出了{name}！",
+    "battle.wild_appeared": "呀！野生的{name}出现了！",
     "battle.foe_prefix": "对手的{name}",
     "battle.used_move": "{user}使用了{move}！",
     "battle.hurt": "{name}受到了伤害（{hp}）",

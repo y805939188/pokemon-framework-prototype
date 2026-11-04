@@ -45,6 +45,7 @@ SUITES=(
   experiments/step5/4/test-victory-bgm-scene.cjs
   experiments/step5/4/test-victory-music-native.cjs
   experiments/step5/4/test-trainer-opening.cjs
+  experiments/step5/4/test-wild-opening-scene.cjs
   experiments/step5/4/test-author-dialogue-pages.cjs
   experiments/step5/4/test-author-dialogue-native.cjs
   experiments/step5/4/test-trainer-opening-native.cjs
