@@ -30,6 +30,10 @@ import { prebattlePlan } from './battleflow/prebattle';
 import { createLevelStatsMZ } from "./battleflow/level-stats-mz";
 import { createOrdinaryMessageMZ, createPausedMessageMZ, createSynchronizedMessageMZ, createBriefMessageMZ, isMessageStepMZ } from "./battleflow/ordinary-message-mz";
 import { BriefMessageStep } from './battleflow/brief-message';
+import { BattleBagSelection } from './battleflow/battle-bag';
+import type { BattleBagRequest } from './battleflow/battle-bag';
+import { catalogOf, itemForBattleId } from '../framework/rules/item-catalog';
+import { BALLS } from '../framework/rules/items';
 import { installPrebattleHost } from './battleflow/prebattle-host';
 const { developmentCapabilities } = RuleConfig;
 
@@ -1053,7 +1057,8 @@ const { developmentCapabilities } = RuleConfig;
   };
   for (const [method, direction] of Object.entries({ cursorUp: 'up', cursorDown: 'down', cursorLeft: 'left', cursorRight: 'right' } as const)) {
     Window_PSMenu.prototype[method] = function (wrap: boolean) {
-      if (this.maxCols() === 2) this.select(gridCursor(this.index(), direction, this._items.length));
+      if (this._phase === 'bag' && (direction === 'left' || direction === 'right') && this._bagPocket) this._bagPocket(direction === 'left' ? -1 : 1);
+      else if (this.maxCols() === 2) this.select(gridCursor(this.index(), direction, this._items.length));
       else G.Window_Command.prototype[method].call(this, wrap);
     };
   }
@@ -1160,6 +1165,7 @@ const { developmentCapabilities } = RuleConfig;
     this._D = null; this._names = {}; this._display = null; this._displayAudio = []; this._faintAudio = []; this._menuCursor = new BattleMenuCursor(); this._backdrop = null;
     this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false; this._endFeedbackPages = null; this._endFeedbackPage = 0; this._endPageShownUpdate = -1; this._trainerOpeningQueued = false; this._retryMoveMenu = false;
     this._residentBrief = null; this._briefTail = null;
+    this._battleBag = null; this._bagHidden = null; this._bagRetry = false;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1172,6 +1178,7 @@ const { developmentCapabilities } = RuleConfig;
     for (const win of [this._status, this._log, this._menu]) { win.backOpacity = 96; this.addWindow(win); }
     this._menu.setHandler("ok", this.onMenuOk.bind(this));
     this._menu.setHandler("cancel", this.onMenuCancel.bind(this));
+    this._menu._bagPocket = (delta: number) => this.changeBagPocket(delta);
     this._menu.deactivate(); this._menu.hide();
     c.open(() => { this._psBindHost(); return PSFlow.begin(); });
     });
@@ -1270,7 +1277,7 @@ const { developmentCapabilities } = RuleConfig;
     } else ++this._pictureUpdate;
     // A rejected display clock still owes normal host/input updates for its aborted-end menu.
     G.Scene_MenuBase.prototype.update.call(this);
-    if (!c.isCurrent()) { retireBrief(this); c.dispose(); this._log.pause = false; this._endFeedbackPages = null; this._ballFeedback?.cancel(); this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
+    if (!c.isCurrent()) { retireBattleBag(this); retireBrief(this); c.dispose(); this._log.pause = false; this._endFeedbackPages = null; this._ballFeedback?.cancel(); this._backdrop?.dispose(); this._pictures?.dispose(); } else c.present(() => this._backdrop?.poll());
     // Host abort may close this owner from main/boot/pending action. tick observes closure before phase/busy gates.
     this.updateQueue();
   };
@@ -1397,7 +1404,7 @@ const { developmentCapabilities } = RuleConfig;
   P.ordinaryMessageState = function () { return this._ordinaryMessage?.snapshot() ?? null; };
   P.updateQueue = function () {
     const c = sceneController(this);
-    if (!c.isCurrent() || !PSFlow.running) { retireBrief(this); this._ballFeedback?.cancel(); this._display?.dispose(); this._pictures?.dispose(); }
+    if (!c.isCurrent() || !PSFlow.running) { retireBattleBag(this); retireBrief(this); this._ballFeedback?.cancel(); this._display?.dispose(); this._pictures?.dispose(); }
     c.tick(G.Input.isTriggered('ok'), PSFlow.fast ? 0 : 24);
   };
   P.ballFeedbackState = function () { return this._ballFeedback?.snapshot() ?? null; };
@@ -1409,6 +1416,7 @@ const { developmentCapabilities } = RuleConfig;
     if (s.pendingLearn) { this.showLearn(); return; }
     const req = s.currentRequest();
     if (req && req.forceSwitch) { this.showParty("forced"); return; }
+    if (this._bagRetry && this._battleBag?.view().kind !== 'closed') { this._bagRetry = false; this.showBattleBagView(); return; }
     if (retryMoves && req?.active?.[0]?.moves?.length) { this.showMoves(); return; }
     this.showMain();
   };
@@ -1480,11 +1488,110 @@ const { developmentCapabilities } = RuleConfig;
       ext: i + 1, enabled: true,
     })));
   };
+  function restoreBagView(scene: any): void {
+    const hidden = scene._bagHidden; scene._bagHidden = null;
+    if (!hidden || !sceneController(scene).ownsHost() || G.SceneManager._scene !== scene) return;
+    for (const row of hidden) row.node.visible = row.visible;
+  }
+  function retireBattleBag(scene: any): void {
+    scene._battleBag?.retire(); scene._bagRetry = false; restoreBagView(scene);
+  }
   P.showBag = function () {
-    const bag = this._session.bag;
-    const tr = PSFlow.translator();
-    const items = Object.keys(bag).filter((k) => bag[k] > 0).map((k) => ({ name: tr.t("ui.bag.entry", { name: tr.tOr(`item.name.${k}`, k), count: bag[k] }), ext: k }));
-    this.show("bag", items.length ? items : [{ name: tr.t("ui.bag.nothing"), ext: null, enabled: false }]);
+    const c = sceneController(this), s = this._session;
+    if (!c.isCurrent()) return;
+    const model = this._battleBag ??= new BattleBagSelection(), catalog = catalogOf(s.content);
+    if (model.view().kind === 'closed') {
+      // Real App-owned battles have the host document (including eggs). The existing direct-Session host seam may not.
+      const saved = G.$gameSystem?._psGame ? PSFlow.game().party : s.party, party = saved?.length ? saved : s.party;
+      const members = party.map((saved: any) => {
+        const member = s.party.find((m: any) => m.id === saved.id) ?? saved;
+        return { memberId: member.id, egg: member.isEgg === true, moves: (member.moves ?? []).map((m: any, slot: number) => ({ slot, moveId: m.id })) };
+      });
+      const ids = new Set(members.map((m: any) => m.memberId));
+      const activeIds = s.gw.readState('p1').filter((m: any) => m.active && ids.has(m.id)).map((m: any) => m.id);
+      const foes = this._display?.snapshot() ?? s.gw.readState('p2').map((m: any) => ({ ...m, side: 'p2' }));
+      // The current formal StartBattle entry binds internalBattle=true; facility/non-internal entry is not implemented.
+      model.open({ internalBattle: true, actorId: activeIds[0] ?? members.find((m: any) => !m.egg)?.memberId,
+        members, activeIds, foeIds: foes.filter((m: any) => m.side === 'p2' && m.active && m.hp > 0).map((m: any) => m.id),
+        items: Object.entries(s.bag).map(([battleId, quantity]) => {
+          const item = itemForBattleId(catalog, battleId); if (!item) throw new Error('unmapped battle bag item: ' + battleId);
+          return { itemId: item.id, battleId, quantity: quantity as number, pocket: item.pocket, battleUse: item.battleUse };
+        }) });
+    }
+    this.showBattleBagView();
+  };
+  P.battleBagState = function () { return this._battleBag?.view() ?? null; };
+  P.showBattleBagView = function () {
+    const c = sceneController(this), model = this._battleBag; if (!c.isCurrent() || !model) return;
+    const view = model.view(); if (view.kind === 'closed') { restoreBagView(this); this.showMain(); return; }
+    if (view.kind === 'submitting') return;
+    if (!this._bagHidden) {
+      const nodes = new Set([this._status, this._log, ...(this.children ?? []).filter((n: any) => n !== this._windowLayer && n !== this._menu)]);
+      this._bagHidden = [...nodes].filter(Boolean).map(node => ({ node, visible: (node as any).visible }));
+      for (const row of this._bagHidden) { if (!c.isCurrent()) return; row.node.visible = false; }
+    }
+    const tr = PSFlow.translator(), catalog = catalogOf(this._session.content);
+    const itemName = (item: any) => {
+      const data = catalog[item.itemId], authored = data?.name && data.name !== 'Unnamed' ? data.name : null;
+      return data?.nameKey ? tr.tOr(data.nameKey, authored ?? item.itemId) : authored ?? tr.tOr(`item.name.${item.battleId}`, item.itemId);
+    };
+    const cancel = { name: tr.t('ui.battlebag.cancel'), ext: null };
+    let phase: string, items: any[];
+    if (view.kind === 'items') {
+      phase = 'bag'; const pocket = tr.t('inventory.pocket.' + view.pocket);
+      items = [...view.rows.map((item: any) => ({ name: pocket + ' · ' + tr.t('ui.bag.entry', { name: itemName(item), count: item.quantity }), ext: item.itemId })),
+        { name: tr.t('ui.battlebag.cancelPockets', { pocket }), ext: null }];
+    } else if (view.kind === 'commands') {
+      phase = 'bag-command'; items = [{ name: tr.t('ui.battlebag.use', { name: itemName(view.item) }), ext: 'use' }, cancel];
+    } else if (view.kind === 'members') {
+      phase = 'bag-members'; const live = this._session.gw.readState('p1');
+      items = [...view.rows.map((member: any) => { const data = live.find((m: any) => m.id === member.memberId), mon = this._session.party.find((m: any) => m.id === member.memberId);
+        return { name: member.egg ? tr.t('inventory.egg') : tr.t('ui.party.entry', { name: mon ? PSFlow.speciesName(mon.species) : member.memberId,
+          level: data?.level ?? mon?.level ?? '?', hp: data?.hp ?? 0, maxhp: data?.maxhp ?? 0, fainted: data?.fainted ? tr.t('ui.party.fainted') : '', active: data?.active ? tr.t('ui.party.active') : '', noEffect: '' }),
+          ext: member.memberId, enabled: !member.egg }; }), cancel];
+    } else if (view.kind === 'moves') {
+      phase = 'bag-moves'; const mon = this._session.party.find((m: any) => m.id === view.memberId), live = this._session.gw.readState('p1').find((m: any) => m.id === view.memberId);
+      items = [...view.rows.map((move: any) => ({ name: tr.t('ui.moves.line', { move: move.moveId, pp: live?.pp?.[move.moveId] ?? mon?.moves[move.slot]?.pp ?? '?', maxpp: mon?.moves[move.slot]?.maxpp ?? '?' }), ext: move.slot })), cancel];
+    } else { phase = 'bag-foes'; items = [...view.rows.map((id: string) => ({ name: this._names[id] ?? id, ext: id })), cancel]; }
+    this.show(phase, items); if (!c.isCurrent()) return;
+    this._menu.select(view.cursor); this._bagShownUpdate = this._pictureUpdate;
+  };
+  P.changeBagPocket = function (delta: number) {
+    sceneController(this).input(() => {
+      if (this._battleBag?.view().kind !== 'items') return;
+      this._battleBag.select(this._menu.index()); this._battleBag.move(delta < 0 ? 'left' : 'right');
+      this.showBattleBagView(); G.SoundManager.playCursor?.();
+    });
+  };
+  P.confirmBattleBag = function () {
+    const model = this._battleBag; if (!model) return;
+    if (model.view().kind === 'commands' && Number.isSafeInteger(this._pictureUpdate) && this._pictureUpdate === this._bagShownUpdate) { this._menu.activate(); return; }
+    model.select(this._menu.index()); const request: BattleBagRequest | null = model.confirm();
+    if (!request) { this.showBattleBagView(); return; }
+    const c = sceneController(this), s = this._session, kind = BALLS.includes(request.battleId) ? 'ball' : 'item';
+    c.run(async () => {
+      const target = request.target;
+      if (target.kind === 'foe' && BALLS.includes(request.battleId)) {
+        if (s.gw.activeId('p2') !== target.memberId) return { ok: false, reason: 'unknown-target' };
+        return s.throwBall(request.battleId);
+      }
+      if (target.kind !== 'member' && target.kind !== 'active') return { ok: false, reason: 'unsupported-battle-item' };
+      if (target.kind === 'active' && !s.gw.readState('p1').some((m: any) => m.id === target.memberId && m.active)) return { ok: false, reason: 'unknown-target' };
+      const eligible = s.canUseItem(request.battleId, target.memberId); if (!eligible.ok) return eligible;
+      return s.useItem(request.battleId, target.memberId); // actual reservation/registration and execution, not a positive query
+    }, (result: any) => {
+      if (typeof result?.ok !== 'boolean') throw new Error('invalid battle bag registration result');
+      if (!model.resolve(request, { ok: result.ok })) return;
+      restoreBagView(this);
+      if (!result.ok) {
+        this._bagRetry = true;
+        this.enqueueMessages([result.reason === 'unsupported-battle-item' ? PSFlow.translator().t('ui.battlebag.unsupported') : refusalText(kind, result.reason)]);
+      } else {
+        this._bagRetry = false;
+        if (!Array.isArray(result.messages)) throw new Error('unexpected staged battle bag action');
+        this.pushMessages(result.messages);
+      }
+    }, kind);
   };
   P.showParty = function (sub: string) {
     this._partySub = sub;
@@ -1542,6 +1649,9 @@ const { developmentCapabilities } = RuleConfig;
 
   P.onMenuCancel = function () {
     sceneController(this).input(() => {
+    if (this._mode.startsWith('bag') && this._battleBag) {
+      this._battleBag.select(this._menu.index()); this._battleBag.cancel(); this.showBattleBagView(); return;
+    }
     if (this._mode === 'moves') this._menuCursor?.remember('moves', this._menu.index(), this._menu._items.length);
     switch (this._mode) {
       case "moves": case "bag": this.showMain(); return;
@@ -1552,6 +1662,7 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.onMenuOk = function () {
     sceneController(this).input(() => {
+    if (this._mode.startsWith('bag') && this._battleBag) { this.confirmBattleBag(); return; }
     if (this._mode === 'main' || this._mode === 'moves') this._menuCursor?.remember(this._mode, this._menu.index(), this._menu._items.length);
     const it = this._menu.itemAt(this._menu.index());
     const ext = it && it.ext;
@@ -1606,9 +1717,10 @@ const { developmentCapabilities } = RuleConfig;
   P.onEnd = function () {
     // A delayed callback from an old scene must not pop the current scene's global SceneManager stack.
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // bare API callers refer to the current operation
-    if (op !== PSFlow._op) { retireBrief(this); this._display?.dispose(); this._pictures?.dispose(); PSFlow.stale("finish", op); return; }
+    if (op !== PSFlow._op) { retireBattleBag(this); retireBrief(this); this._display?.dispose(); this._pictures?.dispose(); PSFlow.stale("finish", op); return; }
     const c = this._controller as BattleSceneController<any> | undefined;
     if (c && !c.isCurrent()) return;
+    if (!this._aborted && !this._failure && this._battleBag && this._battleBag.view().kind !== 'closed') return;
     if (!this._aborted && !this._failure && this._captureMelody?.pending()) return;
     if (!this._aborted && !this._failure && this._ballFeedback?.pending()) return;
     if (!this._aborted && !this._failure && this._endFeedbackPages) {
@@ -1622,7 +1734,7 @@ const { developmentCapabilities } = RuleConfig;
       }
       this._endFeedbackPages = null; this._log.pause = false;
     }
-    retireBrief(this); this._display?.dispose(); c?.dispose(); this._pictures?.dispose();
+    retireBattleBag(this); retireBrief(this); this._display?.dispose(); c?.dispose(); this._pictures?.dispose();
     if (!this._aborted && !this._failure) {
       try { const outcome=PSFlow.finish(this._session, this._psOp);if(c&&!c.ownsHost())return;if(outcome?.continuationToken){this._evolutionTransferred=true;this.popScene();return;}if(outcome?.pending&&W.PSManagement){this._menu.deactivate();if(c&&!c.ownsHost())return;this._receivingTransferred=W.PSManagement.replaceBattleWithReceiving();if(this._receivingTransferred)return;} } catch (e) { PSFlow.abort(e, this._psOp); } // finishBattle does not throw; this guards only the plugin's own wiring
     }
@@ -1632,6 +1744,7 @@ const { developmentCapabilities } = RuleConfig;
   P.terminate = function () {
     const c = this._controller as BattleSceneController<any> | undefined;
     this._menuCursor?.clear();
+    retireBattleBag(this);
     retireBrief(this);
     this._endFeedbackPages = null; if (this._log) this._log.pause = false;
     this._ballFeedback?.cancel();

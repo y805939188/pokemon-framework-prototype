@@ -237,7 +237,8 @@ export async function runD2Music(p: any, continuing: boolean): Promise<void> {
         eq(returned.plays[0].position, memo.position, 'actual return play uses exact saved offset'); const before = stateHash(); old.onEnd(); old.terminate(); assert(audio._bgmBuffer === returned.buffer && !returned.destroyed, 'duplicate old teardown does not stop handoff'); eq(stateHash(), before, 'no duplicate install'); return { result: raw.battleId, memo, nativeReturn: readNative(returned) };
       });
       await run('M08', async () => {
-        await reset('receiving'); await world(); const h = await open(); await active('Battle wild'); await choose(/^Bag/); await inMode('bag'); await choose(/master ball/i); await inMode('end');
+        await reset('receiving'); await world(); const h = await open(); await active('Battle wild'); await choose(/^Bag/); await inMode('bag'); await choose(/master ball/i);
+        await inMode('bag-command'); await choose(/^Use /); await inMode('end');
         const outcome = flow.finish(h.session, h.op); assert(outcome.pending && h.app.pendingReceiving, 'actual capture requires full-party reception'); eq(audio._currentBgm.name, 'Battle wild', 'receiving retains BGM'); assert(h.app.saveBlocked && flow.running, 'same root barrier');
         const pending = h.app.pendingReceiving, caught = pending.members[0].id, oldId = flow.game().party[0].id;
         flow.resolveReceiving(pending.token, { [caught]: { nickname: { kind: 'keep' }, placement: { kind: 'replace', target: { id: oldId, position: { kind: 'party', index: 0 } } } } });

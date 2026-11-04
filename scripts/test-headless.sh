@@ -27,6 +27,7 @@ SUITES=(
   experiments/step5/4/test-brief-message.cjs
   experiments/step5/4/test-brief-message-scene.cjs
   experiments/step5/4/test-battle-bag.cjs
+  experiments/step5/4/test-battle-bag-scene.cjs
   experiments/step5/4/test-status-card.cjs
   experiments/step5/4/test-ordinary-message-scene.cjs
   experiments/step5/4/test-levelup-stats.cjs

@@ -171,8 +171,14 @@ test('compiled menu redraw replacing host cannot activate obsolete input',async(
  const h=await host().ready(),s=h.scene;s._menu.deactivate();s._menu.hide();const next={request:{battleId:'next'}};
  s._menu.setItems=()=>{h.flow.stateReplaced();h.flow._op=next;h.flow.running=true;};s.showMain();assert.equal(h.flow._op,next);assert(!s._menu.active);assert(!s._menu.visible);assert(!s.inputState().ready);
 });
+function publishBagMember(h) {
+ // This controller-only host otherwise has no party. Publish the valid stable
+ // identity now required by the bag consumer, without changing navigation assertions.
+ h.session.party=[{id:'P',species:'Pidgey',moves:[]}];
+ h.session.gw.readState=side=>side==='p1'?[{id:'P',active:true,hp:10,maxhp:10}]:[];
+}
 test('compiled cancel navigation preserves bag/party intent and is blocked while action is pending',async()=>{
- const h=await host().ready(),s=h.scene,d=deferred();s.showMoves();s.onMenuCancel();assert.equal(s._mode,'main');s.showBag();s.onMenuCancel();assert.equal(s._mode,'main');s._pendingItem='potion';s.show('party',[]);s.onMenuCancel();assert.equal(s._pendingItem,null);assert.equal(s._mode,'bag');s.onMenuCancel();s.act(()=>d.promise);await flush();const phase=s._mode;s.onMenuCancel();assert.equal(s._mode,phase);assert(s._busy);d.resolve({messages:[]});await flush();s.updateQueue();assert.equal(s._mode,'main');
+ const h=await host().ready(),s=h.scene,d=deferred();publishBagMember(h);s.showMoves();s.onMenuCancel();assert.equal(s._mode,'main');s.showBag();s.onMenuCancel();assert.equal(s._mode,'main');s._pendingItem='potion';s.show('party',[]);s.onMenuCancel();assert.equal(s._pendingItem,null);assert.equal(s._mode,'bag');s.onMenuCancel();s.act(()=>d.promise);await flush();const phase=s._mode;s.onMenuCancel();assert.equal(s._mode,phase);assert(s._busy);d.resolve({messages:[]});await flush();s.updateQueue();assert.equal(s._mode,'main');
 });
 test('compiled postcommit message failure preserves committed outcome and never aborts application state',async()=>{
  const h=await host().ready();h.session.finished=true;h.scene.showEnd(false);h.app.finishBattle=()=>{h.counts.finish++;return {code:1,commit:'applied',battleId:'scene#1',trainerReward:{actual:10,normalizationLoss:0}};};h.G.$gameMessage.add=()=>{throw Error('message after commit');};h.scene.onMenuOk();assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(h.flow.lastOutcome.code,1);assert.equal(h.counts.abort,0);assert.equal(h.counts.finish,1);assert.equal(h.flow.lastOutcome.hostErrors[0].step,'trainer-reward-message');assert.equal(h.counts.pop,1);assert(!h.flow.running);
@@ -188,7 +194,7 @@ test('compiled command window uses two columns with occupied-grid edges and deta
  assert.equal(h.counts.choose,0);assert(s.inputState().ready);
 });
 test('compiled Scene keeps command and move cursors separate across cancel and bag return',async()=>{
- const h=await host().ready(),s=h.scene;s._session.currentRequest=()=>({active:[{moves:['A','B','C','D'].map(id=>({id,move:id,pp:5,maxpp:5}))}]});
+ const h=await host().ready(),s=h.scene;publishBagMember(h);s._session.currentRequest=()=>({active:[{moves:['A','B','C','D'].map(id=>({id,move:id,pp:5,maxpp:5}))}]});
  s.showMoves();s._menu.select(3);s.onMenuCancel();assert.equal(s._mode,'main');assert.equal(s._menu.index(),0);s._menu.select(1);s.onMenuOk();assert.equal(s._mode,'bag');assert.equal(s._menu.maxCols(),1);s.onMenuCancel();assert.equal(s._menu.index(),1);s._menu.select(0);s.onMenuOk();assert.equal(s._mode,'moves');assert.equal(s._menu.index(),3);assert.equal(s._menu.maxCols(),2);assert.equal(h.counts.choose,0);
 });
 

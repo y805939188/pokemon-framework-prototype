@@ -67,6 +67,7 @@ export async function runStep5Sample(p: any): Promise<void> {
     I6.setItemCount(game(), "masterball", 1); // disclosed: one deterministic capture ball, not a fixture inventory fallback
     await stepInto(3, 9, 2);
     await inMode("main"); await choose(/^Bag/); await inMode("bag"); await choose(/Master Ball/);
+    await inMode("bag-command"); await choose(/^Use /);
     await finishBattle();
     eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit], [2, "applied"], "real capture committed once");
     eq(game().party.length, 2, "captured member joins the normal sample party");
