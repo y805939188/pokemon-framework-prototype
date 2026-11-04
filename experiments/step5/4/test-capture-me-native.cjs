@@ -29,7 +29,7 @@ test('native plan freezes exact product and15 ordered cases, two-process denomin
  // freeze checks actual bundle bytes against f021. This digest now records the
  // post-wild-opening source for headless controls only. No requalification of
  // the historical fifteen-case App/PLAN is implied: new native packaging must rebind separately.
- const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),'a2285c60cbc7c8482c5baf45add2e04baa49a6383be123cdfa9c994e2a3bac58','current source identity; historical native plan requires rebind');
+ const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),'8f0f780fdfc51814fe018c7e710e8c27206aa8f0429d42de623e71b14faa6354','current source identity; historical native plan requires rebind');
 });
 for(const kind of ['map','title'])test('actual driver readiness rejects unstarted/changing/incomplete '+kind,()=>{
  class Map{}class Title{}let changing=false;const G={Scene_Map:Map,Scene_Title:Title,SceneManager:{isSceneChanging:()=>changing}},v=new(kind==='map'?Map:Title)();let started=false,active=true,busy=false;

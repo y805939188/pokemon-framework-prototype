@@ -1222,6 +1222,7 @@ const { developmentCapabilities } = RuleConfig;
     this._bagLayer = 'battle'; this._bagFade = null; this._bagFadeReturn = false;
     this._partySelected = null; this._retryPartySelection = null; this._partyCommandShownUpdate = -1;
     this._partyDisplayOrder = null;
+    this._learningRetry = null;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1542,7 +1543,10 @@ const { developmentCapabilities } = RuleConfig;
     this._learningGiveUp = null;
     if (s.pendingLearn) {
       if (this._learningInitial?.pending !== s.pendingLearn) { this.askLearningInitial(); return; }
-      if (this._learningInitial.accepted) this.showLearn();
+      if (this._learningInitial.accepted) {
+        const retry = this._learningRetry; this._learningRetry = null;
+        this.showLearn(retry?.pending === s.pendingLearn ? retry.slot : 0);
+      }
       else {
         const tr = PSFlow.translator();
         this.show('learn-initial', [{ name: tr.t('progression.yes'), ext: 'forget-move' }, { name: tr.t('progression.no'), ext: 'decline-learning' }]);
@@ -1551,6 +1555,7 @@ const { developmentCapabilities } = RuleConfig;
       return;
     }
     this._learningInitial = null;
+    this._learningRetry = null;
     const req = s.currentRequest();
     if (req && req.forceSwitch) { this.showParty("forced", retryParty?.memberId ?? null); return; }
     if (this._bagFadeReturn) { this._bagFadeReturn = false; this.showBattleBagView(); return; }
@@ -1891,6 +1896,17 @@ const { developmentCapabilities } = RuleConfig;
     return c.isCurrent() && this._mode === 'learn' && win?.visible
       ? { page: structuredClone(win.page), text: [...win.rendered] } : null;
   };
+  P.chooseLearningSlot = function (slot: number) {
+    const c = sceneController(this), pending = this._session.pendingLearn;
+    if (!c.isCurrent() || !pending) return;
+    const protection = engine().B.battlePresentation.readBattleLearnProtection(this._session, slot);
+    if (protection) {
+      this._learningRetry = { pending, slot };
+      this.enqueueMessages([PSFlow.translator().t('progression.hm-protected')]);
+      return;
+    }
+    this.act(async () => ({ ok: true, messages: await this._session.decideLearn(slot) }), 'learn');
+  };
   P.askLearningGiveUp = function () {
     const c = sceneController(this), pending = this._session.pendingLearn;
     if (!c.isCurrent() || !pending) return;
@@ -1916,7 +1932,7 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.showEnd = function (aborted: boolean) {
     const c = sceneController(this); if (!c.isCurrent()) return;
-    this._learningGiveUp = null; this._learningInitial = null;
+    this._learningGiveUp = null; this._learningInitial = null; this._learningRetry = null;
     if (aborted) { this._endFeedbackPages = null; this._log.pause = false; this._log.add(PSFlow.translator().t("ui.end.aborted")); }
     // Full-party reception still has a destination choice. Do not announce a box before that choice commits.
     const s = this._session;
@@ -2013,7 +2029,7 @@ const { developmentCapabilities } = RuleConfig;
         return;
       case "learn":
         if (ext === null) this.askLearningGiveUp();
-        else this.act(async () => ({ ok: true, messages: await this._session.decideLearn(ext) }), "learn");
+        else this.chooseLearningSlot(ext);
         return;
       case 'learn-giveup':
         if (ext === 'give-up' || ext === 'continue-learning') this.answerLearningGiveUp(ext === 'give-up');
@@ -2074,7 +2090,7 @@ const { developmentCapabilities } = RuleConfig;
     this.popScene();
   };
   P.terminate = function () {
-    this._learningGiveUp = null; this._learningInitial = null;
+    this._learningGiveUp = null; this._learningInitial = null; this._learningRetry = null;
     const c = this._controller as BattleSceneController<any> | undefined;
     this._menuCursor?.clear();
     retireBattleBag(this);
