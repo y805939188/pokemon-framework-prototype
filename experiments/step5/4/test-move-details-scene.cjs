@@ -7,7 +7,7 @@ let temp,plugins,entryText,fixture;
 test.before(async()=>{
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-move-details-'));plugins={};
  for(const name of['PS_BattleFlow','PS_SaveState','PS_Evolution','PS_BattleFlowTest']){const out=path.join(temp,name),r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:PRODUCT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);let code=fs.readFileSync(path.join(out,name+'.js'),'utf8');
-  if(name==='PS_BattleFlow'&&process.env.PF_MOVE_DETAILS_SCENE_MUTATION){const variants={'remove-pp': ['if (view.pp !== null) {','if (false) {'],'remove-type': ['this.drawText(view.typeLabel,','this.drawText("",']},change=variants[process.env.PF_MOVE_DETAILS_SCENE_MUTATION];assert(change,'known explicit display mutation');assert.equal(code.split(change[0]).length,2,'one actual compiled display gate');code=code.replace(...change);}
+  if(name==='PS_BattleFlow'&&process.env.PF_MOVE_DETAILS_SCENE_MUTATION){const variants={'remove-pp': ['if (view.pp !== null) {','if (false) {'],'remove-type': ['this.drawText(view.typeLabel,','this.drawText("",'],'foreground-tile': ['this.contentsBack.fillRect(','this.contents.fillRect(']},change=variants[process.env.PF_MOVE_DETAILS_SCENE_MUTATION];assert(change,'known explicit display mutation');assert.equal(code.split(change[0]).length,2,'one actual compiled display gate');code=code.replace(...change);}
   if(name==='PS_BattleFlowTest')entryText=code;else plugins[name]=code;
  }
  const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));await vite.build({configFile:false,root:ROOT,logLevel:'error',build:{outDir:path.join(temp,'fixture'),minify:false,lib:{entry:path.join(ROOT,'src/plugins/flowtest/music-native-fixture.ts'),formats:['cjs'],fileName:()=> 'entry.cjs'}}});fixture=require(path.join(temp,'fixture/entry.cjs'));
@@ -31,7 +31,7 @@ function draw(h){
  G.Window_Command.prototype.drawItem=function(i){this._fallbackDraw=i;};
  menu.innerWidth=784;menu.innerHeight=172;menu.lineHeight=()=>36;menu.scrollBaseX=()=>0;menu.scrollBaseY=()=>0;
  const rows=[];menu.changePaintOpacity=v=>{rows.push({kind:'opacity',value:v});};menu.changeTextColor=v=>{menu._textColour=v;};menu.resetTextColor=()=>{menu._textColour='RESET';};
- menu.drawText=(text,x,y,width,align)=>rows.push({kind:'text',text,x,y,width,align,colour:menu._textColour});menu.contents.fillRect=(x,y,width,height,colour)=>rows.push({kind:'fill',x,y,width,height,colour});
+ menu.drawText=(text,x,y,width,align)=>rows.push({kind:'text',text,x,y,width,align,colour:menu._textColour});menu.contents.fillRect=(x,y,width,height,colour)=>rows.push({kind:'fill',x,y,width,height,colour});menu.contentsBack={fillRect:(x,y,width,height,colour)=>rows.push({kind:'back-fill',x,y,width,height,colour})};
  for(let i=0;i<menu._items.length;i++)menu.drawItem(i);
  return rows;
 }
@@ -40,7 +40,7 @@ for(const lang of['en','zh'])test(lang+' real four-slot menu paints type badges 
   for(const [text,colour]of[['PP 0/35','#bd2929'],['PP 6/25','#b35d00'],['PP 12/25','#8b7300'],['PP 40/40','#202028']])assert(texts.some(r=>r.text===text&&r.colour===colour),'actual PP draw '+text);
   for(const label of lang==='en'?['Normal','Fire','Water']:['一般','火','水'])assert(texts.some(r=>r.text===label),'actual localized type draw '+label);
   assert(rows.some(r=>r.kind==='fill'&&r.colour==='#cf6a38'),'actual Fire-colour badge/stripe');assert(h.s._menu._items.every(i=>i.enabled===true));assert.equal(h.s._menu._textColour,'RESET');
-  for(const r of rows)if(r.kind==='text'||r.kind==='fill'){assert(r.x>=0&&r.y>=0&&r.width>0);assert(r.x+r.width<=784);assert(r.y+(r.height??36)<=172,'two visible rows fit actual default window');}
+  for(const r of rows)if(['text','fill','back-fill'].includes(r.kind)){assert(r.x>=0&&r.y>=0&&r.width>0);assert(r.x+r.width<=784);assert(r.y+(r.height??36)<=172,'two visible rows fit actual default window');}
   assert.equal(JSON.stringify({state:h.flow.game(),request:h.s._session.currentRequest(),bag:h.s._session.bag}),before);assert.equal(JSON.stringify(h.flow.game()),h.before);
  }finally{h.cleanup();}
 });
@@ -58,4 +58,11 @@ test('missing checked metadata uses a neutral badge and does not fabricate a mov
 });
 test('returning to the main menu delegates its original single-line rendering and height',async()=>{
  const h=await open();try{choose(h,'fight');draw(h);const expanded=h.s._menu.itemHeight();h.s.onMenuCancel();const menu=h.s._menu;assert.equal(h.s._mode,'main');menu.drawItem(0);assert.equal(menu._fallbackDraw,0);assert(menu.itemHeight()<expanded);assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
+});
+test('large opaque tiles paint behind the real host cursor layer, leaving its ordinary selection visible',async()=>{
+ const source=fs.readFileSync(path.join(ROOT,'js/reactor_core.js'),'utf8');const C={Window:function(){},Sprite:class{},PIXI:{Container:class{constructor(){this.children=[];}addChild(c){this.children.push(c);}}}};vm.createContext(C);
+ for(const name of['_createAllParts','_createContentsBackSprite','_createCursorSprite','_createContentsSprite']){const marker='Window.prototype.'+name+' = function',a=source.indexOf(marker),b=source.indexOf('\n};',a);assert(a>=0&&b>a);vm.runInContext(source.slice(a,b+3),C);}
+ for(const name of['_createContainer','_createBackSprite','_createFrameSprite','_createArrowSprites','_createPauseSignSprites'])C.Window.prototype[name]=()=>{};
+ C.Window.prototype._createClientArea=function(){this._clientArea=new C.PIXI.Container();};const w=new C.Window();w._createAllParts();const layers=w._clientArea.children;assert(layers.indexOf(w._contentsBackSprite)<layers.indexOf(w._cursorSprite));assert(layers.indexOf(w._cursorSprite)<layers.indexOf(w._contentsSprite));
+ const h=await open();try{choose(h,'fight');const rows=draw(h);assert.equal(rows.filter(r=>r.kind==='back-fill'&&r.colour==='#fffdf5').length,4,'whole tiles stay behind the cursor');assert(!rows.some(r=>r.kind==='fill'&&r.colour==='#fffdf5'),'opaque foreground must not cover the actual cursor layer');}finally{h.cleanup();}
 });

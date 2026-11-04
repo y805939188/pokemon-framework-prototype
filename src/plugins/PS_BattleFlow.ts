@@ -1034,7 +1034,9 @@ const { developmentCapabilities } = RuleConfig;
     const rect = this.itemRect(index), x = rect.x + 8, width = rect.width - 16;
     // Simple replaceable type badge; no dependency on a particular artwork atlas.
     this.changePaintOpacity(true); // PP0 and disabled requests remain selectable candidates.
-    this.contents.fillRect(rect.x + 2, rect.y + 2, rect.width - 4, rect.height - 4, '#fffdf5');
+    // MZ draws the cursor between contentsBack and contents. Keep the large
+    // opaque tile behind it so keyboard/touch selection remains visible.
+    this.contentsBack.fillRect(rect.x + 2, rect.y + 2, rect.width - 4, rect.height - 4, '#fffdf5');
     this.contents.fillRect(rect.x + 2, rect.y + 2, 4, rect.height - 4, view.typeColour);
     this.changeTextColor('#202028');
     this.drawText(view.name, x, rect.y + 2, width);

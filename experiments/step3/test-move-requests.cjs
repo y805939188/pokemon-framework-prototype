@@ -28,7 +28,10 @@ function menu(session) {
     Scene_MenuBase: Base, Game_Interpreter: Base };
   vm.createContext(ctx);
   vm.runInContext(pluginText, ctx);
-  ctx.window.PSFlow.translator = () => ({ t: (_key, v) => `${v.move} PP ${v.pp}/${v.maxpp}` });
+  ctx.window.PSFlow.translator = () => ({ t: (_key, v) => `${v.move} PP ${v.pp}/${v.maxpp}`, tOr: (_key, fallback) => fallback });
+  // This isolated source consumer supplies its Session's actual content; it has
+  // no MZ PluginManager parameters or application boot/content-loader port.
+  ctx.window.PSFlow.content = () => session.content;
   const scene = Object.create(ctx.window.Scene_PSBattle.prototype);
   scene._session = session;
   let items;
