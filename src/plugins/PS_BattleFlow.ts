@@ -1214,6 +1214,7 @@ const { developmentCapabilities } = RuleConfig;
     this._battleBag = null; this._bagHidden = null; this._bagRetry = false; this._trainerDispatchQueued = false;
     this._bagLayer = 'battle'; this._bagFade = null; this._bagFadeReturn = false;
     this._partySelected = null; this._retryPartySelection = null; this._partyCommandShownUpdate = -1;
+    this._partyDisplayOrder = null;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1304,7 +1305,12 @@ const { developmentCapabilities } = RuleConfig;
       paint: cards => { if (c.isCurrent()) {
         this._status._d2Cards = cards.map(card => ({ ...card })); this._status.setLines([]);
         // Observe every owned, sequentially shown send-out, including A -> B -> A before another menu.
-        if (c.isCurrent()) this._menuCursor?.bindActive(cards.find(card => card.side === 'p1' && card.active)?.id ?? null);
+        if (c.isCurrent()) {
+          const active = cards.find(card => card.side === 'p1' && card.active);
+          // Single-player-seat presentation follows each published swap, including A -> B -> A.
+          if (active && !cards.some(card => card !== active && card.side === 'p1' && card.active)) bindPartyDisplayActive(this, active.id);
+          if (c.isCurrent()) this._menuCursor?.bindActive(active?.id ?? null);
+        }
         // HP0 is published before faint presentation. Keep the owned portrait
         // until that display step actually finishes instead of inferring it from HP.
         if (c.isCurrent()) this._pictures.sync(cards.filter(card => card.active && card.portraitVisible !== false).map(card => ({ id: card.id, side: card.side, name: card.name })));
@@ -1748,9 +1754,23 @@ const { developmentCapabilities } = RuleConfig;
   // participating members retain the Session record and stable battle identity, never a display index.
   const partyForDisplay = (scene: any): any[] => {
     const party = scene._session.party, byId = new Map(party.map((m: any) => [m.id, m]));
-    let saved: any; try { saved = PSFlow.game().party; } catch { return party; }
-    if (!Array.isArray(saved) || !party.every((m: any) => saved.some((own: any) => own?.id === m.id))) return party;
-    return saved.flatMap((own: any) => byId.has(own?.id) ? [byId.get(own.id)] : own?.isEgg === true ? [own] : []);
+    let rows = party;
+    try {
+      const saved = PSFlow.game().party;
+      if (Array.isArray(saved) && party.every((m: any) => saved.some((own: any) => own?.id === m.id))) {
+        rows = saved.flatMap((own: any) => byId.has(own?.id) ? [byId.get(own.id)] : own?.isEgg === true ? [own] : []);
+      }
+    } catch { /* Existing fallback: participating records, never invented Egg data. */ }
+    const order: string[] | null = scene._partyDisplayOrder;
+    if (!order) return rows;
+    const known = new Map(rows.map((member: any) => [member.id, member])), ranked = new Set(order);
+    return [...order.flatMap(id => known.has(id) ? [known.get(id)] : []), ...rows.filter((member: any) => !ranked.has(member.id))];
+  };
+  // A Scene-owned view of natural party ranks. It never sorts/mutates saved or Session members.
+  const bindPartyDisplayActive = (scene: any, memberId: string): void => {
+    const order: string[] = scene._partyDisplayOrder ??= partyForDisplay(scene).map((member: any) => member.id);
+    const at = order.indexOf(memberId);
+    if (at > 0) [order[0], order[at]] = [order[at]!, order[0]!];
   };
   P.showParty = function (sub: string, selected: string | null = null) {
     this._partySub = sub; this._partySelected = selected;
@@ -2034,6 +2054,7 @@ const { developmentCapabilities } = RuleConfig;
     this._ballFeedback?.cancel();
     this._display?.dispose();
     c?.dispose(); // retire callbacks before host teardown can reenter application code
+    this._partyDisplayOrder = null;
     this._backdrop?.dispose();
     this._pictures?.dispose();
     try { G.Scene_MenuBase.prototype.terminate.call(this); }

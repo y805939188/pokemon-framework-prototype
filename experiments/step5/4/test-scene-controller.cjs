@@ -215,6 +215,7 @@ for(const roar of [false,true])test(`real Session compiled Scene resets both cur
  const s=h.scene,painted=[],emitted=[];
  try {
   s.create();await flush();assert(s.isReady());s.start();drainScene(s);
+  const ranks=[],bind=s._menuCursor.bindActive.bind(s._menuCursor);s._menuCursor.bindActive=id=>{ranks.push({id,order:Array.from(s._partyDisplayOrder??[])});return bind(id);};
   const refresh=s._status.refresh;s._status.refresh=function(...args){const r=refresh.apply(this,args);const id=s.presentationState().cards.find(c=>c.side==='p1'&&c.active)?.id;if(painted.at(-1)!==id)painted.push(id);return r;};
   const push=s.pushMessages;s.pushMessages=function(messages){emitted.push(...JSON.parse(JSON.stringify(messages)));return push.call(this,messages);};
   await rememberBoth(s);s.onMenuOk();assert.equal(s._mode,'party');
@@ -225,6 +226,7 @@ for(const roar of [false,true])test(`real Session compiled Scene resets both cur
   const switches=emitted.filter(m=>m.kind==='events').flatMap(m=>m.events).filter(e=>['switch','drag'].includes(e.type));
   assert(switches.some(e=>e.type==='switch'&&e.args[0].includes(game.party[1].id)));
   if(roar)assert(switches.some(e=>e.type==='drag'&&e.args[0].includes(game.party[0].id)));
+  assert(ranks.some(row=>row.id===game.party[1].id&&row.order[0]===row.id),'published B stage must own display rank0 even when final engine is already A');assert.deepEqual(Array.from(s._partyDisplayOrder),roar?game.party.map(m=>m.id):[game.party[1].id,game.party[0].id]);
  } finally {s.terminate();}
 });
 async function projectionMenuHost() {

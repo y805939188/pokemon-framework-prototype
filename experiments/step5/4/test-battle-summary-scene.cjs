@@ -19,7 +19,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, leadingEgg = false, leadHP = null, pivot = false } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = suppliedContent ?? fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -27,6 +27,7 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   if (integration) { assert(content.moves.Rest); content.species.Snorlax.learnset[51] = ['Rest']; }
   const trainerRecord = content.trainers?.['music-normal']?.[0];
   if (trainerRecord) trainerRecord.party = Array.from({ length: trainerMembers }, (_, i) => ({ ...trainerRecord.party[0], level: 3 + i }));
+  if (pivot) { trainerRecord.party[0].level = 100; trainerRecord.party[0].moves = ['splash']; }
   if (shadowTag) trainerRecord.party[0].ability = 'shadowtag'; // Explicit author fixture; trapping itself is the real Gen8 engine.
   G.PluginManager.parameters = function (name) { const p = parameters.call(this, name); return name === 'PS_BattleFlow' ? { ...p, language: lang } : p; };
   flow.setLanguage(null); flow.stateReplaced(); flow._app = null; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.seed = [1, 2, 3, 4]; flow.rng = () => 0; flow.fast = fast; (G.ConfigManager ??= {}).battleEffects = effects;
@@ -36,9 +37,12 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   if (integration) { state.party[0].moves = [{ id: 'tackle', pp: 35, maxpp: 35 }, { id: 'growl', pp: 40, maxpp: 40 }, { id: 'splash', pp: 40, maxpp: 40 }, { id: 'protect', pp: 10, maxpp: 10 }]; state.party[0].gender = 'F'; state.party[0].shiny = true; state.dex.owned.push('pidgey'); Object.assign(trainerRecord.party[0], { gender: 'M', shiny: false }); }
   if (heldItem) { state.party[0].item = heldItem; flow.developerCapabilities = { allowHeldItemSources: true, allowExperimentalHeldItemBattle: true }; }
   if (mint) state.party[0].statNature = 'Timid';
+  if (pivot) state.party[0].moves = [{ id: 'uturn', pp: 20, maxpp: 20 }];
   if (hurt) state.party[0].hp -= 40;
+  if (leadHP !== null) { state.party[0].hp = leadHP; state.party[0].moves = [{ id: 'splash', pp: 40, maxpp: 40 }]; }
   if (reserveHP !== null) state.party[egg ? 2 : 1].hp = reserveHP;
   if (egg) { state.party[1].isEgg = true; state.party[1].shiny = eggShiny; state.party[1].nickname = 'Hidden Species'; }
+  if (leadingEgg) { state.party[0].isEgg = true; state.party[0].nickname = 'LEADING-EGG-NAME'; }
   state.inventory = E.inventory.inventoryFromBag(bag, E.itemCatalog.catalogOf(content)); G.$gameSystem._psGame = state;
   G.Input.keyMapper ??= {}; G.Input.isPressed ??= () => false; G.TouchInput.isCancelled ??= () => false;
   const listeners = new Map(), globals = new Map();
@@ -92,7 +96,7 @@ for (const lang of ['en', 'zh']) test(lang + ' battle Summary uses live HP/PP, s
     assert.equal(JSON.stringify(s.party.map(m => m.moves)), moves, 'read-only increment cannot sort or mark');
     await h.p.press('cancel'); assert.equal(current(h).view.detail, null);
     await h.p.press('right'); await h.p.press('right'); assert.equal(current(h).view.page, 4, 'pages clamp at the last page');
-    await h.p.press('down'); assert.equal(current(h).view.ids[current(h).view.cursor], reserve);
+    await h.p.press('up'); assert.equal(current(h).view.ids[current(h).view.cursor], reserve, 'after a real switch the reserve is the preceding displayed row');
     await h.p.press('left'); await h.p.press('left');
     assert(text(h).some(line => line.endsWith(`${hurt.hp}/${hurt.maxhp}`)));
     await h.p.press('cancel'); await h.p.inMode('party');
@@ -304,4 +308,24 @@ for (const lang of ['en', 'zh']) test(lang + ' combined public cards, full-slot 
   assert.equal(installs, 0); await h.frames(1); h.s.onMenuOk(); await h.frames(3); assert.equal(h.flow.lastOutcome.commit, 'applied'); assert.equal(installs, 1);
   assert.equal(h.flow.game().party[0].level, 51); assert(h.flow.game().party[0].moves.some(move => move.id === 'rest')); const after = JSON.stringify(h.flow.game()); h.s.onEnd(); assert.equal(installs, 1); assert.equal(JSON.stringify(h.flow.game()), after);
  } finally { h.cleanup(); }
+});
+
+
+const displayIds = h => Array.from(h.s._menu._items, row => row.ext).filter(id => id !== null);
+for(const lang of ['en','zh'])test(lang+' party display order follows real swaps and Summary returns a stable member without sorting the save',async()=>{
+ const h=await open({lang,members:4,egg:true,trainer:true,fast:true,effects:lang!=='en'});try{const s=h.s._session,saved=JSON.parse(h.before).party.map(m=>m.id),sessionIds=s.party.map(m=>m.id),[a,egg,b,c]=saved;let installs=0,doc=h.G.$gameSystem._psGame;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:value=>{installs++;doc=value;}});
+ await commands(h,b);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),b);await party(h);assert.deepEqual(displayIds(h),[b,egg,a,c],'first switch swaps natural display ranks including the Egg');h.s.onMenuCancel();await h.p.inMode('main');
+ await commands(h,c);await pick(h,'switch-in');await h.p.inMode('main');await party(h);assert.deepEqual(displayIds(h),[c,egg,a,b],'second switch swaps ranks instead of merely moving the active row to front');h.s.onMenuCancel();await h.p.inMode('main');
+ const raw=s.gw.snapshot(),work=JSON.stringify(s.party);await summary(h,c);assert.deepEqual(Array.from(current(h).view.ids),[c,egg,a,b]);await h.p.press('down');assert.equal(current(h).view.ids[current(h).view.cursor],egg);assert(text(h).some(t=>t.includes('1/1')));await h.p.press('up');await h.p.press('right');await h.p.press('down');assert.equal(current(h).view.ids[current(h).view.cursor],a,'non-INFO navigation skips the Egg in displayed order');await h.p.press('down');assert.equal(current(h).view.ids[current(h).view.cursor],b);await h.p.press('cancel');await h.p.inMode('party');assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext,b);assert.equal(h.s._menu.index(),3,'display cursor is not the saved index');assert.equal(s.gw.snapshot(),raw);assert.equal(JSON.stringify(s.party),work);
+ await pick(h,b);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),b,'row3 submits member B, never raw participating slot3');await party(h);assert.deepEqual(displayIds(h),[b,egg,a,c]);assert.deepEqual(s.party.map(m=>m.id),sessionIds);assert.deepEqual(h.flow.game().party.map(m=>m.id),saved);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
+ assert.equal(installs,0);h.s.onMenuCancel();await h.p.inMode('main');await h.p.fightUntilEnd();await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),saved,'final result write preserves original saved positions, including the Egg');h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
+test('party display order handles a leading Egg at initial dispatch and keeps it display-only after a real switch',async()=>{
+ const h=await open({members:4,leadingEgg:true,fast:true});try{const saved=JSON.parse(h.before).party.map(m=>m.id),[egg,a,b,c]=saved,s=h.s._session;assert.equal(s.gw.activeId('p1'),a);await party(h);assert.deepEqual(displayIds(h),[a,egg,b,c],'initial shown dispatch swaps the leading Egg rank');assert(h.s._menu._items.find(row=>row.ext===egg).name.includes('Egg'));h.s.onMenuCancel();await h.p.inMode('main');await commands(h,c);await pick(h,'switch-in');await h.p.inMode('main');await party(h);assert.deepEqual(displayIds(h),[c,egg,b,a]);await pick(h,egg);assert.deepEqual(Array.from(h.s._menu._items,row=>row.ext),['summary',null]);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
+});
+for(const kind of ['faint','pivot'])test('party display order follows the real mandatory '+kind+' replacement and keeps stable-ID submission',async()=>{
+ const h=await open({members:4,egg:true,trainer:true,fast:true,...(kind==='faint'?{leadHP:1}:{pivot:true})});try{const saved=JSON.parse(h.before).party.map(m=>m.id),[a,egg,b,c]=saved,s=h.s._session;await pick(h,'fight');await pick(h,1);await h.p.inMode('party-forced');assert.equal(!!s.gw.readState('p1').find(m=>m.id===a).fainted,kind==='faint');h.s.onMenuCancel();await h.frames(1);assert.equal(h.s._mode,'party-forced');await pick(h,c);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),c);await party(h);assert.deepEqual(displayIds(h),[c,egg,b,a]);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
 });
