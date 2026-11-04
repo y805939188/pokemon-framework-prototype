@@ -1,6 +1,5 @@
-import type { Stats } from "../rules/types";
+import type { Content, Member, Stats } from "../rules/types";
 import type { GrowthMessage, SessionMessage } from "../battle/protocol";
-import type { BattleSession } from './session';
 import { catalogOf } from '../rules/item-catalog';
 import { planLearningQueue } from '../rules/learning';
 
@@ -11,7 +10,11 @@ export interface BattleLearnProtection {
 /** The current validated author catalog supplies HM identities; no display-name or Gen8-name guess.
  * This is a detached read-only explanation. The Session repeats the same check before a decision.
  */
-export function readBattleLearnProtection(session: Pick<BattleSession, 'pendingLearn' | 'party' | 'content'>, slot: number): BattleLearnProtection | null {
+export function readBattleLearnProtection(session: {
+  readonly pendingLearn: { readonly memberId: string; readonly move: { readonly id: string; readonly name: string; readonly pp: number } } | null;
+  readonly party: readonly Member[];
+  readonly content: Content;
+}, slot: number): BattleLearnProtection | null {
   const pending = session.pendingLearn;
   if (!pending || !Number.isSafeInteger(slot) || slot < 0 || slot > 3) return null;
   const member = session.party.find(member => member.id === pending.memberId);
