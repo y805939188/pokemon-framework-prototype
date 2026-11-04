@@ -9,7 +9,7 @@ test.before(async () => {
   for (const name of ['PS_BattleFlow', 'PS_SaveState', 'PS_Evolution', 'PS_BattleFlowTest']) {
     const out = path.join(temp, name), r = spawnSync('pnpm', ['--dir', 'src', 'exec', 'vite', 'build', '--outDir', out], { cwd: ROOT, env: { ...process.env, RR_PLUGIN: name }, encoding: 'utf8' });
     assert.equal(r.status, 0, r.stdout + r.stderr); const code = fs.readFileSync(path.join(out, name + '.js'), 'utf8');
-    if (name === 'PS_BattleFlowTest') entryText = code; else plugins[name] = code;
+    if (name === 'PS_BattleFlowTest') entryText = code; else plugins[name] = name === 'PS_BattleFlow' && process.env.PF_BAG_FADE_TEST_PLUGIN ? fs.readFileSync(process.env.PF_BAG_FADE_TEST_PLUGIN, 'utf8') : code;
   }
   const vite = require(require.resolve('vite', { paths: [path.join(ROOT, 'src')] }));
   await vite.build({ configFile: false, root: ROOT, logLevel: 'error', build: { outDir: path.join(temp, 'fixture'), minify: false,
@@ -17,13 +17,13 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, fast = true } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
   if (catalog) catalog(content.items);
   G.PluginManager.parameters = function (name) { const p = parameters.call(this, name); return name === 'PS_BattleFlow' ? { ...p, language: lang } : p; };
-  flow.setLanguage(null); flow.stateReplaced(); flow._app = null; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.seed = [1, 2, 3, 4]; flow.rng = () => 0; flow.fast = true;
+  flow.setLanguage(null); flow.stateReplaced(); flow._app = null; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.seed = [1, 2, 3, 4]; flow.rng = () => 0; flow.fast = fast;
   const state = fixture.musicNativeState(E, content, 'receiving'); state.party = state.party.slice(0, members); state.nextMemberOrdinal = String(members + 1);
   if (hurt) state.party[0].hp -= 40;
   if (egg) state.party[1].isEgg = true;
@@ -154,5 +154,84 @@ test('the confirmation that opens Use/Cancel cannot also accept Use in the same 
     await bag(h); const index = h.s.inputState().items.findIndex(x => x.key === 'potion'); h.s._menu.select(index); h.s.onMenuOk();
     assert.equal(h.s._mode, 'bag-command'); h.s.onMenuOk(); assert.equal(h.s._mode, 'bag-command'); assert.equal(h.s._session.bag.potion, 3);
     await h.frames(1); await pick(h, 'use'); assert.equal(h.s._mode, 'bag-members'); assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { h.cleanup(); }
+});
+
+async function animatedBag(h) {
+  await pick(h, 'bag');
+  assert.equal(h.s.inputState().ready, false, 'normal opening fade must lock selection before swapping the screen');
+  assert.equal(h.s._mode, 'messages');
+  const fade = h.s._bagFade, cover = h.s.children.find(n => n._psBagFade);
+  assert(fade && cover?.visible !== false && cover?.bitmap, 'actual owned cover is attached');
+  return { fade, cover, surface: cover.bitmap };
+}
+async function visibleBag(h, mode = 'bag') {
+  await h.waitFor(() => h.s._mode === mode && h.s.inputState().ready, 'ready animated ' + mode);
+  assert(!h.s.children.some(n => n._psBagFade), 'finished fade releases its cover');
+}
+for (const lang of ['en', 'zh']) test(lang + ' normal-speed bag fades out the battle, locks input, and fades it back without replacing menu or model', async () => {
+  const h = await open({ lang, fast: false }); try {
+    const menu = h.s._menu, status = h.s._status;
+    const { fade, cover, surface } = await animatedBag(h), model = h.s._battleBag;
+    let releases = 0; const destroy = surface.destroy.bind(surface); surface.destroy = () => { releases++; destroy(); };
+    assert.equal(fade.snapshot().phase, 'out'); assert(status.visible !== false, 'battle stays painted during outgoing fade');
+    await h.frames(4); assert(cover.opacity > 0 && cover.opacity < 255);
+    const sampledOpacity = cover.opacity; fade.advance(h.G.performance.now() + 10000);
+    assert.equal(cover.opacity, sampledOpacity, 'resampling one Scene update must not consume a later transition phase');
+    const cursor = model.view().cursor; h.s.onMenuOk(); h.s.onMenuCancel();
+    assert.equal(model.view().cursor, cursor); assert.equal(h.s._session.bag.potion, 3);
+    await h.waitFor(() => fade.snapshot().phase === 'in', 'opaque screen swap');
+    assert(!status.visible && cover.visible !== false, 'cover must not hide itself with battle nodes');
+    assert.equal(h.s.inputState().ready, false); await visibleBag(h);
+    assert.equal(fade.snapshot().phase, 'done'); assert.equal(cover.bitmap, null);
+    assert.equal(releases, 1, 'the private cover bitmap is released exactly once');
+    assert.equal(h.s._menu, menu); assert.equal(h.s._battleBag, model);
+    await cancel(h); assert.equal(h.s.inputState().ready, false); assert.equal(h.s._bagFade.snapshot().phase, 'out');
+    await h.waitFor(() => h.s._mode === 'main' && h.s.inputState().ready, 'battle fade-in completion');
+    assert(status.visible !== false); assert.equal(h.s._menu, menu); assert.equal(h.s._battleBag, model);
+    assert(!h.s.children.some(n => n._psBagFade)); assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { h.cleanup(); }
+});
+test('normal member targeting and cancellation fade between the existing bag and target layer while retaining the same selection', async () => {
+  const h = await open({ fast: false }); try {
+    await animatedBag(h); await visibleBag(h); const model = h.s._battleBag, menu = h.s._menu;
+    await use(h, 'potion'); assert.equal(model.view().kind, 'members');
+    assert.equal(h.s.inputState().ready, false); await visibleBag(h, 'bag-members');
+    assert.equal(h.s._battleBag, model); assert.equal(h.s._session.bag.potion, 3);
+    await cancel(h); assert.equal(model.view().kind, 'items'); assert.equal(h.s.inputState().ready, false);
+    await visibleBag(h); assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext, 'potion');
+    assert.equal(h.s._menu, menu); assert.equal(h.s._battleBag, model); assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { h.cleanup(); }
+});
+test('normal successful member Use hands the battle to the existing action without replaying a menu fade or double-consuming', async () => {
+  const h = await open({ fast: false }); try {
+    await animatedBag(h); await visibleBag(h); await use(h, 'potion'); await visibleBag(h, 'bag-members');
+    const s = h.s._session, target = s.party[0].id; let calls = 0; const useItem = s.useItem.bind(s);
+    s.useItem = (...args) => { calls++; return useItem(...args); };
+    await pick(h, target); h.s.onMenuOk(); await h.p.inMode('main');
+    assert.equal(calls, 1); assert.equal(s.bag.potion, 2); assert.equal(h.s._bagLayer, 'battle');
+    assert(!h.s.children.some(n => n._psBagFade)); assert(h.s._status.visible !== false);
+    assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { h.cleanup(); }
+});
+for (const how of ['abort', 'replace', 'terminate']) test(how + ' during a normal bag fade releases only its private cover and cannot swap a successor', async () => {
+  const h = await open({ fast: false }); try {
+    const { fade, cover } = await animatedBag(h); await h.frames(3);
+    if (how === 'terminate') await h.waitFor(() => fade.snapshot().phase === 'in', 'incoming fade before scene close');
+    if (how === 'abort') h.flow.abort(Error('owned bag fade cancel')); else if (how === 'replace') h.flow.stateReplaced(); else h.s.terminate();
+    if (how !== 'terminate') await h.frames(2); h.s.terminate();
+    const next = { children: [] }; h.G.SceneManager._scene = next;
+    assert(fade.advance(h.G.performance.now() + 10000)); assert.equal(fade.snapshot().phase, 'cancelled');
+    assert.equal(cover.bitmap, null); assert(!cover.parent); assert.equal(next.children.length, 0);
+    assert.equal(h.G.SceneManager._scene, next); assert.equal(JSON.stringify(h.flow.game()), h.before); assert(!h.flow.app().saveBlocked);
+  } finally { h.cleanup(); }
+});
+test('a failed view swap preserves the failure and removes the private cover without committing a battle', async () => {
+  const h = await open({ fast: false }); try {
+    h.s.renderBattleBagView = () => { throw Error('controlled bag view failure'); };
+    const { cover } = await animatedBag(h); await h.p.inMode('end');
+    assert.equal(h.s._failure.message, 'controlled bag view failure'); assert.equal(cover.bitmap, null);
+    assert(!h.s.children.some(n => n._psBagFade)); assert.equal(JSON.stringify(h.flow.game()), h.before);
+    assert(!h.flow.app().saveBlocked);
   } finally { h.cleanup(); }
 });

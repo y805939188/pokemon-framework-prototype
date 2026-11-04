@@ -30,6 +30,7 @@ import { createLevelStatsMZ } from "./battleflow/level-stats-mz";
 import { createOrdinaryMessageMZ, createPausedMessageMZ, createSynchronizedMessageMZ, createBriefMessageMZ, isMessageStepMZ } from "./battleflow/ordinary-message-mz";
 import { BriefMessageStep } from './battleflow/brief-message';
 import { BattleBagSelection } from './battleflow/battle-bag';
+import { createBagFadeMZ } from './battleflow/bag-fade-mz';
 import type { BattleBagRequest } from './battleflow/battle-bag';
 import { catalogOf, itemForBattleId } from '../framework/rules/item-catalog';
 import { BALLS } from '../framework/rules/items';
@@ -1178,6 +1179,7 @@ const { developmentCapabilities } = RuleConfig;
     this._residentBrief = null; this._briefTail = null;
     this._wildOpeningQueued = false;
     this._battleBag = null; this._bagHidden = null; this._bagRetry = false; this._trainerDispatchQueued = false;
+    this._bagLayer = 'battle'; this._bagFade = null; this._bagFadeReturn = false;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1459,6 +1461,7 @@ const { developmentCapabilities } = RuleConfig;
     if (s.pendingLearn) { this.showLearn(); return; }
     const req = s.currentRequest();
     if (req && req.forceSwitch) { this.showParty("forced"); return; }
+    if (this._bagFadeReturn) { this._bagFadeReturn = false; this.showBattleBagView(); return; }
     if (this._bagRetry && this._battleBag?.view().kind !== 'closed') { this._bagRetry = false; this.showBattleBagView(); return; }
     if (retryMoves && req?.active?.[0]?.moves?.length) { this.showMoves(); return; }
     this.showMain();
@@ -1536,11 +1539,13 @@ const { developmentCapabilities } = RuleConfig;
     })));
   };
   function restoreBagView(scene: any): void {
+    scene._bagLayer = 'battle';
     const hidden = scene._bagHidden; scene._bagHidden = null;
     if (!hidden || !sceneController(scene).ownsHost() || G.SceneManager._scene !== scene) return;
     for (const row of hidden) row.node.visible = row.visible;
   }
   function retireBattleBag(scene: any): void {
+    scene._bagFadeReturn = false; scene._bagFade?.cancel(); scene._bagFade = null;
     scene._battleBag?.retire(); scene._bagRetry = false; restoreBagView(scene);
   }
   P.showBag = function () {
@@ -1568,12 +1573,28 @@ const { developmentCapabilities } = RuleConfig;
     this.showBattleBagView();
   };
   P.battleBagState = function () { return this._battleBag?.view() ?? null; };
+  P.battleBagTransitionState = function () { return sceneController(this).isCurrent() ? this._bagFade?.snapshot() ?? null : null; };
   P.showBattleBagView = function () {
+    const c = sceneController(this), view = this._battleBag?.view();
+    if (!c.isCurrent() || !view || view.kind === 'submitting' || this._bagFadeReturn) return;
+    const layer = view.kind === 'closed' ? 'battle' : view.kind === 'items' || view.kind === 'commands' ? 'bag' : 'target';
+    if (!PSFlow.fast && layer !== this._bagLayer) {
+      this._bagFadeReturn = true;
+      const current = () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this;
+      this._bagFade = createBagFadeMZ(G, this, current, () => this._pictureUpdate, () => {
+        this._bagLayer = layer; this.renderBattleBagView();
+        if (current()) { c.show('messages'); this._menu.deactivate(); }
+      });
+      c.enqueue([this._bagFade]); return;
+    }
+    this._bagLayer = layer; this.renderBattleBagView();
+  };
+  P.renderBattleBagView = function () {
     const c = sceneController(this), model = this._battleBag; if (!c.isCurrent() || !model) return;
     const view = model.view(); if (view.kind === 'closed') { restoreBagView(this); this.showMain(); return; }
     if (view.kind === 'submitting') return;
     if (!this._bagHidden) {
-      const nodes = new Set([this._status, this._log, ...(this.children ?? []).filter((n: any) => n !== this._windowLayer && n !== this._menu)]);
+      const nodes = new Set([this._status, this._log, ...(this.children ?? []).filter((n: any) => n !== this._windowLayer && n !== this._menu && !n._psBagFade)]);
       this._bagHidden = [...nodes].filter(Boolean).map(node => ({ node, visible: (node as any).visible }));
       for (const row of this._bagHidden) { if (!c.isCurrent()) return; row.node.visible = false; }
     }
