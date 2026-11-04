@@ -126,6 +126,12 @@
  * @type variable
  * @default 10
  *
+ * @arg canSwitch
+ * @text Allow manual switching
+ * @desc false hides voluntary Switch In; mandatory replacements remain available. Default true.
+ * @type boolean
+ * @default true
+ *
  * @arg canLose
  * @text Can lose
  * @desc false (default): a defeat takes the player home and ends this event. true: the event continues with result 4. Money loss and heal apply either way.
@@ -244,6 +250,12 @@
  * @arg resultVariable
  * @type variable
  * @default 0
+ *
+ * @arg canSwitch
+ * @text Allow manual switching
+ * @desc false hides voluntary Switch In; mandatory replacements remain available. Default true.
+ * @type boolean
+ * @default true
  *
  * @arg canLose
  * @type boolean

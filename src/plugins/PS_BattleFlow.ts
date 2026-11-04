@@ -712,6 +712,11 @@ const { developmentCapabilities } = RuleConfig;
   const prebattle = installPrebattleHost(G, PSFlow, op => PSFlow._preparePrebattleAudio(op));
 
   // ---------------------------------------------------------------- plugin commands + interpreter wait
+  function parseCanSwitch(value: unknown): boolean {
+    if (value === undefined || value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+    throw new Error('canSwitch must be true or false');
+  }
   function parseFoes(text: string): { species: string; level: number }[] {
     return String(text).split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
       const [species, level] = s.split(":");
@@ -721,7 +726,7 @@ const { developmentCapabilities } = RuleConfig;
 
   G.PluginManager.registerCommand(NAME, "StartBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
-    const seq = PSFlow.nextSeq();
+    const canSwitch = parseCanSwitch(args.canSwitch), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || "battle"}#${seq}`;
     const opened=PSFlow.tryOpenBattle({
       kind: args.kind === "trainer" ? "trainer" : "wild",
@@ -729,7 +734,7 @@ const { developmentCapabilities } = RuleConfig;
       seq,
       battleId,
       resultVariable: Number(args.resultVariable) || 0,
-      canLose: String(args.canLose) === "true",
+      canLose: String(args.canLose) === "true", canSwitch,
       forceParty: String(args.forceParty) === "true",
     }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
       transition: { location: args.prebattleLocation || undefined } });
@@ -741,6 +746,7 @@ const { developmentCapabilities } = RuleConfig;
   G.PluginManager.registerCommand(NAME, "StartTrainerBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
     if (args.moneyGain !== undefined && ![true, false, "true", "false"].includes(args.moneyGain)) throw new Error("moneyGain must be true or false");
+    const canSwitch = parseCanSwitch(args.canSwitch);
     const id = String(args.trainerId || args.id || ""), version = Number(args.version ?? 0), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || `trainer-${id}-v${version}`}#${seq}`;
     let known = true;
@@ -756,7 +762,7 @@ const { developmentCapabilities } = RuleConfig;
       kind: "trainer", trainer: { id, version }, foes: [], seq, battleId,
       moneyGain: args.moneyGain !== false && args.moneyGain !== "false",
       resultVariable: Number(args.resultVariable) || 0,
-      canLose: String(args.canLose) === "true",
+      canLose: String(args.canLose) === "true", canSwitch,
       forceParty: String(args.forceParty) === "true",
     }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
       transition: { location: args.prebattleLocation || undefined } });
@@ -1768,7 +1774,7 @@ const { developmentCapabilities } = RuleConfig;
     if (!member || (!member.isEgg && !live)) { this.showParty(this._partySub); return; }
     this._partySelected = memberId;
     const tr = PSFlow.translator(), items: any[] = [];
-    if (!member.isEgg && live?.hp > 0 && !live.fainted) items.push({ name: tr.t('ui.party.switch_in'), ext: 'switch-in' });
+    if ((this._session.canSwitch !== false || this._partySub === 'forced') && !member.isEgg && live?.hp > 0 && !live.fainted) items.push({ name: tr.t('ui.party.switch_in'), ext: 'switch-in' });
     items.push({ name: tr.t('management.summary'), ext: 'summary' });
     items.push({ name: tr.t('ui.party.cancel'), ext: null });
     this.show('party-command', items);

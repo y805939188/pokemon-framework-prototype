@@ -868,6 +868,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.#currentSettlementAdmission = admission;
     const assertCurrent = () => { if (this.op !== op || this.generation !== generation) throw new Error(`battle ${request.battleId} was aborted while its session was being created; the late session is not used`); };
     try {
+      const canSwitch = request.canSwitch; assertCurrent();
+      if (canSwitch !== undefined && typeof canSwitch !== "boolean") throw new Error("canSwitch must be boolean when provided");
       const moneyGain = request.moneyGain; assertCurrent();
       if (moneyGain !== undefined && typeof moneyGain !== "boolean") throw new Error("moneyGain must be boolean when provided");
       op.facts.moneyGain = moneyGain ?? true;
@@ -928,7 +930,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         if (!member.owner) throw new Error(`player member ${member.id} has no authoritative owner for obedience`);
         return [member.id, { ...member.owner }];
       }));
-      const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full,
+      const setup: BattleSetup = { foes, canSwitch: canSwitch ?? true, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full,
         obedience: { player: { ...game.player }, members: memberOwners, badges: badgeCount(game.badges), anyHighLevel: config.ANY_HIGH_LEVEL_POKEMON_CAN_DISOBEY,
           foreignHighLevel: config.FOREIGN_HIGH_LEVEL_POKEMON_CAN_DISOBEY, generation, contentIdentity },
         // This host-facing DTO must never alias the private settlement facts.

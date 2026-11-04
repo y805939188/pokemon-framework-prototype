@@ -88,6 +88,8 @@ export interface FoeSpec {
 export type FoeAi = (request: Req) => string | null | undefined;
 
 export interface CreateOptions {
+  /** Voluntary choice policy only; never a replacement for simulator switch legality. */
+  canSwitch?: boolean;
   game: GameState;
   battleId: string;
   foe: FoeSpec;
@@ -157,6 +159,8 @@ export class SessionBrokenError extends Error {
 }
 
 export class BattleSession {
+  /** Fixed for this session; not saved, checkpointed, or part of the result protocol. */
+  constructor(readonly canSwitch = true) {}
   content!: Content;
   rules!: G.ExpRules;
   battleId!: string;
@@ -195,7 +199,8 @@ export class BattleSession {
   _friendUnavailable: string[] = [];
   _pendingFriendFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
 
-  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi }: CreateOptions): Promise<BattleSession> {
+  static async create({ game, battleId, foe, content, canSwitch = true, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi }: CreateOptions): Promise<BattleSession> {
+    if (typeof canSwitch !== "boolean") throw new Error("canSwitch must be boolean when provided");
     if (!experimentalHeldBattle && [...game.party, ...foe.team].some((m) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成");
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
     for (const m of [...game.party, ...foe.team]) {
@@ -212,7 +217,7 @@ export class BattleSession {
     }
     const party = S.clone(game.party).filter((m) => !m.isEgg).slice(0, 6);
     const lead = [...party.filter((m) => m.hp > 0), ...party.filter((m) => m.hp <= 0)];
-    const s = new BattleSession();
+    const s = new BattleSession(canSwitch);
     s.content = content; s.rules = rules || G.DEFAULT_RULES; s.battleId = battleId; s.foe = foe;
     s.party = party; s.foeTeam = S.clone(foe.team);
     s.startBag = battleBag(game.inventory, catalogOf(content)); s.bag = S.clone(s.startBag);
@@ -393,6 +398,9 @@ export class BattleSession {
 
   async chooseMove(index: number): Promise<TurnResult> { this._log("info", "choice", { action: "move", index }); return this._action(() => this._turn(async () => this.gw.choose("p1", `move ${index}`))); }
   async chooseSwitch(memberId: string): Promise<TurnResult> {
+    this._assertUsable();
+    const forced = this.currentRequest()?.forceSwitch;
+    if (!this.canSwitch && !(Array.isArray(forced) ? forced[0] === true : forced === true)) return this._refuse('choice-rejected');
     return this._action(async () => {
       this._log("info", "choice", { action: "switch", member: memberId });
       const i = (this.requests!["p1"]!["side"].pokemon as Req[]).findIndex((p) => p["ident"] === `p1: ${memberId}`);
@@ -427,6 +435,9 @@ export class BattleSession {
    * and resolve the turn. Items/balls are reserved in the ledger first and refunded if the choice is refused.
    */
   async chooseDoubles(specs: (DoublesSpec | null)[], { commit = true }: { commit?: boolean } = {}): Promise<TurnResult> {
+    this._assertUsable();
+    const forced = this.currentRequest()?.forceSwitch;
+    if (!this.canSwitch && specs.some((spec, i) => spec?.switch !== undefined && !(Array.isArray(forced) ? forced[i] === true : forced === true))) return this._refuse('choice-rejected');
     return this._action(async () => {
       this._log("info", "choice", { action: "doubles", specs: specs.map((x) => (x ? x.kind ?? (x.switch !== undefined ? "switch" : "move") : null)), commit });
       // validate every spec BEFORE reserving anything: a refusal consumes nothing (WP38 2 / WP28 3.5)
