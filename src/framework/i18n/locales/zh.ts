@@ -296,6 +296,8 @@ export const zh: LocaleTable = {
     "ui.levelStats.total": "Lv. {level} 能力数值",
     "ui.learn.forget": "忘记 {move}",
     "ui.learn.skip": "不学习 {move}",
+    "ui.learn.give_up": "要放弃学习{move}吗？",
+    "ui.learn.not_learned": "{name}没有学会{move}。",
     "ui.end.continue": "继续",
     "trainer.challenged": "{name}向你发起了挑战！",
     "trainer.defeated": "你击败了{name}！",

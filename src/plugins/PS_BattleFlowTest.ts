@@ -232,7 +232,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   async function finishBattle() { await inMode("end"); await press("ok"); await dismissMessages(); await waitFor(() => !W.PSFlow.running && !battle(), "back from the battle"); await frames(5); }
   async function fightUntilEnd(moveRe: RegExp, max = 12) {
     for (let i = 0; i < max && mode_() !== "end"; i++) {
-      if (mode_() === "learn") { await choose(/Don't learn|不学习/); continue; }
+      if (mode_() === "learn") { await choose(/Don't learn|不学习/); await inMode('learn-giveup'); await choose({ key: 'give-up' }); continue; }
       await choose({ key: "fight" }); await inMode("moves"); await choose(moveRe);
       await waitBattlePresentation(() => ["main", "end", "learn"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after the move");
     }
@@ -391,7 +391,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       assert(items[0].enabled === false, "the active member cannot be switched to itself");
       await press("cancel"); await inMode("main");
       // finish the battle: two KOs
-      for (let i = 0; i < 2; i++) { await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower/i); await frames(5); await waitFor(() => mode_() === "main" || mode_() === "end" || mode_() === "learn", "after attack"); if (mode_() === "learn") { await choose(/Don't learn/); } await frames(5); if (mode_() === "end") break; await inMode("main"); }
+      for (let i = 0; i < 2; i++) { await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower/i); await frames(5); await waitFor(() => mode_() === "main" || mode_() === "end" || mode_() === "learn", "after attack"); if (mode_() === "learn") { await choose(/Don't learn/); await inMode('learn-giveup'); await choose({ key: 'give-up' }); } await frames(5); if (mode_() === "end") break; await inMode("main"); }
       await inMode("end"); await press("ok"); await dismissMessages();
       eq(W.PSFlow.lastOutcome.commit, "applied", "finished and committed");
       eq(I6.bagOf(game()), { ...I6.bagOf(before), pokeball: I6.bagOf(before).pokeball - 1 }, "committed bag: only the ball that the trainer blocked is spent");

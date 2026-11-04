@@ -48,7 +48,7 @@ export async function runD2Status(p: any): Promise<void> {
       p.assert(scene.presentationState().cards.find((card: any) => card.side === 'p1' && card.active).level === 51, 'display reflects published level before learning');
       const duration = flashDuration(traced.rows); p.eq(game(), before, 'growth presentation did not install working state');
       const audio = scene.presentationState().audio; p.eq(audio.map((row: any) => row.kind), ['exp-gain', 'exp-full', 'exp-gain'], 'each actual level segment owns its logical audio requests');
-      await choose(/Don't learn|不学习/); await inMode('main'); await abort();
+      await choose(/Don't learn|不学习/); await inMode('learn-giveup'); await choose({ key: 'give-up' }); await inMode('main'); await abort();
       return result({ id: 'D2-S02', duration, paints: traced.rows, audio });
     } finally { traced.restore(); }
   });
