@@ -15,6 +15,8 @@ SUITES=(
   experiments/step5/4/test-prebattle-native.cjs
   experiments/step5/4/test-prebattle-menu.cjs
   experiments/step5/4/test-menu-grid.cjs
+  experiments/step5/4/test-move-choice.cjs
+  experiments/step5/4/test-move-details-scene.cjs
   experiments/step5/4/test-move-menu-refusal.cjs
   experiments/step5/4/test-move-menu-native.cjs
   experiments/step5/4/test-growth-display.cjs

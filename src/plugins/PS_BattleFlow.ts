@@ -14,6 +14,7 @@ import { BattleDisplayPlayback } from "./battleflow/display";
 import type { BattleDisplayCard } from "./battleflow/display";
 import { hpColour } from "./battleflow/visual-timing";
 import { BattleMenuCursor, gridCursor } from "./battleflow/menu";
+import { moveChoice } from "./battleflow/move-choice";
 import { battlebackContext, createBattlebackMZ } from "./battleflow/battleback-mz";
 import { createBattlePicturesMZ } from "./battleflow/picture-mz";
 import { createFaintMediaMZ } from "./battleflow/faint-mz";
@@ -1023,6 +1024,30 @@ const { developmentCapabilities } = RuleConfig;
   };
   Window_PSMenu.prototype.itemAt = function (i: number) { return this._items[i]; };
   Window_PSMenu.prototype.maxCols = function () { return this._phase === 'main' || this._phase === 'moves' ? 2 : 1; };
+  Window_PSMenu.prototype.itemHeight = function () {
+    const normal = G.Window_Command.prototype.itemHeight.call(this);
+    return this._phase === 'moves' ? Math.max(normal, this.lineHeight() * 2 + 8) : normal;
+  };
+  Window_PSMenu.prototype.drawItem = function (index: number) {
+    const view = this._phase === 'moves' && this._items[index]?.moveView;
+    if (!view) { G.Window_Command.prototype.drawItem.call(this, index); return; }
+    const rect = this.itemRect(index), x = rect.x + 8, width = rect.width - 16;
+    // Simple replaceable type badge; no dependency on a particular artwork atlas.
+    this.changePaintOpacity(true); // PP0 and disabled requests remain selectable candidates.
+    this.contents.fillRect(rect.x + 2, rect.y + 2, rect.width - 4, rect.height - 4, '#fffdf5');
+    this.contents.fillRect(rect.x + 2, rect.y + 2, 4, rect.height - 4, view.typeColour);
+    this.changeTextColor('#202028');
+    this.drawText(view.name, x, rect.y + 2, width);
+    const badgeWidth = Math.min(112, Math.floor(width / 2)), y = rect.y + this.lineHeight() + 4;
+    this.contents.fillRect(x, y, badgeWidth, this.lineHeight(), view.typeColour);
+    this.changeTextColor(view.typeTextColour);
+    this.drawText(view.typeLabel, x + 2, y, badgeWidth - 4, 'center');
+    if (view.pp !== null) {
+      this.changeTextColor(view.ppColour);
+      this.drawText(view.pp, x + badgeWidth + 6, y, width - badgeWidth - 6, 'right');
+    }
+    this.resetTextColor();
+  };
   for (const [method, direction] of Object.entries({ cursorUp: 'up', cursorDown: 'down', cursorLeft: 'left', cursorRight: 'right' } as const)) {
     Window_PSMenu.prototype[method] = function (wrap: boolean) {
       if (this.maxCols() === 2) this.select(gridCursor(this.index(), direction, this._items.length));
@@ -1414,8 +1439,15 @@ const { developmentCapabilities } = RuleConfig;
   P.showMoves = function () {
     const req = this._session.currentRequest();
     const moves = req.active[0].moves;
+    const tr = PSFlow.translator(), checked = PSFlow.content().meta?.showdownSourceChecked;
     this.show("moves", moves.map((m: any, i: number) => ({
       name: m.pp === undefined ? m.move : PSFlow.translator().t("ui.moves.line", { move: m.move, pp: m.pp, maxpp: m.maxpp }),
+      moveView: (() => {
+        // Published names preserve Gen8 display variants such as Hidden Power Ice.
+        const data = checked ? PSFlow._dex?.moveDetails?.(m.move) ?? PSFlow._dex?.moveDetails?.(m.id) : null;
+        const type = data?.type ?? null;
+        return moveChoice(m.move, type, type ? tr.tOr(`pokedex.type.${type}`, type) : '?', m.pp, m.maxpp);
+      })(),
       // The menu offers a candidate; the Session/simulator accepts or rejects it.
       ext: i + 1, enabled: true,
     })));
