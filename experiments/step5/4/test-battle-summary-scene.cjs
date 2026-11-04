@@ -19,7 +19,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, leadingEgg = false, leadHP = null, pivot = false } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, leadHP = null, command = null, pivot = false, leadingEgg = false } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = suppliedContent ?? fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -35,9 +35,9 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   if (ghost) state.party[0] = E.speciesKey.toPersistentMember(E.memberFactory.createMember({ id: state.party[0].id, species: 'Gengar', level: 100 }, content, () => 0), content);
   if (grow) { state.party[0] = E.speciesKey.toPersistentMember(E.memberFactory.createMember({ id: state.party[0].id, species: 'Snorlax', level: 50 }, content, () => 0), content); state.party[0].exp = E.growth.minExp(content.species.Snorlax.growth, 51) - 1; }
   if (integration) { state.party[0].moves = [{ id: 'tackle', pp: 35, maxpp: 35 }, { id: 'growl', pp: 40, maxpp: 40 }, { id: 'splash', pp: 40, maxpp: 40 }, { id: 'protect', pp: 10, maxpp: 10 }]; state.party[0].gender = 'F'; state.party[0].shiny = true; state.dex.owned.push('pidgey'); Object.assign(trainerRecord.party[0], { gender: 'M', shiny: false }); }
+  if (pivot) state.party[0].moves = [{ id: 'uturn', pp: 20, maxpp: 20 }];
   if (heldItem) { state.party[0].item = heldItem; flow.developerCapabilities = { allowHeldItemSources: true, allowExperimentalHeldItemBattle: true }; }
   if (mint) state.party[0].statNature = 'Timid';
-  if (pivot) state.party[0].moves = [{ id: 'uturn', pp: 20, maxpp: 20 }];
   if (hurt) state.party[0].hp -= 40;
   if (leadHP !== null) { state.party[0].hp = leadHP; state.party[0].moves = [{ id: 'splash', pp: 40, maxpp: 40 }]; }
   if (reserveHP !== null) state.party[egg ? 2 : 1].hp = reserveHP;
@@ -51,7 +51,8 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   vm.runInContext(plugins.PS_Management, G, { filename: 'actual-PS_Management.js' });
   const before = JSON.stringify(flow.game()); await h.p.toMapId(5, 8, 9);
   const batches = [], begin = flow.begin.bind(flow); flow.begin = async (...args) => { const session = await begin(...args), take = session.take.bind(session); session.take = () => { const value = take(); batches.push({ value, wire: JSON.stringify(value) }); return value; }; return session; };
-  flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true });
+  if (command) h.w.commands['PS_BattleFlow:' + command].call({ setWaitMode() {} }, { kind: 'wild', foes: 'Pidgey:3', trainerId: 'music-normal', version: '1', canLose: 'true', ...(canSwitch === undefined ? {} : { canSwitch }) });
+  else flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true, ...(canSwitch === undefined ? {} : { canSwitch }) });
   await h.waitFor(() => !!h.p.battle()?._session, 'real opening Session'); const s = h.p.battle();
   const completed = [], add = s._log.add; s._log.add = function (line) { completed.push(line); return add.call(this, line); };
   await h.p.inMode('main');
@@ -310,6 +311,94 @@ for (const lang of ['en', 'zh']) test(lang + ' combined public cards, full-slot 
  } finally { h.cleanup(); }
 });
 
+for (const lang of ['en', 'zh']) test(lang + ' manual switching policy hides Switch In but keeps Summary and rejects direct voluntary choices without changes', async () => {
+ const h = await open({ lang, canSwitch: false }); try {
+  const s = h.s._session, id = s.party[1].id, raw = s.gw.snapshot(), work = JSON.stringify(s.party), bag = JSON.stringify(s.bag), ledger = JSON.stringify(s.ledger);
+  await commands(h, id); assert.deepEqual(Array.from(h.s._menu._items, row => row.ext), ['summary', null], 'disabled manual switching must not offer Switch In');
+  await pick(h, 'summary'); await h.waitFor(() => current(h)?.ready, 'inspect while manual switching disabled'); await h.p.press('cancel'); await h.p.inMode('party');
+  assert.deepEqual(await s.chooseSwitch(id), { ok: false, reason: 'choice-rejected' });
+  assert.deepEqual(await s.chooseForcedSwitch(id), { ok: false, reason: 'choice-rejected' }, 'method name alone must not bypass a normal active request');
+  assert.equal(s.canSwitch, false); assert.equal(s.gw.snapshot(), raw); assert.equal(JSON.stringify(s.party), work); assert.equal(JSON.stringify(s.bag), bag); assert.equal(JSON.stringify(s.ledger), ledger); assert.equal(JSON.stringify(h.flow.game()), h.before);
+  h.s.onMenuCancel(); await h.p.inMode('main'); assert.equal(h.s._failure, null);
+ } finally { h.cleanup(); }
+});
+test('disabled voluntary switching still permits the real fainted replacement', async () => {
+ const h = await open({ canSwitch: false, leadHP: 1 }); try {
+  const s = h.s._session, lead = s.party[0].id, next = s.party[1].id;
+  await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('party-forced'); assert(s.gw.readState('p1').find(m => m.id === lead).fainted);
+  h.s.onMenuCancel(); await h.frames(1); assert.equal(h.s._mode, 'party-forced');
+  await pick(h, next); assert(h.s._menu._items.some(row => row.ext === 'switch-in'));
+  await pick(h, 'switch-in'); await h.p.inMode('main'); assert.equal(s.gw.activeId('p1'), next); assert.equal(s.canSwitch, false); assert.equal(JSON.stringify(h.flow.game()), h.before);
+ } finally { h.cleanup(); }
+});
+test('policy rejection does not cancel or refund an already staged item', async () => {
+ const h = await open({ canSwitch: false }); try {
+  const s = h.s._session; assert.deepEqual(await s.useItem('potion', s.party[0].id, { commit: false }), { ok: true, staged: true });
+  const raw = s.gw.snapshot(), ledger = JSON.stringify(s.ledger), bag = JSON.stringify(s.bag);
+  assert.equal((await s.chooseSwitch(s.party[1].id)).ok, false);
+  assert.equal(s.gw.snapshot(), raw); assert.equal(JSON.stringify(s.ledger), ledger); assert.equal(JSON.stringify(s.bag), bag); assert.equal(JSON.stringify(h.flow.game()), h.before);
+ } finally { h.cleanup(); }
+});
+test('explicit true keeps the existing voluntary switch behavior', async () => {
+ const h = await open({ canSwitch: true }); try { const s = h.s._session, id = s.party[1].id; await commands(h, id); await pick(h, 'switch-in'); await h.p.inMode('main'); assert.equal(s.gw.activeId('p1'), id); assert.equal(s.canSwitch, true); assert.equal(JSON.stringify(h.flow.game()), h.before); } finally { h.cleanup(); }
+});
+for (const command of ['StartBattle', 'StartTrainerBattle']) test(command + ' real registered event forwards its false boolean argument', async () => {
+ const h = await open({ command, canSwitch: 'false' }); try { assert.equal(h.s._session.canSwitch, false); await commands(h, h.s._session.party[1].id); assert(!h.s._menu._items.some(row => row.ext === 'switch-in')); assert.equal(JSON.stringify(h.flow.game()), h.before); } finally { h.cleanup(); }
+});
+test('invalid MZ policy values are rejected before opening or incrementing the event sequence', async () => {
+ const h = await open(); try { h.cleanup(); const before = JSON.stringify(h.flow.game()), seq = h.G.$gameSystem._psBattleSeq;
+  for (const name of ['StartBattle', 'StartTrainerBattle']) for (const canSwitch of [null, 0, 'no', {}]) assert.throws(() => h.w.commands['PS_BattleFlow:' + name].call({ setWaitMode() {} }, { canSwitch }), /canSwitch must be true or false/);
+  assert.equal(h.flow.running, false); assert.equal(h.G.$gameSystem._psBattleSeq, seq); assert.equal(JSON.stringify(h.flow.game()), before);
+ } finally { h.cleanup(); }
+});
+test('direct Session validates the new policy before calling the driver', async () => {
+ let calls = 0; const driver = { moveNames() { calls++; throw Error('must not be reached'); } };
+ for (const canSwitch of [null, 0, 'false', {}]) await assert.rejects(E.session.BattleSession.create({ game: {}, foe: {}, content: {}, battleId: 'invalid-policy', canSwitch, driver }), /canSwitch must be boolean/);
+ assert.equal(calls, 0);
+});
+
+test('a real U-turn replacement remains available under the no-manual-switch rule', async () => {
+ const h = await open({ canSwitch: false, trainer: true, pivot: true }); try {
+  const s = h.s._session, lead = s.party[0].id, next = s.party[1].id;
+  await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('party-forced'); assert(!s.gw.readState('p1').find(m => m.id === lead).fainted); assert(s.currentRequest().forceSwitch[0]);
+  await pick(h, next); await pick(h, 'switch-in'); await h.p.inMode('main'); assert.equal(s.gw.activeId('p1'), next); assert.equal(JSON.stringify(h.flow.game()), h.before);
+ } finally { h.cleanup(); }
+});
+test('existing doubles command API also rejects voluntary switch specs before changing the engine', async () => {
+ const h = await open({ members: 3 }); try {
+  const source = h.s._session, s = await E.session.BattleSession.create({ game: { ...h.flow.game(), party: source.party }, battleId: 'policy-doubles', content: source.content, foe: { ...source.foe, team: [...source.foe.team, { ...structuredClone(source.foe.team[0]), id: 'POLICY-F2' }] }, seed: [1, 2, 3, 4], doubles: true, canSwitch: false });
+  const raw = s.gw.snapshot(), bag = JSON.stringify(s.bag), ledger = JSON.stringify(s.ledger);
+  assert.deepEqual(await s.chooseDoubles([{ switch: 3 }, { move: 1 }]), { ok: false, reason: 'choice-rejected' });
+  assert.equal(s.gw.snapshot(), raw); assert.equal(JSON.stringify(s.bag), bag); assert.equal(JSON.stringify(s.ledger), ledger);
+ } finally { h.cleanup(); }
+});
+
+// Accepted policies and details must coexist with the real Summary/growth owner.
+for (const lang of ['en', 'zh']) test(lang + ' combined disabled switching, shared learning details and live Egg Summary keep one battle and install once', async () => {
+ const h = await open({ lang, members: 3, egg: true, grow: true, integration: true, trainer: true, trainerMembers: 2, fast: true, canSwitch: false }); try {
+  const s = h.s._session, lead = s.party[0].id, reserve = s.party[1].id, egg = JSON.parse(h.before).party[1].id, app = h.flow.app();
+  assert.equal(s.canSwitch, false, 'typed policy must reach this actual mixed Session');
+  const beginLearning = app.beginLearning.bind(app); let learningTransactions = 0; app.beginLearning = (...args) => { learningTransactions++; return beginLearning(...args); };
+  let installs = 0, doc = h.G.$gameSystem._psGame; Object.defineProperty(h.G.$gameSystem, '_psGame', { configurable: true, get: () => doc, set: value => { installs++; doc = value; } });
+  await commands(h, reserve); assert.deepEqual(Array.from(h.s._menu._items, row => row.ext), ['summary', null]);
+  await pick(h, 'summary'); await h.waitFor(() => current(h)?.ready, 'mixed pre-growth read-only Summary'); await h.p.press('cancel'); await h.p.inMode('party'); h.s.onMenuCancel(); await h.p.inMode('main');
+  await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('learn-initial'); assert.equal(installs, 0); await h.frames(1); await pick(h, 'forget-move');
+  assert.equal(typeof h.s.learningMoveState, 'function', 'mixed Scene retains the accepted details consumer'); const win = h.s._menu, normal = h.s._commandMenu; assert.notEqual(win, normal); assert.equal(normal.visible, false);
+  let view = h.s.learningMoveState(); assert.equal(view.page.rows.length, 5); assert.equal(view.page.rows[0].details, '34/35 PP'); assert.equal(view.page.rows[4].moveId, 'rest');
+  win.select(4); assert(h.s.learningMoveState().text.includes(lang === 'zh' ? '属性：Psychic' : 'Type: Psychic'));
+  h.s.onMenuOk(); await h.p.inMode('learn-giveup'); assert.equal(h.s._menu, normal); assert.equal(win.visible, false); await h.frames(1); await pick(h, 'continue-learning'); assert.equal(h.s._menu, win); assert.equal(win.index(), 4);
+  await pick(h, 3); await h.p.inMode('main'); assert.equal(h.s._menu, normal); assert.equal(win.visible, false); assert.equal(win.active, false); assert.equal(s.party[0].moves[3].id, 'rest'); assert.equal(s.gw.readState('p1').find(m => m.id === lead).pp.rest, 10);
+  // Swapping the menu instance for learning must not reset the author policy.
+  await commands(h, reserve); assert.deepEqual(Array.from(h.s._menu._items, row => row.ext), ['summary', null]); h.s.onMenuCancel(); await h.p.inMode('party'); h.s.onMenuCancel(); await h.p.inMode('main');
+  const raw = s.gw.snapshot(), work = JSON.stringify(s.party); assert.deepEqual(await s.chooseSwitch(reserve), { ok: false, reason: 'choice-rejected' }); assert.equal(s.gw.snapshot(), raw); assert.equal(JSON.stringify(s.party), work);
+  await summary(h, lead); assert(text(h).some(line => line.includes('Lv.51'))); await h.p.press('right'); await h.p.press('right'); await h.p.press('right'); assert(text(h).some(line => /\brest\b.*10\/10 PP/i.test(line)));
+  await h.p.press('left'); await h.p.press('left'); await h.p.press('left'); await h.p.press('down'); assert.equal(current(h).view.ids[current(h).view.cursor], egg); assert(text(h).some(line => line.includes('1/1'))); await h.p.press('cancel'); await h.p.inMode('party'); assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext, egg);
+  const player = h.s.statusCardState().find(card => card.side === 'p1'); assert.equal(player.gender.kind, 'female'); assert.equal(player.shiny, true);
+  assert.equal(installs, 0); assert.equal(JSON.stringify(h.flow.game()), h.before); assert.deepEqual(h.managementCalls(), { beginManagement: 0, manage: 0 }); assert.equal(learningTransactions, 0); assert.equal(s.canSwitch, false);
+  h.s.onMenuCancel(); await h.p.inMode('main'); await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('end'); assert.equal(installs, 0); await h.frames(1); h.s.onMenuOk(); await h.frames(3); assert.equal(installs, 1); assert.equal(h.flow.lastOutcome.commit, 'applied'); assert.equal(h.flow.game().party[0].level, 51); assert(h.flow.game().party[0].moves.some(move => move.id === 'rest'));
+  const installed = JSON.stringify(h.flow.game()); h.s.onEnd(); assert.equal(installs, 1); assert.equal(JSON.stringify(h.flow.game()), installed);
+ } finally { h.cleanup(); }
+});
 
 const displayIds = h => Array.from(h.s._menu._items, row => row.ext).filter(id => id !== null);
 for(const lang of ['en','zh'])test(lang+' party display order follows real swaps and Summary returns a stable member without sorting the save',async()=>{

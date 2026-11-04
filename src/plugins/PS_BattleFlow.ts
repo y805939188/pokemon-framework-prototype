@@ -13,6 +13,7 @@ import type { BattleScenePresentation } from "./battleflow/controller";
 import { BattleDisplayPlayback } from "./battleflow/display";
 import type { BattleDisplayCard } from "./battleflow/display";
 import { BattleMenuCursor, gridCursor } from "./battleflow/menu";
+import { createMoveSelectionWindow } from "./progression/move-selection-window";
 import { moveChoice } from "./battleflow/move-choice";
 import { battlebackContext, createBattlebackMZ } from "./battleflow/battleback-mz";
 import { createBattlePicturesMZ } from "./battleflow/picture-mz";
@@ -712,6 +713,11 @@ const { developmentCapabilities } = RuleConfig;
   const prebattle = installPrebattleHost(G, PSFlow, op => PSFlow._preparePrebattleAudio(op));
 
   // ---------------------------------------------------------------- plugin commands + interpreter wait
+  function parseCanSwitch(value: unknown): boolean {
+    if (value === undefined || value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+    throw new Error('canSwitch must be true or false');
+  }
   function parseFoes(text: string): { species: string; level: number }[] {
     return String(text).split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
       const [species, level] = s.split(":");
@@ -721,7 +727,7 @@ const { developmentCapabilities } = RuleConfig;
 
   G.PluginManager.registerCommand(NAME, "StartBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
-    const seq = PSFlow.nextSeq();
+    const canSwitch = parseCanSwitch(args.canSwitch), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || "battle"}#${seq}`;
     const opened=PSFlow.tryOpenBattle({
       kind: args.kind === "trainer" ? "trainer" : "wild",
@@ -729,7 +735,7 @@ const { developmentCapabilities } = RuleConfig;
       seq,
       battleId,
       resultVariable: Number(args.resultVariable) || 0,
-      canLose: String(args.canLose) === "true",
+      canLose: String(args.canLose) === "true", canSwitch,
       forceParty: String(args.forceParty) === "true",
     }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
       transition: { location: args.prebattleLocation || undefined } });
@@ -741,6 +747,7 @@ const { developmentCapabilities } = RuleConfig;
   G.PluginManager.registerCommand(NAME, "StartTrainerBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
     if (args.moneyGain !== undefined && ![true, false, "true", "false"].includes(args.moneyGain)) throw new Error("moneyGain must be true or false");
+    const canSwitch = parseCanSwitch(args.canSwitch);
     const id = String(args.trainerId || args.id || ""), version = Number(args.version ?? 0), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || `trainer-${id}-v${version}`}#${seq}`;
     let known = true;
@@ -756,7 +763,7 @@ const { developmentCapabilities } = RuleConfig;
       kind: "trainer", trainer: { id, version }, foes: [], seq, battleId,
       moneyGain: args.moneyGain !== false && args.moneyGain !== "false",
       resultVariable: Number(args.resultVariable) || 0,
-      canLose: String(args.canLose) === "true",
+      canLose: String(args.canLose) === "true", canSwitch,
       forceParty: String(args.forceParty) === "true",
     }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
       transition: { location: args.prebattleLocation || undefined } });
@@ -1224,6 +1231,7 @@ const { developmentCapabilities } = RuleConfig;
     this._status = new (Window_PSText as any)(new G.Rectangle(0, 0, w, 120));
     this._log = new (Window_PSText as any)(new G.Rectangle(0, 120, w, 300));
     this._menu = new (Window_PSMenu as any)(new G.Rectangle(0, 420, w, h - 420));
+    this._commandMenu = this._menu; this._learningMenu = null;
     for (const win of [this._status, this._log, this._menu]) { win.backOpacity = 96; this.addWindow(win); }
     this._menu.setHandler("ok", this.onMenuOk.bind(this));
     this._menu.setHandler("cancel", this.onMenuCancel.bind(this));
@@ -1572,6 +1580,8 @@ const { developmentCapabilities } = RuleConfig;
     const cur = PSFlow.perf.cur;
     if (cur && cur.firstMenuMs === undefined) { const ms = Math.round((performance.now() - cur.t0) * 10) / 10; if (c.isCurrent() && PSFlow.perf.cur === cur) cur.firstMenuMs = ms; }
     if (!c.isCurrent()) return;
+    const menu = mode === 'learn' && this._learningMenu ? this._learningMenu : this._commandMenu ?? this._menu;
+    if (this._menu !== menu) { this._menu.deactivate(); this._menu.hide(); this._menu = menu; }
     this._menu._phase = mode;
     this._menu.setItems(items);
     if (c.isCurrent() && this._menuCursor && (mode === 'main' || mode === 'moves')) {
@@ -1795,7 +1805,7 @@ const { developmentCapabilities } = RuleConfig;
     if (!member || (!member.isEgg && !live)) { this.showParty(this._partySub); return; }
     this._partySelected = memberId;
     const tr = PSFlow.translator(), items: any[] = [];
-    if (!member.isEgg && live?.hp > 0 && !live.fainted) items.push({ name: tr.t('ui.party.switch_in'), ext: 'switch-in' });
+    if ((this._session.canSwitch !== false || this._partySub === 'forced') && !member.isEgg && live?.hp > 0 && !live.fainted) items.push({ name: tr.t('ui.party.switch_in'), ext: 'switch-in' });
     items.push({ name: tr.t('management.summary'), ext: 'summary' });
     items.push({ name: tr.t('ui.party.cancel'), ext: null });
     this.show('party-command', items);
@@ -1856,11 +1866,30 @@ const { developmentCapabilities } = RuleConfig;
     }, 'learn');
   };
   P.showLearn = function (selected = 0) {
+    const c = sceneController(this), p = this._session.pendingLearn;
+    if (!c.isCurrent() || !p) return;
     this._learningGiveUp = null;
-    const p = this._session.pendingLearn;
-    const m = this._session.party.find((x: any) => x.id === p.memberId);
-    this.show("learn", [...m.moves.map((mv: any, i: number) => ({ name: PSFlow.translator().t("ui.learn.forget", { move: mv.id }), ext: i })), { name: PSFlow.translator().t("ui.learn.skip", { move: p.move.name }), ext: null }]);
-    this._menu.select(Math.max(0, Math.min(selected, m.moves.length)));
+    const m = this._session.party.find((x: any) => x.id === p.memberId), tr = PSFlow.translator();
+    const move = (id: string) => PSFlow.app().describeLearningMove(id);
+    const name = (id: string) => tr.tOr('move.name.' + id, move(id)?.name ?? id);
+    if (!this._learningMenu) {
+      this._learningMenu = createMoveSelectionWindow(G, new G.Rectangle(0, 0, G.Graphics.boxWidth, G.Graphics.boxHeight), {
+        font: tr.font(), text: (key, params) => tr.t('progression.' + key, params), textOr: (key, fallback) => tr.tOr(key, fallback), move,
+      });
+      this._learningMenu.setHandler('ok', this.onMenuOk.bind(this));
+      this._learningMenu.setHandler('cancel', this.onMenuCancel.bind(this));
+      this.addWindow(this._learningMenu);
+    }
+    this._learningMenu.page = { kind: 'moves', title: tr.t('progression.chooseMove', { move: name(p.move.id) }), cursor: selected,
+      rows: [...m.moves.map((mv: any, i: number) => ({ key: String(i), text: name(mv.id), details: `${mv.pp}/${mv.maxpp} PP`, moveId: mv.id })),
+        { key: 'new', text: name(p.move.id), details: tr.t('progression.keepOld'), moveId: p.move.id }] };
+    this.show('learn', this._learningMenu.page.rows.map((row: any, i: number) => ({ name: row.text, ext: i < m.moves.length ? i : null })));
+    if (c.isCurrent()) this._menu.select(Math.max(0, Math.min(selected, m.moves.length)));
+  };
+  P.learningMoveState = function () {
+    const c = sceneController(this), win = this._learningMenu;
+    return c.isCurrent() && this._mode === 'learn' && win?.visible
+      ? { page: structuredClone(win.page), text: [...win.rendered] } : null;
   };
   P.askLearningGiveUp = function () {
     const c = sceneController(this), pending = this._session.pendingLearn;
@@ -2055,6 +2084,12 @@ const { developmentCapabilities } = RuleConfig;
     this._display?.dispose();
     c?.dispose(); // retire callbacks before host teardown can reenter application code
     this._partyDisplayOrder = null;
+
+    const learning = this._learningMenu; this._learningMenu = null;
+    if (learning) {
+      if (this._menu === learning) this._menu = this._commandMenu;
+      learning.deactivate(); learning.hide(); learning.parent?.removeChild(learning); learning.destroy({ children: true });
+    }
     this._backdrop?.dispose();
     this._pictures?.dispose();
     try { G.Scene_MenuBase.prototype.terminate.call(this); }

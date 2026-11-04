@@ -41,6 +41,8 @@ export interface BattleStartRequest {
   /** Author flags of a scripted battle (protocol v1 foe descriptor). */
   noRun?: boolean;
   noBall?: boolean;
+  /** Author rule for voluntary switching. Defaults to true; forced replacements remain available. */
+  canSwitch?: boolean;
   /** The author lets the player lose this battle (story battle): a defeat then is not a blackout (WP61 §7, statistics). */
   canLose?: boolean;
   /** Victory money settlement (WP42). Defaults to true; false does not normalize the wallet. */
@@ -66,6 +68,8 @@ export interface BattleSetup {
   diagnostics?: string[];
   foes: Member[];
   noRun: boolean;
+  /** Captured author policy; formal starts supply a boolean, legacy custom factories may omit it. */
+  canSwitch?: boolean;
   /** The author's flag, or forced on because a caught member would have nowhere to go (decision D1). */
   noBall: boolean;
   /** The party and the boxes are both full (the reason a ball is disabled, for the host's message). */

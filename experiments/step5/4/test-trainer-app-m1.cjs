@@ -245,3 +245,14 @@ test('A-M1 late session after abort cannot install or clear a successor reservat
   assert.equal(state.current().money, 1000);
   assert.deepEqual(state.current().defeatedTrainers, {});
 });
+
+for (const value of [undefined, false, true]) test('author canSwitch ' + String(value) + ' is captured before the session factory callback', async () => {
+ const w = fakeApp(), req = { ...request(), ...(value === undefined ? {} : { canSwitch: value }) }, before = JSON.stringify(w.state.current()), create = w.sessions.create;
+ w.sessions.create = function(r, game, setup) { r.canSwitch = value === false; return create.call(this, r, game, setup); };
+ await w.app.startTrainerBattle(req); assert.equal(w.sessions.created[0].setup.canSwitch, value ?? true); assert.equal(JSON.stringify(w.state.current()), before);
+});
+test('application rejects invalid canSwitch before making a session and releases its opening owner', async () => {
+ const w = fakeApp(), before = JSON.stringify(w.state.current());
+ for (const canSwitch of [null, 0, 'false', {}]) { await assert.rejects(w.app.startTrainerBattle({ ...request(), canSwitch }), /canSwitch must be boolean/); assert.equal(w.sessions.created.length, 0); assert(!w.app.saveBlocked); assert.equal(JSON.stringify(w.state.current()), before); }
+ await w.app.startTrainerBattle({ ...request(), canSwitch: false }); assert.equal(w.sessions.created[0].setup.canSwitch, false);
+});
