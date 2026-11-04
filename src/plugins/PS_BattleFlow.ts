@@ -1177,7 +1177,7 @@ const { developmentCapabilities } = RuleConfig;
     this._pictures = null; this._pictureUpdate = 0; this._ballFeedback = null; this._endFeedbackShown = false; this._endFeedbackPages = null; this._endFeedbackPage = 0; this._endPageShownUpdate = -1; this._trainerOpeningQueued = false; this._retryMoveMenu = false;
     this._residentBrief = null; this._briefTail = null;
     this._wildOpeningQueued = false;
-    this._battleBag = null; this._bagHidden = null; this._bagRetry = false;
+    this._battleBag = null; this._bagHidden = null; this._bagRetry = false; this._trainerDispatchQueued = false;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1328,6 +1328,17 @@ const { developmentCapabilities } = RuleConfig;
               const first = events.indexOf(switches[0]);
               events = [...events.slice(0, first), foe, player, ...events.slice(first).filter((event: any) => event !== player && event !== foe)];
               wildEntrance = foe; this._wildOpeningQueued = true;
+            }
+          }
+          if (openingBatch && op?.request.kind === 'trainer' && this._session.foeTeam.length === 1 && !this._trainerDispatchQueued) {
+            const switches = events.filter((event: any) => event.type === 'switch');
+            const player = switches.find((event: any) => /^p1a?: /.test(event.args[0] || ''));
+            const foe = switches.find((event: any) => /^p2a?: /.test(event.args[0] || ''));
+            if (switches.length === 2 && player && foe) {
+              // Initial trainer dispatch is foe-first too; later switches keep their owned event order.
+              const first = events.indexOf(switches[0]);
+              events = [...events.slice(0, first), foe, player, ...events.slice(first).filter((event: any) => event !== player && event !== foe)];
+              this._trainerDispatchQueued = true;
             }
           }
           for (const event of events) {
