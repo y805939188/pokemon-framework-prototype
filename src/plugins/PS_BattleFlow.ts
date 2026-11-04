@@ -2084,7 +2084,6 @@ const { developmentCapabilities } = RuleConfig;
     this._display?.dispose();
     c?.dispose(); // retire callbacks before host teardown can reenter application code
     this._partyDisplayOrder = null;
-
     const learning = this._learningMenu; this._learningMenu = null;
     if (learning) {
       if (this._menu === learning) this._menu = this._commandMenu;
