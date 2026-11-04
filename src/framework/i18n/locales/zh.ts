@@ -290,6 +290,7 @@ export const zh: LocaleTable = {
     "ui.card.slp": "睡眠",
     "ui.card.frz": "冰冻",
     "ui.card.unknown": "未知",
+    "ui.card.owned": "已拥有",
     "ui.who.foe": "对手", "ui.who.you": "我方",
     "stat.hp": "HP",
     "ui.levelStats.delta": "Lv. {level} 能力增长",

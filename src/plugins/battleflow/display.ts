@@ -8,6 +8,8 @@ export interface BattleDisplayCard {
   experienceUnavailable?: 'outside-level-interval';
   boxOpacity?: number;
   portraitVisible?: boolean;
+  /** Published details only, after the owner binds this event to the current actor. */
+  appearance?: { species: string; gender: 'M' | 'F' | 'N'; shiny: boolean };
 }
 export interface BattleDisplayPorts {
   current(): boolean;
@@ -16,10 +18,12 @@ export interface BattleDisplayPorts {
   cue(kind: 'exp-gain' | 'exp-full'): (() => void) | undefined;
   picture?(kind: 'send-out' | 'recall' | 'damage', actor: PictureActor): BattleSceneVisualStep;
   faint?(actor: PictureActor, box: (opacity: number) => boolean): BattleSceneVisualStep;
+  bindsAppearance?(side: 'p1' | 'p2', id: string): boolean;
 }
 export interface DisplayEvent { type: string; args: readonly string[]; }
 const key = (side: string, id: string) => side + ':' + id;
-const copy = (cards: readonly BattleDisplayCard[]) => cards.map(card => ({ ...card }));
+const copy = (cards: readonly BattleDisplayCard[]) => cards.map(card => ({ ...card,
+  ...(card.appearance ? { appearance: { ...card.appearance } } : {}) }));
 
 /** Only display projections are retained. Planning reads published events, never polls the live battle. */
 export class BattleDisplayPlayback {
@@ -156,10 +160,34 @@ export class BattleDisplayPlayback {
       const old = previous && { ...previous };
       for (const member of this.planned) if (member.side === card.side) member.active = member === card;
       Object.assign(card, condition(event.args[2], card), { boxOpacity: 1, portraitVisible: true });
+      this.appearance(card, event.args[1]);
       const shown = this.instant();
       if (!this.ports.picture) return [shown];
       const steps = old && old.id !== card.id && old.hp > 0 ? [this.picture('recall', old)] : [];
       return [...steps, this.picture('send-out', card, shown)];
+    }
+    if (event.type === 'replace' || event.type === 'detailschange') {
+      // Illusion's public alias need not be the real actor. Only a proven owner
+      // binding may replace the shown identity; never read the private species.
+      if (!this.appearance(card, event.args[1])) {
+        for (const member of this.planned) if (member.side === card.side && member.active) delete member.appearance;
+        return [this.instant()];
+      }
+      if (event.type === 'replace') {
+        const previous = this.planned.find(member => member.side === card.side && member.active);
+        if (previous && previous !== card) {
+          Object.assign(card, { hp: previous.hp, maxhp: previous.maxhp, status: previous.status,
+            boxOpacity: previous.boxOpacity, portraitVisible: previous.portraitVisible });
+        }
+        for (const member of this.planned) if (member.side === card.side) member.active = member === card;
+      }
+      return [this.instant()];
+    }
+    if (event.type === '-formechange') {
+      if (card.appearance && this.ports.bindsAppearance?.(card.side, card.id) && event.args[1]) {
+        card.appearance = { ...card.appearance, species: event.args[1] };
+      } else delete card.appearance;
+      return [this.instant()];
     }
     if (event.type === '-status' || event.type === '-curestatus' || event.type === 'faint') {
       card.status = event.type === '-status' ? event.args[1] || '' : '';
@@ -170,6 +198,14 @@ export class BattleDisplayPlayback {
       return [this.instant()];
     }
     return [];
+  }
+  private appearance(card: BattleDisplayCard, details: string | undefined): boolean {
+    delete card.appearance;
+    if (!this.ports.bindsAppearance?.(card.side, card.id) || !details) return false;
+    const parts = details.split(',').map(part => part.trim()), species = parts[0];
+    if (!species) return false;
+    card.appearance = { species, gender: parts.includes('M') ? 'M' : parts.includes('F') ? 'F' : 'N', shiny: parts.includes('shiny') };
+    return true;
   }
   experience(memberId: string, segment: { level: number; from: number; to: number }): BattleSceneVisualStep | null {
     const card = this.planned.find(member => member.side === 'p1' && member.id === memberId);

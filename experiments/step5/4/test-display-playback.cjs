@@ -7,6 +7,28 @@ test.before(()=>{
  const r=spawnSync('pnpm',['--dir','src','exec','tsc','-p',path.join(tmp,'tsconfig.json')],{cwd:ROOT,encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);M=require(path.join(tmp,'display.js')).BattleDisplayPlayback;C=require(path.join(tmp,'controller.js')).BattleSceneController;P=require(path.join(tmp,'picture-playback.js')).BattlePicturePlayback;
 });
 test.after(()=>{if(tmp)fs.rmSync(tmp,{recursive:true,force:true});});
+test('public appearance is shown only at its queued paint and all returned copies are detached',()=>{
+ let bound=true;const p=new M([{id:'F',side:'p2',name:'private fallback',level:50,hp:100,maxhp:100,status:'',active:true,ratio:null}],
+  {current:()=>true,paint(){},cue(){},bindsAppearance:()=>bound});
+ const start=p.event({type:'switch',args:['p2a: F','Pidgey, L50, F, shiny','100/100']})[0];
+ assert.equal(p.snapshot()[0].appearance,undefined);assert(start.advance(0));
+ assert.deepEqual(p.snapshot()[0].appearance,{species:'Pidgey',gender:'F',shiny:true});
+ const copy=p.snapshot();copy[0].appearance.gender='M';assert.equal(p.snapshot()[0].appearance.gender,'F');
+ const next=p.event({type:'detailschange',args:['p2a: F','Snorlax, L50, M']})[0];
+ assert.equal(p.snapshot()[0].appearance.species,'Pidgey');next.advance(1);
+ assert.deepEqual(p.snapshot()[0].appearance,{species:'Snorlax',gender:'M',shiny:false});
+ p.event({type:'-formechange',args:['p2a: F','Snorlax-Gmax']})[0].advance(2);
+ assert.equal(p.snapshot()[0].appearance.species,'Snorlax-Gmax');assert.equal(p.snapshot()[0].appearance.gender,'M');
+ bound=false;p.event({type:'detailschange',args:['p2a: F','private unproven, L50, F, shiny']})[0].advance(3);
+ assert.equal(p.snapshot()[0].appearance,undefined);
+});
+test('published genderless details and an absent binding do not infer private gender or shiny',()=>{
+ for(const bound of [true,false]){const p=new M([{id:'P',side:'p1',name:'private',level:50,hp:100,maxhp:100,status:'',active:true,ratio:0}],
+  {current:()=>true,paint(){},cue(){},bindsAppearance:()=>bound});
+  p.event({type:'switch',args:['p1a: P','Magnemite, L50','100/100']})[0].advance(0);
+  assert.deepEqual(p.snapshot()[0].appearance,bound?{species:'Magnemite',gender:'N',shiny:false}:undefined);
+ }
+});
 const card=(id='P',side='p1')=>({id,side,name:id,level:50,hp:100,maxhp:100,status:'',active:true,ratio:side==='p1'?0:null});
 function fixture(cards=[card(),card('F','p2')],picture){
  const f={current:true,paint:[],cue:[],stops:[],time:0};f.p=new M(cards,{current:()=>f.current,paint:v=>{f.paint.push(v);f.onPaint?.(v);},cue:k=>{f.cue.push(k);f.onCue?.(k);return()=>f.stops.push(k);},...(picture?{picture:(kind,actor)=>picture(f,kind,actor)}:{})});return f;

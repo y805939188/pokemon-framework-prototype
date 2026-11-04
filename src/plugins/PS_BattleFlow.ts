@@ -984,8 +984,11 @@ const { developmentCapabilities } = RuleConfig;
   Window_PSText.prototype.statusCardViews = function () {
     const tr = PSFlow.translator();
     const labels = Object.fromEntries(['psn', 'tox', 'brn', 'par', 'slp', 'frz', 'unknown'].map(key => [key, tr.t('ui.card.' + key)])) as Parameters<typeof projectStatusCard>[2];
-    // This consumer owns drawing only. No Session/private member metadata is a public appearance source.
-    return (this._d2Cards ?? []).map((card: BattleDisplayCard) => projectStatusCard(card, null, labels));
+    // Metadata is supplied by the owning Scene from already-shown public details.
+    return (this._d2Cards ?? []).map((card: BattleDisplayCard) => {
+      const published = this._d2Appearance?.(card);
+      return projectStatusCard(published ? { ...card, name: published.name } : card, published?.metadata, labels);
+    });
   };
   Window_PSText.prototype.refresh = function () {
     this.contents.clear();
@@ -998,7 +1001,20 @@ const { developmentCapabilities } = RuleConfig;
         const previousOpacity = this.contents.paintOpacity;
         this.contents.paintOpacity = Math.round(card.opacity * 255);
         const x = index * (this.innerWidth / 2);
-        this.drawText(this.fitText(tr.t('ui.card.level', { name: card.name, level: card.level }), width), x, 0, width);
+        const badges = [
+          ...(card.gender.symbol ? [{ text: card.gender.symbol, colour: card.gender.colour === 'blue' ? '#71afff' : '#ff8585' }] : []),
+          ...(card.shiny ? [{ text: '★', colour: '#ffdc68' }] : []),
+          ...(card.owned ? [{ text: tr.t('ui.card.owned'), colour: '#ffffff' }] : []),
+        ];
+        const badgeWidth = badges.reduce((n, badge) => n + this.textWidth(badge.text) + 8, 0);
+        this.drawText(this.fitText(tr.t('ui.card.level', { name: card.name, level: card.level }), Math.max(0, width - badgeWidth)), x, 0, Math.max(0, width - badgeWidth));
+        let badgeX = x + width - badgeWidth;
+        const textColour = this.contents.textColor;
+        for (const badge of badges) {
+          const size = this.textWidth(badge.text) + 8;
+          this.contents.textColor = badge.colour; this.drawText(badge.text, badgeX, 0, size); badgeX += size;
+        }
+        this.contents.textColor = textColour;
         if (card.condition.label) {
           const colour = { psn: '#a966b3', tox: '#6c3d83', brn: '#b74c42', par: '#8c721e', slp: '#596681', frz: '#397d99', unknown: '#59616b' }[card.condition.kind as Exclude<typeof card.condition.kind, 'none'>];
           this.contents.fillRect?.(x, 24, width / 2, 20, colour);
@@ -1263,8 +1279,23 @@ const { developmentCapabilities } = RuleConfig;
     }
     const initialCards = initialDisplay(s, this._names);
     for (const card of initialCards) if (waitingForOpening.has(card.side + ':' + card.id)) card.portraitVisible = false;
+    this._status._d2Appearance = (card: BattleDisplayCard) => {
+      if (!c.isCurrent() || !PSFlow.running || this._session !== s) return null;
+      const publicView = card.appearance;
+      if (!publicView) return { name: card.side === 'p2' ? PSFlow.translator().t('ui.card.unknown') : card.name, metadata: null };
+      const key = engine().B.speciesKey.keyOfBattleName(s.content, publicView.species);
+      return { name: PSFlow.speciesName(publicView.species), metadata: {
+        id: card.id, side: card.side, gender: publicView.gender, shiny: publicView.shiny,
+        owned: card.side === 'p2' && key ? PSFlow.game().dex.owned.includes(key.species) : null,
+      } };
+    };
     this._display = new BattleDisplayPlayback(initialCards, {
       current: () => c.isCurrent() && PSFlow.running,
+      bindsAppearance: (side, id) => {
+        if (!c.isCurrent() || !PSFlow.running) return false;
+        try { return s.gw.readState(side).some((member: any) => member.active && member.id === id); }
+        catch { return false; } // Optional appearance never invents a source or aborts legal battle control.
+      },
       paint: cards => { if (c.isCurrent()) {
         this._status._d2Cards = cards.map(card => ({ ...card })); this._status.setLines([]);
         // Observe every owned, sequentially shown send-out, including A -> B -> A before another menu.

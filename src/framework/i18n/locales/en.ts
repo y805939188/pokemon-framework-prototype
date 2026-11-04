@@ -291,6 +291,7 @@ export const en: LocaleTable = {
     "ui.card.slp": "Sleep",
     "ui.card.frz": "Freeze",
     "ui.card.unknown": "Unknown",
+    "ui.card.owned": "Owned",
     "ui.who.foe": "Foe", "ui.who.you": "You",
     "stat.hp": "HP",
     "ui.levelStats.delta": "Lv. {level} gains",
