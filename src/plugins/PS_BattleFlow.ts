@@ -1585,7 +1585,11 @@ const { developmentCapabilities } = RuleConfig;
         this._bagLayer = layer; this.renderBattleBagView();
         if (current()) { c.show('messages'); this._menu.deactivate(); }
       });
-      c.enqueue([this._bagFade]); return;
+      const menu = this._menu, outgoingVisible = menu.visible;
+      if (c.enqueue([this._bagFade]) && current() && outgoingVisible) {
+        menu.show(); menu.deactivate(); // Keep the outgoing content painted while the queue still owns all input.
+      }
+      return;
     }
     this._bagLayer = layer; this.renderBattleBagView();
   };

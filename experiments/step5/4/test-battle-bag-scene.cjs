@@ -235,3 +235,32 @@ test('a failed view swap preserves the failure and removes the private cover wit
     assert(!h.flow.app().saveBlocked);
   } finally { h.cleanup(); }
 });
+
+for (const route of ['enter-target', 'return-from-target', 'close-bag']) test(route + ' outgoing menu remains visible and unchanged until the real blackout is opaque', async () => {
+  const h = await open({ fast: false }), frames = []; try {
+    await animatedBag(h); await visibleBag(h);
+    if (route === 'enter-target') await pick(h, 'potion');
+    if (route === 'return-from-target') { await use(h, 'potion'); await visibleBag(h, 'bag-members'); }
+    const menu = h.s._menu, model = h.s._battleBag, oldItems = JSON.stringify(menu._items), oldPhase = menu._phase, oldCursor = menu.index();
+    assert(menu.visible && h.s.inputState().ready, 'old real menu is present and interactive before transition');
+    if (route === 'enter-target') await pick(h, 'use'); else await cancel(h);
+    const fade = h.s._bagFade; assert.equal(fade.snapshot().phase, 'out');
+    const selected = JSON.stringify(model.view());
+    for (let i = 0; fade.snapshot().phase === 'out' && i < 20; i++) {
+      frames.push({ update: h.s._pictureUpdate, phase: fade.snapshot().phase, opacity: fade.snapshot().opacity,
+        menuVisible: menu.visible, menuActive: menu.active, ready: h.s.inputState().ready, menuPhase: menu._phase });
+      assert(menu.visible, 'outgoing real menu must remain visible while blackout is still transparent');
+      assert(!menu.active && !h.s.inputState().ready, 'visible outgoing menu must remain input-locked');
+      assert.equal(JSON.stringify(menu._items), oldItems); assert.equal(menu._phase, oldPhase); assert.equal(menu.index(), oldCursor);
+      h.s.onMenuOk(); h.s.onMenuCancel(); assert.equal(JSON.stringify(model.view()), selected);
+      await h.frames(1);
+    }
+    assert(frames.length >= 9, 'check every outgoing update, including transparent and partially opaque frames');
+    assert.equal(frames[0].opacity, 0); assert(frames.some(row => row.opacity > 0 && row.opacity < 1));
+    assert.equal(fade.snapshot().phase, 'in'); assert.equal(fade.snapshot().opacity, 1, 'view changes only under a fully opaque cover');
+    assert.notEqual(JSON.stringify(menu._items), oldItems); assert(menu.visible && !menu.active && !h.s.inputState().ready);
+    const expected = route === 'enter-target' ? 'bag-members' : route === 'return-from-target' ? 'bag' : 'main';
+    await visibleBag(h, expected); assert.equal(h.s._menu, menu); assert.equal(h.s._battleBag, model);
+    assert.equal(h.s._session.bag.potion, 3); assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { console.log('BAG_OUTGOING_FRAMES', JSON.stringify({ route, frames })); h.cleanup(); }
+});
