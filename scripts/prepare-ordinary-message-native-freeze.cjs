@@ -9,6 +9,7 @@ function prepare(app,assetFile,runRoot,out){
  app=fs.realpathSync(app);assetFile=fs.realpathSync(assetFile);runRoot=path.resolve(runRoot);out=path.resolve(out);
  assert(!fs.existsSync(runRoot)&&!fs.existsSync(out),'new run/freeze roots only');for(const p of[runRoot,out]){assert(!inside(app,p)&&p!==app,'outputs outside APP');assert(!inside(app,path.join(fs.realpathSync(path.dirname(p)),path.basename(p))),'parent cannot alias APP');}
  const game=path.join(app,'Contents/Resources/app.nw'),info=JSON.parse(fs.readFileSync(path.join(game,'package-info.json'))),media=JSON.parse(fs.readFileSync(assetFile));
+ const boot=path.join(game,'js/reactor_plugins.js');assert(fs.existsSync(boot),'boot plugin list is missing');assert(inside(game,fs.realpathSync(boot)),'boot plugin list outside APP');assert.equal(fileHash(boot),fileHash(path.join(ROOT,'js/plugins.js')),'current boot plugin list');
  assert.equal(info.withTests,true);assert.equal(info.workingTreeChanges,0);assert.match(info.gitHead,/^[a-f0-9]{40}$/);
  assert.equal(cp.execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),info.gitHead);assert.equal(cp.execFileSync('git',['status','--porcelain','-uall'],{cwd:ROOT,encoding:'utf8'}).trim(),'');cp.execFileSync('git',['merge-base','--is-ancestor',PLAN.productCommit,info.gitHead],{cwd:ROOT});
  for(const[name,h]of Object.entries(PLAN.productRuntime))assert.equal(fileHash(path.join(game,name)),h,'actual fixed ordinary-message product '+name);
