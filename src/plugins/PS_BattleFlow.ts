@@ -1483,7 +1483,17 @@ const { developmentCapabilities } = RuleConfig;
       return;
     }
     this._learningGiveUp = null;
-    if (s.pendingLearn) { this.showLearn(); return; }
+    if (s.pendingLearn) {
+      if (this._learningInitial?.pending !== s.pendingLearn) { this.askLearningInitial(); return; }
+      if (this._learningInitial.accepted) this.showLearn();
+      else {
+        const tr = PSFlow.translator();
+        this.show('learn-initial', [{ name: tr.t('progression.yes'), ext: 'forget-move' }, { name: tr.t('progression.no'), ext: 'decline-learning' }]);
+        if (sceneController(this).isCurrent()) this._learningInitialShownUpdate = this._pictureUpdate;
+      }
+      return;
+    }
+    this._learningInitial = null;
     const req = s.currentRequest();
     if (req && req.forceSwitch) { this.showParty("forced", retryParty?.memberId ?? null); return; }
     if (this._bagFadeReturn) { this._bagFadeReturn = false; this.showBattleBagView(); return; }
@@ -1759,6 +1769,29 @@ const { developmentCapabilities } = RuleConfig;
       child.update(); return child.closed;
     }, cancel: () => { child?.dispose(); } }]);
   };
+  P.askLearningInitial = function () {
+    const c = sceneController(this), pending = this._session.pendingLearn;
+    if (!c.isCurrent() || !pending) return;
+    const m = this._session.party.find((member: any) => member.id === pending.memberId), tr = PSFlow.translator();
+    const name = m.nickname || PSFlow.speciesName(m.species);
+    this._learningInitial = { pending, accepted: false, lines: [...this._log._lines], declined: tr.t('ui.learn.not_learned', { name, move: pending.move.name }) };
+    this.enqueueMessages([createBriefMessageMZ(G, this, tr.t('ui.learn.should_forget', { name, move: pending.move.name }),
+      () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => PSFlow.fast)]);
+  };
+  P.answerLearningInitial = function (accept: boolean) {
+    const c = sceneController(this), question = this._learningInitial, session = this._session;
+    if (!c.isCurrent() || this._mode !== 'learn-initial' || !question) return;
+    if (Number.isSafeInteger(this._pictureUpdate) && this._pictureUpdate === this._learningInitialShownUpdate) { this._menu.activate(); return; }
+    retireBrief(this);
+    if (session.pendingLearn !== question.pending) { this._learningInitial = null; this.afterMessages(); return; }
+    if (accept) { question.accepted = true; this._log.setLines(question.lines); this.showLearn(); return; }
+    this._learningInitial = null;
+    c.run(() => session.decideLearn(null), (messages: unknown) => {
+      if (!Array.isArray(messages)) throw new Error('invalid learning decision messages');
+      this.enqueueMessages([question.declined]);
+      this.pushMessages(messages);
+    }, 'learn');
+  };
   P.showLearn = function (selected = 0) {
     this._learningGiveUp = null;
     const p = this._session.pendingLearn;
@@ -1791,7 +1824,7 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.showEnd = function (aborted: boolean) {
     const c = sceneController(this); if (!c.isCurrent()) return;
-    this._learningGiveUp = null;
+    this._learningGiveUp = null; this._learningInitial = null;
     if (aborted) { this._endFeedbackPages = null; this._log.pause = false; this._log.add(PSFlow.translator().t("ui.end.aborted")); }
     // Full-party reception still has a destination choice. Do not announce a box before that choice commits.
     const s = this._session;
@@ -1832,6 +1865,7 @@ const { developmentCapabilities } = RuleConfig;
     }
     if (this._mode === 'moves') this._menuCursor?.remember('moves', this._menu.index(), this._menu._items.length);
     switch (this._mode) {
+      case 'learn-initial': this.answerLearningInitial(false); return;
       case 'learn': this.askLearningGiveUp(); return;
       case 'learn-giveup': this.answerLearningGiveUp(false); return;
       case "party-command": this.showParty(this._partySub, this._partySelected); return;
@@ -1882,6 +1916,9 @@ const { developmentCapabilities } = RuleConfig;
           ? this._session.chooseForcedSwitch(id) : this._session.chooseSwitch(id), 'switch', undefined, { memberId: id });
         return;
       }
+      case 'learn-initial':
+        if (ext === 'forget-move' || ext === 'decline-learning') this.answerLearningInitial(ext === 'forget-move');
+        return;
       case "learn":
         if (ext === null) this.askLearningGiveUp();
         else this.act(async () => ({ ok: true, messages: await this._session.decideLearn(ext) }), "learn");
@@ -1945,7 +1982,7 @@ const { developmentCapabilities } = RuleConfig;
     this.popScene();
   };
   P.terminate = function () {
-    this._learningGiveUp = null;
+    this._learningGiveUp = null; this._learningInitial = null;
     const c = this._controller as BattleSceneController<any> | undefined;
     this._menuCursor?.clear();
     retireBattleBag(this);

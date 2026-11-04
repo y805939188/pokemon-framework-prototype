@@ -297,6 +297,7 @@ export const en: LocaleTable = {
     "ui.levelStats.total": "Lv. {level} stats",
     "ui.learn.forget": "Forget {move}",
     "ui.learn.skip": "Don't learn {move}",
+    "ui.learn.should_forget": "Should {name} forget a move to learn {move}?",
     "ui.learn.give_up": "Give up on learning {move}?",
     "ui.learn.not_learned": "{name} did not learn {move}.",
     "ui.end.continue": "Continue",
