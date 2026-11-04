@@ -127,11 +127,16 @@ test('abort, replacement and termination retire party commands without selecting
 test('a full six-member list keeps stable identities across actual switches instead of submitting displayed indexes', async () => {
   const h = await open({ members: 6 }); try {
     const s = h.s._session, last = s.party[5].id, second = s.party[1].id;
+    const original = s.party.map(m => m.id), displayed = () => Array.from(h.s.inputState().items.filter(r => r.key !== null), r => r.key);
     await commands(h, last); await pick(h, 'switch-in'); await h.p.inMode('main'); assert.equal(s.gw.activeId('p1'), last);
     await party(h); assert.equal(h.s._menu._items.length, 7, 'six stable member rows plus Cancel');
-    assert.deepEqual(h.s.inputState().items.filter(r => r.key !== null).map(r => r.key).sort(), s.party.map(m => m.id).sort());
+    // Normalize VM-owned arrays: stable IDs and ranks are the contract, not Array.prototype.
+    assert.deepEqual(displayed().sort(), original.toSorted());
+    assert.deepEqual(displayed(), [last, ...original.slice(1, 5), original[0]]);
     await pick(h, second); assert.equal(h.s._mode, 'party-command'); await pick(h, 'switch-in'); await h.p.inMode('main');
     assert.equal(s.gw.activeId('p1'), second); assert.equal(JSON.stringify(h.flow.game()), h.before);
+    await party(h); assert.deepEqual(displayed(), [second, last, ...original.slice(2, 5), original[0]]);
+    assert.deepEqual(s.party.map(m => m.id), original, 'display swaps do not reorder Session participants');
   } finally { h.cleanup(); }
 });
 
