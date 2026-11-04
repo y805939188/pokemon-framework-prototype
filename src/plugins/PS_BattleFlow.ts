@@ -1180,6 +1180,7 @@ const { developmentCapabilities } = RuleConfig;
     this._wildOpeningQueued = false;
     this._battleBag = null; this._bagHidden = null; this._bagRetry = false; this._trainerDispatchQueued = false;
     this._bagLayer = 'battle'; this._bagFade = null; this._bagFadeReturn = false;
+    this._partySelected = null; this._retryPartySelection = null; this._partyCommandShownUpdate = -1;
   };
   P.create = function () {
     const c = sceneController(this);
@@ -1454,16 +1455,17 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.ballFeedbackState = function () { return this._ballFeedback?.snapshot() ?? null; };
   P.afterMessages = function () {
-    const s = this._session, retryMoves = this._retryMoveMenu;
-    this._retryMoveMenu = false;
+    const s = this._session, retryMoves = this._retryMoveMenu, retryParty = this._retryPartySelection;
+    this._retryMoveMenu = false; this._retryPartySelection = null;
     if (this._failure) { this.showEnd(true); return; }
     if (s.finished) { this.showEnd(false); return; }
     if (s.pendingLearn) { this.showLearn(); return; }
     const req = s.currentRequest();
-    if (req && req.forceSwitch) { this.showParty("forced"); return; }
+    if (req && req.forceSwitch) { this.showParty("forced", retryParty?.memberId ?? null); return; }
     if (this._bagFadeReturn) { this._bagFadeReturn = false; this.showBattleBagView(); return; }
     if (this._bagRetry && this._battleBag?.view().kind !== 'closed') { this._bagRetry = false; this.showBattleBagView(); return; }
     if (retryMoves && req?.active?.[0]?.moves?.length) { this.showMoves(); return; }
+    if (retryParty && req?.active) { this.showParty("switch", retryParty.memberId); return; }
     this.showMain();
   };
   P.refreshStatus = function () {
@@ -1665,19 +1667,32 @@ const { developmentCapabilities } = RuleConfig;
       }
     }, kind);
   };
-  P.showParty = function (sub: string) {
-    this._partySub = sub;
+  P.showParty = function (sub: string, selected: string | null = null) {
+    this._partySub = sub; this._partySelected = selected;
     const s = this._session;
     const live = Object.fromEntries(s.gw.readState("p1").map((x: any) => [x.id, x]));
     const items = s.party.map((m: any) => {
       const x = live[m.id];
       // an item that could not do anything is refused before it is registered (WP28 3.5): grey the target out
-      const can = sub === "item" ? s.canUseItem(this._pendingItem, m.id).ok : !(x.active || x.fainted);
+      const can = sub === "item" ? s.canUseItem(this._pendingItem, m.id).ok : true;
       const tr = PSFlow.translator();
-      return { name: tr.t("ui.party.entry", { name: PSFlow.speciesName(m.species), level: x.level, hp: x.hp, maxhp: x.maxhp,
-        fainted: x.fainted ? tr.t("ui.party.fainted") : "", active: x.active ? tr.t("ui.party.active") : "", noEffect: sub === "item" && !can ? tr.t("ui.party.no_effect") : "" }), ext: m.id, enabled: can };
+      return { name: tr.t("ui.party.entry", { name: PSFlow.speciesName(m.species), level: x?.level ?? m.level, hp: x?.hp ?? 0, maxhp: x?.maxhp ?? 0,
+        fainted: x?.fainted ? tr.t("ui.party.fainted") : "", active: x?.active ? tr.t("ui.party.active") : "", noEffect: sub === "item" && !can ? tr.t("ui.party.no_effect") : "" }), ext: m.id, enabled: can };
     });
+    if (sub !== 'item') items.push({ name: PSFlow.translator().t('ui.party.cancel'), ext: null, enabled: true });
     this.show(sub === "forced" ? "party-forced" : "party", items);
+    if (selected !== null && sceneController(this).isCurrent()) this._menu.select(Math.max(0, items.findIndex((item: any) => item.ext === selected)));
+  };
+  P.showPartyCommands = function (memberId: string) {
+    const c = sceneController(this); if (!c.isCurrent()) return;
+    const member = this._session.party.find((m: any) => m.id === memberId), live = this._session.gw.readState('p1').find((m: any) => m.id === memberId);
+    if (!member || !live) { this.showParty(this._partySub); return; }
+    this._partySelected = memberId;
+    const tr = PSFlow.translator(), items: any[] = [];
+    if (!member.isEgg && live.hp > 0 && !live.fainted) items.push({ name: tr.t('ui.party.switch_in'), ext: 'switch-in' });
+    items.push({ name: tr.t('ui.party.cancel'), ext: null });
+    this.show('party-command', items);
+    if (c.isCurrent()) this._partyCommandShownUpdate = this._pictureUpdate;
   };
   P.showLearn = function () {
     const p = this._session.pendingLearn;
@@ -1726,6 +1741,7 @@ const { developmentCapabilities } = RuleConfig;
     }
     if (this._mode === 'moves') this._menuCursor?.remember('moves', this._menu.index(), this._menu._items.length);
     switch (this._mode) {
+      case "party-command": this.showParty(this._partySub, this._partySelected); return;
       case "moves": case "bag": this.showMain(); return;
       case "party": if (this._pendingItem) { this._pendingItem = null; this.showBag(); } else this.showMain(); return;
       default: G.SoundManager.playBuzzer(); this._menu.activate();
@@ -1757,25 +1773,39 @@ const { developmentCapabilities } = RuleConfig;
         return;
       case "party":
         if (this._pendingItem) { const item = this._pendingItem; this._pendingItem = null; this.act(() => this._session.useItem(item, ext), "item"); }
-        else this.act(() => this._session.chooseSwitch(ext), "switch");
+        else if (ext === null) this.showMain();
+        else if (typeof ext === 'string') this.showPartyCommands(ext);
         return;
-      case "party-forced": this.act(() => this._session.chooseForcedSwitch(ext), "switch"); return;
+      case "party-forced":
+        if (ext === null) { G.SoundManager.playBuzzer(); this._menu.activate(); }
+        else if (typeof ext === 'string') this.showPartyCommands(ext);
+        return;
+      case "party-command": {
+        if (ext === null) { this.showParty(this._partySub, this._partySelected); return; }
+        if (Number.isSafeInteger(this._pictureUpdate) && this._pictureUpdate === this._partyCommandShownUpdate) { this._menu.activate(); return; }
+        const id = this._partySelected, forced = this._partySub === 'forced';
+        if (ext === 'switch-in' && typeof id === 'string') this.act(() => forced
+          ? this._session.chooseForcedSwitch(id) : this._session.chooseSwitch(id), 'switch', undefined, { memberId: id });
+        return;
+      }
       case "learn": this.act(async () => ({ ok: true, messages: await this._session.decideLearn(ext) }), "learn"); return;
       case "end": this.onEnd(); return;
     }
     });
   };
 
-  /** Refused hand-selected moves return to their menu; other actions retain their existing return path. */
-  P.act = function (fn: () => Promise<any> | any, kind?: string, refusedMove?: { pp?: number }) {
+  /** Captured move/party context returns refused choices to their selector; other actions retain their return path. */
+  P.act = function (fn: () => Promise<any> | any, kind?: string, refusedMove?: { pp?: number }, refusedParty?: { memberId: string }) {
     const c = sceneController(this);
     c.run(fn, (r: any) => {
       if (r && r.ok === false) {
         this._retryMoveMenu = !!refusedMove;
+        this._retryPartySelection = refusedParty ? { ...refusedParty } : null;
         this.enqueueMessages([refusedMove?.pp === 0 && r.reason === 'choice-rejected'
           ? PSFlow.translator().t('refusal.move.no-pp') : refusalText(kind, r.reason)]);
         return;
       }
+      this._retryPartySelection = null;
       this.pushMessages(r.messages || []);
     }, kind);
   };

@@ -90,7 +90,8 @@ test('a normal later player switch is still a single owned send-out and never re
     await h.p.inMode('main'); const foeText = sendOutText(h, 'p2'), s = h.s._session;
     const next = s.party.find(m => m.id !== s.gw.activeId('p1')); assert(next);
     h.s.showParty('switch'); const index = h.s._menu._items.findIndex(row => row.ext === next.id);
-    assert(index >= 0); h.s._menu.select(index); h.s.onMenuOk(); await h.p.inMode('main');
+    assert(index >= 0); h.s._menu.select(index); h.s.onMenuOk(); assert.equal(h.s._mode, 'party-command');
+    await h.frames(1); h.s._menu.select(h.s._menu._items.findIndex(row => row.ext === 'switch-in')); h.s.onMenuOk(); await h.p.inMode('main');
     assert.equal(s.gw.activeId('p1'), next.id);
     const actor = h.s.children.find(n => n._psPictureRole === 'body' && n._psPictureKey === 'p1:' + next.id);
     assert(actor?.visible && actor.scale.x > 0 && actor.opacity > 0);

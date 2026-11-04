@@ -165,7 +165,7 @@ for(const choice of [0,null])test(`compiled terminal learning ${choice===null?'d
 });
 test('compiled forced replacement stays mandatory and submits the legal member once',async()=>{
  const h=await host().ready(),s=h.scene;h.flow.speciesName=x=>x;h.session.party=[{id:'P1',species:'Snorlax'},{id:'P2',species:'Snorlax'}];h.session.gw.readState=()=>[{id:'P1',active:true,fainted:true,level:50,hp:0,maxhp:100},{id:'P2',active:false,fainted:false,level:50,hp:100,maxhp:100}];let forced=true,chosen;
- h.session.currentRequest=()=>({forceSwitch:forced,active:[{moves:[]}]});h.session.chooseForcedSwitch=member=>{chosen=member;forced=false;return {messages:[]};};s.pushMessages([]);s.updateQueue();assert.equal(s._mode,'party-forced');s.onMenuCancel();assert.equal(s._mode,'party-forced');s._menu.select(1);s.onMenuOk();s.onMenuOk();await flush();assert.equal(chosen,'P2');s.updateQueue();assert.equal(s._mode,'main');assert.equal(h.flow.perf.cur.actions.length,1);
+ h.session.currentRequest=()=>({forceSwitch:forced,active:[{moves:[]}]});h.session.chooseForcedSwitch=member=>{chosen=member;forced=false;return {messages:[]};};s.pushMessages([]);s.updateQueue();assert.equal(s._mode,'party-forced');s.onMenuCancel();assert.equal(s._mode,'party-forced');s._menu.select(1);s.onMenuOk();assert.equal(s._mode,'party-command');s.onMenuOk();assert.equal(chosen,undefined);s.update();s._menu.select(s._menu._items.findIndex(x=>x.ext==='switch-in'));s.onMenuOk();s.onMenuOk();await flush();assert.equal(chosen,'P2');s.updateQueue();assert.equal(s._mode,'main');assert.equal(h.flow.perf.cur.actions.length,1);
 });
 test('compiled menu redraw replacing host cannot activate obsolete input',async()=>{
  const h=await host().ready(),s=h.scene;s._menu.deactivate();s._menu.hide();const next={request:{battleId:'next'}};
@@ -218,7 +218,7 @@ for(const roar of [false,true])test(`real Session compiled Scene resets both cur
   const refresh=s._status.refresh;s._status.refresh=function(...args){const r=refresh.apply(this,args);const id=s.presentationState().cards.find(c=>c.side==='p1'&&c.active)?.id;if(painted.at(-1)!==id)painted.push(id);return r;};
   const push=s.pushMessages;s.pushMessages=function(messages){emitted.push(...JSON.parse(JSON.stringify(messages)));return push.call(this,messages);};
   await rememberBoth(s);s.onMenuOk();assert.equal(s._mode,'party');
-  s._menu.select(s._menu._items.findIndex(x=>x.ext===game.party[1].id));s.onMenuOk();
+  s._menu.select(s._menu._items.findIndex(x=>x.ext===game.party[1].id));s.onMenuOk();assert.equal(s._mode,'party-command');advanceSceneClock.get(s)?.(16.7);s.update();s._menu.select(s._menu._items.findIndex(x=>x.ext==='switch-in'));s.onMenuOk();
   for(let i=0;i<100&&s._busy;i++)await flush();assert(!s._busy);assert.equal(s._failure,null);drainScene(s);
   assert.equal(s._mode,'main');assert.equal(s._menu.index(),0);s.onMenuOk();assert.equal(s._mode,'moves');assert.equal(s._menu.index(),0);
   assert(painted.includes(game.party[1].id));assert.equal(painted.at(-1),game.party[roar?0:1].id);
