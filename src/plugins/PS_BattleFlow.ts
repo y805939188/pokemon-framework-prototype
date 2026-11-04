@@ -1330,7 +1330,7 @@ const { developmentCapabilities } = RuleConfig;
               wildEntrance = foe; this._wildOpeningQueued = true;
             }
           }
-          if (openingBatch && op?.request.kind === 'trainer' && this._session.foeTeam.length === 1 && !this._trainerDispatchQueued) {
+          if (openingBatch && op?.request.kind === 'trainer' && !this._trainerDispatchQueued) {
             const switches = events.filter((event: any) => event.type === 'switch');
             const player = switches.find((event: any) => /^p1a?: /.test(event.args[0] || ''));
             const foe = switches.find((event: any) => /^p2a?: /.test(event.args[0] || ''));

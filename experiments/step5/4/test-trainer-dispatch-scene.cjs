@@ -18,11 +18,13 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = true, egg = false, fast = false, effects = true } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = true, egg = false, trainerMembers = 1, fast = false, effects = true } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
   if (catalog) catalog(content.items);
+  const trainerRecord = content.trainers['music-normal'][0];
+  trainerRecord.party = Array.from({ length: trainerMembers }, (_, i) => ({ ...trainerRecord.party[0], level: 3 + i }));
   G.PluginManager.parameters = function (name) { const p = parameters.call(this, name); return name === 'PS_BattleFlow' ? { ...p, language: lang } : p; };
   flow.setLanguage(null); flow.stateReplaced(); flow._app = null; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.seed = [1, 2, 3, 4]; flow.rng = () => 0; flow.fast = fast; (G.ConfigManager ??= {}).battleEffects = effects;
   const state = fixture.musicNativeState(E, content, 'receiving'); state.party = state.party.slice(0, members); state.nextMemberOrdinal = String(members + 1);
@@ -53,8 +55,9 @@ async function firstBrief(h) {
   assert(!painted(h, 'p1') && !painted(h, 'p2'), 'neither body may start before the first dispatch brief is full');
   assert(!h.s.inputState().ready);
 }
-for (const lang of ['en', 'zh']) test(lang + ' normal trainer opening dispatches the actual foe before the player without changing Session messages', async () => {
-  const h = await open({ lang }); try {
+for (const trainerMembers of [1, 3]) for (const lang of ['en', 'zh']) test(lang + ' normal trainer opening dispatches the actual foe before the player without changing Session messages, roster ' + trainerMembers, async () => {
+  const h = await open({ lang, trainerMembers }); try {
+    assert.equal(h.s._session.foeTeam.length, trainerMembers, 'the real trainer roster includes its reserves');
     await firstBrief(h); const first = h.s._residentBrief;
     await h.waitFor(() => h.s._residentBrief && h.s._residentBrief !== first && h.s.briefMessageState()?.phase === 'typing', 'player brief after foe appearance');
     assert(painted(h, 'p2'), 'actual foe body has appeared before the player brief');
