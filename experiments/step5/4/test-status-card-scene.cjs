@@ -163,6 +163,17 @@ test('real normal switch replaces the previous gender/shiny badges and snapshots
     assert.equal(JSON.stringify(h.flow.game()), h.before);
   } finally { h.cleanup(); }
 });
+test('optional owned record unavailable keeps known public appearance and the normal input gate', async () => {
+  const h = await open(); const read = h.flow.game;
+  try {
+    for (const unavailable of [() => ({ ...read(), dex: undefined }), () => { throw Error('controlled unavailable owned query'); }]) {
+      h.flow.game = unavailable;
+      const f = paint(h).views.find(c => c.side === 'p2' && c.visible);
+      assert.equal(f.owned, null); assert.notEqual(f.gender.kind, 'unknown'); assert.equal(typeof f.shiny, 'boolean');
+      assert(h.s.inputState().ready); assert.equal(h.s._failure, null);
+    }
+  } finally { h.flow.game = read; assert.equal(JSON.stringify(h.flow.game()), h.before); h.cleanup(); }
+});
 function illusionContent() {
   const input = donor.progressionDonorInputs(), base = input.species.find(s => s.id === 'snorlax');
   const species = { ...base, id: 'zoroark', showdownId: 'zoroark', nameKey: 'species.zoroark', learnset: [{ level: 1, move: 'splash' }] }; delete species.evolutions;

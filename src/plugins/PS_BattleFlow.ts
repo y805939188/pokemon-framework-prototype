@@ -1284,9 +1284,14 @@ const { developmentCapabilities } = RuleConfig;
       const publicView = card.appearance;
       if (!publicView) return { name: card.side === 'p2' ? PSFlow.translator().t('ui.card.unknown') : card.name, metadata: null };
       const key = engine().B.speciesKey.keyOfBattleName(s.content, publicView.species);
+      let owned: boolean | null = null;
+      try {
+        const record = PSFlow.game()?.dex?.owned;
+        if (card.side === 'p2' && key && Array.isArray(record)) owned = record.includes(key.species);
+      } catch { /* Optional record unavailable: preserve unknown and legal control. */ }
       return { name: PSFlow.speciesName(publicView.species), metadata: {
         id: card.id, side: card.side, gender: publicView.gender, shiny: publicView.shiny,
-        owned: card.side === 'p2' && key ? PSFlow.game().dex.owned.includes(key.species) : null,
+        owned,
       } };
     };
     this._display = new BattleDisplayPlayback(initialCards, {
