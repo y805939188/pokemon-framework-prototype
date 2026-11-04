@@ -6,16 +6,16 @@ const {createVictoryDriverHost}=require('./victory-music-driver-host.cjs');
 const ROOT=path.resolve(process.env.PF_LEVEL_STATS_ROOT||path.resolve(__dirname,'../../..')),E=require(path.join(ROOT,'js/engine/build/production.cjs')),PLAN=require(path.join(ROOT,'experiments/step5/4/victory-music-native-plan.json'));let temp,plugins,entryText,fixture;
 test.before(async()=>{temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-level-scene-'));plugins={};for(const n of ['PS_BattleFlow','PS_SaveState','PS_Evolution','PS_BattleFlowTest']){const out=path.join(temp,n),r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,env:{...process.env,RR_PLUGIN:n},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);const code=fs.readFileSync(path.join(out,n+'.js'),'utf8');if(n==='PS_BattleFlowTest')entryText=code;else plugins[n]=n==='PS_BattleFlow'&&process.env.PF_LEARNING_CANCEL_TEST_PLUGIN?fs.readFileSync(process.env.PF_LEARNING_CANCEL_TEST_PLUGIN,'utf8'):code;}const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));await vite.build({configFile:false,root:ROOT,logLevel:'error',build:{outDir:path.join(temp,'fixture'),minify:false,lib:{entry:path.join(ROOT,'src/plugins/flowtest/music-native-fixture.ts'),formats:['cjs'],fileName:()=> 'entry.cjs'}}});fixture=require(path.join(temp,'fixture/entry.cjs'));});
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
-async function open({lang='en',levels=1,atCap=false,evBoundary=false,expOffset=-1,normalLearning=false}={}){
+async function open({lang='en',levels=1,atCap=false,evBoundary=false,expOffset=-1,normalLearning=false,normalGrowth=false,noLearn=false}={}){
  const h=createVictoryDriverHost({ROOT,work:temp,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true}}),G=h.G,flow=h.w.flow,content=fixture.musicNativeContent(E,assert),oldParameters=G.PluginManager.parameters;
  G.PluginManager.parameters=function(name){const v=oldParameters.call(this,name);return name==='PS_BattleFlow'?{...v,language:lang}:v;};
  const refresh=G.Window_Base.prototype.refresh;G.Window_Base.prototype.refresh=function(...args){const r=refresh.apply(this,args);if(this.page&&this.drawAllItems)this.drawAllItems();return r;};
  const destroyed=[],draws=[],addWindow=G.Scene_MenuBase.prototype.addWindow;G.Scene_MenuBase.prototype.addWindow=function(view){addWindow.call(this,view);view.parent={removeChild(){}};};G.Window_Base.prototype.destroy=function(){destroyed.push(this);this._destroyed=true;};const draw=G.Window_Base.prototype.drawText;G.Window_Base.prototype.drawText=function(...args){draws.push({window:this,args});return draw.apply(this,args);};let sounds=0;G.SoundManager.playOk=()=>sounds++;
  flow.setLanguage(null);flow.stateReplaced();flow._app=null;flow._content=content;flow._dex=E.dex.createDexLookup();flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=true;
- const level=atCap?100:evBoundary?30:50;content.species.Snorlax.learnset[51]=['Rest'];assert(content.moves.Rest,'real learning fixture exists');const member=E.memberFactory.createMember({id:'LEVEL-P1',species:'Snorlax',level},content,()=>0);if(evBoundary){assert.equal(member.ivs.spe,0,'fixture has IV0, not an assumed31');assert.equal(member.nature,'hardy');member.evs={...member.evs,spe:15};}const state=E.state.newGame({content,party:[E.speciesKey.toPersistentMember(member,content)],money:1000,bag:{masterball:2}});state.badges.fill(true);state.nextMemberOrdinal='2';state.party[0].moves=[{id:'tackle',pp:35,maxpp:35},{id:'growl',pp:40,maxpp:40},{id:'splash',pp:40,maxpp:40},{id:'protect',pp:10,maxpp:10}];const curve=content.species.Snorlax.growth;if(!atCap)state.party[0].exp=E.growth.minExp(curve,level+levels)+expOffset;G.$gameSystem._psGame=state;const before=JSON.stringify(flow.game());
- await h.p.toMapId(5,8,9);flow.openBattle({kind:'wild',foes:[{species:'Pidgey',level:3}],battleId:'level-'+path.basename(h.w.root),seq:1,canLose:true});await h.p.inMode('main');const s=h.p.battle(),initialCard=s.presentationState().cards.find(c=>c.side==='p1'),initialView=s.statusCardState?.().find(c=>c.side==='p1'),messages=[],push=s.pushMessages;s.pushMessages=function(msgs){messages.push(...msgs);return push.call(this,msgs);};if(normalLearning)flow.fast=false;s.act(()=>s._session.chooseMove(1),'move');await h.waitFor(()=>!s._busy,'real KO result');
- await h.waitFor(()=>s.levelStatsState?.()||['learn','end'].includes(s._mode),'stat panel or old next menu');
- return{...h,G,flow,s,before,initialCard,initialView,destroyed,draws,messages,get sounds(){return sounds;},state(){return s.levelStatsState?.();},cleanup(){if(flow.running)flow.abort(Error('owned level stats cleanup'));s.terminate();}};
+ const level=atCap?100:evBoundary?30:50;content.species.Snorlax.learnset[51]=noLearn?[]:['Rest'];assert(content.moves.Rest,'real learning fixture exists');const member=E.memberFactory.createMember({id:'LEVEL-P1',species:'Snorlax',level},content,()=>0);if(evBoundary){assert.equal(member.ivs.spe,0,'fixture has IV0, not an assumed31');assert.equal(member.nature,'hardy');member.evs={...member.evs,spe:15};}const state=E.state.newGame({content,party:[E.speciesKey.toPersistentMember(member,content)],money:1000,bag:{masterball:2}});state.badges.fill(true);state.nextMemberOrdinal='2';state.party[0].moves=[{id:'tackle',pp:35,maxpp:35},{id:'growl',pp:40,maxpp:40},{id:'splash',pp:40,maxpp:40},{id:'protect',pp:10,maxpp:10}];const curve=content.species.Snorlax.growth;if(!atCap)state.party[0].exp=E.growth.minExp(curve,level+levels)+expOffset;G.$gameSystem._psGame=state;const before=JSON.stringify(flow.game());
+ await h.p.toMapId(5,8,9);flow.openBattle({kind:'wild',foes:[{species:'Pidgey',level:3}],battleId:'level-'+path.basename(h.w.root),seq:1,canLose:true});await h.p.inMode('main');const s=h.p.battle(),initialCard=s.presentationState().cards.find(c=>c.side==='p1'),initialView=s.statusCardState?.().find(c=>c.side==='p1'),messages=[],growthPauses=[],paused=s.pausedMessages,push=s.pushMessages;if(typeof paused==='function')s.pausedMessages=function(lines){const steps=paused.call(this,lines);growthPauses.push(...steps.filter(step=>typeof step!=='string'));return steps;};s.pushMessages=function(msgs){messages.push(...msgs);return push.call(this,msgs);};if(normalGrowth||normalLearning)flow.fast=false;s.act(()=>s._session.chooseMove(1),'move');await h.waitFor(()=>!s._busy,'real KO result');
+ await h.waitFor(()=>(normalGrowth||normalLearning)?s.ordinaryMessageState?.():s.levelStatsState?.()||['learn','end'].includes(s._mode),'stat panel, message or old next menu');
+ return{...h,G,flow,s,before,initialCard,initialView,destroyed,draws,messages,growthPauses,get sounds(){return sounds;},state(){return s.levelStatsState?.();},cleanup(){if(flow.running)flow.abort(Error('owned level stats cleanup'));s.terminate();}};
 }
 async function firstLearningStage(h){
  for(let i=0;i<12&&h.state();i++)await h.p.press('ok');
@@ -139,8 +139,17 @@ test('compiled generic inMode driver explicitly accepts the new question before 
 // WP67-A 7.2: actual full-slot announcement uses the existing paused message,
 // separately from the subsequent permission question and final result commit.
 async function learningNotice(h){
- for(let i=0;i<12&&h.state();i++)await h.p.press('ok');
- await h.waitFor(()=>!!h.s.ordinaryMessageState(),'actual wants-to-learn text stage');
+ const message=h.messages.find(m=>m.kind==='learn-prompt');assert(message,'actual pending learning message');const text=h.s._D.message(message)[0];let found=false;
+ // Observe the actual growth factories and delegate unchanged. Use real inputs
+ // for their front pauses/panels; never turn fast back on to reach the notice.
+ for(let i=0;i<2400;i++){
+  const step=h.s._ordinaryMessage,view=step?.snapshot();
+  if(step&&!h.growthPauses.includes(step)&&view.implementation==='paused-message-v1'){found=true;break;}
+  if(step&&!h.growthPauses.includes(step)&&view.phase==='full'&&h.s._log._lines.join(' ')===text)assert.equal(view.implementation,'paused-message-v1','learning notice must remain paused after growth');
+  assert.notEqual(h.s._mode,'learn-initial','permission cannot precede the paused announcement');
+  if(h.state()||step)await h.p.press('ok');else await h.frames(1);
+ }
+ assert(found,'bounded actual wants-to-learn paused stage');
  const view=h.s.ordinaryMessageState();assert.equal(view.implementation,'paused-message-v1','full-slot announcement is a paused message, not an ordinary one-second line');
  assert.equal(h.s._mode,'messages');assert.equal(h.s.inputState().ready,false);assert.equal(h.s._learningInitial??null,null,'permission question must wait for the announcement');
  return h.s._ordinaryMessage;
@@ -190,4 +199,36 @@ for(const how of ['abort','replace','terminate'])test(how+' retires shared learn
  const h=await open();try{await learningRoot(h);const scene=h.s,win=scene._menu,session=scene._session;assert.equal(typeof scene.learningMoveState,'function','real shared detail window required');assert(scene.learningMoveState());let decisions=0;const decide=session.decideLearn.bind(session);session.decideLearn=(...args)=>{decisions++;return decide(...args);};const before=JSON.stringify(session.party);
  if(how==='abort')h.flow.abort(Error('owned detail cancellation'));else if(how==='replace')h.flow.stateReplaced();else scene.terminate();win.select(1);scene.onMenuOk();scene.onMenuCancel();await h.frames(2);assert.equal(decisions,0);assert.equal(JSON.stringify(session.party),before);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(scene.learningMoveState(),null);if(how!=='terminate')scene.terminate();assert.equal(h.destroyed.filter(w=>w===win).length,1);assert.equal(win.visible,false);assert.equal(win.active,false);assert.equal(scene._learningMenu,null);
  }finally{h.cleanup();}
+});
+
+
+// D2/WP67-A 7.1: normal experience/level text owns a pause before bars/panels.
+async function growthPause(h,text){
+ for(let i=0;i<1200;i++){
+  const step=h.s._ordinaryMessage,view=step?.snapshot();
+  if(view?.implementation==='paused-message-v1'){
+   assert.equal(view.total,Array.from(text).length,'actual next paused growth line, not an unrelated text');return step;
+  }
+  if(view?.phase==='full'&&h.s._log._lines.join(' ')===text)assert.equal(view.implementation,'paused-message-v1','experience and level text must use the paused contract');
+  await h.p.press('ok');
+ }
+ assert.fail('bounded growth paused-message stage');
+}
+function growthTexts(h){const msg=h.messages.find(m=>m.kind==='growth');assert(msg&&msg.exp>0&&msg.levelUps.includes(51));return {exp:h.s._D.message({...msg,levelUps:[]})[0],level:h.s._D.message({...msg,exp:0,levelUps:[51]})[0]};}
+for(const lang of ['en','zh'])test(lang+' normal growth messages pause before the bar and level stats without committing working growth',async()=>{
+ const h=await open({lang,normalGrowth:true});try{
+  const texts=growthTexts(h),exp=await growthPause(h,texts.exp),s=h.s._session;
+  assert.equal(exp.snapshot().phase,'typing');assert.equal(h.state(),null);assert.equal(s.party[0].level,51,'working growth is already applied');assert.equal(h.s.presentationState().cards.find(c=>c.side==='p1').level,50,'level presentation waits behind experience text');assert.equal(JSON.stringify(h.flow.game()),h.before);
+  const sound=h.sounds;await h.p.press('ok');assert.equal(exp.snapshot().phase,'full','the reveal input does not also dismiss');assert.equal(h.s._log._lines.join(' '),texts.exp);assert.equal(h.s._log.pause,true);assert.equal(h.sounds,sound);await h.frames(120);assert.equal(exp.snapshot().phase,'full','ordinary one-second dwell is insufficient');assert.equal(h.state(),null);assert(!h.s.inputState().ready);
+  await h.p.press('ok');assert.equal(exp.snapshot().phase,'done');const level=await growthPause(h,texts.level);assert.equal(level.snapshot().phase,'typing');assert.equal(h.state(),null);assert.equal(h.s.presentationState().cards.find(c=>c.side==='p1').level,51);await h.p.press('ok');assert.equal(level.snapshot().phase,'full');assert.equal(h.s._log._lines.join(' '),texts.level);await h.frames(120);assert.equal(level.snapshot().phase,'full');assert.equal(h.state(),null);await h.p.press('ok');await h.waitFor(()=>h.state(),'stats only after level pause');assert.equal(h.state().phase,'delta');await h.p.press('ok');assert.equal(h.state().phase,'total');assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
+});
+test('non-terminal growth pause naturally ends only after its own three-second full-text dwell',async()=>{
+ const h=await open({normalGrowth:true});try{const texts=growthTexts(h),exp=await growthPause(h,texts.exp);await h.waitFor(()=>exp.snapshot().phase==='full','natural experience full paint');assert.equal(h.s._session.finished,false,'pending learning keeps the Session non-terminal');assert.equal(h.s._log._lines.join(' '),texts.exp);const at=exp.snapshot().fullyShownAt;while(h.G.performance.now()-at<2960)await h.frames(1);assert.equal(exp.snapshot().phase,'full');assert(h.G.performance.now()-at<3000);await h.frames(4);assert.equal(exp.snapshot().phase,'done');assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
+});
+test('terminal experience and level pauses require input, then Continue installs the result exactly once',async()=>{
+ const h=await open({normalGrowth:true,noLearn:true});try{let installs=0,doc=h.G.$gameSystem._psGame;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});const texts=growthTexts(h),exp=await growthPause(h,texts.exp);assert.equal(h.s._session.finished,true);await h.p.press('ok');assert.equal(exp.snapshot().phase,'full');await h.frames(400);assert.equal(exp.snapshot().phase,'full','battle-ended pause never auto-closes');assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.p.press('ok');const level=await growthPause(h,texts.level);await h.p.press('ok');await h.frames(400);assert.equal(level.snapshot().phase,'full');assert.equal(h.state(),null);await h.p.press('ok');await h.waitFor(()=>h.state(),'terminal level stats');await h.p.press('ok');await h.p.press('ok');await h.p.inMode('end');assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(installs,1);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(h.flow.game().party[0].level,51);h.s.onEnd();assert.equal(installs,1);}finally{h.cleanup();}
+});
+for(const how of ['abort','replace','terminate'])test(how+' retires a visible growth pause without leaking input or installing the battle',async()=>{
+ const h=await open({normalGrowth:true});try{const texts=growthTexts(h),exp=await growthPause(h,texts.exp);await h.p.press('ok');assert.equal(exp.snapshot().phase,'full');const s=h.s._session,working=JSON.stringify(s.party);if(how==='abort')h.flow.abort(Error('owned growth pause abort'));else if(how==='replace')h.flow.stateReplaced();else h.s.terminate();h.s.onMenuOk();h.s.onMenuCancel();await h.frames(3);assert.equal(exp.snapshot().phase,'done');assert.equal(h.s._log.pause,false);assert.equal(h.s.ordinaryMessageState(),null);assert.equal(h.state(),null);assert.equal(JSON.stringify(s.party),working);assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
 });

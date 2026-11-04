@@ -419,11 +419,31 @@ for(const kind of ['faint','pivot'])test('party display order follows the real m
  }finally{h.cleanup();}
 });
 
+// Normal user confirmations through the existing queue, stopping as soon as
+// the genuine stat panel is shown. Record full rendered text before closing it.
+async function normalGrowthBeforeStats(h){
+ const observations=[],seen=new Set();
+ for(let i=0;i<2400;i++){
+  if(h.s.levelStatsState())return observations;
+  const step=h.s._ordinaryMessage,view=step?.snapshot();
+  if(step&&view.phase==='full'&&!seen.has(step)){seen.add(step);observations.push({implementation:view.implementation,text:h.s._log._lines.join(' ')});}
+  assert(!['learn','learn-initial','end'].includes(h.s._mode),'stats must precede learning or a terminal menu');
+  if(step)await h.p.press('ok');else await h.frames(1);
+ }
+ assert.fail('bounded genuine normal growth panel');
+}
+function assertPausedGrowth(h,observations){
+ const growth=h.batches.flatMap(batch=>batch.value).find(m=>m.kind==='growth'&&m.levelUps.includes(51));assert(growth,'actual first KO growth');
+ for(const text of [...h.s._D.message({...growth,levelUps:[]}),...h.s._D.message({...growth,exp:0,levelUps:[51]})]){
+  const row=observations.find(row=>row.text===text);assert(row,'actual fully rendered growth line '+text);assert.equal(row.implementation,'paused-message-v1','both growth stages must use the accepted paused consumer');
+ }
+}
+
 test('unified party order, paused notice and private details learn for the non-active member by stable ID',async()=>{
  const h=await open({lang:'zh',members:4,egg:true,grow:true,integration:true,trainer:true,trainerMembers:2,fast:true});try{
   const s=h.s._session,[learner,egg,actor,reserve]=JSON.parse(h.before).party.map(m=>m.id);let installs=0,doc=h.G.$gameSystem._psGame;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
   await commands(h,actor);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),actor);h.flow.fast=false;await pick(h,'fight');await pick(h,1);
-  await h.waitFor(()=>!!h.s.levelStatsState(),'non-active learner actual level stats');for(let i=0;i<12&&h.s.levelStatsState();i++)await h.p.press('ok');
+  const normalGrowth=await normalGrowthBeforeStats(h);assertPausedGrowth(h,normalGrowth);for(let i=0;i<12&&h.s.levelStatsState();i++)await h.p.press('ok');
   await h.waitFor(()=>h.s.ordinaryMessageState()?.implementation==='paused-message-v1','unified full-slot paused notice');const notice=h.s._ordinaryMessage;assert.equal(s.pendingLearn.memberId,learner);assert.equal(h.s._learningInitial??null,null);await h.p.press('ok');assert.equal(notice.snapshot().phase,'full');assert(h.s._log.pause);await h.p.press('ok');await h.p.inMode('learn-initial');assert.equal(notice.snapshot().phase,'done');
   await h.frames(1);await pick(h,'forget-move');await h.p.inMode('learn');const view=h.s.learningMoveState();assert.equal(view.page.rows[0].details,'35/35 PP','details use the non-active learner, not the actor which consumed Tackle');assert(s.gw.readState('p1').find(m=>m.id===actor).pp.tackle<35);await pick(h,3);await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),actor);assert.equal(s.party.find(m=>m.id===learner).moves[3].id,'rest');assert.equal(s.gw.readState('p1').find(m=>m.id===learner).pp.rest,10);
   await summary(h,learner);assert.deepEqual(Array.from(current(h).view.ids),[actor,egg,learner,reserve]);assert.equal(current(h).view.cursor,2);assert(text(h).some(t=>t.includes('Lv.51')));await h.p.press('right');await h.p.press('right');await h.p.press('right');assert(text(h).some(t=>/\brest\b.*10\/10 PP/i.test(t)));await h.p.press('cancel');await h.p.inMode('party');assert.equal(h.s._menu.index(),2);assert.equal(h.s._menu.itemAt(2).ext,learner);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
