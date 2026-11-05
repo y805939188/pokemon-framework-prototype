@@ -593,6 +593,48 @@ test('SWC01 en default player Switch publishes an actual replacement question be
 });
 
 const SWD=require('../../../js/engine/build/testing.cjs').trainerAiDiagnostics;
+for (const lang of ['en', 'zh']) for (const style of ['switch', 'set']) test('RUI01 ' + lang + ' no-growth/prohibitions after forced replacement with ' + style, async () => {
+  const h = await open({ lang, command: 'StartTrainerBattle', trainerMembers: 2, members: 3, battleStyle: style,
+    expGain: 'false', noRun: 'true', noBall: 'true', fast: true, bag: { masterball: 2 },
+    leadHP: 1, leadMoves: [{ id: 'splash', pp: 1, maxpp: 40 }] });
+  try {
+    const s = h.s._session, installs = observeInstalls(h), savedBefore = JSON.parse(h.before);
+    const [lead, reserve] = s.party.map(m => m.id), foe = s.gw.activeId('p2');
+    const growth = m => [m.id, m.level, m.exp, m.evs];
+    const expectedGrowth = savedBefore.party.map(growth).sort();
+    assert.equal(s.expGain, false);
+    assert.deepEqual(s.gw.query('p1', 'ball'), { allowed: false, reason: 'ballsdisabled' });
+    assert.deepEqual(s.gw.query('p1', 'run'), { allowed: false, reason: 'trainer' });
+    const beforeRefusal = s.gw.snapshot(); await pick(h, 'run'); await h.p.inMode('main');
+    assert.equal(s.gw.snapshot(), beforeRefusal); assert.equal(s.bag.masterball, 2);
+    await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('party-forced');
+    assert(s.gw.readState('p1').find(m => m.id === lead).fainted);
+    await pick(h, reserve); await pick(h, 'switch-in'); await h.p.inMode('main');
+    await pick(h, 'fight'); await pick(h, 1);
+    await h.waitFor(() => ['main', 'replacement-question'].includes(h.s._mode) && h.s.inputState().ready, 'combined KO boundary');
+    assert(s.gw.readState('p2').find(m => m.id === foe).fainted);
+    assert.deepEqual(s.party.map(growth).sort(), expectedGrowth, 'KO with growth off must not change EXP/EV/level');
+    if (style === 'switch') {
+      assert.equal(h.s._mode, 'replacement-question'); assert(E.session.readTrainerReplacement(s));
+      assert.equal(s.gw.activeId('p2'), foe);
+      const pp = s.gw.readState('p1').map(m => [m.id, m.pp]).sort();
+      const random = structuredClone(SWD.trainerAiDiagnostics(s).state.random), journal = SWD.trainerAiJournal(s).entries.length;
+      await h.frames(1); await pick(h, 'replace-no'); await h.p.inMode('main');
+      assert.deepEqual(s.gw.readState('p1').map(m => [m.id, m.pp]).sort(), pp);
+      assert.deepEqual(SWD.trainerAiDiagnostics(s).state.random, random); assert.equal(SWD.trainerAiJournal(s).entries.length, journal);
+    } else { assert.equal(h.s._mode, 'main'); assert.equal(E.session.readTrainerReplacement(s), null); }
+    assert.notEqual(s.gw.activeId('p2'), foe); assert.equal(s.gw.activeId('p1'), reserve);
+    assert.equal(JSON.stringify(h.flow.game()), h.before); assert.equal(installs(), 0);
+    await finishSwitchBattle(h, installs);
+    const saved = h.flow.game(); assert.deepEqual(saved.party.map(growth).sort(), expectedGrowth);
+    assert.deepEqual(saved.party.map(m => m.id), savedBefore.party.map(m => m.id));
+    assert.equal(saved.party.find(m => m.id === lead).hp, 0);
+    assert.equal(saved.party.find(m => m.id === lead).moves[0].pp, 0);
+    assert.equal(saved.party.find(m => m.id === reserve).moves[0].pp, 33);
+    assert.deepEqual(saved.inventory, savedBefore.inventory); assert.equal(s.bag.masterball, 2);
+    assert(!h.batches.flatMap(row => row.value).some(m => ['growth', 'learn-prompt', 'learned'].includes(m.kind)));
+  } finally { h.cleanup(); }
+});
 for (const faintFirst of [false, true]) test('SWF01 default Switch with prior forced replacement=' + faintFirst, async () => {
   const h = await open({ trainer: true, trainerMembers: 2, members: 3, battleStyle: '', fast: true,
     ...(faintFirst ? { leadHP: 1, leadMoves: [{ id: 'splash', pp: 1, maxpp: 40 }] } : {}) });
