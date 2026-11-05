@@ -47,7 +47,8 @@
     {
       "id": "EMZS02",
       "kind": "knockoff",
-      "expect": "temporary Knock Off; ordinary compressed slot; next Node actually receives and loses restored held item"
+      "expect": "trainer temporary Knock Off then normal Tackle victory; ordinary compressed slot; next Node actually receives and loses restored item",
+      "entry": "startTrainerBattle c-basic/version1 one Pidgey level5"
     },
     {
       "id": "EMZS03",
