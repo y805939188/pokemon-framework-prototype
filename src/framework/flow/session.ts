@@ -184,8 +184,8 @@ export class BattleSession {
   held: GatewayMessage[] = [];
   growthQueue: GrowthTask[] = [];
   pendingLearn: { memberId: string; move: { id: string; name: string; pp: number } } | null = null;
-  private _waitForLearnedMessages = false;
-  private _pendingLearned: { memberId: string; move: { id: string; name: string; pp: number } } | null = null;
+  _waitForLearnedMessages = false;
+  _pendingLearned: { memberId: string; move: { id: string; name: string; pp: number } } | null = null;
   participants: Record<string, Set<string>> = {};
   activeNow: Record<string, (string | null)[]> = { p1: [], p2: [] };
   doubles = false;
@@ -287,29 +287,6 @@ export class BattleSession {
 
   /** One mutation owns the engine and ledger until its promise settles. Readers still see plain snapshots. */
   get broken(): SessionBrokenError | null { return this._broken; }
-
-  /** A real Scene waits for the ordinary learned message before updating the engine move table.
-   * Direct/headless consumers retain their synchronous growth contract unless they bind this presentation.
-   */
-  bindLearningPresentation(): void {
-    this._assertUsable();
-    if (this._operation || this.finished || this.pendingLearn || this._pendingLearned || this.growthQueue.length) throw new Error('learning presentation must bind before growth');
-    this._waitForLearnedMessages = true;
-  }
-  get pendingLearnedMessage(): boolean { return this._pendingLearned !== null; }
-
-  /** Called by the owned Scene only after the complete ordinary-message queue has returned. */
-  async completeLearnedMessage(): Promise<TurnResult> {
-    return this._exclusive(async () => {
-      const pending = this._pendingLearned;
-      if (!pending) throw new Error('no learned message pending');
-      const member = this.party.find(m => m.id === pending.memberId)!;
-      this.gw.applyGrowth('p1', member.id, { level: member.level, evs: member.evs, newMoves: [pending.move.name], replaceSlot: null });
-      this._pendingLearned = null;
-      await this._continueGrowth();
-      return { ok: true, messages: this.take() };
-    });
-  }
 
   _assertUsable(): void { if (this._broken) throw this._broken; }
 
@@ -966,4 +943,29 @@ export class BattleSession {
     this._result = result;
     finalizeRequiredSettlement(this, this.gw, result);
   }
+}
+
+
+/** Host presentation companion, outside the frozen protocol-v1 Session call set.
+ * Real Scenes opt in before growth; legacy direct/headless consumers remain automatic.
+ */
+export function bindLearningPresentation(session: BattleSession): void {
+  if (!(session instanceof BattleSession)) return; // Existing controlled host handles have no growth presenter.
+  session._assertUsable();
+  if (session._operation || session.finished || session.pendingLearn || session._pendingLearned || session.growthQueue.length) throw new Error('learning presentation must bind before growth');
+  session._waitForLearnedMessages = true;
+}
+export function readLearnedMessagePending(session: BattleSession): boolean { return !!session._pendingLearned; }
+
+/** Owned Scene completion only; no protocol-v1 message or result field is added. */
+export async function completeLearnedMessage(session: BattleSession): Promise<TurnResult> {
+  return session._exclusive(async () => {
+    const pending = session._pendingLearned;
+    if (!pending) throw new Error('no learned message pending');
+    const member = session.party.find(m => m.id === pending.memberId)!;
+    session.gw.applyGrowth('p1', member.id, { level: member.level, evs: member.evs, newMoves: [pending.move.name], replaceSlot: null });
+    session._pendingLearned = null;
+    await session._continueGrowth();
+    return { ok: true, messages: session.take() };
+  });
 }

@@ -327,7 +327,7 @@ for(const how of ['abort','replace'])test('ELS '+how+' while an empty-slot messa
 test('ELS pending engine append survives checkpoint and a failed sync restores both sides without duplicate append',async()=>{
  const h=await open({normalAward:true,moveSlots:1,normalLearning:true,levelLearnset:{6:['Rest'],7:[]}});try{
   await emptyLearnNotice(h);const s=h.s._session,cp=s._checkpoint(),before=JSON.stringify(s.party),engine=JSON.stringify(s.gw.readState('p1')),apply=s.gw.applyGrowth.bind(s.gw);let injected=false;
-  s.gw.applyGrowth=(...args)=>{const r=apply(...args);if(args[2].newMoves&&!injected){injected=true;throw Error('controlled engine append failure');}return r;};await assert.rejects(s.completeLearnedMessage(),/controlled engine append failure/);assert(injected);assert.equal(s.pendingLearnedMessage,true);assert.equal(JSON.stringify(s.party),before);assert.equal(JSON.stringify(s.gw.readState('p1')),engine);
-  await s._restoreCheckpoint(cp);assert.equal(s.pendingLearnedMessage,true);await emptyEnd(h);assert.equal(s.gw.readState('p1')[0].pp.rest,10);assert.equal(s.party[0].moves.filter(m=>m.id==='rest').length,1);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  s.gw.applyGrowth=(...args)=>{const r=apply(...args);if(args[2].newMoves&&!injected){injected=true;throw Error('controlled engine append failure');}return r;};await assert.rejects(E.session.completeLearnedMessage(s),/controlled engine append failure/);assert(injected);assert.equal(E.session.readLearnedMessagePending(s),true);assert.equal(JSON.stringify(s.party),before);assert.equal(JSON.stringify(s.gw.readState('p1')),engine);
+  await s._restoreCheckpoint(cp);assert.equal(E.session.readLearnedMessagePending(s),true);await emptyEnd(h);assert.equal(s.gw.readState('p1')[0].pp.rest,10);assert.equal(s.party[0].moves.filter(m=>m.id==='rest').length,1);assert.equal(JSON.stringify(h.flow.game()),h.before);
  }finally{h.cleanup();}
 });
