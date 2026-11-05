@@ -90,6 +90,8 @@ export type FoeAi = (request: Req) => string | null | undefined;
 export interface CreateOptions {
   /** Voluntary choice policy only; never a replacement for simulator switch legality. */
   canSwitch?: boolean;
+  /** Immutable growth policy of this battle, independent of the capture EXP setting. */
+  expGain?: boolean;
   game: GameState;
   battleId: string;
   foe: FoeSpec;
@@ -161,7 +163,8 @@ export class SessionBrokenError extends Error {
 export class BattleSession {
   /** Fixed for this session; not saved, checkpointed, or part of the result protocol. */
   readonly canSwitch: boolean;
-  constructor(canSwitch = true) { this.canSwitch = canSwitch; }
+  readonly expGain: boolean;
+  constructor(canSwitch = true, expGain = true) { this.canSwitch = canSwitch; this.expGain = expGain; }
   content!: Content;
   rules!: G.ExpRules;
   battleId!: string;
@@ -200,7 +203,8 @@ export class BattleSession {
   _friendUnavailable: string[] = [];
   _pendingFriendFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
 
-  static async create({ game, battleId, foe, content, canSwitch = true, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi }: CreateOptions): Promise<BattleSession> {
+  static async create({ game, battleId, foe, content, canSwitch = true, expGain = true, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi }: CreateOptions): Promise<BattleSession> {
+    if (typeof expGain !== "boolean") throw new Error("expGain must be boolean when provided");
     if (typeof canSwitch !== "boolean") throw new Error("canSwitch must be boolean when provided");
     if (!experimentalHeldBattle && [...game.party, ...foe.team].some((m) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成");
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
@@ -218,7 +222,7 @@ export class BattleSession {
     }
     const party = S.clone(game.party).filter((m) => !m.isEgg).slice(0, 6);
     const lead = [...party.filter((m) => m.hp > 0), ...party.filter((m) => m.hp <= 0)];
-    const s = new BattleSession(canSwitch);
+    const s = new BattleSession(canSwitch, expGain);
     s.content = content; s.rules = rules || G.DEFAULT_RULES; s.battleId = battleId; s.foe = foe;
     s.party = party; s.foeTeam = S.clone(foe.team);
     s.startBag = battleBag(game.inventory, catalogOf(content)); s.bag = S.clone(s.startBag);
@@ -785,6 +789,8 @@ export class BattleSession {
   }
 
   _award(foeId: string): void {
+    // WP42 §4.1: the growth gate precedes EV/EXP and leaves participation records intact.
+    if (!this.expGain) return;
     this._syncWorkingFromEngine();
     const foe = this.foeTeam.find((m) => m.id === foeId)!;
     const foeC = this.content.species[foe.species]!;

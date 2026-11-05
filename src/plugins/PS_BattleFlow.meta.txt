@@ -132,6 +132,12 @@
  * @type boolean
  * @default true
  *
+ * @arg expGain
+ * @text Award experience and EVs
+ * @desc false disables growth for this battle, including capture growth. Outcome, money and capture reception remain enabled.
+ * @type boolean
+ * @default true
+ *
  * @arg canLose
  * @text Can lose
  * @desc false (default): a defeat takes the player home and ends this event. true: the event continues with result 4. Money loss and heal apply either way.
@@ -254,6 +260,12 @@
  * @arg canSwitch
  * @text Allow manual switching
  * @desc false hides voluntary Switch In; mandatory replacements remain available. Default true.
+ * @type boolean
+ * @default true
+ *
+ * @arg expGain
+ * @text Award experience and EVs
+ * @desc false disables growth for this battle, including capture growth. Outcome, money and capture reception remain enabled.
  * @type boolean
  * @default true
  *
