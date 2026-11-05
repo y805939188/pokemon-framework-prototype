@@ -224,3 +224,6 @@
 
 
 2026-11-05 普通Continue方法链后继：[非渲染Continue验收准备](5.4-E-continue-chain.md)合入已发布a57保存证据统一树，来源88五文件逐字、生产与220套headless清单零改；本组合五套原25项加Continue四项共29项另验，不把源CI256或10项独审当新SHA结果。slot1/版本544/最小对象/显式成功terminate限制、真实Title/Continue/NW和完整E出口保持OPEN。
+
+
+2026-11-05 E核心后继：[会心与固定伤害七个契约](5.4-E-damage-contracts.md)补强防会心、类型免疫、等级固定伤害和Counter真实Gateway样本；仅四标题部分契约，不等于概率/公式/完整标题或App/Scene/NW。来源产品不改，新测试/独审/完整CI按固定候选另验，原74模板和历史保持。
