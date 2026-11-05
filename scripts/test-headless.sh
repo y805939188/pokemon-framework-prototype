@@ -11,6 +11,7 @@ pnpm --dir src typecheck:framework
 node scripts/check-boundaries.cjs
 pnpm --dir src build:distribution > /dev/null
 SUITES=(
+  experiments/step5/4/test-config-file-io.cjs
   experiments/step5/4/test-battle-effects-settings.cjs
   experiments/step5/4/test-battle-effects-scene.cjs
   experiments/step5/4/test-learned-move-pp.cjs
