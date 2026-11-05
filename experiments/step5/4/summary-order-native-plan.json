@@ -1,0 +1,77 @@
+{
+  "version": "battle-summary-order-case-v1",
+  "state": "SCENE_RECIPE_PREPARATION_NOT_NATIVE_ADMITTED",
+  "productCommit": "d96acd6e2383681ad50a281fb0a82d2ff1016767",
+  "productRuntime": {
+    "js/plugins/PS_BattleFlow.js": "5eb3560daa8f830e0a491ead8746340757981200881e3993345bc50bf40b0687",
+    "js/plugins/PS_Management.js": "41334b1b3503ce49312ef3d1ffc5c11adfc2b587272fd7e29e1912be119ac03b",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "js/engine/build/engine.cjs": "ddec8736e64efa81b2058a7e85a504c9a42ee37823544e005c3511071e3d85b0",
+    "js/engine/build/production.cjs": "3577ccada0e1e4f68bc19bad03d667a99b79a4a1547d485baaf160c595e029df"
+  },
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "moves": [
+    {
+      "id": "tackle",
+      "pp": 32,
+      "maxpp": 56,
+      "ppUps": 3
+    },
+    {
+      "id": "splash",
+      "pp": 7,
+      "maxpp": 40,
+      "ppUps": 0
+    }
+  ],
+  "foe": {
+    "species": "Snorlax",
+    "level": 75,
+    "moves": [
+      "splash"
+    ]
+  },
+  "cases": [
+    {
+      "id": "SS01",
+      "language": "en"
+    },
+    {
+      "id": "SS02",
+      "language": "zh"
+    }
+  ],
+  "renderStages": [
+    "before-sort",
+    "after-sort",
+    "after-use"
+  ],
+  "nativeProcessCountPlanned": 1,
+  "nativeScenarioCountPlanned": 2,
+  "nativePlannedMaximumSeconds": 180,
+  "nativeKeyframesPlanned": 6,
+  "nativeControlsPlanned": 6,
+  "scope": [
+    "actual shared Summary USE/BACK and complete move/PPUps swap",
+    "current battle wrappers retain identity; actual Tackle drains the right record",
+    "zero state install before final confirmation; one outcome and ledger install",
+    "English/Chinese author fixture, default normal presentation; no probabilities or hearing"
+  ],
+  "prerequisitesNotExecuted": [
+    "register outer Boot/Title/Map mode and real input/package/font identity admission",
+    "new clean package with exact driver/runtime identities and font hashes",
+    "independent package/supervisor/static review and precise CI",
+    "idle host and one approved supervised native round"
+  ],
+  "prohibitions": [
+    "no NW launch or APP construction in this preparation batch",
+    "no claim physical input or native rendering from controlled host",
+    "no deprecated source data or real player save",
+    "no repaint, frozen runtime changes, or parent candidate edits"
+  ]
+}
