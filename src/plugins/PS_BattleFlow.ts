@@ -2123,6 +2123,13 @@ const { developmentCapabilities } = RuleConfig;
     this.show("end", [{ name: PSFlow.translator().t(aborted ? "ui.end.back" : "ui.end.continue"), ext: "end" }]);
   };
 
+  // The visible list Cancel and BACK have the same replacement-offer ownership contract.
+  P.cancelPartyList = function () {
+    if (this._partySub === 'replacement') {
+      if (this._pictureUpdate === this._replacementListShownUpdate) this._menu.activate();
+      else this.resolveTrainerReplacement(null);
+    } else if (this._pendingItem) { this._pendingItem = null; this.showBag(); } else this.showMain();
+  };
   P.onMenuCancel = function () {
     sceneController(this).input(() => {
     if (this._mode.startsWith('bag') && this._battleBag) {
@@ -2138,10 +2145,7 @@ const { developmentCapabilities } = RuleConfig;
       case "party-command": this.showParty(this._partySub, this._partySelected); return;
       case "moves": case "bag": this.showMain(); return;
       case "party":
-        if (this._partySub === 'replacement') {
-          if (this._pictureUpdate === this._replacementListShownUpdate) this._menu.activate();
-          else this.resolveTrainerReplacement(null);
-        } else if (this._pendingItem) { this._pendingItem = null; this.showBag(); } else this.showMain();
+        this.cancelPartyList();
         return;
       default: G.SoundManager.playBuzzer(); this._menu.activate();
     }
@@ -2174,7 +2178,7 @@ const { developmentCapabilities } = RuleConfig;
         return;
       case "party":
         if (this._pendingItem) { const item = this._pendingItem; this._pendingItem = null; this.act(() => this._session.useItem(item, ext), "item"); }
-        else if (ext === null) this.showMain();
+        else if (ext === null) this.cancelPartyList();
         else if (typeof ext === 'string') this.showPartyCommands(ext);
         return;
       case "party-forced":
