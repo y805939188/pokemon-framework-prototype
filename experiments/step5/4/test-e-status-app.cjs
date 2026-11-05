@@ -59,6 +59,7 @@ for(const c of plan.cases)test(c.id+' '+c.check,async()=>{
   for(const original of beforeEnd){const row=result.members[original.id];assert.equal(row.hp,original.hp);assert.equal(row.status,original.status==='tox'?'psn':original.status);assert.equal(row.statusCount,original.status==='slp'?original.statusCount:0);assert.equal(row.moves[0].pp,original.pp.splash);}
   const outcome=w.app.finishBattle(w.s,w.request);assert.equal(outcome.commit,'applied',JSON.stringify(outcome));assert.equal(w.state.replaced.length,1);
   const saved=w.state.read();for(const row of beforeEnd){const savedMember=saved.party.find(m=>m.id===row.id),expected=result.members[row.id];assert.equal(savedMember.status,expected.status);assert.equal(savedMember.statusCount,expected.statusCount);assert.equal(savedMember.hp,expected.hp);assert.equal(savedMember.moves[0].pp,expected.moves[0].pp);}
+  const antidote=saved.inventory.pockets.flat().find(item=>item.itemId==='antidote');assert.equal(antidote?.quantity,c.check==='benched-cure'?1:2,'the real installed inventory matches the one-use result');
   const installed=JSON.stringify(saved);w.app.finishBattle(w.s,w.request);assert.equal(w.state.replaced.length,1);assert.equal(JSON.stringify(w.state.read()),installed);
   console.log('E_STATUS_APP_OBSERVATION '+JSON.stringify({id:c.id,featureIds:plan.featureIds,initial:JSON.parse(w.before),trace:w.trace,beforeEnd,result,saved:clone(saved),installs:1,scope:plan.scope,completeHeading:false}));
  }finally{w.cleanup();}
