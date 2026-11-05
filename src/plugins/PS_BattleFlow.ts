@@ -507,6 +507,8 @@ const { developmentCapabilities } = RuleConfig;
       PSFlow._prepareBattlePresentation(op, app, assertCurrent);
       op.request.storageFull = engine().B.limits.storageFull(current, limits); // only refusal text; application decides noBall
       const sessionRequest = { ...op.request, battleStyle: op.battleStyle ?? effectiveBattleStyle(G, op.request.battleStyle) };
+      // Match the App's synchronous begin-time policy capture; the caller still owns its request object.
+      op.canLose = !!sessionRequest.canLose;
       const session = await (op.request.trainer ? app.startTrainerBattle(sessionRequest) : app.startBattle(sessionRequest)); assertCurrent();
       const elapsed = performance.now() - tCreate; assertCurrent();
       op.session = session;
@@ -538,7 +540,7 @@ const { developmentCapabilities } = RuleConfig;
       // D3: after a committed defeat the host takes the player home (unless the author allowed losing). The money and the
       // heal were settled in the commit; this is only the trip, it can fail and be retried without settling again. The
       // trip is requested before the messages, and a failing message is recorded on the outcome without changing it.
-      if (outcome.code === 4 && outcome.commit !== "none" && !op.request.canLose) {
+      if (outcome.code === 4 && outcome.commit !== "none" && !op.canLose) {
         outcome.blackout = true;
         const ret = PSFlow.returnHome();
         PSFlow.afterCommit(outcome, "message", () => {
