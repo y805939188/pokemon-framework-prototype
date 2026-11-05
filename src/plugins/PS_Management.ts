@@ -11,7 +11,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
  const pending=(o:any)=>!!o&&(o.pending===true||o.status==='pending');
  type MenuItem={key:string;label:string;enabled?:boolean;run:()=>void};
  type View={kind:string;cursor:number;[key:string]:any};
- type BattleSummarySource={views:IndividualView[];isCurrent:()=>boolean};
+ type BattleSummarySource={views:IndividualView[];isCurrent:()=>boolean;swapMoves?:(id:string,from:number,to:number,expectedOrder:string[])=>Promise<IndividualView|null>};
  type OpenRequest={kind:'party'|'pc'|'summary'|'selector'|'receiving'|'battle-summary';id?:string;qualifier?:(m:Member)=>boolean;done?:(result:any)=>void;battleSummary?:BattleSummarySource};
  const KEY:Record<string,Action|Direction>={Enter:'use',Space:'use',KeyZ:'use',Escape:'back',KeyX:'back',Numpad0:'back',ShiftLeft:'action',ShiftRight:'action',ControlLeft:'special',ControlRight:'special',KeyA:'jumpup',PageUp:'jumpup',KeyS:'jumpdown',PageDown:'jumpdown',ArrowUp:'up',ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down'};
  const ALIAS:Record<Action|Direction,string>={use:'ok',back:'cancel',action:'shift',special:'control',jumpup:'pageup',jumpdown:'pagedown',up:'up',left:'left',right:'right',down:'down'};
@@ -73,6 +73,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   storageQuick=false;inventoryChild:any=null;dexChild:any=null;
   reception:any=null;decisions:Record<string,ReceivingDecision>={};receiveIndex=0;readonly=false;completion:any=null;
   summaryViews:Map<string,IndividualView>|null=null;
+  summarySorting=false;
   onKeyDown=(e:any)=>{const key=eventKey(e);if(key)this.physical.add(key);};
   // keyup clears only its DOM source. The next merged frame releases the latch after gamepad polling.
   onKeyUp=(e:any)=>{const key=eventKey(e);if(key&&!Array.from(keyboardKeys.values()).includes(key)&&!Array.from(nativeConsumed.values()).includes(key)){this.physical.delete(key);}};
@@ -204,6 +205,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   resolveReceive(){const token=this.reception.token,result=flow().resolveReceiving(token,this.decisions);if(!this.valid())return;if(result?.continuationToken){this.completion=result;this.close(result);return;}if(pending(result)||result.status==='refused'){this.stack=[];this.menu(tr('saveFailed'),[{key:'retry',label:tr('recover'),run:()=>this.resolveReceive()}]);this.fail(result.reason||result.error||'pending');return;}const ids=this.reception.members.map((m:Member)=>m.id);for(const decision of Object.values(this.decisions))if(decision.placement?.kind==='replace')ids.push(decision.placement.target.id);try{flow().notifyReceived?.(ids,result.battleId??token);}catch(e){console.error(NAME,'committed placement message failed',e);}this.completion=result;this.close(result);}
   update(){
    if(!this.valid()){if(!this.closed){this.closed=true;this.removeInput();this.scene._invalid=true;}return;}
+   if(this.summarySorting)return;
    if(this.dexChild){const child=this.dexChild;try{child.update();}catch(e){child.dispose();this.error=String(e);}if(this.dexChild===child&&child.closed){this.dexChild=null;if(this.valid()){this.boundary();this.refresh();}}return;}
    if(this.inventoryChild){this.inventoryChild.update();return;}
    if(!this.top()||!this.started||this.top()?.kind==='text')return;
@@ -274,10 +276,24 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    if(action==='action'&&!v.detail&&!this.readonly&&!m.isEgg){this.marking(m.id,true);return;}
    if(action!=='use'||m.isEgg)return;
    if(!v.detail){if(v.page===3){v.detail='moves';v.detailCursor=0;}else if(v.page===4){v.detail='ribbons';v.detailCursor=0;}else if(!this.readonly){const items:MenuItem[]=[];if(W.PSPokedex&&this.application.pokedexSnapshot().dex.hasDex)items.push({key:'pokedex',label:flow().translator().t('pokedex.title'),run:()=>{this.back();if(this.valid()){const token=this.managementToken,window=this.window,child=W.PSPokedex.attach(window,{token,memberId:m.id,application:this.application,generation:this.generation,isCurrent:()=>this.dexParentCurrent(token,window),releaseAbandoned:()=>this.releaseAbandonedDexParent()});if(this.dexParentCurrent(token,window))this.dexChild=child;else{child?.dispose();this.releaseAbandonedDexParent();}}}});items.push({key:'item',label:tr('item'),run:()=>{this.back();this.itemMenu(m.id);}},{key:'mark',label:tr('mark'),run:()=>{this.back();this.marking(m.id,true);}},{key:'cancel',label:tr('cancel'),run:()=>this.back()});this.menu(tr('summary'),items);}return;}
-   if(this.readonly)return;const list=v.detail==='moves'?m.moves:m.ribbons??[];
+   const battleSort=v.detail==='moves'&&this.request.battleSummary?.swapMoves;
+   if(this.readonly&&!battleSort||v.detail==='moves'&&m.shadow)return;const list=v.detail==='moves'?m.moves:m.ribbons??[];
    if(v.selected===null){if(v.detailCursor<list.length)v.selected=v.detailCursor;return;}
    if(v.detail==='moves'&&v.detailCursor>=list.length)return;
+   if(battleSort){this.sortBattleMoves(m,v.selected,v.detailCursor);v.selected=null;return;}
    this.operate({kind:v.detail==='moves'?'sort-moves':'sort-ribbons',source:this.reference(m.id),from:v.selected,to:v.detailCursor});v.selected=null;
+  }
+  sortBattleMoves(member:Member,from:number,to:number){
+   const source=this.request.battleSummary;if(!source?.swapMoves||!this.valid()||this.summarySorting)return;
+   this.summarySorting=true;this.boundary();
+   void(async()=>{try{
+    const view=await source.swapMoves!(member.id,from,to,member.moves.map(move=>move.id));
+    if(!this.valid())return;
+    if(!view||view.member.id!==member.id){this.fail('stale-source');return;}
+    const copy=structuredClone(view);this.summaryViews!.set(member.id,copy);
+    const index=this.snapshot.party.findIndex(m=>m.id===member.id);if(index>=0)this.snapshot.party[index]=copy.member;
+   }catch(error){if(this.valid())this.fail(String(error));}
+   finally{this.summarySorting=false;if(this.valid()){this.boundary();this.draw();}}})();
   }
   dexParentCurrent(token=this.managementToken,window=this.window){return !this.closed&&current===this&&this.managementToken===token&&this.window===window&&!window?.destroyed&&!window?._destroyed&&this.application===flow()._app&&this.generation===this.application.stateGeneration&&G.SceneManager._scene===this.scene&&this.scene._controller===this&&!G.SceneManager.isSceneChanging();}
   releaseAbandonedDexParent(){if(this.dexParentCurrent())return;if(!this.closed){this.dispose();return;}const owns=()=>this.application===flow()._app&&this.generation===this.application.stateGeneration;if(this.managementToken&&owns()){this.application.manage(this.managementToken,'cleanup-'+(++this.serial),{kind:'cancel-held'});if(owns())this.application.endManagement(this.managementToken);}}
@@ -331,7 +347,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    if(view.diagnostics.length)text(tr('unavailable'),4,390,w-8,'#ffb5b5');
   }
  }
- /** An attached viewer shares summary rendering/navigation, but acquires no management operation. */
+ /** Shared battle summary rendering/navigation, with an optional Session-owned move-order command. */
  function attachBattleSummary(scene:any,id:string,source:BattleSummarySource,done:(id:string)=>void){
   if(current||presentationPending())throw Error('management-presentation-active');
   if(!source.isCurrent())throw Error('stale-operation');

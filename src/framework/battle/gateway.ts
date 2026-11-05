@@ -552,11 +552,16 @@ export class BattleGateway implements BattleDriver {
    * moves. `expect.stats` (from the game rules) is cross-checked against the engine's own
    * computation; a mismatch throws instead of silently diverging.
    */
-  applyGrowth(sideId: string, id: string, { level, evs, expect, newMoves = [], replaceSlot }: {
-    level: number; evs?: PartialStats; expect?: { stats?: Partial<Stats> }; newMoves?: string[]; replaceSlot?: number | null;
+  applyGrowth(sideId: string, id: string, { level, evs, expect, newMoves = [], replaceSlot, replaceMoveId }: {
+    level: number; evs?: PartialStats; expect?: { stats?: Partial<Stats> }; newMoves?: string[]; replaceSlot?: number | null; replaceMoveId?: string;
   }): { before: { level: number; maxhp: number; hp: number }; after: { level: number; maxhp: number; hp: number }; stats: Stats } {
     const b = this._battle;
     const p = this._mon(sideId, id);
+    if (replaceMoveId !== undefined) {
+      const index = p.baseMoveSlots.findIndex((slot: { id: string }) => slot.id === replaceMoveId);
+      if (index < 0 || newMoves.length !== 1 || replaceSlot === null || replaceSlot === undefined) throw new Error('growth replacement identity unavailable');
+      replaceSlot = index;
+    }
     const before = { level: p.level, maxhp: p.maxhp, hp: p.hp };
     p.set.level = level; p.level = level;
     if (evs) p.set.evs = { ...evs };

@@ -66,6 +66,8 @@ export interface DriverCheckpoint { readonly opaque?: never }
 
 export interface GrowthApplication {
   level: number; evs?: PartialStats; expect?: { stats?: Partial<Stats> }; newMoves?: string[]; replaceSlot?: number | null;
+  /** Permanent identity before replacement; individual order can differ from battle wrapper order. */
+  replaceMoveId?: string;
 }
 export interface GrowthOutcome {
   before: { level: number; maxhp: number; hp: number };

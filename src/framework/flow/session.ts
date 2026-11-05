@@ -35,6 +35,7 @@ import type { TrainerAiConfiguration } from './trainer-ai';
 import { _publishGrowthDisplay, _capturePresentation, _restorePresentation, readBattleLearnProtection } from './presentation';
 import { bindReplacementOffer, hasReplacementOffer, prepareReplacementOffer, checkpointReplacementOffer, preflightReplacementOffer, restoreReplacementOffer } from './replacement-offer';
 export { readTrainerReplacement, readTrainerReplacementTarget, resolveTrainerReplacement } from './replacement-offer';
+export { reorderBattleSummaryMoves } from './battle-summary';
 import type { GrowthDisplay } from './presentation';
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
@@ -892,11 +893,12 @@ export class BattleSession {
 
   _learn(memberId: string, move: { id: string; name: string; pp: number }, replaceSlot: number | null | undefined): void {
     const m = this.party.find((x) => x.id === memberId)!;
+    const replaceMoveId = replaceSlot === null || replaceSlot === undefined ? undefined : m.moves[replaceSlot]!.id;
     const rec = { id: move.id, pp: move.pp, maxpp: move.pp };
     if (replaceSlot === null || replaceSlot === undefined) m.moves.push(rec); else m.moves[replaceSlot] = rec;
     if (this._waitForLearnedMessages && (replaceSlot === null || replaceSlot === undefined)) {
       this._pendingLearned = { memberId, move: { ...move } };
-    } else this.gw.applyGrowth("p1", memberId, { level: m.level, evs: m.evs, newMoves: [move.name], replaceSlot });
+    } else this.gw.applyGrowth("p1", memberId, { level: m.level, evs: m.evs, newMoves: [move.name], replaceSlot, replaceMoveId });
     this.grew = true;
     this.out.push({ kind: "learned", member: memberId, move: move.id, replaced: replaceSlot ?? null });
   }

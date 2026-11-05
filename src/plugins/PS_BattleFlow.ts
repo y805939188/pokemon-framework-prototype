@@ -1978,7 +1978,7 @@ const { developmentCapabilities } = RuleConfig;
     c.enqueue([{ kind: 'visual', advance: () => {
       if (!child) {
         const B = engine().B, game = PSFlow.game(), app = PSFlow.app();
-        const views = partyForDisplay(this).map((member: any) => {
+        const makeView = (member: any) => {
           if (member.isEgg) return app.describeIndividual(member.id);
           const state = B.battlePresentation.readBattleSummary(session, member.id);
           if (!state) throw Error('battle-summary-state-unavailable');
@@ -1988,10 +1988,16 @@ const { developmentCapabilities } = RuleConfig;
           view.stats = stats; view.heldItemKnown = heldItemKnown;
           if (!heldItemKnown) view.diagnostics.push('battle-held-unavailable');
           return view;
-        });
+        };
+        const views = partyForDisplay(this).map(makeView);
         if (!c.isCurrent() || !PSFlow.running || this._session !== session) return true;
-        child = W.PSManagement.attachBattleSummary(this, memberId, { views,
-          isCurrent: () => c.isCurrent() && PSFlow.running && this._session === session }, (id: string) => {
+        const isCurrent = () => c.isCurrent() && PSFlow.running && this._session === session;
+        child = W.PSManagement.attachBattleSummary(this, memberId, { views, isCurrent,
+          swapMoves: async (id: string, from: number, to: number, expectedOrder: string[]) => {
+            if (!isCurrent()) return null;
+            if (!await B.session.reorderBattleSummaryMoves(session, id, from, to, expectedOrder) || !isCurrent()) return null;
+            return makeView(session.party.find((member: any) => member.id === id));
+          } }, (id: string) => {
             if (c.isCurrent()) this._retryPartySelection = { memberId: id };
           });
       }
