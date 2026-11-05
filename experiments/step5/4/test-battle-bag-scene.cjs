@@ -17,7 +17,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, fast = true, leadMoves = null, benchMoves = null, benchHP = null } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, fast = true, noRun = false, leadMoves = null, benchMoves = null, benchHP = null } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -32,7 +32,7 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   if (benchHP !== null) state.party[1].hp = benchHP;
   state.inventory = E.inventory.inventoryFromBag(bag, E.itemCatalog.catalogOf(content)); G.$gameSystem._psGame = state;
   const before = JSON.stringify(flow.game()); await h.p.toMapId(5, 8, 9);
-  flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true });
+  flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true, noRun });
   await h.p.inMode('main'); const s = h.p.battle();
   return { ...h, s, flow, before, cleanup() { if (flow.running) flow.abort(Error('owned bag cleanup')); s.terminate(); } };
 }
@@ -282,4 +282,27 @@ test('Max Elixir auto-selects its only member and restores all PP without a move
 });
 test('full selected PP and fainted PP targets return to members with no reserve, turn, or game write',async()=>{
  const h=await open({bag:{ether:2},leadMoves:[{id:'splash',pp:0,maxpp:40},{id:'tackle',pp:35,maxpp:35}],benchMoves:[{id:'splash',pp:0,maxpp:40}],benchHP:0});try{const s=h.s._session,engine=s.gw.snapshot();await bag(h);await use(h,'ether');await pick(h,s.party[0].id);await pick(h,1);await h.p.inMode('bag-members');assert.equal(s.bag.ether,2);assert.equal(s.ledger.length,0);await pick(h,s.party[1].id);await pick(h,0);await h.p.inMode('bag-members');assert.equal(s.bag.ether,2);assert.equal(s.ledger.length,0);assert.equal(s.gw.snapshot(),engine);assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
+});
+
+// No-target escape family: real compiled menu -> Session item action -> final App commit.
+for(const lang of ['en','zh'])test(lang+' direct toy skips all target pickers, cancels safely, and saves its escape once',async()=>{
+ const h=await open({lang,bag:{pokedoll:2}});try{const s=h.s._session,foe=s.gw.readState('p2'),modes=[];let calls=0,installs=0,doc=h.G.$gameSystem._psGame;const real=s.useItem.bind(s),show=h.s.show; s.useItem=(...a)=>{calls++;return real(...a);};h.s.show=function(mode,...a){modes.push(mode);return show.call(this,mode,...a);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  await bag(h);await pick(h,'pokedoll');await cancel(h);assert.equal(h.s._mode,'bag');assert.equal(calls,0);assert.equal(s.bag.pokedoll,2);
+  await use(h,'pokedoll');h.s.onMenuOk();h.s.onMenuCancel();await h.p.inMode('end');assert.equal(calls,1);assert(!modes.some(m=>['bag-members','bag-moves','bag-foes'].includes(m)));assert.equal(s.bag.pokedoll,1);assert.equal(s.ended.reason,'run');assert.deepEqual(s.gw.readState('p2'),foe);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied',JSON.stringify(h.flow.lastOutcome));assert.equal(installs,1);assert.equal(E.inventory.aggregateBag(h.flow.game().inventory).pokedoll,1);h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
+for(const flags of [{trainer:true},{noRun:true}])test(JSON.stringify(flags)+' direct toy refuses back to the item list without any reserve',async()=>{
+ const h=await open({...flags,bag:{pokedoll:2}});try{const s=h.s._session,engine=s.gw.snapshot();let calls=0;const real=s.useItem.bind(s);s.useItem=(...a)=>{calls++;return real(...a);};await bag(h);await use(h,'pokedoll');await h.p.inMode('bag');assert.equal(calls,0);assert.equal(s.bag.pokedoll,2);assert.equal(s.ledger.length,0);assert.equal(s.gw.snapshot(),engine);assert.equal(JSON.stringify(h.flow.game()),h.before);await cancel(h);assert.equal(h.s._mode,'main');}finally{h.cleanup();}
+});
+
+// Battle revives: existing member picker + real Session/Gen8 action + one final App installation.
+for(const [lang,item] of [['en','revive'],['zh','revive'],['en','maxrevive'],['zh','maxhoney']])test(lang+' '+item+' cancels member selection, rejects a living member, then revives and saves once',async()=>{
+ const h=await open({lang,bag:{[item]:2},benchHP:0});try{
+  const s=h.s._session,id=s.party[1].id,order=s.party.map(m=>m.id),old=s.gw.readState('p1').find(m=>m.id===id);assert(old.fainted);let calls=0,installs=0,doc=h.G.$gameSystem._psGame;const real=s.useItem.bind(s);s.useItem=(...a)=>{calls++;return real(...a);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  await bag(h);await use(h,item);assert.equal(h.s._mode,'bag-members');await cancel(h);assert.equal(h.s._mode,'bag');assert.equal(s.bag[item],2);assert.equal(calls,0);
+  await use(h,item);await pick(h,s.party[0].id);await h.p.inMode('bag-members');assert.equal(calls,0);assert.equal(s.ledger.length,0);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await pick(h,id);h.s.onMenuOk();h.s.onMenuCancel();await h.p.inMode('main');const live=s.gw.readState('p1').find(m=>m.id===id),expected=item==='revive'?Math.max(1,Math.floor(old.maxhp/2)):old.maxhp;assert.equal(live.hp,expected);assert(!live.fainted);assert.equal(s.bag[item],1);assert.equal(calls,1);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied',JSON.stringify(h.flow.lastOutcome));assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),order);assert.equal(h.flow.game().party.find(m=>m.id===id).hp,expected);assert.equal(E.inventory.aggregateBag(h.flow.game().inventory)[item],1);h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
 });

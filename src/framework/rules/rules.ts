@@ -24,6 +24,13 @@ export const HEAL_ITEMS: Record<string, { amount: HealAmount }> = {
   sitrusberry: { amount: "quarter" },
 };
 
+/** WP28 §5.1 manual battle revives. Revival Herb's friendship effect is a separate family. */
+export const REVIVE_ITEMS: Record<string, { half: boolean }> = {
+  revive: { half: true },
+  maxrevive: { half: false },
+  maxhoney: { half: false },
+};
+
 /** Status cures: `cures` lists persistent statuses it removes ('all' = any; confusion handled separately). */
 export const STATUS_ITEMS: Record<string, { cures: readonly string[] | "all"; confusion?: boolean }> = {
   antidote: { cures: ["psn", "tox"] },
@@ -50,6 +57,9 @@ export function ppRecovery(item: string, moves: readonly PPMove[], moveSlot?: nu
     return Math.max(0, Math.min(move.maxpp - move.pp, spec.amount === "full" ? move.maxpp : spec.amount));
   });
 }
+
+/** WP28 §5.5 manual no-target escape toys; not the normal speed-based Run command. */
+export const ESCAPE_ITEMS: readonly string[] = ["pokedoll", "fluffytail", "poketoy"];
 
 /** Battle stat items (step 2.2 sample; stage amounts follow the modern +2 convention, WP28 5.5 to confirm). */
 export const STAT_ITEMS: Record<string, { boosts: Record<string, number> }> = {
@@ -229,6 +239,8 @@ export type Eligibility = { ok: true } | { ok: false; reason: "unknown-target" |
  */
 export function itemEligibility(item: string, mon: MonView | undefined, pp: { moves?: readonly PPMove[]; moveSlot?: number } = {}): Eligibility {
   if (!mon) return { ok: false, reason: "unknown-target" };
+  if (REVIVE_ITEMS[item]) return mon.fainted && mon.hp === 0
+    ? { ok: true } : { ok: false, reason: "item-no-effect" };
   if (mon.fainted || mon.hp <= 0) return { ok: false, reason: "item-no-effect" };
   if (Object.hasOwn(PP_ITEMS, item)) return ppRecovery(item, pp.moves ?? [], pp.moveSlot).some(n => n > 0)
     ? { ok: true } : { ok: false, reason: "item-no-effect" };

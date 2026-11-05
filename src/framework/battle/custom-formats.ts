@@ -5,7 +5,7 @@
  * (js/engine/build/custom-formats.cjs) and staged into the engine by scripts/build-showdown.sh; no Showdown source is
  * modified. It runs inside Showdown, so it may only depend on plain rules code (bundled in), never on the gateway.
  */
-import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, PP_ITEMS, ppRecovery, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules";
+import { HEAL_ITEMS, REVIVE_ITEMS, STAT_ITEMS, STATUS_ITEMS, PP_ITEMS, ESCAPE_ITEMS, ppRecovery, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules";
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types";
 import type { FormatObserver, FormatObservation } from "../rules/battle-evidence";
 import type { BattleActor, BattleDisplaySnapshot } from "../rules/battle-evidence";
@@ -50,6 +50,30 @@ function resolveItem(battle: ShowdownBattle, user: ShowdownPokemon, payload: Pay
       if (target.isActive && !target.transformed && active?.id === permanent.id) active.pp = permanent.pp;
     });
     emit(battle, "item", side.id, item, target.name, "ok");
+    return;
+  }
+  if (ESCAPE_ITEMS.includes(item)) {
+    if (!battle.rpg.wild || battle.rpg.noRun || target !== user || user.fainted || user.hp <= 0) {
+      emit(battle, "item", side.id, item, payload.target || "-", "noeffect"); return;
+    }
+    emit(battle, "item", side.id, item, user.name, "ok");
+    emit(battle, "run", side.id, "ok", "item", battle.rpg.attempts[side.id] || 0);
+    finish(battle, { kind: "run", side: side.id });
+    return;
+  }
+  const revive = REVIVE_ITEMS[item];
+  if (revive) {
+    // A revive is not Pokemon.heal(): the native heal API deliberately rejects zero HP.
+    if (!target || !target.fainted || target.hp !== 0) { emit(battle, "item", side.id, item, payload.target || "-", "noeffect"); return; }
+    target.fainted = false; target.faintQueued = false; target.subFainted = false;
+    target.status = ""; target.statusState = { id: "", target };
+    target.hp = revive.half ? Math.max(1, Math.floor(target.maxhp / 2)) : target.maxhp;
+    side.pokemonLeft++;
+    if (target.isActive) {
+      battle.queue.addChoice({ choice: "instaswitch", pokemon: target, target });
+      battle.add("-heal", target, target.getHealth);
+    }
+    emit(battle, "item", side.id, item, target.name, "ok", target.hp, target.hp, target.maxhp);
     return;
   }
   if (item === "fullrestore") {

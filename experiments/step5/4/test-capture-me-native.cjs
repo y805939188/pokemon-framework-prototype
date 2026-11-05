@@ -27,9 +27,9 @@ test('native plan freezes exact product and15 ordered cases, two-process denomin
  assert.equal(PLAN.assets.length,5);assert.equal(PLAN.assets.find(a=>a.name==='long').seconds/1.2,5);assert(PLAN.assets.find(a=>a.name==='short').seconds<3.5);
  // Headless CI does not install ignored generated plugin bundles. The package
  // freeze checks actual bundle bytes against f021. This digest now records the
- // post-Switch-Scene source for headless controls only. No requalification of
+ // post-Switch-Scene-and-items source for headless controls only. No requalification of
  // the historical fifteen-case App/PLAN is implied: new native packaging must rebind separately.
- const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),'8a55c308a3eefaaf5536d705fc15f45034b39383eaa670eaecdd2bd9cf2111ea','current source identity; historical native plan requires rebind');
+ const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),'3bd7382469418031eeecd9a4529304f59aa67a3800b12d8518861ad59b3d773e','current source identity; historical native plan requires rebind');
 });
 for(const kind of ['map','title'])test('actual driver readiness rejects unstarted/changing/incomplete '+kind,()=>{
  class Map{}class Title{}let changing=false;const G={Scene_Map:Map,Scene_Title:Title,SceneManager:{isSceneChanging:()=>changing}},v=new(kind==='map'?Map:Title)();let started=false,active=true,busy=false;
