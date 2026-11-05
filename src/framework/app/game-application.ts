@@ -934,7 +934,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         if (!member.owner) throw new Error(`player member ${member.id} has no authoritative owner for obedience`);
         return [member.id, { ...member.owner }];
       }));
-      const setup: BattleSetup = { foes, canSwitch: canSwitch ?? true, battleStyle: battleStyle ?? "switch", expGain: expGain ?? true, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full,
+      const setup: BattleSetup = { foes, canSwitch: canSwitch ?? true, battleStyle: battleStyle ?? "switch", expGain: expGain ?? true, captureExpGain: config.GAIN_EXP_FOR_CAPTURE, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full,
         obedience: { player: { ...game.player }, members: memberOwners, badges: badgeCount(game.badges), anyHighLevel: config.ANY_HIGH_LEVEL_POKEMON_CAN_DISOBEY,
           foreignHighLevel: config.FOREIGN_HIGH_LEVEL_POKEMON_CAN_DISOBEY, generation, contentIdentity },
         // This host-facing DTO must never alias the private settlement facts.

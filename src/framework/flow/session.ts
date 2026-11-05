@@ -96,6 +96,8 @@ export interface CreateOptions {
   canSwitch?: boolean;
   /** Immutable growth policy of this battle, independent of the capture EXP setting. */
   expGain?: boolean;
+  /** Composition-time capture rule; absent direct/legacy callers use the author content profile. */
+  captureExpGain?: boolean;
   game: GameState;
   battleId: string;
   foe: FoeSpec;
@@ -169,7 +171,8 @@ export class BattleSession {
   /** Fixed for this session; not saved, checkpointed, or part of the result protocol. */
   readonly canSwitch: boolean;
   readonly expGain: boolean;
-  constructor(canSwitch = true, expGain = true) { this.canSwitch = canSwitch; this.expGain = expGain; }
+  readonly captureExpGain: boolean;
+  constructor(canSwitch = true, expGain = true, captureExpGain = true) { this.canSwitch = canSwitch; this.expGain = expGain; this.captureExpGain = captureExpGain; }
   content!: Content;
   rules!: G.ExpRules;
   battleId!: string;
@@ -208,10 +211,12 @@ export class BattleSession {
   _friendUnavailable: string[] = [];
   _pendingFriendFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
 
-  static async create({ replacementOffers = false, game, battleId, foe, content, canSwitch = true, expGain = true, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi }: CreateOptions): Promise<BattleSession> {
+  static async create({ replacementOffers = false, game, battleId, foe, content, canSwitch = true, expGain = true, captureExpGain, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi }: CreateOptions): Promise<BattleSession> {
     if (typeof replacementOffers !== "boolean") throw new Error("replacementOffers must be boolean when provided");
     if (replacementOffers && (!trainerAi || doubles || foe.kind !== "trainer")) throw new Error("replacement-offer-formal-single-trainer-required");
     if (typeof expGain !== "boolean") throw new Error("expGain must be boolean when provided");
+    if (captureExpGain !== undefined && typeof captureExpGain !== "boolean") throw new Error("captureExpGain must be boolean when provided");
+    const captureGrowth = captureExpGain ?? resolveConfig(content.settings).GAIN_EXP_FOR_CAPTURE;
     if (typeof canSwitch !== "boolean") throw new Error("canSwitch must be boolean when provided");
     if (!experimentalHeldBattle && [...game.party, ...foe.team].some((m) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成");
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
@@ -229,7 +234,7 @@ export class BattleSession {
     }
     const party = S.clone(game.party).filter((m) => !m.isEgg).slice(0, 6);
     const lead = [...party.filter((m) => m.hp > 0), ...party.filter((m) => m.hp <= 0)];
-    const s = new BattleSession(canSwitch, expGain);
+    const s = new BattleSession(canSwitch, expGain, captureGrowth);
     s.content = content; s.rules = rules || G.DEFAULT_RULES; s.battleId = battleId; s.foe = foe;
     s.party = party; s.foeTeam = S.clone(foe.team);
     s.startBag = battleBag(game.inventory, catalogOf(content)); s.bag = S.clone(s.startBag);
@@ -778,7 +783,7 @@ export class BattleSession {
       // a caught battle awards exp for the caught target before the result is built (WP38 step 3)
       if (this.ended && this.ended.reason === "caught" && !this._caughtAwarded) {
         this._caughtAwarded = true;
-        this.growthQueue.push({ kind: "award", foeId: (this.ended.outcome as { target: string }).target });
+        if (this.captureExpGain) this.growthQueue.push({ kind: "award", foeId: (this.ended.outcome as { target: string }).target });
       }
       while (this.growthQueue.length) {
         const task = this.growthQueue.shift()!;

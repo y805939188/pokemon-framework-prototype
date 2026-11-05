@@ -1399,7 +1399,7 @@ const { developmentCapabilities } = RuleConfig;
           op.ballHideQueued = true;
           steps.push(op.ballFeedback.hide()); // after capture ME/growth; before receiving/end
         }
-        if (op && message.kind === 'end' && message.reason === 'win' && message.winner === 'Player' && !op.victoryQueued) {
+        if (op && message.kind === 'end' && (message.reason === 'win' && message.winner === 'Player' || message.reason === 'caught' && op.request.kind === 'wild' && this._session.captureExpGain === false) && !op.victoryQueued) {
           op.victoryQueued = true;
           let retired = false;
           steps.push({ kind: 'visual', advance: () => {

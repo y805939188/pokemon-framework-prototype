@@ -98,3 +98,8 @@ test('abort/load/new game retire a queued cue and suppress a pending late decode
   f.load(pending);f.advance(f.time+6000);assert(!f.names().includes('Battle victory'));assert(pending.destroyed>0);
  }finally{f.cleanup();}}
 });
+
+test('CEXP actual no-EXP capture requests victory BGM once after its capture presentation and restores the world',async()=>{
+ const B=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs')),content={...B.content,settings:{GAIN_EXP_FOR_CAPTURE:false}},game=B.makeGame();game.inventory=E.inventory.inventoryFromBag({masterball:1},E.itemCatalog.catalogOf(content));const session=await E.session.BattleSession.create({game,content,battleId:'victory-no-capture-exp',seed:[1,2,3,4],foe:{kind:'wild',team:[B.foeMember('F-1','Pidgey',5)]}});
+ const f=await open({session});try{const s=f.currentScene,r=await session.throwBall('masterball');assert(r.ok);assert(session.finished);assert(!r.messages.some(x=>x.kind==='growth'));s.pushMessages(r.messages);assert.equal(f.names().at(-1),'Battle wild','planning is not playback');await f.drain();assert.equal(f.names().at(-1),'Battle victory');assert.equal(f.flow.musicState().player.requests.filter(x=>x.kind==='victory').length,1);assert.equal(f.finishes,0);s.pushMessages([r.messages.find(m=>m.kind==='end')]);await f.drain();assert.equal(f.flow.musicState().player.requests.filter(x=>x.kind==='victory').length,1);s.onEnd();assert.equal(f.names().at(-1),'Map');assert.equal(f.plays.at(-1).pos,17);}finally{f.cleanup();}
+});

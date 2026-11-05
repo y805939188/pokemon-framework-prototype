@@ -15,6 +15,7 @@ import type { Limits } from "./limits";
 import { own } from "./own";
 
 export interface RuleConfig {
+  GAIN_EXP_FOR_CAPTURE: boolean;
   CHECK_EVOLUTION_AFTER_ALL_BATTLES: boolean;
   CHECK_EVOLUTION_FOR_FAINTED_POKEMON: boolean;
   MOVE_RELEARNER_CAN_TEACH_MORE_MOVES: boolean;
@@ -44,7 +45,7 @@ export interface RuleConfig {
 /** Slots per box (WP25 §3.1); not a setting of the reference. */
 export const BOX_SIZE = 30;
 
-export const GEN8_DEFAULTS: Readonly<RuleConfig> = Object.freeze({ CHECK_EVOLUTION_AFTER_ALL_BATTLES: true, CHECK_EVOLUTION_FOR_FAINTED_POKEMON: true, MOVE_RELEARNER_CAN_TEACH_MORE_MOVES: true, RARE_CANDY_USABLE_AT_MAX_LEVEL: true, SHOW_NEW_SPECIES_POKEDEX_ENTRY_MORE_OFTEN: true, USE_CURRENT_REGION_DEX: false, DEX_SHOWS_ALL_FORMS: false, DEXES_WITH_OFFSETS: Object.freeze([]) as unknown as number[],  MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999,
+export const GEN8_DEFAULTS: Readonly<RuleConfig> = Object.freeze({ GAIN_EXP_FOR_CAPTURE: true, CHECK_EVOLUTION_AFTER_ALL_BATTLES: true, CHECK_EVOLUTION_FOR_FAINTED_POKEMON: true, MOVE_RELEARNER_CAN_TEACH_MORE_MOVES: true, RARE_CANDY_USABLE_AT_MAX_LEVEL: true, SHOW_NEW_SPECIES_POKEDEX_ENTRY_MORE_OFTEN: true, USE_CURRENT_REGION_DEX: false, DEX_SHOWS_ALL_FORMS: false, DEXES_WITH_OFFSETS: Object.freeze([]) as unknown as number[],  MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999,
   BAG_POCKET_SLOTS: Object.freeze([-1,-1,-1,-1,-1,-1,-1,-1]) as unknown as number[], BAG_AUTO_SORT: Object.freeze([false,false,false,true,true,false,false,false]) as unknown as boolean[],
   AFFECTION_EFFECTS: false, MORE_BONUS_PREMIER_BALLS: true, USE_MULTIPLE_STAT_ITEMS_AT_ONCE: true, NO_VITAMIN_EV_CAP: true,
   REBALANCED_HEALING_ITEM_AMOUNTS: true, RAGE_CANDY_BAR_CURES_STATUS_PROBLEMS: true, TAUGHT_MACHINES_KEEP_OLD_PP: false,
