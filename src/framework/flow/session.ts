@@ -500,9 +500,14 @@ export class BattleSession {
     });
   }
 
-  async run(): Promise<TurnResult> {
+  async run({ duringReplacement = false }: { duringReplacement?: boolean } = {}): Promise<TurnResult> {
     return this._action(async () => {
       this._log("info", "choice", { action: "run" });
+      if (duringReplacement) {
+        if (this.foe.kind !== 'wild' || !this.currentRequest()?.forceSwitch?.[0]
+          || !this.gw.runAfterFaint || !await this.gw.runAfterFaint('p1')) return this._refuse('choice-rejected');
+        return this._resolveTurn();
+      }
       const q = this.gw.query("p1", "run");
       if (!q.allowed) return this._refuse(q.reason ?? "refused");
       if (!await this.gw.act("p1", { kind: "run" })) return this._refuse("not-registered");

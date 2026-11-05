@@ -18,7 +18,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, fast = false, effects = true } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, fast = false, effects = true, noRun = false } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -36,7 +36,7 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   state.inventory = E.inventory.inventoryFromBag(bag, E.itemCatalog.catalogOf(content)); G.$gameSystem._psGame = state;
   const before = JSON.stringify(flow.game()); await h.p.toMapId(5, 8, 9);
   const batches = [], begin = flow.begin.bind(flow); flow.begin = async (...args) => { const session = await begin(...args), take = session.take.bind(session); session.take = () => { const value = take(); batches.push({ value, wire: JSON.stringify(value) }); return value; }; return session; };
-  flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true });
+  flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true, noRun });
   await h.waitFor(() => !!h.p.battle()?._session, 'real opening Session'); const s = h.p.battle();
   const completed = [], add = s._log.add; s._log.add = function (line) { completed.push(line); return add.call(this, line); };
   await h.p.inMode('main');
@@ -47,6 +47,43 @@ function row(h, key) { const i = h.s._menu._items.findIndex(r => r.ext === key);
 async function pick(h, key) { row(h, key); h.s.onMenuOk(); await h.frames(1); }
 async function party(h) { await pick(h, 'party'); assert.equal(h.s._mode, 'party'); }
 async function commands(h, id) { await party(h); await pick(h, id); assert.equal(h.s._mode, 'party-command'); }
+async function wildFaint(h) {
+ const s=h.s._session,reserve=s.party[1].id;
+ await commands(h,reserve);await pick(h,'switch-in');await h.p.inMode('wild-faint');
+ assert(s.gw.readState('p1').find(m=>m.id===reserve).fainted);return s;
+}
+for(const lang of ['en','zh'])test(lang+' actual wild faint asks before forced selection; Yes and root cancel never attempt escape',async()=>{
+ const h=await open({lang,reserveHP:1});try{
+  const s=await wildFaint(h),before=JSON.stringify(s.gw.readState('p1')),request=JSON.stringify(s.currentRequest());let runs=0;
+  const run=s.run.bind(s);s.run=(...args)=>{runs++;return run(...args);};
+  assert(h.s._log._lines.join('').includes(lang==='zh'?'使用下一只宝可梦吗？':'Use next Pokémon?'));
+  h.s.onMenuOk();assert.equal(h.s._mode,'wild-faint','same update must not accept the question');await h.frames(1);await pick(h,'next');
+  assert.equal(h.s._mode,'party-forced');h.s.onMenuCancel();await h.frames(1);assert.equal(h.s._mode,'party-forced');assert.equal(runs,0);
+  assert.equal(JSON.stringify(s.currentRequest()),request);assert.equal(JSON.stringify(s.gw.readState('p1')),before);
+  const lead=s.party[0].id;await pick(h,lead);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),lead);assert.equal(runs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
+});
+for(const lang of ['en','zh'])test(lang+' actual wild faint No escapes once and only explicit end confirmation installs',async()=>{
+ const h=await open({lang,reserveHP:1});try{
+  const s=await wildFaint(h),foe=JSON.stringify(s.gw.readState('p2'));let calls=0,installs=0,doc=h.G.$gameSystem._psGame;
+  const run=s.run.bind(s);s.run=(arg)=>{calls++;assert.equal(arg?.duringReplacement,true);assert.deepEqual(Object.keys(arg),['duringReplacement']);return run(arg);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  await h.frames(1);await pick(h,'escape');h.s.onMenuOk();await h.p.inMode('end');assert.equal(calls,1);assert.equal(s.ended?.reason,'run');assert.equal(JSON.stringify(s.gw.readState('p2')),foe);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
+test('wild faint BACK observes noRun and returns to forced selection without another foe action or a repeated question',async()=>{
+ const h=await open({reserveHP:1,noRun:true});try{
+  const s=await wildFaint(h),before=JSON.stringify([s.gw.readState('p1'),s.gw.readState('p2')]),request=JSON.stringify(s.currentRequest());let calls=0;const run=s.run.bind(s);s.run=(...a)=>{calls++;return run(...a);};
+  await h.frames(1);h.s.onMenuCancel();await h.p.inMode('party-forced');assert.equal(calls,1);assert.equal(s.ended,null);assert.equal(JSON.stringify([s.gw.readState('p1'),s.gw.readState('p2')]),before);assert.equal(JSON.stringify(s.currentRequest()),request);
+  h.s.onMenuCancel();await h.frames(1);assert.equal(h.s._mode,'party-forced');const lead=s.party[0].id;await pick(h,lead);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(calls,1);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
+});
+test('trainer faint goes directly to mandatory replacement without the wild question',async()=>{
+ const h=await open({trainer:true,reserveHP:1});try{const s=h.s._session;await commands(h,s.party[1].id);await pick(h,'switch-in');await h.p.inMode('party-forced');assert(!h.s._wildFaintQuestion);assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
+});
+test('retired wild confirmation cannot attempt escape on an aborted or replaced owner',async()=>{
+ const h=await open({reserveHP:1});try{const s=await wildFaint(h);let calls=0;s.run=()=>{calls++;throw Error('retired escape');};h.flow.stateReplaced();h.s.onMenuOk();h.s.onMenuCancel();await h.frames(2);assert.equal(calls,0);assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
+});
 for (const lang of ['en', 'zh']) test(lang + ' selecting a party member opens commands without submitting; explicit Switch In registers once', async () => {
   const h = await open({ lang }); try {
     const s = h.s._session, next = s.party[1].id, beforeRequest = JSON.stringify(s.currentRequest()); let calls = 0;
@@ -91,7 +128,7 @@ test('a fainted reserve has no Switch In command and can return without registra
 test('real faint replacement forbids root cancellation but permits command cancellation, then registers the survivor once', async () => {
   const h = await open({ reserveHP: 1 }); try {
     const s = h.s._session, original = s.party[0].id, reserve = s.party[1].id;
-    await commands(h, reserve); await pick(h, 'switch-in'); await h.p.inMode('party-forced');
+    await commands(h, reserve); await pick(h, 'switch-in'); await h.p.inMode('wild-faint'); await h.frames(1); await pick(h, 'next'); await h.p.inMode('party-forced');
     assert(s.gw.readState('p1').find(m => m.id === reserve).fainted, 'actual enemy action caused the replacement');
     const request = JSON.stringify(s.currentRequest()); h.s.onMenuCancel(); await h.frames(1);
     assert.equal(h.s._mode, 'party-forced'); assert.equal(JSON.stringify(s.currentRequest()), request);

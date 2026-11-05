@@ -273,6 +273,7 @@ export const zh: LocaleTable = {
     "ui.battlebag.unsupported": "暂未支持这个道具的战斗效果。道具没有被消耗。",
     "ui.bag.entry": "{name}  x{count}",
     "ui.party.switch_in": "派上场",
+    "ui.wild.use_next": "使用下一只宝可梦吗？",
     "ui.party.cancel": "取消",
     "ui.party.entry": "{name}  Lv{level}  体力 {hp}/{maxhp}{fainted}{active}{noEffect}",
     "ui.party.fainted": "（倒下）",

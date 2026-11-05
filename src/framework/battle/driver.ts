@@ -78,6 +78,8 @@ export interface BattleDriver {
   choose(side: string, choice: string): Promise<boolean>;
   /** Register a non-move action (item, ball, run) as the whole choice of one slot. */
   act(side: string, payload: SlotSpec, slot?: number): Promise<boolean>;
+  /** Immediate wild faint replacement escape; true means evaluated, not necessarily escaped. */
+  runAfterFaint?(side: string): Promise<boolean>;
   chooseSlots(side: string, specs: (SlotSpec | null)[]): Promise<boolean>;
   cancel(side: string): Promise<void>;
   /** Menu query. automatic-encore may return a one-based moveSlot; allowed without a slot is not an automatic choice. */

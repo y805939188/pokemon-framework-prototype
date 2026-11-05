@@ -105,25 +105,40 @@ function certainEscape(user: ShowdownPokemon): boolean {
 }
 
 function resolveRun(battle: ShowdownBattle, user: ShowdownPokemon): void {
+  resolveEscape(battle, user, false);
+}
+
+function resolveEscape(battle: ShowdownBattle, user: ShowdownPokemon, replacement: boolean): void {
   const side = user.side;
   if (!battle.rpg.wild) { emit(battle, "run", side.id, "denied", "trainer"); return; }
   if (battle.rpg.noRun) { emit(battle, "run", side.id, "denied", "norun"); return; }
-  if (certainEscape(user)) {
+  if (!replacement && certainEscape(user)) {
     emit(battle, "run", side.id, "ok", "certain", battle.rpg.attempts[side.id] || 0);
     finish(battle, { kind: "run", side: side.id });
     return;
   }
-  if (user.trapped || user.volatiles["partiallytrapped"] || user.volatiles["trapped"]) { emit(battle, "run", side.id, "denied", "trapped"); return; }
+  if (!replacement && (user.trapped || user.volatiles["partiallytrapped"] || user.volatiles["trapped"])) { emit(battle, "run", side.id, "denied", "trapped"); return; }
   const foes = foesOf(user);
   if (!foes.length) { emit(battle, "run", side.id, "denied", "nofoe"); return; }
   // attempts only count once the calculation is reached (WP41 7.2)
-  const attempts = (battle.rpg.attempts[side.id] = (battle.rpg.attempts[side.id] || 0) + 1);
+  const attempts = replacement ? (battle.rpg.attempts[side.id] || 0)
+    : (battle.rpg.attempts[side.id] = (battle.rpg.attempts[side.id] || 0) + 1);
   const ownSpeed = user.storedStats.spe; // unmodified battle copy, not boosted/paralysed speed
   const foeSpeed = Math.max(...foes.map((f) => f.storedStats.spe as number));
   const rate = escapeRate(ownSpeed, foeSpeed, attempts);
   const ok = rate >= 256 || battle.random(256) < rate;
   emit(battle, "run", side.id, ok ? "ok" : "fail", rate, attempts);
   if (ok) finish(battle, { kind: "run", side: side.id });
+}
+
+/** WP41 replacement escape is immediate, outside the move queue; a refusal never consumes a foe action. */
+export function runAfterFaint(battle: ShowdownBattle, sideId: string): boolean {
+  const side = battle.sides.find((s: ShowdownPokemon) => s.id === sideId), user = side?.active[0];
+  if (sideId !== 'p1' || battle.ended || !battle.rpg?.wild || side?.active.length !== 1
+    || battle.requestState !== 'switch' || side.activeRequest?.forceSwitch?.[0] !== true || !user?.fainted
+    || !side.pokemon.some((p: ShowdownPokemon) => !p.isActive && !p.fainted && p.hp > 0)) return false;
+  resolveEscape(battle, user, true);
+  return true;
 }
 
 function resolveBall(battle: ShowdownBattle, user: ShowdownPokemon, payload: Payload): void {

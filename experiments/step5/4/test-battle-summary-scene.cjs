@@ -110,7 +110,7 @@ for (const lang of ['en', 'zh']) test(lang + ' battle Summary uses live HP/PP, s
 test('faint replacement may inspect the fainted member and returns to the same mandatory selector', async () => {
   const h = await open({ reserveHP: 1 }); try {
     const s = h.s._session, original = s.party[0].id, reserve = s.party[1].id;
-    await commands(h, reserve); await pick(h, 'switch-in'); await h.p.inMode('party-forced');
+    await commands(h, reserve); await pick(h, 'switch-in'); await h.p.inMode('wild-faint'); await h.frames(1); await pick(h, 'next'); await h.p.inMode('party-forced');
     await pick(h, reserve); assert.equal(h.s._mode, 'party-command');
     assert(!h.s._menu._items.some(row => row.ext === 'switch-in')); await pick(h, 'summary');
     await h.waitFor(() => current(h)?.ready, 'fainted summary');
@@ -257,7 +257,7 @@ test('mandatory replacement can inspect an Egg but cannot deploy it or cancel re
   const h = await open({ members: 3, egg: true, reserveHP: 1 }); try {
     const s = h.s._session, [lead, egg, reserve] = JSON.parse(h.before).party.map(m => m.id);
     // The actual engine, rather than a fabricated request, produces fainted forced replacement.
-    await commands(h, reserve); await pick(h, 'switch-in'); await h.p.inMode('party-forced');
+    await commands(h, reserve); await pick(h, 'switch-in'); await h.p.inMode('wild-faint'); await h.frames(1); await pick(h, 'next'); await h.p.inMode('party-forced');
     await pick(h, egg); assert.deepEqual(Array.from(h.s._menu._items, r => r.ext), ['summary', null]);
     await pick(h, 'summary'); await h.waitFor(() => current(h)?.ready, 'forced Egg Summary');
     await h.p.press('cancel'); await h.p.inMode('party-forced');
@@ -325,7 +325,7 @@ for (const lang of ['en', 'zh']) test(lang + ' manual switching policy hides Swi
 test('disabled voluntary switching still permits the real fainted replacement', async () => {
  const h = await open({ canSwitch: false, leadHP: 1 }); try {
   const s = h.s._session, lead = s.party[0].id, next = s.party[1].id;
-  await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('party-forced'); assert(s.gw.readState('p1').find(m => m.id === lead).fainted);
+  await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('wild-faint'); await h.frames(1); await pick(h, 'next'); await h.p.inMode('party-forced'); assert(s.gw.readState('p1').find(m => m.id === lead).fainted);
   h.s.onMenuCancel(); await h.frames(1); assert.equal(h.s._mode, 'party-forced');
   await pick(h, next); assert(h.s._menu._items.some(row => row.ext === 'switch-in'));
   await pick(h, 'switch-in'); await h.p.inMode('main'); assert.equal(s.gw.activeId('p1'), next); assert.equal(s.canSwitch, false); assert.equal(JSON.stringify(h.flow.game()), h.before);

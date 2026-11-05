@@ -367,6 +367,14 @@ export class BattleGateway implements BattleDriver {
     return this.chooseSlots(side, specs);
   }
 
+  async runAfterFaint(side: string): Promise<boolean> {
+    const evaluate = loadFormatExtension(this._env.root).runAfterFaint;
+    if (!evaluate || !evaluate(this._battle, side)) return false;
+    this._pump();
+    if (!this._battle.ended) this.refreshRequests(); // Immediate failure keeps the same mandatory replacement open.
+    return true;
+  }
+
   /**
    * Register this side's choice for every active slot in one go. Each spec is either
    *   { move: n, target?: loc } | { switch: n }                    -> ordinary engine choice
