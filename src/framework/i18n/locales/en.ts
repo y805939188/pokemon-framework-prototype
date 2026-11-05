@@ -4,6 +4,9 @@ import type { LocaleTable } from "../translator";
 export const en: LocaleTable = {
   meta: { name: "English" },
   text: {
+    "ui.options.battle_effects": "Battle Effects",
+    "ui.options.effects_on": "On",
+    "ui.options.effects_off": "Off",
     "evolution.itemGrowth": "Growth has been applied.",
     "evolution.itemChoiceRecorded": "The learning choice is recorded for this use.",
     "evolution.itemUsed": "Used {quantity} × {item}.",

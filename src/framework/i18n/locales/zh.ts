@@ -8,6 +8,9 @@ import type { LocaleTable } from "../translator";
 export const zh: LocaleTable = {
   meta: { name: "简体中文", font: "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif" },
   text: {
+    "ui.options.battle_effects": "战斗特效",
+    "ui.options.effects_on": "开",
+    "ui.options.effects_off": "关",
     "evolution.itemGrowth": "成长已生效。",
     "evolution.itemChoiceRecorded": "已记录本次用药的学招选择。",
     "evolution.itemUsed": "使用了{quantity}个{item}。",

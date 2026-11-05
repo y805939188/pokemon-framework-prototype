@@ -199,7 +199,7 @@ export class BattlePicturePlayback<T> {
     } };
   }
   snapshot(): object {
-    return { version: 'd2-basic-picture-consumer-v2', preset: 'simple-default-pictures-v1', damagePreset: 'simple-damage-feedback-v1', retired: this.retired,
+    return { version: 'd2-basic-picture-consumer-v2', preset: 'simple-default-pictures-v1', damagePreset: 'simple-damage-feedback-v1', effects: this.effects, retired: this.retired,
       faintPreset: 'simple-faint-feedback-v1', faintAudio: [...this.faintMedia].map(media => media.snapshot()), lastUpdate: this.lastUpdate, runningGroups: this.runs.size, actors: [...this.entries.values()].map(entry => ({ ...entry.actor, ...entry.pose })), cleanupErrors: [...this.cleanupErrors] };
   }
   dispose(): void {

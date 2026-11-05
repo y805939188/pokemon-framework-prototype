@@ -1,0 +1,27 @@
+// Installed MZ method bodies; rendering and configuration I/O are controlled.
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),{installNativeSettings}=require('./battle-effects-settings-host.cjs');let temp,S;
+test.before(async()=>{temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-battle-effects-settings-'));const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));await vite.build({configFile:false,root:ROOT,logLevel:'error',build:{outDir:temp,minify:false,lib:{entry:path.join(ROOT,'src/plugins/battleflow/battle-effects-settings.ts'),formats:['cjs'],fileName:()=>'settings.cjs'}}});S=require(path.join(temp,'settings.cjs'));});
+test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
+function host(lang='en'){const G=installNativeSettings({},ROOT);S.installBattleEffectsSettings(G,()=>E.i18n.translatorFor(lang));return G;}
+test('event parser and author boolean overrides reject malformed input without coercion',()=>{
+ for(const v of [undefined,'','inherit'])assert.equal(S.parseBattleEffects(v),undefined);assert.equal(S.parseBattleEffects('on'),true);assert.equal(S.parseBattleEffects('off'),false);
+ for(const v of [null,true,false,0,1,'true','false','ON',{},[]])assert.throws(()=>S.parseBattleEffects(v),/battleEffects must be/);
+ for(const v of [null,0,'on','off','inherit',{},[]])assert.throws(()=>S.effectiveBattleEffects({},v),/boolean/);
+ assert.equal(S.effectiveBattleEffects({ConfigManager:{psBattleEffects:false}},true),true);assert.equal(S.effectiveBattleEffects({ConfigManager:{psBattleEffects:true}},false),false);assert.equal(S.playerBattleEffects({}),true);
+});
+test('actual make/apply methods restore Off, preserve native settings, default old config On and migrate only a missing new field',()=>{
+ const G=host();G.ConfigManager.applyData({alwaysDash:true,touchUI:false,bgmVolume:40,psBattleEffects:false});const data=JSON.parse(JSON.stringify(G.ConfigManager.makeData()));assert.equal(data.psBattleEffects,false);assert.equal(data.alwaysDash,true);assert.equal(data.touchUI,false);assert.equal(data.bgmVolume,40);assert(!Object.hasOwn(data,'battleEffects'));
+ const next=host();next.ConfigManager.applyData(data);assert.equal(next.ConfigManager.psBattleEffects,false);assert.equal(next.ConfigManager.bgmVolume,40);
+ for(const [data,expected]of [[{},true],[{battleEffects:false},false],[{battleEffects:true},true],[{psBattleEffects:true,battleEffects:false},true],[{psBattleEffects:false,battleEffects:true},false],[{psBattleEffects:null,battleEffects:false},true],[{psBattleEffects:0,battleEffects:false},true],[{psBattleEffects:'off'},true]]){next.ConfigManager.applyData(data);assert.equal(next.ConfigManager.psBattleEffects,expected,JSON.stringify(data));}
+ assert.equal(new G.Scene_Options().maxCommands(),8);
+});
+for(const lang of ['en','zh'])test(lang+' real Options methods display both values, clamp enum ends and delegate native rows',()=>{
+ const G=host(lang),w=new G.Window_Options(),tr=E.i18n.translatorFor(lang);w.addGeneralOptions();assert.equal(w._list.length,4);assert.equal(w._list[3].name,tr.t('ui.options.battle_effects'));w._index=3;assert.equal(w.statusText(3),tr.t('ui.options.effects_on'));
+ w.cursorLeft();assert.equal(w.sounds,0);w.cursorRight();assert.equal(G.ConfigManager.psBattleEffects,false);assert.equal(w.statusText(3),tr.t('ui.options.effects_off'));w.cursorRight();assert.equal(w.sounds,1);w.cursorLeft();w.processOk();assert.equal(G.ConfigManager.psBattleEffects,false);w.processOk();assert.equal(G.ConfigManager.psBattleEffects,true);assert.equal(w.sounds,4);
+ w._index=0;w.processOk();assert.equal(G.ConfigManager.alwaysDash,true);assert.equal(w.statusText(0),'ON');w._list.push({name:'Music',symbol:'bgmVolume',enabled:true});w._index=4;w.cursorRight();assert(w.volumeDelegated);assert.equal(G.ConfigManager.psBattleEffects,true);
+});
+test('disabled Effects row cannot change and duplicate install does not duplicate row or command count',()=>{const G=host();S.installBattleEffectsSettings(G,()=>E.i18n.translatorFor('en'));const w=new G.Window_Options();w.addGeneralOptions();w._index=3;w._list[3].enabled=false;w.processOk();w.cursorRight();w.cursorLeft();assert.equal(G.ConfigManager.psBattleEffects,true);assert.equal(w.sounds,0);assert.equal(w._list.filter(r=>r.symbol==='psBattleEffects').length,1);assert.equal(new G.Scene_Options().maxCommands(),8);});
+test('installed Options terminate retains its original save owner and serializes the new preference exactly once',()=>{const G=host();let saves=0,saved;G.ConfigManager.psBattleEffects=false;G.ConfigManager.save=()=>{saves++;saved=G.ConfigManager.makeData();};new G.Scene_Options().terminate();assert.equal(saves,1);assert.equal(saved.psBattleEffects,false);const next=host();next.ConfigManager.applyData(JSON.parse(JSON.stringify(saved)));assert.equal(next.ConfigManager.psBattleEffects,false);});
+test('minimal legacy hosts retain transient field reads and receive no invented storage API',()=>{const G={ConfigManager:{battleEffects:false}};S.installBattleEffectsSettings(G,()=>E.i18n.translatorFor('en'));assert.equal(S.playerBattleEffects(G),false);assert.equal(G.ConfigManager.makeData,undefined);G.ConfigManager.psBattleEffects=true;assert.equal(S.playerBattleEffects(G),true);});

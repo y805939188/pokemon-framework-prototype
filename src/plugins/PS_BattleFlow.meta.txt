@@ -126,6 +126,18 @@
  * @type variable
  * @default 10
  *
+ * @arg battleEffects
+ * @text Battle Effects
+ * @desc Inherit the player option, or override for this battle. Captured before the Map transition; basic feedback always plays.
+ * @type select
+ * @option Inherit
+ * @value inherit
+ * @option On
+ * @value on
+ * @option Off
+ * @value off
+ * @default inherit
+ *
  * @arg canSwitch
  * @text Allow manual switching
  * @desc false hides voluntary Switch In; mandatory replacements remain available. Default true.
@@ -250,6 +262,18 @@
  * @arg resultVariable
  * @type variable
  * @default 0
+ *
+ * @arg battleEffects
+ * @text Battle Effects
+ * @desc Inherit the player option, or override for this battle. Captured before the Map transition; basic feedback always plays.
+ * @type select
+ * @option Inherit
+ * @value inherit
+ * @option On
+ * @value on
+ * @option Off
+ * @value off
+ * @default inherit
  *
  * @arg canSwitch
  * @text Allow manual switching

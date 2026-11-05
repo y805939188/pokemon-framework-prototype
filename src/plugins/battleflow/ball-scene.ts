@@ -36,7 +36,7 @@ export class BallScenePresentation<T> implements BattleSceneVisualStep {
   private pose: BallPose = { flight: 0, lift: 0, drop: 0, rotation: 0, opacity: 1, scale: 1 };
   private error: string | null = null;
   readonly cleanupErrors: string[] = [];
-  constructor(private readonly plan: BallFeedbackPlan, effects: boolean, private readonly ports: BallScenePorts<T>) {
+  constructor(private readonly plan: BallFeedbackPlan, private readonly effects: boolean, private readonly ports: BallScenePorts<T>) {
     this.clock = new BallFeedbackClock(plan, effects);
   }
   pending(): boolean { return !this.closed && !this.cancelled; }
@@ -95,7 +95,7 @@ export class BallScenePresentation<T> implements BattleSceneVisualStep {
       try {
         const update = this.ports.updateOrdinal(); if (update === this.hideSampled) return false;
         this.hideClock ??= new BasicPictureGroup([{ id: 'ball', kind: 'capture', startUnits: 0, durationUnits: 20 },
-          { id: 'box', kind: 'capture', startUnits: 0, durationUnits: 5 }], true);
+          { id: 'box', kind: 'capture', startUnits: 0, durationUnits: 5 }], this.effects);
         const frame = this.hideClock.sample(now, update); this.hideSampled = update;
         const ball = frame.frames.find(track => track.id === 'ball')!.progress, box = frame.frames.find(track => track.id === 'box')!.progress;
         if (!this.ports.box(1 - box)) { if (!this.live()) { this.cancel(); return false; } throw new Error('captured data box unavailable'); }
@@ -109,7 +109,7 @@ export class BallScenePresentation<T> implements BattleSceneVisualStep {
     } };
   }
   snapshot() {
-    return { version: 'ball-feedback-scene-v1' as const, preset: 'simple-ball-feedback-v1', plan: this.clock.snapshot(),
+    return { version: 'ball-feedback-scene-v1' as const, preset: 'simple-ball-feedback-v1', effects: this.effects, plan: this.clock.snapshot(),
       animationDone: this.animationDone, closed: this.closed, cancelled: this.cancelled, pending: this.pending(),
       sampledUpdate: this.sampled, hideSampledUpdate: this.hideSampled, pose: { ...this.pose },
       frame: this.frame ? { ...this.frame, frames: this.frame.frames.map(track => ({ ...track })) } : null,

@@ -7,7 +7,7 @@ interface OwnedActor { body: any; shadow: any; bodyBitmap: any; shadowBitmap: an
 
 /** Simple private code-generated portraits. Real media can replace this port without changing the timing consumer. */
 export function createBattlePicturesMZ(G: any, scene: any, current: () => boolean, updateOrdinal: () => number, failed: (error: unknown) => void,
-  prepareFaint?: (actor: Readonly<PictureActor>) => FaintMedia): BattlePicturePlayback<OwnedActor> {
+  prepareFaint?: (actor: Readonly<PictureActor>) => FaintMedia, effects = true): BattlePicturePlayback<OwnedActor> {
   const owned = new Set<OwnedActor>();
   const release = (actor: OwnedActor) => {
     if (actor.released) return; actor.released = true;
@@ -58,5 +58,5 @@ export function createBattlePicturesMZ(G: any, scene: any, current: () => boolea
       }
     }
   };
-  return new BattlePicturePlayback({ current, updateOrdinal, create, paint, release, failed, prepareFaint });
+  return new BattlePicturePlayback({ current, updateOrdinal, create, paint, release, failed, prepareFaint }, effects);
 }
