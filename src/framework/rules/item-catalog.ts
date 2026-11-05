@@ -1,6 +1,7 @@
 /** Item identity belongs to content; battle IDs, prices and display names are independent. */
 import { FIELD_EFFECTS } from './item-families';
 import { BAG_ITEMS, BALLS } from './items';
+import { PP_ITEMS } from './rules';
 import { own, setOwn } from './own';
 
 export type FieldUse = 'none' | 'member' | 'direct' | 'field' | 'tm' | 'hm' | 'tr';
@@ -41,11 +42,11 @@ export function legacyCatalog(): ItemCatalog {
   BAG_ITEMS.forEach((id, order) => {
     const ball = BALLS.includes(id), active = id.startsWith('x') || id === 'direhit' || id === 'guardspec';
     setOwn<ItemDefinition>(catalog, id, { id, name: 'Unnamed', namePlural: 'Unnamed', pocket: ball ? 3 : active ? 7 : 2, order,
-      price: 0, sellPrice: 0, flags: ball ? ['PokeBall'] : [], fieldUse: 'none', battleUse: ball ? 'ball' : active ? 'active' : 'member',
+      price: 0, sellPrice: 0, flags: ball ? ['PokeBall'] : [], fieldUse: 'none', battleUse: ball ? 'ball' : active ? 'active' : Object.hasOwn(PP_ITEMS, id) && !PP_ITEMS[id]!.all ? 'move' : 'member',
       battleId: id, legacyIds: [id], consumable: true, source: 'framework-legacy' });
   });
   // Explicit held compatibility; Berry placement/flags must retain any pre-existing battle-use identity.
-  for (const [id,pocket] of [['leftovers',1],['choiceband',1],['oranberry',5],['sitrusberry',5]] as const) {
+  for (const [id,pocket] of [['leftovers',1],['choiceband',1],['oranberry',5],['sitrusberry',5],['leppaberry',5]] as const) {
     const previous=own(catalog,id);
     setOwn<ItemDefinition>(catalog,id,{id,name:'Unnamed',namePlural:'Unnamed',order:Object.keys(catalog).length,price:0,sellPrice:0,fieldUse:'none',battleUse:'none',legacyIds:[id],consumable:true,source:'framework-legacy',...previous,pocket,flags:pocket===5?['Berry']:previous?.flags??[]});
   }

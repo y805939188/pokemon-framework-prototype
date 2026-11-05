@@ -15,7 +15,7 @@ import type { BattleDriver, BattleDriverFactory } from "../battle/driver";
 import { isSelectableMove } from "../battle/move-requests";
 import type { GatewayMessage, MemberState } from "../battle/gateway";
 import * as G from "../rules/growth";
-import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, itemEligibility } from "../rules/rules";
+import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, PP_ITEMS, itemEligibility } from "../rules/rules";
 import * as S from "../rules/state";
 import type { BattleResult, GameState } from "../rules/state";
 import type { Content, Member } from "../rules/types";
@@ -67,7 +67,7 @@ export function sealBattleEffects(session: BattleSession, binding: EffectsBindin
   return session._effects.seal(session.result(), binding, session._pendingFriendFaints.length ? session.party.map(m => m.id) : session._friendUnavailable);
 }
 
-const ITEM_IDS = new Set(["fullrestore", ...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS)]);
+const ITEM_IDS = new Set(["fullrestore", ...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS), ...Object.keys(PP_ITEMS)]);
 
 function toSet(m: Member, moveName: (id: string) => string): Record<string, unknown> {
   return {
@@ -411,24 +411,25 @@ export class BattleSession {
   async chooseForcedSwitch(memberId: string): Promise<TurnResult> { return this.chooseSwitch(memberId); }
 
   /** Reserve the item (deduct now), register the action; refunded on cancel/no-effect. */
-  async useItem(itemId: string, targetId: string, { commit = true }: { commit?: boolean } = {}): Promise<TurnResult> {
+  async useItem(itemId: string, targetId: string, { commit = true, moveSlot }: { commit?: boolean; moveSlot?: number } = {}): Promise<TurnResult> {
     return this._action(async () => {
-      this._log("info", "choice", { action: "item", item: itemId, target: targetId, commit });
+      this._log("info", "choice", { action: "item", item: itemId, target: targetId, commit, moveSlot });
       if (!ITEM_IDS.has(itemId)) return this._refuse("unknown-item");
       if ((this.bag[itemId] || 0) < 1) return this._refuse("none-left");
-      const el = this.canUseItem(itemId, targetId);
+      const el = this.canUseItem(itemId, targetId, moveSlot);
       if (!el.ok) return this._refuse(el.reason); // refused before registration: nothing consumed, no turn used
       const entry = this._reserve("item", itemId, targetId);
-      const ok = await this.gw.act("p1", { kind: "item", item: itemId, target: targetId });
+      const ok = await this.gw.act("p1", { kind: "item", item: itemId, target: targetId, ...(moveSlot === undefined ? {} : { moveSlot }) });
       if (!ok) { this._refund(entry, "not-registered"); return this._refuse("not-registered"); }
       return commit ? this._resolveTurn() : { ok: true, staged: true };
     });
   }
 
   /** Registration-time eligibility of an item for a party member (same rule the menu uses to grey out targets). */
-  canUseItem(itemId: string, targetId: unknown): ReturnType<typeof itemEligibility> {
+  canUseItem(itemId: string, targetId: unknown, moveSlot?: number): ReturnType<typeof itemEligibility> {
     const mon = this.gw.readState("p1").find((x: MemberState) => x.id === targetId);
-    return itemEligibility(itemId, mon);
+    const moves = Object.hasOwn(PP_ITEMS, itemId) ? this.party.find(m => m.id === targetId)?.moves.map(m => ({ ...m, pp: mon?.pp[m.id] ?? m.pp })) : undefined;
+    return itemEligibility(itemId, mon, { moves, moveSlot });
   }
 
   /**
@@ -454,7 +455,7 @@ export class BattleSession {
           if (!q.allowed) return this._refuse(q.reason ?? "refused");
         } else if (sp && sp.kind === "item") {
           if (!ITEM_IDS.has(sp.item as string)) return this._refuse("unknown-item");
-          const el = this.canUseItem(sp.item as string, sp.target);
+          const el = this.canUseItem(sp.item as string, sp.target, sp.moveSlot as number | undefined);
           if (!el.ok) return this._refuse(el.reason);
         }
         if (sp) acted = true;

@@ -18,7 +18,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, fast = false, effects = true, noRun = false, leadHP = null, leadMoves = null } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, fast = false, effects = true, noRun = false, leadHP = null, leadMoves = null, benchMoves = null } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -33,6 +33,7 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   if (hurt) state.party[0].hp -= 40;
   if (leadHP !== null) state.party[0].hp = leadHP;
   if (leadMoves) state.party[0].moves = leadMoves.map(m => ({ ...m }));
+  if (benchMoves) state.party[1].moves = benchMoves.map(m => ({ ...m }));
   if (reserveHP !== null) state.party[1].hp = reserveHP;
   if (egg) state.party[1].isEgg = true;
   state.inventory = E.inventory.inventoryFromBag(bag, E.itemCatalog.catalogOf(content)); G.$gameSystem._psGame = state;
@@ -245,4 +246,18 @@ test('a different refusal reason retains its existing localized message even for
     assert(h.completed.includes("That isn't possible right now.")); assert(!h.completed.some(line => typeof line === 'string' && line.includes('already in battle')));
     assert.equal(JSON.stringify(h.flow.game()), h.before);
   } finally { h.cleanup(); }
+});
+
+// Accepted PP recovery + wild-faint path: no new rules, actual Scene -> Session -> Gen8 -> one final App install.
+for(const lang of ['en','zh'])for(const route of ['next','blocked'])test(lang+' PPI '+route+' replacement restores and then spends PP without losing the fainted lead ledger',async()=>{
+ const h=await open({lang,fast:true,leadHP:1,noRun:route==='blocked',leadMoves:[{id:'splash',pp:1,maxpp:40}],benchMoves:[{id:'splash',pp:0,maxpp:40},{id:'tackle',pp:35,maxpp:35}],bag:{ether:2}});try{
+  const s=h.s._session,[lead,reserve]=s.party.map(m=>m.id),order=JSON.parse(h.before).party.map(m=>m.id),calls=[];let installs=0,runs=0,items=0,doc=h.G.$gameSystem._psGame;const move=s.chooseMove.bind(s),run=s.run.bind(s),use=s.useItem.bind(s);
+  s.chooseMove=slot=>{calls.push(slot);return move(slot);};s.run=(...a)=>{runs++;return run(...a);};s.useItem=(...a)=>{items++;return use(...a);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  h.flow.fast=false;await pick(h,'fight');await pick(h,1);await h.p.inMode('wild-faint');assert.equal(s.party.find(m=>m.id===lead).moves[0].pp,0);assert(s.gw.readState('p1').find(m=>m.id===lead).fainted);const foe=JSON.stringify(s.gw.readState('p2'));
+  await h.frames(1);await pick(h,route==='next'?'next':'escape');await h.p.inMode('party-forced');assert.equal(runs,route==='next'?0:1);assert.equal(JSON.stringify(s.gw.readState('p2')),foe);assert.equal(items,0);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await pick(h,reserve);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),reserve);h.flow.fast=true;
+  await pick(h,'bag');await pick(h,'ether');await pick(h,'use');await h.p.inMode('bag-members');await pick(h,reserve);await h.p.inMode('bag-moves');await pick(h,0);h.s.onMenuOk();h.s.onMenuCancel();await h.p.inMode('main');assert.equal(items,1);assert.equal(s.bag.ether,1);assert.equal(s.party.find(m=>m.id===reserve).moves[0].pp,10);assert.equal(s.currentRequest().active[0].moves[0].pp,10);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await pick(h,'fight');await pick(h,1);await h.p.inMode('main');assert.equal(s.party.find(m=>m.id===reserve).moves[0].pp,9);assert.equal(s.gw.readState('p1').find(m=>m.id===reserve).pp.splash,9);
+  await pick(h,'fight');await pick(h,2);await h.p.inMode('end');assert.deepEqual(calls,[1,1,2]);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),order);const saved=h.flow.game().party;assert.equal(saved.find(m=>m.id===lead).moves[0].pp,0);assert.equal(saved.find(m=>m.id===lead).hp,0);assert.equal(saved.find(m=>m.id===reserve).moves[0].pp,9);assert.equal(E.inventory.aggregateBag(h.flow.game().inventory).ether,1);h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
 });

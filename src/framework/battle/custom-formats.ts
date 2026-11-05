@@ -5,7 +5,7 @@
  * (js/engine/build/custom-formats.cjs) and staged into the engine by scripts/build-showdown.sh; no Showdown source is
  * modified. It runs inside Showdown, so it may only depend on plain rules code (bundled in), never on the gateway.
  */
-import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules";
+import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, PP_ITEMS, ppRecovery, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules";
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types";
 import type { FormatObserver, FormatObservation } from "../rules/battle-evidence";
 import type { BattleActor, BattleDisplaySnapshot } from "../rules/battle-evidence";
@@ -16,7 +16,7 @@ import type { HeldRuntimeObserver } from "../rules/held-facts";
 /** Private actual-battle hooks. No JSON field, save setting or public log can install one. */
 export const settlements = new WeakMap<object, HeldRuntimeObserver>();
 
-interface Payload { kind: string; item?: string; target?: string; ball?: string; catchRate?: number; ctx?: Record<string, unknown> }
+interface Payload { kind: string; item?: string; target?: string; moveSlot?: number; ball?: string; catchRate?: number; ctx?: Record<string, unknown> }
 
 /** Pending actions live on the (serialized) battle object so snapshots carry them. */
 function pendingFor(battle: ShowdownBattle, sideId: string, position: number): Payload | null {
@@ -38,6 +38,20 @@ function resolveItem(battle: ShowdownBattle, user: ShowdownPokemon, payload: Pay
   const side = user.side;
   const item = payload.item as string;
   const target = side.pokemon.find((p: ShowdownPokemon) => p.name === payload.target);
+  if (Object.hasOwn(PP_ITEMS, item)) {
+    if (!target || target.fainted || target.hp <= 0) { emit(battle, "item", side.id, item, payload.target || "-", "noeffect"); return; }
+    const gains = ppRecovery(item, target.baseMoveSlots, payload.moveSlot);
+    if (!gains.some(n => n > 0)) { emit(battle, "item", side.id, item, target.name, "noeffect"); return; }
+    gains.forEach((gain, index) => {
+      if (!gain) return;
+      const permanent = target.baseMoveSlots[index]; permanent.pp += gain;
+      // WP20: an active copy is updated only for the same move and outside Transform.
+      const active = target.moveSlots[index];
+      if (target.isActive && !target.transformed && active?.id === permanent.id) active.pp = permanent.pp;
+    });
+    emit(battle, "item", side.id, item, target.name, "ok");
+    return;
+  }
   if (item === "fullrestore") {
     if (!target || target.fainted || target.hp <= 0) { emit(battle, "item", side.id, item, payload.target || "-", "noeffect"); return; }
     const confused = target.isActive && !!target.volatiles.confusion;
