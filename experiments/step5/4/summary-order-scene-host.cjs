@@ -80,4 +80,4 @@ async function summary(h, id) {
 const current = h => h.G.PSManagement.current();
 const text = h => current(h).text;
 
-module.exports = { prepare, cleanup, open, current, makeContent: () => fixture.musicNativeContent(E, assert) };
+module.exports = { prepare, cleanup, open, current, makeContent: () => fixture.musicNativeContent(E, assert), controls: () => ({ plugins, entryText, temp, fixture }) };
