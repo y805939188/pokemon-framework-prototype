@@ -422,9 +422,11 @@ export class BattleGateway implements BattleDriver {
     const active: ShowdownPokemon = s.active[slot];
     if (what === 'automatic-encore') {
       // Read the pinned engine's own condition and already-published permissions, never run a rule event here.
-      const request = this.awaitingChoice(side), moves = request?.active?.[0]?.moves;
       if (slot !== 0 || s.active.length !== 1 || !active || active.fainted || active.volatiles?.dynamax
-        || request?.forceSwitch || !Array.isArray(moves) || !active.volatiles?.encore?.move) return { allowed: false };
+        || !active.volatiles?.encore?.move) return { allowed: false };
+      // isChoiceDone/awaitingChoice can register pass actions for empty seats. This hint only reads existing data.
+      const request = s.activeRequest, moves = request?.active?.[0]?.moves;
+      if (!request || request.wait || request.forceSwitch || s.choice.actions.length > 0 || !Array.isArray(moves)) return { allowed: false };
       const eligible = moves.map((move: any, index: number) => ({ move, slot: index + 1 }))
         .filter(({ move }) => isSelectableMove(move));
       return eligible.length === 1 && eligible[0]!.move.id === active.volatiles.encore.move
