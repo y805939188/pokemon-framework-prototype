@@ -32,7 +32,9 @@ function verify(c,o){
  for(const [id,pp]of Object.entries(b.p1.pp))if(id!==c.move)assert.equal(a.p1.pp[id],pp);
  assert.equal(a.p1.hp,b.p1.hp);assert(hits.length>=c.minHits&&hits.length<=c.maxHits,'actual completed hit count');
  const count=events.filter(e=>e.type==='-hitcount'&&e.args[0].startsWith('p2a:'));
- assert.equal(count.length,1);assert.equal(Number(count[0].args[1]),hits.length,'reported count equals actual target HP submissions');
+ if(c.ko){assert.equal(o.finished,true);assert.equal(o.endReason,'win');assert(count.length<=1,'terminal metadata must not duplicate counts');}
+ else assert.equal(count.length,1,'a surviving-target multihit use retains its summary');
+ if(count.length)assert.equal(Number(count[0].args[1]),hits.length,'reported count equals actual target HP submissions');
  let hp=b.p2.hp;
  for(const hit of hits){const m=/^(\d+)(?:\/(\d+))?(?:\s|$)/.exec(hit.args[1]);assert(m,'actual HP wire required');const next=Number(m[1]);if(m[2])assert.equal(Number(m[2]),b.p2.maxhp);assert(next<hp&&next>=0);hp=next;}
  assert.equal(a.p2.hp,hp);assert.equal(a.p2.hp===0,c.ko,'a KO stops remaining planned strikes');
@@ -42,7 +44,8 @@ function verify(c,o){
 for(const c of plan.cases)test(c.id+' '+c.check,async()=>{
  const w=await open(c);try{
   unchanged(w);const r=await w.s.chooseMove(plan.playerMoves.indexOf(c.move)+1);assert(r.ok,JSON.stringify(r));
-  const row={before:w.before,after:observation(w.s),messages:clone(r.messages)};verify(c,row);unchanged(w);
+  const row={before:w.before,after:observation(w.s),messages:clone(r.messages),finished:w.s.finished,endReason:w.s.finished?w.s.ended.reason:null};
+  try{verify(c,row);}catch(error){console.log('E_MULTIHIT_APP_FAILED_OBSERVATION '+JSON.stringify({id:c.id,initial:w.initial,...row}));throw error;}unchanged(w);
   const wrong=clone(row);wrong.after.p1.pp[c.move]=wrong.before.p1.pp[c.move];assert.throws(()=>verify(c,wrong),assert.AssertionError,'same oracle rejects a missed PP charge');
   if(c.exit==='abort'){
    w.app.abortBattle(w.request,Error('owned normal lifecycle abort'));unchanged(w);const outcome=w.app.finishBattle(w.s,w.request);assert.equal(outcome.commit,'none');assert.equal(outcome.aborted,true);unchanged(w);
