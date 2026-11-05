@@ -863,6 +863,10 @@ test('summary move sorting validates own member, order, slots, shadow and busy s
 test('summary move sorting then real full-slot learning replaces the intended permanent identity, not the old slot', async () => {
   const h = await open({ grow:true,integration:true,trainer:true,trainerMembers:2,fast:true }); try {
     const s = h.s._session,id=s.party[0].id;
+    if (process.env.PF_SUMMARY_SORT_MUTATION === 'slot-only') {
+      const apply = s.gw.applyGrowth.bind(s.gw);
+      s.gw.applyGrowth = (side, member, change) => { const { replaceMoveId, ...oldSlotOnly } = change; return apply(side, member, oldSlotOnly); };
+    }
     await movesDetail(h,id); await h.p.press('ok'); await h.p.press('down'); await h.p.press('ok');
     assert.deepEqual(s.party[0].moves.map(m=>m.id),['growl','tackle','splash','protect']); await leaveMoves(h);
     await pick(h,'fight'); await pick(h,1); await h.p.inMode('learn-initial'); await h.frames(1); await pick(h,'forget-move');
@@ -877,4 +881,16 @@ test('summary move sorting then real full-slot learning replaces the intended pe
     assert.deepEqual(h.flow.game().party[0].moves.map(m=>m.id),['rest','tackle','splash','protect']);
     assert.equal(h.flow.game().party[0].moves[1].pp,33);
   } finally {h.cleanup();}
+});
+test('summary move sorting uses the selected reserve identity and keeps ribbons read-only', async () => {
+  const moves=[{id:'splash',pp:9,maxpp:40,ppUps:0},{id:'growl',pp:24,maxpp:48,ppUps:1}];
+  const h=await open({benchMoves:moves});try{
+    const s=h.s._session,lead=JSON.stringify(s.party[0]),id=s.party[1].id;
+    await movesDetail(h,id);await h.p.press('ok');await h.p.press('down');await h.p.press('ok');
+    assert.deepEqual(s.party[1].moves,[moves[1],moves[0]]);assert.equal(JSON.stringify(s.party[0]),lead);
+    await h.p.press('cancel');await h.p.press('right');assert.equal(current(h).view.page,4);
+    await h.p.press('ok');await h.p.press('ok');assert.equal(current(h).view.selected,null,'move capability does not enable ribbon or management writes');
+    await h.p.press('cancel');await h.p.press('cancel');await h.p.inMode('party');assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext,id);
+    assert.equal(JSON.stringify(h.flow.game()),h.before);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
+  }finally{h.cleanup();}
 });
