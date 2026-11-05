@@ -21,7 +21,7 @@ async function move(w,b){const r=await b.s.chooseMove(1);assert(r.ok,JSON.string
 async function finish(w,b){
  const before=clone(live(b)),writes=w.state.replaced.length,r=await b.s.run();assert(r.ok);assert(b.s.finished);assert.equal(b.s.ended.reason,'run');unchanged(w,b);
  const result=b.s.result();assert.equal(result.members['CARRY-P1'].hp,before.hp);const outcome=w.app.finishBattle(b.s,b.req);assert.equal(outcome.commit,'applied',JSON.stringify(outcome));assert.equal(w.state.replaced.length,writes+1);
- const saved=clone(w.state.read());w.app.finishBattle(b.s,b.req);assert.equal(w.state.replaced.length,writes+1);assert.equal(JSON.stringify(w.state.read()),JSON.stringify(saved));b.result=clone(result);b.savedParty=clone(saved.party);w.active=null;return saved.party[0];
+ const saved=clone(w.state.read()),installed=saved.party[0],patch=result.members['CARRY-P1'];for(const key of ['hp','status','statusCount'])assert.equal(installed[key],patch[key]);assert.deepEqual(installed.moves.map(({id,pp,maxpp})=>({id,pp,maxpp})),patch.moves);assert.equal(saved.appliedBattles[b.req.battleId].hash,E.state.resultHash(result));w.app.finishBattle(b.s,b.req);assert.equal(w.state.replaced.length,writes+1);assert.equal(JSON.stringify(w.state.read()),JSON.stringify(saved));b.result=clone(result);b.savedParty=clone(saved.party);w.active=null;return saved.party[0];
 }
 async function inflict(w){
  const foe=plan.firstFoes[w.c.first],b=await w.start(foe),events=await move(w,b),m=live(b);assert.equal(m.pp.splash,w.maxpp-1);assert.equal(m.status,w.c.first==='toxic'?'tox':'slp');assert(events.some(e=>e.type==='-status'&&e.args[0].startsWith('p1a:')&&e.args[1]===m.status));
