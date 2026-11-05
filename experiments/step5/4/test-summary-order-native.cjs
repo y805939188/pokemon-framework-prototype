@@ -6,7 +6,7 @@ test.before(async()=>{
  await host.prepare();temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-summary-exercise-'));
  const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));await vite.build({configFile:false,root:ROOT,logLevel:'error',build:{outDir:temp,emptyOutDir:false,minify:false,lib:{entry:path.join(ROOT,'src/plugins/flowtest/d2-summary-order.ts'),formats:['cjs'],fileName:()=> 'entry.cjs'}}});mod=require(path.join(temp,'entry.cjs'));
 });test.after(()=>{host.cleanup();if(temp)fs.rmSync(temp,{recursive:true,force:true});});
-async function open(c){const content=host.makeContent();content.species.Snorlax.learnset={1:['splash']};return host.open({lang:c.language,members:1,hurt:false,leadMoves:plan.moves,fast:false,suppliedContent:content,foeSpecies:plan.foe.species,foeLevel:plan.foe.level});}
+async function open(c){const content=host.makeContent();content.species.Snorlax.learnset={1:['Splash']};return host.open({lang:c.language,members:1,hurt:false,leadMoves:plan.moves,fast:false,suppliedContent:content,foeSpecies:plan.foe.species,foeLevel:plan.foe.level});}
 function ports(h,change){return{...h.p,evidence:async row=>{
  assert(row.window.contents,'actual compiled shared window created');assert(row.view.text.some(text=>text.includes(' PP')),'actual shared rendering records');
  if(change)return change(row,h);
