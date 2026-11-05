@@ -17,7 +17,8 @@ export async function exerciseBattleSummaryOrder(p: any, c: any): Promise<any> {
   assert(typeof evidence === 'function', 'explicit render evidence port');
   const stable = (v: any) => p.api().contentCompile.canonicalJson(v), before = clone(flow.game());
   const descriptor = Object.getOwnPropertyDescriptor(system, '_psGame');
-  assert(descriptor && descriptor.configurable && descriptor.writable && 'value' in descriptor, 'own state observer');
+  if (!descriptor) throw Error('own state observer missing');
+  assert(descriptor.configurable && descriptor.writable && 'value' in descriptor, 'own state observer');
   let value = descriptor.value, committed = false;
   const installs: any[] = [], renders: any[] = [], selected: any[] = [];
   const get = () => value, set = (next: any) => { installs.push(clone(next)); value = next; };
