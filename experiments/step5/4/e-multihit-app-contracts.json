@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "format": "gen8rpgcustomgame",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "playerMoves": [
+    "doublekick",
+    "iciclespear",
+    "splash"
+  ],
+  "playerMaxHP": 110,
+  "featureIds": [
+    "FR-000555",
+    "FR-000556"
+  ],
+  "completeHeading": false,
+  "scope": "six real production App/Session normal multihit HP/one-PP/KO-stop and single commit/abort contracts; owned memory state only, no full heading/probability/disk/Scene/NW claim",
+  "source": {
+    "path": "deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+    "sha256": "7e65ae4945ab1cd101b357f3edcadbff2cbaa94630c609244519a688901e1841",
+    "referenceHead": "5c9805de2331f75565891851d4d7b2bc97acad94"
+  },
+  "headings": [
+    {
+      "featureId": "FR-000555",
+      "heading": "2. 整次使用、每击与中断",
+      "lines": [
+        13,
+        44
+      ],
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000556",
+      "heading": "3. 多击、两回合与连用",
+      "lines": [
+        45,
+        92
+      ],
+      "completeHeading": false
+    }
+  ],
+  "cases": [
+    {
+      "id": "EMHA-01",
+      "check": "fixed-two-hits-one-pp",
+      "move": "doublekick",
+      "minHits": 2,
+      "maxHits": 2,
+      "abilityIndex": 0,
+      "ability": "Shell Armor",
+      "foe": "slowbro",
+      "foeLevel": 100,
+      "foeMaxHP": 300,
+      "ko": false,
+      "exit": "run"
+    },
+    {
+      "id": "EMHA-02",
+      "check": "skill-link-five-hits",
+      "move": "iciclespear",
+      "minHits": 5,
+      "maxHits": 5,
+      "abilityIndex": 1,
+      "ability": "Skill Link",
+      "foe": "slowbro",
+      "foeLevel": 100,
+      "foeMaxHP": 300,
+      "ko": false,
+      "exit": "run"
+    },
+    {
+      "id": "EMHA-03",
+      "check": "ordinary-two-to-five-observed",
+      "move": "iciclespear",
+      "minHits": 2,
+      "maxHits": 5,
+      "abilityIndex": 0,
+      "ability": "Shell Armor",
+      "foe": "slowbro",
+      "foeLevel": 100,
+      "foeMaxHP": 300,
+      "ko": false,
+      "exit": "run"
+    },
+    {
+      "id": "EMHA-04",
+      "check": "first-hit-ko-stops-planned-five",
+      "move": "iciclespear",
+      "minHits": 1,
+      "maxHits": 1,
+      "abilityIndex": 1,
+      "ability": "Skill Link",
+      "foe": "pidgey",
+      "foeLevel": 5,
+      "foeMaxHP": 19,
+      "ko": true,
+      "exit": "win"
+    },
+    {
+      "id": "EMHA-05",
+      "check": "skill-link-does-not-change-fixed-two",
+      "move": "doublekick",
+      "minHits": 2,
+      "maxHits": 2,
+      "abilityIndex": 1,
+      "ability": "Skill Link",
+      "foe": "slowbro",
+      "foeLevel": 100,
+      "foeMaxHP": 300,
+      "ko": false,
+      "exit": "run"
+    },
+    {
+      "id": "EMHA-06",
+      "check": "five-hits-then-abort-zero-install",
+      "move": "iciclespear",
+      "minHits": 5,
+      "maxHits": 5,
+      "abilityIndex": 1,
+      "ability": "Skill Link",
+      "foe": "slowbro",
+      "foeLevel": 100,
+      "foeMaxHP": 300,
+      "ko": false,
+      "exit": "abort"
+    }
+  ]
+}
