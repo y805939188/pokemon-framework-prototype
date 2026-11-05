@@ -80,8 +80,8 @@ export interface BattleDriver {
   act(side: string, payload: SlotSpec, slot?: number): Promise<boolean>;
   chooseSlots(side: string, specs: (SlotSpec | null)[]): Promise<boolean>;
   cancel(side: string): Promise<void>;
-  /** May this side try to run/throw a ball now, and if not, why. */
-  query(side: string, what: "run" | "ball" | string, slot?: number): { allowed: boolean; reason?: string };
+  /** Menu query. automatic-encore may return a one-based moveSlot; allowed without a slot is not an automatic choice. */
+  query(side: string, what: "run" | "ball" | string, slot?: number): { allowed: boolean; reason?: string; moveSlot?: number };
   readState(side: string): MemberState[];
   seedState(side: string, records: StateRecord[]): void;
   applyGrowth(side: string, id: string, change: GrowthApplication): GrowthOutcome;

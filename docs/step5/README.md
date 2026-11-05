@@ -107,6 +107,10 @@
 
 [范围与验收](5.4-automatic-struggle.md)：基于已限定接受 bfa，按锁定 Showdown 的特殊请求跳过招式菜单，经中英暂停提示后才提交一次真实动作。普通单招和原拒绝路径保持；不含在审成长组合或 HM，Encore、CI／原生及完整 D2 仍 OPEN。
 
+### 普通单打 Encore 自动入口（作者候选／待独立复审）
+
+[查询与提交合同](5.4-automatic-encore.md)：从已限定接受e485派生，复用只读菜单查询返回当前 Encore 可选槽，Fight 经原动作入口一次提交，不猜测唯一可用招式的原因。自然失效恢复手选，Fly／Recharge／Choice Band 不误用；本批独审、CI、原生及与成长/HM的组合尚待。
+
 作者手动换人策略后继候选：见[canSwitch正常接线](5.4-manual-switch-policy.md)。基于已独立接受af7蛋摘要，默认可手动换人，false保留摘要并禁止主动提交；真实濒死／U-turn替补保持，Showdown合法性不改。作者本地验证待独审／CI／必要宿主，学习／状态兄弟分支未组合，完整D2仍OPEN。
 
 

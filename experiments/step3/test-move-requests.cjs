@@ -89,6 +89,7 @@ test('Fly locks the next request to a PP-less move; its second turn completes', 
   assert.equal(s.currentRequest().active[0].moves[0].id, 'fly');
   assert.equal(s.currentRequest().active[0].moves[0].pp, undefined);
   assert.equal(menu(s)[0].enabled, true);
+  assert.deepEqual(s.gw.query('p1', 'automatic-encore'), { allowed: false }, 'Fly lock is not Encore');
   const response = await s.chooseMove(1);
   assert.ok(response.messages.some(m => m.kind === 'events' && m.events.some(e => e.type === 'move' && e.args[1] === 'Fly')));
   assert.equal(s.gw._debugBattle().turn, 3);
@@ -111,6 +112,7 @@ test('default AI handles a real recharge request and a doubles PP-less slot', as
   await s.chooseMove(4);
   const request = s.gw._debugBattle().getSide('p2').activeRequest;
   assert.equal(request.active[0].moves[0].id, 'recharge');
+  assert.deepEqual(s.gw.query('p2', 'automatic-encore'), { allowed: false }, 'Recharge is not Encore');
   assert.equal(BattleSession.defaultAi(request), 'move 1');
   await s.chooseMove(4); assert.equal(s.gw._debugBattle().turn, 3);
   const exhausted = F.foeMember('foe1', 'Snorlax', 40, { moves: ['tackle'] }); exhausted.moves[0].pp = 0;
@@ -147,6 +149,7 @@ test('real Choice lock stays focusable in the menu but is rejected by the engine
   const foeRequest = s.gw._debugBattle().getSide('p2').activeRequest;
   assert.equal(foeRequest.active[0].moves[1].disabled, true);
   assert.equal(BattleSession.defaultAi(foeRequest), 'move 1', 'the AI skips the locked-out move');
+  assert.deepEqual(s.gw.query('p1', 'automatic-encore'), { allowed: false }, 'Choice Band alone must not bypass the menu');
   assert.equal((await s.chooseMove(1)).ok, false, 'choosing a disabled move is still refused by the engine');
 });
 
