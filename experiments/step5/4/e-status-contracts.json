@@ -1,0 +1,624 @@
+{
+  "schema": 1,
+  "format": "gen8rpgcustomgame",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "initialHP": 430,
+  "ppSetup": {
+    "splash": 40,
+    "flamewheel": 25
+  },
+  "scope": "six hand-selected raw Gateway status-continuation groups; seed carried status after real team choices; no App/Session save/UI/NW/Ruby or complete heading claim",
+  "heading": {
+    "featureId": "FR-000545",
+    "source": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+    "heading": "4. 各状态的延续与清理",
+    "lineRanges": [
+      [
+        64,
+        83
+      ]
+    ],
+    "sha256": "e144ad75bab96647c12220d7f7e137d534277c169f6ca64d8c6bd06044268943",
+    "completeHeading": false
+  },
+  "formal74TemplateSHA256": "8d3e2119f25c9ce450c36f437ef10cc07f76465d55daf30e7385c05b9e416a99",
+  "cases": [
+    {
+      "id": "ESTAT-01",
+      "featureIds": [
+        "FR-000545"
+      ],
+      "check": "ordinary-poison",
+      "player": [
+        {
+          "name": "A",
+          "species": "Snorlax",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Thick Fat",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "splash"
+          ]
+        }
+      ],
+      "foe": [
+        {
+          "name": "B",
+          "species": "Snorlax",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Thick Fat",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "splash"
+          ]
+        }
+      ],
+      "initialStatus": "psn",
+      "initialStatusCount": 0,
+      "playerChoices": [
+        "move 1",
+        "move 1"
+      ],
+      "foeChoices": [
+        "move 1",
+        "move 1"
+      ],
+      "expected": {
+        "hpA": [
+          377,
+          324
+        ],
+        "ppA": [
+          39,
+          38
+        ],
+        "statusA": [
+          "psn",
+          "psn"
+        ],
+        "countA": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ESTAT-02",
+      "featureIds": [
+        "FR-000545"
+      ],
+      "check": "toxic-switch-reset",
+      "player": [
+        {
+          "name": "A",
+          "species": "Snorlax",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Thick Fat",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "splash"
+          ]
+        },
+        {
+          "name": "R",
+          "species": "Snorlax",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Thick Fat",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "splash"
+          ]
+        }
+      ],
+      "foe": [
+        {
+          "name": "B",
+          "species": "Snorlax",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Thick Fat",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "splash"
+          ]
+        }
+      ],
+      "initialStatus": "psn",
+      "initialStatusCount": 1,
+      "playerChoices": [
+        "move 1",
+        "move 1",
+        "switch 2",
+        "switch 1"
+      ],
+      "foeChoices": [
+        "move 1",
+        "move 1",
+        "move 1",
+        "move 1"
+      ],
+      "expected": {
+        "hpA": [
+          404,
+          351,
+          351,
+          325
+        ],
+        "ppA": [
+          39,
+          38,
+          38,
+          38
+        ],
+        "statusA": [
+          "tox",
+          "tox",
+          "tox",
+          "tox"
+        ],
+        "countA": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "active": [
+          "A",
+          "A",
+          "R",
+          "A"
+        ]
+      }
+    },
+    {
+      "id": "ESTAT-03",
+      "featureIds": [
+        "FR-000545"
+      ],
+      "check": "burn-residual",
+      "player": [
+        {
+          "name": "A",
+          "species": "Snorlax",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Thick Fat",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "splash"
+          ]
+        }
+      ],
+      "foe": [
+        {
+          "name": "B",
+          "species": "Snorlax",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Thick Fat",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "splash"
+          ]
+        }
+      ],
+      "initialStatus": "brn",
+      "initialStatusCount": 0,
+      "playerChoices": [
+        "move 1",
+        "move 1"
+      ],
+      "foeChoices": [
+        "move 1",
+        "move 1"
+      ],
+      "expected": {
+        "hpA": [
+          404,
+          378
+        ],
+        "ppA": [
+          39,
+          38
+        ],
+        "statusA": [
+          "brn",
+          "brn"
+        ],
+        "countA": [
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "id": "ESTAT-04",
+      "featureIds": [
+        "FR-000545"
+      ],
+      "check": "sleep-countdown",
+      "player": [
+        {
+          "name": "A",
+          "species": "Snorlax",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Thick Fat",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "splash"
+          ]
+        }
+      ],
+      "foe": [
+        {
+          "name": "B",
+          "species": "Snorlax",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Thick Fat",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "splash"
+          ]
+        }
+      ],
+      "initialStatus": "slp",
+      "initialStatusCount": 3,
+      "playerChoices": [
+        "move 1",
+        "move 1",
+        "move 1"
+      ],
+      "foeChoices": [
+        "move 1",
+        "move 1",
+        "move 1"
+      ],
+      "expected": {
+        "hpA": [
+          430,
+          430,
+          430
+        ],
+        "ppA": [
+          40,
+          40,
+          39
+        ],
+        "statusA": [
+          "slp",
+          "slp",
+          ""
+        ],
+        "countA": [
+          2,
+          1,
+          0
+        ],
+        "cantRounds": [
+          1,
+          2
+        ],
+        "wakeRound": 3
+      }
+    },
+    {
+      "id": "ESTAT-05",
+      "featureIds": [
+        "FR-000545"
+      ],
+      "check": "self-thaw",
+      "player": [
+        {
+          "name": "A",
+          "species": "Snorlax",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Thick Fat",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "flamewheel"
+          ]
+        }
+      ],
+      "foe": [
+        {
+          "name": "B",
+          "species": "Snorlax",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Thick Fat",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "splash"
+          ]
+        }
+      ],
+      "initialStatus": "frz",
+      "initialStatusCount": 0,
+      "playerChoices": [
+        "move 1"
+      ],
+      "foeChoices": [
+        "move 1"
+      ],
+      "expected": {
+        "hpA": [
+          430
+        ],
+        "ppA": [
+          24
+        ],
+        "statusA": [
+          ""
+        ],
+        "countA": [
+          0
+        ],
+        "cureStatus": "frz",
+        "executedMove": "Flame Wheel"
+      }
+    },
+    {
+      "id": "ESTAT-06",
+      "featureIds": [
+        "FR-000545"
+      ],
+      "check": "paralysis-order",
+      "player": [
+        {
+          "name": "A",
+          "species": "Snorlax",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Thick Fat",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "splash"
+          ]
+        }
+      ],
+      "foe": [
+        {
+          "name": "B",
+          "species": "Slowpoke",
+          "level": 100,
+          "nature": "Hardy",
+          "ability": "Own Tempo",
+          "ivs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          },
+          "moves": [
+            "splash"
+          ]
+        }
+      ],
+      "initialStatus": "par",
+      "initialStatusCount": 0,
+      "playerChoices": [
+        "move 1"
+      ],
+      "foeChoices": [
+        "move 1"
+      ],
+      "expected": {
+        "hpA": [
+          430
+        ],
+        "statusA": [
+          "par"
+        ],
+        "countA": [
+          0
+        ],
+        "firstActor": "p2a: B",
+        "baseSpeedA": 65,
+        "baseSpeedB": 35
+      }
+    }
+  ]
+}
