@@ -18,9 +18,10 @@ test.before(async()=>{
  fixture=require(path.join(temp,'fixture/entry.cjs'));
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
-async function open({lang='en',trainer=false,moves:chosenMoves}={}){
+async function open({lang='en',trainer=false,moves:chosenMoves,encore=false}={}){
  const h=createVictoryDriverHost({ROOT,work:temp,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true}}),G=h.G,flow=h.w.flow,content=fixture.musicNativeContent(E,assert),parameters=G.PluginManager.parameters;
  G.PluginManager.parameters=function(name){const p=parameters.call(this,name);return name==='PS_BattleFlow'?{...p,language:lang}:p;};
+ if(encore)Object.assign(content.trainers['music-normal'][0].party[0],{species:'snorlax',level:1,moves:['encore']}); // Explicit legal custom-game trainer fixture; slower than the level100 player.
  flow.setLanguage(null);flow.stateReplaced();flow._app=null;flow._content=content;flow._dex=E.dex.createDexLookup();flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=true;
  const state=fixture.musicNativeState(E,content);state.party[0].moves=chosenMoves??[{id:'tackle',pp:0,maxpp:35},{id:'growl',pp:40,maxpp:40}];G.$gameSystem._psGame=state;
  const before=JSON.stringify(flow.game());await h.p.toMapId(5,8,9);
@@ -131,4 +132,31 @@ test('an expired published request cannot borrow a completed no-moves notice',as
   // Explicit request revision control, not a claim that the engine changes a request during an idle notice.
   t.session.currentRequest=()=>({...request,rqid:'controlled-successor-request'});await h.p.press('ok');await h.p.inMode('main');assert.equal(step.snapshot().phase,'done');assert.equal(t.attempts.length,0);assert.equal(t.session.gw.snapshot(),engine);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(t.installs,0);t.session.currentRequest=original;
  }finally{h.cleanup();}
+});
+
+
+// Normal singles Encore uses actual engine state plus published permissions, not a one-legal-move heuristic.
+async function actualEncore(h){
+ const s=h.s._session;assert.deepEqual(s.gw.query('p1','automatic-encore'),{allowed:false});
+ await moves(h);choose(h,2);await h.p.inMode('main');
+ const legal=s.currentRequest().active[0].moves.filter(E.moveRequests.isSelectableMove);assert.deepEqual(legal.map(m=>m.id),['growl'],'real opponent Encore disabled the other published move');assert.deepEqual(s.gw.query('p1','automatic-encore'),{allowed:true,moveSlot:2});
+}
+for(const lang of ['en','zh'])test(lang+' actual Encore skips the move menu and submits its permitted non-first slot exactly once',async()=>{
+ const h=await open({lang,trainer:true,encore:true,moves:[{id:'tackle',pp:35,maxpp:35},{id:'growl',pp:40,maxpp:40}]});try{
+  const t=trackAutomatic(h);await actualEncore(h);assert.equal(t.attempts.length,1);const before=t.session.gw.snapshot();for(let i=0;i<3;i++)assert.deepEqual(t.session.gw.query('p1','automatic-encore'),{allowed:true,moveSlot:2});const hint=t.session.gw.query('p1','automatic-encore');hint.moveSlot=1;assert.equal(t.session.gw.query('p1','automatic-encore').moveSlot,2);assert.equal(t.session.gw.snapshot(),before,'readonly query consumes no request or RNG');
+  const modes=[],show=h.s.show;h.s.show=function(mode,...args){modes.push(mode);return show.call(this,mode,...args);};h.flow.fast=false;choose(h,'fight');assert.notEqual(h.s._mode,'moves','valid singles Encore has no manual move selection');assert.equal(h.s.inputState().ready,false);h.s.onMenuOk();h.s.onMenuCancel();await h.waitFor(()=>t.attempts.length===2&&!h.s._busy,'one actual Encore action');await h.p.inMode('main');assert.deepEqual(t.attempts.map(a=>a.slot),[2,2]);assert.equal(t.attempts[1].result.ok,true);assert.equal(modes.includes('moves'),false);assert.equal(t.session.gw.readState('p1')[0].pp.growl,38);assert.equal(t.session.gw.readState('p1')[0].pp.tackle,35);assert(!t.session.gw.readState('p2')[0].fainted);const after=t.session.gw.snapshot();await h.frames(400);assert.equal(t.attempts.length,2);assert.equal(t.session.gw.snapshot(),after);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(t.installs,0);
+ }finally{h.cleanup();}
+});
+test('natural Encore expiry restores manual choice before a normal KO and a single final commit',async()=>{
+ const h=await open({trainer:true,encore:true,moves:[{id:'tackle',pp:35,maxpp:35},{id:'growl',pp:40,maxpp:40}]});try{
+  const t=trackAutomatic(h);await actualEncore(h);for(let i=0;i<3;i++){assert.equal(t.session.gw.query('p1','automatic-encore').moveSlot,2);choose(h,'fight');assert.notEqual(h.s._mode,'moves');await h.waitFor(()=>t.attempts.length===i+2&&!h.s._busy,'next explicit Encore Fight');await h.p.inMode('main');}
+  assert.deepEqual(t.attempts.map(a=>a.slot),[2,2,2,2]);assert.equal(t.session.gw.readState('p1')[0].pp.growl,36);assert.deepEqual(t.session.gw.query('p1','automatic-encore'),{allowed:false},'actual engine Encore condition naturally expired');assert.equal(t.installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await moves(h);assert.equal(h.s._menu._items.length,2);choose(h,1);await h.p.inMode('end');assert.equal(t.installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(t.installs,1);assert.equal(h.flow.game().party[0].moves[0].pp,34);assert.equal(h.flow.game().party[0].moves[1].pp,36);h.s.onEnd();assert.equal(t.installs,1);
+ }finally{h.cleanup();}
+});
+test('a query adapter returning allowed without a slot retains manual choice instead of guessing Encore',async()=>{
+ const h=await open({trainer:true,encore:true,moves:[{id:'tackle',pp:35,maxpp:35},{id:'growl',pp:40,maxpp:40}]});try{const t=trackAutomatic(h);await actualEncore(h);const gw=t.session.gw,query=gw.query;gw.query=function(side,what,...args){return what==='automatic-encore'?{allowed:true}:query.call(this,side,what,...args);};const before=gw.snapshot();await moves(h);assert.equal(t.attempts.length,1);h.s.onMenuCancel();assert.equal(h.s._mode,'main');assert.equal(gw.snapshot(),before);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(t.installs,0);gw.query=query;}finally{h.cleanup();}
+});
+test('retiring the Encore action owner before its microtask cannot submit into a later operation',async()=>{
+ const h=await open({trainer:true,encore:true,moves:[{id:'tackle',pp:35,maxpp:35},{id:'growl',pp:40,maxpp:40}]});try{const t=trackAutomatic(h);await actualEncore(h);const before=t.session.gw.snapshot(),act=h.s.act;let scheduled=0;h.s.act=function(...args){const result=act.apply(this,args);scheduled++;assert.equal(this._busy,true);h.flow.stateReplaced();return result;};choose(h,'fight');await h.frames(4);h.s.onMenuOk();h.s.onMenuCancel();await h.frames(2);assert.equal(scheduled,1);assert.equal(t.attempts.length,1);assert.equal(t.session.gw.snapshot(),before);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(t.installs,0);}finally{h.cleanup();}
 });

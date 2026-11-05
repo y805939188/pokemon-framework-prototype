@@ -1651,6 +1651,13 @@ const { developmentCapabilities } = RuleConfig;
           () => s.finished, () => PSFlow.fast)));
       return;
     }
+    const encore = this._session.gw?.query?.('p1', 'automatic-encore');
+    if (encore?.allowed && Number.isSafeInteger(encore.moveSlot) && encore.moveSlot > 0 && encore.moveSlot <= moves.length
+      && engine().B.moveRequests.isSelectableMove(moves[encore.moveSlot - 1])) {
+      // In singles the pinned request already identifies the target; use the ordinary action owner.
+      this.act(() => this._session.chooseMove(encore.moveSlot), 'move');
+      return;
+    }
     this.show("moves", moves.map((m: any, i: number) => ({
       name: m.pp === undefined ? m.move : PSFlow.translator().t("ui.moves.line", { move: m.move, pp: m.pp, maxpp: m.maxpp }),
       moveView: (() => {
