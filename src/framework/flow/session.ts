@@ -184,6 +184,8 @@ export class BattleSession {
   held: GatewayMessage[] = [];
   growthQueue: GrowthTask[] = [];
   pendingLearn: { memberId: string; move: { id: string; name: string; pp: number } } | null = null;
+  private _waitForLearnedMessages = false;
+  private _pendingLearned: { memberId: string; move: { id: string; name: string; pp: number } } | null = null;
   participants: Record<string, Set<string>> = {};
   activeNow: Record<string, (string | null)[]> = { p1: [], p2: [] };
   doubles = false;
@@ -286,6 +288,29 @@ export class BattleSession {
   /** One mutation owns the engine and ledger until its promise settles. Readers still see plain snapshots. */
   get broken(): SessionBrokenError | null { return this._broken; }
 
+  /** A real Scene waits for the ordinary learned message before updating the engine move table.
+   * Direct/headless consumers retain their synchronous growth contract unless they bind this presentation.
+   */
+  bindLearningPresentation(): void {
+    this._assertUsable();
+    if (this._operation || this.finished || this.pendingLearn || this._pendingLearned || this.growthQueue.length) throw new Error('learning presentation must bind before growth');
+    this._waitForLearnedMessages = true;
+  }
+  get pendingLearnedMessage(): boolean { return this._pendingLearned !== null; }
+
+  /** Called by the owned Scene only after the complete ordinary-message queue has returned. */
+  async completeLearnedMessage(): Promise<TurnResult> {
+    return this._exclusive(async () => {
+      const pending = this._pendingLearned;
+      if (!pending) throw new Error('no learned message pending');
+      const member = this.party.find(m => m.id === pending.memberId)!;
+      this.gw.applyGrowth('p1', member.id, { level: member.level, evs: member.evs, newMoves: [pending.move.name], replaceSlot: null });
+      this._pendingLearned = null;
+      await this._continueGrowth();
+      return { ok: true, messages: this.take() };
+    });
+  }
+
   _assertUsable(): void { if (this._broken) throw this._broken; }
 
   async _exclusive<T>(action: () => Promise<T>): Promise<T> {
@@ -315,7 +340,7 @@ export class BattleSession {
   /** Protocol-v1 action refusal; no new reason or request-id semantics are introduced. */
   async _action(action: () => Promise<TurnResult>, replace = true): Promise<TurnResult> {
     this._assertUsable();
-    if (this._operation || this.finished || this.pendingLearn || hasReplacementOffer(this)) return this._refuse("choice-rejected");
+    if (this._operation || this.finished || this.pendingLearn || this._pendingLearned || hasReplacementOffer(this)) return this._refuse("choice-rejected");
     return this._exclusive(async () => {
       if (replace && this._staged) {
         await this.gw.cancel("p1");
@@ -339,7 +364,7 @@ export class BattleSession {
       engine,
       state: S.clone({
         party: this.party, bag: this.bag, ledger: this.ledger, out: this.out, held: this.held,
-        growthQueue: this.growthQueue, pendingLearn: this.pendingLearn, activeNow: this.activeNow,
+        growthQueue: this.growthQueue, pendingLearn: this.pendingLearn, _pendingLearned: this._pendingLearned, activeNow: this.activeNow,
         participants: Object.entries(this.participants).map(([id, members]) => [id, [...members]] as const),
         ended: this.ended, finished: this.finished, requests: this.requests, grew: this.grew,
         _caughtAwarded: this._caughtAwarded, _result: this._result, _staged: this._staged,
@@ -774,7 +799,7 @@ export class BattleSession {
 
   async _continueGrowth(): Promise<void> {
     for (;;) {
-      if (this.pendingLearn) return; // blocked on a UI decision
+      if (this.pendingLearn || this._pendingLearned) return; // blocked on a decision or the empty-slot learned message
       // a caught battle awards exp for the caught target before the result is built (WP38 step 3)
       if (this.ended && this.ended.reason === "caught" && !this._caughtAwarded) {
         this._caughtAwarded = true;
@@ -786,7 +811,7 @@ export class BattleSession {
         if (task.kind === "growth") { this._applyGrowthStage(task); continue; }
         const m = this.party.find((x) => x.id === task.memberId)!;
         if (m.moves.some((x) => x.id === task.move.id)) continue;
-        if (m.moves.length < 4) { this._learn(task.memberId, task.move, null); continue; }
+        if (m.moves.length < 4) { this._learn(task.memberId, task.move, null); if (this._pendingLearned) return; continue; }
         this.pendingLearn = { memberId: task.memberId, move: task.move };
         this.out.push({ kind: "learn-prompt", member: task.memberId, move: task.move, slots: m.moves.map((x) => x.id) });
         return;
@@ -887,7 +912,9 @@ export class BattleSession {
     const m = this.party.find((x) => x.id === memberId)!;
     const rec = { id: move.id, pp: move.pp, maxpp: move.pp };
     if (replaceSlot === null || replaceSlot === undefined) m.moves.push(rec); else m.moves[replaceSlot] = rec;
-    this.gw.applyGrowth("p1", memberId, { level: m.level, evs: m.evs, newMoves: [move.name], replaceSlot });
+    if (this._waitForLearnedMessages && (replaceSlot === null || replaceSlot === undefined)) {
+      this._pendingLearned = { memberId, move: { ...move } };
+    } else this.gw.applyGrowth("p1", memberId, { level: m.level, evs: m.evs, newMoves: [move.name], replaceSlot });
     this.grew = true;
     this.out.push({ kind: "learned", member: memberId, move: move.id, replaced: replaceSlot ?? null });
   }

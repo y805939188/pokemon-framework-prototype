@@ -1281,6 +1281,7 @@ const { developmentCapabilities } = RuleConfig;
     if (!PSFlow.running) { c.tick(false, 0); return; }
     if (this._failure) { this.abort(this._failure); return; }
     const s = this._session;
+    s.bindLearningPresentation?.();
     PSFlow._startBattleMusic(this._psOp); if (!c.isCurrent() || !PSFlow.running) return;
     for (const m of [...s.party, ...s.foeTeam]) { if (!c.isCurrent()) return; this._names[m.id] = PSFlow.speciesName(m.species); }
     if (!c.isCurrent()) return;
@@ -1560,6 +1561,12 @@ const { developmentCapabilities } = RuleConfig;
     const s = this._session, retryMoves = this._retryMoveMenu, retryParty = this._retryPartySelection, automaticMove = this._automaticMove;
     this._retryMoveMenu = false; this._retryPartySelection = null; this._automaticMove = null;
     if (this._failure) { this.showEnd(true); return; }
+    if (s.pendingLearnedMessage) {
+      // The ordinary learned message has fully returned. Resume through the same action owner,
+      // before later growth, foe replacement or the end menu can become interactive.
+      if (sceneController(this).show('learning-sync')) this.act(() => s.completeLearnedMessage(), 'learning');
+      return;
+    }
     if (s.finished) { this.showEnd(false); return; }
     if (s.pendingLearn && this._learningGiveUp?.pending === s.pendingLearn) {
       const tr = PSFlow.translator();
