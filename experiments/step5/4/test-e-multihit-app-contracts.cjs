@@ -26,12 +26,16 @@ async function open(c){
 function observation(s){return{p1:clone(s.gw.readState('p1')[0]),p2:clone(s.gw.readState('p2')[0])};}
 function unchanged(w){assert.deepEqual(w.state.read(),w.initial);assert.equal(w.state.replaced.length,0);}
 function verify(c,o){
- const b=o.before,a=o.after,events=ev(o.messages),hits=events.filter(e=>e.type==='-damage'&&e.args[0].startsWith('p2a:'));
- assert.equal(events.filter(e=>e.type==='move'&&e.args[0].startsWith('p1a:')).length,1,'one move use, not one use per hit');
+ const b=o.before,a=o.after,events=ev(o.messages);
+ const identifies=(text,side,id)=>text===side+'a: '+id||text===side+': '+id;
+ const target=e=>identifies(e.args[0],'p2',b.p2.id),actor=e=>identifies(e.args[0],'p1',b.p1.id);
+ const hits=events.filter(e=>e.type==='-damage'&&target(e));
+ assert.equal(events.filter(e=>e.type==='move'&&actor(e)).length,1,'one move use, not one use per hit');
  assert.equal(a.p1.pp[c.move],b.p1.pp[c.move]-1,'one actual PP consumed for the entire use');
  for(const [id,pp]of Object.entries(b.p1.pp))if(id!==c.move)assert.equal(a.p1.pp[id],pp);
  assert.equal(a.p1.hp,b.p1.hp);assert(hits.length>=c.minHits&&hits.length<=c.maxHits,'actual completed hit count');
- const count=events.filter(e=>e.type==='-hitcount'&&e.args[0].startsWith('p2a:'));
+ const allCounts=events.filter(e=>e.type==='-hitcount'),count=allCounts.filter(target);
+ assert.equal(count.length,allCounts.length,'all summaries in this single-target use must bind the actual member, not another id');
  if(c.ko){assert.equal(o.finished,true);assert.equal(o.endReason,'win');assert(count.length<=1,'terminal metadata must not duplicate counts');}
  else assert.equal(count.length,1,'a surviving-target multihit use retains its summary');
  if(count.length)assert.equal(Number(count[0].args[1]),hits.length,'reported count equals actual target HP submissions');
@@ -39,7 +43,7 @@ function verify(c,o){
  for(const hit of hits){const m=/^(\d+)(?:\/(\d+))?(?:\s|$)/.exec(hit.args[1]);assert(m,'actual HP wire required');const next=Number(m[1]);if(m[2])assert.equal(Number(m[2]),b.p2.maxhp);assert(next<hp&&next>=0);hp=next;}
  assert.equal(a.p2.hp,hp);assert.equal(a.p2.hp===0,c.ko,'a KO stops remaining planned strikes');
  assert.equal(a.p2.pp.splash,b.p2.pp.splash-(c.ko?0:1),'the living foe acts once; a first-hit KO prevents its move');
- assert.equal(events.filter(e=>e.type==='faint'&&e.args[0].startsWith('p2a:')).length,c.ko?1:0);
+ assert.equal(events.filter(e=>e.type==='faint'&&target(e)).length,c.ko?1:0);
 }
 for(const c of plan.cases)test(c.id+' '+c.check,async()=>{
  const w=await open(c);try{
@@ -47,9 +51,19 @@ for(const c of plan.cases)test(c.id+' '+c.check,async()=>{
   const row={before:w.before,after:observation(w.s),messages:clone(r.messages),finished:w.s.finished,endReason:w.s.finished?w.s.ended.reason:null};
   try{verify(c,row);}catch(error){console.log('E_MULTIHIT_APP_FAILED_OBSERVATION '+JSON.stringify({id:c.id,initial:w.initial,...row}));throw error;}unchanged(w);
   const wrong=clone(row);wrong.after.p1.pp[c.move]=wrong.before.p1.pp[c.move];assert.throws(()=>verify(c,wrong),assert.AssertionError,'same oracle rejects a missed PP charge');
+  const protocolChecks=[],summary=o=>ev(o.messages).find(e=>e.type==='-hitcount');
+  const normalize=e=>{e.raw='|'+e.type+'|'+e.args.join('|');};
+  const probe=(label,change,accept=false)=>{const copy=clone(row);change(copy);if(accept)assert.doesNotThrow(()=>verify(c,copy),label);else assert.throws(()=>verify(c,copy),assert.AssertionError,label);protocolChecks.push({label,accepted:accept});};
+  probe('wrong-count-999',copy=>{const e=summary(copy);e.args[1]='999';normalize(e);});
+  probe('duplicate-summary',copy=>{const e=clone(summary(copy));copy.messages.find(m=>m.kind==='events').events.push(e);});
+  probe('mixed-legal-alias-duplicate',copy=>{const e=clone(summary(copy));e.args[0]=e.args[0]==='p2: '+copy.before.p2.id?'p2a: '+copy.before.p2.id:'p2: '+copy.before.p2.id;normalize(e);copy.messages.find(m=>m.kind==='events').events.push(e);});
+  probe('foreign-member-summary',copy=>{const e=summary(copy);e.args[0]='p2: OTHER';normalize(e);});
+  probe('missing-summary',copy=>{for(const m of copy.messages)if(m.kind==='events')m.events=m.events.filter(e=>e.type!=='-hitcount');},c.ko);
+  for(const prefix of ['p2: ','p2a: '])probe('valid-target-'+prefix.trim(),copy=>{const e=summary(copy);e.args[0]=prefix+copy.before.p2.id;normalize(e);},true);
+
   if(c.exit==='abort'){
    w.app.abortBattle(w.request,Error('owned normal lifecycle abort'));unchanged(w);const outcome=w.app.finishBattle(w.s,w.request);assert.equal(outcome.commit,'none');assert.equal(outcome.aborted,true);unchanged(w);
-   console.log('E_MULTIHIT_APP_OBSERVATION '+JSON.stringify({id:c.id,featureIds:plan.featureIds,initial:w.initial,...row,outcome,saved:clone(w.state.read()),installs:0,syntheticWrongReadout:'rejected',completeHeading:false,NW:0}));return;
+   console.log('E_MULTIHIT_APP_OBSERVATION '+JSON.stringify({id:c.id,featureIds:plan.featureIds,initial:w.initial,...row,outcome,saved:clone(w.state.read()),installs:0,protocolChecks,syntheticWrongReadout:'rejected',completeHeading:false,NW:0}));return;
   }
   let ending=[];
   if(!c.ko){const finish=await w.s.run();assert(finish.ok,JSON.stringify(finish));ending=clone(finish.messages);}
@@ -61,6 +75,6 @@ for(const c of plan.cases)test(c.id+' '+c.check,async()=>{
   assert.deepEqual(installed.moves.map(({id,pp,maxpp})=>({id,pp,maxpp})),patch.moves);assert.equal(saved.appliedBattles[c.id].hash,E.state.resultHash(result));assert.deepEqual(Object.keys(saved.appliedBattles),[c.id]);
   assert.deepEqual(saved.inventory,w.initial.inventory);assert.equal(saved.money,w.initial.money);
   w.app.finishBattle(w.s,w.request);assert.equal(w.state.replaced.length,1);assert.deepEqual(w.state.read(),saved);
-  console.log('E_MULTIHIT_APP_OBSERVATION '+JSON.stringify({id:c.id,featureIds:plan.featureIds,initial:w.initial,...row,ending,result,outcome,saved,installs:1,syntheticWrongReadout:'rejected',completeHeading:false,NW:0}));
+  console.log('E_MULTIHIT_APP_OBSERVATION '+JSON.stringify({id:c.id,featureIds:plan.featureIds,initial:w.initial,...row,ending,result,outcome,saved,installs:1,protocolChecks,syntheticWrongReadout:'rejected',completeHeading:false,NW:0}));
  }finally{w.cleanup();}
 });
