@@ -29,6 +29,8 @@ export function readBattleLearnProtection(session: {
 /** Applied results only. Reading this projection grants no battle or persistence operation. */
 export interface GrowthDisplay {
   version: 1; fromExp: number; toExp: number; fromLevel: number; toLevel: number; hp: number; maxhp: number; ratio: number;
+  /** Total award is announced once even when a learning decision divides its applied intervals. */
+  experienceGained?: number;
   segments: { level: number; from: number; to: number; levelUp?: { level: number; hp: number; maxhp: number; stats?: { before: Stats; after: Stats } } }[];
 }
 type Published = { wire: string; display: GrowthDisplay };

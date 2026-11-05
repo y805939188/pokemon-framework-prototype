@@ -18,7 +18,7 @@ import * as G from "../rules/growth";
 import { HEAL_ITEMS, REVIVE_ITEMS, STAT_ITEMS, STATUS_ITEMS, PP_ITEMS, ESCAPE_ITEMS, itemEligibility } from "../rules/rules";
 import * as S from "../rules/state";
 import type { BattleResult, GameState } from "../rules/state";
-import type { Content, Member } from "../rules/types";
+import type { Content, Member, Stats } from "../rules/types";
 import type { ObedienceContext } from "../rules/obedience";
 import type { BattleEvent, SessionMessage } from "../battle/protocol";
 import type { LogLevel, LogSink } from "./log";
@@ -146,6 +146,7 @@ interface LedgerEntry {
 
 type GrowthTask =
   | { kind: "award"; foeId: string }
+  | { kind: "growth"; memberId: string; exp: number; evs: Member["evs"]; level: number; hp: number; stats: Stats; levelUps: number[]; changed: boolean; message: Extract<SessionMessage, { kind: "growth" }>; display: GrowthDisplay }
   | { kind: "learn"; memberId: string; move: { id: string; name: string; pp: number } };
 
 /**
@@ -782,6 +783,7 @@ export class BattleSession {
       while (this.growthQueue.length) {
         const task = this.growthQueue.shift()!;
         if (task.kind === "award") { this._award(task.foeId); continue; }
+        if (task.kind === "growth") { this._applyGrowthStage(task); continue; }
         const m = this.party.find((x) => x.id === task.memberId)!;
         if (m.moves.some((x) => x.id === task.move.id)) continue;
         if (m.moves.length < 4) { this._learn(task.memberId, task.move, null); continue; }
@@ -816,26 +818,13 @@ export class BattleSession {
     const parts = [...(this.participants[foeId] || [])];
     const alive = new Set(this.gw.readState("p1").filter((x) => !x.fainted).map((x) => x.id));
     const receivers = this.party.filter((m) => parts.includes(m.id) && alive.has(m.id));
-    const learns: GrowthTask[] = [];
+    const stages: GrowthTask[] = [];
     for (const m of receivers) {
       const evs = G.gainEvs(m.evs ?? {}, foeC.evYield);
       const withEv: Member = { ...m, evs };
       const amount = G.battleExp({ foe: { level: foe.level, baseExp: foeC.baseExp }, receiver: withEv, participants: receivers.length, rules: this.rules, trainer: this.foe.kind === "trainer" });
       const res = G.applyExp(withEv, amount, this.content, m);
-      const idx = this.party.indexOf(m);
-      this.party[idx] = res.member;
-      if (this.gw.readState("p1").some(p => p.id === m.id && p.active && !p.fainted)) {
-        for (const _level of res.log.levels) this._changeBattleFriendship(m.id, "levelup");
-      }
       const changed = amount > 0 || JSON.stringify(evs) !== JSON.stringify(m.evs);
-      if (changed) {
-        const eng = this.gw.applyGrowth("p1", m.id, { level: res.member.level, evs, expect: { stats: res.after.stats } });
-        if (eng.after.hp !== res.member.hp && m.hp > 0) {
-          this._log("error", "failure", { what: "hp-rule-mismatch", member: m.id, engine: eng.after.hp, game: res.member.hp });
-          throw new Error(`HP rule mismatch for ${m.id}: engine ${eng.after.hp} vs game ${res.member.hp}`);
-        }
-        this.grew = true;
-      }
       this._log("info", "growth", { member: m.id, foe: foeId, exp: amount, level: res.member.level, levelUps: res.log.levels.length });
       // Publish the already computed interval, so the view never reconstructs growth from mutable live state.
       const segments: GrowthDisplay['segments'] = [];
@@ -848,14 +837,49 @@ export class BattleSession {
           ...(levelUp ? { levelUp: { level: levelUp.level, hp: levelUp.hp, maxhp: levelUp.maxhp, stats: { before: { ...(res.log.levels.find(item => item.level === level)?.stats ?? res.before.stats) }, after: { ...levelUp.stats } } } } : {}) });
       }
       const finalFloor = G.minExp(curve, res.after.level), finalCeiling = G.minExp(curve, res.after.level + 1);
-      const message: Extract<SessionMessage, { kind: 'growth' }> = { kind: "growth", member: m.id, foe: foeId, exp: amount, level: res.member.level, levelUps: res.log.levels.map((l) => l.level), hp: res.member.hp };
-      _publishGrowthDisplay(this, message, { version: 1, fromExp: res.before.exp, toExp: res.after.exp, fromLevel: res.before.level, toLevel: res.after.level, hp: res.after.hp, maxhp: res.after.stats.hp,
-        ratio: finalCeiling > finalFloor ? (res.after.exp - finalFloor) / (finalCeiling - finalFloor) : 1, segments });
-      this.out.push(message);
-      for (const pm of res.log.pendingMoves) learns.push({ kind: "learn", memberId: m.id, move: this.gw.moveInfo(pm.move) });
+      // Pause application as well as presentation at each level that may learn a move.
+      // Tasks are plain data in the existing rollback queue; future stages preserve any learned slots/PP.
+      const cuts = [...new Set(res.log.pendingMoves.map(pm => pm.level).filter(level => level < res.after.level)), res.after.level].sort((a, b) => a - b);
+      let segmentIndex = 0, fromLevel = res.before.level;
+      for (let index = 0; index < cuts.length; index++) {
+        const level = cuts[index]!, last = index === cuts.length - 1;
+        const stop = last ? segments.length : segments.findIndex(segment => segment.levelUp?.level === level) + 1;
+        const up = res.log.levels.find(item => item.level === level);
+        const hp = last ? res.after.hp : up!.hp, stats = last ? res.after.stats : up!.stats;
+        const levelUps = res.log.levels.filter(item => item.level > fromLevel && item.level <= level).map(item => item.level);
+        const message: Extract<SessionMessage, { kind: 'growth' }> = { kind: "growth", member: m.id, foe: foeId, exp: index === 0 ? amount : 0, level, levelUps, hp };
+        const display: GrowthDisplay = { version: 1,
+          fromExp: index === 0 ? res.before.exp : Math.max(res.before.exp, G.minExp(curve, fromLevel)),
+          toExp: last ? res.after.exp : Math.max(res.before.exp, G.minExp(curve, level)),
+          fromLevel, toLevel: level, hp, maxhp: stats.hp,
+          ratio: last ? (finalCeiling > finalFloor ? (res.after.exp - finalFloor) / (finalCeiling - finalFloor) : 1) : 0,
+          segments: segments.slice(segmentIndex, stop),
+          ...(cuts.length > 1 ? { experienceGained: index === 0 ? res.after.exp - res.before.exp : 0 } : {}) };
+        stages.push({ kind: "growth", memberId: m.id, exp: res.after.exp, evs, level, hp, stats, levelUps, changed, message, display });
+        for (const pm of res.log.pendingMoves.filter(pm => pm.level > fromLevel && pm.level <= level)) stages.push({ kind: "learn", memberId: m.id, move: this.gw.moveInfo(pm.move) });
+        segmentIndex = stop; fromLevel = level;
+      }
     }
-    this.growthQueue.unshift(...learns);
+    this.growthQueue.unshift(...stages);
     this.participants[foeId] = new Set(); // paid once per foe
+  }
+
+  _applyGrowthStage(task: Extract<GrowthTask, { kind: "growth" }>): void {
+    const index = this.party.findIndex(member => member.id === task.memberId), prior = this.party[index]!;
+    this.party[index] = { ...prior, exp: task.exp, evs: { ...task.evs }, level: task.level, hp: task.hp };
+    if (task.changed) {
+      const applied = this.gw.applyGrowth("p1", task.memberId, { level: task.level, evs: task.evs, expect: { stats: task.stats } });
+      if (applied.after.hp !== task.hp && prior.hp > 0) {
+        this._log("error", "failure", { what: "hp-rule-mismatch", member: task.memberId, engine: applied.after.hp, game: task.hp });
+        throw new Error(`HP rule mismatch for ${task.memberId}: engine ${applied.after.hp} vs game ${task.hp}`);
+      }
+      this.grew = true;
+    }
+    if (this.gw.readState("p1").some(member => member.id === task.memberId && member.active && !member.fainted)) {
+      for (const _level of task.levelUps) this._changeBattleFriendship(task.memberId, "levelup");
+    }
+    _publishGrowthDisplay(this, task.message, task.display);
+    this.out.push(task.message);
   }
 
   _learn(memberId: string, move: { id: string; name: string; pp: number }, replaceSlot: number | null | undefined): void {
