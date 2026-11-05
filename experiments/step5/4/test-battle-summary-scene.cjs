@@ -796,3 +796,84 @@ for(const lang of ['en','zh'])test('CEXP Scene '+lang+' disabled capture growth 
 test('CEXP Scene true keeps ordinary capture growth and does not duplicate its victory cue',async()=>{
  const h=await open({bag:{masterball:1},hurt:false,grow:true,fast:true,captureSetting:true});try{const s=h.s._session,before=s.party[0].exp;h.s.act(()=>s.throwBall('masterball'),'item');await h.waitFor(()=>h.s.levelStatsState?.()||h.s._mode==='end','capture growth display');if(h.s.levelStatsState()){await h.p.press('ok');await h.p.press('ok');}await h.p.inMode('end');assert.equal(s.captureExpGain,true);assert(s.party[0].exp>before);assert.equal(s.party[0].level,51);assert.equal(h.flow.musicState().player.requests.filter(x=>x.kind==='victory').length,0,'new terminal fallback is only for the disabled global rule');assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
 });
+
+// WP66-A 6.1 + WP20 5.5: reorder individual records, retain independent battle wrappers.
+async function movesDetail(h, id) {
+  await summary(h, id);
+  for (let i = 0; i < 3; i++) await h.p.press('right');
+  await h.p.press('ok'); assert.equal(current(h).view.detail, 'moves');
+}
+async function leaveMoves(h) {
+  await h.p.press('cancel'); await h.p.press('cancel'); await h.p.inMode('party');
+  h.s.onMenuCancel(); await h.p.inMode('main');
+}
+for (const lang of ['en', 'zh']) test(lang + ' summary move sorting swaps complete working records and preserves actual PP and single final write', async () => {
+  const original = [{ id: 'tackle', pp: 32, maxpp: 56, ppUps: 3 }, { id: 'splash', pp: 7, maxpp: 40, ppUps: 0 }];
+  const h = await open({ lang, leadMoves: original, trainer: true, trainerMembers: 2, fast: true }); try {
+    const s = h.s._session, id = s.party[0].id, engine = s.gw.snapshot();
+    let installs = 0, doc = h.G.$gameSystem._psGame;
+    Object.defineProperty(h.G.$gameSystem, '_psGame', { configurable: true, get: () => doc, set: value => { installs++; doc = value; } });
+    await movesDetail(h, id); await h.p.press('ok');
+    assert.equal(current(h).view.selected, 0, 'normal USE must select the source move');
+    assert.deepEqual(s.party[0].moves, original, 'source selection alone does not write');
+    await h.p.press('down'); await h.p.press('ok');
+    assert.deepEqual(s.party[0].moves, [original[1], original[0]], 'entire records, including PP Ups, follow the move');
+    assert.equal(current(h).view.selected, null); assert.equal(s.gw.snapshot(), engine, 'summary sorting does not rewrite temporary battle wrappers');
+    const rows = text(h).filter(line => line.includes(' PP'));
+    assert(rows[0].includes('7/40 PP') && rows[1].includes('32/56 PP'), 'shared view redraws the accepted order and PP');
+    assert.equal(JSON.stringify(h.flow.game()), h.before); assert.equal(installs, 0);
+    await leaveMoves(h); await pick(h, 'fight');
+    assert.equal(h.s._menu._items[0].ext, 1, 'current battle wrapper choice keeps its own slot identity');
+    await pick(h, 1); await h.p.inMode('main');
+    assert.equal(s.party[0].moves[1].id, 'tackle'); assert.equal(s.party[0].moves[1].pp, 31, 'actual Gen8 use synchronizes by move identity after sorting');
+    await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('end');
+    assert.equal(installs, 0); assert.equal(JSON.stringify(h.flow.game()), h.before);
+    await h.frames(1); h.s.onMenuOk(); await h.frames(3);
+    assert.equal(h.flow.lastOutcome.commit, 'applied'); assert.equal(installs, 1);
+    assert.deepEqual(h.flow.game().party[0].moves.map(m => [m.id, m.pp, m.maxpp, m.ppUps]), [['splash',7,40,0],['tackle',30,56,3]]);
+    const committed = JSON.stringify(h.flow.game()); h.s.onEnd(); assert.equal(installs, 1); assert.equal(JSON.stringify(h.flow.game()), committed);
+    assert.deepEqual(h.managementCalls(), { beginManagement: 0, manage: 0 });
+  } finally { h.cleanup(); }
+});
+test('summary move sorting cancels source selection and retired owners cannot submit it', async () => {
+  const h = await open({ leadMoves: [{id:'tackle',pp:35,maxpp:35},{id:'splash',pp:40,maxpp:40}] }); try {
+    const s = h.s._session, before = JSON.stringify(s.party);
+    await movesDetail(h, s.party[0].id); await h.p.press('ok'); assert.equal(current(h).view.selected, 0);
+    await h.p.press('cancel'); assert.equal(current(h).view.selected, null); assert.equal(current(h).view.detail, 'moves');
+    await h.p.press('ok'); await h.p.press('down'); h.flow.stateReplaced(); await h.frames(2); await h.p.press('ok');
+    assert.equal(current(h), null); assert.equal(JSON.stringify(s.party), before); assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { h.cleanup(); }
+});
+test('summary move sorting validates own member, order, slots, shadow and busy state and restores its checkpoint', async () => {
+  const h = await open({ leadMoves: [{id:'tackle',pp:35,maxpp:35},{id:'splash',pp:40,maxpp:40}] }); try {
+    const s = h.s._session, id = s.party[0].id, reorder = E.session.reorderBattleSummaryMoves;
+    assert.equal(typeof reorder, 'function'); const order = ['tackle','splash'], before = JSON.stringify(s._checkpoint());
+    for (const args of [[s.foeTeam[0].id,0,1,order],[id,-1,1,order],[id,0,2,order],[id,0,0.5,order],[id,0,1,['splash','tackle']]]) {
+      assert.equal(await reorder(s,...args), false); assert.equal(JSON.stringify(s._checkpoint()), before);
+    }
+    s.party[0].shadow = true; assert.equal(await reorder(s,id,0,1,order),false); delete s.party[0].shadow;
+    await s._exclusive(async () => { assert.equal(await reorder(s,id,0,1,order),false); });
+    const cp = s._checkpoint(); assert.equal(await reorder(s,id,0,1,order),true);
+    assert.deepEqual(s.party[0].moves.map(m=>m.id), ['splash','tackle']);
+    await s._restoreCheckpoint(cp); assert.deepEqual(s.party[0].moves.map(m=>m.id),order);
+    assert.equal(JSON.stringify(h.flow.game()),h.before);
+  } finally { h.cleanup(); }
+});
+test('summary move sorting then real full-slot learning replaces the intended permanent identity, not the old slot', async () => {
+  const h = await open({ grow:true,integration:true,trainer:true,trainerMembers:2,fast:true }); try {
+    const s = h.s._session,id=s.party[0].id;
+    await movesDetail(h,id); await h.p.press('ok'); await h.p.press('down'); await h.p.press('ok');
+    assert.deepEqual(s.party[0].moves.map(m=>m.id),['growl','tackle','splash','protect']); await leaveMoves(h);
+    await pick(h,'fight'); await pick(h,1); await h.p.inMode('learn-initial'); await h.frames(1); await pick(h,'forget-move');
+    assert.equal(h.s._mode,'learn'); await pick(h,0); await h.p.inMode('main');
+    assert.deepEqual(s.party[0].moves.map(m=>m.id),['rest','tackle','splash','protect']);
+    const pp=s.gw.readState('p1').find(m=>m.id===id).pp;
+    assert.equal(pp.growl,undefined,'the selected working move is the one removed from the engine');
+    assert.equal(pp.tackle,34,'the unselected used move retains its own spent PP'); assert.equal(pp.rest,10);
+    await pick(h,'fight'); await pick(h,1); await h.p.inMode('end');
+    assert.equal(s.party[0].moves[1].pp,33); assert.equal(JSON.stringify(h.flow.game()),h.before);
+    await h.frames(1); h.s.onMenuOk(); await h.frames(3); assert.equal(h.flow.lastOutcome.commit,'applied');
+    assert.deepEqual(h.flow.game().party[0].moves.map(m=>m.id),['rest','tackle','splash','protect']);
+    assert.equal(h.flow.game().party[0].moves[1].pp,33);
+  } finally {h.cleanup();}
+});
