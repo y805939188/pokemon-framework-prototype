@@ -277,7 +277,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    if(action!=='use'||m.isEgg)return;
    if(!v.detail){if(v.page===3){v.detail='moves';v.detailCursor=0;}else if(v.page===4){v.detail='ribbons';v.detailCursor=0;}else if(!this.readonly){const items:MenuItem[]=[];if(W.PSPokedex&&this.application.pokedexSnapshot().dex.hasDex)items.push({key:'pokedex',label:flow().translator().t('pokedex.title'),run:()=>{this.back();if(this.valid()){const token=this.managementToken,window=this.window,child=W.PSPokedex.attach(window,{token,memberId:m.id,application:this.application,generation:this.generation,isCurrent:()=>this.dexParentCurrent(token,window),releaseAbandoned:()=>this.releaseAbandonedDexParent()});if(this.dexParentCurrent(token,window))this.dexChild=child;else{child?.dispose();this.releaseAbandonedDexParent();}}}});items.push({key:'item',label:tr('item'),run:()=>{this.back();this.itemMenu(m.id);}},{key:'mark',label:tr('mark'),run:()=>{this.back();this.marking(m.id,true);}},{key:'cancel',label:tr('cancel'),run:()=>this.back()});this.menu(tr('summary'),items);}return;}
    const battleSort=v.detail==='moves'&&this.request.battleSummary?.swapMoves;
-   if(this.readonly&&!battleSort||v.detail==='moves'&&m.shadow)return;const list=v.detail==='moves'?m.moves:m.ribbons??[];
+   if(this.readonly&&!battleSort||v.detail==='moves'&&(m as Member&{shadow?:boolean}).shadow)return;const list=v.detail==='moves'?m.moves:m.ribbons??[];
    if(v.selected===null){if(v.detailCursor<list.length)v.selected=v.detailCursor;return;}
    if(v.detail==='moves'&&v.detailCursor>=list.length)return;
    if(battleSort){this.sortBattleMoves(m,v.selected,v.detailCursor);v.selected=null;return;}
