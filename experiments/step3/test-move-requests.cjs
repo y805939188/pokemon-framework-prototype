@@ -19,7 +19,7 @@ test.before(() => {
 });
 test.after(() => { if(pluginDirectory)fs.rmSync(pluginDirectory,{recursive:true,force:true}); });
 
-function menu(session) {
+function menu(session, observeAutomatic) {
   function Base() {}
   const nodeRequire = id => require(id.startsWith('./') ? path.join(ROOT, id) : id);
   nodeRequire.resolve = id => require.resolve(path.join(ROOT, id));
@@ -28,15 +28,20 @@ function menu(session) {
     Scene_MenuBase: Base, Game_Interpreter: Base };
   vm.createContext(ctx);
   vm.runInContext(pluginText, ctx);
-  ctx.window.PSFlow.translator = () => ({ t: (_key, v) => `${v.move} PP ${v.pp}/${v.maxpp}`, tOr: (_key, fallback) => fallback });
+  ctx.window.PSFlow.translator = () => ({ t: (key, v) => key === 'ui.moves.none-left' ? `${v.name} has no moves left!` : `${v.move} PP ${v.pp}/${v.maxpp}`, tOr: (_key, fallback) => fallback });
   // This isolated source consumer supplies its Session's actual content; it has
   // no MZ PluginManager parameters or application boot/content-loader port.
   ctx.window.PSFlow.content = () => session.content;
   const scene = Object.create(ctx.window.Scene_PSBattle.prototype);
   scene._session = session;
+  // Explicit bare-source ports: the real Scene supplies names and owns message pacing.
+  // This source consumer observes its real controller queue without running a visual lifecycle.
+  scene._names = Object.fromEntries(session.party.map(member => [member.id, member.species]));
+  ctx.window.PSFlow.fast = true;
   let items;
   scene.show = (_mode, value) => { items = value; };
   scene.showMoves();
+  observeAutomatic?.({ items, queued: Array.from(scene._queue), intent: scene._automaticMove, phase: scene._mode });
   return items;
 }
 async function make(game, foe, options = {}) {
@@ -58,13 +63,21 @@ test('ordinary menu exposes PP0 candidates while engine refuses them and illegal
   assert.equal((await s.chooseMove(4)).ok, true);
 });
 
-test('Struggle with no PP fields is selectable, executes and never displays undefined PP', async () => {
+test('Struggle with no PP fields queues the automatic notice, remains selectable and executes without undefined PP', async () => {
   const game = F.makeGame(); game.party[0].moves.forEach(m => { m.pp = 0; });
   const s = await make(game, mon('foe'));
   assert.equal(s.currentRequest().active[0].moves[0].id, 'struggle');
-  assert.equal(menu(s)[0].enabled, true);
-  assert.doesNotMatch(menu(s)[0].name, /undefined/);
   const before = s.gw._debugBattle().turn;
+  let view;
+  assert.equal(menu(s, value => { view = value; }), undefined, 'forced Struggle has no manual menu');
+  assert.equal(view.phase, 'messages');
+  assert.equal(view.queued.length, 1);
+  assert.match(view.queued[0], /has no moves left!/);
+  assert.doesNotMatch(view.queued[0], /undefined/);
+  assert.equal(view.intent.session, s);
+  assert.equal(view.intent.request, JSON.stringify(s.currentRequest()));
+  assert.equal(E.moveRequests.isSelectableMove(s.currentRequest().active[0].moves[0]), true);
+  assert.equal(s.gw._debugBattle().turn, before, 'observing the queued notice does not register an action');
   const response = await s.chooseMove(1);
   assert.equal(response.ok, true); assert.ok(s.gw._debugBattle().turn > before);
 });

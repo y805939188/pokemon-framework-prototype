@@ -265,6 +265,7 @@ export const zh: LocaleTable = {
     "refusal.ball.multiplefoes": "不能只瞄准多个对手中的一个！",
     "ui.menu.fight": "战斗", "ui.menu.bag": "背包", "ui.menu.party": "精灵", "ui.menu.run": "逃跑",
     "ui.moves.line": "{move}   PP {pp}/{maxpp}",
+    "ui.moves.none-left": "{name}已经没有可用的招式了！",
     "ui.bag.nothing": "（空）",
     "ui.battlebag.cancel": "取消",
     "ui.battlebag.cancelPockets": "取消 · {pocket}（←/→切换口袋）",

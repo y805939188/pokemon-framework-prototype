@@ -266,6 +266,7 @@ export const en: LocaleTable = {
     // ---- battle screen
     "ui.menu.fight": "Fight", "ui.menu.bag": "Bag", "ui.menu.party": "Pokémon", "ui.menu.run": "Run",
     "ui.moves.line": "{move}   PP {pp}/{maxpp}",
+    "ui.moves.none-left": "{name} has no moves left!",
     "ui.bag.nothing": "(nothing)",
     "ui.battlebag.cancel": "Cancel",
     "ui.battlebag.cancelPockets": "Cancel · {pocket} (←/→ pockets)",

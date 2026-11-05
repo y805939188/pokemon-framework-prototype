@@ -9,6 +9,7 @@ test.before(async()=>{
  for(const name of ['PS_BattleFlow','PS_SaveState','PS_Evolution','PS_BattleFlowTest']){
   const out=path.join(temp,name),r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);
   let code=fs.readFileSync(path.join(out,name+'.js'),'utf8');
+  if(name==='PS_BattleFlow'&&process.env.PF_AUTO_STRUGGLE_TEST_PLUGIN)code=fs.readFileSync(process.env.PF_AUTO_STRUGGLE_TEST_PLUGIN,'utf8');
   if(name==='PS_BattleFlow'&&process.env.PF_MOVE_CURSOR_TEST_MUTATION){assert.equal(process.env.PF_MOVE_CURSOR_TEST_MUTATION,'forget-confirm');const marker='this._menuCursor?.remember(this._mode, this._menu.index(), this._menu._items.length);';assert.equal(code.split(marker).length,2,'one actual compiled confirm memory');code=code.replace(marker,'void 0;');}
   if(name==='PS_BattleFlowTest')entryText=code;else plugins[name]=code;
  }
@@ -84,5 +85,50 @@ test('a real fourth-slot PP0 refusal restores that slot, including BACK and reen
   await moves(h);h.s._menu.cursorRight();h.s._menu.cursorDown();assert.equal(h.s._menu.index(),3);const before=snapshot(h),session=h.s._session,original=session.chooseMove,calls=[];session.chooseMove=function(...args){calls.push(args[0]);return original.apply(this,args);};
   h.s.onMenuOk();await h.waitFor(()=>h.s.inputState().ready&&!h.s._busy,'fourth-slot refusal finished');assert.equal(h.s._mode,'moves');assert.equal(h.s._menu.index(),3,'rejected non-first slot is restored');assert.deepEqual(calls,[4]);assert.equal(snapshot(h),before);assert.equal(JSON.stringify(h.flow.game()),h.before);
   h.s.onMenuCancel();choose(h,'fight');assert.equal(h.s._menu.index(),3);assert.deepEqual(calls,[4]);
+ }finally{h.cleanup();}
+});
+
+
+// Automatic no-move entry: real Gen8 request and action, controlled message/input ports.
+const noPP=[{id:'tackle',pp:0,maxpp:35},{id:'growl',pp:0,maxpp:40}];
+function trackAutomatic(h){
+ const session=h.s._session,original=session.chooseMove,attempts=[],doc=h.G.$gameSystem._psGame;let installs=0,state=doc;
+ session.chooseMove=async function(...args){const row={slot:args[0]};attempts.push(row);row.result=await original.apply(this,args);return row.result;};
+ Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>state,set:v=>{installs++;state=v;}});
+ return{session,attempts,get installs(){return installs;}};
+}
+async function noMoveNotice(h){
+ choose(h,'fight');assert.equal(h.s._mode,'messages','no selectable move must skip the manual move menu');
+ await h.waitFor(()=>!!h.s.ordinaryMessageState(),'automatic no-moves notice');
+ const step=h.s._ordinaryMessage;assert.equal(step.snapshot().implementation,'paused-message-v1');return step;
+}
+for(const lang of ['en','zh'])test(lang+' automatic Struggle shows a paused no-moves notice before exactly one real registration',async()=>{
+ const h=await open({lang,moves:noPP});try{
+  const t=trackAutomatic(h),req=t.session.currentRequest(),before=snapshot(h),engine=t.session.gw.snapshot();
+  assert.deepEqual(req.active[0].moves.map(m=>[m.id,m.pp]),[['struggle',undefined]],'pinned Gen8, not a fake disabled-move projection');h.flow.fast=false;
+  const step=await noMoveNotice(h);assert.equal(step.snapshot().phase,'typing');assert.equal(t.attempts.length,0);assert.equal(h.s.inputState().ready,false);
+  h.s.onMenuOk();h.s.onMenuCancel();assert.equal(t.attempts.length,0);await h.p.press('ok');assert.equal(step.snapshot().phase,'full');assert(h.s._log.pause);assert.equal(t.attempts.length,0);
+  assert.equal(h.s._log._lines.join(' '),h.flow.translator().t('ui.moves.none-left',{name:h.s._names[t.session.gw.activeId('p1')]}));
+  await h.frames(50);assert.equal(step.snapshot().phase,'full');assert.equal(snapshot(h),before);assert.equal(t.installs,0);
+  await h.p.press('ok');await h.waitFor(()=>t.attempts.length===1&&!h.s._busy,'one real Struggle action');assert.equal(step.snapshot().phase,'done');assert.equal(t.attempts[0].slot,1);assert.equal(t.attempts[0].result.ok,true);assert.notEqual(t.session.gw.snapshot(),engine);assert(t.session.gw.readState('p2')[0].fainted,'the actual engine resolves Struggle damage');assert.deepEqual(t.session.party[0].moves.map(m=>m.pp),[0,0]);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(t.installs,0);
+  h.s.onMenuOk();h.s.onMenuCancel();await h.frames(2);assert.equal(t.attempts.length,1);h.flow.fast=true;await h.p.inMode('end');await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(t.installs,1);h.s.onEnd();assert.equal(t.installs,1);
+ }finally{h.cleanup();}
+});
+test('automatic Struggle submits after the ordinary nonterminal three-second pause without player input',async()=>{
+ const h=await open({moves:noPP});try{const t=trackAutomatic(h);h.flow.fast=false;const step=await noMoveNotice(h);await h.waitFor(()=>step.snapshot().phase==='full','natural no-moves full text');const at=step.snapshot().fullyShownAt;while(h.G.performance.now()-at<2960)await h.frames(1);assert.equal(t.attempts.length,0);assert.equal(step.snapshot().phase,'full');await h.frames(4);await h.waitFor(()=>t.attempts.length===1&&!h.s._busy,'automatic Struggle after pause');assert.equal(t.attempts[0].result.ok,true);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(t.installs,0);}finally{h.cleanup();}
+});
+test('fast testing keeps one automatic Struggle action and never requires an extra menu selection',async()=>{
+ const h=await open({moves:noPP});try{const t=trackAutomatic(h);choose(h,'fight');assert.notEqual(h.s._mode,'moves');await h.waitFor(()=>t.attempts.length===1&&!h.s._busy,'fast no-moves action');assert.equal(t.attempts[0].result.ok,true);assert.equal(t.installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
+});
+test('one ordinary legal move still opens the manual menu and can return without registering',async()=>{
+ const h=await open({moves:[{id:'tackle',pp:35,maxpp:35}]});try{const t=trackAutomatic(h);h.flow.fast=false;await moves(h);assert.equal(h.s._menu._items.length,1);assert.equal(t.attempts.length,0);h.s.onMenuCancel();assert.equal(h.s._mode,'main');assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(t.installs,0);}finally{h.cleanup();}
+});
+for(const how of ['abort','replace','terminate'])test(how+' retires a normal no-moves notice without a late automatic action',async()=>{
+ const h=await open({moves:noPP});try{const t=trackAutomatic(h);h.flow.fast=false;const step=await noMoveNotice(h),engine=t.session.gw.snapshot();await h.p.press('ok');if(how==='abort')h.flow.abort(Error('owned no-moves abort'));else if(how==='replace')h.flow.stateReplaced();else h.s.terminate();h.s.onMenuOk();h.s.onMenuCancel();await h.frames(5);assert.equal(step.snapshot().phase,'done');assert.equal(t.attempts.length,0);assert.equal(t.session.gw.snapshot(),engine);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(t.installs,0);}finally{h.cleanup();}
+});
+test('an expired published request cannot borrow a completed no-moves notice',async()=>{
+ const h=await open({moves:noPP});try{const t=trackAutomatic(h);h.flow.fast=false;const step=await noMoveNotice(h),engine=t.session.gw.snapshot(),original=t.session.currentRequest,request=original.call(t.session);await h.p.press('ok');
+  // Explicit request revision control, not a claim that the engine changes a request during an idle notice.
+  t.session.currentRequest=()=>({...request,rqid:'controlled-successor-request'});await h.p.press('ok');await h.p.inMode('main');assert.equal(step.snapshot().phase,'done');assert.equal(t.attempts.length,0);assert.equal(t.session.gw.snapshot(),engine);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(t.installs,0);t.session.currentRequest=original;
  }finally{h.cleanup();}
 });
