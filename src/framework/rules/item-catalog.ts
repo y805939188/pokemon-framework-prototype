@@ -1,6 +1,7 @@
 /** Item identity belongs to content; battle IDs, prices and display names are independent. */
 import { FIELD_EFFECTS } from './item-families';
 import { BAG_ITEMS, BALLS } from './items';
+import { ESCAPE_ITEMS } from './rules';
 import { own, setOwn } from './own';
 
 export type FieldUse = 'none' | 'member' | 'direct' | 'field' | 'tm' | 'hm' | 'tr';
@@ -39,9 +40,9 @@ export const holdableItem = (item: ItemDefinition): boolean => !importantItem(it
 export function legacyCatalog(): ItemCatalog {
   const catalog: ItemCatalog = {};
   BAG_ITEMS.forEach((id, order) => {
-    const ball = BALLS.includes(id), active = id.startsWith('x') || id === 'direhit' || id === 'guardspec';
-    setOwn<ItemDefinition>(catalog, id, { id, name: 'Unnamed', namePlural: 'Unnamed', pocket: ball ? 3 : active ? 7 : 2, order,
-      price: 0, sellPrice: 0, flags: ball ? ['PokeBall'] : [], fieldUse: 'none', battleUse: ball ? 'ball' : active ? 'active' : 'member',
+    const ball = BALLS.includes(id), active = id.startsWith('x') || id === 'direhit' || id === 'guardspec', escape = ESCAPE_ITEMS.includes(id);
+    setOwn<ItemDefinition>(catalog, id, { id, name: 'Unnamed', namePlural: 'Unnamed', pocket: ball ? 3 : active || escape ? 7 : 2, order,
+      price: 0, sellPrice: 0, flags: ball ? ['PokeBall'] : [], fieldUse: 'none', battleUse: escape ? 'direct' : ball ? 'ball' : active ? 'active' : 'member',
       battleId: id, legacyIds: [id], consumable: true, source: 'framework-legacy' });
   });
   // Explicit held compatibility; Berry placement/flags must retain any pre-existing battle-use identity.

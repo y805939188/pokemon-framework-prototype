@@ -34,6 +34,9 @@ export const STATUS_ITEMS: Record<string, { cures: readonly string[] | "all"; co
   fullheal: { cures: "all", confusion: true },
 };
 
+/** WP28 §5.5 manual no-target escape toys; not the normal speed-based Run command. */
+export const ESCAPE_ITEMS: readonly string[] = ["pokedoll", "fluffytail", "poketoy"];
+
 /** Battle stat items (step 2.2 sample; stage amounts follow the modern +2 convention, WP28 5.5 to confirm). */
 export const STAT_ITEMS: Record<string, { boosts: Record<string, number> }> = {
   xattack: { boosts: { atk: 2 } },

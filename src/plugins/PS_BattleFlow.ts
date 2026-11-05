@@ -35,6 +35,7 @@ import { createBagFadeMZ } from './battleflow/bag-fade-mz';
 import type { BattleBagRequest } from './battleflow/battle-bag';
 import { catalogOf, itemForBattleId } from '../framework/rules/item-catalog';
 import { BALLS } from '../framework/rules/items';
+import { ESCAPE_ITEMS } from '../framework/rules/rules';
 import { projectStatusCard } from './battleflow/status-card';
 import { installPrebattleHost } from './battleflow/prebattle-host';
 const { developmentCapabilities } = RuleConfig;
@@ -1797,6 +1798,12 @@ const { developmentCapabilities } = RuleConfig;
       if (target.kind === 'foe' && BALLS.includes(request.battleId)) {
         if (s.gw.activeId('p2') !== target.memberId) return { ok: false, reason: 'unknown-target' };
         return s.throwBall(request.battleId);
+      }
+      if (target.kind === 'direct') {
+        if (!ESCAPE_ITEMS.includes(request.battleId)) return { ok: false, reason: 'unsupported-battle-item' };
+        if (s.gw.activeId('p1') !== target.memberId) return { ok: false, reason: 'unknown-target' };
+        const eligible = s.canUseItem(request.battleId, target.memberId); if (!eligible.ok) return eligible;
+        return s.useItem(request.battleId, target.memberId);
       }
       if (target.kind !== 'member' && target.kind !== 'active') return { ok: false, reason: 'unsupported-battle-item' };
       if (target.kind === 'active' && !s.gw.readState('p1').some((m: any) => m.id === target.memberId && m.active)) return { ok: false, reason: 'unknown-target' };

@@ -17,7 +17,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, fast = true } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, fast = true, noRun = false } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -29,7 +29,7 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   if (egg) state.party[1].isEgg = true;
   state.inventory = E.inventory.inventoryFromBag(bag, E.itemCatalog.catalogOf(content)); G.$gameSystem._psGame = state;
   const before = JSON.stringify(flow.game()); await h.p.toMapId(5, 8, 9);
-  flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true });
+  flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true, noRun });
   await h.p.inMode('main'); const s = h.p.battle();
   return { ...h, s, flow, before, cleanup() { if (flow.running) flow.abort(Error('owned bag cleanup')); s.terminate(); } };
 }
@@ -263,4 +263,16 @@ for (const route of ['enter-target', 'return-from-target', 'close-bag']) test(ro
     await visibleBag(h, expected); assert.equal(h.s._menu, menu); assert.equal(h.s._battleBag, model);
     assert.equal(h.s._session.bag.potion, 3); assert.equal(JSON.stringify(h.flow.game()), h.before);
   } finally { console.log('BAG_OUTGOING_FRAMES', JSON.stringify({ route, frames })); h.cleanup(); }
+});
+
+// No-target escape family: real compiled menu -> Session item action -> final App commit.
+for(const lang of ['en','zh'])test(lang+' direct toy skips all target pickers, cancels safely, and saves its escape once',async()=>{
+ const h=await open({lang,bag:{pokedoll:2}});try{const s=h.s._session,foe=s.gw.readState('p2'),modes=[];let calls=0,installs=0,doc=h.G.$gameSystem._psGame;const real=s.useItem.bind(s),show=h.s.show; s.useItem=(...a)=>{calls++;return real(...a);};h.s.show=function(mode,...a){modes.push(mode);return show.call(this,mode,...a);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  await bag(h);await pick(h,'pokedoll');await cancel(h);assert.equal(h.s._mode,'bag');assert.equal(calls,0);assert.equal(s.bag.pokedoll,2);
+  await use(h,'pokedoll');h.s.onMenuOk();h.s.onMenuCancel();await h.p.inMode('end');assert.equal(calls,1);assert(!modes.some(m=>['bag-members','bag-moves','bag-foes'].includes(m)));assert.equal(s.bag.pokedoll,1);assert.equal(s.ended.reason,'run');assert.deepEqual(s.gw.readState('p2'),foe);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied',JSON.stringify(h.flow.lastOutcome));assert.equal(installs,1);assert.equal(E.inventory.aggregateBag(h.flow.game().inventory).pokedoll,1);h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
+for(const flags of [{trainer:true},{noRun:true}])test(JSON.stringify(flags)+' direct toy refuses back to the item list without any reserve',async()=>{
+ const h=await open({...flags,bag:{pokedoll:2}});try{const s=h.s._session,engine=s.gw.snapshot();let calls=0;const real=s.useItem.bind(s);s.useItem=(...a)=>{calls++;return real(...a);};await bag(h);await use(h,'pokedoll');await h.p.inMode('bag');assert.equal(calls,0);assert.equal(s.bag.pokedoll,2);assert.equal(s.ledger.length,0);assert.equal(s.gw.snapshot(),engine);assert.equal(JSON.stringify(h.flow.game()),h.before);await cancel(h);assert.equal(h.s._mode,'main');}finally{h.cleanup();}
 });

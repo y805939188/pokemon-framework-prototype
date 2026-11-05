@@ -5,7 +5,7 @@
  * (js/engine/build/custom-formats.cjs) and staged into the engine by scripts/build-showdown.sh; no Showdown source is
  * modified. It runs inside Showdown, so it may only depend on plain rules code (bundled in), never on the gateway.
  */
-import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules";
+import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, ESCAPE_ITEMS, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules";
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types";
 import type { FormatObserver, FormatObservation } from "../rules/battle-evidence";
 import type { BattleActor, BattleDisplaySnapshot } from "../rules/battle-evidence";
@@ -38,6 +38,15 @@ function resolveItem(battle: ShowdownBattle, user: ShowdownPokemon, payload: Pay
   const side = user.side;
   const item = payload.item as string;
   const target = side.pokemon.find((p: ShowdownPokemon) => p.name === payload.target);
+  if (ESCAPE_ITEMS.includes(item)) {
+    if (!battle.rpg.wild || battle.rpg.noRun || target !== user || user.fainted || user.hp <= 0) {
+      emit(battle, "item", side.id, item, payload.target || "-", "noeffect"); return;
+    }
+    emit(battle, "item", side.id, item, user.name, "ok");
+    emit(battle, "run", side.id, "ok", "item", battle.rpg.attempts[side.id] || 0);
+    finish(battle, { kind: "run", side: side.id });
+    return;
+  }
   if (item === "fullrestore") {
     if (!target || target.fainted || target.hp <= 0) { emit(battle, "item", side.id, item, payload.target || "-", "noeffect"); return; }
     const confused = target.isActive && !!target.volatiles.confusion;

@@ -15,7 +15,7 @@ import type { BattleDriver, BattleDriverFactory } from "../battle/driver";
 import { isSelectableMove } from "../battle/move-requests";
 import type { GatewayMessage, MemberState } from "../battle/gateway";
 import * as G from "../rules/growth";
-import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, itemEligibility } from "../rules/rules";
+import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, ESCAPE_ITEMS, itemEligibility } from "../rules/rules";
 import * as S from "../rules/state";
 import type { BattleResult, GameState } from "../rules/state";
 import type { Content, Member } from "../rules/types";
@@ -67,7 +67,7 @@ export function sealBattleEffects(session: BattleSession, binding: EffectsBindin
   return session._effects.seal(session.result(), binding, session._pendingFriendFaints.length ? session.party.map(m => m.id) : session._friendUnavailable);
 }
 
-const ITEM_IDS = new Set(["fullrestore", ...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS)]);
+const ITEM_IDS = new Set(["fullrestore", ...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS), ...ESCAPE_ITEMS]);
 
 function toSet(m: Member, moveName: (id: string) => string): Record<string, unknown> {
   return {
@@ -428,6 +428,11 @@ export class BattleSession {
   /** Registration-time eligibility of an item for a party member (same rule the menu uses to grey out targets). */
   canUseItem(itemId: string, targetId: unknown): ReturnType<typeof itemEligibility> {
     const mon = this.gw.readState("p1").find((x: MemberState) => x.id === targetId);
+    if (ESCAPE_ITEMS.includes(itemId)) {
+      if (!mon || targetId !== this.gw.activeId("p1")) return { ok: false, reason: "unknown-target" };
+      return this.foe.kind === "wild" && !this.foe.noRun && mon.hp > 0 && !mon.fainted
+        ? { ok: true } : { ok: false, reason: "item-no-effect" };
+    }
     return itemEligibility(itemId, mon);
   }
 
