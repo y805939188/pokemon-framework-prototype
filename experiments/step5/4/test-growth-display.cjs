@@ -33,7 +33,7 @@ test('legacy checkpoint without presentation remains usable and never invents di
  const {s,growth:m}=await award();s.out.push(m);const cp=s._checkpoint();delete cp.presentation;await s._restoreCheckpoint(cp);const restored=s.take()[0];assert.equal(readGrowthDisplay(s,restored),null);assert.equal(restored.exp,m.exp);assert.equal(readGrowthDisplay(s,m),null);
 });
 test('public projection facade has no producer, restore hook or test capability',()=>{
- const api=require('../../../js/engine/build/production.cjs').battlePresentation,legacy=require('../../../js/engine/build/engine.cjs').battlePresentation;assert.deepEqual(Object.keys(api),['readBattleSummary','readGrowthDisplay']);assert.equal(api.readGrowthDisplay,legacy.readGrowthDisplay);assert.equal(api.readBattleSummary,legacy.readBattleSummary);
+ const api=require('../../../js/engine/build/production.cjs').battlePresentation,legacy=require('../../../js/engine/build/engine.cjs').battlePresentation;assert.deepEqual(Object.keys(api),['readBattleLearnProtection','readBattleSummary','readGrowthDisplay']);assert.equal(typeof api.readBattleLearnProtection,'function');assert.equal(api.readBattleLearnProtection,legacy.readBattleLearnProtection);assert.equal(api.readGrowthDisplay,legacy.readGrowthDisplay);assert.equal(api.readBattleSummary,legacy.readBattleSummary);
 });
 
 test('existing EXP ahead of held level preserves every applied level-up without fabricating earned intervals',async()=>{

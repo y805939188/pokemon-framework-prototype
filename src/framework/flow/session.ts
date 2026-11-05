@@ -32,7 +32,7 @@ import { own, setOwn } from "../rules/own";
 import { bindRequiredSettlement, checkpointRequiredSettlement, finalizeRequiredSettlement, requiredCaptureItem, restoreRequiredSettlement } from "./required-settlement";
 import { bindTrainerAi, runTrainerAi, trainerAiEvent, checkpointTrainerAi, restoreTrainerAi, preflightTrainerAiRestore, prepareTrainerAiRestore, failTrainerAiRestore, assertTrainerAiCheckpointReady, cancelTrainerAiDecision } from './trainer-ai';
 import type { TrainerAiConfiguration } from './trainer-ai';
-import { _publishGrowthDisplay, _capturePresentation, _restorePresentation } from './presentation';
+import { _publishGrowthDisplay, _capturePresentation, _restorePresentation, readBattleLearnProtection } from './presentation';
 import type { GrowthDisplay } from './presentation';
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
@@ -525,6 +525,9 @@ export class BattleSession {
     return this._exclusive(async () => {
       const p = this.pendingLearn;
       if (!p) throw new Error("no learn decision pending");
+      // A normal refused HM replacement keeps the existing question and all working state.
+      // Empty output introduces no new protocol-v1 message; the read-only companion explains the refusal.
+      if (slotOrNull !== null && slotOrNull !== undefined && readBattleLearnProtection(this, slotOrNull)) return [];
       this.pendingLearn = null;
       if (slotOrNull !== null && slotOrNull !== undefined) this._learn(p.memberId, p.move, slotOrNull);
       await this._continueGrowth();

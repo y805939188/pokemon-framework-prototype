@@ -1,5 +1,30 @@
-import type { Stats } from "../rules/types";
+import type { Content, Member, Stats } from "../rules/types";
 import type { GrowthMessage, SessionMessage } from "../battle/protocol";
+import { catalogOf } from '../rules/item-catalog';
+import { planLearningQueue } from '../rules/learning';
+
+export interface BattleLearnProtection {
+  version: 1; memberId: string; slot: number; moveId: string; reason: 'hm-protected';
+}
+
+/** The current validated author catalog supplies HM identities; no display-name or Gen8-name guess.
+ * This is a detached read-only explanation. The Session repeats the same check before a decision.
+ */
+export function readBattleLearnProtection(session: {
+  readonly pendingLearn: { readonly memberId: string; readonly move: { readonly id: string; readonly name: string; readonly pp: number } } | null;
+  readonly party: readonly Member[];
+  readonly content: Content;
+}, slot: number): BattleLearnProtection | null {
+  const pending = session.pendingLearn;
+  if (!pending || !Number.isSafeInteger(slot) || slot < 0 || slot > 3) return null;
+  const member = session.party.find(member => member.id === pending.memberId);
+  if (!member?.moves[slot]) return null;
+  const hmMoves = Object.values(catalogOf(session.content)).filter(item => item.fieldUse === 'hm' && typeof item.move === 'string').map(item => item.move!);
+  const plan = planLearningQueue(member, [pending.move], { kind: 'battle' },
+    { shadow: false, hmMoves, keepMachinePp: false }, [{ kind: 'replace', slot }]);
+  return plan.status === 'pending' && plan.selection.reason === 'hm-protected'
+    ? { version: 1, memberId: member.id, slot, moveId: member.moves[slot]!.id, reason: 'hm-protected' } : null;
+}
 
 /** Applied results only. Reading this projection grants no battle or persistence operation. */
 export interface GrowthDisplay {
