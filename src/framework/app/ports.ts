@@ -45,6 +45,8 @@ export interface BattleStartRequest {
   canSwitch?: boolean;
   /** Author override. The host captures the player preference first; direct App callers default to Switch. */
   battleStyle?: "switch" | "set";
+  /** Per-battle growth gate. Defaults to true; false skips both EV and experience distribution. */
+  expGain?: boolean;
   /** The author lets the player lose this battle (story battle): a defeat then is not a blackout (WP61 §7, statistics). */
   canLose?: boolean;
   /** Victory money settlement (WP42). Defaults to true; false does not normalize the wallet. */
@@ -74,6 +76,8 @@ export interface BattleSetup {
   canSwitch?: boolean;
   /** Captured per-battle style, independent of voluntary switching legality. */
   battleStyle?: "switch" | "set";
+  /** Per-battle growth gate. Defaults to true; false skips both EV and experience distribution. */
+  expGain?: boolean;
   /** The author's flag, or forced on because a caught member would have nowhere to go (decision D1). */
   noBall: boolean;
   /** The party and the boxes are both full (the reason a ball is disabled, for the host's message). */

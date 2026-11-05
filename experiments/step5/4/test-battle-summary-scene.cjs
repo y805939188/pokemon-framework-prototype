@@ -19,7 +19,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, battleStyle = 'set', playerStyle, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null, benchMoves = null } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, expGain, battleStyle = 'set', playerStyle, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null, benchMoves = null } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = suppliedContent ?? fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -53,8 +53,8 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   vm.runInContext(plugins.PS_Management, G, { filename: 'actual-PS_Management.js' });
   const before = JSON.stringify(flow.game()); await h.p.toMapId(5, 8, 9);
   const batches = [], begin = flow.begin.bind(flow); flow.begin = async (...args) => { const session = await begin(...args), take = session.take.bind(session); session.take = () => { const value = take(); batches.push({ value, wire: JSON.stringify(value) }); return value; }; return session; };
-  if (command) h.w.commands['PS_BattleFlow:' + command].call({ setWaitMode() {} }, { kind: 'wild', foes: 'Pidgey:3', trainerId: 'music-normal', version: '1', canLose: 'true', ...(canSwitch === undefined ? {} : { canSwitch }), battleStyle });
-  else flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true, ...(canSwitch === undefined ? {} : { canSwitch }), battleStyle });
+  if (command) h.w.commands['PS_BattleFlow:' + command].call({ setWaitMode() {} }, { kind: 'wild', foes: 'Pidgey:3', trainerId: 'music-normal', version: '1', canLose: 'true', ...(canSwitch === undefined ? {} : { canSwitch }), ...(expGain === undefined ? {} : { expGain }), battleStyle });
+  else flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true, ...(canSwitch === undefined ? {} : { canSwitch }), ...(expGain === undefined ? {} : { expGain }), battleStyle });
   await h.waitFor(() => !!h.p.battle()?._session, 'real opening Session'); const s = h.p.battle();
   const completed = [], add = s._log.add; s._log.add = function (line) { completed.push(line); return add.call(this, line); };
   await h.p.inMode('main');
@@ -698,5 +698,18 @@ for(const lang of ['en','zh'])test('SWF02 '+lang+' unified trainer: real faint, 
   const snapshot=s.gw.snapshot(),ledger=JSON.stringify(s.ledger);await pick(h,'bag');h.s.changeBagPocket(1);await h.frames(1);await pick(h,'pokedoll');await pick(h,'use');await h.p.inMode('bag');assert.equal(s.gw.snapshot(),snapshot);assert.equal(JSON.stringify(s.ledger),ledger);assert.equal(s.bag.pokedoll,2);assert.deepEqual(uses,['ether','revive']);h.s.onMenuCancel();await h.frames(1);await h.p.inMode('main');
   await pick(h,'fight');await pick(h,2);await h.p.inMode('end');assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);
   const saved=h.flow.game();assert.deepEqual(saved.party.map(m=>m.id),order);assert(saved.party.find(m=>m.id===lead).hp>0);assert.deepEqual(saved.party.find(m=>m.id===lead).moves.map(m=>m.pp),[0,34]);assert.equal(saved.party.find(m=>m.id===reserve).moves[0].pp,9);assert.deepEqual(E.inventory.aggregateBag(saved.inventory),{ether:1,revive:1,pokedoll:2});h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
+
+// Per-battle growth off: real registered MZ events, App/Session/Gen8, and compiled result presentation.
+for(const lang of ['en','zh'])for(const command of ['StartBattle','StartTrainerBattle'])test(lang+' '+command+' expGain false skips growth but preserves victory cue, feedback and single installation',async()=>{
+ const h=await open({lang,command,expGain:'false',trainerMembers:2,grow:true,fast:true});try{
+  const s=h.s._session,id=s.party[0].id,baseline=structuredClone(JSON.parse(h.before).party[0]);assert.equal(s.expGain,false);let installs=0,document=h.G.$gameSystem._psGame,cues=0;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>document,set:v=>{installs++;document=v;}});const victory=h.flow._victoryBattleMusic;h.flow._victoryBattleMusic=function(...a){cues++;return victory.apply(this,a);};
+  for(let n=0;n<2&&!s.finished;n++){await pick(h,'fight');await pick(h,1);await h.waitFor(()=>['main','end'].includes(h.s._mode),'no-exp normal result or next command');assert.equal(s.party[0].level,baseline.level);assert.equal(s.party[0].exp,baseline.exp);assert.deepEqual(s.party[0].evs,baseline.evs);assert.equal(cues,s.finished?1:0);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);}
+  assert(s.finished);await h.p.inMode('end');assert(!h.batches.flatMap(row=>row.value).some(m=>['growth','learn-prompt','learned'].includes(m.kind)));assert.equal(cues,1);assert(h.s._endFeedbackShown);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied',JSON.stringify(h.flow.lastOutcome));assert.equal(installs,1);const saved=h.flow.game().party.find(m=>m.id===id);assert.equal(saved.exp,baseline.exp);assert.equal(saved.level,baseline.level);assert.deepEqual(saved.evs,baseline.evs);assert(saved.moves[0].pp<baseline.moves[0].pp);h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
+test('both registered events reject malformed expGain before opening or advancing sequence; metadata defaults On',async()=>{
+ const h=await open();try{h.cleanup();const before=JSON.stringify(h.flow.game()),seq=h.G.$gameSystem._psBattleSeq;for(const name of ['StartBattle','StartTrainerBattle'])for(const expGain of [null,0,'off',{}])assert.throws(()=>h.w.commands['PS_BattleFlow:'+name].call({setWaitMode(){}},{expGain}),/expGain must be true or false/);assert.equal(h.flow.running,false);assert.equal(h.G.$gameSystem._psBattleSeq,seq);assert.equal(JSON.stringify(h.flow.game()),before);const meta=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.meta.txt'),'utf8');assert.equal(meta.split('@arg expGain').length-1,2);assert.equal((meta.match(/@arg expGain[\s\S]*?@default true/g)||[]).length,2);
  }finally{h.cleanup();}
 });

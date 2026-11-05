@@ -143,6 +143,11 @@
  * @option Set
  * @value set
  * @default inherit
+ * @arg expGain
+ * @text Award experience and EVs
+ * @desc false disables growth for this battle, including capture growth. Outcome, money and capture reception remain enabled.
+ * @type boolean
+ * @default true
  *
  * @arg canLose
  * @text Can lose
@@ -280,6 +285,11 @@
  * @option Set
  * @value set
  * @default inherit
+ * @arg expGain
+ * @text Award experience and EVs
+ * @desc false disables growth for this battle, including capture growth. Outcome, money and capture reception remain enabled.
+ * @type boolean
+ * @default true
  *
  * @arg canLose
  * @type boolean

@@ -724,6 +724,11 @@ const { developmentCapabilities } = RuleConfig;
     if (value === false || value === 'false') return false;
     throw new Error('canSwitch must be true or false');
   }
+  function parseExpGain(value: unknown): boolean {
+    if (value === undefined || value === true || value === 'true') return true;
+    if (value === false || value === 'false') return false;
+    throw new Error('expGain must be true or false');
+  }
   function parseFoes(text: string): { species: string; level: number }[] {
     return String(text).split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
       const [species, level] = s.split(":");
@@ -733,7 +738,7 @@ const { developmentCapabilities } = RuleConfig;
 
   G.PluginManager.registerCommand(NAME, "StartBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
-    const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle), seq = PSFlow.nextSeq();
+    const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle), expGain = parseExpGain(args.expGain), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || "battle"}#${seq}`;
     const opened=PSFlow.tryOpenBattle({
       kind: args.kind === "trainer" ? "trainer" : "wild",
@@ -741,7 +746,7 @@ const { developmentCapabilities } = RuleConfig;
       seq,
       battleId,
       resultVariable: Number(args.resultVariable) || 0,
-      canLose: String(args.canLose) === "true", canSwitch, battleStyle,
+      canLose: String(args.canLose) === "true", canSwitch, battleStyle, expGain,
       forceParty: String(args.forceParty) === "true",
     }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
       transition: { location: args.prebattleLocation || undefined } });
@@ -753,7 +758,7 @@ const { developmentCapabilities } = RuleConfig;
   G.PluginManager.registerCommand(NAME, "StartTrainerBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
     if (args.moneyGain !== undefined && ![true, false, "true", "false"].includes(args.moneyGain)) throw new Error("moneyGain must be true or false");
-    const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle);
+    const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle), expGain = parseExpGain(args.expGain);
     const id = String(args.trainerId || args.id || ""), version = Number(args.version ?? 0), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || `trainer-${id}-v${version}`}#${seq}`;
     let known = true;
@@ -769,7 +774,7 @@ const { developmentCapabilities } = RuleConfig;
       kind: "trainer", trainer: { id, version }, foes: [], seq, battleId,
       moneyGain: args.moneyGain !== false && args.moneyGain !== "false",
       resultVariable: Number(args.resultVariable) || 0,
-      canLose: String(args.canLose) === "true", canSwitch, battleStyle,
+      canLose: String(args.canLose) === "true", canSwitch, battleStyle, expGain,
       forceParty: String(args.forceParty) === "true",
     }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
       transition: { location: args.prebattleLocation || undefined } });
