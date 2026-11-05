@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "scope": "REAL_MZ_SAVE_APIS_COMPRESSED_DISK_NEW_NODE_MINIMAL_OBJECTS_NOT_NW_CONTINUE",
+  "base": "62c2ec02ca902b1f960ece6f634b42b2df324e80",
+  "schema": 9,
+  "protocol": 1,
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "host": {
+    "js/reactor_managers.js": "0a45145a23c377f70d5df07b0b58e12679f14b84e4e9d2ae8ea90ac3e9cfca04",
+    "js/reactor_core.js": "b18c5f887be92cd3ee199660f371d2dd9a3b383003925c42a16219aee44201ec",
+    "js/libs/pako.min.js": "29cfa0542b9864b6640cfdcc8f15b184db6431b532db2702a3ce97e5f2a7fc1c",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3"
+  },
+  "engine": {
+    "js/engine/build/content-cli.cjs": "113d2b55ab7c2956af00df2527958c4e8302338646a124a0961db58e62e1b76a",
+    "js/engine/build/core.cjs": "e5b94494f7fdec50643626bcb922ce3afde72e66a92196d44785c34467307a0b",
+    "js/engine/build/custom-formats.cjs": "50f2bc529f506a2c8499bc948719e3f297fed353435d1de6882c9b03f687b033",
+    "js/engine/build/engine.cjs": "ddec8736e64efa81b2058a7e85a504c9a42ee37823544e005c3511071e3d85b0",
+    "js/engine/build/production.cjs": "3577ccada0e1e4f68bc19bad03d667a99b79a4a1547d485baaf160c595e029df",
+    "js/engine/build/public-presentation-rCv_7JPM.js": "0cc14e37d2edd9f685a4cef6ce3a715af4628d2347eb695ec65c46a8b4e78c32",
+    "js/engine/build/session-B-ur6ARl.js": "56a031c75d08ef52918955e804269ba5c26a65a4ff1087a85ca3f5fff088d745",
+    "js/engine/build/testing.cjs": "38b08688fe41402af61b4ff6dc79aec9b83a045d103c27a06f748e649e789061",
+    "js/engine/build/trainer-ai-diagnostics-jO7nZSLu.js": "08687e04275085d9ba38b72e45885f392656903b23f5658618ac2fe56fa2b493",
+    "js/engine/showdown/SOURCE_SHA": "495b7f40c79b08384b2bb2be040edbc952be76fe18f8dff1a96f0fb949fc78ba"
+  },
+  "hostAdaptations": [
+    "minimal nonrendering Game_* constructors",
+    "owned temporary StorageManager.fileDirectoryPath",
+    "read-only restricted Node fs boundary",
+    "observer awaiting all actual slot/global save promises"
+  ],
+  "appCapabilities": {
+    "allowHeldItemSources": true,
+    "allowExperimentalHeldItemBattle": true
+  },
+  "cases": [
+    {
+      "id": "EMZS01",
+      "kind": "consume",
+      "expect": "real berry consumed; ordinary compressed slot; next Node battle has no berry"
+    },
+    {
+      "id": "EMZS02",
+      "kind": "knockoff",
+      "expect": "temporary Knock Off; ordinary compressed slot; next Node actually receives and loses restored held item"
+    },
+    {
+      "id": "EMZS03",
+      "kind": "consume",
+      "abort": true,
+      "expect": "new Node actual continuation then abort keeps original compressed slot and ledger"
+    }
+  ],
+  "NW": 0,
+  "fullTitleAcceptance": false
+}
