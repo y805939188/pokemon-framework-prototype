@@ -9,7 +9,7 @@ function installRaster(G,{blank=false}={}){
  Object.assign(G.Graphics,{width:816,height:624,boxWidth:808,boxHeight:616});
  G.Bitmap.prototype.fillRect=()=>{};
  const init=G.Window_Base.prototype.initialize;G.Window_Base.prototype.initialize=function(rect){init.call(this,rect);Object.assign(this,rect);this.visible=true;this.openness=255;this.renderable=true;};
- G.Scene_PSBattle.prototype.addWindow=function(win){if(!this._windowLayer){const layer={x:4,y:4,children:[],addChild(v){this.children.push(v);v.parent=this;return v;},removeChild(v){this.children=this.children.filter(c=>c!==v);v.parent=null;}};this._windowLayer=layer;this.addChild(layer);}this._windowLayer.addChild(win);};
+ G.Scene_PSBattle.prototype.addWindow=function(win){if(typeof this._windowLayer?.addChild!=='function'){const layer={x:4,y:4,children:[],addChild(v){this.children.push(v);v.parent=this;return v;},removeChild(v){this.children=this.children.filter(c=>c!==v);v.parent=null;}};this._windowLayer=layer;this.addChild(layer);}this._windowLayer.addChild(win);};
  G.Bitmap.snap=scene=>{
   const width=G.Graphics.width,height=G.Graphics.height,data=new Uint8ClampedArray(width*height*4);for(let i=3;i<data.length;i+=4)data[i]=255;
   const view=G.PSManagement.current();const windows=[];const walk=n=>{if(n?.contents)windows.push(n);for(const c of n?.children??[])walk(c);};walk(scene);

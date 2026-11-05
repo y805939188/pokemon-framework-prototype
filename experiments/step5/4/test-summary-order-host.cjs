@@ -11,7 +11,7 @@ test.before(async()=>{
 async function make(options={}){
  const c=host.controls(),h=createVictoryDriverHost({ROOT,work:temp,plugins:c.plugins,entryText:c.entryText,driverText:code,PLAN:{...plan,prefix:'summary_control/'},options:{productionTranslator:true,prebattleWorld:true}}),G=h.G;
  G.Input.keyMapper??={};G.Input.isPressed??=()=>false;G.TouchInput.isCancelled??=()=>false;const listeners=new Map();G.document={addEventListener(k,f){if(!listeners.has(k))listeners.set(k,new Set());listeners.get(k).add(f);},removeEventListener(k,f){listeners.get(k)?.delete(f);}};G.addEventListener=()=>{};
- vm.runInContext(c.plugins.PS_Management,G,{filename:'actual-PS_Management.js'});installRaster(G,{blank:options.blank});
+ h.w.flow._content=host.makeContent();h.w.flow._dex=E.dex.createDexLookup();vm.runInContext(c.plugins.PS_Management,G,{filename:'actual-PS_Management.js'});installRaster(G,{blank:options.blank});
  G.Scene_Map.prototype.create=function(){this._messageWindow={};this._spriteset={};};
  function Title(){this.initialize();}Title.prototype=Object.create(G.Scene_MenuBase.prototype);Title.prototype.constructor=Title;Title.prototype.create=function(){this._commandWindow={isOpenAndActive:()=>true};};Title.prototype.isBusy=()=>false;G.Scene_Title=Title;
  if(options.cold!==false){h.M.goto(Title);await h.frames(2);}else await h.p.toMapId(5,8,9);
@@ -31,5 +31,5 @@ test('product, font and isolated storage substitutions reject before any case',a
  for(const kind of['product','font','storage']){const h=await make();if(kind==='product')fs.appendFileSync(path.join(h.w.root,'js/plugins/PS_Management.js'),'BAD');if(kind==='font')fs.appendFileSync(path.join(h.w.root,plan.fontResourcePaths[0]),'BAD');if(kind==='storage')h.G.StorageManager.fileDirectoryPath=()=>h.w.root;await assert.rejects(normal.runD2SummaryOrder(h.p),/actual product|actual css|actual isolated storage/);assert.equal(h.report.results.length,0);}
 });
 test('delayed Map start is awaited before the real battle opens',async()=>{
- const h=await make();const start=h.G.Scene_Map.prototype.start;let remaining=0,early=0;h.G.Scene_Map.prototype.start=function(){start.call(this);this._started=false;remaining=4;};const update=h.G.Scene_Map.prototype.update;h.G.Scene_Map.prototype.update=function(...a){if(remaining&&!--remaining)this._started=true;return update.apply(this,a);};const open=h.w.flow.openBattle;h.w.flow.openBattle=function(...a){if(!h.p.scene().isStarted())early++;return open.apply(this,a);};await normal.runD2SummaryOrder(h.p);assert.equal(early,0);assert.equal(h.report.results.filter(r=>r.status==='pass').length,2);
+ const h=await make();const start=h.G.Scene_Map.prototype.start;let early=0;h.G.Scene_Map.prototype.start=function(){start.call(this);this._summaryStartAt??=h.G.Graphics.frameCount+4;this._started=h.G.Graphics.frameCount>=this._summaryStartAt;};const open=h.w.flow.openBattle;h.w.flow.openBattle=function(...a){if(!h.p.scene().isStarted())early++;return open.apply(this,a);};await normal.runD2SummaryOrder(h.p);assert.equal(early,0);assert.equal(h.report.results.filter(r=>r.status==='pass').length,2);
 });
