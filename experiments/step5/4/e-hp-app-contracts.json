@@ -121,5 +121,6 @@
         "FR-000560"
       ]
     }
-  ]
+  ],
+  "maxEscapeAttempts": 6
 }

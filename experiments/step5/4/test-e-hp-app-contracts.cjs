@@ -20,7 +20,7 @@ async function open(c){
  const request={battleId:c.id,seq:1,kind:'wild',foes:[{species:'slowbro',level:50}],canLose:true,expGain:false};
  const s=await app.startBattle(request);s.take();assert.equal(s.gw.readState('p1')[0].hp,m.hp);assert.equal(s.gw.readState('p2')[0].maxhp,plan.foeMaxHP);
  assert.deepEqual(Object.keys(s.gw.readState('p2')[0].pp),['splash']);
- return{app,s,state,before,request,trace:[],cleanup(){app.abortBattle(request,Error('owned hp-app cleanup'));}};
+ return{app,s,state,before,request,trace:[],exitTrace:[],cleanup(){app.abortBattle(request,Error('owned hp-app cleanup'));}};
 }
 function observation(w){return{p1:clone(w.s.gw.readState('p1')[0]),p2:clone(w.s.gw.readState('p2')[0])};}
 function unchanged(w){assert.deepEqual(w.state.read(),w.before,'actual Session work cannot change persistent state before App finish');assert.equal(w.state.replaced.length,0);}
@@ -57,9 +57,14 @@ for(const c of plan.cases)test(c.id+' '+c.check,async()=>{
   if(c.exit==='abort'){
    w.app.abortBattle(w.request,Error('owned normal player lifecycle exit'));unchanged(w);
    const outcome=w.app.finishBattle(w.s,w.request);assert.equal(outcome.commit,'none');assert.equal(outcome.aborted,true);unchanged(w);
-   console.log('E_HP_APP_OBSERVATION '+JSON.stringify({id:c.id,featureIds:c.featureIds,initial:w.before,trace:w.trace,beforeEnd,outcome,saved:clone(w.state.read()),installs:0,syntheticWrongReadout:'rejected',completeHeading:false,NW:0}));return;
+   console.log('E_HP_APP_OBSERVATION '+JSON.stringify({id:c.id,featureIds:c.featureIds,initial:w.before,trace:w.trace,exitTrace:w.exitTrace,beforeEnd,outcome,saved:clone(w.state.read()),installs:0,syntheticWrongReadout:'rejected',completeHeading:false,NW:0}));return;
   }
-  const r=await w.s.run();assert(r.ok,JSON.stringify(r));assert(w.s.finished);assert.equal(w.s.ended.reason,'run');unchanged(w);
+  for(let attempt=1;!w.s.finished&&attempt<=plan.maxEscapeAttempts;attempt++){
+   const r=await w.s.run();assert(r.ok,JSON.stringify(r));const after=observation(w);
+   assert.equal(after.p1.hp,beforeEnd.p1.hp);assert.deepEqual(after.p1.pp,beforeEnd.p1.pp,'escape attempts do not consume a move PP');unchanged(w);
+   w.exitTrace.push({attempt,messages:clone(r.messages),after,finished:w.s.finished});
+  }
+  assert(w.s.finished,'bounded normal escape choices must actually finish this fixed fixture');assert.equal(w.s.ended.reason,'run');unchanged(w);
   const result=w.s.result(),patch=result.members['HP-P1'];assert.equal(patch.hp,beforeEnd.p1.hp);assert.equal(patch.status,'');assert.equal(patch.statusCount,0);
   for(const slot of patch.moves)assert.equal(slot.pp,beforeEnd.p1.pp[slot.id]);
   const outcome=w.app.finishBattle(w.s,w.request);assert.equal(outcome.commit,'applied',JSON.stringify(outcome));assert.equal(w.state.replaced.length,1);
@@ -68,6 +73,6 @@ for(const c of plan.cases)test(c.id+' '+c.check,async()=>{
   assert.equal(saved.appliedBattles[c.id].hash,E.state.resultHash(result));assert.deepEqual(Object.keys(saved.appliedBattles),[c.id]);
   assert.deepEqual(saved.inventory,w.before.inventory);assert.equal(saved.money,w.before.money);assert.equal(installed.exp,w.before.party[0].exp);
   w.app.finishBattle(w.s,w.request);assert.equal(w.state.replaced.length,1);assert.deepEqual(w.state.read(),saved,'repeat finish cannot restore old HP/PP or install twice');
-  console.log('E_HP_APP_OBSERVATION '+JSON.stringify({id:c.id,featureIds:c.featureIds,initial:w.before,trace:w.trace,beforeEnd,result,outcome,saved,installs:1,syntheticWrongReadout:'rejected',completeHeading:false,NW:0}));
+  console.log('E_HP_APP_OBSERVATION '+JSON.stringify({id:c.id,featureIds:c.featureIds,initial:w.before,trace:w.trace,exitTrace:w.exitTrace,beforeEnd,result,outcome,saved,installs:1,syntheticWrongReadout:'rejected',completeHeading:false,NW:0}));
  }finally{w.cleanup();}
 });
