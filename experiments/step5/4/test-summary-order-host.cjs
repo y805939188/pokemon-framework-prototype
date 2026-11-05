@@ -18,7 +18,7 @@ async function make(options={}){
  let transitions=0;const toMap=h.p.toMapId;h.p.toMapId=async(...a)=>{transitions++;await toMap(...a);};
  for(const rel of[...plan.worldFiles,...plan.fontResourcePaths]){const out=path.join(h.w.root,rel);fs.mkdirSync(path.dirname(out),{recursive:true});fs.writeFileSync(out,rel.endsWith('.json')?fs.readFileSync(path.join(ROOT,rel)):'SYNTHETIC_CONTROL_FONT_LAYOUT');}
  for(const rel of['js/engine/build/engine.cjs','js/engine/build/production.cjs']){const out=path.join(h.w.root,rel);fs.mkdirSync(path.dirname(out),{recursive:true});fs.copyFileSync(path.join(ROOT,rel),out);}
- const input=JSON.parse(fs.readFileSync(h.inputFile));input.productRuntime=plan.productRuntime;for(const key of['worldFiles','fontFiles'])input[key]=Object.fromEntries((key==='worldFiles'?plan.worldFiles:plan.fontResourcePaths).map(n=>[n,hash(fs.readFileSync(path.join(h.w.root,n)))]));fs.writeFileSync(h.inputFile,JSON.stringify(input));const arg=h.p.arg;h.p.arg=k=>k==='ps-summary-order-input'?h.inputFile:arg(k);
+ const input=JSON.parse(fs.readFileSync(h.inputFile));input.productRuntime=plan.productRuntime;input.planSHA256=hash(E.contentCompile.canonicalJson(plan));for(const key of['worldFiles','fontFiles'])input[key]=Object.fromEntries((key==='worldFiles'?plan.worldFiles:plan.fontResourcePaths).map(n=>[n,hash(fs.readFileSync(path.join(h.w.root,n)))]));fs.writeFileSync(h.inputFile,JSON.stringify(input));const arg=h.p.arg;h.p.arg=k=>k==='ps-summary-order-input'?h.inputFile:arg(k);
  return{...h,get transitions(){return transitions;}};
 }
 test('cold Title then later Map reaches both ordered normal Scene cases and six raster pairs',async()=>{
