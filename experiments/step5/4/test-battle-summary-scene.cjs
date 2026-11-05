@@ -894,3 +894,23 @@ test('summary move sorting uses the selected reserve identity and keeps ribbons 
     assert.equal(JSON.stringify(h.flow.game()),h.before);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
   }finally{h.cleanup();}
 });
+
+// AUD1: the visible footer command is distinct from BACK and member-command Cancel.
+for(const lang of ['en','zh'])test('AUD1 '+lang+' normal-speed explicit list Cancel resolves No and the real battle commits once',async()=>{
+ const h=await open({lang,trainer:true,trainerMembers:2,battleStyle:'',fast:false});try{
+  const s=h.s._session,installs=observeInstalls(h),offer=await switchOffer(h),foe=s.gw.activeId('p2');
+  await h.frames(1);await pick(h,'replace-yes');await h.p.inMode('party');await h.frames(1);assert.equal(h.s._partySub,'replacement');
+  const pp=JSON.stringify(s.gw.readState('p1').map(m=>[m.id,m.pp]));row(h,null);h.s.onMenuOk();h.s.onMenuOk();
+  await h.p.inMode('main');assert.equal(E.session.readTrainerReplacement(s),null,'footer Cancel must consume the offer just like BACK');assert(s.currentRequest());
+  assert.notEqual(s.gw.activeId('p2'),foe);assert.equal(JSON.stringify(s.gw.readState('p1').map(m=>[m.id,m.pp])),pp,'declining does not spend a player action');
+  assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(installs(),0);assert.equal(h.s._failure,null);await finishSwitchBattle(h,installs);
+ }finally{h.cleanup();}
+});
+test('AUD1 explicit list Cancel shares the first-update gate and member-command Cancel remains only a return',async()=>{
+ const h=await open({trainer:true,trainerMembers:2,battleStyle:'',fast:true});try{
+  const s=h.s._session,offer=await switchOffer(h);await h.frames(1);row(h,'replace-yes');h.s.onMenuOk();assert.equal(h.s._mode,'party');
+  row(h,null);h.s.onMenuOk();assert.equal(h.s._mode,'party','the confirmation that opened the list cannot immediately decline it');assert.equal(E.session.readTrainerReplacement(s).offerId,offer.offerId);
+  await h.frames(1);await pick(h,s.party[1].id);await h.p.inMode('party-command');await pick(h,null);await h.p.inMode('party');assert.equal(E.session.readTrainerReplacement(s).offerId,offer.offerId,'member-command Cancel only returns to the list');
+  await h.frames(1);await pick(h,null);await h.p.inMode('main');assert.equal(E.session.readTrainerReplacement(s),null);assert(s.currentRequest());assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
+});
