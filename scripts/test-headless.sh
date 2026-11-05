@@ -72,6 +72,7 @@ SUITES=(
   experiments/step5/4/test-trainer-opening-native.cjs
   experiments/step5/4/test-result-native.cjs
   experiments/step5/4/test-result-feedback.cjs
+  experiments/step5/4/test-defeat-policy-scene.cjs
   experiments/step5/4/test-ball-native.cjs
   experiments/step5/4/test-ball-scene.cjs
   experiments/step5/4/test-ball-scene-integration.cjs

@@ -211,3 +211,5 @@
 [范围](5.4-e-ability-contracts.md)：四组正反对照、八场Gateway战斗，六个FR标题有限抽样；不等于标题全集、App/存档/实机或完整E接收。
 
 2026-11-05 正常摘要后继：[战斗内个体招式排序](5.4-battle-summary-move-order.md)接共享真实Scene与Session工作副本，保持PP身份、排序后学招与一次战后写回；本场临时招式包装保留独立顺序。缎带、完整摘要/D2/E/P4及实机未完成，作者/独审/精确CI门分列。
+
+2026-11-05 窄修：[Switch显式取消与败北策略一致性](5.4-cancel-defeat-policy-fix.md)修正常列表取消的提议解析，另让宿主和App使用同一begin时canLose策略；跨开关音乐观察后置，独审/CI/实机不由作者测试代签。
