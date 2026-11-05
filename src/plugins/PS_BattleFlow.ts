@@ -507,10 +507,11 @@ const { developmentCapabilities } = RuleConfig;
       PSFlow._prepareBattlePresentation(op, app, assertCurrent);
       op.request.storageFull = engine().B.limits.storageFull(current, limits); // only refusal text; application decides noBall
       const sessionRequest = { ...op.request, battleStyle: op.battleStyle ?? effectiveBattleStyle(G, op.request.battleStyle) };
-      // Match the App's synchronous begin-time policy capture; the caller still owns its request object.
-      op.canLose = !!sessionRequest.canLose;
+      // Capture before awaiting, but only publish for a successfully accepted, still-current Session.
+      const canLose = !!sessionRequest.canLose;
       const session = await (op.request.trainer ? app.startTrainerBattle(sessionRequest) : app.startBattle(sessionRequest)); assertCurrent();
       const elapsed = performance.now() - tCreate; assertCurrent();
+      op.canLose = canLose;
       op.session = session;
       if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round(elapsed * 10) / 10;
       return session;
