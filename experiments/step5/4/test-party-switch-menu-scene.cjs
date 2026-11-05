@@ -18,7 +18,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, fast = false, effects = true, noRun = false } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, fast = false, effects = true, noRun = false, leadHP = null, leadMoves = null } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -31,6 +31,8 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   const state = fixture.musicNativeState(E, content, 'receiving'); state.party = state.party.slice(0, members); state.nextMemberOrdinal = String(members + 1);
   if (ghost) state.party[0] = E.speciesKey.toPersistentMember(E.memberFactory.createMember({ id: state.party[0].id, species: 'Gengar', level: 100 }, content, () => 0), content);
   if (hurt) state.party[0].hp -= 40;
+  if (leadHP !== null) state.party[0].hp = leadHP;
+  if (leadMoves) state.party[0].moves = leadMoves.map(m => ({ ...m }));
   if (reserveHP !== null) state.party[1].hp = reserveHP;
   if (egg) state.party[1].isEgg = true;
   state.inventory = E.inventory.inventoryFromBag(bag, E.itemCatalog.catalogOf(content)); G.$gameSystem._psGame = state;
@@ -47,6 +49,25 @@ function row(h, key) { const i = h.s._menu._items.findIndex(r => r.ext === key);
 async function pick(h, key) { row(h, key); h.s.onMenuOk(); await h.frames(1); }
 async function party(h) { await pick(h, 'party'); assert.equal(h.s._mode, 'party'); }
 async function commands(h, id) { await party(h); await pick(h, id); assert.equal(h.s._mode, 'party-command'); }
+// Integration: action-return PP sync must survive the new real faint question and its three exits.
+for(const lang of ['en','zh'])for(const route of ['next','escape','blocked'])test(lang+' spent last PP survives actual faint '+route+' and one final App install',async()=>{
+ const h=await open({lang,fast:true,leadHP:1,noRun:route==='blocked',leadMoves:[{id:'splash',pp:1,maxpp:40}]});try{
+  const s=h.s._session,[lead,reserve]=s.party.map(m=>m.id),order=JSON.parse(h.before).party.map(m=>m.id),calls=[],choose=s.chooseMove.bind(s);let installs=0,runs=0,doc=h.G.$gameSystem._psGame;
+  s.chooseMove=slot=>{calls.push(slot);return choose(slot);};const run=s.run.bind(s);s.run=(...a)=>{runs++;return run(...a);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  h.flow.fast=false;await pick(h,'fight');assert.equal(h.s._mode,'moves');await pick(h,1);await h.p.inMode('wild-faint');
+  assert(h.batches.flatMap(b=>b.value).flatMap(m=>m.events??[]).some(e=>e.type==='move'&&e.args[1]==='Splash'));
+  const fainted=s.gw.readState('p1').find(m=>m.id===lead);assert(fainted.fainted);assert.equal(fainted.pp.splash,0);assert.equal(s.party.find(m=>m.id===lead).moves[0].pp,0,'completed real action synchronizes PP before the faint question');assert.deepEqual(calls,[1]);assert.equal(runs,0);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  const foe=JSON.stringify(s.gw.readState('p2'));await h.frames(1);await pick(h,route==='next'?'next':'escape');h.s.onMenuOk();h.s.onMenuCancel();
+  if(route==='escape'){
+   await h.p.inMode('end');assert.equal(s.ended?.reason,'run');assert.equal(runs,1);assert.equal(JSON.stringify(s.gw.readState('p2')),foe);assert.deepEqual(calls,[1]);
+  }else{
+   await h.p.inMode('party-forced');assert.equal(runs,route==='blocked'?1:0);assert.equal(s.ended,null);assert.equal(JSON.stringify(s.gw.readState('p2')),foe);assert.equal(s.party.find(m=>m.id===lead).moves[0].pp,0);h.s.onMenuCancel();await h.frames(1);assert.equal(h.s._mode,'party-forced');
+   await pick(h,reserve);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),reserve);h.flow.fast=true;await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.deepEqual(calls,[1,1]);
+  }
+  assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),order);
+  const saved=h.flow.game().party.find(m=>m.id===lead);assert.equal(saved.moves[0].id,'splash');assert.equal(saved.moves[0].pp,0);assert.equal(saved.hp,0);h.s.onEnd();assert.equal(installs,1);assert.equal(runs,route==='next'?0:1);
+ }finally{h.cleanup();}
+});
 async function wildFaint(h) {
  const s=h.s._session,reserve=s.party[1].id;
  await commands(h,reserve);await pick(h,'switch-in');await h.p.inMode('wild-faint');
