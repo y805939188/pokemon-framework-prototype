@@ -15,7 +15,8 @@ async function open(c){
  const joined=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(joined.errors,[]);const content=joined.content;
  const game=E.state.newGame({content,party:[],money:1000,bag:{antidote:2}});
  game.party=Array.from({length:c.check==='benched-cure'?2:1},(_,i)=>{
-  const member=E.memberFactory.createMember({id:'STATUS-P'+(i+1),species:c.player,level:plan.playerLevel},content,()=>0);
+  const member=E.memberFactory.createMember({id:'STATUS-P'+(i+1),species:c.player,level:plan.playerLevel,abilityIndex:plan.playerAbilityIndex[c.player]},content,()=>0);
+  assert.equal(member.ability,c.player==='Snorlax'?'Thick Fat':'Overgrow','the positive fixture must not accidentally carry Immunity');
   member.moves=[{id:'splash',pp:40,maxpp:40}];return E.speciesKey.toPersistentMember(member,content);
  });game.nextMemberOrdinal=String(game.party.length+1);
  const state=T.fakes.createMemoryState(game),before=JSON.stringify(state.read()),factory=E.composition.createBattleSessionFactory({content:()=>content,seed:()=>[...plan.seed]});

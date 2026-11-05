@@ -4,6 +4,7 @@
   "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
   "seed": [1, 2, 3, 4],
   "playerLevel": 100,
+  "playerAbilityIndex": {"Snorlax": 1, "Venusaur": 0},
   "foeLevel": 5,
   "featureIds": ["FR-000544", "FR-000545"],
   "completeHeading": false,
