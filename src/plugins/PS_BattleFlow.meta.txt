@@ -138,6 +138,18 @@
  * @type boolean
  * @default false
  *
+ * @arg battleEffects
+ * @text Battle Effects
+ * @desc Inherit the player option, or override for this battle. Captured before the Map transition; basic feedback always plays.
+ * @type select
+ * @option Inherit
+ * @value inherit
+ * @option On
+ * @value on
+ * @option Off
+ * @value off
+ * @default inherit
+ *
  * @arg canSwitch
  * @text Allow manual switching
  * @desc false hides voluntary Switch In; mandatory replacements remain available. Default true.
@@ -291,6 +303,18 @@
  * @desc true refuses ball registration without consuming a ball. Default false retains normal capture/storage rules and trainer blocking.
  * @type boolean
  * @default false
+ *
+ * @arg battleEffects
+ * @text Battle Effects
+ * @desc Inherit the player option, or override for this battle. Captured before the Map transition; basic feedback always plays.
+ * @type select
+ * @option Inherit
+ * @value inherit
+ * @option On
+ * @value on
+ * @option Off
+ * @value off
+ * @default inherit
  *
  * @arg canSwitch
  * @text Allow manual switching

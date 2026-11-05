@@ -19,7 +19,7 @@ const hostClock: FaintAudioClock = {
  * this is not a replacement for every legacy file-header reader quirk. */
 export function createFaintMediaMZ(G: any, nodeRequire: any, root: string,
   identity: { species: string; form: number } | null, current: () => boolean,
-  trace: (row: any) => void = () => {}, clock: FaintAudioClock = hostClock): FaintMedia {
+  trace: (row: any) => void = () => {}, clock: FaintAudioClock = hostClock, battleEffects = true): FaintMedia {
   identity = identity && { species: identity.species, form: identity.form };
   const fs = nodeRequire('fs'), path = nodeRequire('path');
   let retired = false, origin: number | null = null, selected: FaintCrySlot | null = null, lastNow = -1;
@@ -172,7 +172,7 @@ export function createFaintMediaMZ(G: any, nodeRequire: any, root: string,
           : cry.state === 'failed' ? { state: 'failed', reason: cry.error || 'faint decode failed' }
           : now - origin >= 5000 ? { state: 'failed', reason: 'faint decode timeout' } : { state: 'pending' };
       }
-      scheduled = planFaintSchedule({ candidates: observations, battleEffects: true });
+      scheduled = planFaintSchedule({ candidates: observations, battleEffects });
       return scheduled;
     },
     playCry() {
@@ -193,7 +193,7 @@ export function createFaintMediaMZ(G: any, nodeRequire: any, root: string,
       for (const voice of [...voices]) release(voice);
       if (cleanupErrors.length) throw new Error('owned faint audio cleanup: ' + cleanupErrors.join('; '));
     },
-    snapshot: () => ({ version: 'faint-media-mz-v1', durationSource: 'mz-decoded-v1', retired, selected,
+    snapshot: () => ({ version: 'faint-media-mz-v1', durationSource: 'mz-decoded-v1', battleEffects, retired, selected,
       cry: cry && { assetId: cry.assetId, state: cry.state, fileSeconds: cry.buffer?.duration ?? null },
       effect: effect && { assetId: effect.assetId, state: effect.state, error: effect.error ?? null,
         playPending: effect.playPending, deadline: effect.deadline, fileSeconds: effect.buffer?.duration ?? null },

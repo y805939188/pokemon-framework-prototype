@@ -39,6 +39,7 @@ import { BALLS } from '../framework/rules/items';
 import { PP_ITEMS, ESCAPE_ITEMS } from '../framework/rules/rules';
 import { projectStatusCard } from './battleflow/status-card';
 import { installPrebattleHost } from './battleflow/prebattle-host';
+import { effectiveBattleEffects, installBattleEffectsSettings, parseBattleEffects } from './battleflow/battle-effects-settings';
 const { developmentCapabilities } = RuleConfig;
 
 (() => {
@@ -643,6 +644,7 @@ const { developmentCapabilities } = RuleConfig;
         // Preserve contained scene initialization for an unusable/missing save. A usable save retains the held gate.
         if(!G.$gameSystem._psSaveError&&G.$gameSystem._psGame)PSFlow.assertBattleAllowed();
         assertCurrent();
+        const battleEffects = effectiveBattleEffects(G, request.battleEffects); assertCurrent();
         const started = performance.now(); assertCurrent();
         const battleStyle = effectiveBattleStyle(G, request.battleStyle); assertCurrent();
         const visualContext = battlebackContext(presentation, G.PluginManager.parameters(NAME)); assertCurrent();
@@ -650,7 +652,7 @@ const { developmentCapabilities } = RuleConfig;
         const presetHolder = PSFlow._nextBattleMusic;
         const settings = musicSettings(presentation, G.PluginManager.parameters(NAME), presetHolder); assertCurrent();
         const prepared = battleMusic.capture({ app: PSFlow._app, generation: PSFlow._app?.stateGeneration }); assertCurrent();
-        PSFlow._op = { request, session: null, battleStyle, visualContext, musicPlan: { settings, prepared, presetHolder, started: false, closed: false } };
+        PSFlow._op = { request, session: null, battleStyle, battleEffects, visualContext, musicPlan: { settings, prepared, presetHolder, started: false, closed: false } };
         PSFlow.request = request;
         PSFlow.running = true;
         PSFlow.lastOutcome = null;
@@ -717,6 +719,7 @@ const { developmentCapabilities } = RuleConfig;
     makePort: (current, defaultBgm) => createBattleMusicMZ(G, nodeRequire, engine().root, current, { defaultBgm }),
   });
   const prebattle = installPrebattleHost(G, PSFlow, op => PSFlow._preparePrebattleAudio(op));
+  installBattleEffectsSettings(G, () => PSFlow.translator());
 
   // ---------------------------------------------------------------- plugin commands + interpreter wait
   function parseCanSwitch(value: unknown): boolean {
@@ -743,7 +746,7 @@ const { developmentCapabilities } = RuleConfig;
 
   G.PluginManager.registerCommand(NAME, "StartBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
-    const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle), expGain = parseExpGain(args.expGain), noRun = parseProhibition(args.noRun, 'noRun'), noBall = parseProhibition(args.noBall, 'noBall'), seq = PSFlow.nextSeq();
+    const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle), expGain = parseExpGain(args.expGain), battleEffects = parseBattleEffects(args.battleEffects), noRun = parseProhibition(args.noRun, 'noRun'), noBall = parseProhibition(args.noBall, 'noBall'), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || "battle"}#${seq}`;
     const opened=PSFlow.tryOpenBattle({
       kind: args.kind === "trainer" ? "trainer" : "wild",
@@ -751,7 +754,7 @@ const { developmentCapabilities } = RuleConfig;
       seq,
       battleId,
       resultVariable: Number(args.resultVariable) || 0,
-      canLose: String(args.canLose) === "true", canSwitch, battleStyle, expGain, noRun, noBall,
+      canLose: String(args.canLose) === "true", canSwitch, battleStyle, expGain, noRun, noBall, battleEffects,
       forceParty: String(args.forceParty) === "true",
     }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
       transition: { location: args.prebattleLocation || undefined } });
@@ -763,7 +766,7 @@ const { developmentCapabilities } = RuleConfig;
   G.PluginManager.registerCommand(NAME, "StartTrainerBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
     if (args.moneyGain !== undefined && ![true, false, "true", "false"].includes(args.moneyGain)) throw new Error("moneyGain must be true or false");
-    const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle), expGain = parseExpGain(args.expGain), noRun = parseProhibition(args.noRun, 'noRun'), noBall = parseProhibition(args.noBall, 'noBall');
+    const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle), expGain = parseExpGain(args.expGain), battleEffects = parseBattleEffects(args.battleEffects), noRun = parseProhibition(args.noRun, 'noRun'), noBall = parseProhibition(args.noBall, 'noBall');
     const id = String(args.trainerId || args.id || ""), version = Number(args.version ?? 0), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || `trainer-${id}-v${version}`}#${seq}`;
     let known = true;
@@ -779,7 +782,7 @@ const { developmentCapabilities } = RuleConfig;
       kind: "trainer", trainer: { id, version }, foes: [], seq, battleId,
       moneyGain: args.moneyGain !== false && args.moneyGain !== "false",
       resultVariable: Number(args.resultVariable) || 0,
-      canLose: String(args.canLose) === "true", canSwitch, battleStyle, expGain, noRun, noBall,
+      canLose: String(args.canLose) === "true", canSwitch, battleStyle, expGain, noRun, noBall, battleEffects,
       forceParty: String(args.forceParty) === "true",
     }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
       transition: { location: args.prebattleLocation || undefined } });
@@ -1291,8 +1294,8 @@ const { developmentCapabilities } = RuleConfig;
         const identity = !member || member.egg ? null : mapped || { species: member.species, form: member.form ?? 0 };
         return createFaintMediaMZ(G, nodeRequire, engine().root, identity,
           () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
-          row => { if (c.isCurrent() && PSFlow.running) this._faintAudio.push({ ...row, t: performance.now() }); });
-      });
+          row => { if (c.isCurrent() && PSFlow.running) this._faintAudio.push({ ...row, t: performance.now() }); }, undefined, this._psOp.battleEffects ?? true);
+      }, this._psOp.battleEffects ?? true);
     // Active is already the engine's opening state; a queued public send-out
     // still owns the first visible portrait. Consume the batch once, and hide
     // only those identities until their own send-out step paints them.
@@ -1451,7 +1454,7 @@ const { developmentCapabilities } = RuleConfig;
               const current = () => c.isCurrent() && PSFlow.running && op === PSFlow._op && G.SceneManager._scene === this;
               const ports = createBallPortsMZ(G, this, current, () => this._pictureUpdate,
                 scale => this._pictures.captureScale(ballPlan.target!, scale), opacity => this._display.captureBox(ballPlan.target!, opacity));
-              const stage = new BallScenePresentation(ballPlan, G.ConfigManager?.battleEffects !== false, ports);
+              const stage = new BallScenePresentation(ballPlan, op.battleEffects ?? true, ports);
               this._ballFeedback = op.ballFeedback = stage;
               // Normal results publish throw text first; trainer blocking has its own result text.
               if (ballPlan.outcome !== 'blocked' && lines.length) steps.push(...this.briefMessages([lines[0]]), this.clearBriefFor(stage), ...lines.slice(1));
