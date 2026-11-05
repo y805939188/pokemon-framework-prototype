@@ -19,7 +19,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, expGain, noRun, noBall, battleStyle = 'set', playerStyle, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null, benchMoves = null } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, expGain, noRun, noBall, battleEffects, battleStyle = 'set', playerStyle, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null, benchMoves = null } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = suppliedContent ?? fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -53,8 +53,8 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   vm.runInContext(plugins.PS_Management, G, { filename: 'actual-PS_Management.js' });
   const before = JSON.stringify(flow.game()); await h.p.toMapId(5, 8, 9);
   const batches = [], begin = flow.begin.bind(flow); flow.begin = async (...args) => { const session = await begin(...args), take = session.take.bind(session); session.take = () => { const value = take(); batches.push({ value, wire: JSON.stringify(value) }); return value; }; return session; };
-  if (command) h.w.commands['PS_BattleFlow:' + command].call({ setWaitMode() {} }, { kind: 'wild', foes: 'Pidgey:3', trainerId: 'music-normal', version: '1', canLose: 'true', ...(canSwitch === undefined ? {} : { canSwitch }), ...(expGain === undefined ? {} : { expGain }), ...(noRun === undefined ? {} : { noRun }), ...(noBall === undefined ? {} : { noBall }), battleStyle });
-  else flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true, ...(canSwitch === undefined ? {} : { canSwitch }), ...(expGain === undefined ? {} : { expGain }), ...(noRun === undefined ? {} : { noRun }), ...(noBall === undefined ? {} : { noBall }), battleStyle });
+  if (command) h.w.commands['PS_BattleFlow:' + command].call({ setWaitMode() {} }, { kind: 'wild', foes: 'Pidgey:3', trainerId: 'music-normal', version: '1', canLose: 'true', ...(canSwitch === undefined ? {} : { canSwitch }), ...(expGain === undefined ? {} : { expGain }), ...(noRun === undefined ? {} : { noRun }), ...(noBall === undefined ? {} : { noBall }), ...(battleEffects === undefined ? {} : { battleEffects }), battleStyle });
+  else flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true, ...(canSwitch === undefined ? {} : { canSwitch }), ...(expGain === undefined ? {} : { expGain }), ...(noRun === undefined ? {} : { noRun }), ...(noBall === undefined ? {} : { noBall }), ...(battleEffects === undefined ? {} : { battleEffects }), battleStyle });
   await h.waitFor(() => !!h.p.battle()?._session, 'real opening Session'); const s = h.p.battle();
   const completed = [], add = s._log.add; s._log.add = function (line) { completed.push(line); return add.call(this, line); };
   await h.p.inMode('main');
@@ -595,7 +595,7 @@ test('SWC01 en default player Switch publishes an actual replacement question be
 const SWD=require('../../../js/engine/build/testing.cjs').trainerAiDiagnostics;
 for (const lang of ['en', 'zh']) for (const style of ['switch', 'set']) test('RUI01 ' + lang + ' no-growth/prohibitions after forced replacement with ' + style, async () => {
   const h = await open({ lang, command: 'StartTrainerBattle', trainerMembers: 2, members: 3, battleStyle: style,
-    expGain: 'false', noRun: 'true', noBall: 'true', fast: true, bag: { masterball: 2 },
+    expGain: 'false', noRun: 'true', noBall: 'true', battleEffects: 'off', fast: true, bag: { masterball: 2 },
     leadHP: 1, leadMoves: [{ id: 'splash', pp: 1, maxpp: 40 }] });
   try {
     const s = h.s._session, installs = observeInstalls(h), savedBefore = JSON.parse(h.before);
@@ -603,6 +603,10 @@ for (const lang of ['en', 'zh']) for (const style of ['switch', 'set']) test('RU
     const growth = m => [m.id, m.level, m.exp, m.evs];
     const expectedGrowth = savedBefore.party.map(growth).sort();
     assert.equal(s.expGain, false);
+    assert.equal(h.flow._op.battleStyle, style); assert.equal(h.flow._op.battleEffects, false);
+    h.G.ConfigManager.psBattleStyle = style === 'switch' ? 'set' : 'switch'; h.G.ConfigManager.psBattleEffects = true;
+    h.flow._op.request.battleStyle = h.G.ConfigManager.psBattleStyle; h.flow._op.request.battleEffects = true;
+    assert.equal(h.s.pictureState().effects, false);
     assert.deepEqual(s.gw.query('p1', 'ball'), { allowed: false, reason: 'ballsdisabled' });
     assert.deepEqual(s.gw.query('p1', 'run'), { allowed: false, reason: 'trainer' });
     const beforeRefusal = s.gw.snapshot(); await pick(h, 'run'); await h.p.inMode('main');
