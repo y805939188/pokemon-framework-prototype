@@ -818,7 +818,7 @@ export class BattleSession {
     const parts = [...(this.participants[foeId] || [])];
     const alive = new Set(this.gw.readState("p1").filter((x) => !x.fainted).map((x) => x.id));
     const receivers = this.party.filter((m) => parts.includes(m.id) && alive.has(m.id));
-    const stages: GrowthTask[] = [];
+    const initialStages: GrowthTask[] = [], stages: GrowthTask[] = [];
     for (const m of receivers) {
       const evs = G.gainEvs(m.evs ?? {}, foeC.evYield);
       const withEv: Member = { ...m, evs };
@@ -855,12 +855,13 @@ export class BattleSession {
           ratio: last ? (finalCeiling > finalFloor ? (res.after.exp - finalFloor) / (finalCeiling - finalFloor) : 1) : 0,
           segments: segments.slice(segmentIndex, stop),
           ...(cuts.length > 1 ? { experienceGained: index === 0 ? res.after.exp - res.before.exp : 0 } : {}) };
-        stages.push({ kind: "growth", memberId: m.id, exp: res.after.exp, evs, level, hp, stats, levelUps, changed, message, display });
+        (index === 0 ? initialStages : stages).push({ kind: "growth", memberId: m.id, exp: res.after.exp, evs, level, hp, stats, levelUps, changed, message, display });
         for (const pm of res.log.pendingMoves.filter(pm => pm.level > fromLevel && pm.level <= level)) stages.push({ kind: "learn", memberId: m.id, move: this.gw.moveInfo(pm.move) });
         segmentIndex = stop; fromLevel = level;
       }
     }
-    this.growthQueue.unshift(...stages);
+    // Preserve the existing per-foe payment boundary for every eligible participant before the first decision.
+    this.growthQueue.unshift(...initialStages, ...stages);
     this.participants[foeId] = new Set(); // paid once per foe
   }
 
