@@ -35,6 +35,7 @@ import { createBagFadeMZ } from './battleflow/bag-fade-mz';
 import type { BattleBagRequest } from './battleflow/battle-bag';
 import { catalogOf, itemForBattleId } from '../framework/rules/item-catalog';
 import { BALLS } from '../framework/rules/items';
+import { PP_ITEMS } from '../framework/rules/rules';
 import { projectStatusCard } from './battleflow/status-card';
 import { installPrebattleHost } from './battleflow/prebattle-host';
 const { developmentCapabilities } = RuleConfig;
@@ -1778,6 +1779,12 @@ const { developmentCapabilities } = RuleConfig;
       if (target.kind === 'foe' && BALLS.includes(request.battleId)) {
         if (s.gw.activeId('p2') !== target.memberId) return { ok: false, reason: 'unknown-target' };
         return s.throwBall(request.battleId);
+      }
+      if (target.kind === 'move') {
+        if (!Object.hasOwn(PP_ITEMS, request.battleId) || PP_ITEMS[request.battleId]!.all) return { ok: false, reason: 'unsupported-battle-item' };
+        if (s.party.find((m: any) => m.id === target.memberId)?.moves[target.slot]?.id !== target.moveId) return { ok: false, reason: 'unknown-target' };
+        const eligible = s.canUseItem(request.battleId, target.memberId, target.slot); if (!eligible.ok) return eligible;
+        return s.useItem(request.battleId, target.memberId, { moveSlot: target.slot });
       }
       if (target.kind !== 'member' && target.kind !== 'active') return { ok: false, reason: 'unsupported-battle-item' };
       if (target.kind === 'active' && !s.gw.readState('p1').some((m: any) => m.id === target.memberId && m.active)) return { ok: false, reason: 'unknown-target' };

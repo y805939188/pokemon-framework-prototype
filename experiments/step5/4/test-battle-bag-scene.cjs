@@ -17,7 +17,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, fast = true } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, fast = true, leadMoves = null, benchMoves = null, benchHP = null } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -27,6 +27,9 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   const state = fixture.musicNativeState(E, content, 'receiving'); state.party = state.party.slice(0, members); state.nextMemberOrdinal = String(members + 1);
   if (hurt) state.party[0].hp -= 40;
   if (egg) state.party[1].isEgg = true;
+  if (leadMoves) state.party[0].moves = leadMoves.map(m => ({ ...m }));
+  if (benchMoves) state.party[1].moves = benchMoves.map(m => ({ ...m }));
+  if (benchHP !== null) state.party[1].hp = benchHP;
   state.inventory = E.inventory.inventoryFromBag(bag, E.itemCatalog.catalogOf(content)); G.$gameSystem._psGame = state;
   const before = JSON.stringify(flow.game()); await h.p.toMapId(5, 8, 9);
   flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true });
@@ -263,4 +266,20 @@ for (const route of ['enter-target', 'return-from-target', 'close-bag']) test(ro
     await visibleBag(h, expected); assert.equal(h.s._menu, menu); assert.equal(h.s._battleBag, model);
     assert.equal(h.s._session.bag.potion, 3); assert.equal(JSON.stringify(h.flow.game()), h.before);
   } finally { console.log('BAG_OUTGOING_FRAMES', JSON.stringify({ route, frames })); h.cleanup(); }
+});
+
+// Manual PP family: actual compiled Scene targets, real Session/engine, and final App write.
+for(const lang of ['en','zh'])test(lang+' Ether move selection cancels without a reserve, then restores and saves once',async()=>{
+ const h=await open({lang,bag:{ether:2,masterball:1},leadMoves:[{id:'splash',pp:0,maxpp:40},{id:'tackle',pp:35,maxpp:35}]});try{
+  const s=h.s._session,lead=s.party[0].id,order=s.party.map(m=>m.id);let calls=0,installs=0,doc=h.G.$gameSystem._psGame;const real=s.useItem.bind(s);s.useItem=(...a)=>{calls++;return real(...a);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  await bag(h);await use(h,'ether');assert.equal(h.s._mode,'bag-members');await pick(h,lead);assert.equal(h.s._mode,'bag-moves');assert(h.s._menu._items[0].name.includes('0'));await cancel(h);assert.equal(h.s._mode,'bag-members');assert.equal(s.bag.ether,2);assert.equal(calls,0);
+  await pick(h,lead);await pick(h,0);h.s.onMenuOk();h.s.onMenuCancel();await h.p.inMode('main');assert.equal(calls,1);assert.equal(s.bag.ether,1);assert.equal(s.party[0].moves[0].pp,10);assert.equal(s.currentRequest().active[0].moves[0].pp,10);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await pick(h,'fight');await pick(h,2);await h.p.inMode('end');assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied',JSON.stringify({outcome:h.flow.lastOutcome,failure:h.s._failure?.message,ended:s.ended,result:s.finished?s.result():null}));assert.equal(installs,1);assert.deepEqual(h.flow.game().party.slice(0,order.length).map(m=>m.id),order);assert.equal(h.flow.game().party.find(m=>m.id===lead).moves[0].pp,10);assert.equal(E.inventory.aggregateBag(h.flow.game().inventory).ether,1);h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
+test('Max Elixir auto-selects its only member and restores all PP without a move picker',async()=>{
+ const h=await open({members:1,bag:{maxelixir:1},leadMoves:[{id:'rest',pp:2,maxpp:10},{id:'tackle',pp:3,maxpp:35}]});try{await bag(h);await use(h,'maxelixir');await h.p.inMode('main');assert.deepEqual(h.s._session.party[0].moves.map(m=>m.pp),[10,35]);assert.equal(h.s._session.bag.maxelixir,0);assert.equal(h.s.battleBagState().reason,'accepted');assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
+});
+test('full selected PP and fainted PP targets return to members with no reserve, turn, or game write',async()=>{
+ const h=await open({bag:{ether:2},leadMoves:[{id:'splash',pp:0,maxpp:40},{id:'tackle',pp:35,maxpp:35}],benchMoves:[{id:'splash',pp:0,maxpp:40}],benchHP:0});try{const s=h.s._session,engine=s.gw.snapshot();await bag(h);await use(h,'ether');await pick(h,s.party[0].id);await pick(h,1);await h.p.inMode('bag-members');assert.equal(s.bag.ether,2);assert.equal(s.ledger.length,0);await pick(h,s.party[1].id);await pick(h,0);await h.p.inMode('bag-members');assert.equal(s.bag.ether,2);assert.equal(s.ledger.length,0);assert.equal(s.gw.snapshot(),engine);assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
 });
