@@ -18,7 +18,7 @@ function layout(game){
 }
 function prepare(app,runRoot,out){
  app=fs.realpathSync(app);runRoot=path.resolve(runRoot);out=path.resolve(out);assert(!fs.existsSync(runRoot)&&!fs.existsSync(out),'fresh run/freeze roots, no replacement');
- for(const p of[runRoot,out]){assert(p!==app&&!inside(app,p),'outputs outside APP');const physical=path.join(fs.realpathSync(path.dirname(p)),path.basename(p));assert(physical!==app&&!inside(app,physical),'parent cannot alias APP');}
+ for(const p of[runRoot,out]){assert(p!==app&&!inside(app,p),'outputs outside APP');const physical=path.join(fs.realpathSync(path.dirname(p)),path.basename(p));assert(physical!==app&&!inside(app,physical),'outputs outside APP: parent cannot alias APP');}
  const game=path.join(app,'Contents/Resources/app.nw'),info=JSON.parse(fs.readFileSync(path.join(game,'package-info.json'))),git=(...a)=>cp.execFileSync('git',a,{cwd:ROOT,encoding:'utf8'}).trim();
  assert(info.withTests&&info.workingTreeChanges===0&&/^[a-f0-9]{40}$/.test(info.gitHead));assert.equal(git('rev-parse','HEAD'),info.gitHead);assert.equal(git('status','--porcelain','-uall'),'');cp.execFileSync('git',['merge-base','--is-ancestor',PLAN.productCommit,info.gitHead],{cwd:ROOT});
  for(const[n,digest]of Object.entries(PLAN.productRuntime))assert.equal(fileHash(path.join(game,n)),digest,'fixed accepted product '+n);
