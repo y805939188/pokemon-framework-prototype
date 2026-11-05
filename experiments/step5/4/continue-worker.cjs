@@ -11,7 +11,7 @@ async function consumer(id,folder,hostRoot,productRoot,plan){
  await h.readGlobal();assert.equal(h.commands().find(x=>x.symbol==='continue').enabled,true);const route=await h.continueSlot(1);
  if(c.corrupt){
   assert.equal(route.outcome,'failure');assert.equal(route.loadSuccess,false);assert.equal(route.listActive,true);assert.equal(g.$gameSystem,initialSystem);assert.equal(g.$gameMap,initialMap);assert.equal(g.PSFlow.replacements,0);assert.equal(h.io.length,0);assert.equal(sha(fs.readFileSync(slot)),slotBefore);
-  assert.equal(route.trace.filter(x=>x.kind==='goto').length,0);assert.equal(route.trace.filter(x=>x.kind==='buzzer').length,1);assert.equal(route.trace.filter(x=>x.kind==='game-system-after-load').length,0);
+  assert.equal(route.trace.filter(x=>x.kind==='goto').length,0);assert.equal(route.trace.filter(x=>x.kind==='buzzer').length,1);assert.equal(route.trace.filter(x=>x.kind==='game-system-after-load').length,0);assert.equal(route.trace.filter(x=>x.kind==='base-terminate').length,0,'failed load stays in the active list scene');
   return{id,sourceCase:c.sourceCase,pid:process.pid,ppid:process.ppid,scope:plan.scope,route,slotBefore,slotAfter:sha(fs.readFileSync(slot)),writes:h.records(),host:h.hashes,loadRejected:true,NW:0};
  }
  assert.equal(route.outcome,'success');assert.equal(route.loadSuccess,true);assert.equal(route.listActive,false);assert.equal(g.PSFlow.replacements,1);assert.notEqual(g.$gameSystem,initialSystem);assert.equal(g.$gameSystem.constructor.name,'Game_System');assert.equal(g.$gameMap.constructor.name,'Game_Map');assert.equal(g.$gameMap._mapId,5);assert.equal(g.$gamePlayer._x,3);assert.equal(g.$gamePlayer._y,4);

@@ -52,7 +52,7 @@ function createContinueHost(hostRoot,productRoot,folder,content,manifest){
   assert.equal(load.firstSavefileId(),slot,'actual global-info latest file is selected');assert.equal(load.savefileId(),slot,'actual save-list index maps to ordinary slot identity');
   let timer;
   const finished=new Promise((resolve,reject)=>{completion=resolve;timer=setTimeout(()=>reject(Error('owned Continue method chain did not settle')),2000);});
-  try{load.onSavefileOk();const outcome=await finished;await Promise.resolve();load.terminate();return{outcome,loadSuccess:load._loadSuccess,listActive:list.active,trace:JSON.parse(JSON.stringify(trace)),commands:JSON.parse(JSON.stringify(commands()))};}
+  try{load.onSavefileOk();const outcome=await finished;await Promise.resolve();if(outcome==='success')load.terminate();return{outcome,loadSuccess:load._loadSuccess,listActive:list.active,trace:JSON.parse(JSON.stringify(trace)),commands:JSON.parse(JSON.stringify(commands()))};}
   finally{completion=null;clearTimeout(timer);}
  }
  return{...h,trace,readGlobal,commands,continueSlot};
