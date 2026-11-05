@@ -14,6 +14,7 @@ SUITES=(
   experiments/step5/4/test-learned-move-pp.cjs
   experiments/step5/4/test-wild-faint-escape.cjs
   experiments/step5/4/test-e-basic-contracts.cjs
+  experiments/step5/4/test-e-action-contracts.cjs
   experiments/step5/4/test-prebattle-wrapper.cjs
   experiments/step5/4/test-prebattle-native.cjs
   experiments/step5/4/test-prebattle-menu.cjs
