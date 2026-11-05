@@ -98,6 +98,7 @@ for (const lang of ['en', 'zh']) test(lang + ' battle Summary uses live HP/PP, s
     const moves = JSON.stringify(s.party.map(m => m.moves));
     await h.p.press('ok'); assert.equal(current(h).view.detail, 'moves'); await h.p.press('ok'); await h.p.press('shift');
     assert.equal(JSON.stringify(s.party.map(m => m.moves)), moves, 'read-only increment cannot sort or mark');
+    await h.p.press('cancel'); assert.equal(current(h).view.selected, null, 'BACK cancels the newly available move source selection');
     await h.p.press('cancel'); assert.equal(current(h).view.detail, null);
     await h.p.press('right'); await h.p.press('right'); assert.equal(current(h).view.page, 4, 'pages clamp at the last page');
     await h.p.press('up'); assert.equal(current(h).view.ids[current(h).view.cursor], reserve, 'after a real switch the reserve is the preceding displayed row');

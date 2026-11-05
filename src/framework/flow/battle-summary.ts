@@ -43,7 +43,7 @@ export async function reorderBattleSummaryMoves(session: BattleSession, id: stri
   if (session._operation || session.finished || session.ended || session.broken || session._staged ||
     session.pendingLearn || session._pendingLearned || session.growthQueue.length) return false;
   const member = session.party.find(member => member.id === id);
-  if (!member || member.isEgg || member.shadow || !Array.isArray(expectedOrder) ||
+  if (!member || member.isEgg || (member as Member & { shadow?: boolean }).shadow || !Array.isArray(expectedOrder) ||
     expectedOrder.length !== member.moves.length || member.moves.some((move, i) => move.id !== expectedOrder[i]) ||
     !Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to < 0 ||
     from >= member.moves.length || to >= member.moves.length || !readBattleSummary(session, id)) return false;
