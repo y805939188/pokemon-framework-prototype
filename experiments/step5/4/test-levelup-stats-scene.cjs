@@ -278,11 +278,56 @@ test('GLI declining the first level preserves moves and still presents the follo
  const h=await open({normalAward:true,levelLearnset:{6:['Rest'],7:['Growl']}});try{const s=h.s._session;await h.p.press('ok');await h.p.press('ok');await firstLearningStage(h);await h.frames(1);h.s._menu.select(h.s._menu._items.findIndex(x=>x.ext==='decline-learning'));h.s.onMenuOk();await h.waitFor(()=>h.state()?.level===7,'next level after declining');assert.equal(s.pendingLearn,null,'already known Growl is skipped');assert(!s.party[0].moves.some(x=>x.id==='rest'));await h.p.press('ok');await h.p.press('ok');await h.p.inMode('end');assert.equal(JSON.stringify(h.flow.game()),h.before);assert.deepEqual(h.messages.filter(m=>m.kind==='growth').flatMap(m=>Array.from(m.levelUps)),[6,7]);}finally{h.cleanup();}
 });
 test('GLI empty slots append at their level in the message sequence without duplicating EXP or overwriting slots',async()=>{
- const h=await open({normalAward:true,moveSlots:1,levelLearnset:{6:['Rest'],7:['Growl']}});try{const s=h.s._session;assert.deepEqual(h.messages.filter(m=>['growth','learned'].includes(m.kind)).map(m=>m.kind==='growth'?'level'+m.levelUps.join(','):m.move),['level6','rest','level7','growl']);assert.deepEqual(s.party[0].moves.map(x=>x.id),['hypervoice','rest','growl']);assert.equal(s.gw.readState('p1')[0].pp.rest,10);assert.equal(s.gw.readState('p1')[0].pp.growl,40);await h.p.press('ok');await h.p.press('ok');await h.waitFor(()=>h.state()?.level===7,'second automatic learning level');await h.p.press('ok');await h.p.press('ok');await h.p.inMode('end');assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
+ const h=await open({normalAward:true,moveSlots:1,levelLearnset:{6:['Rest'],7:['Growl']}});try{const s=h.s._session;assert.deepEqual(h.messages.filter(m=>['growth','learned'].includes(m.kind)).map(m=>m.kind==='growth'?'level'+m.levelUps.join(','):m.move),['level6','rest']);assert.deepEqual(s.party[0].moves.map(x=>x.id),['hypervoice','rest']);assert.equal(s.gw.readState('p1')[0].pp.rest,undefined,'first learned message has not returned');await h.p.press('ok');await h.p.press('ok');await h.waitFor(()=>h.state()?.level===7,'second automatic learning level');assert.equal(s.gw.readState('p1')[0].pp.rest,10);assert.equal(s.gw.readState('p1')[0].pp.growl,undefined,'second learned message has not returned');await h.p.press('ok');await h.p.press('ok');await h.p.inMode('end');assert.deepEqual(h.messages.filter(m=>['growth','learned'].includes(m.kind)).map(m=>m.kind==='growth'?'level'+m.levelUps.join(','):m.move),['level6','rest','level7','growl']);assert.deepEqual(s.party[0].moves.map(x=>x.id),['hypervoice','rest','growl']);assert.equal(s.gw.readState('p1')[0].pp.rest,10);assert.equal(s.gw.readState('p1')[0].pp.growl,40);assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
 });
 test('GLI checkpoint restores a suspended growth stage without overwriting a subsequently learned move or PP',async()=>{
  const h=await open({normalAward:true,levelLearnset:{6:['Rest'],7:['Growl']}});try{const s=h.s._session,cp=s._checkpoint();assert.equal(s.party[0].level,6);const first=await s.decideLearn(1);assert.equal(s.party[0].level,7);const retired=first.find(m=>m.kind==='growth');assert(E.battlePresentation.readGrowthDisplay(s,retired));await s._restoreCheckpoint(cp);assert.equal(s.party[0].level,6);assert.equal(s.gw.readState('p1')[0].level,6);assert.equal(s.pendingLearn.move.id,'rest');assert.equal(E.battlePresentation.readGrowthDisplay(s,retired),null);const again=await s.decideLearn(1);assert.equal(again.filter(m=>m.kind==='growth').length,1);assert.equal(s.pendingLearn.move.id,'growl');assert.equal(s.party[0].moves[1].id,'rest');assert.equal(s.gw.readState('p1')[0].pp.rest,10);assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
 });
 test('GLI abort at the first learning gate prevents later queued levels and persistent writes',async()=>{
  const h=await open({normalAward:true,levelLearnset:{6:['Rest'],7:['Growl']}});try{await h.p.press('ok');await h.p.press('ok');await enterLearningSelector(h);const s=h.s._session;h.flow.abort(Error('owned interleaving interruption'));h.s.onMenuOk();await h.frames(3);assert.equal(s.party[0].level,6);assert.equal(s.gw.readState('p1')[0].level,6);assert(!s.party[0].moves.some(x=>x.id==='rest'));assert.equal(JSON.stringify(h.flow.game()),h.before);assert(!h.flow.app().saveBlocked);}finally{h.cleanup();}
+});
+
+
+// ELS: the working individual and the active engine own distinct move-table writes.
+async function emptyLearnNotice(h,move='rest'){
+ const text=h.s._D.message({kind:'learned',member:'LEVEL-P1',move,replaced:null})[0];
+ for(let i=0;i<2400;i++){
+  const step=h.s._ordinaryMessage,view=step?.snapshot();
+  if(step&&view.phase!=='done'&&h.s._log._lines.join(' ')===text)return step;
+  if(h.state()||step)await h.p.press('ok');else await h.frames(1);
+ }
+ assert.fail('bounded real empty-slot learned message: '+move);
+}
+async function emptyAdvanceUntil(h,condition,label){
+ for(let i=0;i<2400;i++){if(condition())return;if(h.state()||h.s._ordinaryMessage)await h.p.press('ok');else await h.frames(1);}
+ assert.fail('bounded normal learning continuation: '+label);
+}
+async function emptyEnd(h){await emptyAdvanceUntil(h,()=>h.s._mode==='end'&&!h.s._busy&&!h.s._queue.length,'end');}
+for(const lang of ['en','zh'])test('ELS '+lang+' empty-slot learned message precedes engine append and the next learning level',async()=>{
+ const h=await open({lang,normalAward:true,moveSlots:1,normalLearning:true,levelLearnset:{6:['Rest'],7:['Growl']}});try{
+  const step=await emptyLearnNotice(h),s=h.s._session;
+  assert.equal(s.gw.readState('p1')[0].pp.rest,undefined,'battle move is absent during the learned message');
+  assert.deepEqual(s.party[0].moves.map(m=>m.id),['hypervoice','rest'],'individual move is already written');assert.equal(s.party[0].level,6,'future growth still waits');assert.equal(s.finished,false);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(h.s.inputState().ready,false);
+  if(step.snapshot().phase==='typing')await h.p.press('ok');else await h.frames(1);await h.frames(4);assert.notEqual(step.snapshot().phase,'done');assert.equal(s.gw.readState('p1')[0].pp.rest,undefined,'the engine stays unchanged before the ordinary message returns');h.s.onMenuOk();h.s.onMenuCancel();assert.equal(s.gw.readState('p1')[0].pp.rest,undefined);
+  await emptyAdvanceUntil(h,()=>h.state()?.level===7,'next level after learned message');assert.equal(s.gw.readState('p1')[0].pp.rest,10);assert.equal(s.party[0].level,7);const second=await emptyLearnNotice(h,'growl');assert.equal(s.gw.readState('p1')[0].pp.growl,undefined);assert(s.party[0].moves.some(m=>m.id==='growl'));assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await h.waitFor(()=>second.snapshot().phase==='done','second learned message return');await emptyEnd(h);assert.equal(s.gw.readState('p1')[0].pp.growl,40);assert.equal(JSON.stringify(h.flow.game()),h.before);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.deepEqual(h.flow.game().party[0].moves.map(m=>m.id),['hypervoice','rest','growl']);const saved=JSON.stringify(h.flow.game());h.s.onEnd();assert.equal(JSON.stringify(h.flow.game()),saved);
+ }finally{h.cleanup();}
+});
+test('ELS same-level empty-slot moves each wait for their own returned message',async()=>{
+ const h=await open({normalAward:true,moveSlots:1,normalLearning:true,levelLearnset:{6:['Rest','Growl'],7:[]}});try{
+  const first=await emptyLearnNotice(h),s=h.s._session;assert.equal(s.gw.readState('p1')[0].pp.rest,undefined);assert(!s.party[0].moves.some(m=>m.id==='growl'));
+  const second=await emptyLearnNotice(h,'growl');assert.equal(first.snapshot().phase,'done');assert.equal(s.gw.readState('p1')[0].pp.rest,10);assert.equal(s.gw.readState('p1')[0].pp.growl,undefined);await emptyEnd(h);assert.equal(second.snapshot().phase,'done');assert.equal(s.gw.readState('p1')[0].pp.growl,40);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
+});
+for(const how of ['abort','replace'])test('ELS '+how+' while an empty-slot message is visible never synchronizes or saves the retired battle',async()=>{
+ const h=await open({normalAward:true,moveSlots:1,normalLearning:true,levelLearnset:{6:['Rest'],7:['Growl']}});try{
+  const step=await emptyLearnNotice(h),s=h.s._session;assert.equal(s.gw.readState('p1')[0].pp.rest,undefined);const live=JSON.stringify(s.gw.readState('p1'));if(how==='abort')h.flow.abort(Error('owned learned-message abort'));else h.flow.stateReplaced();h.s.onMenuOk();h.s.onMenuCancel();await h.frames(10);assert.equal(step.snapshot().phase,'done');assert.equal(JSON.stringify(s.gw.readState('p1')),live);assert.equal(s.party[0].level,6);assert.equal(JSON.stringify(h.flow.game()),h.before);assert(!h.flow.app().saveBlocked);
+ }finally{h.cleanup();}
+});
+test('ELS pending engine append survives checkpoint and a failed sync restores both sides without duplicate append',async()=>{
+ const h=await open({normalAward:true,moveSlots:1,normalLearning:true,levelLearnset:{6:['Rest'],7:[]}});try{
+  await emptyLearnNotice(h);const s=h.s._session,cp=s._checkpoint(),before=JSON.stringify(s.party),engine=JSON.stringify(s.gw.readState('p1')),apply=s.gw.applyGrowth.bind(s.gw);let injected=false;
+  s.gw.applyGrowth=(...args)=>{const r=apply(...args);if(args[2].newMoves&&!injected){injected=true;throw Error('controlled engine append failure');}return r;};await assert.rejects(E.session.completeLearnedMessage(s),/controlled engine append failure/);assert(injected);assert.equal(E.session.readLearnedMessagePending(s),true);assert.equal(JSON.stringify(s.party),before);assert.equal(JSON.stringify(s.gw.readState('p1')),engine);
+  await s._restoreCheckpoint(cp);assert.equal(E.session.readLearnedMessagePending(s),true);await emptyEnd(h);assert.equal(s.gw.readState('p1')[0].pp.rest,10);assert.equal(s.party[0].moves.filter(m=>m.id==='rest').length,1);assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
 });
