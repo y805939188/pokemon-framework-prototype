@@ -11,7 +11,7 @@ async function open(c){
  input.species.push({id:'slowbro',showdownId:'slowbro',nameKey:'species.slowbro',growth:'medium',baseExp:100,evYield:{},catchRate:45,learnset:[{level:1,move:'splash'}],source:'author-placeholder'});
  const compiled=E.contentCompile.compileContent(input);assert(compiled.ok,JSON.stringify(compiled.errors));
  const joined=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(joined.errors,[]);const content=joined.content;
- const m=E.memberFactory.createMember({id:'HP-P1',species:'Snorlax',level:50,nature:'Hardy',abilityIndex:1},content,()=>0);
+ const m=E.memberFactory.createMember({id:'HP-P1',species:'Snorlax',level:50,nature:'hardy',abilityIndex:1},content,()=>0);
  assert.equal(m.ability,'Thick Fat');assert.equal(m.hp,plan.playerMaxHP);assert.equal(m.hp%2,0,'this finite fixture does not choose between odd-HP reference rounding variants');
  if(c.initial==='quarter')m.hp=plan.playerMaxHP/4;
  const game=E.state.newGame({content,party:[E.speciesKey.toPersistentMember(m,content)],money:1000});game.nextMemberOrdinal='2';
