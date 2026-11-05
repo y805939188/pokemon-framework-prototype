@@ -8,6 +8,7 @@ test.before(async()=>{temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-level-scene-
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
 async function open({lang='en',levels=1,atCap=false,evBoundary=false,expOffset=-1,normalLearning=false,normalGrowth=false,noLearn=false,machineMove=null,machineKind='hm',levelLearnset=null,moveSlots=4,normalAward=false,capture=false}={}){
  const h=createVictoryDriverHost({ROOT,work:temp,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true}}),G=h.G,flow=h.w.flow,content=fixture.musicNativeContent(E,assert),oldParameters=G.PluginManager.parameters;
+ if(capture)G.Bitmap.prototype.fillRect=()=>{}; // Match the existing controlled capture host; no native pixel claim.
  G.PluginManager.parameters=function(name){const v=oldParameters.call(this,name);return name==='PS_BattleFlow'?{...v,language:lang}:v;};
  const refresh=G.Window_Base.prototype.refresh;G.Window_Base.prototype.refresh=function(...args){const r=refresh.apply(this,args);if(this.page&&this.drawAllItems)this.drawAllItems();return r;};
  const destroyed=[],draws=[],addWindow=G.Scene_MenuBase.prototype.addWindow;G.Scene_MenuBase.prototype.addWindow=function(view){addWindow.call(this,view);view.parent={removeChild(){}};};G.Window_Base.prototype.destroy=function(){destroyed.push(this);this._destroyed=true;};const draw=G.Window_Base.prototype.drawText;G.Window_Base.prototype.drawText=function(...args){draws.push({window:this,args});return draw.apply(this,args);};let sounds=0;G.SoundManager.playOk=()=>sounds++;
