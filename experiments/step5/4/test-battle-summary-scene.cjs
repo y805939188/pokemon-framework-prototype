@@ -19,7 +19,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, leadHP = null, command = null, pivot = false, leadingEgg = false } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = suppliedContent ?? fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -43,6 +43,7 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   if (reserveHP !== null) state.party[egg ? 2 : 1].hp = reserveHP;
   if (egg) { state.party[1].isEgg = true; state.party[1].shiny = eggShiny; state.party[1].nickname = 'Hidden Species'; }
   if (leadingEgg) { state.party[0].isEgg = true; state.party[0].nickname = 'LEADING-EGG-NAME'; }
+  if (leadMoves) state.party[0].moves = leadMoves.map(move => ({ ...move }));
   state.inventory = E.inventory.inventoryFromBag(bag, E.itemCatalog.catalogOf(content)); G.$gameSystem._psGame = state;
   G.Input.keyMapper ??= {}; G.Input.isPressed ??= () => false; G.TouchInput.isCancelled ??= () => false;
   const listeners = new Map(), globals = new Map();
@@ -481,4 +482,52 @@ for(const lang of ['en','zh'])test(lang+' normal growth and HM guard preserve th
   await summary(h,learner);assert.deepEqual(Array.from(current(h).view.ids),[actor,egg,learner,reserve]);assert.equal(current(h).view.cursor,2);assert(text(h).some(line=>line.includes('Lv.51')));await h.p.press('right');await h.p.press('right');await h.p.press('right');assert(text(h).some(line=>/\brest\b.*10\/10 PP/i.test(line)));assert(text(h).some(line=>/\btackle\b.*35\/35 PP/i.test(line)));await h.p.press('cancel');await h.p.inMode('party');assert.equal(h.s._menu.index(),2);assert.equal(h.s._menu.itemAt(2).ext,learner);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
   await pick(h,learner);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),learner);h.flow.fast=true;await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),[learner,egg,actor,reserve]);assert.equal(h.flow.game().party[0].moves[0].id,'tackle');assert.equal(h.flow.game().party[0].moves[1].id,'rest');assert.equal(h.flow.game().party[0].moves[1].pp,10);h.s.onEnd();assert.equal(installs,1);
  }finally{h.cleanup();}
+});
+
+
+// Accepted growth/HM and automatic Struggle meet in one actual normal command flow.
+for (const lang of ['en', 'zh']) test(lang + ' normal HM give-up after the last PP continues through one automatic Struggle and one commit', async () => {
+  const moves = [{id:'tackle',pp:1,maxpp:35},{id:'growl',pp:0,maxpp:40},{id:'splash',pp:0,maxpp:40},{id:'protect',pp:0,maxpp:10}];
+  const h = await open({lang,members:2,grow:true,integration:true,trainer:true,trainerMembers:2,fast:true,leadMoves:moves,
+    // Explicit author classification; Tackle is not an official HM.
+    catalog:items=>{const {battleId:unused,...base}=items.potion;items['test-machine']={...base,id:'test-machine',name:'Test machine',namePlural:'Test machines',pocket:4,fieldUse:'hm',battleUse:'none',move:'tackle',legacyIds:[],consumable:false,flags:[]};}});
+  try {
+    const s=h.s._session, lead=s.party[0].id, order=JSON.parse(h.before).party.map(m=>m.id), attempts=[], decisions=[];
+    const choose=s.chooseMove.bind(s),decide=s.decideLearn.bind(s);let doc=h.G.$gameSystem._psGame,installs=0;
+    s.chooseMove=async slot=>{const row={slot};attempts.push(row);row.result=await choose(slot);return row.result;};
+    s.decideLearn=(...args)=>{decisions.push(args[0]);return decide(...args);};
+    Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+    h.flow.fast=false;await pick(h,'fight');await pick(h,1);
+    const observations=await normalGrowthBeforeStats(h);assertPausedGrowth(h,observations);
+    assert.equal(s.ended,null);assert.equal(s.party[0].level,51);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+    await h.p.press('ok');assert.equal(h.s.levelStatsState().phase,'total');await h.p.press('ok');
+    await h.waitFor(()=>!!h.s.ordinaryMessageState(),'normal full-slot notice before HM selection');
+    const learnNotice=h.s._ordinaryMessage;assert.equal(learnNotice.snapshot().implementation,'paused-message-v1');
+    await h.p.press('ok');assert.equal(learnNotice.snapshot().phase,'full');assert.equal(decisions.length,0);
+    await h.p.press('ok');await h.p.inMode('learn-initial');await h.frames(1);await pick(h,'forget-move');await h.p.inMode('learn');
+    assert.equal(h.s.learningMoveState().page.rows[0].details,'0/35 PP','real first KO used the last Tackle PP');
+    const pending=s.pendingLearn,checkpoint=JSON.stringify(s._checkpoint()),from=h.completed.length;
+    await pick(h,0);await h.p.inMode('learn');
+    const warning=lang==='zh'?'学习时不能替换秘传招式，请重新选择。':'HM moves cannot be replaced while learning. Choose another move.';
+    assert(h.completed.slice(from).join('').replace(/\s+/g,' ').includes(warning));
+    assert.equal(s.pendingLearn,pending);assert.equal(JSON.stringify(s._checkpoint()),checkpoint);assert.equal(decisions.length,0);assert.equal(installs,0);
+    h.s.onMenuCancel();await h.p.inMode('learn-giveup');await h.frames(1);await pick(h,'give-up');await h.p.inMode('main');
+    assert.deepEqual(decisions,[null]);assert.equal(s.pendingLearn,null);assert.deepEqual(s.party[0].moves.map(m=>[m.id,m.pp]),moves.map(m=>[m.id,0]));
+    assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(installs,0);assert.equal(attempts.length,1);
+    assert.deepEqual(s.currentRequest().active[0].moves.map(m=>[m.id,m.pp]),[['struggle',undefined]],'actual pinned Gen8 fallback after learning was declined');
+    await pick(h,'fight');assert.notEqual(h.s._mode,'moves');await h.waitFor(()=>!!h.s.ordinaryMessageState(),'normal no-moves pause after HM give-up');
+    const notice=h.s._ordinaryMessage;assert.equal(notice.snapshot().implementation,'paused-message-v1');
+    assert.equal(attempts.length,1);h.s.onMenuOk();h.s.onMenuCancel();assert.equal(attempts.length,1);
+    await h.p.press('ok');assert.equal(notice.snapshot().phase,'full');assert.equal(attempts.length,1);
+    await h.frames(30);assert.equal(notice.snapshot().phase,'full');assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(installs,0);
+    assert.equal(h.s._log._lines.join(' '),h.flow.translator().t('ui.moves.none-left',{name:h.s._names[lead]}));
+    await h.p.press('ok');await h.waitFor(()=>attempts.length===2&&!h.s._busy,'one actual automatic Struggle after the notice');
+    assert.deepEqual(attempts.map(a=>a.slot),[1,1]);assert(attempts.every(a=>a.result.ok));assert.equal(notice.snapshot().phase,'done');
+    assert(s.gw.readState('p2').every(m=>m.fainted),'actual engine Struggle resolves the remaining low-level foe');
+    assert.deepEqual(s.party[0].moves.map(m=>m.pp),[0,0,0,0]);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(installs,0);
+    h.flow.fast=true;await h.p.inMode('end');await h.frames(1);h.s.onMenuOk();await h.frames(3);
+    assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),order);
+    assert.equal(h.flow.game().party[0].level,51);assert.deepEqual(h.flow.game().party[0].moves.map(m=>[m.id,m.pp]),moves.map(m=>[m.id,0]));
+    h.s.onEnd();assert.equal(installs,1);assert.equal(attempts.length,2);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
+  } finally { h.cleanup(); }
 });
