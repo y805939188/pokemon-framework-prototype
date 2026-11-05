@@ -132,6 +132,18 @@
  * @type boolean
  * @default true
  *
+ * @arg battleStyle
+ * @text Battle style
+ * @desc Player setting by default; Switch offers an optional replacement before the next trainer member, Set does not.
+ * @type select
+ * @option Player setting
+ * @value inherit
+ * @option Switch
+ * @value switch
+ * @option Set
+ * @value set
+ * @default inherit
+ *
  * @arg canLose
  * @text Can lose
  * @desc false (default): a defeat takes the player home and ends this event. true: the event continues with result 4. Money loss and heal apply either way.
@@ -256,6 +268,18 @@
  * @desc false hides voluntary Switch In; mandatory replacements remain available. Default true.
  * @type boolean
  * @default true
+ *
+ * @arg battleStyle
+ * @text Battle style
+ * @desc Player setting by default; Switch offers an optional replacement before the next trainer member, Set does not.
+ * @type select
+ * @option Player setting
+ * @value inherit
+ * @option Switch
+ * @value switch
+ * @option Set
+ * @value set
+ * @default inherit
  *
  * @arg canLose
  * @type boolean

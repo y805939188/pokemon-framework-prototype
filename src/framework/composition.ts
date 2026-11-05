@@ -29,7 +29,7 @@ export interface BattleSessionFactoryOptions {
   content: () => Content;
   trainerAiStrategies?: TrainerAiStrategyRegistry;
   trainerAiTiming?: TrainerAiTiming;
-  /** Internal opt-in until the default Scene consumer is integrated; not a player preference. */
+  /** Consumer capability. Defaults off for old hosts; the default Scene opts in and uses the captured battle style. */
   replacementOffers?: boolean;
   /** Pins the engine seed (tests); undefined lets the engine pick one. */
   seed?: () => number[] | string | undefined;
@@ -65,7 +65,7 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
       return CREATE_BATTLE_SESSION({
       game, battleId: request.battleId, content, experimentalHeldBattle: setup.experimentalHeldBattle ?? false,
       requiredSettlement: required, canSwitch: setup.canSwitch ?? true,
-      replacementOffers: replacementOffers && !!setup.trainer,
+      replacementOffers: replacementOffers && !!setup.trainer && (setup.battleStyle ?? "switch") === "switch",
       ...(setup.evidenceContext ? { evidence: setup.evidenceContext } : {}),
       ...(setup.obedience ? { obedience: setup.obedience } : {}),
       ...(required && setup.trainer && setup.evidenceContext && setup.isCurrentBattle ? { trainerAi: {

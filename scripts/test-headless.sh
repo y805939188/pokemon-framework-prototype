@@ -17,6 +17,7 @@ SUITES=(
   experiments/step5/4/test-battle-pp-items.cjs
 
   experiments/step5/4/test-switch-style-ports.cjs
+  experiments/step5/4/test-battle-style-settings.cjs
   experiments/step5/4/test-e-basic-contracts.cjs
   experiments/step5/4/test-prebattle-wrapper.cjs
   experiments/step5/4/test-prebattle-native.cjs

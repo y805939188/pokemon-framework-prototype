@@ -4,6 +4,10 @@ import type { LocaleTable } from "../translator";
 export const en: LocaleTable = {
   meta: { name: "English" },
   text: {
+    "ui.options.battle_style": "Battle Style",
+    "ui.options.style_switch": "Switch",
+    "ui.options.style_set": "Set",
+    "ui.replacement.question": "{trainer} is about to send out {species}. Will you switch your Pokémon?",
     "evolution.itemGrowth": "Growth has been applied.",
     "evolution.itemChoiceRecorded": "The learning choice is recorded for this use.",
     "evolution.itemUsed": "Used {quantity} × {item}.",

@@ -32,6 +32,7 @@ import { createOrdinaryMessageMZ, createPausedMessageMZ, createSynchronizedMessa
 import { BriefMessageStep } from './battleflow/brief-message';
 import { BattleBagSelection } from './battleflow/battle-bag';
 import { createBagFadeMZ } from './battleflow/bag-fade-mz';
+import { parseBattleStyle, effectiveBattleStyle, installBattleStyleSettings } from './battleflow/battle-style-settings';
 import type { BattleBagRequest } from './battleflow/battle-bag';
 import { catalogOf, itemForBattleId } from '../framework/rules/item-catalog';
 import { BALLS } from '../framework/rules/items';
@@ -367,7 +368,7 @@ const { developmentCapabilities } = RuleConfig;
           state: { read: () => PSFlow.game(), replace: (next: unknown) => { G.$gameSystem._psGame = next; } },
           content: () => ({ content: PSFlow.content(), dex: PSFlow._dex }),
           sessions: ((G.PluginManager.parameters(NAME).contentSource || "sample") === "fixture"
-            ? B.composition.createLegacyNoHeldBattleSessionFactory : B.composition.createBattleSessionFactory)({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger.sink }),
+            ? B.composition.createLegacyNoHeldBattleSessionFactory : B.composition.createBattleSessionFactory)({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger.sink, replacementOffers: (G.PluginManager.parameters(NAME).contentSource || "sample") !== "fixture" }),
           projection: { project: (outcome: { code: number }) => PSFlow.projectOutcome(outcome) },
           random: (n: number) => PSFlow.random(n),
           clock: () => PSFlow.now(),
@@ -504,7 +505,8 @@ const { developmentCapabilities } = RuleConfig;
       const limits = PSFlow.limits(); assertCurrent();
       PSFlow._prepareBattlePresentation(op, app, assertCurrent);
       op.request.storageFull = engine().B.limits.storageFull(current, limits); // only refusal text; application decides noBall
-      const session = await (op.request.trainer ? app.startTrainerBattle(op.request) : app.startBattle(op.request)); assertCurrent();
+      const sessionRequest = { ...op.request, battleStyle: op.battleStyle ?? effectiveBattleStyle(G, op.request.battleStyle) };
+      const session = await (op.request.trainer ? app.startTrainerBattle(sessionRequest) : app.startBattle(sessionRequest)); assertCurrent();
       const elapsed = performance.now() - tCreate; assertCurrent();
       op.session = session;
       if (PSFlow.perf.cur) PSFlow.perf.cur.sessionMs = Math.round(elapsed * 10) / 10;
@@ -642,12 +644,13 @@ const { developmentCapabilities } = RuleConfig;
         if(!G.$gameSystem._psSaveError&&G.$gameSystem._psGame)PSFlow.assertBattleAllowed();
         assertCurrent();
         const started = performance.now(); assertCurrent();
+        const battleStyle = effectiveBattleStyle(G, request.battleStyle); assertCurrent();
         const visualContext = battlebackContext(presentation, G.PluginManager.parameters(NAME)); assertCurrent();
         const transition = prebattlePlan(request.kind, presentation, G.PluginManager.parameters(NAME), visualContext.time); assertCurrent();
         const presetHolder = PSFlow._nextBattleMusic;
         const settings = musicSettings(presentation, G.PluginManager.parameters(NAME), presetHolder); assertCurrent();
         const prepared = battleMusic.capture({ app: PSFlow._app, generation: PSFlow._app?.stateGeneration }); assertCurrent();
-        PSFlow._op = { request, session: null, visualContext, musicPlan: { settings, prepared, presetHolder, started: false, closed: false } };
+        PSFlow._op = { request, session: null, battleStyle, visualContext, musicPlan: { settings, prepared, presetHolder, started: false, closed: false } };
         PSFlow.request = request;
         PSFlow.running = true;
         PSFlow.lastOutcome = null;
@@ -705,6 +708,8 @@ const { developmentCapabilities } = RuleConfig;
     },
   });
 
+  installBattleStyleSettings(G, () => PSFlow.translator());
+
   const battleMusic = new BattleMusicOperations({
     current: (owner, op) => PSFlow._app === owner.app && PSFlow._app?.stateGeneration === owner.generation &&
       (op === null ? !PSFlow.running : PSFlow._op === op),
@@ -728,7 +733,7 @@ const { developmentCapabilities } = RuleConfig;
 
   G.PluginManager.registerCommand(NAME, "StartBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
-    const canSwitch = parseCanSwitch(args.canSwitch), seq = PSFlow.nextSeq();
+    const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || "battle"}#${seq}`;
     const opened=PSFlow.tryOpenBattle({
       kind: args.kind === "trainer" ? "trainer" : "wild",
@@ -736,7 +741,7 @@ const { developmentCapabilities } = RuleConfig;
       seq,
       battleId,
       resultVariable: Number(args.resultVariable) || 0,
-      canLose: String(args.canLose) === "true", canSwitch,
+      canLose: String(args.canLose) === "true", canSwitch, battleStyle,
       forceParty: String(args.forceParty) === "true",
     }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
       transition: { location: args.prebattleLocation || undefined } });
@@ -748,7 +753,7 @@ const { developmentCapabilities } = RuleConfig;
   G.PluginManager.registerCommand(NAME, "StartTrainerBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
     if (args.moneyGain !== undefined && ![true, false, "true", "false"].includes(args.moneyGain)) throw new Error("moneyGain must be true or false");
-    const canSwitch = parseCanSwitch(args.canSwitch);
+    const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle);
     const id = String(args.trainerId || args.id || ""), version = Number(args.version ?? 0), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || `trainer-${id}-v${version}`}#${seq}`;
     let known = true;
@@ -764,7 +769,7 @@ const { developmentCapabilities } = RuleConfig;
       kind: "trainer", trainer: { id, version }, foes: [], seq, battleId,
       moneyGain: args.moneyGain !== false && args.moneyGain !== "false",
       resultVariable: Number(args.resultVariable) || 0,
-      canLose: String(args.canLose) === "true", canSwitch,
+      canLose: String(args.canLose) === "true", canSwitch, battleStyle,
       forceParty: String(args.forceParty) === "true",
     }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
       transition: { location: args.prebattleLocation || undefined } });
@@ -1221,6 +1226,7 @@ const { developmentCapabilities } = RuleConfig;
     this._wildOpeningQueued = false;
     this._battleBag = null; this._bagHidden = null; this._bagRetry = false; this._trainerDispatchQueued = false;
     this._bagLayer = 'battle'; this._bagFade = null; this._bagFadeReturn = false;
+    this._replacementQuestion = null;
     this._partySelected = null; this._retryPartySelection = null; this._partyCommandShownUpdate = -1;
     this._partyDisplayOrder = null;
     this._learningRetry = null;
@@ -1564,6 +1570,25 @@ const { developmentCapabilities } = RuleConfig;
     }
     this._learningInitial = null;
     this._learningRetry = null;
+    const offer = engine().B.session?.readTrainerReplacement?.(s) ?? null;
+    if (offer) {
+      if (this._replacementQuestion?.session !== s || this._replacementQuestion.offerId !== offer.offerId) {
+        const tr = PSFlow.translator();
+        this._replacementQuestion = { session: s, offerId: offer.offerId, selecting: false, lines: [...this._log._lines], view: offer };
+        this.enqueueMessages([createBriefMessageMZ(G, this, tr.t('ui.replacement.question', {
+          trainer: this._psOp?.trainerPresentation?.name ?? tr.t('ui.who.foe'), species: PSFlow.speciesName(offer.opponentSpecies),
+        }), () => sceneController(this).isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => PSFlow.fast)]);
+        return;
+      }
+      if (this._replacementQuestion.selecting) this.showParty('replacement', retryParty?.memberId ?? null);
+      else {
+        const tr = PSFlow.translator();
+        this.show('replacement-question', [{ name: tr.t('progression.yes'), ext: 'replace-yes' }, { name: tr.t('progression.no'), ext: 'replace-no' }]);
+        this._replacementShownUpdate = this._pictureUpdate;
+      }
+      return;
+    }
+    this._replacementQuestion = null;
     const req = s.currentRequest();
     if (req && req.forceSwitch) {
       const active = s.gw.readState('p1').find((m: any) => m.id === s.gw.activeId('p1'));
@@ -1847,6 +1872,7 @@ const { developmentCapabilities } = RuleConfig;
   };
   P.showParty = function (sub: string, selected: string | null = null) {
     this._partySub = sub; this._partySelected = selected;
+    if (sub === 'replacement') this._replacementListShownUpdate = this._pictureUpdate;
     const s = this._session;
     const live = Object.fromEntries(s.gw.readState("p1").map((x: any) => [x.id, x]));
     const items = (sub === "item" ? s.party : partyForDisplay(this)).map((m: any) => {
@@ -1861,6 +1887,38 @@ const { developmentCapabilities } = RuleConfig;
     if (sub !== 'item') items.push({ name: PSFlow.translator().t('ui.party.cancel'), ext: null, enabled: true });
     this.show(sub === "forced" ? "party-forced" : "party", items);
     if (selected !== null && sceneController(this).isCurrent()) this._menu.select(Math.max(0, items.findIndex((item: any) => item.ext === selected)));
+  };
+  P.answerTrainerReplacement = function (replace: boolean) {
+    const c = sceneController(this), q = this._replacementQuestion;
+    if (!c.isCurrent() || this._mode !== 'replacement-question' || !q) return;
+    if (this._pictureUpdate === this._replacementShownUpdate) { this._menu.activate(); return; }
+    const view = engine().B.session.readTrainerReplacement(this._session);
+    if (!view || view.offerId !== q.offerId || q.session !== this._session) { this._replacementQuestion = null; this.afterMessages(); return; }
+    retireBrief(this); this._log.setLines(q.lines);
+    if (replace) { q.selecting = true; this.showParty('replacement'); }
+    else this.resolveTrainerReplacement(null);
+  };
+  P.resolveTrainerReplacement = function (memberId: string | null) {
+    const c = sceneController(this), q = this._replacementQuestion, s = this._session, ports = engine().B.session;
+    if (!c.isCurrent() || !q || q.session !== s) return;
+    const view = ports.readTrainerReplacement(s);
+    if (!view || view.offerId !== q.offerId) { this._replacementQuestion = null; this.afterMessages(); return; }
+    if (memberId !== null) {
+      const allowed = ports.readTrainerReplacementTarget(s, q.offerId, memberId);
+      if (!allowed.ok) {
+        this._retryPartySelection = { memberId };
+        const tr = PSFlow.translator(), active = s.gw.readState('p1').find((m: any) => m.id === memberId)?.active;
+        const key = allowed.reason === 'trapped' ? 'refusal.switch.trapped' : active ? 'refusal.switch.already-active' : 'refusal.default';
+        this.enqueueMessages([tr.t(key, { name: this._names[allowed.reason === 'trapped' ? view.playerId : memberId], reason: allowed.reason })]);
+        return;
+      }
+    }
+    retireBrief(this);
+    c.run(() => ports.resolveTrainerReplacement(s, q.offerId, memberId), (result: any) => {
+      this._replacementQuestion = null;
+      if (!result?.ok) { this.enqueueMessages([refusalText('switch', result?.reason ?? 'choice-rejected')]); return; }
+      this.pushMessages(result.messages);
+    }, 'switch');
   };
   P.answerWildFaint = function (useNext: boolean) {
     const c = sceneController(this), q = this._wildFaintQuestion, s = this._session;
@@ -2041,12 +2099,18 @@ const { developmentCapabilities } = RuleConfig;
     if (this._mode === 'moves') this._menuCursor?.remember('moves', this._menu.index(), this._menu._items.length);
     switch (this._mode) {
       case 'wild-faint': this.answerWildFaint(false); return;
+      case 'replacement-question': this.answerTrainerReplacement(false); return;
       case 'learn-initial': this.answerLearningInitial(false); return;
       case 'learn': this.askLearningGiveUp(); return;
       case 'learn-giveup': this.answerLearningGiveUp(false); return;
       case "party-command": this.showParty(this._partySub, this._partySelected); return;
       case "moves": case "bag": this.showMain(); return;
-      case "party": if (this._pendingItem) { this._pendingItem = null; this.showBag(); } else this.showMain(); return;
+      case "party":
+        if (this._partySub === 'replacement') {
+          if (this._pictureUpdate === this._replacementListShownUpdate) this._menu.activate();
+          else this.resolveTrainerReplacement(null);
+        } else if (this._pendingItem) { this._pendingItem = null; this.showBag(); } else this.showMain();
+        return;
       default: G.SoundManager.playBuzzer(); this._menu.activate();
     }
     });
@@ -2059,6 +2123,7 @@ const { developmentCapabilities } = RuleConfig;
     const ext = it && it.ext;
     switch (this._mode) {
       case 'wild-faint': this.answerWildFaint(ext === 'next'); return;
+      case 'replacement-question': this.answerTrainerReplacement(ext === 'replace-yes'); return;
       case "main":
         if (ext === "fight") this.showMoves();
         else if (ext === "bag") this.showBag();
@@ -2089,6 +2154,7 @@ const { developmentCapabilities } = RuleConfig;
         if (Number.isSafeInteger(this._pictureUpdate) && this._pictureUpdate === this._partyCommandShownUpdate) { this._menu.activate(); return; }
         const id = this._partySelected, forced = this._partySub === 'forced';
         if (ext === 'summary' && typeof id === 'string') { this.showPartySummary(id); return; }
+        if (ext === 'switch-in' && typeof id === 'string' && this._partySub === 'replacement') { this.resolveTrainerReplacement(id); return; }
         if (ext === 'switch-in' && typeof id === 'string') this.act(() => forced
           ? this._session.chooseForcedSwitch(id) : this._session.chooseSwitch(id), 'switch', undefined, { memberId: id });
         return;
