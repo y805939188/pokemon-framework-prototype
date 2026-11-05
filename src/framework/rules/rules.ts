@@ -24,6 +24,13 @@ export const HEAL_ITEMS: Record<string, { amount: HealAmount }> = {
   sitrusberry: { amount: "quarter" },
 };
 
+/** WP28 §5.1 manual battle revives. Revival Herb's friendship effect is a separate family. */
+export const REVIVE_ITEMS: Record<string, { half: boolean }> = {
+  revive: { half: true },
+  maxrevive: { half: false },
+  maxhoney: { half: false },
+};
+
 /** Status cures: `cures` lists persistent statuses it removes ('all' = any; confusion handled separately). */
 export const STATUS_ITEMS: Record<string, { cures: readonly string[] | "all"; confusion?: boolean }> = {
   antidote: { cures: ["psn", "tox"] },
@@ -215,6 +222,8 @@ export type Eligibility = { ok: true } | { ok: false; reason: "unknown-target" |
  */
 export function itemEligibility(item: string, mon: MonView | undefined): Eligibility {
   if (!mon) return { ok: false, reason: "unknown-target" };
+  if (REVIVE_ITEMS[item]) return mon.fainted && mon.hp === 0
+    ? { ok: true } : { ok: false, reason: "item-no-effect" };
   if (mon.fainted || mon.hp <= 0) return { ok: false, reason: "item-no-effect" };
   if (item === "fullrestore") return mon.hp < mon.maxhp || !!mon.status || !!(mon.active && mon.confused)
     ? { ok: true } : { ok: false, reason: "item-no-effect" };

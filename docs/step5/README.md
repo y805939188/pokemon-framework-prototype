@@ -152,3 +152,7 @@
 2026-11-05 组合：[PP／Encore／E 八观察整合](5.4-pp-encore-e-integration.md)正常合并已限定接受 c2e、0eaf 与 E420，保留完整成长／HM／挣扎及两 P2 修复，新增中英学习 Growl→实际 Encore 自动使用→消耗 PP 写回一次。E 仅八观察，累计 PP／固定种子 Swift／事前封存限制明示。组合待独审／CI／必要原生，野生倒下候选另审、不含本组合；完整 D2／E／5.4／P-4 未关闭。
 
 2026-11-05 正常背包接线：[无目标玩偶逃脱](5.4-escape-items.md)基于已接收d1，接通三种direct玩偶的Use／Cancel、野生／禁逃资格、实际物品阶段逃脱及最终一次保存；不扩大到其它direct族或待审PP道具。候选独审／CI／必要原生尚待；训练家Switch提议仍列独立依赖，完整D2／E／P4与原WARN／UNKNOWN保留。
+
+- [战斗复活道具（REVIVE/MAXREVIVE/MAXHONEY）](5.4-battle-revive-items.md)：成员目标到真实引擎复活和最终一次写回；作者实现，独立审查/CI/实机待验，不代表完整 D2。
+
+2026-11-05 已审家族组合：[玩偶与复活整合](5.4-escape-revive-integration.md)正常合并039+a878，八中英实际倒下→复活→再次派出→玩偶/禁逃返回及188相关过，单次保存成立；完整组合待独审/CI/必要NW，不含在审PP组合，不签完整D2/E/P4或旧WARN。

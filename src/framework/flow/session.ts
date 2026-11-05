@@ -15,7 +15,7 @@ import type { BattleDriver, BattleDriverFactory } from "../battle/driver";
 import { isSelectableMove } from "../battle/move-requests";
 import type { GatewayMessage, MemberState } from "../battle/gateway";
 import * as G from "../rules/growth";
-import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, ESCAPE_ITEMS, itemEligibility } from "../rules/rules";
+import { HEAL_ITEMS, REVIVE_ITEMS, STAT_ITEMS, STATUS_ITEMS, ESCAPE_ITEMS, itemEligibility } from "../rules/rules";
 import * as S from "../rules/state";
 import type { BattleResult, GameState } from "../rules/state";
 import type { Content, Member } from "../rules/types";
@@ -67,7 +67,7 @@ export function sealBattleEffects(session: BattleSession, binding: EffectsBindin
   return session._effects.seal(session.result(), binding, session._pendingFriendFaints.length ? session.party.map(m => m.id) : session._friendUnavailable);
 }
 
-const ITEM_IDS = new Set(["fullrestore", ...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS), ...ESCAPE_ITEMS]);
+const ITEM_IDS = new Set(["fullrestore", ...Object.keys(HEAL_ITEMS), ...Object.keys(REVIVE_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS), ...ESCAPE_ITEMS]);
 
 function toSet(m: Member, moveName: (id: string) => string): Record<string, unknown> {
   return {
