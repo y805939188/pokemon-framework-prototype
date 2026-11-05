@@ -19,9 +19,10 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, expGain, noRun, noBall, battleEffects, battleStyle = 'set', playerStyle, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null, benchMoves = null } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, expGain, noRun, noBall, battleEffects, battleStyle = 'set', playerStyle, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null, benchMoves = null, captureSetting } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = suppliedContent ?? fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
+  if (captureSetting !== undefined) { content.settings = { ...content.settings, GAIN_EXP_FOR_CAPTURE: captureSetting }; flow.receiveOptions = { mode: 0, naming: 1 }; }
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
   if (catalog) catalog(content.items);
   if (integration) { assert(content.moves.Rest); content.species.Snorlax.learnset[51] = ['Rest']; }
@@ -783,4 +784,15 @@ for(const rule of ['noRun','noBall'])test('SR03 '+rule+' is independent of the o
 test('SR04 both event commands validate prohibition types before sequence/open and declare default false metadata',async()=>{
  const h=await open();try{h.cleanup();const before=JSON.stringify(h.flow.game()),seq=h.G.$gameSystem._psBattleSeq;for(const command of ['StartBattle','StartTrainerBattle'])for(const rule of ['noRun','noBall'])for(const value of [null,0,'off',{}])assert.throws(()=>h.w.commands['PS_BattleFlow:'+command].call({setWaitMode(){}},{[rule]:value}),new RegExp(rule+' must be true or false'));assert.equal(h.flow.running,false);assert.equal(h.G.$gameSystem._psBattleSeq,seq);assert.equal(JSON.stringify(h.flow.game()),before);const meta=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.meta.txt'),'utf8');for(const rule of ['noRun','noBall'])assert.equal((meta.match(new RegExp('@arg '+rule+'[\\s\\S]*?@default false','g'))||[]).length,2);
  }finally{h.cleanup();}
+});
+
+for(const lang of ['en','zh'])test('CEXP Scene '+lang+' disabled capture growth still shows success, requests victory BGM and receives once',async()=>{
+ const h=await open({lang,bag:{masterball:1},hurt:false,grow:true,fast:true,captureSetting:false});try{
+  const s=h.s._session,original=JSON.stringify({level:s.party[0].level,exp:s.party[0].exp,evs:s.party[0].evs,moves:s.party[0].moves});let doc=h.G.$gameSystem._psGame,installs=0;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  h.s.act(()=>s.throwBall('masterball'),'item');await h.p.inMode('end');assert.equal(s.captureExpGain,false);assert.equal(s.ended.reason,'caught');assert.equal(JSON.stringify({level:s.party[0].level,exp:s.party[0].exp,evs:s.party[0].evs,moves:s.party[0].moves}),original);assert(!h.batches.flatMap(x=>x.value).some(m=>m.kind==='growth'));assert.equal(h.flow.musicState().player.requests.filter(x=>x.kind==='victory').length,1);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await h.frames(1);h.s.onMenuOk();await h.frames(4);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.equal(h.flow.game().party.length,3);assert(h.flow.game().dex.owned.includes('pidgey'));assert.equal(h.flow.game().party[0].exp,JSON.parse(h.before).party[0].exp);assert.equal(h.flow.game().inventory.pockets.flat().filter(x=>x.itemId==='masterball').length,0);h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
+test('CEXP Scene true keeps ordinary capture growth and does not duplicate its victory cue',async()=>{
+ const h=await open({bag:{masterball:1},hurt:false,grow:true,fast:true,captureSetting:true});try{const s=h.s._session,before=s.party[0].exp;h.s.act(()=>s.throwBall('masterball'),'item');await h.waitFor(()=>h.s.levelStatsState?.()||h.s._mode==='end','capture growth display');if(h.s.levelStatsState()){await h.p.press('ok');await h.p.press('ok');}await h.p.inMode('end');assert.equal(s.captureExpGain,true);assert(s.party[0].exp>before);assert.equal(s.party[0].level,51);assert.equal(h.flow.musicState().player.requests.filter(x=>x.kind==='victory').length,0,'new terminal fallback is only for the disabled global rule');assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
 });

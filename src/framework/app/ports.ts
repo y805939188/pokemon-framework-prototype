@@ -78,6 +78,8 @@ export interface BattleSetup {
   battleStyle?: "switch" | "set";
   /** Per-battle growth gate. Defaults to true; false skips both EV and experience distribution. */
   expGain?: boolean;
+  /** Global author capture-growth rule captured by the application before the session factory. */
+  captureExpGain?: boolean;
   /** The author's flag, or forced on because a caught member would have nowhere to go (decision D1). */
   noBall: boolean;
   /** The party and the boxes are both full (the reason a ball is disabled, for the host's message). */
