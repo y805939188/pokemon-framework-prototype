@@ -15,5 +15,6 @@ function installRaster(G,{blank=false}={}){
   const view=G.PSManagement.current();const windows=[];const walk=n=>{if(n?.contents)windows.push(n);for(const c of n?.children??[])walk(c);};walk(scene);
   const win=windows.at(-1);if(!blank&&view?.view.kind==='summary'&&win?.renderable!==false){for(let y=7;y<height-5;y+=3)for(let x=5;x<width-5;x+=5){const at=(y*width+x)*4;data[at]=80+(x%80);data[at+1]=30+(y%150);data[at+2]=200;}}
   return{width,height,context:{getImageData:()=>({data})},canvas:{toDataURL:()=> 'data:image/png;base64,'+png(width,height,data).toString('base64')},destroy(){}};
+ };
 }
 module.exports={installRaster,png};
