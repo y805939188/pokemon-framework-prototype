@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "format": "gen8rpgcustomgame",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "playerMoves": [
+    "recover",
+    "gigadrain",
+    "doubleedge",
+    "splash"
+  ],
+  "playerMaxHP": 220,
+  "foeMaxHP": 155,
+  "completeHeading": false,
+  "scope": "six production App/real Session ordinary HP/PP commit or abort contracts with owned memory-state ports; no disk/Scene/NW or complete heading claim",
+  "source": {
+    "path": "deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+    "sha256": "7e65ae4945ab1cd101b357f3edcadbff2cbaa94630c609244519a688901e1841",
+    "referenceHead": "5c9805de2331f75565891851d4d7b2bc97acad94",
+    "commonLines": [
+      1,
+      12
+    ]
+  },
+  "headings": [
+    {
+      "featureId": "FR-000559",
+      "heading": "6. 治疗、吸取与持续建立",
+      "lines": [
+        204,
+        252
+      ],
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000560",
+      "heading": "7. 反伤、自损与同归",
+      "lines": [
+        253,
+        284
+      ],
+      "completeHeading": false
+    }
+  ],
+  "cases": [
+    {
+      "id": "EHPA-01",
+      "check": "recover-twice-and-cap",
+      "initial": "quarter",
+      "sequence": [
+        "recover",
+        "recover"
+      ],
+      "exit": "run",
+      "featureIds": [
+        "FR-000559"
+      ]
+    },
+    {
+      "id": "EHPA-02",
+      "check": "full-hp-recover-fails-but-costs-pp",
+      "initial": "full",
+      "sequence": [
+        "recover"
+      ],
+      "exit": "run",
+      "featureIds": [
+        "FR-000559"
+      ]
+    },
+    {
+      "id": "EHPA-03",
+      "check": "giga-drain-actual-loss-heal",
+      "initial": "quarter",
+      "sequence": [
+        "gigadrain"
+      ],
+      "exit": "run",
+      "featureIds": [
+        "FR-000559"
+      ]
+    },
+    {
+      "id": "EHPA-04",
+      "check": "double-edge-actual-loss-recoil",
+      "initial": "full",
+      "sequence": [
+        "doubleedge"
+      ],
+      "exit": "run",
+      "featureIds": [
+        "FR-000560"
+      ]
+    },
+    {
+      "id": "EHPA-05",
+      "check": "full-hp-drain-still-damages",
+      "initial": "full",
+      "sequence": [
+        "gigadrain"
+      ],
+      "exit": "run",
+      "featureIds": [
+        "FR-000559"
+      ]
+    },
+    {
+      "id": "EHPA-06",
+      "check": "recoil-then-abort-zero-install",
+      "initial": "full",
+      "sequence": [
+        "doubleedge"
+      ],
+      "exit": "abort",
+      "featureIds": [
+        "FR-000560"
+      ]
+    }
+  ]
+}
