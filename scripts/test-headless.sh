@@ -22,6 +22,7 @@ SUITES=(
   experiments/step5/4/test-battle-revive-items.cjs
   experiments/step5/4/test-exp-gain-rule.cjs
   experiments/step5/4/test-e-basic-contracts.cjs
+  experiments/step5/4/test-e-action-contracts.cjs
   experiments/step5/4/test-prebattle-wrapper.cjs
   experiments/step5/4/test-prebattle-native.cjs
   experiments/step5/4/test-prebattle-menu.cjs
