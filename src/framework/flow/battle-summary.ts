@@ -34,21 +34,3 @@ export function readBattleSummary(session: BattleSession, id: string): BattleSum
     statusCount: live.statusCount, moves, evs: member.evs, friendship: member.friendship ?? 70,
     item: item ?? '', heldItemKnown: item !== undefined, stats: { ...live.stats, hp: live.maxhp } });
 }
-
-/** WP66-A: swap whole individual records. Battle wrappers keep their independent order (WP20 5.5).
- * This Session-owned operation never acquires a persistent management transaction or submits a turn.
- */
-export async function reorderBattleSummaryMoves(session: BattleSession, id: string, from: number, to: number,
-  expectedOrder: readonly string[]): Promise<boolean> {
-  if (session._operation || session.finished || session.ended || session.broken || session._staged ||
-    session.pendingLearn || session._pendingLearned || session.growthQueue.length) return false;
-  const member = session.party.find(member => member.id === id);
-  if (!member || member.isEgg || (member as Member & { shadow?: boolean }).shadow || !Array.isArray(expectedOrder) ||
-    expectedOrder.length !== member.moves.length || member.moves.some((move, i) => move.id !== expectedOrder[i]) ||
-    !Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to < 0 ||
-    from >= member.moves.length || to >= member.moves.length || !readBattleSummary(session, id)) return false;
-  return session._exclusive(async () => {
-    [member.moves[from], member.moves[to]] = [member.moves[to]!, member.moves[from]!];
-    return true;
-  });
-}

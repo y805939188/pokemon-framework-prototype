@@ -35,7 +35,6 @@ import type { TrainerAiConfiguration } from './trainer-ai';
 import { _publishGrowthDisplay, _capturePresentation, _restorePresentation, readBattleLearnProtection } from './presentation';
 import { bindReplacementOffer, hasReplacementOffer, prepareReplacementOffer, checkpointReplacementOffer, preflightReplacementOffer, restoreReplacementOffer } from './replacement-offer';
 export { readTrainerReplacement, readTrainerReplacementTarget, resolveTrainerReplacement } from './replacement-offer';
-export { reorderBattleSummaryMoves } from './battle-summary';
 import type { GrowthDisplay } from './presentation';
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
@@ -963,6 +962,24 @@ export function bindLearningPresentation(session: BattleSession): void {
   session._waitForLearnedMessages = true;
 }
 export function readLearnedMessagePending(session: BattleSession): boolean { return !!session._pendingLearned; }
+
+/** WP66-A: swap whole individual records. Battle wrappers keep their independent order (WP20 5.5).
+ * Session-owned command outside the frozen prototype, never a persistent management transaction or turn.
+ */
+export async function reorderBattleSummaryMoves(session: BattleSession, id: string, from: number, to: number,
+  expectedOrder: readonly string[]): Promise<boolean> {
+  if (session._operation || session.finished || session.ended || session.broken || session._staged ||
+    session.pendingLearn || session._pendingLearned || session.growthQueue.length) return false;
+  const member = session.party.find(member => member.id === id);
+  if (!member || member.isEgg || (member as Member & { shadow?: boolean }).shadow || !Array.isArray(expectedOrder) ||
+    expectedOrder.length !== member.moves.length || member.moves.some((move, i) => move.id !== expectedOrder[i]) ||
+    !Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to < 0 ||
+    from >= member.moves.length || to >= member.moves.length || !session.gw.readState('p1').some(live => live.id === id)) return false;
+  return session._exclusive(async () => {
+    [member.moves[from], member.moves[to]] = [member.moves[to]!, member.moves[from]!];
+    return true;
+  });
+}
 
 /** Owned Scene completion only; no protocol-v1 message or result field is added. */
 export async function completeLearnedMessage(session: BattleSession): Promise<TurnResult> {
