@@ -1484,7 +1484,7 @@ const { developmentCapabilities } = RuleConfig;
             }
           }
         } else if (this._display && growth?.version === 1) {
-          steps.push(...this.pausedMessages(this._D.message({ ...message, exp: growth.toExp - growth.fromExp, levelUps: [] })));
+          steps.push(...this.pausedMessages(this._D.message({ ...message, exp: growth.experienceGained ?? growth.toExp - growth.fromExp, levelUps: [] })));
           for (const segment of growth.segments) {
             const animation = this._display.experience(message.member, segment); if (animation) steps.push(animation);
             if (segment.levelUp) {
