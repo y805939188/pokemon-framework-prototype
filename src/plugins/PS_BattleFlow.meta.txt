@@ -126,6 +126,18 @@
  * @type variable
  * @default 10
  *
+ * @arg noRun
+ * @text Forbid escape
+ * @desc true refuses running from this scripted battle. Trainer battles still forbid running by their normal rule.
+ * @type boolean
+ * @default false
+ *
+ * @arg noBall
+ * @text Forbid Poke Balls
+ * @desc true refuses ball registration without consuming a ball. Default false retains normal capture/storage rules and trainer blocking.
+ * @type boolean
+ * @default false
+ *
  * @arg canSwitch
  * @text Allow manual switching
  * @desc false hides voluntary Switch In; mandatory replacements remain available. Default true.
@@ -250,6 +262,18 @@
  * @arg resultVariable
  * @type variable
  * @default 0
+ *
+ * @arg noRun
+ * @text Forbid escape
+ * @desc true refuses running from this scripted battle. Trainer battles still forbid running by their normal rule.
+ * @type boolean
+ * @default false
+ *
+ * @arg noBall
+ * @text Forbid Poke Balls
+ * @desc true refuses ball registration without consuming a ball. Default false retains normal capture/storage rules and trainer blocking.
+ * @type boolean
+ * @default false
  *
  * @arg canSwitch
  * @text Allow manual switching

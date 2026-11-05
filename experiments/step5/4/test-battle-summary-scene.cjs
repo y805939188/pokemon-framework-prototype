@@ -19,7 +19,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, noRun, noBall, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = suppliedContent ?? fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -52,8 +52,8 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   vm.runInContext(plugins.PS_Management, G, { filename: 'actual-PS_Management.js' });
   const before = JSON.stringify(flow.game()); await h.p.toMapId(5, 8, 9);
   const batches = [], begin = flow.begin.bind(flow); flow.begin = async (...args) => { const session = await begin(...args), take = session.take.bind(session); session.take = () => { const value = take(); batches.push({ value, wire: JSON.stringify(value) }); return value; }; return session; };
-  if (command) h.w.commands['PS_BattleFlow:' + command].call({ setWaitMode() {} }, { kind: 'wild', foes: 'Pidgey:3', trainerId: 'music-normal', version: '1', canLose: 'true', ...(canSwitch === undefined ? {} : { canSwitch }) });
-  else flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true, ...(canSwitch === undefined ? {} : { canSwitch }) });
+  if (command) h.w.commands['PS_BattleFlow:' + command].call({ setWaitMode() {} }, { kind: 'wild', foes: 'Pidgey:3', trainerId: 'music-normal', version: '1', canLose: 'true', ...(canSwitch === undefined ? {} : { canSwitch }), ...(noRun === undefined ? {} : { noRun }), ...(noBall === undefined ? {} : { noBall }) });
+  else flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true, ...(canSwitch === undefined ? {} : { canSwitch }), ...(noRun === undefined ? {} : { noRun }), ...(noBall === undefined ? {} : { noBall }) });
   await h.waitFor(() => !!h.p.battle()?._session, 'real opening Session'); const s = h.p.battle();
   const completed = [], add = s._log.add; s._log.add = function (line) { completed.push(line); return add.call(this, line); };
   await h.p.inMode('main');
@@ -581,5 +581,30 @@ for(const lang of ['en','zh'])test(lang+' learned permanent Growl participates i
   await h.frames(240);assert.deepEqual(calls,[1,2,2]);await commands(h,reserve);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),reserve);
   h.flow.fast=true;await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);
   assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),order);assert.equal(h.flow.game().party.find(m=>m.id===lead).moves[1].id,'growl');assert.equal(h.flow.game().party.find(m=>m.id===lead).moves[1].pp,38);h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
+
+// Scripted event rules consume the existing App/Gen8 prohibition policy, not a UI-only menu flag.
+for(const lang of ['en','zh'])for(const command of ['StartBattle','StartTrainerBattle'])test('SR01 '+lang+' '+command+' prohibited Run and Ball preserve combat state and allow a different action to finish once',async()=>{
+ const h=await open({lang,command,noRun:'true',noBall:'true',bag:{masterball:2},fast:true});try{
+  const s=h.s._session;assert.deepEqual(s.gw.query('p1','ball'),{allowed:false,reason:'ballsdisabled'},'the registered event must inject noBall');assert.deepEqual(s.gw.query('p1','run'),{allowed:false,reason:command==='StartBattle'?'norun':'trainer'});
+  const engine=s.gw.snapshot(),request=JSON.stringify(s.currentRequest()),bag=JSON.stringify(s.bag);let installs=0,document=h.G.$gameSystem._psGame;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>document,set:v=>{installs++;document=v;}});
+  await pick(h,'run');await h.p.inMode('main');assert.equal(s.gw.snapshot(),engine);assert.equal(JSON.stringify(s.currentRequest()),request);assert.equal(JSON.stringify(s.bag),bag);assert.equal(installs,0);
+  await pick(h,'bag');await pick(h,'masterball');await pick(h,'use');await h.p.inMode('bag');assert.equal(h.s.battleBagState().kind,'items');assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext,'masterball');assert.equal(s.gw.snapshot(),engine);assert.equal(JSON.stringify(s.currentRequest()),request);assert.equal(JSON.stringify(s.bag),bag);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  const painted=h.completed.join('').replace(/\s/g,'');assert(painted.includes(h.flow.translator().t('refusal.ball.ballsdisabled').replace(/\s/g,'')),'the actual ball refusal must be presented in the chosen language');
+  h.s.onMenuCancel();await h.frames(1);await h.p.inMode('main');await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert(s.finished);assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().inventory,JSON.parse(h.before).inventory);assert.equal(s.bag.masterball,2);h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
+for(const flag of [undefined,'false'])for(const command of ['StartBattle','StartTrainerBattle'])test('SR02 '+command+' '+String(flag)+' retains the existing wild capture or trainer blocked-ball contract',async()=>{
+ const h=await open({command,noRun:flag,noBall:flag,bag:{masterball:2},fast:true});try{
+  const s=h.s._session;assert.equal(s.gw.query('p1','ball').allowed,true);assert.deepEqual(s.gw.query('p1','run'),command==='StartBattle'?{allowed:true}:{allowed:false,reason:'trainer'});const r=await s.throwBall('masterball');assert(r.ok);assert.equal(s.bag.masterball,1);
+  if(command==='StartBattle'){assert(s.finished);assert.equal(s.ended.reason,'caught');assert.equal(s.result().captured.length,1);}else{assert(!s.finished);assert(r.messages.some(m=>m.kind==='events'&&m.events.some(e=>e.type==='rpg'&&e.args.includes('blocked'))));}assert.equal(JSON.stringify(h.flow.game()),h.before);
+ }finally{h.cleanup();}
+});
+for(const rule of ['noRun','noBall'])test('SR03 '+rule+' is independent of the other prohibition',async()=>{
+ const h=await open({command:'StartBattle',[rule]:true,bag:{masterball:2},fast:true});try{assert.deepEqual(h.s._session.gw.query('p1','ball'),rule==='noBall'?{allowed:false,reason:'ballsdisabled'}:{allowed:true});assert.deepEqual(h.s._session.gw.query('p1','run'),rule==='noRun'?{allowed:false,reason:'norun'}:{allowed:true});assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
+});
+test('SR04 both event commands validate prohibition types before sequence/open and declare default false metadata',async()=>{
+ const h=await open();try{h.cleanup();const before=JSON.stringify(h.flow.game()),seq=h.G.$gameSystem._psBattleSeq;for(const command of ['StartBattle','StartTrainerBattle'])for(const rule of ['noRun','noBall'])for(const value of [null,0,'off',{}])assert.throws(()=>h.w.commands['PS_BattleFlow:'+command].call({setWaitMode(){}},{[rule]:value}),new RegExp(rule+' must be true or false'));assert.equal(h.flow.running,false);assert.equal(h.G.$gameSystem._psBattleSeq,seq);assert.equal(JSON.stringify(h.flow.game()),before);const meta=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.meta.txt'),'utf8');for(const rule of ['noRun','noBall'])assert.equal((meta.match(new RegExp('@arg '+rule+'[\\s\\S]*?@default false','g'))||[]).length,2);
  }finally{h.cleanup();}
 });
