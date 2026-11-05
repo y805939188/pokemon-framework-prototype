@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "format": "gen8rpgcustomgame",
+  "seed": [1, 2, 3, 4],
+  "featureIds": ["FR-000544", "FR-000545"],
+  "completeHeading": false,
+  "player": {"species":"Snorlax","level":100,"abilityIndex":1,"ability":"Thick Fat","move":"splash","basePP":40},
+  "firstFoes": {"toxic":{"species":"Gengar","level":5,"move":"toxic"},"sleep":{"species":"Parasect","level":5,"move":"spore"}},
+  "nextFoe": {"species":"Pidgey","level":5,"move":"splash"},
+  "cases": [
+    {"id":"ECARRY-01","check":"toxic-becomes-ordinary","first":"toxic","nextTurns":2,"nextResidualDivisor":8,"ppUps":0},
+    {"id":"ECARRY-02","check":"sleep-count-resumes","first":"sleep","nextTurns":"remaining-sleep-checks","ppUps":0},
+    {"id":"ECARRY-03","check":"heal-before-next-battle","first":"toxic","nextTurns":1,"ppUps":3},
+    {"id":"ECARRY-04","check":"abort-second-preserves-first","first":"sleep","nextTurns":"remaining-sleep-checks","ppUps":0}
+  ],
+  "scope": "four real App lifecycle scenarios, nine Sessions including one intentionally aborted, in-memory state port only; not disk, Scene, NW, status probability, complete E or new status families",
+  "boundaries": ["Initial status is empty; the first foe actually inflicts status, no seedState or private engine write.","Actual sleep duration is observed once in 2..4 and reused exactly; no artificial sleep duration or seed search.","The earlier toxic-rounding reference difference is unchanged; second-battle ordinary poison is a different contract.","Normal healing is one owned App state replacement; battle commits and healing replacements are counted separately."]
+}
