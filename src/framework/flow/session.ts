@@ -575,6 +575,7 @@ export class BattleSession {
     }
     this._ingest();
     await this._continueGrowth();
+    this._syncWorkingFromEngine(true); // Ready working move PP; retain existing HP/status synchronization points.
     const messages = this.take();
     const kinds: Record<string, number> = {};
     for (const m of messages) kinds[m.kind] = (kinds[m.kind] ?? 0) + 1;
@@ -734,11 +735,11 @@ export class BattleSession {
   }
 
   // ------------------------------------------------------------------ growth
-  _syncWorkingFromEngine(): void {
+  _syncWorkingFromEngine(ppOnly = false): void {
     const st = Object.fromEntries(this.gw.readState("p1").map((x) => [x.id, x]));
     for (const m of this.party) {
       const e = st[m.id]; if (!e) continue;
-      m.hp = e.hp; m.status = e.status; m.statusCount = e.statusCount;
+      if (!ppOnly) { m.hp = e.hp; m.status = e.status; m.statusCount = e.statusCount; }
       for (const mv of m.moves) if (e.pp[mv.id] !== undefined) mv.pp = e.pp[mv.id]!;
     }
   }

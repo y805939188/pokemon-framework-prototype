@@ -531,3 +531,32 @@ for (const lang of ['en', 'zh']) test(lang + ' normal HM give-up after the last 
     h.s.onEnd();assert.equal(installs,1);assert.equal(attempts.length,2);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
   } finally { h.cleanup(); }
 });
+
+
+// A newly learned move must remain spent in the actual Summary and final App install.
+for(const lang of ['en','zh'])test(lang+' learned Rest use reaches working data, Summary and the single final save at PP9',async()=>{
+ const h=await open({lang,members:2,grow:true,integration:true,trainer:true,trainerMembers:2,fast:true,
+  leadMoves:[{id:'tackle',pp:1,maxpp:35},{id:'growl',pp:40,maxpp:40},{id:'splash',pp:40,maxpp:40},{id:'protect',pp:10,maxpp:10}],
+  catalog:items=>{const {battleId:unused,...base}=items.potion;items['test-machine']={...base,id:'test-machine',name:'Test machine',namePlural:'Test machines',pocket:4,fieldUse:'hm',battleUse:'none',move:'tackle',legacyIds:[],consumable:false,flags:[]};}});try{
+  const s=h.s._session,[lead,reserve]=s.party.map(m=>m.id),order=JSON.parse(h.before).party.map(m=>m.id),decide=s.decideLearn.bind(s),calls=[];let installs=0,doc=h.G.$gameSystem._psGame;
+  s.decideLearn=(...a)=>{calls.push(a[0]);return decide(...a);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  h.flow.fast=false;await pick(h,'fight');await pick(h,1);const observations=await normalGrowthBeforeStats(h);assertPausedGrowth(h,observations);assert.equal(s.ended,null);
+  await h.p.press('ok');assert.equal(h.s.levelStatsState().phase,'total');await h.p.press('ok');
+  await h.waitFor(()=>!!h.s.ordinaryMessageState(),'full-slot notice');await h.p.press('ok');await h.p.press('ok');await h.p.inMode('learn-initial');await h.frames(1);await pick(h,'forget-move');await h.p.inMode('learn');
+  const pending=s.pendingLearn,checkpoint=JSON.stringify(s._checkpoint()),start=h.completed.length;await pick(h,0);await h.p.inMode('learn');
+  const warning=lang==='zh'?'学习时不能替换秘传招式，请重新选择。':'HM moves cannot be replaced while learning. Choose another move.';
+  assert(h.completed.slice(start).join('').replace(/\s+/g,' ').includes(warning));assert.equal(s.pendingLearn,pending);assert.equal(JSON.stringify(s._checkpoint()),checkpoint);assert.deepEqual(calls,[]);
+  await pick(h,1);await h.p.inMode('main');assert.deepEqual(calls,[1]);assert.equal(s.currentRequest().active[0].moves[1].id,'rest');assert.equal(s.currentRequest().active[0].moves[1].pp,10);
+  await pick(h,'fight');assert.equal(h.s._mode,'moves');h.s.onMenuCancel();await h.p.inMode('main');assert.equal(s.party[0].moves[1].pp,10);assert.equal(installs,0);
+  await pick(h,'fight');const first=h.batches.length;await pick(h,2);await h.p.inMode('main');
+  assert(h.batches.slice(first).flatMap(b=>b.value).flatMap(m=>m.events??[]).some(e=>e.type==='move'&&e.args[1]==='Rest'),'actual learned Rest executed');
+  assert.equal(s.gw.readState('p1').find(m=>m.id===lead).status,'slp');assert.equal(s.currentRequest().active[0].moves[1].pp,9);
+  assert.equal(s.gw.readState('p1').find(m=>m.id===lead).pp.rest,9,'Gateway must not publish stale permanent PP10');
+  assert.equal(s.party.find(m=>m.id===lead).moves[1].pp,9,'Session working PP after actual Rest');assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(installs,0);
+  await summary(h,lead);await h.p.press('right');await h.p.press('right');await h.p.press('right');assert(text(h).some(line=>/\brest\b.*9\/10 PP/i.test(line)),'actual shared Summary uses consumed PP9');
+  await h.p.press('cancel');await h.p.inMode('party');await pick(h,reserve);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),reserve);assert.equal(s.party.find(m=>m.id===lead).moves[1].pp,9);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  h.flow.fast=true;await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);
+  assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),order);assert.equal(h.flow.game().party.find(m=>m.id===lead).moves[1].id,'rest');assert.equal(h.flow.game().party.find(m=>m.id===lead).moves[1].pp,9,'actual App install must not restore spent learned PP');
+  h.s.onEnd();assert.equal(installs,1);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
+ }finally{h.cleanup();}
+});

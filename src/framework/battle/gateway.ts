@@ -548,11 +548,13 @@ export class BattleGateway implements BattleDriver {
     for (const mv of newMoves) {
       const dm = b.dex.moves.get(mv);
       const slot = { move: dm.name, id: dm.id, pp: dm.pp, maxpp: dm.pp, target: dm.target, disabled: false, disabledSource: "", used: false };
+      // Natural slots share PP. An already transformed actor keeps a virtual copy, including across restore.
+      const activeSlot = p.transformed ? { ...slot, virtual: true } : slot;
       if (replaceSlot !== undefined && replaceSlot !== null) {
-        p.baseMoveSlots[replaceSlot] = slot; p.moveSlots[replaceSlot] = { ...slot }; p.set.moves[replaceSlot] = dm.name;
+        p.baseMoveSlots[replaceSlot] = slot; p.moveSlots[replaceSlot] = activeSlot; p.set.moves[replaceSlot] = dm.name;
         p.ppUps[replaceSlot] = 0;
       } else {
-        p.baseMoveSlots.push(slot); p.moveSlots.push({ ...slot }); p.set.moves.push(dm.name);
+        p.baseMoveSlots.push(slot); p.moveSlots.push(activeSlot); p.set.moves.push(dm.name);
         p.ppUps.push(0);
       }
     }
