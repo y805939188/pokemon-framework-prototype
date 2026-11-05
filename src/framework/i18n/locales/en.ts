@@ -274,6 +274,7 @@ export const en: LocaleTable = {
     "ui.battlebag.unsupported": "This battle item effect is not supported yet. The item was not used up.",
     "ui.bag.entry": "{name}  x{count}",
     "ui.party.switch_in": "Switch In",
+    "ui.wild.use_next": "Use next Pokémon?",
     "ui.party.cancel": "Cancel",
     "ui.party.entry": "{name}  Lv{level}  HP {hp}/{maxhp}{fainted}{active}{noEffect}",
     "ui.party.fainted": " (fainted)",

@@ -1564,7 +1564,26 @@ const { developmentCapabilities } = RuleConfig;
     this._learningInitial = null;
     this._learningRetry = null;
     const req = s.currentRequest();
-    if (req && req.forceSwitch) { this.showParty("forced", retryParty?.memberId ?? null); return; }
+    if (req && req.forceSwitch) {
+      const active = s.gw.readState('p1').find((m: any) => m.id === s.gw.activeId('p1'));
+      if (s.foe.kind === 'wild' && req.forceSwitch[0] && active?.fainted) {
+        const request = JSON.stringify(req);
+        if (this._wildFaintQuestion?.session !== s || this._wildFaintQuestion?.request !== request) {
+          this._wildFaintQuestion = { session: s, request, answered: false, lines: [...this._log._lines] };
+          this.enqueueMessages([createBriefMessageMZ(G, this, PSFlow.translator().t('ui.wild.use_next'),
+            () => sceneController(this).isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => PSFlow.fast)]);
+          return;
+        }
+        if (!this._wildFaintQuestion.answered) {
+          const tr = PSFlow.translator();
+          this.show('wild-faint', [{ name: tr.t('progression.yes'), ext: 'next' }, { name: tr.t('progression.no'), ext: 'escape' }]);
+          this._wildFaintShownUpdate = this._pictureUpdate;
+          return;
+        }
+      }
+      this.showParty("forced", retryParty?.memberId ?? null); return;
+    }
+    this._wildFaintQuestion = null;
     if (automaticMove && automaticMove.session === s && automaticMove.request === JSON.stringify(req)) {
       // The notice is a visual step only. Submit after it leaves the queue, through the normal action owner.
       if (sceneController(this).show('automatic-move')) this.act(() => s.chooseMove(1), 'move');
@@ -1649,6 +1668,13 @@ const { developmentCapabilities } = RuleConfig;
         createPausedMessageMZ(G, this, page.join('\n'),
           () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
           () => s.finished, () => PSFlow.fast)));
+      return;
+    }
+    const encore = this._session.gw?.query?.('p1', 'automatic-encore');
+    if (encore?.allowed && Number.isSafeInteger(encore.moveSlot) && encore.moveSlot > 0 && encore.moveSlot <= moves.length
+      && engine().B.moveRequests.isSelectableMove(moves[encore.moveSlot - 1])) {
+      // In singles the pinned request already identifies the target; use the ordinary action owner.
+      this.act(() => this._session.chooseMove(encore.moveSlot), 'move');
       return;
     }
     this.show("moves", moves.map((m: any, i: number) => ({
@@ -1829,6 +1855,15 @@ const { developmentCapabilities } = RuleConfig;
     this.show(sub === "forced" ? "party-forced" : "party", items);
     if (selected !== null && sceneController(this).isCurrent()) this._menu.select(Math.max(0, items.findIndex((item: any) => item.ext === selected)));
   };
+  P.answerWildFaint = function (useNext: boolean) {
+    const c = sceneController(this), q = this._wildFaintQuestion, s = this._session;
+    if (!c.isCurrent() || this._mode !== 'wild-faint' || !q || q.answered) return;
+    if (Number.isSafeInteger(this._pictureUpdate) && this._pictureUpdate === this._wildFaintShownUpdate) { this._menu.activate(); return; }
+    if (q.session !== s || q.request !== JSON.stringify(s.currentRequest())) { this._wildFaintQuestion = null; this.afterMessages(); return; }
+    q.answered = true; retireBrief(this); this._log.setLines(q.lines);
+    if (useNext) this.showParty('forced');
+    else this.act(() => s.run({ duringReplacement: true }), 'run');
+  };
   P.showPartyCommands = function (memberId: string) {
     const c = sceneController(this); if (!c.isCurrent()) return;
     const member = partyForDisplay(this).find((m: any) => m.id === memberId), live = this._session.gw.readState('p1').find((m: any) => m.id === memberId);
@@ -1998,6 +2033,7 @@ const { developmentCapabilities } = RuleConfig;
     }
     if (this._mode === 'moves') this._menuCursor?.remember('moves', this._menu.index(), this._menu._items.length);
     switch (this._mode) {
+      case 'wild-faint': this.answerWildFaint(false); return;
       case 'learn-initial': this.answerLearningInitial(false); return;
       case 'learn': this.askLearningGiveUp(); return;
       case 'learn-giveup': this.answerLearningGiveUp(false); return;
@@ -2015,6 +2051,7 @@ const { developmentCapabilities } = RuleConfig;
     const it = this._menu.itemAt(this._menu.index());
     const ext = it && it.ext;
     switch (this._mode) {
+      case 'wild-faint': this.answerWildFaint(ext === 'next'); return;
       case "main":
         if (ext === "fight") this.showMoves();
         else if (ext === "bag") this.showBag();
@@ -2115,7 +2152,7 @@ const { developmentCapabilities } = RuleConfig;
     this.popScene();
   };
   P.terminate = function () {
-    this._learningGiveUp = null; this._learningInitial = null; this._learningRetry = null; this._automaticMove = null;
+    this._learningGiveUp = null; this._learningInitial = null; this._learningRetry = null; this._automaticMove = null; this._wildFaintQuestion = null;
     const c = this._controller as BattleSceneController<any> | undefined;
     this._menuCursor?.clear();
     retireBattleBag(this);

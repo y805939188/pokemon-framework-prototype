@@ -15,6 +15,7 @@ import type { PartialStats, Stats } from "../rules/types";
 import type { BattleObservation, EvidenceIssue, ObservationBatch } from "../rules/battle-evidence";
 import type { FormatObservation } from "../rules/battle-evidence";
 import { HeldTracker } from "./held-tracker";
+import { isSelectableMove } from './move-requests';
 import type { HeldTrackerSnapshot } from "./held-tracker";
 import type { HeldBinding, HeldRosterMember, RequiredFacts } from "../rules/held-facts";
 import { attachTrainerSource, trainerSourceRequest, trainerSourcePublic, checkpointTrainerSource, restoreTrainerSource } from './trainer-ai-source';
@@ -366,6 +367,14 @@ export class BattleGateway implements BattleDriver {
     return this.chooseSlots(side, specs);
   }
 
+  async runAfterFaint(side: string): Promise<boolean> {
+    const evaluate = loadFormatExtension(this._env.root).runAfterFaint;
+    if (!evaluate || !evaluate(this._battle, side)) return false;
+    this._pump();
+    if (!this._battle.ended) this.refreshRequests(); // Immediate failure keeps the same mandatory replacement open.
+    return true;
+  }
+
   /**
    * Register this side's choice for every active slot in one go. Each spec is either
    *   { move: n, target?: loc } | { switch: n }                    -> ordinary engine choice
@@ -415,10 +424,22 @@ export class BattleGateway implements BattleDriver {
    * Menu-layer legality (read-only, nothing consumed). Mirrors the spec's "refuse without
    * consuming" checks for the cases step 2.2 covers. Returns { allowed, reason }.
    */
-  query(side: string, what: "run" | "ball" | string, slot = 0): { allowed: boolean; reason?: string } {
+  query(side: string, what: "run" | "ball" | string, slot = 0): { allowed: boolean; reason?: string; moveSlot?: number } {
     const b = this._battle;
     const s = b.getSide(side);
     const active: ShowdownPokemon = s.active[slot];
+    if (what === 'automatic-encore') {
+      // Read the pinned engine's own condition and already-published permissions, never run a rule event here.
+      if (slot !== 0 || s.active.length !== 1 || !active || active.fainted || active.volatiles?.dynamax
+        || !active.volatiles?.encore?.move) return { allowed: false };
+      // isChoiceDone/awaitingChoice can register pass actions for empty seats. This hint only reads existing data.
+      const request = s.activeRequest, moves = request?.active?.[0]?.moves;
+      if (!request || request.wait || request.forceSwitch || s.choice.actions.length > 0 || !Array.isArray(moves)) return { allowed: false };
+      const eligible = moves.map((move: any, index: number) => ({ move, slot: index + 1 }))
+        .filter(({ move }) => isSelectableMove(move));
+      return eligible.length === 1 && eligible[0]!.move.id === active.volatiles.encore.move
+        ? { allowed: true, moveSlot: eligible[0]!.slot } : { allowed: false };
+    }
     const foes = s.foe.pokemon.filter((p: ShowdownPokemon) => !p.fainted);
     if (!b.rpg || !b.rpg.wild) {
       if (what === "run") return { allowed: false, reason: "trainer" };

@@ -89,6 +89,7 @@ test('Fly locks the next request to a PP-less move; its second turn completes', 
   assert.equal(s.currentRequest().active[0].moves[0].id, 'fly');
   assert.equal(s.currentRequest().active[0].moves[0].pp, undefined);
   assert.equal(menu(s)[0].enabled, true);
+  assert.deepEqual(s.gw.query('p1', 'automatic-encore'), { allowed: false }, 'Fly lock is not Encore');
   const response = await s.chooseMove(1);
   assert.ok(response.messages.some(m => m.kind === 'events' && m.events.some(e => e.type === 'move' && e.args[1] === 'Fly')));
   assert.equal(s.gw._debugBattle().turn, 3);
@@ -111,6 +112,7 @@ test('default AI handles a real recharge request and a doubles PP-less slot', as
   await s.chooseMove(4);
   const request = s.gw._debugBattle().getSide('p2').activeRequest;
   assert.equal(request.active[0].moves[0].id, 'recharge');
+  assert.deepEqual(s.gw.query('p2', 'automatic-encore'), { allowed: false }, 'Recharge is not Encore');
   assert.equal(BattleSession.defaultAi(request), 'move 1');
   await s.chooseMove(4); assert.equal(s.gw._debugBattle().turn, 3);
   const exhausted = F.foeMember('foe1', 'Snorlax', 40, { moves: ['tackle'] }); exhausted.moves[0].pp = 0;
@@ -147,6 +149,7 @@ test('real Choice lock stays focusable in the menu but is rejected by the engine
   const foeRequest = s.gw._debugBattle().getSide('p2').activeRequest;
   assert.equal(foeRequest.active[0].moves[1].disabled, true);
   assert.equal(BattleSession.defaultAi(foeRequest), 'move 1', 'the AI skips the locked-out move');
+  assert.deepEqual(s.gw.query('p1', 'automatic-encore'), { allowed: false }, 'Choice Band alone must not bypass the menu');
   assert.equal((await s.chooseMove(1)).ok, false, 'choosing a disabled move is still refused by the engine');
 });
 
@@ -156,4 +159,35 @@ test('the scripted demo policy uses the same rule: Struggle, locked and disabled
   assert.equal(decide(request([{ move: 'Struggle', id: 'struggle' }])), 'move 1');
   assert.equal(decide(request([{ move: 'A', pp: 3, disabled: true }, { move: 'B', pp: 2 }])), 'move 2');
   assert.equal(decide(request([{ move: 'A', pp: 0 }, { move: 'B', disabled: true }, { move: 'Fly', id: 'fly' }])), 'move 3');
+});
+
+
+// Encore query is a pure hint, including rejected public multi-seat requests.
+test('Encore query rejects a real doubles KO without adding a pass choice or changing the snapshot', async () => {
+  const {gateway:{BattleGateway}}=require('../../js/engine/build/production.cjs');
+  const gw=await BattleGateway.create({formatid:'gen8rpgdoublescustomgame',seed:[1,2,3,4],players:[
+    {name:'P1',team:[{name:'A',species:'Snorlax',level:100,moves:['tackle','growl']},{name:'B',species:'Snorlax',level:100,moves:['growl']}]},
+    {name:'P2',team:[{name:'C',species:'Pidgey',level:1,moves:['splash']},{name:'D',species:'Snorlax',level:100,moves:['splash']}]}]});
+  assert.equal(await gw.choose('p1','team 12'),true);assert.equal(await gw.choose('p2','team 12'),true);
+  assert.equal(await gw.choose('p1','move 1 1, move 1'),true);assert.equal(await gw.choose('p2','move 1, move 1'),true);
+  const battle=gw._debugBattle(),side=battle.getSide('p2');assert.equal(battle.turn,2);assert.equal(battle.requestState,'move');
+  assert(side.active[0].fainted);assert(!side.active[1].fainted);assert.deepEqual(side.choice.actions,[]);
+  const before=gw.snapshot(),actions=JSON.stringify(side.choice.actions);
+  for(const slot of [0,1,0]){
+    assert.deepEqual(gw.query('p2','automatic-encore',slot),{allowed:false});
+    assert.equal(gw.snapshot(),before,'a false hint must not append an engine pass action');
+    assert.equal(JSON.stringify(side.choice.actions),actions);
+  }
+});
+test('Encore query reads real singles permissions but does not offer an already registered action again', async () => {
+  const {gateway:{BattleGateway}}=require('../../js/engine/build/production.cjs');
+  const gw=await BattleGateway.create({formatid:'gen8rpgcustomgame',seed:[1,2,3,4],players:[
+    {name:'P1',team:[{name:'A',species:'Snorlax',level:100,moves:['tackle','growl']}]},
+    {name:'P2',team:[{name:'B',species:'Snorlax',level:1,moves:['encore']}]}]});
+  assert.equal(await gw.choose('p1','team 1'),true);assert.equal(await gw.choose('p2','team 1'),true);
+  assert.equal(await gw.choose('p1','move 2'),true);assert.equal(await gw.choose('p2','move 1'),true);
+  const side=gw._debugBattle().getSide('p1');assert.equal(side.active[0].volatiles.encore.move,'growl');
+  const before=gw.snapshot();for(let i=0;i<2;i++)assert.deepEqual(gw.query('p1','automatic-encore'),{allowed:true,moveSlot:2});assert.equal(gw.snapshot(),before);
+  assert.equal(await gw.choose('p1','move 2'),true);assert.equal(side.choice.actions.length,1);
+  const chosen=gw.snapshot();assert.deepEqual(gw.query('p1','automatic-encore'),{allowed:false});assert.equal(gw.snapshot(),chosen);assert.equal(side.choice.actions.length,1);
 });
