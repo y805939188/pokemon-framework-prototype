@@ -8,7 +8,7 @@ assert.equal(fs.readFileSync(path.resolve(__dirname,'../../../js/engine/showdown
 async function open(c){
  const input=inputs({moves:['splash']});
  input.species.find(s=>s.id==='snorlax').learnset=plan.playerMoves.map(move=>({level:1,move}));
- input.species.push({id:'slowbro',showdownId:'Slowbro',nameKey:'species.slowbro',growth:'medium',baseExp:100,evYield:{},catchRate:45,learnset:[{level:1,move:'splash'}],source:'author-placeholder'});
+ input.species.push({id:'slowbro',showdownId:'slowbro',nameKey:'species.slowbro',growth:'medium',baseExp:100,evYield:{},catchRate:45,learnset:[{level:1,move:'splash'}],source:'author-placeholder'});
  const compiled=E.contentCompile.compileContent(input);assert(compiled.ok,JSON.stringify(compiled.errors));
  const joined=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(joined.errors,[]);const content=joined.content;
  const m=E.memberFactory.createMember({id:'HP-P1',species:'Snorlax',level:50,nature:'Hardy',abilityIndex:1},content,()=>0);
