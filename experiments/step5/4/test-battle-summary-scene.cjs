@@ -560,3 +560,26 @@ for(const lang of ['en','zh'])test(lang+' learned Rest use reaches working data,
   h.s.onEnd();assert.equal(installs,1);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
  }finally{h.cleanup();}
 });
+
+// Integration: learning restores a usable move before Encore owns a later move entry.
+for(const lang of ['en','zh'])test(lang+' learned permanent Growl participates in real automatic Encore and saves consumed PP once',async()=>{
+ const content=fixture.musicNativeContent(E,assert);assert(content.moves.Growl);content.species.Snorlax.learnset[51]=['Growl'];
+ content.trainers['music-normal'][0].party[0].moves=['encore']; // Explicit author custom-game fixture, not an official learnset claim.
+ const h=await open({lang,suppliedContent:content,members:2,grow:true,trainer:true,trainerMembers:2,fast:true,
+  leadMoves:[{id:'tackle',pp:1,maxpp:35},{id:'splash',pp:0,maxpp:40},{id:'protect',pp:0,maxpp:10},{id:'rest',pp:0,maxpp:10}],
+  catalog:items=>{const {battleId:unused,...base}=items.potion;items['test-machine']={...base,id:'test-machine',name:'Test machine',namePlural:'Test machines',pocket:4,fieldUse:'hm',battleUse:'none',move:'tackle',legacyIds:[],consumable:false,flags:[]};}});try{
+  const s=h.s._session,[lead,reserve]=s.party.map(m=>m.id),order=JSON.parse(h.before).party.map(m=>m.id),calls=[],choose=s.chooseMove.bind(s);let installs=0,doc=h.G.$gameSystem._psGame;
+  s.chooseMove=(slot)=>{calls.push(slot);return choose(slot);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  h.flow.fast=false;await pick(h,'fight');await pick(h,1);const observed=await normalGrowthBeforeStats(h);assertPausedGrowth(h,observed);await h.p.press('ok');await h.p.press('ok');
+  await h.waitFor(()=>!!h.s.ordinaryMessageState(),'full-slot learning notice');await h.p.press('ok');await h.p.press('ok');await h.p.inMode('learn-initial');await h.frames(1);await pick(h,'forget-move');await h.p.inMode('learn');
+  const pending=s.pendingLearn,checkpoint=JSON.stringify(s._checkpoint());await pick(h,0);await h.p.inMode('learn');assert.equal(s.pendingLearn,pending);assert.equal(JSON.stringify(s._checkpoint()),checkpoint);
+  await pick(h,1);await h.p.inMode('main');assert.equal(s.party[0].moves[1].id,'growl');assert.equal(s.party[0].moves[1].pp,40);assert.deepEqual(calls,[1]);assert.equal(s.gw.query('p1','automatic-encore').allowed,false);
+  await pick(h,'fight');assert.equal(h.s._mode,'moves','a newly learned legal move prevents Struggle but still requires the first manual choice');await pick(h,2);await h.p.inMode('main');
+  assert.equal(s.gw.readState('p1').find(m=>m.id===lead).pp.growl,39);assert.equal(s.party[0].moves[1].pp,39);const before=s.gw.snapshot();for(let i=0;i<3;i++)assert.deepEqual(s.gw.query('p1','automatic-encore'),{allowed:true,moveSlot:2});assert.equal(s.gw.snapshot(),before);
+  const modes=[],show=h.s.show;h.s.show=function(mode,...args){modes.push(mode);return show.call(this,mode,...args);};await pick(h,'fight');h.s.onMenuOk();h.s.onMenuCancel();await h.p.inMode('main');
+  assert.deepEqual(calls,[1,2,2]);assert(!modes.includes('moves'));assert.equal(s.currentRequest().active[0].moves[1].pp,38);assert.equal(s.gw.readState('p1').find(m=>m.id===lead).pp.growl,38);assert.equal(s.party[0].moves[1].pp,38);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await h.frames(240);assert.deepEqual(calls,[1,2,2]);await commands(h,reserve);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),reserve);
+  h.flow.fast=true;await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);
+  assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),order);assert.equal(h.flow.game().party.find(m=>m.id===lead).moves[1].id,'growl');assert.equal(h.flow.game().party.find(m=>m.id===lead).moves[1].pp,38);h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
