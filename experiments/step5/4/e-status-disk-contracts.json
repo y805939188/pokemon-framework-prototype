@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "version": "e-status-disk-roundtrip-v1",
+  "product": "62c2ec02ca902b1f960ece6f634b42b2df324e80",
+  "schemaVersion": 9,
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "runtime": {
+    "js/engine/build/custom-formats.cjs": "50f2bc529f506a2c8499bc948719e3f297fed353435d1de6882c9b03f687b033",
+    "js/engine/build/production.cjs": "3577ccada0e1e4f68bc19bad03d667a99b79a4a1547d485baaf160c595e029df",
+    "js/engine/build/public-presentation-rCv_7JPM.js": "0cc14e37d2edd9f685a4cef6ce3a715af4628d2347eb695ec65c46a8b4e78c32",
+    "js/engine/build/core.cjs": "e5b94494f7fdec50643626bcb922ce3afde72e66a92196d44785c34467307a0b",
+    "js/engine/build/engine.cjs": "ddec8736e64efa81b2058a7e85a504c9a42ee37823544e005c3511071e3d85b0",
+    "js/engine/build/testing.cjs": "38b08688fe41402af61b4ff6dc79aec9b83a045d103c27a06f748e649e789061",
+    "js/engine/build/content-cli.cjs": "113d2b55ab7c2956af00df2527958c4e8302338646a124a0961db58e62e1b76a",
+    "js/engine/build/session-B-ur6ARl.js": "56a031c75d08ef52918955e804269ba5c26a65a4ff1087a85ca3f5fff088d745",
+    "js/engine/build/trainer-ai-diagnostics-jO7nZSLu.js": "08687e04275085d9ba38b72e45885f392656903b23f5658618ac2fe56fa2b493"
+  },
+  "format": "gen8rpgcustomgame",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "featureIds": [
+    "FR-000544",
+    "FR-000545"
+  ],
+  "completeHeading": false,
+  "carrySource": "a73be04e66bf2ec184ae8c9aeb234e7499c36239",
+  "player": {
+    "species": "Snorlax",
+    "level": 100,
+    "abilityIndex": 1,
+    "ability": "Thick Fat",
+    "move": "splash",
+    "basePP": 40
+  },
+  "firstFoes": {
+    "toxic": {
+      "species": "Gengar",
+      "level": 5
+    },
+    "sleep": {
+      "species": "Parasect",
+      "level": 5
+    }
+  },
+  "nextFoe": {
+    "species": "Pidgey",
+    "level": 5
+  },
+  "cases": [
+    {
+      "id": "EDISK-01",
+      "first": "toxic",
+      "check": "ordinary-poison-after-read",
+      "ppUps": 0,
+      "processes": 2
+    },
+    {
+      "id": "EDISK-02",
+      "first": "sleep",
+      "check": "sleep-count-after-read",
+      "ppUps": 0,
+      "processes": 2
+    },
+    {
+      "id": "EDISK-03",
+      "first": "toxic",
+      "check": "heal-and-PPUps-after-read",
+      "ppUps": 3,
+      "processes": 2
+    },
+    {
+      "id": "EDISK-04",
+      "first": "sleep",
+      "check": "abort-consumer-preserves-saved-first",
+      "ppUps": 0,
+      "processes": 3
+    }
+  ],
+  "scope": "four headless real App/Session-to-SaveStore disk/restart paths; synthetic state initialized only in first producer, consumers use actual disk solely",
+  "bounds": [
+    "No MZ save/Title/Continue/Scene/NW or physical input claim",
+    "Not full E74 heading, performance, Ruby comparison, probability, or production change",
+    "No legacy SaveStore.commit authority bypass; persist the complete candidate from App StatePort.replace through SaveStore.save",
+    "Stop on worker error; no automatic retries; no mid-battle serialization or expected-state replacement"
+  ]
+}
