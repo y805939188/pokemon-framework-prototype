@@ -33,6 +33,8 @@ import { bindRequiredSettlement, checkpointRequiredSettlement, finalizeRequiredS
 import { bindTrainerAi, runTrainerAi, trainerAiEvent, checkpointTrainerAi, restoreTrainerAi, preflightTrainerAiRestore, prepareTrainerAiRestore, failTrainerAiRestore, assertTrainerAiCheckpointReady, cancelTrainerAiDecision } from './trainer-ai';
 import type { TrainerAiConfiguration } from './trainer-ai';
 import { _publishGrowthDisplay, _capturePresentation, _restorePresentation, readBattleLearnProtection } from './presentation';
+import { bindReplacementOffer, hasReplacementOffer, prepareReplacementOffer, checkpointReplacementOffer, preflightReplacementOffer, restoreReplacementOffer } from './replacement-offer';
+export { readTrainerReplacement, readTrainerReplacementTarget, resolveTrainerReplacement } from './replacement-offer';
 import type { GrowthDisplay } from './presentation';
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
@@ -88,6 +90,8 @@ export interface FoeSpec {
 export type FoeAi = (request: Req) => string | null | undefined;
 
 export interface CreateOptions {
+  /** Internal opt-in ports; the current default Scene has no replacement-offer consumer yet. */
+  replacementOffers?: boolean;
   /** Voluntary choice policy only; never a replacement for simulator switch legality. */
   canSwitch?: boolean;
   game: GameState;
@@ -200,7 +204,9 @@ export class BattleSession {
   _friendUnavailable: string[] = [];
   _pendingFriendFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
 
-  static async create({ game, battleId, foe, content, canSwitch = true, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi }: CreateOptions): Promise<BattleSession> {
+  static async create({ replacementOffers = false, game, battleId, foe, content, canSwitch = true, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi }: CreateOptions): Promise<BattleSession> {
+    if (typeof replacementOffers !== "boolean") throw new Error("replacementOffers must be boolean when provided");
+    if (replacementOffers && (!trainerAi || doubles || foe.kind !== "trainer")) throw new Error("replacement-offer-formal-single-trainer-required");
     if (typeof canSwitch !== "boolean") throw new Error("canSwitch must be boolean when provided");
     if (!experimentalHeldBattle && [...game.party, ...foe.team].some((m) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成");
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
@@ -254,6 +260,7 @@ export class BattleSession {
       if (foe.kind !== 'trainer' || doubles || !requiredSettlement || ai) throw new Error('trainer-ai-formal-composition-required');
       bindTrainerAi(s, s.gw, content, trainerAi);
     }
+    bindReplacementOffer(s, replacementOffers);
     s._ingest();
     s._finishTurn();
     s._log("info", "session.create", { content: content.meta ? { kind: content.meta.kind, id: content.meta.id, hash: content.meta.inputsHash?.slice(0, 12) } : null, format: formatid, doubles, foe: { kind: foe.kind, members: foe.team.length }, party: party.map((m) => m.id), seed: seed ?? null });
@@ -303,7 +310,7 @@ export class BattleSession {
   /** Protocol-v1 action refusal; no new reason or request-id semantics are introduced. */
   async _action(action: () => Promise<TurnResult>, replace = true): Promise<TurnResult> {
     this._assertUsable();
-    if (this._operation || this.finished || this.pendingLearn) return this._refuse("choice-rejected");
+    if (this._operation || this.finished || this.pendingLearn || hasReplacementOffer(this)) return this._refuse("choice-rejected");
     return this._exclusive(async () => {
       if (replace && this._staged) {
         await this.gw.cancel("p1");
@@ -322,6 +329,7 @@ export class BattleSession {
     const engine = this.gw.checkpoint();
     checkpointRequiredSettlement(this, engine);
     checkpointTrainerAi(this, this.gw, engine);
+    checkpointReplacementOffer(this, engine);
     return {
       engine,
       state: S.clone({
@@ -343,6 +351,7 @@ export class BattleSession {
     if(ownedEpoch!==undefined&&ownedEpoch!==this._operationEpoch)throw new Error('battle session operation retired');
     const entryEpoch=this._operationEpoch,entryDriver=this.gw;
     preflightTrainerAiRestore(this,entryDriver,checkpoint.engine);
+    preflightReplacementOffer(this,checkpoint.engine);
     // Preflight is read-only but calls trusted ports: a reentrant restore/operation may now own the Session.
     if(this._restoring)throw new Error('battle session restore already in progress');
     if(this._operationEpoch!==entryEpoch||this.gw!==entryDriver)throw new Error('battle session operation retired during restore preflight');
@@ -362,6 +371,7 @@ export class BattleSession {
     _restorePresentation(this, this.out, checkpoint.presentation);
     if (checkpoint.evidence) this._evidence?.restore(checkpoint.evidence);
     if (checkpoint.effects) this._effects?.restore(checkpoint.effects);
+    restoreReplacementOffer(this, checkpoint.engine);
     }catch(error){failTrainerAiRestore(this);throw error;}
     finally{this._restoring=false;if(external){complete?.();if(this._operationDone===done)this._operationDone=null;if(this._operationEpoch===epoch)this._operation=false;}}
   }
@@ -778,6 +788,7 @@ export class BattleSession {
   async _autoFoeReplacement(): Promise<boolean> {
     const req = this.gw.awaitingChoice("p2");
     if (!req || !req.forceSwitch) return false;
+    if (await prepareReplacementOffer(this)) return false;
     if (await runTrainerAi(this, this.gw)) return true;
     const choice = this.ai(req);
     if (!choice || !await this.gw.choose("p2", choice)) throw new Error("foe AI did not provide a legal replacement");
@@ -843,6 +854,7 @@ export class BattleSession {
   }
 
   _finishTurn(): void {
+    if (hasReplacementOffer(this)) { this.requests = {}; return; }
     if (this.ended) {
       this._buildResult(); this.finished = true;
       this._log("info", "end", { reason: this.ended.reason, winner: this.ended.winner, bag: this._result?.bag, members: Object.keys(this._result?.members ?? {}).length });

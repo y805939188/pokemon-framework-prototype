@@ -1,3 +1,4 @@
+import { retireReplacementOffer } from './flow/replacement-offer';
 import { createTrainerAiStrategyRegistry } from "./flow/trainer-ai-strategy";
 import { retireTrainerAi } from './flow/trainer-ai';
 import { trainerAiTiming } from './battle/trainer-ai-timing';
@@ -28,6 +29,8 @@ export interface BattleSessionFactoryOptions {
   content: () => Content;
   trainerAiStrategies?: TrainerAiStrategyRegistry;
   trainerAiTiming?: TrainerAiTiming;
+  /** Internal opt-in until the default Scene consumer is integrated; not a player preference. */
+  replacementOffers?: boolean;
   /** Pins the engine seed (tests); undefined lets the engine pick one. */
   seed?: () => number[] | string | undefined;
   logger?: () => LogSink | undefined;
@@ -47,6 +50,8 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
   // Selecting the producer mode and the actual driver is one composition-time choice. Later mutable options cannot
   // retain required authority while substituting another engine. Callback receivers/content lookup stay unchanged.
   const driver = selectedDriver ?? showdownDriverFactory;
+  const replacementOffers = options.replacementOffers ?? false;
+  if (typeof replacementOffers !== "boolean" || replacementOffers && !required) throw new Error("replacement-offers-require-formal-factory");
   const strategies = options.trainerAiStrategies ?? createTrainerAiStrategyRegistry();
   const resolveStrategy = strategies.resolve.bind(strategies);
   const timing=options.trainerAiTiming??trainerAiTiming;
@@ -60,6 +65,7 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
       return CREATE_BATTLE_SESSION({
       game, battleId: request.battleId, content, experimentalHeldBattle: setup.experimentalHeldBattle ?? false,
       requiredSettlement: required, canSwitch: setup.canSwitch ?? true,
+      replacementOffers: replacementOffers && !!setup.trainer,
       ...(setup.evidenceContext ? { evidence: setup.evidenceContext } : {}),
       ...(setup.obedience ? { obedience: setup.obedience } : {}),
       ...(required && setup.trainer && setup.evidenceContext && setup.isCurrentBattle ? { trainerAi: {
@@ -73,7 +79,7 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
     }); },
     evidence: (handle, binding) => sealBattleEvidence(handle, binding),
     effects: (handle, binding) => sealBattleEffects(handle, binding),
-    retire: handle => retireTrainerAi(handle),
+    retire: handle => { retireReplacementOffer(handle); retireTrainerAi(handle); },
   };
   if (required) registerSettlementFactory(factory, "required", sealRequiredSettlement);
   return factory;

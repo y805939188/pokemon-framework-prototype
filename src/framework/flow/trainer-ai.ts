@@ -311,3 +311,39 @@ export function validateTrainerAiTicket(session:object,driver:BattleDriver,ticke
   const c=CHANNELS.get(session);if(!c)throw new Error('trainer-ai-operation-in-progress');const gate=begin(c);
   try{current(c,driver);trainerCandidate(driver,c.owner,ticket,candidateId,c.state.resourceRevision);}finally{end(c,gate);}
 }
+
+
+/** Prepared force-switch only: opaque execution right, never a strategy or engine ticket in UI data. */
+export interface PreparedTrainerReplacement { readonly opaque?: never }
+interface ReplacementDecision { channel:Channel; cache:Cache; candidateId:string; memberId:string; spent:boolean }
+const REPLACEMENTS=new WeakMap<PreparedTrainerReplacement,ReplacementDecision>();
+function replacementDecision(c:Channel,cache:Cache,expectedMember?:string):{token:PreparedTrainerReplacement;memberId:string} {
+  const r=cache.capture.snapshot.request,plan=cache.plan;
+  if(r.kind!=='force-switch'||!plan||cache.submitted)throw new Error('trainer-replacement-not-ready');
+  const selected=plan.kind==='choose'?plan.retryOrder:plan.kind==='fallback'?plan.candidateIds:[];
+  const candidateId=selected[0],candidate=r.legalSwitches.find(x=>x.candidateId===candidateId);
+  if(!candidate||expectedMember!==undefined&&candidate.memberId!==expectedMember)throw new Error('trainer-replacement-candidate-mismatch');
+  const action=trainerCandidate(c.driver,c.owner,cache.capture.ticket,candidateId,c.state.resourceRevision);
+  if(action.kind!=='switch')throw new Error('trainer-replacement-not-switch');
+  const token=Object.freeze({});REPLACEMENTS.set(token,{channel:c,cache,candidateId,memberId:candidate.memberId,spent:false});return {token,memberId:candidate.memberId};
+}
+export async function prepareTrainerReplacement(session:object,driver:BattleDriver):Promise<{token:PreparedTrainerReplacement;memberId:string}> {
+  const c=CHANNELS.get(session);if(!c)throw new Error('trainer-replacement-source-unavailable');const gate=begin(c);
+  try{qualified(c,driver,gate);const cache=capture(c);if(cache.capture.snapshot.request.kind!=='force-switch')throw new Error('trainer-replacement-not-ready');
+    const result=decide(c,cache,gate,true);if(result instanceof Promise)await result;qualified(c,driver,gate);return replacementDecision(c,cache);
+  }finally{end(c,gate);}
+}
+/** Restore only an already journalled choice. This path never invokes the strategy again. */
+export function restorePreparedTrainerReplacement(session:object,driver:BattleDriver,memberId:string):{token:PreparedTrainerReplacement;memberId:string} {
+  const c=CHANNELS.get(session);if(!c)throw new Error('trainer-replacement-source-unavailable');const gate=begin(c);
+  try{qualified(c,driver,gate);const cache=capture(c);if(!cache.plan)throw new Error('trainer-replacement-plan-missing');return replacementDecision(c,cache,memberId);}finally{end(c,gate);}
+}
+export async function commitPreparedTrainerReplacement(session:object,driver:BattleDriver,token:PreparedTrainerReplacement):Promise<boolean> {
+  const c=CHANNELS.get(session);if(!c)throw new Error('trainer-replacement-source-unavailable');const gate=begin(c);
+  try{qualified(c,driver,gate);const value=REPLACEMENTS.get(token);
+    if(!value||value.channel!==c||value.cache!==c.cache||value.spent||value.cache.submitted)throw new Error('trainer-replacement-stale');
+    const cache=value.cache;trainerCandidate(driver,c.owner,cache.capture.ticket,value.candidateId,c.state.resourceRevision);value.spent=true;cache.attempted.push(value.candidateId);
+    const result=await submitTrainerCandidate(driver,c.owner,cache.capture.ticket,value.candidateId,c.state.resourceRevision);qualified(c,driver,gate);
+    if(result==='accepted'){cache.submitted=true;if(cache.key)c.lastAccepted.set(cache.key,value.candidateId);return true;}return false;
+  }finally{end(c,gate);}
+}

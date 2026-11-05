@@ -150,3 +150,5 @@
 2026-11-05 最终后继：[PP／成长、Encore、野生倒下与 E 八观察](5.4-pp-wild-integration.md)在同一树组合已限定接受 c2e、3e、52；产品逐字初版 d72，保留六条中英 PP0→倒下 Yes／No／禁逃回退与两条 Growl→真实 Encore→PP38→单次保存控制，E 八观察及三限制不变。d72 原回归身份独立保留，最终组合另测／独审；精确 CI、必要原生、完整 D2／E／5.4／P-4 与 LOW／WARN／UNKNOWN 未关闭。
 
 2026-11-05 组合：[PP／Encore／E 八观察整合](5.4-pp-encore-e-integration.md)正常合并已限定接受 c2e、0eaf 与 E420，保留完整成长／HM／挣扎及两 P2 修复，新增中英学习 Growl→实际 Encore 自动使用→消耗 PP 写回一次。E 仅八观察，累计 PP／固定种子 Swift／事前封存限制明示。组合待独审／CI／必要原生，野生倒下候选另审、不含本组合；完整 D2／E／5.4／P-4 未关闭。
+
+- [训练家替补提议生产端口层](5.4-switch-style-ports.md)：正式AI准备、只读资格、请求绑定、取消/成对原生提交及checkpoint；内部显式启用，默认关闭，Scene/默认Switch及玩家选项尚未接线，不代表完整功能接受。

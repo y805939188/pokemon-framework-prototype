@@ -18,6 +18,7 @@ import { HeldTracker } from "./held-tracker";
 import { isSelectableMove } from './move-requests';
 import type { HeldTrackerSnapshot } from "./held-tracker";
 import type { HeldBinding, HeldRosterMember, RequiredFacts } from "../rules/held-facts";
+import { attachReplacementSource, checkpointReplacementSource, restoreReplacementSource } from './replacement-source';
 import { attachTrainerSource, trainerSourceRequest, trainerSourcePublic, checkpointTrainerSource, restoreTrainerSource } from './trainer-ai-source';
 
 /** Version tag of the engine-level message stream used by the 2.2 harness only; NOT the game protocol (state.ts PROTOCOL_VERSION = 1). */
@@ -92,6 +93,7 @@ export class BattleGateway implements BattleDriver {
     });
     gw._battle = battle;
     gw.#attachTrainerSource();
+    attachReplacementSource(gw, gw._battle, gw._env);
     gw._attachObservations();
     for (const [i, p] of (opts.players ?? []).entries()) {
       battle.setPlayer(`p${i + 1}`, { name: p.name, team: sim.Teams.pack(p.team) });
@@ -124,6 +126,7 @@ export class BattleGateway implements BattleDriver {
     const gw = new BattleGateway(opts);
     gw._battle = gw._env.sim.Battle.fromJSON(snapshot);
     gw.#attachTrainerSource();
+    attachReplacementSource(gw, gw._battle, gw._env);
     gw._attachObservations();
     gw._battle.restart((type: string, data: string | string[]) => gw._onSend(type, data));
     gw._opts = { ...opts, restored: true };
@@ -148,6 +151,7 @@ export class BattleGateway implements BattleDriver {
       ...(source ? { settlement: { state: source.tracker.snapshot(), lineage: source.lineage, wild: source.wild } } : {}),
     });
     checkpointTrainerSource(this, token);
+    checkpointReplacementSource(this, token);
     return token;
   }
 
@@ -164,6 +168,7 @@ export class BattleGateway implements BattleDriver {
     gw._faintSequence = data.faintSequence;
     if (data.settlement) gw.#attachSettlement(new HeldTracker(gw._battle, data.settlement.wild, [], data.settlement.state), data.settlement.lineage, data.settlement.wild);
     restoreTrainerSource(gw, token);
+    restoreReplacementSource(gw, token);
     return gw;
   }
 
