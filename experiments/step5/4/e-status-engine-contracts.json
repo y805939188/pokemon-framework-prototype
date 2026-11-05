@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "comparisonLayer": "pinned-engine-conformance-and-reference-difference-reported-separately",
+  "originalVectorSHA256": "fea46c0a05ff77e6b72fa0edfbf6bb0742dc16fae53b39621209593a33a8e9d7",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "format": "gen8rpgcustomgame",
+  "initialHP": 430,
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "authority": {
+    "source": "docs/step2/deviations.md",
+    "item": 10,
+    "decisionDate": "2026-10-18",
+    "rule": "Showdown authoritative inside battle; record reference differences",
+    "scope": "author test comparison classification; not complete FR/reference equivalence acceptance"
+  },
+  "difference": {
+    "id": "E-WP44-TOXIC-ROUNDING-01",
+    "featureId": "FR-000545",
+    "caseId": "ESTAT-02",
+    "classification": "RECORDED_SELECTED_SHOWDOWN_RULE_DIFFERENCE",
+    "referenceSource": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+    "referenceSourceSHA256": "e144ad75bab96647c12220d7f7e137d534277c169f6ca64d8c6bd06044268943",
+    "referenceFormula": "floor(maxHP * cumulative / 16)",
+    "pinnedEngineFormula": "max(1, floor(baseMaxHP / 16)) * cumulative",
+    "referenceExpectedHP": [
+      404,
+      351,
+      351,
+      325
+    ],
+    "engineExpectedHP": [
+      404,
+      352,
+      352,
+      326
+    ],
+    "actualMinusReference": [
+      0,
+      1,
+      1,
+      1
+    ],
+    "statusCountMeaning": "persistent toxic marker 1, not cumulative damage stage"
+  },
+  "switchTargets": {
+    "ESTAT-02": [
+      null,
+      null,
+      "R",
+      "A"
+    ]
+  },
+  "limitations": [
+    "original745 first run stays5pass1fail; no retroactive change",
+    "reference numeric conformance remains different in ESTAT-02",
+    "six selected rawGateway samples only; completeHeading false",
+    "not App/Session save/UI/NW/Ruby/whole E acceptance"
+  ]
+}
