@@ -5,7 +5,7 @@
  * (js/engine/build/custom-formats.cjs) and staged into the engine by scripts/build-showdown.sh; no Showdown source is
  * modified. It runs inside Showdown, so it may only depend on plain rules code (bundled in), never on the gateway.
  */
-import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules";
+import { HEAL_ITEMS, REVIVE_ITEMS, STAT_ITEMS, STATUS_ITEMS, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules";
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types";
 import type { FormatObserver, FormatObservation } from "../rules/battle-evidence";
 import type { BattleActor, BattleDisplaySnapshot } from "../rules/battle-evidence";
@@ -38,6 +38,21 @@ function resolveItem(battle: ShowdownBattle, user: ShowdownPokemon, payload: Pay
   const side = user.side;
   const item = payload.item as string;
   const target = side.pokemon.find((p: ShowdownPokemon) => p.name === payload.target);
+  const revive = REVIVE_ITEMS[item];
+  if (revive) {
+    // A revive is not Pokemon.heal(): the native heal API deliberately rejects zero HP.
+    if (!target || !target.fainted || target.hp !== 0) { emit(battle, "item", side.id, item, payload.target || "-", "noeffect"); return; }
+    target.fainted = false; target.faintQueued = false; target.subFainted = false;
+    target.status = ""; target.statusState = { id: "", target };
+    target.hp = revive.half ? Math.max(1, Math.floor(target.maxhp / 2)) : target.maxhp;
+    side.pokemonLeft++;
+    if (target.isActive) {
+      battle.queue.addChoice({ choice: "instaswitch", pokemon: target, target });
+      battle.add("-heal", target, target.getHealth);
+    }
+    emit(battle, "item", side.id, item, target.name, "ok", target.hp, target.hp, target.maxhp);
+    return;
+  }
   if (item === "fullrestore") {
     if (!target || target.fainted || target.hp <= 0) { emit(battle, "item", side.id, item, payload.target || "-", "noeffect"); return; }
     const confused = target.isActive && !!target.volatiles.confusion;
