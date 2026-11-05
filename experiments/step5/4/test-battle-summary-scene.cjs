@@ -19,7 +19,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, battleStyle = 'set', playerStyle, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, battleStyle = 'set', playerStyle, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null, benchMoves = null } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = suppliedContent ?? fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
@@ -44,6 +44,7 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   if (egg) { state.party[1].isEgg = true; state.party[1].shiny = eggShiny; state.party[1].nickname = 'Hidden Species'; }
   if (leadingEgg) { state.party[0].isEgg = true; state.party[0].nickname = 'LEADING-EGG-NAME'; }
   if (leadMoves) state.party[0].moves = leadMoves.map(move => ({ ...move }));
+  if (benchMoves) state.party[1].moves = benchMoves.map(move => ({ ...move }));
   state.inventory = E.inventory.inventoryFromBag(bag, E.itemCatalog.catalogOf(content)); G.$gameSystem._psGame = state;
   G.Input.keyMapper ??= {}; G.Input.isPressed ??= () => false; G.TouchInput.isCancelled ??= () => false;
   const listeners = new Map(), globals = new Map();
@@ -592,6 +593,60 @@ test('SWC01 en default player Switch publishes an actual replacement question be
 });
 
 const SWD=require('../../../js/engine/build/testing.cjs').trainerAiDiagnostics;
+for (const faintFirst of [false, true]) test('SWF01 default Switch with prior forced replacement=' + faintFirst, async () => {
+  const h = await open({ trainer: true, trainerMembers: 2, members: 3, battleStyle: '', fast: true,
+    ...(faintFirst ? { leadHP: 1, leadMoves: [{ id: 'splash', pp: 1, maxpp: 40 }] } : {}) });
+  try {
+    const s = h.s._session, foe = s.gw.activeId('p2'), installs = observeInstalls(h);
+    if (faintFirst) {
+      const lead = s.gw.activeId('p1'), reserve = s.party[1].id;
+      await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('party-forced');
+      assert(s.gw.readState('p1').find(m => m.id === lead).fainted);
+      await pick(h, reserve); await pick(h, 'switch-in'); await h.p.inMode('main');
+      assert.equal(s.gw.activeId('p1'), reserve);
+    }
+    const offer = await switchOffer(h);
+    assert(s.gw.readState('p2').find(m => m.id === foe).fainted);
+    assert(s.gw.readState('p1').some(m => !m.active && !m.fainted && m.hp > 0));
+    assert.equal(s.gw.activeId('p2'), foe, 'foe replacement must wait for the decision');
+    assert.equal(offer.playerId, s.gw.activeId('p1'));
+    assert.equal(JSON.stringify(h.flow.game()), h.before); assert.equal(installs(), 0);
+  } finally { h.cleanup(); }
+});
+for (const route of ['no', 'list-cancel', 'set']) test('SWF03 after forced replacement, ' + route + ' continues and commits once', async () => {
+  const h = await open({ trainer: true, trainerMembers: 2, members: 3, battleStyle: route === 'set' ? 'set' : '',
+    fast: true, leadHP: 1, leadMoves: [{ id: 'splash', pp: 1, maxpp: 40 }] });
+  try {
+    const s = h.s._session, lead = s.gw.activeId('p1'), reserve = s.party[1].id, foe = s.gw.activeId('p2'), installs = observeInstalls(h);
+    const order = JSON.parse(h.before).party.map(m => m.id);
+    await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('party-forced');
+    await pick(h, reserve); await pick(h, 'switch-in'); await h.p.inMode('main');
+    if (route === 'set') {
+      await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('main');
+      assert.equal(E.session.readTrainerReplacement(s), null);
+    } else {
+      await switchOffer(h);
+      const pp = s.gw.readState('p1').map(m => [m.id, m.pp]).sort();
+      const random = structuredClone(SWD.trainerAiDiagnostics(s).state.random), journal = SWD.trainerAiJournal(s).entries.length;
+      await h.frames(1);
+      if (route === 'no') await pick(h, 'replace-no');
+      else { await pick(h, 'replace-yes'); await h.p.inMode('party'); await h.frames(1); h.s.onMenuCancel(); await h.frames(1); }
+      await h.p.inMode('main');
+      assert.equal(E.session.readTrainerReplacement(s), null);
+      assert.deepEqual(s.gw.readState('p1').map(m => [m.id, m.pp]).sort(), pp);
+      assert.deepEqual(SWD.trainerAiDiagnostics(s).state.random, random);
+      assert.equal(SWD.trainerAiJournal(s).entries.length, journal);
+    }
+    assert(s.gw.readState('p2').find(m => m.id === foe).fainted);
+    assert.notEqual(s.gw.activeId('p2'), foe); assert.equal(s.gw.activeId('p1'), reserve);
+    assert.equal(s.gw.readState('p1').find(m => m.id === reserve).pp.tackle, 34);
+    await finishSwitchBattle(h, installs);
+    const saved = h.flow.game(); assert.deepEqual(saved.party.map(m => m.id), order);
+    assert.equal(saved.party.find(m => m.id === lead).hp, 0);
+    assert.equal(saved.party.find(m => m.id === lead).moves[0].pp, 0);
+    assert.equal(saved.party.find(m => m.id === reserve).moves[0].pp, 33);
+  } finally { h.cleanup(); }
+});
 async function switchOffer(h,slot=1){await pick(h,'fight');await pick(h,slot);await h.waitFor(()=>['main','replacement-question'].includes(h.s._mode)&&h.s.inputState().ready,'replacement boundary');assert.equal(h.s._mode,'replacement-question');const v=E.session.readTrainerReplacement(h.s._session);assert(v);return v;}
 function observeInstalls(h){let count=0,document=h.G.$gameSystem._psGame;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>document,set:v=>{count++;document=v;}});return()=>count;}
 async function finishSwitchBattle(h,installs){await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs(),0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs(),1);h.s.onEnd();assert.equal(installs(),1);}
@@ -626,4 +681,22 @@ test('SWC08 the first question update and the first member-list update cannot co
 });
 test('SWC09 both event entry styles validate before sequence/open and declare inheritance by default',async()=>{
  const h=await open();try{h.cleanup();const seq=h.G.$gameSystem._psBattleSeq,before=JSON.stringify(h.flow.game());for(const name of ['StartBattle','StartTrainerBattle'])for(const battleStyle of [null,true,0,'bogus'])assert.throws(()=>h.w.commands['PS_BattleFlow:'+name].call({setWaitMode(){}},{battleStyle}),/battleStyle must be/);assert.equal(h.G.$gameSystem._psBattleSeq,seq);assert.equal(h.flow.running,false);assert.equal(JSON.stringify(h.flow.game()),before);const meta=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.meta.txt'),'utf8');assert.equal((meta.match(/@arg battleStyle[\s\S]*?@default inherit/g)||[]).length,2);}finally{h.cleanup();}
+});
+
+// Regression: a real forced player replacement can leave the foe action queued.
+// A subsequent KO must still reach the existing Switch offer before foe dispatch.
+for(const lang of ['en','zh'])test('SWF02 '+lang+' unified trainer: real faint, Ether, Revive, default Switch, trainer toy refusal and one joint commit',async()=>{
+ const h=await open({lang,trainer:true,trainerMembers:2,battleStyle:'',fast:true,leadHP:1,leadMoves:[{id:'splash',pp:1,maxpp:40},{id:'tackle',pp:35,maxpp:35}],benchMoves:[{id:'tackle',pp:0,maxpp:35}],bag:{ether:2,revive:2,pokedoll:2}});try{
+  const s=h.s._session,[lead,reserve]=s.party.map(m=>m.id),order=JSON.parse(h.before).party.map(m=>m.id),uses=[];let installs=0,document=h.G.$gameSystem._psGame;
+  Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>document,set:v=>{installs++;document=v;}});const use=s.useItem.bind(s);s.useItem=(...a)=>{uses.push(a[0]);return use(...a);};
+  await pick(h,'fight');await pick(h,1);await h.p.inMode('party-forced');assert(s.gw.readState('p1').find(m=>m.id===lead).fainted);await pick(h,reserve);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),reserve);
+  await pick(h,'bag');await pick(h,'ether');await pick(h,'use');await h.p.inMode('bag-members');await pick(h,reserve);await h.p.inMode('bag-moves');await pick(h,0);await h.p.inMode('main');assert.equal(s.currentRequest().active[0].moves[0].pp,10);
+  await pick(h,'bag');await pick(h,'revive');await pick(h,'use');await h.p.inMode('bag-members');await pick(h,lead);await h.p.inMode('main');assert(s.gw.readState('p1').find(m=>m.id===lead).hp>0);
+  await pick(h,'fight');await pick(h,1);await h.waitFor(()=>['main','replacement-question'].includes(h.s._mode)&&h.s.inputState().ready,'first post-item attack');assert.equal(h.s._mode,'replacement-question');const offer=E.session.readTrainerReplacement(s);assert(offer);assert.equal(s.gw.readState('p1').find(m=>m.id===reserve).pp.tackle,9);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  const pp=s.gw.readState('p1').map(m=>[m.id,m.pp]).sort(),random=structuredClone(SWD.trainerAiDiagnostics(s).state.random),journal=SWD.trainerAiJournal(s).entries.length;
+  await h.frames(1);await pick(h,'replace-yes');await h.p.inMode('party');await pick(h,lead);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),lead);assert.equal(E.session.readTrainerReplacement(s),null);assert.deepEqual(s.gw.readState('p1').map(m=>[m.id,m.pp]).sort(),pp);assert.deepEqual(SWD.trainerAiDiagnostics(s).state.random,random);assert.equal(SWD.trainerAiJournal(s).entries.length,journal);
+  const snapshot=s.gw.snapshot(),ledger=JSON.stringify(s.ledger);await pick(h,'bag');h.s.changeBagPocket(1);await h.frames(1);await pick(h,'pokedoll');await pick(h,'use');await h.p.inMode('bag');assert.equal(s.gw.snapshot(),snapshot);assert.equal(JSON.stringify(s.ledger),ledger);assert.equal(s.bag.pokedoll,2);assert.deepEqual(uses,['ether','revive']);h.s.onMenuCancel();await h.frames(1);await h.p.inMode('main');
+  await pick(h,'fight');await pick(h,2);await h.p.inMode('end');assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);
+  const saved=h.flow.game();assert.deepEqual(saved.party.map(m=>m.id),order);assert(saved.party.find(m=>m.id===lead).hp>0);assert.deepEqual(saved.party.find(m=>m.id===lead).moves.map(m=>m.pp),[0,34]);assert.equal(saved.party.find(m=>m.id===reserve).moves[0].pp,9);assert.deepEqual(E.inventory.aggregateBag(saved.inventory),{ether:1,revive:1,pokedoll:2});h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
 });

@@ -586,9 +586,11 @@ export class BattleSession {
   }
 
   async _resolveTurn(): Promise<TurnResult> {
-    // auto-choose the foe from its own pending request, then process whatever the engine produced
+    // Choose ordinary foe actions here. A queued foe action may already have let
+    // playerAction finish the turn; any resulting forced replacement must wait
+    // for growth and the existing replacement-offer path below.
     const foeRequest = this.gw.awaitingChoice("p2");
-    if (foeRequest) {
+    if (foeRequest && !foeRequest.forceSwitch) {
       if (!await runTrainerAi(this, this.gw)) {
         const c = this.ai(foeRequest);
         if (!c || !await this.gw.choose("p2", c)) throw new Error("foe AI did not provide a legal choice");
