@@ -1,0 +1,138 @@
+{
+  "schema": 1,
+  "format": "gen8rpgcustomgame",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "playerMoves": [
+    "swordsdance",
+    "growl",
+    "tackle",
+    "splash"
+  ],
+  "featureIds": [
+    "FR-000548",
+    "FR-000549"
+  ],
+  "completeHeading": false,
+  "scope": "five normal stat-stage primary App contracts, six actual Sessions including read-only next battle; owned memory state only",
+  "source": {
+    "path": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+    "sha256": "e144ad75bab96647c12220d7f7e137d534277c169f6ca64d8c6bd06044268943",
+    "referenceHead": "5c9805de2331f75565891851d4d7b2bc97acad94"
+  },
+  "headings": [
+    {
+      "featureId": "FR-000548",
+      "heading": "7. 阶级变化族与直接重写",
+      "lines": [
+        131,
+        179
+      ],
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000549",
+      "heading": "8. 计算交界与局部期限",
+      "lines": [
+        180,
+        186
+      ],
+      "completeHeading": false
+    }
+  ],
+  "cases": [
+    {
+      "id": "ESTA-01",
+      "check": "cap-and-next-battle-reset",
+      "party": 1,
+      "steps": [
+        {
+          "op": "move",
+          "move": "swordsdance"
+        },
+        {
+          "op": "move",
+          "move": "swordsdance"
+        },
+        {
+          "op": "move",
+          "move": "swordsdance"
+        },
+        {
+          "op": "move",
+          "move": "swordsdance"
+        }
+      ],
+      "exit": "run"
+    },
+    {
+      "id": "ESTA-02",
+      "check": "target-attack-lower",
+      "party": 1,
+      "steps": [
+        {
+          "op": "move",
+          "move": "growl"
+        }
+      ],
+      "exit": "run"
+    },
+    {
+      "id": "ESTA-03",
+      "check": "ordinary-switch-resets",
+      "party": 2,
+      "steps": [
+        {
+          "op": "move",
+          "move": "swordsdance"
+        },
+        {
+          "op": "switch",
+          "target": "STAGE-P2"
+        },
+        {
+          "op": "switch",
+          "target": "STAGE-P1"
+        }
+      ],
+      "exit": "run"
+    },
+    {
+      "id": "ESTA-04",
+      "check": "stage-affects-damage",
+      "party": 1,
+      "steps": [
+        {
+          "op": "move",
+          "move": "tackle"
+        },
+        {
+          "op": "move",
+          "move": "swordsdance"
+        },
+        {
+          "op": "move",
+          "move": "tackle"
+        }
+      ],
+      "exit": "run"
+    },
+    {
+      "id": "ESTA-05",
+      "check": "abort-buff-zero-install",
+      "party": 1,
+      "steps": [
+        {
+          "op": "move",
+          "move": "swordsdance"
+        }
+      ],
+      "exit": "abort"
+    }
+  ]
+}
