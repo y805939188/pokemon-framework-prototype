@@ -447,8 +447,10 @@ export class BattleSession {
       if ((this.bag[itemId] || 0) < 1) return this._refuse("none-left");
       const el = this.canUseItem(itemId, targetId, moveSlot);
       if (!el.ok) return this._refuse(el.reason); // refused before registration: nothing consumed, no turn used
+      const engineSlot = this._itemMoveSlot(itemId, targetId, moveSlot);
+      if (engineSlot === null) return this._refuse("item-no-effect");
       const entry = this._reserve("item", itemId, targetId);
-      const ok = await this.gw.act("p1", { kind: "item", item: itemId, target: targetId, ...(moveSlot === undefined ? {} : { moveSlot }) });
+      const ok = await this.gw.act("p1", { kind: "item", item: itemId, target: targetId, ...(engineSlot === undefined ? {} : { moveSlot: engineSlot }) });
       if (!ok) { this._refund(entry, "not-registered"); return this._refuse("not-registered"); }
       return commit ? this._resolveTurn() : { ok: true, staged: true };
     });
@@ -463,7 +465,21 @@ export class BattleSession {
         ? { ok: true } : { ok: false, reason: "item-no-effect" };
     }
     const moves = Object.hasOwn(PP_ITEMS, itemId) ? this.party.find(m => m.id === targetId)?.moves.map(m => ({ ...m, pp: mon?.pp[m.id] ?? m.pp })) : undefined;
-    return itemEligibility(itemId, mon, { moves, moveSlot });
+    const eligibility = itemEligibility(itemId, mon, { moves, moveSlot });
+    if (!eligibility.ok) return eligibility;
+    if (this._itemMoveSlot(itemId, targetId, moveSlot) === null) return { ok: false, reason: "item-no-effect" };
+    return eligibility;
+  }
+
+  /** Translate the selected individual slot before reservation; never guess from temporary moveSlots or PP-map order. */
+  private _itemMoveSlot(itemId: string, targetId: unknown, moveSlot?: number): number | undefined | null {
+    if (!Object.hasOwn(PP_ITEMS, itemId) || PP_ITEMS[itemId]!.all) return moveSlot;
+    const member = this.party.find(m => m.id === targetId);
+    if (!member || !Number.isSafeInteger(moveSlot)) return null;
+    const move = member.moves[moveSlot!];
+    if (!move || member.moves.filter(m => m.id === move.id).length !== 1) return null;
+    const slot = this.gw.permanentMoveSlot?.("p1", member.id, move.id);
+    return Number.isSafeInteger(slot) && slot! >= 0 ? slot! : null;
   }
 
   /**
@@ -494,8 +510,15 @@ export class BattleSession {
         }
         if (sp) acted = true;
       }
+      const engineSpecs = specs.map(sp => sp ? { ...sp } : null);
+      for (const sp of engineSpecs) {
+        if (sp?.kind !== "item") continue;
+        const slot = this._itemMoveSlot(sp.item as string, sp.target, sp.moveSlot as number | undefined);
+        if (slot === null) return this._refuse("item-no-effect");
+        if (slot !== undefined) sp.moveSlot = slot;
+      }
       const entries: LedgerEntry[] = [];
-      for (const sp of specs) {
+      for (const sp of engineSpecs) {
         if (!sp || !sp.kind || sp.kind === "run") continue;
         const id = (sp.kind === "item" ? sp.item : sp.ball) as string;
         if ((this.bag[id] || 0) < 1) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("none-left"); }
@@ -507,7 +530,7 @@ export class BattleSession {
         }
         entries.push(this._reserve(sp.kind, id, sp.target));
       }
-      const ok = await this.gw.chooseSlots("p1", specs);
+      const ok = await this.gw.chooseSlots("p1", engineSpecs);
       if (!ok) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("choice-rejected"); }
       return commit ? this._resolveTurn() : { ok: true, staged: true };
     });
