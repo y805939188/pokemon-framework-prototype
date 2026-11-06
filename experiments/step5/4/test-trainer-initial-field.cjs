@@ -70,7 +70,7 @@ async function world(t, { kind = 'trainer', field, moves = ['splash'], refuse } 
     ...(field === undefined ? {} : { initialField: clone(field) }) };
   const proto = E.gateway.BattleGateway.prototype, original = proto.choose, attempts = [];
   if (refuse) proto.choose = async function(side, choice) {
-    if (side === 'p2') {
+    if (side === 'p2' && /^(move|switch) /.test(choice)) {
       attempts.push(choice);
       const response = await refuse.call(this, choice, attempts.length, original);
       if (response !== undefined) return response;
