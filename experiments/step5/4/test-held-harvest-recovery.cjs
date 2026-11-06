@@ -94,7 +94,9 @@ for (const c of plan.cases) test(c.id + ' actual ' + c.kind + ' ' + c.ability + 
     }
     w.phase = 'terminal';
     assert(w.session.finished, 'actual Psychic KO, without diagnostic termination');
-    assert.equal(w.session.currentRequest(), null, 'natural terminal has no following move request');
+    assert(w.session.gw.ended, 'actual driver is ended');
+    assert.equal(w.trace.at(-1).after.foe.hp, 0, 'the ordinary final Psychic actually defeated the foe');
+    assert(!w.trace.at(-1).messages.some(m => m.kind === 'request'), 'terminal turn emits no subsequent request; currentRequest caches the prior one');
     const raw = w.session.result();
     observation.raw = clone(raw);
     assert.equal(raw.outcome.kind, 'win'); assert.equal(raw.outcome.winner, 'Player');
