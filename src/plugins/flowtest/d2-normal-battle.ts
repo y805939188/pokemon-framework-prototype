@@ -10,7 +10,8 @@ export function bindNormalBattle(tools: any,E: any,G: any,W: any,clock: any): an
   const binding: any={owner,
     read(){
       const base=original.read(),bag=scene.battleBagState?.()??null,cards=scene.presentationState?.().cards??[];
-      const request=session.currentRequest(),moveIds=request?.active?.[0]?.moves?.map((m: any)=>m.id)??[];
+      // Scene.showMoves assigns request slot i the menu key i+1; navigation indexes by that key.
+      const request=session.currentRequest(),moveIds=Object.fromEntries((request?.active?.[0]?.moves??[]).map((m: any,i: number)=>[i+1,m.id]));
       const observed=scene.requestObservationState?.();
       const current=base.current===true&&G.SceneManager._scene===scene&&scene._session===session&&flow._op?.session===session
         &&observed?.current===true&&observed.status!=='unavailable'&&observed.requestViewEpoch===owner.epoch;
