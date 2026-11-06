@@ -41,7 +41,16 @@ async function select(x,phase,key){
   const found=s._menu._items.map((item,index)=>({item,index})).filter(x=>x.item.ext===key&&x.item.enabled!==false);assert.equal(found.length,1,phase+'/'+key);
   s._menu.select(found[0].index);s.onMenuOk();await x.frames(2);
 }
-async function caught(x,run){x.scene.act(()=>x.session.throwBall('masterball'),'ball');if(run){assert.equal(E.session.readSessionRequestContext(x.session).reason,'request-view-busy');assert.equal(run.decide(x.context).decision.kind,'wait');}await x.p.inMode('end');}
+async function caught(x,run){
+  let observed;
+  x.scene.act(()=>{
+    const action=x.session.throwBall('masterball');
+    if(run){try{observed={view:E.session.readSessionRequestContext(x.session),out:run.decide(x.context)};}catch(error){observed={error:String(error)};}}
+    return action;
+  },'ball');
+  await x.p.inMode('end');
+  if(run){assert(observed);assert.equal(observed.error,undefined);assert.equal(observed.view.reason,'request-view-busy');assert.equal(observed.out.decision.kind,'wait');}
+}
 async function drain(x,run,{untilContinuation=false}={}){
   const seen=[];
   for(let i=0;i<3000;i++){
