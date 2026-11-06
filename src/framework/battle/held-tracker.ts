@@ -121,7 +121,10 @@ export class HeldTracker {
       return;
     }
     if (method === "setItem" && ["recycle", "harvest"].includes(effect) && !before.current && before.recycle === next) {
-      this.record(cell, "recycle", { current: next, recovery: this.wild && !before.recovery ? next : before.recovery, recycle: "" });
+      const harvest = effect === "harvest";
+      this.record(cell, harvest ? "harvest" : "recycle", {
+        current: next, recovery: (harvest || this.wild) && !before.recovery ? next : before.recovery, recycle: "",
+      });
       return;
     }
     if (transfer.has(effect)) {

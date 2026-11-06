@@ -12,7 +12,7 @@ export interface HeldRosterMember { id: string; side: "p1" | "p2"; initial: stri
 export interface HeldValues { current: string; recovery: string; recycle: string }
 export interface HeldMemberFact extends HeldRosterMember, HeldValues {}
 export type HeldReason = "consume" | "consume-no-recycle" | "temporary-remove" | "temporary-receive"
-  | "permanent-gain" | "permanent-loss" | "transfer-release" | "recycle" | "clear-recycle";
+  | "permanent-gain" | "permanent-loss" | "transfer-release" | "recycle" | "harvest" | "clear-recycle";
 export interface HeldEvent { ordinal: number; id: string; side: "p1" | "p2"; sourceId: string | null; reason: HeldReason; before: HeldValues; after: HeldValues }
 export interface RequiredFacts {
   version: 1; binding: HeldBinding; coverage: "complete";
@@ -74,6 +74,8 @@ function legalTransition(event: HeldEvent, wild: boolean): boolean {
     case "transfer-release": return wild && !a.current && !!a.recovery && !b.current && !b.recovery && b.recycle === a.recycle;
     case "recycle": return !a.current && !!a.recycle && b.current === a.recycle && b.recycle === ""
       && b.recovery === (wild && !a.recovery ? a.recycle : a.recovery);
+    case "harvest": return !a.current && !!a.recycle && b.current === a.recycle && b.recycle === ""
+      && b.recovery === (!a.recovery ? a.recycle : a.recovery);
     case "clear-recycle": return b.current === a.current && b.recovery === a.recovery && b.recycle === "";
     default: return false;
   }

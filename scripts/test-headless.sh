@@ -231,6 +231,8 @@ SUITES=(
   experiments/step5/3/test-perf-write-regression.cjs
   experiments/step5/4/test-trainer-m1.cjs
   experiments/step5/4/test-held-facts.cjs
+  experiments/step5/4/test-held-harvest-facts.cjs
+  experiments/step5/4/test-held-harvest-recovery.cjs
   experiments/step5/4/test-held-engine.cjs
   experiments/step5/4/test-held-app.cjs
   experiments/step5/4/test-held-store.cjs
