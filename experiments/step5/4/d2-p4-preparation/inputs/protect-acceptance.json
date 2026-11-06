@@ -1,0 +1,33 @@
+{
+  "UTC": "2026-11-06T06:31:38.683750+00:00",
+  "candidate": "c293122eb3caf2bd3ae4cf379edb6c7def45e09a",
+  "tree": "43f4b4a5eb48373a63eb5d52b283ac3e518be57d",
+  "review": "/Users/dingshinn/Documents/Codex/2026-11-05/task/e-protect-app-independent-review/REVIEW.zh.md",
+  "reviewSHA256": "763b13c4db2b1d73b53fa29dcf231c03b77b13e8c6378787b44e2c9314fbc2db",
+  "seal": "/Users/dingshinn/Documents/Codex/2026-11-05/task/e-protect-app-independent-review/SEAL.json",
+  "sealSHA256": "e8e6eac3cdfc88b0e0104b7d94b43b3ba7d1a235fa978f035da2a2db88c0c7a2",
+  "sealedFiles": 30,
+  "directReferences": 68,
+  "decision": "ACCEPTED_SCOPED_PROTECT_THREE_APP_SAMPLES",
+  "independentActual": {
+    "targeted": 3,
+    "related": 10,
+    "dataPositive": 6,
+    "dataNegative": 10,
+    "oldNewOracleEvaluations": 12,
+    "apps": 3,
+    "sessions": 4,
+    "normalMoves": 6,
+    "installs": 2,
+    "aborts": 2
+  },
+  "oldFailureClassification": "author oracle wrongly required per-turn work HP/status cache equality; old0/3 and missing fresh raw kept, product unchanged",
+  "remaining": [
+    "two auxiliary-incomplete diagnostics",
+    "complete current227/type/build/SDK/CI not executed",
+    "Scene/disk/Title/Continue/NW not accepted",
+    "complete E/D2/5.4/P4 not accepted"
+  ],
+  "published": false,
+  "NW": 0
+}

@@ -1,0 +1,23 @@
+{
+  "UTC": "2026-11-05T14:10:34.834671+00:00",
+  "scope": "read-only next-admission facts while exact CI runs; no new plan or driver",
+  "source": "a50d392c41a51df3e7a4b373da410610cdf25031",
+  "files": {
+    "src/plugins/flowtest/d1-benchmark.ts": "4747bc9f8af17144b9cdc80f7439acfd503c2246f9f37e397aa972a9be3be964",
+    "scripts/run-d1-benchmark-mac.py": "f229f886cb7d354faa09bf6ddca07578d51d1a6682983133b1f5f7b035881af5"
+  },
+  "existingTask3Runbook": "/Users/dingshinn/Documents/Codex/2026-11-04/task-3/RUNBOOK.zh.md",
+  "existingTask3RunbookSHA256": "89e9bb15a187a4e8e298931bf296e8299b70fdfa297dbbddb85391261817a074",
+  "currentFastTrue": true,
+  "currentDeclaresNoD2Transition": true,
+  "driverVersion": "D1-driver-v2-port-order",
+  "supervisorStillPinsD1Presentation": true,
+  "existingF100CannotSignFinalNormalD2": true,
+  "normalDriverFinalInputComparableControlAndTimeBudgetNotFrozen": true,
+  "newImplementationOrExecution": false,
+  "ownershipNotAssumed": true,
+  "NW": 0,
+  "APP": 0,
+  "metricsCollected": false,
+  "GCWarnRemainsOpen": true
+}

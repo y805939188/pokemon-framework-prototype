@@ -1,0 +1,39 @@
+{
+  "UTC": "2026-11-06T07:40:45.969693+00:00",
+  "candidate": "bac206927fb3cf8c19c97a975cb3f11954586853",
+  "tree": "6c973e45e56ec87116afd1beb8587bc2f89732d2",
+  "review": "/Users/dingshinn/Documents/Codex/2026-11-05/task/capture-receiving-scene-independent-review/REPORT.zh.md",
+  "reviewSHA256": "27932d3ccd23ef4ac41661360ced2e502d5ff1e24af028e2e5f0e3a05bb7e7f5",
+  "seal": "/Users/dingshinn/Documents/Codex/2026-11-05/task/capture-receiving-scene-independent-review/SEAL.json",
+  "sealSHA256": "b54dcb4a89ae4e4b1d1170ce17e6e70f660af4cf302a14220302f898fad199e9",
+  "sealedFiles": 38,
+  "directReferences": 49,
+  "decision": "ACCEPTED_SCOPED_CONTROLLED_CAPTURE_RECEIVING_SCENE",
+  "independentUniqueNormalCases": 4,
+  "independentPositiveExecutions": {
+    "reusedPlugins": 4,
+    "compiledCurrentSource": 4
+  },
+  "independentExpectedNegativeFailures": 4,
+  "auxiliaryDiagnosticMessagesPerPositiveMode": 4,
+  "historicalAuthorFailedVersionsPreserved": [
+    "7572987",
+    "b10a919",
+    "1c11b2d"
+  ],
+  "deferred": [
+    "existing default nickname No rather than reference Yes"
+  ],
+  "limitations": [
+    "same four cases in two modes, not eight mechanisms",
+    "hasDex false; no Pokedex entry page, actual rename entry, party replacement, multiple capture or full storage",
+    "controlled VM rendering and inputs, not physical keyboard/Window.processOk/DOM/native pixels or full Boot lifecycle",
+    "dependency links verify targets only, not every dependency byte",
+    "no current full227/type/boundary/SDK/build/CI",
+    "no disk/Title/Continue/NW or complete D2/E/5.4/P4",
+    "auxiliary facts completeness not accepted",
+    "independent read-only metadata KeyError and untracked-reference audit failure preserved; business not rerun"
+  ],
+  "published": false,
+  "NW": 0
+}
