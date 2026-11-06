@@ -89,6 +89,8 @@ export interface BattleDriver {
   /** Menu query. automatic-encore may return a one-based moveSlot; allowed without a slot is not an automatic choice. */
   query(side: string, what: "run" | "ball" | string, slot?: number): { allowed: boolean; reason?: string; moveSlot?: number };
   readState(side: string): MemberState[];
+  /** Unique permanent engine slot for a move identity; unavailable/missing/ambiguous means refuse a selected PP item. */
+  permanentMoveSlot?(side: string, memberId: string, moveId: string): number | null;
   seedState(side: string, records: StateRecord[]): void;
   applyGrowth(side: string, id: string, change: GrowthApplication): GrowthOutcome;
   /** Internal optional capabilities. Absence means unavailable, never an empty/complete observation. */

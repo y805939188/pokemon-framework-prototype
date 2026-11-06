@@ -808,6 +808,27 @@ async function leaveMoves(h) {
   await h.p.press('cancel'); await h.p.press('cancel'); await h.p.inMode('party');
   h.s.onMenuCancel(); await h.p.inMode('main');
 }
+for(const lang of ['en','zh'])for(const reserve of [false,true])test(lang+' default Summary to Bag restores the displayed move after sorting '+(reserve?'reserve':'active')+' member',async()=>{
+  const original=[{id:'tackle',pp:35,maxpp:35},{id:'splash',pp:7,maxpp:40}];
+  const h=await open({lang,hurt:false,fast:true,bag:{ether:2},...(reserve?{benchMoves:original}:{leadMoves:original})});try{
+    const s=h.s._session,id=s.party[reserve?1:0].id,engine=s.gw.snapshot();let installs=0,doc=h.G.$gameSystem._psGame;
+    Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:value=>{installs++;doc=value;}});
+    await movesDetail(h,id);await h.p.press('ok');await h.p.press('down');await h.p.press('ok');
+    assert.deepEqual(s.party.find(m=>m.id===id).moves,[original[1],original[0]]);assert.equal(s.gw.snapshot(),engine);
+    await leaveMoves(h);await pick(h,'bag');
+    for(let i=0;i<8&&!h.s.inputState().items.some(row=>row.key==='ether');i++){h.s.changeBagPocket(1);await h.frames(1);}
+    await pick(h,'ether');await pick(h,'use');await h.p.inMode('bag-members');await pick(h,id);await h.p.inMode('bag-moves');
+    assert.equal(h.s.inputState().items[0].key,0);assert.equal(h.s.battleBagState().rows[0].moveId,'splash');
+    await pick(h,0);await h.p.inMode('main');
+    assert.deepEqual(s.party.find(m=>m.id===id).moves.map(m=>[m.id,m.pp]),[['splash',17],['tackle',35]]);
+    assert.equal(s.gw.readState('p1').find(m=>m.id===id).pp.splash,17);assert.equal(s.bag.ether,1);assert.equal(s.ledger.length,1);assert.equal(s.ledger[0].state,'consumed');
+    assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+    await pick(h,'fight');await pick(h,1);await h.p.inMode('end');h.s.onMenuOk();await h.frames(3);
+    assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);
+    assert.deepEqual(h.flow.game().party.find(m=>m.id===id).moves.map(m=>[m.id,m.pp]),[['splash',17],['tackle',reserve?35:34]]);
+    const committed=JSON.stringify(h.flow.game());h.s.onEnd();assert.equal(installs,1);assert.equal(JSON.stringify(h.flow.game()),committed);
+  }finally{h.cleanup();}
+});
 for (const lang of ['en', 'zh']) test(lang + ' summary move sorting swaps complete working records and preserves actual PP and single final write', async () => {
   const original = [{ id: 'tackle', pp: 32, maxpp: 56, ppUps: 3 }, { id: 'splash', pp: 7, maxpp: 40, ppUps: 0 }];
   const h = await open({ lang, leadMoves: original, trainer: true, trainerMembers: 2, fast: true }); try {

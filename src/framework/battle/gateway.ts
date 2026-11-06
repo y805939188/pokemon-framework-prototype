@@ -549,6 +549,15 @@ export class BattleGateway implements BattleDriver {
     side.pokemonLeft = side.pokemon.filter((p: ShowdownPokemon) => !p.fainted).length;
   }
 
+  /** Summary order is independent of engine wrappers. Only permanent slots identify PP item targets. */
+  permanentMoveSlot(sideId: string, memberId: string, moveId: string): number | null {
+    const members = this._battle.getSide(sideId).pokemon.filter((p: ShowdownPokemon) => p.name === memberId);
+    if (members.length !== 1 || !moveId) return null;
+    const slots = members[0].baseMoveSlots;
+    const index = slots.findIndex((slot: { id: string }) => slot.id === moveId);
+    return index >= 0 && slots.filter((slot: { id: string }) => slot.id === moveId).length === 1 ? index : null;
+  }
+
   /** Read back the engine-owned dynamic state per member: hp, persistent status, pp per move. */
   readState(sideId: string): MemberState[] {
     return this._battle.getSide(sideId).pokemon.map((p: ShowdownPokemon): MemberState => ({
