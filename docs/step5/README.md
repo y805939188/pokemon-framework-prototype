@@ -242,3 +242,8 @@
 ## HP/PP普通槽与非渲染Continue贯穿（有限、待独审）
 
 [范围、固定前提及本地命令](5.4-E-hp-mz-continue.md)：实际主战果→普通压缩槽→新Node Continue方法→下一战，三案包含恢复、反伤和中止后重接。不签完整Title/UI/NW、完整E或辅助事实；实际SHA/结果以STATUS和外部原始回执为准。
+
+
+## 异常状态普通槽与非渲染Continue（有限、待独审）
+
+[三案合同与本机前提](5.4-E-status-mz-continue.md)：剧毒战后普通毒规范化、睡眠剩余数和醒来PP，实际压缩槽/新Node Continue/下一战及取消后原档重接。真实Title/Scene/NW与完整E不签，实际结果见STATUS。
