@@ -2332,7 +2332,7 @@ const { developmentCapabilities } = RuleConfig;
     try { G.Scene_MenuBase.prototype.terminate.call(this); }
     finally {
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // (a scene always has one; a bare caller means the current one)
-    if (PSFlow.running && op === PSFlow._op && (!c || c.ownsHost()) && !(this._receivingTransferred&&PSFlow.app().pendingReceiving) && !(this._evolutionTransferred&&PSFlow.app().pendingEvolution) && (!c || c.ownsHost())) PSFlow.abort(new Error("the battle scene closed without an outcome"), op); // transferred operations keep the same event and save lock
+    if (PSFlow.running && op === PSFlow._op && (!c || c.ownsHost()) && !(this._receivingTransferred&&PSFlow.app().pendingReceiving) && !(this._evolutionTransferred&&(PSFlow.app().pendingEvolution||PSFlow.app().pendingPokedex)) && (!c || c.ownsHost())) PSFlow.abort(new Error("the battle scene closed without an outcome"), op); // transferred operations keep the same event and save lock
     }
   };
 

@@ -115,3 +115,9 @@ test('a new production App at the same generation cannot be driven by the old ca
   finally{x.flow._app=old;}
   assert.equal(run.decide(x.context).decision.kind,'blocked','retired coordinator cannot revive when the old App returns');
 });
+test('a trusted Session restore retires the same-App coordinator rather than treating the new observation epoch as busy',async t=>{
+  const x=await owned(t),run=x.attach(),cp=x.session._checkpoint(),before=x.fixture.state();
+  await x.session._restoreCheckpoint(cp);const out=run.decide(x.context);
+  assert.equal(out.decision.kind,'blocked');assert.match(out.decision.reason,/observation generation retired/);
+  assert.deepEqual(x.fixture.state(),before);assert.equal(x.context.intentIndex,0);
+});

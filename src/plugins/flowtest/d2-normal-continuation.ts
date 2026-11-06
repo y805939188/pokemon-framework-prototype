@@ -7,7 +7,7 @@ export function bindNormalContinuation(tools: any,E: any,G: any,W: any,fixture: 
   if(!(app instanceof E.app.GameApplication)||fixture?.app!==app||typeof fixture.assertOwned!=='function'
     ||!session||op?.session!==session||op.request?.battleId!==plan.id||session.battleId!==plan.id||!app.saveBlocked)throw Error('owned formal normal case required');
   fixture.assertOwned();
-  const generation=app.stateGeneration,battle=bindNormalBattle(tools,E,G,W,clock),owner=Object.freeze({version:'normal-case-continuation-v1',caseId:plan.id});
+  const generation=app.stateGeneration,battle=bindNormalBattle(tools,E,G,W,clock),requestEpoch=battle.owner.epoch,owner=Object.freeze({version:'normal-case-continuation-v1',caseId:plan.id});
   const previousLedger=copy(fixture.state().appliedBattles);
   if(Object.hasOwn(previousLedger,plan.id))throw Error('normal continuation requires a new case ledger');
   let retired='',lastTick=-1,page: any=null;
@@ -32,6 +32,10 @@ export function bindNormalContinuation(tools: any,E: any,G: any,W: any,fixture: 
       if(!Number.isSafeInteger(tick)||tick<lastTick){retired='normal game clock retired';return blocked(retired);}lastTick=tick;
       if(current===scene){
         page=null;
+        if(!flow.running)return blocked('battle stopped before the case boundary');
+        const view=E.session.readSessionRequestContext(session);
+        if(view.requestViewEpoch!==requestEpoch){retired='normal Session observation generation retired';return blocked(retired);}
+        if(view.status==='unavailable')return view.reason==='request-view-busy'?wait('battle','actual Session action is in progress'):blocked('normal Session view unavailable');
         let observedOutcomeCode: number|undefined;
         if(session.finished){
           const raw=session.result();if(raw.battleId!==plan.id)return blocked('terminal case mismatch');
@@ -39,7 +43,13 @@ export function bindNormalContinuation(tools: any,E: any,G: any,W: any,fixture: 
           if(observedOutcomeCode!==plan.expected.code)return blocked('unexpected actual terminal outcome');
         }
         // Actual Session result overrides any caller-provided terminal metadata.
-        const out=battle.decide(plan,{...context,observedOutcomeCode});
+        let out: any;
+        try{out=battle.decide(plan,{...context,observedOutcomeCode});}
+        catch(error){
+          const after=E.session.readSessionRequestContext(session);
+          if(valid()&&G.SceneManager._scene===current&&after.requestViewEpoch===requestEpoch&&after.reason==='request-view-busy')return wait('battle','actual Session action is in progress');
+          retired='normal battle observation rejected';return blocked(retired+': '+String(error));
+        }
         if(!valid()||G.SceneManager._scene!==current||out.snapshot.current!==true){retired='normal battle view retired';return blocked(retired);}
         return result('battle',out.decision,{...out.snapshot,owner,observedOutcomeCode});
       }
@@ -56,6 +66,7 @@ export function bindNormalContinuation(tools: any,E: any,G: any,W: any,fixture: 
         return wait('receiving','receiving presenter is completing its actual transition');
       }
       const continuation=W.PSEvolution?.normalObservationState?.();
+      if(!valid()||G.SceneManager._scene!==current){retired='normal continuation projection owner retired';return blocked(retired);}
       if(continuation?.status==='available'){
         const ui=continuation,dex=app.pendingPokedex,growth=app.pendingEvolution;
         if(!valid()||G.SceneManager._scene!==current)return blocked('continuation owner changed during projection');
