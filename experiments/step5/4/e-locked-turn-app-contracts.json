@@ -12,7 +12,7 @@
   },
   "headings": [{"featureId": "FR-000556", "heading": "3. 多击、两回合与连用", "lines": [45, 92], "sampledSubsections": ["3.2", "3.3"], "completeHeading": false}],
   "player": {"id": "LOCK-P1", "species": "Snorlax", "level": 50, "nature": "hardy", "abilityIndex": 1, "maxhp": 220},
-  "playerMoves": [{"id": "dig", "pp": 10, "maxpp": 10}, {"id": "hyperbeam", "pp": 5, "maxpp": 5}, {"id": "splash", "pp": 40, "maxpp": 40}],
+  "playerMoves": [{"id": "dig", "pp": 10, "maxpp": 10, "ppUps": 0}, {"id": "hyperbeam", "pp": 5, "maxpp": 5, "ppUps": 0}, {"id": "splash", "pp": 40, "maxpp": 40, "ppUps": 0}],
   "foe": {"species": "slowbro", "level": 100, "moves": ["splash"]},
   "maxEscapeAttempts": 6,
   "cases": [
