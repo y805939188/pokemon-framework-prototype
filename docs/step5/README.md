@@ -262,3 +262,5 @@
 ## 异常状态普通槽与非渲染Continue（有限、待独审）
 
 [三案合同与本机前提](5.4-E-status-mz-continue.md)：剧毒战后普通毒规范化、睡眠剩余数和醒来PP，实际压缩槽/新Node Continue/下一战及取消后原档重接。真实Title/Scene/NW与完整E不签，实际结果见STATUS。
+
+- 5.4 E 普通两回合／休息回合 App 契约抽样：[有限范围与运行入口](5.4-E-locked-turn-app.md)。四案，非完整 FR-000556、Scene、磁盘或 NW 验收。

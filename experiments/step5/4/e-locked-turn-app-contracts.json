@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "format": "gen8rpgcustomgame",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "seed": [1, 2, 3, 4],
+  "completeHeading": false,
+  "scope": "Four normal player Dig/Hyper Beam App contracts: real production Session requests, work PP, commit or abort and fresh next battle. Controlled in-memory state/projection only; no Scene, disk, NW, full two-turn family or full FR-000556 claim.",
+  "source": {
+    "path": "deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+    "sha256": "7e65ae4945ab1cd101b357f3edcadbff2cbaa94630c609244519a688901e1841",
+    "referenceHead": "5c9805de2331f75565891851d4d7b2bc97acad94"
+  },
+  "headings": [{"featureId": "FR-000556", "heading": "3. 多击、两回合与连用", "lines": [45, 92], "sampledSubsections": ["3.2", "3.3"], "completeHeading": false}],
+  "player": {"id": "LOCK-P1", "species": "Snorlax", "level": 50, "nature": "hardy", "abilityIndex": 1, "maxhp": 220},
+  "playerMoves": [{"id": "dig", "pp": 10, "maxpp": 10, "ppUps": 0}, {"id": "hyperbeam", "pp": 5, "maxpp": 5, "ppUps": 0}, {"id": "splash", "pp": 40, "maxpp": 40, "ppUps": 0}],
+  "foe": {"species": "slowbro", "level": 100, "moves": ["splash"]},
+  "maxEscapeAttempts": 6,
+  "cases": [
+    {"id": "ELTA-01", "check": "dig-charge-attack-one-pp-and-single-install", "kind": "dig", "exit": "run"},
+    {"id": "ELTA-02", "check": "hyper-beam-recharge-no-second-pp-and-next-choice", "kind": "hyperbeam", "exit": "run"},
+    {"id": "ELTA-03", "check": "abort-during-dig-charge-and-fresh-next-battle", "kind": "dig", "exit": "abort"},
+    {"id": "ELTA-04", "check": "abort-before-recharge-and-fresh-next-battle", "kind": "hyperbeam", "exit": "abort"}
+  ]
+}
