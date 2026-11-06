@@ -60,3 +60,62 @@ test('learning while already Transformed keeps temporary PP off the permanent sl
  await turn(gw,'switch 2');const back=request(gw).side.pokemon.findIndex(m=>m.ident==='p1: A');await turn(gw,'switch '+(back+1));
  assert.equal(request(gw).active[0].moves[0].id,'rest');assert.equal(request(gw).active[0].moves[0].pp,10);assert.equal(read(gw).pp.rest,10);
 });
+
+// G-1 regression: real Summary order command, natural KO/growth and real App finish/abort.
+// These are explicit author HM classifications, not claims about official Gen8 HM lists.
+const G1_ORDER=['tackle','growl','splash','protect'],copyG1=v=>JSON.parse(JSON.stringify(v));
+async function sortedHmWorld(hmMove){
+ const {T,inputs}=require('./trainer-ai-integration/fixtures.cjs');
+ const input=inputs({moves:['splash'],party:2});
+ input.species.find(s=>s.id==='snorlax').learnset=[...G1_ORDER.map(move=>({level:1,move})),{level:51,move:'rest'}];
+ for(const trainer of input.trainers)for(const member of trainer.party)member.level=3;
+ input.items.push({id:'g1-synthetic-hm',name:'Synthetic HM',namePlural:'Synthetic HMs',pocket:4,fieldUse:'hm',move:hmMove,flags:['HM'],consumable:false,source:'author-placeholder'});
+ const compiled=E.contentCompile.compileContent(input);assert(compiled.ok,JSON.stringify(compiled.errors));
+ const joined=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(joined.errors,[]);const content=joined.content;
+ const m=E.memberFactory.createMember({id:'G1-P1',species:'Snorlax',level:50,nature:'hardy',abilityIndex:1},content,()=>0);assert.deepEqual(m.moves.map(x=>x.id),G1_ORDER);
+ const game=E.state.newGame({content,party:[E.speciesKey.toPersistentMember(m,content)],money:1000});game.party[0].exp=E.growth.minExp(content.species.Snorlax.growth,51)-1;game.nextMemberOrdinal='2';
+ const state=T.fakes.createMemoryState(game),initial=copyG1(state.read());
+ const app=new E.app.GameApplication({state,projection:T.fakes.createRecordingProjection(),sessions:E.composition.createBattleSessionFactory({content:()=>content,seed:()=>[1,2,3,4]}),content:()=>({content}),random:()=>0,clock:()=>12345});
+ const request={battleId:'G1-order-'+hmMove,seq:1,trainer:{id:'c-basic',version:1},canLose:true},s=await app.startTrainerBattle(request);s.take();
+ return{app,state,initial,request,s,id:m.id};
+}
+for(const hmMove of ['tackle','growl'])test('summary sorted '+hmMove+' HM is protected at its new slot while ordinary replacement follows identity',async()=>{
+ const w=await sortedHmWorld(hmMove),{app,s,state,initial,id}=w;
+ try{
+  const calls=[],apply=s.gw.applyGrowth.bind(s.gw);
+  s.gw.applyGrowth=(...args)=>{calls.push(copyG1(args));return apply(...args);}; // G1_DELEGATE_UNCHANGED
+  const unchanged=()=>{assert.deepEqual(state.read(),initial);assert.equal(state.replaced.length,0);};
+  const oldEngine=s.gw.snapshot();assert.deepEqual(s.currentRequest().active[0].moves.map(m=>m.id),G1_ORDER);
+  assert.equal(await E.session.reorderBattleSummaryMoves(s,id,0,1,G1_ORDER),true);
+  const sortedOrder=['growl','tackle','splash','protect'];assert.deepEqual(s.party[0].moves.map(m=>m.id),sortedOrder);
+  assert.equal(s.gw.snapshot(),oldEngine,'the real sort command leaves the independent battle wrapper order unchanged');
+  assert.deepEqual(s.currentRequest().active[0].moves.map(m=>m.id),G1_ORDER);unchanged();
+  const ko=await s.chooseMove(1);assert(ko.ok,JSON.stringify(ko));assert.equal(s.party[0].level,51);assert.equal(s.pendingLearn.memberId,id);assert.equal(s.pendingLearn.move.id,'rest');
+  const hmSlot=sortedOrder.indexOf(hmMove),normalSlot=hmSlot===0?1:0,normalMove=sortedOrder[normalSlot];
+  assert.deepEqual(E.battlePresentation.readBattleLearnProtection(s,hmSlot),{version:1,memberId:id,slot:hmSlot,moveId:hmMove,reason:'hm-protected'});
+  assert.equal(E.battlePresentation.readBattleLearnProtection(s,normalSlot),null,'the ordinary move must not inherit protection from the old engine slot');
+  const checkpoint=JSON.stringify(s._checkpoint()),pending=s.pendingLearn,beforeRefusals=copyG1(s.party[0]);
+  for(let retry=0;retry<2;retry++){
+   assert.deepEqual(await s.decideLearn(hmSlot),[]);assert.equal(s.pendingLearn,pending);assert.equal(JSON.stringify(s._checkpoint()),checkpoint);unchanged();
+  }
+  const learned=await s.decideLearn(normalSlot);assert.equal(s.pendingLearn,null);assert(learned.some(x=>x.kind==='learned'&&x.move==='rest'));
+  const afterLearning=copyG1(s.party[0]),enginePP=copyG1(read(s.gw,id).pp);
+  assert.equal(afterLearning.moves[hmSlot].id,hmMove);assert.equal(afterLearning.moves[normalSlot].id,'rest');
+  assert.equal(enginePP[normalMove],undefined,'only the selected ordinary identity is removed from the independently ordered engine');
+  assert.equal(enginePP[hmMove],hmMove==='tackle'?34:40,'HM and its spent PP survive the other-slot replacement');assert.equal(enginePP.rest,10);
+  const replacementCalls=calls.filter(x=>x[2].newMoves?.includes('Rest'));assert.equal(replacementCalls.length,1);
+  assert.equal(replacementCalls[0][2].replaceSlot,normalSlot);assert.equal(replacementCalls[0][2].replaceMoveId,normalMove);unchanged();
+  let result=null,outcome;
+  if(hmMove==='tackle'){
+   const slot=s.currentRequest().active[0].moves.findIndex(m=>m.id==='tackle')+1;assert(slot>0);assert((await s.chooseMove(slot)).ok);assert(s.finished);unchanged();
+   result=s.result();outcome=app.finishBattle(s,w.request);assert.equal(outcome.commit,'applied');assert.equal(state.replaced.length,1);
+   const saved=copyG1(state.read()),member=saved.party.find(m=>m.id===id);assert.deepEqual(member.moves.map(m=>m.id),['rest','tackle','splash','protect']);
+   assert.equal(member.moves.find(m=>m.id==='tackle').pp,33);assert.equal(member.moves.find(m=>m.id==='rest').pp,10);assert.equal(read(s.gw,id).pp.tackle,33);
+   assert.equal(saved.appliedBattles[w.request.battleId].hash,E.state.resultHash(result));assert.deepEqual(Object.keys(saved.appliedBattles),[w.request.battleId]);
+   app.finishBattle(s,w.request);assert.equal(state.replaced.length,1);assert.deepEqual(state.read(),saved);
+  }else{
+   app.abortBattle(w.request,Error('owned G1 ordinary replacement observation complete'));outcome=app.finishBattle(s,w.request);assert.equal(outcome.commit,'none');assert(outcome.aborted);unchanged();
+  }
+  console.log('G1_HM_ORDER_OBSERVATION '+JSON.stringify({hmMove,normalMove,initial,sortedOrder,beforeRefusals,afterLearning,enginePP,replacementCall:replacementCalls[0],refusals:2,result,outcome,saved:copyG1(state.read()),installs:state.replaced.length,NW:0}));
+ }finally{app.abortBattle(w.request,Error('owned G1 sorted HM regression cleanup'));}
+});

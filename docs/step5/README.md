@@ -264,3 +264,5 @@
 [三案合同与本机前提](5.4-E-status-mz-continue.md)：剧毒战后普通毒规范化、睡眠剩余数和醒来PP，实际压缩槽/新Node Continue/下一战及取消后原档重接。真实Title/Scene/NW与完整E不签，实际结果见STATUS。
 
 - 5.4 E 普通两回合／休息回合 App 契约抽样：[有限范围与运行入口](5.4-E-locked-turn-app.md)。四案，非完整 FR-000556、Scene、磁盘或 NW 验收。
+
+- 5.4 G-1 排序与 HM 守卫交叉永久回归：[两案与边界](5.4-G1-summary-hm-order-tests.md)。仅测试补强，产品未改，非Scene/NW验收。
