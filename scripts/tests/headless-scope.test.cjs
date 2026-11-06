@@ -40,19 +40,19 @@ if [[ "$3" != 'control-only-a.cjs' ]]; then
   printf '# pass 1\\n# fail 0\\n# cancelled 0\\n# skipped 0\\n'
   exit 0
 fi
-case "${CONTROL_CASE:-pass}" in
+case "\${CONTROL_CASE:-pass}" in
   empty) exit 0 ;;
   fail) printf '# pass 0\\n# fail 1\\n# cancelled 0\\n# skipped 0\\n'; exit 0 ;;
   cancelled) printf '# pass 0\\n# fail 0\\n# cancelled 1\\n# skipped 0\\n'; exit 0 ;;
   missing-cancelled) printf '# pass 1\\n# fail 0\\n# skipped 0\\n'; exit 0 ;;
   skipped) printf '# pass 0\\n# fail 0\\n# cancelled 0\\n# skipped 1\\n'; exit 0 ;;
-  *) printf '# pass 1\\n# fail 0\\n# cancelled 0\\n# skipped 0\\n'; exit "${CONTROL_RC:-0}" ;;
+  *) printf '# pass 1\\n# fail 0\\n# cancelled 0\\n# skipped 0\\n'; exit "\${CONTROL_RC:-0}" ;;
 esac
 `, { mode: 0o755 });
   fs.writeFileSync(path.join(dir, 'bin/pnpm'), `#!/bin/bash
 printf 'pnpm %s\\n' "$*" >> "$CONTROL_LOG"
 case "$*" in
-  '--dir src typecheck:framework'|'--dir src build:distribution') exit "${CONTROL_PREFLIGHT_RC:-0}" ;;
+  '--dir src typecheck:framework'|'--dir src build:distribution') exit "\${CONTROL_PREFLIGHT_RC:-0}" ;;
   *) exit 93 ;;
 esac
 `, { mode: 0o755 });
