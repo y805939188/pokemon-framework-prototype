@@ -38,6 +38,9 @@ function verify(c,o){
  assert.equal(count.length,allCounts.length,'all summaries in this single-target use must bind the actual member, not another id');
  if(c.ko){assert.equal(o.finished,true);assert.equal(o.endReason,'win');assert(count.length<=1,'terminal metadata must not duplicate counts');}
  else assert.equal(count.length,1,'a surviving-target multihit use retains its summary');
+ // Pinned ordinary first-hit KO emits a summary after the target becomes inactive.
+ // Keep this presence requirement narrow; other multihit/terminal families are not proven here.
+ if(c.id==='EMHA-04')assert.equal(count.length,1,'pinned EMHA-04 retains exactly one terminal hitcount');
  if(count.length)assert.equal(Number(count[0].args[1]),hits.length,'reported count equals actual target HP submissions');
  let hp=b.p2.hp;
  for(const hit of hits){const m=/^(\d+)(?:\/(\d+))?(?:\s|$)/.exec(hit.args[1]);assert(m,'actual HP wire required');const next=Number(m[1]);if(m[2])assert.equal(Number(m[2]),b.p2.maxhp);assert(next<hp&&next>=0);hp=next;}
@@ -50,6 +53,11 @@ for(const c of plan.cases)test(c.id+' '+c.check,async()=>{
   unchanged(w);const r=await w.s.chooseMove(plan.playerMoves.indexOf(c.move)+1);assert(r.ok,JSON.stringify(r));
   const row={before:w.before,after:observation(w.s),messages:clone(r.messages),finished:w.s.finished,endReason:w.s.finished?w.s.ended.reason:null};
   try{verify(c,row);}catch(error){console.log('E_MULTIHIT_APP_FAILED_OBSERVATION '+JSON.stringify({id:c.id,initial:w.initial,...row}));throw error;}unchanged(w);
+  if(c.id==='EMHA-04'){
+   const terminal=ev(row.messages).filter(e=>e.type==='-hitcount');assert.equal(terminal.length,1);
+   assert.deepEqual(terminal[0].args,['p2: '+row.before.p2.id,'1'],'the actual inactive target uses its stable member identity');
+   assert.equal(terminal[0].raw,'|-hitcount|p2: '+row.before.p2.id+'|1','Session retains the pinned native terminal wire');
+  }
   const wrong=clone(row);wrong.after.p1.pp[c.move]=wrong.before.p1.pp[c.move];assert.throws(()=>verify(c,wrong),assert.AssertionError,'same oracle rejects a missed PP charge');
   const protocolChecks=[],summary=o=>ev(o.messages).find(e=>e.type==='-hitcount');
   const normalize=e=>{e.raw='|'+e.type+'|'+e.args.join('|');};
@@ -58,7 +66,7 @@ for(const c of plan.cases)test(c.id+' '+c.check,async()=>{
   probe('duplicate-summary',copy=>{const e=clone(summary(copy));copy.messages.find(m=>m.kind==='events').events.push(e);});
   probe('mixed-legal-alias-duplicate',copy=>{const e=clone(summary(copy));e.args[0]=e.args[0]==='p2: '+copy.before.p2.id?'p2a: '+copy.before.p2.id:'p2: '+copy.before.p2.id;normalize(e);copy.messages.find(m=>m.kind==='events').events.push(e);});
   probe('foreign-member-summary',copy=>{const e=summary(copy);e.args[0]='p2: OTHER';normalize(e);});
-  probe('missing-summary',copy=>{for(const m of copy.messages)if(m.kind==='events')m.events=m.events.filter(e=>e.type!=='-hitcount');},c.ko);
+  probe('missing-summary',copy=>{for(const m of copy.messages)if(m.kind==='events')m.events=m.events.filter(e=>e.type!=='-hitcount');},c.ko&&c.id!=='EMHA-04');
   for(const prefix of ['p2: ','p2a: '])probe('valid-target-'+prefix.trim(),copy=>{const e=summary(copy);e.args[0]=prefix+copy.before.p2.id;normalize(e);},true);
 
   if(c.exit==='abort'){
