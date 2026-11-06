@@ -114,3 +114,109 @@ test('C1-03 Burn Up on dual Fire/Flying retains Flying STAB alongside exact type
   const raw=inputs({moves:['burnup','wingattack']});raw.trainers[0].party.forEach(p=>p.species='charizard');raw.trainers[0].aiStrategy={id:'dual-types',parameters:{}};
   const w=await fixture({content:assemble(raw),registry:r});await w.session.chooseMove(1);const s=D.captureTrainerAiRequest(w.session,w.session.gw).snapshot;assert.deepEqual(s.own.party.find(m=>m.active).types,['???','Flying']);s.request.legalMoves=s.request.legalMoves.filter(m=>m.moveId==='wingattack');s.profile.flags=['ScoreMoves'];const none=clone(s);none.own.party.find(m=>m.active).types=['???'];const a=[],b=[],policy=E.trainerAi.createTrainerAiPolicy(catalog);assert.equal(policy.decide(s,n=>{a.push(n);return 0;}).kind,'choose');assert.equal(policy.decide(none,n=>{b.push(n);return 0;}).kind,'choose');assert.deepEqual(a,[10]);assert.deepEqual(b,[8]);assert.equal((await w.session.chooseMove(1)).ok,true);
 });
+
+// C-D2: authored synthetic teams, real App -> Session -> pinned Gen8 legal moves.
+// This proves supported author configuration, not availability in the default game's encounters.
+async function addedTypeFixture({playerMoves=['splash'],npcMoves=['splash'],npcTurns,playerParty=1}={}){
+  const raw=inputs({party:1,moves:npcMoves});
+  raw.species.find(s=>s.id==='pidgey').learnset=playerMoves.map(move=>({level:1,move}));
+  let catalog,seen=[];
+  const registry=E.composition.createTrainerAiStrategyRegistry();
+  if(npcTurns){
+    raw.trainers[0].aiStrategy={id:'added-type-test',version:'1',parameters:{}};
+    registry.register({id:'added-type-test',version:'1',implementationIdentity:'test-only/added-type/1',validateParameters(){},create(c){catalog=clone(c);return {decide(s){seen.push(clone(s));return selected(s,npcTurns[s.binding.turn-1]??npcTurns.at(-1));}};}});
+  }
+  const content=assemble(raw),game=E.state.newGame({content,party:[],money:1000});
+  game.party=Array.from({length:playerParty},(_,i)=>{
+    const m=E.memberFactory.createMember({id:'P'+(i+1),species:'Pidgey',level:50},content,()=>0);
+    assert.deepEqual(m.moves.map(m=>m.id),playerMoves);
+    return E.speciesKey.toPersistentMember(m,content);
+  });game.nextMemberOrdinal=String(playerParty+1);
+  const state=T.fakes.createMemoryState(game),sessions=E.composition.createBattleSessionFactory({content:()=>content,seed:()=>[1,2,3,4],trainerAiStrategies:registry});
+  const app=new E.app.GameApplication({state,projection:T.fakes.createRecordingProjection(),sessions,content:()=>({content}),random:()=>0,clock:()=>12345});
+  const request={battleId:'C-D2-added-type',trainer:{id:'c-basic',version:1},seq:1,canLose:true},session=await app.startTrainerBattle(request);
+  return {app,session,state,request,get gw(){return session.gw;},get catalog(){return catalog;},seen};
+}
+const addedSnapshot=w=>D.captureTrainerAiRequest(w.session,w.session.gw).snapshot;
+const ownActive=s=>s.own.party.find(p=>p.active);
+const publicTypes=w=>addedSnapshot(w).opponent.active[0].shownTypes;
+const engineTypes=(w,side)=>w.session.gw._debugBattle().sides[side].active[0].getTypes();
+for(const [move,type]of [['forestscurse','Grass'],['trickortreat','Ghost']])test('C-D2 own dual type plus '+move+' permits the next ordinary Session turn',async t=>{
+  const w=await addedTypeFixture({playerMoves:[move,'splash']});
+  assert.equal((await w.session.chooseMove(1)).ok,true);
+  assert.deepEqual(engineTypes(w,1),['Normal','Flying',type]);
+  // Do not use a diagnostic to trigger the original failure: this is the normal player action.
+  assert.equal((await w.session.chooseMove(2)).ok,true);
+  assert.deepEqual(ownActive(addedSnapshot(w)).types,['Normal','Flying',type]);
+  assert.equal(w.session.broken,null);assert.equal(w.state.replaced.length,0);
+  t.diagnostic(JSON.stringify({move,turn:w.gw._debugBattle().turn,types:ownActive(addedSnapshot(w)).types}));
+});
+for(const [move,type]of [['forestscurse','Grass'],['trickortreat','Ghost']])test('C-D2 reverse public '+move+' preserves both base types and Normal immunity',async()=>{
+  const w=await addedTypeFixture({npcMoves:[move,'shadowball','splash'],npcTurns:[1,3]});
+  assert.equal((await w.session.chooseMove(1)).ok,true);
+  assert.deepEqual(engineTypes(w,0),['Normal','Flying',type]);
+  assert.deepEqual(publicTypes(w),['Normal','Flying',type]);
+  const s=addedSnapshot(w),shadow=s.request.legalMoves.find(m=>m.moveId==='shadowball');
+  assert.deepEqual(shadow.metadata.publicTypeMultiplier,{numerator:0,denominator:1});
+  assert.equal((await w.session.chooseMove(1)).ok,true);assert.equal(w.session.broken,null);
+});
+test('C-D2 own repeated additions replace one added type; Soak clears it and accepts another',async()=>{
+  const w=await addedTypeFixture({playerMoves:['trickortreat','forestscurse','soak','splash']});
+  for(const [slot,expected]of [[1,['Normal','Flying','Ghost']],[2,['Normal','Flying','Grass']],[1,['Normal','Flying','Ghost']],[3,['Water']],[2,['Water','Grass']],[4,['Water','Grass']]]){
+    assert.equal((await w.session.chooseMove(slot)).ok,true);assert.deepEqual(engineTypes(w,1),expected);assert.deepEqual(ownActive(addedSnapshot(w)).types,expected);
+  }
+  assert.equal(w.session.broken,null);
+});
+test('C-D2 the third own type grants STAB and a checkpoint restores it before another replacement',async t=>{
+  t.mock.method(Date,'now',()=>1793350000000);
+  const w=await addedTypeFixture({playerMoves:['forestscurse','trickortreat','splash'],npcMoves:['energyball','splash'],npcTurns:[2]});
+  await w.session.chooseMove(1);const withThird=addedSnapshot(w),withoutThird=clone(withThird);
+  withThird.profile.flags=['ScoreMoves'];withThird.request.legalMoves=withThird.request.legalMoves.filter(m=>m.moveId==='energyball');
+  withoutThird.profile=clone(withThird.profile);withoutThird.request=clone(withThird.request);ownActive(withoutThird).types=['Normal','Flying'];
+  const policy=E.trainerAi.createTrainerAiPolicy(w.catalog),a=[],b=[];
+  assert.equal(policy.decide(withThird,n=>{a.push(n);return 0;}).kind,'choose');assert.equal(policy.decide(withoutThird,n=>{b.push(n);return 0;}).kind,'choose');
+  assert.ok(a[0]>b[0],JSON.stringify({withThird:a,withoutThird:b}));
+  const cp=w.session._checkpoint();await w.session.chooseMove(2);assert.deepEqual(ownActive(addedSnapshot(w)).types,['Normal','Flying','Ghost']);
+  const first={engine:JSON.parse(w.gw.snapshot()),snapshot:addedSnapshot(w)};
+  await w.session._restoreCheckpoint(cp);assert.deepEqual(ownActive(addedSnapshot(w)).types,['Normal','Flying','Grass']);
+  await w.session.chooseMove(2);assert.deepEqual({engine:JSON.parse(w.gw.snapshot()),snapshot:addedSnapshot(w)},first);assert.equal(w.session.broken,null);
+});
+test('C-D2 public repeated additions, typechange and same-source checkpoint replay keep exact type identity',async t=>{
+  t.mock.method(Date,'now',()=>1793350000000);
+  const w=await addedTypeFixture({npcMoves:['trickortreat','forestscurse','soak','splash'],npcTurns:[1,2,1,3,2,1]});
+  await w.session.chooseMove(1);assert.deepEqual(publicTypes(w),['Normal','Flying','Ghost']);
+  const cp=w.session._checkpoint(),before=addedSnapshot(w);
+  const advance=async()=>{
+    for(const expected of [['Normal','Flying','Grass'],['Normal','Flying','Ghost'],['Water'],['Water','Grass']]){
+      assert.equal((await w.session.chooseMove(1)).ok,true);assert.deepEqual(publicTypes(w),expected);assert.deepEqual(engineTypes(w,0),expected);
+    }
+    return {engine:JSON.parse(w.session.gw.snapshot()),snapshot:addedSnapshot(w),ai:clone(diag(w))};
+  };
+  const first=await advance(),calls=w.seen.length;
+  await w.session._restoreCheckpoint(cp);assert.deepEqual(addedSnapshot(w),before);
+  const replay=await advance();assert.deepEqual(replay,first);assert.equal(w.seen.length,calls,'restored decisions use the immutable journal');
+  const changedBase=w.session._checkpoint();await w.session.chooseMove(1);assert.deepEqual(publicTypes(w),['Water','Ghost']);const next=JSON.parse(w.gw.snapshot());
+  await w.session._restoreCheckpoint(changedBase);assert.deepEqual(publicTypes(w),['Water','Grass']);await w.session.chooseMove(1);assert.deepEqual(publicTypes(w),['Water','Ghost']);assert.deepEqual(JSON.parse(w.gw.snapshot()),next);assert.equal(w.session.broken,null);
+});
+test('C-D2 switching the public target out and back clears changed and added types per appearance',async()=>{
+  const w=await addedTypeFixture({playerParty:2,npcMoves:['forestscurse','soak','splash'],npcTurns:[1,3,2,3,3]});
+  await w.session.chooseMove(1);assert.deepEqual(publicTypes(w),['Normal','Flying','Grass']);const key=addedSnapshot(w).opponent.active[0].appearanceKey;
+  assert.equal((await w.session.chooseSwitch('P2')).ok,true);assert.deepEqual(publicTypes(w),['Normal','Flying']);assert.notEqual(addedSnapshot(w).opponent.active[0].appearanceKey,key);
+  await w.session.chooseMove(1);assert.deepEqual(publicTypes(w),['Water']);
+  assert.equal((await w.session.chooseSwitch('P1')).ok,true);assert.deepEqual(engineTypes(w,0),['Normal','Flying']);assert.deepEqual(publicTypes(w),['Normal','Flying']);
+  assert.equal((await w.session.chooseMove(1)).ok,true);assert.equal(w.session.broken,null);
+});
+test('C-D2 public type tracking never reads hidden opposing getTypes, including replacement of an addition',async t=>{
+  const a=await addedTypeFixture({npcMoves:['trickortreat','forestscurse','splash'],npcTurns:[1,2,3]}),b=await addedTypeFixture({npcMoves:['trickortreat','forestscurse','splash'],npcTurns:[1,2,3]});
+  for(const w of [a,b]){await w.session.chooseMove(1);await w.session.chooseMove(1);}
+  // A diagnostic capture must rely only on observed typeadd, not even query the private method.
+  const hidden=b.gw._debugBattle().sides[0].active[0];t.mock.method(hidden,'getTypes',()=>{throw Error('opponent private types read');});
+  const x=addedSnapshot(a),y=addedSnapshot(b);assert.deepEqual(y,x);assert.deepEqual(y.opponent.active[0].shownTypes,['Normal','Flying','Grass']);
+});
+for(const [side,values]of [['own',[]],['own',['Normal','Flying','Grass','Ghost']],['own',['Normal','Flying','Flying']],['own',['Normal','Flying','Mystery']],['public',[]],['public',['Normal','Flying','Grass','Ghost']],['public',['Normal','Flying','Flying']],['public',['Normal','Flying','Mystery']]])test('C-D2 '+side+' invalid types '+JSON.stringify(values)+' refuse before policy RNG',async()=>{
+  const w=await addedTypeFixture({npcMoves:['splash'],npcTurns:[1]});
+  const snapshot=addedSnapshot(w);snapshot.request={kind:'wait'};
+  if(side==='own')ownActive(snapshot).types=values;else snapshot.opponent.active[0].shownTypes=values;
+  let draws=0;const policy=E.trainerAi.createTrainerAiPolicy(w.catalog),plan=policy.decide(snapshot,()=>{draws++;return 0;});
+  assert.equal(plan.reason,'invalid-snapshot');assert.equal(draws,0);
+});

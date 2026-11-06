@@ -18,7 +18,7 @@ export interface PublicOpponent {
   readonly displayedSpecies: string;
   readonly displayedForm: number;
   readonly level: number;
-  /** Public Gen8 `???` is neutral typeless, never inferred from an opponent's hidden real type. */
+  /** Up to two public base types plus Gen8's current added type. `???` is neutral, never privately inferred. */
   readonly shownTypes: readonly string[];
   readonly hpBar: PublicHpBar;
   readonly status: PersistentStatus;
@@ -43,7 +43,7 @@ export interface OwnMember {
   readonly maxhp: number;
   readonly status: PersistentStatus;
   readonly confusionTurns: number;
-  /** Fixed Gen8's exact `???` sentinel is typeless: neutral defense and no move-type STAB. */
+  /** Up to three current Gen8 types. Exact `???` is typeless: neutral defense and no move-type STAB. */
   readonly types: readonly string[];
   readonly knownAbility: string;
   readonly knownHeldItem: string;
@@ -388,7 +388,7 @@ function validateSnapshot(input:unknown,catalog:TrainerAiCatalog):TrainerAiSnaps
   const members=new Map<string,OwnMember>(),orders=new Set<number>(),resources=new Map<string,TrainerResource>(),resourceItems=new Set<string>();
   for(const m of x.own.party){
     record(m,'memberId partyOrder active hp maxhp status confusionTurns types knownAbility knownHeldItem moves');text(m.memberId);number(m.partyOrder,0,5);bool(m.active);
-    number(m.maxhp,1,65535);number(m.hp,0,m.maxhp);status(m.status);number(m.confusionTurns,0,255);strings(m.types,2);requireValue(m.types.length>0&&m.types.every(t=>t==='???'||Object.hasOwn(catalog.types,t)));
+    number(m.maxhp,1,65535);number(m.hp,0,m.maxhp);status(m.status);number(m.confusionTurns,0,255);strings(m.types,3);requireValue(m.types.length>0&&m.types.every(t=>t==='???'||Object.hasOwn(catalog.types,t)));
     text(m.knownAbility,true);text(m.knownHeldItem,true);list(m.moves,4);const slots=new Set<number>();
     for(const move of m.moves){record(move,'slot moveId pp maxpp');number(move.slot,1,4);text(move.moveId);number(move.maxpp,1,255);number(move.pp,0,move.maxpp);requireValue(!slots.has(move.slot)&&Object.hasOwn(catalog.moves,move.moveId));slots.add(move.slot);}
     requireValue(!members.has(m.memberId)&&!orders.has(m.partyOrder));members.set(m.memberId,m);orders.add(m.partyOrder);
@@ -398,7 +398,7 @@ function validateSnapshot(input:unknown,catalog:TrainerAiCatalog):TrainerAiSnaps
   record(x.opponent,'active');list(x.opponent.active,1);
   for(const foe of x.opponent.active){
     record(foe,'appearanceKey displayedSpecies displayedForm level shownTypes hpBar status stages revealedMoves lastPublicMove fainted revealedAbility revealedItem');
-    text(foe.appearanceKey);text(foe.displayedSpecies);number(foe.displayedForm,0,65535);number(foe.level,1,100);strings(foe.shownTypes,2);requireValue(foe.shownTypes.length>0&&foe.shownTypes.every(t=>t==='???'||Object.hasOwn(catalog.types,t)));
+    text(foe.appearanceKey);text(foe.displayedSpecies);number(foe.displayedForm,0,65535);number(foe.level,1,100);strings(foe.shownTypes,3);requireValue(foe.shownTypes.length>0&&foe.shownTypes.every(t=>t==='???'||Object.hasOwn(catalog.types,t)));
     record(foe.hpBar,'parts scale');requireValue(foe.hpBar.scale===100);number(foe.hpBar.parts,0,100);bool(foe.fainted);requireValue(foe.fainted===(foe.hpBar.parts===0));status(foe.status);
     record(foe.stages,'atk def spa spd spe accuracy evasion');for(const stage of Object.values(foe.stages))number(stage,-6,6);
     strings(foe.revealedMoves,64);requireValue(foe.revealedMoves.every(id=>Object.hasOwn(catalog.moves,id)));
