@@ -68,7 +68,7 @@ export function createFormalNormalFixture(E: any, options: any = {}): any {
 }
 
 /** Explicit attachment only for a caller-owned isolated host. The CLI preparation route never calls this. */
-export function installNormalHostFixture(E: any, G: any, W: any): any {
+export function installNormalHostFixture(E: any, G: any, W: any, options: any = {}): any {
   const flow=W.PSFlow,system=G.$gameSystem;
   requireTrue(flow&&system&&!flow.running&&!flow._op&&!flow._app?.saveBlocked,'normal fixture requires idle isolated host');
   const names=['_app','_content','_dex','fast','receiveOptions','developerCapabilities','lang','_tr','seed'];
@@ -80,7 +80,7 @@ export function installNormalHostFixture(E: any, G: any, W: any): any {
   };
   const restoreFields=()=>{if(oldGameOwn)system._psGame=oldGame;else delete system._psGame;for(const k of names){if(previous[k].own)flow[k]=previous[k].value;else delete flow[k];}};
   try {
-    fixture=createFormalNormalFixture(E,{assertOwned:guard,
+    fixture=createFormalNormalFixture(E,{assertOwned:guard,...(options.trainerAiTiming?{trainerAiTiming:options.trainerAiTiming}:{}),
       stateFactory:(initial: any)=>{ownedGame=initial;system._psGame=initial;return {read:()=>{guard();return system._psGame;},replace:(next: any)=>{guard();ownedGame=next;system._psGame=next;}};},
       project:(out: any)=>flow.projectOutcome(out),onSeed:(seed: number[])=>{flow.seed=seed;}});
     flow._app=fixture.app;flow._content=fixture.content;flow._dex=E.dex.createDexLookup();flow.fast=false;
