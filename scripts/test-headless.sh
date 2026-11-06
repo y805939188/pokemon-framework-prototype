@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
-# Headless check: every Node test suite, no windows, no MZ, no Reactor sources (this is what CI layer 1 runs).
+# Regular headless checks for CI and release validation; historical reference replay is excluded (NOT RUN).
 # Needs: Node >= 22.18, JS dependencies installed (pnpm --dir src install), the engine staged (scripts/build-showdown.sh). Type checking of the plugins needs Reactor's
 # declaration bundle and lives in scripts/test-quick.sh (typecheck + this script).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-[[ -d js/engine/showdown/dist ]] || { echo "engine not staged: run scripts/build-showdown.sh first" >&2; exit 1; }
-# the TS framework: strict type check, import-boundary check, then rebuild runtime, declarations, sample and local delivery
-pnpm --dir src typecheck:framework
-node scripts/check-boundaries.cjs
-pnpm --dir src build:distribution > /dev/null
 SUITES=(
   experiments/step5/4/test-config-file-io.cjs
   experiments/step5/4/test-battle-effects-settings.cjs
@@ -120,6 +115,7 @@ SUITES=(
   experiments/step2/s5/test-matrix.cjs
   experiments/step2/s5/test-protocol-freeze.cjs
   experiments/step2/s5/test-engine-contract.cjs
+  scripts/tests/headless-scope.test.cjs
   scripts/tests/reactor-install.test.cjs
   scripts/tests/showdown-build.test.cjs
   scripts/tests/package-excludes.test.cjs
@@ -131,7 +127,6 @@ SUITES=(
   experiments/step3/test-i18n.cjs
   experiments/step3/test-save.cjs
   experiments/step3/test-integration.cjs
-  experiments/step3/test-growth-differential.cjs
   experiments/step3/test-move-requests.cjs
   experiments/step3/test-pp-sync.cjs
   experiments/step3/test-session-operations.cjs
@@ -240,6 +235,38 @@ SUITES=(
   experiments/step5/4/test-trainer-app-m1.cjs
   experiments/step5/4/test-obedience-m1.cjs
 )
+# Explicit policy exclusions, not skipped tests and never counted as passes.
+# There is no environment switch or automatic-runner option that enables this replay.
+EXCLUDED_SUITES=(
+  experiments/step3/test-growth-differential.cjs
+)
+for s in "${SUITES[@]}"; do
+  for excluded in "${EXCLUDED_SUITES[@]}"; do
+    if [[ "$s" == "$excluded" ]]; then
+      echo "excluded suite was registered for execution: $s" >&2
+      exit 2
+    fi
+  done
+done
+if [[ $# -gt 1 ]]; then
+  echo "usage: $0 [--scope=regular|--list|--list-exclusions]" >&2
+  exit 2
+fi
+case "${1:-}" in
+  --list) printf '%s\n' "${SUITES[@]}"; exit 0 ;;
+  --list-exclusions) printf '%s\n' "${EXCLUDED_SUITES[@]}"; exit 0 ;;
+  ''|--scope=regular) ;;
+  *) echo "usage: $0 [--scope=regular|--list|--list-exclusions]" >&2; exit 2 ;;
+esac
+printf 'Headless scope=regular: %s selected suites; %s policy exclusion(s), NOT RUN and not passes.\n' "${#SUITES[@]}" "${#EXCLUDED_SUITES[@]}"
+for excluded in "${EXCLUDED_SUITES[@]}"; do
+  printf 'EXCLUDED (NOT RUN): %s\n' "$excluded"
+done
+[[ -d js/engine/showdown/dist ]] || { echo "engine not staged: run scripts/build-showdown.sh first" >&2; exit 1; }
+# the TS framework: strict type check, import-boundary check, then rebuild runtime, declarations, sample and local delivery
+pnpm --dir src typecheck:framework
+node scripts/check-boundaries.cjs
+pnpm --dir src build:distribution > /dev/null
 fail=0
 for s in "${SUITES[@]}"; do
   set +e
