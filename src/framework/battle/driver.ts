@@ -31,9 +31,13 @@ export interface GatewayOptions {
   restored?: boolean;
 }
 
+/** Internal non-enumerable observation header, outside request payload and protocol-v1 projection. */
+export interface DriverRequestSource {
+  readonly version: 'player-forced-choice-source-v1'; readonly side: 'p1'; readonly occurrenceId: string;
+}
 export type GatewayMessage =
   | { kind: "events"; seq: number; events: BattleEvent[] }
-  | { kind: "request"; seq: number; side: string; request: Record<string, any> }
+  | { kind: "request"; seq: number; side: string; request: Record<string, any>; readonly source?: DriverRequestSource }
   | { kind: "error"; seq: number; side: string; message: string; choice?: string; payload?: unknown }
   | { kind: "end"; seq: number; winner: string | null; turn: number; reason: string; outcome?: Record<string, unknown> };
 

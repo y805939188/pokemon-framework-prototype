@@ -1,4 +1,5 @@
 import { captureInitialField } from '../rules/initial-field';
+import { attachRequestSource, technicalRequestRefresh, tagRequestMessage, checkpointRequestSource, restoreRequestSource, closeRequestSource } from './request-source';
 /**
  * Thin async battle gateway over a pinned Pokemon Showdown build.
  *
@@ -95,6 +96,7 @@ export class BattleGateway implements BattleDriver {
       send: (type: string, data: string | string[]) => gw._onSend(type, data),
     });
     gw._battle = battle;
+    attachRequestSource(gw, battle);
     gw.#attachTrainerSource();
     attachReplacementSource(gw, gw._battle, gw._env);
     gw._attachObservations();
@@ -134,6 +136,7 @@ export class BattleGateway implements BattleDriver {
     if (captureInitialField(opts)) throw new Error("initial-field-restore-rebind");
     const gw = new BattleGateway(opts);
     gw._battle = gw._env.sim.Battle.fromJSON(snapshot);
+    attachRequestSource(gw, gw._battle);
     if (gw._battle.rpg?.initialField) {
       const fields = loadFormatExtension(gw._env.root).initialFields;
       if (!fields) throw new Error("initial-field-extension-unavailable");
@@ -167,6 +170,7 @@ export class BattleGateway implements BattleDriver {
     });
     checkpointTrainerSource(this, token);
     checkpointReplacementSource(this, token);
+    checkpointRequestSource(this, token, this._queue);
     return token;
   }
 
@@ -184,6 +188,7 @@ export class BattleGateway implements BattleDriver {
     if (data.settlement) gw.#attachSettlement(new HeldTracker(gw._battle, data.settlement.wild, [], data.settlement.state), data.settlement.lineage, data.settlement.wild);
     restoreTrainerSource(gw, token);
     restoreReplacementSource(gw, token);
+    restoreRequestSource(gw, token, gw._queue);
     return gw;
   }
 
@@ -637,6 +642,7 @@ export class BattleGateway implements BattleDriver {
    * fresh requests per side and queues nothing else.
    */
   refreshRequests(): GatewayMessage[] {
+    return technicalRequestRefresh(this, () => {
     const b = this._battle;
     const saved = this._queue.splice(0);
     b.makeRequest(b.requestState);
@@ -646,6 +652,7 @@ export class BattleGateway implements BattleDriver {
     const fresh = this._queue.splice(0);
     this._queue.push(...saved.filter((m) => m.kind !== "request"), ...fresh);
     return fresh.filter((m) => m.kind === "request");
+    });
   }
 
   /** Drop this side's registered choice (engine undo) and any pending RPG payload. */
@@ -664,6 +671,7 @@ export class BattleGateway implements BattleDriver {
 
   _emit(msg: Unsequenced): void {
     const full = { ...msg, seq: this._seq++ } as GatewayMessage;
+    tagRequestMessage(this, full);
     const w = this._waiters.shift();
     if (w) w(full);
     else this._queue.push(full);
@@ -700,6 +708,7 @@ export class BattleGateway implements BattleDriver {
         ...(outcome ? { outcome } : {}),
       });
       this._closed = true;
+      closeRequestSource(this);
       for (const w of this._waiters.splice(0)) w(null);
     }
   }
