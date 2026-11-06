@@ -67,10 +67,10 @@
   "headings": [
     {
       "featureId": "FR-000544",
-      "heading": "2. 状态域、输入输出与写回",
+      "heading": "3. 异常施加的分层入口",
       "lines": [
-        13,
-        28
+        29,
+        63
       ],
       "completeHeading": false
     },
@@ -84,7 +84,7 @@
       "completeHeading": false
     }
   ],
-  "planBasis": "5.4 r2 6.3 and E, WP44 2/4; local licensed-host method chain only",
+  "planBasis": "5.4 r2 6.3 and E, formal WP44 FR544 section3 / FR545 section4; section2 is shared state-domain background only; local licensed-host method chain only",
   "completeHeading": false,
   "fullTitleAcceptance": false,
   "excluded": [
