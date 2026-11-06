@@ -257,3 +257,8 @@
 ## 连击HP/PP普通槽与非渲染Continue（有限、待独审）
 
 [三案合同与本地前提](5.4-E-multihit-mz-continue.md)：整次连击一次PP、对方实际伤害、普通压缩槽、新Node Continue及下一战；含续战取消后旧槽重接。真实Title/Scene/NW、完整E及辅助事实仍开放；实际冻结版本和结果见STATUS。
+
+
+## 异常状态普通槽与非渲染Continue（有限、待独审）
+
+[三案合同与本机前提](5.4-E-status-mz-continue.md)：剧毒战后普通毒规范化、睡眠剩余数和醒来PP，实际压缩槽/新Node Continue/下一战及取消后原档重接。真实Title/Scene/NW与完整E不签，实际结果见STATUS。

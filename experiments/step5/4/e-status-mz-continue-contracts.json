@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "scope": "REAL_STATUS_APP_COMPRESSED_MZ_SLOT_NEW_NODE_CONTINUE_METHODS_NEXT_BATTLE_NOT_RENDERING_NW",
+  "base": "506d437a81cf1d1530a0dc2617b4bc53055ce415",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "format": "gen8rpgcustomgame",
+  "schema": 9,
+  "protocol": 1,
+  "host": {
+    "js/reactor_managers.js": "0a45145a23c377f70d5df07b0b58e12679f14b84e4e9d2ae8ea90ac3e9cfca04",
+    "js/reactor_core.js": "b18c5f887be92cd3ee199660f371d2dd9a3b383003925c42a16219aee44201ec",
+    "js/libs/pako.min.js": "29cfa0542b9864b6640cfdcc8f15b184db6431b532db2702a3ce97e5f2a7fc1c",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "js/reactor_scenes.js": "8826bfe54b2c1688022d3a1a807d06a697509b36e124f19aeb0fef5a6faf137b",
+    "js/reactor_windows.js": "a592e8e4fbd25b37a1f9470dc56e9dc182edba855f46a64cc8ab3d97e82c3b18"
+  },
+  "engine": {
+    "js/engine/build/content-cli.cjs": "113d2b55ab7c2956af00df2527958c4e8302338646a124a0961db58e62e1b76a",
+    "js/engine/build/core.cjs": "e5b94494f7fdec50643626bcb922ce3afde72e66a92196d44785c34467307a0b",
+    "js/engine/build/custom-formats.cjs": "50f2bc529f506a2c8499bc948719e3f297fed353435d1de6882c9b03f687b033",
+    "js/engine/build/engine.cjs": "ddec8736e64efa81b2058a7e85a504c9a42ee37823544e005c3511071e3d85b0",
+    "js/engine/build/production.cjs": "3577ccada0e1e4f68bc19bad03d667a99b79a4a1547d485baaf160c595e029df",
+    "js/engine/build/public-presentation-rCv_7JPM.js": "0cc14e37d2edd9f685a4cef6ce3a715af4628d2347eb695ec65c46a8b4e78c32",
+    "js/engine/build/session-B-ur6ARl.js": "56a031c75d08ef52918955e804269ba5c26a65a4ff1087a85ca3f5fff088d745",
+    "js/engine/build/testing.cjs": "38b08688fe41402af61b4ff6dc79aec9b83a045d103c27a06f748e649e789061",
+    "js/engine/build/trainer-ai-diagnostics-jO7nZSLu.js": "08687e04275085d9ba38b72e45885f392656903b23f5658618ac2fe56fa2b493",
+    "js/engine/showdown/SOURCE_SHA": "495b7f40c79b08384b2bb2be040edbc952be76fe18f8dff1a96f0fb949fc78ba"
+  },
+  "player": {
+    "species": "Snorlax",
+    "level": 100,
+    "abilityIndex": 1,
+    "ability": "Thick Fat",
+    "move": "splash",
+    "basePP": 40
+  },
+  "firstFoes": {
+    "toxic": {
+      "species": "Gengar",
+      "level": 5
+    },
+    "sleep": {
+      "species": "Parasect",
+      "level": 5
+    }
+  },
+  "nextFoe": {
+    "species": "Pidgey",
+    "level": 5
+  },
+  "maxEscapeAttempts": 1,
+  "escapeBasis": "strictly higher unmodified speed asserted in every real session",
+  "featureIds": [
+    "FR-000544",
+    "FR-000545"
+  ],
+  "source": {
+    "path": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+    "sha256": "e144ad75bab96647c12220d7f7e137d534277c169f6ca64d8c6bd06044268943",
+    "referenceHead": "5c9805de2331f75565891851d4d7b2bc97acad94"
+  },
+  "headings": [
+    {
+      "featureId": "FR-000544",
+      "heading": "3. 异常施加的分层入口",
+      "lines": [
+        29,
+        63
+      ],
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000545",
+      "heading": "4. 各状态的延续与清理",
+      "lines": [
+        64,
+        83
+      ],
+      "completeHeading": false
+    }
+  ],
+  "planBasis": "5.4 r2 6.3 and E, formal WP44 FR544 section3 / FR545 section4; section2 is shared state-domain background only; local licensed-host method chain only",
+  "completeHeading": false,
+  "fullTitleAcceptance": false,
+  "excluded": [
+    "rendering",
+    "Boot",
+    "real SceneManager create/start lifecycle",
+    "PS_BattleFlow owner lifecycle",
+    "physical input",
+    "NW",
+    "P4",
+    "all statuses",
+    "status immunity families",
+    "probability coverage",
+    "complete heading"
+  ],
+  "cases": [
+    {
+      "id": "ESMC01",
+      "first": "toxic",
+      "check": "actual Toxic -> normalized ordinary poison/zero count in compressed slot -> Continue and two ordinary poison residuals next battle"
+    },
+    {
+      "id": "ESMC02",
+      "first": "sleep",
+      "check": "actual Spore -> remaining sleep counter in compressed slot -> Continue -> unchanged countdown and wake with one PP charge"
+    },
+    {
+      "id": "ESMC03",
+      "first": "sleep",
+      "abortConsumer": true,
+      "check": "continued wake then abort preserves prior sleeping slot/global; third new process repeats from original saved remaining count normally"
+    }
+  ]
+}
