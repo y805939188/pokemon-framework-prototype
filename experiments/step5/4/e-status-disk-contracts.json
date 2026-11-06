@@ -1,19 +1,19 @@
 {
   "schema": 1,
   "version": "e-status-disk-roundtrip-v1",
-  "product": "62c2ec02ca902b1f960ece6f634b42b2df324e80",
+  "product": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
   "schemaVersion": 9,
   "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
   "runtime": {
-    "js/engine/build/custom-formats.cjs": "50f2bc529f506a2c8499bc948719e3f297fed353435d1de6882c9b03f687b033",
-    "js/engine/build/production.cjs": "3577ccada0e1e4f68bc19bad03d667a99b79a4a1547d485baaf160c595e029df",
-    "js/engine/build/public-presentation-rCv_7JPM.js": "0cc14e37d2edd9f685a4cef6ce3a715af4628d2347eb695ec65c46a8b4e78c32",
+    "js/engine/build/custom-formats.cjs": "70db558b8ba0a3523913c8d2ce0c560e9976af80796c123b7ff4536183d4ac22",
+    "js/engine/build/production.cjs": "7bf42c9b03dfcb3b50c369ad94d47de43828713f0a8ff2da03158661477a077d",
+    "js/engine/build/public-presentation-D3G8XC5n.js": "5f87ba54aa62452eb61e1d9fc27fd2f22285b20671873e9b8542248c4c2ab534",
     "js/engine/build/core.cjs": "e5b94494f7fdec50643626bcb922ce3afde72e66a92196d44785c34467307a0b",
-    "js/engine/build/engine.cjs": "ddec8736e64efa81b2058a7e85a504c9a42ee37823544e005c3511071e3d85b0",
-    "js/engine/build/testing.cjs": "38b08688fe41402af61b4ff6dc79aec9b83a045d103c27a06f748e649e789061",
+    "js/engine/build/engine.cjs": "380317528e02eec8a7faa0237d0e70c8e640d5a419c800d789159eb4a340adb2",
+    "js/engine/build/testing.cjs": "c9d9d9dedee45dceab95094d3c21ca3aacca446cb5e745ad308a4384517f79e5",
     "js/engine/build/content-cli.cjs": "113d2b55ab7c2956af00df2527958c4e8302338646a124a0961db58e62e1b76a",
-    "js/engine/build/session-B-ur6ARl.js": "56a031c75d08ef52918955e804269ba5c26a65a4ff1087a85ca3f5fff088d745",
-    "js/engine/build/trainer-ai-diagnostics-jO7nZSLu.js": "08687e04275085d9ba38b72e45885f392656903b23f5658618ac2fe56fa2b493"
+    "js/engine/build/session-DZc5zRre.js": "78d2551316e82dddb139bc3eb30641e1a55062cf75d39a7ffac25f4ceadf8df4",
+    "js/engine/build/trainer-ai-diagnostics-DkQ8ZunF.js": "0e63ad2ee1e14cbdec0ce78a573ec9c25fb8c25c9ad4edcf46544bb5bc44e141"
   },
   "format": "gen8rpgcustomgame",
   "seed": [
@@ -86,5 +86,11 @@
     "Not full E74 heading, performance, Ruby comparison, probability, or production change",
     "No legacy SaveStore.commit authority bypass; persist the complete candidate from App StatePort.replace through SaveStore.save",
     "Stop on worker error; no automatic retries; no mid-battle serialization or expected-state replacement"
-  ]
+  ],
+  "runtimeRebinding": {
+    "sourceProduct": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
+    "priorRuntimeProduct": "62c2ec02ca902b1f960ece6f634b42b2df324e80",
+    "priorFixtureSHA256": "b08f08eb3578fd825e220b02b6db924142843d7d9866ca2235ed3992b6b5a5b3",
+    "scope": "runtime paths/hashes only; business inputs, expected states and assertions unchanged; historical frozen evidence remains bound to its original revision"
+  }
 }
