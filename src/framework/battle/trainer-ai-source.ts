@@ -22,6 +22,7 @@ interface Source {
   driver:BattleDriver; battle:ShowdownBattle; env:LoadedSim; lineage:object; seed:number[]|string;
   public:MutableOpponent|null; publicTypes:PublicTypes|null; appearance:number; weather:string; terrain:string; conditions:string[];
   request:RequestIdentity; ticket:TrainerRequestTicket|null; owner?:object; catalog?:AssembledTrainerCatalog;
+  snapshot:()=>string;
   submit:(action:Action)=>Promise<boolean>;
 }
 const SOURCES = new WeakMap<BattleDriver,Source>();
@@ -33,8 +34,8 @@ const id = (v:string):string => v.toLowerCase().replace(/[^a-z0-9]/g,'');
 const status = (v:string,fainted=false):PersistentStatus => (v === 'fnt' && fainted ? 'none' : v || 'none') as PersistentStatus;
 const stages = ():PublicOpponent['stages'] => ({atk:0,def:0,spa:0,spd:0,spe:0,accuracy:0,evasion:0});
 /** Called only by the gateway constructor, before setPlayer can emit callbacks. */
-export function attachTrainerSource(driver:BattleDriver,battle:ShowdownBattle,env:LoadedSim,submit:Source['submit']):void {
-  SOURCES.set(driver,{driver,battle,env,submit,lineage:{},seed:copy(battle.prngSeed),public:null,publicTypes:null,appearance:0,weather:'',terrain:'',conditions:[],request:{object:null,turn:0,seq:0,revision:0,signature:''},ticket:null});
+export function attachTrainerSource(driver:BattleDriver,battle:ShowdownBattle,env:LoadedSim,submit:Source['submit'],snapshot:Source['snapshot']):void {
+  SOURCES.set(driver,{driver,battle,env,submit,snapshot,lineage:{},seed:copy(battle.prngSeed),public:null,publicTypes:null,appearance:0,weather:'',terrain:'',conditions:[],request:{object:null,turn:0,seq:0,revision:0,signature:''},ticket:null});
 }
 /** Only emitted engine requests create/advance request authority. Equal refresh retains one entitlement. */
 export function trainerSourceRequest(driver:BattleDriver):void {
@@ -195,10 +196,10 @@ export function trainerDecisionKey(driver:BattleDriver,owner:object,ticket:Train
 export async function submitTrainerCandidate(driver:BattleDriver,owner:object,ticket:TrainerRequestTicket,candidateId:string,resourceRevision:number):Promise<'accepted'|'safe-rejected'> {
   const action=trainerCandidate(driver,owner,ticket,candidateId,resourceRevision),s=sourceFor(driver,owner),t=TICKETS.get(ticket)!;
   // Consume before the first async/reentrant driver callback. A refusal may re-open only after exact no-effect proof.
-  t.spent=true;const before=JSON.stringify(s.battle.toJSON());
+  t.spent=true;const before=s.snapshot();
   const ok=await s.submit(action);
   if(ok)return 'accepted';
-  if(JSON.stringify(s.battle.toJSON())!==before)throw new Error('trainer-ai-rejection-has-unknown-effects');
+  if(s.snapshot()!==before)throw new Error('trainer-ai-rejection-has-unknown-effects');
   t.spent=false;return 'safe-rejected';
 }
 export function checkpointTrainerSource(driver:BattleDriver,token:DriverCheckpoint):void {

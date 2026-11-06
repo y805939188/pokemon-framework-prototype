@@ -189,9 +189,9 @@ export class BattleGateway implements BattleDriver {
 
   #attachTrainerSource(): void {
     // Retain the actual operations before caller-visible callbacks or later public-method replacement.
-    const choose = this.choose.bind(this), act = this.act.bind(this);
+    const choose = this.choose.bind(this), act = this.act.bind(this), snapshot = this.snapshot.bind(this);
     attachTrainerSource(this, this._battle, this._env, action => action.kind === 'item'
-      ? act('p2', {kind:'item',item:action.battleId,target:action.target}) : choose('p2', action.choice));
+      ? act('p2', {kind:'item',item:action.battleId,target:action.target}) : choose('p2', action.choice), snapshot);
   }
 
   #attachSettlement(tracker: HeldTracker, lineage: object, wild: boolean): void {
