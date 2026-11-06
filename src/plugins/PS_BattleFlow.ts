@@ -1,3 +1,4 @@
+import { captureInitialField, withInitialField, initialFieldMZ, WEATHER, TERRAIN } from '../framework/rules/initial-field';
 /**
  * Step 2.4: MZ/RPGReactor integration of the Showdown battle session (placeholder text UI).
  *
@@ -506,7 +507,7 @@ const { developmentCapabilities } = RuleConfig;
       const limits = PSFlow.limits(); assertCurrent();
       PSFlow._prepareBattlePresentation(op, app, assertCurrent);
       op.request.storageFull = engine().B.limits.storageFull(current, limits); // only refusal text; application decides noBall
-      const sessionRequest = { ...op.request, battleStyle: op.battleStyle ?? effectiveBattleStyle(G, op.request.battleStyle) };
+      const sessionRequest = { ...withInitialField(op.request, op.initialField), battleStyle: op.battleStyle ?? effectiveBattleStyle(G, op.request.battleStyle) };
       // Capture before awaiting, but only publish for a successfully accepted, still-current Session.
       const canLose = !!sessionRequest.canLose;
       const session = await (op.request.trainer ? app.startTrainerBattle(sessionRequest) : app.startBattle(sessionRequest)); assertCurrent();
@@ -637,6 +638,7 @@ const { developmentCapabilities } = RuleConfig;
     openBattle(request: any, presentation?: any): void {
       if (PSFlow.running) throw new Error("a battle is already running");
       if (openingBattle || PSFlow.operationPending() || PSFlow._app?.encounterBlocked) throw new Error("operation-active");
+      const initialField = captureInitialField(request);
       const opening = {}, app = PSFlow._app, generation = app?.stateGeneration;
       openingBattle = opening;
       const assertCurrent = () => {
@@ -655,7 +657,7 @@ const { developmentCapabilities } = RuleConfig;
         const presetHolder = PSFlow._nextBattleMusic;
         const settings = musicSettings(presentation, G.PluginManager.parameters(NAME), presetHolder); assertCurrent();
         const prepared = battleMusic.capture({ app: PSFlow._app, generation: PSFlow._app?.stateGeneration }); assertCurrent();
-        PSFlow._op = { request, session: null, battleStyle, battleEffects, visualContext, musicPlan: { settings, prepared, presetHolder, started: false, closed: false } };
+        PSFlow._op = { request, initialField, session: null, battleStyle, battleEffects, visualContext, musicPlan: { settings, prepared, presetHolder, started: false, closed: false } };
         PSFlow.request = request;
         PSFlow.running = true;
         PSFlow.lastOutcome = null;
@@ -749,6 +751,7 @@ const { developmentCapabilities } = RuleConfig;
 
   G.PluginManager.registerCommand(NAME, "StartBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
+    const initialField = initialFieldMZ(args.defaultWeather, args.defaultTerrain, args.battleEnvironment);
     const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle), expGain = parseExpGain(args.expGain), battleEffects = parseBattleEffects(args.battleEffects), noRun = parseProhibition(args.noRun, 'noRun'), noBall = parseProhibition(args.noBall, 'noBall'), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || "battle"}#${seq}`;
     const opened=PSFlow.tryOpenBattle({
@@ -757,6 +760,7 @@ const { developmentCapabilities } = RuleConfig;
       seq,
       battleId,
       resultVariable: Number(args.resultVariable) || 0,
+      initialField,
       canLose: String(args.canLose) === "true", canSwitch, battleStyle, expGain, noRun, noBall, battleEffects,
       forceParty: String(args.forceParty) === "true",
     }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
@@ -769,6 +773,7 @@ const { developmentCapabilities } = RuleConfig;
   G.PluginManager.registerCommand(NAME, "StartTrainerBattle", function (this: any, args: any) {
     if (PSFlow.running) throw new Error("a battle is already running");
     if (args.moneyGain !== undefined && ![true, false, "true", "false"].includes(args.moneyGain)) throw new Error("moneyGain must be true or false");
+    const initialField = initialFieldMZ(args.defaultWeather, args.defaultTerrain, args.battleEnvironment);
     const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle), expGain = parseExpGain(args.expGain), battleEffects = parseBattleEffects(args.battleEffects), noRun = parseProhibition(args.noRun, 'noRun'), noBall = parseProhibition(args.noBall, 'noBall');
     const id = String(args.trainerId || args.id || ""), version = Number(args.version ?? 0), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || `trainer-${id}-v${version}`}#${seq}`;
@@ -785,6 +790,7 @@ const { developmentCapabilities } = RuleConfig;
       kind: "trainer", trainer: { id, version }, foes: [], seq, battleId,
       moneyGain: args.moneyGain !== false && args.moneyGain !== "false",
       resultVariable: Number(args.resultVariable) || 0,
+      initialField,
       canLose: String(args.canLose) === "true", canSwitch, battleStyle, expGain, noRun, noBall, battleEffects,
       forceParty: String(args.forceParty) === "true",
     }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
@@ -1434,6 +1440,20 @@ const { developmentCapabilities } = RuleConfig;
               const first = events.indexOf(switches[0]);
               events = [...events.slice(0, first), foe, player, ...events.slice(first).filter((event: any) => event !== player && event !== foe)];
               this._trainerDispatchQueued = true;
+            }
+          }
+          if (openingBatch && op?.initialField && !this._initialFieldAnnouncementsQueued) {
+            const lastSwitch = events.reduce((last: number, event: any, i: number) => event.type === 'switch' ? i : last, -1);
+            if (lastSwitch >= 0) {
+              const firstSwitch = events.findIndex((event: any) => event.type === 'switch');
+              const weatherId = WEATHER[op.initialField.weather as keyof typeof WEATHER], terrainId = TERRAIN[op.initialField.terrain as keyof typeof TERRAIN];
+              const notices = events.filter((event: any, i: number) => i < firstSwitch &&
+                (event.type === '-weather' && weatherId && String(event.args[0]).toLowerCase().replace(/[^a-z]/g, '') === weatherId ||
+                 event.type === '-fieldstart' && terrainId && String(event.args[0]).toLowerCase().replace(/^move: /, '').replace(/[^a-z]/g, '') === terrainId));
+              if (notices.length) {
+                events = [...events.slice(0, lastSwitch + 1).filter((event: any) => !notices.includes(event)), ...notices, ...events.slice(lastSwitch + 1)];
+                this._initialFieldAnnouncementsQueued = true;
+              }
             }
           }
           for (const event of events) {

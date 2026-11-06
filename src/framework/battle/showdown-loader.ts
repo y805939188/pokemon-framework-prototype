@@ -37,6 +37,6 @@ export function readEngineSha(root: string): string {
 }
 
 /** The staged RPG format extension (a copy of the custom-formats build); it owns the non-serialized hooks table. */
-export function loadFormatExtension(root: string): { hooks: WeakMap<object, (e: unknown) => void>; observers: WeakMap<object, FormatObserver>; settlements?: WeakMap<object, HeldRuntimeObserver>; runAfterFaint?: (battle: ShowdownBattle, side: string) => boolean } {
+export function loadFormatExtension(root: string): { hooks: WeakMap<object, (e: unknown) => void>; observers: WeakMap<object, FormatObserver>; initialFields?: { bind(battle: ShowdownBattle, raw: unknown): void; attach(battle: ShowdownBattle): void; snapshot<T>(battle: ShowdownBattle, serialize: () => T): T }; settlements?: WeakMap<object, HeldRuntimeObserver>; runAfterFaint?: (battle: ShowdownBattle, side: string) => boolean } {
   return nodeRequire(path.join(root, "dist", "config", "custom-formats.js"));
 }

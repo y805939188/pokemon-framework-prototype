@@ -1,3 +1,4 @@
+import type { InitialFieldInput } from '../rules/initial-field';
 /**
  * The seam between the game flow and a battle engine: everything the session needs, as plain data and controlled
  * operations. `BattleGateway` (Pokemon Showdown) implements it; a scripted fake can stand in for it in tests. Types
@@ -15,6 +16,7 @@ export interface PlayerSpec {
 }
 
 export interface GatewayOptions {
+  initialField?: InitialFieldInput;
   formatid?: string;
   seed?: number[] | string;
   players?: PlayerSpec[];

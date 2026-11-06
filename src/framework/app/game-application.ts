@@ -1,3 +1,4 @@
+import { captureInitialField, withInitialField } from '../rules/initial-field';
 import { planPlayerFriendshipMigration, applyPlayerFriendshipMigration, friendshipMigrationSnapshot } from "../rules/friendship-migration";
 import type { FriendshipMigrationPlan } from "../rules/friendship-migration";
 import type { Content } from "../rules/types";
@@ -849,7 +850,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   async startTrainerBattle(request: TrainerBattleStartRequest): Promise<S> { this.assertNoFriendshipWrite();
-    return this.startBattle({ ...request, kind: "trainer", foes: [], trainer: { ...request.trainer } });
+    const initialField = captureInitialField(request);
+    return this.startBattle({ ...request, initialField, kind: "trainer", foes: [], trainer: { ...request.trainer } });
   }
 
   async startBattle(request: BattleStartRequest): Promise<S> { this.assertNoFriendshipWrite();
@@ -858,6 +860,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.battleCommitOwner) throw new Error("battle-commit-active");
     if (this.evolutions.active) throw new Error("evolution-operation-active");
     if (this.battleBusy) throw new Error("operation-active");
+    const initialField = captureInitialField(request);
     const generation = this.generation;
     // The mode is fixed before the first host callback. Returning a handle or omitting a method cannot downgrade it.
     const settlementSource = this.#settlementFactoryRoot;
@@ -934,7 +937,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         if (!member.owner) throw new Error(`player member ${member.id} has no authoritative owner for obedience`);
         return [member.id, { ...member.owner }];
       }));
-      const setup: BattleSetup = { foes, canSwitch: canSwitch ?? true, battleStyle: battleStyle ?? "switch", expGain: expGain ?? true, captureExpGain: config.GAIN_EXP_FOR_CAPTURE, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full,
+      const setup: BattleSetup = { ...(initialField ? { initialField } : {}), foes, canSwitch: canSwitch ?? true, battleStyle: battleStyle ?? "switch", expGain: expGain ?? true, captureExpGain: config.GAIN_EXP_FOR_CAPTURE, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full,
         obedience: { player: { ...game.player }, members: memberOwners, badges: badgeCount(game.badges), anyHighLevel: config.ANY_HIGH_LEVEL_POKEMON_CAN_DISOBEY,
           foreignHighLevel: config.FOREIGN_HIGH_LEVEL_POKEMON_CAN_DISOBEY, generation, contentIdentity },
         // This host-facing DTO must never alias the private settlement facts.
@@ -960,9 +963,10 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       assertCurrent();
       // The required source sees the operation's captured kind/id, not fields a prior host callback changed.
       // Explicit old adapters retain their historical request object contract.
-      const factoryRequest = settlementSource?.mode === "required" ? { ...request, battleId: op.battleId, kind: op.facts.kind } : request;
+      const acceptedRequest = initialField ? withInitialField(request, initialField) : request;
+      const factoryRequest = settlementSource?.mode === "required" ? { ...withInitialField(acceptedRequest, initialField), battleId: op.battleId, kind: op.facts.kind } : acceptedRequest;
       assertCurrent();
-      const session = await (settlementSource ? settlementSource.create(factoryRequest, view, setup) : this.ports.sessions.create(request, view, setup)) as S;
+      const session = await (settlementSource ? settlementSource.create(factoryRequest, view, setup) : this.ports.sessions.create(factoryRequest, view, setup)) as S;
       assertCurrent();
       if (!claimSettlementHandle(session, this, context)) throw new Error("battle-handle-already-bound");
       admission.handle = session;

@@ -43,6 +43,15 @@ export function make(names: Record<string, string> = {}, tr: Translator = defaul
       case "-curestatus": return [status(a0, a1, "cured")];
       case "-boost": return [tr.t(Number(a[2]) > 1 ? "battle.boost_rose_sharply" : "battle.boost_rose", { name: nm(a0), stat: statName(a1) })];
       case "-unboost": return [tr.t("battle.stat_fell", { name: nm(a0), stat: statName(a1) })];
+      case "-weather": {
+        if (a.includes("[upkeep]")) return [];
+        const id = a0.toLowerCase().replace(/[^a-z]/g, "");
+        return tr.has(`battle.weather.${id}`) ? [tr.t(`battle.weather.${id}`)] : [];
+      }
+      case "-fieldstart": {
+        const id = a0.replace(/^move: /, "").toLowerCase().replace(/[^a-z]/g, "");
+        return tr.has(`battle.terrain.${id}`) ? [tr.t(`battle.terrain.${id}`)] : [];
+      }
       case "rpg": return rpg(a);
       case "win": return [];
       default: return [];

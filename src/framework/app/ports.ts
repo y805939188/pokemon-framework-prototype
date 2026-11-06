@@ -1,3 +1,4 @@
+import type { InitialField, InitialFieldInput } from '../rules/initial-field';
 /**
  * What the game application needs from the world, as small interfaces it owns. The MZ plugin implements them with
  * `$gameSystem` and `$gameVariables`; tests implement them in memory; the composition root wires the Showdown-backed
@@ -32,6 +33,8 @@ export interface ClockPort {
 
 /** One battle as the author (StartBattle) or an encounter asks for it. */
 export interface BattleStartRequest {
+  /** Captured author field defaults; no world inference. */
+  initialField?: InitialFieldInput;
   battleId: string;
   kind: "wild" | "trainer";
   /** Species as content id or persistent name, and level; the application creates the individuals. */
@@ -61,6 +64,7 @@ export type TrainerBattleStartRequest = Omit<BattleStartRequest, "kind" | "foes"
 
 /** What the application decided before a session exists: the created foes and the effective flags. */
 export interface BattleSetup {
+  initialField?: InitialField;
   /** Internal application authority for a transient companion; never read from a save or UI request. */
   evidenceContext?: BattleEvidenceContext;
   /** Formal application path always supplies authoritative player/badges/content/generation; legacy direct sessions may omit it. */

@@ -1,3 +1,5 @@
+import { captureInitialField } from '../rules/initial-field';
+import type { InitialFieldInput } from '../rules/initial-field';
 import { battleBag } from "../rules/inventory";
 import { catalogOf } from "../rules/item-catalog";
 /**
@@ -105,6 +107,7 @@ export interface CreateOptions {
   seed?: number[] | string;
   doubles?: boolean;
   /** Explicit controlled test/developer path; held-item write-back is incomplete. Never a player/save setting. */
+  initialField?: InitialFieldInput;
   experimentalHeldBattle?: boolean;
   /** Composition-owned complete settlement channel; arbitrary custom drivers do not acquire it. */
   requiredSettlement?: boolean;
@@ -213,7 +216,10 @@ export class BattleSession {
   _friendUnavailable: string[] = [];
   _pendingFriendFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
 
-  static async create({ replacementOffers = false, game, battleId, foe, content, canSwitch = true, expGain = true, captureExpGain, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi }: CreateOptions): Promise<BattleSession> {
+  static async create(options: CreateOptions): Promise<BattleSession> {
+    const initialField = captureInitialField(options);
+    const { replacementOffers = false, game, battleId, foe, content, canSwitch = true, expGain = true, captureExpGain, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi } = options;
+    if (initialField && (doubles || formatid !== "gen8rpgcustomgame")) throw new Error("initial-field-requires-rpg-singles");
     if (typeof replacementOffers !== "boolean") throw new Error("replacementOffers must be boolean when provided");
     if (replacementOffers && (!trainerAi || doubles || foe.kind !== "trainer")) throw new Error("replacement-offer-formal-single-trainer-required");
     if (typeof expGain !== "boolean") throw new Error("expGain must be boolean when provided");
@@ -251,6 +257,7 @@ export class BattleSession {
     }
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
     s.gw = await driver.create({
+      ...(initialField ? { initialField } : {}),
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
       requiredSettlement,
       ...(obedience ? { obedience } : {}),

@@ -64,6 +64,7 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
       if (required && setup.trainer && !setup.isCurrentBattle) throw new Error('trainer-ai-app-owner-missing');
       return CREATE_BATTLE_SESSION({
       game, battleId: request.battleId, content, experimentalHeldBattle: setup.experimentalHeldBattle ?? false,
+      ...(setup.initialField ? { initialField: setup.initialField } : {}),
       requiredSettlement: required, canSwitch: setup.canSwitch ?? true, expGain: setup.expGain ?? true, captureExpGain: setup.captureExpGain,
       replacementOffers: replacementOffers && !!setup.trainer && (setup.battleStyle ?? "switch") === "switch",
       ...(setup.evidenceContext ? { evidence: setup.evidenceContext } : {}),

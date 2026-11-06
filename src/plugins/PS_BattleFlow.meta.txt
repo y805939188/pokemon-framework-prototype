@@ -179,6 +179,24 @@
  * @type boolean
  * @default false
  *
+ * @arg defaultWeather
+ * @text Default battle weather
+ * @desc none,sun,rain,sandstorm,hail,harshsun,heavyrain,strongwinds; blank means none. No world inference.
+ * @type string
+ * @default
+ *
+ * @arg defaultTerrain
+ * @text Default battle terrain
+ * @desc none,electric,grassy,misty,psychic; blank means none.
+ * @type string
+ * @default
+ *
+ * @arg battleEnvironment
+ * @text Battle rule environment
+ * @desc none,grass,tallgrass,movingwater,stillwater,puddle,underwater,cave,rock,sand,forest,forestgrass,snow,ice,volcano,graveyard,sky,space,ultraspace. Independent of background.
+ * @type string
+ * @default
+ *
  * @arg battleBackground
  * @text Battle background
  * @desc Optional override; blank inherits the plugin default. Relative resource identity, without image extension.
@@ -350,6 +368,24 @@
  * @arg forceParty
  * @type boolean
  * @default false
+ *
+ * @arg defaultWeather
+ * @text Default battle weather
+ * @desc none,sun,rain,sandstorm,hail,harshsun,heavyrain,strongwinds; blank means none. No world inference.
+ * @type string
+ * @default
+ *
+ * @arg defaultTerrain
+ * @text Default battle terrain
+ * @desc none,electric,grassy,misty,psychic; blank means none.
+ * @type string
+ * @default
+ *
+ * @arg battleEnvironment
+ * @text Battle rule environment
+ * @desc none,grass,tallgrass,movingwater,stillwater,puddle,underwater,cave,rock,sand,forest,forestgrass,snow,ice,volcano,graveyard,sky,space,ultraspace. Independent of background.
+ * @type string
+ * @default
  *
  * @arg battleBackground
  * @text Battle background

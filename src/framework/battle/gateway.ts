@@ -1,3 +1,4 @@
+import { captureInitialField } from '../rules/initial-field';
 /**
  * Thin async battle gateway over a pinned Pokemon Showdown build.
  *
@@ -84,6 +85,8 @@ export class BattleGateway implements BattleDriver {
   }
 
   static async create(opts: GatewayOptions): Promise<BattleGateway> {
+    const initialField = captureInitialField(opts);
+    if (initialField && opts.formatid !== "gen8rpgcustomgame") throw new Error("initial-field-requires-rpg-singles");
     const gw = new BattleGateway(opts);
     const { sim } = gw._env;
     const battle = new sim.Battle({
@@ -97,6 +100,11 @@ export class BattleGateway implements BattleDriver {
     gw._attachObservations();
     for (const [i, p] of (opts.players ?? []).entries()) {
       battle.setPlayer(`p${i + 1}`, { name: p.name, team: sim.Teams.pack(p.team) });
+    }
+    if (initialField) {
+      const fields = loadFormatExtension(gw._env.root).initialFields;
+      if (!fields) throw new Error("initial-field-extension-unavailable");
+      fields.bind(battle, initialField);
     }
     // The format's onBegin creates battle.rpg when the second player joins, so flags go after.
     if (opts.wild !== undefined || opts.noBall !== undefined || opts.noRun !== undefined) {
@@ -123,8 +131,14 @@ export class BattleGateway implements BattleDriver {
 
   /** Restore from a snapshot string produced by snapshot(). Emits no events until the next choice. */
   static async restore(snapshot: string, opts: GatewayOptions = {}): Promise<BattleGateway> {
+    if (captureInitialField(opts)) throw new Error("initial-field-restore-rebind");
     const gw = new BattleGateway(opts);
     gw._battle = gw._env.sim.Battle.fromJSON(snapshot);
+    if (gw._battle.rpg?.initialField) {
+      const fields = loadFormatExtension(gw._env.root).initialFields;
+      if (!fields) throw new Error("initial-field-extension-unavailable");
+      fields.attach(gw._battle);
+    }
     gw.#attachTrainerSource();
     attachReplacementSource(gw, gw._battle, gw._env);
     gw._attachObservations();
@@ -134,7 +148,8 @@ export class BattleGateway implements BattleDriver {
   }
 
   snapshot(): string {
-    return JSON.stringify(this._battle.toJSON());
+    const serialize = () => JSON.stringify(this._battle.toJSON());
+    return this._battle.rpg?.initialField ? loadFormatExtension(this._env.root).initialFields!.snapshot(this._battle, serialize) : serialize();
   }
 
   /** An opaque rollback point of everything this gateway owns (see GatewayCheckpoint). */

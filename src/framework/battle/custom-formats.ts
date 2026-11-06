@@ -1,3 +1,5 @@
+import { startInitialField, bindInitialField, attachInitialField, snapshotInitialField } from './initial-field';
+export const initialFields = { bind: bindInitialField, attach: attachInitialField, snapshot: snapshotInitialField };
 /**
  * Showdown "custom-formats" extension (officially supported: dist/config/custom-formats.js is merged into the format
  * list). Adds `[Gen 8] RPG Custom Game` (and a doubles variant): Gen 8 Custom Game plus one engine event, `RpgAction`,
@@ -339,6 +341,7 @@ function checkObedience(battle: ShowdownBattle, pokemon: ShowdownPokemon, target
 }
 
 const rpgHandlers = {
+  onBattleStart(this: ShowdownBattle): void { startInitialField(this); },
   onModifyMove(this: ShowdownBattle, move: ShowdownPokemon, pokemon: ShowdownPokemon): void {
     const observer = settlements.get(this);
     if (!observer) return;
