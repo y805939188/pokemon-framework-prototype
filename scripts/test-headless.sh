@@ -35,6 +35,7 @@ SUITES=(
   experiments/step5/4/test-e-damage-contracts.cjs
   experiments/step5/4/test-e-hp-app-contracts.cjs
   experiments/step5/4/test-e-multihit-app-contracts.cjs
+  experiments/step5/4/test-e-stages-app-contracts.cjs
   experiments/step5/4/test-e-status-carry.cjs
   experiments/step5/4/test-prebattle-wrapper.cjs
   experiments/step5/4/test-prebattle-native.cjs
