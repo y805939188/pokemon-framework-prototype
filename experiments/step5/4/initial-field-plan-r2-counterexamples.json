@@ -1,0 +1,42 @@
+{
+  "schema": "D2-initial-field-plan-r2-vectors-v1",
+  "kind": "FUTURE_ACCEPTANCE_RECIPES_NOT_EXECUTED",
+  "status": "PENDING_PLAN_REVIEW",
+  "revisionOf": "87f6ee4c7a4ab42cc2d2f39de68559b7305c4cc7",
+  "engine": {"showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b", "format": "gen8rpgcustomgame", "seed": [1, 2, 3, 4]},
+  "priorEvidencePolicy": "Retain original independent native weather4/environment4 findings and seals outside repo; do not rerun, edit, or reclassify them as product failures or revised passes.",
+  "weatherVectors": [
+    {"id": "W01", "finding": "IF-P2-01", "acceptance": ["IF02", "IF06"], "parameterizedDefaults": ["harshsun", "heavyrain", "strongwinds"], "action": "real entry Drought", "expected": "each stored default primal remains unchanged and infinite; no fake default source; ordinary ability setter is refused", "status": "NOT_EXECUTED"},
+    {"id": "W02", "finding": "IF-P2-01", "acceptance": ["IF06"], "default": "harshsun", "action": "real Rain Dance with an ordinary active source", "expected": "stored desolateland retained; move registration/use still consumes native PP once; ordinary weather effect refused with native failure path", "status": "NOT_EXECUTED"},
+    {"id": "W03", "finding": "IF-P2-01", "acceptance": ["IF06"], "default": "harshsun", "setup": "actual Air Lock or Cloud Nine makes effective weather none", "action": "ordinary weather move or ability", "expected": "effective none must not permit replacing stored desolateland; scope is stored weather, not default ID or effective weather", "status": "NOT_EXECUTED"},
+    {"id": "W04", "finding": "IF-P2-01", "acceptance": ["IF06"], "default": "harshsun", "action": "legitimate source of a different primal weather", "expected": "native legal primal interchange accepted, current becomes that primal and original default retained for later supported restoration; no fabricated ability source", "status": "NOT_EXECUTED"},
+    {"id": "W05", "finding": "IF-P2-01", "acceptance": ["IF06"], "default": "rain", "action": "real entry Drought", "expected": "ordinary default is not permanently locked: current sunnyday has native finite duration, later expiry restores infinite default rain with the proper single residual phase", "status": "NOT_EXECUTED"},
+    {"id": "W06", "finding": "IF-P2-01", "acceptance": ["IF04"], "parameterizedDefaults": ["harshsun", "heavyrain", "strongwinds"], "action": "source-less initialization and one default announcement", "expected": "canonical state before first active/ability; standard weather protocol without ability/of tags; no primal onFieldStart dereference of absent effect", "status": "NOT_EXECUTED"}
+  ],
+  "secretPowerVectors": [
+    {"id": "S01", "finding": "IF-P2-02", "acceptance": ["IF08"], "environment": "cave", "equivalentMappings": ["graveyard", "space"], "ability": "Parental Bond", "fixture": "Kangaskhan versus surviving Regirock, ordinary native Secret Power", "expected": "two real hits where the fixture permits, exactly one 30% environment opportunity after actual hit loop; no fake hit index or changed raw hitcount", "status": "NOT_EXECUTED"},
+    {"id": "S02", "finding": "IF-P2-02", "acceptance": ["IF08"], "environment": "grass", "ability": "Parental Bond", "expected": "one 30% sleep opportunity at completed move; native first-hit nonflinch filtering cannot swallow an eligible whole-move effect; sleep duration draw recorded separately", "status": "NOT_EXECUTED"},
+    {"id": "S03", "finding": "IF-P2-02", "acceptance": ["IF08"], "environment": "grass", "ability": "Sheer Force", "expected": "own secondary generated before native ability, then deleted; native power boost remains, no environment chance draw/status and no recreation at completion", "status": "NOT_EXECUTED"},
+    {"id": "S04", "finding": "IF-P2-02", "acceptance": ["IF08"], "environment": "grass", "ability": "Serene Grace", "expected": "own 30% generated before native -2 ability callback and becomes60 once; completion uses one 60% opportunity, not30 or120", "status": "NOT_EXECUTED"},
+    {"id": "S05", "finding": "IF-P2-02", "acceptance": ["IF08"], "environment": "cave", "ability": "Parental Bond", "setup": "every actual hit absorbed by a sufficiently healthy native Substitute", "expected": "no qualified body record, zero environment opportunity; do not infer eligibility merely because substitute disappeared later", "status": "NOT_EXECUTED"},
+    {"id": "S06", "finding": "IF-P2-02", "acceptance": ["IF08"], "environment": "cave", "ability": "Parental Bond", "setup": "target actually faints on first hit", "expected": "real hitcount1, zero environment opportunity, complete without waiting for planned second hit", "status": "NOT_EXECUTED"},
+    {"id": "S07", "finding": "IF-P2-02", "acceptance": ["IF08"], "environment": "grass", "ability": "Parental Bond", "setup": "qualify actual first-hit early end with living body-hit target; candidate native Jaboca Berry and HP1 user", "expected": "after actual loop finishes, one eligible whole-move opportunity without changing native hit metadata; fixture must prove the actual early-end precondition before acceptance", "status": "NOT_EXECUTED"},
+    {"id": "S08", "finding": "IF-P2-02", "acceptance": ["IF01", "IF08"], "parameterizedContext": ["environment none", "each of four native terrains overriding a non-none environment"], "expected": "native original Secret Power path, ability qualification, protocol, requests, random stream and result unchanged; no tagged environment work", "status": "NOT_EXECUTED"}
+  ],
+  "negativeControls": [
+    {"id": "N01", "change": "omit stored-primal ordinary-weather gate", "mustRejectWith": ["W01", "W02"], "priorIndependentCounterexampleExists": true, "status": "NOT_EXECUTED"},
+    {"id": "N02", "change": "read effectiveWeather instead of stored field.weather", "mustRejectWith": ["W03"], "status": "NOT_EXECUTED"},
+    {"id": "N03", "change": "block every weather change while a default exists", "mustRejectWith": ["W04", "W05"], "status": "NOT_EXECUTED"},
+    {"id": "N04", "change": "inject environment secondaries at default priority0 after native ability processing", "mustRejectWith": ["S03", "S04"], "assertion": "native callback order/deletion and final 60% chance must be checked even if a separate safety guard suppresses a late effect", "priorIndependentCounterexampleExists": true, "status": "NOT_EXECUTED"},
+    {"id": "N05", "change": "return tagged environment flinch to native per-hit secondaries", "mustRejectWith": ["S01"], "priorIndependentCounterexampleExists": true, "status": "NOT_EXECUTED"},
+    {"id": "N06", "change": "treat planned move.hit2 as completed-move eligibility or omit qualified-body/alive guards", "mustRejectWith": ["S05", "S06", "S07"], "status": "NOT_EXECUTED"}
+  ],
+  "observationPolicy": "Only observe actual native random arguments and returned values, forwarding each call exactly once and restoring wrappers in finally. Never force PRNG returns, reseed/retry for favorable outcomes, or count sleep-duration [2,5] as a second 30% opportunity. Filter counts by the tagged environment opportunity, not unrelated damage/accuracy/item randomness.",
+  "lifecycleSupplement": "IF09 includes temporary cover before/after expiry and same-source restore with priority/once/clear hooks reconstructed once; IF10 includes open-to-begin caller mutation and rejected duplicate begin; all remain NOT_EXECUTED.",
+  "productImplementation": "NOT_STARTED",
+  "newDiagnosticRuns": 0,
+  "NW": 0,
+  "APP": 0,
+  "completeD2": false,
+  "completeE": false
+}
