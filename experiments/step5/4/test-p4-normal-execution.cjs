@@ -80,3 +80,13 @@ test('cancellation at a keydown releases keys and retires the case without a suc
   await assert.rejects(x.pump(execute(E,x.G,x.G,x.fixture,tools,{scope:'OFFLINE_CONTROL',donorCaseId:'F100-001',caseId:'owned-input-cancel'},p)),e=>{x.save('owned-input-cancel-FAIL',e.receipt);assert.match(e.receipt.error.message,/offline input cancelled/);assert.equal(e.receipt.status,'FAIL');return true;});
   assert(cancelledAt>0);assert(x.dispatches.slice(cancelledAt).every(d=>d.type==='keyup'));assert.equal(x.G.SceneManager.updateMain,base);released(x);assert.deepEqual(x.fixture.state().appliedBattles,{});
 });
+test('an actual source-backed forced P1 replacement stays within the current business intention',async t=>{
+  const x=await owned(t);x.fixture.prepareCase('F100-003');
+  // Separate controlled branch: actual high-level authored trainer, not a frozen F100 case/result.
+  x.w.flow.openBattle({kind:'trainer',trainer:x.fixture.data.donor.cases[3].request.trainer,battleId:'owned-oracle-forced',seq:4,battleEffects:true});await x.p.inMode('main');
+  const plan={...tools.compileNavigation().cases[2],id:'owned-oracle-forced'},oracle=oracleFactory(E,x.G,x.G,x.fixture,plan),session=x.w.flow._op.session;
+  assert.equal((await session.useItem('potion','P1')).ok,true);assert.equal(oracle.poll().intentIndex,1);
+  assert.equal((await session.chooseSwitch('P2')).ok,true);assert.equal(oracle.poll().intentIndex,2);assert(session.currentRequest().forceSwitch.some(Boolean));
+  const source=E.session.readSessionRequestContext(session);assert.equal(source.status,'available');assert(source.source.occurrenceId);
+  assert.equal((await session.chooseForcedSwitch('P1')).ok,true);const progress=oracle.poll();assert.equal(progress.intentIndex,2);assert.equal(progress.actionCount,3);assert.equal(oracle.dispose().restored,true);
+});
