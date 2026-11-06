@@ -71,3 +71,10 @@ test('atomic Session view with unavailable source blocks only observer; legacy S
   assert.equal(h.scene.requestObservationState().status,'unavailable');assert.equal(h.scene.inputState().ready,true);
   await selectP2(h);const index=h.scene._menu._items.findIndex(x=>x.ext==='switch-in');h.scene._menu.select(index);h.scene.onMenuOk();await h.p.inMode('main');assert.equal(h.session.gw.activeId('p1'),'P2');
 });
+test('menu projection triggering actual restore synchronously cannot publish the pre-restore Session context',async t=>{
+  const h=await host(t),before=h.scene.requestObservationState(),cp=h.session._checkpoint(),menu=h.scene._menu,original=menu.maxCols;
+  let pending;menu.maxCols=function(){menu.maxCols=original;pending=h.session._restoreCheckpoint(cp);return original.call(this);};
+  try {const sampled=h.scene.requestObservationState();assert.equal(sampled.status,'unavailable');assert.equal(sampled.source,undefined);}
+  finally {menu.maxCols=original;if(pending)await pending;}
+  const after=h.scene.requestObservationState();assert.equal(after.status,'available');assert(after.requestViewEpoch>before.requestViewEpoch);assert.notEqual(after.ownerToken,before.ownerToken);
+});
