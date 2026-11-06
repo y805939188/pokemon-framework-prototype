@@ -170,10 +170,13 @@ test.describe('actual normal request slots and compiled Scene menu keys',()=>{
   test.after(async()=>{
     if(host){
       if(host.w.flow.running)host.w.flow.abort(Error('owned move-key pre-action control cleanup'));
-      // abort retires the actual root asynchronously; retain the strict fixture guard.
-      await host.waitFor(()=>!host.w.flow.running&&!host.w.flow._op&&!fixture?.app.saveBlocked,'owned move-key operation retired');
+      await host.waitFor(()=>!host.w.flow.running&&!fixture?.app.saveBlocked,'owned move-key operation stopped');
+      assert.equal(host.w.flow.lastOutcome.commit,'none');assert.equal(host.w.flow.lastOutcome.aborted,true);
+      // close keeps a historical _op. Do not clear it or weaken fixture.restore's guard:
+      // leave that isolated VM after stopping its real operation, rather than restoring into it.
+      host.M.goto(host.G.Scene_Map);
     }
-    if(fixture)fixture.restore();
+    host=fixture=scene=binding=null;
   });
   test('actual payday request binds to actual ready menu key 1',()=>{
     const p=plans[0];assert.equal(p.policy[0].step,'finish-payday');
