@@ -1713,8 +1713,10 @@ const { developmentCapabilities } = RuleConfig;
       && PSFlow._op === op && PSFlow._app === app && app.stateGeneration === generation
       && this._session === session && G.SceneManager._scene === this && sceneController(this).isCurrent();
     if (!current()) return unavailable('request-observer-owner-retired');
-    const context = engine().B.session.readSessionRequestContext(session);
     const input = this.inputState();
+    // Project host/menu callbacks first, then read the Session pair once. A synchronous restore
+    // during maxCols/canChoose must not let a previously read epoch escape as current.
+    const context = engine().B.session.readSessionRequestContext(session);
     if (!current()) return unavailable('request-observer-owner-changed');
     if (context.status !== 'available') { requestObservers.delete(this); return { ...context, current: true, sceneKind: 'battle' }; }
     let owner = requestObservers.get(this);
