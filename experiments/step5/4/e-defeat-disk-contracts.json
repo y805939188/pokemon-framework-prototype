@@ -72,7 +72,7 @@
   "completeE74Heading": false,
   "newE74Rows": 0,
   "NW": 0,
-  "product": "e06a57ec4095f6ccf2858d59ec145e48e8b61aa6",
+  "product": "b68b75424f725fddb99eaaf8b5c596f61f5a53b0",
   "runtime": {
     "js/engine/build/content-cli.cjs": "afc1bb820ee9da32875247cf39ff5d60164a825f0d5cb6a2bb313b62744bccab",
     "js/engine/build/core.cjs": "70735564d6428bc4f388b493fec760a48eb3f15a786a43266f255f695922ffb4",
@@ -85,34 +85,42 @@
     "js/engine/build/trainer-ai-diagnostics-cXhbZ6rN.js": "4a6dd869312b1305e681779f8a28c24a898198b08a3c6227ac381d80dcffd536"
   },
   "runtimeRebinding": {
-    "reason": "Final request-source seam including atomic Scene callback ordering; scenarios/seeds/business oracle unchanged",
-    "sourceCommit": "e06a57ec4095f6ccf2858d59ec145e48e8b61aa6",
-    "sourceTree": "6ffc76bbd3b3e5eeb00e58af7d5cc6beed9d7068",
-    "previousBindingProduct": "a4725d64d61da0914a47f836baf8b21dcc33925c",
-    "previousBindingSHA256": "1def8bebc3199582f7726a3470ac984944c1f32bb9605522f198fd1be8ad3d73",
+    "reason": "Offline normal preparation plugin/fixture source point; current nine engine files rebuilt and individually verified; business cases/seeds/oracles unchanged",
+    "sourceCommit": "b68b75424f725fddb99eaaf8b5c596f61f5a53b0",
+    "sourceTree": "f6cb8236b46a7c70e5a3d7367b56616bd31b9783",
+    "previousBindingProduct": "e06a57ec4095f6ccf2858d59ec145e48e8b61aa6",
+    "previousBindingSHA256": "baa8f509970c38be02f9ec986c94cf61d1b62404314c4a40af6aedf10dc2113c",
     "previousRebinding": {
-      "reason": "Player forced-request source seam rebuilt from the fixed source commit; scenarios/seeds/business oracle unchanged",
-      "sourceCommit": "a4725d64d61da0914a47f836baf8b21dcc33925c",
-      "sourceTree": "a980b6806a9e629efac25365363a5759415776bd",
-      "previousBindingProduct": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
-      "previousBindingSHA256": "ce64fbd515bb914ec53e1e446024dcb9780d6683ad947aab97b33714b4e00cca",
+      "reason": "Final request-source seam including atomic Scene callback ordering; scenarios/seeds/business oracle unchanged",
+      "sourceCommit": "e06a57ec4095f6ccf2858d59ec145e48e8b61aa6",
+      "sourceTree": "6ffc76bbd3b3e5eeb00e58af7d5cc6beed9d7068",
+      "previousBindingProduct": "a4725d64d61da0914a47f836baf8b21dcc33925c",
+      "previousBindingSHA256": "1def8bebc3199582f7726a3470ac984944c1f32bb9605522f198fd1be8ad3d73",
       "previousRebinding": {
-        "reason": "COMBO-P2-01: rebuilt final source-owned AI safe snapshot repair; scenarios/seeds/oracles unchanged",
-        "sourceCommit": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
-        "sourceTree": "f26c1a7c20474f214d6d26753bdb846bf55e1769",
-        "previousBindingProduct": "47dbbc393860018cf04faaa1e89862e63652aa2b",
-        "previousBindingSHA256": "b3de86b8cb410ad34a518eca4a5bfec08f5ac3705821a05cc7f0237dd614eb25",
+        "reason": "Player forced-request source seam rebuilt from the fixed source commit; scenarios/seeds/business oracle unchanged",
+        "sourceCommit": "a4725d64d61da0914a47f836baf8b21dcc33925c",
+        "sourceTree": "a980b6806a9e629efac25365363a5759415776bd",
+        "previousBindingProduct": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
+        "previousBindingSHA256": "ce64fbd515bb914ec53e1e446024dcb9780d6683ad947aab97b33714b4e00cca",
         "previousRebinding": {
-          "reason": "Rebuilt final field/Harvest/PP/trainer combination; no scenario, seed, or business oracle changes",
-          "sourceCommit": "47dbbc393860018cf04faaa1e89862e63652aa2b",
-          "sourceTree": "406614edc72a531db1a503293fa85033fa4d9aa3",
-          "priorProducts": {
-            "field": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
-            "harvest": "a91570b6d006f0a303bfe3350b051f81be644dd2"
-          },
-          "mappingSource": "Actual nine files in this integration worktree js/engine/build after source-H build; not union or selection of prior tables"
+          "reason": "COMBO-P2-01: rebuilt final source-owned AI safe snapshot repair; scenarios/seeds/oracles unchanged",
+          "sourceCommit": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
+          "sourceTree": "f26c1a7c20474f214d6d26753bdb846bf55e1769",
+          "previousBindingProduct": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+          "previousBindingSHA256": "b3de86b8cb410ad34a518eca4a5bfec08f5ac3705821a05cc7f0237dd614eb25",
+          "previousRebinding": {
+            "reason": "Rebuilt final field/Harvest/PP/trainer combination; no scenario, seed, or business oracle changes",
+            "sourceCommit": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+            "sourceTree": "406614edc72a531db1a503293fa85033fa4d9aa3",
+            "priorProducts": {
+              "field": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
+              "harvest": "a91570b6d006f0a303bfe3350b051f81be644dd2"
+            },
+            "mappingSource": "Actual nine files in this integration worktree js/engine/build after source-H build; not union or selection of prior tables"
+          }
         }
       }
-    }
+    },
+    "mappingSource": "Actual complete nine files rebuilt in this exclusive tree; byte-identical to accepted 4b3 engine because framework sources unchanged; not a union of old maps"
   }
 }
