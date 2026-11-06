@@ -72,26 +72,33 @@
   "completeE74Heading": false,
   "newE74Rows": 0,
   "NW": 0,
-  "product": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+  "product": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
   "runtime": {
     "js/engine/build/content-cli.cjs": "113d2b55ab7c2956af00df2527958c4e8302338646a124a0961db58e62e1b76a",
     "js/engine/build/core.cjs": "9cd1a060fa1279e97ac82390e45c947721182efa11b017efb51a4276fc34d04e",
     "js/engine/build/custom-formats.cjs": "70db558b8ba0a3523913c8d2ce0c560e9976af80796c123b7ff4536183d4ac22",
-    "js/engine/build/engine.cjs": "283560d40086145a10eb48da9893ef3e8ae61b51d276b572f6df295e16ab8417",
-    "js/engine/build/production.cjs": "fbebc6bb9289d949059916bb3401e3bc438e6d1e2fd8cd15a6f7c49e2a49d979",
-    "js/engine/build/public-presentation-I3Ny9wFC.js": "e46ff48bfbdb453d481f44c7e41af723b2d6911d483ce21e58979cb5efa2e2ce",
-    "js/engine/build/session-DhcGhG7C.js": "0bebc518b5538680ff26273a2ceba7d1bc645d23f627dde91ee31bc6ac95b2d6",
-    "js/engine/build/testing.cjs": "311e3825693c02b08dd24cc861141cdb01ebf64bdbc27c881f133318504a05bf",
-    "js/engine/build/trainer-ai-diagnostics-AimyJGhg.js": "6f496484e0e89450debd586c9e879908b48125dd6c8d5af1b3e7942be9585600"
+    "js/engine/build/engine.cjs": "54c6a207117cabaeda5125335a632eb1244f628355841d9709e7d6863b6f3ee0",
+    "js/engine/build/production.cjs": "0d0a68b55744b62303d60de5ad3065904065b56877e95cfd59d4da49cf8554f1",
+    "js/engine/build/public-presentation-BxGIkbT5.js": "2ad6c12980325f266b48491f7f5153e32b0a4992d1f59c2e2a192812384eabaa",
+    "js/engine/build/session-ByrEDd6W.js": "7e0af4fbea0ef7a1f0080c02d860dce6fa6313098c033a5e2d0a61f4c3d89920",
+    "js/engine/build/testing.cjs": "e1876baa26caa3121b7a901a0ee49e926ffad09f8d6ac698d30e9a56ff2b6c8c",
+    "js/engine/build/trainer-ai-diagnostics-CNKjdhxr.js": "abd9c8257733dba4bc29af5116f0b92c33f7d70cf7a2cb64b4700a3d7b88d305"
   },
   "runtimeRebinding": {
-    "reason": "Rebuilt final field/Harvest/PP/trainer combination; no scenario, seed, or business oracle changes",
-    "sourceCommit": "47dbbc393860018cf04faaa1e89862e63652aa2b",
-    "sourceTree": "406614edc72a531db1a503293fa85033fa4d9aa3",
-    "priorProducts": {
-      "field": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
-      "harvest": "a91570b6d006f0a303bfe3350b051f81be644dd2"
-    },
-    "mappingSource": "Actual nine files in this integration worktree js/engine/build after source-H build; not union or selection of prior tables"
+    "reason": "COMBO-P2-01: rebuilt final source-owned AI safe snapshot repair; scenarios/seeds/oracles unchanged",
+    "sourceCommit": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
+    "sourceTree": "f26c1a7c20474f214d6d26753bdb846bf55e1769",
+    "previousBindingProduct": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+    "previousBindingSHA256": "b3de86b8cb410ad34a518eca4a5bfec08f5ac3705821a05cc7f0237dd614eb25",
+    "previousRebinding": {
+      "reason": "Rebuilt final field/Harvest/PP/trainer combination; no scenario, seed, or business oracle changes",
+      "sourceCommit": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+      "sourceTree": "406614edc72a531db1a503293fa85033fa4d9aa3",
+      "priorProducts": {
+        "field": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
+        "harvest": "a91570b6d006f0a303bfe3350b051f81be644dd2"
+      },
+      "mappingSource": "Actual nine files in this integration worktree js/engine/build after source-H build; not union or selection of prior tables"
+    }
   }
 }
