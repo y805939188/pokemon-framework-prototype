@@ -257,3 +257,5 @@
 ## 连击HP/PP普通槽与非渲染Continue（有限、待独审）
 
 [三案合同与本地前提](5.4-E-multihit-mz-continue.md)：整次连击一次PP、对方实际伤害、普通压缩槽、新Node Continue及下一战；含续战取消后旧槽重接。真实Title/Scene/NW、完整E及辅助事实仍开放；实际冻结版本和结果见STATUS。
+
+- 5.4 E 普通两回合／休息回合 App 契约抽样：[有限范围与运行入口](5.4-E-locked-turn-app.md)。四案，非完整 FR-000556、Scene、磁盘或 NW 验收。
