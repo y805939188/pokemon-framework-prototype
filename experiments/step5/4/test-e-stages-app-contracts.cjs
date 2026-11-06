@@ -36,7 +36,7 @@ function verify(row){
  assert(ev.some(e=>e.type==='move'&&identifies(e.args[0],'p1',b.active)));
  if(row.move==='swordsdance'){
   assert.equal(now.boosts.atk,Math.min(6,old.boosts.atk+2));assert.equal(foeAfter.hp,foeBefore.hp);assert.deepEqual(foeAfter.boosts,foeBefore.boosts);
-  if(old.boosts.atk===6)assert(ev.some(e=>e.type==='-fail'&&identifies(e.args[0],'p1',b.active)));
+  if(old.boosts.atk===6){const capped=ev.filter(e=>e.type==='-boost'&&identifies(e.args[0],'p1',b.active)&&e.args[1]==='atk');assert(capped.length>0);assert(capped.every(e=>Number(e.args[2])===0),'capped use must not report a positive increase');}
   else assert(ev.some(e=>e.type==='-boost'&&identifies(e.args[0],'p1',b.active)&&e.args[1]==='atk'&&Number(e.args[2])===2));
  }else if(row.move==='growl'){
   assert.equal(foeAfter.boosts.atk,Math.max(-6,foeBefore.boosts.atk-1));assert.deepEqual(now.boosts,old.boosts);assert.equal(foeAfter.hp,foeBefore.hp);
