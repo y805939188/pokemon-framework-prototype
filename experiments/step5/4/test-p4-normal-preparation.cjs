@@ -150,3 +150,50 @@ test('restore starting between adapter snapshot and source sample cannot authori
   finally{menu.maxCols=old;if(pending)await pending;}
   assert.equal(x.binding.read().current,false);assert.equal(x.context.intentIndex,0);
 });
+
+test.describe('actual normal request slots and compiled Scene menu keys',()=>{
+  let host,fixture,scene,binding,plans,before,requestBefore,snapshot;
+  test.before(async()=>{
+    host=createVictoryDriverHost({...h,driverText:'SYNTHETIC_UNUSED',PLAN,options:{productionTranslator:true}});
+    await host.p.toMapId(5);fixture=A.installNormalHostFixture(E,host.G,host.G);
+    const prepared=fixture.prepareCase('F100-001'),request={...prepared.case.request,battleId:'owned-normal-move-key-control'};
+    before=fixture.state();host.w.flow.openBattle(request);await host.p.inMode('main');scene=host.p.battle();
+    requestBefore=plain(scene._session.currentRequest());
+    const fight=scene._menu._items.findIndex(i=>i.ext==='fight');assert(fight>=0);scene._menu.select(fight);scene.onMenuOk();await host.p.inMode('moves');
+    binding=A.bindNormalBattle(tools,E,host.G,host.G,{gameTick:()=>host.G.Graphics.frameCount});snapshot=binding.read();
+    assert.equal(snapshot.phase,'moves');assert.equal(snapshot.ready,true);assert.equal(snapshot.current,true);
+    const program=tools.compileNavigation();plans=[program.cases[0],program.cases[3]].map(p=>({...p,id:request.battleId}));
+    console.log('NORMAL_MOVE_KEY_OBSERVATION '+JSON.stringify({scope:'OWN_ID_REAL_APP_COMPILED_SCENE_PRE_ACTION_NOT_F100',battleId:request.battleId,
+      requestMoves:requestBefore.active[0].moves.map(m=>m.id),sceneKeys:snapshot.items.map(i=>i.key),moveIds:snapshot.moveIds,
+      decisions:plans.map(p=>binding.decide(p,{caseId:p.id,intentIndex:0}).decision)}));
+  });
+  test.after(async()=>{
+    if(host){
+      if(host.w.flow.running)host.w.flow.abort(Error('owned move-key pre-action control cleanup'));
+      // abort retires the actual root asynchronously; retain the strict fixture guard.
+      await host.waitFor(()=>!host.w.flow.running&&!host.w.flow._op&&!fixture?.app.saveBlocked,'owned move-key operation retired');
+    }
+    if(fixture)fixture.restore();
+  });
+  test('actual payday request binds to actual ready menu key 1',()=>{
+    const p=plans[0];assert.equal(p.policy[0].step,'finish-payday');
+    assert.deepEqual(binding.decide(p,{caseId:p.id,intentIndex:0}).decision,{kind:'choose',phase:'moves',key:1});
+  });
+  test('actual memento request binds to actual ready menu key 3',()=>{
+    const p=plans[1];assert.equal(p.policy[0].step,'memento-or-genuine-defeat');
+    assert.deepEqual(binding.decide(p,{caseId:p.id,intentIndex:0}).decision,{kind:'choose',phase:'moves',key:3});
+  });
+  test('actual request/menu positive control and wrong current move ID remain strict without submitting actions',()=>{
+    const moves=scene._session.currentRequest().active[0].moves;
+    assert.deepEqual(moves.map(m=>m.id),['payday','splash','memento','roost']);assert.deepEqual(snapshot.items.map(i=>i.key),[1,2,3,4]);
+    const actualKeyMap=Object.fromEntries(snapshot.items.map((item,i)=>[item.key,moves[i].id]));
+    for(const [i,key] of [[0,1],[1,3]]){
+      const p=plans[i];assert.deepEqual(tools.nextDecision(p,{caseId:p.id,intentIndex:0},{...snapshot,moveIds:actualKeyMap}),{kind:'choose',phase:'moves',key});
+    }
+    // Roost exists in the same real request, but is not the move at actual key 1.
+    const wrong={...plans[0],policy:[{...plans[0].policy[0],move:'roost'}]};
+    assert.equal(binding.decide(wrong,{caseId:wrong.id,intentIndex:0}).decision.kind,'NEEDS_BINDING');
+    assert.deepEqual(plain(scene._session.currentRequest()),requestBefore);assert.deepEqual(fixture.state(),before);
+    assert.deepEqual(Object.keys(fixture.state().appliedBattles),[]);assert.equal(scene._session.gw.activeId('p1'),'P1');
+  });
+});
