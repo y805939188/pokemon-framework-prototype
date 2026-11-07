@@ -1,19 +1,19 @@
 {
   "schema": 1,
   "version": "e-status-disk-roundtrip-v1",
-  "product": "42637265dba277ce1a0a28bf22ca483720edc040",
+  "product": "a9046e820cd451b3424a5fd1ab7127cae00b2825",
   "schemaVersion": 9,
   "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
   "runtime": {
-    "js/engine/build/content-cli.cjs": "afc1bb820ee9da32875247cf39ff5d60164a825f0d5cb6a2bb313b62744bccab",
-    "js/engine/build/core.cjs": "b0b04508173f2fb13e92d6dd1377aea5ad3d7ea6b7c533c8678b0e458d4cbf01",
-    "js/engine/build/custom-formats.cjs": "b817d3be46af67b93cf87ff3463ba13176937eb8cf2d353adbfc36e49c5fe954",
-    "js/engine/build/engine.cjs": "47d0ddf1fbbed5786fd6b756b908f882faa596995b92a83c488889300fbc8309",
-    "js/engine/build/production.cjs": "a3c11b84ac32416652e44b11f89d1e383649398c9096a7aa0e50389a17502c43",
-    "js/engine/build/public-presentation-t086M4Aq.js": "5e4b5f2e0dc99f11ee82c15f14c59d3cd3bb17ad3e6451c3345b18de91b79bb7",
-    "js/engine/build/session-ELb8ITWc.js": "e025874eec05612ae0b764a5861f720067f90e137dc70cbbc70cf168aa9656e0",
-    "js/engine/build/testing.cjs": "a54c43417f1b9588a2767d0e41aead474f7589d44616ba78f090d3e382d518db",
-    "js/engine/build/trainer-ai-diagnostics-DG1VUMDW.js": "74e3ca7b20a10fc8471533c4c4c5e735f97a51591bf2519934e70fddae88a703"
+    "js/engine/build/content-cli.cjs": "113d2b55ab7c2956af00df2527958c4e8302338646a124a0961db58e62e1b76a",
+    "js/engine/build/core.cjs": "e5b94494f7fdec50643626bcb922ce3afde72e66a92196d44785c34467307a0b",
+    "js/engine/build/custom-formats.cjs": "50f2bc529f506a2c8499bc948719e3f297fed353435d1de6882c9b03f687b033",
+    "js/engine/build/engine.cjs": "e1f5545d67887d4201ba3375a9737be46531225228c627aca288cc2c6ca18874",
+    "js/engine/build/production.cjs": "26cb9c245b2e0f0fd35d409642091bd0d31d6eafd670efd0dd361f5cf30ec327",
+    "js/engine/build/public-presentation-Skbe5iGR.js": "ad53dfc94fec5c5560dab1a6f34aa49a659e11f07e609095b023a2667b2646db",
+    "js/engine/build/session-C3M41nTs.js": "2a528df3e422575da1ea143f2ba378608451e6c7d9293a24a03902c4d3d8583a",
+    "js/engine/build/testing.cjs": "d36825dac1bb9cef02861a42b7ada5fc7e8f72abc79ad6127e640e23a1ef625c",
+    "js/engine/build/trainer-ai-diagnostics-D0bjC_rg.js": "0bd3fe3424d67f54a16a7bf2af56499b0a18eb821afdeb1e4a07416adda11184"
   },
   "format": "gen8rpgcustomgame",
   "seed": [
@@ -88,20 +88,29 @@
     "Stop on worker error; no automatic retries; no mid-battle serialization or expected-state replacement"
   ],
   "runtimeRebinding": {
-    "reason": "Final G1 control source including synchronous native authority and retirement boundary; scenarios/seeds/business oracle unchanged",
-    "sourceCommit": "42637265dba277ce1a0a28bf22ca483720edc040",
+    "reason": "Rebind only artifact identity to the exact release/CI pnpm --dir src build working directory; prior root-cwd bytes and complete rebinding history retained; no scenario, seed or business-oracle changes",
+    "sourceCommit": "a9046e820cd451b3424a5fd1ab7127cae00b2825",
     "sourceTree": "942432d8b77d5fc93074683b9de2ca340daa7e5b",
-    "previousBindingProduct": "4449b1957f2723ad2a2c5edf549f00954c2ad9d7",
-    "previousBindingSHA256": "89fcb3ca7883c6229e7dd7176289b3e6745d2a0d79e0da7e6200e0b0e575dfea",
+    "buildCommand": "pnpm --dir src build",
+    "buildCwd": "src",
+    "previousBindingProduct": "42637265dba277ce1a0a28bf22ca483720edc040",
+    "previousBindingSHA256": "d7abcc54d95bef275494933d1f49d8dc6ddce585af42df929b069a62ec1b0ccf",
     "previousRebinding": {
-      "reason": "G1 control source with identical normal/native qualification bridge; scenarios/seeds/business oracle unchanged",
-      "sourceCommit": "4449b1957f2723ad2a2c5edf549f00954c2ad9d7",
-      "sourceTree": "a89f7f66f2d11f180183d8edf43be1914f5df489",
-      "previousBindingProduct": "62c2ec02ca902b1f960ece6f634b42b2df324e80",
-      "previousBindingSHA256": "b08f08eb3578fd825e220b02b6db924142843d7d9866ca2235ed3992b6b5a5b3",
-      "previousRebinding": null,
+      "reason": "Final G1 control source including synchronous native authority and retirement boundary; scenarios/seeds/business oracle unchanged",
+      "sourceCommit": "42637265dba277ce1a0a28bf22ca483720edc040",
+      "sourceTree": "942432d8b77d5fc93074683b9de2ca340daa7e5b",
+      "previousBindingProduct": "4449b1957f2723ad2a2c5edf549f00954c2ad9d7",
+      "previousBindingSHA256": "89fcb3ca7883c6229e7dd7176289b3e6745d2a0d79e0da7e6200e0b0e575dfea",
+      "previousRebinding": {
+        "reason": "G1 control source with identical normal/native qualification bridge; scenarios/seeds/business oracle unchanged",
+        "sourceCommit": "4449b1957f2723ad2a2c5edf549f00954c2ad9d7",
+        "sourceTree": "a89f7f66f2d11f180183d8edf43be1914f5df489",
+        "previousBindingProduct": "62c2ec02ca902b1f960ece6f634b42b2df324e80",
+        "previousBindingSHA256": "b08f08eb3578fd825e220b02b6db924142843d7d9866ca2235ed3992b6b5a5b3",
+        "previousRebinding": null,
+        "mappingSource": "Actual complete nine files rebuilt in this exclusive control tree from this frozen source; no selection or union of old mappings"
+      },
       "mappingSource": "Actual complete nine files rebuilt in this exclusive control tree from this frozen source; no selection or union of old mappings"
-    },
-    "mappingSource": "Actual complete nine files rebuilt in this exclusive control tree from this frozen source; no selection or union of old mappings"
+    }
   }
 }
