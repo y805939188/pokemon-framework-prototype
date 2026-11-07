@@ -95,3 +95,14 @@ test('authorized synthetic Title bootstrap requests one new game and waits an ac
  const authority={bindGroup(b){assert.equal(setups,0);return {binding:b,assertCurrent(){},retire(){retired++;}};}},collector={append(row){if(row.kind==='binding'){attached=true;assert.equal(setups,1);assert(x.G.SceneManager._scene instanceof x.G.Scene_Map);assert(x.G.SceneManager._scene.isStarted());throw Error('stop after controlled bootstrap');}}};
  await assert.rejects(x.pump(out.consume(authority,collector)),error=>{assert.match(error.receipt.error.message,/controlled bootstrap/);assert(error.receipt.records.some(r=>r.kind==='bootstrap-ready'));return true;});assert.equal(setups,1);assert(attached);assert.equal(retired,1);assert.equal(x.G.SceneManager.updateMain,update);assert.equal(x.dispatches.length,0);assert.equal(x.w.flow.running,false);
 });
+
+test('asynchronous or boolean current-checks cannot precede native inputs; the lease still retires',async t=>{
+ for(const [nonce,check]of [['e',async()=>{}],['f',()=>true]]){
+  const x=await owned(t),original=x.G.SceneManager.updateMain;let entered=0;x.authority={bindGroup(b){return {binding:b,assertCurrent:check,retire(){entered++;}};}};
+  await assert.rejects(api.executeNativeQualificationGroup(E,x.G,x.G,x.fixture,tools,binding(nonce.repeat(32)),x.authority,x.collector),error=>{assert.match(error.receipt.error.message,/synchronous authority/);return true;});assert.equal(entered,1);assert.equal(x.G.SceneManager.updateMain,original);assert.equal(x.dispatches.length,0);released(x);
+ }
+});
+test('asynchronous lease retirement is awaited and its failure stays secondary to the first collection error',async t=>{
+ const x=await owned(t);let retired=false;x.authority={bindGroup(b){return {binding:b,assertCurrent(){},async retire(){await Promise.resolve();retired=true;throw Error('controlled async retirement failure');}};}};x.collector={append(row){if(row.kind==='binding')throw Error('controlled primary binding sink failure');}};
+ await assert.rejects(api.executeNativeQualificationGroup(E,x.G,x.G,x.fixture,tools,binding('1'.repeat(32)),x.authority,x.collector),error=>{assert.match(error.receipt.error.message,/primary binding sink/);assert(error.receipt.cleanupErrors.some(x=>x.includes('async retirement failure')));return true;});assert(retired);released(x);
+});
