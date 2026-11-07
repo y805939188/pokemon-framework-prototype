@@ -2,7 +2,7 @@
   "version": "e-defeat-disk-v1",
   "scope": "REAL_TRAINER_DEFEAT_APP_SAVESTORE_NEW_NODE_RETRY_NOT_HOST_BLACKOUT",
   "base": "3609225cebdea17bbe3fd75ef301f43d73188e2d",
-  "product": "4449b1957f2723ad2a2c5edf549f00954c2ad9d7",
+  "product": "42637265dba277ce1a0a28bf22ca483720edc040",
   "schemaVersion": 9,
   "minimumNode": "22.18",
   "runtime": {
@@ -85,12 +85,20 @@
   "newE74Rows": 0,
   "NW": 0,
   "runtimeRebinding": {
-    "reason": "G1 control source with identical normal/native qualification bridge; scenarios/seeds/business oracle unchanged",
-    "sourceCommit": "4449b1957f2723ad2a2c5edf549f00954c2ad9d7",
-    "sourceTree": "a89f7f66f2d11f180183d8edf43be1914f5df489",
-    "previousBindingProduct": "62c2ec02ca902b1f960ece6f634b42b2df324e80",
-    "previousBindingSHA256": "ee1f68fb4f0eb43c028f94c64d1905b2ef8616f0be0d28cfdc7616f284b98f0c",
-    "previousRebinding": null,
+    "reason": "Final G1 control source including synchronous native authority and retirement boundary; scenarios/seeds/business oracle unchanged",
+    "sourceCommit": "42637265dba277ce1a0a28bf22ca483720edc040",
+    "sourceTree": "942432d8b77d5fc93074683b9de2ca340daa7e5b",
+    "previousBindingProduct": "4449b1957f2723ad2a2c5edf549f00954c2ad9d7",
+    "previousBindingSHA256": "c2ae815d695663e68339b6b45cc4d73725bac44fb1cb50b038c19e9c7a805f86",
+    "previousRebinding": {
+      "reason": "G1 control source with identical normal/native qualification bridge; scenarios/seeds/business oracle unchanged",
+      "sourceCommit": "4449b1957f2723ad2a2c5edf549f00954c2ad9d7",
+      "sourceTree": "a89f7f66f2d11f180183d8edf43be1914f5df489",
+      "previousBindingProduct": "62c2ec02ca902b1f960ece6f634b42b2df324e80",
+      "previousBindingSHA256": "ee1f68fb4f0eb43c028f94c64d1905b2ef8616f0be0d28cfdc7616f284b98f0c",
+      "previousRebinding": null,
+      "mappingSource": "Actual complete nine files rebuilt in this exclusive control tree from this frozen source; no selection or union of old mappings"
+    },
     "mappingSource": "Actual complete nine files rebuilt in this exclusive control tree from this frozen source; no selection or union of old mappings"
   }
 }
