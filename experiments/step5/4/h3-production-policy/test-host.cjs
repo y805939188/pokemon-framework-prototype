@@ -3,6 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const {fixture,acquireReady,E,clone,runtime,capabilities}=require('./support.cjs'),plan=require('./host-plan.json');
 for(const [name,expected]of Object.entries(plan.files))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(runtime,name))).digest('hex'),expected,name);
 const {createVictoryDriverHost}=require(path.join(runtime,'experiments/step5/4/victory-music-driver-host.cjs'));
+const {assertTakeConserved}=require('./take-conservation-oracle.cjs');
 const basePlan=require(path.join(runtime,'experiments/step5/4/victory-music-native-plan.json'));
 const plugins=Object.fromEntries(['PS_BattleFlow','PS_SaveState','PS_Evolution'].map(n=>[n,fs.readFileSync(path.join(runtime,'js/plugins',n+'.js'),'utf8')]));
 const entryText=fs.readFileSync(path.join(runtime,'js/plugins/PS_BattleFlowTest.js'),'utf8');
@@ -57,7 +58,19 @@ for(const injection of ['plugin-parameters','saved-host-fields'])test('H3 normal
 });
 test('H3 normal closed policy permits taking old held item then an all-empty required battle',async()=>{
  const h=await host('give'),flow=h.flow;flow.developerCapabilities={};flow._app=null;
- const app=flow.app(),token=app.beginManagement();try{assert.equal(app.manage(token,'H3-SAFE-TAKE',{kind:'take-item',source:{id:'P1',position:{kind:'party',index:0}}}).status,'applied');}finally{app.endManagement(token);}
+ const takeBefore=clone(flow.game()),takeWrites=h.w.state.replaced.length;
+ const app=flow.app(),token=app.beginManagement(),takeRequest={kind:'take-item',source:{id:'P1',position:{kind:'party',index:0}}};
+ try{
+ assert.equal(app.manage(token,'H3-SAFE-TAKE',takeRequest).status,'applied');
+ assertTakeConserved(takeBefore,flow.game());assert.equal(h.w.state.replaced.length,takeWrites+1,'take installs once');
+ assertTakeConserved(takeBefore,h.w.state.replaced[takeWrites]);
+ const taken=clone(flow.game());
+ assert.equal(app.manage(token,'H3-SAFE-TAKE',takeRequest).status,'applied');
+ assert.deepEqual(flow.game(),taken,'same receipt replay is inert');assert.equal(h.w.state.replaced.length,takeWrites+1);
+ assert.equal(app.manage(token,'H3-SAFE-TAKE-EMPTY',takeRequest).status,'unchanged');
+ assert.deepEqual(flow.game(),taken,'fresh empty take is inert');assert.equal(h.w.state.replaced.length,takeWrites+1);
+ }finally{app.endManagement(token);}
+ assertTakeConserved(takeBefore,flow.game());assert.equal(h.w.state.replaced.length,takeWrites+1);
  const before=clone(flow.game()),writes=h.w.state.replaced.length;assert.equal(before.party[0].item,'');
  try{const interpreter=start(h,'H3-EMPTY-REQUIRED');assert.equal(interpreter.mode,'psBattle');await h.p.inMode('main');const scene=h.p.battle(),session=scene._session;assert(session.party.every(m=>!m.item));assert(session.foeTeam.every(m=>!m.item));await action(h,3);await h.p.inMode('end');assert.deepEqual(flow.game(),before);assert.equal(h.w.state.replaced.length,writes);
  for(let i=0;i<20&&flow.running;i++){scene.onEnd();await h.frames(2);}assert.equal(flow.lastOutcome.commit,'applied');assert.equal(h.w.state.replaced.length,writes+1);const raw=session.result();assert.match(flow.game().appliedBattles[raw.battleId].settlement.pairHash,/^[a-f0-9]{64}$/,'all-empty normal production factory still supplies required held pair');
