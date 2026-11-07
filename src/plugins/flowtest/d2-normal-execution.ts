@@ -125,7 +125,7 @@ export async function executeNativeQualificationGroup(E:any,G:any,W:any,fixture:
   const runtime=Object.freeze({G,W,performance,argv:Object.freeze([...G.nw.App.argv])}),lease=await authority.bindGroup(binding,runtime);
   if(lease?.binding!==binding||typeof lease.assertCurrent!=='function'||typeof lease.retire!=='function')throw Error('opaque same-binding authority lease required');
   let failure:any=null,last=start,gameUpdates=0,displayUpdates=0,raf:any=null,installed=false;
-  const assertAuthority=()=>{if(controller.signal.aborted)throw failure??Error('native qualification cancelled');lease.assertCurrent(binding,runtime);fixture?.assertOwned();const t=now();if(G.performance!==performance||performance.now!==nowMethod||G.document!==document||G.KeyboardEvent!==KeyboardEvent||!Number.isFinite(t)||!Number.isFinite(end)||t<0||t<last||t>=end)throw Error('native qualification owner/clock/hygiene budget retired');last=t;
+  const assertAuthority=()=>{if(controller.signal.aborted)throw failure??Error('native qualification cancelled');if(lease.assertCurrent.constructor?.name==='AsyncFunction')throw Error('synchronous authority check required');const checked=lease.assertCurrent(binding,runtime);if(checked!==undefined){if(typeof checked?.then==='function')checked.catch?.(()=>{});throw Error('synchronous authority check must complete with undefined');}fixture?.assertOwned();const t=now();if(G.performance!==performance||performance.now!==nowMethod||G.document!==document||G.KeyboardEvent!==KeyboardEvent||!Number.isFinite(t)||!Number.isFinite(end)||t<0||t<last||t>=end)throw Error('native qualification owner/clock/hygiene budget retired');last=t;
     if(G.document.visibilityState!=='visible'||G.document.hasFocus?.()!==true||G.innerWidth!==binding.view.width||G.innerHeight!==binding.view.height||G.devicePixelRatio!==binding.view.dpr)throw Error('native foreground/viewport changed');};
   const append=(row:any)=>{const value={groupId:binding.groupId,...row};const completion=collector.append(value);if(completion!==undefined){if(typeof completion?.then==='function')completion.catch?.(()=>{});throw Error('synchronous collector must complete before continuation');}records.push(value);};
   const failed=(error:any)=>{failure??=error;controller.abort();};
@@ -158,7 +158,7 @@ export async function executeNativeQualificationGroup(E:any,G:any,W:any,fixture:
     controller.abort();if(raf!==null)try{cancelFrame(raf);}catch(error){cleanupErrors.push(error);}
     if(installed){if(G.SceneManager.updateMain===update)G.SceneManager.updateMain=original;else cleanupErrors.push(Error('native update observer ownership changed'));}
     if(attached&&!W.PSFlow._op&&!W.PSFlow.running&&!fixture?.app.saveBlocked)try{fixture.restore();}catch(error){cleanupErrors.push(error);}
-    try{lease.retire();}catch(error){cleanupErrors.push(error);}
+    try{await lease.retire();}catch(error){cleanupErrors.push(error);}
   }
   const result={version:'D2-native-qualification-raw-v1',status:failure||cleanupErrors.length?'FAIL':'RAW_QUALIFICATION_COMPLETE_PENDING_REVIEW',binding,cases,records,error:describeError(failure),cleanupErrors:cleanupErrors.map(String),nativeAdmission:false,traceQualified:false,deadlineQualified:false,full100Accepted:false};
   if(failure||cleanupErrors.length){const error=new Error('native qualification stopped; no retry',{cause:failure??cleanupErrors[0]});Object.assign(error,{receipt:result,primary:failure});throw error;}
