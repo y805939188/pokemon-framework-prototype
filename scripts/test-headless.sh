@@ -39,6 +39,8 @@ SUITES=(
   experiments/step5/4/test-e-stages-app-contracts.cjs
   experiments/step5/4/test-e-position-entry.cjs
   experiments/step5/4/test-e-residual-outcome.cjs
+  experiments/step5/4/test-e1-choice-lock-scene.cjs
+  experiments/step5/4/test-e2-status-feedback-scene.cjs
   experiments/step5/4/test-e-status-carry.cjs
   experiments/step5/4/test-prebattle-wrapper.cjs
   experiments/step5/4/test-prebattle-native.cjs
