@@ -96,7 +96,7 @@ export class BattleGateway implements BattleDriver {
     });
     gw._battle = battle;
     gw.#attachTrainerSource();
-    attachReplacementSource(gw, gw._battle, gw._env);
+    attachReplacementSource(gw, gw._battle, gw._env, gw.snapshot.bind(gw));
     gw._attachObservations();
     for (const [i, p] of (opts.players ?? []).entries()) {
       battle.setPlayer(`p${i + 1}`, { name: p.name, team: sim.Teams.pack(p.team) });
@@ -140,7 +140,7 @@ export class BattleGateway implements BattleDriver {
       fields.attach(gw._battle);
     }
     gw.#attachTrainerSource();
-    attachReplacementSource(gw, gw._battle, gw._env);
+    attachReplacementSource(gw, gw._battle, gw._env, gw.snapshot.bind(gw));
     gw._attachObservations();
     gw._battle.restart((type: string, data: string | string[]) => gw._onSend(type, data));
     gw._opts = { ...opts, restored: true };

@@ -1,17 +1,29 @@
 /** Internal forced-replacement capability. UI never receives the engine, choices, or a mintable token. */
 import type { BattleDriver, DriverCheckpoint } from './driver';
+import { loadFormatExtension } from './showdown-loader';
 import type { LoadedSim } from './showdown-loader';
 import type { ShowdownBattle, ShowdownPokemon } from './showdown-types';
 export interface ReplacementTicket { readonly opaque?: never }
 export interface ReplacementView { playerId:string; opponentSpecies:string; candidates:string[] }
-interface Source { driver:BattleDriver; battle:ShowdownBattle; env:LoadedSim; lineage:object; owner?:object; retired:boolean; current?:ReplacementTicket }
+interface Source { driver:BattleDriver; battle:ShowdownBattle; env:LoadedSim; snapshot:()=>string; lineage:object; owner?:object; retired:boolean; current?:ReplacementTicket }
 interface Ticket { source:Source; owner:object; snapshot:string; foeId:string; view:ReplacementView; spent:boolean }
 const SOURCES=new WeakMap<BattleDriver,Source>(),TICKETS=new WeakMap<ReplacementTicket,Ticket>();
 const CHECKPOINTS=new WeakMap<DriverCheckpoint,{lineage:object}>();
 const copy=<T>(v:T):T=>JSON.parse(JSON.stringify(v)) as T;
-const snapshot=(s:Source):string=>JSON.stringify(s.battle.toJSON());
-export function attachReplacementSource(driver:BattleDriver,battle:ShowdownBattle,env:LoadedSim):void {
-  SOURCES.set(driver,{driver,battle,env,lineage:{},retired:false});
+const snapshot=(s:Source):string=>s.snapshot();
+/** Restore the private field callbacks before any native preview/trapping event runs. */
+function probe(s:Source,sealed:string):ShowdownBattle {
+  const b=s.env.sim.Battle.fromJSON(sealed);
+  if(b.rpg?.initialField){
+    const fields=loadFormatExtension(s.env.root).initialFields;
+    if(!fields)throw new Error('initial-field-extension-unavailable');
+    fields.attach(b);
+  }
+  return b;
+}
+export function attachReplacementSource(driver:BattleDriver,battle:ShowdownBattle,env:LoadedSim,snapshot:()=>string):void {
+  // Capture the gateway's serializer at attachment, not a later caller-visible method.
+  SOURCES.set(driver,{driver,battle,env,snapshot,lineage:{},retired:false});
 }
 function source(driver:BattleDriver,owner:object):Source {
   const s=SOURCES.get(driver);if(!s||s.owner!==owner||s.retired)throw new Error('replacement-source-unavailable');return s;
@@ -37,10 +49,10 @@ function data(driver:BattleDriver,owner:object,token:ReplacementTicket):Ticket {
 export function prepareReplacementSource(driver:BattleDriver,owner:object,foeId:string):{token:ReplacementTicket;view:ReplacementView} {
   const s=source(driver,owner);if(!gate(s))throw new Error('replacement-offer-ineligible');
   const target=s.battle.sides[1].pokemon.find((p:ShowdownPokemon)=>p.name===foeId&&!p.isActive&&!p.fainted&&p.hp>0);if(!target)throw new Error('replacement-foe-unavailable');
-  const sealed=snapshot(s),probe=s.env.sim.Battle.fromJSON(sealed),incoming=probe.sides[1].pokemon.find((p:ShowdownPokemon)=>p.name===foeId);
+  const sealed=snapshot(s),preview=probe(s,sealed),incoming=preview.sides[1].pokemon.find((p:ShowdownPokemon)=>p.name===foeId);
   // Use the native switch-in prefix on the clone: it activates/reorders the member before BeforeSwitchIn.
   // Calling an ability event on an inactive reserve would suppress Illusion and expose the real species.
-  if (!probe.actions.switchIn(incoming, 0)) throw new Error('replacement-preview-unavailable');
+  if (!preview.actions.switchIn(incoming, 0)) throw new Error('replacement-preview-unavailable');
   const shown=incoming.illusion||incoming;
   const view:ReplacementView={playerId:s.battle.sides[0].active[0].name,opponentSpecies:shown.species.name,
     candidates:s.battle.sides[0].pokemon.filter((p:ShowdownPokemon)=>!p.isActive&&!p.fainted&&p.hp>0).map((p:ShowdownPokemon)=>String(p.name))};
@@ -50,7 +62,7 @@ export function prepareReplacementSource(driver:BattleDriver,owner:object,foeId:
 export function readReplacementSource(driver:BattleDriver,owner:object,token:ReplacementTicket):ReplacementView {return copy(data(driver,owner,token).view);}
 /** True trapping is recomputed by native events on an isolated battle, never on the live query target. */
 export function replacementTarget(driver:BattleDriver,owner:object,token:ReplacementTicket,id:string):{ok:true}|{ok:false;reason:'invalid-target'|'trapped'} {
-  const t=data(driver,owner,token),s=t.source,b=s.env.sim.Battle.fromJSON(t.snapshot),side=b.sides[0],lead=side.active[0];
+  const t=data(driver,owner,token),s=t.source,b=probe(s,t.snapshot),side=b.sides[0],lead=side.active[0];
   const target=side.pokemon.find((p:ShowdownPokemon)=>p.name===id&&!p.isActive&&!p.fainted&&p.hp>0);
   if(!target)return {ok:false,reason:'invalid-target'};
   lead.trapped=lead.maybeTrapped=false;b.runEvent('TrapPokemon',lead);

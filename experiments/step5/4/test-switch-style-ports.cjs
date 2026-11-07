@@ -6,7 +6,7 @@ const read=s=>E.session.readTrainerReplacement?.(s)??null;
 const resolve=(s,v,id)=>E.session.resolveTrainerReplacement(s,v.offerId,id);
 const target=(s,v,id)=>E.session.readTrainerReplacementTarget(s,v.offerId,id);
 function choose(snapshot){const list=snapshot.request.kind==='force-switch'?snapshot.request.legalSwitches:snapshot.request.legalMoves,c=list[0];return {kind:'choose',binding:snapshot.binding,candidateId:c.candidateId,retryOrder:[c.candidateId],diagnostics:[]};}
-async function open({enabled=true,canSwitch=true,members=2,ownMoves=['tackle'],decide,illusion=false}={}){
+async function open({enabled=true,canSwitch=true,members=2,ownMoves=['tackle'],decide,illusion=false,initialField,battleStyle}={}){
  const registry=E.composition.createTrainerAiStrategyRegistry();let calls=0,onContent=null;
  const ref=decide?{id:'switch-test',version:'1',parameters:{}}:undefined;
  if(decide)registry.register({id:'switch-test',version:'1',implementationIdentity:'test-only/switch-port/1',validateParameters(){},create(){return {decide(s,p,r){calls++;return decide(s,p,r);}};}});
@@ -15,7 +15,7 @@ async function open({enabled=true,canSwitch=true,members=2,ownMoves=['tackle'],d
  const compiled=E.contentCompile.compileContent(input);assert(compiled.ok,JSON.stringify(compiled.errors));const assembled=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(assembled.errors,[]);const content=assembled.content,dex=E.dex.createDexLookup();
  const game=E.state.newGame({content,party:[],money:1000});game.party=['P1','R'].slice(0,members).map(id=>{const m=E.memberFactory.createMember({id,species:'Snorlax',level:50},content,()=>0);m.moves=ownMoves.map(id=>({id,pp:dex.move(id).pp,maxpp:dex.move(id).pp}));return E.speciesKey.toPersistentMember(m,content);});game.nextMemberOrdinal=String(members+1);
  const state=T.fakes.createMemoryState(game),before=JSON.stringify(state.read()),projection=T.fakes.createRecordingProjection(),options={replacementOffers:enabled,trainerAiStrategies:registry,content:()=>{onContent?.();return content;},seed:()=>[1,2,3,4]},factory=E.composition.createBattleSessionFactory(options);
- const app=new E.app.GameApplication({state,projection,sessions:factory,content:()=>({content}),random:()=>0,clock:()=>12345}),request={battleId:'replacement-ports',trainer:{id:'c-basic',version:1},seq:1,canLose:true,canSwitch};
+ const app=new E.app.GameApplication({state,projection,sessions:factory,content:()=>({content}),random:()=>0,clock:()=>12345}),request={battleId:'replacement-ports',trainer:{id:'c-basic',version:1},seq:1,canLose:true,canSwitch,...(initialField?{initialField}:{}),...(battleStyle?{battleStyle}:{})};
  const s=await app.startTrainerBattle(request),oldFoe=s.gw.activeId('p2');s.take();return{s,app,request,state,before,oldFoe,options,calls:()=>calls,onContent:f=>{onContent=f;},cleanup(){app.abortBattle(request,Error('owned test cleanup'));if(!state.replaced.length)assert.equal(JSON.stringify(state.read()),before);}};
 }
 const events=r=>r.messages.flatMap(m=>m.kind==='events'?m.events:[]),journal=s=>D.trainerAiJournal(s).entries;
@@ -76,4 +76,74 @@ test('SSP13 abort during asynchronous forced replacement preparation prevents a 
 test('SSP14 opt-in is captured once and invalid or legacy factories are rejected',async()=>{
  const w=await open();try{w.options.replacementOffers=false;assert((await w.s.chooseMove(1)).ok);assert(read(w.s));}finally{w.cleanup();}
  assert.throws(()=>E.composition.createBattleSessionFactory({content:()=>null,replacementOffers:'true'}),/replacement-offers/);assert.throws(()=>E.composition.createBattleSessionFactory({content:()=>null,replacementOffers:true,driver:{}}),/replacement-offers/);
+});
+
+// Initial-field callbacks are runtime-only. All real replacement ticket operations must use
+// the gateway's field-aware serializer and recreate those callbacks only on isolated probes.
+function hookIdentity(b){
+ const table=b.events,rows=Object.entries(table??{}).map(([key,value])=>[key,value,[...value]]);
+ return()=>{assert.equal(b.events,table);for(const[key,array,records]of rows){assert.equal(table[key],array);assert.deepEqual(array,records);}};
+}
+const initialFields=[['rain',{weather:'rain'}],['grassy',{terrain:'grassy'}],['cave',{environment:'cave'}]];
+for(const[name,initialField]of initialFields)for(const answer of ['R',null])test('SSF01 '+name+' default Switch complete offer lifecycle '+(answer??'No/list-cancel'),async()=>{
+ const w=await open({initialField,decide:choose});try{
+  assert.equal(w.request.battleStyle,undefined,'exercise default Switch');assert((await w.s.chooseMove(1)).ok);const v=read(w.s);assert(v);assert.equal(v.opponentSpecies,'Pidgey');assert.equal(w.s.gw.activeId('p2'),w.oldFoe);
+  const b=w.s.gw._debugBattle(),hooks=hookIdentity(b),snapshot=w.s.gw.snapshot(),rng=b.prng.getSeed(),j=clone(journal(w.s)),calls=w.calls();
+  for(let i=0;i<3;i++){assert.deepEqual(read(w.s),v);assert.deepEqual(target(w.s,v,'R'),{ok:true});assert.deepEqual(target(w.s,v,'missing'),{ok:false,reason:'invalid-target'});hooks();}
+  assert.deepEqual(await resolve(w.s,v,'missing'),{ok:false,reason:'choice-rejected'});await w.s.cancel();assert.deepEqual(read(w.s),v);assert.equal(w.s.gw.snapshot(),snapshot);assert.equal(b.prng.getSeed(),rng);assert.deepEqual(journal(w.s),j);assert.equal(JSON.stringify(w.state.read()),w.before);
+  const r=await resolve(w.s,v,answer);assert(r.ok);assert.deepEqual(events(r).filter(e=>e.type==='switch').map(e=>e.args[0].slice(0,2)),answer?['p1','p2']:['p2']);assert.equal(events(r).filter(e=>e.type==='move').length,0);assert.equal(w.s.gw.activeId('p1'),answer??'P1');assert.equal(w.calls(),calls);assert.equal(read(w.s),null);assert.deepEqual(await resolve(w.s,v,answer),{ok:false,reason:'choice-rejected'});hooks();await finish(w);
+ }finally{w.cleanup();}
+});
+for(const[name,initialField]of initialFields)test('SSF02 '+name+' pending offer checkpoint restoration rejects old selector without repeating AI',async()=>{
+ const w=await open({initialField,decide:(s,p,r)=>{r(11);return choose(s);}});try{
+  assert((await w.s.chooseMove(1)).ok);const old=read(w.s),cp=w.s._checkpoint(),before=w.s.gw.snapshot(),rng=clone(D.trainerAiDiagnostics(w.s).state.random),calls=w.calls();assert((await resolve(w.s,old,'R')).ok);await w.s._restoreCheckpoint(cp);const v=read(w.s);assert(v);assert.notEqual(v.offerId,old.offerId);assert.deepEqual(JSON.parse(w.s.gw.snapshot()),JSON.parse(before));assert.equal(w.calls(),calls);assert.deepEqual(D.trainerAiDiagnostics(w.s).state.random,rng);assert.equal(w.s.gw._debugBattle().events.onSetWeather.length,1);assert.deepEqual(await resolve(w.s,old,null),{ok:false,reason:'choice-rejected'});assert((await resolve(w.s,v,null)).ok);await finish(w);
+ }finally{w.cleanup();}
+});
+for(const[name,initialField]of initialFields)test('SSF03 '+name+' actual staged failure restores offer rights and field hooks before retry',async()=>{
+ const w=await open({initialField});try{
+  assert((await w.s.chooseMove(1)).ok);const old=read(w.s),snapshot=w.s.gw.snapshot(),rng=clone(D.trainerAiDiagnostics(w.s).state.random);let fired=false;
+  w.onContent(()=>{if(!fired&&w.s.gw._debugBattle().sides[0].choice.actions.some(a=>a.order===2.5)){fired=true;throw Error('controlled field replacement commit failure');}});
+  await assert.rejects(resolve(w.s,old,'R'),/controlled field replacement commit failure/);assert(fired);assert.deepEqual(JSON.parse(w.s.gw.snapshot()),JSON.parse(snapshot));assert.deepEqual(D.trainerAiDiagnostics(w.s).state.random,rng);const v=read(w.s);assert(v);assert.notEqual(v.offerId,old.offerId);assert.equal(w.s.gw._debugBattle().events.onSetWeather.length,1);assert.equal(w.s.gw._debugBattle().sides[0].choice.actions.length,0);assert.equal(w.state.replaced.length,0);w.onContent(null);assert((await resolve(w.s,v,'R')).ok);await finish(w);
+ }finally{w.cleanup();}
+});
+for(const[name,initialField]of [['none',{weather:'none',terrain:'none',environment:'none'}],...initialFields])test('SSF04 '+name+' explicit Set retains automatic replacement',async()=>{
+ const w=await open({initialField,battleStyle:'set'});try{assert((await w.s.chooseMove(1)).ok);assert.equal(read(w.s),null);assert.notEqual(w.s.gw.activeId('p2'),w.oldFoe);await finish(w);}finally{w.cleanup();}
+});
+test('SSF05 all-none default Switch remains supported',async()=>{
+ const w=await open({initialField:{weather:'none',terrain:'none',environment:'none'}});try{assert((await w.s.chooseMove(1)).ok);assert((await resolve(w.s,read(w.s),'R')).ok);await finish(w);}finally{w.cleanup();}
+});
+test('SSF06 both native preview clones have exactly one field hook set before evaluation; live query stays pure',async()=>{
+ const w=await open({initialField:{weather:'harshsun',terrain:'grassy',environment:'cave'},illusion:true,decide:choose});
+ const Sim=require('../../../js/engine/showdown/dist/sim'),original=Sim.Battle.fromJSON;let previews=0,traps=0;
+ Sim.Battle.fromJSON=function(...args){const b=original.apply(this,args),nativeSwitch=b.actions.switchIn,nativeEvent=b.runEvent;
+  const attached=()=>{assert.equal(b.events?.onSetWeather?.length,1);assert.equal(b.events?.onModifyMove?.length,1);assert.equal(b.events?.onModifySecondaries?.length,1);};
+  b.actions.switchIn=function(...a){previews++;attached();return nativeSwitch.apply(this,a);};
+  b.runEvent=function(...a){if(a[0]==='TrapPokemon'){traps++;attached();}return nativeEvent.apply(this,a);};return b;
+ };
+ try{assert((await w.s.chooseMove(1)).ok);const v=read(w.s);assert.equal(v.opponentSpecies,'Pidgey');const snapshot=w.s.gw.snapshot();assert.deepEqual(target(w.s,v,'R'),{ok:true});assert.equal(w.s.gw.snapshot(),snapshot);assert(previews>0);assert(traps>0);}
+ finally{Sim.Battle.fromJSON=original;w.cleanup();}
+});
+test('SSF07 field serialization fault restores exact live hook identities; captured snapshot cannot be replaced by caller',async()=>{
+ const w=await open({initialField:{weather:'rain',environment:'cave'}});try{
+  assert((await w.s.chooseMove(1)).ok);const v=read(w.s),b=w.s.gw._debugBattle(),original=b.toJSON,restore=hookIdentity(b);
+  b.toJSON=function(){throw Error('controlled replacement serializer fault');};try{assert.throws(()=>read(w.s),/controlled replacement serializer fault/);}finally{b.toJSON=original;}restore();
+  const snapshot=w.s.gw.snapshot,at=snapshot.call(w.s.gw);w.s.gw.snapshot=()=>{throw Error('caller snapshot must not be used');};try{assert.deepEqual(read(w.s),v);assert.deepEqual(target(w.s,v,'R'),{ok:true});}finally{w.s.gw.snapshot=snapshot;}assert.equal(w.s.gw.snapshot(),at);restore();
+ }finally{w.cleanup();}
+});
+test('SSF08 field trapping and changed-state stale guards remain fail closed',async()=>{
+ const w=await open({initialField:{weather:'rain',terrain:'grassy',environment:'cave'},ownMoves:['ingrain','tackle']});try{
+  assert((await w.s.chooseMove(1)).ok);assert((await w.s.chooseMove(2)).ok);const v=read(w.s),snapshot=w.s.gw.snapshot();assert.deepEqual(target(w.s,v,'R'),{ok:false,reason:'trapped'});assert.deepEqual(await resolve(w.s,v,'R'),{ok:false,reason:'choice-rejected'});assert.equal(w.s.gw.snapshot(),snapshot);
+  const lead=w.s.gw.readState('p1').find(m=>m.id==='P1');w.s.gw.seedState('p1',[{id:lead.id,hp:lead.hp-1}]);const changed=w.s.gw.snapshot();assert.throws(()=>read(w.s),/replacement-offer-stale/);assert.equal(w.s.gw.snapshot(),changed);
+ }finally{w.cleanup();}
+});
+test('SSF09 initial field abort during async preparation prevents a late offer or action',async()=>{
+ let release,input;const deferred=new Promise(r=>{release=r;}),w=await open({initialField:{weather:'rain',terrain:'grassy',environment:'cave'},decide:s=>{if(s.request.kind==='force-switch'){input=s;return deferred;}return choose(s);}});try{
+  const task=w.s.chooseMove(1).then(v=>({v}),error=>({error}));await new Promise(r=>setImmediate(r));assert(input);w.app.abortBattle(w.request,Error('controlled field replacement abort'));const snapshot=w.s.gw.snapshot();release(choose(input));assert((await task).error);await new Promise(r=>setImmediate(r));assert.equal(read(w.s),null);assert.equal(w.s.gw.snapshot(),snapshot);assert.equal(w.state.replaced.length,0);
+ }finally{w.cleanup();}
+});
+test('SSF10 replacement serialization does not discard unrelated event registrations',async()=>{
+ const w=await open({initialField:{weather:'rain',environment:'cave'}});try{
+  assert((await w.s.chooseMove(1)).ok);const b=w.s.gw._debugBattle();b.onEvent('ModifyMove',b.format,3,()=>{});const restore=hookIdentity(b);
+  assert.throws(()=>read(w.s),/Unsupported type Format/,'foreign native callback must still fail serialization, not silently disappear');restore();
+ }finally{w.cleanup();}
 });
