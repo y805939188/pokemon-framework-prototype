@@ -49,7 +49,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   const mode = route.mode;
   // Normal preparation must return before legacy focus/audio/presenter/frame/driver hooks.
   if (route.kind === 'normal') {
-    W.PSNormalD2 = prepareNormalD2Entry(argv, G.require);
+    W.PSNormalD2 = prepareNormalD2Entry(argv, G.require, {G,W});
     return;
   }
   // Backend contract modes drive their own answers; formal UI and the normal-sample integration use the default presenter.
