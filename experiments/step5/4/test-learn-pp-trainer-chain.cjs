@@ -8,9 +8,12 @@ const { createVictoryDriverHost } = require('./victory-music-driver-host.cjs');
 const ROOT = path.resolve(__dirname, '../../..');
 const E = require('../../../js/engine/build/production.cjs');
 const PLAN = require('./victory-music-native-plan.json');
-let work, plugins, entryText, fixture;
+let work, plugins, entryText, fixture, failed = false;
+async function preserveOnFailure(action) {
+  try { return await action(); } catch (error) { failed = true; throw error; }
+}
 const clone = value => JSON.parse(JSON.stringify(value));
-test.before(async () => {
+test.before(() => preserveOnFailure(async () => {
   work = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-learn-pp-chain-')); plugins = {};
   for (const name of ['PS_BattleFlow', 'PS_SaveState', 'PS_Evolution', 'PS_BattleFlowTest']) {
     const out = path.join(work, name);
@@ -27,9 +30,8 @@ test.before(async () => {
     lib: { entry: path.join(ROOT, 'src/plugins/flowtest/music-native-fixture.ts'), formats: ['cjs'], fileName: () => 'entry.cjs' },
   } });
   fixture = require(path.join(work, 'fixture/entry.cjs'));
-});
+}));
 // Preserve failed-run artifacts; only remove this test's generated host on success.
-let failed = false;
 test.beforeEach(() => { assert(!failed, 'earlier case failed; no further business case may start'); });
 test.after(() => { if (work && !failed) fs.rmSync(work, { recursive: true, force: true }); });
 async function open(lang, layout) {
@@ -154,5 +156,5 @@ for (const lang of ['en', 'zh']) for (const layout of ['append', 'replace']) tes
     const final = JSON.stringify(saved); h.scene.onEnd(); h.scene.onMenuOk(); await h.frames(3);
     assert.equal(h.installs(), 1); assert.equal(JSON.stringify(h.flow.game()), final);
     if (process.env.PF_LPP_OBSERVATIONS) fs.writeFileSync(path.join(process.env.PF_LPP_OBSERVATIONS, lang + '-' + layout + '.json'), JSON.stringify({ execution: 'SYNTHETIC_COMPILED_HOST', lang, layout, stages: h.stages, growth: h.messages.filter(m => ['growth', 'learned'].includes(m.kind)), decisions: h.decisions, uses: h.uses, result, outcome: h.flow.lastOutcome, installs: h.installs(), saved }, null, 2) + '\n');
-  } catch (error) { failed = true; throw error; } finally { h?.cleanup(); }
+  } catch (error) { failed = true; throw error; } finally { await preserveOnFailure(() => h?.cleanup()); }
 });
