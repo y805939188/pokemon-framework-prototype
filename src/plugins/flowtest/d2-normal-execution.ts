@@ -119,13 +119,13 @@ export async function executeNativeQualificationGroup(E:any,G:any,W:any,fixture:
   const key=binding.groupId;if(nativeAttempts.has(key))throw Error('native attempt cannot be retried');nativeAttempts.add(key);
   const performance=G.performance,nowMethod=performance?.now,now=nowMethod?.bind(performance);
   if(typeof now!=='function'||typeof G.requestAnimationFrame!=='function'||typeof G.cancelAnimationFrame!=='function'||typeof G.AbortController!=='function')throw Error('actual native clock/frame/cancellation ports required');
-  const runtime=Object.freeze({G,W,performance,argv:Object.freeze([...G.nw.App.argv])}),lease=await authority.bindGroup(binding,runtime);
-  if(lease?.binding!==binding||typeof lease.assertCurrent!=='function'||typeof lease.retire!=='function')throw Error('opaque same-binding authority lease required');
   const requestFrame=G.requestAnimationFrame.bind(G),cancelFrame=G.cancelAnimationFrame.bind(G),document=G.document,KeyboardEvent=G.KeyboardEvent;
   const fixtureInput=fixture;fixture=typeof fixtureInput==='function'?null:fixtureInput;let attached=false;
   const start=now(),end=start+binding.budget.runMs,controller=new G.AbortController(),original=G.SceneManager.updateMain,records:any[]=[],cases:any[]=[],cleanupErrors:any[]=[];
+  const runtime=Object.freeze({G,W,performance,argv:Object.freeze([...G.nw.App.argv])}),lease=await authority.bindGroup(binding,runtime);
+  if(lease?.binding!==binding||typeof lease.assertCurrent!=='function'||typeof lease.retire!=='function')throw Error('opaque same-binding authority lease required');
   let failure:any=null,last=start,gameUpdates=0,displayUpdates=0,raf:any=null,installed=false;
-  const assertAuthority=()=>{lease.assertCurrent(binding,runtime);fixture?.assertOwned();const t=now();if(G.performance!==performance||performance.now!==nowMethod||G.document!==document||G.KeyboardEvent!==KeyboardEvent||!Number.isFinite(t)||!Number.isFinite(end)||t<0||t<last||t>=end)throw Error('native qualification owner/clock/hygiene budget retired');last=t;
+  const assertAuthority=()=>{if(controller.signal.aborted)throw failure??Error('native qualification cancelled');lease.assertCurrent(binding,runtime);fixture?.assertOwned();const t=now();if(G.performance!==performance||performance.now!==nowMethod||G.document!==document||G.KeyboardEvent!==KeyboardEvent||!Number.isFinite(t)||!Number.isFinite(end)||t<0||t<last||t>=end)throw Error('native qualification owner/clock/hygiene budget retired');last=t;
     if(G.document.visibilityState!=='visible'||G.document.hasFocus?.()!==true||G.innerWidth!==binding.view.width||G.innerHeight!==binding.view.height||G.devicePixelRatio!==binding.view.dpr)throw Error('native foreground/viewport changed');};
   const append=(row:any)=>{const value={groupId:binding.groupId,...row};const completion=collector.append(value);if(completion!==undefined){if(typeof completion?.then==='function')completion.catch?.(()=>{});throw Error('synchronous collector must complete before continuation');}records.push(value);};
   const failed=(error:any)=>{failure??=error;controller.abort();};
@@ -135,9 +135,18 @@ export async function executeNativeQualificationGroup(E:any,G:any,W:any,fixture:
   try{
     assertAuthority();
     if(typeof G.gc==='function'||[...runtime.argv,...(Array.isArray(G.process?.execArgv)?G.process.execArgv:[])].some((arg:string)=>arg.includes('expose-gc')))throw Error('natural qualification forbids exposed/forced GC');
-    if(typeof fixtureInput==='function'){fixture=fixtureInput();attached=true;}fixture.assertOwned();assertAuthority();
-    append({kind:'binding',binding,UTC:new Date().toISOString(),scope:'RAW_NATIVE_QUALIFICATION_NOT_ACCEPTANCE'});
-    G.SceneManager.updateMain=update;installed=true;raf=requestFrame(display);state('initial');
+    G.SceneManager.updateMain=update;installed=true;raf=requestFrame(display);
+    if(typeof fixtureInput==='function'){
+      append({kind:'bootstrap-start',t:now()});
+      const clock=tools.installGameFrames(G,{now,setTimer:G.setTimeout.bind(G),clearTimer:G.clearTimeout.bind(G)}),deadline=Math.min(now()+binding.budget.caseMs,end);
+      const stop=()=>{try{clock.dispose();}catch(error){cleanupErrors.push(error);}};controller.signal.addEventListener('abort',stop,{once:true});
+      let bootstrapFailure:any=null;
+      try{fixture=await fixtureInput({assertCurrent:assertAuthority,nextGameUpdate:()=>clock.nextGameUpdate(deadline)});attached=true;}catch(error){bootstrapFailure=error;throw error;}
+      finally{controller.signal.removeEventListener('abort',stop);try{clock.dispose();}catch(error){cleanupErrors.push(error);if(!bootstrapFailure)throw error;}}
+      append({kind:'bootstrap-ready',t:now()});
+    }
+    fixture.assertOwned();assertAuthority();
+    append({kind:'binding',binding,UTC:new Date().toISOString(),scope:'RAW_NATIVE_QUALIFICATION_NOT_ACCEPTANCE'});state('initial');
     for(const c of fixture.data.donor.cases){
       assertAuthority();const deadline=Math.min(now()+binding.budget.caseMs,end),ports={deadlineKind:'QUALIFICATION_HYGIENE',deadline,now,setTimer:G.setTimeout.bind(G),clearTimer:G.clearTimeout.bind(G),dispatch:tools.domDispatch(G.document,G.KeyboardEvent),assertAuthority,signal:controller.signal};
       const result=await executeNormalCase(E,G,W,fixture,tools,{scope:'NATIVE_QUALIFICATION',donorCaseId:c.id,caseId:c.id},ports);
