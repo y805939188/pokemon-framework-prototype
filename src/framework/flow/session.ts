@@ -270,10 +270,13 @@ export class BattleSession {
       bindRequiredSettlement(s, s.gw, { battleId, generation: evidence.generation, contentIdentity: evidence.contentIdentity }, restore);
     }
     s._effects?.startControl(!doubles && !!s.gw.drainFriendshipFaints && !!s.gw.validateFriendshipFaints && !!s.gw.applyFriendship && !!s.gw.checkpointFriendship && !!s.gw.restoreFriendship);
-    await s.gw.choose("p1", "team " + lead.map((_, i) => i + 1).join(""));
-    await s.gw.choose("p2", "team " + s.foeTeam.map((_, i) => i + 1).join(""));
+    // Both rosters exist during Team Preview. Import dynamic state before the second team
+    // choice starts switchIn: native send-out conditions and entry effects must see the saved
+    // HP/status/PP, and no later seed may overwrite an effect that already resolved on entry.
     s.gw.seedState("p1", lead);
     s.gw.seedState("p2", s.foeTeam);
+    await s.gw.choose("p1", "team " + lead.map((_, i) => i + 1).join(""));
+    await s.gw.choose("p2", "team " + s.foeTeam.map((_, i) => i + 1).join(""));
     s.gw.refreshRequests();
     if (trainerAi) {
       if (foe.kind !== 'trainer' || doubles || !requiredSettlement || ai) throw new Error('trainer-ai-formal-composition-required');
