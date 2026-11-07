@@ -72,33 +72,39 @@
   "completeE74Heading": false,
   "newE74Rows": 0,
   "NW": 0,
-  "product": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
+  "product": "68e35c3677734f8cf6398bdca8521e747483f160",
   "runtime": {
-    "js/engine/build/content-cli.cjs": "113d2b55ab7c2956af00df2527958c4e8302338646a124a0961db58e62e1b76a",
-    "js/engine/build/core.cjs": "9cd1a060fa1279e97ac82390e45c947721182efa11b017efb51a4276fc34d04e",
+    "js/engine/build/content-cli.cjs": "41168bff64ca2e564a17fbf3af8aa451f2b00f536b7d32110cb83c7b3564ea54",
+    "js/engine/build/core.cjs": "702b884c1ca31ed0ec4036e72db08c50d614729962b583afa10c8ceb588d43c5",
     "js/engine/build/custom-formats.cjs": "70db558b8ba0a3523913c8d2ce0c560e9976af80796c123b7ff4536183d4ac22",
-    "js/engine/build/engine.cjs": "54c6a207117cabaeda5125335a632eb1244f628355841d9709e7d6863b6f3ee0",
-    "js/engine/build/production.cjs": "0d0a68b55744b62303d60de5ad3065904065b56877e95cfd59d4da49cf8554f1",
-    "js/engine/build/public-presentation-BxGIkbT5.js": "2ad6c12980325f266b48491f7f5153e32b0a4992d1f59c2e2a192812384eabaa",
-    "js/engine/build/session-ByrEDd6W.js": "7e0af4fbea0ef7a1f0080c02d860dce6fa6313098c033a5e2d0a61f4c3d89920",
-    "js/engine/build/testing.cjs": "e1876baa26caa3121b7a901a0ee49e926ffad09f8d6ac698d30e9a56ff2b6c8c",
-    "js/engine/build/trainer-ai-diagnostics-CNKjdhxr.js": "abd9c8257733dba4bc29af5116f0b92c33f7d70cf7a2cb64b4700a3d7b88d305"
+    "js/engine/build/engine.cjs": "870f3a479fde0a2eb09a3ca67bb1128abc8529540d47f5786398ac26721b9b5d",
+    "js/engine/build/production.cjs": "3c3c71163243d8eb08e6b9b106ab1d5028d124dbf7fb9fc579b205f7688b23af",
+    "js/engine/build/public-presentation-BN1XBb77.js": "bd27339109173ad14b00a4fd86f3f76826cc758b563dbe786d8fcf399b04c52c",
+    "js/engine/build/session-Cc9yAo41.js": "779b40a75b90796f768886cc73df765fcafd5640315c3d4d17846d0e37f1633c",
+    "js/engine/build/testing.cjs": "78ba8ee3e9a15db23154234cb3460a23ad9fe3d67745a0d364e80ae82390be8a",
+    "js/engine/build/trainer-ai-diagnostics-DMhy-dLS.js": "9ee4adfff094d89526386ce7f65791e883514960da291a16d634e96cd2a82040"
   },
   "runtimeRebinding": {
-    "reason": "COMBO-P2-01: rebuilt final source-owned AI safe snapshot repair; scenarios/seeds/oracles unchanged",
-    "sourceCommit": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
-    "sourceTree": "f26c1a7c20474f214d6d26753bdb846bf55e1769",
-    "previousBindingProduct": "47dbbc393860018cf04faaa1e89862e63652aa2b",
-    "previousBindingSHA256": "b3de86b8cb410ad34a518eca4a5bfec08f5ac3705821a05cc7f0237dd614eb25",
+    "reason": "Closed H3 production policy integration; source data, seeds and business oracles unchanged",
+    "sourceCommit": "68e35c3677734f8cf6398bdca8521e747483f160",
+    "sourceTree": "f609b10101d4652dc54cdc085cb515e546102b20",
+    "previousBindingSHA256": "ce64fbd515bb914ec53e1e446024dcb9780d6683ad947aab97b33714b4e00cca",
     "previousRebinding": {
-      "reason": "Rebuilt final field/Harvest/PP/trainer combination; no scenario, seed, or business oracle changes",
-      "sourceCommit": "47dbbc393860018cf04faaa1e89862e63652aa2b",
-      "sourceTree": "406614edc72a531db1a503293fa85033fa4d9aa3",
-      "priorProducts": {
-        "field": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
-        "harvest": "a91570b6d006f0a303bfe3350b051f81be644dd2"
-      },
-      "mappingSource": "Actual nine files in this integration worktree js/engine/build after source-H build; not union or selection of prior tables"
+      "reason": "COMBO-P2-01: rebuilt final source-owned AI safe snapshot repair; scenarios/seeds/oracles unchanged",
+      "sourceCommit": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
+      "sourceTree": "f26c1a7c20474f214d6d26753bdb846bf55e1769",
+      "previousBindingProduct": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+      "previousBindingSHA256": "b3de86b8cb410ad34a518eca4a5bfec08f5ac3705821a05cc7f0237dd614eb25",
+      "previousRebinding": {
+        "reason": "Rebuilt final field/Harvest/PP/trainer combination; no scenario, seed, or business oracle changes",
+        "sourceCommit": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+        "sourceTree": "406614edc72a531db1a503293fa85033fa4d9aa3",
+        "priorProducts": {
+          "field": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
+          "harvest": "a91570b6d006f0a303bfe3350b051f81be644dd2"
+        },
+        "mappingSource": "Actual nine files in this integration worktree js/engine/build after source-H build; not union or selection of prior tables"
+      }
     }
   }
 }
