@@ -1,0 +1,44 @@
+{
+  "version": "D2-P4-execution-pins-v1",
+  "state": "PREPARATION_ONLY_NATIVE_NOT_ADMITTED",
+  "nativeExecutionGranted": false,
+  "preparationBase": {
+    "head": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+    "tree": "00a6b3938d533edb6542adc4d3038da645c7f342",
+    "meaning": "accepted published G1/G3 test baseline and read anchor, not finalD2/performance package"
+  },
+  "finalProduct": null,
+  "comparableControl": null,
+  "required": {
+    "finalProductSHA_tree_clean_and_exactCI": null,
+    "normalComparableControlSHA_tree_clean_and_exactCI": null,
+    "sharedNormalDriverValidatorSupervisorHashesAndIndependentReview": null,
+    "exactResolvedNormalTrace100_andOracle": null,
+    "fullContentConfigSDKEngineShowdownReactorRuntimeIdentity": null,
+    "controlCandidateFullAppInventoryModesLinksAndStrictSignatures": null,
+    "declaredPayloadDiffPathsBothHashesAndReasons": null,
+    "qualifiedFiniteStageAndProcessDeadlines": null,
+    "newExecutionRootAndFrozenArgvEnv": null,
+    "namedExecutorAndExclusiveHostLease": null,
+    "materiallyNewHostOccupancyAuthorizationAndSuccessfulOriginalGate": null,
+    "ownedPIDLineageRSSAndCleanupPermissionDisposition": null,
+    "realProducerNewProcessTitleContinueBinding": null,
+    "reviewDispositionAndApplicableNativeAuthorization": null
+  },
+  "currentKnownParallelScopes": {
+    "bac2069": "independently accepted controlled capture receiving; unpublished; no native/full227",
+    "d57bf3f": "independently accepted weather/G3 limited combination; unpublished; no native/full227",
+    "c293122": "independently accepted Protect App limited contracts; no finalD2",
+    "87f6ee4": "initial field plan frozen; review pending at read snapshot; product not started"
+  },
+  "preserved": [
+    "D1 old1000/P4 scoped acceptance",
+    "D1 GC app RSS +23.8929% WARN_OPEN",
+    "canonical rows NOT_COMPARABLE unless actual methods match",
+    "U51 UNKNOWN",
+    "AUD2 OPEN",
+    "CPU/allocation attribution OPEN",
+    "all historical FAIL/HOLD/LOW/DEFER and tail gaps",
+    "Ruby/source clean-room boundaries unchanged"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "version": "D2-final-pair-profile-v1",
+  "state": "FINAL_PRODUCTS_NOT_SELECTED_NATIVE_BLOCKED",
+  "preparationAccepted": "48f3da4edb9dc0f94d380fa13433aa582f0848f4",
+  "toolCoresAccepted": "93314ee6c90d2bf11a4995367457890a5b3086d3",
+  "proposedControlRootOnly": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+  "control": null,
+  "candidate": null,
+  "declaredDiff": null,
+  "sameDriverInputConfigProof": null,
+  "comparabilityByMetric": null,
+  "resolvedTraceAndQualifiedDeadlines": null,
+  "nativeBackendReview": null,
+  "originalGateResolution": null,
+  "originalDeniedProbeArgv": null,
+  "nativePermit": "CLOSED_NO_GRANT_IMPLEMENTATION",
+  "currentActualNativeProcesses": 0,
+  "currentActualBattles": 0,
+  "sharedIntegration": {
+    "owner": "CENTRAL_SINGLE_WRITER",
+    "pluginRoute": "NOT_REGISTERED",
+    "moduleEmbedding": "UNDECIDED_BY_CENTRAL_OWNER",
+    "formalAppFixture": null,
+    "receivingMapTitleAdapters": null,
+    "newGenericCI": "HOLD_UNTIL_FORBIDDEN_FROZEN_REPLAY_EXCLUSION_IS_INDEPENDENTLY_VERIFIED",
+    "sharedFilesWrittenByThisCandidate": []
+  }
+}

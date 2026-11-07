@@ -1,0 +1,29 @@
+{
+  "UTC": "2026-11-06T06:30:58.353802+00:00",
+  "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+  "decision": "ACCEPTED_SCOPED_G1_G3_TESTS_WITH_VERIFIED_AUTHOR_FULL_AND_EXACT_CI264",
+  "independentSelectedAcceptance": {
+    "path": "/Users/dingshinn/Desktop/pokemon-framework/.verify/step5-4-g3-terminal-hitcount-tests-independent-acceptance-20261106.json",
+    "sha256": "1d2d209b535a2beb9b4949f6c3bcad93277c645eec544d0160a8eb80293ef189"
+  },
+  "independentFullSupplement": {
+    "path": "/Users/dingshinn/Desktop/pokemon-framework/.verify/step5-4-g3-terminal-hitcount-tests-full-independent-acceptance-20261106.json",
+    "sha256": "f6838756433154a979ac4ae55930f0aeb6d69cd1a542cd41fe468dd94dfe36ff"
+  },
+  "publication": "/Users/dingshinn/Desktop/pokemon-framework/.verify/step5-4-g3-terminal-hitcount-tests-publication-final-20261106.json",
+  "publicationSHA256": "6f15632bb3540b854e91df2b0bdc283c44517e56ed3dbda6bfd2ddf2be7da35f",
+  "CI": {
+    "run": 42173905140,
+    "number": 264,
+    "attempt": 1,
+    "bothJobs": "success"
+  },
+  "retainedSelectedAuxiliaryDiagnostics": {
+    "multihitAppliedOutcomes": 5,
+    "G1AppliedOutcomes": 1,
+    "G1DiagnosticMessages": 2
+  },
+  "actualTitleSceneNW": "NOT_RUN",
+  "completeE_D2_5_4_P4": "NOT_ACCEPTED",
+  "NW": 0
+}

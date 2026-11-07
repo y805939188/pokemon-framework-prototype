@@ -1,0 +1,31 @@
+{
+  "UTC": "2026-11-06T06:52:06.967197+00:00",
+  "candidate": "d57bf3f467f4ac1edb07b8170dcd4ea333322d0b",
+  "tree": "81551330a9a5d282ecce688a42b25d513c4aaf0e",
+  "review": "/Users/dingshinn/Documents/Codex/2026-11-05/task/e-weather-g3-unified-independent-review/REVIEW.zh.md",
+  "reviewSHA256": "2f463512ddb0761981e203aab24dc18402bc637b1e7b480c824e3a13b5cedd70",
+  "seal": "/Users/dingshinn/Documents/Codex/2026-11-05/task/e-weather-g3-unified-independent-review/SEAL.json",
+  "sealSHA256": "73c0746fc0f522a54e86ec5997f0212c73140236ef684bbc32daae5b5441db7c",
+  "sealedFiles": 36,
+  "directReferences": 57,
+  "decision": "ACCEPTED_SCOPED_G3_WEATHER_COMBINATION",
+  "independentSelectedPass": 83,
+  "selectedObservedGroups": 6,
+  "selectedObservationRows": 29,
+  "selectedSessions": 33,
+  "selectedInstalls": 22,
+  "selectedAbortCounts": {
+    "main": 7,
+    "observer": 4
+  },
+  "selectedAuxiliaryDiagnosticMessages": 23,
+  "limitations": [
+    "no new weather and multihit interleaving within one battle",
+    "Grassy Terrain abort then new battle not directly tested",
+    "Protect c293 not merged",
+    "full current227/type/build/SDK/CI not run",
+    "Scene/disk/Title/NW/full E/D2/5.4/P4 not accepted"
+  ],
+  "published": false,
+  "NW": 0
+}

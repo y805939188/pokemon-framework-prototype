@@ -1,0 +1,21 @@
+{
+  "version": "D2-offline-deadline-proposal-v1",
+  "state": "BLOCKED_NO_FINAL_PAIR_NO_FULL_TRACE_NO_QUALIFIED_TIMINGS",
+  "pairProfileHash": null,
+  "sourceHead": null,
+  "traceVersion": null,
+  "role": null,
+  "mode": null,
+  "donorHash": null,
+  "presentationHash": null,
+  "policy": null,
+  "cases": null,
+  "launch": null,
+  "idle": null,
+  "sampling": null,
+  "verification": null,
+  "tail": null,
+  "safety": null,
+  "qualified": false,
+  "nativeAdmission": false
+}

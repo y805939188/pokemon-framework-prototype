@@ -1,0 +1,46 @@
+{
+  "version": "D2-P4-central-wiring-handoff-v1",
+  "state": "READY_FOR_CENTRAL_DESIGN_NOT_INSTALLED_NOT_NATIVE",
+  "writer": "CENTRAL_SINGLE_WRITER",
+  "currentProductSource": "c6ce3e63f7946d396ad6d3fac168a648c6593367",
+  "reviewedDormantTools": "2dcb1b9809cb3536097e386e5c89521de6fcb4ad",
+  "currentProductContainsP4ToolDirectories": false,
+  "normalRoute": {"mode": "d2-normal-f100", "present": false, "registrationOwner": "CENTRAL_ONLY"},
+  "centralEditsRequired": [
+    {"path": "src/plugins/PS_BattleFlowTest.ts", "work": "Review and explicitly register normal route, without altering other modes; no normal driver exists in current c6 product."},
+    {"path": "src/plugins/flowtest/", "work": "Central owner chooses module embedding and formal App/fixture lifecycle. Import the 39 reviewed P4 preparation/runtime/native tool files by pinned blob identity before this successor's imports can resolve; do not merge old product trees."},
+    {"path": "scripts/test-headless.sh", "work": "If integrating the new pure Node test, add its exact path while preserving ordered suites, exclusions and fail/no-skip policy; no registration edited by this candidate."},
+    {"path": ".github/workflows/ci.yml", "work": "Only central owner may decide registration. Future H needs its own exact CI and forbidden-replay exclusion review; CI266 does not cover these P4 files."}
+  ],
+  "proposedExactOfflineTest": ["node", "--test", "experiments/step5/4/d2-p4-qualification-prep/test-deadline-proposal.cjs"],
+  "normalObserverSourcesAtCurrentProduct": {
+    "phaseReadyItemsColumns": "Scene.inputState() at PS_BattleFlow.ts:1700; actual controller canChoose and active menu, never merely Scene object existence",
+    "owner": "same actual Scene, PSFlow._op, PSFlow._app and app.stateGeneration; bindBattleScene already supplies object owner/current, not a serializable ownerToken",
+    "ownerToken": "central observer must derive a per-group serializable token from that actual owner, retire on replacement and bind it to trace context",
+    "partySub": "Scene._partySub set by showParty at PS_BattleFlow.ts:1923",
+    "selectedMemberId": "Scene._partySelected set by showPartyCommands at PS_BattleFlow.ts:1985; never infer from desired target",
+    "forcedRequestToken": "NEW REQUIRED CENTRAL SEAM: monotonically distinct actual forced-request occurrence under current owner. showParty('forced') is reached from afterMessages and wild-faint handling; identical currentRequest payload may recur. Do not use payload hash or object identity as occurrence proof.",
+    "forcedContinuation": "Only after actual ready before/after snapshots match, call reviewed observeForcedSelection. Sending P1 alone cannot create context. A new force request invalidates old continuation.",
+    "intentAdvance": "actual corresponding business event/state oracle only; never advance on choose/keydown or forced replacement confirmation",
+    "remainingAdapters": "receiving/growth/learning/Map/Title, catalog pockets/foe IDs and terminal full-state oracle remain unbound; do not route them through BattleScene fallback"
+  },
+  "traceAndDeadlineHandoff": {
+    "authoredInputs": "Existing exact100 ordered IDs, requests/setup/expected and all seeds unchanged. This candidate generates no actual trace.",
+    "sourceBinding": "Bind final pair, driver/oracle/normal config and every trace version before qualification; current c6 source lock is eligibility only.",
+    "branchCoverage": "Enumerate later-level/learning/receiving and all valid normal alternatives. Interval union within one branch; max across mutually exclusive alternatives; sum all100 cases.",
+    "qualificationFallback": "If finite static normal branch bounds cannot be proved, separately labelled full100 qualification outside formal groups only after original host gate succeeds; preserve all attempts, including failures.",
+    "deadlines": "No real numbers supplied. Fill explicit launch, per-case branch waits/nonwait/input, idle120 game ticks, sampling/verification/tail and safety sources; calculateProposal yields a review proposal only, never native-qualified deadlines.",
+    "oracle": "Real package Node JSON.stringify/crypto plus core.validateGame on all complete states and ledger; retain ordered middle-row raw material. JSON hashes or stub success alone are not authenticity."
+  },
+  "finalPairGate": {
+    "control": null, "candidate": null, "declaredDiff": null, "formalAppFixture": null,
+    "resourcesRuntimeSDKContentConfig": null, "strictSignature": null, "exactFutureCI": null,
+    "nativeInterfaceQualification": null, "fullTrace": null, "qualifiedDeadlines": null,
+    "originalSuccessfulHostGate": null, "namedExecutorAndExclusiveWindow": null
+  },
+  "nativePermit": "CLOSED_NO_GRANT_IMPLEMENTATION",
+  "sharedFilesWritten": [],
+  "commandsOrHostQueriesToRunNow": [],
+  "nativeAdmission": false,
+  "P4Acceptance": false
+}

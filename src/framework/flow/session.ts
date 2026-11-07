@@ -1,3 +1,6 @@
+import { initializeRequestView, clearRequestView, publishRequestView, checkpointRequestView, beginRequestViewRestore, finishRequestViewRestore, failRequestViewRestore } from './request-view';
+export { readSessionRequestContext } from './request-view';
+export type { SessionRequestContext } from './request-view';
 import { battleBag } from "../rules/inventory";
 import { catalogOf } from "../rules/item-catalog";
 /**
@@ -172,7 +175,7 @@ export class BattleSession {
   readonly canSwitch: boolean;
   readonly expGain: boolean;
   readonly captureExpGain: boolean;
-  constructor(canSwitch = true, expGain = true, captureExpGain = true) { this.canSwitch = canSwitch; this.expGain = expGain; this.captureExpGain = captureExpGain; }
+  constructor(canSwitch = true, expGain = true, captureExpGain = true) { this.canSwitch = canSwitch; this.expGain = expGain; this.captureExpGain = captureExpGain; initializeRequestView(this); }
   content!: Content;
   rules!: G.ExpRules;
   battleId!: string;
@@ -342,7 +345,7 @@ export class BattleSession {
     checkpointRequiredSettlement(this, engine);
     checkpointTrainerAi(this, this.gw, engine);
     checkpointReplacementOffer(this, engine);
-    return {
+    const checkpoint = {
       engine,
       state: S.clone({
         party: this.party, bag: this.bag, ledger: this.ledger, out: this.out, held: this.held,
@@ -356,6 +359,8 @@ export class BattleSession {
       effects: this._effects?.snapshot(),
       presentation: _capturePresentation(this, this.out),
     };
+    checkpointRequestView(this, checkpoint);
+    return checkpoint;
   }
 
   async _restoreCheckpoint(checkpoint: ReturnType<BattleSession["_checkpoint"]>,ownedEpoch?:number): Promise<void> {
@@ -367,6 +372,7 @@ export class BattleSession {
     // Preflight is read-only but calls trusted ports: a reentrant restore/operation may now own the Session.
     if(this._restoring)throw new Error('battle session restore already in progress');
     if(this._operationEpoch!==entryEpoch||this.gw!==entryDriver)throw new Error('battle session operation retired during restore preflight');
+    beginRequestViewRestore(this);
     const external=ownedEpoch===undefined;
     const epoch=external?++this._operationEpoch:this._operationEpoch;
     let complete:()=>void=()=>{},done:Promise<void>|null=null;
@@ -384,7 +390,8 @@ export class BattleSession {
     if (checkpoint.evidence) this._evidence?.restore(checkpoint.evidence);
     if (checkpoint.effects) this._effects?.restore(checkpoint.effects);
     restoreReplacementOffer(this, checkpoint.engine);
-    }catch(error){failTrainerAiRestore(this);throw error;}
+    finishRequestViewRestore(this, checkpoint);
+    }catch(error){failRequestViewRestore(this);failTrainerAiRestore(this);throw error;}
     finally{this._restoring=false;if(external){complete?.();if(this._operationDone===done)this._operationDone=null;if(this._operationEpoch===epoch)this._operation=false;}}
   }
 
@@ -903,7 +910,7 @@ export class BattleSession {
   }
 
   _finishTurn(): void {
-    if (hasReplacementOffer(this)) { this.requests = {}; return; }
+    if (hasReplacementOffer(this)) { this.requests = {}; clearRequestView(this); return; }
     if (this.ended) {
       this._buildResult(); this.finished = true;
       this._log("info", "end", { reason: this.ended.reason, winner: this.ended.winner, bag: this._result?.bag, members: Object.keys(this._result?.members ?? {}).length });
@@ -913,7 +920,8 @@ export class BattleSession {
     let reqs = this.held.splice(0).filter((m) => !(m.kind === "request" && m.side === "p2" && m.request["forceSwitch"])); // foe replacements are internal
     if (this.grew) { this.grew = false; reqs = this.gw.refreshRequests(); this.gw.discardQueued(); }
     this.requests = {};
-    for (const m of reqs) if (m.kind === "request") { this.requests[m.side] = m.request; this.out.push(m); this._log("info", "request", { side: m.side, seq: m.seq, forceSwitch: !!m.request["forceSwitch"], wait: !!m.request["wait"] }); }
+    clearRequestView(this);
+    for (const m of reqs) if (m.kind === "request") { this.requests[m.side] = m.request; publishRequestView(this, m); this.out.push(m); this._log("info", "request", { side: m.side, seq: m.seq, forceSwitch: !!m.request["forceSwitch"], wait: !!m.request["wait"] }); }
   }
 
   _buildResult(): void {

@@ -1,0 +1,186 @@
+{
+  "version": "D1-F100-measurement-v1",
+  "state": "FROZEN_PROPOSAL_FOR_TARGETED_REVIEW_NOT_EXECUTED",
+  "createdUTC": "2026-10-31T03:17:29.392975+00:00",
+  "authority": {
+    "plan": ".handoff/step5-4-M0-readonly-checkpoint-ae3ec1b-20261029T062059Z/inputs/APPROVED-PLAN-r2.zh.md",
+    "sections": [
+      "5.D1",
+      "6.1",
+      "6.2",
+      "6.3"
+    ],
+    "requiresTargetedReviewBeforeD1": true
+  },
+  "base": "2ff30070defff05a45f7c604b1db9507f0eb9d5e",
+  "scope": "D1 host controller/message/input lifecycle + measurement only; no D2 presentation",
+  "workload": {
+    "id": "F100-v1",
+    "rounds": 25,
+    "kindsPerRound": [
+      "wild-win",
+      "wild-capture",
+      "trainer-win",
+      "trainer-loss-D3"
+    ],
+    "count": 100,
+    "order": "round-major in listed order, no extra measured/preparatory battles in these100",
+    "seedRecipe": "case ordinal i=0..99: [1,2,3,4+i]; both versions same resolvedseed recorded",
+    "requiredManifestFields": [
+      "version",
+      "source/content/config hashes",
+      "100 unique case IDs in exact order",
+      "each input/request/expected outcome",
+      "each resolved seed",
+      "stable member/trainer IDs",
+      "exact semantic choices and expected special events",
+      "each between-battle setup operation and its full write-set"
+    ],
+    "capabilities": "actual formal B held-capable and C AI-enabled training paths; wild default AI unchanged",
+    "specialEvents": {
+      "trainerWinRound1": [
+        "player medicine",
+        "trainer FullRestore",
+        "trainer ball blocked",
+        "legal player switch",
+        "real growth/learning prompt"
+      ],
+      "heldControls": "specific fixed cases must exercise actual B held consumption/restoration; identity paired receipts and no forced data replacement"
+    },
+    "setup": "only explicit identical between-battle replenishment/healing at no-owner boundary; preserve current party/captures/receipts/stats across battles; never reset full document or clear caches each battle",
+    "finalFreeze": "exact input manifest/source/payload frozen and validated before formal runs; correction of fixture/version creates new manifest, retains failed pilot and cannot cherry-pick successful repetitions"
+  },
+  "versions": {
+    "control": "explicit bridge from accepted2ff containing only the same benchmark driver/hooks/manifest, original text-scene behavior; separate fixed SHA and patch manifest",
+    "candidate": "same bridge+minimal D1 controller, same driver/content/config/inputs/seed/setup",
+    "oldMain": "not baseline for new B/C workload; historical canonical budgets retained separately",
+    "noMislabel": "control is bridge not original2ff bytes; dependency/output/driver changes separately identified"
+  },
+  "runs": {
+    "naturalPerVersion": 3,
+    "forcedGcPerVersion": 1,
+    "processesPerVersion": 5,
+    "battlesPerVersion": 500,
+    "totalProcesses": 10,
+    "totalBattles": 1000,
+    "ordering": [
+      "control-natural1",
+      "candidate-natural1",
+      "control-natural2",
+      "candidate-natural2",
+      "control-natural3",
+      "candidate-natural3",
+      "control-instrumentOff",
+      "candidate-instrumentOff",
+      "control-GC1",
+      "candidate-GC1"
+    ],
+    "process": "each is one fresh NW process for its full100, no per-battle restart/cache cleanup/GC",
+    "naturalGc": "no expose-gc flag and zero forced calls",
+    "diagnosticGc": "expose-gc; two explicit calls only at declared memory sample points; record success not inferred from flag; do not combine with natural medians",
+    "missingOrFailure": "record every attempted run and actual inputcount/outcomes/exit/timeout; no retry-to-green or sample selection",
+    "instrumentOff": "One additional adjacent control/candidate natural full100 pair with detailed timing instrumentation disabled; samedriver/manifest/choices, noGC. These 2 runs are separate from 3 instrumented-natural+1GC perversion and not included in instrumented frame medians. Boundary outcome/identity checks stay outside measured intervals; record exact disabled/enabled probes. If impossible, report instrumented-only and keep obligation OPEN, no silent waiver.",
+    "instrumentOffPerVersion": 1
+  },
+  "host": {
+    "platform": "macOS arm64 actual NW0.117/Chromium154 locked target; actual versions reported",
+    "window": [
+      816,
+      624
+    ],
+    "dpr": 2,
+    "focus": "frontmost/visible; record actual loss and classify it, never suppress or relabel",
+    "concurrency": "no local builds/tests/native processes in measurement window; no system-wide setting change or killing unrelated processes",
+    "profilesAndSaves": "new per-process profiles and test saves; only own process tree cleanup; no user slots"
+  },
+  "timing": {
+    "clock": "raw monotonic performance.now, game updateMain tick/frame and rAF tick/frame distinct; wall clock only launch correlation",
+    "markers": [
+      "event-start",
+      "transition-select",
+      "transition-start",
+      "transition-end",
+      "scene-controller-ready",
+      "first-input-ready",
+      "action-start",
+      "action-resolved",
+      "AI-start-end",
+      "prepare-commit-start-end",
+      "install-start-end",
+      "return-map-ready"
+    ],
+    "separation": "deliberate presentation wait/observed wait, readiness overhead without deliberate wait, total experience time separately; D1 has no D2 transition added",
+    "frameMetrics": [
+      "p50",
+      "p95",
+      "p99",
+      "max",
+      "count",
+      "over33ms count and ratio",
+      "long-frame contiguous raw samples"
+    ],
+    "gameVsRaf": "60Hz game vs120Hz screen never substitute; retain raw deltas and counts",
+    "scope": "document whether driver/assertions fall in timed intervals; no post-hoc subtracting slow frames or CPU attribution from elapsed waiting"
+  },
+  "memory": {
+    "points": [
+      "initial-map",
+      "after4",
+      "after50",
+      "after100",
+      "after-fixed-idle120-game-ticks"
+    ],
+    "fields": [
+      "renderer RSS bytes",
+      "renderer JS heap bytes",
+      "whole owned app tree RSS bytes",
+      "managed texture count",
+      "bitmap count",
+      "window count",
+      "listener count",
+      "owner count"
+    ],
+    "ownedAppTree": "sampler starts at launched exact PID, recursively enumerates only direct descendants and samples only verified owned PIDs; no whole-system ps/name substring sum",
+    "unavailable": "null+UNKNOWN and exact denied/unsupported reason; never0 or substitute renderer aswholeapp",
+    "units": "raw bytes and explicit MiB conversion; no rounded MB leak proof",
+    "gcGroups": "label actual gcForced per sample, separate natural/GC plots and growth4-to100"
+  },
+  "budgets": {
+    "canonical": "docs/step5/perf-budget.json unchanged including factor1.2 and memory100 warn7.2MB",
+    "newRows": "bridge comparison distinct; missing truly comparable oldrow => NOT_COMPARABLE; no invented no-regression result",
+    "warnings": "WARN remain WARN, not code failure or implicit exemption; new specific regressions investigated",
+    "P4": "reproducible actual100/frame/identity report and review disposition; not a demand to clear all oldWARN",
+    "cpuAndAllocation": "OPEN unless actual matching source/time attribution evidence exists"
+  },
+  "identity": {
+    "required": [
+      "gitSHA/tree/dirty",
+      "source archive/patch",
+      "content/config/manifest hash",
+      "resolved seed and random contract",
+      "Showdown lock and actual stage/build hashes",
+      "ReactorSHA",
+      "NW/Node/Chromium/arch",
+      "all runtime/plugin/SDK/payload files and symlinks",
+      "signature exit",
+      "input/output/save file hashes",
+      "command/UTC/PID/exit/timeout",
+      "instrumentation/GC settings"
+    ],
+    "package": "new fixed clean prebuilt package; no auto publish or global NW modification; all pre/post payload unchanged"
+  },
+  "acceptance": {
+    "scenes": "exact nonempty IDs/case order/count and expected outcomes; schema/missing/errors/timeouts fail closed",
+    "legacyTests": "oldT IDs map to controller semantic ready/choose/resolve/wait assertions, not only scene existence/private field names; original failures preserved",
+    "lifecycle": "old callback after abort/load/terminate cannot touch successor session/UI/op; busy/reentry/failure/finish transfer owners checked",
+    "gates": "quick/type/boundaries/SDK/B/C/friendship/golden + actualMac flow; each fixed batch ultra; fullD1P4 before D2"
+  },
+  "notExecuted": [
+    "D1 implementation",
+    "benchmark fixture finalmanifest",
+    "new measurements",
+    "new controller tests",
+    "D2",
+    "Windows/Linux host"
+  ]
+}

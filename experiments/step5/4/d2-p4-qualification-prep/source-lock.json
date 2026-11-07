@@ -1,0 +1,165 @@
+{
+  "version": "D2-P4-current-source-eligibility-lock-v1",
+  "status": "STATIC_SOURCE_AND_RECORDED_CI_BOUND_NOT_FINAL_PACKAGE",
+  "snapshotUTC": "2026-11-06T18:03:45.268801+00:00",
+  "currentSource": {
+    "head": "c6ce3e63f7946d396ad6d3fac168a648c6593367",
+    "tree": "c77b5c3f648bdb6d3f33774ea634ee6bc7bd5dee",
+    "srcTree": "f26c1a7c20474f214d6d26753bdb846bf55e1769",
+    "checkout": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree",
+    "clean": true
+  },
+  "exactCI": {
+    "head": "c6ce3e63f7946d396ad6d3fac168a648c6593367",
+    "branch": "step5/4-reviewed-combination-p2-fix-20261106",
+    "runNumber": 266,
+    "runId": 42260886922,
+    "attempt": 1,
+    "event": "push",
+    "conclusion": "success",
+    "regularSuites": 231,
+    "regularPass": 4123,
+    "todo": "NOT_RETAINED_BY_EXISTING_RUNNER_SUMMARY",
+    "oldFrozenReplay": "EXCLUDED_NOT_RUN",
+    "observation": "existing local publication/CI receipts; no remote query or rerun in this task"
+  },
+  "dormantTools": {
+    "head": "2dcb1b9809cb3536097e386e5c89521de6fcb4ad",
+    "independentVerdict": "PASS_SCOPED_DORMANT_BACKEND_AND_NAVIGATION_PREPARATION",
+    "twoP2": "CLOSED_SCOPED"
+  },
+  "sharedSourcePins": {
+    "src/plugins/PS_BattleFlow.ts": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/src/plugins/PS_BattleFlow.ts",
+      "bytes": 157388,
+      "sha256": "c436144262c9b92046b8bd514d136fa48c4a32d7f795b489ed28b4485bffef1b"
+    },
+    "src/plugins/PS_BattleFlowTest.ts": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/src/plugins/PS_BattleFlowTest.ts",
+      "bytes": 394258,
+      "sha256": "cec3564edae06280dbd0f92f6f6de747fbbc1427ea3aff602c82d1e1ea905615"
+    },
+    "scripts/test-headless.sh": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/scripts/test-headless.sh",
+      "bytes": 13526,
+      "sha256": "ea977a4f0c3c005d5e862a05d642683e2045f7cca98f7a596d3008cc4c082be6"
+    },
+    ".github/workflows/ci.yml": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/.github/workflows/ci.yml",
+      "bytes": 4559,
+      "sha256": "96eed8d0608792d3de49653e9221482e6eb1388714b8e7dd583b123671eacc3b"
+    }
+  },
+  "currentBuiltRuntimePins": {
+    "js/engine/build/content-cli.cjs": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/js/engine/build/content-cli.cjs",
+      "bytes": 179415,
+      "sha256": "113d2b55ab7c2956af00df2527958c4e8302338646a124a0961db58e62e1b76a"
+    },
+    "js/engine/build/core.cjs": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/js/engine/build/core.cjs",
+      "bytes": 354340,
+      "sha256": "9cd1a060fa1279e97ac82390e45c947721182efa11b017efb51a4276fc34d04e"
+    },
+    "js/engine/build/custom-formats.cjs": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/js/engine/build/custom-formats.cjs",
+      "bytes": 38506,
+      "sha256": "70db558b8ba0a3523913c8d2ce0c560e9976af80796c123b7ff4536183d4ac22"
+    },
+    "js/engine/build/engine.cjs": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/js/engine/build/engine.cjs",
+      "bytes": 9733,
+      "sha256": "54c6a207117cabaeda5125335a632eb1244f628355841d9709e7d6863b6f3ee0"
+    },
+    "js/engine/build/production.cjs": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/js/engine/build/production.cjs",
+      "bytes": 8577,
+      "sha256": "0d0a68b55744b62303d60de5ad3065904065b56877e95cfd59d4da49cf8554f1"
+    },
+    "js/engine/build/public-presentation-BxGIkbT5.js": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/js/engine/build/public-presentation-BxGIkbT5.js",
+      "bytes": 497850,
+      "sha256": "2ad6c12980325f266b48491f7f5153e32b0a4992d1f59c2e2a192812384eabaa"
+    },
+    "js/engine/build/session-ByrEDd6W.js": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/js/engine/build/session-ByrEDd6W.js",
+      "bytes": 571579,
+      "sha256": "7e0af4fbea0ef7a1f0080c02d860dce6fa6313098c033a5e2d0a61f4c3d89920"
+    },
+    "js/engine/build/testing.cjs": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/js/engine/build/testing.cjs",
+      "bytes": 1229,
+      "sha256": "e1876baa26caa3121b7a901a0ee49e926ffad09f8d6ac698d30e9a56ff2b6c8c"
+    },
+    "js/engine/build/trainer-ai-diagnostics-CNKjdhxr.js": {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/worktree/js/engine/build/trainer-ai-diagnostics-CNKjdhxr.js",
+      "bytes": 48347,
+      "sha256": "abd9c8257733dba4bc29af5116f0b92c33f7d70cf7a2cb64b4700a3d7b88d305"
+    }
+  },
+  "runtimeScope": "nine existing build files byte-checked only; no execution, copy, link or full SDK/APP authentication",
+  "recordedSDKOnly": {
+    "payload": 649,
+    "files": 651,
+    "scope": "prior build audit receipt, not a final APP binding or fresh SDK verification"
+  },
+  "receiptPins": [
+    {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/publication-c6ce3e6-20261106/RESULT.json",
+      "bytes": 3198,
+      "sha256": "155267e29e2497c3efe37de5f9a5695e47aef70e9cda12f5ad50d35a4fdeb0e8"
+    },
+    {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/publication-c6ce3e6-20261106/evidence/CI-FINAL-AUDIT.json",
+      "bytes": 44615,
+      "sha256": "8f7cfed1bea174b203bdc99a73e38a7f7027765cd4155383ad6a193f580496f4"
+    },
+    {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/publication-c6ce3e6-20261106/CI-COMMAND-REVIEW.zh.md",
+      "bytes": 6267,
+      "sha256": "da183483fafbb4c20c2790fc6e817e53c95c7ff349764fe5f5d6e4351d4fcb1b"
+    },
+    {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/fix-combo-p2-01-20261106/evidence/CURRENT-RUNTIME-CLOSURE.json",
+      "bytes": 4594,
+      "sha256": "d88d80cab96892cd119e0faf365cb77ea13d4b66a47ab0e8971a72627799ddef"
+    },
+    {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/fix-combo-p2-01-20261106/evidence/FINAL-AUDIT.json",
+      "bytes": 2417,
+      "sha256": "94e3853d9c27a7e44df2e2fffd11da3ea262f8a4bd56b65eb987b6d4a2ca343f"
+    },
+    {
+      "path": "/Users/dingshinn/Documents/Codex/2026-11-06/task-4/integration-20261106/fix-combo-p2-01-20261106/evidence/SUITE-MANIFEST.json",
+      "bytes": 36740,
+      "sha256": "c878e8bcc0a0994827b307e009c33602604cefb941d57cb907ad9b2999e1327c"
+    },
+    {
+      "path": "/Users/dingshinn/Desktop/pokemon-framework/.independent-reviews/step5-4-D2-P4-native-fix-ultra-2dcb1b9-20261106/REPORT.zh.md",
+      "bytes": 7446,
+      "sha256": "be49b9d1b05f03565c882254ec9db0e0bc90891750d981122695b013e0612141"
+    },
+    {
+      "path": "/Users/dingshinn/Desktop/pokemon-framework/.independent-reviews/step5-4-D2-P4-native-fix-ultra-2dcb1b9-20261106/SEAL.json",
+      "bytes": 42814,
+      "sha256": "e2e518cf5255601e66582bded9c63a1d2108f43778ceb73008f173c347a8a7fc"
+    }
+  ],
+  "normalRoutePresent": false,
+  "centralWriterRequired": true,
+  "finalProducts": {
+    "control": null,
+    "candidate": null,
+    "declaredDiff": null,
+    "APP": null,
+    "signature": null
+  },
+  "full100Trace": null,
+  "qualifiedDeadlines": null,
+  "nativeOSQualification": null,
+  "originalHostGate": "UNRESOLVED_NOT_QUERIED",
+  "nativePermit": "CLOSED",
+  "nativeAdmission": false,
+  "P4Acceptance": false,
+  "nonTransfer": "CI266 binds c6ce3e6 only, not this prep commit or a future central integration. Rebuild/review/exact CI required for new product H."
+}

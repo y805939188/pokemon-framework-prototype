@@ -1,0 +1,75 @@
+{
+  "version": "D2-P4-read-input-lock-v1",
+  "sourceHead": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+  "sourceTree": "00a6b3938d533edb6542adc4d3038da645c7f342",
+  "files": {
+    "docs/step5/perf-budget.json": {
+      "sha256": "ca3e745572a56f87ba1ffc5e5366bc99dda397a9d0be4fbfaedce1219f30a1f8",
+      "bytes": 4378
+    },
+    "docs/step5/5.4-D1-measurement.md": {
+      "sha256": "a39f30c5456cb94986ff876d28de5945f27c1f69008ef92ef0cf57d6779aab7b",
+      "bytes": 13134
+    },
+    "experiments/step5/4/d1/f100-v1.json": {
+      "sha256": "3bb0fb4b2cbb0c4c3465dceaf95e2332a317b5469e3786e8cd70ef62b0934244",
+      "bytes": 66402
+    },
+    "src/plugins/flowtest/d1-benchmark.ts": {
+      "sha256": "4747bc9f8af17144b9cdc80f7439acfd503c2246f9f37e397aa972a9be3be964",
+      "bytes": 18087
+    },
+    "scripts/run-d1-benchmark-mac.py": {
+      "sha256": "f229f886cb7d354faa09bf6ddca07578d51d1a6682983133b1f5f7b035881af5",
+      "bytes": 26661
+    },
+    "scripts/d1_host_identity.py": {
+      "sha256": "7df117dc738d43df8150f971ef9ca5e6f65eddc87598646b64a241cfba16ac7f",
+      "bytes": 6683
+    },
+    "scripts/d1-report-hashes.cjs": {
+      "sha256": "2ae87448db63849d62bb6ea58a51283b4edb958ff6ee10807df251807b322b19",
+      "bytes": 4564
+    },
+    "src/plugins/battleflow/visual-timing.ts": {
+      "sha256": "d90989d7496c25ba1a3688917df4db1ce0b071590d83f00b7c33819aace1e4cb",
+      "bytes": 8219
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/approved-plan-r2.zh.md": {
+      "sha256": "9de3ede2fd769ef18663bdc239bfd7b1fc8b51e6306fceb52a9a7e71f8b46135",
+      "bytes": 43815
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/d1-original-contract.json": {
+      "sha256": "8a5e4b1676ee6716fed83e705bcea3ed49c93b949f94428c6b99e92cfbcc3f8b",
+      "bytes": 8634
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/previous-preparation-pins.json": {
+      "sha256": "13e9c5f1af596c64d42bd0f44a52651fec5da3ae8ca5f72c9bbe85f846e348fc",
+      "bytes": 2167
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/previous-preparation-ownership.json": {
+      "sha256": "04020a704a83bd7e7b22ab0cd9bf75447bb4f222d87a086eb78dd3152a27dd00",
+      "bytes": 1627
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/g3-published-acceptance.json": {
+      "sha256": "c5d7189b75d7a087c3a9a5b46ec302d09c9b1854d0e995398f256b70b62eec80",
+      "bytes": 1276
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/capture-receiving-acceptance.json": {
+      "sha256": "61a64c7f9b1ba73932188beb54ebe0cd208f0b0d52fcf96c87f67b025d93490d",
+      "bytes": 1787
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/weather-g3-acceptance.json": {
+      "sha256": "102abed796dc6ce59a3ec5a4c358bddde7540441532a30d34e36d1b9589ac971",
+      "bytes": 1245
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/protect-acceptance.json": {
+      "sha256": "de5c44bf3b3964fd1f0e324cdb34548a2a81517ddb7253e7685276e763b33f49",
+      "bytes": 1296
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/d1-current-readonly-admission.json": {
+      "sha256": "c6b83f36e70b3250fdc11467cad6d02421bdd8447eecc61c3c4d272c5ab22c00",
+      "bytes": 1054
+    }
+  }
+}

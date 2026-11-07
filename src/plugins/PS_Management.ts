@@ -66,6 +66,15 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   inputFrame:inventoryInputFrame,
   hasBoxLink:()=>app().hasBoxLink?.()??false, // default reads authoritative inventory; explicit developer override stays process-local
   retryReceiving:()=>{if(!app().pendingReceiving)return false;return open({kind:'receiving'});},
+  // Dormant read-only normal observer. Existing current()/player input do not depend on it.
+  normalObservationState:()=>{
+   const c=current,s=G.SceneManager._scene;
+   const valid=()=>!!c&&!c.closed&&current===c&&c.scene===s&&G.SceneManager._scene===s&&c.valid();
+   if(!valid())return {status:'unavailable'};
+   const out={status:'available',current:true,generation:c!.generation,ownerToken:c!.token,requestKind:c!.request.kind,
+    ready:c!.ready,viewKind:c!.top()?.kind??null,receivingToken:c!.reception?.token??null,error:c!.error};
+   return valid()?out:{status:'unavailable'};
+  },
  };
  class Controller {
   scene:any;window:any;request:OpenRequest;application:any;token='';generation:number;ready=false;started=false;closed=false;frame=0;serial=0;

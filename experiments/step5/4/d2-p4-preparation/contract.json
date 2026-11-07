@@ -1,0 +1,175 @@
+{
+  "version": "D2-P4-preparation-contract-v1",
+  "state": "PROPOSAL_PENDING_INDEPENDENT_REVIEW",
+  "executionEnabled": false,
+  "authority": {
+    "approvedPlanSHA256": "9de3ede2fd769ef18663bdc239bfd7b1fc8b51e6306fceb52a9a7e71f8b46135",
+    "sections": [
+      "5 D2",
+      "6.1",
+      "6.2",
+      "6.3"
+    ],
+    "priorD1ContractSHA256": "8a5e4b1676ee6716fed83e705bcea3ed49c93b949f94428c6b99e92cfbcc3f8b",
+    "noNewProductScope": true
+  },
+  "control": {
+    "recommendation": "New normal-D2 bridge rooted at latest accepted/published product a4dc at this read snapshot, with the SAME reviewed normal benchmark driver/content/config/oracle added to both products. Freeze new clean SHA/tree on each side; a4dc is only a proposed root, never a ready control APP.",
+    "finalSelection": "Compare final integrated normalD2 against that normal bridge only after exact request/state/trace and shared runtime equivalence. Final product and control remain null.",
+    "comparability": "Same normal timing/text/effects/media policy, business workload, resolved seeds, formal App ports, runtime/window/DPR and observation policy. Every changed product/payload path has both hashes and rationale. If a metric has changed semantics or no valid bridge, mark NOT_COMPARABLE for that metric; preserve raw candidate results and paired obligation OPEN.",
+    "notControl": "Historical D1 fast/legacy or old canonical package is historical only; no extra mandatory D1 launches. Current preparation commit is not a product/control measurement commit."
+  },
+  "runs": {
+    "groups": [
+      "control-natural1",
+      "candidate-natural1",
+      "control-natural2",
+      "candidate-natural2",
+      "control-natural3",
+      "candidate-natural3",
+      "control-instrumentOff",
+      "candidate-instrumentOff",
+      "control-GC1",
+      "candidate-GC1"
+    ],
+    "battlesPerProcess": 100,
+    "formalProcesses": 10,
+    "formalBattles": 1000,
+    "naturalMedianModes": [
+      "natural1",
+      "natural2",
+      "natural3"
+    ],
+    "freshProcessProfileSavePerGroup": true,
+    "sameProcessAcross100": true,
+    "retry": "NONE_STOP_ON_FIRST_FAILURE",
+    "extraWarmupBattles": 0,
+    "normal": "No expose-gc and zero forced calls, no cache clearing or full-state reset between cases.",
+    "off": "Adjacent pair retains semantic/oracle and production perf; disables new fine probes. Fine frames/memory NOT_SAMPLED, not zero; no off p95 PASS.",
+    "GC": "Separate single diagnostic pair; expose-gc only here; two actual calls at each initial/after4/after50/after100/idle120 point, require success evidence.",
+    "qualification": "Outside formal groups; exact case/trace IDs and version; all attempts retained. Full100 qualification only when static normal branch bounds cannot otherwise be proved."
+  },
+  "host": {
+    "admission": "BLOCKED_PRIOR_OCCUPANCY_DENIAL",
+    "launchInThisCandidate": false,
+    "currentHostQueries": 0,
+    "priorDenial": "Original occupancy ps check denied; exact command/receipt retained by parent. No retry, alternative process listing, different runner, UI or inference of idle in this task.",
+    "futureGate": "Only after materially new relevant authorization, outcome check, and one permitted retry of the original known-unexecuted denied operation. A lease or user approval alone is not a successful occupancy receipt.",
+    "lease": "Named executor, bounded UTC window, no concurrent local build/test/NW/heavy GUI. Re-read all live ownership before reservation; cloud-only comparison work may continue if it does not contend locally.",
+    "occupancy": "Only reviewed narrow original host gate; no whole-machine ps replacement, no killing unrelated tasks. Query unavailable/denied => no launch.",
+    "ownedSampling": "After actual Popen identity only: exact PID/PGID plus birth identity, executable, recursive direct descendants and renderer binding. Race/partial/denied => null+UNKNOWN and reason. No global process scan or name sums.",
+    "capabilitySplit": "Unresolved occupancy/owned-cleanup admission blocks launch; an optional RSS sample failure after valid admission records UNKNOWN, never substitutes Renderer RSS."
+  },
+  "identity": {
+    "beforeRun": [
+      "both git SHA/tree/clean/source archive/patch",
+      "exact driver/validator/supervisor and input bytes/canonical Node JSON.stringify hash",
+      "resolved content/config/locale/expected ordered100 IDs and all seeds",
+      "Showdown7244fe8 lock+actual staged/build, Gen8, Reactor fixed source and runtime hashes",
+      "NW/Node/Chromium/V8/macOS/arm64 and native executable identity",
+      "SDK/plugins/resources and all files/directories/modes/internal-link-targets",
+      "both strict deep signatures and signing policy; no widening binary exclusions",
+      "exact CI H/tree/branch/event/attempt/jobs+steps and review disposition",
+      "frozen argv/env/GC/probes/deadlines/output/profile/save roots; new roots nonexisting"
+    ],
+    "differencePolicy": "Replace D1 three-path allowlist with independently reviewed exact per-path control+candidate hashes and source reason; preserve engine/SDK/locale changes if legitimate, do not whitelist whole directories.",
+    "afterRun": "Full APP files/modes/dirs/links and strict signatures before/after even on failure. Binding to exact raw report, group ID, input nonce, start/end UTC and PID lineage; mutation invalidates the group.",
+    "state": "Actual Node JSON.stringify+crypto and package core validateGame; no Python float substitution/field removal/time normalization. Preserve every case full state+ledger receipt for independent middle-row hashes; formal overlay must disclose oracle overhead in both modes."
+  },
+  "metrics": {
+    "clocks": [
+      "performance.now monotonic",
+      "updateMain game frame/tick",
+      "rAF display frame/tick",
+      "wall UTC correlation only"
+    ],
+    "frames": [
+      "raw dt/t/count separately by clock",
+      "per-process p50/p95/p99/max",
+      "strict >33ms count/ratio",
+      "contiguous raw long-frame segments",
+      "focus/visibility/window/DPR with each sample"
+    ],
+    "spans": [
+      "event-start",
+      "transition-select/start/end",
+      "scene-controller-ready",
+      "first-input-ready",
+      "input-submit",
+      "action-start/resolved",
+      "AI-start/end budget window",
+      "prepare-commit-start/end",
+      "install-start/end",
+      "return-map-ready"
+    ],
+    "waitSeparation": "Record union of actual intentional-wait intervals (not sum of overlapping tracks), raw total and exposed nonwait. Preserve all slow frames; not CPU attribution; never deduct post-hoc expected waits from an unrelated endpoint.",
+    "memoryPoints": [
+      "initial-map",
+      "after4",
+      "after50",
+      "after100",
+      "after-idle120-game-ticks"
+    ],
+    "memory": [
+      "raw renderer RSS bytes",
+      "node heap used bytes",
+      "browser JS heap bytes or null",
+      "actual owned whole-app tree RSS bytes or null",
+      "reachable texture/bitmap/window/listener/rootOwner/saveBarrier counts"
+    ],
+    "units": "Raw bytes and explicit /1048576 MiB. Original canonical MB label/method preserved; no silent reinterpretation of old rounded units.",
+    "aggregation": "Compute each process independently then median of three natural summaries; never pool natural/GC/off or substitute rAF for updateMain. Positive comparable baseline may use +20%; nonpositive growth ratios are N/A, report raw differences.",
+    "coverage": "No physical input, audio listening, allocation/CPU attribution, Windows/Intel, complete D2/E/5.4 acceptance by this report."
+  },
+  "presentationTargets": {
+    "hpMs": 1000,
+    "fullExpSegmentMs": 1750,
+    "fullExpFlashMs": 200,
+    "pictureUnitMs": 50,
+    "genericTransitionUnits": 25,
+    "genericTransitionMs": 1250,
+    "VSTrainerMainMs": 4000,
+    "meaning": "Existing semantic targets, not measured times or new hard perf budgets; preflash/postwait/return-map0.4s recorded separately. Never skip waits to hit a performance number."
+  },
+  "deadlines": {
+    "state": "QUALIFICATION_REQUIRED_NOT_FROZEN",
+    "processSeconds": null,
+    "qualificationInputs": null,
+    "formula": "Finite process bound = qualified launch upper + sum(all100 enumerated intentional critical-path upper bounds + reviewed per-kind nonwait/input upper bounds) + idle120 game ticks bound + bounded sampling/verification/tail budgets. All components, safety factors, raw qualification sources and final numeric value must be frozen/reviewed before running.",
+    "branchGate": "Cover later progression/receiving/level branches, not just first4. If static enumeration is unavailable, one separately labelled full100 qualification per version supplies traces; never substitute expected state or call a failed formal run qualification afterward.",
+    "noLegacy900": "Old D1 900-second limit is not accepted for normalD2 without proof. Timeout stops and preserves; no post-failure extension or automatic rerun."
+  },
+  "thresholds": {
+    "factor": 1.2,
+    "severity": "WARN_ONLY",
+    "historicalCanonicalRows": "Unchanged in docs/step5/perf-budget.json; compare only identical measurement method/units. Old159ms excludes deliberate4s presentation and cannot bound totalD2.",
+    "historicalMemory100": {
+      "label": "memory: app RSS growth from 4 to 100 battles (MB)",
+      "baseline": {
+        "source": "experiments/step5/evidence/5.0/remediation/foreground-baseline/memory100-run1.json",
+        "gitHead": "c789620a153d8efeb8bc0b39afe3ea92685db8fc",
+        "rssAfter4": 1223,
+        "rssAfter100": 1229,
+        "growth": 6,
+        "runs": 1,
+        "method": "Same fresh ad-hoc foreground baseline package; 25 rounds x 4 kinds, --js-flags=--expose-gc, every sample gcForced=true; DPR 2, zero skipped unfocused frames and positive battle/map frame samples."
+      },
+      "warnAbove": 7.2,
+      "note": "Current fourth-step baseline replaces the second-step hardened historical reference. One 100-battle run and rounded MB samples cannot establish or rule out a leak; report the curve and warn only."
+    },
+    "pairedD2": "Matched rows > control natural median*1.2 are WARN; frame long33ms is descriptive, not an invented hard failure. Ratios for nonpositive control are N/A.",
+    "newHardPerfThreshold": null,
+    "historicalGCWarn": "+23.8929% remains OPEN, one pair; no leak conclusion",
+    "cpuAllocation": "OPEN"
+  },
+  "failure": {
+    "firstError": "Retain original business/fatal/timeout/signal separately from cleanup errors and later tail failures; any failure prevents next group.",
+    "prelaunchDenied": "No native attempt, signal, repeated occupancy or alternative check; independent file preparation may continue.",
+    "finally": "For attempted launch: reconcile uncertain outcome first; cleanup only proven owned group; final APP inventory/signature and after-idle as authorized. Receipt absent/permission denied remains UNKNOWN/FAIL_STOP. A denied query is not automatically retried by finally.",
+    "cleanup": "Record ownership, bounded TERM/grace/KILL policy before run; never signal uncertain/reused PID or nonowned helper. Exact owned group absence required; unknown means no next launch.",
+    "preservation": "New exclusive attempt roots; stdout/stderr/raw reports/progress/signal/RSS/hash-helper bytes/PID/exit/deadline/cleanup/tail records. Preserve partials and all old failures; no retry to green.",
+    "acceptance": "All100 exact IDs/order/expected outcomes, no fatal/timeout/mutation, actual exits, complete declared tails, independent review. Reproducible measurements/WARN disposition is P4 gate, not warning eradication."
+  },
+  "continue": "Separate functional producer -> ordinary isolated save -> producer exit/owned cleanup -> new profile+NW process actual Title/Continue/Scene_Load exact slot -> next real battle. Bind full state, explicit MZ fields, slot bytes, paired ledger, consumed vs temporary-held outcomes and no repeated install. Not counted among100 or proved by Node method-only Continue.",
+  "pureControlScope": "Offline validator and in-memory finally reference controls only; neither accepts a host receipt nor launches NW. New normal native supervisor/driver NOT_IMPLEMENTED."
+}

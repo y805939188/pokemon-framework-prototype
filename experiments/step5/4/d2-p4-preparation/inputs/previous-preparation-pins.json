@@ -1,0 +1,45 @@
+{
+  "schema": "D2-P4-successor-pins-v1",
+  "scope": "PREPARATION_ONLY",
+  "executionGranted": false,
+  "knownPreparationAnchor": {
+    "readUTC": "2026-11-04T09:36:35.417985+00:00",
+    "candidatePath": "/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step5-4-d2-pause-integration-20261104",
+    "candidateHead": "4d64f3502b0d054c365d80e51822890a1d1de0f6",
+    "candidateTree": "50ddb792d547aa36dea75ca29cb69e9ed749b49e",
+    "candidateStatus": "",
+    "mainPath": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-prototype",
+    "mainHead": "d6aae8cfa4d706cf976c42aeb3dcc683a252aa03",
+    "currentCollectorLastCommit": "b465e26c9e5ee7c8e1d54b27876c274d68cd6742",
+    "note": "Read-only local Git identity; no fetch/push/network and no claim final D2 identity."
+  },
+  "historicalP4": {
+    "candidate": "03b3c582aca7ab2bf99bc1356c2702999f923fab",
+    "control": "7e53dc2a43f375e4a95a6355e120aba1f998b758",
+    "status": "PASS_SCOPED_WITH_WARN_OPEN",
+    "notFinalD2": true
+  },
+  "requiredSuccessorPins": {
+    "ownershipConfirmation": null,
+    "finalProductSHAAndTree": null,
+    "comparableControlSHAAndTreeOrExplicitNonComparableDisposition": null,
+    "D2NormalWorkloadAndExpectedCaseIDs": null,
+    "driverValidatorSupervisorHashesAndStaticReview": null,
+    "contentConfigurationEngineReactorSDKResourceHashes": null,
+    "controlAndCandidateFullAppInventoriesAndStrictSignatures": null,
+    "exactProductAndDriverCIProof": null,
+    "functionalAndPerformanceActualArgvAndFiniteDeadlines": null,
+    "producerConsumerSaveAndExpectedStateContract": null,
+    "failureFinallyTailCheckContract": null,
+    "exclusiveHostWindowAndDesignatedExecutor": null,
+    "applicableExecutionAuthorizationOrExistingScopeEvidence": null
+  },
+  "preservedOpen": [
+    "GC_APP_RSS_GROWTH_WARN_OPEN +23.8929% in historical single GC pair",
+    "old canonical workload NOT_COMPARABLE unless same measurement proven",
+    "CPU/allocation attribution OPEN",
+    "U51 UNKNOWN and original FAIL/DEFER",
+    "MC STOPPED_NO_RETRY / FAIL_NO_RETRY and historical NOT_EXECUTED tail",
+    "physical input / actual listening / platform / Ruby boundaries unchanged"
+  ]
+}

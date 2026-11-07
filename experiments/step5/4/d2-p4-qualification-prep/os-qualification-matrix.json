@@ -1,0 +1,28 @@
+{
+  "version": "D2-P4-native-interface-qualification-matrix-v1",
+  "state": "PROTOCOL_PREPARED_ACTUAL_OS_NOT_EXECUTED",
+  "reviewedInterfaceSource": "2dcb1b9809cb3536097e386e5c89521de6fcb4ad",
+  "nativePermit": "CLOSED",
+  "originalHostGate": "UNRESOLVED_NOT_QUERIED_NO_ALTERNATIVE",
+  "qualificationEntry": null,
+  "actualResults": null,
+  "records": [
+    {"id": "OS01", "interface": "SystemOps permission boundaries", "offlineEvidence": "2dcb independent default-ClosedPermit controls", "actualRequired": "Review permitted operations and actual authority provenance; JSON true/typed fixture is not authorization", "actualStatus": "NOT_RUN"},
+    {"id": "OS02", "interface": "MacOSBackend.preflight_identity and final identity", "offlineEvidence": "static inventory/signature FakeOps and unchanged-source controls", "actualRequired": "Final source/APP/runtime/SDK/config identity and strict deep signature before/after, including failure; do not widen exclusions", "actualStatus": "NOT_RUN"},
+    {"id": "OS03", "interface": "original_gate / admit_host", "offlineEvidence": "missing original receipt blocks, no substitute query", "actualRequired": "Parent-held original denied operation, materially new relevant evidence and successful original receipt, named executor and exclusive window; do not run or reconstruct it here", "actualStatus": "BLOCKED_PRIOR_DENIAL"},
+    {"id": "OS04", "interface": "launch / OwnedProcess", "offlineEvidence": "FakeOps exact root/group/birth/collector association", "actualRequired": "Actual Popen root identity, PGID, birth, executable, parent, nonce and group; final argv/env/profile/save/output fixed and fresh; no name search", "actualStatus": "NOT_RUN"},
+    {"id": "OS05", "interface": "reconcile_launch", "offlineEvidence": "uncertain result only reconciles recorded child", "actualRequired": "Retain actual launch-attempt outcome and known child; uncertain without owned child stays UNKNOWN and stops, never retries launch", "actualStatus": "NOT_RUN"},
+    {"id": "OS06", "interface": "wait_report / verify_report", "offlineEvidence": "bounded wait, fatal/exit and raw SHA before/after controls", "actualRequired": "Real raw report, actual exits and formal Node/package-core validator with complete100 state/seed/ledger; verify callback None is necessary but not proof of real validator", "actualStatus": "NOT_RUN"},
+    {"id": "OS07", "interface": "owned tree RSS sampling", "offlineEvidence": "partial/denied/reused owner becomes null+UNKNOWN", "actualRequired": "Actual exact owned recursive descendants and renderer attribution; completeness/birth checks and raw source evidence; no global process listing. Current backend retains structured fields only, so raw ps text and actual renderer proof remain missing", "actualStatus": "NOT_RUN"},
+    {"id": "OS08", "interface": "cleanup / owned group absence", "offlineEvidence": "bounded TERM/grace/KILL, wrong/reused ownership refusal and first-error retention", "actualRequired": "Actual authorized owned-group cleanup and absence receipt, including leader-exited/group-liveness case; permission errors/unknown stop next group, no unrelated signal", "actualStatus": "NOT_RUN"},
+    {"id": "OS09", "interface": "output path and frozen APP boundary", "offlineEvidence": "P4-NATIVE-ULTRA-02 CLOSED_SCOPED, physical case/link/retarget/other-APP FakeOps controls", "actualRequired": "Final exact output/profile/save locations independently bound outside both APPs, normal external output plus actual inventory/signature tails. Scoped code acceptance is not complete concurrent-filesystem proof", "actualStatus": "NOT_RUN"},
+    {"id": "OS10", "interface": "game clocks / memory points / GC policy", "offlineEvidence": "pure frame/wait arithmetic and per-mode policy controls", "actualRequired": "Actual updateMain and rAF separately, monotonic spans, initial/4/50/100/idle120 game-tick samples, normal/off no exposeGC or forced calls; GC-only exact 2 calls at all5 points with success evidence", "actualStatus": "NOT_RUN"},
+    {"id": "OS11", "interface": "native qualification attempt ledger", "offlineEvidence": "deadline proposal rejects formal-group IDs relabelled as qualification", "actualRequired": "Outside formal groups, exact trace/APP/tool/mode/source versions and every attempt/raw/exit/failure preserved; failed formal runs never reclassified", "actualStatus": "NOT_RUN"},
+    {"id": "OS12", "interface": "formal group supervisor / final tails", "offlineEvidence": "reviewed injected-port supervisor first-error/finally controls", "actualRequired": "10 exact groups, no retry or next group after failure/UNKNOWN, proven cleanup, post-package identity and after-gate; actual qualification remains separate from formal results", "actualStatus": "NOT_RUN"}
+  ],
+  "currentCommands": [],
+  "hostQueries": 0,
+  "NW": 0,
+  "nativeAdmission": false,
+  "P4Accepted": false
+}

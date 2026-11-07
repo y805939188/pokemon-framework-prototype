@@ -1,0 +1,39 @@
+{
+  "version": "D2-P4-runtime-binding-template-v1",
+  "state": "IMPLEMENTED_CORES_NOT_INTEGRATED_NOT_NATIVE_NOT_P4",
+  "nativeEntry": "NOT_IMPLEMENTED_NO_LAUNCH_CLI",
+  "reviewedPreparation": "48f3da4edb9dc0f94d380fa13433aa582f0848f4",
+  "reviewDecision": "PASS_SCOPED_PREPARATION",
+  "proposedNormalControlRoot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+  "required": {
+    "finalProductSHA_tree_clean_and_exactCI": null,
+    "normalControlSHA_tree_clean_and_exactCI": null,
+    "sharedPluginRoutingAndTestRegistrationByCentralOwner": null,
+    "full100ResolvedNormalTraceAndSemanticReview": null,
+    "qualifiedFiniteDeadlinesAndSources": null,
+    "formalAppFixtureAndAllSetupWriteSets": null,
+    "receivingGrowthMapTitleAdaptersAndLifecycleReview": null,
+    "nativeBackendOwnershipCleanupSamplingSignaturesReview": null,
+    "finalAPPInventoryRuntimeEngineSDKContentConfiguration": null,
+    "exactDeclaredPayloadDiff": null,
+    "materiallyNewAuthorizationAndOriginalSuccessfulOccupancyReceipt": null,
+    "namedExecutorExclusiveWindowAndNewExecutionRoot": null
+  },
+  "sharedWritesPaused": [
+    "src/plugins/PS_BattleFlowTest.ts: import/route new normal driver and real fixture lifecycle",
+    "scripts/test-headless.sh: register successor Node/Python suites when central owner integrates",
+    "package/runtime build and actual binding: final product/normal control not yet frozen",
+    "shared STATUS: parent single writer"
+  ],
+  "implemented": [
+    "one-game-update input release and normal grid/pause/stat-page input core",
+    "BattleScene DTO/operation/App-generation binding factory, not installed in plugin",
+    "typed admission/owned-process supervisor orchestration and first-error/finally receipts via injected ports",
+    "static full file/mode/directory/internal-link inventory and exact declared payload differences",
+    "Node JSON.stringify intention/input identity and resolved-trace shape gate",
+    "separate raw frame clocks, wait union, natural-only median and WARN-only comparison"
+  ],
+  "actualNativeProcesses": 0,
+  "actualBattles": 0,
+  "nativeAdmissionGranted": false
+}

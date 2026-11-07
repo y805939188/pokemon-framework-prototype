@@ -1,0 +1,51 @@
+{
+  "captureUTC": "2026-11-06T08:03:24.261831+00:00",
+  "readOnlyOriginals": true,
+  "inputs": {
+    "experiments/step5/4/d2-p4-preparation/inputs/approved-plan-r2.zh.md": {
+      "originalPath": "/Users/dingshinn/Desktop/pokemon-framework/.handoff/step5-4-M0-readonly-checkpoint-ae3ec1b-20261029T062059Z/inputs/APPROVED-PLAN-r2.zh.md",
+      "sha256": "9de3ede2fd769ef18663bdc239bfd7b1fc8b51e6306fceb52a9a7e71f8b46135",
+      "bytes": 43815
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/d1-original-contract.json": {
+      "originalPath": "/Users/dingshinn/Desktop/pokemon-framework/.verify/step5-4-D1-measurement-contract-20261031T0318Z/MEASUREMENT-CONTRACT.v1.json",
+      "sha256": "8a5e4b1676ee6716fed83e705bcea3ed49c93b949f94428c6b99e92cfbcc3f8b",
+      "bytes": 8634
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/previous-preparation-pins.json": {
+      "originalPath": "/Users/dingshinn/Documents/Codex/2026-11-04/task-3/EXECUTION-PINS.json",
+      "sha256": "13e9c5f1af596c64d42bd0f44a52651fec5da3ae8ca5f72c9bbe85f846e348fc",
+      "bytes": 2167
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/previous-preparation-ownership.json": {
+      "originalPath": "/Users/dingshinn/Documents/Codex/2026-11-04/task-3/OWNERSHIP.json",
+      "sha256": "04020a704a83bd7e7b22ab0cd9bf75447bb4f222d87a086eb78dd3152a27dd00",
+      "bytes": 1627
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/g3-published-acceptance.json": {
+      "originalPath": "/Users/dingshinn/Desktop/pokemon-framework/.verify/step5-4-g3-terminal-hitcount-tests-formal-acceptance-20261106.json",
+      "sha256": "c5d7189b75d7a087c3a9a5b46ec302d09c9b1854d0e995398f256b70b62eec80",
+      "bytes": 1276
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/capture-receiving-acceptance.json": {
+      "originalPath": "/Users/dingshinn/Desktop/pokemon-framework/.verify/step5-4-d2-capture-receiving-scene-independent-acceptance-20261106.json",
+      "sha256": "61a64c7f9b1ba73932188beb54ebe0cd208f0b0d52fcf96c87f67b025d93490d",
+      "bytes": 1787
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/weather-g3-acceptance.json": {
+      "originalPath": "/Users/dingshinn/Desktop/pokemon-framework/.verify/step5-4-e-weather-g3-unified-independent-acceptance-20261106.json",
+      "sha256": "102abed796dc6ce59a3ec5a4c358bddde7540441532a30d34e36d1b9589ac971",
+      "bytes": 1245
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/protect-acceptance.json": {
+      "originalPath": "/Users/dingshinn/Desktop/pokemon-framework/.verify/step5-4-e-protect-app-independent-acceptance-20261106.json",
+      "sha256": "de5c44bf3b3964fd1f0e324cdb34548a2a81517ddb7253e7685276e763b33f49",
+      "bytes": 1296
+    },
+    "experiments/step5/4/d2-p4-preparation/inputs/d1-current-readonly-admission.json": {
+      "originalPath": "/Users/dingshinn/Desktop/pokemon-framework/.verify/step5-4-final-d2-admission-current-readonly-20261105.json",
+      "sha256": "c6b83f36e70b3250fdc11467cad6d02421bdd8447eecc61c3c4d272c5ab22c00",
+      "bytes": 1054
+    }
+  }
+}
