@@ -77,6 +77,8 @@ function opening(h) {
   assert.equal(switches.length, 2); assert.equal(wire.filter(e => e.type === 'turn').length, 1); assert.equal(wire.find(e => e.type === 'turn').args[0], '1');
   assert.equal(wire.filter(e => e.type === 'move' || e.type === 'cant' || e.type === 'faint').length, 0);
   assert.equal(JSON.stringify(batch.messages), batch.wire, 'Scene must not repair or mutate original public messages');
+  const engine = JSON.parse(h.session.gw.snapshot());
+  for (const side of engine.sides) {assert.equal(side.pokemonLeft, side.pokemon.filter(m => !m.fainted).length); assert.equal(side.totalFainted, 0, 'carried faints do not become new KOs');}
   for (const side of ['p1', 'p2']) {
     const m = live(h)[side].find(m => m.active), e = switches.find(e => e.args[0] === side + 'a: ' + m.id);
     assert(e); assert.equal(e.args[2], m.hp + '/' + m.maxhp + (m.status ? ' ' + m.status : ''), 'native opening condition'); cardMatches(h, side);
@@ -184,4 +186,30 @@ for (const status of ['slp', 'brn']) test('direct real Session seeds injured ' +
   assert.equal(captured.hp, foe.hp); assert.equal(captured.status, status); assert.equal(captured.statusCount, foe.statusCount); assert.equal(captured.moves[0].pp, 17);
   assert.deepEqual(s.gw.readState('p2')[0], before); assert.equal(events(r.messages).filter(e => e.type === 'move' || e.type === 'cant' || e.type === '-damage').length, 0);
   console.log('OPENING_STATE ' + JSON.stringify({name: 'direct-foe-' + status, opening: wire, before, captured, execution: 'REAL_SESSION_SYNTHETIC_CARRIED_RECORD', NW: 0}));
+});
+for (const count of [undefined, 3]) test('sleep ' + (count === undefined ? 'legacy missing count draws exactly once' : 'explicit count does not draw') + ' before native entry', async () => {
+  const c = content(input => {addSpecies(input, 'snorlax', ['splash']);});
+  const member = id => E.memberFactory.createMember({id, species: 'Snorlax', level: 50, abilityIndex: 1}, c, () => 0);
+  const player = member('SLEEP-P'), foe = member('SLEEP-F'); player.status = 'slp';
+  if (count === undefined) delete player.statusCount; else player.statusCount = count;
+  const game = E.state.newGame({content: c, party: [E.speciesKey.toPersistentMember(player, c)]});
+  if (count === undefined) delete game.party[0].statusCount;
+  const {PRNG} = require('../../../js/engine/showdown/dist/sim/prng.js'), calls = [], base = E.gateway.showdownDriverFactory;
+  const driver = {...base, async create(options) {
+    const gw = await base.create(options), seed = gw.seedState.bind(gw);
+    gw.seedState = (side, records) => {
+      const before = JSON.parse(gw.snapshot()).prng, oracle = new PRNG(before);
+      const expected = side === 'p1' && count === undefined ? oracle.random(2, 5) : count;
+      seed(side, records); const after = JSON.parse(gw.snapshot()).prng;
+      assert.equal(after, oracle.getSeed(), side + ' seed consumes exactly the required sleep draw and no others'); calls.push({side, before, after, expected});
+    };
+    return gw;
+  }};
+  const s = await E.session.BattleSession.create({game: E.speciesKey.battleView(game, c), content: c, battleId: 'legacy-sleep-' + String(count), seed: [1, 2, 3, 4], driver, foe: {kind: 'wild', team: [foe]}});
+  assert.deepEqual(calls.map(x => x.side), ['p1', 'p2']); const actual = s.gw.readState('p1')[0]; assert.equal(actual.statusCount, calls[0].expected);
+  assert(actual.statusCount >= 2 && actual.statusCount <= 4); assert.equal(actual.pp.splash, 40);
+  const observed = () => {const snap = JSON.parse(s.gw.snapshot()); return {prng: snap.prng, log: snap.log, p1: s.gw.readState('p1'), p2: s.gw.readState('p2')};};
+  const checkpoint = s._checkpoint(), before = observed(); await s._restoreCheckpoint(checkpoint);
+  assert.deepEqual(observed(), before, 'restore does not repeat opening, sample sleep again, or alter dynamic state');
+  console.log('OPENING_STATE ' + JSON.stringify({name: 'sleep-count-' + String(count), calls, actual, execution: 'REAL_SESSION_WITH_READ_ONLY_SEED_OBSERVATION', NW: 0}));
 });

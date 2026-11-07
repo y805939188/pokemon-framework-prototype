@@ -476,7 +476,12 @@ function checkObedience(battle: ShowdownBattle, pokemon: ShowdownPokemon, target
 }
 
 const rpgHandlers = {
-  onBattleStart(this: ShowdownBattle): void { startInitialField(this); },
+  onBattleStart(this: ShowdownBattle): void {
+    // The native start action resets pokemonLeft after Team Preview. Restore carried-faint
+    // counts before any switch-in/entry effect, without a new KO or another HP/status/PP seed.
+    for (const side of this.sides) side.pokemonLeft = side.pokemon.filter((p: ShowdownPokemon) => !p.fainted).length;
+    startInitialField(this);
+  },
   onModifyMove(this: ShowdownBattle, move: ShowdownPokemon, pokemon: ShowdownPokemon): void {
     const observer = settlements.get(this);
     if (!observer) return;
