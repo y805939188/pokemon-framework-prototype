@@ -1296,7 +1296,7 @@
         "Description 34 is not 34 real engine causes or all 16 reasons tested through Scene.",
         "No new mapping of every whitelist reason into frozen FR rows.",
         "Unknown reasons use neutral fallback; no complete ability-specific feedback.",
-        "Original 34/34 old-description failures, Scene 16/22 and 20/22 failures retained.",
+        "Original old-description run: 34 failed out of 34. Historical Scene first run: 16 passed and 6 failed out of 22; second run: 20 passed and 2 failed out of 22. Original failure records retained.",
         "Opening-card defect was still open at ci274 and fixed separately in ci275; no retrospective ci274 opening PASS.",
         "Controlled VM; no native pixels/fonts/audio/NW."
       ],
