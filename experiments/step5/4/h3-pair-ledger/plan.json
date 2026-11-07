@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "scope": "CONTROLLED_ACTUAL_SESSION_INDEPENDENT_PAIR_INSTALL_COMPRESSED_SAVE_FRESH_NODE_NOT_NW",
+  "base": "75c736ad60cd6b5ceeffab948244b18aa83d8720",
+  "schema": 9,
+  "protocol": 1,
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "host": {
+    "js/reactor_managers.js": "0a45145a23c377f70d5df07b0b58e12679f14b84e4e9d2ae8ea90ac3e9cfca04",
+    "js/reactor_core.js": "b18c5f887be92cd3ee199660f371d2dd9a3b383003925c42a16219aee44201ec",
+    "js/libs/pako.min.js": "29cfa0542b9864b6640cfdcc8f15b184db6431b532db2702a3ce97e5f2a7fc1c",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3"
+  },
+  "engine": {
+    "js/engine/build/content-cli.cjs": "41168bff64ca2e564a17fbf3af8aa451f2b00f536b7d32110cb83c7b3564ea54",
+    "js/engine/build/core.cjs": "702b884c1ca31ed0ec4036e72db08c50d614729962b583afa10c8ceb588d43c5",
+    "js/engine/build/custom-formats.cjs": "001e16652e90e5417102769689b482c1bc4ba4a3b9b5ed7c1789459c6a4f501c",
+    "js/engine/build/engine.cjs": "c0c3c351133d9cce8c0da7b99353e32770ea410b98e6e0e117452a1b6fa7c000",
+    "js/engine/build/production.cjs": "0264aee6b2606d2a1c9a666521a8b3ce4a0289ffea5676111cf826579714ccf7",
+    "js/engine/build/public-presentation-ABj0EuvG.js": "2172ae4b672ae98046c3743b989a479799acc7300abab5a80f02b154b9f8cfa0",
+    "js/engine/build/session-DH4u-YM4.js": "8147d1eaef9a684ccbfed6cb0700104858175a1d1ffbc1627b42caa5387afb1b",
+    "js/engine/build/testing.cjs": "c431cf396b5f6d935fc7c085d5d4ee6ff9d64b84e566b6419c5680fdf85e5d94",
+    "js/engine/build/trainer-ai-diagnostics-KpdVcIqs.js": "1dd4db3c51ec6e38786abf4b468a4f2299cdbc9b8d0da18e663fb10ecfb649f1",
+    "js/engine/showdown/SOURCE_SHA": "495b7f40c79b08384b2bb2be040edbc952be76fe18f8dff1a96f0fb949fc78ba",
+    "js/engine/showdown/dist/config/custom-formats.js": "001e16652e90e5417102769689b482c1bc4ba4a3b9b5ed7c1789459c6a4f501c"
+  },
+  "hostAdaptations": [
+    "minimal nonrendering Game_* constructors",
+    "owned temporary StorageManager.fileDirectoryPath",
+    "read-only restricted Node fs boundary",
+    "observer awaiting all actual slot/global save promises"
+  ],
+  "appCapabilities": {
+    "allowHeldItemSources": true,
+    "allowExperimentalHeldItemBattle": true
+  },
+  "cases": [
+    {
+      "id": "EMZS01",
+      "kind": "consume",
+      "expect": "real berry consumed; ordinary compressed slot; next Node battle has no berry"
+    },
+    {
+      "id": "EMZS02",
+      "kind": "knockoff",
+      "expect": "trainer temporary Knock Off then normal Tackle victory; ordinary compressed slot; next Node actually receives and loses restored item",
+      "entry": "startTrainerBattle c-basic/version1 one Pidgey level5"
+    },
+    {
+      "id": "EMZS03",
+      "kind": "consume",
+      "abort": true,
+      "expect": "new Node actual continuation then abort keeps original compressed slot and ledger"
+    }
+  ],
+  "NW": 0,
+  "fullTitleAcceptance": false,
+  "independentOracle": "Node crypto SHA256; lexicographic object keys; array order preserved; domain required-battle-settlement-v1"
+}
