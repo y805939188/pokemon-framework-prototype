@@ -107,4 +107,21 @@ export function developmentCapabilities(raw: unknown = {}): DevelopmentCapabilit
   return { allowHeldItemSources: false, allowExperimentalHeldItemBattle: false, ...record } as DevelopmentCapabilities;
 }
 
+/** Normal production policy is a code-reviewed release decision, never a runtime input.
+ * B-3 remains closed until its main-integration and independent acceptance prerequisites hold.
+ * One value controls both sources and battle admission so release wiring cannot open only one side.
+ */
+const ORDINARY_HELD_ITEMS_RELEASED: boolean = false;
+
+/** Effective policy for production callers. The only override remains the existing developer port.
+ * Do not pass settings, plugin parameters or saved state here. Validation deliberately remains strict.
+ */
+export function runtimeCapabilities(developerOverrides: unknown = {}): Readonly<DevelopmentCapabilities> {
+  const developer = developmentCapabilities(developerOverrides);
+  return Object.freeze({
+    allowHeldItemSources: ORDINARY_HELD_ITEMS_RELEASED || developer.allowHeldItemSources,
+    allowExperimentalHeldItemBattle: ORDINARY_HELD_ITEMS_RELEASED || developer.allowExperimentalHeldItemBattle,
+  });
+}
+
 export type { RuleOverrides } from "./settings-types";

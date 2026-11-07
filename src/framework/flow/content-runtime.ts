@@ -5,7 +5,7 @@
  */
 import { checkItemInputs } from "../content/item-input";
 import type { CompiledContent, ContentError } from "../content/schema";
-import { checkOverrides, developmentCapabilities } from "../rules/config";
+import { checkOverrides, runtimeCapabilities } from "../rules/config";
 import { COMPILED_SCHEMA_VERSION } from "../content/schema";
 import { canonicalJson, speciesFieldProblem, checkSources, preUseProblem, showdownDependencyProblem } from "../content/compile";
 import type { Content, DexLookup, Member } from "../rules/types";
@@ -84,7 +84,7 @@ export function loadCompiled(json: unknown): CompiledContent {
 
 export function assembleContent(compiled: CompiledContent, dex: DexLookup, developerCapabilities: unknown = {}): { content: Content; errors: ContentError[] } {
   const errors: ContentError[] = [];
-  const capabilities = developmentCapabilities(developerCapabilities);
+  const capabilities = runtimeCapabilities(developerCapabilities);
   try { loadCompiled(compiled); } catch(error) { return {content:{species:{}},errors:[{file:"compiled",path:"$",message:(error as Error).message}]}; }
   const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash, compiledSemantics: COMPILED_SCHEMA_VERSION, showdownSha: compiled.showdownSha, contentIdentity: compiled.contentIdentity }, registrationOrder: compiled.registrationOrder?.map(k=>({...k})), regionalDex: JSON.parse(JSON.stringify(compiled.regionalDex)) as import("../rules/types").RegionalDex, ...(compiled.mapMetadata ? {mapMetadata:JSON.parse(JSON.stringify(compiled.mapMetadata)) as import("../rules/types").MapMetadata} : {}), moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {}, ...(compiled.settings ? { settings: { ...compiled.settings } } : {}) };
   // A compiled document may be older than the gate, or edited by hand. Validate the whole registry and every source

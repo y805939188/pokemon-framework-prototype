@@ -51,7 +51,7 @@ import { stateIdentity } from "./state-identity";
 import type { ReceptionContext, ReceptionPending } from "./reception-types";
 import { ManagementSession } from "./management";
 import type { ManagementOutcome, ManagementRequest } from "./management";
-import { developmentCapabilities, resolveConfig } from "../rules/config";
+import { runtimeCapabilities, resolveConfig } from "../rules/config";
 import type { DevelopmentCapabilities } from "../rules/config";
 import type { ItemDescriptor, MemberReference } from "../rules/storage-operations";
 import { healParty, recoverAll } from "../rules/heal";
@@ -282,7 +282,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.startMoney = options.startMoney ?? 3000;
     if (!Number.isSafeInteger(this.startMoney) || this.startMoney < 0) throw new Error("invalid-start-money");
     this.noMoneyLoss = options.noMoneyLoss ?? false;
-    this.capabilities = developmentCapabilities(options.capabilities);
+    this.capabilities = runtimeCapabilities(options.capabilities);
     this.depositHeal = options.depositHeal ?? false;
     this.profile = { ...(options.receivingProfile ?? { mode: 0, naming: 0 }) };
     if (![0, 1, 2].includes(this.profile.mode) || !Number.isSafeInteger(this.profile.naming) || this.profile.naming < 0) throw new Error("invalid receiving profile");

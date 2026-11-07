@@ -1,0 +1,27 @@
+{
+  "base": "da86278c5c9c2bc48592c0af0fd25e8727353834",
+  "runtimeBase": "H3-production-policy-own-build-see-review-entry",
+  "scope": "exact compiled plugin formal command and Scene; synthetic nonrendering host, not NW",
+  "files": {
+    "js/plugins/PS_BattleFlow.js": "cd17e67d8a5f12c1ec1793270ceb56f4fcd4bc964dc1fd19f35e364a998aa202",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "js/plugins/PS_Evolution.js": "74403e3c9299df414ac9a05965951907e2a63f3d06db8baf52298d7670097622",
+    "js/plugins/PS_BattleFlowTest.js": "15298ab1a938fb5a0d75bc74b020ba69ac7d8ad0e53321de5d10f44a00c28082",
+    "js/reactor_managers.js": "0a45145a23c377f70d5df07b0b58e12679f14b84e4e9d2ae8ea90ac3e9cfca04",
+    "js/reactor_objects.js": "f4ee924ffd7b493c47357b9bb4e53d97a94e0ff1f07db7c8f637cb7c57c50235",
+    "js/reactor_scenes.js": "8826bfe54b2c1688022d3a1a807d06a697509b36e124f19aeb0fef5a6faf137b",
+    "data/System.json": "33792db542a8671e2510f44b27baa2b6766c385b0bee5bad9b32d25bb8a05eab",
+    "experiments/step5/4/victory-music-driver-host.cjs": "b6038311b6a13ad41ef3652b6fb632f89d23194dd410b1c14a85764d6b3cabc2",
+    "experiments/step5/4/battle-music-composition-host.cjs": "ee8b5c5c13729382206bf1ab2a1e461a0ad0092bb24c6475d45c49b94fa687b0",
+    "experiments/step5/4/victory-music-native-plan.json": "de3d10f9e884442e4f6f01a4232bec94ecb24abf509ee972500ff55cd2bfc29d"
+  },
+  "sources": [
+    "give",
+    "gift",
+    "grant",
+    "trade",
+    "capture-party",
+    "capture-box",
+    "capture-replace"
+  ]
+}

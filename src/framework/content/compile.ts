@@ -6,7 +6,7 @@ import { sha256Hex } from "../rules/sha256";
 import { checkItemInputs } from "./item-input";
 import { DEFAULT_LIMITS } from "../rules/limits";
 import { MAX_FORM } from "../rules/species-key";
-import { checkOverrides, developmentCapabilities } from "../rules/config";
+import { checkOverrides, runtimeCapabilities } from "../rules/config";
 import {
   CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, COMPILED_SCHEMA_VERSION, SOURCE_KINDS, STAT_KEYS_ALLOWED, USAGE_DECISIONS,
 } from "./schema";
@@ -136,7 +136,7 @@ export function showdownDependencyProblem(sources: readonly SourceEntry[]): stri
 }
 
 export function compileContent(inputs: ContentInputs, developerCapabilities: unknown = {}, context: { showdownSha: string } = { showdownSha: CONTENT_SHOWDOWN_SHA }): CompileResult {
-  const capabilities = developmentCapabilities(developerCapabilities);
+  const capabilities = runtimeCapabilities(developerCapabilities);
   const errors: ContentError[] = [];
   const warnings: ContentError[] = [];
   const report: Report = (file, path, message) => { errors.push({ file, path, message }); };

@@ -41,7 +41,7 @@ import { PP_ITEMS, ESCAPE_ITEMS } from '../framework/rules/rules';
 import { projectStatusCard } from './battleflow/status-card';
 import { installPrebattleHost } from './battleflow/prebattle-host';
 import { effectiveBattleEffects, installBattleEffectsSettings, parseBattleEffects } from './battleflow/battle-effects-settings';
-const { developmentCapabilities } = RuleConfig;
+const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
 
 (() => {
   "use strict";
@@ -211,7 +211,7 @@ const { developmentCapabilities } = RuleConfig;
     },
     beginTrade(requestId: string, intent: any): any { return PSFlow.app().beginTrade(requestId, intent); },
     resolveTrade(token: string, revision: number, decision: any): any { return PSFlow.app().resolveTrade(token, revision, decision); },
-    assertBattleAllowed(): void { const capabilities = developmentCapabilities(PSFlow.developerCapabilities); if (!capabilities.allowExperimentalHeldItemBattle && (PSFlow.game().party || []).some((m: any) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成"); },
+    assertBattleAllowed(): void { const capabilities = runtimeCapabilities(PSFlow.developerCapabilities); if (!capabilities.allowExperimentalHeldItemBattle && (PSFlow.game().party || []).some((m: any) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成"); },
     running: false, // a battle scene is open (the interpreter waits on this)
     request: null as any,
     lastOutcome: null as any,
