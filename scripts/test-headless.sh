@@ -48,6 +48,8 @@ SUITES=(
   experiments/step5/4/test-e-status-carry.cjs
   experiments/step5/4/test-opening-state-scene.cjs
   experiments/step5/4/test-capture-receiving-scene.cjs
+  experiments/step5/4/test-learn-pp-trainer-chain.cjs
+  experiments/step5/4/test-learn-pp-trainer-chain-lifecycle.cjs
   experiments/step5/4/test-prebattle-wrapper.cjs
   experiments/step5/4/test-prebattle-native.cjs
   experiments/step5/4/test-prebattle-menu.cjs
