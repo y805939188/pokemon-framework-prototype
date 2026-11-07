@@ -1,0 +1,214 @@
+{
+  "schema": 1,
+  "kind": "bounded-real-choice-and-lock-compiled-Scene",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "completeHeading": false,
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "base": "b3319a65abd21c63a5e7748f11d3545e59e4b9b0",
+  "cases": [
+    {
+      "id": "E1-DISABLE-en",
+      "kind": "disable",
+      "lang": "en",
+      "featureIds": [
+        "FR-000010",
+        "FR-000060"
+      ],
+      "player": {
+        "species": "machamp",
+        "abilityIndex": 1,
+        "level": 50,
+        "moves": [
+          "tackle",
+          "splash"
+        ]
+      },
+      "foe": {
+        "species": "snorlax",
+        "level": 50,
+        "moves": [
+          "disable"
+        ]
+      },
+      "setupSlot": 1,
+      "rejectedSlot": 1,
+      "legalSlot": 2
+    },
+    {
+      "id": "E1-TAUNT-en",
+      "kind": "taunt",
+      "lang": "en",
+      "featureIds": [
+        "FR-000010",
+        "FR-000060"
+      ],
+      "player": {
+        "species": "machamp",
+        "abilityIndex": 1,
+        "level": 50,
+        "moves": [
+          "tackle",
+          "splash"
+        ]
+      },
+      "foe": {
+        "species": "snorlax",
+        "level": 50,
+        "moves": [
+          "taunt"
+        ]
+      },
+      "setupSlot": 2,
+      "rejectedSlot": 2,
+      "legalSlot": 1
+    },
+    {
+      "id": "E1-DISABLE-zh",
+      "kind": "disable",
+      "lang": "zh",
+      "featureIds": [
+        "FR-000010",
+        "FR-000060"
+      ],
+      "player": {
+        "species": "machamp",
+        "abilityIndex": 1,
+        "level": 50,
+        "moves": [
+          "tackle",
+          "splash"
+        ]
+      },
+      "foe": {
+        "species": "snorlax",
+        "level": 50,
+        "moves": [
+          "disable"
+        ]
+      },
+      "setupSlot": 1,
+      "rejectedSlot": 1,
+      "legalSlot": 2
+    },
+    {
+      "id": "E1-TAUNT-zh",
+      "kind": "taunt",
+      "lang": "zh",
+      "featureIds": [
+        "FR-000010",
+        "FR-000060"
+      ],
+      "player": {
+        "species": "machamp",
+        "abilityIndex": 1,
+        "level": 50,
+        "moves": [
+          "tackle",
+          "splash"
+        ]
+      },
+      "foe": {
+        "species": "snorlax",
+        "level": 50,
+        "moves": [
+          "taunt"
+        ]
+      },
+      "setupSlot": 2,
+      "rejectedSlot": 2,
+      "legalSlot": 1
+    },
+    {
+      "id": "E1-DIG-en",
+      "kind": "dig",
+      "lang": "en",
+      "featureIds": [
+        "FR-000556",
+        "FR-000010"
+      ],
+      "player": {
+        "species": "machamp",
+        "abilityIndex": 1,
+        "level": 50,
+        "moves": [
+          "dig",
+          "hyperbeam",
+          "splash"
+        ]
+      },
+      "foe": {
+        "species": "snorlax",
+        "level": 50,
+        "moves": [
+          "splash"
+        ]
+      },
+      "setupSlot": 1,
+      "lockedId": "dig",
+      "lockedName": "Dig"
+    },
+    {
+      "id": "E1-RECHARGE-zh",
+      "kind": "recharge",
+      "lang": "zh",
+      "featureIds": [
+        "FR-000556",
+        "FR-000010"
+      ],
+      "player": {
+        "species": "machamp",
+        "abilityIndex": 1,
+        "level": 50,
+        "moves": [
+          "dig",
+          "hyperbeam",
+          "splash"
+        ]
+      },
+      "foe": {
+        "species": "snorlax",
+        "level": 50,
+        "moves": [
+          "splash"
+        ]
+      },
+      "setupSlot": 2,
+      "lockedId": "recharge",
+      "lockedName": "Recharge"
+    }
+  ],
+  "sources": [
+    {
+      "feature_id": "FR-000010",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/combat-requirements/wp40-commands-obedience-and-action-order.md",
+      "sha256": "86772d23bc60dc660713fd28d3b21da3397925e35089d4491f2baf75372a02c3",
+      "currentHeadingStart": 78,
+      "currentHeadingEnd": 123
+    },
+    {
+      "feature_id": "FR-000060",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/combat-requirements/wp47-b-switching-control-and-item-changes.md",
+      "sha256": "ffe11e08dee19a63a9a8108aa62f1d820cf40d76047c05b137a71047c6b3b6eb",
+      "currentHeadingStart": 96,
+      "currentHeadingEnd": 115
+    },
+    {
+      "feature_id": "FR-000556",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+      "sha256": "7e65ae4945ab1cd101b357f3edcadbff2cbaa94630c609244519a688901e1841",
+      "currentHeadingStart": 45,
+      "currentHeadingEnd": 92
+    }
+  ],
+  "notCovered": [
+    "full FR headings",
+    "old PP0/Encore business repetition",
+    "native NW/pixels/audio/physical input",
+    "complete E74/D2/5.4/P4"
+  ]
+}
