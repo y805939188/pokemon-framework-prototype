@@ -22,10 +22,10 @@ function contentFor(c){
 async function open(c){
  const h=createVictoryDriverHost({ROOT,work,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true}}),G=h.G,flow=h.w.flow,{content,input}=contentFor(c),parameters=G.PluginManager.parameters;
  G.Bitmap.prototype.fillRect=()=>{};G.PluginManager.parameters=function(name){const p=parameters.call(this,name);return name==='PS_BattleFlow'?{...p,language:c.lang}:p;};
- flow.setLanguage(null);flow.stateReplaced();flow._app=null;flow._content=content;flow._dex=E.dex.createDexLookup();flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=true;
+ flow.setLanguage(null);flow.stateReplaced();flow._app=null;flow._content=content;flow._dex=E.dex.createDexLookup();flow.seed=c.seed??[1,2,3,4];flow.rng=()=>0;flow.fast=true;
  const state=E.state.newGame({content,party:[],money:1000});
  for(const [i,config]of [c.player,c.reserve].filter(Boolean).entries()){
-  const species=E.dex.createDexLookup().species(config.species).name,m=E.memberFactory.createMember({id:'SCENE-P'+(i+1),species,level:config.level,nature:'hardy',abilityIndex:config.abilityIndex},content,()=>0);assert.deepEqual(m.moves.map(x=>x.id),config.moves);state.party.push(E.speciesKey.toPersistentMember(m,content));
+  const species=E.dex.createDexLookup().species(config.species).name,m=E.memberFactory.createMember({id:'SCENE-P'+(i+1),species,level:config.level,nature:'hardy',abilityIndex:config.abilityIndex},content,()=>0);assert.deepEqual(m.moves.map(x=>x.id),config.moves);if(config.status){m.status=config.status;m.statusCount=config.statusCount??0;}state.party.push(E.speciesKey.toPersistentMember(m,content));
  }
  state.nextMemberOrdinal=String(state.party.length+1);state.badges.fill(true);let saved=state,installs=0;
  Object.defineProperty(G.$gameSystem,'_psGame',{configurable:true,get:()=>saved,set:v=>{installs++;saved=v;}});
