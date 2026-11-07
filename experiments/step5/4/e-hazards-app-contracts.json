@@ -44,8 +44,7 @@
   },
   "featureIds": [
     "FR-000039",
-    "FR-000041",
-    "FR-000042"
+    "FR-000041"
   ],
   "sourceHead": "5c9805de2331f75565891851d4d7b2bc97acad94",
   "sources": [
@@ -77,14 +76,6 @@
       "range": [
         178,
         192
-      ],
-      "completeHeading": false
-    },
-    {
-      "featureId": "FR-000042",
-      "range": [
-        193,
-        218
       ],
       "completeHeading": false
     }

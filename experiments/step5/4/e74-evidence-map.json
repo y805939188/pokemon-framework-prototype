@@ -1,0 +1,2943 @@
+{
+  "schema": 1,
+  "kind": "E74_FROZEN_IDENTITIES_AND_SELECTED_SCOPED_EVIDENCE_METADATA",
+  "baseSourceSnapshot": "1a611aa2f03fd47b305c45d91276874ddf38dd19",
+  "baseSourceTree": "8592a1e51794f50eceba9abca588e0e41e90a1dd",
+  "frozen74": {
+    "originalTemplateSHA256": "8d3e2119f25c9ce450c36f437ef10cc07f76465d55daf30e7385c05b9e416a99",
+    "rows": 74,
+    "originalTemplateChanged": false,
+    "referenceHead": "5c9805de2331f75565891851d4d7b2bc97acad94",
+    "identityFields": [
+      "feature_id",
+      "name",
+      "source",
+      "heading",
+      "line_ranges"
+    ]
+  },
+  "scope": "18 previous selected audit families plus six integrated additions; not an exhaustive test inventory or coverage percentage.",
+  "priorSelectedAudit": {
+    "base": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+    "familiesSHA256": "48b561645bed7f866ed3badc7857302f50fb40b4aa0bdb0a6f173a307d48d2b5",
+    "frozenIdentitiesSHA256": "b7b3b2befe67112b954aae39b1049c6b925c3bf29fa8fa29fdcf6c65959656bd",
+    "finding": "E74-TRACE-01"
+  },
+  "correction": {
+    "finding": "E74-TRACE-01",
+    "oldHazardAssociationRemoved": "FR-000042",
+    "retainedHazardFeatures": [
+      "FR-000039",
+      "FR-000041"
+    ],
+    "reason": "WP45 section 8 (178-192) is entry hazards; FR-000042 is section 9 (193-218), position recovery/delayed effects. Seven hazard cases do not exercise section 9.",
+    "actualPositionEvidence": "position",
+    "historicalMetadataAndBusinessLogsNotRewritten": true,
+    "productBehaviorChanged": false
+  },
+  "formalSourceAnchors": [
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp40-commands-obedience-and-action-order.md",
+      "sha256": "86772d23bc60dc660713fd28d3b21da3397925e35089d4491f2baf75372a02c3"
+    },
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp41-switching-positioning-and-escape.md",
+      "sha256": "22a57a362a3bfb8efa55390127903cf1ef655525eb29e6b320f8c2d846821789"
+    },
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp42-growth-end-of-round-and-battle-outcomes.md",
+      "sha256": "ec2203f1cf58cbf9327ef6361a82510fab3ec51174d39f72dbec233dfeed87e8"
+    },
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp45-weather-terrain-side-and-position-effects.md",
+      "sha256": "bcb8c6c7d4b86e30799d866952db35ca5448d4922d6e7873d95f368a498623da"
+    },
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp47-a-attributes-targeting-calling-data.md",
+      "sha256": "1137ca38a1a52a527b9058063ac8cbf82c1f3452097f3943d23f0425174ce141"
+    },
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp47-a-move-attributes-targeting-and-calling.md",
+      "sha256": "0e3a3fa46ab07fd82331db7b5790788c75b5aa45f6093aa9b2db5cf6c55b3fa3"
+    },
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp47-b-control-items-coverage-data.md",
+      "sha256": "3a4b189f23a82dae95b0750ca6967d168ee85afe6e27594e00e6d183f4a63827"
+    },
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp47-b-switching-control-and-item-changes.md",
+      "sha256": "ffe11e08dee19a63a9a8108aa62f1d820cf40d76047c05b137a71047c6b3b6eb"
+    },
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp49-ability-phase-triggers.md",
+      "sha256": "f48646d40325a44265d2a85e7459366d894bde64f206e931a7574dfc39cb368f"
+    },
+    {
+      "path": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+      "sha256": "6a09dfad69faa5c0c35991e9fa4eb83646b6f2162427e5bcd3df09c55fded6d3"
+    },
+    {
+      "path": "deliverables/final-specification-set/pokemon-rules/wp44-effect-coverage.md",
+      "sha256": "c1384960e2446795c42b911cdc2b66aa9ad641c5774b3f90861e33b33854f381"
+    },
+    {
+      "path": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+      "sha256": "e144ad75bab96647c12220d7f7e137d534277c169f6ca64d8c6bd06044268943"
+    },
+    {
+      "path": "deliverables/final-specification-set/pokemon-rules/wp46-damage-healing-coverage.md",
+      "sha256": "3ec4fde8b170f3d40f4b0a0cbfd060198ff4adcc8b25a6b08a00496042723fcb"
+    },
+    {
+      "path": "deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+      "sha256": "7e65ae4945ab1cd101b357f3edcadbff2cbaa94630c609244519a688901e1841"
+    },
+    {
+      "path": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+      "sha256": "19c5799a7949013b85e2c0937860596db6eed875470ac7a12c53ddc4e5268e07"
+    },
+    {
+      "path": "deliverables/final-specification-set/pokemon-rules/wp50-held-item-effect-coverage.md",
+      "sha256": "b17d23945fe45a7534d09c38e5ca0a1046fede803b014dc24d4652c5e7046628"
+    },
+    {
+      "path": "deliverables/final-specification-set/pokemon-rules/wp50-held-item-triggers-and-consumption.md",
+      "sha256": "e1038d0eeb359406e8334a4ef51226a1d2625e03776c0d57ccf201d9d5bba8b9"
+    }
+  ],
+  "publications": {
+    "ci269": {
+      "candidate": "b3319a65abd21c63a5e7748f11d3545e59e4b9b0",
+      "run": 42342248014,
+      "number": 269,
+      "attempt": 1,
+      "url": "https://github.com/y805939188/pokemon-framework-prototype/actions/runs/42342248014",
+      "evidenceKind": "ARCHIVED_EXACT_SOURCE_PUBLICATION_RECEIPT_NOT_FRESH_QUERY_OR_NEW_CANDIDATE_CI",
+      "receiptSHA256": "498b72d29b4b5407ae32b0ebd37ab84454380d1d85bab478881478cacdf3324d",
+      "receiptSealSHA256": "b15371d12165dbe954ecf2d315cf0312debb12af5f27279ef3fdb682a99c6742",
+      "status": "FORMALLY_ACCEPTED_SCOPED_E74_INTEGRATION_AND_PUBLICATION",
+      "isCompleteFRAcceptance": false
+    },
+    "ci271": {
+      "candidate": "664ee9b23c9c3caca2e0e64dd11cff8acc94804f",
+      "run": 42353883281,
+      "number": 271,
+      "attempt": 1,
+      "url": "https://github.com/y805939188/pokemon-framework-prototype/actions/runs/42353883281",
+      "evidenceKind": "ARCHIVED_EXACT_SOURCE_PUBLICATION_RECEIPT_NOT_FRESH_QUERY_OR_NEW_CANDIDATE_CI",
+      "receiptSHA256": "906aad57c3ca5686f8282d9239c51892b3eea3f062bc6f02560376d0cfc7fb95",
+      "receiptSealSHA256": "c2288f3e0b1119d573ae9a92838355d457336fb47e780fc415a2141d12ae36c7",
+      "status": "FORMALLY_ACCEPTED_LIMITED_E1_E2_SCENE_INTEGRATION",
+      "isCompleteFRAcceptance": false
+    },
+    "ci274": {
+      "candidate": "6cf870ad936895f36ece1733f58e7ff6804a892e",
+      "run": 42390634517,
+      "number": 274,
+      "attempt": 1,
+      "url": "https://github.com/y805939188/pokemon-framework-prototype/actions/runs/42390634517",
+      "evidenceKind": "ARCHIVED_EXACT_SOURCE_PUBLICATION_RECEIPT_NOT_FRESH_QUERY_OR_NEW_CANDIDATE_CI",
+      "receiptSHA256": "2549deacd14c3e0382a7447588dced487681d861182dbd5c8f60be3ceb0015c7",
+      "receiptSealSHA256": "ff9876fb6451bc0aabd9b1a88aa320b67766c5978bdb57f80f32b825cfeafb8e",
+      "status": "ACCEPTED_LIMITED_CANT_FEEDBACK_PUBLISHED_CI_PASS",
+      "isCompleteFRAcceptance": false
+    },
+    "ci275": {
+      "candidate": "75c736ad60cd6b5ceeffab948244b18aa83d8720",
+      "run": 42393434722,
+      "number": 275,
+      "attempt": 1,
+      "url": "https://github.com/y805939188/pokemon-framework-prototype/actions/runs/42393434722",
+      "evidenceKind": "ARCHIVED_EXACT_SOURCE_PUBLICATION_RECEIPT_NOT_FRESH_QUERY_OR_NEW_CANDIDATE_CI",
+      "receiptSHA256": "8ebae66635d0163cc7ec92cd69339e00d3fc34f1b3594921a73dbfbd28267bed",
+      "receiptSealSHA256": "70eefab97544547e067e9d0ee6f4f12a3feaa458727607eecab2ea16c70a112a",
+      "status": "ACCEPTED_LIMITED_CANT_OPENING_INTEGRATION_PUBLISHED_CI_PASS",
+      "isCompleteFRAcceptance": false
+    },
+    "ci276": {
+      "candidate": "1a611aa2f03fd47b305c45d91276874ddf38dd19",
+      "run": 42403479249,
+      "number": 276,
+      "attempt": 1,
+      "url": "https://github.com/y805939188/pokemon-framework-prototype/actions/runs/42403479249",
+      "evidenceKind": "ARCHIVED_EXACT_SOURCE_PUBLICATION_RECEIPT_NOT_FRESH_QUERY_OR_NEW_CANDIDATE_CI",
+      "receiptSHA256": "67e1949371e200b5a3d03719aff43fc9d2dbe3f476a63844f0fae4e56fb572cf",
+      "receiptSealSHA256": "31d5f4327d38e600db26e17783b9cc47a50db4907929846876c1c6723d926a8a",
+      "status": "ACCEPTED_CONTROLLED_PAIR_CHAIN_ONLY_PUBLISHED_CI_PASS",
+      "isCompleteFRAcceptance": false
+    }
+  },
+  "families": [
+    {
+      "id": "prior-basic",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000532",
+        "FR-000533",
+        "FR-000544",
+        "FR-000546"
+      ],
+      "layer": "Gateway",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "8组，累计PP/固定seed Swift；来源缺事前独立收据，原7过1失败保留",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-basic-contracts.json",
+          "sha256": "72d8868297ac18c96ceba215c83a843cac15d5c493037bc98aa90a775d378c01",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-basic-contracts.cjs",
+          "sha256": "0aa30b161360f04197342ddda5532d166a19019f43c0de6976cd32aaafbc42ad",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-basic-contracts.json",
+          "blob": "4bc5b1919a9154773afd73339a92e1d358cf6567",
+          "sha256": "72d8868297ac18c96ceba215c83a843cac15d5c493037bc98aa90a775d378c01",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-basic-contracts.cjs",
+          "blob": "7ef985cb03b4f5ee2be5de6f14b3f81c768bfe8b",
+          "sha256": "0aa30b161360f04197342ddda5532d166a19019f43c0de6976cd32aaafbc42ad",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-action",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000013",
+        "FR-000018",
+        "FR-000019",
+        "FR-000028"
+      ],
+      "layer": "Gateway",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "6组8实例；濒死初始化计数限制与独审补控分列",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-action-contracts.json",
+          "sha256": "8ca6c231663b43b6c1ad11a9bac4e5b6d51cba637c14be934738a6b71ce90bc5",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-action-contracts.cjs",
+          "sha256": "2d5426e36bc681b6f97e410f0dc038a1226c544d4665e24dc741b3b5b99c31b4",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-action-contracts.json",
+          "blob": "12b2dd9dced21665df3f65912bc37514f1ab3647",
+          "sha256": "8ca6c231663b43b6c1ad11a9bac4e5b6d51cba637c14be934738a6b71ce90bc5",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-action-contracts.cjs",
+          "blob": "68d24394d95096a2b7f28865d19a53837d9e559a",
+          "sha256": "2d5426e36bc681b6f97e410f0dc038a1226c544d4665e24dc741b3b5b99c31b4",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-status",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000545"
+      ],
+      "layer": "Gateway",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "6带入状态样本；剧毒参考差异保留，不是全部施加/概率",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-status-contracts.json",
+          "sha256": "fea46c0a05ff77e6b72fa0edfbf6bb0742dc16fae53b39621209593a33a8e9d7",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-status-contracts.cjs",
+          "sha256": "064cfb9a09e080199ee31841619d527e3cf8b52a09573bc2f6cfdfd4d5aa898a",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-status-contracts.json",
+          "blob": "af7d61dec870f5410e0d7fc15b6f549a2e005fcc",
+          "sha256": "fea46c0a05ff77e6b72fa0edfbf6bb0742dc16fae53b39621209593a33a8e9d7",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-status-contracts.cjs",
+          "blob": "9bcb22b004159ad3f6cd84af086d19a6011be7e3",
+          "sha256": "064cfb9a09e080199ee31841619d527e3cf8b52a09573bc2f6cfdfd4d5aa898a",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-ability",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000065",
+        "FR-000532",
+        "FR-000536",
+        "FR-000562",
+        "FR-000566",
+        "FR-000568"
+      ],
+      "layer": "Gateway",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "4对8案；威吓/恒净之躯、飘浮/破格、压力、结实的局部合同",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-ability-contracts.json",
+          "sha256": "3b210c7d0535139f3976006976f0670f6cb822f3d1c6641d48eed9fb89fb91f0",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-ability-contracts.cjs",
+          "sha256": "b25d1e266888676e10f9a1678e9c24199d5d5fe2fd51d80289ba04483e327a50",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-ability-contracts.json",
+          "blob": "937728029d80552e7332ae1d9932ac49a78f8ed9",
+          "sha256": "3b210c7d0535139f3976006976f0670f6cb822f3d1c6641d48eed9fb89fb91f0",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-ability-contracts.cjs",
+          "blob": "172ead610b7988fee18db5746dee48203d73d518",
+          "sha256": "b25d1e266888676e10f9a1678e9c24199d5d5fe2fd51d80289ba04483e327a50",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-damage",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000532",
+        "FR-000534",
+        "FR-000557",
+        "FR-000564"
+      ],
+      "layer": "Gateway",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "7案；强制会心/防会心、等级固定伤、Counter，不测概率/完整公式",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-damage-contracts.json",
+          "sha256": "b917ea722cd5509e67dab422de2dbbc414b5daf6616ae26e7193b4d9d942096b",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-damage-contracts.cjs",
+          "sha256": "99cf9505286d139d122802fd38dabd001bf9904afc1c0f2831b4cc91a1b6b8ba",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-damage-contracts.json",
+          "blob": "581b9273efa96a9d2c549504540f273eb196c5a8",
+          "sha256": "b917ea722cd5509e67dab422de2dbbc414b5daf6616ae26e7193b4d9d942096b",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-damage-contracts.cjs",
+          "blob": "498fff134d4c921e981f89687b4a42b1d3478bba",
+          "sha256": "99cf9505286d139d122802fd38dabd001bf9904afc1c0f2831b4cc91a1b6b8ba",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-statusApp",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000544",
+        "FR-000545"
+      ],
+      "layer": "App/Session",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "6案；实际剧毒/麻痹/睡眠、解毒/免疫/中止，内存端口",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-status-app-contracts.json",
+          "sha256": "d32d8d6e36632f5b30a28f9bbf763f5d424003da163d6832f7e776ca26f2c987",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-status-app.cjs",
+          "sha256": "37fcae53c13e05700fa12daf85d8c567fa227011d07f649c9a77909695b74d69",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-status-app-contracts.json",
+          "blob": "9e25281a7d1b236bd0a1254c3d8022fa35d5b965",
+          "sha256": "d32d8d6e36632f5b30a28f9bbf763f5d424003da163d6832f7e776ca26f2c987",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-status-app.cjs",
+          "blob": "a7102f90b74b59e600152a88c93109bbb4a845cb",
+          "sha256": "37fcae53c13e05700fa12daf85d8c567fa227011d07f649c9a77909695b74d69",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-statusCarry",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000544",
+        "FR-000545"
+      ],
+      "layer": "App跨战",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "4案9Session；剧毒归普通毒、睡眠计数、治疗、后继中止",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-status-carry-contracts.json",
+          "sha256": "03cdd1538b509975003b0998307113e96ebd2174dd4862e0f2b26a9ef63c6dd4",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-status-carry.cjs",
+          "sha256": "6b74abd8aaad7d5e930c64f8a6b633df4f1da9739f2ed7fdd9cd41075ee7ae57",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-status-carry-contracts.json",
+          "blob": "c7e0cce1c038d1688a3d7c5758f0ff14b71f64b8",
+          "sha256": "03cdd1538b509975003b0998307113e96ebd2174dd4862e0f2b26a9ef63c6dd4",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-status-carry.cjs",
+          "blob": "3788027d5f7aefa7999746abfe0b0e3f57e55044",
+          "sha256": "6b74abd8aaad7d5e930c64f8a6b633df4f1da9739f2ed7fdd9cd41075ee7ae57",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-statusDisk",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000544",
+        "FR-000545"
+      ],
+      "layer": "SaveStore/新Node",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "6项；普通JSON与新进程，不是MZ/Title",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-status-disk-contracts.json",
+          "sha256": "b08f08eb3578fd825e220b02b6db924142843d7d9866ca2235ed3992b6b5a5b3",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-status-disk.cjs",
+          "sha256": "87b92fd45a3c959ab10433810225ee8914108797709e9f7f3c29b1fab670517a",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-status-disk-contracts.json",
+          "blob": "d276d1074aa9bbf1c02a09e6ee696dcc422c104a",
+          "sha256": "c1da3f5f53ad4bec2a85e7fb06088b2fb42292f441c257d0b385be0b74429c4b",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": false
+        },
+        {
+          "path": "experiments/step5/4/test-e-status-disk.cjs",
+          "blob": "de7da3046bcd125dacc0dba94eed9101361abd6b",
+          "sha256": "87b92fd45a3c959ab10433810225ee8914108797709e9f7f3c29b1fab670517a",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-hp",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000559",
+        "FR-000560"
+      ],
+      "layer": "App/Session",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "6案；自我再生/吸取/反伤、终局一次安装/中止，偶数HP限定",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-hp-app-contracts.json",
+          "sha256": "e10b9cf676279c4b97466d5f95272799bb81d5caa9c360c116180af7244f7141",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-hp-app-contracts.cjs",
+          "sha256": "512cdd5d7f899212c694a2ba178f214f07aa74c1b91731aa89069d5cb89b22e8",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-hp-app-contracts.json",
+          "blob": "a133f216cb8f16c5e23656e809b2bae3988bfdb0",
+          "sha256": "e10b9cf676279c4b97466d5f95272799bb81d5caa9c360c116180af7244f7141",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-hp-app-contracts.cjs",
+          "blob": "30fb39d09a5d0ae4a5d6866290c517a0c4e8d101",
+          "sha256": "512cdd5d7f899212c694a2ba178f214f07aa74c1b91731aa89069d5cb89b22e8",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-hpContinue",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000559",
+        "FR-000560"
+      ],
+      "layer": "实际MZ压缩方法/新Node",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "3案；slot1/global、Continue真实方法的非渲染替身宿主，不是Boot/Scene生命周期",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-hp-mz-continue-contracts.json",
+          "sha256": "139ac39c0ff866967fd967f25548c67779af20cb4c44475fe030841282ad5866",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-hp-mz-continue.cjs",
+          "sha256": "5cd6d5c56a596f0d164f4303704fe8ebdbed636f85ca527e437f582f58bfb053",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-hp-mz-continue-contracts.json",
+          "blob": "e112c95e02f6417f4cd0d3498946a69a5685b4f8",
+          "sha256": "139ac39c0ff866967fd967f25548c67779af20cb4c44475fe030841282ad5866",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-hp-mz-continue.cjs",
+          "blob": "9a4163ddf7b0d0b3bc900539bc300dfa919213b3",
+          "sha256": "5cd6d5c56a596f0d164f4303704fe8ebdbed636f85ca527e437f582f58bfb053",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-multihit",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000555",
+        "FR-000556"
+      ],
+      "layer": "App/Session",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "6案；二连踢/冰锥、SkillLink、首击KO、一次PP/中止；终局hitcount身份控制，非概率分布",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-multihit-app-contracts.json",
+          "sha256": "0d6f1fdcfde5b147d77c1fada9f67232687d84c225be95c8fef544d2f25fffff",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-multihit-app-contracts.cjs",
+          "sha256": "77a21d06c798068a725ba26bb346ff800f83e6ef541bc65e1d904ff1e05d16d9",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-multihit-app-contracts.json",
+          "blob": "1cf6396d07251f2097867307fa7dfc9f52f0200f",
+          "sha256": "0d6f1fdcfde5b147d77c1fada9f67232687d84c225be95c8fef544d2f25fffff",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-multihit-app-contracts.cjs",
+          "blob": "52af0e6cf3eef985895f667aa9016ec7ee274d33",
+          "sha256": "77a21d06c798068a725ba26bb346ff800f83e6ef541bc65e1d904ff1e05d16d9",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-multihitContinue",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000555",
+        "FR-000556"
+      ],
+      "layer": "实际MZ压缩方法/新Node",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "3案；连击主战果压缩槽及非渲染Continue续战/中止，不是Title/NW",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-multihit-mz-continue-contracts.json",
+          "sha256": "1c72e9f34ef722e69bcb051ae8c8b136bef06852e70d2fd21a2c8b19eaa15142",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-multihit-mz-continue.cjs",
+          "sha256": "74ca84b6798d68d4721ca7f03fc7450209f26acd30357b0687ead5f183f182c2",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-multihit-mz-continue-contracts.json",
+          "blob": "fa2f5905a0d3456a1b956f50fc7ac8403f1b8791",
+          "sha256": "1c72e9f34ef722e69bcb051ae8c8b136bef06852e70d2fd21a2c8b19eaa15142",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-multihit-mz-continue.cjs",
+          "blob": "9afbb632d1c1ab0406ac4f4a1ac4e4855198ddd4",
+          "sha256": "74ca84b6798d68d4721ca7f03fc7450209f26acd30357b0687ead5f183f182c2",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-stages",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000548",
+        "FR-000549"
+      ],
+      "layer": "App/Session",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "5案；普通剑舞/叫声、实际后继伤害、普通换人/新战清除与中止",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-stages-app-contracts.json",
+          "sha256": "531d16a44d0c497aab3a446821e95bf2fe43a5fd9dca43a1aa441076942769e8",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-stages-app-contracts.cjs",
+          "sha256": "0ddbf833d1dcc12d2a83ddac469556869fb8220c23a5a3e41bc91119570e2b71",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-stages-app-contracts.json",
+          "blob": "1fb0af70247b42de36d340dfb69293e448c62fc8",
+          "sha256": "531d16a44d0c497aab3a446821e95bf2fe43a5fd9dca43a1aa441076942769e8",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-stages-app-contracts.cjs",
+          "blob": "8753902d21c3887a17b6f94e9b3ffabd80337cb6",
+          "sha256": "0ddbf833d1dcc12d2a83ddac469556869fb8220c23a5a3e41bc91119570e2b71",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-hazards",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000039",
+        "FR-000041"
+      ],
+      "layer": "App/Session",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "7案；岩、1/2/3层撒菱、1层毒菱、网和中止；只直接验证岩的新战清除；FR42归属待纠正",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-hazards-app-contracts.json",
+          "sha256": "d364c0276ddd56363e0b9f7627c09d3fa43bb4e1f4cdf1d5728c74abf6127bd8",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-hazards-app-contracts.cjs",
+          "sha256": "3cba2d6c6003bbfa89f15fd1bf72ef48321258f5eb372d461d900476b68ba3b1",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-hazards-app-contracts.json",
+          "blob": "547c716c7c405eaef122b20023a9041a58152d8f",
+          "sha256": "d364c0276ddd56363e0b9f7627c09d3fa43bb4e1f4cdf1d5728c74abf6127bd8",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-hazards-app-contracts.cjs",
+          "blob": "70bea7ad369b570c2eb4fefa953ecd0b23d2af90",
+          "sha256": "3cba2d6c6003bbfa89f15fd1bf72ef48321258f5eb372d461d900476b68ba3b1",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-statusContinue",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000544",
+        "FR-000545"
+      ],
+      "layer": "实际MZ压缩方法/新Node",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "3案；毒规范化、睡眠剩余计数/醒来PP及中止重接；原b576错误FR归属与f4d静态修正分列",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-status-mz-continue-contracts.json",
+          "sha256": "4913e35b6b6791dc8721ef33ce58e702ea04cd37cdf0f5217c983a2211a7e224",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-status-mz-continue.cjs",
+          "sha256": "697f5486b2db768e107f9a11cd020ef8dbb9471a68436ccdaf3f495ffb002434",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-status-mz-continue-contracts.json",
+          "blob": "d44077fb78532d07362e068c228389dbc25bb859",
+          "sha256": "4913e35b6b6791dc8721ef33ce58e702ea04cd37cdf0f5217c983a2211a7e224",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-status-mz-continue.cjs",
+          "blob": "142a22708f5f2d9d299ac8b5959e9e52bd1ca870",
+          "sha256": "697f5486b2db768e107f9a11cd020ef8dbb9471a68436ccdaf3f495ffb002434",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-locked",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000556"
+      ],
+      "layer": "App/Session",
+      "historicalSourceSnapshot": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+      "historicalBoundedScope": "4案；Dig蓄力/锁定攻击、HyperBeam休息、待行动中止与新战；没有Scene菜单贯穿",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-locked-turn-app-contracts.json",
+          "sha256": "ecd21c1a33618c67b1e56865f9239f86a925df63c9c33ea9cd63faf6b923aabe",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-locked-turn-app-contracts.cjs",
+          "sha256": "e420a9322b65f094f3dfbf52369b7e4e0731c7d95f3880cb42574fd93b3293f2",
+          "candidate": "a4dc03c8e976467c78e9fa0d2e85189642ead10b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-locked-turn-app-contracts.json",
+          "blob": "84876715794458880c212662b28497fcd53a3987",
+          "sha256": "ecd21c1a33618c67b1e56865f9239f86a925df63c9c33ea9cd63faf6b923aabe",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-locked-turn-app-contracts.cjs",
+          "blob": "44abcab4aef498eaf92c7baecd113b3456cb0c41",
+          "sha256": "e420a9322b65f094f3dfbf52369b7e4e0731c7d95f3880cb42574fd93b3293f2",
+          "presentAtBase": true,
+          "sameBytesAsPriorAudit": true
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-weather",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000035",
+        "FR-000037",
+        "FR-000038"
+      ],
+      "layer": "App/Session",
+      "historicalSourceSnapshot": "d57bf3f467f4ac1edb07b8170dcd4ea333322d0b",
+      "historicalBoundedScope": "4案；普通沙暴/青草、重复/到期、接地/飞行、沙暴中止新战；无默认/覆盖压制/青草中止",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-weather-terrain-app.json",
+          "sha256": "dc013c3ae7d98798e5d61e5a426be5904f25695ebaaeed2b3cbe6750572efc7a",
+          "candidate": "d57bf3f467f4ac1edb07b8170dcd4ea333322d0b"
+        },
+        {
+          "path": "experiments/step5/4/test-e-weather-terrain-app.cjs",
+          "sha256": "7a69ad1608035cf4fbd4aaaa8bdf0251028c2ec64348dde77273dc7fff3d53f7",
+          "candidate": "d57bf3f467f4ac1edb07b8170dcd4ea333322d0b"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-weather-terrain-app.json",
+          "presentAtBase": false,
+          "sameBytesAsPriorAudit": false
+        },
+        {
+          "path": "experiments/step5/4/test-e-weather-terrain-app.cjs",
+          "presentAtBase": false,
+          "sameBytesAsPriorAudit": false
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "prior-protect",
+      "kind": "PRIOR_SELECTED_SCOPED_AUDIT_REFERENCE",
+      "featureIds": [
+        "FR-000030",
+        "FR-000050"
+      ],
+      "layer": "App/Session",
+      "historicalSourceSnapshot": "c293122eb3caf2bd3ae4cf379edb6c7def45e09a",
+      "historicalBoundedScope": "3案4Session；普通守住挡伤/挡麻痹、下一轮解除、中止新战；原错误work缓存oracle保留",
+      "historicalScopeIsNotLatestProductDefectState": true,
+      "priorArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-protect-app.json",
+          "sha256": "622eec31d6c5751b8df3953a189b14286027517fa506c294b53e83056aa3f381",
+          "candidate": "c293122eb3caf2bd3ae4cf379edb6c7def45e09a"
+        },
+        {
+          "path": "experiments/step5/4/test-e-protect-app.cjs",
+          "sha256": "42dbe6a4b06274b2be0be2c53b7c7b80455f8cacac70072423c6bbfc9de6661a",
+          "candidate": "c293122eb3caf2bd3ae4cf379edb6c7def45e09a"
+        }
+      ],
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-protect-app.json",
+          "presentAtBase": false,
+          "sameBytesAsPriorAudit": false
+        },
+        {
+          "path": "experiments/step5/4/test-e-protect-app.cjs",
+          "presentAtBase": false,
+          "sameBytesAsPriorAudit": false
+        }
+      ],
+      "completeHeading": false,
+      "newExecution": false,
+      "scopeNote": "Historical selected audit evidence, not a current source/runtime revalidation or an exhaustive repository inventory."
+    },
+    {
+      "id": "position",
+      "featureIds": [
+        "FR-000042",
+        "FR-000019",
+        "FR-000559"
+      ],
+      "layer": "REAL_APP_SESSION_CONTROLLED_MEMORY_PORTS",
+      "sourceCandidate": "7f9f1431157dca4f49026a62dc546044593db876",
+      "integratedCommits": [
+        "891dc8b3a11a485f009f1ee903934359461ab638"
+      ],
+      "document": "docs/step5/5.4-E-position-entry.md",
+      "publication": "ci269",
+      "sourceEvidence": {
+        "businessCases": 5,
+        "negativeReadoutsRejected": 13,
+        "installs": 4,
+        "auxiliaryIncompleteOutcomes": 4
+      },
+      "scope": "Wish follows current position occupant and expires without deferred healing; Healing Wish HP/status and Lunar Dance PP qualification; abort isolation and one installation.",
+      "limits": [
+        "No full position family, delayed attack or Shift/Ally Switch acceptance.",
+        "Existing controls do not prove event order or Lunar Dance one-time position-record consumption.",
+        "Controlled memory ports, no Scene/disk/Title/NW; four auxiliary-fact downgrade diagnostics retained."
+      ],
+      "featureScopes": {
+        "FR-000042": "Finite Wish/Healing Wish/Lunar Dance position recovery only.",
+        "FR-000019": "Actual switch replacement invokes the observed position recovery; not complete entry ordering.",
+        "FR-000559": "Finite HP/status/PP restoration and qualification."
+      },
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-position-entry.json",
+          "blob": "27408a203b8b090619ccbb1824de92679569be90",
+          "sha256": "87cf8b9612a37acd053c1967d7ac560f4c1b0a8579b24a70b6b3782ea188ec0f",
+          "scopedSourceCandidate": "7f9f1431157dca4f49026a62dc546044593db876",
+          "scopedSourceSHA256": "87cf8b9612a37acd053c1967d7ac560f4c1b0a8579b24a70b6b3782ea188ec0f",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/e-position-entry-common.cjs",
+          "blob": "c4332806b65e2925d77f04265b686daca24b6dd0",
+          "sha256": "8a26e2d7044df3eef19557a96f89892213770cec202b02a112131af7127ce831",
+          "scopedSourceCandidate": "7f9f1431157dca4f49026a62dc546044593db876",
+          "scopedSourceSHA256": "8a26e2d7044df3eef19557a96f89892213770cec202b02a112131af7127ce831",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/e-position-entry-oracle.cjs",
+          "blob": "53d5bc4a6071482c5038027c7059b545a9429155",
+          "sha256": "8c29c5c41988a31e815101393bbaf9c028919e6a685d6444431b36f484835ca7",
+          "scopedSourceCandidate": "7f9f1431157dca4f49026a62dc546044593db876",
+          "scopedSourceSHA256": "8c29c5c41988a31e815101393bbaf9c028919e6a685d6444431b36f484835ca7",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-position-entry.cjs",
+          "blob": "40b00284c5888f42eb7b71dde29904692475c340",
+          "sha256": "6444fd90853209e4b75aeb2a41894870b76f138f7f58b80d8f701cc9c9f9900d",
+          "scopedSourceCandidate": "7f9f1431157dca4f49026a62dc546044593db876",
+          "scopedSourceSHA256": "6444fd90853209e4b75aeb2a41894870b76f138f7f58b80d8f701cc9c9f9900d",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "docs/step5/5.4-E-position-entry.md",
+          "blob": "310a68b6ed6655bdaabead99deb2f6243c2e6c8b",
+          "sha256": "18ee5e8d205c857ea0233acbbbbc78a6393f95416bc99b04c54fbaae8c22cc2d",
+          "scopedSourceCandidate": "7f9f1431157dca4f49026a62dc546044593db876",
+          "scopedSourceSHA256": "18ee5e8d205c857ea0233acbbbbc78a6393f95416bc99b04c54fbaae8c22cc2d",
+          "sameBytesAsScopedSourceCandidate": true
+        }
+      ],
+      "kind": "INTEGRATED_SCOPED_SOURCE_EVIDENCE",
+      "completeHeading": false,
+      "newExecution": false
+    },
+    {
+      "id": "residual",
+      "featureIds": [
+        "FR-000030",
+        "FR-000037",
+        "FR-000038",
+        "FR-000545",
+        "FR-000028"
+      ],
+      "layer": "REAL_APP_SESSION_CONTROLLED_MEMORY_PORTS",
+      "sourceCandidate": "fc7d3d5018b513d54b4c3b8ad42273f235dd7b00",
+      "businessSourceCandidate": "5906791322ee9dcfe6707af81db21369396743ba",
+      "integratedCommits": [
+        "fe42bf72e023291e01327bde20110bfcad480a4b",
+        "b30d3b797ca39c96674f6d15984f90626a9d0881"
+      ],
+      "document": "docs/step5/5.4-E-residual-outcome.md",
+      "publication": "ci269",
+      "sourceEvidence": {
+        "businessCasesAt590": 3,
+        "newBusinessRunsAtFc": 0,
+        "originalNegativeReadoutsRejected": 12,
+        "addedOrderNegativeReadoutsRejected": 1,
+        "installs": 2,
+        "auxiliaryIncompleteOutcomes": 2
+      },
+      "scope": "Finite Grassy Terrain/sand/Toxic residual composition, fifth-turn natural weather expiry before same-member poison, poison terminal result/D3 and abort isolation.",
+      "limits": [
+        "fc is a pure-oracle strengthening over archived 590 observations, not a new business run.",
+        "Only the fixed fifth-turn local expiry/poison order is established, not full residual order.",
+        "Fixed Gen8 Toxic rounding difference and two auxiliary-fact downgrade outcomes retained; no Scene/disk/Title/NW."
+      ],
+      "featureScopes": {
+        "FR-000030": "Finite same-round residual composition and one local order assertion.",
+        "FR-000037": "Fixed sand fifth-turn natural expiry.",
+        "FR-000038": "Fixed Grassy Terrain residual restoration.",
+        "FR-000545": "Finite Toxic continuation/damage observations; known rounding difference retained.",
+        "FR-000028": "Observed poison terminal result and D3 commit only."
+      },
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e-residual-outcome.json",
+          "blob": "630d724d11ad76b9027ae8ae644b5496191c64d9",
+          "sha256": "525839232d42fb7843905d14a5d3ca507f8dec3eaf52f4969d3f560652cfa3f7",
+          "scopedSourceCandidate": "fc7d3d5018b513d54b4c3b8ad42273f235dd7b00",
+          "scopedSourceSHA256": "525839232d42fb7843905d14a5d3ca507f8dec3eaf52f4969d3f560652cfa3f7",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/e-residual-outcome-common.cjs",
+          "blob": "c4332806b65e2925d77f04265b686daca24b6dd0",
+          "sha256": "8a26e2d7044df3eef19557a96f89892213770cec202b02a112131af7127ce831",
+          "scopedSourceCandidate": "fc7d3d5018b513d54b4c3b8ad42273f235dd7b00",
+          "scopedSourceSHA256": "8a26e2d7044df3eef19557a96f89892213770cec202b02a112131af7127ce831",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/e-residual-outcome-oracle.cjs",
+          "blob": "3640db32f69dd5f8845ce4e172b87adb560e6ddb",
+          "sha256": "deb7a7989fe82f4b1d48bd91616da02af84b47807e2aa5ccaa992c3553abdee7",
+          "scopedSourceCandidate": "fc7d3d5018b513d54b4c3b8ad42273f235dd7b00",
+          "scopedSourceSHA256": "deb7a7989fe82f4b1d48bd91616da02af84b47807e2aa5ccaa992c3553abdee7",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/test-e-residual-outcome.cjs",
+          "blob": "b9868719352e6be0503307a7dd2dcad5d1028b9a",
+          "sha256": "6eadd041e012d61f59e8f1e0e832be796128033f8b0c5aa27757906ad8b147dd",
+          "scopedSourceCandidate": "fc7d3d5018b513d54b4c3b8ad42273f235dd7b00",
+          "scopedSourceSHA256": "6eadd041e012d61f59e8f1e0e832be796128033f8b0c5aa27757906ad8b147dd",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "docs/step5/5.4-E-residual-outcome.md",
+          "blob": "3638309dc106537bdca98e65745caef0ed4149d2",
+          "sha256": "169dfc575152dddb979a143b58b7610961c48deb939f1bafdc0a6f40593625da",
+          "scopedSourceCandidate": "fc7d3d5018b513d54b4c3b8ad42273f235dd7b00",
+          "scopedSourceSHA256": "169dfc575152dddb979a143b58b7610961c48deb939f1bafdc0a6f40593625da",
+          "sameBytesAsScopedSourceCandidate": true
+        }
+      ],
+      "kind": "INTEGRATED_SCOPED_SOURCE_EVIDENCE",
+      "completeHeading": false,
+      "newExecution": false
+    },
+    {
+      "id": "e1",
+      "featureIds": [
+        "FR-000010",
+        "FR-000060",
+        "FR-000556"
+      ],
+      "layer": "COMPILED_PRODUCTION_SCENE_REAL_APP_SESSION_CONTROLLED_VM",
+      "sourceCandidate": "23f24d8aa3e8530b52f0e37d8de9aedf404bb6ca",
+      "integratedCommits": [
+        "4a29d08affdc8938d311f96a162c6cf7072edf77",
+        "58c7418565e8daaaf62f5cb17db997f7f8bacc6c"
+      ],
+      "document": "docs/step5/5.4-e1-choice-lock-scene.md",
+      "publication": "ci271",
+      "sourceEvidence": {
+        "businessCases": 6,
+        "mechanismFamilies": 4,
+        "negativeReadoutsRejected": 28,
+        "installs": 6,
+        "auxiliaryIncompleteOutcomes": 6
+      },
+      "scope": "Actual NPC Disable/Taunt followed by Scene restriction refusal and legal reselection; Dig/Recharge manual single-candidate continuation, no duplicate permanent PP charge and restored full menu.",
+      "limits": [
+        "Six cases are four mechanism families plus language variants.",
+        "Only existing generic en/zh refusal text; not every restriction, dedicated reason or event order.",
+        "Six auxiliary-fact downgrade outcomes; initial bd224 manifest-length failure (five cases) retained.",
+        "Node VM windows/input/clock/audio/SceneManager, no native Boot/Map/Title/NW/physical input."
+      ],
+      "featureScopes": {
+        "FR-000010": "Finite actual Scene request legality/refusal/reselection.",
+        "FR-000060": "Finite Disable/Taunt restriction and unchanged request/PP on rejection.",
+        "FR-000556": "Finite Dig/Recharge continuation and PP/menu restoration."
+      },
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e1-choice-lock-scene.json",
+          "blob": "a1970e8b0bfed1b3b2fbf8905cda06caf1fa1c62",
+          "sha256": "69a45e3f5f63ba4c52d13291d2461209f08fb7d20bc069b79dc75855b9a49acc",
+          "scopedSourceCandidate": "23f24d8aa3e8530b52f0e37d8de9aedf404bb6ca",
+          "scopedSourceSHA256": "69a45e3f5f63ba4c52d13291d2461209f08fb7d20bc069b79dc75855b9a49acc",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/e1-choice-lock-scene-host.cjs",
+          "blob": "fecfd141a9537e3ef71af771ed928788ae781da1",
+          "sha256": "1e7006e5dd46a6859e8c865ee022a9a0930bf9b316fbf9f58d2b9cdc57323efb",
+          "scopedSourceCandidate": "23f24d8aa3e8530b52f0e37d8de9aedf404bb6ca",
+          "scopedSourceSHA256": "1e7006e5dd46a6859e8c865ee022a9a0930bf9b316fbf9f58d2b9cdc57323efb",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/e1-choice-lock-scene-oracle.cjs",
+          "blob": "623986ac56891f13424ae661ef7aa311f4650c80",
+          "sha256": "aa6474eb7cb595083abf1e2d80e838db5fce210e177cf53c5e12c41f531e4a2c",
+          "scopedSourceCandidate": "23f24d8aa3e8530b52f0e37d8de9aedf404bb6ca",
+          "scopedSourceSHA256": "aa6474eb7cb595083abf1e2d80e838db5fce210e177cf53c5e12c41f531e4a2c",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/test-e1-choice-lock-scene.cjs",
+          "blob": "3fa7d3d50feb8319d9318409ff864c0383b0bb1c",
+          "sha256": "db1af4c4f83d2db431e7af795973cd9cfb4050b9c8663b4a9c49702a4871a81b",
+          "scopedSourceCandidate": "23f24d8aa3e8530b52f0e37d8de9aedf404bb6ca",
+          "scopedSourceSHA256": "db1af4c4f83d2db431e7af795973cd9cfb4050b9c8663b4a9c49702a4871a81b",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "docs/step5/5.4-e1-choice-lock-scene.md",
+          "blob": "90a4601337455af2a4cf7dabaa958b865d76a256",
+          "sha256": "85b587e308cf9d2ac31876d34bdf3ea1c06a82695b68be1280b83e13f3345d48",
+          "scopedSourceCandidate": "23f24d8aa3e8530b52f0e37d8de9aedf404bb6ca",
+          "scopedSourceSHA256": "85b587e308cf9d2ac31876d34bdf3ea1c06a82695b68be1280b83e13f3345d48",
+          "sameBytesAsScopedSourceCandidate": true
+        }
+      ],
+      "kind": "INTEGRATED_SCOPED_SOURCE_EVIDENCE",
+      "completeHeading": false,
+      "newExecution": false
+    },
+    {
+      "id": "e2",
+      "featureIds": [
+        "FR-000050",
+        "FR-000536",
+        "FR-000544",
+        "FR-000545",
+        "FR-000555"
+      ],
+      "layer": "COMPILED_PRODUCTION_SCENE_REAL_APP_SESSION_CONTROLLED_VM",
+      "sourceCandidate": "f5ba8a4bab7a992f7153bafe8e7763be0b9625da",
+      "integratedCommits": [
+        "11d66b4162a7aa853068f853e0871a79d30fcf1b"
+      ],
+      "document": "docs/step5/5.4-e2-status-feedback-scene.md",
+      "publication": "ci271",
+      "sourceEvidence": {
+        "businessCases": 6,
+        "mechanismFamilies": 4,
+        "negativeReadoutsRejected": 33,
+        "installs": 5,
+        "auxiliaryIncompleteOutcomes": 5
+      },
+      "scope": "Actual Toxic HP/status cards and switch identity, Protect HP plus supported used-move text, first-hit multihit KO/PP/no late foe action, abort/fresh card isolation.",
+      "limits": [
+        "Protect dedicated block text is not proved: describer ignores -activate.",
+        "Terminal hitcount may be absent; no invented hitcount UI or complete per-hit abilities/items.",
+        "Fresh Scene after abort performs no second-battle action or cross-battle commit.",
+        "Five auxiliary-fact downgrade outcomes; initial illegal continue parse error occurred before App/Session and is retained.",
+        "Controlled VM, not native Boot/Map/Title/NW/physical input."
+      ],
+      "featureScopes": {
+        "FR-000050": "Finite Protect damage blocking and following-turn expiry.",
+        "FR-000536": "Observed real damage and card HP for Protect/first-hit KO.",
+        "FR-000544": "Actual Toxic application and immune reserve card identity.",
+        "FR-000545": "Finite status card carry/switch/abort isolation.",
+        "FR-000555": "First-hit KO termination and no late extra hit/action; not full multihit family."
+      },
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/e2-status-feedback-scene.json",
+          "blob": "9ce0f679479405df2853833d774700eca7ec414c",
+          "sha256": "82ab098511d9a85dd473d25c80f2474c93a1c7d7c5ee90c5725cf3f4c31339d1",
+          "scopedSourceCandidate": "f5ba8a4bab7a992f7153bafe8e7763be0b9625da",
+          "scopedSourceSHA256": "82ab098511d9a85dd473d25c80f2474c93a1c7d7c5ee90c5725cf3f4c31339d1",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/e2-status-feedback-scene-host.cjs",
+          "blob": "1da24bc1d40166192bb3d8a31737fb6687b659c2",
+          "sha256": "c445db81dfddf1bae499021ef7a70516101c3964e61beb39edef11ddead66bb0",
+          "scopedSourceCandidate": "f5ba8a4bab7a992f7153bafe8e7763be0b9625da",
+          "scopedSourceSHA256": "510c0ceb8fb821d3581a9077ccd4926f17b53f1fd0b0b84e6017109c6e973b2a",
+          "sameBytesAsScopedSourceCandidate": false,
+          "descendantChangeCommit": "2f006fa0bd9de327eeb82261e7cb5861f5c70d33",
+          "descendantChangeScope": "Shared host adds optional per-case seed and explicit initial status/count for cant fixtures; original E2 cases provide neither optional input. Current source is bound separately, not declared byte-identical."
+        },
+        {
+          "path": "experiments/step5/4/e2-status-feedback-scene-oracle.cjs",
+          "blob": "d01594b8cfbc34c2a6f06ee528f2cd64a4076bcb",
+          "sha256": "4d97ec21d39028c0f15d78d6fa8d062762abc311872bf4285fa8080a60388e72",
+          "scopedSourceCandidate": "f5ba8a4bab7a992f7153bafe8e7763be0b9625da",
+          "scopedSourceSHA256": "4d97ec21d39028c0f15d78d6fa8d062762abc311872bf4285fa8080a60388e72",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/test-e2-status-feedback-scene.cjs",
+          "blob": "d816cb15ca573b8cd217ae9d6928a9d727e0723e",
+          "sha256": "cf72319b628881a7337fc8e9cbdb8e56570b40def2ebd53bb3f0d2390dc4edba",
+          "scopedSourceCandidate": "f5ba8a4bab7a992f7153bafe8e7763be0b9625da",
+          "scopedSourceSHA256": "cf72319b628881a7337fc8e9cbdb8e56570b40def2ebd53bb3f0d2390dc4edba",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "docs/step5/5.4-e2-status-feedback-scene.md",
+          "blob": "be8ed9c4ab9f7b29212c26de65b62e92119256a8",
+          "sha256": "2cf35ecf88f6fbb13a986ca8a08d0329b7a8e7bd7331ea074f484e726ed78994",
+          "scopedSourceCandidate": "f5ba8a4bab7a992f7153bafe8e7763be0b9625da",
+          "scopedSourceSHA256": "2cf35ecf88f6fbb13a986ca8a08d0329b7a8e7bd7331ea074f484e726ed78994",
+          "sameBytesAsScopedSourceCandidate": true
+        }
+      ],
+      "kind": "INTEGRATED_SCOPED_SOURCE_EVIDENCE",
+      "completeHeading": false,
+      "newExecution": false
+    },
+    {
+      "id": "cant",
+      "featureIds": [
+        "FR-000545",
+        "FR-000556"
+      ],
+      "layer": "SEPARATE_DESCRIPTION_GATEWAY_AND_COMPILED_SCENE_EVIDENCE",
+      "sourceCandidate": "6cf870ad936895f36ece1733f58e7ff6804a892e",
+      "integratedCommits": [
+        "2f006fa0bd9de327eeb82261e7cb5861f5c70d33",
+        "6cf870ad936895f36ece1733f58e7ff6804a892e"
+      ],
+      "document": "docs/step5/5.4-cant-feedback.zh.md",
+      "publication": "ci274",
+      "sourceEvidence": {
+        "descriptionOnly": 34,
+        "realGateway": 14,
+        "controlledCompiledScene": 22,
+        "sameCasesNotAdditiveAcrossPublicationRuns": true
+      },
+      "scope": "Description whitelist/fallback is synthetic protocol-only evidence; actual engine/Scene verify sleep/paralysis/freeze/flinch, recharge versus Dig, sleep-usable moves and ordinary message timing/actor/PP/abort.",
+      "limits": [
+        "Description 34 is not 34 real engine causes or all 16 reasons tested through Scene.",
+        "No new mapping of every whitelist reason into frozen FR rows.",
+        "Unknown reasons use neutral fallback; no complete ability-specific feedback.",
+        "Original 34/34 old-description failures, Scene 16/22 and 20/22 failures retained.",
+        "Opening-card defect was still open at ci274 and fixed separately in ci275; no retrospective ci274 opening PASS.",
+        "Controlled VM; no native pixels/fonts/audio/NW."
+      ],
+      "featureScopes": {
+        "FR-000545": "Actual status-related inability/allowed sleep moves and their visible messages; no full status probabilities.",
+        "FR-000556": "Real Hyper Beam recharge versus Dig preparation and PP; not complete locked-turn family."
+      },
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/test-cant-description.cjs",
+          "blob": "d8c1367519a2777d49d72b2582e7d5b3786336a8",
+          "sha256": "1726fa955086f83008a61872879210bcc5b895e083e50c19ed3058ea580a111a",
+          "scopedSourceCandidate": "6cf870ad936895f36ece1733f58e7ff6804a892e",
+          "scopedSourceSHA256": "1726fa955086f83008a61872879210bcc5b895e083e50c19ed3058ea580a111a",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/test-cant-engine.cjs",
+          "blob": "e1ee22d1dad3da1acea6ccdaceb16fa075cdf595",
+          "sha256": "9a71102c439d8fb0a96ac8cd9bcde58893d4964b60220be2a9469e21c2d8197f",
+          "scopedSourceCandidate": "6cf870ad936895f36ece1733f58e7ff6804a892e",
+          "scopedSourceSHA256": "9a71102c439d8fb0a96ac8cd9bcde58893d4964b60220be2a9469e21c2d8197f",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/test-cant-scene.cjs",
+          "blob": "7bfe28877705c49c2e0a745eca2242cdd5f53083",
+          "sha256": "9edca146cd2dbc7050a4aac790c4e8acd64f959b238821c6a557100e8cab0a32",
+          "scopedSourceCandidate": "6cf870ad936895f36ece1733f58e7ff6804a892e",
+          "scopedSourceSHA256": "9edca146cd2dbc7050a4aac790c4e8acd64f959b238821c6a557100e8cab0a32",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "docs/step5/5.4-cant-feedback.zh.md",
+          "blob": "3598e5d553626b8ce58fd2f703cb92a799d487c7",
+          "sha256": "60c539e875054c316a41903878ccf3b7c8e2ac20b67439687936c860b3e2a5f1",
+          "scopedSourceCandidate": "6cf870ad936895f36ece1733f58e7ff6804a892e",
+          "scopedSourceSHA256": "60c539e875054c316a41903878ccf3b7c8e2ac20b67439687936c860b3e2a5f1",
+          "sameBytesAsScopedSourceCandidate": true
+        }
+      ],
+      "kind": "INTEGRATED_SCOPED_SOURCE_EVIDENCE",
+      "completeHeading": false,
+      "newExecution": false
+    },
+    {
+      "id": "opening",
+      "featureIds": [
+        "FR-000019",
+        "FR-000028",
+        "FR-000065",
+        "FR-000545"
+      ],
+      "layer": "COMPILED_SCENE_AND_DIRECT_SESSION_PLUS_SEPARATE_APP_REGRESSIONS",
+      "sourceCandidate": "6b4a0a0083349931eb0dbc53654159cc95234aae",
+      "integratedCommits": [
+        "b1aa79be07a7723665f888678dfd7f1b3b4354df",
+        "fac38f13a07feba9df86b5af2859ba8927cfd849"
+      ],
+      "document": "docs/step5/4-opening-state.zh.md",
+      "publication": "ci275",
+      "sourceEvidence": {
+        "newOpeningControlledSceneCases": 13,
+        "newOpeningDirectSessionCases": 4,
+        "carriedFaintAndReviveAreSeparateSupportingRegressions": true
+      },
+      "scope": "Seed both rosters before team choice/native entry; real injured/sleeping/poisoned carry and native Immunity, exact sleep count/capture result; reconcile living roster after native start reset so carried faints and real KO/D3 remain coherent.",
+      "limits": [
+        "Only the final 6b successor is accepted; cd5 seed-only candidate caused carried-faint/revive regressions.",
+        "Original full 238 suites 4191 pass/27 fail retained: 20 missing host completed later at same bytes and 7 stale runtime pins refused before business.",
+        "Capture stops at real result before receiving UI/persistent installation; no receiving UI acceptance.",
+        "Missing legacy sleep count sampling moves before entry RNG; no promise of identical old erroneous PRNG sequence.",
+        "Controlled Scene/Session, not native Boot/Map/Title/NW/input; no complete entry order or full FR."
+      ],
+      "featureScopes": {
+        "FR-000019": "Seeded entry/switch public condition identity only, not complete entry-effect sequence.",
+        "FR-000028": "Carried faint/live roster plus real KO/D3 supporting regressions; not full outcome lifecycle.",
+        "FR-000065": "Native entry Immunity sees carried poison and its cure is not overwritten, not all entry abilities/order.",
+        "FR-000545": "Actual carried states and preserved explicit sleep count; legacy missing count drawn once."
+      },
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/test-opening-state-scene.cjs",
+          "blob": "4f53547a02adc4a3b539996eb82d8a410205aa04",
+          "sha256": "7e92e8a8e8d5e3bf998d4651e79ae8bb17efe9b4a83ec84524606014029743f2",
+          "scopedSourceCandidate": "6b4a0a0083349931eb0dbc53654159cc95234aae",
+          "scopedSourceSHA256": "7e92e8a8e8d5e3bf998d4651e79ae8bb17efe9b4a83ec84524606014029743f2",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/test-carried-faint.cjs",
+          "blob": "b05ddb740a8e242b2365bbe9b121ea3760826ef2",
+          "sha256": "886c5103ec6dfa4029ee0829573e98e7d634df482c62781815568de576166948",
+          "scopedSourceCandidate": "6b4a0a0083349931eb0dbc53654159cc95234aae",
+          "scopedSourceSHA256": "886c5103ec6dfa4029ee0829573e98e7d634df482c62781815568de576166948",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "experiments/step5/4/test-battle-revive-items.cjs",
+          "blob": "9eed4a5a0b8a6bb93f50b99d0e3a6362d5346114",
+          "sha256": "85a3291dd953c7cc0c6dc17266b6cee13bb52845f524667cbba0900a6caa3e90",
+          "scopedSourceCandidate": "6b4a0a0083349931eb0dbc53654159cc95234aae",
+          "scopedSourceSHA256": "85a3291dd953c7cc0c6dc17266b6cee13bb52845f524667cbba0900a6caa3e90",
+          "sameBytesAsScopedSourceCandidate": true
+        },
+        {
+          "path": "docs/step5/4-opening-state.zh.md",
+          "blob": "77ae453e532a935d9b41b3a17c90f852516b2999",
+          "sha256": "7a867d0eb5e5bb7c94a74bc4bfee9d9f9bbd8457bf846d81bcc18119934c7577",
+          "scopedSourceCandidate": "6b4a0a0083349931eb0dbc53654159cc95234aae",
+          "scopedSourceSHA256": "7a867d0eb5e5bb7c94a74bc4bfee9d9f9bbd8457bf846d81bcc18119934c7577",
+          "sameBytesAsScopedSourceCandidate": true
+        }
+      ],
+      "kind": "INTEGRATED_SCOPED_SOURCE_EVIDENCE",
+      "completeHeading": false,
+      "newExecution": false
+    }
+  ],
+  "rows": [
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000010",
+        "name": "命令、特殊行动、服从性与行动顺序行为规格（净化正文；批次 10） / 4. 选择期合法性",
+        "source": "deliverables/final-specification-set/combat-requirements/wp40-commands-obedience-and-action-order.md",
+        "heading": "4. 选择期合法性",
+        "line_ranges": [
+          [
+            78,
+            96
+          ],
+          [
+            106,
+            123
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "e1"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000013",
+        "name": "命令、特殊行动、服从性与行动顺序行为规格（净化正文；批次 10） / 6. 行动顺序",
+        "source": "deliverables/final-specification-set/combat-requirements/wp40-commands-obedience-and-action-order.md",
+        "heading": "6. 行动顺序",
+        "line_ranges": [
+          [
+            251,
+            273
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-action"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000018",
+        "name": "换人、替补、场上位置移动与逃跑行为规格（净化正文；批次 10） / 3. 换人资格",
+        "source": "deliverables/final-specification-set/combat-requirements/wp41-switching-positioning-and-escape.md",
+        "heading": "3. 换人资格",
+        "line_ranges": [
+          [
+            46,
+            72
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-action"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000019",
+        "name": "换人、替补、场上位置移动与逃跑行为规格（净化正文；批次 10） / 4. 换人执行与出入场次序",
+        "source": "deliverables/final-specification-set/combat-requirements/wp41-switching-positioning-and-escape.md",
+        "heading": "4. 换人执行与出入场次序",
+        "line_ranges": [
+          [
+            73,
+            113
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-action",
+        "position",
+        "opening"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000021",
+        "name": "换人、替补、场上位置移动与逃跑行为规格（净化正文；批次 10） / 6. Shift 位置移动",
+        "source": "deliverables/final-specification-set/combat-requirements/wp41-switching-positioning-and-escape.md",
+        "heading": "6. Shift 位置移动",
+        "line_ranges": [
+          [
+            138,
+            151
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000028",
+        "name": "战斗成长交界、回合末与终局行为规格（净化正文；批次 10） / 3. 主阶段与裁判（A）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp42-growth-end-of-round-and-battle-outcomes.md",
+        "heading": "3. 主阶段与裁判（A）",
+        "line_ranges": [
+          [
+            35,
+            58
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-action",
+        "residual",
+        "opening"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000030",
+        "name": "战斗成长交界、回合末与终局行为规格（净化正文；批次 10） / 5. 普通回合末完整阶段合同（C）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp42-growth-end-of-round-and-battle-outcomes.md",
+        "heading": "5. 普通回合末完整阶段合同（C）",
+        "line_ranges": [
+          [
+            97,
+            165
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-protect",
+        "residual"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000035",
+        "name": "战斗天气、场地、阵营与位置效果行为规格（净化正文；批次 10） / 2. 域与状态模型",
+        "source": "deliverables/final-specification-set/combat-requirements/wp45-weather-terrain-side-and-position-effects.md",
+        "heading": "2. 域与状态模型",
+        "line_ranges": [
+          [
+            23,
+            31
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-weather"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000037",
+        "name": "战斗天气、场地、阵营与位置效果行为规格（净化正文；批次 10） / 4. 天气建立、覆盖、到期与压制（A/B）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp45-weather-terrain-side-and-position-effects.md",
+        "heading": "4. 天气建立、覆盖、到期与压制（A/B）",
+        "line_ranges": [
+          [
+            54,
+            90
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-weather",
+        "residual"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000038",
+        "name": "战斗天气、场地、阵营与位置效果行为规格（净化正文；批次 10） / 5. 场地建立、有效成员、到期与直接移除（A/B）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp45-weather-terrain-side-and-position-effects.md",
+        "heading": "5. 场地建立、有效成员、到期与直接移除（A/B）",
+        "line_ranges": [
+          [
+            91,
+            101
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-weather",
+        "residual"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000039",
+        "name": "战斗天气、场地、阵营与位置效果行为规格（净化正文；批次 10） / 6. 有界作用域目录（C）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp45-weather-terrain-side-and-position-effects.md",
+        "heading": "6. 有界作用域目录（C）",
+        "line_ranges": [
+          [
+            102,
+            146
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-hazards"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000040",
+        "name": "战斗天气、场地、阵营与位置效果行为规格（净化正文；批次 10） / 7. 阵营/全场效果的建立与清理差异（B/C）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp45-weather-terrain-side-and-position-effects.md",
+        "heading": "7. 阵营/全场效果的建立与清理差异（B/C）",
+        "line_ranges": [
+          [
+            147,
+            177
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000041",
+        "name": "战斗天气、场地、阵营与位置效果行为规格（净化正文；批次 10） / 8. 入场危害与范围（D）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp45-weather-terrain-side-and-position-effects.md",
+        "heading": "8. 入场危害与范围（D）",
+        "line_ranges": [
+          [
+            178,
+            192
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-hazards"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000042",
+        "name": "战斗天气、场地、阵营与位置效果行为规格（净化正文；批次 10） / 9. 位置、换人、Shift 与延迟执行（D）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp45-weather-terrain-side-and-position-effects.md",
+        "heading": "9. 位置、换人、Shift 与延迟执行（D）",
+        "line_ranges": [
+          [
+            193,
+            218
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "position"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000043",
+        "name": "WP47-A 覆盖与默认数据附表（净化正文；批次 11） / 1. 完整调用排除表",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-a-attributes-targeting-calling-data.md",
+        "heading": "1. 完整调用排除表",
+        "line_ranges": [
+          [
+            7,
+            80
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000044",
+        "name": "WP47-A 覆盖与默认数据附表（净化正文；批次 11） / 2. 持物改类型的完整默认映射",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-a-attributes-targeting-calling-data.md",
+        "heading": "2. 持物改类型的完整默认映射",
+        "line_ranges": [
+          [
+            81,
+            125
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000045",
+        "name": "WP47-A 覆盖与默认数据附表（净化正文；批次 11） / 3. 自然之恩默认内容数据",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-a-attributes-targeting-calling-data.md",
+        "heading": "3. 自然之恩默认内容数据",
+        "line_ranges": [
+          [
+            126,
+            201
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000048",
+        "name": "招式属性、目标与复制调用行为规格（净化正文；批次 11） / 2. 当前类型与持久字段（A）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-a-move-attributes-targeting-and-calling.md",
+        "heading": "2. 当前类型与持久字段（A）",
+        "line_ranges": [
+          [
+            21,
+            55
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000049",
+        "name": "招式属性、目标与复制调用行为规格（净化正文；批次 11） / 3. 本次类型、环境和数据（A/E）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-a-move-attributes-targeting-and-calling.md",
+        "heading": "3. 本次类型、环境和数据（A/E）",
+        "line_ranges": [
+          [
+            56,
+            111
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000050",
+        "name": "招式属性、目标与复制调用行为规格（净化正文；批次 11） / 4. 命中、保护与时机（B）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-a-move-attributes-targeting-and-calling.md",
+        "heading": "4. 命中、保护与时机（B）",
+        "line_ranges": [
+          [
+            112,
+            135
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-protect",
+        "e2"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000051",
+        "name": "招式属性、目标与复制调用行为规格（净化正文；批次 11） / 5. 目标选择、重定向与反射（C）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-a-move-attributes-targeting-and-calling.md",
+        "heading": "5. 目标选择、重定向与反射（C）",
+        "line_ranges": [
+          [
+            136,
+            176
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000052",
+        "name": "招式属性、目标与复制调用行为规格（净化正文；批次 11） / 6. 再次使用、复制与递归边界（D）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-a-move-attributes-targeting-and-calling.md",
+        "heading": "6. 再次使用、复制与递归边界（D）",
+        "line_ranges": [
+          [
+            177,
+            212
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000053",
+        "name": "WP47-B 有界覆盖与默认数据附表（净化正文；批次 11） / 1. 号令与安可完整排除表",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-b-control-items-coverage-data.md",
+        "heading": "1. 号令与安可完整排除表",
+        "line_ranges": [
+          [
+            7,
+            48
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000054",
+        "name": "WP47-B 有界覆盖与默认数据附表（净化正文；批次 11） / 2. 不可移物的默认物种组合",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-b-control-items-coverage-data.md",
+        "heading": "2. 不可移物的默认物种组合",
+        "line_ranges": [
+          [
+            49,
+            65
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000055",
+        "name": "WP47-B 有界覆盖与默认数据附表（净化正文；批次 11） / 3. 投掷完整默认威力数据",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-b-control-items-coverage-data.md",
+        "heading": "3. 投掷完整默认威力数据",
+        "line_ranges": [
+          [
+            66,
+            94
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000059",
+        "name": "招式换人、行动控制与物品变化行为规格（净化正文；批次 11） / 3. 拘束、代价与行动调度（B）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-b-switching-control-and-item-changes.md",
+        "heading": "3. 拘束、代价与行动调度（B）",
+        "line_ranges": [
+          [
+            48,
+            95
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000060",
+        "name": "招式换人、行动控制与物品变化行为规格（净化正文；批次 11） / 4. PP 变化与招式限制（C）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-b-switching-control-and-item-changes.md",
+        "heading": "4. PP 变化与招式限制（C）",
+        "line_ranges": [
+          [
+            96,
+            115
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "e1"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000062",
+        "name": "招式换人、行动控制与物品变化行为规格（净化正文；批次 11） / 6. 能力、浮空与变身（E）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp47-b-switching-control-and-item-changes.md",
+        "heading": "6. 能力、浮空与变身（E）",
+        "line_ranges": [
+          [
+            160,
+            181
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000064",
+        "name": "特性阶段触发、反应与连锁行为规格（净化正文；批次 12） / 2. 通用入口与能力变化（A）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp49-ability-phase-triggers.md",
+        "heading": "2. 通用入口与能力变化（A）",
+        "line_ranges": [
+          [
+            19,
+            42
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000065",
+        "name": "特性阶段触发、反应与连锁行为规格（净化正文；批次 12） / 3. 入场顺序与具体反应（B）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp49-ability-phase-triggers.md",
+        "heading": "3. 入场顺序与具体反应（B）",
+        "line_ranges": [
+          [
+            43,
+            84
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-ability",
+        "opening"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000067",
+        "name": "特性阶段触发、反应与连锁行为规格（净化正文；批次 12） / 5. HP、状态、阶级与行动失败反应（C）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp49-ability-phase-triggers.md",
+        "heading": "5. HP、状态、阶级与行动失败反应（C）",
+        "line_ranges": [
+          [
+            100,
+            123
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000070",
+        "name": "特性阶段触发、反应与连锁行为规格（净化正文；批次 12） / 8. 场地变化（E）",
+        "source": "deliverables/final-specification-set/combat-requirements/wp49-ability-phase-triggers.md",
+        "heading": "8. 场地变化（E）",
+        "line_ranges": [
+          [
+            217,
+            224
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000072",
+        "name": "特性阶段触发、反应与连锁行为规格（净化正文；批次 12） / 11. 不变量、失败、配置与依赖",
+        "source": "deliverables/final-specification-set/combat-requirements/wp49-ability-phase-triggers.md",
+        "heading": "11. 不变量、失败、配置与依赖",
+        "line_ranges": [
+          [
+            266,
+            272
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000532",
+        "name": "战斗类型、命中与伤害计算（净化正文；批次 7） / 3. 本次类型与相性",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+        "heading": "3. 本次类型与相性",
+        "line_ranges": [
+          [
+            37,
+            65
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-basic",
+        "prior-ability",
+        "prior-damage"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000533",
+        "name": "战斗类型、命中与伤害计算（净化正文；批次 7） / 4. 命中合同",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+        "heading": "4. 命中合同",
+        "line_ranges": [
+          [
+            66,
+            91
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-basic"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000534",
+        "name": "战斗类型、命中与伤害计算（净化正文；批次 7） / 5. 会心门",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+        "heading": "5. 会心门",
+        "line_ranges": [
+          [
+            92,
+            100
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-damage"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000535",
+        "name": "战斗类型、命中与伤害计算（净化正文；批次 7） / 6. 普通伤害核心",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+        "heading": "6. 普通伤害核心",
+        "line_ranges": [
+          [
+            101,
+            140
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000536",
+        "name": "战斗类型、命中与伤害计算（净化正文；批次 7） / 7. 伤害状态、实际损失与特殊路径",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+        "heading": "7. 伤害状态、实际损失与特殊路径",
+        "line_ranges": [
+          [
+            141,
+            158
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-ability",
+        "e2"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000537",
+        "name": "战斗类型、命中与伤害计算（净化正文；批次 7） / 8. 配置与数据要求",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+        "heading": "8. 配置与数据要求",
+        "line_ranges": [
+          [
+            159,
+            166
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000538",
+        "name": "战斗类型、命中与伤害计算（净化正文；批次 7） / 9. 不变量、失败与边界",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+        "heading": "9. 不变量、失败与边界",
+        "line_ranges": [
+          [
+            167,
+            175
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000540",
+        "name": "有界效果归属与数据对应（净化附表；批次 7） / 2. 阶级效果 114 项归属表",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp44-effect-coverage.md",
+        "heading": "2. 阶级效果 114 项归属表",
+        "line_ranges": [
+          [
+            11,
+            155
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000541",
+        "name": "有界效果归属与数据对应（净化附表；批次 7） / 3. 状态文件的有界目录（31 项）",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp44-effect-coverage.md",
+        "heading": "3. 状态文件的有界目录（31 项）",
+        "line_ranges": [
+          [
+            156,
+            168
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000542",
+        "name": "有界效果归属与数据对应（净化附表；批次 7） / 4. 当前数据样本（文本数据确认）",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp44-effect-coverage.md",
+        "heading": "4. 当前数据样本（文本数据确认）",
+        "line_ranges": [
+          [
+            169,
+            188
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000544",
+        "name": "异常状态、能力阶级与免疫（净化正文；批次 7） / 3. 异常施加的分层入口",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+        "heading": "3. 异常施加的分层入口",
+        "line_ranges": [
+          [
+            29,
+            63
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-basic",
+        "prior-statusApp",
+        "prior-statusCarry",
+        "prior-statusDisk",
+        "prior-statusContinue",
+        "e2"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000545",
+        "name": "异常状态、能力阶级与免疫（净化正文；批次 7） / 4. 各状态的延续与清理",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+        "heading": "4. 各状态的延续与清理",
+        "line_ranges": [
+          [
+            64,
+            83
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-status",
+        "prior-statusApp",
+        "prior-statusCarry",
+        "prior-statusDisk",
+        "prior-statusContinue",
+        "residual",
+        "e2",
+        "cant",
+        "opening"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000546",
+        "name": "异常状态、能力阶级与免疫（净化正文；批次 7） / 5. 阶级资格、提交与反射",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+        "heading": "5. 阶级资格、提交与反射",
+        "line_ranges": [
+          [
+            84,
+            114
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-basic"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000547",
+        "name": "异常状态、能力阶级与免疫（净化正文；批次 7） / 6. 状态招式有界目录",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+        "heading": "6. 状态招式有界目录",
+        "line_ranges": [
+          [
+            115,
+            130
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000548",
+        "name": "异常状态、能力阶级与免疫（净化正文；批次 7） / 7. 阶级变化族与直接重写",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+        "heading": "7. 阶级变化族与直接重写",
+        "line_ranges": [
+          [
+            131,
+            179
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-stages"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000549",
+        "name": "异常状态、能力阶级与免疫（净化正文；批次 7） / 8. 计算交界与局部期限",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+        "heading": "8. 计算交界与局部期限",
+        "line_ranges": [
+          [
+            180,
+            186
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-stages"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000550",
+        "name": "异常状态、能力阶级与免疫（净化正文；批次 7） / 9. 不变量、配置与失败",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+        "heading": "9. 不变量、配置与失败",
+        "line_ranges": [
+          [
+            187,
+            194
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000551",
+        "name": "多次攻击、特殊伤害与恢复——有界效果覆盖（净化附表；批次 7） / 1. 本包实际合同（原有 139 项，另接收 3 项）",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp46-damage-healing-coverage.md",
+        "heading": "1. 本包实际合同（原有 139 项，另接收 3 项）",
+        "line_ranges": [
+          [
+            5,
+            54
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000552",
+        "name": "多次攻击、特殊伤害与恢复——有界效果覆盖（净化附表；批次 7） / 2. 同目录已定位的其它责任（不计本包主合同数量）",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp46-damage-healing-coverage.md",
+        "heading": "2. 同目录已定位的其它责任（不计本包主合同数量）",
+        "line_ranges": [
+          [
+            55,
+            82
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000554",
+        "name": "多次攻击、特殊伤害与恢复——有界效果覆盖（净化附表；批次 7） / 3. 自然之恩的多击消费者边界",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp46-damage-healing-coverage.md",
+        "heading": "3. 自然之恩的多击消费者边界",
+        "line_ranges": [
+          [
+            87,
+            89
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000555",
+        "name": "多次攻击、特殊伤害与恢复（净化正文；批次 7） / 2. 整次使用、每击与中断",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+        "heading": "2. 整次使用、每击与中断",
+        "line_ranges": [
+          [
+            13,
+            44
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-multihit",
+        "prior-multihitContinue",
+        "e2"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000556",
+        "name": "多次攻击、特殊伤害与恢复（净化正文；批次 7） / 3. 多击、两回合与连用",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+        "heading": "3. 多击、两回合与连用",
+        "line_ranges": [
+          [
+            45,
+            92
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-multihit",
+        "prior-multihitContinue",
+        "prior-locked",
+        "e1",
+        "cant"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000557",
+        "name": "多次攻击、特殊伤害与恢复（净化正文；批次 7） / 4. 固定伤害、反击与伤害记录",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+        "heading": "4. 固定伤害、反击与伤害记录",
+        "line_ranges": [
+          [
+            93,
+            128
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-damage"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000558",
+        "name": "多次攻击、特殊伤害与恢复（净化正文；批次 7） / 5. 威力、类别和输入替代",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+        "heading": "5. 威力、类别和输入替代",
+        "line_ranges": [
+          [
+            129,
+            203
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000559",
+        "name": "多次攻击、特殊伤害与恢复（净化正文；批次 7） / 6. 治疗、吸取与持续建立",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+        "heading": "6. 治疗、吸取与持续建立",
+        "line_ranges": [
+          [
+            204,
+            252
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-hp",
+        "prior-hpContinue",
+        "position"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000560",
+        "name": "多次攻击、特殊伤害与恢复（净化正文；批次 7） / 7. 反伤、自损与同归",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+        "heading": "7. 反伤、自损与同归",
+        "line_ranges": [
+          [
+            253,
+            284
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-hp",
+        "prior-hpContinue"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000561",
+        "name": "多次攻击、特殊伤害与恢复（净化正文；批次 7） / 8. 配置、默认数据与有界场景",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+        "heading": "8. 配置、默认数据与有界场景",
+        "line_ranges": [
+          [
+            285,
+            288
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000562",
+        "name": "特性参与计算、免疫与有效性（净化正文；批次 7） / 2. 输入、有效性与读取约定",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+        "heading": "2. 输入、有效性与读取约定",
+        "line_ranges": [
+          [
+            11,
+            35
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-ability"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000563",
+        "name": "特性参与计算、免疫与有效性（净化正文；批次 7） / 3. 速度、重量与行动顺序",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+        "heading": "3. 速度、重量与行动顺序",
+        "line_ranges": [
+          [
+            36,
+            55
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000564",
+        "name": "特性参与计算、免疫与有效性（净化正文；批次 7） / 4. 本次类型、命中与会心",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+        "heading": "4. 本次类型、命中与会心",
+        "line_ranges": [
+          [
+            56,
+            88
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-damage"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000565",
+        "name": "特性参与计算、免疫与有效性（净化正文；批次 7） / 5. 伤害倍率合同",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+        "heading": "5. 伤害倍率合同",
+        "line_ranges": [
+          [
+            89,
+            154
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000566",
+        "name": "特性参与计算、免疫与有效性（净化正文；批次 7） / 6. 状态与阶级资格",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+        "heading": "6. 状态与阶级资格",
+        "line_ranges": [
+          [
+            155,
+            162
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-ability"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000567",
+        "name": "特性参与计算、免疫与有效性（净化正文；批次 7） / 7. 招式阻止、免疫、换出与逃跑",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+        "heading": "7. 招式阻止、免疫、换出与逃跑",
+        "line_ranges": [
+          [
+            163,
+            180
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000568",
+        "name": "特性参与计算、免疫与有效性（净化正文；批次 7） / 8. 注册表外核心与共享责任",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+        "heading": "8. 注册表外核心与共享责任",
+        "line_ranges": [
+          [
+            181,
+            195
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [
+        "prior-ability"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000569",
+        "name": "特性参与计算、免疫与有效性（净化正文；批次 7） / 9. 有界登记覆盖（27 族，148 展开身份）",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+        "heading": "9. 有界登记覆盖（27 族，148 展开身份）",
+        "line_ranges": [
+          [
+            196,
+            228
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000570",
+        "name": "特性参与计算、免疫与有效性（净化正文；批次 7） / 11. 失败、不变量、依赖与未决",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+        "heading": "11. 失败、不变量、依赖与未决",
+        "line_ranges": [
+          [
+            233,
+            238
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000571",
+        "name": "持物效果有界覆盖（净化附表；批次 7） / 1. 登记与具体合同",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp50-held-item-effect-coverage.md",
+        "heading": "1. 登记与具体合同",
+        "line_ranges": [
+          [
+            5,
+            43
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000572",
+        "name": "持物效果有界覆盖（净化附表；批次 7） / 2. 类型宝石与减伤果完整映射",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp50-held-item-effect-coverage.md",
+        "heading": "2. 类型宝石与减伤果完整映射",
+        "line_ranges": [
+          [
+            44,
+            68
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000575",
+        "name": "持有物计算、触发与消耗（净化正文；批次 7） / 3. 计算修正",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp50-held-item-triggers-and-consumption.md",
+        "heading": "3. 计算修正",
+        "line_ranges": [
+          [
+            33,
+            71
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000579",
+        "name": "持有物计算、触发与消耗（净化正文；批次 7） / 7. 注册表外直接核心与边界",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp50-held-item-triggers-and-consumption.md",
+        "heading": "7. 注册表外直接核心与边界",
+        "line_ranges": [
+          [
+            153,
+            170
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    },
+    {
+      "formalIdentity": {
+        "feature_id": "FR-000724",
+        "name": "未知效果身份、变化失败与伤害回退",
+        "source": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+        "heading": "2.1 效果身份缺省与无实现回退",
+        "line_ranges": [
+          [
+            29,
+            36
+          ]
+        ]
+      },
+      "selectedEvidenceRefs": [],
+      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "completeHeading": false,
+      "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
+      "emptySelectionIsNotRepositoryUntested": true
+    }
+  ],
+  "newBusinessRuns": 0,
+  "newBuilds": 0,
+  "newCI": 0,
+  "NW": 0,
+  "oldFrozenReplayRuns": 0,
+  "completeHeadingAcceptancesAdded": 0,
+  "retainedBoundaries": [
+    "All historical FAIL/WARN/UNKNOWN/HOLD/LOW/DEFER and Showdown differences retain their versioned meaning.",
+    "Default held-item production gates remain false.",
+    "No native Boot/Map/Title, physical input, NW or original comparison acceptance.",
+    "No complete E74/D2/5.4/P4 acceptance; no current-candidate CI inherited from source receipts."
+  ]
+}
