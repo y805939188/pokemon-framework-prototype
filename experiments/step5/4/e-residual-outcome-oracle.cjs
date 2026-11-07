@@ -12,7 +12,11 @@ function verify(c,rows){
   }else{
    const sand=ev.findIndex(e=>e.type==='-damage'&&targets(e,'RES-P1')&&e.args.some(v=>/Sandstorm/i.test(v)));
    if(i<4)assert(sand>=0&&sand<tox,'actual Sandstorm damage precedes poison');
-   else{assert.equal(sand,-1,'fifth-turn weather expiry prevents weather damage');assert(ev.some(e=>e.type==='-weather'&&e.args[0]==='none'),'actual natural weather end');}
+   else{
+    assert.equal(sand,-1,'fifth-turn weather expiry prevents weather damage');
+    const weatherEnd=ev.findIndex(e=>e.type==='-weather'&&e.args[0]==='none');
+    assert(weatherEnd>=0&&weatherEnd<tox,'fifth-turn natural weather end precedes poison');
+   }
   }
  }
  if(c.exit==='abort'){
