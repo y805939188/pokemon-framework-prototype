@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "kind": "bounded-combined-residual-order-real-App-Session",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "completeHeading": false,
+  "sourceFRs": [
+    "FR-000030",
+    "FR-000037",
+    "FR-000038",
+    "FR-000545",
+    "FR-000028"
+  ],
+  "playerMaxHP": 150,
+  "unit16": 9,
+  "playerAbility": "No Guard",
+  "moves": [
+    "sandstorm",
+    "grassyterrain",
+    "splash"
+  ],
+  "foe": {
+    "species": "slowbro",
+    "level": 10,
+    "moves": [
+      "toxic"
+    ]
+  },
+  "cases": [
+    {
+      "id": "ERO-01",
+      "check": "Grassy-heal-before-real-Toxic-residual",
+      "featureIds": [
+        "FR-000030",
+        "FR-000038",
+        "FR-000545"
+      ],
+      "initialHP": 45,
+      "turns": [
+        "grassyterrain",
+        "splash",
+        "splash"
+      ],
+      "expectedHP": [
+        45,
+        36,
+        18
+      ],
+      "kind": "grass",
+      "exit": "run"
+    },
+    {
+      "id": "ERO-02",
+      "check": "Sandstorm-expiry-before-Toxic-terminal-and-D3-install",
+      "featureIds": [
+        "FR-000030",
+        "FR-000037",
+        "FR-000545",
+        "FR-000028"
+      ],
+      "initialHP": 150,
+      "turns": [
+        "sandstorm",
+        "splash",
+        "splash",
+        "splash",
+        "splash"
+      ],
+      "expectedHP": [
+        132,
+        105,
+        69,
+        24,
+        0
+      ],
+      "kind": "sand",
+      "exit": "defeat"
+    },
+    {
+      "id": "ERO-03",
+      "check": "abort-combined-weather-poison-and-fresh-battle-isolation",
+      "featureIds": [
+        "FR-000030",
+        "FR-000037",
+        "FR-000545"
+      ],
+      "initialHP": 150,
+      "turns": [
+        "sandstorm"
+      ],
+      "expectedHP": [
+        132
+      ],
+      "kind": "sand",
+      "exit": "abort"
+    }
+  ],
+  "sources": [
+    {
+      "feature_id": "FR-000030",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/combat-requirements/wp42-growth-end-of-round-and-battle-outcomes.md",
+      "sha256": "ec2203f1cf58cbf9327ef6361a82510fab3ec51174d39f72dbec233dfeed87e8",
+      "currentHeadingStart": 97,
+      "currentHeadingEnd": 165
+    },
+    {
+      "feature_id": "FR-000037",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/combat-requirements/wp45-weather-terrain-side-and-position-effects.md",
+      "sha256": "bcb8c6c7d4b86e30799d866952db35ca5448d4922d6e7873d95f368a498623da",
+      "currentHeadingStart": 54,
+      "currentHeadingEnd": 90
+    },
+    {
+      "feature_id": "FR-000038",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/combat-requirements/wp45-weather-terrain-side-and-position-effects.md",
+      "sha256": "bcb8c6c7d4b86e30799d866952db35ca5448d4922d6e7873d95f368a498623da",
+      "currentHeadingStart": 91,
+      "currentHeadingEnd": 101
+    },
+    {
+      "feature_id": "FR-000545",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+      "sha256": "e144ad75bab96647c12220d7f7e137d534277c169f6ca64d8c6bd06044268943",
+      "currentHeadingStart": 64,
+      "currentHeadingEnd": 83
+    },
+    {
+      "feature_id": "FR-000028",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/combat-requirements/wp42-growth-end-of-round-and-battle-outcomes.md",
+      "sha256": "ec2203f1cf58cbf9327ef6361a82510fab3ec51174d39f72dbec233dfeed87e8",
+      "currentHeadingStart": 35,
+      "currentHeadingEnd": 58
+    }
+  ]
+}
