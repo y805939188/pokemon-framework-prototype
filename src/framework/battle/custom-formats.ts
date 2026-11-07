@@ -130,7 +130,8 @@ function attachInitialField(b: ShowdownBattle): void {
     const expired = this.terrainState.duration === 0;
     const result = clearTerrain.call(this), id = TERRAIN[c.terrain];
     if (result && expired && !this.terrain && id) {
-      terrain(b, id, true); b.eachEvent('TerrainChange'); b.eachEvent('TerrainChange');
+      // Native clear already notified the empty field; notify the restored default only once.
+      terrain(b, id, true); b.eachEvent('TerrainChange');
     }
     return result;
   } });

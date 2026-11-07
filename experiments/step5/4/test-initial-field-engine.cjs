@@ -58,3 +58,136 @@ test('IF07 Camouflage same-type failure retains native type and normal PP',async
 
 test('W02/W03 full 3 stored primal × 4 ordinary move gate, with both native suppressors',async()=>{for(const weather of['harshsun','heavyrain','strongwinds'])for(const move of['Sunny Day','Rain Dance','Sandstorm','Hail'])for(const suppressor of['Run Away','Cloud Nine','Air Lock']){const s=await create({weather},set('P1',[move]),set('F1',['Splash'],suppressor)),id=move.toLowerCase().replace(/ /g,''),pp=s.gw.readState('p1')[0].pp[id];const messages=await turn(s);assert.equal(s.b.field.weather,({harshsun:'desolateland',heavyrain:'primordialsea',strongwinds:'deltastream'})[weather]);assert.equal(s.gw.readState('p1')[0].pp[id],pp-1);assert.match(JSON.stringify(messages),/-fail/);observe({kind:'stored-weather-gate',weather,move,suppressor,messages});}});
 test('IF10 unsupported format rejects before loading/constructing the simulator',async()=>{await assert.rejects(G.BattleGateway.create({engineRoot:'/not-an-engine',formatid:'gen8rpgdoublescustomgame',initialField:{weather:'rain'}}),/initial-field-requires-rpg-singles/);});
+
+
+// Terrain restoration has two transitions: native clear -> none, then default -> active.
+// Observation delegates every native dispatch unchanged; it never supplies a random result.
+function recordTerrainPasses(s) {
+ const native=s.b.eachEvent,passes=[];
+ s.b.eachEvent=function(name,...args){
+  if(name==='TerrainChange')passes.push(this.field.terrain);
+  return native.call(this,name,...args);
+ };
+ return{passes,stop(){s.b.eachEvent=native;}};
+}
+async function beforeTerrainExpiry(s){
+ await turn(s);
+ for(let i=0;i<3;i++)await turn(s,'move 2');
+ assert.equal(s.b.field.terrainState.duration,1);
+}
+for(const [defaultTerrain,temporary]of[
+ ['grassy','Electric Terrain'],['electric','Misty Terrain'],
+ ['misty','Psychic Terrain'],['psychic','Grassy Terrain'],
+])test('IF05 notification once per transition on natural '+defaultTerrain+' restoration',async()=>{
+ const s=await create({terrain:defaultTerrain},set('P1',[temporary,'Splash']));
+ await beforeTerrainExpiry(s);
+ const trace=recordTerrainPasses(s);
+ try{
+  await turn(s,'move 2');
+  assert.deepEqual(trace.passes,['',terrain[defaultTerrain]]);
+  assert.equal(s.b.field.terrain,terrain[defaultTerrain]);
+  assert.equal(s.b.field.terrainState.duration,undefined);
+  assert.equal(s.b.field.terrainState.source,undefined);
+  assert.equal(s.b.field.terrainState.sourceSlot,undefined);
+  trace.passes.length=0;
+  await turn(s,'move 2');
+  assert.deepEqual(trace.passes,[],'infinite default has no repeated change');
+ }finally{trace.stop();}
+});
+
+test('IF05 normal Mimicry callback observes clear and restored terrain exactly once',async()=>{
+ const s=await create({terrain:'grassy'},set('P1',['Electric Terrain','Splash']),
+  set('F1',['Splash'],'Mimicry','Stunfisk-Galar'));
+ assert.deepEqual(s.b.sides[1].active[0].getTypes(),['Grass']);
+ await beforeTerrainExpiry(s);
+ assert.deepEqual(s.b.sides[1].active[0].getTypes(),['Electric']);
+ const native=s.b.runEvent,callbacks=[];
+ s.b.runEvent=function(name,target,...args){
+  const current=this.field.terrain,result=native.call(this,name,target,...args);
+  if(name==='TerrainChange'&&target?.name==='F1')callbacks.push({terrain:current,types:target.getTypes()});
+  return result;
+ };
+ try{
+  const messages=await turn(s,'move 2');
+  assert.deepEqual(callbacks,[{terrain:'',types:['Ground','Steel']},{terrain:'grassyterrain',types:['Grass']}]);
+  assert.deepEqual(s.b.sides[1].active[0].getTypes(),['Grass']);
+  assert.match(JSON.stringify(messages),/Mimicry/);
+ }finally{s.b.runEvent=native;}
+});
+
+// Independent single-notification control uses the pinned engine's own setter after its own clear.
+// Native setTerrain requires a source; this synthetic control supplies its actual active user,
+// then removes finite/source metadata to model the source-less infinite default. Product code
+// must not use this source-bearing setter for defaults. No random, speed or queue is overwritten.
+function useNativeTerrainControl(s,defaultId){
+ const field=s.b.field,nativeClear=Object.getPrototypeOf(field).clearTerrain;
+ Object.defineProperty(field,'clearTerrain',{configurable:true,value:function(){
+  const expired=this.terrainState.duration===0,result=nativeClear.call(this);
+  if(result&&expired&&!this.terrain){
+   assert.equal(this.setTerrain(defaultId,s.b.sides[0].active[0]),true);
+   delete this.terrainState.duration;
+   delete this.terrainState.source;
+   delete this.terrainState.sourceSlot;
+  }
+  return result;
+ }});
+}
+async function terrainTiePair(){
+ const make=()=>create({terrain:'grassy'},set('P1',['Electric Terrain','Splash']),set('F1'),[],[1,2,3,4]);
+ const actual=await make(),control=await make();
+ useNativeTerrainControl(control,'grassyterrain');
+ assert.deepEqual(normalizeClock(actual.opening),normalizeClock(control.opening));
+ for(const s of[actual,control]){
+  const [p,f]=s.b.getAllActive();
+  assert.equal(p.speed,f.speed);assert.equal(p.item,'');assert.equal(f.item,'');
+  assert.equal(p.ability,'runaway');assert.equal(f.ability,'runaway');
+ }
+ for(let i=0;i<4;i++){
+  const move=i?'move 2':'move 1';
+  assert.deepEqual(normalizeClock(await turn(actual,move)),normalizeClock(await turn(control,move)));
+  assert.equal(actual.b.prng.getSeed(),control.b.prng.getSeed());
+ }
+ assert.equal(actual.b.field.terrainState.duration,1);
+ assert.deepEqual(normalizeClock(await turn(actual,'move 2')),normalizeClock(await turn(control,'move 2')));
+ return{actual,control};
+}
+test('IF05 same-speed itemless expiry preserves PRNG against one native restoration',async()=>{
+ const{actual,control}=await terrainTiePair();
+ assert.equal(actual.b.prng.getSeed(),control.b.prng.getSeed());
+ for(const side of['p1','p2'])assert.deepEqual(actual.gw.readState(side),control.gw.readState(side));
+});
+test('IF05 same-speed itemless next-turn move order matches one native restoration',async()=>{
+ const{actual,control}=await terrainTiePair();
+ const a=await turn(actual,'move 2'),b=await turn(control,'move 2');
+ const order=messages=>messages.flatMap(m=>m.kind==='events'?m.events:[]).filter(e=>e.type==='move').map(e=>e.args[0]);
+ assert.equal(order(a).length,2);
+ assert.deepEqual(order(a),order(b));
+ assert.deepEqual(normalizeClock(a),normalizeClock(b));
+ assert.equal(actual.b.prng.getSeed(),control.b.prng.getSeed());
+});
+
+test('IF05 no-default natural expiry and direct removal retain only native clear notification',async()=>{
+ const noDefault=await create(undefined,set('P1',['Electric Terrain','Splash']));
+ await beforeTerrainExpiry(noDefault);
+ const natural=recordTerrainPasses(noDefault);
+ try{await turn(noDefault,'move 2');assert.deepEqual(natural.passes,['']);assert.equal(noDefault.b.field.terrain,'');}
+ finally{natural.stop();}
+ for(const move of['Defog','Steel Roller']){
+  const s=await create({terrain:'grassy'},set('P1',[move]));
+  const trace=recordTerrainPasses(s);
+  try{await turn(s);assert.deepEqual(trace.passes,['']);assert.equal(s.b.field.terrain,'');}
+  finally{trace.stop();}
+ }
+});
+test('IF09 checkpoint rebind preserves one clear and one restoration notification',async()=>{
+ const original=await create({terrain:'grassy'},set('P1',['Electric Terrain','Splash']));
+ await beforeTerrainExpiry(original);
+ const gw=await G.showdownDriverFactory.fromCheckpoint(original.gw.checkpoint());
+ const restored={gw,b:gw._debugBattle()},trace=recordTerrainPasses(restored);
+ assert.deepEqual(gw.drain(),[]);
+ try{
+  assert.deepEqual(normalizeClock(await turn(original,'move 2')),normalizeClock(await turn(restored,'move 2')));
+  assert.deepEqual(trace.passes,['','grassyterrain']);
+  assert.equal(original.b.prng.getSeed(),restored.b.prng.getSeed());
+ }finally{trace.stop();}
+});
