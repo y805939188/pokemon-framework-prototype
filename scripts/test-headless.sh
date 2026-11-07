@@ -47,6 +47,7 @@ SUITES=(
   experiments/step5/4/test-e2-status-feedback-scene.cjs
   experiments/step5/4/test-e-status-carry.cjs
   experiments/step5/4/test-opening-state-scene.cjs
+  experiments/step5/4/test-capture-receiving-scene.cjs
   experiments/step5/4/test-prebattle-wrapper.cjs
   experiments/step5/4/test-prebattle-native.cjs
   experiments/step5/4/test-prebattle-menu.cjs
