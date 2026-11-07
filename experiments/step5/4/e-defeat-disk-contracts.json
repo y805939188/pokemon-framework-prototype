@@ -72,95 +72,104 @@
   "completeE74Heading": false,
   "newE74Rows": 0,
   "NW": 0,
-  "product": "6779c4310f5981c5f6ae265bda1130bb0b30344a",
+  "product": "005f12d3a22892a6194f8c31158e71d6b1850753",
   "runtime": {
-    "js/engine/build/content-cli.cjs": "afc1bb820ee9da32875247cf39ff5d60164a825f0d5cb6a2bb313b62744bccab",
-    "js/engine/build/core.cjs": "70735564d6428bc4f388b493fec760a48eb3f15a786a43266f255f695922ffb4",
-    "js/engine/build/custom-formats.cjs": "f9d0c3b54541617cc8375554ca387a6ab556fe221adec4291cef12a5a531cf36",
-    "js/engine/build/engine.cjs": "78ccf3920b2bd8ff3d53c1049ba0926eacff20adc8cc4e2125641170cf468c02",
-    "js/engine/build/production.cjs": "13ca00621421246f2f04ed1006008ca7c58b23ea79cc6e29768bc461a41700f5",
-    "js/engine/build/public-presentation-9D9eN0Y2.js": "9cb07685e1a640945e665e0516976bc175add3375cb894e59fb4d03fd6f106a1",
-    "js/engine/build/session-TV_lxmG3.js": "b90db6035fce9cbc61344c7d150365cd5f64cfa3d5107274b615751c8b155a40",
-    "js/engine/build/testing.cjs": "1819113552b4273f5fc815982737d3f721a3a99e9a977d1d549a9725fdb2cb5b",
-    "js/engine/build/trainer-ai-diagnostics-cXhbZ6rN.js": "4a6dd869312b1305e681779f8a28c24a898198b08a3c6227ac381d80dcffd536"
+    "js/engine/build/content-cli.cjs": "113d2b55ab7c2956af00df2527958c4e8302338646a124a0961db58e62e1b76a",
+    "js/engine/build/core.cjs": "9cd1a060fa1279e97ac82390e45c947721182efa11b017efb51a4276fc34d04e",
+    "js/engine/build/custom-formats.cjs": "70db558b8ba0a3523913c8d2ce0c560e9976af80796c123b7ff4536183d4ac22",
+    "js/engine/build/engine.cjs": "694042b52fc6afe1c7b4bac76310bdf689f232d19172e2dc5b5f93ed0c0e0904",
+    "js/engine/build/production.cjs": "3129ef4f49050caf78b1253c5b15e63ac2a926714be2227dc6f7633c2d30c8e3",
+    "js/engine/build/public-presentation-DT54tlH9.js": "94b6914e348620a37e6e1d5533d57b6ddf37dc574df1628e62aaa5b64226e440",
+    "js/engine/build/session-HPSJ_jfZ.js": "8d3f8a121e4ba1cc01d0b6819aafa9c1951c0dca9f8aed69f6600630d7346b4b",
+    "js/engine/build/testing.cjs": "970d35628f2c83b80d07c9659c377e46c9bf4d1e23328d7f41bd8826f491cf6a",
+    "js/engine/build/trainer-ai-diagnostics-E4RTuX7I.js": "fc79ca64f35461f812120583f52a1f9b0b2cefc507537c7f1245ad7fdc55dc79"
   },
   "runtimeRebinding": {
-    "reason": "Final G1 candidate source including synchronous native authority and retirement boundary; scenarios/seeds/business oracle unchanged",
-    "sourceCommit": "6779c4310f5981c5f6ae265bda1130bb0b30344a",
+    "reason": "Rebind only artifact identity to the exact release/CI pnpm --dir src build working directory; prior root-cwd bytes and complete rebinding history retained; no scenario, seed or business-oracle changes",
+    "sourceCommit": "005f12d3a22892a6194f8c31158e71d6b1850753",
     "sourceTree": "feb897d890b78cdbcf08d87bb527efc430688b44",
-    "previousBindingProduct": "f76c55804fe4930586bee2cd0f746d46b83376ba",
-    "previousBindingSHA256": "a3fb9d6ab5bb16a93c555dfc05bb8796ee1cc0040b874f64b89fe88b73d4cc00",
+    "buildCommand": "pnpm --dir src build",
+    "buildCwd": "src",
+    "previousBindingProduct": "6779c4310f5981c5f6ae265bda1130bb0b30344a",
+    "previousBindingSHA256": "f52e81dffe836ab697532c8bc021e9e66a17e0bae0d1d00700f21b5ca8e1fee0",
     "previousRebinding": {
-      "reason": "G1 candidate source with identical normal/native qualification bridge; scenarios/seeds/business oracle unchanged",
-      "sourceCommit": "f76c55804fe4930586bee2cd0f746d46b83376ba",
-      "sourceTree": "8bb65d0b9421151c84a0fca605c1da28165f59e8",
-      "previousBindingProduct": "e1dbe9d5bde43830f7be6f8a52a76271718daeee",
-      "previousBindingSHA256": "260da6fbd32961c89c58bdb0f7f2f21d963e58574d6d44f446bf9dc695bb0e2d",
+      "reason": "Final G1 candidate source including synchronous native authority and retirement boundary; scenarios/seeds/business oracle unchanged",
+      "sourceCommit": "6779c4310f5981c5f6ae265bda1130bb0b30344a",
+      "sourceTree": "feb897d890b78cdbcf08d87bb527efc430688b44",
+      "previousBindingProduct": "f76c55804fe4930586bee2cd0f746d46b83376ba",
+      "previousBindingSHA256": "a3fb9d6ab5bb16a93c555dfc05bb8796ee1cc0040b874f64b89fe88b73d4cc00",
       "previousRebinding": {
-        "reason": "Explicit offline normal input/oracle composition; frozen scenarios/seeds/business oracle unchanged",
-        "sourceCommit": "e1dbe9d5bde43830f7be6f8a52a76271718daeee",
-        "sourceTree": "7739fe3c16f72485aa03acd4b62cde0c545b8e7b",
-        "previousBindingProduct": "467c6b4416fa108c339810e66e9678e05ab37617",
-        "previousBindingSHA256": "31db84c80666b61d07326b555d6138793696055bc1ad8e34519260d3229edd83",
+        "reason": "G1 candidate source with identical normal/native qualification bridge; scenarios/seeds/business oracle unchanged",
+        "sourceCommit": "f76c55804fe4930586bee2cd0f746d46b83376ba",
+        "sourceTree": "8bb65d0b9421151c84a0fca605c1da28165f59e8",
+        "previousBindingProduct": "e1dbe9d5bde43830f7be6f8a52a76271718daeee",
+        "previousBindingSHA256": "260da6fbd32961c89c58bdb0f7f2f21d963e58574d6d44f446bf9dc695bb0e2d",
         "previousRebinding": {
-          "reason": "Normal same-case cross-Scene observation/decision and actual capture Pokedex handoff repair; current complete nine engine files rebuilt; business cases/seeds/oracles unchanged",
-          "sourceCommit": "467c6b4416fa108c339810e66e9678e05ab37617",
-          "sourceTree": "ecb29babcd9402a2bdeae6eeb689b749164e9c8a",
-          "previousBindingProduct": "7283eb5d3e2854b1384d6b8e59cf92fc8a84da0f",
-          "previousBindingSHA256": "3dc79d5a1ad535076f2f8838f84f679b6376ad981216654264890d2bf4fa5222",
+          "reason": "Explicit offline normal input/oracle composition; frozen scenarios/seeds/business oracle unchanged",
+          "sourceCommit": "e1dbe9d5bde43830f7be6f8a52a76271718daeee",
+          "sourceTree": "7739fe3c16f72485aa03acd4b62cde0c545b8e7b",
+          "previousBindingProduct": "467c6b4416fa108c339810e66e9678e05ab37617",
+          "previousBindingSHA256": "31db84c80666b61d07326b555d6138793696055bc1ad8e34519260d3229edd83",
           "previousRebinding": {
-            "reason": "P4-NORMAL-ULTRA-01: align current request slots with actual one-based Scene move keys; complete nine engine files rebuilt, business cases/seeds/oracles unchanged",
-            "sourceCommit": "7283eb5d3e2854b1384d6b8e59cf92fc8a84da0f",
-            "sourceTree": "84b6560e482117e8b669b2b346323532a31dc4ba",
-            "previousBindingProduct": "b68b75424f725fddb99eaaf8b5c596f61f5a53b0",
-            "previousBindingSHA256": "e195eb95a18503f1890e5594c50f9f402b083b5b244a5e28aeaa990791cbdf4c",
+            "reason": "Normal same-case cross-Scene observation/decision and actual capture Pokedex handoff repair; current complete nine engine files rebuilt; business cases/seeds/oracles unchanged",
+            "sourceCommit": "467c6b4416fa108c339810e66e9678e05ab37617",
+            "sourceTree": "ecb29babcd9402a2bdeae6eeb689b749164e9c8a",
+            "previousBindingProduct": "7283eb5d3e2854b1384d6b8e59cf92fc8a84da0f",
+            "previousBindingSHA256": "3dc79d5a1ad535076f2f8838f84f679b6376ad981216654264890d2bf4fa5222",
             "previousRebinding": {
-              "reason": "Offline normal preparation plugin/fixture source point; current nine engine files rebuilt and individually verified; business cases/seeds/oracles unchanged",
-              "sourceCommit": "b68b75424f725fddb99eaaf8b5c596f61f5a53b0",
-              "sourceTree": "f6cb8236b46a7c70e5a3d7367b56616bd31b9783",
-              "previousBindingProduct": "e06a57ec4095f6ccf2858d59ec145e48e8b61aa6",
-              "previousBindingSHA256": "baa8f509970c38be02f9ec986c94cf61d1b62404314c4a40af6aedf10dc2113c",
+              "reason": "P4-NORMAL-ULTRA-01: align current request slots with actual one-based Scene move keys; complete nine engine files rebuilt, business cases/seeds/oracles unchanged",
+              "sourceCommit": "7283eb5d3e2854b1384d6b8e59cf92fc8a84da0f",
+              "sourceTree": "84b6560e482117e8b669b2b346323532a31dc4ba",
+              "previousBindingProduct": "b68b75424f725fddb99eaaf8b5c596f61f5a53b0",
+              "previousBindingSHA256": "e195eb95a18503f1890e5594c50f9f402b083b5b244a5e28aeaa990791cbdf4c",
               "previousRebinding": {
-                "reason": "Final request-source seam including atomic Scene callback ordering; scenarios/seeds/business oracle unchanged",
-                "sourceCommit": "e06a57ec4095f6ccf2858d59ec145e48e8b61aa6",
-                "sourceTree": "6ffc76bbd3b3e5eeb00e58af7d5cc6beed9d7068",
-                "previousBindingProduct": "a4725d64d61da0914a47f836baf8b21dcc33925c",
-                "previousBindingSHA256": "1def8bebc3199582f7726a3470ac984944c1f32bb9605522f198fd1be8ad3d73",
+                "reason": "Offline normal preparation plugin/fixture source point; current nine engine files rebuilt and individually verified; business cases/seeds/oracles unchanged",
+                "sourceCommit": "b68b75424f725fddb99eaaf8b5c596f61f5a53b0",
+                "sourceTree": "f6cb8236b46a7c70e5a3d7367b56616bd31b9783",
+                "previousBindingProduct": "e06a57ec4095f6ccf2858d59ec145e48e8b61aa6",
+                "previousBindingSHA256": "baa8f509970c38be02f9ec986c94cf61d1b62404314c4a40af6aedf10dc2113c",
                 "previousRebinding": {
-                  "reason": "Player forced-request source seam rebuilt from the fixed source commit; scenarios/seeds/business oracle unchanged",
-                  "sourceCommit": "a4725d64d61da0914a47f836baf8b21dcc33925c",
-                  "sourceTree": "a980b6806a9e629efac25365363a5759415776bd",
-                  "previousBindingProduct": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
-                  "previousBindingSHA256": "ce64fbd515bb914ec53e1e446024dcb9780d6683ad947aab97b33714b4e00cca",
+                  "reason": "Final request-source seam including atomic Scene callback ordering; scenarios/seeds/business oracle unchanged",
+                  "sourceCommit": "e06a57ec4095f6ccf2858d59ec145e48e8b61aa6",
+                  "sourceTree": "6ffc76bbd3b3e5eeb00e58af7d5cc6beed9d7068",
+                  "previousBindingProduct": "a4725d64d61da0914a47f836baf8b21dcc33925c",
+                  "previousBindingSHA256": "1def8bebc3199582f7726a3470ac984944c1f32bb9605522f198fd1be8ad3d73",
                   "previousRebinding": {
-                    "reason": "COMBO-P2-01: rebuilt final source-owned AI safe snapshot repair; scenarios/seeds/oracles unchanged",
-                    "sourceCommit": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
-                    "sourceTree": "f26c1a7c20474f214d6d26753bdb846bf55e1769",
-                    "previousBindingProduct": "47dbbc393860018cf04faaa1e89862e63652aa2b",
-                    "previousBindingSHA256": "b3de86b8cb410ad34a518eca4a5bfec08f5ac3705821a05cc7f0237dd614eb25",
+                    "reason": "Player forced-request source seam rebuilt from the fixed source commit; scenarios/seeds/business oracle unchanged",
+                    "sourceCommit": "a4725d64d61da0914a47f836baf8b21dcc33925c",
+                    "sourceTree": "a980b6806a9e629efac25365363a5759415776bd",
+                    "previousBindingProduct": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
+                    "previousBindingSHA256": "ce64fbd515bb914ec53e1e446024dcb9780d6683ad947aab97b33714b4e00cca",
                     "previousRebinding": {
-                      "reason": "Rebuilt final field/Harvest/PP/trainer combination; no scenario, seed, or business oracle changes",
-                      "sourceCommit": "47dbbc393860018cf04faaa1e89862e63652aa2b",
-                      "sourceTree": "406614edc72a531db1a503293fa85033fa4d9aa3",
-                      "priorProducts": {
-                        "field": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
-                        "harvest": "a91570b6d006f0a303bfe3350b051f81be644dd2"
-                      },
-                      "mappingSource": "Actual nine files in this integration worktree js/engine/build after source-H build; not union or selection of prior tables"
+                      "reason": "COMBO-P2-01: rebuilt final source-owned AI safe snapshot repair; scenarios/seeds/oracles unchanged",
+                      "sourceCommit": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
+                      "sourceTree": "f26c1a7c20474f214d6d26753bdb846bf55e1769",
+                      "previousBindingProduct": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+                      "previousBindingSHA256": "b3de86b8cb410ad34a518eca4a5bfec08f5ac3705821a05cc7f0237dd614eb25",
+                      "previousRebinding": {
+                        "reason": "Rebuilt final field/Harvest/PP/trainer combination; no scenario, seed, or business oracle changes",
+                        "sourceCommit": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+                        "sourceTree": "406614edc72a531db1a503293fa85033fa4d9aa3",
+                        "priorProducts": {
+                          "field": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
+                          "harvest": "a91570b6d006f0a303bfe3350b051f81be644dd2"
+                        },
+                        "mappingSource": "Actual nine files in this integration worktree js/engine/build after source-H build; not union or selection of prior tables"
+                      }
                     }
                   }
-                }
+                },
+                "mappingSource": "Actual complete nine files rebuilt in this exclusive tree; byte-identical to accepted 4b3 engine because framework sources unchanged; not a union of old maps"
               },
-              "mappingSource": "Actual complete nine files rebuilt in this exclusive tree; byte-identical to accepted 4b3 engine because framework sources unchanged; not a union of old maps"
+              "mappingSource": "Actual complete nine files rebuilt in this exclusive tree; framework unchanged and runtime byte-identical to reviewed 5e43c3a; not a selection/union of old mappings"
             },
-            "mappingSource": "Actual complete nine files rebuilt in this exclusive tree; framework unchanged and runtime byte-identical to reviewed 5e43c3a; not a selection/union of old mappings"
+            "mappingSource": "Actual complete nine files rebuilt in this exclusive tree; framework unchanged, byte-identical to reviewed d8dae2b; not a union/selection of old runtime maps"
           },
-          "mappingSource": "Actual complete nine files rebuilt in this exclusive tree; framework unchanged, byte-identical to reviewed d8dae2b; not a union/selection of old runtime maps"
+          "mappingSource": "Actual complete nine runtime files rebuilt in this exclusive tree; framework unchanged and byte-identical to independently reviewed 528afe3; no selection or union of old maps"
         },
-        "mappingSource": "Actual complete nine runtime files rebuilt in this exclusive tree; framework unchanged and byte-identical to independently reviewed 528afe3; no selection or union of old maps"
+        "mappingSource": "Actual complete nine files rebuilt in this exclusive candidate tree from this frozen source; no selection or union of old mappings"
       },
       "mappingSource": "Actual complete nine files rebuilt in this exclusive candidate tree from this frozen source; no selection or union of old mappings"
-    },
-    "mappingSource": "Actual complete nine files rebuilt in this exclusive candidate tree from this frozen source; no selection or union of old mappings"
+    }
   }
 }
