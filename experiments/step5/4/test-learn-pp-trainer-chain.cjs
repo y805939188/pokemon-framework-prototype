@@ -30,6 +30,7 @@ test.before(async () => {
 });
 // Preserve failed-run artifacts; only remove this test's generated host on success.
 let failed = false;
+test.beforeEach(() => { assert(!failed, 'earlier case failed; no further business case may start'); });
 test.after(() => { if (work && !failed) fs.rmSync(work, { recursive: true, force: true }); });
 async function open(lang, layout) {
   const h = createVictoryDriverHost({ ROOT, work, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
@@ -56,20 +57,20 @@ async function open(lang, layout) {
   state.party[0].moves = [{ id: 'hypervoice', pp: 10, maxpp: 10 }, ...(layout === 'replace' ? [
     { id: 'splash', pp: 7, maxpp: 40 }, { id: 'protect', pp: 3, maxpp: 10 }, { id: 'tackle', pp: 24, maxpp: 35 },
   ] : [])];
-  state.party[1].moves = [{ id: 'growl', pp: 11, maxpp: 40 }];
+  state.party[1].moves = [{ id: 'growl', pp: 11, maxpp: 40, ppUps: 0 }];
   G.$gameSystem._psGame = state;
   const before = JSON.stringify(flow.game()); let doc = state, installs = 0;
   Object.defineProperty(G.$gameSystem, '_psGame', { configurable: true, get: () => doc, set: value => { installs++; doc = value; } });
   await h.p.toMapId(5, 8, 9);
   flow.openBattle({ kind: 'trainer', trainer: { id: 'music-normal', version: 1 }, battleId: 'learn-pp-' + path.basename(h.w.root), seq: 1, canLose: true, battleStyle: 'set' });
   await h.p.inMode('main'); const scene = h.p.battle(), session = scene._session;
-  const messages = [], push = scene.pushMessages;
+  const messages = [], stages = [], push = scene.pushMessages;
   scene.pushMessages = function (value) { messages.push(...value); return push.call(this, value); };
   const decisions = [], decide = session.decideLearn.bind(session);
   session.decideLearn = (...args) => { decisions.push({ member: session.pendingLearn?.memberId, move: session.pendingLearn?.move.id, slot: args[0] }); return decide(...args); };
   const uses = [], use = session.useItem.bind(session);
   session.useItem = (...args) => { uses.push(clone(args)); return use(...args); };
-  return { ...h, flow, scene, session, before, messages, decisions, uses, installs: () => installs,
+  return { ...h, flow, scene, session, before, messages, stages, decisions, uses, installs: () => installs,
     cleanup() { if (flow.running) flow.abort(Error('owned learn/PP chain cleanup')); scene.terminate(); },
   };
 }
@@ -93,6 +94,7 @@ function pp(h, growl, hypervoice) {
   assert.equal(h.session.party.find(m => m.id === 'LEARN-PP-P2').moves[0].pp, 11, 'same-named move on other member is untouched');
   if (working(h).moves.length === 4) assert.equal(working(h).moves[3].pp, 24);
   uncommitted(h);
+  h.stages.push({ mode: h.scene._mode, working: clone(working(h)), live: clone(live(h)), request: clone(h.session.currentRequest()), foe: h.session.gw.activeId('p2'), bag: clone(h.session.bag), ledger: clone(h.session.ledger), installs: h.installs() });
 }
 async function etherSelector(h) {
   await pick(h, 'bag'); await pick(h, 'ether'); await pick(h, 'use'); await h.p.inMode('bag-members');
@@ -151,6 +153,6 @@ for (const lang of ['en', 'zh']) for (const layout of ['append', 'replace']) tes
     assert.deepEqual(saved.party[1], JSON.parse(h.before).party[1]);
     const final = JSON.stringify(saved); h.scene.onEnd(); h.scene.onMenuOk(); await h.frames(3);
     assert.equal(h.installs(), 1); assert.equal(JSON.stringify(h.flow.game()), final);
-    if (process.env.PF_LPP_OBSERVATIONS) fs.writeFileSync(path.join(process.env.PF_LPP_OBSERVATIONS, lang + '-' + layout + '.json'), JSON.stringify({ execution: 'SYNTHETIC_COMPILED_HOST', lang, layout, decisions: h.decisions, uses: h.uses, result, outcome: h.flow.lastOutcome, installs: h.installs(), saved }, null, 2) + '\n');
+    if (process.env.PF_LPP_OBSERVATIONS) fs.writeFileSync(path.join(process.env.PF_LPP_OBSERVATIONS, lang + '-' + layout + '.json'), JSON.stringify({ execution: 'SYNTHETIC_COMPILED_HOST', lang, layout, stages: h.stages, growth: h.messages.filter(m => ['growth', 'learned'].includes(m.kind)), decisions: h.decisions, uses: h.uses, result, outcome: h.flow.lastOutcome, installs: h.installs(), saved }, null, 2) + '\n');
   } catch (error) { failed = true; throw error; } finally { h?.cleanup(); }
 });
