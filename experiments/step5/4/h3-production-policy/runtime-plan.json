@@ -2,13 +2,19 @@
   "runtime": {
     "js/engine/build/content-cli.cjs": "41168bff64ca2e564a17fbf3af8aa451f2b00f536b7d32110cb83c7b3564ea54",
     "js/engine/build/core.cjs": "702b884c1ca31ed0ec4036e72db08c50d614729962b583afa10c8ceb588d43c5",
-    "js/engine/build/custom-formats.cjs": "70db558b8ba0a3523913c8d2ce0c560e9976af80796c123b7ff4536183d4ac22",
-    "js/engine/build/engine.cjs": "870f3a479fde0a2eb09a3ca67bb1128abc8529540d47f5786398ac26721b9b5d",
-    "js/engine/build/production.cjs": "3c3c71163243d8eb08e6b9b106ab1d5028d124dbf7fb9fc579b205f7688b23af",
-    "js/engine/build/public-presentation-BN1XBb77.js": "bd27339109173ad14b00a4fd86f3f76826cc758b563dbe786d8fcf399b04c52c",
-    "js/engine/build/session-Cc9yAo41.js": "779b40a75b90796f768886cc73df765fcafd5640315c3d4d17846d0e37f1633c",
-    "js/engine/build/testing.cjs": "78ba8ee3e9a15db23154234cb3460a23ad9fe3d67745a0d364e80ae82390be8a",
-    "js/engine/build/trainer-ai-diagnostics-DMhy-dLS.js": "9ee4adfff094d89526386ce7f65791e883514960da291a16d634e96cd2a82040",
+    "js/engine/build/custom-formats.cjs": "34ebab84fa4b48f5a7c7226566b96bded231d80cf1549adfc13265bf830012f7",
+    "js/engine/build/engine.cjs": "7c46ff376dcd97cea5f6c929d01b9a16b3d89d3ef82a6537518b6fd3baf78c0c",
+    "js/engine/build/production.cjs": "40a77900182e108050ea8d733a797b0ad5ae777eb523002ad3be7805ff76f852",
+    "js/engine/build/public-presentation-CYNJ2rRN.js": "269f9d3a00e0a9c922d4f7d08a40a0f460164f5fae2d5e848ca31cc39daccee8",
+    "js/engine/build/session-CaFkPdAO.js": "6a895e048dc306b6527e7611fcdc4a828de7f5e22dcb45bdd97467a0d968ad7b",
+    "js/engine/build/testing.cjs": "09170c3852c7ed9f67aa89677280f23cdb5b52f33b92e2f7a0e89dd6df6a07aa",
+    "js/engine/build/trainer-ai-diagnostics-Caz0kv5J.js": "e06ddd4284314563896cf833c7754a1b698fcf9d8163e9a7454b6e3977540217",
     "js/engine/showdown/SOURCE_SHA": "495b7f40c79b08384b2bb2be040edbc952be76fe18f8dff1a96f0fb949fc78ba"
+  },
+  "runtimeRebinding": {
+    "sourceCommit": "26e24a93ce318b625009e806d8125ccae356d67c",
+    "sourceTree": "548af7a7d5d2ffb453294572fa8fadbd1111e219",
+    "previousBindingSHA256": "0f020a82810ec18d2b4ab6f6e3b0e9db6ee877d2c3ded49aa4883ebbb9080398",
+    "reason": "Current combined field-fix bundles; host fixtures, policy and oracle unchanged"
   }
 }
