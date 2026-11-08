@@ -88,3 +88,17 @@ test('P51-16/F: ribbon swap with empty display slot compacts without persistent 
 test('P51-12/F: experimental moving revalidates holdability and mail instead of creating a new holder for an unsupported legacy item',()=>run((x,t,exec)=>{
  const game=clone(x.state.current());game.party[0].item='not-an-item';x.state.replace(game);const source=ref(game,game.party[0].id),target=ref(game,'BOX1');const before=clone(game);assert.equal(exec({kind:'swap-items',source,target}).reason,'invalid-held-item');assert.deepEqual(x.state.current(),before);assert.equal(exec({kind:'take-item',source}).status,'applied','trusted existing item can still be removed safely');assert.equal(I6.bagOf(x.state.current())['not-an-item'],1);
 }));
+
+test('S2 receipt cap retains held intent until cancel; closing and reopening safely restores operations',()=>{
+ const x=setup(),token=x.app.beginManagement();
+ for(let i=0;i<255;i++)assert(['applied','unchanged'].includes(x.app.manage(token,'cap-'+i,{kind:'current-box',box:0}).status));
+ const before=clone(x.state.current()),writes=x.state.replaced.length,source=ref(before,before.party[1].id);
+ assert.equal(x.app.manage(token,'cap-pick',{kind:'pick-up',source}).status,'held');
+ assert.equal(x.app.manage(token,'cap-place',{kind:'place-held',target:box(1,0),expectedTargetId:null}).reason,'session-request-limit');
+ assert.equal(x.app.saveBlocked,true);assert.equal(x.app.endManagement(token).reason,'member-held');
+ assert.equal(x.app.manage(token,'cap-cancel',{kind:'cancel-held'}).status,'cancelled');
+ assert.deepEqual(x.state.current(),before);assert.equal(x.state.replaced.length,writes);assert.equal(x.app.saveBlocked,false);
+ assert.equal(x.app.endManagement(token).status,'unchanged');
+ const fresh=x.app.beginManagement();assert.equal(x.app.manage(fresh,'fresh-move',{kind:'move',source,target:box(1,0),expectedTargetId:null}).status,'applied');
+ assert.equal(x.state.replaced.length,writes+1);assert.equal(x.app.endManagement(fresh).status,'unchanged');
+});

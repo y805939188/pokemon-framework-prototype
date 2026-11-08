@@ -80,7 +80,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   constructor(scene:any,request:OpenRequest){this.scene=scene;this.request=request;this.application=app();this.generation=this.application.stateGeneration;this.token='ui:'+this.generation+':'+(++sequence);}
   valid(){try{return !this.closed&&this.application===app()&&this.generation===this.application.stateGeneration&&current===this&&(!this.request.battleSummary||this.request.battleSummary.isCurrent());}catch{return false;}}
   top():View{return this.stack[this.stack.length-1]!;}
-  refresh(){this.snapshot=this.reception&&app().pendingReceiving?.token===this.reception.token?app().previewReceiving(this.reception.token,this.decisions,this.receiveIndex):app().managementSnapshot(this.readonly?undefined:this.managementToken);for(const view of this.stack)if(view.kind==='party'&&view.cursor!==6&&view.cursor>=this.snapshot.party.length)view.cursor=this.snapshot.party.length?this.snapshot.party.length-1:6;this.draw();}
+  refresh(){this.snapshot=this.reception&&app().pendingReceiving?.token===this.reception.token?app().previewReceiving(this.reception.token,this.decisions,this.receiveIndex):app().managementSnapshot(this.readonly?undefined:this.managementToken);for(const view of this.stack)if(view.pcRoot)this.refreshPCMenu(view);for(const view of this.stack)if(view.kind==='party'&&view.cursor!==6&&view.cursor>=this.snapshot.party.length)view.cursor=this.snapshot.party.length?this.snapshot.party.length-1:6;this.draw();}
   managementToken='';
   start(win:any){
    const manager=G.SceneManager;
@@ -130,6 +130,13 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   fail(reason:string){this.error=tr('refused',{reason:String(reason)});G.SoundManager.playBuzzer();this.draw();}
   menu(title:string,items:MenuItem[],cursor=0,cancel?:()=>void){this.push({kind:'menu',title,items,cursor,cancel});}
   confirm(title:string,yes:()=>void,defaultYes=false,no?:()=>void){this.menu(title,[{key:'yes',label:tr('yes'),run:()=>{this.dismiss();yes();}},{key:'no',label:tr('no'),run:()=>{this.dismiss();no?.();}}],defaultYes?0:1,()=>{this.dismiss();no?.();});}
+  refreshPCMenu(view:View){
+   const able=this.snapshot.party.filter(m=>!m.isEgg&&m.hp>0).length;
+   for(const item of view.items??[]){
+    if(item.key==='withdraw')item.enabled=this.snapshot.party.length<this.snapshot.limits.party;
+    else if(item.key==='deposit')item.enabled=able>1;
+   }
+  }
   pc(){
    const able=this.snapshot.party.filter(m=>!m.isEgg&&m.hp>0).length;
    this.stack=[];this.menu(tr('pc'),[
@@ -137,6 +144,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
     {key:'withdraw',label:tr('withdraw'),enabled:this.snapshot.party.length<this.snapshot.limits.party,run:()=>this.storage('withdraw')},
     {key:'deposit',label:tr('deposit'),enabled:able>1,run:()=>this.storage('deposit')},
     {key:'close',label:tr('close'),run:()=>this.close(null)}],0,()=>this.close(null));
+   this.top().pcRoot=true;
   }
   storage(mode:string){this.storageQuick=false;this.push({kind:mode==='deposit'?'panel':'box',cursor:0,mode,box:this.snapshot.storage.currentBox});}
   boxLink(){const v=this.top();return boxLinkAvailable(ui.hasBoxLink?.(),G.$gameSwitches&&G.$dataSystem?.switches?.length>35?!!G.$gameSwitches.value(35):undefined,G.$dataMap?.meta?!!G.$dataMap.meta.DisableBoxLink:undefined,v.quick===true);}

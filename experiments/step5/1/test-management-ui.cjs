@@ -149,3 +149,18 @@ test('RJ02: withdraw party button only prompts without writes; organize panel an
 test('RJ01: first ready frame observes native key release before an immediate fresh press, without accepting held input',()=>{
  const h=host();h.G.PSManagement.openStorage();h.choose('organize');h.ready();h.press('control');h.use();h.choose('name');const c=h.manager._scene._controller;c.input.value='Ready release';c.input.events.keydown({key:'Enter',code:'Enter',keyCode:13,preventDefault(){},stopPropagation(){}});h.releaseNative('Enter');h.tick();assert.equal(h.G.PSManagement.current().ready,true);h.use();assert.equal(h.G.PSManagement.current().view.kind,'menu','next press immediately after ready opens box menu');
 });
+
+for(const [initial,operation,expected]of [[6,'deposit',5],[5,'withdraw',6],[2,'deposit',1],[1,'withdraw',2]])test(`S1 PC root refresh ${initial} ${operation} -> ${expected}`,()=>{
+ const h=host(),g=structuredClone(h.state.current()),template=g.party[0];
+ g.party=Array.from({length:initial},(_,i)=>({...structuredClone(template),id:'PC-'+i}));
+ g.storage.boxes[0].slots[0]={...structuredClone(template),id:'PC-BOX'};h.state.replace(g);h.state.replaced.length=0;
+ h.G.PSManagement.openStorage();h.choose(operation);h.ready();h.use();h.choose('transfer');
+ assert.equal(h.state.current().party.length,expected);assert.equal(h.state.replaced.length,1);
+ h.ready();h.back();h.choose('no');h.ready();
+ const root=h.G.PSManagement.current().view;assert.equal(root.kind,'menu');assert.equal(root.items[root.cursor].key,operation,'root selection retained');
+ const byKey=k=>root.items.find(x=>x.key===k);assert.equal(byKey('withdraw').enabled,expected<6);assert.equal(byKey('deposit').enabled,expected>1);
+ const before=JSON.stringify(h.state.current()),writes=h.state.replaced.length;
+ const disabled=expected===6?'withdraw':expected===1?'deposit':null;
+ if(disabled){h.choose(disabled);assert.equal(h.G.PSManagement.current().view.kind,'menu');assert.equal(JSON.stringify(h.state.current()),before);assert.equal(h.state.replaced.length,writes);}
+ else {h.choose(operation==='deposit'?'withdraw':'deposit');assert.equal(h.G.PSManagement.current().view.kind,operation==='deposit'?'box':'panel','newly available operation is reachable');}
+});
