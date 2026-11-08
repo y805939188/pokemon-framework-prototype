@@ -75,57 +75,63 @@
     "No legacy SaveStore.commit authority bypass; persist the complete candidate from App StatePort.replace through SaveStore.save",
     "Stop on worker error; no automatic retries; no mid-battle serialization or expected-state replacement"
   ],
-  "product": "fac38f13a07feba9df86b5af2859ba8927cfd849",
+  "product": "2c6214064a9406e8f79fde2883975e00231b641e",
   "runtime": {
     "js/engine/build/content-cli.cjs": "41168bff64ca2e564a17fbf3af8aa451f2b00f536b7d32110cb83c7b3564ea54",
     "js/engine/build/core.cjs": "702b884c1ca31ed0ec4036e72db08c50d614729962b583afa10c8ceb588d43c5",
     "js/engine/build/custom-formats.cjs": "001e16652e90e5417102769689b482c1bc4ba4a3b9b5ed7c1789459c6a4f501c",
-    "js/engine/build/engine.cjs": "c0c3c351133d9cce8c0da7b99353e32770ea410b98e6e0e117452a1b6fa7c000",
-    "js/engine/build/production.cjs": "0264aee6b2606d2a1c9a666521a8b3ce4a0289ffea5676111cf826579714ccf7",
-    "js/engine/build/public-presentation-ABj0EuvG.js": "2172ae4b672ae98046c3743b989a479799acc7300abab5a80f02b154b9f8cfa0",
+    "js/engine/build/engine.cjs": "bfb4889082c6bddb9ec8e69bec4d4efa9b8068e9c7cbb7b92f2a5c43069f82ce",
+    "js/engine/build/production.cjs": "2cdbbef4f7d83eef1a0b95d49194b4de42cf9f0496f7cc81ef544f61f9717a18",
+    "js/engine/build/public-presentation-Dw87h0Sm.js": "f8f7d8e2607dc4d8de31a2ab2a94dda97e2f7a039cab734bfc1505cc2a26b6e8",
     "js/engine/build/session-DH4u-YM4.js": "8147d1eaef9a684ccbfed6cb0700104858175a1d1ffbc1627b42caa5387afb1b",
     "js/engine/build/testing.cjs": "c431cf396b5f6d935fc7c085d5d4ee6ff9d64b84e566b6419c5680fdf85e5d94",
     "js/engine/build/trainer-ai-diagnostics-KpdVcIqs.js": "1dd4db3c51ec6e38786abf4b468a4f2299cdbc9b8d0da18e663fb10ecfb649f1"
   },
   "runtimeRebinding": {
-    "sourceCommit": "fac38f13a07feba9df86b5af2859ba8927cfd849",
-    "sourceTree": "8592a1e51794f50eceba9abca588e0e41e90a1dd",
-    "previousBindingSHA256": "87834a4091e711e49764641c99387ff69cd8ad28917824c46834b512186bc4b8",
+    "sourceCommit": "2c6214064a9406e8f79fde2883975e00231b641e",
+    "sourceTree": "cd097260a81afa3722a8a96dcb79b01167d8774b",
+    "previousBindingSHA256": "c1da3f5f53ad4bec2a85e7fb06088b2fb42292f441c257d0b385be0b74429c4b",
     "previousRebinding": {
-      "sourceCommit": "2f006fa0bd9de327eeb82261e7cb5861f5c70d33",
-      "sourceTree": "f326be869d74361e701ee55eedcbed9cabe91bbe",
-      "previousBindingSHA256": "80c471f9c9eb403cd79236e7c19b6ddb7a2ff711477c912f5f52cb53fc240d07",
+      "sourceCommit": "fac38f13a07feba9df86b5af2859ba8927cfd849",
+      "sourceTree": "8592a1e51794f50eceba9abca588e0e41e90a1dd",
+      "previousBindingSHA256": "87834a4091e711e49764641c99387ff69cd8ad28917824c46834b512186bc4b8",
       "previousRebinding": {
-        "reason": "Integrate reviewed Switch safe snapshots and exactly-once default terrain restore; only current generated identity changes",
-        "sourceCommit": "26e24a93ce318b625009e806d8125ccae356d67c",
-        "sourceTree": "548af7a7d5d2ffb453294572fa8fadbd1111e219",
-        "previousBindingSHA256": "5cb417b8abe510f8af7e400c8024ad6185d2a2854b3e51f1dd220ea6a10007db",
+        "sourceCommit": "2f006fa0bd9de327eeb82261e7cb5861f5c70d33",
+        "sourceTree": "f326be869d74361e701ee55eedcbed9cabe91bbe",
+        "previousBindingSHA256": "80c471f9c9eb403cd79236e7c19b6ddb7a2ff711477c912f5f52cb53fc240d07",
         "previousRebinding": {
-          "reason": "Closed H3 production policy integration; source data, seeds and business oracles unchanged",
-          "sourceCommit": "68e35c3677734f8cf6398bdca8521e747483f160",
-          "sourceTree": "f609b10101d4652dc54cdc085cb515e546102b20",
-          "previousBindingSHA256": "b74ef0b3844ceb118f9c3874552ce3ec482f12b3d6cc33bea3345be70575645d",
+          "reason": "Integrate reviewed Switch safe snapshots and exactly-once default terrain restore; only current generated identity changes",
+          "sourceCommit": "26e24a93ce318b625009e806d8125ccae356d67c",
+          "sourceTree": "548af7a7d5d2ffb453294572fa8fadbd1111e219",
+          "previousBindingSHA256": "5cb417b8abe510f8af7e400c8024ad6185d2a2854b3e51f1dd220ea6a10007db",
           "previousRebinding": {
-            "reason": "COMBO-P2-01: rebuilt final source-owned AI safe snapshot repair; scenarios/seeds/oracles unchanged",
-            "sourceCommit": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
-            "sourceTree": "f26c1a7c20474f214d6d26753bdb846bf55e1769",
-            "previousBindingProduct": "47dbbc393860018cf04faaa1e89862e63652aa2b",
-            "previousBindingSHA256": "a862fc3f759ea23440f88595c63fbbff9efde470d23503f4906ec1577c6b3751",
+            "reason": "Closed H3 production policy integration; source data, seeds and business oracles unchanged",
+            "sourceCommit": "68e35c3677734f8cf6398bdca8521e747483f160",
+            "sourceTree": "f609b10101d4652dc54cdc085cb515e546102b20",
+            "previousBindingSHA256": "b74ef0b3844ceb118f9c3874552ce3ec482f12b3d6cc33bea3345be70575645d",
             "previousRebinding": {
-              "reason": "Rebuilt final field/Harvest/PP/trainer combination; no scenario, seed, or business oracle changes",
-              "sourceCommit": "47dbbc393860018cf04faaa1e89862e63652aa2b",
-              "sourceTree": "406614edc72a531db1a503293fa85033fa4d9aa3",
-              "priorProducts": {
-                "field": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
-                "harvest": "a91570b6d006f0a303bfe3350b051f81be644dd2"
-              },
-              "mappingSource": "Actual nine files in this integration worktree js/engine/build after source-H build; not union or selection of prior tables"
+              "reason": "COMBO-P2-01: rebuilt final source-owned AI safe snapshot repair; scenarios/seeds/oracles unchanged",
+              "sourceCommit": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
+              "sourceTree": "f26c1a7c20474f214d6d26753bdb846bf55e1769",
+              "previousBindingProduct": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+              "previousBindingSHA256": "a862fc3f759ea23440f88595c63fbbff9efde470d23503f4906ec1577c6b3751",
+              "previousRebinding": {
+                "reason": "Rebuilt final field/Harvest/PP/trainer combination; no scenario, seed, or business oracle changes",
+                "sourceCommit": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+                "sourceTree": "406614edc72a531db1a503293fa85033fa4d9aa3",
+                "priorProducts": {
+                  "field": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
+                  "harvest": "a91570b6d006f0a303bfe3350b051f81be644dd2"
+                },
+                "mappingSource": "Actual nine files in this integration worktree js/engine/build after source-H build; not union or selection of prior tables"
+              }
             }
           }
-        }
+        },
+        "reason": "Localized cant description only; current generated runtime identity, scenarios, seeds, assertions and business oracles unchanged"
       },
-      "reason": "Localized cant description only; current generated runtime identity, scenarios, seeds, assertions and business oracles unchanged"
+      "reason": "Combined reviewed cant feedback and opening state seed/faint count repair; current compiled identity only; business scenarios and oracles unchanged"
     },
-    "reason": "Combined reviewed cant feedback and opening state seed/faint count repair; current compiled identity only; business scenarios and oracles unchanged"
+    "reason": "Reviewed diagnostic classification integration only; new compiled identities, business contract fields unchanged"
   }
 }
