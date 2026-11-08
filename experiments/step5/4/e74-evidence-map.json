@@ -16,7 +16,7 @@
       "line_ranges"
     ]
   },
-  "scope": "18 previous selected audit families plus six integrated additions; not an exhaustive test inventory or coverage percentage.",
+  "scope": "18 previous selected audit families plus six integrated additions and two scoped field-evidence bindings; not an exhaustive test inventory or coverage percentage.",
   "priorSelectedAudit": {
     "base": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
     "familiesSHA256": "48b561645bed7f866ed3badc7857302f50fb40b4aa0bdb0a6f173a307d48d2b5",
@@ -164,6 +164,18 @@
       "receiptSHA256": "67e1949371e200b5a3d03719aff43fc9d2dbe3f476a63844f0fae4e56fb572cf",
       "receiptSealSHA256": "31d5f4327d38e600db26e17783b9cc47a50db4907929846876c1c6723d926a8a",
       "status": "ACCEPTED_CONTROLLED_PAIR_CHAIN_ONLY_PUBLISHED_CI_PASS",
+      "isCompleteFRAcceptance": false
+    },
+    "ci273": {
+      "candidate": "1c68072b5e2d3273cf0083c0a853465080b3fe71",
+      "run": 42385564917,
+      "number": 273,
+      "attempt": 1,
+      "url": "https://github.com/y805939188/pokemon-framework-prototype/actions/runs/42385564917",
+      "evidenceKind": "ARCHIVED_EXACT_SOURCE_PUBLICATION_RECEIPT_NOT_NEW_CANDIDATE_CI",
+      "receiptSHA256": "c82b16a2096cc5062592d01bda77b83dd407a322b25792988530dc28ea01eb5c",
+      "independentReviewSHA256": "c6a0cf129c2ffbbdc0e7cbb47d830c110667fd001f3b3a88d4d6990c30f95008",
+      "status": "ACCEPTED_LIMITED_FIELD_FIXES_PUBLISHED_CI_PASS",
       "isCompleteFRAcceptance": false
     }
   },
@@ -1414,6 +1426,176 @@
       "kind": "INTEGRATED_SCOPED_SOURCE_EVIDENCE",
       "completeHeading": false,
       "newExecution": false
+    },
+    {
+      "layer": "REAL_GATEWAY_ENGINE_SCOPED_EXISTING_TESTS",
+      "sourceCandidate": "1c68072b5e2d3273cf0083c0a853465080b3fe71",
+      "document": "docs/step5/5.4-E74-evidence-map.md",
+      "publication": "ci273",
+      "sourceEvidence": {
+        "existingIndependentEngineSuiteCases": 89,
+        "selectedEvidenceIsSubsetOfSuite": true,
+        "sameCasesNotAdditiveAcrossPublicationRuns": true,
+        "newBusinessRuns": 0
+      },
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/test-initial-field-engine.cjs",
+          "blob": "18f93c40305852bf01d6a5973a3546dc8608ca46",
+          "sha256": "9da150e8695cff3a1fdc315f66fb38df14b1ded537637167038043d06a6303e8",
+          "scopedSourceCandidate": "1c68072b5e2d3273cf0083c0a853465080b3fe71",
+          "scopedSourceSHA256": "9da150e8695cff3a1fdc315f66fb38df14b1ded537637167038043d06a6303e8",
+          "sameBytesAsScopedSourceCandidate": true,
+          "verifiedAtSnapshot": "0622070a6d02bf3a26bfa859b735a3038da53570",
+          "sameBytesAtOriginalMapBase": true
+        },
+        {
+          "path": "docs/step5/5.4-terrain-notification-fix.md",
+          "blob": "46137a7bb67303804605a06484e47a564a5136ab",
+          "sha256": "6ca7d63b3cf56c2d568f3fdfa76f5f1cb05f68b50f93dd1d753ab15c9675da6e",
+          "scopedSourceCandidate": "1c68072b5e2d3273cf0083c0a853465080b3fe71",
+          "scopedSourceSHA256": "6ca7d63b3cf56c2d568f3fdfa76f5f1cb05f68b50f93dd1d753ab15c9675da6e",
+          "sameBytesAsScopedSourceCandidate": true,
+          "verifiedAtSnapshot": "0622070a6d02bf3a26bfa859b735a3038da53570",
+          "sameBytesAtOriginalMapBase": true
+        },
+        {
+          "path": "docs/step5/5.4-field-fixes-integration.md",
+          "blob": "30421200e2159ddc48bb8d009e42292f13df9faf",
+          "sha256": "d3234db53779e8d4b6865154ccda8f6d3973b687155604f6e443290df4a9f42e",
+          "scopedSourceCandidate": "1c68072b5e2d3273cf0083c0a853465080b3fe71",
+          "scopedSourceSHA256": "d3234db53779e8d4b6865154ccda8f6d3973b687155604f6e443290df4a9f42e",
+          "sameBytesAsScopedSourceCandidate": true,
+          "verifiedAtSnapshot": "0622070a6d02bf3a26bfa859b735a3038da53570",
+          "sameBytesAtOriginalMapBase": true
+        }
+      ],
+      "kind": "INTEGRATED_SCOPED_SOURCE_EVIDENCE",
+      "completeHeading": false,
+      "newExecution": false,
+      "id": "field-environment",
+      "featureIds": [
+        "FR-000049"
+      ],
+      "scope": "WP47-A section 3.3 only: actual Gen8 Nature Power/Camouflage environment choices, Nature Power terrain precedence, and selected Secret Power native secondary definitions. Not the whole current-type/power/data heading.",
+      "featureScopes": {
+        "FR-000049": "Nineteen IF07 environment cases execute Nature Power then Camouflage and assert called move, Nature Power PP debit and current type; four IF07 cases assert Nature Power native terrain precedence; eighteen IF08 cases assert the native Secret Power secondary definition and one sampled opportunity."
+      },
+      "testSelectors": [
+        {
+          "namePrefix": "IF07 environment ",
+          "cases": 19,
+          "lineRanges": [
+            [
+              24,
+              25
+            ]
+          ]
+        },
+        {
+          "namePrefix": "IF07 native terrain precedence ",
+          "cases": 4,
+          "lineRanges": [
+            [
+              26,
+              26
+            ]
+          ]
+        },
+        {
+          "namePrefix": "IF08 actual native secondary definition ",
+          "cases": 18,
+          "lineRanges": [
+            [
+              49,
+              50
+            ]
+          ]
+        }
+      ],
+      "formalSection": "WP47-A section 3.3, within frozen FR-000049 lines 56-111",
+      "limits": [
+        "Only the selected Gen8 fixed-data samples; no claim for all section 3.1 type/power consumers, section 3.1.1 Natural Gift multi-hit or section 3.2 Hidden Power.",
+        "Nature Power field precedence is not proof of every terrain interaction for all three moves. The sampled Secret Power secondary definition/opportunity is not exhaustive probability or downstream status eligibility coverage.",
+        "No missing-type/move-data fallbacks, old-generation rules, or complete calling/targeting family acceptance. Media/animation and declared-flinch differences in the formal specification are not resolved by these tests.",
+        "Source suite 89 is existing independent evidence, not 89 newly mapped mechanisms or new executions. No Scene, persistence, Title, NW or reference-equivalence acceptance.",
+        "The three selected files are byte-identical at source, original map base and supplement base; this does not assert all product dependencies or runtimes are identical."
+      ]
+    },
+    {
+      "layer": "REAL_GATEWAY_ENGINE_SCOPED_EXISTING_TESTS",
+      "sourceCandidate": "1c68072b5e2d3273cf0083c0a853465080b3fe71",
+      "document": "docs/step5/5.4-E74-evidence-map.md",
+      "publication": "ci273",
+      "sourceEvidence": {
+        "existingIndependentEngineSuiteCases": 89,
+        "selectedEvidenceIsSubsetOfSuite": true,
+        "sameCasesNotAdditiveAcrossPublicationRuns": true,
+        "newBusinessRuns": 0
+      },
+      "baseArtifactBindings": [
+        {
+          "path": "experiments/step5/4/test-initial-field-engine.cjs",
+          "blob": "18f93c40305852bf01d6a5973a3546dc8608ca46",
+          "sha256": "9da150e8695cff3a1fdc315f66fb38df14b1ded537637167038043d06a6303e8",
+          "scopedSourceCandidate": "1c68072b5e2d3273cf0083c0a853465080b3fe71",
+          "scopedSourceSHA256": "9da150e8695cff3a1fdc315f66fb38df14b1ded537637167038043d06a6303e8",
+          "sameBytesAsScopedSourceCandidate": true,
+          "verifiedAtSnapshot": "0622070a6d02bf3a26bfa859b735a3038da53570",
+          "sameBytesAtOriginalMapBase": true
+        },
+        {
+          "path": "docs/step5/5.4-terrain-notification-fix.md",
+          "blob": "46137a7bb67303804605a06484e47a564a5136ab",
+          "sha256": "6ca7d63b3cf56c2d568f3fdfa76f5f1cb05f68b50f93dd1d753ab15c9675da6e",
+          "scopedSourceCandidate": "1c68072b5e2d3273cf0083c0a853465080b3fe71",
+          "scopedSourceSHA256": "6ca7d63b3cf56c2d568f3fdfa76f5f1cb05f68b50f93dd1d753ab15c9675da6e",
+          "sameBytesAsScopedSourceCandidate": true,
+          "verifiedAtSnapshot": "0622070a6d02bf3a26bfa859b735a3038da53570",
+          "sameBytesAtOriginalMapBase": true
+        },
+        {
+          "path": "docs/step5/5.4-field-fixes-integration.md",
+          "blob": "30421200e2159ddc48bb8d009e42292f13df9faf",
+          "sha256": "d3234db53779e8d4b6865154ccda8f6d3973b687155604f6e443290df4a9f42e",
+          "scopedSourceCandidate": "1c68072b5e2d3273cf0083c0a853465080b3fe71",
+          "scopedSourceSHA256": "d3234db53779e8d4b6865154ccda8f6d3973b687155604f6e443290df4a9f42e",
+          "sameBytesAsScopedSourceCandidate": true,
+          "verifiedAtSnapshot": "0622070a6d02bf3a26bfa859b735a3038da53570",
+          "sameBytesAtOriginalMapBase": true
+        }
+      ],
+      "kind": "INTEGRATED_SCOPED_SOURCE_EVIDENCE",
+      "completeHeading": false,
+      "newExecution": false,
+      "id": "field-mimicry",
+      "featureIds": [
+        "FR-000070"
+      ],
+      "scope": "Real native Mimicry in the accepted default-terrain restoration contract: Grass to temporary Electric, then basic Ground/Steel on clear and Grass on restoration, one notification per actual transition.",
+      "featureScopes": {
+        "FR-000070": "The existing IF05 normal Mimicry case observes actual callback outputs and final type, plus presence of a Mimicry message; it does not accept the complete formal OnTerrainChange heading."
+      },
+      "testSelectors": [
+        {
+          "exactName": "IF05 normal Mimicry callback observes clear and restored terrain exactly once",
+          "cases": 1,
+          "lineRanges": [
+            [
+              98,
+              117
+            ]
+          ]
+        }
+      ],
+      "formalSection": "WP49 section 8, frozen FR-000070 lines 217-224",
+      "limits": [
+        "The formal source describes an additional outer ability/item pass after default restoration. The accepted pinned-Showdown product contract uses clear once and restore once. This association preserves that reference/product distinction and grants no reference-equivalence or new compatibility decision.",
+        "Only the actual Grass/Electric/default-restoration Mimicry sample; four generic terrain-notification controls do not prove Mimicry under all four terrain types.",
+        "No full ability/item ordering, grounding/suppression/ability-loss/missing-type/debug-menu cases, exact message-count or item-consumption acceptance.",
+        "No Scene, persistence, Title, NW, complete FR-000070 or full E74/D2/5.4 acceptance.",
+        "Only selected file bytes were compared across versions; old failures and unrelated source/runtime boundaries remain unchanged."
+      ]
     }
   ],
   "rows": [
@@ -1807,8 +1989,10 @@
           ]
         ]
       },
-      "selectedEvidenceRefs": [],
-      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "selectedEvidenceRefs": [
+        "field-environment"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
       "completeHeading": false,
       "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
       "emptySelectionIsNotRepositoryUntested": true
@@ -2062,8 +2246,10 @@
           ]
         ]
       },
-      "selectedEvidenceRefs": [],
-      "selectedMapState": "NO_ASSOCIATION_IN_THIS_SELECTED_MAP",
+      "selectedEvidenceRefs": [
+        "field-mimicry"
+      ],
+      "selectedMapState": "SCOPED_ASSOCIATIONS_ONLY",
       "completeHeading": false,
       "formalHeadingAcceptance": "NOT_GRANTED_BY_THIS_METADATA_BATCH",
       "emptySelectionIsNotRepositoryUntested": true
@@ -2939,5 +3125,23 @@
     "Default held-item production gates remain false.",
     "No native Boot/Map/Title, physical input, NW or original comparison acceptance.",
     "No complete E74/D2/5.4/P4 acceptance; no current-candidate CI inherited from source receipts."
-  ]
+  ],
+  "fieldBindingSupplement": {
+    "baseSourceSnapshot": "0622070a6d02bf3a26bfa859b735a3038da53570",
+    "originalMapBasePreserved": "1a611aa2f03fd47b305c45d91276874ddf38dd19",
+    "sourcePublicationCandidate": "1c68072b5e2d3273cf0083c0a853465080b3fe71",
+    "featureIds": [
+      "FR-000049",
+      "FR-000070"
+    ],
+    "formalIdentityChanged": false,
+    "existingFamiliesChanged": false,
+    "completeHeadingAcceptancesAdded": 0,
+    "newBusinessRuns": 0,
+    "newBuilds": 0,
+    "newCI": 0,
+    "NW": 0,
+    "oldFrozenReplayRuns": 0,
+    "scope": "Metadata association only. Previously unassociated in this selected map did not mean untested in the repository."
+  }
 }
