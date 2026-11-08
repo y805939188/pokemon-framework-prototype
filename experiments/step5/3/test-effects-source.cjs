@@ -3,6 +3,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {pathToFileURL}=require('node:url'),{resolve}=require('node:path');
 require('../../../scripts/tests/ts-source-loader.cjs');
+const classification=import(pathToFileURL(resolve(__dirname,'../../../src/framework/rules/battle-effects-writeback.ts')));
 const pure=import(pathToFileURL(resolve(__dirname,'../../../src/framework/rules/battle-consumption.ts')));
 const E=require('../../../js/engine/build/engine.cjs'),clone=x=>JSON.parse(JSON.stringify(x)),D=E.dex.createDexLookup(),C=clone(E.fixtures.content);
 for(const id of ['splash','surgingstrikes','substitute','quickattack','return','transform']){const m=D.move(id);C.moves[id]={id:m.id,name:m.name,pp:m.pp};}
@@ -36,6 +37,7 @@ test('V2 D-only failure leaves K, display, no-faint coverage and control friends
  const {s,game}=await make({party:[member('P1','Charizard',50,['flamethrower'],{hp:50})]});
  const drain=s.gw.drainObservations.bind(s.gw);s.gw.drainObservations=()=>{const b=drain();b.issues.push({group:'damage',memberId:'P1',reason:'synthetic bad D'});return b;};
  await s.useItem('potion','P1');await s.throwBall('masterball');const r=await resolved(s,game);
+ const diagnosis=(await classification).classifyBattleEffectDispositions(r.dispositions,[{group:'readiness',status:'skipped',memberId:'P1',reason:'awaiting-complete-ordered-evolution-scan'}]);assert.equal(diagnosis.degraded,true);assert(diagnosis.entries.some(d=>d.group==='damage'&&d.memberId==='P1'&&d.category==='degraded'));
  assert.equal(r.damage.P1.status,'unavailable');assert.equal(r.critical.P1.status,'complete');assert(r.appearances.length);assert(r.friendshipReplacements.P1>99);assert.equal(r.faint.P1.coverage.status,'complete');
 });
 test('V2 actual faint hook identities match across sources; synthetic revival cannot erase positive prefix',async()=>{

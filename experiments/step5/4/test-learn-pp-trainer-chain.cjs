@@ -150,7 +150,14 @@ for (const lang of ['en', 'zh']) for (const layout of ['append', 'replace']) tes
     assert.equal(h.flow.lastOutcome.commit, 'applied'); assert.equal(h.installs(), 1);
     const saved = h.flow.game(), actor = saved.party.find(m => m.id === 'LEARN-PP-P1');
     assert.deepEqual(actor.moves.map(m => [m.id, m.pp]), [['hypervoice', 7], ['rest', 10], ['growl', 39], ...(layout === 'replace' ? [['tackle', 24]] : [])]);
-    assert.equal(actor.level, 7); assert.equal(E.inventory.aggregateBag(saved.inventory).ether, 1);
+    assert.equal(actor.level, 7);
+    assert.deepEqual(h.flow.lastOutcome.diagnostics??[],[], 'legal primary friendship and no-op readiness are not missing evidence');
+    const prior=JSON.parse(h.before);assert.deepEqual(saved.stats,{...prior.stats,trainer_battles_won:prior.stats.trainer_battles_won+1});
+    assert.deepEqual(saved.dex.defeatedCounts,{pidgey:1,pidgeotto:2});assert.deepEqual(saved.dex.capturedCounts,{});
+    assert.deepEqual([...saved.dex.seen].sort(),['pidgeotto','pidgey','snorlax']);assert.deepEqual(saved.dex.owned,[]);
+    assert.equal(prior.party[0].friendship,70);assert.equal(actor.friendship,81, 'two low-band levelups (+5 each) and Ether battleitem (+1) use the auxiliary receipt');
+    assert(saved.party.every(m=>m.evolutionReadiness==='known'&&m.readyToEvolve===false));
+ assert.equal(E.inventory.aggregateBag(saved.inventory).ether, 1);
     assert.deepEqual(saved.party.map(m => m.id), ['LEARN-PP-P1', 'LEARN-PP-P2']);
     assert.deepEqual(saved.party[1], JSON.parse(h.before).party[1]);
     const final = JSON.stringify(saved); h.scene.onEnd(); h.scene.onMenuOk(); await h.frames(3);

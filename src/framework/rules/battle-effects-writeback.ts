@@ -141,3 +141,32 @@ export function composeBattleEffects(input: ComposeBattleEffectsInput): Composed
   }
   return { state, dispositions, captures };
 }
+
+/** Explain finite receipt outcomes without treating a legitimate no-op as missing facts.
+ * Unknown reasons fail conservatively. Partial writes with unavailable appearance still warn.
+ * A later evolution scan owns its own diagnostics; waiting here does not certify that scan.
+ */
+export function classifyBattleEffectDispositions(
+  resolved: readonly ResolvedBattleEffects["dispositions"][number][],
+  composed: readonly BattleEffectsWritebackDisposition[],
+): { degraded: boolean; entries: { source: string; group: string; memberId?: string; reason?: string;
+  category: "complete" | "no-op" | "primary-wins" | "later-scan" | "degraded" }[] } {
+  type Category = "complete" | "no-op" | "primary-wins" | "later-scan" | "degraded";
+  const entries: { source: string; group: string; memberId?: string; reason?: string; category: Category }[] = resolved.map(d => ({ source: d.source, group: d.group,
+    ...(d.memberId === undefined ? {} : { memberId: d.memberId }), ...(d.reason === undefined ? {} : { reason: d.reason }),
+    category: (d.status === "complete" ? "complete" : "degraded") as Category }));
+  for (const d of composed) {
+    let category: Category = "degraded";
+    if (d.status !== "invalid") {
+      if (d.group === "friendship" && d.status === "skipped" && d.reason === "legal-primary-friendship-wins") category = "primary-wins";
+      else if (d.group === "readiness" && d.reason === "awaiting-complete-ordered-evolution-scan") category = "later-scan";
+      else if (d.reason === undefined || d.group === "readiness" && (d.reason === "reliable-hp-zero" || d.reason === "known-faint")
+        || ["appearance", "defeat", "capture-appearance", "capture-count"].includes(d.group) && d.reason === "not-internal-battle") {
+        category = d.status === "applied" ? "complete" : "no-op";
+      }
+    }
+    entries.push({ source: "writeback", group: d.group, memberId: d.memberId,
+      ...(d.reason === undefined ? {} : { reason: d.reason }), category });
+  }
+  return { degraded: entries.some(d => d.category === "degraded"), entries };
+}

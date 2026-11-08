@@ -37,7 +37,7 @@ import { planBattlePrimary, capturedTemplates, clone, newGame, resultHash } from
 import { assertBattleResultShape } from "../rules/battle-result-validation";
 import { resolveBattleEffects } from "../rules/battle-consumption";
 import type { EffectsBindingV2, EffectsContextV2, ResolvedBattleEffects } from "../rules/battle-consumption";
-import { composeBattleEffects } from "../rules/battle-effects-writeback";
+import { composeBattleEffects, classifyBattleEffectDispositions } from "../rules/battle-effects-writeback";
 import type { ApplyStatus, BattleCommitOptions, BattleResult, GameState } from "../rules/state";
 import { allMembers, locateMember } from "../rules/storage";
 import { DEFAULT_LIMITS, storageFull } from "../rules/limits";
@@ -1256,7 +1256,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
           // Technical aborts never reach this owned, validated result transaction.
           enabled: config.CHECK_EVOLUTION_AFTER_ALL_BATTLES || !isDefeat(result) }, next, content);
       }
-      if (prepared.effects.dispositions.some(d => d.status !== "complete") || composed.dispositions.some(d => d.status !== "applied")) prepared.diagnostics.push("部分战斗附加事实不可用，主战果保留");
+      if (classifyBattleEffectDispositions(prepared.effects.dispositions, composed.dispositions).degraded) prepared.diagnostics.push("部分战斗附加事实不可用，主战果保留");
       prepared.next = clone(next); prepared.nextIdentity = identity;
     }
     const next = prepared.next!;

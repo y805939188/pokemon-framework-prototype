@@ -25,6 +25,12 @@ for(const c of plan.cases)test(c.id+' capture terminal to nickname No and '+c.de
   }
   await h.waitFor(()=>!h.flow.running&&!h.app.saveBlocked&&h.G.PSManagement.current()===null,'completed normal receiving');
   const saved=clone(h.flow.game()),result=clone(h.flow.lastResult),outcome=clone(h.flow.lastOutcome);assert.equal(h.installs(),1);assert.equal(outcome.commit,'applied');assert.equal(h.app.pendingReceiving,null);assert.equal(bagCount(saved,'masterball'),1);assert.equal(result.captured.length,1);assert.equal(result.captured[0].id,caughtId);assert.equal(saved.appliedBattles[c.id].hash,E.state.resultHash(result));assert.deepEqual(Object.keys(saved.appliedBattles),[c.id]);assert(saved.dex.owned.includes('pidgey'));assert.equal(saved.dex.hasDex,false);
+  assert.deepEqual(outcome.diagnostics??[],[], 'normal no-op/readiness deferral is not missing evidence');
+  assert.deepEqual(saved.stats,{...h.before.stats,wild_battles_won:h.before.stats.wild_battles_won+1});
+  assert.deepEqual(saved.dex.capturedCounts,{pidgey:1});assert.deepEqual(saved.dex.defeatedCounts,{});
+  assert.deepEqual([...saved.dex.seen].sort(),['pidgey','snorlax']);assert.deepEqual(saved.dex.owned,['pidgey']);
+  assert(saved.party.every(m=>m.evolutionReadiness==='known'&&m.readyToEvolve===false));
+
   // Integration of independent review recommendation: ordinal advances exactly once.
   assert.equal(saved.nextMemberOrdinal,String(BigInt(h.before.nextMemberOrdinal)+1n),'receiving advances nextMemberOrdinal exactly once');
   const stored=saved.storage.boxes.flatMap(box=>box.slots).filter(Boolean),inParty=saved.party.find(m=>m.id===caughtId),inBox=stored.find(m=>m.id===caughtId);assert.equal(saved.party.length,c.destination==='party'?c.members+1:c.members);assert.equal(!!inParty,c.destination==='party');assert.equal(!!inBox,c.destination==='box');assert.equal(stored.length,c.destination==='box'?1:0);assert.deepEqual(saved.party.filter(m=>m.id!==caughtId).map(m=>m.id),originalIds);assert.equal((inParty??inBox).nickname,pending.members[0].nickname,'No keeps the original captured nickname representation');
