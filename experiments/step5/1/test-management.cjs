@@ -5,7 +5,7 @@ function setup(options={}){const game=E.fixtures.makeGame();const m=clone(game.p
 const ref=(g,id)=>{const x=T.locateMember(g,id);assert.ok(x,id);return {id,position:x.position};};
 const box=(b,s)=>({kind:'box',box:b,slot:s});
 const party=index=>({kind:'party',index});
-function run(f){const x=setup({capabilities:{allowHeldItemSources:true}}),token=x.app.beginManagement();let n=0;const exec=req=>x.app.manage(token,String(++n),req);f(x,token,exec);}
+function run(f){const x=setup(),token=x.app.beginManagement();let n=0;const exec=req=>x.app.manage(token,String(++n),req);f(x,token,exec);}
 
 test('P51-09: move/withdraw/swap is one replacement; source/target stale and last able cannot partially apply',()=>run((x,token,exec)=>{
  const id=x.game.party[1].id;const source=ref(x.state.current(),id);const before=clone(x.state.current());const writes=x.state.replaced.length;
@@ -49,18 +49,23 @@ test('P51-10/11: release guards, confirmation, duplicate receipt, failed replace
  exec({kind:'pick-up',source:src});x.app.stateReplacedByHost();assert.equal(x.app.saveBlocked,false);assert.equal(exec({kind:'place-held',target:box(1,1),expectedTargetId:null}).reason,'stale-operation');
  for(const flag of ['isEgg','mail','cannotRelease']){const s=clone(x.state.current());s.party[1][flag]=flag==='mail'?'letter':true;x.state.replace(s);const fresh=x.app.beginManagement();const r=x.app.manage(fresh,'r',{kind:'release',source:ref(s,s.party[1].id),confirmed:true});assert.ok(['egg','mail','cannot-release'].includes(r.reason));x.app.endManagement(fresh);}
 }));
-test('P51-11: give/take/swap items is atomic, capacity checked after spending, closed gate permits take only',()=>run((x,token,exec)=>{
+test('P51-11: give/take/swap items is atomic and open by default, capacity checked after spending',()=>run((x,token,exec)=>{
  const src=ref(x.state.current(),x.game.party[0].id);assert.equal(exec({kind:'give-item',source:src,item:'leftovers'}).reason,'no-item');
  assert.equal(exec({kind:'give-item',source:src,item:'oranberry'}).status,'unchanged','giving same item spends and returns one, no copy');
  const target=ref(x.state.current(),'BOX1');assert.equal(exec({kind:'swap-items',source:src,target}).status,'applied');assert.equal(T.locateMember(x.state.current(),src.id).member.item,'leftovers');
  const s=clone(x.state.current());I6.setItemCount(s, "leftovers", 999);x.state.replace(s);const before=clone(s);assert.equal(exec({kind:'take-item',source:src}).reason,'bag-full');assert.deepEqual(x.state.current(),before);
- const closed=setup();const t=closed.app.beginManagement(),r=ref(closed.state.current(),closed.game.party[0].id);assert.equal(closed.app.manage(t,'g',{kind:'give-item',source:r,item:'oranberry'}).reason,'held-item-source-disabled');assert.equal(closed.contentCalls,0,'closed source refuses before content load');assert.equal(closed.app.manage(t,'t',{kind:'take-item',source:r}).status,'applied');
+ const ordinary=setup();const t=ordinary.app.beginManagement(),r=ref(ordinary.state.current(),ordinary.game.party[0].id);assert.equal(ordinary.app.manage(t,'t',{kind:'take-item',source:r}).status,'applied');assert.equal(ordinary.state.current().party[0].item,'');assert.equal(ordinary.app.manage(t,'g',{kind:'give-item',source:r,item:'oranberry'}).status,'applied');assert.equal(ordinary.state.current().party[0].item,'oranberry');assert.equal(I6.bagOf(ordinary.state.current()).oranberry,1);assert.equal(ordinary.state.replaced.length,2);
 }));
-test('P51-12: independent runtime capabilities, no capability in state, battle gate precedes content/session load',async()=>{
- for(const source of [false,true])for(const battle of [false,true]){const x=setup({capabilities:{allowHeldItemSources:source,allowExperimentalHeldItemBattle:battle}});const token=x.app.beginManagement(),r=ref(x.state.current(),x.game.party[0].id);assert.equal(x.app.manage(token,'g',{kind:'give-item',source:r,item:'oranberry'}).status,source?'unchanged':'refused');x.app.endManagement(token);const before=x.contentCalls;
- const start=x.app.startBattle({battleId:'held-probe',kind:'wild',foes:[{species:'Pidgey',level:3}],seq:1});if(battle){await assert.rejects(start,/legacy-no-held-source-gate/);assert.equal(x.sessions.created.length,0,'the old synthetic legacy root may not open held battles; normal required positive is in test-held-app');}else{await assert.rejects(start,/held-item-battle-disabled/);assert.equal(x.contentCalls,before);assert.equal(x.sessions.created.length,0);}assert.equal(JSON.stringify(x.state.current()).includes('allowHeldItem'),false);
+test('P51-12: released capabilities stay open, while legacy held sessions still refuse before content/session load',async()=>{
+ for(const source of [false,true])for(const battle of [false,true]){const x=setup({capabilities:{allowHeldItemSources:source,allowExperimentalHeldItemBattle:battle}});const token=x.app.beginManagement(),r=ref(x.state.current(),x.game.party[0].id);assert.equal(x.app.manage(token,'g',{kind:'give-item',source:r,item:'oranberry'}).status,'unchanged');x.app.endManagement(token);const before=x.contentCalls;
+ await assert.rejects(x.app.startBattle({battleId:'held-probe',kind:'wild',foes:[{species:'Pidgey',level:3}],seq:1}),/legacy-no-held-source-gate/);assert.equal(x.contentCalls,before);assert.equal(x.sessions.created.length,0,'a released runtime does not authenticate the old held-item fake');assert.equal(JSON.stringify(x.state.current()).includes('allowHeldItem'),false);
  }
- assert.throws(()=>E.config.developmentCapabilities({allowHeldItemSources:1}),/invalid/);assert.ok(E.config.checkOverrides({allowHeldItemSources:true}).length);
+ assert.deepEqual(E.config.developmentCapabilities(),{allowHeldItemSources:false,allowExperimentalHeldItemBattle:false});assert.deepEqual(E.config.runtimeCapabilities(),{allowHeldItemSources:true,allowExperimentalHeldItemBattle:true});assert.throws(()=>E.config.developmentCapabilities({allowHeldItemSources:1}),/invalid/);assert.ok(E.config.checkOverrides({allowHeldItemSources:true}).length);
+});
+test('P51-11: explicit pure-rule source denial still rejects before item lookup without changing state',()=>{
+ const x=setup(),before=clone(x.state.current()),source=ref(before,before.party[0].id),target=ref(before,'BOX1');let calls=0;
+ assert.throws(()=>E.storageOperations.giveItem(before,source,'oranberry',{limits:E.limits.DEFAULT_LIMITS,sourceAllowed:false,describe:()=>{calls++;throw Error('unexpected item lookup');}}),/held-item-source-disabled/);
+ assert.throws(()=>E.storageOperations.swapItems(before,source,target,false),/held-item-source-disabled/);assert.equal(calls,0);assert.deepEqual(x.state.current(),before);assert.equal(x.state.replaced.length,0);
 });
 test('P51-20: deposit healing only after success; HealParty and RecoverAll differ by configuration',()=>{
  const x=setup({depositHeal:true});const g=clone(x.state.current());g.party[1].hp=1;g.party[1].readyToEvolve=true;g.storage.boxes[0].slots[0].hp=1;x.state.replace(g);const t=x.app.beginManagement();const source=ref(g,g.party[1].id);
@@ -69,7 +74,7 @@ test('P51-20: deposit healing only after success; HealParty and RecoverAll diffe
  assert.equal(x.app.recoverAll().status,'unchanged');assert.equal(x.state.current().storage.boxes[0].slots[0].hp,1,'depositHeal on: RecoverAll party only');
  const off=setup();const damaged=clone(off.state.current());damaged.storage.boxes[0].slots[0].hp=1;off.state.replace(damaged);off.app.healParty();assert.equal(off.state.current().storage.boxes[0].slots[0].hp,1);assert.equal(off.app.recoverAll().status,'healed');assert.ok(off.state.current().storage.boxes[0].slots[0].hp>1);
 });
-test('P51-12: direct session boundary refuses held members before driver/data work',async()=>{
+test('P51-12: uncomposed direct session still requires explicit held ownership before driver/data work',async()=>{
  const game=E.fixtures.makeGame({charizard:{item:'leftovers'}});let calls=0;const driver={moveNames:async()=>{calls++;throw Error('must not read engine');},create:async()=>{calls++;throw Error('must not create');}};
  await assert.rejects(E.session.BattleSession.create({game,battleId:'direct-held',content:E.fixtures.content,foe:{kind:'wild',team:[E.fixtures.foeMember('direct','Pidgey',3)]},driver}),/held-item-battle-disabled/);assert.equal(calls,0);
 });
@@ -85,7 +90,7 @@ test('P51-11/F: eggs reject new holders and a stale frozen item reference cannot
 test('P51-16/F: ribbon swap with empty display slot compacts without persistent holes; moves still require a real target',()=>run((x,t,exec)=>{
  const source=ref(x.state.current(),x.game.party[0].id);assert.equal(exec({kind:'sort-ribbons',source,from:0,to:11}).status,'applied');assert.deepEqual(x.state.current().party[0].ribbons,['R2','R1']);assert.equal(exec({kind:'sort-moves',source,from:0,to:11}).reason,'invalid-index');
 }));
-test('P51-12/F: experimental moving revalidates holdability and mail instead of creating a new holder for an unsupported legacy item',()=>run((x,t,exec)=>{
+test('P51-12/F: ordinary moving revalidates holdability and mail instead of creating a new holder for an unsupported legacy item',()=>run((x,t,exec)=>{
  const game=clone(x.state.current());game.party[0].item='not-an-item';x.state.replace(game);const source=ref(game,game.party[0].id),target=ref(game,'BOX1');const before=clone(game);assert.equal(exec({kind:'swap-items',source,target}).reason,'invalid-held-item');assert.deepEqual(x.state.current(),before);assert.equal(exec({kind:'take-item',source}).status,'applied','trusted existing item can still be removed safely');assert.equal(I6.bagOf(x.state.current())['not-an-item'],1);
 }));
 

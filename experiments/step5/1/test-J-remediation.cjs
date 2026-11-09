@@ -41,6 +41,6 @@ for(const schema of [4,5])test(`J05: schema ${schema} refuses unknown/prototype 
   const app=setup({read:()=>game,replace(){throw Error('read-only')}});const v=app.describeIndividual(game.party[0].id);assert.ok(Object.hasOwn(v,'modifiers'));assert.equal(typeof v.modifiers,'object');
  }
 });
-test('J11: application encounter gate rejects held items before content/RNG; explicit experimental control proceeds',()=>{
- for(const allowed of [false,true]){const g=fresh();g.party[0].item='leftovers';let loads=0,draws=0;const app=setup({read:()=>g,replace(){}},{content:()=>{loads++;return {content}},random:()=>{draws++;return 0}},{capabilities:{allowExperimentalHeldItemBattle:allowed}});const out=app.prepareEncounter({regions:[],slots:[{species:'Pidgey',weight:1,minLevel:5,maxLevel:5}]},0);assert.equal(out.ok,allowed);if(allowed){assert.ok(loads>0);assert.ok(draws>0)}else{assert.equal(out.reason,'held-item-battle-disabled');assert.equal(loads,0);assert.equal(draws,0)}}
+test('J11: ordinary held encounters are open by default and developer false cannot close released battle policy',()=>{
+ for(const capabilities of [undefined,{allowExperimentalHeldItemBattle:false},{allowExperimentalHeldItemBattle:true}]){const g=fresh();g.party[0].item='leftovers';const before=clone(g);let loads=0,draws=0;const app=setup({read:()=>g,replace(){throw Error('encounter must not write')}},{content:()=>{loads++;return {content}},random:()=>{draws++;return 0}},capabilities?{capabilities}:{});const out=app.prepareEncounter({regions:[],slots:[{species:'Pidgey',weight:1,minLevel:5,maxLevel:5}]},0);assert.equal(out.ok,true);assert.deepEqual(out.foe,{species:'Pidgey',level:5});assert.ok(loads>0);assert.ok(draws>0);assert.deepEqual(g,before);}
 });
