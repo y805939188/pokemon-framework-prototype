@@ -108,10 +108,10 @@ export function developmentCapabilities(raw: unknown = {}): DevelopmentCapabilit
 }
 
 /** Normal production policy is a code-reviewed release decision, never a runtime input.
- * B-3 remains closed until its main-integration and independent acceptance prerequisites hold.
+ * B-3 development release is independently accepted on its exact branch; merging main is not a prerequisite.
  * One value controls both sources and battle admission so release wiring cannot open only one side.
  */
-const ORDINARY_HELD_ITEMS_RELEASED: boolean = false;
+const ORDINARY_HELD_ITEMS_RELEASED: boolean = true;
 
 /** Effective policy for production callers. The only override remains the existing developer port.
  * Do not pass settings, plugin parameters or saved state here. Validation deliberately remains strict.

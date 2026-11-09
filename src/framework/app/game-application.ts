@@ -51,7 +51,7 @@ import { stateIdentity } from "./state-identity";
 import type { ReceptionContext, ReceptionPending } from "./reception-types";
 import { ManagementSession } from "./management";
 import type { ManagementOutcome, ManagementRequest } from "./management";
-import { runtimeCapabilities, resolveConfig } from "../rules/config";
+import { developmentCapabilities, runtimeCapabilities, resolveConfig } from "../rules/config";
 import type { DevelopmentCapabilities } from "../rules/config";
 import type { ItemDescriptor, MemberReference } from "../rules/storage-operations";
 import { healParty, recoverAll } from "../rules/heal";
@@ -167,6 +167,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly startMoney: number;
   private readonly noMoneyLoss: boolean;
   private readonly capabilities: DevelopmentCapabilities;
+  /** Explicit legacy roots remain no-held even after the production release. */
+  private readonly legacyHeldRequested: boolean;
   private readonly management: ManagementSession;
   private readonly depositHeal: boolean;
   private readonly profile: ReceivingProfile;
@@ -283,6 +285,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (!Number.isSafeInteger(this.startMoney) || this.startMoney < 0) throw new Error("invalid-start-money");
     this.noMoneyLoss = options.noMoneyLoss ?? false;
     this.capabilities = runtimeCapabilities(options.capabilities);
+    const developer = developmentCapabilities(options.capabilities);
+    this.legacyHeldRequested = developer.allowHeldItemSources || developer.allowExperimentalHeldItemBattle;
     this.depositHeal = options.depositHeal ?? false;
     this.profile = { ...(options.receivingProfile ?? { mode: 0, naming: 0 }) };
     if (![0, 1, 2].includes(this.profile.mode) || !Number.isSafeInteger(this.profile.naming) || this.profile.naming < 0) throw new Error("invalid receiving profile");
@@ -882,7 +886,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       op.facts.moneyGain = moneyGain ?? true;
       const game = this.ports.state.read(); assertCurrent();
       if (!this.capabilities.allowExperimentalHeldItemBattle && game.party.some((m) => !!m.item)) throw new Error("held-item-battle-disabled: battle item write-back is incomplete");
-      if (settlementSource?.mode === "legacy-no-held" && (this.capabilities.allowHeldItemSources || this.capabilities.allowExperimentalHeldItemBattle)) throw new Error("legacy-no-held-source-gate");
+      if (settlementSource?.mode === "legacy-no-held" && (this.legacyHeldRequested)) throw new Error("legacy-no-held-source-gate");
       const { content, dex } = this.ports.content(); assertCurrent();
       const trainer = request.trainer ? findTrainerRecord(content, request.trainer.id, request.trainer.version) : null;
       if (request.trainer && (request.kind !== "trainer" || !trainer)) throw new Error(`missing trainer record "${request.trainer.id}" version ${request.trainer.version}`);
@@ -959,7 +963,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         ];
       this.#settlementAdmissions.set(context, admission);
       if (settlementSource?.mode === "required" && (!admission.contentIdentity || admission.invalid)) throw new Error("required-settlement-content-identity-unavailable-or-changed");
-      if (settlementSource?.mode === "legacy-no-held" && (this.capabilities.allowHeldItemSources || this.capabilities.allowExperimentalHeldItemBattle || admission.roster.some(m => !!m.initial))) throw new Error("legacy-no-held-source-gate");
+      if (settlementSource?.mode === "legacy-no-held" && (this.legacyHeldRequested || admission.roster.some(m => !!m.initial))) throw new Error("legacy-no-held-source-gate");
       assertCurrent();
       // The required source sees the operation's captured kind/id, not fields a prior host callback changed.
       // Explicit old adapters retain their historical request object contract.
@@ -1040,7 +1044,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (source?.mode !== "legacy-no-held" || !source.legacyProduce) throw new Error("legacy-producer-not-selected-at-composition");
     if (!battleId || typeof battleId !== "string") throw new Error("invalid-legacy-producer");
     if (this.battleBusy || this.reception || this.management.active || this.inventory.active) throw new Error("operation-active");
-    if (this.capabilities.allowHeldItemSources || this.capabilities.allowExperimentalHeldItemBattle) throw new Error("legacy-no-held-source-gate");
+    if (this.legacyHeldRequested) throw new Error("legacy-no-held-source-gate");
     const generation = this.generation, context = this.newReceptionContext(options);
     if (this.battleBusy || this.reception || this.management.active || this.inventory.active || generation !== this.generation) throw new Error("operation-active");
     this.battleCommitOwner = context;
@@ -1126,11 +1130,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       return { status: "already-applied" };
     }
     // A closed external source refuses before any content/producer lookup. This is not a legacy admission.
-    if (!this.capabilities.allowHeldItemSources) assertCapturedHeldSources(result.captured, context.templates ?? {}, { allowed: false, describe: this.describeHeldItem });
+    if (!this.capabilities.allowHeldItemSources || admission?.source?.mode === "legacy-no-held" || this.#settlementFactoryRoot?.mode === "legacy-no-held") assertCapturedHeldSources(result.captured, context.templates ?? {}, { allowed: false, describe: this.describeHeldItem });
     // A deliberately selected legacy direct producer can preserve the old public direct API. The supplied JSON is
     // compared to that preselected producer, never used to choose a mode or manufacture a source capability.
     if (!handle && !admission && this.#settlementFactoryRoot?.mode === "legacy-no-held" && this.#settlementFactoryRoot.legacyProduce) {
-      if (this.capabilities.allowHeldItemSources || this.capabilities.allowExperimentalHeldItemBattle || current.party.some(m => !!m.item)) throw new Error("legacy-no-held-source-gate");
+      if (this.legacyHeldRequested || current.party.some(m => !!m.item)) throw new Error("legacy-no-held-source-gate");
       const source = this.#settlementFactoryRoot, producedHandle: BattleHandle = { result: () => source.legacyProduce!(result.battleId) };
       admission = { source, generation: context.generation, battleId: result.battleId, contentIdentity: null, roster: [], wild: false,
         handle: producedHandle, invalid: false, read: false };
@@ -1143,7 +1147,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     }
     if (!handle && admission?.source?.mode === "legacy-no-held" && admission.handle) handle = admission.handle as S;
     if (!admission?.source || admission.invalid || admission.generation !== this.generation || admission.battleId !== result.battleId || admission.handle !== handle) throw new Error("battle-settlement-source-unknown-or-retired");
-    if (admission.source.mode === "legacy-no-held" && (this.capabilities.allowHeldItemSources || this.capabilities.allowExperimentalHeldItemBattle
+    if (admission.source.mode === "legacy-no-held" && (this.legacyHeldRequested
       || current.party.some(m => !!m.item) || result.captured.some(m => !!m.item))) { admission.invalid = true; throw new Error("legacy-no-held-source-gate"); }
     // This fresh-only closed-source guard must not load current content or an external item catalog.
     assertCapturedHeldSources(result.captured, context.templates ?? {}, { allowed: this.capabilities.allowHeldItemSources, describe: this.describeHeldItem });
