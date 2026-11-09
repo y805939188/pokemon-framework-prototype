@@ -16,7 +16,7 @@ export interface HeldTrackerSnapshot {
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 // Sticky Barb uses the same actual takeItem -> setItem handoff in the pinned engine.
 // It is neither consumption nor recovery; donor matching still requires this effect/turn/move.
-const transfer = new Set(["thief", "covet", "trick", "switcheroo", "bestow", "stickybarb"]);
+const transfer = new Set(["thief", "covet", "trick", "switcheroo", "bestow", "stickybarb", "magician", "pickpocket"]);
 const removal = new Set([...transfer, "knockoff", "corrosivegas", "incinerate", "bugbite", "pluck"]);
 const itemId = (value: unknown): value is string => typeof value === "string" && /^(?:[a-z0-9]{1,64})?$/.test(value);
 
