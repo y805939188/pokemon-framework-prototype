@@ -34,6 +34,8 @@ import { runD2Music } from "./flowtest/d2-music";
 import { runD2CaptureME } from "./flowtest/d2-capture-me";
 import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
 import { pressKey, waitGameFrames, waitUntil } from "./flowtest/timing";
+import { classifyFlowTestRoute } from './flowtest/d2-normal-route';
+import { prepareNormalD2Entry } from './flowtest/d2-normal-entry';
 import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } from "./flowtest/evidence";
 
 (() => {
@@ -42,8 +44,13 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   const W = window as any;
   const argv: string[] = (G.nw && G.nw.App && G.nw.App.argv) || [];
   const arg = (n: string) => { const a = argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : undefined; };
-  const mode = arg("ps-flow-test");
-  if (!mode) return;
+  const route = classifyFlowTestRoute(argv);
+  if (route.kind === 'inactive') return;
+  const mode = route.mode;
+  if (route.kind === 'normal') {
+    W.PSNormalD2 = prepareNormalD2Entry(argv, G.require, {G,W});
+    return;
+  }
   // Backend contract modes drive their own answers; formal UI and the normal-sample integration use the default presenter.
   if(mode!=="d2-victory-music"&&mode!=="evolution-ui"&&mode!=="trade-ui"&&mode!=="closeout"&&mode!=="closeout-continue"&&mode!=="step5-sample"&&mode!=="step5-continue"&&W.PSEvolution)W.PSEvolution.automatic=false;
 
