@@ -119,9 +119,15 @@ test('a copied source JSON from a lookalike driver cannot grant strict observati
   const before=Object.getOwnPropertyNames(E.session.BattleSession.prototype).filter(n=>!n.startsWith('_'));
   assert(!before.includes('readSessionRequestContext'));assert.deepEqual(s.currentRequest(),a.request);
 });
-test('pure adapter range control: wrapper once, exact return/throw/this and finally recovery without real engine', async()=>{
-  const {pathToFileURL}=require('node:url'),path=require('node:path');
-  const S=await import(pathToFileURL(path.resolve(__dirname,'../../../src/framework/battle/request-source.ts')).href);
+test('pure adapter range control: wrapper once, exact return/throw/this and finally recovery without real engine', async t=>{
+  // Node >=22 includes versions without native TypeScript loading. Compile only this
+  // pure adapter through the same installed Vite toolchain as the other host controls.
+  const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),root=path.resolve(__dirname,'../../..');
+  const work=fs.mkdtempSync(path.join(os.tmpdir(),'pf-request-source-adapter-'));
+  t.after(()=>fs.rmSync(work,{recursive:true,force:true}));
+  const vite=require(require.resolve('vite',{paths:[path.join(root,'src')]}));
+  await vite.build({configFile:false,root,logLevel:'error',build:{outDir:work,emptyOutDir:false,minify:false,lib:{entry:path.join(root,'src/framework/battle/request-source.ts'),formats:['cjs'],fileName:()=> 'adapter.cjs'}}});
+  const S=require(path.join(work,'adapter.cjs'));
   const request=()=>({forceSwitch:[true]}),driver={},b={gen:8,gameType:'singles',requestState:'switch',sides:[{activeRequest:null,choice:{actions:[]}}]};
   let calls=0,throws=false;const error=Error('controlled original throw');b.makeRequest=function(value){assert.equal(this,b);calls++;if(throws)throw error;this.sides[0].activeRequest=request();return value;};
   S.attachRequestSource(driver,b);const hook=b.makeRequest;S.attachRequestSource(driver,b);assert.equal(b.makeRequest,hook);
