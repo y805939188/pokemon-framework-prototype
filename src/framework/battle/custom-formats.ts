@@ -509,8 +509,9 @@ const rpgHandlers = {
         return true;
       };
     }
-    // WP47-B: a wild user cannot steal/remove the player's item; the damaging move itself still executes.
-    if (this.rpg.wild && pokemon.side.id === "p2" && ["thief", "covet", "knockoff"].includes(move.id)) move.onAfterHit = undefined;
+    // WP47-B: a wild user cannot steal the player's item. Knock Off is temporary
+    // battle removal, so keep its native effect; held settlement preserves original ownership.
+    if (this.rpg.wild && pokemon.side.id === "p2" && ["thief", "covet"].includes(move.id)) move.onAfterHit = undefined;
     // Fail an attempted exchange after the engine's ordinary PP deduction, not at BeforeMove.
     if (this.rpg.wild && pokemon.side.id === "p2" && ["trick", "switcheroo"].includes(move.id)) move.onTry = () => false;
   },

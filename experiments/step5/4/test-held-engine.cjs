@@ -195,3 +195,26 @@ for(const occupied of [false,true])test(`Sticky Barb normal nontransfer ${occupi
  const facts=await finish(sample,false);assert.equal(facts.members.find(m=>m.id==='P1').current,occupied?'leftovers':'');assert.equal(facts.members.find(m=>m.id==='F1').current,'stickybarb');
  assert(!facts.events.some(e=>['permanent-gain','temporary-receive','transfer-release'].includes(e.reason)));
 });
+
+// Wild removal is a battle effect, not theft of persistent ownership.
+test('wild Knock Off removes Leftovers for the battle and preserves recovery ownership', async () => {
+  for (const wild of [true, false]) {
+    const sample = await create({wild, p:set('P1','Snorlax',['Splash'],'leftovers'), f:set('F1','Meowth',['Knock Off'])});
+    const lines = await turn(sample.gw);
+    const player = sample.gw._debugBattle().sides[0].active[0];
+    assert.equal(player.item, '');
+    assert.ok(player.hp < player.maxhp);
+    assert.ok(!JSON.stringify(lines).includes('[from] item: Leftovers'));
+    const facts = await finish(sample), held = facts.members.find(m=>m.id==='P1');
+    assert.deepEqual([held.current,held.recovery,held.recycle],['','leftovers','']);
+    assert.equal(facts.events.filter(e=>e.id==='P1' && e.reason==='temporary-remove').length,1);
+  }
+});
+
+test('wild Knock Off retains native Sticky Hold protection', async()=>{
+ const sample=await create({wild:true,p:{...set('P1','Snorlax',['Splash'],'leftovers'),ability:'Sticky Hold'},f:set('F1','Meowth',['Knock Off'])});
+ await turn(sample.gw);
+ assert.equal(sample.gw._debugBattle().sides[0].active[0].item,'leftovers');
+ const facts=await finish(sample);
+ assert.equal(facts.events.filter(e=>e.id==='P1'&&e.reason==='temporary-remove').length,0);
+});

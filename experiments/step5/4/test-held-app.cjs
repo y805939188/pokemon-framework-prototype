@@ -280,3 +280,24 @@ for(const wild of [false])for(const forward of [false,true])test(`Sticky Barb Ap
  assert.equal(w.state.read().appliedBattles[raw.battleId].hash,E.state.resultHash(raw));assert.match(w.state.read().appliedBattles[raw.battleId].settlement.pairHash,/^[a-f0-9]{64}$/);
  const after=J(w.state.read());assert.equal(w.app.finishBattle(h,req).commit,'already-applied');assert.equal(w.state.replaced.length,1);assert.deepEqual(w.state.read(),after);
 });
+
+test('wild Knock Off through real App disables held effect then restores owned item exactly once', async()=>{
+  const supplied=content({},'knockoff'), w=fixture({supplied,item:'leftovers'});
+  const before=J(w.state.current()), h=await w.app.startBattle(w.request);
+  assert.equal((await h.chooseMove(4)).ok,true);
+  assert.equal(h.finished,false);
+  const player=h.gw._debugBattle().sides[0].active[0];
+  assert.equal(player.item,'');
+  assert.ok(player.hp<player.maxhp);
+  assert.equal(w.state.replaced.length,0);
+  assert.equal((await h.throwBall('masterball')).ok,true);
+  assert.equal(h.finished,true);
+  const raw=h.result(), out=w.app.finishBattle(h,w.request);
+  assert.equal(out.commit,'applied',JSON.stringify(out));
+  assert.equal(w.state.current().party.find(m=>m.id==='P1').item,'leftovers');
+  assert.equal(E.inventory.aggregateBag(w.state.current().inventory).leftovers,E.inventory.aggregateBag(before.inventory).leftovers);
+  assert.equal(w.state.current().party.find(m=>m.id===raw.captured[0].id).item,'');
+  assert.equal(w.state.replaced.length,1);
+  assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied');
+  assert.equal(w.state.replaced.length,1);
+});
