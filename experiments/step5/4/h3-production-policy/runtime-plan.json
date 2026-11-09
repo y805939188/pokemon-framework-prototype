@@ -3,36 +3,42 @@
     "js/engine/build/content-cli.cjs": "41168bff64ca2e564a17fbf3af8aa451f2b00f536b7d32110cb83c7b3564ea54",
     "js/engine/build/core.cjs": "702b884c1ca31ed0ec4036e72db08c50d614729962b583afa10c8ceb588d43c5",
     "js/engine/build/custom-formats.cjs": "001e16652e90e5417102769689b482c1bc4ba4a3b9b5ed7c1789459c6a4f501c",
-    "js/engine/build/engine.cjs": "bfb4889082c6bddb9ec8e69bec4d4efa9b8068e9c7cbb7b92f2a5c43069f82ce",
-    "js/engine/build/production.cjs": "2cdbbef4f7d83eef1a0b95d49194b4de42cf9f0496f7cc81ef544f61f9717a18",
-    "js/engine/build/public-presentation-Dw87h0Sm.js": "f8f7d8e2607dc4d8de31a2ab2a94dda97e2f7a039cab734bfc1505cc2a26b6e8",
-    "js/engine/build/session-DH4u-YM4.js": "8147d1eaef9a684ccbfed6cb0700104858175a1d1ffbc1627b42caa5387afb1b",
-    "js/engine/build/testing.cjs": "c431cf396b5f6d935fc7c085d5d4ee6ff9d64b84e566b6419c5680fdf85e5d94",
-    "js/engine/build/trainer-ai-diagnostics-KpdVcIqs.js": "1dd4db3c51ec6e38786abf4b468a4f2299cdbc9b8d0da18e663fb10ecfb649f1",
+    "js/engine/build/engine.cjs": "4f0ca5186b3dfac6ef6ecd85c913460455ccb59b083c89df70c4caaaea7e63a4",
+    "js/engine/build/production.cjs": "2a570f49a5dbd1fd3f542a6414aa8e9a270e7308616ebbadcf6079a633c8da85",
+    "js/engine/build/public-presentation-CmWXpM6Y.js": "49d275e6ac585055a40945ffbee7dbd5ae7d9dde698ad3dd97abab7061f8e5bf",
+    "js/engine/build/session-iAJUJGai.js": "c27424d27a16589632f560862adea2559f64cba53d8cfb3e691e9a75b0b8d284",
+    "js/engine/build/testing.cjs": "14dfddd89548b0855644ca6283cc322cf23f2ee18690e6d696f21ba4016dae31",
+    "js/engine/build/trainer-ai-diagnostics-BpoQhF-p.js": "dc6aef0b6b5529da1d1dd0426fecf888d1f256ebd2ce2731f024675640af0721",
     "js/engine/showdown/SOURCE_SHA": "495b7f40c79b08384b2bb2be040edbc952be76fe18f8dff1a96f0fb949fc78ba"
   },
   "runtimeRebinding": {
-    "sourceCommit": "2c6214064a9406e8f79fde2883975e00231b641e",
-    "sourceTree": "cd097260a81afa3722a8a96dcb79b01167d8774b",
-    "previousBindingSHA256": "334041d72816b2660e41d92f4f0ece1502a741260146f482e108cc6301918510",
+    "sourceCommit": "6d742ce500fd1632315bff24deffbcc8bd7208ef",
+    "sourceTree": "9bb23d230010c5238218341c83932327b9793f8a",
+    "previousBindingSHA256": "2a454f7867581692b36cf1c446dc847967da9129656d6a627adcda326843d95e",
     "previousRebinding": {
-      "sourceCommit": "fac38f13a07feba9df86b5af2859ba8927cfd849",
-      "sourceTree": "8592a1e51794f50eceba9abca588e0e41e90a1dd",
-      "previousBindingSHA256": "76c69709d6cfd908314568d69f911673dfbd1ee12da8d5f59ba2de7a89ceecb6",
+      "sourceCommit": "2c6214064a9406e8f79fde2883975e00231b641e",
+      "sourceTree": "cd097260a81afa3722a8a96dcb79b01167d8774b",
+      "previousBindingSHA256": "334041d72816b2660e41d92f4f0ece1502a741260146f482e108cc6301918510",
       "previousRebinding": {
-        "sourceCommit": "2f006fa0bd9de327eeb82261e7cb5861f5c70d33",
-        "sourceTree": "f326be869d74361e701ee55eedcbed9cabe91bbe",
-        "previousBindingSHA256": "1883ee947aaf72241832c3276dcb1da7917edc4410d5c821c9cd645b4b2978cf",
+        "sourceCommit": "fac38f13a07feba9df86b5af2859ba8927cfd849",
+        "sourceTree": "8592a1e51794f50eceba9abca588e0e41e90a1dd",
+        "previousBindingSHA256": "76c69709d6cfd908314568d69f911673dfbd1ee12da8d5f59ba2de7a89ceecb6",
         "previousRebinding": {
-          "sourceCommit": "26e24a93ce318b625009e806d8125ccae356d67c",
-          "sourceTree": "548af7a7d5d2ffb453294572fa8fadbd1111e219",
-          "previousBindingSHA256": "0f020a82810ec18d2b4ab6f6e3b0e9db6ee877d2c3ded49aa4883ebbb9080398",
-          "reason": "Current combined field-fix bundles; host fixtures, policy and oracle unchanged"
+          "sourceCommit": "2f006fa0bd9de327eeb82261e7cb5861f5c70d33",
+          "sourceTree": "f326be869d74361e701ee55eedcbed9cabe91bbe",
+          "previousBindingSHA256": "1883ee947aaf72241832c3276dcb1da7917edc4410d5c821c9cd645b4b2978cf",
+          "previousRebinding": {
+            "sourceCommit": "26e24a93ce318b625009e806d8125ccae356d67c",
+            "sourceTree": "548af7a7d5d2ffb453294572fa8fadbd1111e219",
+            "previousBindingSHA256": "0f020a82810ec18d2b4ab6f6e3b0e9db6ee877d2c3ded49aa4883ebbb9080398",
+            "reason": "Current combined field-fix bundles; host fixtures, policy and oracle unchanged"
+          },
+          "reason": "Localized cant description only; current generated runtime identity, scenarios, seeds, assertions and business oracles unchanged"
         },
-        "reason": "Localized cant description only; current generated runtime identity, scenarios, seeds, assertions and business oracles unchanged"
+        "reason": "Combined reviewed cant feedback and opening state seed/faint count repair; current compiled identity only; business scenarios and oracles unchanged"
       },
-      "reason": "Combined reviewed cant feedback and opening state seed/faint count repair; current compiled identity only; business scenarios and oracles unchanged"
+      "reason": "Reviewed diagnostic classification integration only; new compiled identities, business contract fields unchanged"
     },
-    "reason": "Reviewed diagnostic classification integration only; new compiled identities, business contract fields unchanged"
+    "reason": "Rebuilt complete runtime after reviewed Sticky Barb transfer integration; no scenario, seed, oracle or runtime guard changes"
   }
 }
