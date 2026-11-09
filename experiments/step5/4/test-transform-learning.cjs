@@ -58,3 +58,12 @@ test('replacing an automatically learned permanent move updates its appended vir
   await w.s._restoreCheckpoint(w.s._checkpoint());await w.s.decideLearn(3);dense(w);assert.deepEqual(actor(w).moveSlots.map(m=>m.id),['splash','seismictoss','growl','tailwhip','amnesia']);assert.equal(w.s.party[0].moves[3].id,'amnesia');unchanged(w);
  }finally{cleanup(w);}
 });
+
+test('sequential different permanent replacements preserve the earlier densely appended virtual move',async()=>{
+ const w=await open({learnMoves:['rest','amnesia']});try{
+  await transform(w);await knockout(w);assert.equal(w.s.pendingLearn.move.id,'rest');await w.s.decideLearn(3);assert.equal(w.s.pendingLearn.move.id,'amnesia');assert.deepEqual(actor(w).moveSlots.map(m=>m.id),['splash','seismictoss','rest']);
+  await w.s._restoreCheckpoint(w.s._checkpoint());await w.s.decideLearn(2);dense(w);assert.deepEqual(actor(w).moveSlots.map(m=>m.id),['splash','seismictoss','rest','amnesia']);assert.deepEqual(w.s.party[0].moves.map(m=>m.id),['transform','splash','amnesia','rest']);
+  assert((await w.s.chooseMove(4)).ok);assert.equal(actor(w).moveSlots[3].pp,19);assert.equal(w.s.gw.readState('p1')[0].pp.amnesia,20);assert.equal(w.s.gw.readState('p1')[0].pp.rest,10);unchanged(w);
+  assert((await w.s.chooseSwitch('P2')).ok);assert((await w.s.chooseSwitch('P1')).ok);assert.equal(actor(w).transformed,false);assert.deepEqual(w.s.currentRequest().active[0].moves.map(m=>m.id),['transform','splash','amnesia','rest']);unchanged(w);
+ }finally{cleanup(w);}
+});

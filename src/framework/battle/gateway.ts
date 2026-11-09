@@ -629,7 +629,11 @@ export class BattleGateway implements BattleDriver {
         if (p.transformed) {
           // Preserve an existing corresponding slot. A shorter copied list has no such slot:
           // splice appends densely instead of manufacturing holes at the permanent index.
-          p.moveSlots.splice(learnedIndex >= 0 ? learnedIndex : replaceSlot, 1, activeSlot);
+          // A prior dense append can occupy another permanent slot's numerical index.
+          // Keep that already learned copy unless this decision replaces its own identity.
+          const activeIndex = learnedIndex >= 0 ? learnedIndex
+            : p.moveSlots[replaceSlot]?.rpgLearnedMove ? p.moveSlots.length : replaceSlot;
+          p.moveSlots.splice(activeIndex, 1, activeSlot);
         } else p.moveSlots[replaceSlot] = activeSlot;
         p.set.moves[replaceSlot] = dm.name;
         p.ppUps[replaceSlot] = 0;
