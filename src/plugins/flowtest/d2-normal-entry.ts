@@ -42,5 +42,5 @@ export function prepareNormalD2Entry(argv: readonly string[],nodeRequire: any,ho
   const E=nodeRequire('./js/engine/build/production.cjs'),fixture=createFormalNormalFixture(E);
   return Object.freeze({...base,status:'OFFLINE_PREPARED_EXECUTION_BLOCKED',policyCases:policy.cases.length,donorHash:tools.donorHash,
     presentationHash:tools.presentationHash,initialStateHash:tools.hash(fixture.state()),fixture:fixture.describe(),
-    stateHostAttached:false,normalDriverInstalled:false,actualInputSent:false,sourceObserver:'AVAILABLE_SEAM_NOT_INSTALLED'});
+    stateHostAttached:false,normalDriverInstalled:false,actualInputSent:false,sourceObserver:typeof E.session?.readSessionRequestContext === 'function' ? 'SESSION_SEAM_PRESENT_HOST_OBSERVERS_UNVERIFIED' : 'UNAVAILABLE_PRODUCT_SESSION_SEAM'});
 }

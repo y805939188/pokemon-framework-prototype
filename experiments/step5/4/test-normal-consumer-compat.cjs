@@ -37,6 +37,7 @@ test('offline authored100 policy and fixture compile against exact current produ
  const E=require('../../../js/engine/build/production.cjs');
  const r=entry(['--ps-flow-test=d2-normal-f100','--ps-d2-normal-stage=offline-prepare'],id=>id==='./js/engine/build/production.cjs'?E:require(id));
  assert.equal(r.error,undefined);assert.equal(r.W.PSNormalD2.policyCases,100);assert.equal(r.W.PSNormalD2.actualBattles,0);assert.equal(r.W.PSNormalD2.stateHostAttached,false);assert.equal(r.G.$gameSystem,undefined);
+ assert.equal(r.W.PSNormalD2.sourceObserver,'UNAVAILABLE_PRODUCT_SESSION_SEAM');
  assert.equal(typeof E.session.readSessionRequestContext,'undefined','44ca source seam remains an honest blocker');
 });
 test('legacy route allowlist matches current dispatcher without executing legacy modes',()=>{
