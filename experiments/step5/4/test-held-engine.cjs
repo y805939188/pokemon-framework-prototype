@@ -130,7 +130,6 @@ test('B effective Gen8 unsupported transfer/removal families refuse the complete
  const inputs=[
   {p:{...set('P1','Delphox',['Tackle']),ability:'Magician'},f:set('F1','Snorlax',['Splash'],'leftovers')},
   {p:set('P1','Snorlax',['Tackle'],'leftovers'),f:{...set('F1','Weavile',['Splash']),ability:'Pickpocket'}},
-  {p:{...set('P1','Snorlax',['Splash']),ability:'Pickup'},f:set('F1','Snorlax',['Splash'],'oranberry')},
  ];
  for(const input of inputs){const s=await create(input),api=await G;if(input.p.ability==='Pickup')s.gw.seedState('p2',[{id:'F1',hp:1}]);await turn(s.gw);s.gw._debugBattle().tie();s.gw._pump();assert.throws(()=>api.gatewaySettlementFacts(s.gw,s.lineage,binding),/required-held-facts-unavailable/);}
 });

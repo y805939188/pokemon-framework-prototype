@@ -27,6 +27,7 @@ export class HeldTracker {
   private readonly byId = new Map<string, Cell>();
   private readonly calls: Call[] = [];
   private readonly taken: Taken[] = [];
+  private pickup: { donor: Cell; receiver: ShowdownPokemon; item: string; recovery: string; turn: number; effectState: object } | null = null;
   private events: HeldEvent[] = [];
   private invalid: string[] = [];
   private money: RequiredFacts["money"] = { amuletCoin: false, happyHour: false, payDay: 0 };
@@ -81,6 +82,14 @@ export class HeldTracker {
       set: (next: unknown) => {
         if (!itemId(next)) { this.fail("held-invalid-engine-recycle"); throw new Error("invalid engine recycle item"); }
         const method = this.calls.at(-1), effect = this.effect();
+        // The pinned Pickup handler clears the selected donor's R before setItem.
+        // Bind that actual object to the actual ability holder, not a display log or guessed candidate.
+        if (effect === "pickup" && actualRecycle && !next) {
+          const receiver = this.battle.effectState?.target;
+          if (!receiver || receiver === pokemon || !this.cells.has(receiver)) this.fail("pickup-source-unbound");
+          else this.pickup = { donor: cell, receiver, item: actualRecycle, recovery: cell.recovery,
+            turn: this.battle.turn, effectState: this.battle.effectState };
+        }
         const consumption = !!method && method.pokemon === pokemon && ["eatItem", "useItem"].includes(method.method)
           || ["fling", "naturalgift"].includes(effect);
         if (next !== actualRecycle && !consumption && !["recycle", "harvest"].includes(effect)) {
@@ -129,6 +138,19 @@ export class HeldTracker {
       });
       return;
     }
+    if (method === "setItem" && effect === "pickup") {
+      const picked = this.pickup;
+      this.pickup = null;
+      if (picked && picked.receiver === cell.pokemon && picked.item === next && !before.current
+        && picked.turn === this.battle.turn && picked.effectState === this.battle.effectState) {
+        const other = picked.donor;
+        const permanent = this.wild && cell.side === "p1" && other.side === "p2" && !before.recovery && next === picked.recovery;
+        if (permanent) this.record(other, "transfer-release", { ...this.state(other), recovery: "" }, cell.id);
+        this.record(cell, permanent ? "permanent-gain" : "temporary-receive",
+          { current: next, recovery: permanent ? next : before.recovery, recycle: before.recycle }, other.id);
+        return;
+      }
+    }
     if (transfer.has(effect)) {
       const donor = [...this.taken].reverse().find(t => !t.used && t.pokemon !== cell.pokemon && t.item === next && t.effect === effect && t.turn === this.battle.turn && t.move === (this.battle.activeMove ?? null));
       if (donor) {
@@ -167,7 +189,7 @@ export class HeldTracker {
     for (const cell of this.cells.values()) if (cell.pokemon.item !== cell.current || cell.pokemon.lastItem !== cell.recycle) this.fail("held-engine-state-diverged");
     if (this.calls.length) this.fail("held-checkpoint-inside-primitive");
   }
-  boundary(): void { this.taken.length = 0; }
+  boundary(): void { this.taken.length = 0; this.pickup = null; }
   snapshot(): HeldTrackerSnapshot {
     this.check();
     return { members: [...this.cells.values()].map(({ pokemon: _p, ...member }) => ({ ...member })), events: copy(this.events), invalid: [...this.invalid],
