@@ -6,7 +6,7 @@ import { captureInitialField } from '../rules/initial-field';
  * - Callers never hold Battle/Pokemon objects. `_debugBattle()` is the single diagnostic escape hatch.
  * - Members are addressed by stable id (= the Showdown nickname we assigned), never by slot.
  */
-import { loadFormatExtension, loadSim } from "./showdown-loader";
+import { loadFormatExtension, loadSim, restoreSimBattle } from "./showdown-loader";
 import type { LoadedSim } from "./showdown-loader";
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types";
 import type { BattleEvent } from "./protocol";
@@ -133,7 +133,7 @@ export class BattleGateway implements BattleDriver {
   static async restore(snapshot: string, opts: GatewayOptions = {}): Promise<BattleGateway> {
     if (captureInitialField(opts)) throw new Error("initial-field-restore-rebind");
     const gw = new BattleGateway(opts);
-    gw._battle = gw._env.sim.Battle.fromJSON(snapshot);
+    gw._battle = restoreSimBattle(gw._env, snapshot);
     if (gw._battle.rpg?.initialField) {
       const fields = loadFormatExtension(gw._env.root).initialFields;
       if (!fields) throw new Error("initial-field-extension-unavailable");
@@ -618,10 +618,20 @@ export class BattleGateway implements BattleDriver {
     for (const mv of newMoves) {
       const dm = b.dex.moves.get(mv);
       const slot = { move: dm.name, id: dm.id, pp: dm.pp, maxpp: dm.pp, target: dm.target, disabled: false, disabledSource: "", used: false };
-      // Natural slots share PP. An already transformed actor keeps a virtual copy, including across restore.
-      const activeSlot = p.transformed ? { ...slot, virtual: true } : slot;
+      // Natural slots share PP. A learned move in a transformed list is a separate virtual
+      // copy; its permanent identity lets a later learning decision replace that same copy.
+      const activeSlot = p.transformed ? { ...slot, virtual: true, rpgLearnedMove: dm.id } : slot;
       if (replaceSlot !== undefined && replaceSlot !== null) {
-        p.baseMoveSlots[replaceSlot] = slot; p.moveSlots[replaceSlot] = activeSlot; p.set.moves[replaceSlot] = dm.name;
+        const oldId = p.baseMoveSlots[replaceSlot]?.id;
+        const learnedIndex = p.transformed && oldId !== undefined
+          ? p.moveSlots.findIndex((move: { rpgLearnedMove?: string }) => move.rpgLearnedMove === oldId) : -1;
+        p.baseMoveSlots[replaceSlot] = slot;
+        if (p.transformed) {
+          // Preserve an existing corresponding slot. A shorter copied list has no such slot:
+          // splice appends densely instead of manufacturing holes at the permanent index.
+          p.moveSlots.splice(learnedIndex >= 0 ? learnedIndex : replaceSlot, 1, activeSlot);
+        } else p.moveSlots[replaceSlot] = activeSlot;
+        p.set.moves[replaceSlot] = dm.name;
         p.ppUps[replaceSlot] = 0;
       } else {
         p.baseMoveSlots.push(slot); p.moveSlots.push(activeSlot); p.set.moves.push(dm.name);

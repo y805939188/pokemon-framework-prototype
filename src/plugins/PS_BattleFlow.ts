@@ -1121,7 +1121,10 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   for (const [method, direction] of Object.entries({ cursorUp: 'up', cursorDown: 'down', cursorLeft: 'left', cursorRight: 'right' } as const)) {
     Window_PSMenu.prototype[method] = function (wrap: boolean) {
       if (this._phase === 'bag' && (direction === 'left' || direction === 'right') && this._bagPocket) this._bagPocket(direction === 'left' ? -1 : 1);
-      else if (this.maxCols() === 2) this.select(gridCursor(this.index(), direction, this._items.length));
+      else if (this.maxCols() === 2) {
+        this.select(gridCursor(this.index(), direction, this._items.length));
+        this.ensureCursorVisible?.(false);
+      }
       else G.Window_Command.prototype[method].call(this, wrap);
     };
   }
@@ -1693,6 +1696,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       const active = this._display?.snapshot().find((member: BattleDisplayCard) => member.side === 'p1' && member.active);
       this._menuCursor.bindActive(active?.id ?? null);
       this._menu.select(this._menuCursor.index(mode, items.length));
+      this._menu.ensureCursorVisible?.(false);
     }
     if (!c.isCurrent()) return; this._menu.show();
     if (c.isCurrent()) this._menu.activate();

@@ -1,6 +1,6 @@
 /** Internal forced-replacement capability. UI never receives the engine, choices, or a mintable token. */
 import type { BattleDriver, DriverCheckpoint } from './driver';
-import { loadFormatExtension } from './showdown-loader';
+import { loadFormatExtension, restoreSimBattle } from './showdown-loader';
 import type { LoadedSim } from './showdown-loader';
 import type { ShowdownBattle, ShowdownPokemon } from './showdown-types';
 export interface ReplacementTicket { readonly opaque?: never }
@@ -13,7 +13,7 @@ const copy=<T>(v:T):T=>JSON.parse(JSON.stringify(v)) as T;
 const snapshot=(s:Source):string=>s.snapshot();
 /** Restore the private field callbacks before any native preview/trapping event runs. */
 function probe(s:Source,sealed:string):ShowdownBattle {
-  const b=s.env.sim.Battle.fromJSON(sealed);
+  const b=restoreSimBattle(s.env,sealed);
   if(b.rpg?.initialField){
     const fields=loadFormatExtension(s.env.root).initialFields;
     if(!fields)throw new Error('initial-field-extension-unavailable');

@@ -31,6 +31,40 @@ export function loadSim(engineRoot?: string): LoadedSim {
   return { sim, extractChannelMessages, root };
 }
 
+/**
+ * Pinned State.deserializePokemon assumes every permanent slot has a same-index active slot.
+ * Transform legitimately violates that assumption. Decode its permanent list separately with
+ * the native reference codec, before exposing the restored battle or attaching live callbacks.
+ * Neither the snapshot nor the live battle is padded with invented selectable moves.
+ */
+export function restoreSimBattle(env: LoadedSim, snapshot: string): ShowdownBattle {
+  const state = JSON.parse(snapshot);
+  const detached: { side: number; member: number; slots: unknown[] }[] = [];
+  for (const [side, team] of state.sides.entries()) {
+    for (const [member, pokemon] of team.pokemon.entries()) {
+      if (pokemon.transformed && Array.isArray(pokemon.baseMoveSlots) && Array.isArray(pokemon.moveSlots)
+        && pokemon.baseMoveSlots.length > pokemon.moveSlots.length) {
+        detached.push({ side, member, slots: pokemon.baseMoveSlots });
+        delete pokemon.baseMoveSlots;
+      }
+    }
+  }
+  const battle = env.sim.Battle.fromJSON(state);
+  if (detached.length) {
+    const { State } = nodeRequire(path.join(env.root, "dist", "sim", "state"));
+    for (const saved of detached) {
+      battle.sides[saved.side].pokemon[saved.member].baseMoveSlots = State.deserializeWithRefs(saved.slots, battle);
+    }
+    // Native deserialization derives requests before the permanent slots above are restored.
+    // Rebuild only those derived values, retaining the native null/no-request distinction.
+    const requests = battle.getRequests(battle.requestState);
+    for (const [index, side] of state.sides.entries()) {
+      battle.sides[index].activeRequest = side.activeRequest === null ? null : requests[index];
+    }
+  }
+  return battle;
+}
+
 /** The SHA the staged Showdown build was made from (written by scripts/build-showdown.sh). */
 export function readEngineSha(root: string): string {
   try { return fs.readFileSync(path.join(root, "SOURCE_SHA"), "utf8").trim(); } catch { return "unknown"; }
