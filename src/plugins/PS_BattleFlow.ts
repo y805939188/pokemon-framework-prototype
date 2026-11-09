@@ -1161,6 +1161,8 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   Scene_PSBattle.prototype.constructor = Scene_PSBattle;
 
   const P = Scene_PSBattle.prototype;
+  const requestObservers = new WeakMap<object, { op: any; app: any; session: any; generation: number; epoch: number; token: string; menu: any; menuRevision: number }>();
+  let requestObserverSerial = 0;
   function initialDisplay(session: any, names: Record<string, string>): BattleDisplayCard[] {
     return ['p1', 'p2'].flatMap(side => session.gw.readState(side).map((state: any) => {
       const member = (side === 'p1' ? session.party : session.foeTeam).find((item: any) => item.id === state.id);
@@ -1706,6 +1708,32 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     const interactive = c.canChoose() && !!menu?.isOpenAndActive();
     const items = (menu?._items || []).map((item: any) => ({ key: item.ext === null || typeof item.ext === 'string' || typeof item.ext === 'number' ? item.ext : null, enabled: item.enabled !== false }));
     return { phase: c.phase, ready: !!interactive && c.canChoose(), items, columns: menu?.maxCols?.() ?? 1, implementation: 'd2-menu-grid-v1' };
+  };
+  /** Strict observer only. Normal player input and the legacy DTO do not depend on this capability. */
+  P.requestObservationState = function () {
+    const unavailable = (reason: string) => { requestObservers.delete(this); return { status: 'unavailable', reason }; };
+    const session = this._session, op = PSFlow._op, app = PSFlow._app, generation = app?.stateGeneration;
+    const current = () => !!op && !!app && PSFlow.running && this._psOp === op && op.session === session
+      && PSFlow._op === op && PSFlow._app === app && app.stateGeneration === generation
+      && this._session === session && G.SceneManager._scene === this && sceneController(this).isCurrent();
+    if (!current()) return unavailable('request-observer-owner-retired');
+    const input = this.inputState();
+    // Project host/menu callbacks first, then read the Session pair once. A synchronous restore
+    // during maxCols/canChoose must not let a previously read epoch escape as current.
+    const context = engine().B.session.readSessionRequestContext(session);
+    if (!current()) return unavailable('request-observer-owner-changed');
+    if (context.status !== 'available') { requestObservers.delete(this); return { ...context, current: true, sceneKind: 'battle' }; }
+    let owner = requestObservers.get(this);
+    if (!owner || owner.op !== op || owner.app !== app || owner.generation !== generation || owner.session !== session || owner.epoch !== context.requestViewEpoch) {
+      const serial = ++requestObserverSerial;
+      if (!Number.isSafeInteger(serial)) return unavailable('request-observer-capacity');
+      owner = { op, app, generation, session, epoch: context.requestViewEpoch, token: `forced-view/${serial}`, menu: null, menuRevision: 0 };
+      requestObservers.set(this, owner);
+    }
+    if (owner.menu !== this._menu?._items) { owner.menu = this._menu?._items; owner.menuRevision++; }
+    return { ...input, ...context, current: true, sceneKind: 'battle', ownerToken: owner.token,
+      menuToken: `${owner.token}/${owner.menuRevision}`, fast: PSFlow.fast, effects: op.battleEffects === true,
+      partySub: this._partySub ?? null, selectedMemberId: this._partySelected ?? null };
   };
   P.presentationState = function () {
     const c = sceneController(this);
@@ -2308,7 +2336,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     try { G.Scene_MenuBase.prototype.terminate.call(this); }
     finally {
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // (a scene always has one; a bare caller means the current one)
-    if (PSFlow.running && op === PSFlow._op && (!c || c.ownsHost()) && !(this._receivingTransferred&&PSFlow.app().pendingReceiving) && !(this._evolutionTransferred&&PSFlow.app().pendingEvolution) && (!c || c.ownsHost())) PSFlow.abort(new Error("the battle scene closed without an outcome"), op); // transferred operations keep the same event and save lock
+    if (PSFlow.running && op === PSFlow._op && (!c || c.ownsHost()) && !(this._receivingTransferred&&PSFlow.app().pendingReceiving) && !(this._evolutionTransferred&&(PSFlow.app().pendingEvolution||PSFlow.app().pendingPokedex)) && (!c || c.ownsHost())) PSFlow.abort(new Error("the battle scene closed without an outcome"), op); // transferred operations keep the same event and save lock
     }
   };
 

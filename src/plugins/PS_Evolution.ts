@@ -215,6 +215,18 @@ const { publicIdText } = memberIdentity;
  P.popScene=function(){if(this._controller&&!this._controller.closed){if(this._controller.ready)this._controller.backRequested=true;return;}G.Scene_MenuBase.prototype.popScene.call(this);};
  P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);if(this._controller)this._controller.dispose();else if(this._request)retire(this._request,'presentation-ended');};
  const ui:any=W.PSEvolution={automatic:true,show:()=>open(request()),event:(event=0,memberId?:string)=>open(request({event,...(memberId?{memberId}:{})})),current:()=>active&&!active.closed?{ready:active.ready,owner:active.request.owner,generation:active.request.generation,layer:active.layer,trade:active.views().q?{phase:active.views().q.phase,source:'trade-draft'}:null,tradeTimeline:active.tradeTimeline?{phase:active.tradeTimeline.phase,progress:active.tradeTimeline.progress}:null,timeline:active.timeline?{phase:active.timeline.phase,successReady:active.timeline.successReady,picture:active.timeline.picture}:null,lesson:active.lesson?structuredClone(active.lesson.page):null,error:active.error,text:[...active.text]}:null};
+ const normalSceneTokens=new WeakMap<object,string>();let normalSceneSerial=0;
+ // A separate observer preserves the old current() DTO and cannot drive the player presenter.
+ ui.normalObservationState=()=>{
+  const c=active,s=G.SceneManager._scene,r=c?.request;
+  const valid=()=>!!c&&!!r&&!c.closed&&active===c&&r.scene===s&&G.SceneManager._scene===s&&c.valid();
+  if(!valid())return {status:'unavailable'};
+  let sceneToken=normalSceneTokens.get(c!);
+  if(!sceneToken){if(!Number.isSafeInteger(normalSceneSerial+1))return {status:'unavailable'};sceneToken='normal-continuation/'+(++normalSceneSerial);normalSceneTokens.set(c!,sceneToken);}
+  const out={status:'available',current:true,sceneToken,ready:c!.ready,owner:r!.owner,generation:r!.generation,layer:c!.layer,error:c!.error,
+   battleId:r!.battleOp===flow()._op&&r!.battleId===flow().request?.battleId?r!.battleId:null};
+  return valid()?out:{status:'unavailable'};
+ };
  const originalClose=flow().close;if(typeof originalClose==='function')flow().close=function(code:number,op:any){if(op&&active?.valid()&&active.request.battleOp===op&&active.request.battleId===op.request?.battleId){active.deferredClose={code,op};return;}return originalClose.call(this,code,op);};
  function tradeRequest(input?:{requestId:string;intent:any}):Request|null{const application=app(),q=application.pendingTrade;if(input&&application.encounterBlocked||!input&&!q)return null;return {application,generation:application.stateGeneration,owner:q?.token??'',trigger:false,trade:input??true,done:false};}
  function beginTradeUI(requestId:string,intent:any){retireOrphan();if(active||reserved||queued||G.SceneManager.isSceneChanging()||G.$gameMessage?.isBusy?.())return null;const r=tradeRequest({requestId,intent:structuredClone(intent)});if(!r)return null;if(intent.outgoingId)return open(r);reserved=r;r.selectorStage='selecting';const valid=()=>!r.done&&reserved===r&&r.application===flow()._app&&r.generation===r.application.stateGeneration;try{const opened=W.PSManagement.selectMember((m:any)=>valid()&&r.application.tradeCandidates(intent.requiredSpecies).some((c:any)=>c.memberId===m.id&&c.eligible),(result:any)=>{if(!valid())return;if(!result?.id){r.outcome={status:'cancelled',source:'selector'};retire(r,'cancelled');return;}if(r.trade&&r.trade!==true)r.trade.intent.outgoingId=result.id;r.selectorStage='ready';});if(!opened){retire(r,'selector-unavailable');return null;}r.selectorScene=G.SceneManager._nextScene??G.SceneManager._scene;return r;}catch(error){retire(r,String(error));return null;}}

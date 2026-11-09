@@ -37,8 +37,8 @@ test('offline authored100 policy and fixture compile against exact current produ
  const E=require('../../../js/engine/build/production.cjs');
  const r=entry(['--ps-flow-test=d2-normal-f100','--ps-d2-normal-stage=offline-prepare'],id=>id==='./js/engine/build/production.cjs'?E:require(id));
  assert.equal(r.error,undefined);assert.equal(r.W.PSNormalD2.policyCases,100);assert.equal(r.W.PSNormalD2.actualBattles,0);assert.equal(r.W.PSNormalD2.stateHostAttached,false);assert.equal(r.G.$gameSystem,undefined);
- assert.equal(r.W.PSNormalD2.sourceObserver,'UNAVAILABLE_PRODUCT_SESSION_SEAM');
- assert.equal(typeof E.session.readSessionRequestContext,'undefined','44ca source seam remains an honest blocker');
+ assert.equal(r.W.PSNormalD2.sourceObserver,'SESSION_SEAM_PRESENT_HOST_OBSERVERS_UNVERIFIED');
+ assert.equal(typeof E.session.readSessionRequestContext,'function','actual source seam exists without granting native admission');
 });
 test('legacy route allowlist matches current dispatcher without executing legacy modes',()=>{
  const source=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlowTest.ts'),'utf8'),dispatch=source.slice(source.indexOf('try { if(mode ==='));
@@ -47,7 +47,7 @@ test('legacy route allowlist matches current dispatcher without executing legacy
 test('valid binding bytes cannot substitute missing product source observation or acquire authority',()=>{
  const tools=A.createReviewedNormalTools(require),file=path.join(work,'binding.json'),nonce='1'.repeat(32);
  const b={version:'D2-native-qualification-binding-v1',stage:'QUALIFICATION',role:'candidate',mode:'natural',nonce,groupId:'qualification-candidate-'+nonce,sourceHead:'44ca0c2d008f929b990f65917a8965a6efed69a0',sourceTree:'30ce29df3d033ce1d083bfa4b6c037cd46dc9643',pairBytesSHA256:'2'.repeat(64),packageInventorySHA256:'3'.repeat(64),sharedBridgeSHA256:'4'.repeat(64),donorHash:tools.donorHash,presentationHash:tools.presentationHash,appRoot:'/compat/app',profileRoot:'/compat/profile',saveRoot:'/compat/save',outputRoot:'/compat/output',caseIds:tools.compileNavigation().cases.map(c=>c.id),budget:{caseMs:1000,runMs:100000},view:{width:816,height:624,dpr:2}};
- fs.writeFileSync(file,JSON.stringify(b));const E=require('../../../js/engine/build/production.cjs');
+ fs.writeFileSync(file,JSON.stringify(b));const production=require('../../../js/engine/build/production.cjs'),E={...production,session:{...production.session,readSessionRequestContext:undefined}}; // explicit missing-capability negative control
  const r=entry(['--ps-flow-test=d2-normal-f100','--ps-d2-normal-stage=native-qualification','--ps-d2-native-binding='+file],id=>id==='./js/engine/build/production.cjs'?E:require(id));
  assert.equal(r.error,undefined);let binds=0,writes=0;
  assert.throws(()=>r.W.PSNormalD2.consume({bindGroup(){binds++;}},{append(){writes++;}}),/source observation unavailable/);
