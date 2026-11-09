@@ -3,54 +3,60 @@
     "js/engine/build/content-cli.cjs": "16b6a3a2ff61898ff8854aa0289e76ea6b3c8d84c174c576826ba0e0d28ff28f",
     "js/engine/build/core.cjs": "e3099712d92dfab92cb6b9f5b15921ddfabaa3cb18927e4fd289e0d11139d725",
     "js/engine/build/custom-formats.cjs": "e9d8fdbd140cf691b3c18a7f56d600ae10db1d05fe798652987eb1f61a43580c",
-    "js/engine/build/engine.cjs": "e62b3f64b715f05bea2f466f10a30a1f33d4cc180f6882f832894c8c9b0e8d9c",
-    "js/engine/build/production.cjs": "145e95da53f635d618dafb299abf52938f2514cbb48aef84c44972ab338bb3b5",
-    "js/engine/build/public-presentation-Cz-BUXe3.js": "36d91b038323c3d9d0b2e94f42b0dccc3111562759d809cd5bd8f9812d8b4b6b",
-    "js/engine/build/session-BD3WRyZR.js": "720c250c70495196ee19f495bb80625e6ad7363dc88922ab9837849fcc21dc20",
-    "js/engine/build/testing.cjs": "f3640302415ad40b35ae6e6673c9017e1f39fe11a29df57997d6687561929db5",
-    "js/engine/build/trainer-ai-diagnostics-MOMkYoxO.js": "edbdc04674b38487df3fa4b9f582df2555c27f1c559536a73b791dfe4e2667d0",
+    "js/engine/build/engine.cjs": "5525dc88986b1059c4661c32c4fb73defa05264bf951a6e03dad0804499c1aac",
+    "js/engine/build/production.cjs": "6e5cb5afd2a6bcc0780bf0f6d043a8f88e30677f9901c21f25754ffa3068d757",
+    "js/engine/build/public-presentation--t89kf1n.js": "aba318835cda96565e6e18bcd06352dc77dbbbce639ae816777095d695be0065",
+    "js/engine/build/session-BIDGSl81.js": "43f9dc2040cb43641e7a9517052ca0f8e2dcdbd3f904d3460b10b12e6934ace6",
+    "js/engine/build/testing.cjs": "0ddc14a47024964a196384725ede9184631d3f6b03fa8cde33b4cb0b032a2ca2",
+    "js/engine/build/trainer-ai-diagnostics-LgW7rXGc.js": "67a1f8c995ae180da8a7a115c3e0bb016c99130bfc070403b194cdd73c5b0a95",
     "js/engine/showdown/SOURCE_SHA": "495b7f40c79b08384b2bb2be040edbc952be76fe18f8dff1a96f0fb949fc78ba"
   },
   "runtimeRebinding": {
-    "sourceCommit": "76ec28f3760a1a6676447e3b7fbcdaf2e163eed6",
-    "sourceTree": "84b779afd1618b7d1b01f1df449d551193207bdb",
-    "previousBindingSHA256": "1220e8addf589716da266a72b7dccde9b1e634aaf166e5473f97a180cdf8fe37",
+    "sourceCommit": "8431f3e8f4262aa5c07bf6daccdf5eeff7a22aa9",
+    "sourceTree": "9197532d8512ac81d3f91ad9c63654fcff340120",
+    "previousBindingSHA256": "839f43dd9be1d73bbe5509de13a024ee5bae3db807023c1e173404a18ff9aa02",
     "previousRebinding": {
-      "sourceCommit": "2cddae0752962b878b2e30ed75756736904b34f1",
-      "sourceTree": "f5d7308987657a9f06dd5c3b13c2e60f5467a594",
-      "previousBindingSHA256": "7b9a3cc6ec0609143b39ea05750216a8cb1fff833b033a03e5d83e420e0bd34d",
+      "sourceCommit": "76ec28f3760a1a6676447e3b7fbcdaf2e163eed6",
+      "sourceTree": "84b779afd1618b7d1b01f1df449d551193207bdb",
+      "previousBindingSHA256": "1220e8addf589716da266a72b7dccde9b1e634aaf166e5473f97a180cdf8fe37",
       "previousRebinding": {
-        "sourceCommit": "6d742ce500fd1632315bff24deffbcc8bd7208ef",
-        "sourceTree": "9bb23d230010c5238218341c83932327b9793f8a",
-        "previousBindingSHA256": "2a454f7867581692b36cf1c446dc847967da9129656d6a627adcda326843d95e",
+        "sourceCommit": "2cddae0752962b878b2e30ed75756736904b34f1",
+        "sourceTree": "f5d7308987657a9f06dd5c3b13c2e60f5467a594",
+        "previousBindingSHA256": "7b9a3cc6ec0609143b39ea05750216a8cb1fff833b033a03e5d83e420e0bd34d",
         "previousRebinding": {
-          "sourceCommit": "2c6214064a9406e8f79fde2883975e00231b641e",
-          "sourceTree": "cd097260a81afa3722a8a96dcb79b01167d8774b",
-          "previousBindingSHA256": "334041d72816b2660e41d92f4f0ece1502a741260146f482e108cc6301918510",
+          "sourceCommit": "6d742ce500fd1632315bff24deffbcc8bd7208ef",
+          "sourceTree": "9bb23d230010c5238218341c83932327b9793f8a",
+          "previousBindingSHA256": "2a454f7867581692b36cf1c446dc847967da9129656d6a627adcda326843d95e",
           "previousRebinding": {
-            "sourceCommit": "fac38f13a07feba9df86b5af2859ba8927cfd849",
-            "sourceTree": "8592a1e51794f50eceba9abca588e0e41e90a1dd",
-            "previousBindingSHA256": "76c69709d6cfd908314568d69f911673dfbd1ee12da8d5f59ba2de7a89ceecb6",
+            "sourceCommit": "2c6214064a9406e8f79fde2883975e00231b641e",
+            "sourceTree": "cd097260a81afa3722a8a96dcb79b01167d8774b",
+            "previousBindingSHA256": "334041d72816b2660e41d92f4f0ece1502a741260146f482e108cc6301918510",
             "previousRebinding": {
-              "sourceCommit": "2f006fa0bd9de327eeb82261e7cb5861f5c70d33",
-              "sourceTree": "f326be869d74361e701ee55eedcbed9cabe91bbe",
-              "previousBindingSHA256": "1883ee947aaf72241832c3276dcb1da7917edc4410d5c821c9cd645b4b2978cf",
+              "sourceCommit": "fac38f13a07feba9df86b5af2859ba8927cfd849",
+              "sourceTree": "8592a1e51794f50eceba9abca588e0e41e90a1dd",
+              "previousBindingSHA256": "76c69709d6cfd908314568d69f911673dfbd1ee12da8d5f59ba2de7a89ceecb6",
               "previousRebinding": {
-                "sourceCommit": "26e24a93ce318b625009e806d8125ccae356d67c",
-                "sourceTree": "548af7a7d5d2ffb453294572fa8fadbd1111e219",
-                "previousBindingSHA256": "0f020a82810ec18d2b4ab6f6e3b0e9db6ee877d2c3ded49aa4883ebbb9080398",
-                "reason": "Current combined field-fix bundles; host fixtures, policy and oracle unchanged"
+                "sourceCommit": "2f006fa0bd9de327eeb82261e7cb5861f5c70d33",
+                "sourceTree": "f326be869d74361e701ee55eedcbed9cabe91bbe",
+                "previousBindingSHA256": "1883ee947aaf72241832c3276dcb1da7917edc4410d5c821c9cd645b4b2978cf",
+                "previousRebinding": {
+                  "sourceCommit": "26e24a93ce318b625009e806d8125ccae356d67c",
+                  "sourceTree": "548af7a7d5d2ffb453294572fa8fadbd1111e219",
+                  "previousBindingSHA256": "0f020a82810ec18d2b4ab6f6e3b0e9db6ee877d2c3ded49aa4883ebbb9080398",
+                  "reason": "Current combined field-fix bundles; host fixtures, policy and oracle unchanged"
+                },
+                "reason": "Localized cant description only; current generated runtime identity, scenarios, seeds, assertions and business oracles unchanged"
               },
-              "reason": "Localized cant description only; current generated runtime identity, scenarios, seeds, assertions and business oracles unchanged"
+              "reason": "Combined reviewed cant feedback and opening state seed/faint count repair; current compiled identity only; business scenarios and oracles unchanged"
             },
-            "reason": "Combined reviewed cant feedback and opening state seed/faint count repair; current compiled identity only; business scenarios and oracles unchanged"
+            "reason": "Reviewed diagnostic classification integration only; new compiled identities, business contract fields unchanged"
           },
-          "reason": "Reviewed diagnostic classification integration only; new compiled identities, business contract fields unchanged"
+          "reason": "Rebuilt complete runtime after reviewed Sticky Barb transfer integration; no scenario, seed, oracle or runtime guard changes"
         },
-        "reason": "Rebuilt complete runtime after reviewed Sticky Barb transfer integration; no scenario, seed, oracle or runtime guard changes"
+        "reason": "Complete rebuilt reviewed held-item integration including native wild Knock Off; only identities change, scenarios, seeds, oracles and checks retained"
       },
-      "reason": "Complete rebuilt reviewed held-item integration including native wild Knock Off; only identities change, scenarios, seeds, oracles and checks retained"
+      "reason": "Normal held production release and strict explicit legacy no-held admission; scenarios, seeds and guards retained"
     },
-    "reason": "Normal held production release and strict explicit legacy no-held admission; scenarios, seeds and guards retained"
+    "reason": "Reviewed Transform growth and permanent public identity repair; current generated runtime identities only, scenarios, seeds, oracles and guards unchanged"
   }
 }
