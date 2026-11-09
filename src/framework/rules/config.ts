@@ -108,7 +108,7 @@ export function developmentCapabilities(raw: unknown = {}): DevelopmentCapabilit
 }
 
 /** Normal production policy is a code-reviewed release decision, never a runtime input.
- * B-3 development release is independently accepted on its exact branch; merging main is not a prerequisite.
+ * B-3 release admission is reviewed on the exact development branch; merging main is not a prerequisite.
  * One value controls both sources and battle admission so release wiring cannot open only one side.
  */
 const ORDINARY_HELD_ITEMS_RELEASED: boolean = true;

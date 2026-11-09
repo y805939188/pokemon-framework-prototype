@@ -11,7 +11,7 @@ async function host(source){
  const seed=fixture(source),work=fs.mkdtempSync(path.join(os.tmpdir(),'pf-h3-compiled-host-'));
  const PLAN={...basePlan,productCommit:plan.runtimeBase,productPlugins:Object.fromEntries(Object.keys(plugins).map(n=>[n,plan.files['js/plugins/'+n+'.js']]))};
  const h=createVictoryDriverHost({ROOT:runtime,work,plugins,entryText,driverText:'H3_SYNTHETIC_CONTROL_NOT_NATIVE',PLAN,options:{productionTranslator:true}});
- const flow=h.w.flow,G=h.G;flow.stateReplaced();flow._app=null;flow._content=seed.content;flow._dex=seed.dex;flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=true;flow.receiveOptions={mode:1,naming:1};flow.developerCapabilities={...capabilities};
+ const flow=h.w.flow,G=h.G;flow.stateReplaced();flow._app=null;flow._content=seed.content;flow._dex=seed.dex;flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=true;flow.receiveOptions={mode:1,naming:1};flow.developerCapabilities={};
  let current=clone(seed.state.read());const replaced=[];
  Object.defineProperty(G.$gameSystem,'_psGame',{configurable:true,enumerable:true,get:()=>current,set:next=>{current=next;replaced.push(clone(next));}});
  const state={read:()=>current,current:()=>current,replaced};const app=flow.app();await h.p.toMapId(5);
@@ -37,10 +37,9 @@ for(const source of plan.sources)test('H3 compiled formal host '+source+' -> Sce
  console.log('H3_COMPILED_HOST '+JSON.stringify({source,work:h.work,kind:plan.scope,battleId:raw.battleId,writes:1,sceneEnded:!flow.running,initialItem:'lumberry',finalItem:installed.party[0].item,NW:0}));
  }finally{if(flow.running)flow.abort(Error('owned H3 host cleanup'));}
 });
-test('H3 compiled default host gate refuses held entry before a Scene is created',async()=>{
- const h=await host('give'),before=clone(h.flow.game()),writes=h.w.state.replaced.length,scene=h.G.SceneManager._scene;
- h.flow.developerCapabilities={};h.flow._app=null;assert.throws(()=>h.flow.openBattle({battleId:'H3-HOST-CLOSED',kind:'trainer',trainer:{id:'h3-npc',version:1}}),/held-item-battle-disabled/);
- assert.equal(h.flow.running,false);assert.equal(h.G.SceneManager._scene,scene);assert.deepEqual(h.flow.game(),before);assert.equal(h.w.state.replaced.length,writes);
+test('H3 compiled normal host enters held battle without developer overrides',async()=>{
+ const h=await host('give'),before=clone(h.flow.game()),writes=h.w.state.replaced.length;
+ assert.deepEqual(h.flow.developerCapabilities,{});try{start(h,'H3-HOST-RELEASED');await h.p.inMode('main');assert(h.flow.running);assert.equal(h.p.battle()._session.party[0].item,'lumberry');assert.deepEqual(h.flow.game(),before);assert.equal(h.w.state.replaced.length,writes);}finally{if(h.flow.running)h.flow.abort(Error('owned normal entry cleanup'));}
 });
 test('H3 compiled Scene abort retires consumed working item without persistent changes',async()=>{
  const h=await host('give'),before=clone(h.flow.game()),writes=h.w.state.replaced.length;
@@ -48,15 +47,14 @@ test('H3 compiled Scene abort retires consumed working item without persistent c
  finally{if(h.flow.running)h.flow.abort(Error('owned H3 cleanup'));}
 });
 
-for(const injection of ['plugin-parameters','saved-host-fields'])test('H3 normal host does not grant held capability from '+injection,async()=>{
+for(const injection of ['plugin-parameters','saved-host-fields'])test('H3 normal host does not derive production policy from '+injection,async()=>{
  const h=await host('give'),before=clone(h.flow.game()),writes=h.w.state.replaced.length;
  h.flow.developerCapabilities={};h.flow._app=null;
  if(injection==='plugin-parameters'){const parameters=h.G.PluginManager.parameters;h.G.PluginManager.parameters=name=>({...parameters(name),allowHeldItemSources:'true',allowExperimentalHeldItemBattle:'true',developerCapabilities:JSON.stringify(capabilities)});}
  else {h.G.$gameSystem.developerCapabilities={...capabilities};h.G.$gameSystem._psDeveloperCapabilities={...capabilities};}
- assert.throws(()=>h.flow.openBattle({battleId:'H3-POLICY-CLOSED',kind:'trainer',trainer:{id:'h3-npc',version:1}}),/held-item-battle-disabled/);
- assert(!h.flow.running);assert.deepEqual(h.flow.game(),before);assert.equal(h.w.state.replaced.length,writes);
+ try{start(h,'H3-POLICY-RELEASED');await h.p.inMode('main');assert(h.flow.running);assert.deepEqual(h.flow.game(),before);assert.equal(h.w.state.replaced.length,writes);}finally{if(h.flow.running)h.flow.abort(Error('owned policy injection cleanup'));}
 });
-test('H3 normal closed policy permits taking old held item then an all-empty required battle',async()=>{
+test('H3 normal released policy permits taking old held item then an all-empty required battle',async()=>{
  const h=await host('give'),flow=h.flow;flow.developerCapabilities={};flow._app=null;
  const takeBefore=clone(flow.game()),takeWrites=h.w.state.replaced.length;
  const app=flow.app(),token=app.beginManagement(),takeRequest={kind:'take-item',source:{id:'P1',position:{kind:'party',index:0}}};

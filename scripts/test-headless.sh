@@ -257,6 +257,11 @@ SUITES=(
   experiments/step5/4/test-held-store.cjs
   experiments/step5/4/test-trainer-app-m1.cjs
   experiments/step5/4/test-obedience-m1.cjs
+  experiments/step5/4/h3-production-policy/test-release-sources.cjs
+  experiments/step5/4/h3-production-policy/test-release-cancel.cjs
+  experiments/step5/4/h3-production-policy/test-host.cjs
+  experiments/step5/4/h3-install-outcome/test-install.cjs
+  experiments/step5/4/h3-held-continue/test-continue.cjs
 )
 # Explicit policy exclusions, not skipped tests and never counted as passes.
 # There is no environment switch or automatic-runner option that enables this replay.
@@ -290,6 +295,11 @@ done
 pnpm --dir src typecheck:framework
 node scripts/check-boundaries.cjs
 pnpm --dir src build:distribution > /dev/null
+# Normal held-source release verifies the compiled host and fresh-process Continue, not only developer fixtures.
+for plugin in PS_BattleFlow PS_SaveState PS_Evolution PS_BattleFlowTest; do
+  RR_PLUGIN="$plugin" pnpm --dir src exec vite build > /dev/null
+done
+export H3_RUNTIME_ROOT="$ROOT"
 fail=0
 for s in "${SUITES[@]}"; do
   set +e

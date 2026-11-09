@@ -24,7 +24,7 @@ try{
  save();assert.equal(process.version,'v22.21.1');assert.equal(summary.nodeSHA256,'8179f1d4a920be531d81edef7a26df5cc5c9cb11c8b5a28fb336aa030fbfe3df');
  for(const [relative,expected]of Object.entries(PLAN.engine))assert.equal(sha(fs.readFileSync(path.join(ROOT,relative))),expected,'frozen runtime '+relative);
  const E=require(path.join(ROOT,'js/engine/build/production.cjs'));
- assert.deepEqual(E.config.runtimeCapabilities(),{allowHeldItemSources:false,allowExperimentalHeldItemBattle:false});summary.controls.push('actual default production capabilities remain false');
+ assert.deepEqual(E.config.runtimeCapabilities(),{allowHeldItemSources:true,allowExperimentalHeldItemBattle:true});summary.controls.push('actual default production capabilities are released');
  for(const c of PLAN.cases){
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-e-mz-slot-'));
   fs.writeFileSync(path.join(dir,'OWNED.json'),JSON.stringify({planVersion:PLAN.version,caseId:c.id}));
@@ -51,7 +51,7 @@ try{
   ]){const x=JSON.parse(JSON.stringify(a)),y=JSON.parse(JSON.stringify(b));mutate(x,y);assert.throws(()=>verifyChain(x,y),assert.AssertionError);summary.controls.push(c.id+': rejects changed '+name);}
   summary.cases.push({id:c.id,status:'PASS',firstPair,producerPID:a.pid,consumerPID:b.pid,ownedSaveDirectory:dir,settlements:c.abort?1:2,consumerAbort:!!c.abort});save();
  }
- assert.deepEqual(E.config.runtimeCapabilities(),{allowHeldItemSources:false,allowExperimentalHeldItemBattle:false});
+ assert.deepEqual(E.config.runtimeCapabilities(),{allowHeldItemSources:true,allowExperimentalHeldItemBattle:true});
  for(const [relative,expected]of Object.entries(PLAN.engine))assert.equal(sha(fs.readFileSync(path.join(ROOT,relative))),expected,'runtime unchanged '+relative);
  summary.status='PASS_CONTROLLED_CHAIN_ONLY';summary.ended=new Date().toISOString();save();console.log(JSON.stringify(summary,null,2));
 }catch(error){summary.status='FAIL_STOP';summary.error=String(error.stack??error);summary.ended=new Date().toISOString();save();console.error(summary.error);process.exitCode=1;}

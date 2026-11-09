@@ -22,9 +22,9 @@ async function run(stage,folder){
   assert.equal(loaded.party[0].item,'lumberry');assert.deepEqual(loaded.appliedBattles,{});
   const state={read:()=>g.$gameSystem._psGame,replace:next=>{writes++;g.$gameSystem._psGame=next;}};
   const app=new E.app.GameApplication({state,content:()=>({content:seed.content,dex:seed.dex}),sessions:E.composition.createBattleSessionFactory({content:()=>seed.content,seed:()=>[1,2,3,4]}),projection:T.fakes.createRecordingProjection(),random:()=>0,clock:()=>12345});
-  assert.equal(app.heldItemSourcesEnabled(),false);
+  assert.equal(app.heldItemSourcesEnabled(),true);
   const request={battleId:'H3-CONTINUE-DEFAULT',seq:1,trainer:{id:'h3-npc',version:1},canLose:true,expGain:false,moneyGain:false};
-  await assert.rejects(()=>app.startTrainerBattle(request),error=>{refusal=error.message;return /held-item-battle-disabled/.test(error.message);});
+  const heldSession=await app.startTrainerBattle(request);assert.equal(heldSession.party[0].item,'lumberry');assert((await heldSession.chooseMove(1)).ok);const used=await heldSession.chooseMove(2);assert(used.ok);assert(used.messages.flatMap(m=>m.kind==='events'?m.events:[]).some(e=>e.type==='-enditem'&&e.args[1]==='Lum Berry'));app.abortBattle(request,Error('normal loaded held consumption then technical abort'));
   assert.equal(writes,0);assert.deepEqual(state.read(),loaded);assert.equal(app.saveBlocked,false);
   const token=app.beginManagement(),bagBefore=E.inventory.aggregateBag(loaded.inventory),take={kind:'take-item',source:{id:loaded.party[0].id,position:{kind:'party',index:0}}};
   try{

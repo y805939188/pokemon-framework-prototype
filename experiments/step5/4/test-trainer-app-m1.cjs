@@ -133,7 +133,7 @@ test('A-M1 trainer query/start uses NPC owner, deterministic team, projections a
   assert.deepEqual(again.sessions.created[0].setup.foes, created.setup.foes);
 });
 
-test('A-M1 missing records and held NPC data fail before session creation; the original held gates stay closed', async () => {
+test('A-M1 missing records still reject while normal held NPC data enters', async () => {
   const missing = fakeApp();
   const before = JSON.stringify(missing.state.current());
   await assert.rejects(missing.app.startTrainerBattle(request('missing#1', { ...record, version: 99 })), /missing trainer record/);
@@ -144,7 +144,7 @@ test('A-M1 missing records and held NPC data fail before session creation; the o
   const heldSessions = E.composition.createBattleSessionFactory({ content: () => heldContent, seed: () => [1, 2, 3, 4] });
   const heldApp = new E.app.GameApplication({ state: heldState, sessions: heldSessions, projection: K.createRecordingProjection(), content: () => ({ content: heldContent, dex: E.dex.createDexLookup() }), random: lcg(9), clock: () => 1234567 });
   const heldBefore = JSON.stringify(heldState.current());
-  await assert.rejects(heldApp.startTrainerBattle(request('held#1', heldNpc)), /held-item-battle-disabled/);
+  const heldRequest=request('held#1',heldNpc), heldSession=await heldApp.startTrainerBattle(heldRequest);assert(heldSession);heldApp.abortBattle(heldRequest,Error('normal held admission cleanup'));
   assert.equal(JSON.stringify(heldState.current()), heldBefore);
   const ordinary = fakeApp();
   await ordinary.app.startTrainerBattle(request('missing#2', { ...record, version: 99 })).catch(() => {});

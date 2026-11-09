@@ -886,7 +886,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       op.facts.moneyGain = moneyGain ?? true;
       const game = this.ports.state.read(); assertCurrent();
       if (!this.capabilities.allowExperimentalHeldItemBattle && game.party.some((m) => !!m.item)) throw new Error("held-item-battle-disabled: battle item write-back is incomplete");
-      if (settlementSource?.mode === "legacy-no-held" && (this.legacyHeldRequested)) throw new Error("legacy-no-held-source-gate");
+      if (settlementSource?.mode === "legacy-no-held" && (this.legacyHeldRequested || game.party.some(m => !!m.item))) throw new Error("legacy-no-held-source-gate");
       const { content, dex } = this.ports.content(); assertCurrent();
       const trainer = request.trainer ? findTrainerRecord(content, request.trainer.id, request.trainer.version) : null;
       if (request.trainer && (request.kind !== "trainer" || !trainer)) throw new Error(`missing trainer record "${request.trainer.id}" version ${request.trainer.version}`);

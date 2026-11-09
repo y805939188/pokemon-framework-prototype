@@ -163,10 +163,10 @@ test('B PD6: actual trainer prize then Pay Day cap independently, multiply once,
     const after=J(w.state.current());assert.equal(w.app.finishBattle(h,req).commit,'already-applied');assert.deepEqual(w.state.current(),after);assert.equal(w.state.replaced.length,1);
   }
 });
-test('B held foe/identity gate: only-foe-held is gated; canonical valid foe works; alias refuses at content gate',async()=>{
+test('B held foe/identity gate: only-foe-held normally enters; canonical valid foe works; alias refuses at content gate',async()=>{
   const supplied=npcContent({held:'oranberry'}),req={battleId:'B-foe-held',trainer:{id:'held-npc',version:0},seq:1,canLose:true};
   const closed=fixture({supplied,capabilities:{allowHeldItemSources:false,allowExperimentalHeldItemBattle:false}}),before=J(closed.state.current());
-  await assert.rejects(closed.app.startTrainerBattle(req),/held-item-battle-disabled/);assert.deepEqual(closed.state.current(),before);assert.equal(closed.state.replaced.length,0);
+  const opened=await closed.app.startTrainerBattle(req);assert(opened);assert.deepEqual(closed.state.current(),before);assert.equal(closed.state.replaced.length,0);closed.app.abortBattle(req,Error('normal admitted entry cleanup'));
   const normal=fixture({supplied}),h=await normal.app.startTrainerBattle(req);await h.chooseMove(2);assert.equal(normal.app.finishBattle(h,req).commit,'applied');assert.equal(normal.state.replaced.length,1);
   assert.throws(()=>npcContent({held:'left-overs'}),/canonical held item id/);
 });

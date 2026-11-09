@@ -7,7 +7,7 @@ for(const mode of ['complete-then-throw','party-only-then-throw'])test('H3 consu
  const seed=fixture('give');await acquireReady(seed);let current=clone(seed.state.read()),writes=0,candidate;
  const before=clone(current);assert.equal(before.party[0].item,'lumberry');
  const state={read:()=>current,replace:next=>{writes++;candidate=clone(next);current=mode==='complete-then-throw'?clone(next):{...clone(current),party:clone(next.party)};throw Error('controlled '+mode);}};
- const app=new E.app.GameApplication({state,content:()=>({content:seed.content,dex:seed.dex}),sessions:E.composition.createBattleSessionFactory({content:()=>seed.content,seed:()=>[1,2,3,4]}),projection:T.fakes.createRecordingProjection(),random:()=>0,clock:()=>12345},{capabilities});
+ const app=new E.app.GameApplication({state,content:()=>({content:seed.content,dex:seed.dex}),sessions:E.composition.createBattleSessionFactory({content:()=>seed.content,seed:()=>[1,2,3,4]}),projection:T.fakes.createRecordingProjection(),random:()=>0,clock:()=>12345});
  const request={battleId:'H3-INSTALL-'+mode,seq:1,trainer:{id:'h3-npc',version:1},canLose:true,expGain:false,moneyGain:true};
  const s=await app.startTrainerBattle(request);assert((await s.chooseMove(1)).ok);const rest=await s.chooseMove(2);assert(rest.ok);
  assert.equal(rest.messages.flatMap(m=>m.kind==='events'?m.events:[]).filter(e=>e.type==='-enditem'&&e.args[1]==='Lum Berry').length,1);
