@@ -589,11 +589,25 @@ export class BattleGateway implements BattleDriver {
     const before = { level: p.level, maxhp: p.maxhp, hp: p.hp };
     p.set.level = level; p.level = level;
     if (evs) p.set.evs = { ...evs };
-    const stats: Stats = b.spreadModify(p.species.baseStats, p.set);
+    // WP42 §4.2: Transform keeps its copied battle stats while the original member grows.
+    // The engine retains that original species in baseSpecies; species is the copied target.
+    const growthSpecies = p.transformed ? p.baseSpecies : p.species;
+    const stats: Stats = b.spreadModify(growthSpecies.baseStats, p.set);
     p.baseStoredStats = stats;
-    for (const k of Object.keys(p.storedStats)) p.storedStats[k] = stats[k as keyof Stats];
-    p.speed = p.storedStats.spe;
-    p.updateMaxHp(); // engine's own HP rule: current HP keeps its distance from max
+    if (!p.transformed) {
+      for (const k of Object.keys(p.storedStats)) p.storedStats[k] = stats[k as keyof Stats];
+      p.speed = p.storedStats.spe;
+    }
+    // updateMaxHp reads species itself. Select the permanent HP basis only for this synchronous
+    // native calculation, retaining its HP delta/fainted rule and notification. Never change the
+    // copied types, ability or stats, and restore the visible species even if notification throws.
+    const battleSpecies = p.species;
+    try {
+      p.species = growthSpecies;
+      p.updateMaxHp();
+    } finally {
+      p.species = battleSpecies;
+    }
     p.details = p.getUpdatedDetails ? p.getUpdatedDetails() : p.details;
     if (expect && expect.stats) {
       for (const k of Object.keys(expect.stats) as (keyof Stats)[]) {
