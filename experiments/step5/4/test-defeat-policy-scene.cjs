@@ -60,3 +60,27 @@ for(const initial of [false,true])test('R2 unchanged duplicate is rejected witho
   await assert.rejects(h.w.flow.begin(),/a battle is already open/);const before=h.w.flow.game().stats.blacked_out_count;await h.p.fightUntilEnd();h.s.onMenuOk();await h.frames(3);assert.equal(h.w.flow.lastOutcome.commit,'applied');assert.equal(h.w.flow.game().stats.blacked_out_count-before,initial?0:1);assert.equal(!!h.w.flow.lastOutcome.blackout,!initial);
  }finally{h.cleanup();}
 });
+
+// T28's post-commit recovery boundary, made portable without claiming native transfer/Title.
+for(const fault of ['message','translation','message-and-transfer','transfer-twice'])test('D3 committed defeat survives '+fault+' without a second settlement',async()=>{
+ const h=await open({trainer:false,losing:true,canLose:false,beforeOpen:({w})=>w.flow.game().badges.fill(false)});
+ const flow=h.w.flow,G=h.G,add=G.$gameMessage.add,translator=flow.translator,reserve=G.$gamePlayer.reserveTransfer;
+ let doc=G.$gameSystem._psGame,installs=0,transfers=0,remaining=fault==='transfer-twice'?2:fault==='message-and-transfer'?1:0;
+ Object.defineProperty(G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+ G.$gamePlayer.reserveTransfer=function(...args){transfers++;if(remaining>0){remaining--;throw Error('D3 controlled transfer failure');}return reserve.apply(this,args);};
+ try{
+  const before=JSON.parse(h.before);await h.p.fightUntilEnd();assert.equal(h.s._session.ended.winner,'Wild');assert.equal(JSON.stringify(flow.game()),h.before);assert.equal(installs,0);
+  if(fault.startsWith('message'))G.$gameMessage.add=()=>{throw Error('D3 controlled message failure');};
+  if(fault==='translation')flow.translator=()=>{throw Error('D3 controlled translation failure');};
+  h.s.onMenuOk();await h.frames(3);G.$gameMessage.add=add;flow.translator=translator;
+  const outcome=flow.lastOutcome,settled=JSON.stringify(flow.game());assert.deepEqual([outcome.code,outcome.commit,outcome.blackout],[4,'applied',true]);assert.equal(outcome.defeat.moneyLost,40);assert.equal(flow.game().money,960);assert.equal(installs,1);assert.equal(flow.game().stats.blacked_out_count-before.stats.blacked_out_count,1);assert.equal(Object.keys(flow.game().appliedBattles).length,Object.keys(before.appliedBattles).length+1);assert(flow.game().party[0].hp>1);assert.equal(flow.game().party[0].status,'');assert(flow.game().party[0].moves.every(m=>m.pp===m.maxpp));assert.equal(flow.running,false);
+  assert.deepEqual(Array.from(outcome.hostErrors||[],e=>e.step),fault==='transfer-twice'?[]:['message']);
+  if(fault!=='transfer-twice')assert.match(outcome.hostErrors[0].error,/D3 controlled (message|translation) failure/);
+  const failedTrip=fault==='message-and-transfer'||fault==='transfer-twice';assert.equal(flow.lastReturn.status,failedTrip?'failed':'requested');assert.equal(!!flow.pendingReturn,failedTrip);assert.equal(transfers,1);
+  // A duplicate Scene terminal callback and a duplicate result cannot reapply money, stats or ledger.
+  h.s.onEnd();assert.equal(installs,1);assert.equal(transfers,1);assert.equal(flow.commit(flow.lastResult),'already-applied');assert.equal(JSON.stringify(flow.game()),settled);assert.equal(installs,1);
+  if(fault==='transfer-twice'){assert.equal(flow.retryReturnHome().status,'failed');assert(flow.pendingReturn);assert.equal(JSON.stringify(flow.game()),settled);assert.equal(installs,1);}
+  if(failedTrip){assert.equal(flow.retryReturnHome().status,'requested');assert.equal(flow.pendingReturn,null);}
+  assert.equal(flow.retryReturnHome().status,'none');assert.equal(transfers,fault==='transfer-twice'?3:failedTrip?2:1);assert.equal(JSON.stringify(flow.game()),settled);assert.equal(installs,1);
+ }finally{G.$gameMessage.add=add;flow.translator=translator;G.$gamePlayer.reserveTransfer=reserve;h.cleanup();}
+});
