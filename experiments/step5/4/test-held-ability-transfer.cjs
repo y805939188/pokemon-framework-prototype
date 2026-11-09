@@ -117,7 +117,11 @@ function expectJournal(sample, c, success) {
     resolved.pairHash);
 }
 
-async function check(c) {
+async function check(c, t) {
+  // The paired native runs must share a clock as well as a seed. Otherwise crossing a real
+  // second changes only |t:| and fails the exact raw-message comparison nondeterministically.
+  const now = 1794220000000;
+  t.mock.method(Date, 'now', () => now);
   const sample = await open(c, true), control = await open(c, false);
   const before = observe(sample.gw);
   assert.deepEqual(before, observe(control.gw));
@@ -125,6 +129,9 @@ async function check(c) {
   const messages = await turn(sample.gw), controlMessages = await turn(control.gw);
   const after = observe(sample.gw), events = protocolEvents(messages);
   assert.deepEqual(after, observe(control.gw), 'held observation preserves HP/PP/status/items/PRNG');
+  const times = protocolEvents(messages).filter(event => event.type === 't:');
+  assert(times.length > 0, 'the native stream still carries its timestamp');
+  assert(times.every(event => event.raw === '|t:|' + now / 1000), 'the paired native clock is fixed, not omitted');
   assert.deepEqual(messages, controlMessages, 'held observation preserves the native message stream');
   assert.equal(after.ended, false, 'the triggering turn is not a synthetic terminal shortcut');
   for (const side of sides) {
@@ -179,12 +186,12 @@ for (const ability of ['Magician', 'Pickpocket']) {
     for (const receiverSide of sides) {
       for (const failure of [null, 'occupied', 'sticky-hold', 'empty-donor', 'protect']) {
         const title = `${ability} ${wild ? 'wild' : 'trainer'} ${receiverSide} receives: ${failure ?? 'successful transfer'}`;
-        test('held ability: ' + title, { concurrency: false }, () => check({ ability, wild, receiverSide, failure }));
+        test('held ability: ' + title, { concurrency: false }, t => check({ ability, wild, receiverSide, failure }, t));
       }
       test(`held ability: ${ability} ${wild ? 'wild' : 'trainer'} ${receiverSide} noncontact damage`,
-        { concurrency: false }, () => check({ ability, wild, receiverSide, noncontact: true }));
+        { concurrency: false }, t => check({ ability, wild, receiverSide, noncontact: true }, t));
       if (ability === 'Magician') test(`held ability: Magician ${wild ? 'wild' : 'trainer'} ${receiverSide} status move`,
-        { concurrency: false }, () => check({ ability, wild, receiverSide, failure: 'status' }));
+        { concurrency: false }, t => check({ ability, wild, receiverSide, failure: 'status' }, t));
     }
   }
 }
