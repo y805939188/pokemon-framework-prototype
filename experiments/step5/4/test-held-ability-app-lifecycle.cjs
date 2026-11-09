@@ -206,7 +206,7 @@ if (process.argv[2] === '--read-save') {
   const supplied = assemble(c), store = storeAt(file, supplied.content), before = fs.readFileSync(file), installs = [];
   const { app, state } = makeApp(supplied, store, installs, false);
   assert.deepEqual(state.read(), installed, 'fresh process reconstructs all installed state and pair ledger');
-  assert.equal(app.heldItemSourcesEnabled(), false, 'loaded evidence does not enable development capability');
+  assert.equal(app.heldItemSourcesEnabled(), true, 'normal released capability is available without loading developer overrides');
   assert.equal(app.commitResult(raw), 'already-applied');
   assert.equal(store.commit(raw).status, 'already-applied');
   assert.equal(installs.length, 0);

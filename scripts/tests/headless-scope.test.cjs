@@ -52,7 +52,7 @@ esac
   fs.writeFileSync(path.join(dir, 'bin/pnpm'), `#!/bin/bash
 printf 'pnpm %s\\n' "$*" >> "$CONTROL_LOG"
 case "$*" in
-  '--dir src typecheck:framework'|'--dir src build:distribution') exit "\${CONTROL_PREFLIGHT_RC:-0}" ;;
+  '--dir src typecheck:framework'|'--dir src build:distribution'|'--dir src exec vite build') exit "\${CONTROL_PREFLIGHT_RC:-0}" ;;
   *) exit 93 ;;
 esac
 `, { mode: 0o755 });
