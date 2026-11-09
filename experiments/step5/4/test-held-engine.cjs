@@ -128,7 +128,6 @@ test('B engine: unknown direct held write poisons the whole channel, rather than
 
 test('B effective Gen8 unsupported transfer/removal families refuse the complete terminal channel',async()=>{
  const inputs=[
-  {p:set('P1','Snorlax',['Corrosive Gas']),f:set('F1','Snorlax',['Splash'],'leftovers')},
   {p:{...set('P1','Delphox',['Tackle']),ability:'Magician'},f:set('F1','Snorlax',['Splash'],'leftovers')},
   {p:set('P1','Snorlax',['Tackle'],'leftovers'),f:{...set('F1','Weavile',['Splash']),ability:'Pickpocket'}},
   {p:{...set('P1','Snorlax',['Splash']),ability:'Pickup'},f:set('F1','Snorlax',['Splash'],'oranberry')},

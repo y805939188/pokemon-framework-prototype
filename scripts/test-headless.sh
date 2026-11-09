@@ -249,6 +249,7 @@ SUITES=(
   experiments/step5/4/test-held-harvest-facts.cjs
   experiments/step5/4/test-held-harvest-recovery.cjs
   experiments/step5/4/test-held-engine.cjs
+  experiments/step5/4/test-held-corrosivegas.cjs
   experiments/step5/4/test-held-app.cjs
   experiments/step5/4/test-held-store.cjs
   experiments/step5/4/test-trainer-app-m1.cjs
