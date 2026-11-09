@@ -598,17 +598,18 @@ export class BattleGateway implements BattleDriver {
       for (const k of Object.keys(p.storedStats)) p.storedStats[k] = stats[k as keyof Stats];
       p.speed = p.storedStats.spe;
     }
-    // updateMaxHp reads species itself. Select the permanent HP basis only for this synchronous
-    // native calculation, retaining its HP delta/fainted rule and notification. Never change the
-    // copied types, ability or stats, and restore the visible species even if notification throws.
+    // Both native helpers read species. Select the permanent basis for HP and public details:
+    // Transform never replaces details, which later switch messages and side requests reuse.
+    // Retain the native HP delta/fainted rule and notification without changing copied types,
+    // ability or stats; restore the visible battle species even if either helper throws.
     const battleSpecies = p.species;
     try {
       p.species = growthSpecies;
       p.updateMaxHp();
+      p.details = p.getUpdatedDetails ? p.getUpdatedDetails() : p.details;
     } finally {
       p.species = battleSpecies;
     }
-    p.details = p.getUpdatedDetails ? p.getUpdatedDetails() : p.details;
     if (expect && expect.stats) {
       for (const k of Object.keys(expect.stats) as (keyof Stats)[]) {
         if (stats[k] !== expect.stats[k]) throw new Error(`stat mismatch for ${id}.${k}: engine ${stats[k]} vs game ${expect.stats[k]}`);

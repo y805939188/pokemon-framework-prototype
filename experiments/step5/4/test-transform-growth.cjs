@@ -27,9 +27,20 @@ async function open({levelUp = true, expGain = true} = {}) {
     sessions:E.composition.createBattleSessionFactory({content:()=>content, seed:()=>[1,2,3,4]}), content:()=>({content}), random:()=>0, clock:()=>12345});
   const request = {battleId:'transform-growth-'+levelUp+'-'+expGain, trainer:{id:'c-basic',version:1}, seq:1, canLose:true, expGain};
   const s = await app.startTrainerBattle(request); s.take();
+  const originalDetails=s.currentRequest().side.pokemon.find(p=>p.ident==='p1: P1').details;
   const growthCalls=[], apply=s.gw.applyGrowth.bind(s.gw);
   s.gw.applyGrowth=(...args)=>{const result=apply(...args); growthCalls.push(clone(result)); return result;};
-  return {app,s,state,initial,request,content,growthCalls};
+  return {app,s,state,initial,request,content,growthCalls,originalDetails};
+}
+function permanentDetails(w) {
+  assert.match(w.originalDetails,/^Ditto, L50(?:,|$)/);
+  return w.originalDetails.replace(', L50',', L'+w.s.party[0].level);
+}
+function assertPublicDetails(w) {
+  const expected=permanentDetails(w); assert.equal(actor(w).details,expected);
+  for(const request of [w.s.currentRequest(),w.s.gw.awaitingChoice('p1')]) {
+    if(request?.side) assert.equal(request.side.pokemon.find(p=>p.ident==='p1: P1').details,expected);
+  }
 }
 function unchanged(w) { assert.deepEqual(w.state.read(),w.initial); assert.equal(w.state.replaced.length,0); }
 async function transform(w) {
@@ -55,7 +66,7 @@ function preserved(w, prior) {
   assert.deepEqual(w.s.gw.readState('p1').find(m=>m.id==='P1').stats,permanent);
   assert.equal(p.maxhp,permanent.hp); assert.equal(p.level,m.level);
   for(const call of w.growthCalls) assert.equal(call.after.hp,E.growth.hpAfterRecalc(call.before.hp,call.before.maxhp,call.after.maxhp));
-  assert.deepEqual(Object.keys(w.s.gw.readState('p1')[0].pp),['transform']); unchanged(w);
+  assert.deepEqual(Object.keys(w.s.gw.readState('p1')[0].pp),['transform']); assertPublicDetails(w); unchanged(w);
 }
 for (const levelUp of [false,true]) test('Transform KO '+(levelUp?'level-up':'same-level EV/EXP')+' preserves copied stats and commits only permanent growth',async()=>{
   const w = await open({levelUp});
@@ -75,11 +86,16 @@ for (const levelUp of [false,true]) test('Transform KO '+(levelUp?'level-up':'sa
     w.app.finishBattle(w.s,w.request); assert.equal(w.state.replaced.length,1); assert.deepEqual(w.state.read(),saved);
   } finally { w.app.abortBattle(w.request,Error('owned Transform growth cleanup')); }
 });
-test('Transform growth restores grown natural stats on switch-back and abort leaves persistence untouched',async()=>{
+for(const restore of [false,true]) test('Transform growth restores natural stats and public identity on switch-back, checkpoint='+restore,async()=>{
   const w = await open();
   try {
     const prior = await transform(w); await knockout(w); preserved(w,prior);
-    assert((await w.s.chooseSwitch('P2')).ok); assert((await w.s.chooseSwitch('P1')).ok);
+    if(restore) { await w.s._restoreCheckpoint(w.s._checkpoint()); preserved(w,prior); }
+    assert((await w.s.chooseSwitch('P2')).ok); assertPublicDetails(w);
+    const back=await w.s.chooseSwitch('P1'); assert(back.ok);
+    const switches=back.messages.flatMap(m=>m.events??[]).filter(e=>e.type==='switch'&&e.args[0]==='p1a: P1');
+    assert.equal(switches.length,1); assert.equal(switches[0].args[1],permanentDetails(w));
+    assertPublicDetails(w);
     const p=actor(w), expected=permanentStats(w,w.s.party[0]);
     assert.equal(p.transformed,false); assert.equal(p.species.name,'Ditto');
     assert.deepEqual(statsOf(p),Object.fromEntries(Object.entries(expected).filter(([k])=>k!=='hp')));
