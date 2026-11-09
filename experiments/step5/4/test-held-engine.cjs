@@ -129,7 +129,6 @@ test('B engine: unknown direct held write poisons the whole channel, rather than
 test('B effective Gen8 unsupported transfer/removal families refuse the complete terminal channel',async()=>{
  const inputs=[
   {p:set('P1','Snorlax',['Corrosive Gas']),f:set('F1','Snorlax',['Splash'],'leftovers')},
-  {p:set('P1','Snorlax',['Tackle']),f:set('F1','Snorlax',['Splash'],'stickybarb')},
   {p:{...set('P1','Delphox',['Tackle']),ability:'Magician'},f:set('F1','Snorlax',['Splash'],'leftovers')},
   {p:set('P1','Snorlax',['Tackle'],'leftovers'),f:{...set('F1','Weavile',['Splash']),ability:'Pickpocket'}},
   {p:{...set('P1','Snorlax',['Splash']),ability:'Pickup'},f:set('F1','Snorlax',['Splash'],'oranberry')},
@@ -185,4 +184,24 @@ test('B-ULTRA-05 same opaque checkpoint after switching/Illusion preserves compl
       assert.equal(restored._debugBattle().prng.getSeed(),s.gw._debugBattle().prng.getSeed());
     }
   }
+});
+
+for(const wild of [false,true])for(const direction of ['foe-to-player','player-to-foe'])test(`Sticky Barb natural contact ${direction} ${wild?'wild':'trainer'} has complete required facts`,async()=>{
+ const forward=direction==='foe-to-player';
+ const sample=await create({wild,p:set('P1','Snorlax',['Tackle','Hyper Beam','Splash'],forward?'':'stickybarb',100),f:set('F1','Snorlax',[forward?'Splash':'Tackle'],forward?'stickybarb':'',50)});
+ await turn(sample.gw,forward?'move 1':'move 3');
+ for(let i=0;i<12&&!sample.gw.ended;i++)await turn(sample.gw,'move 2');
+ assert(sample.gw.ended,'natural terminal, no diagnostic tie');const facts=await finish(sample,false);
+ const p=facts.members.find(m=>m.id==='P1'),f=facts.members.find(m=>m.id==='F1');
+ assert.equal(p.current,forward?'stickybarb':'');assert.equal(f.current,forward?'':'stickybarb');
+ assert.equal(p.recovery,forward?(wild?'stickybarb':''):'stickybarb');assert.equal(f.recovery,forward?(wild?'':'stickybarb'):'');
+ assert.equal(p.recycle,'');assert.equal(f.recycle,'');assert(!facts.events.some(e=>e.reason==='consume'||e.reason==='consume-no-recycle'));
+ const gain=facts.events.find(e=>e.id===(forward?'P1':'F1')&&['permanent-gain','temporary-receive'].includes(e.reason));
+ assert(gain);assert.equal(gain.sourceId,forward?'F1':'P1');
+});
+for(const occupied of [false,true])test(`Sticky Barb normal nontransfer ${occupied?'occupied receiver':'noncontact'} remains valid`,async()=>{
+ const sample=await create({p:set('P1','Snorlax',['Swift','Hyper Beam','Tackle'],occupied?'leftovers':'',100),f:set('F1','Snorlax',['Splash'],'stickybarb',50)});
+ await turn(sample.gw,occupied?'move 3':'move 1');for(let i=0;i<12&&!sample.gw.ended;i++)await turn(sample.gw,'move 2');assert(sample.gw.ended);
+ const facts=await finish(sample,false);assert.equal(facts.members.find(m=>m.id==='P1').current,occupied?'leftovers':'');assert.equal(facts.members.find(m=>m.id==='F1').current,'stickybarb');
+ assert(!facts.events.some(e=>['permanent-gain','temporary-receive','transfer-release'].includes(e.reason)));
 });

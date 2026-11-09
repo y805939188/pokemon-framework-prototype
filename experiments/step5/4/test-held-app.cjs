@@ -10,7 +10,7 @@ function content(extra = {}, foeMove = 'splash') {
   input.species.find(s => s.id === 'snorlax').learnset = ['trick','payday','happyhour','splash'].map(move => ({level:1,move}));
   input.species.find(s => s.id === 'pidgey').learnset = [{level:1,move:foeMove}];
   input.items = Object.values(E.itemCatalog.legacyCatalog()).map(item=>({...item,source:'author-placeholder'}));
-  for(const id of ['amuletcoin','luckincense','airballoon'])input.items.push({id,name:id,namePlural:id,pocket:1,price:0,source:'author-placeholder'});
+  for(const id of ['amuletcoin','luckincense','airballoon','stickybarb'])input.items.push({id,name:id,namePlural:id,pocket:1,price:0,source:'author-placeholder'});
   Object.assign(input,extra);
   const compiled = E.contentCompile.compileContent(input); assert.equal(compiled.ok,true,JSON.stringify(compiled.errors));
   const dex = E.dex.createDexLookup(), runtime = E.contentRuntime.assembleContent(compiled.data,dex); assert.deepEqual(runtime.errors,[]);
@@ -261,4 +261,22 @@ test('HF06/11 legacy installed completion is not a zero-write cancel; original e
   assert.equal(w.app.finishBattle(h,w.raw).commit,'applied');const installed=J(w.state.current());
   assert.equal(w.app.finishBattle(h,w.raw).commit,'already-applied');assert.equal(w.produced(),1);
   assert.equal(w.state.replaced.length,1);assert.deepEqual(w.state.current(),installed);assert.equal(w.app.saveBlocked,false);
+});
+
+// Wild item generation is a separate source feature; engine tests cover wild recovery semantics.
+for(const wild of [false])for(const forward of [false,true])test(`Sticky Barb App normal settlement ${wild?'wild':'trainer'} ${forward?'incoming':'outgoing'}`,async()=>{
+ const species=read('species');species.find(s=>s.id==='snorlax').learnset=['tackle','hyperbeam','splash'].map(move=>({level:1,move}));
+ const type={id:'barb-type',nameKey:'trainer.barb',gender:0,baseMoney:0,skillLevel:0,flags:[],items:[],battleBgm:'',victoryBgm:'',introBgm:'',openingText:'',winText:'',loseText:'',source:'author-placeholder'};
+ const foe={species:'snorlax',level:20,moves:[forward?'splash':'tackle'],...(forward?{item:'stickybarb'}:{})};
+ const supplied=content({species,trainerTypes:[type],trainers:[{id:'barb-npc',type:type.id,name:'Barb NPC',version:0,source:'author-placeholder',items:[],party:[foe]}]});
+ const w=fixture({supplied,item:forward?'':'stickybarb'}),before=J(w.state.read());
+ const req={battleId:'B-barb-'+wild+'-'+forward,seq:1,canLose:true,expGain:false,moneyGain:false,...(wild?{kind:'wild',foes:[foe]}:{trainer:{id:'barb-npc',version:0}})};
+ const h=wild?await w.app.startBattle(req):await w.app.startTrainerBattle(req);
+ assert((await h.chooseMove(forward?1:3)).ok);for(let i=0;i<12&&!h.finished;i++)assert((await h.chooseMove(2)).ok);assert(h.finished);
+ assert.deepEqual(w.state.read(),before);assert.equal(w.state.replaced.length,0);const raw=J(h.result()),out=w.app.finishBattle(h,req);
+ assert.equal(out.commit,'applied',JSON.stringify(out));assert.equal(w.state.replaced.length,1);
+ assert.equal(w.state.read().party[0].item,forward?(wild?'stickybarb':''):'stickybarb');
+ assert.deepEqual(w.state.read().inventory,before.inventory);assert.equal(w.state.read().money,before.money);
+ assert.equal(w.state.read().appliedBattles[raw.battleId].hash,E.state.resultHash(raw));assert.match(w.state.read().appliedBattles[raw.battleId].settlement.pairHash,/^[a-f0-9]{64}$/);
+ const after=J(w.state.read());assert.equal(w.app.finishBattle(h,req).commit,'already-applied');assert.equal(w.state.replaced.length,1);assert.deepEqual(w.state.read(),after);
 });
