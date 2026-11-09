@@ -252,6 +252,7 @@ SUITES=(
   experiments/step5/4/test-held-corrosivegas.cjs
   experiments/step5/4/test-held-pickup.cjs
   experiments/step5/4/test-held-ability-transfer.cjs
+  experiments/step5/4/test-held-ability-app-lifecycle.cjs
   experiments/step5/4/test-held-app.cjs
   experiments/step5/4/test-held-store.cjs
   experiments/step5/4/test-trainer-app-m1.cjs
