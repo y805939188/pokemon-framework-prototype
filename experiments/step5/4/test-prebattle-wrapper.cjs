@@ -18,6 +18,7 @@ test.before(async()=>{
   const code=plugins.PS_BattleFlow,mode=process.env.PF_PREBATTLE_MUTATION;
   if(mode==='early-handoff'){const marker='elapsed >= this.plan.afterMs';assert.equal(code.split(marker).length,2);plugins.PS_BattleFlow=code.replace(marker,'elapsed >= 0');}
   else if(mode==='omit-return-wait'){const marker='this.stage("return-pending", this.now());';assert.equal(code.split(marker).length,2);plugins.PS_BattleFlow=code.replace(marker,'this.stage("done", this.now());');}
+  else if(mode==='same-tick-autosave'){const marker='if (!saved.doneObserved)';assert.equal(code.split(marker).length,2);plugins.PS_BattleFlow=code.replace(marker,'if (false)');}
   else throw Error('unknown prebattle mutation');
  }
 });
@@ -65,15 +66,15 @@ test('allocation, drawing and scene handoff failures preserve the first failure 
   assert.equal(h.op.phaseName,'failed');assert.equal(h.errors[0],primary);assert(!h.op.pending());if(h.layers.length)assert.equal(h.layers[0].disposed,1);
  }
 });
-function world(){return createVictoryDriverHost({ROOT,work:temp,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true}});}
+function world(options={}){return createVictoryDriverHost({ROOT,work:temp,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true,...options}});}
 test('actual installed AudioManager BGS stop/resume does not overwrite a later channel',()=>{
  const h=world(),A=h.A,G=h.G,track={name:'Rain',volume:75,pitch:100,pan:0};
  A.playBgs(track);const pause=adapter.capturePrebattleBGSMZ(G,()=>true);assert(pause);pause.pause();assert.equal(A._bgsBuffer,null);pause.restore();assert.equal(A._currentBgs.name,'Rain');const resumed=A._bgsBuffer;pause.restore();assert.equal(A._bgsBuffer,resumed);
  const next=adapter.capturePrebattleBGSMZ(G,()=>true);next.pause();A.playBgs({...track,name:'River'});const successor=A._bgsBuffer;next.restore();assert.equal(A._bgsBuffer,successor);A.stopBgs();next.restore();assert.equal(A._bgsBuffer,null,'retired ownership cannot revive an old track');
  assert.equal(adapter.capturePrebattleBGSMZ(G,()=>true),null);h.w.flow.stateReplaced();
 });
-async function ready({trainer=false,fast=false,intro=false}={}){
- const h=world(),G=h.G,flow=h.w.flow,content=fixture.musicNativeContent(E,assert);
+async function ready({trainer=false,fast=false,intro=false,beforeProduct}={}){
+ const h=world({beforeProduct}),G=h.G,flow=h.w.flow,content=fixture.musicNativeContent(E,assert);
  if(intro){const type=content.trainerTypes['music-type-normal'];type.introBgm='Intro';type.battleBgm='Authored';}
  flow.stateReplaced();flow._app=null;flow._content=content;flow._dex=E.dex.createDexLookup();flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=fast;G.$gameSystem._psGame=fixture.musicNativeState(E,content);
  const app=flow.app(),calls=[];for(const method of ['startBattle','startTrainerBattle']){const original=app[method];app[method]=function(...args){calls.push(method);return original.apply(this,args);};}
@@ -178,3 +179,47 @@ for(const legacy of [false,true]){
   const h=actualReactorEvents(legacy);h.open();h.held('entry pauses all three event routes');h.p.cancel();h.flow.running=false;h.resume('cancel resumes without reset or lost wait');
  });
 }
+
+// Controlled integration: actual Reactor interpreter scheduling + compiled product
+// blackout wrappers. A fixture supplies the blackout outcome; this is not a native
+// defeat, disk-slot or fresh-process Continue acceptance.
+test('deferred return autosave serializes only after blackout child and parent terminate',async()=>{
+ let writes=0,saved=null,sentinel=0;
+ const source=fs.readFileSync(path.join(ROOT,'js/reactor_objects.js'),'utf8');
+ const scenes=fs.readFileSync(path.join(ROOT,'js/reactor_scenes.js'),'utf8');
+ function method(text,marker){const a=text.indexOf(marker),b=text.indexOf('\n};',a);assert(a>=0&&b>a,marker);return text.slice(a,b+3);}
+ const h=await ready({beforeProduct(G){
+  G.Game_Interpreter=function(){this.initialize();};
+  for(const name of ['initialize','checkOverflow','clear','isRunning','update','updateChild','updateWait','updateWaitCount','updateWaitMode','executeCommand','checkFreeze','terminate','currentCommand','eventId','setWaitMode'])
+   vm.runInContext(method(source,'Game_Interpreter.prototype.'+name+' = function'),G);
+  G.Game_Interpreter.prototype.command999=function(){sentinel++;return true;};
+  G.Game_Map=function(){};
+  G.Game_Map.prototype.mapId=()=>5;G.Game_Map.prototype.setupStartingEvent=()=>false;G.Game_Map.prototype.unlockEvent=()=>{};
+  vm.runInContext(method(source,'Game_Map.prototype.updateInterpreter = function'),G);
+  const update=G.Scene_Map.prototype.update,start=G.Scene_Map.prototype.start;
+  G.Scene_Map.prototype.update=function(){update.call(this);G.$gameMap.updateInterpreter?.();};
+  G.Scene_Map.prototype.start=function(){start.call(this);if(G.__returnRequest)this.requestAutosave();};
+  G.Scene_Base=function(){};
+  for(const name of ['requestAutosave','isAutosaveEnabled','executeAutosave','onAutosaveSuccess','onAutosaveFailure']){
+   vm.runInContext(method(scenes,'Scene_Base.prototype.'+name+' = function'),G);
+   G.Scene_Map.prototype[name]=G.Scene_Base.prototype[name];
+  }
+  G.DataManager.isBattleTest=()=>false;G.DataManager.isEventTest=()=>false;
+  G.Game_System.prototype.isAutosaveEnabled=()=>true;G.Game_System.prototype.onBeforeSave=()=>{};
+  G.DataManager.saveGame=async function(slot){assert.equal(slot,0);writes++;saved=JSON.stringify(G.$gameMap._interpreter);return 0;};
+ }});
+ try{
+  const G=h.G,map=new G.Game_Map();map._interpreter=new G.Game_Interpreter();G.$gameMap=map;
+  h.open();await h.waitFor(()=>!!h.p.battle()?._session,'real Session');await h.p.inMode('main');await h.p.fightUntilEnd();const s=h.p.battle();
+  await h.waitFor(()=>s._resultFeedback?.ready?.()||s._mode==='end','result');await h.frames(2);s.onEnd();
+  h.flow.lastOutcome.blackout=true; // Explicit fixture, not a claimed real defeat.
+  const parent=new G.Game_Interpreter(),child=new G.Game_Interpreter();
+  parent._list=[{code:999,indent:0,parameters:[]}];child._list=[{code:999,indent:0,parameters:[]}];parent._childInterpreter=child;
+  child._waitMode='psBattle';child._psBattleId=h.flow.lastOutcome.battleId;map._interpreter=parent;G.__returnRequest=true;
+  await h.waitFor(()=>h.flow.prebattleState().phase==='done','return done');
+  assert.equal(writes,0,'the done tick must not serialize the still-blocked interpreter');assert.equal(child._waitMode,'psBattle');
+  await h.frames(1);assert.equal(writes,1);assert.equal(sentinel,0);assert.equal(parent._list,null);assert.equal(parent._childInterpreter,null);
+  const restored=Object.assign(new G.Game_Interpreter(),JSON.parse(saved));h.flow.stateReplaced();h.flow.lastOutcome=null;
+  restored.update();assert.equal(sentinel,0,'cold outcome absence cannot resume a command after blackout');assert.equal(restored.isRunning(),false);
+ }finally{h.cleanup();}
+});

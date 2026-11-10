@@ -59,6 +59,7 @@ SUITES=(
   experiments/step5/4/test-learn-pp-trainer-chain-lifecycle.cjs
   experiments/step5/4/test-auxiliary-diagnostics.cjs
   experiments/step5/4/test-prebattle-wrapper.cjs
+  experiments/step5/4/test-return-autosave.cjs
   experiments/step5/4/test-prebattle-native.cjs
   experiments/step5/4/test-prebattle-menu.cjs
   experiments/step5/4/test-menu-grid.cjs
