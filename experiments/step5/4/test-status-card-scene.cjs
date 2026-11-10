@@ -210,15 +210,24 @@ test('real Illusion alias is unavailable until the published replace proves the 
 });
 
 // Controlled touch-button rectangle; actual compiled Scene and status painting, not NW pixels.
-test('visible touch cancel has its own lane outside the opponent card, hidden button restores width', async () => {
-  const h = await open({ touchCancel: true });
+for (const lang of ['en', 'zh']) test(lang + ' visible touch cancel has its own lane outside the opponent card, hidden button restores width', async () => {
+  const h = await open({ lang, trainer: true, touchCancel: true, configure(content, state) {
+    Object.assign(content.trainers['music-normal'][0].party[0], { gender: 'F', shiny: true });
+    state.dex.seen.push('pidgey'); state.dex.owned.push('pidgey');
+  } });
   try {
-    const shown = paint(h, { p2: { gender: 'F', shiny: true } });
+    const shown = paint(h);
+    const foe = shown.views.find(c => c.side === 'p2' && c.visible);
+    assert.equal(foe.gender.kind, 'female'); assert.equal(foe.shiny, true); assert.equal(foe.owned, true);
     const status = h.s._status, button = h.s._cancelButton;
     assert(Number.isFinite(status.x) && Number.isFinite(status.height), 'controlled window has actual rectangle geometry');
     const edge = button.x - status.x - (status.padding ?? 12) - 8;
     const opponent = shown.text.filter(t => t.x >= status.innerWidth / 2);
-    assert(opponent.length > 0);
+    const badges = ['♀', '★', lang === 'zh' ? '已拥有' : 'Owned'];
+    for (const label of badges) assert.equal(opponent.filter(t => t.value === label && t.y === 0).length, 1, 'real published badge drawn: ' + label);
+    const drawnBadges = opponent.filter(t => badges.includes(t.value));
+    assert(drawnBadges.every(t => t.width > 0), 'badges have positive painted widths');
+    assert(drawnBadges.every((t, i) => i === 0 || drawnBadges[i - 1].x + drawnBadges[i - 1].width <= t.x), 'three badges do not overlap one another');
     assert(opponent.every(t => t.x + t.width <= edge), 'all opponent labels stay left of visible cancel');
     const playerWidth = shown.fills.find(f => f.x === 0 && f.y === 52).width;
     const foeWidth = shown.fills.find(f => f.x >= status.innerWidth / 2 && f.y === 52).width;
