@@ -21,12 +21,23 @@ test.before(async () => {
   donor = require(path.join(temp, 'donor/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, configure, contentFactory } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, configure, contentFactory, touchCancel = false } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = contentFactory ? contentFactory() : fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
   if (catalog) catalog(content.items);
   G.PluginManager.parameters = function (name) { const p = parameters.call(this, name); return name === 'PS_BattleFlow' ? { ...p, language: lang } : p; };
+  if (touchCancel) {
+    const initializeWindow = G.Window_Base.prototype.initialize;
+    G.Window_Base.prototype.initialize = function (rect) {
+      initializeWindow.call(this, rect); Object.assign(this, rect); this.padding = 12;
+    };
+    const create = G.Scene_MenuBase.prototype.create;
+    G.Scene_MenuBase.prototype.create = function () {
+      create.call(this);
+      this._cancelButton = { x: G.Graphics.boxWidth - 96 - 4, y: 4, width: 96, height: 48, visible: true };
+    };
+  }
   flow.setLanguage(null); flow.stateReplaced(); flow._app = null; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.seed = [1, 2, 3, 4]; flow.rng = () => 0; flow.fast = true;
   const state = fixture.musicNativeState(E, content, 'receiving'); state.party = state.party.slice(0, members); state.nextMemberOrdinal = String(members + 1);
   if (hurt) state.party[0].hp -= 40;
@@ -195,5 +206,28 @@ test('real Illusion alias is unavailable until the published replace proves the 
     const revealed = paint(h).views.find(c => c.side === 'p2' && c.visible);
     assert.equal(revealed.id, s.foeTeam[0].id); assert.equal(revealed.name, 'Zoroark'); assert.equal(revealed.gender.kind, 'male'); assert.equal(revealed.shiny, false); assert.equal(revealed.owned, true);
     assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { h.cleanup(); }
+});
+
+// Controlled touch-button rectangle; actual compiled Scene and status painting, not NW pixels.
+test('visible touch cancel has its own lane outside the opponent card, hidden button restores width', async () => {
+  const h = await open({ touchCancel: true });
+  try {
+    const shown = paint(h, { p2: { gender: 'F', shiny: true } });
+    const status = h.s._status, button = h.s._cancelButton;
+    assert(Number.isFinite(status.x) && Number.isFinite(status.height), 'controlled window has actual rectangle geometry');
+    const edge = button.x - status.x - (status.padding ?? 12) - 8;
+    const opponent = shown.text.filter(t => t.x >= status.innerWidth / 2);
+    assert(opponent.length > 0);
+    assert(opponent.every(t => t.x + t.width <= edge), 'all opponent labels stay left of visible cancel');
+    const playerWidth = shown.fills.find(f => f.x === 0 && f.y === 52).width;
+    const foeWidth = shown.fills.find(f => f.x >= status.innerWidth / 2 && f.y === 52).width;
+    assert(foeWidth < playerWidth, 'only overlapped opponent card reserves the lane');
+    button.visible = false;
+    const hidden = paint(h);
+    assert.equal(hidden.fills.find(f => f.x >= status.innerWidth / 2 && f.y === 52).width, playerWidth);
+    button.visible = true; button.y = 200;
+    const below = paint(h);
+    assert.equal(below.fills.find(f => f.x >= status.innerWidth / 2 && f.y === 52).width, playerWidth, 'nonintersecting button needs no lane');
   } finally { h.cleanup(); }
 });

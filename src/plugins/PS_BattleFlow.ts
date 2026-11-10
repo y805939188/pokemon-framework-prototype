@@ -1028,7 +1028,6 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   Window_PSText.prototype.refresh = function () {
     this.contents.clear();
     if (this._d2Cards) {
-      const width = this.innerWidth / 2 - 12;
       const cards: ReturnType<typeof projectStatusCard>[] = this.statusCardViews(), tr = PSFlow.translator();
       for (const [index, side] of ['p1', 'p2'].entries()) {
         const card = cards.find((member: ReturnType<typeof projectStatusCard>) => member.side === side && member.visible);
@@ -1036,6 +1035,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         const previousOpacity = this.contents.paintOpacity;
         this.contents.paintOpacity = Math.round(card.opacity * 255);
         const x = index * (this.innerWidth / 2);
+        const width = Math.max(0, Math.min(this.innerWidth / 2 - 12, (this._d2ContentRight?.() ?? this.innerWidth) - x));
         const badges = [
           ...(card.gender.symbol ? [{ text: card.gender.symbol, colour: card.gender.colour === 'blue' ? '#71afff' : '#ff8585' }] : []),
           ...(card.shiny ? [{ text: '★', colour: '#ffdc68' }] : []),
@@ -1264,6 +1264,13 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     G.Scene_MenuBase.prototype.create.call(this); if (!c.isCurrent()) return;
     const w = G.Graphics.boxWidth, h = G.Graphics.boxHeight;
     this._status = new (Window_PSText as any)(new G.Rectangle(0, 0, w, 120));
+    // MenuBase's touch cancel lives in the same window layer. Reserve its lane
+    // rather than painting the opponent name and badges beneath the button.
+    this._status._d2ContentRight = () => {
+      const button = this._cancelButton, status = this._status;
+      return button?.visible && button.y < status.y + status.height && button.y + button.height > status.y
+        ? Math.max(0, button.x - status.x - (status.padding ?? 12) - 8) : status.innerWidth;
+    };
     this._log = new (Window_PSText as any)(new G.Rectangle(0, 120, w, 300));
     this._menu = new (Window_PSMenu as any)(new G.Rectangle(0, 420, w, h - 420));
     this._commandMenu = this._menu; this._learningMenu = null;
