@@ -3,8 +3,8 @@
  * joining framework-owned fields with Showdown-owned battle data (base stats, display names). Every problem is
  * reported with the record and field it comes from; nothing is repaired silently.
  */
-import { checkItemInputs } from "../content/item-input";
-import { heldItemDescriptor } from "../rules/item-catalog";
+import { checkItemInputs, defaultMemberBallProblem } from "../content/item-input";
+import { heldItemDescriptor, itemOf } from "../rules/item-catalog";
 import type { CompiledContent, ContentError } from "../content/schema";
 import { checkOverrides, runtimeCapabilities } from "../rules/config";
 import { COMPILED_SCHEMA_VERSION } from "../content/schema";
@@ -95,6 +95,10 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
   if (errors.length) return { content, errors };
   const itemInputs = checkItemInputs(compiled.items, compiled.shops, id => preUseProblem(sources, id));
   errors.push(...itemInputs.errors);
+  if (compiled.species.length) {
+    const problem = defaultMemberBallProblem(itemInputs.catalog);
+    if (problem) errors.push(problem);
+  }
   if (compiled.species.length || itemInputs.items.some(item => !!item.move) || (compiled.grants ?? []).some((g) => g.members.some((m) => !!m.item))) {
     const dep = showdownDependencyProblem(sources);
     if (dep) errors.push({ file: "assembly", path: "sources", message: dep });
@@ -106,6 +110,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
   for (const sp of compiled.species) if (sp.happiness !== undefined && (!Number.isSafeInteger(sp.happiness) || sp.happiness < 0)) errors.push({ file: "assembly", path: `species/${sp.id}.happiness`, message: "must be a nonnegative safe integer" });
   for (const grant of compiled.grants ?? []) {
     for (const [i, member] of grant.members.entries()) if (member.item && !capabilities.allowHeldItemSources) errors.push({ file: "assembly", path: `grants/${grant.id}.members[${i}].item`, message: "held-item-source-disabled" });
+    for (const [i, member] of grant.members.entries()) if (member.item && !itemOf(itemInputs.catalog, member.item)) errors.push({ file: "assembly", path: `grants/${grant.id}.members[${i}].item`, message: "held item must be registered in the item catalog" });
     const problem = preUseProblem(sources, grant.source);
     if (problem) errors.push({ file: "assembly", path: `grants/${grant.id}.source`, message: problem });
   }

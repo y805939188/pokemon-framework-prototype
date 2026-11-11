@@ -1,5 +1,5 @@
 /** Validation shared by authored JSON and the compiled-content consumption gate; never queries Dex. */
-import { ITEM_ID, importantItem, legacyCatalog } from '../rules/item-catalog';
+import { ITEM_ID, importantItem, itemOf, legacyCatalog } from '../rules/item-catalog';
 import type { FieldUse, ItemCatalog, ItemDefinition, ShopDefinition } from '../rules/item-catalog';
 import { setOwn } from '../rules/own';
 import type { ContentError } from './schema';
@@ -65,4 +65,11 @@ export function checkItemInputs(rawItems: unknown, rawShops: unknown, usable: (i
     if (before === errors.length) shops.push({ ...(raw as unknown as ShopDefinition), allowSell: raw.allowSell as boolean ?? true });
   }
   return { items, shops, catalog, errors };
+}
+
+/** Ordinary creation stores this canonical ID; battle/legacy aliases cannot replace a persistent identity. */
+export function defaultMemberBallProblem(catalog: ItemCatalog): ContentError | null {
+  return itemOf(catalog, 'pokeball')?.battleUse === 'ball' ? null : {
+    file: 'items.json', path: '$.pokeball', message: 'default member ball pokeball must be a registered ball in the item catalog',
+  };
 }

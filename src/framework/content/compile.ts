@@ -3,7 +3,7 @@
  * conflict detection, emit one canonical document whose `inputsHash` covers every input. No file system, no Showdown.
  */
 import { sha256Hex } from "../rules/sha256";
-import { checkItemInputs } from "./item-input";
+import { checkItemInputs, defaultMemberBallProblem } from "./item-input";
 import { holdableItem, itemOf } from "../rules/item-catalog";
 import { DEFAULT_LIMITS } from "../rules/limits";
 import { MAX_FORM } from "../rules/species-key";
@@ -169,6 +169,10 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
 
   const itemInputs = checkItemInputs(inputs.items, inputs.shops, usable);
   errors.push(...itemInputs.errors);
+  if (Array.isArray(inputs.species) && inputs.species.length) {
+    const problem = defaultMemberBallProblem(itemInputs.catalog);
+    if (problem) errors.push(problem);
+  }
 
   // ---- species
   const species: SpeciesSource[] = [];
@@ -278,6 +282,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
         if (m["item"] !== undefined && (typeof m["item"] !== "string" || (m["item"] !== "" && !SHOWDOWN_ID.test(m["item"])))) report("grants.json", `${p}.members[${j}].item`, "must be a held item id");
         if (m["item"] && !capabilities.allowHeldItemSources) report("grants.json", `${p}.members[${j}].item`, "held-item-source-disabled: controlled developer injection required; not a player setting");
         const heldDefinition = typeof m["item"] === "string" ? itemOf(itemInputs.catalog, m["item"]) : undefined;
+        if (m["item"] && !heldDefinition) report("grants.json", `${p}.members[${j}].item`, "held item must be registered in the item catalog");
         if (heldDefinition && !holdableItem(heldDefinition)) report("grants.json", `${p}.members[${j}].item`, "author item rules forbid holding this item");
         if (!ids.has(m["species"])) report("grants.json", `${p}.members[${j}].species`, `"${m["species"]}" is not a species id of species.json`);
       }
