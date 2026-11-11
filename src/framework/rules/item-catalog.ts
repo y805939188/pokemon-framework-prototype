@@ -36,6 +36,14 @@ export const consumesItem = (item: ItemDefinition): boolean => !importantItem(it
 export const showsQuantity = (item: ItemDefinition): boolean => !importantItem(item) || item.showQuantity === true;
 export const holdableItem = (item: ItemDefinition): boolean => !importantItem(item) && !hasFlag(item, 'Mail') && !hasFlag(item, 'Unholdable');
 
+/** Author restrictions only narrow canonical native held items. Callers own the source permission gate. */
+export function heldItemDescriptor<T extends { id?: string; holdable: boolean; mail: boolean }>(catalog: ItemCatalog, id: string, lookup: ((id: string) => T | null) | undefined): T | null {
+  const definition = itemOf(catalog, id);
+  if (definition && !holdableItem(definition)) return null;
+  const item = lookup?.(id);
+  return item?.holdable && !item.mail && (item.id === undefined || item.id === id) ? item : null;
+}
+
 /** Compatibility identity for content predating items.json. Price zero is an author default, not Showdown data. */
 export function legacyCatalog(): ItemCatalog {
   const catalog: ItemCatalog = {};

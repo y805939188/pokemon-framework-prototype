@@ -25,7 +25,7 @@ import type { EvolutionFacts } from "../rules/evolution";
 import type { InventoryRequest, InventoryParent, InventoryOutcome } from "./inventory-session";
 import { badgeCount, hasBadge } from "../rules/economy";
 import { assertInventoryMapped, aggregateBag } from "../rules/inventory";
-import { catalogOf, holdableItem, itemOf } from "../rules/item-catalog";
+import { catalogOf, heldItemDescriptor } from "../rules/item-catalog";
 /**
  * The game application: the use cases that coordinate a battle with the persistent game, and nothing else.
  *  - game rules stay in the core (`rules/`): the application calls `applyBattleResult`, it does not re-implement it;
@@ -294,11 +294,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.describeHeldItem = options.describeHeldItem ?? ((id) => {
       const { content, dex } = this.ports.content();
       if (!content.meta?.showdownSourceChecked) throw new ReceivingRefused("held-item-source-unchecked");
-      // Author restrictions narrow the engine capability; they never make an unsupported item holdable.
-      const definition = itemOf(catalogOf(content), id);
-      if (definition && !holdableItem(definition)) return null;
-      const item = dex?.heldItem?.(id);
-      return item && (item.id === undefined || item.id === id) ? item : null;
+      return heldItemDescriptor(catalogOf(content), id, ref => dex?.heldItem?.(ref) ?? null);
     });
     this.management = new ManagementSession(this.ports.state, () => this.ports.content().content, { limits: this.limits, depositHeal: this.depositHeal, sourceAllowed: this.capabilities.allowHeldItemSources, describeItem: this.describeHeldItem });
     this.pokedex = new PokedexOperation({ state: this.battleStatePort, content: this.ports.content, generation: () => this.generation,
@@ -932,8 +928,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       const heldBattle = game.party.some(m => !!m.item) || foes.some(m => !!m.item);
       if (heldBattle && !this.capabilities.allowExperimentalHeldItemBattle) throw new Error("held-item-battle-disabled: held battle capability required for either side");
       for (const member of [...game.party, ...foes]) if (member.item) {
-        const item = dex?.heldItem?.(member.item); assertCurrent();
-        if (!item?.holdable || item.mail || item.id !== undefined && item.id !== member.item) throw new Error(`unsupported battle held item ${member.item}; use a canonical held item id`);
+        const item = heldItemDescriptor(catalogOf(content), member.item, id => dex?.heldItem?.(id) ?? null); assertCurrent();
+        if (!item) throw new Error(`unsupported battle held item ${member.item}; use a canonical held item id allowed by the author; take the item off the member before battling`);
       }
       const context = this.newReceptionContext({ templates, decisions: {}, profile: request.forceParty ? { ...this.profile, mode: 2 } : this.profile, nextMemberOrdinal: ordinal });
       const full = storageFull(game, this.limits);

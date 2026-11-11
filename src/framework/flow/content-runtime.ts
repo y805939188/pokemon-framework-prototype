@@ -4,6 +4,7 @@
  * reported with the record and field it comes from; nothing is repaired silently.
  */
 import { checkItemInputs } from "../content/item-input";
+import { heldItemDescriptor } from "../rules/item-catalog";
 import type { CompiledContent, ContentError } from "../content/schema";
 import { checkOverrides, runtimeCapabilities } from "../rules/config";
 import { COMPILED_SCHEMA_VERSION } from "../content/schema";
@@ -171,7 +172,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     const members: { species: string; level: number; form?: number; item?: string }[] = [];
     let ok = true;
     for (const [j, m] of g.members.entries()) {
-      if (m.item) { const item = dex.heldItem?.(m.item); if (!item?.holdable || item.mail || item.id !== undefined && item.id !== m.item) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].item`, message: `unsupported held item ${m.item}; use the canonical held item id` }); ok = false; continue; } }
+      if (m.item) { const item = heldItemDescriptor(itemInputs.catalog, m.item, id => dex.heldItem?.(id) ?? null); if (!item) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].item`, message: `unsupported held item ${m.item}; use the canonical held item id` }); ok = false; continue; } }
       if (m.form !== undefined && !compiled.species.some((sp) => sp.id === m.species && (sp.form ?? 0) === m.form)) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].form`, message: "missing exact form" }); ok = false; continue; }
       const name = own(content.speciesIds, m.species);
       if (!name) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].species`, message: `"${m.species}" is not an assembled species` }); ok = false; continue; }
@@ -203,8 +204,8 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
             errors.push({ file: "assembly", path: `${path}.ability`, message: `unsupported trainer ability reference ${member.ability}; use a canonical assembled ability id for ${resolved.name}` });
         }
         if (member.item !== undefined) {
-          const item = dex.heldItem?.(member.item);
-          if (!item?.holdable || item.mail || item.id !== undefined && item.id !== member.item) errors.push({ file: "assembly", path: `${path}.item`, message: "unsupported held item; use the canonical held item id; validation does not open the B battle gate" });
+          const item = heldItemDescriptor(itemInputs.catalog, member.item, id => dex.heldItem?.(id) ?? null);
+          if (!item) errors.push({ file: "assembly", path: `${path}.item`, message: "unsupported held item; use the canonical held item id; validation does not open the B battle gate" });
         }
       }
       const versions = own(content.trainers, record.id) ?? [];

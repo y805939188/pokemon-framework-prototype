@@ -1,5 +1,6 @@
 /** Strict optional trainer catalogs for A-M1. Pure validation; no PBS editor or runtime data authoring. */
 import type { ContentError, TrainerRecordSource, TrainerTypeSource } from "./schema";
+import { holdableItem, itemOf } from "../rules/item-catalog";
 import type { ItemCatalog } from "../rules/item-catalog";
 import type { PartialStats, SpeciesKey } from "../rules/types";
 import { strategyReference } from "../rules/trainer-ai-strategy";
@@ -68,6 +69,8 @@ function member(value: unknown, index: number, context: TrainerInputContext, err
   if (id(value["species"]) && isInt(form, 0, 999) && !context.speciesKeys.has(`${value["species"]}/${form}`)) errors.push({ file, path: `${path}.species`, message: "must name an exact registered species/form" });
   if (!isInt(value["level"], 1, 100)) errors.push({ file, path: `${path}.level`, message: "must be an integer from 1 to 100" });
   if (value["item"] !== undefined && !showdownId(value["item"])) errors.push({ file, path: `${path}.item`, message: "held item must be a non-empty registered-item id; B support remains gated" });
+  const heldDefinition = typeof value["item"] === "string" ? itemOf(context.catalog, value["item"]) : undefined;
+  if (heldDefinition && !holdableItem(heldDefinition)) errors.push({ file, path: `${path}.item`, message: "author item rules forbid holding this item" });
   if (value["moves"] !== undefined) {
     if (!dense(value["moves"]) || value["moves"].length > 24) errors.push({ file, path: `${path}.moves`, message: "must be a dense array of at most 24 move ids; [] requests level defaults" });
     else for (const [moveIndex, move] of value["moves"].entries()) if (!showdownId(move)) errors.push({ file, path: `${path}.moves[${moveIndex}]`, message: "must be a non-empty move id" });

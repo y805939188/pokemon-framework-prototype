@@ -4,6 +4,7 @@
  */
 import { sha256Hex } from "../rules/sha256";
 import { checkItemInputs } from "./item-input";
+import { holdableItem, itemOf } from "../rules/item-catalog";
 import { DEFAULT_LIMITS } from "../rules/limits";
 import { MAX_FORM } from "../rules/species-key";
 import { checkOverrides, runtimeCapabilities } from "../rules/config";
@@ -276,6 +277,8 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
         if (m["form"] !== undefined && (!isInt(m["form"], 0, MAX_FORM) || !keys.has(recordKey(m["species"], m["form"] as number)))) report("grants.json", `${p}.members[${j}].form`, "must name an existing exact form");
         if (m["item"] !== undefined && (typeof m["item"] !== "string" || (m["item"] !== "" && !SHOWDOWN_ID.test(m["item"])))) report("grants.json", `${p}.members[${j}].item`, "must be a held item id");
         if (m["item"] && !capabilities.allowHeldItemSources) report("grants.json", `${p}.members[${j}].item`, "held-item-source-disabled: controlled developer injection required; not a player setting");
+        const heldDefinition = typeof m["item"] === "string" ? itemOf(itemInputs.catalog, m["item"]) : undefined;
+        if (heldDefinition && !holdableItem(heldDefinition)) report("grants.json", `${p}.members[${j}].item`, "author item rules forbid holding this item");
         if (!ids.has(m["species"])) report("grants.json", `${p}.members[${j}].species`, `"${m["species"]}" is not a species id of species.json`);
       }
       const items = g["items"];
