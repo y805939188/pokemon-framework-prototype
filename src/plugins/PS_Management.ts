@@ -1,3 +1,4 @@
+import { messageLiteral } from './message-literal';
 /** 5.1 management adapter. The application owns all records; this scene owns focus and decisions only. */
 import { boxCursor, boxLinkAvailable, editMark, InputLatch, inputIntent, markCursor, panelCursor, partyCursor, ribbonCursor, summaryCursor } from './management/model';
 import type { Action, Direction, InputFrame } from './management/model';
@@ -422,5 +423,9 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
  G.Game_Interpreter.prototype.updateWaitMode=function(){if(this._waitMode==='psReceiving'){if(app().pendingReceiving||app().pendingEvolution||app().pendingPokedex)return true;this._waitMode='';return false;}return wait.call(this);};
  // A recovered placement is acknowledged only after its visible host notification has been queued.
  const mapStart=G.Scene_Map.prototype.start;
- G.Scene_Map.prototype.start=function(){mapStart.call(this);if(!flow()._app||flow()._app.pendingEvolution)return;for(const notice of flow()._app.receivingNotifications){try{const snap=app().managementSnapshot();const dest=notice.placements.map((p:any)=>p.to==='party'?tr('party'):boxTitle(snap,p.box)).join(', ');G.$gameMessage.add(tr('recovered',{dest}));app().acknowledgeReceivingNotification(notice.token);}catch(e){console.error(NAME,e);break;}}};
+ G.Scene_Map.prototype.start=function(){mapStart.call(this);if(!flow()._app||flow()._app.pendingEvolution)return;for(const notice of flow()._app.receivingNotifications){try{const snap=app().managementSnapshot();const dest=notice.placements.map((p:any)=>{
+   if(p.to==='party')return tr('party');
+   const title=boxTitle(snap,p.box);
+   return snap.storage.boxes[p.box]?.name?messageLiteral(title):title;
+  }).join(', ');G.$gameMessage.add(tr('recovered',{dest}));app().acknowledgeReceivingNotification(notice.token);}catch(e){console.error(NAME,e);break;}}};
 })();

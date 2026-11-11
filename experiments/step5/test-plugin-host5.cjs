@@ -24,7 +24,7 @@ const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s, 166452
 let dir; const plugins = {};
 test.before(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-plugin-host5-'));
-  for (const name of ['PS_SaveState', 'PS_BattleFlow']) {
+  for (const name of ['PS_SaveState', 'PS_BattleFlow', 'PS_Management']) {
     const built = spawnSync('pnpm', ['--dir', 'src', 'exec', 'vite', 'build', '--outDir', path.join(dir, name)], { cwd: ROOT, env: { ...process.env, RR_PLUGIN: name }, encoding: 'utf8' });
     assert.equal(built.status, 0, built.stdout + built.stderr);
     plugins[name] = fs.readFileSync(path.join(dir, name, `${name}.js`), 'utf8');
@@ -474,10 +474,10 @@ function messageEscapeHost() {
       for (const match of converted.matchAll(/\x1b([\^.!|><$])/g)) G.Window_Message.prototype.processEscapeCharacter.call(window, match[1], {});
       return window._pauseSkip; } };
 }
-for (const destination of ['party', 'box']) for (const raw of ['\\^Nick', '\\V[1]', '\\C[2]', '\x1b^Nick']) test('receiving ' + destination + ' safely displays literal user name ' + JSON.stringify(raw), () => {
+for (const lang of ['en', 'zh']) for (const destination of ['party', 'box']) for (const raw of ['\\^Nick', '\\V[1]', '\\C[2]', '\x1b^Nick']) test('receiving ' + lang + ' ' + destination + ' safely displays literal user name ' + JSON.stringify(raw), () => {
   const game = E.fixtures.savedFor(E.fixtures.makeGame(), content);
   if (destination === 'box') while (game.party.length < 6) { const m = J(game.party[0]); m.id = 'LITERAL-' + game.party.length; game.party.push(m); }
-  const h = host(game), messages = []; h.ctx.$gameMessage.add = text => messages.push(text); h.flow.receiveOptions = { mode: 0, naming: 0 };
+  const h = host(game), messages = []; h.ctx.$gameMessage.add = text => messages.push(text); h.flow.receiveOptions = { mode: 0, naming: 0 }; h.flow.translator = () => E.i18n.translatorFor(lang);
   const app = h.flow.app();
   if (destination === 'box') {
     const token = app.beginManagement(); const renamed = app.manage(token, 'literal-box-name', { kind: 'box-name', box: 0, name: raw });
@@ -490,7 +490,7 @@ for (const destination of ['party', 'box']) for (const raw of ['\\^Nick', '\\V[1
   h.flow.notifyReceived([id], 'literal-' + destination); assert.equal(messages.length, 1);
   const parser = messageEscapeHost(), converted = parser.convert(messages[0]), visible = raw.replace(/\x1b/g, '␛');
   assert(converted.includes(visible), 'literal user text survives native MZ conversion: ' + converted);
-  assert(!converted.includes('INJECTED_VARIABLE')); assert.equal(parser.pauseSkip(messages[0]), false);
+  assert(!converted.includes('INJECTED_VARIABLE')); assert(!converted.includes('\x1b'), 'user text never becomes a native message control'); assert.equal(parser.pauseSkip(messages[0]), false);
   const saved = h.flow.game();
   assert.equal(destination === 'party' ? saved.party.at(-1).nickname : saved.storage.boxes[0].name, raw, 'stored user input remains unchanged');
   h.flow.notifyReceived([id], 'literal-' + destination); assert.equal(messages.length, 1, 'notice remains idempotent');
@@ -510,4 +510,61 @@ test('receiving escapes only user substitutions while the same authored message 
   const parser = messageEscapeHost(), converted = parser.convert(messages[0]);
   assert(converted.startsWith('\x1bC[2]')); assert(converted.includes(nickname));
   assert(!converted.includes('INJECTED_VARIABLE')); assert.equal(parser.pauseSkip(messages[0]), true, 'authored pause-skip is still effective');
+});
+
+
+function recoveryMessageHost({ lang = 'en', name = '', destination = 'box', signal = 'scene-aborted' } = {}) {
+  const game = E.fixtures.savedFor(E.fixtures.makeGame(), content);
+  if (destination === 'box') while (game.party.length < 6) { const m = J(game.party[0]); m.id = 'RECOVER-' + game.party.length; game.party.push(m); }
+  const h = host(game), messages = [];
+  h.flow.translator = () => E.i18n.translatorFor(lang); h.flow.receiveOptions = { mode: 0, naming: 0 };
+  const app = h.flow.app();
+  if (name) { const token = app.beginManagement(); assert.equal(app.manage(token, 'recovery-box-name', { kind: 'box-name', box: 0, name }).status, 'applied'); app.endManagement(token); }
+  const pending = app.receiveGift({ kind: 'normal', member: { species: 'pidgey', level: 3 } });
+  assert.equal(pending.status, 'pending'); const id = app.pendingReceiving.members[0].id;
+  assert.equal(app.resolveReceiving(pending.token, {}, signal).status, 'applied'); assert.equal(app.receivingNotifications.length, 1);
+  const Input = { keyMapper: {}, isTriggered: () => false, isRepeated: () => false };
+  h.ctx.Input = Input; h.ctx.document = { addEventListener() {} }; h.ctx.addEventListener = () => {};
+  let mapStarts = 0; h.ctx.Scene_Map = function() {}; h.ctx.Scene_Map.prototype.start = () => { mapStarts++; };
+  vm.runInContext(plugins.PS_Management, h.ctx, { filename: 'PS_Management.js (built)' });
+  h.ctx.$gameMessage.add = text => messages.push(text);
+  const mapStart = () => h.ctx.Scene_Map.prototype.start.call({});
+  return { ...h, app, id, pending, messages, mapStart, mapStarts: () => mapStarts };
+}
+for (const lang of ['en', 'zh']) for (const signal of ['scene-aborted', 'rebuild-failed']) for (const raw of ['\\^Nick', '\\V[1]', '\\C[2]', '\x1b^Nick']) test('map recovered ' + lang + ' ' + signal + ' safely displays literal box name ' + JSON.stringify(raw), () => {
+  const h = recoveryMessageHost({ lang, name: raw, signal }), before = J(h.flow.game());
+  h.flow.notifyReceived([h.id], 'recovered-normal-control'); assert.equal(h.messages.length, 0, 'ordinary notice yields to pending recovered notice');
+  h.mapStart(); assert.equal(h.mapStarts(), 1); assert.equal(h.messages.length, 1);
+  const parser = messageEscapeHost(), converted = parser.convert(h.messages[0]), visible = raw.replace(/\x1b/g, '␛');
+  assert(converted.includes(visible), 'literal user box name survives native MZ conversion: ' + converted);
+  assert(!converted.includes('INJECTED_VARIABLE')); assert(!converted.includes('\x1b'), 'user box name cannot become a native message control'); assert.equal(parser.pauseSkip(h.messages[0]), false);
+  assert.equal(h.app.receivingNotifications.length, 0); assert.deepEqual(J(h.flow.game()), before, 'message boundary does not rewrite the saved name or member');
+  h.mapStart(); assert.equal(h.messages.length, 1, 'acknowledged recovery is not repeated');
+});
+for (const lang of ['en', 'zh']) for (const name of ['旧中文盒名', '\\\\V[1]', '']) test('map recovered ' + lang + ' preserves legacy/default box title ' + JSON.stringify(name), () => {
+  const h = recoveryMessageHost({ lang, name }), before = J(h.flow.game()); h.mapStart();
+  const dest = name || h.flow.translator().t('management.box', { n: 1 });
+  assert.equal(messageEscapeHost().convert(h.messages[0]), h.flow.translator().t('management.recovered', { dest }));
+  assert.deepEqual(J(h.flow.game()), before); assert.equal(h.flow.game().storage.boxes[0].name, name);
+});
+for (const lang of ['en', 'zh']) for (const destination of ['party', 'box']) test('map recovered ' + lang + ' keeps authored message and fallback destination controls for ' + destination, () => {
+  const h = recoveryMessageHost({ lang, destination }), original = h.flow.translator();
+  h.flow.translator = () => ({ t(key, args) { const text = original.t(key, args); return ['management.recovered', 'management.party', 'management.box'].includes(key) ? '\\C[2]' + text + '\\^' : text; } });
+  h.mapStart(); const parser = messageEscapeHost(), converted = parser.convert(h.messages[0]);
+  assert.equal((converted.match(/\x1bC\[2\]/g) || []).length, 2, 'both authored template and destination controls remain active');
+  assert.equal(parser.pauseSkip(h.messages[0]), true); assert.equal(h.app.receivingNotifications.length, 0);
+});
+test('map recovered custom box name is escaped inside an otherwise active authored message', () => {
+  const h = recoveryMessageHost({ name: '\\V[1]' }), original = h.flow.translator();
+  h.flow.translator = () => ({ t(key, args) { const text = original.t(key, args); return key === 'management.recovered' ? '\\C[2]' + text + '\\^' : text; } });
+  h.mapStart(); const parser = messageEscapeHost(), converted = parser.convert(h.messages[0]);
+  assert(converted.startsWith('\x1bC[2]')); assert(converted.includes('\\V[1]')); assert(!converted.includes('INJECTED_VARIABLE')); assert.equal(parser.pauseSkip(h.messages[0]), true);
+});
+test('map recovered message queue failure keeps its notice and unchanged save for the next map entry', () => {
+  const h = recoveryMessageHost({ name: '\\^Nick' }), before = J(h.flow.game());
+  h.ctx.$gameMessage.add = () => { throw Error('injected message queue failure'); }; h.mapStart();
+  assert.equal(h.app.receivingNotifications.length, 1); assert.deepEqual(J(h.flow.game()), before);
+  h.ctx.$gameMessage.add = text => h.messages.push(text); h.mapStart();
+  assert.equal(h.messages.length, 1); assert.equal(messageEscapeHost().pauseSkip(h.messages[0]), false);
+  assert.equal(h.app.receivingNotifications.length, 0); assert.deepEqual(J(h.flow.game()), before);
 });

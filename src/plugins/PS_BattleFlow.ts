@@ -1,3 +1,4 @@
+import { messageLiteral } from './message-literal';
 import { captureInitialField, withInitialField, initialFieldMZ, WEATHER, TERRAIN } from '../framework/rules/initial-field';
 /**
  * Step 2.4: MZ/RPGReactor integration of the Showdown battle session (placeholder text UI).
@@ -42,9 +43,6 @@ import { projectStatusCard } from './battleflow/status-card';
 import { installPrebattleHost } from './battleflow/prebattle-host';
 import { effectiveBattleEffects, installBattleEffectsSettings, parseBattleEffects } from './battleflow/battle-effects-settings';
 const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
-
-/** Literal user text for one native MZ message conversion. Keep stored names and authored controls intact. */
-const messageLiteral = (text: string): string => text.replace(/\\/g, '\\\\').replace(/\x1b/g, '␛');
 
 (() => {
   "use strict";
