@@ -249,3 +249,23 @@ for(const harvest of [false,true])test(`capture provenance actual Trick -> Rest 
  const result=(await H).planHeldWriteback({before,primary,facts,capturedOrigins:{C1:'F1'}});
  assert.deepEqual(result.state.party.map(m=>m.item),harvest?['lumberry','lightclay']:['lightclay','']);
 });
+
+for(const sameName of [false,true])test(`capture closes real three-member transfer cycle, sameName=${sameName}`,async()=>{
+ const x='leftovers', y=sameName?x:'lightclay', z=sameName?x:'smoothrock';
+ const sample=await create({wild:true,p:set('P1','Snorlax',['Trick'],x),f:set('F1','Snorlax',['Splash'],y),rest:[set('P2','Snorlax',['Trick'],z)]});
+ await turn(sample.gw);await turn(sample.gw,'switch 2');await turn(sample.gw);
+ assert.equal(await sample.gw.act('p1',{kind:'ball',ball:'masterball',target:'F1',catchRate:45,ctx:{}}),true);
+ assert.equal(await sample.gw.choose('p2','move 1'),true);sample.gw.drain();assert(sample.gw.ended);
+ const facts=await finish(sample,false);
+ assert.deepEqual(facts.members.map(m=>[m.id,m.current]),[['P1',y],['P2',x],['F1',z]]);
+ for(const destination of ['party','box','replace-P1','replace-P2']){
+  const before={party:[{id:'P1',item:x},{id:'P2',item:z}],storage:{boxes:[{slots:[null,null]}]}},primary=JSON.parse(JSON.stringify(before)),caught={id:'C1',item:z};
+  if(destination==='box')primary.storage.boxes[0].slots[0]=caught;
+  else {if(destination.startsWith('replace-'))primary.storage.boxes[0].slots[0]=primary.party.splice(destination==='replace-P1'?0:1,1)[0];primary.party.push(caught);}
+  const result=(await H).planHeldWriteback({before,primary,facts,capturedOrigins:{C1:'F1'}});
+  const actual=Object.fromEntries([...result.state.party,...result.state.storage.boxes[0].slots.filter(Boolean)].map(m=>[m.id,m.item]));
+  const expected=destination==='replace-P1'?{P1:y,P2:z,C1:x}:destination==='replace-P2'?{P1:x,P2:y,C1:z}:{P1:x,P2:z,C1:y};
+  assert.deepEqual(actual,expected,destination);
+  assert.deepEqual(Object.values(actual).sort(),[x,y,z].sort(),'each distinct surviving source is installed exactly once');
+ }
+});

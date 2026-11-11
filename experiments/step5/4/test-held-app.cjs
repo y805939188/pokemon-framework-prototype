@@ -324,3 +324,23 @@ test(`capture held provenance: real Trick, pending ${destination}, abort=${abort
  const after=J(w.state.current());assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied');
  assert.deepEqual(w.state.current(),after);assert.equal(w.state.replaced.length,1);
 });
+
+for(const sameName of [false,true])for(const destination of ['party','box','replace-P1','replace-P2'])
+test(`capture App closes two-player transfer chain ${destination}, sameName=${sameName}`,async()=>{
+ const seed=fixture({item:'leftovers'}),game=J(seed.state.current());
+ game.party.push({...J(game.party[0]),id:'P2',item:sameName?'leftovers':'sitrusberry'});
+ if(destination!=='party')for(let i=3;i<=6;i++)game.party.push({...J(game.party[0]),id:'P'+i,item:''});
+ game.nextMemberOrdinal='7';
+ const w=fixture({game,naming:0}),before=J(w.state.current()),h=await w.app.startBattle(w.request);
+ assert((await h.chooseMove(1)).ok);assert((await h.chooseSwitch('P2')).ok);assert((await h.chooseMove(1)).ok);
+ assert((await h.throwBall('masterball')).ok);
+ const raw=h.result(),id=raw.captured[0].id,pending=w.app.finishBattle(h,w.request);
+ assert(pending.pending);assert.deepEqual(w.state.current(),before);assert.equal(w.state.replaced.length,0);
+ const target=destination==='replace-P1'?'P1':'P2';
+ const placement=destination.startsWith('replace-')?{kind:'replace',target:{id:target,position:{kind:'party',index:target==='P1'?0:1}}}:{kind:'box'};
+ const out=w.app.resolveReceiving(pending.receivingToken,{[id]:{nickname:{kind:'keep'},placement}});
+ assert.equal(out.commit,'applied',JSON.stringify(out));assert.equal(w.state.replaced.length,1);
+ const items=E.storage.allMembers(w.state.current()).map(m=>m.item).filter(Boolean).sort();
+ assert.deepEqual(items,['leftovers',sameName?'leftovers':'sitrusberry'].sort());
+ const after=J(w.state.current());assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied');assert.deepEqual(w.state.current(),after);assert.equal(w.state.replaced.length,1);
+});

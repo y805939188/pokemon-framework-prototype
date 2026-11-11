@@ -165,5 +165,19 @@ export function planHeldWriteback<T extends MemberCollection>(input: HeldWriteba
     used.add(sourceId); located.member.item = item;
     changes.push({ id: capturedId, item, destination: located.position.kind === "party" ? "party" : "box" });
   }
+  if (claims) {
+    // More than two members can form a transfer cycle. Restoring one original can displace
+    // another member's C even when capture C/I are already claimed. Close that entire cycle:
+    // every still-held source token in the admitted roster must occupy exactly one final slot.
+    const sources = [...facts.members.filter(m => m.side === "p1").map(m => m.id), ...used];
+    const remaining = claims.claimRemainingCurrent(sources);
+    const empty = changes.filter(change => !change.item).sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    if (remaining.length > empty.length) throw new Error("held-capture-conservation-capacity");
+    remaining.forEach((item, index) => {
+      const change = empty[index]!;
+      locateMember(state, change.id)!.member.item = item;
+      change.item = item;
+    });
+  }
   return { state, changes };
 }

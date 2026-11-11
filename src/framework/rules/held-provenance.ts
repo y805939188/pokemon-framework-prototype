@@ -10,6 +10,7 @@ interface Token { readonly owner: string; readonly item: string; live: boolean }
 interface Cell { current: Token | null; recovery: Token | null; recycle: Token | null }
 export interface CaptureHeldClaims {
   claim(id: string, field: "current" | "recovery", heldOnly?: boolean): string | null;
+  claimRemainingCurrent(ids: readonly string[]): string[];
 }
 
 /** A token is one initial roster object's item. Consumption retires it; Recycle/Harvest revive that token.
@@ -77,5 +78,13 @@ export function captureHeldClaims(facts: Journal): CaptureHeldClaims {
     if (!token) return "";
     if (!token.live || claimed.has(token) || heldOnly && ![...cells.values()].some(other => other.current === token)) return null;
     claimed.add(token); return token.item;
+  }, claimRemainingCurrent(ids) {
+    const remaining: string[] = [];
+    for (const id of [...ids].sort()) {
+      const cell = cells.get(id); if (!cell) return fail();
+      const token = cell.current;
+      if (token?.live && !claimed.has(token)) { claimed.add(token); remaining.push(token.item); }
+    }
+    return remaining;
   } };
 }
