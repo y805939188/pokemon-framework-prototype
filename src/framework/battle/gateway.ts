@@ -571,7 +571,8 @@ export class BattleGateway implements BattleDriver {
       // persistent counter (WP20): remaining sleep turns, 1 for badly poisoned, else 0
       statusCount: p.fainted ? 0 : p.status === "slp" ? Math.max(0, (p.statusState && p.statusState.time) || 0) : p.status === "tox" ? 1 : 0,
       pp: Object.fromEntries(p.baseMoveSlots.map((m: { id: string; pp: number }) => [m.id, m.pp])),
-      stats: { ...p.baseStoredStats }, active: !!p.isActive,
+      stats: { ...(p.species !== p.baseSpecies && !p.transformed
+        ? this._battle.spreadModify(p.baseSpecies.baseStats, p.set) : p.baseStoredStats) }, active: !!p.isActive,
       confused: !!(p.volatiles && p.volatiles["confusion"]), boosts: { ...p.boosts },
     }));
   }
@@ -594,13 +595,16 @@ export class BattleGateway implements BattleDriver {
     const before = { level: p.level, maxhp: p.maxhp, hp: p.hp };
     p.set.level = level; p.level = level;
     if (evs) p.set.evs = { ...evs };
-    // WP42 §4.2: Transform keeps its copied battle stats while the original member grows.
-    // The engine retains that original species in baseSpecies; species is the copied target.
-    const growthSpecies = p.transformed ? p.baseSpecies : p.species;
+    // Growth belongs to the permanent member, not a copied or temporary battle forme.
+    // Transform keeps copied stats; ordinary forme changes recalculate their own battle stats.
+    const growthSpecies = p.baseSpecies;
     const stats: Stats = b.spreadModify(growthSpecies.baseStats, p.set);
-    p.baseStoredStats = stats;
+    // Non-permanent formes (e.g. Stance Change) grow their current battle stats too.
+    // Keep the engine-native baseStoredStats in that forme; readState projects permanent stats.
+    const battleStats: Stats = p.transformed ? stats : b.spreadModify(p.species.baseStats, p.set);
+    p.baseStoredStats = battleStats;
     if (!p.transformed) {
-      for (const k of Object.keys(p.storedStats)) p.storedStats[k] = stats[k as keyof Stats];
+      for (const k of Object.keys(p.storedStats)) p.storedStats[k] = battleStats[k as keyof Stats];
       p.speed = p.storedStats.spe;
     }
     // Both native helpers read species. Select the permanent basis for HP and public details:
