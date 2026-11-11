@@ -16,18 +16,18 @@ export interface TrainerCapture { ticket:TrainerRequestTicket; snapshot:TrainerA
 interface RequestIdentity { object:object|null; turn:number; seq:number; revision:number; signature:string }
 interface TicketData { source:Source; owner:object; request:RequestIdentity; resourceRevision:number; actions:Map<string,Action>; spent:boolean; automaticCandidateId?:string }
 type MutableOpponent = {-readonly [K in keyof PublicOpponent]:PublicOpponent[K]};
-/** Only public switch/typechange/typeadd events populate this state. Gen8 has one replaceable added type. */
-interface PublicTypes { base:string[]; added:string|null }
+/** Only public appearance and type events populate this state. Gen8 has one replaceable added type. */
+interface PublicTypes { original:string[]; base:string[]; added:string|null; changed:boolean }
 interface Source {
   driver:BattleDriver; battle:ShowdownBattle; env:LoadedSim; lineage:object; seed:number[]|string;
-  public:MutableOpponent|null; publicTypes:PublicTypes|null; appearance:number; weather:string; terrain:string; conditions:string[];
+  public:MutableOpponent|null; publicTypes:PublicTypes|null; ownPublicTypes:PublicTypes|null; appearance:number; weather:string; terrain:string; conditions:string[];
   request:RequestIdentity; ticket:TrainerRequestTicket|null; owner?:object; catalog?:AssembledTrainerCatalog;
   snapshot:()=>string;
   submit:(action:Action)=>Promise<boolean>;
 }
 const SOURCES = new WeakMap<BattleDriver,Source>();
 const TICKETS = new WeakMap<TrainerRequestTicket,TicketData>();
-interface SourceCheckpoint {lineage:object;seed:number[]|string;public:MutableOpponent|null;publicTypes:PublicTypes|null;appearance:number;weather:string;terrain:string;conditions:string[];request:Omit<RequestIdentity,'object'>}
+interface SourceCheckpoint {lineage:object;seed:number[]|string;public:MutableOpponent|null;publicTypes:PublicTypes|null; ownPublicTypes:PublicTypes|null;appearance:number;weather:string;terrain:string;conditions:string[];request:Omit<RequestIdentity,'object'>}
 const CHECKPOINTS = new WeakMap<DriverCheckpoint,SourceCheckpoint>();
 const copy = <T>(v:T):T => JSON.parse(JSON.stringify(v)) as T;
 const id = (v:string):string => v.toLowerCase().replace(/[^a-z0-9]/g,'');
@@ -35,7 +35,7 @@ const status = (v:string,fainted=false):PersistentStatus => (v === 'fnt' && fain
 const stages = ():PublicOpponent['stages'] => ({atk:0,def:0,spa:0,spd:0,spe:0,accuracy:0,evasion:0});
 /** Called only by the gateway constructor, before setPlayer can emit callbacks. */
 export function attachTrainerSource(driver:BattleDriver,battle:ShowdownBattle,env:LoadedSim,submit:Source['submit'],snapshot:Source['snapshot']):void {
-  SOURCES.set(driver,{driver,battle,env,submit,snapshot,lineage:{},seed:copy(battle.prngSeed),public:null,publicTypes:null,appearance:0,weather:'',terrain:'',conditions:[],request:{object:null,turn:0,seq:0,revision:0,signature:''},ticket:null});
+  SOURCES.set(driver,{driver,battle,env,submit,snapshot,lineage:{},seed:copy(battle.prngSeed),public:null,publicTypes:null,ownPublicTypes:null,appearance:0,weather:'',terrain:'',conditions:[],request:{object:null,turn:0,seq:0,revision:0,signature:''},ticket:null});
 }
 /** Only emitted engine requests create/advance request authority. Equal refresh retains one entitlement. */
 export function trainerSourceRequest(driver:BattleDriver):void {
@@ -61,6 +61,35 @@ function hpBar(value:string):{parts:number;scale:100} {
   const parts=hp<maxhp?Math.min(99,Math.ceil(100*hp/maxhp)):100;
   return {parts,scale:100};
 }
+/** A public-only projection for both active slots; Transform must not inspect p1 internals. */
+function collectPublicTypes(s:Source,type:string,a:string,b:string,c:string):void {
+  const slot=a.startsWith('p1a:')?'publicTypes':a.startsWith('p2a:')?'ownPublicTypes':null;
+  if(!slot)return;
+  let current=s[slot];
+  if(['switch','drag','replace','-formechange','detailschange'].includes(type)){
+    const species=s.env.sim.Dex.forGen(8).species.get(b.split(',')[0]!);
+    if(!species.exists)throw new Error('trainer-ai-unknown-public-species');
+    const base=[...species.types];
+    if(type==='replace'&&current){
+      // Illusion ending reveals identity, not a switch: retain publicly announced changes/additions.
+      current.original=base;if(!current.changed)current.base=[...base];
+    }else if((type==='-formechange'||type==='detailschange')&&current){
+      current.base=base;current.added=null;current.changed=false;
+      if(type==='detailschange')current.original=[...base];
+    }else current={original:[...base],base,added:null,changed:false};
+  }
+  if(type==='-transform'&&current){
+    const target=b.startsWith('p2a:')?s.ownPublicTypes:b.startsWith('p1a:')?s.publicTypes:null;
+    if(target){current.base=[...target.base];current.added=target.added;current.changed=true;}
+  }
+  if(current){
+    if(type==='-start'&&b==='typechange'){current.base=c.split('/');current.added=null;current.changed=true;}
+    if(type==='-start'&&b==='typeadd')current.added=c;
+    if(type==='-end'&&b==='typechange'){current.base=[...current.original];current.added=null;current.changed=false;}
+  }
+  s[slot]=current;
+}
+function shownTypes(types:PublicTypes):string[]{return [...new Set([...types.base,...(types.added?[types.added]:[])])];}
 /** Engine public stream only. p1 request, choice, queue and rpg.pending are never inspected. */
 export function trainerSourcePublic(driver:BattleDriver,lines:readonly string[]):void {
   const s=SOURCES.get(driver);if(!s)return;
@@ -75,6 +104,7 @@ export function trainerSourcePublic(driver:BattleDriver,lines:readonly string[])
         if(type==='-sidestart')s.conditions.push(key==='spikes'||key==='toxicspikes'?prefix+':'+Math.min(key==='spikes'?3:2,Number(previous?.split(':')[2]??0)+1):prefix);
       }
     }
+    collectPublicTypes(s,type,a,b,c);
     if(!a.startsWith('p1a:'))continue;
     if(type==='switch'||type==='drag'||type==='replace'){
       const speciesName=b.split(',')[0]!,species=s.env.sim.Dex.forGen(8).species.get(speciesName);
@@ -82,7 +112,6 @@ export function trainerSourcePublic(driver:BattleDriver,lines:readonly string[])
       const previous=type==='replace'?s.public:null;
       const level=Number(/(?:^|, )L(\d+)/.exec(b)?.[1]??100),bar=c?hpBar(c):previous?.hpBar;
       if(!bar)throw new Error('trainer-ai-invalid-public-health');
-      s.publicTypes={base:[...species.types],added:null};
       s.public={appearanceKey:previous?.appearanceKey??'p1a:'+ ++s.appearance,displayedSpecies:species.id,displayedForm:0,level,shownTypes:[...species.types],hpBar:bar,status:c?status(c.split(' ')[1]??'',bar.parts===0):previous!.status,stages:previous?copy(previous.stages):stages(),revealedMoves:previous?[...previous.revealedMoves]:[],lastPublicMove:previous?copy(previous.lastPublicMove):null,fainted:bar.parts===0,revealedAbility:previous?.revealedAbility??null,revealedItem:previous?.revealedItem??null};
     }
     const p=s.public;if(!p)continue;
@@ -99,14 +128,7 @@ export function trainerSourcePublic(driver:BattleDriver,lines:readonly string[])
       const key=b as keyof typeof p.stages,old=p.stages[key];p.stages={...p.stages,[key]:Math.max(-6,Math.min(6,type==='-setboost'?Number(c):old+Number(c)*(type==='-unboost'?-1:1)))};
     }
     if(type==='-clearboost')p.stages=stages();
-    // setType clears the prior addition; addType replaces it without dropping either base type.
-    // Keep the components separately so a second addition cannot become a fourth type or erase a base.
-    if(type==='-start'&&b==='typechange'){
-      s.publicTypes={base:c.split('/'),added:null};p.shownTypes=[...s.publicTypes.base];
-    }
-    if(type==='-start'&&b==='typeadd'){
-      const types=s.publicTypes!;types.added=c;p.shownTypes=[...types.base,types.added];
-    }
+    if(s.publicTypes)p.shownTypes=shownTypes(s.publicTypes);
   }
 }
 export function bindTrainerSource(driver:BattleDriver,owner:object,content:Content,identity:string):{catalog:AssembledTrainerCatalog;seed:number[]|string;lineage:object} {
@@ -205,11 +227,11 @@ export async function submitTrainerCandidate(driver:BattleDriver,owner:object,ti
 export function checkpointTrainerSource(driver:BattleDriver,token:DriverCheckpoint):void {
   const s=SOURCES.get(driver);if(!s)return;
   const {object:_,...request}=s.request;
-  CHECKPOINTS.set(token,{lineage:s.lineage,seed:copy(s.seed),public:copy(s.public),publicTypes:copy(s.publicTypes),appearance:s.appearance,weather:s.weather,terrain:s.terrain,conditions:[...s.conditions],request:copy(request)});
+  CHECKPOINTS.set(token,{lineage:s.lineage,seed:copy(s.seed),public:copy(s.public),publicTypes:copy(s.publicTypes),ownPublicTypes:copy(s.ownPublicTypes),appearance:s.appearance,weather:s.weather,terrain:s.terrain,conditions:[...s.conditions],request:copy(request)});
 }
 export function restoreTrainerSource(driver:BattleDriver,token:DriverCheckpoint):void {
   const s=SOURCES.get(driver),cp=CHECKPOINTS.get(token);if(!s||!cp)throw new Error('trainer-ai-restore-source-mismatch');
-  Object.assign(s,copy({seed:cp.seed,public:cp.public,publicTypes:cp.publicTypes,appearance:cp.appearance,weather:cp.weather,terrain:cp.terrain,conditions:cp.conditions}));
+  Object.assign(s,copy({seed:cp.seed,public:cp.public,publicTypes:cp.publicTypes,ownPublicTypes:cp.ownPublicTypes,appearance:cp.appearance,weather:cp.weather,terrain:cp.terrain,conditions:cp.conditions}));
   s.lineage=cp.lineage;s.request={...cp.request,object:s.battle.sides[1]?.activeRequest??null};s.ticket=null;
 }
 export function rebindTrainerSource(driver:BattleDriver,owner:object,lineage:object,catalog:AssembledTrainerCatalog):void {

@@ -6,6 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 SUITES=(
+  experiments/step5/4/test-trainer-public-type-transitions.cjs
   experiments/step5/4/test-p4-request-source.cjs
   experiments/step5/4/test-p4-request-source-scene.cjs
   experiments/step5/4/test-normal-consumer-compat.cjs
