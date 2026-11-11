@@ -43,7 +43,9 @@ interface ObservationState {
   records: BattleObservation[]; issues: EvidenceIssue[]; displays: Record<string, string>;
   pending: Record<string, Extract<FormatObservation, { kind: "before-loss" }>>;
 }
-interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[]; friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[]; faintSequence: number; settlement?: { state: HeldTrackerSnapshot; lineage: object; wild: boolean } }
+interface ParticipationIdentity { side: string; id: string; slot: number }
+interface ParticipationFact extends ParticipationIdentity { type: string; ident: string }
+interface CheckpointData { participation: (ParticipationIdentity | null)[][]; pendingParticipation: ParticipationFact[]; snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[]; friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[]; faintSequence: number; settlement?: { state: HeldTrackerSnapshot; lineage: object; wild: boolean } }
 const CHECKPOINTS = new WeakMap<GatewayCheckpoint, CheckpointData>();
 const SETTLEMENTS = new WeakMap<object, { tracker: HeldTracker; lineage: object; wild: boolean }>();
 /** Internal companion queries: a look-alike driver or arbitrary restored JSON has no entry. */
@@ -78,6 +80,8 @@ export class BattleGateway implements BattleDriver {
   private _friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[] = [];
   private _faintKeys = new WeakMap<object, string>();
   private _faintSequence = 0;
+  private _participation = new WeakMap<BattleEvent, ParticipationIdentity>();
+  private _pendingParticipation: ParticipationFact[] = [];
   _legacyFaintHook?: (e: unknown) => void;
 
   constructor(opts: GatewayOptions, internal?: LoadedSim) {
@@ -100,6 +104,7 @@ export class BattleGateway implements BattleDriver {
     gw.#attachTrainerSource();
     attachReplacementSource(gw, gw._battle, gw._env, gw.snapshot.bind(gw));
     gw._attachObservations();
+    gw._attachParticipation();
     for (const [i, p] of (opts.players ?? []).entries()) {
       battle.setPlayer(`p${i + 1}`, { name: p.name, team: sim.Teams.pack(p.team) });
     }
@@ -145,6 +150,7 @@ export class BattleGateway implements BattleDriver {
     gw.#attachTrainerSource();
     attachReplacementSource(gw, gw._battle, gw._env, gw.snapshot.bind(gw));
     gw._attachObservations();
+    gw._attachParticipation();
     gw._battle.restart((type: string, data: string | string[]) => gw._onSend(type, data));
     gw._opts = { ...opts, restored: true };
     return gw;
@@ -160,6 +166,8 @@ export class BattleGateway implements BattleDriver {
     const token = new GatewayCheckpoint();
     const source = SETTLEMENTS.get(this);
     CHECKPOINTS.set(token, {
+      participation: this._queue.map(m => m.kind === "events" ? m.events.map(e => this._participation.get(e) ?? null) : []),
+      pendingParticipation: structuredClone(this._pendingParticipation),
       snapshot: this.snapshot(), engineRoot: this._env.root,
       queue: JSON.parse(JSON.stringify(this._queue)) as GatewayMessage[], seq: this._seq, closed: this._closed,
       observation: JSON.parse(JSON.stringify(this._observation)) as ObservationState,
@@ -180,6 +188,8 @@ export class BattleGateway implements BattleDriver {
     if (!data) throw new Error("not a gateway checkpoint");
     const gw = await RESTORE_GATEWAY(data.snapshot, { engineRoot: data.engineRoot });
     gw._queue = JSON.parse(JSON.stringify(data.queue)) as GatewayMessage[];
+    gw._pendingParticipation = structuredClone(data.pendingParticipation);
+    gw._queue.forEach((m, i) => { if (m.kind === "events") m.events.forEach((e, j) => { const identity = data.participation[i]?.[j]; if (identity) gw._participation.set(e, { ...identity }); }); });
     gw._seq = data.seq; gw._closed = data.closed;
     gw._observation = JSON.parse(JSON.stringify(data.observation)) as ObservationState;
     gw._friendshipFaints = JSON.parse(JSON.stringify(data.friendshipFaints)) as typeof gw._friendshipFaints;
@@ -204,6 +214,32 @@ export class BattleGateway implements BattleDriver {
     if (!extension.settlements || !["gen8rpgcustomgame", "gen8rpgdoublescustomgame"].includes(this._battle.format.id)) throw new Error("required-settlement-extension-unavailable");
     extension.settlements.set(this._battle, tracker);
     SETTLEMENTS.set(this, { tracker, lineage, wild });
+  }
+
+  /** Control-only identity captured at the engine log call, not at the eventual batch flush.
+   * Non-enumerable interception stays out of engine snapshots; restored engines are reattached.
+   * Public events and trainer observation keep the engine's disguised names unchanged. */
+  private _attachParticipation(): void {
+    const battle = this._battle, add = battle.add;
+    let depth = 0;
+    Object.defineProperty(battle, "add", { configurable: true, value: (...parts: any[]) => {
+      const type = parts[0], member = parts[1];
+      const tracked = depth === 0 && ["switch", "drag", "replace", "faint"].includes(type);
+      let fact: ParticipationFact | undefined;
+      if (tracked) {
+        if (!member || !battle.sides.includes(member.side) || !member.side.pokemon.includes(member)) throw new Error("participation-event-source-unavailable");
+        fact = { type, ident: String(member), side: member.side.id, id: member.name, slot: member.position };
+      }
+      depth++;
+      try { const result = add.apply(battle, parts); if (fact) this._pendingParticipation.push(fact); return result; }
+      finally { depth--; }
+    }});
+  }
+
+  participationIdentity(event: BattleEvent): ParticipationIdentity {
+    const value = this._participation.get(event);
+    if (!value) throw new Error("participation-event-binding-unavailable");
+    return { ...value };
   }
 
   _observationIssue(group: EvidenceIssue["group"], reason: string, memberId?: string): void {
@@ -717,7 +753,13 @@ export class BattleGateway implements BattleDriver {
       const ch = extractChannelMessages(text, [0]);
       const lines = (ch[0] ?? []).filter((l) => l !== "");
       trainerSourcePublic(this, lines);
-      this._emit({ kind: "events", events: lines.map(parseLine) });
+      const events = lines.map(parseLine);
+      for (const event of events) if (["switch", "drag", "replace", "faint"].includes(event.type)) {
+        const fact = this._pendingParticipation.shift();
+        if (!fact || fact.type !== event.type || fact.ident !== event.args[0]) throw new Error("participation-event-order-mismatch");
+        this._participation.set(event, { side: fact.side, id: fact.id, slot: fact.slot });
+      }
+      this._emit({ kind: "events", events });
     } else if (type === "sideupdate") {
       const nl = text.indexOf("\n");
       const side = text.slice(0, nl);

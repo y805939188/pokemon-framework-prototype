@@ -82,6 +82,8 @@ export interface GrowthOutcome {
 }
 
 export interface BattleDriver {
+  /** Private control identity for the exact event object; never part of public event JSON. */
+  participationIdentity?(event: BattleEvent): { side: string; id: string; slot: number };
   /** Submit a choice string for a side; false when the engine refuses it. */
   choose(side: string, choice: string): Promise<boolean>;
   /** Register a non-move action (item, ball, run) as the whole choice of one slot. */

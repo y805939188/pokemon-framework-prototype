@@ -24,6 +24,7 @@ SUITES=(
   experiments/step5/4/test-battle-effects-scene.cjs
   experiments/step5/4/test-learned-move-pp.cjs
   experiments/step5/4/test-stance-growth.cjs
+  experiments/step5/4/test-illusion-participation.cjs
   experiments/step5/4/test-transform-growth.cjs
   experiments/step5/4/test-transform-learning.cjs
   experiments/step5/4/test-transform-learning-scene.cjs

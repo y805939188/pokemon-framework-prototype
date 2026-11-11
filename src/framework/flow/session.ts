@@ -774,9 +774,11 @@ export class BattleSession {
   _onEvent(e: BattleEvent): void {
     const idOf = (s: string): string => s.replace(/^p\d[a-z]?: /, "");
     const arg0 = e.args[0] ?? "";
+    const identity = ["switch", "drag", "replace", "faint"].includes(e.type)
+      ? this.gw.participationIdentity?.(e) ?? { side: arg0.slice(0, 2), id: idOf(arg0), slot: arg0.charCodeAt(2) - 97 } : null;
+    if (e.type === "replace") return; // disguise reveal is not a new participant or encounter
     if (e.type === "switch" || e.type === "drag") {
-      const side = arg0.slice(0, 2); const id = idOf(arg0);
-      const slot = arg0.charCodeAt(2) - 97; // 'a' -> 0, 'b' -> 1
+      const { side, id, slot } = identity!; // 'a' -> 0, 'b' -> 1
       (this.activeNow[side] ??= [])[slot] = id;
       const ours = (this.activeNow["p1"] ?? []).filter(Boolean) as string[], theirs = (this.activeNow["p2"] ?? []).filter(Boolean) as string[];
       if (side === "p2") this.participants[id] = new Set(ours);
@@ -791,8 +793,8 @@ export class BattleSession {
           this._friendUnavailable = [...this._evidence.value.context.playerIds];
         }
       }
-      const side = arg0.slice(0, 2); const id = idOf(arg0);
-      (this.activeNow[side] ??= [])[arg0.charCodeAt(2) - 97] = null; // off the field: not a participant for later arrivals
+      const { side, id, slot } = identity!;
+      (this.activeNow[side] ??= [])[slot] = null; // off the field: not a participant for later arrivals
       if (side === "p2") this.growthQueue.push({ kind: "award", foeId: id });
     } else if (e.type === "rpg") {
       trainerAiEvent(this, e);
