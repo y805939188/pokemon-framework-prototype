@@ -474,7 +474,7 @@ export class BattleSession {
       return this.foe.kind === "wild" && !this.foe.noRun && mon.hp > 0 && !mon.fainted
         ? { ok: true } : { ok: false, reason: "item-no-effect" };
     }
-    const moves = Object.hasOwn(PP_ITEMS, itemId) ? this.party.find(m => m.id === targetId)?.moves.map(m => ({ ...m, pp: mon?.pp[m.id] ?? m.pp })) : undefined;
+    const moves = Object.hasOwn(PP_ITEMS, itemId) ? this.party.find(m => m.id === targetId)?.moves.map(m => ({ ...m, pp: mon?.pp[m.id] ?? m.pp, maxpp: mon?.ppMax?.[m.id] ?? m.maxpp })) : undefined;
     const eligibility = itemEligibility(itemId, mon, { moves, moveSlot });
     if (!eligibility.ok) return eligibility;
     if (this._itemMoveSlot(itemId, targetId, moveSlot) === null) return { ok: false, reason: "item-no-effect" };

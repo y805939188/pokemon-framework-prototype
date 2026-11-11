@@ -23,6 +23,11 @@ import type { HeldBinding, HeldRosterMember, RequiredFacts } from "../rules/held
 import { attachReplacementSource, checkpointReplacementSource, restoreReplacementSource } from './replacement-source';
 import { attachTrainerSource, trainerSourceRequest, trainerSourcePublic, checkpointTrainerSource, restoreTrainerSource } from './trainer-ai-source';
 
+/** Only the format's witnessed opening rewrite can label a permanent slot. Never consult live copies. */
+function permanentMoveId(slot: { id: string; rpgPermanentMoveId?: string }): string {
+  return slot.rpgPermanentMoveId ?? slot.id;
+}
+
 /** Version tag of the engine-level message stream used by the 2.2 harness only; NOT the game protocol (state.ts PROTOCOL_VERSION = 1). */
 export const PROTOCOL_VERSION = 0;
 
@@ -546,7 +551,7 @@ export class BattleGateway implements BattleDriver {
     const prepared = records.map((r) => {
       const p = this._mon(sideId, r.id);
       const moves = (r.moves ?? []).map((m) => {
-        const index = p.baseMoveSlots.findIndex((slot: { id: string }) => slot.id === m.id);
+        const index = p.baseMoveSlots.findIndex((slot: { id: string }) => permanentMoveId(slot) === m.id);
         if (index < 0) throw new Error(`unknown PP slot ${r.id}.${m.id}`);
         const slot = p.baseMoveSlots[index];
         const maxpp = m.maxpp ?? slot.maxpp; // low-level legacy callers may seed only current PP
@@ -555,7 +560,8 @@ export class BattleGateway implements BattleDriver {
         const ppUps = possible.find((ups) => this._battle.calculatePP(move, ups) === maxpp);
         if (!Number.isInteger(maxpp) || ppUps === undefined) throw new Error(`invalid PP maximum for ${r.id}.${m.id}: ${maxpp}`);
         if (!Number.isInteger(m.pp) || m.pp < 0 || m.pp > maxpp) throw new Error(`invalid current PP for ${r.id}.${m.id}: ${m.pp}/${maxpp}`);
-        return { index, id: m.id, pp: m.pp, maxpp, ppUps };
+        const battleMaxpp = slot.rpgPermanentMoveId ? this._battle.calculatePP(this._battle.dex.moves.get(slot.id), ppUps) : maxpp;
+        return { index, id: m.id, pp: Math.min(m.pp, battleMaxpp), maxpp: battleMaxpp, ppUps };
       });
       return { r, p, moves };
     });
@@ -579,8 +585,9 @@ export class BattleGateway implements BattleDriver {
       for (const m of moves) {
         const base = p.baseMoveSlots[m.index];
         base.pp = m.pp; base.maxpp = m.maxpp;
-        const live = p.moveSlots.find((slot: { id: string }) => slot.id === m.id);
-        if (live) { live.pp = m.pp; live.maxpp = m.maxpp; }
+        const live = p.moveSlots.find((slot: { id: string }) => slot.id === base.id);
+        if (!p.transformed && live && !live.virtual) { live.pp = m.pp; live.maxpp = m.maxpp; }
+        if (p.rpgCrownedMove?.index === m.index) p.rpgCrownedMove.pp = m.pp;
         p.ppUps[m.index] = m.ppUps;
       }
     }
@@ -595,8 +602,8 @@ export class BattleGateway implements BattleDriver {
     const members = this._battle.getSide(sideId).pokemon.filter((p: ShowdownPokemon) => p.name === memberId);
     if (members.length !== 1 || !moveId) return null;
     const slots = members[0].baseMoveSlots;
-    const index = slots.findIndex((slot: { id: string }) => slot.id === moveId);
-    return index >= 0 && slots.filter((slot: { id: string }) => slot.id === moveId).length === 1 ? index : null;
+    const index = slots.findIndex((slot: { id: string }) => permanentMoveId(slot) === moveId);
+    return index >= 0 && slots.filter((slot: { id: string }) => permanentMoveId(slot) === moveId).length === 1 ? index : null;
   }
 
   /** Read back the engine-owned dynamic state per member: hp, persistent status, pp per move. */
@@ -606,7 +613,10 @@ export class BattleGateway implements BattleDriver {
       status: p.fainted ? "" : p.status || "",
       // persistent counter (WP20): remaining sleep turns, 1 for badly poisoned, else 0
       statusCount: p.fainted ? 0 : p.status === "slp" ? Math.max(0, (p.statusState && p.statusState.time) || 0) : p.status === "tox" ? 1 : 0,
-      pp: Object.fromEntries(p.baseMoveSlots.map((m: { id: string; pp: number }) => [m.id, m.pp])),
+      pp: Object.fromEntries(p.baseMoveSlots.map((m: { id: string; pp: number }) => [permanentMoveId(m), m.pp])),
+      ...(p.baseMoveSlots.some((m: { rpgPermanentMoveId?: string }) => m.rpgPermanentMoveId) ? {
+        ppMax: Object.fromEntries(p.baseMoveSlots.map((m: { id: string; maxpp: number }) => [permanentMoveId(m), m.maxpp])),
+      } : {}),
       stats: { ...(p.species !== p.baseSpecies && !p.transformed
         ? this._battle.spreadModify(p.baseSpecies.baseStats, p.set) : p.baseStoredStats) }, active: !!p.isActive,
       confused: !!(p.volatiles && p.volatiles["confusion"]), boosts: { ...p.boosts },
@@ -624,7 +634,7 @@ export class BattleGateway implements BattleDriver {
     const b = this._battle;
     const p = this._mon(sideId, id);
     if (replaceMoveId !== undefined) {
-      const index = p.baseMoveSlots.findIndex((slot: { id: string }) => slot.id === replaceMoveId);
+      const index = p.baseMoveSlots.findIndex((slot: { id: string }) => permanentMoveId(slot) === replaceMoveId);
       if (index < 0 || newMoves.length !== 1 || replaceSlot === null || replaceSlot === undefined) throw new Error('growth replacement identity unavailable');
       replaceSlot = index;
     }

@@ -64,6 +64,8 @@ export interface MemberState extends MonView {
   level: number;
   statusCount: number;
   pp: Record<string, number>;
+  /** Battle caps keyed by persistent move identity when an opening rewrite changes total PP. */
+  ppMax?: Record<string, number>;
   stats: Stats;
 }
 

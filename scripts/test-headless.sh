@@ -32,6 +32,7 @@ SUITES=(
   experiments/step5/4/test-wild-faint-escape.cjs
 
   experiments/step5/4/test-battle-pp-items.cjs
+  experiments/step5/4/test-crowned-move-pp.cjs
 
   experiments/step5/4/test-switch-style-ports.cjs
   experiments/step5/4/test-battle-style-settings.cjs

@@ -480,6 +480,20 @@ const rpgHandlers = {
     // The native start action resets pokemonLeft after Team Preview. Restore carried-faint
     // counts before any switch-in/entry effect, without a new KO or another HP/status/PP seed.
     for (const side of this.sides) side.pokemonLeft = side.pokemon.filter((p: ShowdownPokemon) => !p.fainted).length;
+    // Native Zacian/Zamazenta BattleStart replaces the Iron Head slot and refills it.
+    // WP21 §4.2: retain PP Ups, clamp the imported current PP to the new move's cap.
+    // Only a witnessed permanent opening replacement receives the persistent identity.
+    for (const side of this.sides) for (const p of side.pokemon) {
+      const saved = p.rpgCrownedMove;
+      if (saved) {
+        const slot = p.baseMoveSlots[saved.index];
+        if (slot?.id === saved.battleId && this.toID(p.set.moves[saved.index]) === "ironhead") {
+          slot.rpgPermanentMoveId = "ironhead";
+          slot.pp = Math.min(saved.pp, slot.maxpp);
+        }
+        delete p.rpgCrownedMove;
+      }
+    }
     startInitialField(this);
   },
   onModifyMove(this: ShowdownBattle, move: ShowdownPokemon, pokemon: ShowdownPokemon): void {
@@ -550,6 +564,12 @@ const rpgHandlers = {
   },
   onBegin(this: ShowdownBattle): void {
     this.rpg = { pending: {}, attempts: {} };
+    for (const side of this.sides) for (const p of side.pokemon) {
+      const battleId = p.species.id === "zacian" && p.item === "rustedsword" ? "behemothblade"
+        : p.species.id === "zamazenta" && p.item === "rustedshield" ? "behemothbash" : null;
+      const index = p.baseMoveSlots.findIndex((slot: { id: string }) => slot.id === "ironhead");
+      if (battleId && index >= 0) p.rpgCrownedMove = { index, battleId, pp: p.baseMoveSlots[index].pp };
+    }
   },
   onRpgAction(this: ShowdownBattle, pokemon: ShowdownPokemon): void {
     const payload = pendingFor(this, pokemon.side.id, pokemon.position);
