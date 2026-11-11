@@ -28,6 +28,16 @@ function permanentMoveId(slot: { id: string; rpgPermanentMoveId?: string }): str
   return slot.rpgPermanentMoveId ?? slot.id;
 }
 
+/** The input set survives native opening forme changes that also replace baseSpecies (e.g. Crowned dogs). */
+function permanentSpecies(battle: ShowdownBattle, pokemon: ShowdownPokemon): ShowdownPokemon {
+  return battle.dex.species.get(pokemon.set.species || pokemon.set.name);
+}
+function permanentStats(battle: ShowdownBattle, pokemon: ShowdownPokemon): Stats {
+  const species = permanentSpecies(battle, pokemon);
+  return species.id !== pokemon.baseSpecies.id || (pokemon.species !== pokemon.baseSpecies && !pokemon.transformed)
+    ? battle.spreadModify(species.baseStats, pokemon.set) : pokemon.baseStoredStats;
+}
+
 /** Version tag of the engine-level message stream used by the 2.2 harness only; NOT the game protocol (state.ts PROTOCOL_VERSION = 1). */
 export const PROTOCOL_VERSION = 0;
 
@@ -617,8 +627,7 @@ export class BattleGateway implements BattleDriver {
       ...(p.baseMoveSlots.some((m: { rpgPermanentMoveId?: string }) => m.rpgPermanentMoveId) ? {
         ppMax: Object.fromEntries(p.baseMoveSlots.map((m: { id: string; maxpp: number }) => [permanentMoveId(m), m.maxpp])),
       } : {}),
-      stats: { ...(p.species !== p.baseSpecies && !p.transformed
-        ? this._battle.spreadModify(p.baseSpecies.baseStats, p.set) : p.baseStoredStats) }, active: !!p.isActive,
+      stats: { ...permanentStats(this._battle, p) }, active: !!p.isActive,
       confused: !!(p.volatiles && p.volatiles["confusion"]), boosts: { ...p.boosts },
     }));
   }
@@ -643,24 +652,25 @@ export class BattleGateway implements BattleDriver {
     if (evs) p.set.evs = { ...evs };
     // Growth belongs to the permanent member, not a copied or temporary battle forme.
     // Transform keeps copied stats; ordinary forme changes recalculate their own battle stats.
-    const growthSpecies = p.baseSpecies;
+    const growthSpecies = permanentSpecies(b, p);
     const stats: Stats = b.spreadModify(growthSpecies.baseStats, p.set);
-    // Non-permanent formes (e.g. Stance Change) grow their current battle stats too.
-    // Keep the engine-native baseStoredStats in that forme; readState projects permanent stats.
-    const battleStats: Stats = p.transformed ? stats : b.spreadModify(p.species.baseStats, p.set);
+    // Keep the native battle basis distinct from the stored individual. Crowned replaces
+    // baseSpecies too; Transform retains that natural battle basis beneath the copied stats.
+    const battleStats: Stats = b.spreadModify((p.transformed ? p.baseSpecies : p.species).baseStats, p.set);
     p.baseStoredStats = battleStats;
     if (!p.transformed) {
       for (const k of Object.keys(p.storedStats)) p.storedStats[k] = battleStats[k as keyof Stats];
       p.speed = p.storedStats.spe;
     }
-    // Both native helpers read species. Select the permanent basis for HP and public details:
-    // Transform never replaces details, which later switch messages and side requests reuse.
-    // Retain the native HP delta/fainted rule and notification without changing copied types,
-    // ability or stats; restore the visible battle species even if either helper throws.
+    // Both native helpers read species. HP follows the persistent individual, while public
+    // details retain the natural battle forme (Crowned, or the original of a Transform copy).
+    // Retain the native HP delta/fainted rule without changing copied types, ability or stats;
+    // restore the visible battle species even if either helper throws.
     const battleSpecies = p.species;
     try {
       p.species = growthSpecies;
       p.updateMaxHp();
+      p.species = p.baseSpecies;
       p.details = p.getUpdatedDetails ? p.getUpdatedDetails() : p.details;
     } finally {
       p.species = battleSpecies;
