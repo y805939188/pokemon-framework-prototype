@@ -77,112 +77,118 @@
     "js/engine/build/content-cli.cjs": "16b6a3a2ff61898ff8854aa0289e76ea6b3c8d84c174c576826ba0e0d28ff28f",
     "js/engine/build/core.cjs": "29cdf2e84463d9274022f06ea6d2285482a939c7f5c381bce54bea919c1413ea",
     "js/engine/build/custom-formats.cjs": "2834e4dfad0b819a5d005e230127cf03a1c7217b6d309c5f49895a86576ee76a",
-    "js/engine/build/engine.cjs": "49335b4671b7757ac42703f873f6b440604933d686eca60284a88dfc00ffa37e",
-    "js/engine/build/production.cjs": "4a6990d7daa41b021cb0bef3d8094469c5d6bb9b90ab98c2c4d5e0e519b7f365",
-    "js/engine/build/public-presentation-1A6Isvnn.js": "b23f492ebd2c5125094d61897e8bb76545ad45dc5c05d1a883b1227c66cdfa99",
-    "js/engine/build/session-BM0gguHo.js": "8fdab19cd8a7c058663d3bfb8f105d88c59c2580315c23c504dfb8badeefb27f",
-    "js/engine/build/testing.cjs": "70399bf8f1df14d026d410cabf9f7a0844fb8f549f6f9d407a306c4ba48d4c85",
-    "js/engine/build/trainer-ai-diagnostics-Bj59S0ms.js": "a3acd2bd879b185202d002db31dc8fb6306ea7ce466ed3a4a91c9491fc95bb5f"
+    "js/engine/build/engine.cjs": "365f0208f6b233f0a648c85f86cdf977be57603b181557c7286947e84509675c",
+    "js/engine/build/production.cjs": "69c2aa27122fa8bc48991a67c130b9faebe151b1e6df02b491699b0a8892b938",
+    "js/engine/build/public-presentation--k-1Mzm1.js": "2dba664c31f067126c19dd55ef47391fc5bfe20ecc7f8a0a4eb8dc19371ea400",
+    "js/engine/build/session-CXP_tHs1.js": "4a4a940343e106dc150017d450c8815679484bdf8b0d8b43dce9fdd141293dda",
+    "js/engine/build/testing.cjs": "f8d13f9c2f0d76bd0be367fac5d921891398afe3223ad3e0a477b99edf1953cf",
+    "js/engine/build/trainer-ai-diagnostics-BEwAFXov.js": "389eafbc2f2a661e328178b8389d40957f9f7641e07c6a11a8be2abeac5eae14"
   },
   "runtimeRebinding": {
-    "sourceCommit": "59749fa162e76f65f0c6b17f93083fc83472a51d",
-    "sourceTree": "c8651830db50e55e334376132777d4a45492215c",
-    "previousBindingSHA256": "7a44e91dd99e78204b3158d626dba149546ec8b78dc7a2ce1e3acfdd23b6d43b",
+    "sourceCommit": "5a94a40cdb664e60f74977b3347cc47492929731",
+    "sourceTree": "0092b2b0510c4ffcc4cac705f5cc58b92179edc2",
+    "previousBindingSHA256": "0264e20cdddbf5bb576b20dbde16eb6f1437a8662dd0940036848a24dc2169ba",
     "previousRebinding": {
-      "sourceCommit": "b8b3d6eeb62fba5c828f4dc2843e2d9802f9909e",
-      "sourceTree": "da85d9c24d8c33a695b85056d35035b5faa3e38a",
-      "previousBindingSHA256": "a101bdf1a0bfd4368dccc7688f2a47d11931b3548e5afd1cc2c5fae194d43bd2",
+      "sourceCommit": "59749fa162e76f65f0c6b17f93083fc83472a51d",
+      "sourceTree": "c8651830db50e55e334376132777d4a45492215c",
+      "previousBindingSHA256": "7a44e91dd99e78204b3158d626dba149546ec8b78dc7a2ce1e3acfdd23b6d43b",
       "previousRebinding": {
-        "sourceCommit": "5246c3c2e87c40c15d19940d7e4898fffbd6f664",
-        "sourceTree": "580a88d666328f454d02802231c99e09658280a2",
-        "previousBindingSHA256": "c945f8cc073b839d41d5cce21afbd8ef0bde573f384e84aa0df699d70820c8b3",
+        "sourceCommit": "b8b3d6eeb62fba5c828f4dc2843e2d9802f9909e",
+        "sourceTree": "da85d9c24d8c33a695b85056d35035b5faa3e38a",
+        "previousBindingSHA256": "a101bdf1a0bfd4368dccc7688f2a47d11931b3548e5afd1cc2c5fae194d43bd2",
         "previousRebinding": {
-          "sourceCommit": "efc8c44fecd4ef24c48369ade81ee1f898b98462",
-          "sourceTree": "7808b755bf7b818b69d2a5a9d6c7ccfba9e3d189",
-          "previousBindingSHA256": "3d914892ef8862e84bf3cf8a3fd6839d6e4cc06615d981fd3390271f16b0af63",
+          "sourceCommit": "5246c3c2e87c40c15d19940d7e4898fffbd6f664",
+          "sourceTree": "580a88d666328f454d02802231c99e09658280a2",
+          "previousBindingSHA256": "c945f8cc073b839d41d5cce21afbd8ef0bde573f384e84aa0df699d70820c8b3",
           "previousRebinding": {
-            "sourceCommit": "8337bbda1b4faefe399544e49c2921a991abef59",
-            "sourceTree": "394356d12f30648e9f81553825050aca77334253",
-            "previousBindingSHA256": "f17f021c005ee8d0701deff574493c16859ca793bbff71d7aa785e8aa63dab7f",
+            "sourceCommit": "efc8c44fecd4ef24c48369ade81ee1f898b98462",
+            "sourceTree": "7808b755bf7b818b69d2a5a9d6c7ccfba9e3d189",
+            "previousBindingSHA256": "3d914892ef8862e84bf3cf8a3fd6839d6e4cc06615d981fd3390271f16b0af63",
             "previousRebinding": {
-              "sourceCommit": "8431f3e8f4262aa5c07bf6daccdf5eeff7a22aa9",
-              "sourceTree": "9197532d8512ac81d3f91ad9c63654fcff340120",
-              "previousBindingSHA256": "dc5981e15de781ac1313cf2129cccc44b0164a684ddf5c4f0e7edc46bb5fbf92",
+              "sourceCommit": "8337bbda1b4faefe399544e49c2921a991abef59",
+              "sourceTree": "394356d12f30648e9f81553825050aca77334253",
+              "previousBindingSHA256": "f17f021c005ee8d0701deff574493c16859ca793bbff71d7aa785e8aa63dab7f",
               "previousRebinding": {
-                "sourceCommit": "76ec28f3760a1a6676447e3b7fbcdaf2e163eed6",
-                "sourceTree": "84b779afd1618b7d1b01f1df449d551193207bdb",
-                "previousBindingSHA256": "10acf808ef888a19bf39547ba5a4abfcfb653250888d24e32cf5600bc07d8048",
+                "sourceCommit": "8431f3e8f4262aa5c07bf6daccdf5eeff7a22aa9",
+                "sourceTree": "9197532d8512ac81d3f91ad9c63654fcff340120",
+                "previousBindingSHA256": "dc5981e15de781ac1313cf2129cccc44b0164a684ddf5c4f0e7edc46bb5fbf92",
                 "previousRebinding": {
-                  "sourceCommit": "2cddae0752962b878b2e30ed75756736904b34f1",
-                  "sourceTree": "f5d7308987657a9f06dd5c3b13c2e60f5467a594",
-                  "previousBindingSHA256": "5b21ee36086c70cb2fe0b271903bdf3f287dfe0cb5a65292c28acbffab864e3e",
+                  "sourceCommit": "76ec28f3760a1a6676447e3b7fbcdaf2e163eed6",
+                  "sourceTree": "84b779afd1618b7d1b01f1df449d551193207bdb",
+                  "previousBindingSHA256": "10acf808ef888a19bf39547ba5a4abfcfb653250888d24e32cf5600bc07d8048",
                   "previousRebinding": {
-                    "sourceCommit": "6d742ce500fd1632315bff24deffbcc8bd7208ef",
-                    "sourceTree": "9bb23d230010c5238218341c83932327b9793f8a",
-                    "previousBindingSHA256": "a504ac5e6a72395dacbe51f7970414a30f4adfcd8b26b1ba6852f46d7a51f4cd",
+                    "sourceCommit": "2cddae0752962b878b2e30ed75756736904b34f1",
+                    "sourceTree": "f5d7308987657a9f06dd5c3b13c2e60f5467a594",
+                    "previousBindingSHA256": "5b21ee36086c70cb2fe0b271903bdf3f287dfe0cb5a65292c28acbffab864e3e",
                     "previousRebinding": {
-                      "sourceCommit": "2c6214064a9406e8f79fde2883975e00231b641e",
-                      "sourceTree": "cd097260a81afa3722a8a96dcb79b01167d8774b",
-                      "previousBindingSHA256": "8f243cedf922fea9a48b203d034c556ea8f999a90344ba8e7680f1225de41aab",
+                      "sourceCommit": "6d742ce500fd1632315bff24deffbcc8bd7208ef",
+                      "sourceTree": "9bb23d230010c5238218341c83932327b9793f8a",
+                      "previousBindingSHA256": "a504ac5e6a72395dacbe51f7970414a30f4adfcd8b26b1ba6852f46d7a51f4cd",
                       "previousRebinding": {
-                        "sourceCommit": "fac38f13a07feba9df86b5af2859ba8927cfd849",
-                        "sourceTree": "8592a1e51794f50eceba9abca588e0e41e90a1dd",
-                        "previousBindingSHA256": "ae0d3e09e9c945b51f73a75be65855a04a95661d3a74eede6bd58efe8812a239",
+                        "sourceCommit": "2c6214064a9406e8f79fde2883975e00231b641e",
+                        "sourceTree": "cd097260a81afa3722a8a96dcb79b01167d8774b",
+                        "previousBindingSHA256": "8f243cedf922fea9a48b203d034c556ea8f999a90344ba8e7680f1225de41aab",
                         "previousRebinding": {
-                          "sourceCommit": "2f006fa0bd9de327eeb82261e7cb5861f5c70d33",
-                          "sourceTree": "f326be869d74361e701ee55eedcbed9cabe91bbe",
-                          "previousBindingSHA256": "9e2f6b326ab64e54dedc6f222057388e9fa7b531ec5fff2a09b9fd7b12dc0346",
+                          "sourceCommit": "fac38f13a07feba9df86b5af2859ba8927cfd849",
+                          "sourceTree": "8592a1e51794f50eceba9abca588e0e41e90a1dd",
+                          "previousBindingSHA256": "ae0d3e09e9c945b51f73a75be65855a04a95661d3a74eede6bd58efe8812a239",
                           "previousRebinding": {
-                            "reason": "Integrate reviewed Switch safe snapshots and exactly-once default terrain restore; only current generated identity changes",
-                            "sourceCommit": "26e24a93ce318b625009e806d8125ccae356d67c",
-                            "sourceTree": "548af7a7d5d2ffb453294572fa8fadbd1111e219",
-                            "previousBindingSHA256": "648cfe44ef7a8c77b6cda06d83002b1f01c1091ca836b2b52a22335ccb0529ad",
+                            "sourceCommit": "2f006fa0bd9de327eeb82261e7cb5861f5c70d33",
+                            "sourceTree": "f326be869d74361e701ee55eedcbed9cabe91bbe",
+                            "previousBindingSHA256": "9e2f6b326ab64e54dedc6f222057388e9fa7b531ec5fff2a09b9fd7b12dc0346",
                             "previousRebinding": {
-                              "reason": "Closed H3 production policy integration; source data, seeds and business oracles unchanged",
-                              "sourceCommit": "68e35c3677734f8cf6398bdca8521e747483f160",
-                              "sourceTree": "f609b10101d4652dc54cdc085cb515e546102b20",
-                              "previousBindingSHA256": "ce64fbd515bb914ec53e1e446024dcb9780d6683ad947aab97b33714b4e00cca",
+                              "reason": "Integrate reviewed Switch safe snapshots and exactly-once default terrain restore; only current generated identity changes",
+                              "sourceCommit": "26e24a93ce318b625009e806d8125ccae356d67c",
+                              "sourceTree": "548af7a7d5d2ffb453294572fa8fadbd1111e219",
+                              "previousBindingSHA256": "648cfe44ef7a8c77b6cda06d83002b1f01c1091ca836b2b52a22335ccb0529ad",
                               "previousRebinding": {
-                                "reason": "COMBO-P2-01: rebuilt final source-owned AI safe snapshot repair; scenarios/seeds/oracles unchanged",
-                                "sourceCommit": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
-                                "sourceTree": "f26c1a7c20474f214d6d26753bdb846bf55e1769",
-                                "previousBindingProduct": "47dbbc393860018cf04faaa1e89862e63652aa2b",
-                                "previousBindingSHA256": "b3de86b8cb410ad34a518eca4a5bfec08f5ac3705821a05cc7f0237dd614eb25",
+                                "reason": "Closed H3 production policy integration; source data, seeds and business oracles unchanged",
+                                "sourceCommit": "68e35c3677734f8cf6398bdca8521e747483f160",
+                                "sourceTree": "f609b10101d4652dc54cdc085cb515e546102b20",
+                                "previousBindingSHA256": "ce64fbd515bb914ec53e1e446024dcb9780d6683ad947aab97b33714b4e00cca",
                                 "previousRebinding": {
-                                  "reason": "Rebuilt final field/Harvest/PP/trainer combination; no scenario, seed, or business oracle changes",
-                                  "sourceCommit": "47dbbc393860018cf04faaa1e89862e63652aa2b",
-                                  "sourceTree": "406614edc72a531db1a503293fa85033fa4d9aa3",
-                                  "priorProducts": {
-                                    "field": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
-                                    "harvest": "a91570b6d006f0a303bfe3350b051f81be644dd2"
-                                  },
-                                  "mappingSource": "Actual nine files in this integration worktree js/engine/build after source-H build; not union or selection of prior tables"
+                                  "reason": "COMBO-P2-01: rebuilt final source-owned AI safe snapshot repair; scenarios/seeds/oracles unchanged",
+                                  "sourceCommit": "cb732434072b40332f93e8cd96cbe66901d8f7f5",
+                                  "sourceTree": "f26c1a7c20474f214d6d26753bdb846bf55e1769",
+                                  "previousBindingProduct": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+                                  "previousBindingSHA256": "b3de86b8cb410ad34a518eca4a5bfec08f5ac3705821a05cc7f0237dd614eb25",
+                                  "previousRebinding": {
+                                    "reason": "Rebuilt final field/Harvest/PP/trainer combination; no scenario, seed, or business oracle changes",
+                                    "sourceCommit": "47dbbc393860018cf04faaa1e89862e63652aa2b",
+                                    "sourceTree": "406614edc72a531db1a503293fa85033fa4d9aa3",
+                                    "priorProducts": {
+                                      "field": "d3088307405b8f87ee02274e3d1b8d60b52d7994",
+                                      "harvest": "a91570b6d006f0a303bfe3350b051f81be644dd2"
+                                    },
+                                    "mappingSource": "Actual nine files in this integration worktree js/engine/build after source-H build; not union or selection of prior tables"
+                                  }
                                 }
                               }
-                            }
+                            },
+                            "reason": "Localized cant description only; current generated runtime identity, scenarios, seeds, assertions and business oracles unchanged"
                           },
-                          "reason": "Localized cant description only; current generated runtime identity, scenarios, seeds, assertions and business oracles unchanged"
+                          "reason": "Combined reviewed cant feedback and opening state seed/faint count repair; current compiled identity only; business scenarios and oracles unchanged"
                         },
-                        "reason": "Combined reviewed cant feedback and opening state seed/faint count repair; current compiled identity only; business scenarios and oracles unchanged"
+                        "reason": "Reviewed diagnostic classification integration only; new compiled identities, business contract fields unchanged"
                       },
-                      "reason": "Reviewed diagnostic classification integration only; new compiled identities, business contract fields unchanged"
+                      "reason": "Rebuilt complete runtime after reviewed Sticky Barb transfer integration; no scenario, seed, oracle or runtime guard changes"
                     },
-                    "reason": "Rebuilt complete runtime after reviewed Sticky Barb transfer integration; no scenario, seed, oracle or runtime guard changes"
+                    "reason": "Complete rebuilt reviewed held-item integration including native wild Knock Off; only identities change, scenarios, seeds, oracles and checks retained"
                   },
-                  "reason": "Complete rebuilt reviewed held-item integration including native wild Knock Off; only identities change, scenarios, seeds, oracles and checks retained"
+                  "reason": "Normal held production release and strict explicit legacy no-held admission; scenarios, seeds and guards retained"
                 },
-                "reason": "Normal held production release and strict explicit legacy no-held admission; scenarios, seeds and guards retained"
+                "reason": "Reviewed Transform growth and permanent public identity repair; current generated runtime identities only, scenarios, seeds, oracles and guards unchanged"
               },
-              "reason": "Reviewed Transform growth and permanent public identity repair; current generated runtime identities only, scenarios, seeds, oracles and guards unchanged"
+              "reason": "Reviewed Transform move-slot learning, checkpoint restoration and extended move-menu repair; current generated runtime identity only, scenarios, seeds, oracles and guards unchanged"
             },
-            "reason": "Reviewed Transform move-slot learning, checkpoint restoration and extended move-menu repair; current generated runtime identity only, scenarios, seeds, oracles and guards unchanged"
+            "reason": "Reviewed normal request observation and captured Pokedex continuation on Transform move-slot repair; generated identity only, scenarios, seeds, oracles and guards unchanged"
           },
-          "reason": "Reviewed normal request observation and captured Pokedex continuation on Transform move-slot repair; generated identity only, scenarios, seeds, oracles and guards unchanged"
+          "reason": "Bind independently reviewed four-fix integration runtime; scenarios, seeds, oracle, host, and strict hash assertions unchanged. Historical pre-rebinding failures retained."
         },
-        "reason": "Bind independently reviewed four-fix integration runtime; scenarios, seeds, oracle, host, and strict hash assertions unchanged. Historical pre-rebinding failures retained."
+        "reason": "Bind independently reviewed F1 capture conservation, F2 summary move and Transform learning integration. Scenario, seed, oracle and strict guards unchanged."
       },
-      "reason": "Bind independently reviewed F1 capture conservation, F2 summary move and Transform learning integration. Scenario, seed, oracle and strict guards unchanged."
+      "reason": "Bind independently reviewed crowned move PP and permanent identity repair. Only rebuilt runtime identities change; scenarios, seeds, oracles, host and strict guards unchanged."
     },
-    "reason": "Bind independently reviewed crowned move PP and permanent identity repair. Only rebuilt runtime identities change; scenarios, seeds, oracles, host and strict guards unchanged."
+    "reason": "Bind independently reviewed Crowned permanent growth repair. Only rebuilt runtime identities change; scenarios, seeds, oracles, host and strict guards unchanged."
   }
 }
