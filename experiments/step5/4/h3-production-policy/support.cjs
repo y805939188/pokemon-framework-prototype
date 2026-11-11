@@ -13,8 +13,9 @@ const capabilities = {allowHeldItemSources:true,allowExperimentalHeldItemBattle:
 function fixture(source) {
   const names=['manifest','sources','species','overlays','grants','regional-dex','settings','map-metadata'];
   const input=Object.fromEntries(names.filter(n=>fs.existsSync(path.join(runtime,'content/sample',n+'.json'))).map(n=>[n.replace(/-([a-z])/g,(_,c)=>c.toUpperCase()),JSON.parse(fs.readFileSync(path.join(runtime,'content/sample',n+'.json'),'utf8'))]));
-  input.species.find(s=>s.id==='snorlax').learnset=['splash','rest','payday','trick'].map(move=>({level:1,move}));
+  input.species.find(s=>s.id==='snorlax').learnset=['splash','rest','payday',source.startsWith('capture')?'fling':'trick'].map(move=>({level:1,move}));
   input.species.find(s=>s.id==='pidgey').learnset=[{level:1,move:source.startsWith('capture')?'splash':'tackle'}];
+  if(source.startsWith('capture')) input.species.push({id:'meowth',showdownId:'meowth',nameKey:'species.meowth',growth:'medium',baseExp:50,evYield:{},catchRate:255,source:'author-placeholder',learnset:['splash','rest','payday'].map(move=>({level:1,move}))});
   input.items=Object.values(E.itemCatalog.legacyCatalog()).map(item=>({...item,source:'author-placeholder'}));
   if(!input.items.some(i=>i.id==='lumberry'))input.items.push({id:'lumberry',name:'Lum Berry',namePlural:'Lum Berries',pocket:5,price:0,source:'author-placeholder'});
   input.grants=[{id:'h3-held',source:'author-placeholder',members:[{species:'snorlax',level:50,item:'lumberry'}],items:{},money:0}];
@@ -48,14 +49,20 @@ async function acquireUnchecked(w) {
  const out=acquire(w);assert.equal(out.status,w.source==='trade'?'committed':'applied');
  if(!w.source.startsWith('capture'))return;
  const {app,state,source}=w,before=clone(state.read()),writes=state.replaced.length;
- const req={battleId:'H3-'+source+':capture-source',kind:'wild',seq:1,canLose:true,expGain:false,moneyGain:false,foes:[{species:'snorlax',level:50,moves:['splash','rest','payday']}],...(source==='capture-replace'?{forceParty:true}:{})};
+ const req={battleId:'H3-'+source+':capture-source',kind:'wild',seq:1,canLose:true,expGain:false,moneyGain:false,foes:[{species:'meowth',level:50}],...(source==='capture-replace'?{forceParty:true}:{})};
  let h;
  try{
- h=await app.startBattle(req);assert((await h.chooseMove(4)).ok);assert((await h.throwBall('masterball')).ok);assert(h.finished);
+ h=await app.startBattle(req);
+ const fling=await h.chooseMove(4);assert(fling.ok);const events=fling.messages.flatMap(m=>m.kind==='events'?m.events:[]);
+ assert.equal(events.filter(e=>e.type==='-enditem'&&e.args[1]==='Lum Berry'&&e.args.includes('[from] move: Fling')).length,1);
+ assert.equal(events.filter(e=>e.type==='-item'&&e.args[1]==='Lum Berry'&&e.args.includes('[from] ability: Pickup')).length,1);
+ assert((await h.throwBall('masterball')).ok);assert(h.finished);
  assert.deepEqual(state.read(),before);assert.equal(state.replaced.length,writes);
- const raw=h.result(),id=raw.captured[0].id;let result=app.finishBattle(h,req);
+ const raw=h.result(),id=raw.captured[0].id;assert.equal(raw.captured[0].item,'lumberry');let result=app.finishBattle(h,req);
  if(source==='capture-replace'){assert(result.pending);result=app.resolveReceiving(result.receivingToken,{[id]:{placement:{kind:'replace',target:{id:'P1',position:{kind:'party',index:0}}}}});}
  assert.equal(result.commit,'applied',JSON.stringify(result));assert.equal(state.replaced.length,writes+1);
+ const original=E.storage.locateMember(state.read(),'P1');assert.equal(original.member.item,'','Fling retired the player source; capture must not duplicate it');
+ const held=[...state.read().party,...state.read().storage.boxes.flatMap(box=>box.slots)].filter(m=>m&&m.item==='lumberry');assert.equal(held.length,1,'exactly one held Lum after capture');
  const found=E.storage.locateMember(state.read(),id);assert.equal(found.member.item,'lumberry');assert.equal(found.position.kind,source==='capture-box'?'box':'party');
  if(found.position.kind!=='party'||found.position.index!==0){const token=app.beginManagement();try{assert.equal(app.manage(token,'H3-place-captured',{kind:'move',source:{id,position:found.position},target:{kind:'party',index:0},expectedTargetId:state.read().party[0].id}).status,'applied');}finally{app.endManagement(token);}}
  assert.equal(state.read().party[0].id,id);assert.equal(state.read().party[0].item,'lumberry');
@@ -67,11 +74,17 @@ async function acquireReady(w) {
  if(w.source==='trade')expectedStats.trade_count++;
  if(w.source.startsWith('capture'))expectedStats.wild_battles_won++;
  if(w.source!=='give'){
-  expectedDex.seen=[...new Set([...expectedDex.seen,'snorlax'])];expectedDex.owned=[...new Set([...expectedDex.owned,'snorlax'])];
-  // Frozen synthetic author input: RNG always returns 0, native Snorlax gender/appearance; no engine reference equivalence claim.
+  const species=w.source.startsWith('capture')?'meowth':'snorlax';
+  expectedDex.seen=[...new Set([...expectedDex.seen,species])];expectedDex.owned=[...new Set([...expectedDex.owned,species])];
+  // Frozen synthetic author input: RNG always returns 0, native species gender/appearance; no engine reference equivalence claim.
   const appearance={gender:1,form:0,shiny:true};
-  expectedDex.seenForms.snorlax=[appearance];expectedDex.lastSeenForm.snorlax=appearance;
-  if(w.source.startsWith('capture'))expectedDex.capturedCounts.snorlax=(expectedDex.capturedCounts.snorlax??0)+1;
+  expectedDex.seenForms[species]=[appearance];expectedDex.lastSeenForm[species]=appearance;
+  if(w.source.startsWith('capture')) {
+   expectedDex.capturedCounts[species]=(expectedDex.capturedCounts[species]??0)+1;
+   // Battle also publicly shows the player's original Snorlax; it is seen, not newly owned.
+   expectedDex.seen=[...new Set([...expectedDex.seen,'snorlax'])].sort();
+   expectedDex.seenForms.snorlax=[appearance];expectedDex.lastSeenForm.snorlax=appearance;
+  }
  }
  assert.deepEqual(next.stats,expectedStats,'whole stats oracle for source '+w.source);
  assert.deepEqual(next.dex,expectedDex,'whole dex oracle for source '+w.source);

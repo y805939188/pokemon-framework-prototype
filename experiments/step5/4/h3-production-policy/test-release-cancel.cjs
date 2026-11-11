@@ -26,7 +26,7 @@ for(const source of ['capture-party','capture-box','capture-replace'])test('H3 '
  const w=fixture(source);assert.equal(acquire(w).status,'applied');
  w.app=new E.app.GameApplication({state:w.state,content:()=>({content:w.content,dex:w.dex}),sessions:E.composition.createBattleSessionFactory({content:()=>w.content,seed:()=>[1,2,3,4]}),projection:T.fakes.createRecordingProjection(),random:()=>0,clock:()=>12345},{receivingProfile:{mode:source==='capture-replace'?2:1,naming:0}});
  const before=clone(w.state.read()),n=w.state.replaced.length;
- const request={battleId:'H3-cancel-'+source,kind:'wild',seq:1,canLose:true,expGain:false,moneyGain:false,foes:[{species:'snorlax',level:50,moves:['splash','rest','payday']}],...(source==='capture-replace'?{forceParty:true}:{})};let h;
+ const request={battleId:'H3-cancel-'+source,kind:'wild',seq:1,canLose:true,expGain:false,moneyGain:false,foes:[{species:'meowth',level:50}],...(source==='capture-replace'?{forceParty:true}:{})};let h;
  try{
  h=await w.app.startBattle(request);assert((await h.chooseMove(4)).ok);assert((await h.throwBall('masterball')).ok);assert(h.finished);
  const out=w.app.finishBattle(h,request);assert.equal(out.pending,true,JSON.stringify(out));unchanged(w,before,n);
