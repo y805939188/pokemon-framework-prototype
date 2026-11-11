@@ -19,7 +19,7 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, expGain, noRun, noBall, battleEffects, battleStyle = 'set', playerStyle, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null, benchMoves = null, captureSetting } = {}) {
+async function open({ nicknames = null, lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, expGain, noRun, noBall, battleEffects, battleStyle = 'set', playerStyle, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null, benchMoves = null, captureSetting } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
   const G = h.G, flow = h.w.flow, content = suppliedContent ?? fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   if (captureSetting !== undefined) { content.settings = { ...content.settings, GAIN_EXP_FOR_CAPTURE: captureSetting }; flow.receiveOptions = { mode: 0, naming: 1 }; }
@@ -46,6 +46,7 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   if (leadingEgg) { state.party[0].isEgg = true; state.party[0].nickname = 'LEADING-EGG-NAME'; }
   if (leadMoves) state.party[0].moves = leadMoves.map(move => ({ ...move }));
   if (benchMoves) state.party[1].moves = benchMoves.map(move => ({ ...move }));
+  if (nicknames) state.party.forEach((m, i) => { m.nickname = nicknames[i] ?? ''; });
   state.inventory = E.inventory.inventoryFromBag(bag, E.itemCatalog.catalogOf(content)); G.$gameSystem._psGame = state;
   G.Input.keyMapper ??= {}; G.Input.isPressed ??= () => false; G.TouchInput.isCancelled ??= () => false;
   const listeners = new Map(), globals = new Map();
@@ -934,4 +935,39 @@ test('AUD1 explicit list Cancel shares the first-update gate and member-command 
   await h.frames(1);await pick(h,s.party[1].id);await h.p.inMode('party-command');await pick(h,null);await h.p.inMode('party');assert.equal(E.session.readTrainerReplacement(s).offerId,offer.offerId,'member-command Cancel only returns to the list');
   await h.frames(1);await pick(h,null);await h.p.inMode('main');assert.equal(E.session.readTrainerReplacement(s),null);assert(s.currentRequest());assert.equal(JSON.stringify(h.flow.game()),h.before);
  }finally{h.cleanup();}
+});
+
+for (const lang of ['en', 'zh']) test(`saved player nicknames reach compiled Scene messages, status and party (${lang})`, async () => {
+  const h = await open({ lang, nicknames: ['Alpha', 'Beta'], trainer: true, trainerMembers: 2, fast: true });
+  try {
+    const [lead, bench] = h.s._session.party;
+    assert.equal(h.s._names[lead.id], 'Alpha'); assert.equal(h.s._names[bench.id], 'Beta');
+    const card = h.s._status._d2Cards.find(c => c.side === 'p1' && c.active);
+    assert.equal(card.name, 'Alpha'); assert.equal(h.s._status._d2Appearance(card).name, 'Alpha');
+    assert.equal(h.s._D.event({ type: 'switch', args: ['p1a: ' + lead.id] })[0], h.flow.translator().t('battle.go', { name: 'Alpha' }));
+    assert(h.s._D.event({ type: 'move', args: ['p1a: ' + lead.id, 'Tackle'] })[0].includes('Alpha'));
+    assert(h.s._D.event({ type: 'cant', args: ['p1a: ' + lead.id, 'par'] })[0].includes('Alpha'));
+    await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('main');
+    assert(h.completed.some(line => line.includes('Alpha')), 'real action messages paint the nickname');
+    await pick(h, 'party');
+    assert(h.s._menu._items.find(r => r.ext === lead.id).name.includes('Alpha'));
+    assert(h.s._menu._items.find(r => r.ext === bench.id).name.includes('Beta'));
+    await pick(h, bench.id); await pick(h, 'switch-in'); await h.p.inMode('main');
+    assert(h.completed.some(line => line.includes('Beta')), 'real switch messages paint the reserve nickname');
+    const switched = h.s._status._d2Cards.find(c => c.side === 'p1' && c.active);
+    assert.equal(h.s._status._d2Appearance(switched).name, 'Beta');
+    // No private foe nickname is consulted by the public appearance consumer.
+    const foe = h.s._status._d2Cards.find(c => c.side === 'p2' && c.active);
+    h.s._session.foeTeam.forEach(m => { m.nickname = 'PRIVATE-FOE'; });
+    assert(!h.s._status._d2Appearance(foe).name.includes('PRIVATE-FOE'));
+    assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { h.cleanup(); }
+});
+test('unnamed player keeps localized species fallback in compiled Scene', async () => {
+  const h = await open({ nicknames: ['', ''], fast: true });
+  try { const lead = h.s._session.party[0], expected = h.flow.speciesName(lead.species);
+    assert.equal(h.s._names[lead.id], expected);
+    const card = h.s._status._d2Cards.find(c => c.side === 'p1' && c.active);
+    assert.equal(h.s._status._d2Appearance(card).name, expected);
+  } finally { h.cleanup(); }
 });

@@ -1163,6 +1163,8 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   const P = Scene_PSBattle.prototype;
   const requestObservers = new WeakMap<object, { op: any; app: any; session: any; generation: number; epoch: number; token: string; menu: any; menuRevision: number }>();
   let requestObserverSerial = 0;
+  // Only player-owned members use saved nicknames. Opponent appearance stays public-only.
+  const playerBattleName = (member: any): string => member.nickname || PSFlow.speciesName(member.species);
   function initialDisplay(session: any, names: Record<string, string>): BattleDisplayCard[] {
     return ['p1', 'p2'].flatMap(side => session.gw.readState(side).map((state: any) => {
       const member = (side === 'p1' ? session.party : session.foeTeam).find((item: any) => item.id === state.id);
@@ -1175,7 +1177,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         // Existing author states may carry EXP outside their held level. The view must not reject or normalize them.
         if (value >= 0 && value <= 1) ratio = value; else experienceUnavailable = 'outside-level-interval';
       }
-      return { id: state.id, side: side as 'p1' | 'p2', name: member ? PSFlow.speciesName(member.species) : names[state.id] || state.id,
+      return { id: state.id, side: side as 'p1' | 'p2', name: member ? (side === 'p1' ? playerBattleName(member) : PSFlow.speciesName(member.species)) : names[state.id] || state.id,
         level: state.level, hp: state.hp, maxhp: state.maxhp, status: state.status || '', active: state.active, ratio,
         ...(experienceUnavailable ? { experienceUnavailable } : {}) };
     }));
@@ -1304,7 +1306,8 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     const s = this._session;
     engine().B.session?.bindLearningPresentation?.(s);
     PSFlow._startBattleMusic(this._psOp); if (!c.isCurrent() || !PSFlow.running) return;
-    for (const m of [...s.party, ...s.foeTeam]) { if (!c.isCurrent()) return; this._names[m.id] = PSFlow.speciesName(m.species); }
+    for (const m of s.party) { if (!c.isCurrent()) return; this._names[m.id] = playerBattleName(m); }
+    for (const m of s.foeTeam) { if (!c.isCurrent()) return; this._names[m.id] = PSFlow.speciesName(m.species); }
     if (!c.isCurrent()) return;
     this._D = engine().D.make(this._names, PSFlow.translator());
     this._pictures = createBattlePicturesMZ(G, this,
@@ -1341,7 +1344,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         const record = PSFlow.game()?.dex?.owned;
         if (card.side === 'p2' && key && Array.isArray(record)) owned = record.includes(key.species);
       } catch { /* Optional record unavailable: preserve unknown and legal control. */ }
-      return { name: PSFlow.speciesName(publicView.species), metadata: {
+      return { name: card.side === 'p1' ? card.name : PSFlow.speciesName(publicView.species), metadata: {
         id: card.id, side: card.side, gender: publicView.gender, shiny: publicView.shiny,
         owned,
       } };
@@ -1969,7 +1972,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       const can = sub === "item" ? s.canUseItem(this._pendingItem, m.id).ok : true;
       const tr = PSFlow.translator();
       if (m.isEgg) return { name: tr.t("management.egg"), ext: m.id, enabled: true };
-      return { name: tr.t("ui.party.entry", { name: PSFlow.speciesName(m.species), level: x?.level ?? m.level, hp: x?.hp ?? 0, maxhp: x?.maxhp ?? 0,
+      return { name: tr.t("ui.party.entry", { name: playerBattleName(m), level: x?.level ?? m.level, hp: x?.hp ?? 0, maxhp: x?.maxhp ?? 0,
         fainted: x?.fainted ? tr.t("ui.party.fainted") : "", active: x?.active ? tr.t("ui.party.active") : "", noEffect: sub === "item" && !can ? tr.t("ui.party.no_effect") : "" }), ext: m.id, enabled: can };
     });
     if (sub !== 'item') items.push({ name: PSFlow.translator().t('ui.party.cancel'), ext: null, enabled: true });
