@@ -666,18 +666,22 @@ export class BattleGateway implements BattleDriver {
       // Natural slots share PP. A learned move in a transformed list is a separate virtual
       // copy; its permanent identity lets a later learning decision replace that same copy.
       const activeSlot = p.transformed ? { ...slot, virtual: true, rpgLearnedMove: dm.id } : slot;
+      // Freeze the original copied positions before any learning can compact this list.
+      // These identities survive checkpoints; current array indexes do not.
+      if (p.transformed) p.moveSlots.forEach((move: { rpgLearnedMove?: string; rpgCopiedSlot?: number }, index: number) => {
+        if (move.rpgLearnedMove === undefined && move.rpgCopiedSlot === undefined) move.rpgCopiedSlot = index;
+      });
       if (replaceSlot !== undefined && replaceSlot !== null) {
         const oldId = p.baseMoveSlots[replaceSlot]?.id;
         const learnedIndex = p.transformed && oldId !== undefined
           ? p.moveSlots.findIndex((move: { rpgLearnedMove?: string }) => move.rpgLearnedMove === oldId) : -1;
         p.baseMoveSlots[replaceSlot] = slot;
         if (p.transformed) {
-          // Preserve an existing corresponding slot. A shorter copied list has no such slot:
-          // splice appends densely instead of manufacturing holes at the permanent index.
-          // A prior dense append can occupy another permanent slot's numerical index.
-          // Keep that already learned copy unless this decision replaces its own identity.
-          const activeIndex = learnedIndex >= 0 ? learnedIndex
-            : p.moveSlots[replaceSlot]?.rpgLearnedMove ? p.moveSlots.length : replaceSlot;
+          // Use the learned identity first, otherwise the original copied position.
+          // A short or deduplicated list may no longer have that corresponding row;
+          // append densely rather than replacing an unrelated shifted or learned row.
+          const copiedIndex = p.moveSlots.findIndex((move: { rpgCopiedSlot?: number }) => move.rpgCopiedSlot === replaceSlot);
+          const activeIndex = learnedIndex >= 0 ? learnedIndex : copiedIndex >= 0 ? copiedIndex : p.moveSlots.length;
           p.moveSlots.splice(activeIndex, 1, activeSlot);
         } else p.moveSlots[replaceSlot] = activeSlot;
         p.set.moves[replaceSlot] = dm.name;

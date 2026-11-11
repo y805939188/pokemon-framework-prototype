@@ -112,3 +112,18 @@ for (const slot of [0,1,2,3]) test('full permanent/copied tables learn an overla
   w.app.finishBattle(w.s,w.request);assert.equal(w.state.replaced.length,1);
  }finally{cleanup(w);}
 });
+
+for(const nextSlot of [0,1,2])test('deduplicated copied slots keep original identity across checkpoint, next permanent slot '+nextSlot,async()=>{
+ const w=await open({own:4,copied:4,learnMoves:['seismictoss','amnesia']});try{
+  await transform(w);await knockout(w);await w.s.decideLearn(3);
+  assert.deepEqual(actor(w).moveSlots.map(m=>m.id),['splash','growl','seismictoss']);
+  await w.s._restoreCheckpoint(w.s._checkpoint());await w.s.decideLearn(nextSlot);dense(w);
+  const expected=nextSlot===0?['amnesia','growl','seismictoss']:nextSlot===1?['splash','growl','seismictoss','amnesia']:['splash','amnesia','seismictoss'];
+  assert.deepEqual(actor(w).moveSlots.map(m=>m.id),expected);
+  await w.s._restoreCheckpoint(w.s._checkpoint());assert.deepEqual(w.s.currentRequest().active[0].moves.map(m=>m.id),expected);
+  assert((await w.s.chooseMove(expected.indexOf('amnesia')+1)).ok);assert.equal(actor(w).moveSlots.find(m=>m.id==='amnesia').pp,19);
+  assert.equal(w.s.gw.readState('p1')[0].pp.amnesia,20);unchanged(w);
+  assert((await w.s.chooseSwitch('P2')).ok);assert((await w.s.chooseSwitch('P1')).ok);
+  assert.deepEqual(w.s.currentRequest().active[0].moves.map(m=>m.id),w.s.party[0].moves.map(m=>m.id));
+ }finally{cleanup(w);}
+});
