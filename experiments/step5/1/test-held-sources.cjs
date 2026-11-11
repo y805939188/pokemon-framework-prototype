@@ -18,4 +18,48 @@ if(process.argv[2]==='--child'){
   const firstDraws=draws;assert.equal(app.claimGrant('starter').status,'already-claimed');assert.equal(draws,firstDraws);assert.equal(state.replaced.length,1);assert.equal(JSON.stringify(state.current()).includes('allowHeldItem'),false);
  });
  for(const mode of ['denied','missing','unregistered','malformed'])test(`P51-12/F05: empty held source ${mode} refuses before external data load`,()=>{const r=spawnSync(process.execPath,[__filename,'--child',mode],{cwd:ROOT,encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);assert.equal(JSON.parse(r.stdout.trim()).dataModules,0);});
+
+// Real author compilation and default App descriptor, rather than an injected permissive descriptor.
+function authoredHeld(flags=[],fieldUse='none') {
+ const source=inputs();
+ source.items=Object.values(E.itemCatalog.legacyCatalog()).map(item=>({...item,source:'author-placeholder'}));
+ Object.assign(source.items.find(i=>i.id==='leftovers'),{flags,fieldUse,...(['tm','hm'].includes(fieldUse)?{move:'tackle'}:{})});
+ const compiled=E.contentCompile.compileContent(source);assert.equal(compiled.ok,true,JSON.stringify(compiled.errors));
+ const dex=E.dex.createDexLookup(),assembled=E.contentRuntime.assembleContent(compiled.data,dex);assert.deepEqual(assembled.errors,[]);
+ const content=assembled.content,state=E.fakes.createMemoryState(E.state.newGame({content,party:[],bag:{leftovers:1,oranberry:1}}));
+ const app=new E.app.GameApplication({state,content:()=>({content,dex}),sessions:E.fakes.createFakeSessions({}),projection:E.fakes.createRecordingProjection(),random:()=>0,clock:()=>1000},{receivingProfile:{mode:1,naming:1}});
+ assert.equal(app.claimGrant('starter').status,'applied');
+ const member=state.current().party[0],ref={id:member.id,position:{kind:'party',index:0}};
+ return {app,state,ref,content};
+}
+for(const [label,flags,fieldUse] of [['Unholdable',['Unholdable'],'none'],['KeyItem',['KeyItem'],'none'],['Mail',['Mail'],'none'],['case-insensitive',['uNhOlDaBlE'],'none'],['TM flag',['TM'],'none'],['HM flag',['HM'],'none'],['TM use',[],'tm'],['HM use',[],'hm']])test(`author ${label} restriction reaches default management list and direct give`,()=>{
+ const {app,state,ref}=authoredHeld(flags,fieldUse),before=structuredClone(state.current()),writes=state.replaced.length;
+ assert.equal(app.holdableBagItems().some(i=>i.id==='leftovers'),false);
+ assert.equal(app.holdableBagItems().some(i=>i.id==='oranberry'),true);
+ const token=app.beginManagement();assert.deepEqual(app.manage(token,'deny',{kind:'give-item',source:ref,item:'leftovers'}),{status:'refused',reason:'invalid-held-item',error:'invalid-held-item'});
+ assert.deepEqual(state.current(),before);assert.equal(state.replaced.length,writes);app.endManagement(token);
+});
+test('ordinary legal held items remain available by default and can be given and taken',()=>{
+ const {app,state,ref}=authoredHeld(),n=state.replaced.length;
+ assert.ok(app.holdableBagItems().some(i=>i.id==='leftovers'));
+ const token=app.beginManagement();assert.equal(app.manage(token,'give',{kind:'give-item',source:ref,item:'leftovers'}).status,'applied');
+ assert.equal(state.current().party[0].item,'leftovers');assert.equal(state.replaced.length,n+1);
+ assert.equal(app.manage(token,'take',{kind:'take-item',source:ref}).status,'applied');assert.equal(state.current().party[0].item,'');assert.equal(state.replaced.length,n+2);
+ app.endManagement(token);
+});
+
+test('author restriction also blocks moving an existing item, but taking it remains possible',()=>{
+ const {app,state,ref,content}=authoredHeld();
+ assert.equal(app.receiveGift({kind:'silent',member:{species:'charmander',level:5}}).status,'applied');
+ const target={id:state.current().party[1].id,position:{kind:'party',index:1}},token=app.beginManagement();
+ assert.equal(app.manage(token,'give',{kind:'give-item',source:ref,item:'leftovers'}).status,'applied');
+ content.items.leftovers.flags=['Unholdable']; // Simulate an author restriction applied to an existing held item.
+ const before=structuredClone(state.current()),writes=state.replaced.length;
+ assert.deepEqual(app.manage(token,'swap',{kind:'swap-items',source:ref,target}),{status:'refused',reason:'invalid-held-item',error:'invalid-held-item'});
+ assert.deepEqual(state.current(),before);assert.equal(state.replaced.length,writes);
+ assert.equal(app.manage(token,'take',{kind:'take-item',source:ref}).status,'applied');
+ assert.equal(state.current().party[0].item,'');assert.equal(E.inventory.aggregateBag(state.current().inventory).leftovers,1);
+ app.endManagement(token);
+});
+
 }

@@ -25,7 +25,7 @@ import type { EvolutionFacts } from "../rules/evolution";
 import type { InventoryRequest, InventoryParent, InventoryOutcome } from "./inventory-session";
 import { badgeCount, hasBadge } from "../rules/economy";
 import { assertInventoryMapped, aggregateBag } from "../rules/inventory";
-import { catalogOf } from "../rules/item-catalog";
+import { catalogOf, holdableItem, itemOf } from "../rules/item-catalog";
 /**
  * The game application: the use cases that coordinate a battle with the persistent game, and nothing else.
  *  - game rules stay in the core (`rules/`): the application calls `applyBattleResult`, it does not re-implement it;
@@ -294,6 +294,9 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.describeHeldItem = options.describeHeldItem ?? ((id) => {
       const { content, dex } = this.ports.content();
       if (!content.meta?.showdownSourceChecked) throw new ReceivingRefused("held-item-source-unchecked");
+      // Author restrictions narrow the engine capability; they never make an unsupported item holdable.
+      const definition = itemOf(catalogOf(content), id);
+      if (definition && !holdableItem(definition)) return null;
       const item = dex?.heldItem?.(id);
       return item && (item.id === undefined || item.id === id) ? item : null;
     });
