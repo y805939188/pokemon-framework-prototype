@@ -179,3 +179,25 @@ test('capture cannot guess an unresolved handoff from a same-name item',async()=
  const j=captureJournal('leftovers','');j.swap();j.value.events.at(-1).sourceId='P2';
  await assert.rejects(()=>capturePlan(j),/held-capture-provenance-unavailable/);
 });
+
+for(const extraHolder of ['', 'lightclay', 'leftovers'])for(const reverse of [false,true])for(const destination of ['party','box'])
+test(`capture source priority precedes all current fallbacks: extra=${extraHolder||'none'} reverse=${reverse} destination=${destination}`,async()=>{
+ const H=await loaded, ids=extraHolder?['A','C','B']:['A','B'];if(reverse)ids.reverse();
+ const ms=[...ids.map(id=>cell(id,'p1',id==='B'?'leftovers':id==='C'?extraHolder:'')),cell('F','p2','')];
+ const value={version:1,binding,coverage:'complete',members:ms,events:[],money:{amuletCoin:false,happyHour:false,payDay:0}};
+ const vals=m=>({current:m.current,recovery:m.recovery,recycle:m.recycle});
+ const event=(m,reason,after,sourceId=null)=>{const before=vals(m);Object.assign(m,after);value.events.push({ordinal:value.events.length+1,id:m.id,side:m.side,sourceId,reason,before,after:vals(m)});};
+ const swap=id=>{const p=ms.find(m=>m.id===id),f=ms.find(m=>m.id==='F'),pi=p.current,fi=f.current;
+  if(pi)event(p,'temporary-remove',{current:''});if(fi)event(f,'temporary-remove',{current:''});
+  if(fi)event(p,'temporary-receive',{current:fi},f.id);if(pi)event(f,'temporary-receive',{current:pi},p.id);};
+ swap('B');if(extraHolder)swap('C');swap('A');
+ const before={party:ms.filter(m=>m.side==='p1').map(m=>({id:m.id,item:m.initial})),storage:{boxes:[{slots:[null]}]}},primary=clone(before),caught={id:'Captured',item:''};
+ if(destination==='party')primary.party.push(caught);else primary.storage.boxes[0].slots[0]=caught;
+ const resolved=H.resolveRequiredFacts(value,{binding,roster:ms.map(({id,side,initial})=>({id,side,initial})),wild:true});assert(resolved.ok,JSON.stringify(resolved));
+ const frozen=clone({before,primary,value});
+ const plan=H.planHeldWriteback({before,primary,facts:resolved.facts,capturedOrigins:{Captured:'F'}});
+ const members=[...plan.state.party,...plan.state.storage.boxes[0].slots.filter(Boolean)],items=Object.fromEntries(members.map(m=>[m.id,m.item]));
+ assert.deepEqual(items,{A:'',B:'leftovers',...(extraHolder?{C:extraHolder}:{}),Captured:''},'own source recovery wins in both roster orders');
+ assert.deepEqual(members.map(m=>m.item).filter(Boolean).sort(),['leftovers',...(extraHolder?[extraHolder]:[])].sort(),'quantity alone is not an ownership oracle');
+ assert.deepEqual({before,primary,value},frozen);
+});

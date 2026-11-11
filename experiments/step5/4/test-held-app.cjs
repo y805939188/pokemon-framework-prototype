@@ -10,7 +10,7 @@ function content(extra = {}, foeMove = 'splash') {
   input.species.find(s => s.id === 'snorlax').learnset = ['trick','payday','happyhour','splash'].map(move => ({level:1,move}));
   input.species.find(s => s.id === 'pidgey').learnset = [{level:1,move:foeMove}];
   input.items = Object.values(E.itemCatalog.legacyCatalog()).map(item=>({...item,source:'author-placeholder'}));
-  for(const id of ['amuletcoin','luckincense','airballoon','stickybarb'])input.items.push({id,name:id,namePlural:id,pocket:1,price:0,source:'author-placeholder'});
+  for(const id of ['amuletcoin','luckincense','airballoon','stickybarb','lightclay'])input.items.push({id,name:id,namePlural:id,pocket:1,price:0,source:'author-placeholder'});
   Object.assign(input,extra);
   const compiled = E.contentCompile.compileContent(input); assert.equal(compiled.ok,true,JSON.stringify(compiled.errors));
   const dex = E.dex.createDexLookup(), runtime = E.contentRuntime.assembleContent(compiled.data,dex); assert.deepEqual(runtime.errors,[]);
@@ -343,4 +343,37 @@ test(`capture App closes two-player transfer chain ${destination}, sameName=${sa
  const items=E.storage.allMembers(w.state.current()).map(m=>m.item).filter(Boolean).sort();
  assert.deepEqual(items,['leftovers',sameName?'leftovers':'sitrusberry'].sort());
  const after=J(w.state.current());assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied');assert.deepEqual(w.state.current(),after);assert.equal(w.state.replaced.length,1);
+});
+
+// A current-only fallback must wait until every player has claimed its preferred slot.
+// Both directions execute actual Trick actions. These are authored synthetic teams, not reference replay.
+for (const extraHolder of ['', 'lightclay', 'leftovers'])
+for (const reverse of [false, true])
+for (const destination of ['party', 'box', 'replace-unused'])
+test(`capture recovery priority is roster-order independent: extra=${extraHolder||'none'} reverse=${reverse} destination=${destination}`,async()=>{
+ const seed=fixture(), game=J(seed.state.current());
+ const order=extraHolder?['A','C','B']:['A','B'];if(reverse)order.reverse();
+ game.party=order.map(id=>({...J(game.party[0]),id,item:id==='B'?'leftovers':id==='C'?extraHolder:''}));
+ if(destination!=='party')for(let i=game.party.length;i<6;i++)game.party.push({...J(game.party[0]),id:'Unused'+i,item:''});
+ game.nextMemberOrdinal='7';
+ const w=fixture({game,naming:0}), before=J(w.state.current()), h=await w.app.startBattle(w.request);
+ const act=async id=>{if(h.gw._debugBattle().sides[0].active[0].name!==id)assert((await h.chooseSwitch(id)).ok);assert((await h.chooseMove(1)).ok);};
+ await act('B');if(extraHolder)await act('C');await act('A');
+ const actual=Object.fromEntries(h.gw._debugBattle().sides[0].pokemon.map(p=>[p.name,p.item]));
+ assert.equal(actual.A,extraHolder||'leftovers');assert.equal(actual.B,'');if(extraHolder)assert.equal(actual.C,'leftovers');
+ assert((await h.throwBall('masterball')).ok);assert(h.finished);
+ const raw=h.result(),id=raw.captured[0].id,pending=w.app.finishBattle(h,w.request);
+ assert(pending.pending);assert.deepEqual(w.state.current(),before);assert.equal(w.state.replaced.length,0);
+ const unused=game.party.find(m=>m.id.startsWith('Unused'));
+ const placement=destination==='replace-unused'?{kind:'replace',target:{id:unused.id,position:{kind:'party',index:game.party.indexOf(unused)}}}:{kind:'box'};
+ const out=w.app.resolveReceiving(pending.receivingToken,{[id]:{nickname:{kind:'keep'},placement}});
+ assert.equal(out.commit,'applied',JSON.stringify(out));assert.equal(w.state.replaced.length,1);
+ const next=w.state.current(),get=id=>E.storage.locateMember(next,id).member.item;
+ assert.equal(get('B'),'leftovers','B retains its own live recovery source');
+ if(extraHolder)assert.equal(get('C'),extraHolder,'C retains its distinct live recovery source');
+ assert.equal(get('A'),'','A current fallback cannot preempt another player recovery');assert.equal(get(id),'');
+ assert.equal(E.storage.locateMember(next,id).position.kind,destination==='box'?'box':'party');
+ assert.deepEqual(E.storage.allMembers(next).map(m=>m.item).filter(Boolean).sort(),['leftovers',...(extraHolder?[extraHolder]:[])].sort(),'source ownership and quantity both hold');
+ const after=J(next);assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied');
+ assert.deepEqual(w.state.current(),after);assert.equal(w.state.replaced.length,1);
 });

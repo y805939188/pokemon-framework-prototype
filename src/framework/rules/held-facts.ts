@@ -146,10 +146,17 @@ export function planHeldWriteback<T extends MemberCollection>(input: HeldWriteba
     const old = before.party.find(m => m.id === fact.id), located = locateMember(state, fact.id);
     if (!old || old.item !== fact.initial || !located) throw new Error("held-writeback-player-identity-mismatch");
     const field = located.position.kind === "party" ? "recovery" : "current";
-    const preferred = claims?.claim(fact.id, field);
-    const nextItem = claims ? preferred || claims.claim(fact.id, "current") || "" : fact[field];
+    const nextItem = claims ? claims.claim(fact.id, field) || "" : fact[field];
     located.member.item = nextItem;
     changes.push({ id: fact.id, item: nextItem, destination: located.position.kind === "party" ? "party" : "box" });
+  }
+  if (claims) {
+    // All player preferred claims must precede any current fallback. Otherwise an
+    // earlier empty recovery can take the live source a later player must recover.
+    for (const change of changes) if (!change.item) {
+      change.item = claims.claim(change.id, "current") || "";
+      locateMember(state, change.id)!.member.item = change.item;
+    }
   }
   const used = new Set<string>();
   for (const [capturedId, sourceId] of Object.entries(capturedOrigins)) {
