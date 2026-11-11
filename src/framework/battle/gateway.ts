@@ -648,6 +648,11 @@ export class BattleGateway implements BattleDriver {
       replaceSlot = index;
     }
     const before = { level: p.level, maxhp: p.maxhp, hp: p.hp };
+    // Compare natural values on the same battle-form basis, never the mutable values
+    // written by Power Trick/Split/Speed Swap. An EXP-only or sub-threshold EV update
+    // must not erase those effects when none of the five natural stats changed.
+    const battleBasis = (p.transformed ? p.baseSpecies : p.species).baseStats;
+    const priorBattleStats: Stats = b.spreadModify(battleBasis, p.set);
     p.set.level = level; p.level = level;
     if (evs) p.set.evs = { ...evs };
     // Growth belongs to the permanent member, not a copied or temporary battle forme.
@@ -656,9 +661,11 @@ export class BattleGateway implements BattleDriver {
     const stats: Stats = b.spreadModify(growthSpecies.baseStats, p.set);
     // Keep the native battle basis distinct from the stored individual. Crowned replaces
     // baseSpecies too; Transform retains that natural battle basis beneath the copied stats.
-    const battleStats: Stats = b.spreadModify((p.transformed ? p.baseSpecies : p.species).baseStats, p.set);
+    const battleStats: Stats = b.spreadModify(battleBasis, p.set);
     p.baseStoredStats = battleStats;
-    if (!p.transformed) {
+    const naturalStatsChanged = (["atk", "def", "spa", "spd", "spe"] as const)
+      .some(stat => priorBattleStats[stat] !== battleStats[stat]);
+    if (!p.transformed && naturalStatsChanged) {
       for (const k of Object.keys(p.storedStats)) p.storedStats[k] = battleStats[k as keyof Stats];
       p.speed = p.storedStats.spe;
     }

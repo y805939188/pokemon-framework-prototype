@@ -34,6 +34,7 @@ SUITES=(
   experiments/step5/4/test-battle-pp-items.cjs
   experiments/step5/4/test-crowned-move-pp.cjs
   experiments/step5/4/test-crowned-growth.cjs
+  experiments/step5/4/test-growth-raw-stat-refresh.cjs
 
   experiments/step5/4/test-switch-style-ports.cjs
   experiments/step5/4/test-battle-style-settings.cjs
