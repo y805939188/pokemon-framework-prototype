@@ -666,20 +666,12 @@ export class BattleGateway implements BattleDriver {
       // Natural slots share PP. A learned move in a transformed list is a separate virtual
       // copy; its permanent identity lets a later learning decision replace that same copy.
       const activeSlot = p.transformed ? { ...slot, virtual: true, rpgLearnedMove: dm.id } : slot;
-      // Showdown selects and deducts PP by move ID, not by temporary slot identity.
-      // If Transform already copied this move, retain its remaining PP instead of adding
-      // a second selectable row (or refilling it). The permanent learned slot is separate.
-      const copiedMatch = p.transformed
-        ? p.moveSlots.findIndex((move: { id: string }) => move.id === dm.id) : -1;
       if (replaceSlot !== undefined && replaceSlot !== null) {
         const oldId = p.baseMoveSlots[replaceSlot]?.id;
         const learnedIndex = p.transformed && oldId !== undefined
           ? p.moveSlots.findIndex((move: { rpgLearnedMove?: string }) => move.rpgLearnedMove === oldId) : -1;
         p.baseMoveSlots[replaceSlot] = slot;
-        if (p.transformed && copiedMatch >= 0) {
-          p.moveSlots[copiedMatch].rpgLearnedMove = dm.id;
-          if (learnedIndex >= 0 && learnedIndex !== copiedMatch) p.moveSlots.splice(learnedIndex, 1);
-        } else if (p.transformed) {
+        if (p.transformed) {
           // Preserve an existing corresponding slot. A shorter copied list has no such slot:
           // splice appends densely instead of manufacturing holes at the permanent index.
           // A prior dense append can occupy another permanent slot's numerical index.
@@ -691,12 +683,13 @@ export class BattleGateway implements BattleDriver {
         p.set.moves[replaceSlot] = dm.name;
         p.ppUps[replaceSlot] = 0;
       } else {
-        p.baseMoveSlots.push(slot);
-        if (copiedMatch >= 0) p.moveSlots[copiedMatch].rpgLearnedMove = dm.id;
-        else p.moveSlots.push(activeSlot);
-        p.set.moves.push(dm.name);
+        p.baseMoveSlots.push(slot); p.moveSlots.push(activeSlot); p.set.moves.push(dm.name);
         p.ppUps.push(0);
       }
+      // Showdown resolves actions and PP by ID. Keep the newly installed full-PP
+      // virtual slot, but retire any copied row with that same ID. Perform the normal
+      // replacement first so the selected old temporary slot is still forgotten.
+      if (p.transformed) p.moveSlots = p.moveSlots.filter((move: { id: string }) => move === activeSlot || move.id !== dm.id);
     }
     return { before, after: { level: p.level, maxhp: p.maxhp, hp: p.hp }, stats };
   }

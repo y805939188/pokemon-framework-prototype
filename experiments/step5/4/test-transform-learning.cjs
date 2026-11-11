@@ -68,15 +68,15 @@ test('sequential different permanent replacements preserve the earlier densely a
  }finally{cleanup(w);}
 });
 
-for (const own of [1,4]) test('learning a copied move keeps one selectable ID and its remaining PP, permanent slots '+own, async()=>{
+for (const own of [1,4]) test('learning a copied move keeps one full-PP learned selectable ID, permanent slots '+own, async()=>{
  const w=await open({own,copied:2,learnMoves:['seismictoss']});try{
   await transform(w);await knockout(w);
   if(own===4) await w.s.decideLearn(3);
   dense(w);assert.deepEqual(actor(w).moveSlots.map(m=>m.id),['splash','seismictoss']);
-  assert.equal(actor(w).moveSlots[1].pp,4);assert.equal(w.s.gw.readState('p1')[0].pp.seismictoss,20);
+  assert.equal(actor(w).moveSlots[1].pp,20);assert.equal(w.s.gw.readState('p1')[0].pp.seismictoss,20);
   await w.s._restoreCheckpoint(w.s._checkpoint());dense(w);
   assert.deepEqual(w.s.currentRequest().active[0].moves.map(m=>m.id),['splash','seismictoss']);
-  assert((await w.s.chooseMove(2)).ok);assert.equal(actor(w).moveSlots[1].pp,3);
+  assert((await w.s.chooseMove(2)).ok);assert.equal(actor(w).moveSlots[1].pp,19);
   assert.equal(w.s.gw.readState('p1')[0].pp.seismictoss,20);assert(w.s.finished);unchanged(w);
   assert.equal(w.app.finishBattle(w.s,w.request).commit,'applied');
   const saved=clone(w.state.read());assert.equal(saved.party[0].moves.find(m=>m.id==='seismictoss').pp,20);
@@ -88,9 +88,27 @@ test('replacing a previously learned copy with an already copied ID removes only
   await transform(w);await knockout(w);await w.s.decideLearn(3);
   assert.deepEqual(actor(w).moveSlots.map(m=>m.id),['splash','seismictoss','rest']);
   await w.s.decideLearn(3);assert.deepEqual(actor(w).moveSlots.map(m=>m.id),['splash','seismictoss']);
-  assert.equal(actor(w).moveSlots[1].pp,4);await w.s._restoreCheckpoint(w.s._checkpoint());
+  assert.equal(actor(w).moveSlots[1].pp,20);await w.s._restoreCheckpoint(w.s._checkpoint());
   await w.s.decideLearn(3);assert.deepEqual(actor(w).moveSlots.map(m=>m.id),['splash','amnesia']);dense(w);unchanged(w);
   assert((await w.s.chooseSwitch('P2')).ok);assert((await w.s.chooseSwitch('P1')).ok);
   assert.deepEqual(w.s.currentRequest().active[0].moves.map(m=>m.id),['transform','splash','growl','amnesia']);
+ }finally{cleanup(w);}
+});
+
+for (const slot of [0,1,2,3]) test('full permanent/copied tables learn an overlapping ID in slot '+slot,async()=>{
+ const w=await open({own:4,copied:4,learnMoves:['seismictoss']});try{
+  await transform(w);await knockout(w);assert.equal(w.s.pendingLearn.move.id,'seismictoss');
+  await w.s.decideLearn(slot);dense(w);
+  const expected=['splash','seismictoss','growl','tailwhip'];expected.splice(slot,1,'new');
+  const ids=expected.filter(m=>m!=='seismictoss').map(m=>m==='new'?'seismictoss':m);
+  assert.deepEqual(actor(w).moveSlots.map(m=>m.id),ids);
+  assert.equal(actor(w).moveSlots.find(m=>m.id==='seismictoss').pp,20);
+  await w.s._restoreCheckpoint(w.s._checkpoint());assert.deepEqual(w.s.currentRequest().active[0].moves.map(m=>m.id),ids);
+  assert((await w.s.chooseMove(ids.indexOf('seismictoss')+1)).ok);
+  assert.equal(actor(w).moveSlots.find(m=>m.id==='seismictoss').pp,19);
+  assert.equal(w.s.gw.readState('p1')[0].pp.seismictoss,20);unchanged(w);
+  assert.equal(w.app.finishBattle(w.s,w.request).commit,'applied');
+  assert.equal(w.state.read().party[0].moves[slot].id,'seismictoss');assert.equal(w.state.read().party[0].moves[slot].pp,20);
+  w.app.finishBattle(w.s,w.request);assert.equal(w.state.replaced.length,1);
  }finally{cleanup(w);}
 });
