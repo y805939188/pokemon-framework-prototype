@@ -865,7 +865,8 @@ export class BattleSession {
     const foe = this.foeTeam.find((m) => m.id === foeId)!;
     const foeC = this.content.species[foe.species]!;
     const parts = [...(this.participants[foeId] || [])];
-    const alive = new Set(this.gw.readState("p1").filter((x) => !x.fainted).map((x) => x.id));
+    const liveMembers = this.gw.readState("p1");
+    const alive = new Set(liveMembers.filter((x) => !x.fainted).map((x) => x.id));
     const receivers = this.party.filter((m) => parts.includes(m.id) && alive.has(m.id));
     const initialStages: GrowthTask[] = [], stages: GrowthTask[] = [];
     for (const m of receivers) {
@@ -873,6 +874,25 @@ export class BattleSession {
       const withEv: Member = { ...m, evs };
       const amount = G.battleExp({ foe: { level: foe.level, baseExp: foeC.baseExp }, receiver: withEv, participants: receivers.length, rules: this.rules, trainer: this.foe.kind === "trainer" });
       const res = G.applyExp(withEv, amount, this.content, m);
+      // EXP/EVs and permanent stat validation keep their original species identity.
+      // HP alone can have a different natural battle-form base (Power Construct).
+      // Recompute it with the independent rules formula, not the engine's result.
+      const live = liveMembers.find(member => member.id === m.id)!;
+      const hpStats = (level: number): number => G.computeStats({
+        ...this.content.species[m.species]!.base,
+        ...(live.growthHpBase === undefined ? {} : { hp: live.growthHpBase }),
+      }, m.ivs, evs, level, m.statNature ?? m.nature).hp;
+      let battleHp = m.hp, battleMaxhp = live.maxhp;
+      if (live.growthHpBase !== undefined) {
+        for (const up of res.log.levels) {
+          const maxhp = hpStats(up.level);
+          battleHp = G.hpAfterRecalc(battleHp, battleMaxhp, maxhp); battleMaxhp = maxhp;
+          up.hp = battleHp; up.maxhp = maxhp;
+        }
+        if (!res.log.levels.length) battleHp = G.hpAfterRecalc(battleHp, battleMaxhp, hpStats(res.after.level));
+        res.member.hp = battleHp; res.after.hp = battleHp;
+      }
+      const displayStats = (stats: Stats, level: number): Stats => live.growthHpBase === undefined ? stats : { ...stats, hp: hpStats(level) };
       const changed = amount > 0 || JSON.stringify(evs) !== JSON.stringify(m.evs);
       this._log("info", "growth", { member: m.id, foe: foeId, exp: amount, level: res.member.level, levelUps: res.log.levels.length });
       // Publish the already computed interval, so the view never reconstructs growth from mutable live state.
@@ -883,7 +903,8 @@ export class BattleSession {
         const start = Math.max(floor, res.before.exp), stop = Math.min(ceiling, res.after.exp);
         const levelUp = res.log.levels.find(item => item.level === level + 1);
         if (ceiling > floor && (stop > start || levelUp)) segments.push({ level, from: stop > start ? (start - floor) / (ceiling - floor) : 1, to: stop > start ? (stop - floor) / (ceiling - floor) : 1,
-          ...(levelUp ? { levelUp: { level: levelUp.level, hp: levelUp.hp, maxhp: levelUp.maxhp, stats: { before: { ...(res.log.levels.find(item => item.level === level)?.stats ?? res.before.stats) }, after: { ...levelUp.stats } } } } : {}) });
+          ...(levelUp ? { levelUp: { level: levelUp.level, hp: levelUp.hp, maxhp: levelUp.maxhp, stats: { before: { ...displayStats(res.log.levels.find(item => item.level === level)?.stats ?? res.before.stats, level),
+            ...(live.growthHpBase !== undefined && level === res.before.level ? { hp: live.maxhp } : {}) }, after: { ...displayStats(levelUp.stats, levelUp.level) } } } } : {}) });
       }
       const finalFloor = G.minExp(curve, res.after.level), finalCeiling = G.minExp(curve, res.after.level + 1);
       // Pause application as well as presentation at each level that may learn a move.
@@ -900,7 +921,7 @@ export class BattleSession {
         const display: GrowthDisplay = { version: 1,
           fromExp: index === 0 ? res.before.exp : Math.max(res.before.exp, G.minExp(curve, fromLevel)),
           toExp: last ? res.after.exp : Math.max(res.before.exp, G.minExp(curve, level)),
-          fromLevel, toLevel: level, hp, maxhp: stats.hp,
+          fromLevel, toLevel: level, hp, maxhp: displayStats(stats, level).hp,
           ratio: last ? (finalCeiling > finalFloor ? (res.after.exp - finalFloor) / (finalCeiling - finalFloor) : 1) : 0,
           segments: segments.slice(segmentIndex, stop),
           ...(cuts.length > 1 ? { experienceGained: index === 0 ? res.after.exp - res.before.exp : 0 } : {}) };
@@ -965,7 +986,15 @@ export class BattleSession {
     for (const e of this.ledger) if (e.state === "reserved") this._refund(e, "unexecuted");
     this._syncWorkingFromEngine();
     const members: BattleResult["members"] = {};
-    for (const m of this.party) members[m.id] = { level: m.level, exp: m.exp, hp: m.hp, ...persistentStatus(m.status, m.statusCount), moves: m.moves.map(({id,pp,maxpp}) => ({id,pp,maxpp})), evs: m.evs! };
+    const liveMembers = this.gw.readState("p1");
+    for (const m of this.party) {
+      const live = liveMembers.find(member => member.id === m.id);
+      // Native in-battle formes remain live through the final KO. Protocol v1 writes the
+      // persistent individual, so end-of-battle form regression uses the same HP delta rule.
+      const hp = live?.growthHpBase === undefined ? m.hp : G.hpAfterRecalc(m.hp, live.maxhp,
+        G.computeStats(this.content.species[m.species]!.base, m.ivs, m.evs, m.level, m.statNature ?? m.nature).hp);
+      members[m.id] = { level: m.level, exp: m.exp, hp, ...persistentStatus(m.status, m.statusCount), moves: m.moves.map(({id,pp,maxpp}) => ({id,pp,maxpp})), evs: m.evs! };
+    }
     const bag: Record<string, number> = {};
     for (const k of new Set([...Object.keys(this.startBag), ...Object.keys(this.bag)])) {
       const d = (this.bag[k] || 0) - (this.startBag[k] || 0);
@@ -983,7 +1012,8 @@ export class BattleSession {
       const eng = this.gw.readState("p2").find((x) => x.id === c.id)!;
       const curve = this.content.species[c.species]!.growth;
       result.captured.push(S.protocolMember({
-        ...c, exp: G.minExp(curve, c.level), hp: eng.hp, ...persistentStatus(eng.status, eng.statusCount),
+        ...c, exp: G.minExp(curve, c.level), hp: eng.growthHpBase === undefined ? eng.hp : G.hpAfterRecalc(eng.hp, eng.maxhp,
+          G.computeStats(this.content.species[c.species]!.base, c.ivs, c.evs, c.level, c.statNature ?? c.nature).hp), ...persistentStatus(eng.status, eng.statusCount),
         item: requiredCaptureItem(this, this.gw, c.id) ?? c.item,
         moves: c.moves.map((mv) => ({ id: mv.id, pp: eng.pp[mv.id] ?? mv.pp, maxpp: mv.maxpp })), ball: outcomeInfo!.ball,
       }));

@@ -628,6 +628,8 @@ export class BattleGateway implements BattleDriver {
         ppMax: Object.fromEntries(p.baseMoveSlots.map((m: { id: string; maxpp: number }) => [permanentMoveId(m), m.maxpp])),
       } : {}),
       stats: { ...permanentStats(this._battle, p) }, active: !!p.isActive,
+      ...(p.baseSpecies.baseStats.hp !== permanentSpecies(this._battle, p).baseStats.hp
+        ? { growthHpBase: p.baseSpecies.baseStats.hp } : {}),
       confused: !!(p.volatiles && p.volatiles["confusion"]), boosts: { ...p.boosts },
     }));
   }
@@ -669,15 +671,14 @@ export class BattleGateway implements BattleDriver {
       for (const k of Object.keys(p.storedStats)) p.storedStats[k] = battleStats[k as keyof Stats];
       p.speed = p.storedStats.spe;
     }
-    // Both native helpers read species. HP follows the persistent individual, while public
-    // details retain the natural battle forme (Crowned, or the original of a Transform copy).
-    // Retain the native HP delta/fainted rule without changing copied types, ability or stats;
-    // restore the visible battle species even if either helper throws.
+    // Both native helpers read species. HP and details follow the natural battle forme,
+    // including Power Construct's increased HP, never a Transform copy. Permanent stats
+    // above remain a separate cross-checked projection of the persistent individual.
+    // Restore the visible battle species even if either helper throws.
     const battleSpecies = p.species;
     try {
-      p.species = growthSpecies;
-      p.updateMaxHp();
       p.species = p.baseSpecies;
+      p.updateMaxHp();
       p.details = p.getUpdatedDetails ? p.getUpdatedDetails() : p.details;
     } finally {
       p.species = battleSpecies;

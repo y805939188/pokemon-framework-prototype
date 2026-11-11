@@ -67,6 +67,8 @@ export interface MemberState extends MonView {
   /** Battle caps keyed by persistent move identity when an opening rewrite changes total PP. */
   ppMax?: Record<string, number>;
   stats: Stats;
+  /** Natural battle-form HP base, only when it differs from the persistent species (never a Transform copy). */
+  growthHpBase?: number;
 }
 
 /** An opaque in-memory rollback point (see GatewayCheckpoint); nothing can be read from it. */
