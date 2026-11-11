@@ -45,6 +45,25 @@ test('queued HP changes preserve publicly ordered intermediate values despite fu
 test('one published sethp event animates both targets in parallel and leaves target input unchanged',()=>{
  const f=fixture(),input=event('-sethp','p1a: P','50/100','p2a: F','25/100'),before=JSON.stringify(input),step=f.p.event(input)[0];step.advance(0);step.advance(500);assert.deepEqual(f.p.snapshot().map(x=>x.hp),[75,62.5]);assert(step.advance(1000));assert.deepEqual(f.p.snapshot().map(x=>x.hp),[50,25]);assert.equal(JSON.stringify(input),before);
 });
+for(const tags of [
+ ['[from] move: Pain Split'],
+ ['[from] move: Pain Split','[silent]'],
+ ['[silent]','[from] move: Pain Split'],
+])test('single-target sethp metadata is not a second actor: '+tags.join('|'),()=>{
+ const f=fixture(),input=event('-sethp','p1a: P','30/100 brn',...tags),before=JSON.stringify(input);
+ const step=f.p.event(input)[0];step.advance(0);assert.deepEqual(f.p.snapshot().map(x=>x.hp),[100,100]);
+ step.advance(500);assert.deepEqual(f.p.snapshot().map(x=>x.hp),[65,100]);assert(step.advance(1000));
+ assert.deepEqual(f.p.snapshot().map(x=>[x.hp,x.status]),[[30,'brn'],[100,'']]);assert.equal(JSON.stringify(input),before);
+});
+test('paired sethp accepts trailing metadata but still rejects invalid actual second targets atomically',()=>{
+ const f=fixture(),step=f.p.event(event('-sethp','p1a: P','50/100','p2a: F','25/100','[from] move: Pain Split'))[0];
+ step.advance(0);assert(step.advance(1000));assert.deepEqual(f.p.snapshot().map(x=>x.hp),[50,25]);
+ for(const args of [['p2a: missing','25/100'],['not-an-actor','25/100'],['p2a: F','[silent]'],['p1a: P','25/100']]){
+  const rejected=fixture();assert.throws(()=>rejected.p.event(event('-sethp','p1a: P','50/100',...args)),/unknown published HP actor|unsupported published HP condition|duplicate/);
+  assert.deepEqual(rejected.p.snapshot().map(x=>x.hp),[100,100]);
+  const next=rejected.p.event(event('-damage','p1a: P','90/100'))[0];next.advance(0);next.advance(500);assert.equal(rejected.p.snapshot()[0].hp,95);
+ }
+});
 test('both damage targets advance together even when the first port is pending; a slower port keeps HP endpoint blocked',()=>{
  const calls=[],f=fixture(undefined,(_,kind,actor)=>({kind:'visual',advance:now=>{calls.push([kind,actor.side,now]);return now>=(actor.side==='p1'?1100:1200);},cancel(){}}));
  const step=f.p.event(event('-sethp','p1a: P','50/100','p2a: F','25/100'))[0];assert.equal(calls.length,0);assert(!step.advance(0));assert.deepEqual(calls,[['damage','p1',0],['damage','p2',0]]);assert(!step.advance(1000));assert.deepEqual(f.p.snapshot().map(x=>x.hp),[50,25]);assert(!step.advance(1100));assert(step.advance(1200));

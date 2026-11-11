@@ -149,7 +149,9 @@ export class BattleDisplayPlayback {
     if (!card) return [];
     if (event.type === '-damage' || event.type === '-heal' || event.type === '-sethp') {
       const changes = [{ card, ...condition(event.args[1], card) }];
-      if (event.type === '-sethp' && event.args[2]) {
+      // Native Pain Split emits one target per event followed by [from]/[silent].
+      // A second positional actor is optional; protocol metadata is not a target.
+      if (event.type === '-sethp' && event.args[2] && !event.args[2].startsWith('[')) {
         const other = actor(event.args[2]); if (!other) throw new Error('unknown published HP actor');
         changes.push({ card: other, ...condition(event.args[3], other) });
       }

@@ -229,6 +229,36 @@ for(const roar of [false,true])test(`real Session compiled Scene resets both cur
   assert(ranks.some(row=>row.id===game.party[1].id&&row.order[0]===row.id),'published B stage must own display rank0 even when final engine is already A');assert.deepEqual(Array.from(s._partyDisplayOrder),roar?game.party.map(m=>m.id):[game.party[1].id,game.party[0].id]);
  } finally {s.terminate();}
 });
+for(const user of ['p1','p2'])test(`real Session Pain Split by ${user} reaches compiled Scene without treating source tags as targets`,async(t)=>{
+ const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs'));
+ // Authored synthetic moves/HP; no direct battle-object mutation or hand-written events.
+ const game=F.makeGame();game.party=game.party.slice(0,1);game.party[0].hp=1;
+ const pain={id:'painsplit',pp:20,maxpp:20},splash={id:'splash',pp:40,maxpp:40};
+ game.party[0].moves=user==='p1'?[{...pain},{...splash}]:[{...splash}];
+ const foe=F.foeMember('F-1','Snorlax',50);foe.moves=[user==='p2'?{...pain}:{...splash}];
+ const saved=JSON.stringify(game),session=await BattleSession.create({game,battleId:'pain-split-'+user,content:F.content,seed:[1,2,3,4],foe:{kind:'trainer',team:[foe]}});
+ const h=host({display:true}),s=h.scene;h.flow._content=F.content;h.flow.begin=()=>Promise.resolve(session);h.flow._op.session=session;
+ const emitted=[];try{
+  s.create();await flush();assert(s.isReady());s.start();drainScene(s);
+  const before=['p1','p2'].map(side=>session.gw.readState(side)[0]);
+  const push=s.pushMessages;s.pushMessages=function(messages){emitted.push(...messages);return push.call(this,messages);};
+  s.showMoves();s._menu.select(0);s.onMenuOk();for(let i=0;i<100&&s._busy;i++)await flush();assert(!s._busy);
+  const hpEvents=emitted.filter(m=>m.kind==='events').flatMap(m=>m.events).filter(e=>e.type==='-sethp');
+  assert.equal(hpEvents.length,2);assert(hpEvents.every(e=>e.args[2]==='[from] move: Pain Split'));
+  assert.equal(hpEvents[0].args[3],'[silent]');assert.equal(hpEvents[1].args.length,3);t.diagnostic(JSON.stringify({user,events:hpEvents,sceneFailure:String(s._failure),abortCount:h.counts.abort}));
+  const raw=JSON.stringify(emitted),state=JSON.stringify(session.gw.snapshot());
+  assert.equal(s._failure,null,'real source-tagged events must not abort the Scene');assert.equal(h.counts.abort,0);
+  drainScene(s);assert.equal(s._mode,'main');assert.equal(h.counts.abort,0);assert(h.flow.running);assert(!h.G.$gameSystem.isSaveEnabled());
+  const average=Math.floor((before[0].hp+before[1].hp)/2),after=['p1','p2'].map(side=>session.gw.readState(side)[0]);
+  for(let i=0;i<after.length;i++){
+   assert.equal(after[i].hp,Math.min(average,before[i].maxhp));
+   const shown=s.presentationState().cards.find(c=>c.side===['p1','p2'][i]&&c.id===after[i].id);assert.equal(shown.hp,after[i].hp);assert.equal(shown.maxhp,after[i].maxhp);
+  }
+  assert.equal(session.gw.readState(user)[0].pp.painsplit,19);assert.equal(JSON.stringify(emitted),raw);assert.equal(JSON.stringify(session.gw.snapshot()),state,'painting does not change engine state/RNG');assert.equal(JSON.stringify(game),saved);
+  // The next actual player action remains reachable after both HP animations.
+  s.showMoves();s._menu.select(user==='p1'?1:0);s.onMenuOk();for(let i=0;i<100&&s._busy;i++)await flush();assert.equal(s._failure,null);drainScene(s);assert.equal(s._mode,'main');assert.equal(h.counts.abort,0);assert.equal(session.broken,null);
+ }finally{s.terminate();}
+});
 async function projectionMenuHost() {
  const h=host({display:true});h.session.party.push({id:'Q',species:'Pidgey',exp:125000});h.session.foeTeam.push({id:'G',species:'Pidgey'});
  h.session.gw.readState=side=>(side==='p1'?['P','Q']:['F','G']).map((id,i)=>({id,level:50,hp:100,maxhp:100,status:'',active:i===0}));
