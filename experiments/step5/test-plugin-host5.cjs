@@ -458,3 +458,56 @@ test('HF-04 PSFlow.commit grants no fresh authority from legacy/required boolean
  await session.run();const received=session.result();app.abortBattle(request,Error('retired control'));
  assert.throws(()=>h.flow.commit(received,{legacy:true,required:false}),/source-unknown-or-retired/);assert.deepEqual(J(h.sys._psGame),before);assert.deepEqual(h.writes,[]);
 });
+
+function messageEscapeHost() {
+  const source = fs.readFileSync(path.join(ROOT, 'js/reactor_windows.js'), 'utf8');
+  const methods = ['Window_Base.prototype.convertEscapeCharacters', 'Window_Message.prototype.processEscapeCharacter'];
+  const G = { Window_Base: function() {}, Window_Message: function() {}, $gameVariables: { value: () => 'INJECTED_VARIABLE' }, TextManager: { currencyUnit: 'G' } };
+  vm.createContext(G);
+  for (const name of methods) {
+    const a = source.indexOf(name + ' = function'), b = source.indexOf('\n};', a);
+    assert(a >= 0 && b > a, name); vm.runInContext(source.slice(a, b + 3), G);
+  }
+  G.Window_Base.prototype.processEscapeCharacter = () => {};
+  return { G, convert: text => G.Window_Base.prototype.convertEscapeCharacters.call({ actorName: () => 'ACTOR', partyMemberName: () => 'PARTY' }, text),
+    pauseSkip(text) { const converted = this.convert(text), window = { _pauseSkip: false, _showFast: false, startPause() {}, startWait() {}, startPage() {} };
+      for (const match of converted.matchAll(/\x1b([\^.!|><$])/g)) G.Window_Message.prototype.processEscapeCharacter.call(window, match[1], {});
+      return window._pauseSkip; } };
+}
+for (const destination of ['party', 'box']) for (const raw of ['\\^Nick', '\\V[1]', '\\C[2]', '\x1b^Nick']) test('receiving ' + destination + ' safely displays literal user name ' + JSON.stringify(raw), () => {
+  const game = E.fixtures.savedFor(E.fixtures.makeGame(), content);
+  if (destination === 'box') while (game.party.length < 6) { const m = J(game.party[0]); m.id = 'LITERAL-' + game.party.length; game.party.push(m); }
+  const h = host(game), messages = []; h.ctx.$gameMessage.add = text => messages.push(text); h.flow.receiveOptions = { mode: 0, naming: 0 };
+  const app = h.flow.app();
+  if (destination === 'box') {
+    const token = app.beginManagement(); const renamed = app.manage(token, 'literal-box-name', { kind: 'box-name', box: 0, name: raw });
+    assert.equal(renamed.status, 'applied'); app.endManagement(token);
+  }
+  const pending = app.receiveGift({ kind: 'normal', member: { species: 'pidgey', level: 3 } });
+  assert.equal(pending.status, 'pending'); const id = app.pendingReceiving.members[0].id;
+  const done = app.resolveReceiving(pending.token, { [id]: { nickname: { kind: 'set', value: destination === 'party' ? raw : 'Review' }, ...(destination === 'box' ? { placement: { kind: 'box' } } : {}) } });
+  assert.equal(done.status, 'applied');
+  h.flow.notifyReceived([id], 'literal-' + destination); assert.equal(messages.length, 1);
+  const parser = messageEscapeHost(), converted = parser.convert(messages[0]), visible = raw.replace(/\x1b/g, '␛');
+  assert(converted.includes(visible), 'literal user text survives native MZ conversion: ' + converted);
+  assert(!converted.includes('INJECTED_VARIABLE')); assert.equal(parser.pauseSkip(messages[0]), false);
+  const saved = h.flow.game();
+  assert.equal(destination === 'party' ? saved.party.at(-1).nickname : saved.storage.boxes[0].name, raw, 'stored user input remains unchanged');
+  h.flow.notifyReceived([id], 'literal-' + destination); assert.equal(messages.length, 1, 'notice remains idempotent');
+  // User-only escaping must never disable authored MZ controls globally.
+  h.ctx.$gameMessage.add('Author\\^'); assert.equal(parser.pauseSkip(messages[1]), true);
+});
+
+test('receiving escapes only user substitutions while the same authored message retains its native controls', () => {
+  const h = host(E.fixtures.savedFor(E.fixtures.makeGame(), content)), messages = [];
+  h.flow.receiveOptions = { mode: 0, naming: 0 }; h.ctx.$gameMessage.add = text => messages.push(text);
+  const app = h.flow.app(), pending = app.receiveGift({ kind: 'normal', member: { species: 'pidgey', level: 3 } });
+  const id = app.pendingReceiving.members[0].id, nickname = '\\V[1]';
+  assert.equal(app.resolveReceiving(pending.token, { [id]: { nickname: { kind: 'set', value: nickname } } }).status, 'applied');
+  const translator = h.flow.translator();
+  h.flow.translator = () => ({ t(key, args) { const text = translator.t(key, args); return key === 'management.received' ? '\\C[2]' + text + '\\^' : text; } });
+  h.flow.notifyReceived([id], 'literal-authored-controls');
+  const parser = messageEscapeHost(), converted = parser.convert(messages[0]);
+  assert(converted.startsWith('\x1bC[2]')); assert(converted.includes(nickname));
+  assert(!converted.includes('INJECTED_VARIABLE')); assert.equal(parser.pauseSkip(messages[0]), true, 'authored pause-skip is still effective');
+});

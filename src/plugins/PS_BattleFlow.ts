@@ -43,6 +43,9 @@ import { installPrebattleHost } from './battleflow/prebattle-host';
 import { effectiveBattleEffects, installBattleEffectsSettings, parseBattleEffects } from './battleflow/battle-effects-settings';
 const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
 
+/** Literal user text for one native MZ message conversion. Keep stored names and authored controls intact. */
+const messageLiteral = (text: string): string => text.replace(/\\/g, '\\\\').replace(/\x1b/g, '␛');
+
 (() => {
   "use strict";
   const G: any = globalThis; // Reactor's globals are real typed values; we only need them loosely here
@@ -562,7 +565,8 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       const placements:any[]=[],messages:string[]=[];
       for(const id of ids){if(seen.has(id)||recovered.has(id)||!Object.hasOwn(snapshot.references,id))continue;const position=snapshot.references[id].position,member=position.kind==='party'?snapshot.party[position.index]:snapshot.storage.boxes[position.box].slots[position.slot];if(!member)continue;
         const dest=position.kind==='party'?PSFlow.translator().t('management.party'):snapshot.storage.boxes[position.box].name||PSFlow.translator().t('management.box',{n:position.box+1});
-        const text=PSFlow.translator().t('management.received',{dest:(member.nickname||PSFlow.speciesName(member.species,member.form))+' → '+dest});G.$gameMessage.add(text);seen.add(id);placements.push({id,position,to:position.kind==='party'?'party':'boxes',destination:dest});messages.push(text);
+        const name=member.nickname?messageLiteral(member.nickname):PSFlow.speciesName(member.species,member.form),displayDest=position.kind==='box'&&snapshot.storage.boxes[position.box].name?messageLiteral(dest):dest;
+        const text=PSFlow.translator().t('management.received',{dest:name+' → '+displayDest});G.$gameMessage.add(text);seen.add(id);placements.push({id,position,to:position.kind==='party'?'party':'boxes',destination:dest});messages.push(text);
       }
       if(placements.length)PSFlow.lastReceivingNotice={key,placements,messages};
     },
@@ -1823,7 +1827,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       });
       const ids = new Set(members.map((m: any) => m.memberId));
       const activeIds = s.gw.readState('p1').filter((m: any) => m.active && ids.has(m.id)).map((m: any) => m.id);
-      const foes = this._display?.snapshot() ?? s.gw.readState('p2').map((m: any) => ({ ...m, side: 'p2' }));
+      const foes = battleBagFoes(this);
       // The current formal StartBattle entry binds internalBattle=true; facility/non-internal entry is not implemented.
       model.open({ internalBattle: true, actorId: activeIds[0] ?? members.find((m: any) => !m.egg)?.memberId,
         members, activeIds, foeIds: foes.filter((m: any) => m.side === 'p2' && m.active && m.hp > 0).map((m: any) => m.id),
@@ -1834,6 +1838,9 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     }
     this.showBattleBagView();
   };
+  function battleBagFoes(scene: any): any[] {
+    return scene._display?.snapshot() ?? scene._session.gw.readState('p2').map((m: any) => ({ ...m, side: 'p2' }));
+  }
   P.battleBagState = function () { return this._battleBag?.view() ?? null; };
   P.battleBagTransitionState = function () { return sceneController(this).isCurrent() ? this._bagFade?.snapshot() ?? null : null; };
   P.showBattleBagView = function () {
@@ -1880,7 +1887,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     } else if (view.kind === 'members') {
       phase = 'bag-members'; const live = this._session.gw.readState('p1');
       items = [...view.rows.map((member: any) => { const data = live.find((m: any) => m.id === member.memberId), mon = this._session.party.find((m: any) => m.id === member.memberId);
-        return { name: member.egg ? tr.t('inventory.egg') : tr.t('ui.party.entry', { name: mon ? PSFlow.speciesName(mon.species) : member.memberId,
+        return { name: member.egg ? tr.t('inventory.egg') : tr.t('ui.party.entry', { name: mon ? playerBattleName(mon) : member.memberId,
           level: data?.level ?? mon?.level ?? '?', hp: data?.hp ?? 0, maxhp: data?.maxhp ?? 0, fainted: data?.fainted ? tr.t('ui.party.fainted') : '', active: data?.active ? tr.t('ui.party.active') : '', noEffect: '' }),
           ext: member.memberId, enabled: !member.egg }; }), cancel];
     } else if (view.kind === 'moves') {
@@ -1906,7 +1913,9 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     c.run(async () => {
       const target = request.target;
       if (target.kind === 'foe' && BALLS.includes(request.battleId)) {
-        if (s.gw.activeId('p2') !== target.memberId) return { ok: false, reason: 'unknown-target' };
+        // Selection uses the current public appearance, which can be an Illusion alias.
+        // The Session resolves the actual capture target and all spending/turn rules.
+        if (!battleBagFoes(this).some((foe: any) => foe.side === 'p2' && foe.active && foe.hp > 0 && foe.id === target.memberId)) return { ok: false, reason: 'unknown-target' };
         return s.throwBall(request.battleId);
       }
       if (target.kind === 'move') {

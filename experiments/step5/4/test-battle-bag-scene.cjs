@@ -17,15 +17,16 @@ test.before(async () => {
   fixture = require(path.join(temp, 'fixture/entry.cjs'));
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
-async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, fast = true, noRun = false, leadMoves = null, benchMoves = null, benchHP = null } = {}) {
+async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, fast = true, noRun = false, leadMoves = null, benchMoves = null, benchHP = null, nicknames = [], makeContent = null } = {}) {
   const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
-  const G = h.G, flow = h.w.flow, content = fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
+  const G = h.G, flow = h.w.flow, content = makeContent ? makeContent() : fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
   if (catalog) catalog(content.items);
   G.PluginManager.parameters = function (name) { const p = parameters.call(this, name); return name === 'PS_BattleFlow' ? { ...p, language: lang } : p; };
   flow.setLanguage(null); flow.stateReplaced(); flow._app = null; flow._content = content; flow._dex = E.dex.createDexLookup(); flow.seed = [1, 2, 3, 4]; flow.rng = () => 0; flow.fast = fast;
   const state = fixture.musicNativeState(E, content, 'receiving'); state.party = state.party.slice(0, members); state.nextMemberOrdinal = String(members + 1);
   if (hurt) state.party[0].hp -= 40;
+  nicknames.forEach((name, i) => { state.party[i].nickname = name; });
   if (egg) state.party[1].isEgg = true;
   if (leadMoves) state.party[0].moves = leadMoves.map(m => ({ ...m }));
   if (benchMoves) state.party[1].moves = benchMoves.map(m => ({ ...m }));
@@ -305,4 +306,48 @@ for(const [lang,item] of [['en','revive'],['zh','revive'],['en','maxrevive'],['z
   await pick(h,id);h.s.onMenuOk();h.s.onMenuCancel();await h.p.inMode('main');const live=s.gw.readState('p1').find(m=>m.id===id),expected=item==='revive'?Math.max(1,Math.floor(old.maxhp/2)):old.maxhp;assert.equal(live.hp,expected);assert(!live.fainted);assert.equal(s.bag[item],1);assert.equal(calls,1);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
   await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied',JSON.stringify(h.flow.lastOutcome));assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),order);assert.equal(h.flow.game().party.find(m=>m.id===id).hp,expected);assert.equal(E.inventory.aggregateBag(h.flow.game().inventory)[item],1);h.s.onEnd();assert.equal(installs,1);
  }finally{h.cleanup();}
+});
+
+// Ordinary nickname and public Illusion identities cross the real App/Session -> Scene boundary.
+for (const lang of ['en', 'zh']) test(lang + ' bag member rows use nicknames and keep species fallback and stable item targets', async () => {
+  const h = await open({ lang, nicknames: ['Review', null] }); try {
+    const session = h.s._session, id = session.party[0].id;
+    const hp = session.gw.readState('p1').find(m => m.id === id).hp;
+    await bag(h); await use(h, 'potion');
+    const rows = h.s._menu._items;
+    assert(rows.find(r => r.ext === id).name.includes('Review'));
+    assert(rows.find(r => r.ext === session.party[1].id).name.includes(h.flow.speciesName(session.party[1].species)));
+    await pick(h, id); await h.p.inMode('main');
+    assert.equal(session.bag.potion, 2);
+    assert(session.gw.readState('p1').find(m => m.id === id).hp > hp);
+    assert.equal(session.party[0].nickname, 'Review');
+    assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { h.cleanup(); }
+});
+function trainerBallContent(illusion) {
+  const { inputs } = require('./trainer-ai-integration/fixtures.cjs');
+  const input = inputs({ party: 2, moves: ['splash'] });
+  input.species.push({ id: 'zoroark', showdownId: 'zoroark', nameKey: 'species.zoroark', growth: 'medium', baseExp: 101,
+    evYield: { hp: 1 }, catchRate: 35, learnset: [{ level: 1, move: 'splash' }], source: 'author-placeholder' });
+  input.trainers[0].id = 'music-normal';
+  input.trainers[0].party.forEach(m => { m.level = 5; });
+  if (illusion) input.trainers[0].party[0].species = 'zoroark';
+  const compiled = E.contentCompile.compileContent(input); assert(compiled.ok, JSON.stringify(compiled.errors));
+  const assembled = E.contentRuntime.assembleContent(compiled.data, E.dex.createDexLookup());
+  assert.deepEqual(assembled.errors, []); return assembled.content;
+}
+for (const illusion of [false, true]) test('real trainer ball action consumes a turn and ball with public Illusion=' + illusion, async () => {
+  const h = await open({ trainer: true, bag: { masterball: 1 }, makeContent: () => trainerBallContent(illusion) }); try {
+    const session = h.s._session, beforeTurn = session.gw._debugBattle().turn;
+    const actual = session.gw.activeId('p2'), shown = h.s._display.snapshot().find(c => c.side === 'p2' && c.active).id;
+    assert.equal(shown === actual, !illusion);
+    let calls = 0, result; const throwBall = session.throwBall.bind(session);
+    session.throwBall = async (...args) => { calls++; return result = await throwBall(...args); };
+    await bag(h); await use(h, 'masterball'); await h.p.inMode('main');
+    assert.equal(calls, 1); assert.equal(result.ok, true);
+    assert.match(JSON.stringify(result.messages), /blocked/);
+    assert.equal(session.bag.masterball, 0); assert.equal(session.gw._debugBattle().turn, beforeTurn + 1);
+    assert.equal(session.finished, false); assert.equal(h.s.battleBagState().reason, 'accepted');
+    assert.equal(JSON.stringify(h.flow.game()), h.before);
+  } finally { h.cleanup(); }
 });
