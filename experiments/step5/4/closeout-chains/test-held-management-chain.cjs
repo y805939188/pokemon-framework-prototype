@@ -45,3 +45,46 @@ test('management menu give, natural consumption, reopen, move to empty member an
  open();h.choose('move');h.ready();h.press('right');h.use();h.choose('yes');assert.equal(state.read().party[0].item,'');assert.equal(state.read().party[1].item,'leftovers');close();
  h.G.PSManagement.openParty();h.ready();h.press('right');h.use();h.choose('item');h.choose('take');assert.equal(state.read().party[0].item,'');assert.equal(state.read().party[1].item,'');assert.equal(bag().leftovers,1);assert.equal(bag().lumberry,1);assert.deepEqual(state.read().party.map(m=>m.id),ids);close();
 });
+
+// Drive the compiled production menus, not Controller.itemMenu/itemTarget directly.
+for(const route of ['summary','direct']) for(const location of ['party','box','panel']) for(const targetItem of ['', 'lumberry']) {
+ test(route+' item move returns to '+location+' target selection / '+(targetItem||'empty'),()=>{
+  const h=host(),{app,state}=h;
+  for(let i=0;i<2;i++)assert.equal(app.receiveGift({kind:'silent',member:{species:'snorlax',level:50}}).status,'applied');
+  const ids=state.read().party.map(m=>m.id),token=app.beginManagement();let seq=0;
+  const manage=request=>{const out=app.manage(token,'setup-'+(++seq),request);assert.equal(out.status,'applied',JSON.stringify(out));};
+  const ref=id=>app.managementSnapshot(token).references[id];
+  manage({kind:'give-item',source:ref(ids[0]),item:'leftovers'});
+  if(targetItem)manage({kind:'give-item',source:ref(ids[1]),item:targetItem});
+  if(location==='box')for(let i=0;i<2;i++)manage({kind:'move',source:ref(ids[i]),target:{kind:'box',box:0,slot:i},expectedTargetId:null});
+  app.endManagement(token);
+  const before=clone(state.read()),writes=state.replaced.length;
+  if(location==='party')h.G.PSManagement.openParty();else {h.G.PSManagement.openStorage();h.choose(location==='box'?'organize':'deposit');}
+  h.ready();h.use();if(route==='summary'){h.choose('summary');h.ready();h.use();}h.choose('item');h.choose('move');
+  assert.equal(h.G.PSManagement.current().view.kind,location);
+  assert.equal(h.G.PSManagement.current().view.itemSource.source.id,ids[0]);
+  assert.deepEqual(state.read(),before,'selecting move never installs');
+  h.back();assert.equal(h.G.PSManagement.current().view.itemSource,null);
+  assert.deepEqual(state.read(),before,'cancel leaves items unchanged');
+  h.use();if(route==='summary'){h.choose('summary');h.ready();h.use();}h.choose('item');h.choose('move');
+  h.ready();h.press('right');h.use();h.choose('no');
+  assert.deepEqual(state.read(),before,'rejecting swap confirmation does not install');
+  // Return to source, enter again, and confirm a real transfer/swap.
+  h.press('left');h.use();if(route==='summary'){h.choose('summary');h.ready();h.use();}h.choose('item');h.choose('move');
+  h.ready();h.press('right');h.use();h.choose('yes');
+  const snapshot=app.managementSnapshot(h.manager._scene._controller.managementToken);
+  const members=[...snapshot.party,...snapshot.storage.boxes.flatMap(b=>b.slots).filter(Boolean)];
+  assert.equal(members.find(m=>m.id===ids[0]).item,targetItem);
+  assert.equal(members.find(m=>m.id===ids[1]).item,'leftovers');
+  assert.deepEqual(state.read().inventory,before.inventory);
+  assert.equal(state.replaced.length,writes+1,'one item transaction');
+  h.manager._scene.terminate();
+ });
+}
+test('standalone summary does not offer a dead move action',()=>{
+ const h=host(),{app,state}=h,id=state.read().party[0].id,token=app.beginManagement();
+ assert.equal(app.manage(token,'give',{kind:'give-item',source:app.managementSnapshot(token).references[id],item:'leftovers'}).status,'applied');
+ app.endManagement(token);h.G.PSManagement.openSummary(id);h.ready();h.use();h.choose('item');
+ assert.equal(h.G.PSManagement.current().view.items.some(i=>i.key==='move'&&i.enabled!==false),false);
+ h.manager._scene.terminate();
+});

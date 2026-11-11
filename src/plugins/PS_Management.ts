@@ -180,11 +180,15 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    }
    items.push({key:'cancel',label:tr('cancel'),run:()=>this.back()});this.menu(memberName(m),items);
   }
-  itemMenu(id:string){const m=this.find(id);if(!m)return;const source=this.reference(id);this.menu(tr('item'),[
+  itemMenu(id:string){const m=this.find(id);if(!m)return;const source=this.reference(id);
+   // Summary is not a target selector. Return to its owning list before arming a move.
+   const parent=this.top().kind==='summary'?this.stack[this.stack.length-2]:this.top();
+   const moveView=parent&&['party','box','panel'].includes(parent.kind)?parent:null;
+   this.menu(tr('item'),[
    {key:'use',label:tr('use'),enabled:!!W.PSInventory&&source.position.kind==='party'&&!m.isEgg&&!this.snapshot.held,run:()=>{this.back();this.inventoryChild=W.PSInventory.attach(this.window,{token:this.managementToken,memberId:id},()=>{this.inventoryChild=null;if(this.valid()){this.boundary();this.refresh();}},()=>{if(this.closed&&this.application===flow()._app&&this.generation===this.application.stateGeneration)this.application.endManagement(this.managementToken);});}},
    {key:'give',label:tr('give'),enabled:this.snapshot.heldSourcesEnabled&&!m.isEgg,run:()=>{this.back();const items=app().holdableBagItems().map((it:any)=>({key:it.id,label:it.id+' ×'+it.count,run:()=>{this.back();if(m.item)this.confirm(tr('give')+' '+it.id+' → '+memberName(m),()=>this.operate({kind:'give-item',source,item:it.id}));else this.operate({kind:'give-item',source,item:it.id});}}));this.menu(tr('give'),[...items,{key:'cancel',label:tr('cancel'),run:()=>this.back()}]);}},
    {key:'take',label:tr('take'),enabled:!!m.item&&!m.mail,run:()=>{this.back();this.operate({kind:'take-item',source});}},
-   {key:'move',label:tr('move'),enabled:this.snapshot.heldSourcesEnabled&&!!m.item&&!m.mail,run:()=>{this.back();const v=this.top();v.itemSource={source,item:m.item};this.boundary();this.draw();}},
+   ...(moveView?[{key:'move',label:tr('move'),enabled:this.snapshot.heldSourcesEnabled&&!!m.item&&!m.mail,run:()=>{this.back();if(this.top().kind==='summary')this.back();moveView.itemSource={source,item:m.item};this.boundary();this.draw();}}]:[]),
    {key:'cancel',label:tr('cancel'),run:()=>this.back()}]);if(!this.snapshot.heldSourcesEnabled)this.error=tr('sourceOff');this.draw();}
   switchBox(delta:number){const v=this.top(),box=(v.box+delta+40)%40;if(this.operate({kind:'current-box',box})){v.box=box;this.boundary();this.draw();}}
   boxMenu(){const v=this.top(),box=v.box;this.menu(boxTitle(this.snapshot,box),[
