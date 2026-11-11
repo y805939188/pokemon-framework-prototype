@@ -29,7 +29,7 @@ test('native plan freezes exact product and15 ordered cases, two-process denomin
  // freeze checks actual bundle bytes against f021. This digest now records the
  // reviewed normal-observer, Pokedex-continuation and player-nickname source for headless controls only. No requalification of
  // the historical fifteen-case App/PLAN is implied: new native packaging must rebind separately.
- const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),'94b6b7c2c3bba72c9574d27e021020095c0f26f5b71e8f8fc0ed40589dec3707','current source identity; historical native plan requires rebind');
+ const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),'0b18933ff21ebd92c27452eb885acf57d7098449e66bd18db4f430ae63b6e6f8','current source identity; historical native plan requires rebind');
 });
 for(const kind of ['map','title'])test('actual driver readiness rejects unstarted/changing/incomplete '+kind,()=>{
  class Map{}class Title{}let changing=false;const G={Scene_Map:Map,Scene_Title:Title,SceneManager:{isSceneChanging:()=>changing}},v=new(kind==='map'?Map:Title)();let started=false,active=true,busy=false;
