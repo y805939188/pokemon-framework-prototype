@@ -4,6 +4,7 @@
  */
 import { semanticFingerprint } from "./semantic";
 import { clone } from "./value";
+import { captureHeldClaims } from "./held-provenance";
 import { allMembers, locateMember } from "./storage";
 import type { MemberCollection } from "./storage";
 
@@ -139,11 +140,14 @@ export function planHeldWriteback<T extends MemberCollection>(input: HeldWriteba
   if (incoming.length !== Object.keys(capturedOrigins).length || incoming.some(id => !Object.hasOwn(capturedOrigins, id))) throw new Error("held-writeback-capture-origin-incomplete");
   const byId = new Map(facts.members.map(m => [m.id, m]));
   if (byId.size !== facts.members.length) throw new Error("held-writeback-duplicate-fact");
+  const claims = Object.keys(capturedOrigins).length ? captureHeldClaims(facts) : null;
   const state = clone(primary), changes: { id: string; item: string; destination: "party" | "box" }[] = [];
   for (const fact of facts.members.filter(m => m.side === "p1")) {
     const old = before.party.find(m => m.id === fact.id), located = locateMember(state, fact.id);
     if (!old || old.item !== fact.initial || !located) throw new Error("held-writeback-player-identity-mismatch");
-    const nextItem = located.position.kind === "party" ? fact.recovery : fact.current;
+    const field = located.position.kind === "party" ? "recovery" : "current";
+    const preferred = claims?.claim(fact.id, field);
+    const nextItem = claims ? preferred || claims.claim(fact.id, "current") || "" : fact[field];
     located.member.item = nextItem;
     changes.push({ id: fact.id, item: nextItem, destination: located.position.kind === "party" ? "party" : "box" });
   }
@@ -151,8 +155,15 @@ export function planHeldWriteback<T extends MemberCollection>(input: HeldWriteba
   for (const [capturedId, sourceId] of Object.entries(capturedOrigins)) {
     const source = byId.get(sourceId), located = locateMember(state, capturedId);
     if (!source || source.side !== "p2" || used.has(sourceId) || !located || beforeMembers.some(m => m.id === capturedId)) throw new Error("held-writeback-capture-identity-mismatch");
-    used.add(sourceId); located.member.item = source.current;
-    changes.push({ id: capturedId, item: source.current, destination: located.position.kind === "party" ? "party" : "box" });
+    // Existing player's recovery claim wins over copying its temporary gift into the capture.
+    // In a two-item swap, keep the wild original recovery instead, if it is still alive/unclaimed.
+    // Empty C only reclaims its recovery if that token is actually still held elsewhere;
+    // this returns a displaced swap partner without reviving an unrelated knocked-off wild item.
+    const current = claims!.claim(sourceId, "current");
+    const item = current === null ? claims!.claim(sourceId, "recovery") ?? ""
+      : current || claims!.claim(sourceId, "recovery", true) || "";
+    used.add(sourceId); located.member.item = item;
+    changes.push({ id: capturedId, item, destination: located.position.kind === "party" ? "party" : "box" });
   }
   return { state, changes };
 }

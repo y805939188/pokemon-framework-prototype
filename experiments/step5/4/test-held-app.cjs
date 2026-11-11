@@ -115,7 +115,7 @@ test('HF-05/M02 actual Trick-to-capture pending keeps the authenticated source; 
     if(revoke)allowed=false;
     const id=raw.captured[0].id,out=w.app.resolveReceiving(pending.receivingToken,{[id]:{nickname:{kind:'keep'}}});
     if(revoke){assert.equal(out.aborted,true);assert.match(out.error,/invalid-held-item/);assert.deepEqual(w.state.current(),before);assert.equal(w.state.replaced.length,0);allowed=true;assert.equal(w.app.finishBattle(h,w.request).commit,'none');}
-    else{assert.equal(out.commit,'applied',JSON.stringify(out));assert.equal(w.state.replaced.length,1);assert.equal(w.state.current().party.find(m=>m.id===id).item,'leftovers');assert.equal(w.state.current().party.find(m=>m.id==='P1').item,'leftovers');assert.equal(w.app.commitResult(raw),'already-applied');assert.equal(w.state.replaced.length,1);}
+    else{assert.equal(out.commit,'applied',JSON.stringify(out));assert.equal(w.state.replaced.length,1);assert.equal(w.state.current().party.find(m=>m.id===id).item,'','player-source temporary gift is not duplicated by capture');assert.equal(w.state.current().party.find(m=>m.id==='P1').item,'leftovers');assert.equal(w.app.commitResult(raw),'already-applied');assert.equal(w.state.replaced.length,1);}
   }
 });
 test('B durable Node port: actual required app candidate saves the pair; default store only queries its installed raw',async()=>{
@@ -179,7 +179,7 @@ test('B captured C and boxed old C: real Trick plus capture to box or replacemen
     let out=w.app.finishBattle(h,w.request);
     if(replace){assert.equal(out.pending,true);assert.equal(w.state.replaced.length,0);out=w.app.resolveReceiving(out.receivingToken,{[id]:{placement:{kind:'replace',target:{id:'P1',position:{kind:'party',index:0}}}}});}
     assert.equal(out.commit,'applied',JSON.stringify(out));assert.equal(w.state.replaced.length,1);const next=w.state.current();
-    const caught=E.storage.locateMember(next,id),old=E.storage.locateMember(next,'P1');assert.equal(caught.member.item,'leftovers');
+    const caught=E.storage.locateMember(next,id),old=E.storage.locateMember(next,'P1');assert.equal(caught.member.item,replace?'leftovers':'','capture does not clone the recovered player token');
     assert.equal(caught.position.kind,replace?'party':'box');assert.equal(old.position.kind,replace?'box':'party');assert.equal(old.member.item,replace?'':'leftovers');
     assert.match(next.appliedBattles[raw.battleId].settlement.pairHash,/^[a-f0-9]{64}$/);
   }
@@ -300,4 +300,27 @@ test('wild Knock Off through real App disables held effect then restores owned i
   assert.equal(w.state.replaced.length,1);
   assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied');
   assert.equal(w.state.replaced.length,1);
+});
+
+for (const destination of ['party','box','replace']) for (const abort of [false,true])
+test(`capture held provenance: real Trick, pending ${destination}, abort=${abort}`,async()=>{
+ const initial=fixture({item:'leftovers'}), game=J(initial.state.current());
+ if(destination!=='party')for(let i=2;i<=6;i++)game.party.push({...J(game.party[0]),id:'P'+i,item:i===2?'leftovers':''});
+ game.nextMemberOrdinal='7';
+ const w=fixture({game,naming:0}), before=J(w.state.current()), h=await w.app.startBattle(w.request);
+ assert((await h.chooseMove(1)).ok);assert((await h.throwBall('masterball')).ok);
+ const raw=h.result(),id=raw.captured[0].id,pending=w.app.finishBattle(h,w.request);
+ assert(pending.pending);assert.deepEqual(w.state.current(),before);assert.equal(w.state.replaced.length,0);
+ if(abort){w.app.abortBattle(w.request,Error('cancel capture'));assert.deepEqual(w.state.current(),before);assert.equal(w.state.replaced.length,0);return;}
+ const placement=destination==='replace'?{kind:'replace',target:{id:'P1',position:{kind:'party',index:0}}}:{kind:'box'};
+ const out=w.app.resolveReceiving(pending.receivingToken,{[id]:{nickname:{kind:'keep'},placement}});
+ assert.equal(out.commit,'applied',JSON.stringify(out));assert.equal(w.state.replaced.length,1);
+ const get=id=>E.storage.locateMember(w.state.current(),id).member.item;
+ assert.equal(get('P1'),destination==='replace'?'':'leftovers');
+ assert.equal(get(id),destination==='replace'?'leftovers':'');
+ if(destination!=='party')assert.equal(get('P2'),'leftovers','same-name second item stays distinct');
+ const all=E.storage.allMembers(w.state.current());
+ assert.equal(all.filter(m=>m.item==='leftovers').length,destination==='party'?1:2);
+ const after=J(w.state.current());assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied');
+ assert.deepEqual(w.state.current(),after);assert.equal(w.state.replaced.length,1);
 });

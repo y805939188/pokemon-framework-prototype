@@ -218,3 +218,34 @@ test('wild Knock Off retains native Sticky Hold protection', async()=>{
  const facts=await finish(sample);
  assert.equal(facts.events.filter(e=>e.id==='P1'&&e.reason==='temporary-remove').length,0);
 });
+
+for(const own of ['leftovers','oranberry'])for(const foreign of ['lightclay',own])
+test(`capture provenance from actual engine two-held Trick ${own}/${foreign}`,async()=>{
+ const sample=await create({wild:true,p:set('P1','Snorlax',['Trick','Splash'],own),f:set('F1','Snorlax',['Splash'],foreign),rest:[set('P2','Snorlax',['Splash'],own)]});
+ await turn(sample.gw);
+ assert.equal(await sample.gw.act('p1',{kind:'ball',ball:'masterball',target:'F1',catchRate:45,ctx:{}}),true);
+ assert.equal(await sample.gw.choose('p2','move 1'),true);sample.gw.drain();assert(sample.gw.ended);
+ const facts=await finish(sample,false);
+ assert.equal(facts.members.find(m=>m.id==='P1').current,foreign);
+ assert.equal(facts.members.find(m=>m.id==='F1').current,own);
+ for(const destination of ['party','box','replace']){
+  const before={party:[{id:'P1',item:own},{id:'P2',item:own}],storage:{boxes:[{slots:[null,null]}]}},primary=JSON.parse(JSON.stringify(before)),caught={id:'C1',item:own};
+  if(destination==='box')primary.storage.boxes[0].slots[0]=caught;
+  else {if(destination==='replace')primary.storage.boxes[0].slots[0]=primary.party.shift();primary.party.push(caught);}
+  const plan=(await H).planHeldWriteback({before,primary,facts,capturedOrigins:{C1:'F1'}});
+  const actual=Object.fromEntries([...plan.state.party,...plan.state.storage.boxes[0].slots.filter(Boolean)].map(m=>[m.id,m.item]));
+  assert.deepEqual(actual,{P1:destination==='replace'?foreign:own,P2:own,C1:destination==='replace'?own:foreign});
+ }
+});
+for(const harvest of [false,true])test(`capture provenance actual Trick -> Rest consumption -> Harvest=${harvest}`,async()=>{
+ const sample=await create({wild:true,p:set('P1','Snorlax',['Dragon Rage','Trick'],'lumberry'),f:{...set('F1','Exeggutor',['Sunny Day','Rest'],'lightclay'),ability:harvest?'Harvest':'Chlorophyll'}});
+ await turn(sample.gw,'move 1','move 1'); // legal damage and sun before Rest
+ await turn(sample.gw,'move 2','move 2'); // transferred Lum heals Rest, Harvest revives exactly that source
+ assert.equal(await sample.gw.act('p1',{kind:'ball',ball:'masterball',target:'F1',catchRate:45,ctx:{}}),true);
+ assert.equal(await sample.gw.choose('p2','move 1'),true);sample.gw.drain();assert(sample.gw.ended);
+ const facts=await finish(sample,false);assert(facts.events.some(e=>e.id==='F1'&&e.reason==='consume'));
+ assert.equal(facts.events.some(e=>e.id==='F1'&&e.reason==='harvest'),harvest);
+ const before={party:[{id:'P1',item:'lumberry'}],storage:{boxes:[{slots:[null]}]}},primary=JSON.parse(JSON.stringify(before));primary.party.push({id:'C1',item:''});
+ const result=(await H).planHeldWriteback({before,primary,facts,capturedOrigins:{C1:'F1'}});
+ assert.deepEqual(result.state.party.map(m=>m.item),harvest?['lumberry','lightclay']:['lightclay','']);
+});
