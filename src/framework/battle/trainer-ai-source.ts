@@ -62,7 +62,7 @@ function hpBar(value:string):{parts:number;scale:100} {
   return {parts,scale:100};
 }
 /** A public-only projection for both active slots; Transform must not inspect p1 internals. */
-function collectPublicTypes(s:Source,type:string,a:string,b:string,c:string):void {
+function collectPublicTypes(s:Source,type:string,a:string,b:string,c:string,d:string):void {
   const slot=a.startsWith('p1a:')?'publicTypes':a.startsWith('p2a:')?'ownPublicTypes':null;
   if(!slot)return;
   let current=s[slot];
@@ -83,18 +83,30 @@ function collectPublicTypes(s:Source,type:string,a:string,b:string,c:string):voi
     if(target){current.base=[...target.base];current.added=target.added;current.changed=true;}
   }
   if(current){
-    if(type==='-start'&&b==='typechange'){current.base=c.split('/');current.added=null;current.changed=true;}
+    if(type==='-start'&&b==='typechange'){
+      if(c==='[from] move: Reflect Type'){
+        // Reflect Type names its public target, not a type list. There may be no later
+        // silent correction when the base types stay the same; retain the added type too.
+        const target=d.startsWith('[of] p2a:')?s.ownPublicTypes:d.startsWith('[of] p1a:')?s.publicTypes:null;
+        if(!target)throw new Error('trainer-ai-unknown-public-type-target');
+        const base=target.base.filter(value=>value!=='???');
+        current.base=base.length?base:['Normal'];current.added=target.added;current.changed=true;
+      }else{current.base=c.split('/');current.added=null;current.changed=true;}
+    }
     if(type==='-start'&&b==='typeadd')current.added=c;
     if(type==='-end'&&b==='typechange'){current.base=[...current.original];current.added=null;current.changed=false;}
   }
   s[slot]=current;
 }
 function shownTypes(types:PublicTypes):string[]{return [...new Set([...types.base,...(types.added?[types.added]:[])])];}
+function collectPublicHealth(p:MutableOpponent,value:string):void {
+  p.hpBar=hpBar(value);p.fainted=p.hpBar.parts===0;p.status=status(value.split(' ')[1]??'',p.fainted);
+}
 /** Engine public stream only. p1 request, choice, queue and rpg.pending are never inspected. */
 export function trainerSourcePublic(driver:BattleDriver,lines:readonly string[]):void {
   const s=SOURCES.get(driver);if(!s)return;
   for(const line of lines){
-    const [type,a='',b='',c='']=line.slice(1).split('|');
+    const [type,a='',b='',c='',d='']=line.slice(1).split('|');
     if(type==='-weather')s.weather=b==='[upkeep]'?s.weather:a==='none'?'':id(a);
     if(type==='-fieldstart'&&a.startsWith('move: ')&&a.endsWith('Terrain'))s.terrain=id(a.slice(6));
     if(type==='-fieldend'&&a.startsWith('move: ')&&a.endsWith('Terrain'))s.terrain='';
@@ -104,7 +116,13 @@ export function trainerSourcePublic(driver:BattleDriver,lines:readonly string[])
         if(type==='-sidestart')s.conditions.push(key==='spikes'||key==='toxicspikes'?prefix+':'+Math.min(key==='spikes'?3:2,Number(previous?.split(':')[2]??0)+1):prefix);
       }
     }
-    collectPublicTypes(s,type,a,b,c);
+    collectPublicTypes(s,type,a,b,c,d);
+    if(type==='-sethp'&&s.public){
+      // Pain Split emits single-target lines with trailing tags. The public protocol also
+      // permits two health pairs, so find the active player slot without interpreting tags.
+      if(a.startsWith('p1a:'))collectPublicHealth(s.public,b);
+      else if(c.startsWith('p1a:'))collectPublicHealth(s.public,d);
+    }
     if(!a.startsWith('p1a:'))continue;
     if(type==='switch'||type==='drag'||type==='replace'){
       const speciesName=b.split(',')[0]!,species=s.env.sim.Dex.forGen(8).species.get(speciesName);
@@ -115,7 +133,7 @@ export function trainerSourcePublic(driver:BattleDriver,lines:readonly string[])
       s.public={appearanceKey:previous?.appearanceKey??'p1a:'+ ++s.appearance,displayedSpecies:species.id,displayedForm:0,level,shownTypes:[...species.types],hpBar:bar,status:c?status(c.split(' ')[1]??'',bar.parts===0):previous!.status,stages:previous?copy(previous.stages):stages(),revealedMoves:previous?[...previous.revealedMoves]:[],lastPublicMove:previous?copy(previous.lastPublicMove):null,fainted:bar.parts===0,revealedAbility:previous?.revealedAbility??null,revealedItem:previous?.revealedItem??null};
     }
     const p=s.public;if(!p)continue;
-    if(type==='-damage'||type==='-heal'){p.hpBar=hpBar(b);p.fainted=p.hpBar.parts===0;p.status=status(b.split(' ')[1]??'',p.fainted);}
+    if(type==='-damage'||type==='-heal')collectPublicHealth(p,b);
     if(type==='faint'){p.hpBar={parts:0,scale:100};p.fainted=true;}
     if(type==='-status')p.status=status(b);
     if(type==='-curestatus')p.status='none';
