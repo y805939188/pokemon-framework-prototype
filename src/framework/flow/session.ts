@@ -34,7 +34,7 @@ import { battleFriendshipValue } from "../rules/battle-evidence";
 import type { BattleEvidenceContext, EvidenceBinding, BattleEvidence, FriendEvidence, BattleObservation } from "../rules/battle-evidence";
 import { resolveConfig } from "../rules/config";
 import { own, setOwn } from "../rules/own";
-import { bindRequiredSettlement, checkpointRequiredSettlement, finalizeRequiredSettlement, requiredCaptureItem, requiredGrowthItems, restoreRequiredSettlement } from "./required-settlement";
+import { bindRequiredSettlement, checkpointRequiredSettlement, finalizeRequiredSettlement, requiredCaptureItem, requiredGrowthItems, requiredFaintGrowthItems, restoreRequiredSettlement } from "./required-settlement";
 import { bindTrainerAi, runTrainerAi, trainerAiEvent, checkpointTrainerAi, restoreTrainerAi, preflightTrainerAiRestore, prepareTrainerAiRestore, failTrainerAiRestore, assertTrainerAiCheckpointReady, cancelTrainerAiDecision } from './trainer-ai';
 import type { TrainerAiConfiguration } from './trainer-ai';
 import { _publishGrowthDisplay, _capturePresentation, _restorePresentation, readBattleLearnProtection } from './presentation';
@@ -153,7 +153,7 @@ interface LedgerEntry {
 }
 
 type GrowthTask =
-  | { kind: "award"; foeId: string }
+  | { kind: "award"; foeId: string; items?: Record<string, { current: string; recovery: string }> }
   | { kind: "growth"; memberId: string; exp: number; evs: Member["evs"]; level: number; hp: number; stats: Stats; levelUps: number[]; changed: boolean; message: Extract<SessionMessage, { kind: "growth" }>; display: GrowthDisplay }
   | { kind: "learn"; memberId: string; move: { id: string; name: string; pp: number } };
 
@@ -795,7 +795,7 @@ export class BattleSession {
       }
       const { side, id, slot } = identity!;
       (this.activeNow[side] ??= [])[slot] = null; // off the field: not a participant for later arrivals
-      if (side === "p2") this.growthQueue.push({ kind: "award", foeId: id });
+      if (side === "p2") this.growthQueue.push({ kind: "award", foeId: id, items: requiredFaintGrowthItems(this, this.gw, e) });
     } else if (e.type === "rpg") {
       trainerAiEvent(this, e);
       const [what, side, itemId, , res] = e.args;
@@ -831,7 +831,7 @@ export class BattleSession {
       }
       while (this.growthQueue.length) {
         const task = this.growthQueue.shift()!;
-        if (task.kind === "award") { this._award(task.foeId); continue; }
+        if (task.kind === "award") { this._award(task.foeId, task.items); continue; }
         if (task.kind === "growth") { this._applyGrowthStage(task); continue; }
         const m = this.party.find((x) => x.id === task.memberId)!;
         if (m.moves.some((x) => x.id === task.move.id)) continue;
@@ -858,7 +858,7 @@ export class BattleSession {
     return true;
   }
 
-  _award(foeId: string): void {
+  _award(foeId: string, items?: Record<string, { current: string; recovery: string }>): void {
     // WP42 §4.1: the growth gate precedes EV/EXP and leaves participation records intact.
     if (!this.expGain) return;
     this._syncWorkingFromEngine();
@@ -871,7 +871,9 @@ export class BattleSession {
     const initialStages: GrowthTask[] = [], stages: GrowthTask[] = [];
     for (const m of receivers) {
       // A legacy/custom driver without the required channel does not acquire held-item authority from save data.
-      const held = G.heldGrowthModifiers(foeC.evYield, requiredGrowthItems(this, this.gw, m.id) ?? { current: "", recovery: "" });
+      const pair = items ? own(items, m.id) : requiredGrowthItems(this, this.gw, m.id);
+      if (items && !pair) throw new Error("battle-growth-member-source-unavailable");
+      const held = G.heldGrowthModifiers(foeC.evYield, pair ?? { current: "", recovery: "" });
       const evs = G.gainEvs(m.evs ?? {}, held.evYield);
       const withEv: Member = { ...m, evs };
       const amount = G.battleExp({ foe: { level: foe.level, baseExp: foeC.baseExp }, receiver: withEv, participants: receivers.length, rules: this.rules, trainer: this.foe.kind === "trainer", luckyEgg: held.luckyEgg });

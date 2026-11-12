@@ -192,8 +192,10 @@ test('B private expected mode cannot be downgraded by caller properties; unknown
   Object.assign(missing.app,{currentSettlementAdmission:{source:{mode:'legacy-no-held'}},settlementFactoryRoot:{mode:'legacy-no-held'},settlementAdmissions:new WeakMap()});
   assert.equal(missing.app.finishBattle(h,missing.request).commit,'none');assert.deepEqual(missing.state.current(),before);assert.equal(missing.state.replaced.length,0);
   const real=fixture(),r=await real.app.startBattle(real.request),original=J(real.state.current());
-  r.gw._debugBattle().sides[0].active[0].item='oranberry';await r.chooseMove(2);assert.equal(r.finished,true);
-  const out=real.app.finishBattle(r,real.request);assert.equal(out.commit,'none');assert.match(out.error,/required-held-facts-unavailable/);assert.deepEqual(real.state.current(),original);assert.equal(real.state.replaced.length,0);
+  r.gw._debugBattle().sides[0].active[0].item='oranberry';const working=J(r.party);
+  await assert.rejects(r.chooseMove(2),/battle-growth-held-unavailable/);assert.equal(r.finished,false);assert.deepEqual(r.party,working,'failed growth source restores the operation');
+  real.app.abortBattle(real.request,Error('owned invalid-source cleanup'));
+  assert.equal(real.app.finishBattle(r,real.request).commit,'none');assert.deepEqual(real.state.current(),original);assert.equal(real.state.replaced.length,0);
 });
 test('B required factory kind/id belong to the captured operation despite request mutation in an earlier host callback',async()=>{
   let hook;const w=fixture({port:state=>({read:()=>{hook?.();return state.read();},replace:next=>state.replace(next)})});

@@ -77,3 +77,22 @@ test('GHI12 nonterminal KO applies each foe exactly once while persistent state 
 for(const item of ['luckyegg','powerweight'])test('GHI13 level-up cross-checks engine permanent stats after boosted growth: '+item,async()=>{
  const w=await open({item,nearLevel:true});try{const r=await action(w,1);assert(r.messages.some(m=>m.kind==='growth'&&m.levelUps.includes(21)));const m=install(w);assert.equal(m.level,21);assert.equal(m.exp-w.initial.exp,item==='luckyegg'?19:13);const expected=E.growth.computeStats(w.s.content.species.Snorlax.base,m.ivs,m.evs,m.level,m.nature),actual=w.s.gw.readState('p1')[0];assert.deepEqual(actual.stats,expected);assert.equal(actual.maxhp,expected.hp);}finally{w.cleanup();}
 });
+
+test('GHI14 Memento KO freezes item state before later same-turn Recycle; restored item applies only to next foe',async()=>{
+ const input=F.inputs({party:1,moves:['splash'],skill:0});
+ input.species.push({id:'meowth',showdownId:'meowth',nameKey:'species.meowth',growth:'medium',baseExp:50,evYield:{},catchRate:45,source:'author-placeholder',learnset:['fling','recycle','splash','avalanche'].map(move=>({level:1,move}))});
+ input.species.find(s=>s.id==='pidgey').learnset=['splash','memento'].map(move=>({level:1,move}));
+ input.items.push({id:'powerbracer',name:'Power Bracer',namePlural:'Power Bracers',pocket:1,source:'author-placeholder'});
+ input.trainers[0].party=[{species:'pidgey',level:1,moves:['splash']},{species:'pidgey',level:50,moves:['memento']},{species:'pidgey',level:1,moves:['splash']}];
+ const compiled=E.contentCompile.compileContent(input);assert(compiled.ok,JSON.stringify(compiled.errors));const dex=E.dex.createDexLookup(),assembled=E.contentRuntime.assembleContent(compiled.data,dex);assert.deepEqual(assembled.errors,[]);const c={content:assembled.content,dex};
+ const mon=E.memberFactory.createMember({id:'P1',species:'Meowth',level:20,abilityIndex:0},c.content,()=>0);assert.equal(mon.ability,'Pickup');mon.item='powerbracer';
+ const game=E.state.newGame({content:c.content,party:[E.speciesKey.toPersistentMember(mon,c.content)],money:1000});game.nextMemberOrdinal='2';const state=T.fakes.createMemoryState(game),before=JSON.stringify(state.read());
+ const app=new E.app.GameApplication({state,projection:T.fakes.createRecordingProjection(),content:()=>c,random:()=>0,clock:()=>12345,sessions:E.composition.createBattleSessionFactory({content:()=>c.content,seed:()=>[1,2,3,4]})},{receivingProfile:{mode:0,naming:1}}),request={battleId:'growth-timing',seq:1,canLose:true,trainer:{id:'c-basic',version:1}},s=await app.startTrainerBattle(request);s.take();
+ try{
+  assert((await s.chooseMove(1)).ok);assert.equal(s.party[0].evs.atk,0,'Fling consumed C and I before first KO');assert.equal(s.party[0].evs.spe,1);assert(!s.finished);
+  const r=await s.chooseMove(2);assert(r.ok);const events=r.messages.flatMap(m=>m.kind==='events'?m.events:[]),faint=events.findIndex(e=>e.type==='faint'),recycle=events.findIndex(e=>e.type==='move'&&e.args[1]==='Recycle'),restored=events.findIndex(e=>e.type==='-item'&&e.args[1]==='Power Bracer');
+  assert(faint>=0&&recycle>faint&&restored>recycle,'actual Memento faint precedes successful later Recycle');assert.equal(s.party[0].evs.atk,0,'later item acquisition cannot modify the earlier KO award');assert.equal(s.party[0].evs.spe,2);assert.equal(JSON.stringify(state.read()),before);assert.equal(state.replaced.length,0);
+  assert((await s.chooseMove(4)).ok);assert(s.finished);assert.equal(s.party[0].evs.atk,8,'the item does apply to the next actual KO');assert.equal(s.party[0].evs.spe,3);
+  assert.equal(app.finishBattle(s,request).commit,'applied');assert.equal(state.replaced.length,1);assert.equal(state.read().party[0].evs.atk,8);assert.equal(state.read().party[0].item,'','trainer Recycle restores current item, not the consumed recovery record');
+ }finally{app.abortBattle(request,Error('owned timing cleanup'));}
+});

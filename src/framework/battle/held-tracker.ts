@@ -190,6 +190,13 @@ export class HeldTracker {
     if (this.calls.length) this.fail("held-checkpoint-inside-primitive");
   }
   boundary(): void { this.taken.length = 0; this.pickup = null; }
+  /** Freeze every player pair at an actual foe faint, before later queued actions can change items. */
+  playerGrowthItems(): Record<string, Pick<HeldValues, "current" | "recovery">> {
+    this.check();
+    if (this.invalid.length) throw new Error("battle-growth-held-unavailable");
+    return Object.fromEntries([...this.cells.values()].filter(cell => cell.side === "p1")
+      .map(cell => [cell.id, { current: cell.current, recovery: cell.recovery }]));
+  }
   /** Checked live identity for growth, not a terminal seal or an optional observation. */
   growthItems(id: string): Pick<HeldValues, "current" | "recovery"> {
     this.check();

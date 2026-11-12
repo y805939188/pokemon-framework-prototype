@@ -58,10 +58,13 @@ interface ObservationState {
   records: BattleObservation[]; issues: EvidenceIssue[]; displays: Record<string, string>;
   pending: Record<string, Extract<FormatObservation, { kind: "before-loss" }>>;
 }
+type GrowthItems = Record<string, { current: string; recovery: string }>;
 interface ParticipationIdentity { side: string; id: string; slot: number }
-interface ParticipationFact extends ParticipationIdentity { type: string; ident: string }
-interface CheckpointData { participation: (ParticipationIdentity | null)[][]; pendingParticipation: ParticipationFact[]; snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[]; friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[]; faintSequence: number; settlement?: { state: HeldTrackerSnapshot; lineage: object; wild: boolean } }
+interface ParticipationBinding extends ParticipationIdentity { growthItems?: GrowthItems }
+interface ParticipationFact extends ParticipationBinding { type: string; ident: string }
+interface CheckpointData { participation: (ParticipationBinding | null)[][]; pendingParticipation: ParticipationFact[]; snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[]; friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[]; faintSequence: number; settlement?: { state: HeldTrackerSnapshot; lineage: object; wild: boolean } }
 const CHECKPOINTS = new WeakMap<GatewayCheckpoint, CheckpointData>();
+const FAINT_GROWTH = new WeakMap<object, WeakMap<BattleEvent, GrowthItems>>();
 const SETTLEMENTS = new WeakMap<object, { tracker: HeldTracker; lineage: object; wild: boolean }>();
 /** Internal companion queries: a look-alike driver or arbitrary restored JSON has no entry. */
 export function gatewaySettlementLineage(driver: BattleDriver): object | null { return SETTLEMENTS.get(driver)?.lineage ?? null; }
@@ -75,6 +78,14 @@ export function gatewayOwnGrowthItems(driver: BattleDriver, lineage: object, id:
   const source = SETTLEMENTS.get(driver);
   if (!source || source.lineage !== lineage) throw new Error("required-settlement-driver-source-mismatch");
   return source.tracker.growthItems(id);
+}
+/** Item state at the actual source faint, not after later actions/residuals in the same engine batch. */
+export function gatewayFaintGrowthItems(driver: BattleDriver, lineage: object, event: BattleEvent): GrowthItems {
+  const source = SETTLEMENTS.get(driver);
+  if (!source || source.lineage !== lineage) throw new Error("required-settlement-driver-source-mismatch");
+  const items = FAINT_GROWTH.get(driver)?.get(event);
+  if (event.type !== "faint" || !items) throw new Error("battle-growth-faint-source-unavailable");
+  return structuredClone(items);
 }
 /** Internal own-side display read; a live query is not an ended settlement seal. */
 export function gatewayOwnSummaryItem(driver: BattleDriver, lineage: object, id: string): string {
@@ -101,13 +112,14 @@ export class BattleGateway implements BattleDriver {
   private _friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[] = [];
   private _faintKeys = new WeakMap<object, string>();
   private _faintSequence = 0;
-  private _participation = new WeakMap<BattleEvent, ParticipationIdentity>();
+  private _participation = new WeakMap<BattleEvent, ParticipationBinding>();
   private _pendingParticipation: ParticipationFact[] = [];
   _legacyFaintHook?: (e: unknown) => void;
 
   constructor(opts: GatewayOptions, internal?: LoadedSim) {
     this._env = internal ?? loadSim(opts.engineRoot);
     this._opts = opts;
+    FAINT_GROWTH.set(this, new WeakMap());
   }
 
   static async create(opts: GatewayOptions): Promise<BattleGateway> {
@@ -210,7 +222,7 @@ export class BattleGateway implements BattleDriver {
     const gw = await RESTORE_GATEWAY(data.snapshot, { engineRoot: data.engineRoot });
     gw._queue = JSON.parse(JSON.stringify(data.queue)) as GatewayMessage[];
     gw._pendingParticipation = structuredClone(data.pendingParticipation);
-    gw._queue.forEach((m, i) => { if (m.kind === "events") m.events.forEach((e, j) => { const identity = data.participation[i]?.[j]; if (identity) gw._participation.set(e, { ...identity }); }); });
+    gw._queue.forEach((m, i) => { if (m.kind === "events") m.events.forEach((e, j) => { const identity = data.participation[i]?.[j]; if (identity) { gw._participation.set(e, structuredClone(identity)); if (identity.growthItems) FAINT_GROWTH.get(gw)!.set(e, structuredClone(identity.growthItems)); } }); });
     gw._seq = data.seq; gw._closed = data.closed;
     gw._observation = JSON.parse(JSON.stringify(data.observation)) as ObservationState;
     gw._friendshipFaints = JSON.parse(JSON.stringify(data.friendshipFaints)) as typeof gw._friendshipFaints;
@@ -250,6 +262,8 @@ export class BattleGateway implements BattleDriver {
       if (tracked) {
         if (!member || !battle.sides.includes(member.side) || !member.side.pokemon.includes(member)) throw new Error("participation-event-source-unavailable");
         fact = { type, ident: String(member), side: member.side.id, id: member.name, slot: member.position };
+        const source = SETTLEMENTS.get(this);
+        if (type === "faint" && member.side.id === "p2" && source) fact.growthItems = source.tracker.playerGrowthItems();
       }
       depth++;
       try { const result = add.apply(battle, parts); if (fact) this._pendingParticipation.push(fact); return result; }
@@ -260,7 +274,7 @@ export class BattleGateway implements BattleDriver {
   participationIdentity(event: BattleEvent): ParticipationIdentity {
     const value = this._participation.get(event);
     if (!value) throw new Error("participation-event-binding-unavailable");
-    return { ...value };
+    return { side: value.side, id: value.id, slot: value.slot };
   }
 
   _observationIssue(group: EvidenceIssue["group"], reason: string, memberId?: string): void {
@@ -799,7 +813,8 @@ export class BattleGateway implements BattleDriver {
       for (const event of events) if (["switch", "drag", "replace", "faint"].includes(event.type)) {
         const fact = this._pendingParticipation.shift();
         if (!fact || fact.type !== event.type || fact.ident !== event.args[0]) throw new Error("participation-event-order-mismatch");
-        this._participation.set(event, { side: fact.side, id: fact.id, slot: fact.slot });
+        this._participation.set(event, { side: fact.side, id: fact.id, slot: fact.slot, ...(fact.growthItems ? { growthItems: fact.growthItems } : {}) });
+        if (fact.growthItems) FAINT_GROWTH.get(this)!.set(event, fact.growthItems);
       }
       this._emit({ kind: "events", events });
     } else if (type === "sideupdate") {

@@ -1,5 +1,6 @@
 /** Required source channel, separate from frozen v1 results and optional V2 observations. */
-import { gatewaySettlementFacts, gatewaySettlementLineage, gatewayOwnSummaryItem, gatewayOwnGrowthItems } from "../battle/gateway";
+import { gatewaySettlementFacts, gatewaySettlementLineage, gatewayOwnSummaryItem, gatewayOwnGrowthItems, gatewayFaintGrowthItems } from "../battle/gateway";
+import type { BattleEvent } from "../battle/protocol";
 import type { BattleDriver, DriverCheckpoint } from "../battle/driver";
 import type { HeldBinding, RequiredFacts } from "../rules/held-facts";
 import { clone, resultHash } from "../rules/state";
@@ -21,6 +22,11 @@ export function requiredOwnSummaryItem(session: object, driver: BattleDriver, id
 export function requiredGrowthItems(session: object, driver: BattleDriver, id: string): { current: string; recovery: string } | undefined {
   const channel = CHANNELS.get(session);
   return channel ? gatewayOwnGrowthItems(driver, channel.lineage, id) : undefined;
+}
+/** Authenticated source snapshot for an award queued by a real foe faint. */
+export function requiredFaintGrowthItems(session: object, driver: BattleDriver, event: BattleEvent): Record<string, { current: string; recovery: string }> | undefined {
+  const channel = CHANNELS.get(session);
+  return channel ? gatewayFaintGrowthItems(driver, channel.lineage, event) : undefined;
 }
 export function bindRequiredSettlement(session: object, driver: BattleDriver, binding: Omit<HeldBinding, "rawHash">, restore: (token: DriverCheckpoint) => Promise<BattleDriver>): void {
   const lineage = gatewaySettlementLineage(driver);
