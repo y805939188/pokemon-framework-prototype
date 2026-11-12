@@ -4,7 +4,9 @@
 
 起点是 [rpg-maker-mz-initialize](https://github.com/y805939188/rpg-maker-mz-initialize) 模板（`b6fa1df`）；第二步（验证战斗接入）已完成，结论和证据在 `docs/step2/`。
 
-本整改分支从已限域接受的倒下纯排期f4f5551继续：原ultra及精确CI198双job均通过，旧拒绝／失败保留。当前小批为[简单倒下的Scene／音频消费者](docs/step5/5.4-D2c-faint-view.md)，尚待固定验证与独立复审。完整D2／5.4、新P-4和GC内存增长WARN仍OPEN，原U51-16超时FAIL／输入来源UNKNOWN保留，main未合并。
+## 当前阶段（2026-11-12）
+
+5.4 处于固定候选收尾，产品为 [`fdf25c7`](https://github.com/y805939188/pokemon-framework-prototype/commit/fdf25c7f1f3230e23a239c6bd72351f0c45df561)，开发分支 `step5/4-stored-form-integration-20261112`。[CI #304](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43157940579) 两个 job 成功，274 套／4968 项自动回归通过，冻结参考回放排除。限定实机、独立复核、仍待人工自助验收及保留项见[当前验收索引](docs/step5/5.4-current-acceptance.md)。**完整 5.4 尚未签收，未合并 main。**
 
 ## 先读什么
 
@@ -33,9 +35,15 @@ pnpm --dir src build
 | `src/plugins/` | MZ 插件的 TypeScript 源码 |
 | `scripts/` | 引导、构建、打包、签名、测试、诊断脚本 |
 | `experiments/step2/` | 第二步的测试、探针和证据 |
-| `docs/` | 项目指南与第二步文档 |
+| `docs/` | 项目指南、阶段合同、测试与验收文档 |
 | `data/` `img/` `audio/` … | MZ 工程内容（模板数据；MZ 素材由引导脚本从本机 MZ 复制，不提交） |
 
+
+## 历史批次截面
+
+以下保留各批次当时状态；其中“当前／下一批／待审”只指当时，不覆盖上方当前验收索引。
+
+本整改分支从已限域接受的倒下纯排期f4f5551继续：原ultra及精确CI198双job均通过，旧拒绝／失败保留。当前小批为[简单倒下的Scene／音频消费者](docs/step5/5.4-D2c-faint-view.md)，尚待固定验证与独立复审。完整D2／5.4、新P-4和GC内存增长WARN仍OPEN，原U51-16超时FAIL／输入来源UNKNOWN保留，main未合并。
 
 2026-11-01：默认F2 `9c045fb` 经独立纯路径、新包单轮81项与精确CI203限域接收；下一小批[战斗音频六入口纯选曲](docs/step5/5.4-D2c-audio-selection.md)待固定候选独立复审，只处理逻辑身份优先级，未播放／未接Scene。完整D2/5.4/E、新P4、GC WARN与旧UNKNOWN不关闭。
 
