@@ -98,3 +98,17 @@ test('O1 the cached native move remains untouched by per-use substitution',async
  const gw=await create(1,{moves:['Harden','Tackle']}),dex=gw._debugBattle().dex,before=JSON.stringify(dex.moves.get('harden')),other=JSON.stringify(dex.moves.get('tackle'));
  const s=await change({moves:['Harden','Tackle']});assert.equal(s.gw._debugBattle().dex,dex);assert.equal(JSON.stringify(dex.moves.get('harden')),before);assert.equal(JSON.stringify(dex.moves.get('tackle')),other);
 });
+
+test('R1 ordinary self choice changed to attack retains the target for slower native Instruct and checkpoint replay',async()=>{
+ const gw=await create(88,{moves:['Harden','Tackle'],foe:'Shuckle',foeMoves:['Instruct']}),before=gw.readState('p1')[0].pp,checkpoint=gw.checkpoint(),messages=await turn(gw),p=player(gw);
+ const entries=trace(gw),changed=entries.find(e=>e.kind==='change');assert.equal(changed.newMove,'tackle');assert.equal(changed.targetLoc,-1,'ordinary self choice was already resolved by the native queue');
+ assert(entries.some(e=>e.kind==='eligible'&&e.move==='tackle'&&e.a===6&&e.a<e.limit),'the native instructed second move genuinely obeyed');
+ const attacks=messages.flatMap(m=>m.events??[]).filter(e=>e.type==='move'&&e.args[0]==='p1a: player'&&e.args[1]==='Tackle');assert.equal(attacks.length,2);for(const e of attacks)assert.equal(e.args[2],'p2a: foe');
+ assert.equal(p.lastMoveTargetLoc,1);assert.equal(p.activeMoveActions,2,'Instruct is two genuine actions, not a nested replacement action');assert.equal(p.moveLastTurnResult,true);assert.equal(gw.readState('p1')[0].pp.tackle,before.tackle-2);assert.equal(gw.readState('p1')[0].pp.harden,before.harden);
+ const restored=await E.gateway.BattleGateway.fromCheckpoint(checkpoint);await turn(restored);assert.deepEqual(JSON.parse(restored.snapshot()),JSON.parse(gw.snapshot()));
+});
+for(const lang of ['en','zh'])test(`R2 ${lang} obedience stable identifiers do not read inherited display names`,()=>{
+ const d=E.describe.make({},E.i18n.translatorFor(lang));
+ for(const id of ['constructor','__proto__','toString']){const e={type:'rpg',args:['obedience','p1',id,'refuse','0'],raw:''},out=d.event(e);assert.equal(out.length,1);assert(out[0].includes(id));assert(!out[0].includes('function '));}
+ assert.deepEqual(d.event({type:'rpg',args:['obedience','p3','player','refuse','0'],raw:''}),[]);
+});

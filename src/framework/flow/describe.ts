@@ -95,7 +95,9 @@ export function make(names: Record<string, string> = {}, tr: Translator = defaul
       const keys: Record<string, string> = { sleep: "sleep", ignored: "ignored", change: "change", "self-sleep": "self_sleep", "self-hit": "self_hit" };
       const key = result === "refuse" && /^[0-3]$/.test(detail ?? "") ? `refuse${detail}`
         : result && Object.prototype.hasOwnProperty.call(keys, result) ? keys[result] : undefined;
-      return key ? [tr.t(`battle.obedience.${key}`, { name: nm(`${a[1]}a: ${x}`) })] : [];
+      if (!key || !["p1", "p2"].includes(a[1] ?? "")) return [];
+      const name = Object.prototype.hasOwnProperty.call(names, x) && typeof names[x] === "string" ? names[x]! : x;
+      return [tr.t(`battle.obedience.${key}`, { name: a[1] === "p1" ? name : tr.t("battle.foe_prefix", { name }) })];
     }
     if (what === "item") {
       if (res === "ok") return [a[5] !== undefined && /^\d+$/.test(a[5]) ? tr.t("item.used_recovered", { item: itemName(x), target: tn, hp: a[5] }) : tr.t("item.used", { item: itemName(x), target: tn })];

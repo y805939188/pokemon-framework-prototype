@@ -554,6 +554,9 @@ const rpgHandlers = {
     if (!move.rpgObedienceChanged) return;
     delete move.rpgObedienceChanged;
     relay.target = this.getRandomTarget(pokemon, move);
+    // The queue already resolved the original choice's location before runMove. moveUsed wrote
+    // that old location; Instruct and locked continuations must retain the replacement's target.
+    pokemon.lastMoveTargetLoc = relay.target ? pokemon.getLocOf(relay.target) : 0;
   },
   onBeforeMovePriority: 9.5,
   onBeforeMove(this: ShowdownBattle, pokemon: ShowdownPokemon, target: ShowdownPokemon, move: ShowdownPokemon): boolean | undefined {
