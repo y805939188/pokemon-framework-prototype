@@ -1,3 +1,4 @@
+import { creationBattleNameOf } from "../rules/species-key";
 /**
  * Runtime side of the content pipeline: check a compiled document and assemble the `Content` the session uses by
  * joining framework-owned fields with Showdown-owned battle data (base stats, display names). Every problem is
@@ -79,7 +80,7 @@ export function loadCompiled(json: unknown): CompiledContent {
   if(json.grants!==undefined&&(!dense(json.grants)||json.grants.some(g=>!obj(g)||!dense(g.members)||g.members.some(m=>!obj(m))||!obj(g.items))))report("compiled","$.grants","invalid grant records");
   const trainerOrder = dense(json.registrationOrder) ? json.registrationOrder as unknown as import("../rules/types").SpeciesKey[] : [];
   const trainerCatalog = checkItemInputs(json.items, json.shops, usable).catalog;
-  problems.push(...checkTrainerInputs(json.trainerTypes, json.trainers, { speciesKeys: trainerSpeciesKeys(trainerOrder), catalog: trainerCatalog, usable }).errors);
+  problems.push(...checkTrainerInputs(json.trainerTypes, json.trainers, { speciesKeys: trainerSpeciesKeys(trainerOrder, dense(json.species) ? json.species.filter(sp => obj(sp) && typeof sp.id === "string" && typeof sp.showdownId === "string") as unknown as import("../content/schema").SpeciesSource[] : []), catalog: trainerCatalog, usable }).errors);
   if(problems.length)throw new Error(problems.map(p=>`${p.file} ${p.path}: ${p.message}`).join("; "));
   return json as unknown as CompiledContent;
 }
@@ -180,7 +181,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     let ok = true;
     for (const [j, m] of g.members.entries()) {
       if (m.item) { const item = heldItemDescriptor(itemInputs.catalog, m.item, id => dex.heldItem?.(id) ?? null); if (!item) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].item`, message: `unsupported held item ${m.item}; use the canonical held item id` }); ok = false; continue; } }
-      if (m.form !== undefined && !compiled.species.some((sp) => sp.id === m.species && (sp.form ?? 0) === m.form)) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].form`, message: "missing exact form" }); ok = false; continue; }
+      if (m.form !== undefined && !creationBattleNameOf(content, { species: m.species, form: m.form })) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].form`, message: "missing exact form" }); ok = false; continue; }
       const name = own(content.speciesIds, m.species);
       if (!name) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].species`, message: `"${m.species}" is not an assembled species` }); ok = false; continue; }
       members.push({ species: name, level: m.level, ...(m.form !== undefined ? { form: m.form } : {}), ...(m.item !== undefined ? { item: m.item } : {}) });
@@ -195,7 +196,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     for (const record of compiled.trainers) {
       for (const [index, member] of record.party.entries()) {
         const path = `trainers/${record.id}@${record.version}.party[${index}]`;
-        const formName = own(own(content.forms, member.species), String(member.form ?? 0));
+        const formName = creationBattleNameOf(content, { species: member.species, form: member.form ?? 0 });
         if (!formName || !own(content.species, formName)) errors.push({ file: "assembly", path: `${path}.species`, message: "missing exact assembled species/form" });
         for (const [moveIndex, move] of (member.moves ?? []).entries()) {
           const resolved = dex.move(move);
@@ -232,11 +233,11 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     const base = own(content.species, name);
     if (!base || (base.form ?? 0) !== 0) continue;
     const missing = creationFormCandidates(base.ruleSpecies ?? name).filter(form => {
-      const mapped = own(own(content.forms, id), String(form));
+      const mapped = creationBattleNameOf(content, { species: id, form });
       return !mapped || !own(content.species, mapped);
     });
     if (missing.length) warnings.push({ file: "assembly", path: `species/${id}.creationForms`,
-      message: `missing-creation-forms: automatic creation of "${id}" (${base.ruleSpecies ?? name}) may select unregistered form(s) ${missing.join(", ")}. Creation then refuses without a fallback. Register the required forms before enabling automatic creation; explicit player/gift forms can bypass rechecking, but trainer forms are applied after ordinary creation. This warning does not reject the content.` });
+      message: `missing-creation-forms: automatic creation of "${id}" (${base.ruleSpecies ?? name}) may select unregistered form(s) ${missing.join(", ")}. Creation then refuses without a fallback. Register the required forms before enabling automatic creation; explicit player/gift forms bypass rechecking; explicit trainer forms retain ordinary RNG before selecting their final mapping. This warning does not reject the content.` });
   }
   return { content, errors, warnings };
 }

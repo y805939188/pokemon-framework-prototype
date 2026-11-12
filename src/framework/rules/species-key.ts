@@ -5,6 +5,7 @@
  * The content layer owns the mapping (`Content.forms` and its reverse `Content.speciesKeys`, built by the runtime
  * assembly). Fixture content has no mapping table: its content ids ARE the Showdown names (form 0). Pure.
  */
+import { storedCreationForms } from "./creation-form";
 import { computedNature } from "./member-metadata";
 import { clone } from "./value";
 import type { Storage } from "./storage";
@@ -36,6 +37,17 @@ export function battleNameOf(content: KeyTables, key: SpeciesKey): string | null
     return own(forms, String(key.form)) ?? own(forms, "0") ?? null;
   }
   return own(content.species, key.species) ? key.species : null;
+}
+
+/** Exact author form or a finite, documented latent creation identity. No general base fallback. */
+export function creationBattleNameOf(content: KeyTables, key: SpeciesKey): string | null {
+  const forms = own(content.forms, key.species);
+  const exact = own(forms, String(key.form));
+  if (exact && own(content.species, exact)) return exact;
+  const baseName = own(forms, "0") ?? (!content.forms && own(content.species, key.species) ? key.species : null);
+  const base = baseName ? own(content.species, baseName) : undefined;
+  if (!base || (base.form ?? 0) !== 0) return null;
+  return key.form === 0 || storedCreationForms(base.ruleSpecies ?? baseName!).includes(key.form) ? baseName : null;
 }
 
 /** Every battle name of a content id (all its forms); the dex is kept per species, the engine asks per form. */
@@ -71,7 +83,8 @@ export function toBattleMember(m: Member, content: Pick<Content, "species" | "fo
 export function toPersistentMember(m: Member, content: Pick<Content, "species" | "forms" | "speciesKeys" | "meta">): Member {
   const k = keyOfBattleName(content, m.species);
   if (!k) throw new Error(`member ${m.id}: "${m.species}" has no persistent species key in the content${where(content)}`);
-  return { ...clone(m), species: k.species, form: k.form, statNature: m.statNature ?? null, moves: m.moves.map(move => ({...clone(move),ppUps:move.ppUps ?? 0})) };
+  const form = m.form !== undefined && creationBattleNameOf(content, { species: k.species, form: m.form }) === m.species ? m.form : k.form;
+  return { ...clone(m), species: k.species, form, statNature: m.statNature ?? null, moves: m.moves.map(move => ({...clone(move),ppUps:move.ppUps ?? 0})) };
 }
 
 /** Battle name -> persistent key; what the save migration and the result write-back are given. */

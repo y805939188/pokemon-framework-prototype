@@ -1,3 +1,4 @@
+import { storedCreationForms } from "../rules/creation-form";
 /**
  * Pure content compiler: validate authored JSON (every problem is located by file and path), apply overlays with
  * conflict detection, emit one canonical document whose `inputsHash` covers every input. No file system, no Showdown.
@@ -278,7 +279,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
       if (!Array.isArray(members) || members.length > DEFAULT_LIMITS.party) report("grants.json", `${p}.members`, `must be an array of at most ${DEFAULT_LIMITS.party} {species, level}`);
       else for (const [j, m] of members.entries()) {
         if (!isObj(m) || typeof m["species"] !== "string" || !isInt(m["level"], 1, 100) || Object.keys(m).some((k) => !["species", "level", "form", "item"].includes(k))) { report("grants.json", `${p}.members[${j}]`, "must be {species: <species id>, level: 1..100}"); continue; }
-        if (m["form"] !== undefined && (!isInt(m["form"], 0, MAX_FORM) || !keys.has(recordKey(m["species"], m["form"] as number)))) report("grants.json", `${p}.members[${j}].form`, "must name an existing exact form");
+        if (m["form"] !== undefined && (!isInt(m["form"], 0, MAX_FORM) || !keys.has(recordKey(m["species"], m["form"] as number)) && ![...merged.values()].some(sp => sp.id === m["species"] && (sp.form ?? 0) === 0 && storedCreationForms(sp.showdownId).includes(m["form"] as number)))) report("grants.json", `${p}.members[${j}].form`, "must name an existing exact form");
         if (m["item"] !== undefined && (typeof m["item"] !== "string" || (m["item"] !== "" && !SHOWDOWN_ID.test(m["item"])))) report("grants.json", `${p}.members[${j}].item`, "must be a held item id");
         if (m["item"] && !capabilities.allowHeldItemSources) report("grants.json", `${p}.members[${j}].item`, "held-item-source-disabled: controlled developer injection required; not a player setting");
         const heldDefinition = typeof m["item"] === "string" ? itemOf(itemInputs.catalog, m["item"]) : undefined;
@@ -305,7 +306,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
 
   if (errors.length) return {ok:false,errors};
   const registrationOrder = species.map(sp => ({species: sp.id, form: sp.form ?? 0}));
-  const trainerData = checkTrainerInputs(inputs.trainerTypes, inputs.trainers, { speciesKeys: trainerSpeciesKeys(registrationOrder), catalog: itemInputs.catalog, usable });
+  const trainerData = checkTrainerInputs(inputs.trainerTypes, inputs.trainers, { speciesKeys: trainerSpeciesKeys(registrationOrder, [...merged.values()]), catalog: itemInputs.catalog, usable });
   errors.push(...trainerData.errors);
   const effective = [...merged.values()];
   deriveSpeciesFields(effective, report, (file,path,message)=>warnings.push({file,path,message}));

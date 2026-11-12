@@ -1,3 +1,4 @@
+import { creationBattleNameOf } from "./species-key";
 /** Source-aware gift/grant registration and retained first-entry facts. No installation or UI work. */
 import { applyDexPatch, normalizeDexAppearance, planDexRecord, dexShouldOfferEntry } from "./pokedex";
 import type { DexAppearance } from "./pokedex";
@@ -19,11 +20,13 @@ export function normalizeMemberDexAppearance(content: Content, member: Readonly<
     const name = content.forms ? own(own(content.forms, member.species), String(form)) : form === 0 ? member.species : undefined;
     return name === undefined ? undefined : own(content.species, name);
   };
-  const original = Number.isInteger(member.form) && member.form! >= 0 && member.form! <= 999 ? exact(member.form!) : undefined;
+  const supportedName = Number.isInteger(member.form) && member.form! >= 0 && member.form! <= 999 ? creationBattleNameOf(content, { species: member.species, form: member.form! }) : null;
+  const sourceForm = exact(member.form!) ? member.form! : 0;
+  const original = supportedName ? own(content.species, supportedName) : undefined;
   if (!original) return null;
-  const display = original.pokedexForm ?? member.form!;
+  const display = original.pokedexForm ?? sourceForm;
   if (!Number.isInteger(display) || display < 0 || display > 999 || !exact(display)) return null;
-  return normalizeDexAppearance(content, { species: member.species, form: member.form!, gender, shiny: member.shiny }, operation);
+  return normalizeDexAppearance(content, { species: member.species, form: sourceForm, gender, shiny: member.shiny }, operation);
 }
 export function planAcquisitionDex(dex: DexState, members: readonly Member[], content: Content,
   options: { source: AcquisitionDexSource; seeForm: boolean; showMessages: boolean }): AcquisitionDexPlan {

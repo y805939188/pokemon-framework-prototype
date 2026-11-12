@@ -1,3 +1,4 @@
+import { creationBattleNameOf } from "./species-key";
 import { strategyReference, defaultStrategyReference } from "./trainer-ai-strategy";
 /** Host-free ordinary NPC team construction (WP18 §4.3.1, WP19, WP24). */
 import { computeStats, hpAfterRecalc } from "./growth";
@@ -25,9 +26,8 @@ export interface BuildTrainerTeamInput {
 }
 
 function battleSpecies(content: Content, id: string, form: number): string {
-  const mapped = own(own(content.forms, id), String(form)) ?? (form === 0 ? own(content.speciesIds, id) : undefined);
-  const direct = mapped ?? (own(content.species, id) ? id : undefined);
-  if (!direct || !own(content.species, direct) || (content.species[direct]!.form ?? 0) !== form) throw new Error(`trainer species "${id}" form ${form} is not assembled`);
+  const direct = creationBattleNameOf(content, { species: id, form });
+  if (!direct) throw new Error(`trainer species "${id}" form ${form} is not assembled`);
   return direct;
 }
 
@@ -72,7 +72,7 @@ export function buildTrainerTeam(input: BuildTrainerTeamInput): Member[] {
     if (entry.shadow === true) throw new Error("Shadow trainer members are unsupported (C2)");
     // Ordinary base-species creation comes first, including its creation-form draw even when Form is explicit.
     const created = createMember({ id: input.allocateId(index), species: battleSpecies(content, entry.species, 0), level: entry.level, owner: input.owner,
-      withMoves: false, context: { ...input.context, receivedAt: input.receivedAt, playerId: input.owner.id } }, content, input.random);
+      withMoves: false, trainerForm: entry.form, context: { ...input.context, receivedAt: input.receivedAt, playerId: input.owner.id } }, content, input.random);
     const form = entry.form ?? created.form ?? 0;
     const speciesName = battleSpecies(content, entry.species, form);
     const species = content.species[speciesName]!;

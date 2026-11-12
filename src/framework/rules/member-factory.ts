@@ -4,6 +4,7 @@
 import { computeStats, minExp } from "./growth";
 import { own } from "./own";
 import { newMember } from "./state";
+import { creationBattleNameOf } from "./species-key";
 import { creationForm } from "./creation-form";
 import type { CreationEnvironment } from "./creation-form";
 import { COMPATIBLE_PLAYER, deriveIndividual, NATURE_ORDER, shinyFromPersonalId, uint32 } from "./member-identity";
@@ -60,6 +61,8 @@ export interface CreateMemberInput {
   form?: number;
   /** NPC loading uses ordinary creation without automatic moves, then applies its own ordered overrides. */
   withMoves?: boolean;
+  /** Trainer-only fallback when the discarded ordinary form has no record. Existing ordinary creation metadata stays unchanged. */
+  trainerForm?: number;
   /** Defaults to the historical creation-form recheck. NPC creation retains that default before its later overrides. */
   recheckForm?: boolean;
   context?: CreationEnvironment & { playerId?: number; map?: number; receivedAt?: number; fateful?: boolean };
@@ -94,11 +97,11 @@ export function createMember(input: CreateMemberInput, content: Content, random:
   const contentId = sp.contentId ?? species;
   // Rule family, battle form name and author ID are separate. Legacy fixtures may use a canonical base name.
   const form = input.form ?? (sp.form || (input.recheckForm === false ? (sp.form ?? 0) : creationForm(sp.ruleSpecies ?? species, nature, input.context?.playerId ?? owner.id, random, input.context)));
+  const finalForm = input.trainerForm !== undefined && !creationBattleNameOf(content, { species: contentId, form }) ? input.trainerForm : form;
   let finalName = species;
-  if (form !== (sp.form ?? 0)) {
-    const record = own(content.forms, contentId);
-    const name = record ? own(record, String(form)) : undefined;
-    if (!name || !own(content.species, name)) throw new Error(`species "${contentId}" form ${form}: missing creation form in the content`);
+  if (finalForm !== (sp.form ?? 0)) {
+    const name = creationBattleNameOf(content, { species: contentId, form: finalForm });
+    if (!name || !own(content.species, name)) throw new Error(`species "${contentId}" form ${finalForm}: missing creation form in the content`);
     finalName = name; sp = content.species[name]!;
   }
   const baseName = own(own(content.forms, contentId), "0") ?? own(content.speciesIds, contentId);
@@ -111,7 +114,7 @@ export function createMember(input: CreateMemberInput, content: Content, random:
   const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
   const stats = computeStats(sp.base, ivs, evs, level, nature);
   const created = newMember({
-    id, species: finalName, form, level, exp: minExp(sp.growth, level), hp: stats.hp, status: "", statusCount: 0, moves, item: "", ability, nature, gender,
+    id, species: finalName, form: finalForm, level, exp: minExp(sp.growth, level), hp: stats.hp, status: "", statusCount: 0, moves, item: "", ability, nature, gender,
     ivs, evs, friendship: sp.happiness ?? inheritedHappiness ?? 70, ball: input.ball ?? "pokeball",
     personalID: pid, owner, ownerCompatibilityDefault: false, abilityIndex: derived.abilityIndex, effectiveAbilityIndex: derived.effectiveAbilityIndex,
     shiny: input.shiny ?? (input.superShiny === true ? true : colors.shiny), superShiny: input.superShiny ?? colors.superShiny,

@@ -41,3 +41,14 @@ export function creationFormCandidates(species: string): readonly number[] {
     default: return [0];
   }
 }
+
+/** Latent creation identities sharing a single battle species in the pinned Gen 8 Dex.
+ * Never extend this to forms with different battle data merely because their author record is missing.
+ */
+export function storedCreationForms(species: string): readonly number[] {
+  switch (species.replace(/[^a-z0-9]/gi, "").toUpperCase()) {
+    case "TOXEL": return [0, 1];
+    case "SCATTERBUG": case "SPEWPA": return Array.from({ length: 18 }, (_, i) => i);
+    default: return [];
+  }
+}

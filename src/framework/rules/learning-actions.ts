@@ -16,7 +16,7 @@ import { own } from "./own";
 import type { Content, Member, MoveData, SpeciesData } from "./types";
 import { clone } from "./value";
 import { firstEvolutionPredecessor } from "./evolution-data";
-import { memberKey } from "./species-key";
+import { creationBattleNameOf, memberKey } from "./species-key";
 
 /** Both a real member snapshot and an incoming draft use the same Member value; no party lookup occurs here. */
 export type TeachingActionSource = { readonly kind: "generic" | "tutor"; readonly moveId: string }
@@ -57,15 +57,10 @@ const refused = (reason: LearningActionRefusal): LearningActionRefused => ({ sta
 
 /** Exact current form: missing data cannot borrow another form's teaching or reminder eligibility. */
 function species(content: Content, member: Readonly<Member>): SpeciesData | LearningActionRefused {
-  const form = member.form ?? 0;
-  if (content.forms) {
-    const forms = own(content.forms, member.species);
-    if (!forms) return refused("unknown-species");
-    const name = own(forms, String(form));
-    return name ? own(content.species, name) ?? refused("unknown-species") : refused("missing-exact-form");
-  }
-  if (form !== 0) return refused("missing-exact-form");
-  return own(content.species, member.species) ?? refused("unknown-species");
+  const name = creationBattleNameOf(content, memberKey(member));
+  if (name) return own(content.species, name) ?? refused("unknown-species");
+  return content.forms ? own(content.forms, member.species) ? refused("missing-exact-form") : refused("unknown-species")
+    : own(content.species, member.species) ? refused("missing-exact-form") : refused("unknown-species");
 }
 
 /** Requested IDs and machine.move are canonical identities, never display-name normalization. */

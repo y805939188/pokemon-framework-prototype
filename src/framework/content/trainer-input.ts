@@ -1,3 +1,4 @@
+import { storedCreationForms } from "../rules/creation-form";
 /** Strict optional trainer catalogs for A-M1. Pure validation; no PBS editor or runtime data authoring. */
 import type { ContentError, TrainerRecordSource, TrainerTypeSource } from "./schema";
 import { holdableItem, itemOf } from "../rules/item-catalog";
@@ -143,8 +144,11 @@ export function checkTrainerInputs(rawTypes: unknown, rawRecords: unknown, conte
   return { types, records, errors };
 }
 
-export function trainerSpeciesKeys(order: readonly SpeciesKey[]): ReadonlySet<string> {
-  return new Set(order.map(keyOf));
+export function trainerSpeciesKeys(order: readonly SpeciesKey[], species: readonly { id: string; form?: number; showdownId: string }[] = []): ReadonlySet<string> {
+  const keys = new Set(order.map(keyOf));
+  for (const base of species) if ((base.form ?? 0) === 0)
+    for (const form of storedCreationForms(base.showdownId)) keys.add(keyOf({ species: base.id, form }));
+  return keys;
 }
 
 export type { PartialStats };

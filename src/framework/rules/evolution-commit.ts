@@ -1,4 +1,6 @@
 /** One selected party evolution's complete pure state plan. The application owns installation and learning. */
+import { creationBattleNameOf } from "./species-key";
+import { normalizeMemberDexAppearance } from "./acquisition-dex";
 import { planEvolutionSuccess } from "./evolution-success";
 import type { EvolutionLearningIntent } from "./evolution-success";
 import type { EvolutionSelection } from "./evolution";
@@ -9,7 +11,7 @@ import { DEFAULT_LIMITS } from "./limits";
 import type { Limits } from "./limits";
 import { allocateMemberId } from "./member-identity";
 import { own } from "./own";
-import { applyDexPatch, normalizeDexAppearance, planDexRecord } from "./pokedex";
+import { applyDexPatch, planDexRecord } from "./pokedex";
 import type { DexAppearance } from "./pokedex";
 import { validateGameContent } from "./save-schema";
 import { bumpStat } from "./stats";
@@ -43,22 +45,13 @@ export type EvolutionCommitPlan = {
 const formNumber = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 999;
 const refused = (reason: string, diagnostics: readonly string[] = []): EvolutionCommitPlan => ({ status: "refused", reason, diagnostics });
 
-/** Unlike the ordinary species lookup, a registration source must have its exact authored form. */
+/** Exact author form or a documented finite latent identity, never the general compatibility fallback. */
 function exactSpecies(content: Content, species: string, form: number): SpeciesData | undefined {
-  const name = content.forms ? own(own(content.forms, species), String(form)) : form === 0 ? species : undefined;
-  return name === undefined ? undefined : own(content.species, name);
+  const name = creationBattleNameOf(content, { species, form });
+  return name === null ? undefined : own(content.species, name);
 }
 function appearanceOf(content: Content, member: Readonly<Member>): DexAppearance | null {
-  const form = member.form;
-  if (!formNumber(form)) return null;
-  const original = exactSpecies(content, member.species, form);
-  if (!original) return null;
-  const displayForm = original.pokedexForm ?? form;
-  if (!formNumber(displayForm) || !exactSpecies(content, member.species, displayForm)) return null;
-  const gender = member.gender === "M" ? 0 : member.gender === "F" ? 1 : member.gender === "N" ? 2 : null;
-  if (gender === null || typeof member.shiny !== "boolean") return null;
-  // F owns the explicit PokedexForm alias, gender normalization and unnamed-display => 0 compatibility rule.
-  return normalizeDexAppearance(content, { species: member.species, form, gender, shiny: member.shiny });
+  return normalizeMemberDexAppearance(content, member);
 }
 
 /** D requires a nonempty inventory identity even for quantity 0. This private zero-stock sentinel never persists. */

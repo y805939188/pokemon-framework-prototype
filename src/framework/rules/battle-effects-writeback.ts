@@ -1,3 +1,4 @@
+import { creationBattleNameOf } from "./species-key";
 /** Finite auxiliary composition over an already validated primary plan. The application owns installation and replay. */
 import { planBattleReadiness } from "./battle-consumption";
 import type { ResolvedBattleEffects } from "./battle-consumption";
@@ -43,17 +44,17 @@ function exactDexAppearance(content: Content, individual: DexAppearance, battleS
   if (!formNumber(individual.form)) return null;
   const forms = own(content.forms, individual.species);
   const exactName = (form: number): string | undefined => content.forms ? own(forms, String(form)) : form === 0 ? individual.species : undefined;
-  const originalName = exactName(individual.form);
+  const originalName = exactName(individual.form) ?? creationBattleNameOf(content, individual);
   if (!originalName || battleSpecies !== undefined && originalName !== battleSpecies) return null;
   const original = own(content.species, originalName);
   if (!original) return null;
   // An explicitly authored PokedexForm alias remains valid, including 0. Its target must exist too.
-  const displayForm = original.pokedexForm ?? individual.form;
+  const displayForm = original.pokedexForm ?? (exactName(individual.form) ? individual.form : 0);
   if (!formNumber(displayForm)) return null;
   const displayName = exactName(displayForm);
   if (!displayName || !own(content.species, displayName)) return null;
   // F still decides gender normalization and the permitted unnamed-display => 0 rule.
-  return normalizeDexAppearance(content, individual);
+  return normalizeDexAppearance(content, exactName(individual.form) ? individual : { ...individual, form: 0 });
 }
 
 /** Only friendship, the readiness pair and finite dex fields may differ from primary. Inputs stay detached. */
