@@ -1,6 +1,6 @@
 {
   "base": "da86278c5c9c2bc48592c0af0fd25e8727353834",
-  "runtimeBase": "8175eb6dcb9095fcaae38b9b10a093a5b185bac9",
+  "runtimeBase": "76126b2bb6095b48e3a8a6c9e81847c1e2be36b4",
   "scope": "exact compiled plugin formal command and Scene; synthetic nonrendering host, not NW",
   "files": {
     "js/plugins/PS_BattleFlow.js": "859534f97456b5bb73693e394dd0d0507f3b763ec57c3e89011969c5b47c5f09",
@@ -25,45 +25,52 @@
     "capture-replace"
   ],
   "runtimeRebinding": {
-    "sourceCommit": "8175eb6dcb9095fcaae38b9b10a093a5b185bac9",
-    "sourceTree": "c9ba5911e23e2cb1a5c86caeb8fa2643bd620b3c",
-    "previousBindingSHA256": "dd62d8680dcf8afcc639a21182b379bc224c8e35aed039ed7fc6085dc9d9a7a7",
-    "previousRuntimeBase": "d3e66b07716bd75af0fae5f7ba19e4bc9bf2d855",
+    "sourceCommit": "76126b2bb6095b48e3a8a6c9e81847c1e2be36b4",
+    "sourceTree": "b0507fc7d0447bd8d24a3883c2d292e40cb53086",
+    "previousBindingSHA256": "88754a8eb1c7561d9d22853961defe461c8caac8e5d0cd99a78b7512d8b3aba0",
+    "previousRuntimeBase": "8175eb6dcb9095fcaae38b9b10a093a5b185bac9",
     "previousRebinding": {
-      "sourceCommit": "d3e66b07716bd75af0fae5f7ba19e4bc9bf2d855",
-      "sourceTree": "36531adbf973d5a3f88b6232fb58a9d012134288",
-      "previousBindingSHA256": "919ae1c078bf11518c0573d9d4c7ec79e6cf6a275500f7e3016b7a1da3efb872",
-      "previousRuntimeBase": "6041c4fdf7e39856e19aa24c2b4f0a14986e7e8a",
+      "sourceCommit": "8175eb6dcb9095fcaae38b9b10a093a5b185bac9",
+      "sourceTree": "c9ba5911e23e2cb1a5c86caeb8fa2643bd620b3c",
+      "previousBindingSHA256": "dd62d8680dcf8afcc639a21182b379bc224c8e35aed039ed7fc6085dc9d9a7a7",
+      "previousRuntimeBase": "d3e66b07716bd75af0fae5f7ba19e4bc9bf2d855",
       "previousRebinding": {
-        "sourceCommit": "6041c4fdf7e39856e19aa24c2b4f0a14986e7e8a",
-        "sourceTree": "0e4ea6e5805d8364bc4d64a76682970d5bb19d9e",
-        "previousBindingSHA256": "9c9522f4a5552fa1cd0f6b5aad4a76efd1cd1839331cbf31275b0710d0d35cc4",
-        "previousRuntimeBase": "b8472621e81d678e1da830d5f69c87ea5b348238",
+        "sourceCommit": "d3e66b07716bd75af0fae5f7ba19e4bc9bf2d855",
+        "sourceTree": "36531adbf973d5a3f88b6232fb58a9d012134288",
+        "previousBindingSHA256": "919ae1c078bf11518c0573d9d4c7ec79e6cf6a275500f7e3016b7a1da3efb872",
+        "previousRuntimeBase": "6041c4fdf7e39856e19aa24c2b4f0a14986e7e8a",
         "previousRebinding": {
-          "sourceCommit": "b8472621e81d678e1da830d5f69c87ea5b348238",
-          "sourceTree": "09d6d30e6f44546e00da1e56bd6c879d62df6fe3",
-          "previousBindingSHA256": "b3d7f7a0242200d1b6880b1d18ef7143867cc97a73905102b3d2408b6ef472d5",
-          "previousRuntimeBase": "a9609ddc2e1f8bcbad35cf275b433c16e58bfbfc",
+          "sourceCommit": "6041c4fdf7e39856e19aa24c2b4f0a14986e7e8a",
+          "sourceTree": "0e4ea6e5805d8364bc4d64a76682970d5bb19d9e",
+          "previousBindingSHA256": "9c9522f4a5552fa1cd0f6b5aad4a76efd1cd1839331cbf31275b0710d0d35cc4",
+          "previousRuntimeBase": "b8472621e81d678e1da830d5f69c87ea5b348238",
           "previousRebinding": {
-            "sourceCommit": "a9609ddc2e1f8bcbad35cf275b433c16e58bfbfc",
-            "sourceTree": "20ba9121088138f0f0cec24ae19b71e625ae0098",
-            "previousBindingSHA256": "78ae15e1e45f1f49fd043b23434e0e7cf411d85beb982e31744a2c0e188c6347",
-            "previousRuntimeBase": "bf3c6c65512839aefaeab11aff168a258bd0d1bb",
+            "sourceCommit": "b8472621e81d678e1da830d5f69c87ea5b348238",
+            "sourceTree": "09d6d30e6f44546e00da1e56bd6c879d62df6fe3",
+            "previousBindingSHA256": "b3d7f7a0242200d1b6880b1d18ef7143867cc97a73905102b3d2408b6ef472d5",
+            "previousRuntimeBase": "a9609ddc2e1f8bcbad35cf275b433c16e58bfbfc",
             "previousRebinding": {
-              "sourceCommit": "bf3c6c65512839aefaeab11aff168a258bd0d1bb",
-              "sourceTree": "dc7cec658ad62cb262e70b0adfd91e19752d1bf3",
-              "previousBindingSHA256": "470f040b142bd61b1d90c5fc921fcb6a4dd49ba5e28133b7a2079213f7d8f1ec",
-              "previousRuntimeBase": "45c2e70121c098010a8803209d51727d1c8072c3",
-              "reason": "Shared literal-message helper extraction; normal BattleFlow behavior remains unchanged. Recovery escape integration is tested in test-plugin-host5."
+              "sourceCommit": "a9609ddc2e1f8bcbad35cf275b433c16e58bfbfc",
+              "sourceTree": "20ba9121088138f0f0cec24ae19b71e625ae0098",
+              "previousBindingSHA256": "78ae15e1e45f1f49fd043b23434e0e7cf411d85beb982e31744a2c0e188c6347",
+              "previousRuntimeBase": "bf3c6c65512839aefaeab11aff168a258bd0d1bb",
+              "previousRebinding": {
+                "sourceCommit": "bf3c6c65512839aefaeab11aff168a258bd0d1bb",
+                "sourceTree": "dc7cec658ad62cb262e70b0adfd91e19752d1bf3",
+                "previousBindingSHA256": "470f040b142bd61b1d90c5fc921fcb6a4dd49ba5e28133b7a2079213f7d8f1ec",
+                "previousRuntimeBase": "45c2e70121c098010a8803209d51727d1c8072c3",
+                "reason": "Shared literal-message helper extraction; normal BattleFlow behavior remains unchanged. Recovery escape integration is tested in test-plugin-host5."
+              },
+              "reason": "Bind independently reviewed PP no-effect pending release together with recovered box-name message escaping. Only current generated identities and provenance change; scenarios, seeds, host controls, historical native plans and business assertions remain unchanged."
             },
-            "reason": "Bind independently reviewed PP no-effect pending release together with recovered box-name message escaping. Only current generated identities and provenance change; scenarios, seeds, host controls, historical native plans and business assertions remain unchanged."
+            "reason": "Bind independently reviewed creation-form author diagnostics and party-first held-item recovery. Only current generated identities and provenance change; scenarios, seeds, host controls and historical native plans remain unchanged."
           },
-          "reason": "Bind independently reviewed creation-form author diagnostics and party-first held-item recovery. Only current generated identities and provenance change; scenarios, seeds, host controls and historical native plans remain unchanged."
+          "reason": "Bind finite stored creation forms for Toxel, Scatterbug and Spewpa after scoped review. Only current generated identities and provenance change; scenarios, seeds, host controls and historical native plans remain unchanged."
         },
-        "reason": "Bind finite stored creation forms for Toxel, Scatterbug and Spewpa after scoped review. Only current generated identities and provenance change; scenarios, seeds, host controls and historical native plans remain unchanged."
+        "reason": "Bind current candidate artifacts for verification only. Preserve scenarios, business assertions and historical native plans; no acceptance is implied."
       },
-      "reason": "Bind current candidate artifacts for verification only. Preserve scenarios, business assertions and historical native plans; no acceptance is implied."
+      "reason": "Bind held-growth candidate artifacts for verification only. Preserve all scenarios, seeds, business assertions, strict hash checks and historical plans; no acceptance is implied."
     },
-    "reason": "Bind held-growth candidate artifacts for verification only. Preserve all scenarios, seeds, business assertions, strict hash checks and historical plans; no acceptance is implied."
+    "reason": "Bind battle-local RPG held-item candidate artifacts for verification only. Preserve every scenario, seed, business assertion, strict hash check and prior binding; no native-host or acceptance claim is implied."
   }
 }
