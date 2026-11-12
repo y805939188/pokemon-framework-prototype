@@ -1,9 +1,9 @@
 {
   "base": "da86278c5c9c2bc48592c0af0fd25e8727353834",
-  "runtimeBase": "45c2e70121c098010a8803209d51727d1c8072c3",
+  "runtimeBase": "bf3c6c65512839aefaeab11aff168a258bd0d1bb",
   "scope": "exact compiled plugin formal command and Scene; synthetic nonrendering host, not NW",
   "files": {
-    "js/plugins/PS_BattleFlow.js": "652c58de1b281cb189c2b324a1f48ba3212d3a98d5bec1e8f89287e6acaa8bb9",
+    "js/plugins/PS_BattleFlow.js": "69c64e2428127f933718b45f4fd65c910fc881f9f8cf36bb73119ddca92354df",
     "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
     "js/plugins/PS_Evolution.js": "2694d02da34c39d6366edee17da0628c4b908f4f331546006554cabe8e957deb",
     "js/plugins/PS_BattleFlowTest.js": "4aee409872466c817e3a148bac9ca8322bb45d9351b51ea4ce70d13287a5c4fc",
@@ -23,5 +23,12 @@
     "capture-party",
     "capture-box",
     "capture-replace"
-  ]
+  ],
+  "runtimeRebinding": {
+    "sourceCommit": "bf3c6c65512839aefaeab11aff168a258bd0d1bb",
+    "sourceTree": "dc7cec658ad62cb262e70b0adfd91e19752d1bf3",
+    "previousBindingSHA256": "470f040b142bd61b1d90c5fc921fcb6a4dd49ba5e28133b7a2079213f7d8f1ec",
+    "previousRuntimeBase": "45c2e70121c098010a8803209d51727d1c8072c3",
+    "reason": "Shared literal-message helper extraction; normal BattleFlow behavior remains unchanged. Recovery escape integration is tested in test-plugin-host5."
+  }
 }
