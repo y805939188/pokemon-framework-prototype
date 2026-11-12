@@ -377,3 +377,31 @@ test(`capture recovery priority is roster-order independent: extra=${extraHolder
  const after=J(next);assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied');
  assert.deepEqual(w.state.current(),after);assert.equal(w.state.replaced.length,1);
 });
+
+
+for (const extraHolder of ['', 'lightclay', 'leftovers'])
+for (const reverse of [false, true])
+for (const boxedId of ['A', 'B', ...(extraHolder ? ['C'] : [])])
+test(`capture App party recovery precedes boxed current: extra=${extraHolder||'none'} reverse=${reverse} boxed=${boxedId}`,async()=>{
+ const seed=fixture(),game=J(seed.state.current()),order=extraHolder?['A','C','B']:['A','B'];if(reverse)order.reverse();
+ game.party=order.map(id=>({...J(game.party[0]),id,item:id==='B'?'leftovers':id==='C'?extraHolder:''}));
+ for(let i=game.party.length;i<6;i++)game.party.push({...J(game.party[0]),id:'Unused'+i,item:''});game.nextMemberOrdinal='7';
+ const w=fixture({game,naming:0}),before=J(w.state.current()),h=await w.app.startBattle(w.request);
+ const act=async id=>{if(h.gw._debugBattle().sides[0].active[0].name!==id)assert((await h.chooseSwitch(id)).ok);assert((await h.chooseMove(1)).ok);};
+ await act('B');if(extraHolder)await act('C');await act('A');
+ const actual=Object.fromEntries(h.gw._debugBattle().sides[0].pokemon.map(p=>[p.name,p.item]));
+ assert.equal(actual.A,extraHolder||'leftovers');assert.equal(actual.B,'');if(extraHolder)assert.equal(actual.C,'leftovers');
+ assert((await h.throwBall('masterball')).ok);assert(h.finished);
+ const raw=h.result(),id=raw.captured[0].id,pending=w.app.finishBattle(h,w.request);
+ assert(pending.pending);assert.deepEqual(w.state.current(),before);assert.equal(w.state.replaced.length,0);
+ const out=w.app.resolveReceiving(pending.receivingToken,{[id]:{nickname:{kind:'keep'},placement:{kind:'replace',target:{id:boxedId,position:{kind:'party',index:game.party.findIndex(m=>m.id===boxedId)}}}}});
+ assert.equal(out.commit,'applied',JSON.stringify(out));assert.equal(w.state.replaced.length,1);
+ const next=w.state.current(),get=id=>E.storage.locateMember(next,id).member.item;
+ assert.equal(get('A'),boxedId==='B'?'leftovers':boxedId==='C'?extraHolder:'');
+ assert.equal(get('B'),boxedId==='B'?'':'leftovers');if(extraHolder)assert.equal(get('C'),boxedId==='C'?'':extraHolder);assert.equal(get(id),'');
+ assert.equal(E.storage.locateMember(next,boxedId).position.kind,'box');
+ assert.deepEqual(E.storage.allMembers(next).map(m=>m.item).filter(Boolean).sort(),['leftovers',...(extraHolder?[extraHolder]:[])].sort());
+ const installed=J(next);assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied');assert.deepEqual(w.state.current(),installed);assert.equal(w.state.replaced.length,1);
+ const aborted=fixture({game,naming:0}),ab=await aborted.app.startBattle(aborted.request),snapshot=J(aborted.state.current());
+ assert((await ab.chooseMove(4)).ok);aborted.app.abortBattle(aborted.request,Error('test abort'));assert.deepEqual(aborted.state.current(),snapshot);assert.equal(aborted.state.replaced.length,0);
+});

@@ -142,13 +142,24 @@ export function planHeldWriteback<T extends MemberCollection>(input: HeldWriteba
   if (byId.size !== facts.members.length) throw new Error("held-writeback-duplicate-fact");
   const claims = Object.keys(capturedOrigins).length ? captureHeldClaims(facts) : null;
   const state = clone(primary), changes: { id: string; item: string; destination: "party" | "box" }[] = [];
-  for (const fact of facts.members.filter(m => m.side === "p1")) {
+  const players = facts.members.filter(m => m.side === "p1").map(fact => {
     const old = before.party.find(m => m.id === fact.id), located = locateMember(state, fact.id);
     if (!old || old.item !== fact.initial || !located) throw new Error("held-writeback-player-identity-mismatch");
+    return { fact, located };
+  });
+  // A boxed temporary holder and a remaining party owner can prefer the same token.
+  // Restore party recovery first; boxed current remains preferred over all fallbacks.
+  // Keep the returned change order and the no-capture path unchanged.
+  const preferred = claims ? [...players].sort((a, b) => {
+    const rank = Number(a.located.position.kind !== "party") - Number(b.located.position.kind !== "party");
+    return rank || (a.fact.id < b.fact.id ? -1 : a.fact.id > b.fact.id ? 1 : 0);
+  }) : players;
+  for (const { fact, located } of preferred) {
     const field = located.position.kind === "party" ? "recovery" : "current";
-    const nextItem = claims ? claims.claim(fact.id, field) || "" : fact[field];
-    located.member.item = nextItem;
-    changes.push({ id: fact.id, item: nextItem, destination: located.position.kind === "party" ? "party" : "box" });
+    located.member.item = claims ? claims.claim(fact.id, field) || "" : fact[field];
+  }
+  for (const { fact, located } of players) {
+    changes.push({ id: fact.id, item: located.member.item, destination: located.position.kind === "party" ? "party" : "box" });
   }
   if (claims) {
     // All player preferred claims must precede any current fallback. Otherwise an
