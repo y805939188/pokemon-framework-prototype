@@ -1,6 +1,7 @@
 /** Static Showdown data (species, moves) behind the small DexLookup interface the content layers use. */
 import type { DexLookup } from "../rules/types";
 import { loadSim, readEngineSha } from "./showdown-loader";
+import { RPG_HELD_ITEMS } from "../rules/rpg-held-items";
 
 export function createDexLookup(engineRoot?: string): DexLookup {
   // Constructing the port must consume no external data. Content assembly checks the complete source registry before
@@ -46,7 +47,7 @@ export function createDexLookup(engineRoot?: string): DexLookup {
     heldItem(id) {
       const item = use().gen8.items.get(id);
       // RPG-only money/growth holders have no Showdown data; their effects belong to framework settlement/growth.
-      if (id === "amuletcoin" || id === "luckincense" || id === "luckyegg") return { id, holdable: true, mail: false };
+      if (Object.hasOwn(RPG_HELD_ITEMS, id)) return { id, holdable: true, mail: false };
       return item && item.exists ? { id: item.id, holdable: true, mail: item.isMail === true } : null;
     },
     sha: () => use().sha,

@@ -12,6 +12,35 @@ import type { BattleActor, BattleDisplaySnapshot } from "../rules/battle-evidenc
 import { obedienceEligible, obedienceLevelLimit } from "../rules/obedience";
 import { own } from "../rules/own";
 import type { HeldRuntimeObserver } from "../rules/held-facts";
+import { RPG_HELD_ITEMS } from "../rules/rpg-held-items";
+
+/** A battle-local item port. Never add entries to the shared Dex, its data or its caches. */
+const itemViews = new WeakSet<object>();
+function attachRpgHeldItems(b: ShowdownBattle): void {
+  if (itemViews.has(b)) return;
+  const native = b.dex, additions = new Map<string, ShowdownPokemon>();
+  for (const [id, definition] of Object.entries(RPG_HELD_ITEMS)) {
+    // A future reviewed native entry always wins. Existing native items (including Flower Sweet) are untouched.
+    if (!native.items.getByID(id).exists) additions.set(id, native.deepFreeze(new native.Item({
+      name: definition.name, gen: definition.gen, fling: { basePower: definition.flingPower },
+    })));
+  }
+  const items = Object.create(native.items);
+  const byId = (id: string): ShowdownPokemon => additions.get(id) ?? native.items.getByID(id);
+  let all: readonly ShowdownPokemon[] | undefined;
+  Object.defineProperties(items, {
+    getByID: { value: byId },
+    get: { value: (name: unknown) => {
+      const item = native.items.get(name);
+      return typeof name === "string" && !item.exists ? byId(item.id) : item;
+    } },
+    all: { value: () => all ??= Object.freeze([...native.items.all(), ...additions.values()]) },
+  });
+  const dex = Object.create(native);
+  Object.defineProperty(dex, "items", { value: items });
+  b.dex = dex;
+  itemViews.add(b);
+}
 
 /** RPG-only defaults and per-use environment effects. Never patch the shared Dex or upstream runtime. */
 import { ENVIRONMENT, WEATHER, TERRAIN, normalizeInitialField } from '../rules/initial-field';
@@ -615,7 +644,15 @@ const common = {
   mod: "gen8",
   searchShow: false,
   debug: true,
-  battle: { trunc: Math.trunc },
+  battle: {
+    trunc: Math.trunc,
+    // The native constructor calls setPlayer for both new and deserialized battles. Install before Pokemon
+    // creation/reference decoding, not onBegin (which is deliberately not replayed on restore).
+    setPlayer(this: ShowdownBattle, slot: string, options: ShowdownPokemon) {
+      attachRpgHeldItems(this);
+      return Object.getPrototypeOf(this).setPlayer.call(this, slot, options);
+    },
+  },
   ruleset: ["Team Preview", "Cancel Mod", "Max Team Size = 24", "Max Move Count = 24", "Max Level = 9999", "Default Level = 100"],
   ...rpgHandlers,
 };
