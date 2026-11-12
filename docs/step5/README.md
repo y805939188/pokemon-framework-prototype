@@ -4,6 +4,8 @@
 
 5.4 固定产品 `fdf25c7`／开发分支 `step5/4-stored-form-integration-20261112` 已完成 274 套／4968 项自动回归，[精确 CI #304](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43157940579) 两 job 成功。当前限定接受、已完成的人工补测及未关闭事项见[5.4 当前验收索引](5.4-current-acceptance.md)；完整阶段未签收，未合并 main。
 
+[RPG持物原生身份子批](5.4-rpg-held-native-items.md)在独立开发分支补齐 Lucky Egg／Amulet Coin／Luck Incense 的正常 Fling 身份，保留固定 Showdown 消费者和 Flower Sweet 既有规则。产品限域独审及278套／5044项本地回归通过；远端精确CI另记，不替换上方整合母版或宣称完整FR55／5.4关闭。
+
 ## 历史批次记录
 
 以下保留各批次当时的候选、待审及接受状态。旧文中的“当前／未启动／尚未执行”仅适用于原版本与原日期，不覆盖上方当前索引；不能反向把后继接受改写成旧失败当时通过。
