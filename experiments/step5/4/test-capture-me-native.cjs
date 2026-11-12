@@ -27,9 +27,9 @@ test('native plan freezes exact product and15 ordered cases, two-process denomin
  assert.equal(PLAN.assets.length,5);assert.equal(PLAN.assets.find(a=>a.name==='long').seconds/1.2,5);assert(PLAN.assets.find(a=>a.name==='short').seconds<3.5);
  // Headless CI does not install ignored generated plugin bundles. The package
  // freeze checks actual bundle bytes against f021. This digest now records the
- // reviewed normal-observer, Pokedex-continuation, player-nickname and shared literal-message source for headless controls only. No requalification of
+ // reviewed normal-observer, Pokedex-continuation, player-nickname, shared literal-message and Pay Day notification source for headless controls only. No requalification of
  // the historical fifteen-case App/PLAN is implied: new native packaging must rebind separately.
- const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),'eab7d9d4c504f4c5fcfef14d0515ffacd4bc5584214ed43527fa92ba032b5c11','current source identity; historical native plan requires rebind');
+ const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),'4c814364f498ebe5ee55041bf4fba5861b1e1dd0ea359ef29dbdb8e64522dbb7','current source identity; historical native plan requires rebind');
 });
 for(const kind of ['map','title'])test('actual driver readiness rejects unstarted/changing/incomplete '+kind,()=>{
  class Map{}class Title{}let changing=false;const G={Scene_Map:Map,Scene_Title:Title,SceneManager:{isSceneChanging:()=>changing}},v=new(kind==='map'?Map:Title)();let started=false,active=true,busy=false;
