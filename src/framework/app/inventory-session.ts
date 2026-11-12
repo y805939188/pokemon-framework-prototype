@@ -161,7 +161,14 @@ export class InventorySession {
           if(this.pendingUse&&(this.pendingUse.stale||this.pendingUse.revision!==revision||this.pendingUse.world!==worldRevision)){this.pendingUse.stale=true;throw new Error('stale-item-selection');}
           if(this.pendingUse&&this.pendingUse.fingerprint!==identity)throw new Error('stale-item-selection');
           if(this.pendingUse?.learning&&(answers?.cancelled===true||answers?.confirmed===false))throw new Error('learning-choice-required');
-          const planned=planItemUse(game,content,{itemId:request.itemId,quantity:request.quantity,...(context.parent?.memberId??request.memberId?{memberId:context.parent?.memberId??request.memberId}:{})},answers,world);
+          let planned:ReturnType<typeof planItemUse>;
+          try{planned=planItemUse(game,content,{itemId:request.itemId,quantity:request.quantity,...(context.parent?.memberId??request.memberId?{memberId:context.parent?.memberId??request.memberId}:{})},answers,world);}
+          catch(error){
+            // A valid ordinary choice with no effect ends its prompt without installing anything.
+            // Keep stale, learning and uncertain-install owners subject to their existing recovery rules.
+            if(this.pendingUse&&!this.pendingUse.learning&&reason(error)==='no-effect')this.pendingUse=null;
+            throw error;
+          }
           if(planned.status==='pending'){this.pendingUse={requestId,fingerprint:identity,revision,world:worldRevision,learning:planned.selection.kind==='learn'||planned.selection.kind==='give-up',stale:false};return {status:'pending',requestId,result:{selection:clone(planned.selection)}};}
           if(planned.status==='cancelled'){this.pendingUse=null;return {status:'cancelled',requestId};}next=planned.state;result={...planned.result};break;
         }
