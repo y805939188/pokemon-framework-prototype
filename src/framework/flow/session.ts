@@ -34,7 +34,7 @@ import { battleFriendshipValue } from "../rules/battle-evidence";
 import type { BattleEvidenceContext, EvidenceBinding, BattleEvidence, FriendEvidence, BattleObservation } from "../rules/battle-evidence";
 import { resolveConfig } from "../rules/config";
 import { own, setOwn } from "../rules/own";
-import { bindRequiredSettlement, checkpointRequiredSettlement, finalizeRequiredSettlement, requiredCaptureItem, restoreRequiredSettlement } from "./required-settlement";
+import { bindRequiredSettlement, checkpointRequiredSettlement, finalizeRequiredSettlement, requiredCaptureItem, requiredGrowthItems, restoreRequiredSettlement } from "./required-settlement";
 import { bindTrainerAi, runTrainerAi, trainerAiEvent, checkpointTrainerAi, restoreTrainerAi, preflightTrainerAiRestore, prepareTrainerAiRestore, failTrainerAiRestore, assertTrainerAiCheckpointReady, cancelTrainerAiDecision } from './trainer-ai';
 import type { TrainerAiConfiguration } from './trainer-ai';
 import { _publishGrowthDisplay, _capturePresentation, _restorePresentation, readBattleLearnProtection } from './presentation';
@@ -870,9 +870,11 @@ export class BattleSession {
     const receivers = this.party.filter((m) => parts.includes(m.id) && alive.has(m.id));
     const initialStages: GrowthTask[] = [], stages: GrowthTask[] = [];
     for (const m of receivers) {
-      const evs = G.gainEvs(m.evs ?? {}, foeC.evYield);
+      // A legacy/custom driver without the required channel does not acquire held-item authority from save data.
+      const held = G.heldGrowthModifiers(foeC.evYield, requiredGrowthItems(this, this.gw, m.id) ?? { current: "", recovery: "" });
+      const evs = G.gainEvs(m.evs ?? {}, held.evYield);
       const withEv: Member = { ...m, evs };
-      const amount = G.battleExp({ foe: { level: foe.level, baseExp: foeC.baseExp }, receiver: withEv, participants: receivers.length, rules: this.rules, trainer: this.foe.kind === "trainer" });
+      const amount = G.battleExp({ foe: { level: foe.level, baseExp: foeC.baseExp }, receiver: withEv, participants: receivers.length, rules: this.rules, trainer: this.foe.kind === "trainer", luckyEgg: held.luckyEgg });
       const res = G.applyExp(withEv, amount, this.content, m);
       // EXP/EVs and permanent stat validation keep their original species identity.
       // HP alone can have a different natural battle-form base (Power Construct).

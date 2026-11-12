@@ -1,5 +1,5 @@
 /** Required source channel, separate from frozen v1 results and optional V2 observations. */
-import { gatewaySettlementFacts, gatewaySettlementLineage, gatewayOwnSummaryItem } from "../battle/gateway";
+import { gatewaySettlementFacts, gatewaySettlementLineage, gatewayOwnSummaryItem, gatewayOwnGrowthItems } from "../battle/gateway";
 import type { BattleDriver, DriverCheckpoint } from "../battle/driver";
 import type { HeldBinding, RequiredFacts } from "../rules/held-facts";
 import { clone, resultHash } from "../rules/state";
@@ -16,6 +16,11 @@ const CHECKPOINTS = new WeakMap<DriverCheckpoint, { session: object; sealed: Sea
 export function requiredOwnSummaryItem(session: object, driver: BattleDriver, id: string): string | undefined {
   const channel = CHANNELS.get(session);
   return channel ? gatewayOwnSummaryItem(driver, channel.lineage, id) : undefined;
+}
+/** Growth uses the actual current and updatable recovery pair; unknown never means saved-item authority. */
+export function requiredGrowthItems(session: object, driver: BattleDriver, id: string): { current: string; recovery: string } | undefined {
+  const channel = CHANNELS.get(session);
+  return channel ? gatewayOwnGrowthItems(driver, channel.lineage, id) : undefined;
 }
 export function bindRequiredSettlement(session: object, driver: BattleDriver, binding: Omit<HeldBinding, "rawHash">, restore: (token: DriverCheckpoint) => Promise<BattleDriver>): void {
   const lineage = gatewaySettlementLineage(driver);

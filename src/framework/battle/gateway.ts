@@ -70,6 +70,12 @@ export function gatewaySettlementFacts(driver: BattleDriver, lineage: object, bi
   if (!source || source.lineage !== lineage) throw new Error("required-settlement-driver-source-mismatch");
   return source.tracker.facts(binding);
 }
+/** Internal player growth read, authenticated to the same complete required channel across rollback. */
+export function gatewayOwnGrowthItems(driver: BattleDriver, lineage: object, id: string): { current: string; recovery: string } {
+  const source = SETTLEMENTS.get(driver);
+  if (!source || source.lineage !== lineage) throw new Error("required-settlement-driver-source-mismatch");
+  return source.tracker.growthItems(id);
+}
 /** Internal own-side display read; a live query is not an ended settlement seal. */
 export function gatewayOwnSummaryItem(driver: BattleDriver, lineage: object, id: string): string {
   const source = SETTLEMENTS.get(driver);
