@@ -1,5 +1,5 @@
 {
-  "runtimeBase": "6041c4fdf7e39856e19aa24c2b4f0a14986e7e8a",
+  "runtimeBase": "d3e66b07716bd75af0fae5f7ba19e4bc9bf2d855",
   "files": {
     "js/reactor_managers.js": "0a45145a23c377f70d5df07b0b58e12679f14b84e4e9d2ae8ea90ac3e9cfca04",
     "js/reactor_core.js": "b18c5f887be92cd3ee199660f371d2dd9a3b383003925c42a16219aee44201ec",
@@ -10,27 +10,34 @@
     "experiments/step5/4/mz-slot-host.cjs": "888dc6f859b1fec27875f7ecc5cae9a27ff873edec9fe48696fbabf63a43264e",
     "experiments/step5/4/continue-host.cjs": "7deff0a0deec3f71019392d62f2626eae03f30bc588db3ceb20973c0610da257",
     "experiments/step5/4/h3-production-policy/support.cjs": "f0e8116f8df8b7e2c1d81b246763e6a937b9fcf1fa06d078769c1b4714fd528c",
-    "experiments/step5/4/h3-production-policy/runtime-plan.json": "446cfb836d5fca796c46208305708ca437d6f8d49c92735f647cec5b68a0f6bb"
+    "experiments/step5/4/h3-production-policy/runtime-plan.json": "564b4fb39eb066b0c314aa27c85387f7513d840af25af355c37fceae94a57c31"
   },
   "runtimeRebinding": {
-    "sourceCommit": "6041c4fdf7e39856e19aa24c2b4f0a14986e7e8a",
-    "sourceTree": "0e4ea6e5805d8364bc4d64a76682970d5bb19d9e",
-    "previousBindingSHA256": "0349a85027add1a43b42b8b76d7d8237a7e1127c3b08dc0081375f0cf1455ed8",
-    "previousRuntimeBase": "b8472621e81d678e1da830d5f69c87ea5b348238",
+    "sourceCommit": "d3e66b07716bd75af0fae5f7ba19e4bc9bf2d855",
+    "sourceTree": "36531adbf973d5a3f88b6232fb58a9d012134288",
+    "previousBindingSHA256": "3ea4d953d8bb988198cc0a345706648deae1d6dc48b6dadb5296ca79b6a342c5",
+    "previousRuntimeBase": "6041c4fdf7e39856e19aa24c2b4f0a14986e7e8a",
     "previousRebinding": {
-      "sourceCommit": "b8472621e81d678e1da830d5f69c87ea5b348238",
-      "sourceTree": "09d6d30e6f44546e00da1e56bd6c879d62df6fe3",
-      "previousBindingSHA256": "165117594ddb40ca2fdd3dc5c1e82dbc5fa88e7ac2829f5da3f92fec1d9525f3",
-      "previousRuntimeBase": "a9609ddc2e1f8bcbad35cf275b433c16e58bfbfc",
+      "sourceCommit": "6041c4fdf7e39856e19aa24c2b4f0a14986e7e8a",
+      "sourceTree": "0e4ea6e5805d8364bc4d64a76682970d5bb19d9e",
+      "previousBindingSHA256": "0349a85027add1a43b42b8b76d7d8237a7e1127c3b08dc0081375f0cf1455ed8",
+      "previousRuntimeBase": "b8472621e81d678e1da830d5f69c87ea5b348238",
       "previousRebinding": {
-        "sourceCommit": "a9609ddc2e1f8bcbad35cf275b433c16e58bfbfc",
-        "sourceTree": "20ba9121088138f0f0cec24ae19b71e625ae0098",
-        "previousBindingSHA256": "b1fad0a18d20d13afa6d58fd07a44f7282dc8739026fa6a9031ff85582667a57",
-        "previousRuntimeBase": "45c2e70121c098010a8803209d51727d1c8072c3",
-        "reason": "Bind independently reviewed PP no-effect pending release together with recovered box-name message escaping. Only current generated identities and provenance change; scenarios, seeds, host controls, historical native plans and business assertions remain unchanged."
+        "sourceCommit": "b8472621e81d678e1da830d5f69c87ea5b348238",
+        "sourceTree": "09d6d30e6f44546e00da1e56bd6c879d62df6fe3",
+        "previousBindingSHA256": "165117594ddb40ca2fdd3dc5c1e82dbc5fa88e7ac2829f5da3f92fec1d9525f3",
+        "previousRuntimeBase": "a9609ddc2e1f8bcbad35cf275b433c16e58bfbfc",
+        "previousRebinding": {
+          "sourceCommit": "a9609ddc2e1f8bcbad35cf275b433c16e58bfbfc",
+          "sourceTree": "20ba9121088138f0f0cec24ae19b71e625ae0098",
+          "previousBindingSHA256": "b1fad0a18d20d13afa6d58fd07a44f7282dc8739026fa6a9031ff85582667a57",
+          "previousRuntimeBase": "45c2e70121c098010a8803209d51727d1c8072c3",
+          "reason": "Bind independently reviewed PP no-effect pending release together with recovered box-name message escaping. Only current generated identities and provenance change; scenarios, seeds, host controls, historical native plans and business assertions remain unchanged."
+        },
+        "reason": "Bind independently reviewed creation-form author diagnostics and party-first held-item recovery. Only current generated identities and provenance change; scenarios, seeds, host controls and historical native plans remain unchanged."
       },
-      "reason": "Bind independently reviewed creation-form author diagnostics and party-first held-item recovery. Only current generated identities and provenance change; scenarios, seeds, host controls and historical native plans remain unchanged."
+      "reason": "Bind finite stored creation forms for Toxel, Scatterbug and Spewpa after scoped review. Only current generated identities and provenance change; scenarios, seeds, host controls and historical native plans remain unchanged."
     },
-    "reason": "Bind finite stored creation forms for Toxel, Scatterbug and Spewpa after scoped review. Only current generated identities and provenance change; scenarios, seeds, host controls and historical native plans remain unchanged."
+    "reason": "Bind current candidate artifacts for verification only. Preserve scenarios, business assertions and historical native plans; no acceptance is implied."
   }
 }
