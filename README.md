@@ -6,7 +6,7 @@
 
 ## 当前阶段（2026-11-12）
 
-5.4 处于固定候选收尾，产品为 [`fdf25c7`](https://github.com/y805939188/pokemon-framework-prototype/commit/fdf25c7f1f3230e23a239c6bd72351f0c45df561)，开发分支 `step5/4-stored-form-integration-20261112`。[CI #304](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43157940579) 两个 job 成功，274 套／4968 项自动回归通过，冻结参考回放排除。限定实机、独立复核、仍待人工自助验收及保留项见[当前验收索引](docs/step5/5.4-current-acceptance.md)。**完整 5.4 尚未签收，未合并 main。**
+5.4 处于固定候选收尾，产品为 [`fdf25c7`](https://github.com/y805939188/pokemon-framework-prototype/commit/fdf25c7f1f3230e23a239c6bd72351f0c45df561)，开发分支 `step5/4-stored-form-integration-20261112`。[CI #304](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43157940579) 两个 job 成功，274 套／4968 项自动回归通过，冻结参考回放排除。限定实机、已接受的人工补测、待审结果及保留项见[当前验收索引](docs/step5/5.4-current-acceptance.md)。**完整 5.4 尚未签收，未合并 main。**
 
 ## 先读什么
 

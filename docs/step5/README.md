@@ -2,7 +2,7 @@
 
 ## 当前状态（2026-11-12）
 
-5.4 固定产品 `fdf25c7`／开发分支 `step5/4-stored-form-integration-20261112` 已完成 274 套／4968 项自动回归，[精确 CI #304](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43157940579) 两 job 成功。当前限定接受、人工自助待执行及未关闭事项见[5.4 当前验收索引](5.4-current-acceptance.md)；完整阶段未签收，未合并 main。
+5.4 固定产品 `fdf25c7`／开发分支 `step5/4-stored-form-integration-20261112` 已完成 274 套／4968 项自动回归，[精确 CI #304](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43157940579) 两 job 成功。当前限定接受、已完成的人工补测及未关闭事项见[5.4 当前验收索引](5.4-current-acceptance.md)；完整阶段未签收，未合并 main。
 
 ## 历史批次记录
 
