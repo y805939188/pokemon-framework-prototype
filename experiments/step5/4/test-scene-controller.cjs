@@ -444,3 +444,19 @@ test('compiled Scene terminate during decode prevents late listeners allocating 
   assert.equal(allocations,before);assert.equal(JSON.stringify(h.counts.paint),paint);assert.equal(s.battlebackState().ownedAssets,0);assert(s.battlebackState().retired);
  }finally{s.terminate();}
 });
+
+for(const lang of ['en','zh'])test(`compiled ${lang} Pay Day notice is structured, positive-only and emitted once`,async()=>{
+ for(const actual of [0,500]){
+  const h=await host().ready(),op=h.flow._op,lines=[];h.flow.setLanguage(lang);h.G.$gameMessage.add=text=>lines.push(text);
+  const out={code:1,commit:'applied',battleId:'scene#1',payDayReward:{nominal:1000,before:100,after:100+actual,actual,normalizationLoss:0}};
+  h.flow.completeBattleOutcome(out,null,op);h.flow.completeBattleOutcome(out,null,op);
+  assert.equal(lines.length,actual>0?1:0);if(actual>0){assert(lines[0].includes('500'));assert(!lines[0].includes('1000'));assert(lines[0].includes(lang==='zh'?'聚宝功':'Pay Day'));}
+  assert.equal(h.counts.abort,0);
+ }
+});
+test('compiled Pay Day message failure leaves the committed result intact and is not retried',async()=>{
+ const h=await host().ready(),op=h.flow._op;let calls=0;h.G.$gameMessage.add=()=>{calls++;throw Error('postcommit message');};
+ const out={code:1,commit:'applied',battleId:'scene#1',payDayReward:{actual:250,normalizationLoss:0}};
+ h.flow.completeBattleOutcome(out,null,op);h.flow.completeBattleOutcome(out,null,op);
+ assert.equal(calls,1);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(h.flow.lastOutcome.hostErrors[0].step,'payday-reward-message');assert.equal(h.counts.abort,0);
+});

@@ -25,9 +25,9 @@ async function open(c){
  flow.setLanguage(null);flow.stateReplaced();flow._app=null;flow._content=content;flow._dex=E.dex.createDexLookup();flow.seed=c.seed??[1,2,3,4];flow.rng=()=>0;flow.fast=true;
  const state=E.state.newGame({content,party:[],money:1000});
  for(const [i,config]of [c.player,c.reserve].filter(Boolean).entries()){
-  const species=E.dex.createDexLookup().species(config.species).name,m=E.memberFactory.createMember({id:'SCENE-P'+(i+1),species,level:config.level,nature:'hardy',abilityIndex:config.abilityIndex},content,()=>0);assert.deepEqual(m.moves.map(x=>x.id),config.moves);if(config.status){m.status=config.status;m.statusCount=config.statusCount??0;}state.party.push(E.speciesKey.toPersistentMember(m,content));
+  const species=E.dex.createDexLookup().species(config.species).name,m=E.memberFactory.createMember({id:'SCENE-P'+(i+1),species,level:config.level,nature:'hardy',abilityIndex:config.abilityIndex},content,()=>0);assert.deepEqual(m.moves.map(x=>x.id),config.moves);if(config.status){m.status=config.status;m.statusCount=config.statusCount??0;}if(c.owner)m.owner=clone(c.owner);state.party.push(E.speciesKey.toPersistentMember(m,content));
  }
- state.nextMemberOrdinal=String(state.party.length+1);state.badges.fill(true);let saved=state,installs=0;
+ state.nextMemberOrdinal=String(state.party.length+1);state.badges.fill(c.badges===undefined);if(c.badges!==undefined)for(let i=0;i<c.badges;i++)state.badges[i]=true;let saved=state,installs=0;
  Object.defineProperty(G.$gameSystem,'_psGame',{configurable:true,get:()=>saved,set:v=>{installs++;saved=v;}});
  await h.p.toMapId(5,8,9);const initial=clone(flow.game());const request={kind:'wild',foes:[{species:c.foe.species,level:c.foe.level}],battleId:c.id,seq:1,canLose:true,expGain:false};flow.openBattle(request);await h.p.inMode('main');
  const s=h.p.battle(),lines=[],logAdd=s._log.add;s._log.add=function(line){lines.push(line);return logAdd.call(this,line);};flow.fast=false;

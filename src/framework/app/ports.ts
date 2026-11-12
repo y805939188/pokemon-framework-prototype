@@ -184,6 +184,8 @@ export interface BattleOutcome {
   defeat?: { moneyLost: number; healed: true };
   /** Actual A-M1 base-prize delta, not a nominal amulet/HappyHour/PayDay claim. */
   trainerReward?: { id: string; version: number; nominal: number; before: number; after: number; actual: number; normalizationLoss: number };
+  /** Actual second-stage Pay Day delta, published only after the same battle installation. */
+  payDayReward?: { nominal: number; before: number; after: number; actual: number; normalizationLoss: number };
   /** Whether the host was told. "failed" means the projection threw; `commit` separately says whether state was committed. */
   projection?: "ok" | "failed";
   projectionError?: string;

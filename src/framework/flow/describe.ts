@@ -89,6 +89,14 @@ export function make(names: Record<string, string> = {}, tr: Translator = defaul
   function rpg(a: string[]): string[] {
     const what = a[0], x = a[2] ?? "", target = a[3] ?? "", res = a[4];
     const tn = names[target] || target;
+    if (what === "obedience") {
+      // |rpg|obedience|side|memberId|result|detail. Only recognized outcomes become text.
+      const result = a[3], detail = a[4];
+      const keys: Record<string, string> = { sleep: "sleep", ignored: "ignored", change: "change", "self-sleep": "self_sleep", "self-hit": "self_hit" };
+      const key = result === "refuse" && /^[0-3]$/.test(detail ?? "") ? `refuse${detail}`
+        : result && Object.prototype.hasOwnProperty.call(keys, result) ? keys[result] : undefined;
+      return key ? [tr.t(`battle.obedience.${key}`, { name: nm(`${a[1]}a: ${x}`) })] : [];
+    }
     if (what === "item") {
       if (res === "ok") return [a[5] !== undefined && /^\d+$/.test(a[5]) ? tr.t("item.used_recovered", { item: itemName(x), target: tn, hp: a[5] }) : tr.t("item.used", { item: itemName(x), target: tn })];
       if (res === "noeffect") return [tr.t("item.no_effect", { item: itemName(x) })];

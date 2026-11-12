@@ -39,6 +39,7 @@ test('B required app: actual default session installs main/paired held/money onc
   const w=fixture({item:'amuletcoin'}),{h,raw,out}=await finishWild(w);
   assert.equal(out.commit,'applied',JSON.stringify(out));assert.equal(w.state.replaced.length,1);
   assert.equal(w.state.current().money,1500);assert.equal(w.state.current().stats.battle_money_gained,500);
+  assert.deepEqual(out.payDayReward,{nominal:500,before:1000,after:1500,actual:500,normalizationLoss:0});
   assert.match(w.state.current().appliedBattles[raw.battleId].settlement.pairHash,/^[a-f0-9]{64}$/);
   assert.equal(w.app.finishBattle(h,w.request).commit,'already-applied');
   w.setContent(null);assert.equal(w.app.commitResult(raw),'already-applied');assert.equal(w.state.replaced.length,1);
@@ -160,6 +161,7 @@ test('B PD6: actual trainer prize then Pay Day cap independently, multiply once,
     assert.deepEqual([w.state.current().money,w.state.current().stats.battle_money_gained,w.state.replaced.length],[expected,income,1]);
     assert.deepEqual(w.state.current().defeatedTrainers['held-npc@0'],{id:'held-npc',version:0});
     assert.ok(!(out.diagnostics??[]).some(s=>/聚宝功获得 0/.test(s)));
+    if(enabled)assert.equal(out.payDayReward.actual,Math.max(0,income-out.trainerReward.actual));else assert.equal(out.payDayReward,undefined);
     const after=J(w.state.current());assert.equal(w.app.finishBattle(h,req).commit,'already-applied');assert.deepEqual(w.state.current(),after);assert.equal(w.state.replaced.length,1);
   }
 });
@@ -205,6 +207,7 @@ test('B PD6 capture: Pay Day waits for the same authenticated receiving decision
  const raw=h.result(),pending=w.app.finishBattle(h,w.request);assert.equal(pending.pending,true);assert.deepEqual(w.state.current(),before);assert.equal(w.state.replaced.length,0);
  const id=raw.captured[0].id,done=w.app.resolveReceiving(pending.receivingToken,{[id]:{nickname:{kind:'keep'}}});assert.equal(done.commit,'applied',JSON.stringify(done));
  assert.deepEqual([w.state.current().money,w.state.current().stats.battle_money_gained,w.state.replaced.length],[1500,500,1]);assert.ok(E.storage.locateMember(w.state.current(),id));
+ assert.equal(pending.payDayReward,undefined,'pending reception must not publish an uninstalled gain');assert.equal(done.payDayReward.actual,500);
  const after=J(w.state.current());assert.equal(w.app.commitResult(raw),'already-applied');assert.deepEqual(w.state.current(),after);assert.equal(w.state.replaced.length,1);
 });
 

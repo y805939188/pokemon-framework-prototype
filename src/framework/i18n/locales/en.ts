@@ -4,6 +4,16 @@ import type { LocaleTable } from "../translator";
 export const en: LocaleTable = {
   meta: { name: "English" },
   text: {
+    "battle.paydayReward": "Picked up {money} money with Pay Day.",
+    "battle.obedience.sleep": "{name} ignored orders and kept sleeping!",
+    "battle.obedience.ignored": "{name} ignored orders!",
+    "battle.obedience.change": "{name} ignored orders and used a different move!",
+    "battle.obedience.self_sleep": "{name} began to nap!",
+    "battle.obedience.self_hit": "{name} hurt itself in its disobedience!",
+    "battle.obedience.refuse0": "{name} won't obey!",
+    "battle.obedience.refuse1": "{name} turned away!",
+    "battle.obedience.refuse2": "{name} is loafing around!",
+    "battle.obedience.refuse3": "{name} pretended not to notice!",
     "ui.options.battle_style": "Battle Style",
     "ui.options.style_switch": "Switch",
     "ui.options.style_set": "Set",

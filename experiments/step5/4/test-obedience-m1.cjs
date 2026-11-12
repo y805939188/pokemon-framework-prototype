@@ -89,7 +89,8 @@ test('A-M1 real engine: changed move skips original PP, pays new PP once, recurs
   const sample = await findScenario('change');
   assert.equal(pp(sample.gw).tackle, sample.beforePp.tackle);
   assert.equal(pp(sample.gw).scratch, sample.beforePp.scratch - 1);
-  assert.ok(trace(sample.gw).some(entry => entry.kind === 'recursive'));
+  assert.ok(!trace(sample.gw).some(entry => entry.kind === 'recursive'));
+  assert.equal(sample.gw._debugBattle().getSide('p1').active[0].activeMoveActions, 1, 'one changed move is one action');
   await assertReplay(sample);
 });
 

@@ -8,6 +8,16 @@ import type { LocaleTable } from "../translator";
 export const zh: LocaleTable = {
   meta: { name: "简体中文", font: "'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif" },
   text: {
+    "battle.paydayReward": "用聚宝功拾取了 {money} 元。",
+    "battle.obedience.sleep": "{name}无视指示，继续睡觉！",
+    "battle.obedience.ignored": "{name}无视了指示！",
+    "battle.obedience.change": "{name}无视指示，使出了别的招式！",
+    "battle.obedience.self_sleep": "{name}开始打盹了！",
+    "battle.obedience.self_hit": "{name}因为不服从而伤害了自己！",
+    "battle.obedience.refuse0": "{name}不肯服从！",
+    "battle.obedience.refuse1": "{name}把头转到一边！",
+    "battle.obedience.refuse2": "{name}正在偷懒磨蹭！",
+    "battle.obedience.refuse3": "{name}装作没听见！",
     "ui.options.battle_style": "对战风格",
     "ui.options.style_switch": "替换",
     "ui.options.style_set": "固定",

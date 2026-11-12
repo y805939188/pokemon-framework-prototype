@@ -274,6 +274,8 @@ SUITES=(
   experiments/step5/4/test-held-policy-entry.cjs
   experiments/step5/4/test-held-store.cjs
   experiments/step5/4/test-trainer-app-m1.cjs
+  experiments/step5/4/test-obedience-scene.cjs
+  experiments/step5/4/test-obedience-remediation.cjs
   experiments/step5/4/test-obedience-m1.cjs
   experiments/step5/4/closeout-chains/test-held-management-chain.cjs
   experiments/step5/4/closeout-chains/test-status-capture-chain.cjs

@@ -404,7 +404,19 @@ function obedienceMessage(battle: ShowdownBattle, pokemon: ShowdownPokemon, resu
   battle.add("rpg", "obedience", pokemon.side.id, pokemon.name, result, detail);
 }
 
-/** Real WP40 branch selection. Returning false is before deductPP; a nested selected move pays its own PP once. */
+/** Refresh native move-selection gates at execution time, after any faster opponent's effects. */
+function obedienceCandidates(battle: ShowdownBattle, pokemon: ShowdownPokemon, original: ShowdownPokemon): ShowdownPokemon[] {
+  for (const slot of pokemon.moveSlots) { slot.disabled = false; slot.disabledSource = ""; }
+  battle.runEvent("DisableMove", pokemon);
+  for (const slot of pokemon.moveSlots) {
+    const active = battle.dex.getActiveMove(slot.id);
+    battle.singleEvent("DisableMove", active, null, pokemon);
+    if (active.flags.cantusetwice && pokemon.lastMove?.id === slot.id) pokemon.disableMove(slot.id);
+  }
+  return pokemon.moveSlots.filter((slot: ShowdownPokemon) => slot.id !== original.id && slot.pp > 0 && !slot.disabled);
+}
+
+/** Real WP40 branch selection. A replacement continues the same native runMove, not a nested action. */
 function checkObedience(battle: ShowdownBattle, pokemon: ShowdownPokemon, target: ShowdownPokemon, move: ShowdownPokemon): boolean | undefined {
   const control = battle.rpg?.obedience;
   if (!control || pokemon.side.id !== "p1") return;
@@ -434,8 +446,8 @@ function checkObedience(battle: ShowdownBattle, pokemon: ShowdownPokemon, target
     }
     const second = obedienceRandom(battle, 256), b = Math.floor((pokemon.level + limit) * second / 256);
     if (b < limit) {
-      const candidates = pokemon.moveSlots.filter((slot: ShowdownPokemon) => slot.id !== move.id && slot.pp > 0 && !slot.disabled);
-      if (!candidates.length || pokemon.side.activeRequest?.wait) {
+      const candidates = obedienceCandidates(battle, pokemon, move);
+      if (!candidates.length) {
         obedienceTrace(battle, "no-other-move", pokemon, move, { roll: second, b });
         obedienceMessage(battle, pokemon, "ignored", "no-other-move");
         return false;
@@ -444,8 +456,14 @@ function checkObedience(battle: ShowdownBattle, pokemon: ShowdownPokemon, target
       const targetLoc = target ? pokemon.getLocOf(target) : 0;
       obedienceTrace(battle, "change", pokemon, move, { roll: second, b, newMove: selected.id, targetLoc });
       obedienceMessage(battle, pokemon, "change", selected.id);
-      battle.actions.runMove(selected.id, pokemon, targetLoc, {});
-      return false;
+      // runMove retains this ActiveMove object as both move and baseMove. Replace only that per-use
+      // copy, preserving the queued priority, so native PP/BeforeMove/AfterMove run exactly once.
+      const replacement = battle.dex.getActiveMove(selected.id);
+      replacement.priority = move.priority;
+      replacement.pranksterBoosted = move.pranksterBoosted;
+      for (const key of Object.keys(move)) delete move[key];
+      Object.assign(move, replacement, { rpgObedienceChanged: true });
+      return;
     }
     const c = pokemon.level - limit, roll = obedienceRandom(battle, 256);
     if (roll < c && !pokemon.status) {
@@ -528,6 +546,14 @@ const rpgHandlers = {
     if (this.rpg.wild && pokemon.side.id === "p2" && ["thief", "covet"].includes(move.id)) move.onAfterHit = undefined;
     // Fail an attempted exchange after the engine's ordinary PP deduction, not at BeforeMove.
     if (this.rpg.wild && pokemon.side.id === "p2" && ["trick", "switcheroo"].includes(move.id)) move.onTry = () => false;
+  },
+  // useMove still receives runMove's old lexical target. Resolve the replacement target before
+  // native scripted-target callbacks; do not mutate the shared Dex or re-enter runMove.
+  onModifyTargetPriority: 100,
+  onModifyTarget(this: ShowdownBattle, relay: { target: ShowdownPokemon }, pokemon: ShowdownPokemon, _target: ShowdownPokemon, move: ShowdownPokemon): void {
+    if (!move.rpgObedienceChanged) return;
+    delete move.rpgObedienceChanged;
+    relay.target = this.getRandomTarget(pokemon, move);
   },
   onBeforeMovePriority: 9.5,
   onBeforeMove(this: ShowdownBattle, pokemon: ShowdownPokemon, target: ShowdownPokemon, move: ShowdownPokemon): boolean | undefined {

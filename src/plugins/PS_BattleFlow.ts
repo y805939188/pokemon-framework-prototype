@@ -539,6 +539,11 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         if (reward.actual > 0) G.$gameMessage.add(tr.t("trainer.reward", { money: reward.actual }));
         if (reward.normalizationLoss > 0) G.$gameMessage.add(tr.t("trainer.rewardNormalized", { money: reward.normalizationLoss }));
       });
+      if (outcome.payDayReward && outcome.commit !== "none") PSFlow.afterCommit(outcome, "payday-reward-message", () => {
+        const tr = PSFlow.translator(), reward = outcome.payDayReward;
+        if (reward.actual > 0) G.$gameMessage.add(tr.t("battle.paydayReward", { money: reward.actual }));
+        if (reward.normalizationLoss > 0) G.$gameMessage.add(tr.t("trainer.rewardNormalized", { money: reward.normalizationLoss }));
+      });
       if(outcome.code===2&&outcome.commit!=='none'&&result?.captured?.length)PSFlow.afterCommit(outcome,'receiving-message',()=>PSFlow.notifyReceived(result.captured.map((m:any)=>m.id),outcome.battleId));
       // D3: after a committed defeat the host takes the player home (unless the author allowed losing). The money and the
       // heal were settled in the commit; this is only the trip, it can fail and be retried without settling again. The

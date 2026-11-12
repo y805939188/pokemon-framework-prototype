@@ -154,6 +154,7 @@ interface PreparedBattle {
   sourceIdentity: string | null; sourceInvalidated: boolean; expectedContext: EffectsContextV2;
   next?: GameState; nextIdentity?: string | null; defeat?: { moneyLost: number; healed: true }; attempted: boolean; indeterminate: boolean; completed: boolean;
   trainerReward?: TrainerPrizeResult & { id: string; version: number };
+  payDayReward?: TrainerPrizeResult;
   diagnostics: string[];
   entries?: DexEntryIntent[];
   required?: RequiredFacts; pairHash?: string;
@@ -235,7 +236,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       battleId, generation: prepared.generation, rawHash: prepared.rawHash,
       contentIdentity: prepared.sourceIdentity ?? "0".repeat(64),
     }, expectedContext: prepared.expectedContext, membersBefore: prepared.before.party });
-    delete prepared.next; delete prepared.nextIdentity; delete prepared.defeat;
+    delete prepared.next; delete prepared.nextIdentity; delete prepared.defeat; delete prepared.payDayReward;
     delete prepared.entries;
     prepared.diagnostics = [];
   }
@@ -1093,7 +1094,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * lost or drawn battle the defeat settlement (money loss and party heal, D3), and the battle statistics. All are
    * identified by the result's battleId + hash in appliedBattles, so a repeat (already-applied) never settles again.
    */
-  private commit(result: BattleResult, facts: BattleFacts | undefined, context: ReceptionContext, handle?: S): { status: ApplyStatus; defeat?: { moneyLost: number; healed: true }; trainerReward?: TrainerPrizeResult & { id: string; version: number }; diagnostics?: string[] } {
+  private commit(result: BattleResult, facts: BattleFacts | undefined, context: ReceptionContext, handle?: S): { status: ApplyStatus; defeat?: { moneyLost: number; healed: true }; trainerReward?: TrainerPrizeResult & { id: string; version: number }; payDayReward?: TrainerPrizeResult; diagnostics?: string[] } {
     assertBattleResultShape(result);
     this.assertBattleContext(context);
     const authority = handle ? this.ownedBattleEffects.get(handle) : undefined;
@@ -1123,7 +1124,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         if (stateIdentity(current) !== stateIdentity(prepared.next)) { prepared.indeterminate = true; throw new StateInstallFailed("state-install-indeterminate: reload the last complete save", true); }
         prepared.completed = true; prepared.indeterminate = false;
         this.noteReception(context, result.captured, current); this.reception = null;
-        return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), ...(prepared.trainerReward ? { trainerReward: prepared.trainerReward } : {}), diagnostics: [...prepared.diagnostics, "状态已完整安装，已核定原提交"] };
+        return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), ...(prepared.trainerReward ? { trainerReward: prepared.trainerReward } : {}), ...(prepared.payDayReward ? { payDayReward: prepared.payDayReward } : {}), diagnostics: [...prepared.diagnostics, "状态已完整安装，已核定原提交"] };
       }
       // Exact replay is content-independent and never fetches a newer effects seal or a second prize.
       return { status: "already-applied" };
@@ -1243,6 +1244,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         const multiplier = (prepared.required.money.amuletCoin ? 2 : 1) * (prepared.required.money.happyHour ? 2 : 1);
         const paid = applyBattleMoneyAmount(next, prepared.required.money.payDay * multiplier, content, this.limits);
         next = paid.state;
+        prepared.payDayReward = paid.reward;
         if (paid.reward.actual > 0) prepared.diagnostics.push(`聚宝功获得 ${paid.reward.actual}`);
         if (paid.reward.normalizationLoss > 0) prepared.diagnostics.push(`旧钱包超过上限，规范化下降 ${paid.reward.normalizationLoss}；不计负奖金`);
       }
@@ -1295,7 +1297,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (failure) prepared.diagnostics.push(`状态已完整安装，宿主确认失败: ${message(failure)}`);
     prepared.completed = true; prepared.indeterminate = false;
     this.noteReception(context, result.captured, next); this.reception = null;
-    return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), ...(prepared.trainerReward ? { trainerReward: prepared.trainerReward } : {}), ...(prepared.diagnostics.length ? { diagnostics: [...prepared.diagnostics] } : {}) };
+    return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), ...(prepared.trainerReward ? { trainerReward: prepared.trainerReward } : {}), ...(prepared.payDayReward ? { payDayReward: prepared.payDayReward } : {}), ...(prepared.diagnostics.length ? { diagnostics: [...prepared.diagnostics] } : {}) };
   }
 
   /**
@@ -1341,7 +1343,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       if (this.op === ownedOp) this.op = null;
       const outcome: BattleOutcome & { result?: BattleResult } = { code, battleId, commit: committed.status, kind,
         ...(committed.diagnostics?.length ? { diagnostics: [...committed.diagnostics] } : {}),
-        ...(committed.defeat ? { defeat: committed.defeat } : {}), ...(committed.trainerReward ? { trainerReward: committed.trainerReward } : {}) };
+        ...(committed.defeat ? { defeat: committed.defeat } : {}), ...(committed.trainerReward ? { trainerReward: committed.trainerReward } : {}), ...(committed.payDayReward ? { payDayReward: committed.payDayReward } : {}) };
       // Legacy diagnostics are optional and supply no authority to the V2 consumer or public options.
       if (committed.status === "applied" && this.ports.sessions.evidence) {
         try {
