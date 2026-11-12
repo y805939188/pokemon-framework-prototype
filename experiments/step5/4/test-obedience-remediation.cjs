@@ -95,8 +95,11 @@ test('O1 changed move still runs lower-priority native flinch once and pays no P
  assert(s.messages.flatMap(m=>m.events??[]).some(e=>e.type==='cant'&&e.args[1]==='flinch'));
 });
 test('O1 the cached native move remains untouched by per-use substitution',async()=>{
- const gw=await create(1,{moves:['Harden','Tackle']}),dex=gw._debugBattle().dex,before=JSON.stringify(dex.moves.get('harden')),other=JSON.stringify(dex.moves.get('tackle'));
- const s=await change({moves:['Harden','Tackle']});assert.equal(s.gw._debugBattle().dex,dex);assert.equal(JSON.stringify(dex.moves.get('harden')),before);assert.equal(JSON.stringify(dex.moves.get('tackle')),other);
+ const gw=await create(1,{moves:['Harden','Tackle']}),dex=gw._debugBattle().dex,harden=dex.moves.get('harden'),tackle=dex.moves.get('tackle'),before=JSON.stringify(harden),other=JSON.stringify(tackle);
+ const s=await change({moves:['Harden','Tackle']}),next=s.gw._debugBattle().dex;
+ assert.notEqual(next,dex,'each RPG battle owns its item-view Dex');assert.notEqual(next.items,dex.items,'item ports are battle-local');
+ assert.equal(next.moves,dex.moves,'native move port is still shared');assert.equal(next.moves.get('harden'),harden);assert.equal(next.moves.get('tackle'),tackle);
+ assert.equal(JSON.stringify(harden),before);assert.equal(JSON.stringify(tackle),other);
 });
 
 test('R1 ordinary self choice changed to attack retains the target for slower native Instruct and checkpoint replay',async()=>{
