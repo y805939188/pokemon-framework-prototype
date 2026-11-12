@@ -3,6 +3,7 @@
  * joining framework-owned fields with Showdown-owned battle data (base stats, display names). Every problem is
  * reported with the record and field it comes from; nothing is repaired silently.
  */
+import { creationFormCandidates } from "../rules/creation-form";
 import { checkItemInputs, defaultMemberBallProblem } from "../content/item-input";
 import { heldItemDescriptor, itemOf } from "../rules/item-catalog";
 import type { CompiledContent, ContentError } from "../content/schema";
@@ -83,16 +84,17 @@ export function loadCompiled(json: unknown): CompiledContent {
   return json as unknown as CompiledContent;
 }
 
-export function assembleContent(compiled: CompiledContent, dex: DexLookup, developerCapabilities: unknown = {}): { content: Content; errors: ContentError[] } {
+export function assembleContent(compiled: CompiledContent, dex: DexLookup, developerCapabilities: unknown = {}): { content: Content; errors: ContentError[]; warnings: ContentError[] } {
   const errors: ContentError[] = [];
+  const warnings: ContentError[] = [];
   const capabilities = runtimeCapabilities(developerCapabilities);
-  try { loadCompiled(compiled); } catch(error) { return {content:{species:{}},errors:[{file:"compiled",path:"$",message:(error as Error).message}]}; }
+  try { loadCompiled(compiled); } catch(error) { return {content:{species:{}},errors:[{file:"compiled",path:"$",message:(error as Error).message}],warnings}; }
   const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash, compiledSemantics: COMPILED_SCHEMA_VERSION, showdownSha: compiled.showdownSha, contentIdentity: compiled.contentIdentity }, registrationOrder: compiled.registrationOrder?.map(k=>({...k})), regionalDex: JSON.parse(JSON.stringify(compiled.regionalDex)) as import("../rules/types").RegionalDex, ...(compiled.mapMetadata ? {mapMetadata:JSON.parse(JSON.stringify(compiled.mapMetadata)) as import("../rules/types").MapMetadata} : {}), moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {}, ...(compiled.settings ? { settings: { ...compiled.settings } } : {}) };
   // A compiled document may be older than the gate, or edited by hand. Validate the whole registry and every source
   // whose data will be consumed before even querying the Dex; a placeholder's exemption covers only its own fields.
   for (const p of checkOverrides(compiled.settings ?? {})) errors.push({ file: "settings.json", path: p.path, message: p.message });
   const sources = checkSources(compiled.sources, (file, path, message) => { errors.push({ file, path, message }); });
-  if (errors.length) return { content, errors };
+  if (errors.length) return { content, errors, warnings };
   const itemInputs = checkItemInputs(compiled.items, compiled.shops, id => preUseProblem(sources, id));
   errors.push(...itemInputs.errors);
   if (compiled.species.length) {
@@ -114,12 +116,12 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     const problem = preUseProblem(sources, grant.source);
     if (problem) errors.push({ file: "assembly", path: `grants/${grant.id}.source`, message: problem });
   }
-  if (errors.length) return { content, errors };
+  if (errors.length) return { content, errors, warnings };
   for (const item of itemInputs.items) if (item.move && !dex.move(item.move)) errors.push({file:'assembly',path:`items/${item.id}.move`,message:'move is not in the pinned data'});
-  if (errors.length) return {content,errors};
+  if (errors.length) return {content,errors,warnings};
   content.items = itemInputs.catalog;
   content.shops = Object.fromEntries(itemInputs.shops.map(shop => [shop.id, shop]));
-  if (compiled.species.length && dex.sha() !== compiled.showdownSha) { errors.push({file:"assembly",path:"$.showdownSha",message:"pinned-showdown-mismatch"}); return {content,errors}; }
+  if (compiled.species.length && dex.sha() !== compiled.showdownSha) { errors.push({file:"assembly",path:"$.showdownSha",message:"pinned-showdown-mismatch"}); return {content,errors,warnings}; }
   if (compiled.species.length) content.abilities = Object.fromEntries((dex.allAbilities?.() ?? []).map(ability => [ability.id,{...ability}]));
   if (compiled.species.length || itemInputs.items.some(item=>!!item.move)) for (const move of dex.allMoves?.() ?? []) setOwn(content.moves!,move.name,{...move});
   // Empty author content needs no external battle data, including the lazy Dex's identity lookup.
@@ -224,7 +226,19 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
       setOwn(content.trainers, record.id, versions);
     }
   }
-  return { content, errors };
+  // Non-fatal author guidance. Incomplete automatic-form catalogs can still support explicit
+  // player/gift forms. Do not change the compiled identity, runtime content, RNG or missing-form gate.
+  if (!errors.length) for (const [id, name] of Object.entries(content.speciesIds ?? {})) {
+    const base = own(content.species, name);
+    if (!base || (base.form ?? 0) !== 0) continue;
+    const missing = creationFormCandidates(base.ruleSpecies ?? name).filter(form => {
+      const mapped = own(own(content.forms, id), String(form));
+      return !mapped || !own(content.species, mapped);
+    });
+    if (missing.length) warnings.push({ file: "assembly", path: `species/${id}.creationForms`,
+      message: `missing-creation-forms: automatic creation of "${id}" (${base.ruleSpecies ?? name}) may select unregistered form(s) ${missing.join(", ")}. Creation then refuses without a fallback. Register the required forms before enabling automatic creation; explicit player/gift forms can bypass rechecking, but trainer forms are applied after ordinary creation. This warning does not reject the content.` });
+  }
+  return { content, errors, warnings };
 }
 
 /** A species reference written by an author (content id "pidgey" = its base form, or a Showdown name "Pidgey") -> the battle name, or null. */

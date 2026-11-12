@@ -24,3 +24,20 @@ export function creationForm(species: string, nature: string, playerId: number, 
     default: return 0;
   }
 }
+
+/** Possible automatic creation results across supported environments, owners and natures.
+ * Author diagnostics only: never samples, filters, or replaces the actual creation draw.
+ */
+export function creationFormCandidates(species: string): readonly number[] {
+  const range = (count: number, start = 0): number[] => Array.from({ length: count }, (_, i) => start + i);
+  switch (species.replace(/[^a-z0-9]/gi, "").toUpperCase()) {
+    case "UNOWN": return range(28);
+    case "BURMY": case "WORMADAM": case "LYCANROC": return range(3);
+    case "SCATTERBUG": case "SPEWPA": case "VIVILLON": return range(18);
+    case "PUMPKABOO": case "GOURGEIST": return range(4);
+    case "MINIOR": return range(7, 7);
+    case "TOXEL": case "TOXTRICITY": case "SINISTEA": case "POLTEAGEIST": case "URSHIFU": return range(2);
+    case "ALCREMIE": return range(63);
+    default: return [0];
+  }
+}

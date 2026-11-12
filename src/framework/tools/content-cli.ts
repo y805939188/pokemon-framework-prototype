@@ -88,6 +88,7 @@ export function build(src: string, out: string): number {
     warn(r.warnings);
     const assembled = assembleContent(r.data, createDexLookup());
     if (assembled.errors.length) return fail(assembled.errors);
+    warn(assembled.warnings);
     const text = canonicalJson(r.data, 2) + "\n";
     fs.mkdirSync(path.dirname(out), { recursive: true });
     if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== text) fs.writeFileSync(out, text);
@@ -120,6 +121,7 @@ export function inventory(src: string, report: string): number {
   const dex = createDexLookup();
   const assembled = assembleContent(r.data as CompiledContent, dex);
   if (assembled.errors.length) { show(assembled.errors); return 1; }
+  warn(assembled.warnings);
   const tally: Record<Cmp, number> = { consistent: 0, differs: 0, "framework-only": 0 };
   const rows = r.data.species.map((sp) => {
     const sd = dex.levelUpMoves(sp.showdownId) ?? {};
@@ -141,6 +143,7 @@ export function inventory(src: string, report: string): number {
     note: "Field-level inventory only. Equal data is not equal behaviour. Framework-only fields have no Showdown counterpart to compare; the sample learnsets are synthetic placeholders, so 'differs' and 'framework-only' are expected there.",
     summary: { species: rows.length, learnComparisons: tally },
     species: rows,
+    creationWarnings: assembled.warnings,
   };
   fs.mkdirSync(path.dirname(report), { recursive: true });
   fs.writeFileSync(report, canonicalJson(doc, 2) + "\n");
@@ -258,7 +261,7 @@ if (cmd === "friendship-preview" || cmd === "friendship-migrate") {
     if (cmd === "friendship-preview" && confirm) throw Error("preview does not accept confirmation");
     const result = migrateFriendshipAuthorFiles(SRC,output?path.resolve(ROOT,output):undefined,confirm,Number(schema) as 1|2,
       src=>{const r=readInputs(src);if(r.errors.length)throw Error(JSON.stringify(r.errors));if(authorContext(r.inputs)===null)throw Error("invalid author version");return r.inputs;},
-      inputs=>{const r=compileContent(inputs,{}, {showdownSha:buildPin()});if(!r.ok)throw Error(JSON.stringify(r.errors));const assembled=assembleContent(r.data,createDexLookup());if(assembled.errors.length)throw Error(JSON.stringify(assembled.errors));warn(r.warnings);});
+      inputs=>{const r=compileContent(inputs,{}, {showdownSha:buildPin()});if(!r.ok)throw Error(JSON.stringify(r.errors));const assembled=assembleContent(r.data,createDexLookup());if(assembled.errors.length)throw Error(JSON.stringify(assembled.errors));warn(r.warnings);warn(assembled.warnings);});
     console.log(JSON.stringify(result,null,2)); process.exit(0);
   } catch(error) {console.error(error instanceof Error?error.message:String(error));process.exit(1);}
 }
