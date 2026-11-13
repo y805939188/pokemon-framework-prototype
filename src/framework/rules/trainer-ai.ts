@@ -65,6 +65,8 @@ export interface LegalMoveCandidate {
     readonly moveType: string;
     readonly basePower: number;
     readonly accuracy: { readonly kind: "always" } | { readonly kind: "percent"; readonly value: number };
+    /** Basic Gen8 public chart proxy: immunity is zero; sum all type exponents, then clamp to [-6, 6].
+     * Not final damage: move/ability/field Effectiveness events and other modifiers remain unmodeled. */
     readonly publicTypeMultiplier: Ratio;
     readonly publicFailure: "none" | "type-immune" | "no-public-target" | "public-condition";
     readonly omittedModifiers: readonly string[];
@@ -196,7 +198,9 @@ function bool(v: unknown): asserts v is boolean { requireValue(typeof v === 'boo
 function list(v: unknown, max = 4096): asserts v is unknown[] { requireValue(Array.isArray(v) && v.length <= max); }
 function strings(v: unknown, max = 4096, unique = true): asserts v is string[] { list(v, max); v.forEach(x => text(x)); requireValue(!unique || new Set(v).size === v.length); }
 function status(v: unknown): asserts v is PersistentStatus { requireValue(statuses.includes(v as PersistentStatus)); }
-function ratio(v: unknown): asserts v is Ratio { record(v, 'numerator denominator'); number(v.numerator, 0, 16); number(v.denominator, 1, 16); }
+const TYPE_EXPONENT_LIMIT = 6;
+const TYPE_RATIO_LIMIT = 2 ** TYPE_EXPONENT_LIMIT;
+function ratio(v: unknown, max = TYPE_RATIO_LIMIT): asserts v is Ratio { record(v, 'numerator denominator'); number(v.numerator, 0, max); number(v.denominator, 1, max); }
 function accuracy(v: unknown): void {
   requireValue(v && typeof v === 'object'); const kind = (v as Record<string, unknown>).kind;
   if (kind === 'always') record(v, 'kind');
@@ -350,7 +354,7 @@ function validateCatalog(input:unknown):TrainerAiCatalog {
   requireValue(new Set(typeNames.map(k=>k.toLowerCase())).size===typeNames.length);
   for(const t of typeNames) {
     requireValue(gen8.includes(t.toLowerCase()));const row=x.types[t]!;record(row,typeNames.join(' '));
-    for(const r of Object.values(row)) {ratio(r);requireValue([0,0.5,1,2].includes(r.numerator/r.denominator));}
+    for(const r of Object.values(row)) {ratio(r,16);requireValue([0,0.5,1,2].includes(r.numerator/r.denominator));}
   }
   requireValue(Object.keys(x.moves).length<=2000&&Object.keys(x.items).length<=4096);
   for(const [id,m] of Object.entries(x.moves)) {
@@ -365,17 +369,27 @@ function validateCatalog(input:unknown):TrainerAiCatalog {
   }
   return x;
 }
-function typeMultiplier(catalog:TrainerAiCatalog,attackType:string,defenseTypes:readonly string[]):Ratio {
-  let numerator=1,denominator=1;
+/** @internal Shared by trusted collection and policy validation/scoring; no engine or private state.
+ * Match the fixed Gen8 damage exponent bound, not its dynamic Effectiveness events.
+ * Accumulate before clamping: a late weakness must still cancel an earlier resistance.
+ * Work in exponents so even legal, non-reduced catalog ratios cannot overflow in a long list. */
+export function typeMultiplier(catalog:Pick<TrainerAiCatalog,'types'>,attackType:string,defenseTypes:readonly string[]):Ratio {
+  return chartTypeMultiplier(catalog,attackType,defenseTypes,TYPE_EXPONENT_LIMIT);
+}
+function chartTypeMultiplier(catalog:Pick<TrainerAiCatalog,'types'>,attackType:string,defenseTypes:readonly string[],limit:number):Ratio {
+  let exponent=0,immune=false;
   for(const t of defenseTypes) {
     if(t==='???')continue;
     const row=Object.hasOwn(catalog.types,attackType)?catalog.types[attackType]:undefined;
     const r=row&&Object.hasOwn(row,t)?row[t]:undefined;requireValue(r);
-    numerator=multiply(numerator,r.numerator);denominator=multiply(denominator,r.denominator);
+    const value=r.numerator/r.denominator;
+    requireValue([0,0.5,1,2].includes(value));
+    if(value===0)immune=true;
+    else exponent+=value===2?1:value===0.5?-1:0;
   }
-  // Type-chart inputs are Gen8 0/half/one/double; reduce to a stable small rational.
-  while(numerator%2===0&&denominator%2===0&&denominator>1){numerator/=2;denominator/=2;}
-  return {numerator,denominator};
+  if(immune)return {numerator:0,denominator:1};
+  exponent=Math.max(-limit,Math.min(limit,exponent));
+  return exponent<0?{numerator:1,denominator:2**-exponent}:{numerator:2**exponent,denominator:1};
 }
 function validateSnapshot(input:unknown,catalog:TrainerAiCatalog):TrainerAiSnapshot {
   const x=dataCopy(input) as TrainerAiSnapshot;
@@ -454,7 +468,9 @@ function switchFeatures(c:LegalSwitchCandidate,x:TrainerAiSnapshot,catalog:Train
     const spikes=conditions.includes('p2:spikes:3')?3:conditions.includes('p2:spikes:2')?2:conditions.includes('p2:spikes:1')?1:0;
     if(grounded&&spikes)entry=add(entry,Math.floor(m.maxhp/(spikes===1?8:spikes===2?6:4)));
     if(conditions.includes('p2:stealthrock')){
-      const rock=Object.keys(catalog.types).find(t=>id(t)==='rock');requireValue(rock);const mult=typeMultiplier(catalog,rock,m.types);
+      // Preserve the existing entry estimate for injected public catalogs. Fixed Gen8 Rock
+      // has at most four weaknesses/three resistances, so it never reaches the damage cap.
+      const rock=Object.keys(catalog.types).find(t=>id(t)==='rock');requireValue(rock);const mult=chartTypeMultiplier(catalog,rock,m.types,Infinity);
       entry=add(entry,Math.floor(multiply(m.maxhp,mult.numerator)/multiply(8,mult.denominator)));
     }
   }

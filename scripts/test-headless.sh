@@ -164,6 +164,7 @@ SUITES=(
   experiments/framework-remediation/test-field-potion-vectors.cjs
   experiments/framework-remediation/test-value-semantics-contract.cjs
   experiments/framework-remediation/test-r2-author-types-contract.cjs
+  experiments/framework-remediation/test-r2-ai-effectiveness-contract.cjs
   scripts/tests/headless-regression-binding.test.cjs
   scripts/tests/showdown-build.test.cjs
   scripts/tests/package-excludes.test.cjs

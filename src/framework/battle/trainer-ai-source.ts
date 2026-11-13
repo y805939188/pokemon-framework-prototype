@@ -3,7 +3,8 @@ import type { BattleDriver, DriverCheckpoint } from './driver';
 import type { ShowdownBattle, ShowdownPokemon } from './showdown-types';
 import type { LoadedSim } from './showdown-loader';
 import type { Content } from '../rules/types';
-import type { TrainerAiSnapshot, TrainerResource, PublicOpponent, OwnMember, LegalMoveCandidate, LegalItemCandidate, Ratio, PersistentStatus } from '../rules/trainer-ai';
+import type { TrainerAiSnapshot, TrainerResource, PublicOpponent, OwnMember, LegalMoveCandidate, LegalItemCandidate, PersistentStatus } from '../rules/trainer-ai';
+import { typeMultiplier } from '../rules/trainer-ai';
 import { assembleTrainerCatalog } from './trainer-ai-catalog';
 import type { AssembledTrainerCatalog } from './trainer-ai-catalog';
 import { semanticFingerprint as canonicalJson } from '../rules/semantic';
@@ -196,8 +197,7 @@ export function captureTrainerRequest(driver:BattleDriver,owner:object,generatio
       const self=['self','allySide','allyTeam','all','field'].includes(m.target),opponent=s.public;
       if(!self&&(!opponent||opponent.fainted))throw new Error('trainer-ai-public-target-missing');
       const target=self?{kind:'self' as const}:{kind:'opponent' as const,appearanceKey:opponent!.appearanceKey};
-      let mult:Ratio={numerator:1,denominator:1};for(const t of self?actor.getTypes():opponent!.shownTypes){if(t==='???')continue;const v=catalog.types[meta.moveType]?.[t];if(!v)throw new Error('trainer-ai-public-type-missing');mult={numerator:mult.numerator*v.numerator,denominator:mult.denominator*v.denominator};}
-      while(mult.numerator%2===0&&mult.denominator%2===0&&mult.denominator>1){mult={numerator:mult.numerator/2,denominator:mult.denominator/2};}
+      const mult=typeMultiplier(catalog,meta.moveType,self?actor.getTypes():opponent!.shownTypes);
       const candidateId=key+':m:'+i;actions.set(candidateId,{kind:'move',choice:'move '+(i+1)});
       const slot=m.id==='struggle'?i+1:actor.moveSlots.findIndex((own:any)=>own.id===m.id)+1;
       if(slot<1)throw new Error('trainer-ai-requested-move-not-owned');
