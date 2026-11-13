@@ -119,7 +119,7 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 
 ## 9. 环境准备（从零）
 
-前提：Apple Silicon Mac；Node ≥ 22（开发用 22.21.1，Showdown 要求 ≥ 22.18）；pnpm 10.20.0；git；已安装 RPG Maker MZ（Steam 版，其 NW.js 已是 0.117.0 SDK arm64——`scripts/doctor.sh` 会检查）；RPGReactor 源码检出在 `/Users/dingshinn/Desktop/RPGReactor`，必须是带类型声明的 `2dc2e10e`（0.98.8；0.98.7 标签没有类型包）——`scripts/versions.env` 已固定该提交，本地检出不是它时 `setup-reactor.sh`/`doctor.sh` 会报错（确认要用别的提交时设 `REACTOR_ALLOW_OTHER_COMMIT=1` 并同步改 versions.env 与文档）；下载模式没有为这个提交验证过。
+前提：Apple Silicon Mac；Node ≥ 22（开发用 22.21.1，Showdown 要求 ≥ 22.18）；pnpm 10.20.0；git；已安装 RPG Maker MZ（Steam 版，其 NW.js 已是 0.117.0 SDK arm64——`scripts/doctor.sh` 会检查）；RPGReactor 源码检出在 `/Users/dingshinn/Desktop/RPGReactor`，必须是带类型声明的 `2dc2e10e`（0.98.8；0.98.7 标签没有类型包）——`scripts/versions.env` 已固定该提交，本地检出不是它时 `setup-reactor.sh`/`doctor.sh` 会报错（开发偏离须显式设 `REACTOR_ALLOW_OTHER_COMMIT=1`，不作严格 pin 声明；正式升级须同步版本与来源清单）；下载模式没有为这个提交验证过。
 
 ```bash
 cd pokemon-framework-prototype
@@ -130,6 +130,8 @@ REACTOR_SOURCE=/Users/dingshinn/Desktop/RPGReactor ./scripts/bootstrap-mac.sh   
 `bootstrap` 先安装 Reactor 运行时／声明、MZ 素材与 TypeScript 依赖，再运行 `typecheck`（包含 `types:prepare`）；随后按 `pnpm --dir src build:engine` → `scripts/build-showdown.sh` → `pnpm --dir src build` → 最终检查与 `doctor` 的顺序完成准备。基础引擎构建先生成当前 `custom-formats.cjs`，Showdown 构建将它暂存到战斗运行时，完整构建中的内容编译便可使用该运行时的 Dex。冷环境没有引擎包、Showdown 暂存或编译内容时也走同一入口；上面无需追加单独的构建命令。
 
 生成物/忽略项（不提交、可重建）：`js/engine/showdown/`、`js/plugins/PS_*.js`、`RR_*.js`、`js/libs`、`js/reactor_*.js`、`index.html`、`src/node_modules`、`src/vendor/rpgreactor`、`.reactor-source`、`save/`、`build/`，以及本地复制的 MZ 素材（`.git/info/exclude`）。Showdown 源码缓存放在仓库外（`~/Library/Caches/pokemon-framework/showdown-src`，`SHOWDOWN_SRC` 可覆盖；首次 `build-showdown.sh` 时下载生成），因为 MZ 部署会复制整个项目根目录。已经 staged 的引擎不依赖缓存，只有重建才需要它。
+
+Reactor 正式准备还核对固定提交的实际消费文件集合与 SHA-256；仅 HEAD 或版本注释相同不足以通过。`REACTOR_ALLOW_OTHER_COMMIT=1` 只启用显式非严格开发模式，不代表固定来源验收；旧安装记录需执行一次 `--install` 迁移。清单、模式与测试边界见 [Reactor 来源合同](framework-remediation/reactor-source-identity.zh.md)。
 
 ## 10. 已知坑
 
