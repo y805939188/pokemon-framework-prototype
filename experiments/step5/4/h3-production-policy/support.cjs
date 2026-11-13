@@ -2,10 +2,16 @@
 // Normal production H3 fixtures: no developer capability overrides at compile, assembly or App creation.
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
-const plan = require('./runtime-plan.json');
+// Historical runtime-plan.json is retained byte-for-byte; this successor uses its own strict current binding.
+const current = require('../capture-run-current-headless-runtime.json');
 const runtime = process.env.H3_RUNTIME_ROOT;
 assert(runtime, 'explicit frozen runtime root required');
-for (const [name, expected] of Object.entries(plan.runtime)) assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(runtime,name))).digest('hex'),expected,name);
+assert.equal(current.schema,'capture-run-current-headless-v1');assert.equal(Object.keys(current.runtime).length,9);
+assert.equal(require('node:child_process').execFileSync('git',['rev-parse','HEAD:src'],{cwd:runtime,encoding:'utf8'}).trim(),current.productSrcTree,'current product source tree');
+const currentCommit=require('node:child_process').execFileSync('git',['rev-parse','HEAD'],{cwd:runtime,encoding:'utf8'}).trim();
+for (const [name, expected] of Object.entries(current.runtime)) assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(runtime,name))).digest('hex'),expected,name);
+assert.equal(fs.readFileSync(path.join(runtime,'js/engine/showdown/SOURCE_SHA'),'utf8').trim(),current.showdownSHA);
+assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(runtime,'js/engine/showdown/dist/config/custom-formats.js'))).digest('hex'),current.runtime['js/engine/build/custom-formats.cjs'],'current staged extension');
 const E = require(path.join(runtime,'js/engine/build/production.cjs'));
 const T = require(path.join(runtime,'js/engine/build/testing.cjs'));
 const clone = x => JSON.parse(JSON.stringify(x));
@@ -89,4 +95,4 @@ async function acquireReady(w) {
  assert.deepEqual(next.stats,expectedStats,'whole stats oracle for source '+w.source);
  assert.deepEqual(next.dex,expectedDex,'whole dex oracle for source '+w.source);
 }
-module.exports={fixture,acquire,acquireReady,E,T,clone,runtime,capabilities};
+module.exports={fixture,acquire,acquireReady,E,T,clone,runtime,capabilities,currentCommit};

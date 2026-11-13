@@ -1,7 +1,9 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
-const {fixture,acquireReady,E,clone,runtime,capabilities}=require('./support.cjs'),plan=require('./host-plan.json');
-for(const [name,expected]of Object.entries(plan.files))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(runtime,name))).digest('hex'),expected,name);
+const {fixture,acquireReady,E,clone,runtime,capabilities,currentCommit}=require('./support.cjs'),plan=require('./host-plan.json');
+const current=require('../capture-run-current-headless-runtime.json');assert.equal(Object.keys(current.pluginBundles).length,4);
+const currentFiles={...plan.files,...current.pluginBundles};
+for(const [name,expected]of Object.entries(currentFiles))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(runtime,name))).digest('hex'),expected,name);
 const {createVictoryDriverHost}=require(path.join(runtime,'experiments/step5/4/victory-music-driver-host.cjs'));
 const {assertTakeConserved}=require('./take-conservation-oracle.cjs');
 const basePlan=require(path.join(runtime,'experiments/step5/4/victory-music-native-plan.json'));
@@ -9,7 +11,7 @@ const plugins=Object.fromEntries(['PS_BattleFlow','PS_SaveState','PS_Evolution']
 const entryText=fs.readFileSync(path.join(runtime,'js/plugins/PS_BattleFlowTest.js'),'utf8');
 async function host(source){
  const seed=fixture(source),work=fs.mkdtempSync(path.join(os.tmpdir(),'pf-h3-compiled-host-'));
- const PLAN={...basePlan,productCommit:plan.runtimeBase,productPlugins:Object.fromEntries(Object.keys(plugins).map(n=>[n,plan.files['js/plugins/'+n+'.js']]))};
+ const PLAN={...basePlan,productCommit:currentCommit,productPlugins:Object.fromEntries(Object.keys(plugins).map(n=>[n,currentFiles['js/plugins/'+n+'.js']]))};
  const h=createVictoryDriverHost({ROOT:runtime,work,plugins,entryText,driverText:'H3_SYNTHETIC_CONTROL_NOT_NATIVE',PLAN,options:{productionTranslator:true}});
  const flow=h.w.flow,G=h.G;flow.stateReplaced();flow._app=null;flow._content=seed.content;flow._dex=seed.dex;flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=true;flow.receiveOptions={mode:1,naming:1};flow.developerCapabilities={};
  let current=clone(seed.state.read());const replaced=[];

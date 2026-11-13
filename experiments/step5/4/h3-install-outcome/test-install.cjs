@@ -1,7 +1,8 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const root=process.env.H3_RUNTIME_ROOT;assert(root,'explicit frozen runtime required');
-for(const [p,h]of Object.entries(require('./plan.json')))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root,p))).digest('hex'),h,p);
+const current=require('../capture-run-current-headless-runtime.json');assert.match(current.helperFiles['experiments/step5/4/h3-production-policy/support.cjs'],/^[a-f0-9]{64}$/);
+for(const [p,h]of Object.entries({...require('./plan.json'),...current.helperFiles}))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root,p))).digest('hex'),h,p);
 const {fixture,acquireReady,E,T,clone,capabilities}=require(path.join(root,'experiments/step5/4/h3-production-policy/support.cjs'));
 for(const mode of ['complete-then-throw','party-only-then-throw'])test('H3 consumed Lum required settlement handles '+mode,async()=>{
  const seed=fixture('give');await acquireReady(seed);let current=clone(seed.state.read()),writes=0,candidate;

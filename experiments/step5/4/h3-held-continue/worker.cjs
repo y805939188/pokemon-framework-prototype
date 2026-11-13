@@ -2,12 +2,14 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const runtime=process.env.H3_RUNTIME_ROOT,plan=require('./plan.json'),sha=v=>crypto.createHash('sha256').update(v).digest('hex');
 assert(runtime,'explicit frozen product runtime required');
-for(const [p,h]of Object.entries(plan.files))assert.equal(sha(fs.readFileSync(path.join(runtime,p))),h,p);
+const current=require('../capture-run-current-headless-runtime.json');assert.match(current.helperFiles['experiments/step5/4/h3-production-policy/support.cjs'],/^[a-f0-9]{64}$/);
+const currentFiles={...plan.files,...current.helperFiles};
+for(const [p,h]of Object.entries(currentFiles))assert.equal(sha(fs.readFileSync(path.join(runtime,p))),h,p);
 const {fixture,acquireReady,E,T,clone,capabilities}=require(path.join(runtime,'experiments/step5/4/h3-production-policy/support.cjs'));
 const {createContinueHost}=require(path.join(runtime,'experiments/step5/4/continue-host.cjs'));
 async function run(stage,folder){
  folder=fs.realpathSync(folder);assert(path.basename(folder).startsWith('pf-h3-held-continue-'));assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'OWNED.json'))).scope,'held-continue');
- const seed=fixture('give');const host=createContinueHost(runtime,runtime,folder,seed.content,plan.files),g=host.context;let loaded=null,route=null;
+ const seed=fixture('give');const host=createContinueHost(runtime,runtime,folder,seed.content,currentFiles),g=host.context;let loaded=null,route=null;
  const slot=path.join(folder,'file1.rmmzsave');let slotBefore=null;
  if(stage==='producer'){
   await acquireReady(seed);assert.equal(seed.state.read().party[0].item,'lumberry');g.$gameSystem._psGame=clone(seed.state.read());

@@ -15,7 +15,12 @@ function assertLossSave(game,c,result){const m=game.party[0];assert.equal(m.hp,P
 async function finish(w,s,req,before,disk){unchanged(w,before,disk);const result=clone(s.result()),count=w.installs.length,outcome=w.app.finishBattle(s,req);assert.equal(outcome.commit,'applied',JSON.stringify(outcome));assert.equal(w.installs.length,count+1);const saved=clone(w.state.read()),bytes=rawHash(w.file);
  w.app.finishBattle(s,req);assert.equal(w.installs.length,count+1);assert.equal(rawHash(w.file),bytes,'duplicate finish does not write/deduct again');assert.deepEqual(w.store.load(),saved);return{result,resultHash:E.state.resultHash(result),outcome,saved};}
 async function run(stage,id,folder){supportedNode();folder=fs.realpathSync(folder);assert.equal(path.dirname(folder),fs.realpathSync(os.tmpdir()));assert(path.basename(folder).startsWith('pf-e-defeat-disk-'));const mark=JSON.parse(fs.readFileSync(path.join(folder,'OWNED.json')));assert.equal(mark.version,PLAN.version);assert.equal(mark.id,id);
- for(const[p,h]of Object.entries(PLAN.runtime))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(ROOT,p))).digest('hex'),h);
+ // Current successor regression binding; the historical PLAN.runtime remains unchanged.
+ const binding=require('./capture-run-current-headless-runtime.json');assert.equal(binding.schema,'capture-run-current-headless-v1');assert.equal(binding.showdownSHA,PLAN.showdownSHA);assert.equal(Object.keys(binding.runtime).length,9);
+ assert.equal(require('node:child_process').execFileSync('git',['rev-parse','HEAD:src'],{cwd:ROOT,encoding:'utf8'}).trim(),binding.productSrcTree,'current product source tree');
+ for(const[p,h]of Object.entries(binding.runtime))assert.equal(rawHash(path.join(ROOT,p)),h,'current headless runtime '+p);
+ assert.equal(fs.readFileSync(path.join(ROOT,'js/engine/showdown/SOURCE_SHA'),'utf8').trim(),binding.showdownSHA);
+ assert.equal(rawHash(path.join(ROOT,'js/engine/showdown/dist/config/custom-formats.js')),binding.runtime['js/engine/build/custom-formats.cjs'],'current staged extension');
  const c=PLAN.cases.find(c=>c.id===id);assert(c);const ct=content(),file=path.join(folder,'game.json');let setupSaves=0;if(stage==='producer'){assert(!fs.existsSync(file));storeFor(file,ct).save(initial(ct));setupSaves=1;}else assert(fs.existsSync(file),'consumer may only load the existing producer document');
  const w=application(file,ct),loaded=clone(w.state.read()),entrySHA=rawHash(file),before=clone(loaded);let s=null,req=null,record=null,trace=[];
  try{

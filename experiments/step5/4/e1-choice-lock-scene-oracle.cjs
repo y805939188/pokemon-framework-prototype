@@ -12,7 +12,8 @@ function verify(c,o){
   assert.equal(o.actualMoveCalls,3,'one setup, one real refusal, one legal resubmission');
  }else{
   const req=first.after.request.active[0].moves;assert.equal(req.length,1);assert.equal(req[0].id,c.lockedId);assert.equal(req[0].pp,undefined);
-  assert.equal(o.lockedMenu.names.length,1);assert.equal(o.lockedMenu.names[0],c.lockedName);assert.equal(o.lockedMenu.ready,true);assert.equal(o.lockedMenu.automaticEncore.allowed,false);
+  const entry=o.lockedEntry;assert.deepEqual(entry.automatic,{allowed:true,moveSlot:1});assert.equal(entry.calls,1);assert.equal(entry.phase,'messages');assert.equal(entry.ready,false);assert.equal(entry.automaticEncore.allowed,false);
+  assert.equal(entry.request.active[0].moves.length,1);assert.equal(entry.request.active[0].moves[0].move,c.lockedName);assert.equal(entry.request.active[0].moves[0].id,c.lockedId);assert.equal(entry.request.active[0].moves[0].pp,undefined);
   const locked=o.rows[1];assert.equal(player(locked.after).pp[move],player(first.after).pp[move],'locked continuation does not spend a second permanent PP');
   const b=locked.before.p2[0],a=locked.after.p2[0];
   if(c.kind==='dig'){assert.equal(first.after.p2[0].hp,first.before.p2[0].hp);assert(a.hp<b.hp&&a.hp>0);}

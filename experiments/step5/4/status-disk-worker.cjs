@@ -49,7 +49,11 @@ function recorded(b){return{request:b.req,initial:b.initial,steps:b.steps,result
 async function run(stage,c,folder){
  folder=fs.realpathSync(folder);const tmp=fs.realpathSync(os.tmpdir());assert(path.dirname(folder)===tmp&&path.basename(folder).startsWith('pf-e-status-disk-'),'owned temporary test directory only');
  const marker=JSON.parse(fs.readFileSync(path.join(folder,'OWNED-STATUS-DISK-TEST.json')));assert.equal(marker.version,PLAN.version);assert.equal(marker.caseId,c.id);
- for(const[n,h]of Object.entries(PLAN.runtime))assert.equal(fileHash(path.join(ROOT,n)),h,'accepted runtime '+n);
+ // Current successor regression binding; the historical PLAN.runtime remains unchanged.
+ const binding=require('./capture-run-current-headless-runtime.json');assert.equal(binding.schema,'capture-run-current-headless-v1');assert.equal(binding.showdownSHA,PLAN.showdownSHA);assert.equal(Object.keys(binding.runtime).length,9);
+ assert.equal(require('node:child_process').execFileSync('git',['rev-parse','HEAD:src'],{cwd:ROOT,encoding:'utf8'}).trim(),binding.productSrcTree,'current product source tree');
+ for(const[n,h]of Object.entries(binding.runtime))assert.equal(fileHash(path.join(ROOT,n)),h,'current headless runtime '+n);
+ assert.equal(fileHash(path.join(ROOT,'js/engine/showdown/dist/config/custom-formats.js')),binding.runtime['js/engine/build/custom-formats.cjs'],'current staged extension');
  assert.equal(fs.readFileSync(path.join(ROOT,'js/engine/showdown/SOURCE_SHA'),'utf8').trim(),PLAN.showdownSHA);
  const file=path.join(folder,'game.json'),ct=content();let setupSaves=0;
  if(stage==='produce'){assert(!fs.existsSync(file),'producer cannot replace a prior save');storeFor(file,ct).save(newState(ct,c));setupSaves=1;}else assert(fs.existsSync(file),'consumer requires a real prior disk document');
