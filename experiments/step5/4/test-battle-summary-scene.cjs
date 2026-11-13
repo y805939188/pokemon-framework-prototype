@@ -49,9 +49,8 @@ async function open({ nicknames = null, lang = 'en', members = 2, hurt = true, b
   if (nicknames) state.party.forEach((m, i) => { m.nickname = nicknames[i] ?? ''; });
   state.inventory = E.inventory.inventoryFromBag(bag, E.itemCatalog.catalogOf(content)); G.$gameSystem._psGame = state;
   G.Input.keyMapper ??= {}; G.Input.isPressed ??= () => false; G.TouchInput.isCancelled ??= () => false;
-  const listeners = new Map(), globals = new Map();
-  G.document = { addEventListener(k, f) { if (!listeners.has(k)) listeners.set(k, new Set()); listeners.get(k).add(f); }, removeEventListener(k, f) { listeners.get(k)?.delete(f); } };
-  G.addEventListener = (k, f) => { if (!globals.has(k)) globals.set(k, new Set()); globals.get(k).add(f); };
+  // Evolution already installed the shared sampler on these document/window targets.
+  const listeners = h.w.documentListeners, globals = h.w.windowListeners;
   vm.runInContext(plugins.PS_Management, G, { filename: 'actual-PS_Management.js' });
   const before = JSON.stringify(flow.game()); await h.p.toMapId(5, 8, 9);
   const batches = [], begin = flow.begin.bind(flow); flow.begin = async (...args) => { const session = await begin(...args), take = session.take.bind(session); session.take = () => { const value = take(); batches.push({ value, wire: JSON.stringify(value) }); return value; }; return session; };
