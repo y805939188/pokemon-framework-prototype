@@ -1,12 +1,13 @@
+import type { ApplicationHost, LearningApplication } from './application-host';
 /** 5.3 G1. Thin learning/reminder/forgetting screens; all writes go through the existing application transaction. */
 import { drawLearningPage } from './progression/learning-draw';
 import { LearningScreen } from './progression/learning-screen';
 import { InputLatch } from './management/model';
 import type { LearningIntent, LearningParent, LearningOutcome } from '../framework/app/index';
 (() => {
- const G:any=globalThis,W:any=window,NAME='PS_Progression',flow=()=>W.PSFlow,app=()=>flow().app();
+ const G:any=globalThis,W:any=window,NAME='PS_Progression',flow=()=>W.PSFlow,app=():LearningApplication=>(flow() as ApplicationHost).app();
  const tr=(key:string,params?:Record<string,string|number>)=>flow().translator().t('progression.'+key,params);
- type Handle={application:any;generation:number;done:boolean;result?:LearningOutcome};
+ type Handle={application:LearningApplication;generation:number;done:boolean;result?:LearningOutcome};
  type Request={scene?:any;constructing?:boolean;intent?:LearningIntent;resume?:boolean;handle:Handle;done?:(o:LearningOutcome)=>void};
  let queued:Request|null=null,reserved:Request|null=null,active:Controller|null=null;
  const waits=new WeakMap<object,Handle>(),notices:{request:Request;result:LearningOutcome}[]=[];
@@ -29,7 +30,7 @@ import type { LearningIntent, LearningParent, LearningOutcome } from '../framewo
   valid(){return !this.closed&&this.request.handle.application===flow()._app&&this.request.handle.generation===this.request.handle.application.stateGeneration;}
   start(parent?:LearningParent){
    if(!this.valid()||this.request.handle.done){this.close({status:'refused',reason:'stale-learning-screen'});return;}
-   const r=this.request.resume?(this.request.handle.application.pendingLearning?{status:'pending',view:this.request.handle.application.pendingLearning}:{status:'refused',reason:'no-learning-operation'}):this.request.handle.application.beginLearning(this.request.intent,parent);
+   const r:LearningOutcome=this.request.resume?(this.request.handle.application.pendingLearning?{status:'pending',view:this.request.handle.application.pendingLearning}:{status:'refused',reason:'no-learning-operation'}):this.request.intent?this.request.handle.application.beginLearning(this.request.intent,parent):{status:'refused' as const,reason:'invalid-learning-intent'};
    this.token=r.status==='pending'?r.view.token:'';
    this.model=new LearningScreen({resolve:(token,revision,decision)=>{
     if(!this.valid())return {status:'refused',reason:'stale-learning-screen'};

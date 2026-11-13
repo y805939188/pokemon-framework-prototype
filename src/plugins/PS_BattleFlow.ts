@@ -1,3 +1,8 @@
+import type { ApplicationCompositionHost, HostApplication, ProductionRuntime } from './application-host';
+import type { BattleOutcome, GameApplicationPorts, GameApplicationOptions } from '../framework/app';
+import type { BattleResult, GameState } from '../framework/rules/state';
+import type { Content, DexLookup } from '../framework/rules/types';
+import type { Limits } from '../framework/rules/limits';
 import { messageLiteral } from './message-literal';
 import { captureInitialField, withInitialField, initialFieldMZ, WEATHER, TERRAIN } from '../framework/rules/initial-field';
 /**
@@ -53,12 +58,13 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   const nodeRequire = (globalThis as any).require as any; // NW.js Node require (has .resolve)
 
   // ------------------------------------------------------- production engine access (loaded lazily, runtime-relative)
-  let ENGINE: any = null;
-  function engine(): any {
+  type EngineAccess = { B: ProductionRuntime & Record<string, any>; D: any; root: string };
+  let ENGINE: EngineAccess | null = null;
+  function engine(): EngineAccess {
     if (!ENGINE) {
       const tLoad = performance.now();
       if (!nodeRequire) throw new Error("Node require() is not available in this runtime");
-      const B = nodeRequire("./js/engine/build/production.cjs");
+      const B = nodeRequire("./js/engine/build/production.cjs") as ProductionRuntime & Record<string, any>;
       ENGINE = {
         B,
         D: B.describe,
@@ -78,49 +84,8 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     return TESTING;
   }
 
-  /** What this plugin uses of the game application (framework/app); the full typed contract is app/game-application.ts. */
-  interface BattleOutcomeView { code: number; battleId: string | null; commit: string; kind?: string; aborted?: true; error?: string; projection?: string; projectionError?: string; pending?: boolean }
-  interface GameAppView {
-    startBattle(request: unknown): Promise<any>;
-    startTrainerBattle(request: unknown): Promise<any>;
-    trainerRecord(id: string, version: number): any;
-    finishBattle(session: unknown, request: unknown): BattleOutcomeView & { result?: unknown };
-    abortBattle(request: unknown, error: unknown): BattleOutcomeView;
-    commitResult(result: unknown, options?: unknown): string;
-    readonly saveBlocked: boolean;
-    readonly stateGeneration: number;
-    readonly encounterBlocked: boolean;
-    readonly pendingPokedex: any;
-    pokedexSnapshot(text?: any, currentRegion?: number | null): any;
-    updatePokedex(command: any): any;
-    resolvePokedex(token: string, revision: number, decision: any): any;
-    resolveReceiving(token: string, decisions?: unknown, signal?: unknown): any;
-    terminateAcquisition(token: string): any;
-    readonly pendingEvolution: any;
-    readonly pendingLearning: any;
-    readonly pendingTriggeredEvolution: any;
-    readonly pendingTrade: any;
-    beginTrade(requestId: string, intent: any): any;
-    resolveTrade(token: string, revision: number, decision: any): any;
-    beginEvolutionItem(parent: string, requestId: string, intent: any): any;
-    beginEventEvolution(intent?: any): any;
-    resolveTriggeredEvolution(token: string, revision: number, decision: any): any;
-    beginLearning(intent: any, parent?: any): any;
-    resolveLearning(token: string, revision: number, decision: any): any;
-    resolveEvolution(token: string, revision: number, decision: unknown): any;
-    startNewGame(): { status: string };
-    claimGrant(grantId: string): { status: string; grantId: string; reason?: string; error?: string; placed?: { id: string; species: string; form: number; level: number; to: string }[]; items?: Record<string, number>; money?: number };
-    healParty(): { status: string; reason?: string; error?: string };
-    prepareEncounter(table: unknown, region: number): { ok: boolean; reason?: string; error?: string; foe?: { species: string; level: number } };
-    describeParty(): { members: { id: string; species: string; form: number; nameKey?: string; level: number; hp: number; maxhp: number; status: string; moves: { id: string; pp: number; maxpp: number }[] }[]; boxes: number; bag: Record<string, number>; money: number };
-    recordSteps(n?: number): { status: string; steps?: number; reason?: string; error?: string };
-    now(): number;
-    stateReplacedByHost(): void;
-    assertHostStateReplacementAllowed(): void;
-    previewFriendshipMigration(port: any, paths?: readonly string[]): Promise<any>;
-    confirmFriendshipMigration(handle: any): Promise<any>;
-    cancelFriendshipMigration(handle: any): any;
-  }
+  type GameAppView = HostApplication;
+  type BattleOutcomeView = BattleOutcome & { result?: BattleResult; hostErrors?: { step: string; error: string }[] };
 
   // ---------------------------------------------------------------- shared flow state / API
   let openingBattle: object | null = null;
@@ -139,7 +104,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     const defaultBgm = override === null || override === undefined ? undefined : musicTrack(override);
     return Object.freeze({ config, ...(defaultBgm?.name ? { defaultBgm } : {}) });
   }
-  const PSFlow: any = (W.PSFlow = {
+  const PSFlow: ApplicationCompositionHost & Record<string, any> = {
     _nextBattleMusic: null as any,
     /** Explicit author presets; setting the following battle during this one is not consumed by its cleanup. */
     setNextBattleMusic(presets: unknown): void { PSFlow._nextBattleMusic = Object.freeze({ presets: battleMusicConfig({ presets }).presets }); },
@@ -204,7 +169,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       interpreter.setWaitMode("psPokedex"); interpreter._psPokedexToken = pending.token; return true;
     },
     resolvePokedex(token: string, revision: number, decision: any): any {
-      const op = PSFlow._op, returned = PSFlow.app().resolvePokedex(token, revision, decision), continuation = returned.continuation;
+      const op = PSFlow._op, returned = PSFlow.app().resolvePokedex(token, revision, decision), continuation = 'continuation' in returned ? returned.continuation : undefined;
       if (continuation && "code" in continuation && op && op === PSFlow._op) {
         const { result, ...outcome } = continuation; PSFlow.completeBattleOutcome(outcome, result, op);
       }
@@ -219,7 +184,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     lastResult: null as any,
     lastClaim: null as any,
     lastHeal: null as any,
-    seed: undefined as any, // tests pin the engine seed
+    seed: undefined, // tests pin the engine seed
     fast: false, // tests: no message pacing
     debug: {} as any, // tests: failure injection
     perf: { engineLoadMs: null as any, battles: [] as any[], cur: null as any }, // measurement hooks (cheap; read by the test driver)
@@ -228,7 +193,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
      * the pinned Showdown data; `fixture` is the synthetic step 2 test content. A missing or unusable compiled file is
      * an error, never a silent fallback to the fixture.
      */
-    content(): any {
+    content(): Content {
       if (!PSFlow._content) {
         const params = G.PluginManager.parameters(NAME) as Record<string, string>;
         const E = engine();
@@ -243,10 +208,10 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
           PSFlow._content = content;
         }
       }
-      return PSFlow._content;
+      return PSFlow._content!;
     },
-    _content: null as any,
-    _dex: null as any,
+    _content: null as Content | null,
+    _dex: null as DexLookup | null,
     /** Language of the battle screen: set by tests (setLanguage) or by the plugin parameter; unknown languages use English. */
     lang: null as string | null,
     _tr: null as any,
@@ -323,8 +288,8 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     lastSteps: null as any,
     _stepWarned: null as any,
     /** Redacted, bounded diagnostics of every session (flow/log.ts); the flow test attaches its tail to the report. */
-    logger: null as any,
-    game(): any {
+    logger: null,
+    game(): GameState {
       const err = G.$gameSystem._psSaveError;
       if (err) throw new Error(`the save state is not usable (${err.code}): ${err.message}`); // never battle on, or overwrite, a state we could not read
       // Never invent a party: a new game installs the formal empty state (setupNewGame below) and a save without one gets
@@ -367,16 +332,16 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         const { B } = engine();
         if (!PSFlow.logger) PSFlow.logger = B.log.createRingLogger(500);
         if (!PSFlow._dex) PSFlow._dex = B.dex.createDexLookup();
-        PSFlow._app = new B.app.GameApplication({
-          state: { read: () => PSFlow.game(), replace: (next: unknown) => { G.$gameSystem._psGame = next; } },
-          content: () => ({ content: PSFlow.content(), dex: PSFlow._dex }),
+        const ports: GameApplicationPorts<import('../framework/app').BattleHandle> = {
+          state: { read: () => PSFlow.game(), replace: next => { G.$gameSystem._psGame = next; } },
+          content: () => ({ content: PSFlow.content(), dex: PSFlow._dex ?? undefined }),
           sessions: ((G.PluginManager.parameters(NAME).contentSource || "sample") === "fixture"
-            ? B.composition.createLegacyNoHeldBattleSessionFactory : B.composition.createBattleSessionFactory)({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger.sink, replacementOffers: (G.PluginManager.parameters(NAME).contentSource || "sample") !== "fixture" }),
+            ? B.composition.createLegacyNoHeldBattleSessionFactory : B.composition.createBattleSessionFactory)({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger!.sink, replacementOffers: (G.PluginManager.parameters(NAME).contentSource || "sample") !== "fixture" }),
           projection: { project: (outcome: { code: number }) => PSFlow.projectOutcome(outcome) },
           random: (n: number) => PSFlow.random(n),
           clock: () => PSFlow.now(),
           itemWorld:()=>({mapId:G.$gameMap?.mapId?.()}),
-          evolutionWorld: (member: any) => ({
+          evolutionWorld: member => ({
             hour: () => ({ status: "value", value: new Date(PSFlow.now()).getHours() }),
             mapId: () => G.$dataMap && Number.isSafeInteger(G.$gameMap?.mapId?.()) && G.$gameMap.mapId() > 0
               ? { status: "value", value: G.$gameMap.mapId() } : { status: "invalid", reason: "current-map-unavailable" },
@@ -396,9 +361,11 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
           }),
           variables:{count:()=>Math.max(0,(G.$dataSystem?.variables?.length??1)-1),write:(id:number,value:string)=>G.$gameVariables.setValue(id,value)},
           creationContext: () => ({ map: G.$gameMap?.mapId?.() ?? 0, ...(PSFlow.creationEnvironment?.() ?? {}) }),
-        }, { startMoney: PSFlow.param("startMoney", 3000), noMoneyLoss: PSFlow.flagParam("noMoneyLoss", false), limits: PSFlow.limits(), capabilities: PSFlow.developerCapabilities, receivingProfile: PSFlow.receiveOptions ?? { mode: 0, naming: 0 }, playerLocale: G.navigator?.language ?? "en", playerName: G.$gameParty?.leader?.()?.name?.() || "player" });
+        };
+        const options: GameApplicationOptions = { startMoney: PSFlow.param("startMoney", 3000), noMoneyLoss: PSFlow.flagParam("noMoneyLoss", false), limits: PSFlow.limits(), capabilities: PSFlow.developerCapabilities, receivingProfile: PSFlow.receiveOptions ?? { mode: 0, naming: 0 }, playerLocale: G.navigator?.language ?? "en", playerName: G.$gameParty?.leader?.()?.name?.() || "player" };
+        PSFlow._app = new B.app.GameApplication(ports, options);
       }
-      return PSFlow._app as GameAppView;
+      return PSFlow._app;
     },
     _app: null as GameAppView | null,
     /**
@@ -406,7 +373,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
      * when it has none); tests may replace them with `testLimits` (then reset `_app`).
      */
     testLimits: null as any,
-    limits(): any {
+    limits(): Limits {
       if (PSFlow.testLimits) return PSFlow.testLimits;
       const { config } = engine().B;
       let settings: unknown = {};
@@ -457,7 +424,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       if (v) G.$gameVariables.setValue(v, outcome.code);
     },
     /** Apply a BattleResult to the persistent state. Safe to call twice. */
-    commit(result: any, options: unknown = {}): string { return PSFlow.app().commitResult(result, options); },
+    commit(result: Parameters<HostApplication['commitResult']>[0], options: Parameters<HostApplication['commitResult']>[1] = {}): string { return PSFlow.app().commitResult(result, options); },
     _prepareBattlePresentation(op: any, app: any, assertCurrent: () => void): void {
       const generation = app.stateGeneration;
       if (op.musicPlan?.owner) {
@@ -573,11 +540,11 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       }
       if(placements.length)PSFlow.lastReceivingNotice={key,placements,messages};
     },
-    resolveReceiving(token: string, decisions: unknown = {}, signal?: string): any {
+    resolveReceiving(token: string, decisions: Parameters<HostApplication['resolveReceiving']>[1] = {}, signal?: Parameters<HostApplication['resolveReceiving']>[2]): any {
       const op = PSFlow._op;
       const returned = PSFlow.app().resolveReceiving(token, decisions, signal);
       if (returned && "code" in returned && op === PSFlow._op) {
-        const { result, ...outcome } = returned; return PSFlow.completeBattleOutcome(outcome, result, op);
+        const { result, ...outcome } = returned as BattleOutcomeView; return PSFlow.completeBattleOutcome(outcome, result, op);
       }
       return returned;
     },
@@ -585,7 +552,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     resolveEvolution(token: string, revision: number, decision: any): any {
       const op = PSFlow._op, previous = PSFlow.lastOutcome, returned = PSFlow.app().resolveEvolution(token, revision, decision);
       if (returned && "code" in returned && op === PSFlow._op) {
-        const { result, ...outcome } = returned;
+        const { result, ...outcome } = returned as BattleOutcomeView;
         if (previous?.battleId === outcome.battleId && previous.hostErrors?.length) outcome.hostErrors = [...previous.hostErrors, ...(outcome.hostErrors ?? [])];
         return PSFlow.completeBattleOutcome(outcome, result, op);
       }
@@ -720,7 +687,8 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       try { return PSFlow.app().prepareEncounter(table, region); }
       catch (e) { return { ok: false, reason: "unavailable", error: String(e instanceof Error ? e.message : e) }; }
     },
-  });
+  };
+  W.PSFlow = PSFlow;
 
   installBattleStyleSettings(G, () => PSFlow.translator());
 
@@ -1733,7 +1701,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     const current = () => !!op && !!app && PSFlow.running && this._psOp === op && op.session === session
       && PSFlow._op === op && PSFlow._app === app && app.stateGeneration === generation
       && this._session === session && G.SceneManager._scene === this && sceneController(this).isCurrent();
-    if (!current()) return unavailable('request-observer-owner-retired');
+    if (!app || generation === undefined || !current()) return unavailable('request-observer-owner-retired');
     const input = this.inputState();
     // Project host/menu callbacks first, then read the Session pair once. A synchronous restore
     // during maxCols/canChoose must not let a previously read epoch escape as current.
@@ -2067,7 +2035,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
           if (!state) throw Error('battle-summary-state-unavailable');
           const { stats, heldItemKnown, id: _id, ...dynamic } = state;
           const own = { ...app.describeIndividual(member.id).member, ...dynamic };
-          const view = B.app.individualView(own, game, session.content, PSFlow._dex);
+          const view = B.app.individualView(own, game, session.content, PSFlow._dex ?? undefined);
           view.stats = stats; view.heldItemKnown = heldItemKnown;
           if (!heldItemKnown) view.diagnostics.push('battle-held-unavailable');
           return view;
