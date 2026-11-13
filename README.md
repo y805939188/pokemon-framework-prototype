@@ -6,9 +6,11 @@
 
 ## 当前阶段（2026-11-13）
 
-5.4 已按批准的单打与默认呈现范围完成技术收口。当前后继产品为 [`174568dc`](https://github.com/y805939188/pokemon-framework-prototype/commit/174568dc2a0d20b5e5e2b0878c35c63bca742e27)，src `7c52b290`（源码来源 `5a41caf`）；[投球／逃跑整改](docs/step5/5.4-capture-run-followup.md)的 A1／B1／C1 已通过独立限域复审。[精确 CI #313](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43366638211) 对该产品的两 job 成功，280 套／5082 项通过，失败／取消／跳过均 0，冻结参考回放 EXCLUDED／NOT RUN。
+5.4 已按批准的单打与默认呈现范围完成技术收口。主线整合以普通合并 `580c8637` 承接已独审的最终验收文档 [`4ac83373`](https://github.com/y805939188/pokemon-framework-prototype/commit/4ac83373fac77a2a9eec24e85191a6415ac5dd4a)，产品仍为 [`174568dc`](https://github.com/y805939188/pokemon-framework-prototype/commit/174568dc2a0d20b5e5e2b0878c35c63bca742e27)，src `7c52b290`（源码来源 `5a41caf`）；产品代码和静态运行包身份不变。[投球／逃跑整改](docs/step5/5.4-capture-run-followup.md)的 A1／B1／C1 仅按正常可达范围限域通过，不扩成全部机制验收。
 
-此前 `2ecace8d`／`714b674` 的阶段收口与 CI312 保留为历史，不改写旧证据。战前仍先统一用默认过渡；完整特殊注册／优先级和按场景、对手、事件自由编排未实现，后续阶段和日期未指定。范围及保留边界见[5.4 收口记录](docs/step5/5.4-closure.md)和[当前验收索引](docs/step5/5.4-current-acceptance.md)。本次仅同步后继技术事实，文档自身的精确 CI 以发布后回执为准；不代表全部参考机制、完整性能或包分发完成，**未合并 main**。
+开发分支的[精确 CI #313](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43366638211) 对产品 `174568dc`、[精确 CI #314](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43369227918) 对最终验收文档 `4ac83373` 各自两 job 成功，均为 280 套／5082 项通过，失败／取消／跳过均 0；冻结参考回放 EXCLUDED／NOT RUN，D1 合成控制 7＋23 另列。它们不是 main CI；此主线整合的精确 CI 以对应 main 提交的 [Actions 实绩](https://github.com/y805939188/pokemon-framework-prototype/actions?query=branch%3Amain) 为准，不继承开发分支 CI，也不预填本 README 所属最终 main 提交的结果。
+
+此前 `2ecace8d`／`714b674` 的阶段收口与 CI312 保留为历史，不改写旧证据。战前仍统一用已实现的默认过渡；完整特殊注册／优先级和按场景、对手、事件自由编排尚未实现，后续阶段和日期未指定。范围及合并前固定验收记录见[5.4 收口记录](docs/step5/5.4-closure.md)和[验收索引](docs/step5/5.4-current-acceptance.md)。所链接文档保留 CI314 时的合并前记录；当前 main 集成事实以本节和对应 main CI 为准。旧 native／百场／HI05／CD 保留原版本；完整性能、跨平台与游戏包分发未因此通过，原 FAIL／WARN／UNKNOWN 及未测边界保持。
 
 ## 先读什么
 
