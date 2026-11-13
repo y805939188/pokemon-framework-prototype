@@ -7,6 +7,9 @@ function Base(){}for(const m of ['initialize','create','start','update','termina
 function Win(){}Win.prototype.initialize=function(){};Win.prototype.activate=function(){};
 function MenuCommand(){}MenuCommand.prototype.addOriginalCommands=function(){};MenuCommand.prototype.addCommand=function(){};MenuCommand.prototype.setHandler=function(){};
 const G={console,structuredClone,performance:{now:()=>0},Window_Base:Win,Window_Command:Win,Window_MenuCommand:MenuCommand,Scene_MenuBase:Base,Scene_Menu:class{},SceneManager:{push(){},isSceneChanging(){return false;}},PluginManager:{registerCommand(){},parameters(){return{};}},Game_Interpreter:Base,Input:{clear(){}},TouchInput:{clear(){}},Graphics:{frameCount:0,boxWidth:816,boxHeight:624},Rectangle:function(){},$gameMessage:{add(){}}};G.window=G;
+// Waiting ownership is exercised without input; still provide the real host port.
+Object.assign(G.Input,{keyMapper:{},isPressed:()=>false,isTriggered:()=>false,isRepeated:()=>false});G.TouchInput.isCancelled=()=>false;
+G.document={addEventListener(){},removeEventListener(){}};G.addEventListener=()=>{};G.removeEventListener=()=>{};
 vm.runInNewContext(fs.readFileSync(path.join(bundleDir,'PS_BattleFlow.js'),'utf8'),G);
 const app={pendingPokedex:{token:'installed-entry',revision:1},saveBlocked:true,stateGeneration:0,encounterBlocked:true};G.PSFlow._app=app;G.PSFlow.app=()=>app;
 const interpreter=new G.Game_Interpreter();assert.equal(G.PSFlow.waitForPokedex(interpreter),true);const before=interpreter.updateWaitMode();assert.equal(before,true,'accepted BattleFlow waiter must wait before H plugin');

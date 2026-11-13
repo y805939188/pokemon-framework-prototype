@@ -17,3 +17,7 @@ node --test scripts/tests/host-input.test.cjs
 测试先行时，四个实际默认 UI 都在初始边界报告 `PSManagement.inputFrame is not a function`；新服务的三个契约测试起初因服务尚不存在失败。服务建立后，三个契约测试先通过，四个 UI 红测保留至接线；后补订阅清理和 Management 缺席案例。最终专项 **12／12 通过**；现有 Management 输入／UI、Inventory、Progression、Evolution、item evolution、Pokedex、Pokedex search UI 与应用消费者类型契约的九文件回归 **238／238 通过**，插件 TypeScript 检查通过。真实宿主与 IME 的新实机证据未在本批执行。
 
 接线后新专项 12／12、既有 UI／类型 consumer 定向 238／238 通过，失败／取消／跳过均 0；插件 strict 类型检查通过。四个默认 UI 分别覆盖 Management 被替换与完全未加载两种情形。上述为 Node／受控宿主，不是新 NW 或物理输入／IME 实绩。
+
+整合首轮 regular 又暴露六处旧测试宿主接线：缺完整无输入端口、替换已经安装服务的 document，以及在产品加载后覆写虚拟 getter 而绕过消费屏蔽。仅补测试 host，不给产品增加容错 fallback，不改既有业务断言。有效红测分别包含 composition 17 失败、追加 inline host 3 失败及 nativeConsumed 时序 1 失败；修复后受影响定向 76／76、149／149 通过，并新增三个端口连通回归。磁盘／h3 的旧候选身份门失败另行处理，不计为输入修复通过。
+
+早期补测有缺 Reactor 依赖及临时视图准备失败，均未进入有效业务测试，不计产品红测；其中一次无效准备日志被后继有效红测复用，原完整日志不能提供，该限制另有登记。有效红／绿及明确端口探针日志分别保留。

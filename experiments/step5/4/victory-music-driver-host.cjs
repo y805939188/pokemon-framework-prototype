@@ -8,7 +8,17 @@ const {createCompositionHostFactory}=require('./battle-music-composition-host.cj
 const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 const flush=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
 function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,options={}}){
- const world=createCompositionHostFactory({ROOT,work,plugins}),w=world({evolution:'plugin',productionTranslator:options.productionTranslator===true,prebattleWorld:options.prebattleWorld===true,beforeProduct:options.beforeProduct}),G=w.G,M=w.manager,A=w.AM,E=require(path.join(ROOT,'js/engine/build/production.cjs'));
+ let input={triggered:{},repeated:{},pressed:{}};
+ // Connect the original controlled frames before product hooks capture Input.
+ // Replacing these getters afterwards would discard nativeConsumed suppression.
+ const beforeProduct=function(G){
+  options.beforeProduct?.call(this,G);
+  const key=k=>k==='ok'?'use':k==='cancel'||options.prebattleWorld&&k==='menu'?'back':k;
+  G.Input.isPressed=k=>!!input.pressed[key(k)];
+  G.Input.isTriggered=k=>!!input.triggered[key(k)];
+  G.Input.isRepeated=G.Input.isTriggered;
+ };
+ const world=createCompositionHostFactory({ROOT,work,plugins}),w=world({evolution:'plugin',productionTranslator:options.productionTranslator===true,prebattleWorld:options.prebattleWorld===true,beforeProduct}),G=w.G,M=w.manager,A=w.AM,E=require(path.join(ROOT,'js/engine/build/production.cjs'));
  // Run the actual entry's presenter policy before unrelated global hooks. The
  // complete driver must inherit this policy, not assume the plugin's default.
  assert.equal(typeof entryText,'string');const stop=Symbol('entry boundary'),descriptor=Object.getOwnPropertyDescriptor(M,'isGameActive'),priorNW=G.nw;
@@ -45,10 +55,7 @@ function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,op
  M.goto=C=>install(C);M.push=C=>{const s=M._scene;stack.push(s instanceof G.Scene_Map?G.Scene_Map:s?.constructor??G.Scene_Map);return install(C);};M.pop=()=>install(stack.pop()??G.Scene_Map);
  M.updateScene=function(){const s=this._scene;if(!s)return;if(!s.isStarted()&&s.isReady()&&(!options.delayStart||G.Graphics.frameCount>options.delayStart))s.start();if(s.isStarted())return evoUpdate.call(this);};
  M.goto(Title);
- let input={triggered:{},repeated:{},pressed:{}};
  G.PSManagement.inputFrame=()=>input;G.PSManagement.current=()=>null;
- G.Input.isTriggered=k=>!!input.triggered[k==='ok'?'use':k==='cancel'||options.prebattleWorld&&k==='menu'?'back':k];
- G.Input.isRepeated=G.Input.isTriggered;
  G.$gameMessage.clear=()=>{};if(!options.prebattleWorld)G.$gameMap={mapId:()=>5,_interpreter:{clear(){},isRunning:()=>false}};G.$dataMap={};
  w.flow.limits=()=>({party:6,boxes:1200,bagPerItem:999,money:999999});w.flow.app=w.applicationFactory;w.flow._app=null;w.flow.content=()=>w.flow._content;w.flow.now=()=>12345;
  const gameDir=w.root,saveRoot=path.join(work,'save-'+path.basename(gameDir));fs.mkdirSync(saveRoot);G.StorageManager={fileDirectoryPath:()=>saveRoot};

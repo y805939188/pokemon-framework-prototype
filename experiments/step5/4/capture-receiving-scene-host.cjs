@@ -36,9 +36,9 @@ async function open({lang,members,caseId}){
  flow.setLanguage(null);flow.stateReplaced();flow._app=null;flow._content=content;flow._dex=E.dex.createDexLookup();flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=false;flow.receiveOptions={mode:0,naming:0};
  const state=fixture.musicNativeState(E,content,'receiving');state.party=state.party.slice(0,members);state.nextMemberOrdinal=String(members+1);state.dex.hasDex=false;
  state.inventory=E.inventory.inventoryFromBag({masterball:2},E.itemCatalog.catalogOf(content));G.$gameSystem._psGame=state;
- G.Input.keyMapper??={};G.Input.isPressed??=()=>false;G.TouchInput.isCancelled??=()=>false;
- const listeners=new Map(),globals=new Map();G.document={addEventListener(k,f){if(!listeners.has(k))listeners.set(k,new Set());listeners.get(k).add(f);},removeEventListener(k,f){listeners.get(k)?.delete(f);}};
- G.addEventListener=(k,f)=>{if(!globals.has(k))globals.set(k,new Set());globals.get(k).add(f);};
+ // Evolution already installed the shared sampler on these controlled event
+ // targets. The receiving presenter must observe the same document and blur.
+ const listeners=h.w.documentListeners,globals=h.w.windowListeners;
  vm.runInContext(plugins.PS_Management,G,{filename:'actual-PS_Management.js'});
  if(process.env.PF_CAPTURE_RECEIVING_OMIT_HANDOFF==='1')G.PSManagement.replaceBattleWithReceiving=()=>false; // Explicit negative seam control, never product code.
  await h.p.toMapId(5,8,9);

@@ -14,7 +14,11 @@ function world(opt = {}) {
   const root = fs.mkdtempSync(path.join(work, 'game-')); fs.mkdirSync(path.join(root, 'audio/bgm'), { recursive: true });
   for (const n of ['Battle wild', 'Battle trainer', 'Map', 'Intro', 'Authored', 'Default', 'Foreign']) fs.writeFileSync(path.join(root, 'audio/bgm', n + '.ogg'), 'controlled');
   let time = 0, seq = 0; const timers = new Map(), created = [], errors = [], commands = {};
-  const w = { root, created, errors, commands, hook: null };
+  // The real MZ Input host always supplies these event targets. Keep stable
+  // controlled targets so later presenters share the already-installed sampler.
+  const documentListeners = new Map(), windowListeners = new Map();
+  const add = (listeners, name, callback) => { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(callback); };
+  const w = { root, created, errors, commands, documentListeners, windowListeners, hook: null };
   class WebAudio {
     static _currentTime() { return time / 1000; }
     constructor(url) { Object.assign(this, { _url: url, _loadListeners: [], _stopListeners: [], _ready: !!opt.instant, _error: false, _isPlaying: false, destroys: 0, plays: [], stops: 0, _pos: 0, volume: 1, pitch: 1, pan: 0 }); created.push(this); w.hook?.('create', this); }
@@ -53,7 +57,11 @@ function world(opt = {}) {
     PluginManager: { parameters: () => ({ battleMusic: JSON.stringify(settings) }), registerCommand(p, n, fn) { commands[p + ':' + n] = fn; } },
     Game_Interpreter: Base, Game_System: System, Window_Base: Win, Window_Command: Win, Scene_MenuBase: Base, Scene_Map: SceneMap, SceneManager: manager,
     Graphics: { boxWidth: 816, boxHeight: 624, frameCount: 0 }, Rectangle: function (x, y, width, height) { Object.assign(this, { x, y, width, height }); },
-    Input: { isTriggered: () => false, clear() {} }, TouchInput: { clear() {} }, SoundManager: { playBuzzer() {} }, Bitmap, Sprite,
+    Input: { keyMapper: {}, isPressed: () => false, isTriggered: () => false, isRepeated: () => false, clear() {} },
+    TouchInput: { clear() {}, isCancelled: () => false },
+    document: { addEventListener(name, callback) { add(documentListeners, name, callback); }, removeEventListener(name, callback) { documentListeners.get(name)?.delete(callback); } },
+    addEventListener(name, callback) { add(windowListeners, name, callback); }, removeEventListener(name, callback) { windowListeners.get(name)?.delete(callback); },
+    SoundManager: { playBuzzer() {} }, Bitmap, Sprite,
     $gameSystem: new System(), $gameMessage: { isBusy: () => false, add() {} }, $gameVariables: { setValue() {} }, $dataSystem: opt.dataSystem ?? {},
     DataManager: { setupNewGame() {}, extractSaveContents(contents) { G.$gameSystem = contents.system; }, saveGame: async () => true, makeSaveContents: () => ({ system: G.$gameSystem }) } };
   G.window = G; vm.createContext(G);
