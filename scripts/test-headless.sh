@@ -155,6 +155,7 @@ SUITES=(
   experiments/step2/s5/test-engine-contract.cjs
   scripts/tests/headless-scope.test.cjs
   scripts/tests/reactor-install.test.cjs
+  scripts/tests/bootstrap-mac.test.cjs
   scripts/tests/showdown-build.test.cjs
   scripts/tests/package-excludes.test.cjs
   scripts/tests/check-boundaries.test.cjs

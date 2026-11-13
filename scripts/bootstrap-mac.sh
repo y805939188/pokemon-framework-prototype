@@ -75,7 +75,7 @@ cd "$ROOT"
 # Basic prerequisites
 # ------------------------------------------------------------
 
-step "0/7  Preflight"
+step "0/9  Preflight"
 
 if [[ ! -f "$ROOT/game.rmmzproject" ]]; then
   echo "ERROR: game.rmmzproject is missing." >&2
@@ -101,11 +101,11 @@ echo "Preflight OK."
 # ------------------------------------------------------------
 
 if [[ "$SKIP_NWJS" -eq 0 ]]; then
-  step "1/7  Prepare modern MZ NW.js host"
+  step "1/9  Prepare modern MZ NW.js host"
 
   "$SCRIPT_DIR/setup-nwjs-mac.sh" --install
 else
-  step "1/7  Skip MZ NW.js host"
+  step "1/9  Skip MZ NW.js host"
   echo "Global NW.js left unchanged (use --install-nwjs to replace it)."
 fi
 
@@ -113,7 +113,7 @@ fi
 # Reactor runtime
 # ------------------------------------------------------------
 
-step "2/7  Hydrate RPG Reactor runtime and declarations"
+step "2/9  Hydrate RPG Reactor runtime and declarations"
 
 "$SCRIPT_DIR/setup-reactor.sh" --install
 
@@ -121,7 +121,7 @@ step "2/7  Hydrate RPG Reactor runtime and declarations"
 # Licensed/local MZ stock resources
 # ------------------------------------------------------------
 
-step "3/7  Hydrate local RPG Maker MZ stock assets"
+step "3/9  Hydrate local RPG Maker MZ stock assets"
 
 "$SCRIPT_DIR/setup-mz-assets-mac.sh" --install
 
@@ -129,7 +129,7 @@ step "3/7  Hydrate local RPG Maker MZ stock assets"
 # Modern TypeScript workspace
 # ------------------------------------------------------------
 
-step "4/7  Install TypeScript workspace"
+step "4/9  Install TypeScript workspace"
 
 pnpm --dir "$ROOT/src" install --frozen-lockfile
 
@@ -137,15 +137,31 @@ pnpm --dir "$ROOT/src" install --frozen-lockfile
 # Static validation
 # ------------------------------------------------------------
 
-step "5/7  Typecheck"
+step "5/9  Prepare types and typecheck"
 
 pnpm --dir "$ROOT/src" typecheck
 
 # ------------------------------------------------------------
-# Build first-party plugins
+# Build the engine and its Showdown extension before staging Showdown
 # ------------------------------------------------------------
 
-step "6/7  Build TypeScript plugins"
+step "6/9  Build base engine bundles and Showdown extension"
+
+pnpm --dir "$ROOT/src" build:engine
+
+# ------------------------------------------------------------
+# Stage the pinned battle runtime before content compilation uses its Dex
+# ------------------------------------------------------------
+
+step "7/9  Build and stage pinned Showdown runtime"
+
+"$SCRIPT_DIR/build-showdown.sh"
+
+# ------------------------------------------------------------
+# Build content and first-party plugins with the battle runtime available
+# ------------------------------------------------------------
+
+step "8/9  Build engine, content and TypeScript plugins"
 
 pnpm --dir "$ROOT/src" build
 
@@ -153,7 +169,7 @@ pnpm --dir "$ROOT/src" build
 # Final verification
 # ------------------------------------------------------------
 
-step "7/7  Verify complete environment"
+step "9/9  Verify complete environment"
 
 "$SCRIPT_DIR/setup-reactor.sh" --check
 "$SCRIPT_DIR/setup-mz-assets-mac.sh" --check

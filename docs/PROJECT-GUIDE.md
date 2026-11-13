@@ -123,12 +123,11 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 
 ```bash
 cd pokemon-framework-prototype
-REACTOR_SOURCE=/Users/dingshinn/Desktop/RPGReactor ./scripts/bootstrap-mac.sh   # Reactor 运行时、MZ 素材、依赖、类型检查、构建、doctor（20 项应全过）
-pnpm --dir src build:engine                                                                  # 引擎包（Showdown 扩展由它暂存）
-./scripts/build-showdown.sh                                                                 # 固定提交的 Showdown → js/engine/showdown
-pnpm --dir src build                                                                        # 插件
-./scripts/test-quick.sh                                                                     # 自检
+REACTOR_SOURCE=/Users/dingshinn/Desktop/RPGReactor ./scripts/bootstrap-mac.sh   # 完成全部环境准备和构建，最后运行 doctor
+./scripts/test-quick.sh                                                    # 自检
 ```
+
+`bootstrap` 先安装 Reactor 运行时／声明、MZ 素材与 TypeScript 依赖，再运行 `typecheck`（包含 `types:prepare`）；随后按 `pnpm --dir src build:engine` → `scripts/build-showdown.sh` → `pnpm --dir src build` → 最终检查与 `doctor` 的顺序完成准备。基础引擎构建先生成当前 `custom-formats.cjs`，Showdown 构建将它暂存到战斗运行时，完整构建中的内容编译便可使用该运行时的 Dex。冷环境没有引擎包、Showdown 暂存或编译内容时也走同一入口；上面无需追加单独的构建命令。
 
 生成物/忽略项（不提交、可重建）：`js/engine/showdown/`、`js/plugins/PS_*.js`、`RR_*.js`、`js/libs`、`js/reactor_*.js`、`index.html`、`src/node_modules`、`src/vendor/rpgreactor`、`.reactor-source`、`save/`、`build/`，以及本地复制的 MZ 素材（`.git/info/exclude`）。Showdown 源码缓存放在仓库外（`~/Library/Caches/pokemon-framework/showdown-src`，`SHOWDOWN_SRC` 可覆盖；首次 `build-showdown.sh` 时下载生成），因为 MZ 部署会复制整个项目根目录。已经 staged 的引擎不依赖缓存，只有重建才需要它。
 
