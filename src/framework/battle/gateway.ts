@@ -495,7 +495,8 @@ export class BattleGateway implements BattleDriver {
       while (index < s.active.length && (s.active[index].fainted || s.active[index].volatiles["commanding"])) index++;
       if (index >= s.active.length) break;
       if (spec?.kind && this._hardLockedMove(side, index)) return false;
-      index++;
+      // A null/empty live spec registers nothing, so the next spec still addresses this seat.
+      if (spec && (spec.kind || spec.move !== undefined || spec.switch !== undefined)) index++;
     }
     s.clearChoice();
     for (const k of Object.keys(b.rpg.pending)) if (k.startsWith(side + ":")) delete b.rpg.pending[k];
@@ -553,6 +554,8 @@ export class BattleGateway implements BattleDriver {
         ? { allowed: true, moveSlot: 1 } : { allowed: false };
     }
     if (hardLocked && (what === 'item' || what === 'ball' || what === 'run')) return { allowed: false, reason: 'choice-rejected' };
+    // This new hint only gates hard locks. Keep existing item target/refund/request checks in their owners.
+    if (what === 'item') return { allowed: true };
     if (what === 'automatic-encore') {
       // Read the pinned engine's own condition and already-published permissions, never run a rule event here.
       if (slot !== 0 || s.active.length !== 1 || !active || active.fainted || active.volatiles?.dynamax

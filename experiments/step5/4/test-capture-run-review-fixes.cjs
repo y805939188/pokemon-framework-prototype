@@ -20,7 +20,7 @@ for(const move of lockMoves)test(move+' published hard lock refuses all RPG choi
  b.sides[0].active[0].getLockedMove=()=>{throw Error('query must only read published request');};
  try{for(let i=0;i<3;i++){assert.deepEqual(gw.query('p1','automatic-locked'),{allowed:true,moveSlot:1});for(const kind of ['item','ball','run'])assert.deepEqual(gw.query('p1',kind),{allowed:false,reason:'choice-rejected'});}}finally{b.sides[0].active[0].getLockedMove=lock;}
  assert.equal(gw.snapshot(),before,'queries leave PRNG, request, queue and attempts untouched');
- for(const payload of [{kind:'item',item:'pokedoll',target:'P'},{kind:'ball',ball:'masterball',target:'F',catchRate:30},{kind:'run'}]){assert.equal(await gw.act('p1',payload),false);assert.equal(gw.snapshot(),before);}
+ for(const payload of [{kind:'item',item:'pokedoll',target:'P'},{kind:'ball',ball:'masterball',target:'F',catchRate:30},{kind:'run'}]){assert.equal(await gw.act('p1',payload),false);assert.equal(gw.snapshot(),before);assert.equal(await gw.chooseSlots('p1',[null,payload]),false,'null live spec does not advance the registration index');assert.equal(gw.snapshot(),before);}
  assert(await gw.choose('p1','move 1'));const staged=gw.snapshot();assert.equal(await gw.act('p1',{kind:'run'}),false);assert.equal(gw.snapshot(),staged,'a rejected RPG choice cannot cancel the existing move');assert(await gw.choose('p2','move 1'));gw.drain();assert.equal(gw._debugBattle().turn,3);assert.equal(Object.keys(gw._debugBattle().rpg.pending).length,0);
 });
 for(const [species,ability,item]of [['Gengar','Cursed Body',''],['Rapidash','Run Away',''],['Snorlax','Immunity','Smoke Ball']])test('hard lock precedes certain Run: '+species+'/'+ability+'/'+item,async()=>{
