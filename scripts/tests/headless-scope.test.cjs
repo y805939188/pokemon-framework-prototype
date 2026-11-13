@@ -34,6 +34,15 @@ function sandbox(t, { actualInventory = false, overlap = false, engine = true } 
   fs.writeFileSync(path.join(dir, 'bin/node'), `#!/bin/bash
 printf 'node %s\\n' "$*" >> "$CONTROL_LOG"
 if [[ "$*" == 'scripts/check-boundaries.cjs' ]]; then exit 0; fi
+if [[ "$1" == 'scripts/headless-regression-binding.cjs' ]]; then
+  case "$2" in
+    begin) [[ $# -eq 3 ]] || exit 94; [[ "\${CONTROL_BINDING_BEGIN_RC:-0}" -eq 0 ]] || exit "$CONTROL_BINDING_BEGIN_RC"; printf '{}\\n' > "$3" ;;
+    finish) [[ $# -eq 4 ]] || exit 94; [[ "\${CONTROL_BINDING_FINISH_RC:-0}" -eq 0 ]] || exit "$CONTROL_BINDING_FINISH_RC"; printf '{"runId":"synthetic-control"}\\n' > "$4" ;;
+    verify) [[ $# -eq 3 ]] || exit 94; exit "\${CONTROL_BINDING_VERIFY_RC:-0}" ;;
+    *) exit 94 ;;
+  esac
+  exit 0
+fi
 if [[ "$1" != '--test' || "$2" != '--test-reporter=tap' || $# -ne 3 ]]; then exit 91; fi
 if [[ "$3" == '${excluded}' ]]; then echo 'FORBIDDEN_REPLAY_SELECTED' >&2; exit 92; fi
 if [[ "$3" != 'control-only-a.cjs' ]]; then
@@ -52,6 +61,7 @@ esac
   fs.writeFileSync(path.join(dir, 'bin/pnpm'), `#!/bin/bash
 printf 'pnpm %s\\n' "$*" >> "$CONTROL_LOG"
 case "$*" in
+  '--dir src types:prepare') exit "\${CONTROL_TYPES_PREPARE_RC:-0}" ;;
   '--dir src typecheck:framework'|'--dir src build:distribution'|'--dir src exec vite build') exit "\${CONTROL_PREFLIGHT_RC:-0}" ;;
   *) exit 93 ;;
 esac
@@ -72,7 +82,10 @@ esac
     assert.ifError(result.error);
     return { ...result, commands: fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim().split('\n') : [] };
   }
-  return { run };
+  return { run, receipts: () => {
+    const folder = path.join(dir, 'build/headless-regression-bindings');
+    return fs.existsSync(folder) ? fs.readdirSync(folder) : [];
+  } };
 }
 
 test('regular inventory is explicit, unique, present, and disjoint from exclusions', () => {
@@ -108,6 +121,51 @@ test('default and explicit regular scope select every listed suite and no replay
   }
 });
 
+test('cold host declarations are prepared once before framework checks and suite dispatch', t => {
+  const result = sandbox(t).run();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.commands[0], 'pnpm --dir src types:prepare');
+  assert.equal(result.commands.filter(command => command === 'pnpm --dir src types:prepare').length, 1);
+  assert.equal(result.commands[1], 'pnpm --dir src typecheck:framework');
+});
+
+test('host declaration preparation failure stops before builds or suites', t => {
+  const result = sandbox(t).run([], { CONTROL_TYPES_PREPARE_RC: '45' });
+  assert.equal(result.status, 45, result.stderr);
+  assert.deepEqual(result.commands, ['pnpm --dir src types:prepare']);
+});
+
+test('parent binding spans the controlled build, every suite and final verification; receipts never overwrite', t => {
+  const fixture = sandbox(t);
+  for (let run = 0; run < 2; run++) {
+    const result = fixture.run();
+    assert.equal(result.status, 0, result.stderr);
+    const position = text => result.commands.findIndex(command => command.includes(text));
+    const begin = position('headless-regression-binding.cjs begin ');
+    const finish = position('headless-regression-binding.cjs finish ');
+    const verify = position('headless-regression-binding.cjs verify ');
+    assert(begin > position('scripts/check-boundaries.cjs'));
+    assert(begin < position('pnpm --dir src build:distribution'));
+    assert(finish > result.commands.lastIndexOf('pnpm --dir src exec vite build'));
+    const suites = result.commands.map((command, index) => command.startsWith('node --test ') ? index : -1).filter(index => index >= 0);
+    assert(suites.every(index => index > finish && index < verify));
+    assert.equal(verify, result.commands.length - 1);
+    assert.equal(fixture.receipts().length, run + 1);
+  }
+});
+
+for (const stage of ['BEGIN', 'FINISH']) test(`binding ${stage.toLowerCase()} failure prevents business suite dispatch`, t => {
+  const result = sandbox(t).run([], { ['CONTROL_BINDING_' + stage + '_RC']: '43' });
+  assert.equal(result.status, 43, result.stderr);
+  assert(!result.commands.some(command => command.startsWith('node --test ')));
+});
+
+test('binding verification failure fails the overall run after preserving all suite results', t => {
+  const result = sandbox(t).run([], { CONTROL_BINDING_VERIFY_RC: '44' });
+  assert.equal(result.status, 1, result.stderr);
+  assert.equal(result.commands.filter(command => command.startsWith('node --test ')).length, synthetic.length);
+});
+
 test('registering a policy exclusion is rejected before preflight', t => {
   const result = sandbox(t, { overlap: true }).run();
   assert.equal(result.status, 2);
@@ -131,7 +189,7 @@ test('engine and preflight failures still stop the run', t => {
   assert.deepEqual(missing.commands, []);
   const failed = sandbox(t).run([], { CONTROL_PREFLIGHT_RC: '17' });
   assert.equal(failed.status, 17);
-  assert.deepEqual(failed.commands, ['pnpm --dir src typecheck:framework']);
+  assert.deepEqual(failed.commands, ['pnpm --dir src types:prepare', 'pnpm --dir src typecheck:framework']);
 });
 
 for (const [label, overrides] of [

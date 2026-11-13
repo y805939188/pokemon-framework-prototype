@@ -6,12 +6,17 @@ const fs = require('node:fs'), path = require('node:path'), crypto = require('no
 const current = require('../capture-run-current-headless-runtime.json');
 const runtime = process.env.H3_RUNTIME_ROOT;
 assert(runtime, 'explicit frozen runtime root required');
+const candidateBinding=process.env.PF_HEADLESS_REGRESSION_BINDING?require(path.join(runtime,'scripts/headless-regression-binding.cjs')):null;
+const candidate=process.env.PF_HEADLESS_REGRESSION_BINDING?candidateBinding.capture(runtime,process.env.PF_HEADLESS_REGRESSION_BINDING):null;
+if(candidate)assert.equal(candidate.binding.showdownSHA,current.showdownSHA,'fixed H3-vector Showdown pin');
+if(!candidate){
 assert.equal(current.schema,'capture-run-current-headless-v1');assert.equal(Object.keys(current.runtime).length,9);
 assert.equal(require('node:child_process').execFileSync('git',['rev-parse','HEAD:src'],{cwd:runtime,encoding:'utf8'}).trim(),current.productSrcTree,'current product source tree');
-const currentCommit=require('node:child_process').execFileSync('git',['rev-parse','HEAD'],{cwd:runtime,encoding:'utf8'}).trim();
 for (const [name, expected] of Object.entries(current.runtime)) assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(runtime,name))).digest('hex'),expected,name);
 assert.equal(fs.readFileSync(path.join(runtime,'js/engine/showdown/SOURCE_SHA'),'utf8').trim(),current.showdownSHA);
 assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(runtime,'js/engine/showdown/dist/config/custom-formats.js'))).digest('hex'),current.runtime['js/engine/build/custom-formats.cjs'],'current staged extension');
+}
+const currentCommit=candidate?.binding.source.head??require('node:child_process').execFileSync('git',['rev-parse','HEAD'],{cwd:runtime,encoding:'utf8'}).trim();
 const E = require(path.join(runtime,'js/engine/build/production.cjs'));
 const T = require(path.join(runtime,'js/engine/build/testing.cjs'));
 const clone = x => JSON.parse(JSON.stringify(x));
@@ -95,4 +100,4 @@ async function acquireReady(w) {
  assert.deepEqual(next.stats,expectedStats,'whole stats oracle for source '+w.source);
  assert.deepEqual(next.dex,expectedDex,'whole dex oracle for source '+w.source);
 }
-module.exports={fixture,acquire,acquireReady,E,T,clone,runtime,capabilities,currentCommit};
+module.exports={fixture,acquire,acquireReady,E,T,clone,runtime,capabilities,currentCommit,candidate,candidateBinding};

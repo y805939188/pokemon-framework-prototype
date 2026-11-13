@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 
 function write(root, file, text) {
@@ -17,7 +18,7 @@ function fixture(t) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const project = path.join(root, 'game');
   const source = path.join(root, 'typed source');
-  for (const file of ['setup-reactor.sh', 'reactor-types.cjs', 'versions.env']) {
+  for (const file of ['setup-reactor.sh', 'reactor-types.cjs', 'reactor-source.cjs', 'versions.env']) {
     write(project, `scripts/${file}`, fs.readFileSync(path.join(__dirname, '..', file)));
   }
   write(project, 'game.rmmzproject', 'RPGMZ 1.0.0');
@@ -34,10 +35,22 @@ function fixture(t) {
   write(source, 'types/compat/lib.dom.generated.d.ts', '// source compiler output must not be copied');
   write(source, 'types/tests/fixture.ts', '// tests must not be copied');
   write(source, 'LICENSE', 'Fixture license');
+  const hashes = files => Object.fromEntries(files.sort().map(file => [file,
+    crypto.createHash('sha256').update(fs.readFileSync(path.join(source, file))).digest('hex')]));
+  const declarations = ['globals', 'reactor-data', 'reactor-core', 'reactor-managers', 'reactor-objects', 'reactor-scenes', 'reactor-sprites', 'reactor-windows', 'reactor-3d'].map(name => `types/${name}.d.ts`);
+  declarations.push('types/compat/@webgpu/types/index.d.ts', 'types/tools/typecheck.cjs', 'LICENSE');
+  write(project, 'scripts/reactor-source-manifest.json', JSON.stringify({
+    schema: 1, repository: 'fixture/fixture', commit: 'fixture',
+    runtime: hashes(['runtime/reactor_main.js', 'runtime/libs/pixi.js', 'runtime/libs/pixi_compat.js']),
+    declarations: hashes(declarations),
+  }));
   const run = (args, sourceOverride) => {
     const env = { ...process.env, RMMZ_TEMPLATE_CACHE: path.join(root, 'cache') };
     delete env.REACTOR_SOURCE;
+    delete env.REACTOR_ALLOW_OTHER_COMMIT;
     if (sourceOverride) env.REACTOR_SOURCE = sourceOverride;
+    // These legacy fixtures intentionally edit a non-git development tree.
+    if (sourceOverride !== 'download') env.REACTOR_ALLOW_OTHER_COMMIT = '1';
     return spawnSync('bash', [path.join(project, 'scripts/setup-reactor.sh'), ...args], { env, encoding: 'utf8' });
   };
   const ok = result => assert.equal(result.status, 0, result.stdout + result.stderr);

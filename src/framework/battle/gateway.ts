@@ -1,4 +1,5 @@
 import { captureInitialField } from '../rules/initial-field';
+import { bindSpeciesTypes } from './species-types';
 import { attachRequestSource, technicalRequestRefresh, tagRequestMessage, checkpointRequestSource, restoreRequestSource, closeRequestSource } from './request-source';
 /**
  * Thin async battle gateway over a pinned Pokemon Showdown build.
@@ -133,6 +134,7 @@ export class BattleGateway implements BattleDriver {
       send: (type: string, data: string | string[]) => gw._onSend(type, data),
     });
     gw._battle = battle;
+    bindSpeciesTypes(battle, opts.speciesTypes);
     attachRequestSource(gw, battle);
     gw.#attachTrainerSource();
     attachReplacementSource(gw, gw._battle, gw._env, gw.snapshot.bind(gw));

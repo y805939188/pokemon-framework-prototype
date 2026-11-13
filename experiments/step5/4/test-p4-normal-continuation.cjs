@@ -15,10 +15,9 @@ test.before(async()=>{
 test.after(()=>h?.close());
 async function owned(t,{dex=false,learning=false}={}){
   const x=createVictoryDriverHost({...h,driverText:'SYNTHETIC_UNUSED',PLAN,options:{productionTranslator:true}}),G=x.G,flow=x.w.flow,oldInput=G.PSManagement.inputFrame;
-  const listeners=new Map(),add=(name,fn)=>{if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);},remove=(name,fn)=>listeners.get(name)?.delete(fn);
-  G.document={addEventListener:add,removeEventListener:remove,createElement(){throw Error('unexpected native nickname editor in mode1/naming1 control');}};
-  G.addEventListener=add;G.removeEventListener=remove;
-  G.Bitmap.prototype.fillRect=function(){};G.Input.keyMapper={};G.Input.isPressed=k=>!!oldInput().pressed[k==='ok'?'use':['cancel','escape','menu'].includes(k)?'back':k];G.TouchInput.isCancelled=()=>false;
+  // Keep the event target on which Evolution installed the shared input service.
+  G.document.createElement=function(){throw Error('unexpected native nickname editor in mode1/naming1 control');};
+  G.Bitmap.prototype.fillRect=function(){};G.Input.isPressed=k=>!!oldInput().pressed[k==='ok'?'use':['cancel','escape','menu'].includes(k)?'back':k];G.TouchInput.isCancelled=()=>false;
   vm.runInContext(managementText,G,{filename:'current-PS_Management.js'});
   await x.p.toMapId(5);const fixture=A.installNormalHostFixture(E,G,G);
   if(dex)assert.equal(fixture.app.updatePokedex({kind:'entitlement',value:true}).status,'applied','explicit own-control public entitlement, not a frozen F100 initial');
@@ -36,6 +35,29 @@ async function owned(t,{dex=false,learning=false}={}){
   const attach=()=>continuation.bindNormalContinuation(tools,E,G,G,fixture,plan,{gameTick:()=>G.Graphics.frameCount});
   return {...x,flow,fixture,scene,session,plan,context,attach};
 }
+test('R5 controlled virtual press/release reaches the shared Input port before another presenter loads',async()=>{
+  const x=createVictoryDriverHost({...h,driverText:'SYNTHETIC_UNUSED',PLAN}),G=x.G,virtual=G.PSManagement.inputFrame,seen=[],update=x.M.updateScene;
+  x.M.updateScene=function(...args){seen.push({expected:!!virtual().pressed.use,actual:G.Input.isPressed('ok')});return update.apply(this,args);};
+  await x.p.press('ok');assert(seen.some(frame=>frame.expected),'the original controlled press was issued');
+  for(const frame of seen)assert.equal(frame.actual,frame.expected,'Input preserves the original virtual held/released frame');
+  vm.runInContext(managementText,G,{filename:'current-PS_Management-input-port-control.js'});
+  assert.equal(x.w.documentListeners.get('keydown').size,1);assert.equal(x.w.documentListeners.get('keyup').size,1);assert.equal(x.w.windowListeners.get('blur').size,1);
+});
+test('R5 owned continuation keeps the installed sampler document, blur target and key bindings',async t=>{
+  const x=await owned(t),G=x.G,probe=()=>{};
+  G.document.addEventListener('r5-port-probe',probe);assert.equal(x.w.documentListeners.get('r5-port-probe')?.has(probe),true);G.document.removeEventListener('r5-port-probe',probe);
+  G.addEventListener('r5-port-probe',probe);assert.equal(x.w.windowListeners.get('r5-port-probe')?.has(probe),true);G.removeEventListener('r5-port-probe',probe);
+  assert.equal(G.Input.keyMapper[65],'pageup');assert.equal(G.Input.keyMapper[83],'pagedown');
+});
+test('R5 controlled virtual getters retain native-consumed suppression until the matching keyup',async()=>{
+  let beforeProductCalls=0;
+  const x=createVictoryDriverHost({...h,driverText:'SYNTHETIC_UNUSED',PLAN,options:{beforeProduct(){beforeProductCalls++;assert.equal(this.evolution,'plugin');}}}),G=x.G,virtual=G.PSManagement.inputFrame,seen=[],update=x.M.updateScene;
+  vm.runInContext("globalThis[Symbol.for('pokemon-framework.host-input.v1')].consumeNative({key:'Enter'},'use')",G);
+  x.M.updateScene=function(...args){if(virtual().triggered.use)seen.push(G.Input.isTriggered('ok'));return update.apply(this,args);};
+  await x.p.press('ok');assert(seen.length>0);assert(seen.every(triggered=>triggered===false),'the controlled getter must retain the product nativeConsumed wrapper');
+  for(const release of x.w.documentListeners.get('keyup'))release({code:'Enter',key:'Enter',keyCode:13});
+  seen.length=0;await x.p.press('ok');assert(seen.length>0);assert(seen.every(Boolean),'the exact physical keyup restores the virtual trigger');assert.equal(beforeProductCalls,1);
+});
 async function select(x,phase,key){
   await x.p.inMode(phase);const s=x.p.battle(),dto=s.inputState();assert.equal(dto.ready,true);
   const found=s._menu._items.map((item,index)=>({item,index})).filter(x=>x.item.ext===key&&x.item.enabled!==false);assert.equal(found.length,1,phase+'/'+key);

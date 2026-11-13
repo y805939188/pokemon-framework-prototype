@@ -1,3 +1,4 @@
+import type { ApplicationHost, EvolutionApplication } from './application-host';
 /** G2a: owned evolution/Info/learning continuation. Domain authority remains in GameApplication. */
 import { itemCatalog, memberIdentity } from '../framework/rules/index';
 import type { EvolutionItemIntent, GameApplication, LearningOutcome } from '../framework/app/index';
@@ -6,12 +7,14 @@ import { EvolutionTimeline } from './progression/evolution-timeline';
 import { LearningScreen } from './progression/learning-screen';
 import { drawLearningPage } from './progression/learning-draw';
 import { InputLatch } from './management/model';
+import { hostInput } from './host-input';
 const { catalogOf } = itemCatalog;
 const { publicIdText } = memberIdentity;
 (() => {
- const G:any=globalThis,W:any=window,NAME='PS_Evolution',flow=()=>W.PSFlow,app=()=>flow().app();
+ const G:any=globalThis,W:any=window,NAME='PS_Evolution',flow=():ApplicationHost & Record<string, any>=>W.PSFlow,app=():EvolutionApplication=>flow().app();
+ const inputs=hostInput(G);
  const tr=(key:string,p?:Record<string,string|number>)=>flow().translator().t('evolution.'+key,p);
- type Request={scene?:any;constructing?:boolean;application:any;generation:number;owner:string;trigger:boolean;battleId?:string;battleOp?:object;done:boolean;result?:string;outcome?:any;event?:{event:number;memberId?:string};item?:EvolutionItemIntent;trade?:true|{requestId:string;intent:any};selectorStage?:'selecting'|'ready';selectorScene?:any};
+ type Request={scene?:any;constructing?:boolean;application:EvolutionApplication;generation:number;owner:string;trigger:boolean;battleId?:string;battleOp?:object;done:boolean;result?:string;outcome?:any;event?:{event:number;memberId?:string};item?:EvolutionItemIntent;trade?:true|{requestId:string;intent:any};selectorStage?:'selecting'|'ready';selectorScene?:any};
  let queued:Request|null=null,reserved:Request|null=null,active:Controller|null=null,feedbackRecovery:Request|null=null,recoveryChoice:{request:Request;title:boolean}|null=null;
  const waits=new WeakMap<object,Request>(),outcomes=new WeakMap<object,any>(),tradeOutcomes=new WeakMap<object,{request:Request;outcome:any}>(),tradeRequests=new WeakMap<object,Request>(),suppressed=new Set<string>();
  const suppress=(r:Request)=>{suppressed.add(r.generation+':'+r.owner);if(suppressed.size>32)suppressed.delete(suppressed.values().next().value!);};
@@ -24,7 +27,7 @@ const { publicIdText } = memberIdentity;
   }catch{console.error(NAME,error);}
  }
 
- const root=(a:any)=>a.pendingTrade?null:a.pendingTriggeredEvolution?{owner:a.pendingTriggeredEvolution.token,trigger:true}:a.pendingPokedex?.parentToken?{owner:a.pendingPokedex.parentToken,trigger:false}:a.pendingEvolution?{owner:a.pendingEvolution.token,trigger:false}:null;
+ const root=(a:EvolutionApplication)=>a.pendingTrade?null:a.pendingTriggeredEvolution?{owner:a.pendingTriggeredEvolution.token,trigger:true}:a.pendingPokedex?.parentToken?{owner:a.pendingPokedex.parentToken,trigger:false}:a.pendingEvolution?{owner:a.pendingEvolution.token,trigger:false}:null;
  const terminalItem=(r:Request)=>!!r.item&&r.outcome?.token===r.owner&&['committed','unchanged','technically-terminated'].includes(r.outcome?.status);
  const abandonedItem=(r:Request)=>r.application===flow()._app&&r.generation===r.application.stateGeneration&&W.PSInventory?.hasAbandonedItem(r.application,r.generation,r.owner)===true;
  const sameItem=(a:Request,b:Request)=>a.application===b.application&&a.generation===b.generation&&a.owner===b.owner;
@@ -48,9 +51,9 @@ const { publicIdText } = memberIdentity;
    const e=a.pendingEvolution;
    if(e&&(e.token===this.request.owner||t?.evolution?.token===e.token))this.knownTokens.add(e.token);
    const d=a.pendingPokedex;
-   return {e:e&&this.knownTokens.has(e.token)?e:null,d:d&&(d.parentToken===this.request.owner||this.knownTokens.has(d.parentToken))?d:null,t,q:null};
+   return {e:e&&this.knownTokens.has(e.token)?e:null,d:d&&(d.parentToken===this.request.owner||this.knownTokens.has(d.parentToken!))?d:null,t,q:null};
   }
-  boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;this.latch.arm(W.PSManagement.inputFrame().pressed);G.Input.clear();G.TouchInput.clear();}
+  boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;this.latch.arm(inputs.inputFrame().pressed);G.Input.clear();G.TouchInput.clear();}
   start(){if(!this.valid()){this.close('stale');return;}
    const f=flow(),op=f._op,owner=op?.musicPlan?.owner;
    // A battle-bound continuation leaves save/stop/replay to its exact root.
@@ -63,7 +66,7 @@ const { publicIdText } = memberIdentity;
    const p=this.views()[kind];if(!p){this.error='stale-continuation';return null;}
    const views=this.views(),before=views.e,memberId=before?.memberId,member=views.q?.incoming?.member??flow().game().party.find((m:any)=>m.id===memberId),oldMoves=memberId?new Set(member?.moves.map((m:any)=>m.id)??[]):null;
    const result=views.q&&kind!=='e'?flow().resolveTrade(views.q.token,views.q.revision,kind==='d'?{kind:decision.kind==='message-complete'?'open-entry':decision.kind==='close-entry'?'close-entry':decision.kind}:decision):kind==='e'?flow().resolveEvolution(p.token,p.revision,decision):kind==='d'?flow().resolvePokedex(p.token,p.revision,decision):flow().resolveTriggeredEvolution(p.token,p.revision,decision);
-   const owned=result?.continuation??result;this.request.outcome=structuredClone(owned);if(this.valid()){this.views();if(owned?.token===this.request.owner)this.confirmItem(owned.result?.primaryCommitted===true,owned.result?.item);}
+   const owned=result?.continuation??result;this.request.outcome=structuredClone(owned);if(this.valid()){this.views();if(owned&&'token' in owned&&owned.token===this.request.owner&&'result' in owned){const detail=owned.result;if(detail&&'primaryCommitted' in detail)this.confirmItem(detail.primaryCommitted===true,detail.item);}}
    if(oldMoves&&decision.kind!=='learn'){const member=this.views().q?.incoming?.member??flow().game().party.find((m:any)=>m.id===memberId);for(const move of member?.moves??[])if(!oldMoves.has(move.id)&&!this.learned.includes(move.id))this.learned.push(move.id);}
    return result;
   }
@@ -78,7 +81,7 @@ const { publicIdText } = memberIdentity;
    else if(q?.phase==='offer'){this.key='q';this.layer='trade-offer';}
    else if(q?.phase==='presenting'){this.key='q';this.layer='trade';this.tradeTimeline=new TradeTimeline(clock());if(this.audioCaptured)G.AudioManager?.stopBgm?.();}
    else if(q?.phase==='ready'){const result=this.dispatch('q',{kind:'commit'});if(result?.status==='committed'){this.close('committed');return;}if(result?.status==='refused'){this.layer='recovery';this.key='q';this.error=result.reason;}else {this.sync();return;}}
-   else if(d){this.key='d';this.layer=d.phase==='failed'?'recovery':d.phase==='entry'?'entry':'dex-message';this.error=d.error??'';}
+   else if(d){this.key='d';this.layer=d.phase==='failed'?'recovery':d.phase==='entry'?'entry':'dex-message';this.error='error' in d?d.error??'':'';}
    else if(e){this.key='e';if(e.phase==='failed'){this.layer='recovery';this.error=e.error??'';}
     else if(e.phase==='learning'&&e.learning){this.layer='learning';this.mountLesson(e);}
     else if(e.phase==='after-evolution'){this.layer='recovery';this.error='post-evolution-entry-owner-missing';}
@@ -99,7 +102,7 @@ const { publicIdText } = memberIdentity;
      if(result?.status==='refused')return result;
      const next=this.views().e;
      if(next?.phase==='failed')return {status:'pending',view:{token:next.token,revision:next.revision,memberId:next.memberId??view.memberId,kind:'teach',error:next.error,reloadRequired:next.reloadRequired}};
-     if(next?.phase==='learning'&&next.learning&&next.learning.move.id===before.learning.move.id&&!(decision.kind==='learn'&&decision.answer.kind==='decline'&&decision.answer.giveUp===true))return convert(next);
+     if(next?.phase==='learning'&&next.learning&&next.learning.move.id===before.learning!.move.id&&!(decision.kind==='learn'&&decision.answer.kind==='decline'&&decision.answer.giveUp===true))return convert(next);
      return {status:decision.kind==='learn'&&decision.answer.kind==='decline'?'unchanged':'committed',token:_token,revision:_revision};
     }},convert(view));
   }
@@ -119,7 +122,7 @@ const { publicIdText } = memberIdentity;
   update(){
    if(!this.valid()){this.close('stale');return;}
    const frame=G.Graphics.frameCount??0;if(!this.ready&&(frame<=this.frame||G.SceneManager.isSceneChanging()))return;
-   const input=this.latch.filter(W.PSManagement.inputFrame());if(!this.ready){this.ready=true;return;} // Messages queued by the completed host are displayed on Map after our final ACK.
+   const input=this.latch.filter(inputs.inputFrame());if(!this.ready){this.ready=true;return;} // Messages queued by the completed host are displayed on Map after our final ACK.
    const use=!!input.triggered.use,back=!!input.triggered.back||this.backRequested;this.backRequested=false;
    if(this.layer==='item-growth'&&(use||back)){this.growthShown=true;this.sync();return;}
    else if(this.layer==='item-result'&&(use||back)){this.close('complete');return;}
@@ -162,7 +165,7 @@ const { publicIdText } = memberIdentity;
    else if(this.layer==='dex-message'||this.layer==='entry'){
     const d=this.views().d,entry=d?.entry,name=entry?flow().speciesName(entry.species,entry.appearance.form):'—';
     line(tr('dexTitle'),10,'#b8e3ff');if(this.layer==='dex-message')line(tr('added',{name}),80);
-    else {const a=this.request.application,q=this.views().q,info=q?a.describeTradeEntry(q.token,q.revision,flow().translator().lang??'en'):a.describePokedexEntry(entry.species,flow().translator().lang??'en');line((info?.number.text??'???')+'  '+name,70);line(info?.types?.join(' / ')||'—',115);line(info?.measurements?info.measurements.height+'  '+info.measurements.weight:'—',160);
+    else {const a=this.request.application,q=this.views().q,info=q?a.describeTradeEntry(q.token,q.revision,flow().translator().lang??'en'):a.describePokedexEntry(entry!.species,flow().translator().lang??'en');line((info?.number.text??'???')+'  '+name,70);line(info?.types?.join(' / ')||'—',115);line(info?.measurements?info.measurements.height+'  '+info.measurements.weight:'—',160);
      const text=info?.entryKey?flow().translator().tOr(info.entryKey,tr('entryPlaceholder')):tr('entryPlaceholder');line(text,212);line(tr('captured',{count:info?.counts.captured??0}),258);line(tr('defeated',{count:info?.counts.defeated??0}),302);line(tr('placeholder'),h-110,'#b7bdc6');}
     line(tr('continue'),h-55);
    }else if(this.layer==='recovery'){
@@ -176,7 +179,7 @@ const { publicIdText } = memberIdentity;
    if(out?.status==='refused')line(out.reason,260,'#ffe09a');if(out?.status==='technically-terminated')line(tr('itemStopped'),310,'#ffe09a');line(tr('continue'),h-55);
   }
   drawTrade(line:(text:string,y:number,color?:string)=>void,b:any,w:number,h:number){
-   const q=this.views().q;if(!q)return;const proposal=q.intent.incoming,old=q.outgoing,incoming=q.incoming?.member,oldName=old.nickname||flow().speciesName(old.species,old.form),newName=incoming?.nickname||q.intent.nickname||flow().speciesName(incoming?.species??proposal.existing?.species??proposal.species,incoming?.form??proposal.existing?.form??proposal.form);
+   const q=this.views().q;if(!q)return;const proposal=q.intent.incoming,source='existing' in proposal?proposal.existing:proposal,old=q.outgoing,incoming=q.incoming?.member,oldName=old.nickname||flow().speciesName(old.species,old.form),newName=incoming?.nickname||q.intent.nickname||flow().speciesName(incoming?.species??source.species,incoming?.form??source.form);
    line(tr('tradeTitle'),10,'#b8e3ff');
    if(this.layer==='trade-offer'){line(tr('tradeOffer',{old:oldName,target:newName}),80);line((this.cursor===0?'▶ ':'  ')+tr('tradeYes'),175);line((this.cursor===1?'▶ ':'  ')+tr('tradeNo'),225);line(tr('continue'),h-55);return;}
    const timeline=this.tradeTimeline!,phase=timeline.phase,receiving=['incoming','received','care'].includes(phase),member=receiving?incoming:old;
@@ -214,7 +217,7 @@ const { publicIdText } = memberIdentity;
  P.update=function(){if(G.SceneManager._scene!==this)return;G.Scene_MenuBase.prototype.update.call(this);if(this._finished||this._failure){if(!G.SceneManager.isSceneChanging())this.popScene();return;}try{this._controller?.update();}catch(error){this._controller?.dispose();this._failure=String(error);reportFailure(error,this._request);}};
  P.popScene=function(){if(this._controller&&!this._controller.closed){if(this._controller.ready)this._controller.backRequested=true;return;}G.Scene_MenuBase.prototype.popScene.call(this);};
  P.terminate=function(){G.Scene_MenuBase.prototype.terminate.call(this);if(this._controller)this._controller.dispose();else if(this._request)retire(this._request,'presentation-ended');};
- const ui:any=W.PSEvolution={automatic:true,show:()=>open(request()),event:(event=0,memberId?:string)=>open(request({event,...(memberId?{memberId}:{})})),current:()=>active&&!active.closed?{ready:active.ready,owner:active.request.owner,generation:active.request.generation,layer:active.layer,trade:active.views().q?{phase:active.views().q.phase,source:'trade-draft'}:null,tradeTimeline:active.tradeTimeline?{phase:active.tradeTimeline.phase,progress:active.tradeTimeline.progress}:null,timeline:active.timeline?{phase:active.timeline.phase,successReady:active.timeline.successReady,picture:active.timeline.picture}:null,lesson:active.lesson?structuredClone(active.lesson.page):null,error:active.error,text:[...active.text]}:null};
+ const ui:any=W.PSEvolution={automatic:true,show:()=>open(request()),event:(event=0,memberId?:string)=>open(request({event,...(memberId?{memberId}:{})})),current:()=>active&&!active.closed?{ready:active.ready,owner:active.request.owner,generation:active.request.generation,layer:active.layer,trade:active.views().q?{phase:active.views().q!.phase,source:'trade-draft'}:null,tradeTimeline:active.tradeTimeline?{phase:active.tradeTimeline.phase,progress:active.tradeTimeline.progress}:null,timeline:active.timeline?{phase:active.timeline.phase,successReady:active.timeline.successReady,picture:active.timeline.picture}:null,lesson:active.lesson?structuredClone(active.lesson.page):null,error:active.error,text:[...active.text]}:null};
  const normalSceneTokens=new WeakMap<object,string>();let normalSceneSerial=0;
  // A separate observer preserves the old current() DTO and cannot drive the player presenter.
  ui.normalObservationState=()=>{

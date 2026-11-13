@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "provenance": "Authored synthetic expectations for the existing field Potion policy (20 HP); no reference-runtime output.",
+  "cases": [
+    { "id": "heal-20", "missingHp": 40, "quantity": 1, "expected": { "plan": "ready", "application": "committed", "hpGain": 20, "spent": 1 } },
+    { "id": "cap-at-max", "missingHp": 7, "quantity": 1, "expected": { "plan": "ready", "application": "committed", "hpGain": 7, "spent": 1 } },
+    { "id": "full-hp", "missingHp": 0, "quantity": 1, "expected": { "plan": "refused", "application": "refused", "reason": "no-effect", "hpGain": 0, "spent": 0 } },
+    { "id": "fainted", "fainted": true, "quantity": 1, "expected": { "plan": "refused", "application": "refused", "reason": "no-effect", "hpGain": 0, "spent": 0 } },
+    { "id": "cancel", "missingHp": 40, "quantity": 1, "answers": { "cancelled": true }, "expected": { "plan": "cancelled", "application": "cancelled", "hpGain": 0, "spent": 0 } },
+    { "id": "quantity-limit", "missingHp": 40, "quantity": 2, "expected": { "plan": "refused", "application": "refused", "reason": "quantity-exceeds-limit", "hpGain": 0, "spent": 0 } }
+  ]
+}

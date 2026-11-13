@@ -5,8 +5,11 @@ const {source,inputs,clone,frozen}=require('./helpers.cjs');
 const modules=Promise.all([source('content/compile'),source('content/schema'),source('flow/content-runtime'),source('rules/member-factory')]);
 const E=require('../../js/engine/build/engine.cjs');
 const digest=s=>createHash('sha256').update(s).digest('hex');
+const PIN='7244fe8e28fa8bc4d0809ae30d183c608b62bb2b';
+// Public metadata keys are already in canonical order; keep this expectation independent of the producer's helper.
+const expectedIdentity=(compiledSemantics,inputsHash)=>digest(JSON.stringify({compiledSemantics,inputsHash,showdownSha:PIN}));
 
-test('standard generation entry versions are author2 / compiled3',async()=>{const [,s]=await modules;assert.equal(s.AUTHOR_SCHEMA_VERSION,2);assert.equal(s.SCHEMA_VERSION,2);assert.equal(s.LEGACY_AUTHOR_SCHEMA_VERSION,1);assert.equal(s.COMPILED_SCHEMA_VERSION,3);for(const dir of ['sample','examples/progression'])assert.equal(require('../../content/'+dir+'/manifest.json').schema,2);});
+test('standard generation entry versions are author2 / compiled4',async()=>{const [,s]=await modules;assert.equal(s.AUTHOR_SCHEMA_VERSION,2);assert.equal(s.SCHEMA_VERSION,2);assert.equal(s.LEGACY_AUTHOR_SCHEMA_VERSION,1);assert.equal(s.COMPILED_SCHEMA_VERSION,4);for(const dir of ['sample','examples/progression'])assert.equal(require('../../content/'+dir+'/manifest.json').schema,2);});
 
 for(const happiness of [0,255,undefined])test('standard base/form/overlay accepts '+String(happiness)+' and creation uses existing default',async()=>{
  const [c,,runtime]=await modules,i=inputs();if(happiness!==undefined)i.species[0].happiness=happiness;
@@ -37,8 +40,10 @@ const legacy=[
  {h:256,input:'47845ea77d2bc13727cfd872241b4d78e056a3adbf8d7be3711dd7ff3544757d',identity:'341b39ad484d09a6ad30520081871fbff2a39e33772449b1586251f28e7cd987',compiled:'90832fe2397bdf41d4e43d3ef48402f7084d16c73df248477e04d6205c58877b'},
  {h:257,input:'c756353cbc7d3ca198dcdf29e5555c57b56f46e22e5c2e2c805c4579c9e84147',identity:'304d1d9ccbe413b52712874288354be5afd460ba9efeba168450d5624d528f9e',compiled:'6f7a5a943ddb5b6ae6afbed17f4743aebcc2e8c0e8c361b61ba451591560ef03'},
 ];
-for(const row of legacy)test('explicit legacy1 keeps pre-edit hash/identity/cache bytes '+String(row.h),async()=>{
- const [c,,runtime]=await modules,i=inputs(1);if(row.h!==undefined)i.species[0].happiness=row.h;const before=clone(i),r=c.compileContent(frozen(i));assert.equal(r.ok,true,JSON.stringify(r.errors));assert.deepEqual(i,before);assert.equal(r.data.inputsHash,row.input);assert.equal(r.data.contentIdentity,row.identity);assert.equal(digest(c.canonicalJson(r.data)),row.compiled);assert.ok(r.warnings.some(w=>w.file==='manifest.json'&&w.path==='$.schema'&&/legacy-author-schema/.test(w.message)));
+for(const row of legacy)test('explicit legacy1 rebuilds as content4 while preserving the old input and content3 projection '+String(row.h),async()=>{
+ const [c,,runtime]=await modules,i=inputs(1);if(row.h!==undefined)i.species[0].happiness=row.h;const before=clone(i),r=c.compileContent(frozen(i));assert.equal(r.ok,true,JSON.stringify(r.errors));assert.deepEqual(i,before);assert.equal(r.data.inputsHash,row.input);assert.equal(r.data.schema,4);assert.equal(r.data.showdownSha,PIN);assert.equal(r.data.contentIdentity,expectedIdentity(4,row.input));assert.notEqual(r.data.contentIdentity,row.identity);assert.equal(expectedIdentity(3,row.input),row.identity);
+ // Only the version and its derived identity are projected back. Every other legacy cache byte stays golden.
+ const prior={...clone(r.data),schema:3,contentIdentity:row.identity};assert.equal(digest(c.canonicalJson(prior)),row.compiled);assert.notEqual(digest(c.canonicalJson(r.data)),row.compiled);assert.throws(()=>runtime.loadCompiled(prior),/needs-rebuild: compiled content requires schema 4/);assert.ok(r.warnings.some(w=>w.file==='manifest.json'&&w.path==='$.schema'&&/legacy-author-schema/.test(w.message)));
  const cache=JSON.parse(JSON.stringify(r.data));assert.equal(runtime.loadCompiled(cache),cache);const assembled=runtime.assembleContent(cache,E.dex.createDexLookup());assert.deepEqual(assembled.errors,[]);assert.equal(assembled.content.species.Charizard.happiness,row.h);const m=E.memberFactory.createMember({id:'OLD-1',species:'Charizard',level:5,form:0},assembled.content,()=>0);assert.equal(m.friendship,row.h??70);
 });
 

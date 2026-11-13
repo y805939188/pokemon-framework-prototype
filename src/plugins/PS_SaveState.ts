@@ -20,6 +20,11 @@
  *          menu and autosave are already off: PS_BattleFlow masks Game_System.isSaveEnabled). A refused or failed save is recorded in
  *          PSState.lastSaveError {code: state-unusable | battle-running | write-failed, message, savefileId, at} and logged.
  */
+import type { SaveApplication } from './application-host';
+import type { FriendshipPersistencePort } from '../framework/app';
+type MigrationHandle = Parameters<SaveApplication['confirmFriendshipMigration']>[0];
+type MigrationResult = ReturnType<SaveApplication['cancelFriendshipMigration']>;
+type MigrationSchema = Pick<typeof import('../framework/rules/save-schema'), 'migrateGame' | 'snapshotForSave'>;
 /* eslint-disable @typescript-eslint/no-explicit-any */
 (() => {
   "use strict";
@@ -27,6 +32,8 @@
   const nodeRequire = (globalThis as any).require as any;
   const W = window as any;
   if (!nodeRequire || !G.DataManager) return;
+  const application = (): SaveApplication => W.PSFlow.app();
+  const currentApplication = (): SaveApplication | null | undefined => W.PSFlow?._app;
 
   const schema = (): any => nodeRequire("./js/engine/build/production.cjs").saveSchema;
   const state = (): any => nodeRequire("./js/engine/build/production.cjs").state;
@@ -97,7 +104,7 @@
       const sys = G.$gameSystem;
       if (!sys || sys._psGame === undefined) throw new Error("state-unusable: framework state is missing");
       if (sys._psSaveError) throw new Error(`state-unusable: ${sys._psSaveError.code}: ${sys._psSaveError.message}`);
-      if (W.PSFlow && (W.PSFlow.running || W.PSFlow.operationPending?.())) { W.PSFlow._app?.assertHostStateReplacementAllowed?.(); throw new Error("operation-pending: saving is not allowed while a framework operation is running"); }
+      if (W.PSFlow && (W.PSFlow.running || W.PSFlow.operationPending?.())) { currentApplication()?.assertHostStateReplacementAllowed?.(); throw new Error("operation-pending: saving is not allowed while a framework operation is running"); }
       let content: any;
       try { content = W.PSFlow.content(); } catch (error) { throw new Error(`needs-content: ${String(error instanceof Error ? error.message : error)}`); }
       if (!content?.regionalDex) throw new Error("needs-content: validated layout is unavailable");
@@ -131,7 +138,7 @@
       return Promise.reject(e);
     }
     if (W.PSFlow && (W.PSFlow.running || W.PSFlow.operationPending?.())) {
-      try { W.PSFlow._app?.assertHostStateReplacementAllowed?.(); } catch(error) { fail("operation-pending",error); return Promise.reject(error); }
+      try { currentApplication()?.assertHostStateReplacementAllowed?.(); } catch(error) { fail("operation-pending",error); return Promise.reject(error); }
       const e = new Error("saving is not allowed while a battle is running");
       fail(W.PSFlow.running ? "battle-running" : "operation-pending", e);
       return Promise.reject(e);
@@ -182,7 +189,7 @@
   };
   const assertReplacement = (): void => {
     if (friendshipModal) throw new Error("friendship-preview-active: finish the migration choice before replacing host state");
-    W.PSFlow?._app?.assertHostStateReplacementAllowed?.();
+    currentApplication()?.assertHostStateReplacementAllowed?.();
   };
   const hostIdentity = (): string => {
     const content = W.PSFlow.content(), prepared = schema().snapshotForSave(W.PSFlow.game(),content);
@@ -191,16 +198,17 @@
     delete contents.system._psSaveInfo; delete contents.system._psSaveWarning; delete contents.system._psSaveError;
     return nodeRequire("./js/engine/build/production.cjs").store.friendshipRawHash(G.JsonEx.stringify({contents,globalInfo:detachHost(G.DataManager._globalInfo)}));
   };
-  const migrationPort = (slot: number, assertModal: () => void): any => {
+  const migrationPort = (slot: number, assertModal: () => void): FriendshipPersistencePort => {
     if (!Number.isSafeInteger(slot) || slot < 1 || slot > G.DataManager.maxSavefiles()) throw new Error("choose an existing manual save slot");
     if (!G.StorageManager.isLocalMode()) throw new Error("friendship migration requires a local desktop save");
     const B = nodeRequire("./js/engine/build/production.cjs");
+    const migrationSchema: () => MigrationSchema = schema;
     const file = G.StorageManager.filePath(G.DataManager.makeSavename(slot));
     const assertTarget = (): void => {
       assertModal();
       if (G.StorageManager.filePath(G.DataManager.makeSavename(slot)) !== file) throw new Error("friendship slot location changed");
     };
-    const read = async (): Promise<any> => {
+    const read = async (): ReturnType<FriendshipPersistencePort['preview']> => {
       assertTarget();
       const live = hostIdentity(), raw = B.store.readFriendshipBytes(file);
       const text = await G.StorageManager.zipToJson(raw.bytes.toString("utf8"));
@@ -208,11 +216,11 @@
       if (hostIdentity() !== live || B.store.readFriendshipBytes(file).rawHash !== raw.rawHash) throw new Error("friendship host or slot changed during preview");
       // Keep original host class envelopes as data; do not load or install them during a preview.
       const contents = JSON.parse(text);
-      const migrated = schema().migrateGame(unpack(contents?.system?._psGame),{content:W.PSFlow.content(),speciesKey:W.PSFlow.speciesKeyResolver()});
+      const migrated = migrationSchema().migrateGame(unpack(contents?.system?._psGame),{content:W.PSFlow.content(),speciesKey:W.PSFlow.speciesKeyResolver()});
       if (!migrated.ok) throw new Error("selected slot cannot be fully validated: "+migrated.error.message);
       return {target:raw.target,rawHash:raw.rawHash,sourceSchema:migrated.from,state:migrated.state,hostIdentity:live};
     };
-    return {preview:read,commit:async (request: any): Promise<any> => {
+    return {preview:read,commit:async (request: Parameters<FriendshipPersistencePort['commit']>[0]): ReturnType<FriendshipPersistencePort['commit']> => {
       // All awaits precede the sync local commit; after each, recheck both application owner and whole host capture.
       const assertCurrent = (): void => {
         request.assertCurrent(); assertTarget();
@@ -223,14 +231,14 @@
         const raw = B.store.readFriendshipBytes(file);
         if (raw.rawHash !== request.before.rawHash) throw new Error("friendship-slot-stale");
         const text = await G.StorageManager.zipToJson(raw.bytes.toString("utf8")); assertCurrent();
-        const contents = JSON.parse(text), prepared = schema().snapshotForSave(request.next,W.PSFlow.content());
+        const contents = JSON.parse(text), prepared = migrationSchema().snapshotForSave(request.next,W.PSFlow.content());
         if (!prepared.ok) throw new Error("friendship candidate failed complete validation");
         // Reuse the exact existing host payload; replace only the validated framework envelope.
         contents.system._psGame = {encoding,version:1,data:JSON.stringify(prepared.state)};
         const encoded = JSON.stringify(contents);
         // Actual host decoding must reconstruct the normal classes and the wrapped framework JSON before committing.
         const decoded = await G.StorageManager.jsonToObject(encoded); assertCurrent();
-        const check = schema().snapshotForSave(unpack(decoded.system._psGame),W.PSFlow.content());
+        const check = migrationSchema().snapshotForSave(unpack(decoded.system._psGame),W.PSFlow.content());
         if (!check.ok || JSON.stringify(check.state) !== JSON.stringify(prepared.state)) throw new Error("friendship host decoding mismatch");
         const zip = await G.StorageManager.jsonToZip(encoded); assertCurrent();
         const roundtrip = await G.StorageManager.zipToJson(zip); assertCurrent();
@@ -241,16 +249,16 @@
       } catch(error) {return {status:"not-committed",error:String(error instanceof Error?error.message:error)};}
     }};
   };
-  const previewMigration = async (slot: number, paths?: readonly string[], assertModal: () => void = () => {}): Promise<any> => {
+  const previewMigration = async (slot: number, paths?: readonly string[], assertModal: () => void = () => {}): ReturnType<SaveApplication['previewFriendshipMigration']> => {
     if (ordinaryWrites || ordinaryLoads) return {status:"refused",reason:"host-save-or-load-pending"};
-    return W.PSFlow.app().previewFriendshipMigration(migrationPort(slot,assertModal),paths);
+    return application().previewFriendshipMigration(migrationPort(slot,assertModal),paths);
   };
-  PSState.previewFriendshipMigration = (slot: number, paths?: readonly string[]): Promise<any> => {
+  PSState.previewFriendshipMigration = (slot: number, paths?: readonly string[]): ReturnType<SaveApplication['previewFriendshipMigration']> => {
     if (friendshipModal) return Promise.resolve({status:"refused",reason:"host-migration-choice-pending"});
     return previewMigration(slot,paths);
   };
-  PSState.confirmFriendshipMigration = (handle: any): Promise<any> => W.PSFlow.app().confirmFriendshipMigration(handle);
-  PSState.cancelFriendshipMigration = (handle: any): any => W.PSFlow.app().cancelFriendshipMigration(handle);
+  PSState.confirmFriendshipMigration = (handle: MigrationHandle): ReturnType<SaveApplication['confirmFriendshipMigration']> => application().confirmFriendshipMigration(handle);
+  PSState.cancelFriendshipMigration = (handle: MigrationHandle): MigrationResult => application().cancelFriendshipMigration(handle);
   // Recovery is explicit and hash guarded; never invoked by load/Continue. Reload after a complete/restore action.
   PSState.inspectFriendshipRecovery = (bundle: string): any => nodeRequire("./js/engine/build/production.cjs").store.inspectFriendshipRecovery(bundle);
   PSState.recoverFriendshipMigration = (bundle: string, action: "complete" | "restore-original"): any => {
@@ -299,7 +307,7 @@
     if (this._psFriendshipMigrationPending || friendshipModal) throw new Error("friendship preview already open");
     const scene = G.SceneManager?._scene;
     if (G.Scene_Map && !(scene instanceof G.Scene_Map)) throw new Error("friendship migration command requires a map scene");
-    let live = true, handle: any, choiceOpen = false;
+    let live = true, handle: MigrationHandle | undefined, choiceOpen = false;
     const release = () => { if (friendshipModal === operation) friendshipModal = null; this._psFriendshipMigrationPending = false; };
     const operation = {scene,abort: () => {
       live = false; release();
@@ -312,7 +320,7 @@
     };
     friendshipModal = operation;
     this._psFriendshipMigrationPending = true; this.setWaitMode("psFriendshipMigration");
-    const finish = (result: any) => {
+    const finish = (result: MigrationResult) => {
       const visible = live && G.SceneManager?._scene === scene && !G.SceneManager?.isSceneChanging?.();
       live = false; release(); PSState.lastMigration = result;
       if (!visible) return;
@@ -325,7 +333,7 @@
         : "保存结果尚未核定。请停止操作，重新启动后检查该存档及保留的原档备份。")
       : "迁移未更改所选存档。请检查存档状态并重新预览。"); };
     // command357 still needs to advance its index and finish this frame's world update before capture.
-    Promise.resolve().then(()=>{assertModal();return previewMigration(Number(args.slot),undefined,assertModal);}).then((p: any)=>{
+    Promise.resolve().then(()=>{assertModal();return previewMigration(Number(args.slot),undefined,assertModal);}).then((p)=>{
       if (!live) { if (p.status === "ready") PSState.cancelFriendshipMigration(p.handle); return; }
       if (p.status !== "ready") {finish(p);return;}
       assertModal(); handle = p.handle;

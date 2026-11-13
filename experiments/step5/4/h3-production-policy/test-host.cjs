@@ -1,14 +1,15 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
-const {fixture,acquireReady,E,clone,runtime,capabilities,currentCommit}=require('./support.cjs'),plan=require('./host-plan.json');
+const {fixture,acquireReady,E,clone,runtime,capabilities,currentCommit,candidate,candidateBinding}=require('./support.cjs'),plan=require('./host-plan.json');
 const current=require('../capture-run-current-headless-runtime.json');assert.equal(Object.keys(current.pluginBundles).length,4);
-const currentFiles={...plan.files,...current.pluginBundles};
+const currentFiles=candidate?candidateBinding.boundFiles(candidate,Object.keys({...plan.files,...current.pluginBundles})):{...plan.files,...current.pluginBundles};
 for(const [name,expected]of Object.entries(currentFiles))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(runtime,name))).digest('hex'),expected,name);
 const {createVictoryDriverHost}=require(path.join(runtime,'experiments/step5/4/victory-music-driver-host.cjs'));
 const {assertTakeConserved}=require('./take-conservation-oracle.cjs');
 const basePlan=require(path.join(runtime,'experiments/step5/4/victory-music-native-plan.json'));
 const plugins=Object.fromEntries(['PS_BattleFlow','PS_SaveState','PS_Evolution'].map(n=>[n,fs.readFileSync(path.join(runtime,'js/plugins',n+'.js'),'utf8')]));
 const entryText=fs.readFileSync(path.join(runtime,'js/plugins/PS_BattleFlowTest.js'),'utf8');
+test.after(()=>{if(candidate)candidateBinding.verify(runtime,candidate.binding);});
 async function host(source){
  const seed=fixture(source),work=fs.mkdtempSync(path.join(os.tmpdir(),'pf-h3-compiled-host-'));
  const PLAN={...basePlan,productCommit:currentCommit,productPlugins:Object.fromEntries(Object.keys(plugins).map(n=>[n,currentFiles['js/plugins/'+n+'.js']]))};

@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "provenance": "Authored synthetic JSON values and literal canonical strings; hashes fixed offline with Python hashlib. No product canonicalizer, player data or reference-runtime output. The nonce field is a generic value example, not a new save field.",
+  "vectors": [
+    {
+      "id": "absent",
+      "value": {},
+      "canonicalJSON": "{}",
+      "utf8Hex": "7b7d",
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "validBattleResult": false
+    },
+    {
+      "id": "explicit-null",
+      "value": {
+        "optional": null
+      },
+      "canonicalJSON": "{\"optional\":null}",
+      "utf8Hex": "7b226f7074696f6e616c223a6e756c6c7d",
+      "sha256": "f66ec4e197d912a196b9eb28968da156ab0d83c729c6d029d978e4b1b9d6bc26",
+      "validBattleResult": false
+    },
+    {
+      "id": "nested-dictionaries",
+      "value": {
+        "z": 0,
+        "a": {
+          "z": 2,
+          "a": 1
+        }
+      },
+      "canonicalJSON": "{\"a\":{\"a\":1,\"z\":2},\"z\":0}",
+      "utf8Hex": "7b2261223a7b2261223a312c227a223a327d2c227a223a307d",
+      "sha256": "46d53c4304435e89baf03454d66a45c7f4114424fdada811fb91bb68d1bfd12c",
+      "validBattleResult": false
+    },
+    {
+      "id": "array-forward",
+      "value": {
+        "list": [
+          1,
+          2
+        ]
+      },
+      "canonicalJSON": "{\"list\":[1,2]}",
+      "utf8Hex": "7b226c697374223a5b312c325d7d",
+      "sha256": "19ea12ebf568b326476185ae635d32236139cae0a4c7b45c30b8d80bae494bdb",
+      "validBattleResult": false
+    },
+    {
+      "id": "array-reverse",
+      "value": {
+        "list": [
+          2,
+          1
+        ]
+      },
+      "canonicalJSON": "{\"list\":[2,1]}",
+      "utf8Hex": "7b226c697374223a5b322c315d7d",
+      "sha256": "fe14be62705e47784512b8793100c7bb6f09d5547b3140e487950b1183aa7768",
+      "validBattleResult": false
+    },
+    {
+      "id": "integer-index-keys",
+      "value": {
+        "10": "ten",
+        "2": "two",
+        "01": "leading",
+        "a": 0
+      },
+      "canonicalJSON": "{\"2\":\"two\",\"10\":\"ten\",\"01\":\"leading\",\"a\":0}",
+      "utf8Hex": "7b2232223a2274776f222c223130223a2274656e222c223031223a226c656164696e67222c2261223a307d",
+      "sha256": "f2bace748ffd108a4d8734e21e327876f765c8da8fbb33a3042becd4910299e0",
+      "validBattleResult": false
+    },
+    {
+      "id": "utf16-key-order",
+      "value": {
+        "\ue000": "BMP",
+        "\ud800\udc00": "astral"
+      },
+      "canonicalJSON": "{\"\ud800\udc00\":\"astral\",\"\ue000\":\"BMP\"}",
+      "utf8Hex": "7b22f0908080223a2261737472616c222c22ee8080223a22424d50227d",
+      "sha256": "16ab72c7d809cd8c65427f263923d948fa80b2c5c74d9254d8afab550a2ba49e",
+      "validBattleResult": false
+    },
+    {
+      "id": "unicode-nfc-preserved",
+      "value": {
+        "text": "\u00e9"
+      },
+      "canonicalJSON": "{\"text\":\"\u00e9\"}",
+      "utf8Hex": "7b2274657874223a22c3a9227d",
+      "sha256": "42d3cbf59fdccced04e5dff14433fb52d34d58e385e9770ffd896ff517d63b92",
+      "validBattleResult": false
+    },
+    {
+      "id": "unicode-nfd-preserved",
+      "value": {
+        "text": "e\u0301"
+      },
+      "canonicalJSON": "{\"text\":\"e\u0301\"}",
+      "utf8Hex": "7b2274657874223a2265cc81227d",
+      "sha256": "9b53287cd41955684903378d2b1b4a3ddea9d80d67dcd026319a7c5a9a8a8b42",
+      "validBattleResult": false
+    },
+    {
+      "id": "safe-integer-and-opaque-strings",
+      "value": {
+        "ordinal": "9007199254740993",
+        "nonce": "0007",
+        "n": 9007199254740991
+      },
+      "canonicalJSON": "{\"n\":9007199254740991,\"nonce\":\"0007\",\"ordinal\":\"9007199254740993\"}",
+      "utf8Hex": "7b226e223a393030373139393235343734303939312c226e6f6e6365223a2230303037222c226f7264696e616c223a2239303037313939323534373430393933227d",
+      "sha256": "1c0a561f52c35426cde3b0f86e76220d9d336520931d3ec34a583473069e43f6",
+      "validBattleResult": false
+    },
+    {
+      "id": "well-formed-json-lone-surrogate",
+      "value": {
+        "x": "\ud800"
+      },
+      "canonicalJSON": "{\"x\":\"\\ud800\"}",
+      "utf8Hex": "7b2278223a225c7564383030227d",
+      "sha256": "7f3c6b6b4a88409efe4d2fba1cb3cf2b79b682fe4387678cba2e6b9645b58221",
+      "validBattleResult": false
+    },
+    {
+      "id": "synthetic-frozen-v1-result",
+      "value": {
+        "protocol": 1,
+        "battleId": "value-contract",
+        "outcome": {
+          "kind": "run",
+          "winner": null
+        },
+        "members": {},
+        "bag": {},
+        "captured": [],
+        "dex": {
+          "seen": [],
+          "owned": []
+        }
+      },
+      "canonicalJSON": "{\"bag\":{},\"battleId\":\"value-contract\",\"captured\":[],\"dex\":{\"owned\":[],\"seen\":[]},\"members\":{},\"outcome\":{\"kind\":\"run\",\"winner\":null},\"protocol\":1}",
+      "utf8Hex": "7b22626167223a7b7d2c22626174746c654964223a2276616c75652d636f6e7472616374222c226361707475726564223a5b5d2c22646578223a7b226f776e6564223a5b5d2c227365656e223a5b5d7d2c226d656d62657273223a7b7d2c226f7574636f6d65223a7b226b696e64223a2272756e222c2277696e6e6572223a6e756c6c7d2c2270726f746f636f6c223a317d",
+      "sha256": "a49f7a42263bb2bbc4e7bb48e4cbd5f061e4f7d3b42868356dfa411ccb0b3705",
+      "validBattleResult": true
+    }
+  ]
+}

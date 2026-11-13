@@ -1,46 +1,49 @@
+import type { ApplicationHost, PokedexApplication } from './application-host';
 /** H1 default MZ dex; the application owns all persistent viewing edits. */
 import { PokedexScreen } from './pokedex/screen';
 import { pokedexQuery as Q, config as C, semantic } from '../framework/rules/index';
 import { InputLatch } from './management/model';
+import { hostInput } from './host-input';
 (() => {
- const G:any=globalThis,W:any=window,NAME='PS_Pokedex',flow=()=>W.PSFlow;
+ const G:any=globalThis,W:any=window,NAME='PS_Pokedex',flow=():ApplicationHost & Record<string, any>=>W.PSFlow;
+ const inputs=hostInput(G);
  const text=(key:string,p?:Record<string,string|number>)=>flow().translator().t('pokedex.'+key,p);
- type Request={application:any;generation:number;scene?:any;constructing:boolean;done:boolean;status:string;fingerprint:string;parent?:{token:string;memberId:string;isCurrent:()=>boolean;releaseAbandoned:()=>void};summary?:{parentToken:string;memberId:string;species:string};edit?:{token:string;revision:number}};
+ type Request={application:PokedexApplication|null;generation:number;scene?:any;constructing:boolean;done:boolean;status:string;fingerprint:string;parent?:{token:string;memberId:string;isCurrent:()=>boolean;releaseAbandoned:()=>void};summary?:{parentToken:string;memberId:string;species:string};edit?:{token:string;revision:number}};
  let reserved:Request|null=null,active:Controller|null=null;const waits=new WeakMap<object,Request>();
- const valid=(r:Request)=>!r.done&&r.application===flow()._app&&r.generation===r.application.stateGeneration;
+ const valid=(r:Request)=>!r.done&&r.application===flow()._app&&r.generation===r.application!.stateGeneration;
  const retire=(r:Request)=>{r.done=true;if(reserved===r)reserved=null;};
  function reap(r:Request|null=reserved){if(!r||r.constructing)return;const m=G.SceneManager;if(!valid(r)||r.scene&&r.scene!==m._scene&&r.scene!==m._nextScene)retire(r);}
  const busy=()=>{reap();if(active&&!valid(active.request))active.retireStale();return !!reserved||!!active&&!active.closed;};
  const previousPending=flow().operationPending;flow().operationPending=function(){return busy()||previousPending.call(this);};
  // A UI request may only recover the exact edit captured before external callbacks.
  function owner(r:Request){
-  if(!valid(r))throw Error('stale-pokedex-ui');if(r.parent&&!r.parent.isCurrent())throw Error('stale-pokedex-parent');const a=r.application,p=a.pendingPokedex;
+  if(!valid(r))throw Error('stale-pokedex-ui');if(r.parent&&!r.parent.isCurrent())throw Error('stale-pokedex-parent');const a=r.application!,p=a.pendingPokedex;
   if(r.edit){if(p?.purpose!==(r.parent?'summary':'edit')||p.parentToken||r.parent&&p.summary?.parentToken!==r.parent.token||p.token!==r.edit.token||p.revision!==r.edit.revision)throw Error('stale-pokedex-edit-owner');}
   else if(a.encounterBlocked||previousPending.call(flow()))throw Error('operation-active');
   if(!valid(r))throw Error('stale-pokedex-ui');
  }
  function check(r:Request){owner(r);const c=flow().content();owner(r);if(semantic.semanticFingerprint(c)!==r.fingerprint)throw Error('stale-pokedex-ui-content');}
- function releaseSummary(r:Request){const p=r.application?.pendingPokedex;if(r.parent&&r.edit&&r.application===flow()._app&&r.generation===r.application.stateGeneration&&p?.token===r.edit.token&&p.revision===r.edit.revision&&p.summary?.parentToken===r.parent.token){const result=r.application.resolvePokedex(p.token,p.revision,{kind:'technical-terminate'});if(result.status==='pending')r.edit={token:result.view.token,revision:result.view.revision};else if(result.status!=='refused')delete r.edit;}if(r.parent&&!r.parent.isCurrent()){try{r.parent.releaseAbandoned();}catch(error){console.error(NAME,error);}}}
+ function releaseSummary(r:Request){const p=r.application?.pendingPokedex;if(r.parent&&r.edit&&r.application===flow()._app&&r.generation===r.application!.stateGeneration&&p?.token===r.edit.token&&p.revision===r.edit.revision&&p.summary?.parentToken===r.parent.token){const result=r.application!.resolvePokedex(p.token,p.revision,{kind:'technical-terminate'});if(result.status==='pending')r.edit={token:result.view.token,revision:result.view.revision};else if(result.status!=='refused')delete r.edit;}if(r.parent&&!r.parent.isCurrent()){try{r.parent.releaseAbandoned();}catch(error){console.error(NAME,error);}}}
  function returned(r:Request,result:any){
   if(result.status==='pending'){if(result.view.purpose!==(r.parent?'summary':'edit')||r.edit&&r.edit.token!==result.view.token)throw Error('stale-pokedex-edit-owner');r.edit={token:result.view.token,revision:result.view.revision};}
   else if(r.edit&&result.token===r.edit.token)delete r.edit;
   if(r.parent&&(!valid(r)||!r.parent.isCurrent())){releaseSummary(r);throw Error('stale-pokedex-parent');}
-  if(r.parent&&!r.edit){if(!valid(r)||r.application.pendingPokedex)throw Error('stale-pokedex-summary-owner');}else check(r);return result;
+  if(r.parent&&!r.edit){if(!valid(r)||r.application!.pendingPokedex)throw Error('stale-pokedex-summary-owner');}else check(r);return result;
  }
  function dictionary(content:any){const t=flow().translator(),keys=new Set<string>();for(const data of Object.values(content.species)as any[])for(const k of ['nameKey','formNameKey','categoryKey','entryKey'])if(data[k])keys.add(data[k]);for(const r of content.regionalDex?.regions??[])keys.add(r.nameKey);return Object.fromEntries([...keys].map(k=>[k,t.tOr(k,k)]));}
  function region(){const maps=flow().content().mapMetadata?.maps,id=G.$gameMap?.mapId?.();return maps&&Object.hasOwn(maps,String(id))?maps[String(id)].region??null:null;}
  class Controller {
   description={identity:'',offset:0,max:0,step:1,total:0};closed=false;ready=false;disposing=false;frame=0;latch=new InputLatch();screen!:PokedexScreen;text:string[]=[];
   constructor(readonly scene:any,readonly request:Request,readonly window:any,readonly attached=false){}
-  boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;this.latch.arm(W.PSManagement.inputFrame().pressed);G.Input.clear();G.TouchInput.clear();}
-  start(){const r=this.request,application=r.application;const guard=()=>{if(active!==this)throw Error('stale-pokedex-ui');check(r);};guard();
+  boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;this.latch.arm(inputs.inputFrame().pressed);G.Input.clear();G.TouchInput.clear();}
+  start(){const r=this.request,application=r.application!;const guard=()=>{if(active!==this)throw Error('stale-pokedex-ui');check(r);};guard();
    const pending=r.edit?application.pendingPokedex:null;
    const single=r.summary?(()=>{const snap=application.pokedexSnapshot(dictionary(flow().content()),region()),cfg=C.resolveConfig(flow().content().settings);guard();return{species:r.summary!.species,number:Q.dexCompleteEntryNumber(snap.dex,snap.catalog.layout,r.summary!.species,{locale:flow().translator().lang,offsets:cfg.DEXES_WITH_OFFSETS,useCurrentRegion:cfg.USE_CURRENT_REGION_DEX,currentRegion:region()})};})():undefined;
    this.screen=new PokedexScreen({...(single?{single}:{}),snapshot:()=>{guard();const s=application.pokedexSnapshot(dictionary(flow().content()),region());guard();return s;},content:()=>{guard();const c=flow().content();guard();return c;},directory:()=>{guard();const d=application.pokedexSearchDirectory(flow().translator().lang);guard();return d;},locale:flow().translator().lang,text:dictionary(flow().content()),currentRegion:region(),edit:command=>{guard();if(r.parent){if(command.kind!=='form'||command.species!==r.summary?.species||!r.edit)throw Error('pokedex-summary-edit-required');return returned(r,application.resolvePokedex(r.edit.token,r.edit.revision,{kind:'summary-form',baseFrontsEqual:command.baseFrontsEqual,selected:command.selected,text:command.text,currentRegion:command.currentRegion}));}return returned(r,application.updatePokedex(command));},resolve:(token,revision,decision)=>{guard();if(!r.edit||r.edit.token!==token||r.edit.revision!==revision)throw Error('stale-pokedex-edit-owner');return returned(r,application.resolvePokedex(token,revision,decision));},...(pending&&(!r.parent||pending.error)?{pending:{status:'pending' as const,view:pending}}:{}),finish:()=>this.finish(),reload:()=>{this.retireStale();G.SceneManager.goto(G.Scene_Title);},stopCry:()=>G.AudioManager?.stopSe?.(),cry:()=>{ /* Placeholder media. No audio/resource-success claim. */ }});
    guard();if(this.screen.done){this.finish();return;}this.boundary();guard();this.draw();
   }
-  update(){if(!valid(this.request)){this.retireStale();return;}if(this.screen?.done){this.finish();return;}if(!this.ready){if((G.Graphics.frameCount??0)<=this.frame||G.SceneManager.isSceneChanging())return;this.ready=true;this.latch.filter(W.PSManagement.inputFrame());return;}
-   const input=this.latch.filter(W.PSManagement.inputFrame()),before=JSON.stringify(this.screen.view),v=this.screen.view;
+  update(){if(!valid(this.request)){this.retireStale();return;}if(this.screen?.done){this.finish();return;}if(!this.ready){if((G.Graphics.frameCount??0)<=this.frame||G.SceneManager.isSceneChanging())return;this.ready=true;this.latch.filter(inputs.inputFrame());return;}
+   const input=this.latch.filter(inputs.inputFrame()),before=JSON.stringify(this.screen.view),v=this.screen.view;
    const directions=['up','down','left','right']as const;const direction=directions.find(d=>input.repeated[d]&&(v.kind!=='forms'||G.Input.isTriggered(d)));
    const action=direction??(input.triggered.back?'back':input.triggered.use?'use':input.triggered.action?'action':undefined);
    const scroll=v.kind==='entry'&&v.page===0&&!direction?(input.triggered.jumpup?-1:input.triggered.jumpdown?1:0):0;
@@ -49,7 +52,7 @@ import { InputLatch } from './management/model';
   back(){if(!valid(this.request)){this.retireStale();return;}try{check(this.request);this.screen?.action('back');}catch{this.dispose();}}
   get view(){return this.screen?.view;}
   retireStale(){this.closed=true;retire(this.request);if(active===this)active=null;}
-  finish(){if(this.closed)return;const r=this.request;if(r.parent&&r.edit){check(r);returned(r,r.application.resolvePokedex(r.edit.token,r.edit.revision,{kind:'close-entry'}));}this.closed=true;if(this.request.status==='queued')this.request.status='complete';retire(this.request);if(active===this)active=null;this.releaseSummary();if(!this.attached&&!this.disposing&&G.SceneManager._scene===this.scene&&!G.SceneManager.isSceneChanging())this.scene.popScene();}
+  finish(){if(this.closed)return;const r=this.request;if(r.parent&&r.edit){check(r);returned(r,r.application!.resolvePokedex(r.edit.token,r.edit.revision,{kind:'close-entry'}));}this.closed=true;if(this.request.status==='queued')this.request.status='complete';retire(this.request);if(active===this)active=null;this.releaseSummary();if(!this.attached&&!this.disposing&&G.SceneManager._scene===this.scene&&!G.SceneManager.isSceneChanging())this.scene.popScene();}
   releaseSummary(){releaseSummary(this.request);}
 
   dispose(){if(this.closed){this.releaseSummary();return;}this.disposing=true;if(this.request.status==='queued')this.request.status='technically-terminated';try{if(valid(this.request))this.screen?.close();}catch(e){console.error(NAME,e);}this.releaseSummary();this.retireStale();}
@@ -116,13 +119,13 @@ import { InputLatch } from './management/model';
    G.SceneManager.push(Scene_PSPokedex);r.scene=G.SceneManager._nextScene??G.SceneManager._scene;r.constructing=false;return{status:'opened',request:r};
   }catch(e){r.constructing=false;retire(r);return{status:'refused',reason:String(e)};}
  }
- function attach(window:any,parent:{token:string;memberId:string;application:any;generation:number;isCurrent:()=>boolean;releaseAbandoned:()=>void}){
+ function attach(window:any,parent:{token:string;memberId:string;application:PokedexApplication|null;generation:number;isCurrent:()=>boolean;releaseAbandoned:()=>void}){
   if(busy()||G.SceneManager._scene?._started===false)return null;const application=flow()._app;if(!application||parent.application!==application||parent.generation!==application.stateGeneration)return null;
   if(typeof parent.isCurrent!=='function'||!parent.isCurrent())return null;const scene=G.SceneManager._scene;
   const r:Request={application,generation:application.stateGeneration,constructing:true,done:false,status:'queued',fingerprint:'',parent:{token:parent.token,memberId:parent.memberId,isCurrent:parent.isCurrent,releaseAbandoned:parent.releaseAbandoned}};reserved=r;
   try{
    const result=application.beginSummaryPokedex(parent.token,parent.memberId);
-   if(!valid(r)||result.status!=='pending'||result.view.purpose!=='summary'||result.view.summary?.parentToken!==parent.token)throw Error(result.reason??'pokedex-summary-unavailable');
+   if(!valid(r)||result.status!=='pending'||result.view.purpose!=='summary'||result.view.summary?.parentToken!==parent.token)throw Error(('reason' in result?result.reason:undefined)??'pokedex-summary-unavailable');
    r.edit={token:result.view.token,revision:result.view.revision};r.summary=result.view.summary;r.fingerprint=semantic.semanticFingerprint(flow().content());check(r);
    const controller=new Controller(scene,r,window,true);active=controller;controller.start();check(r);r.constructing=false;return controller;
   }catch(e){r.constructing=false;if(active?.request===r)active.dispose();else{const p=application.pendingPokedex;if(valid(r)&&r.edit&&p?.token===r.edit.token&&p.revision===r.edit.revision&&p.summary?.parentToken===parent.token)application.resolvePokedex(p.token,p.revision,{kind:'technical-terminate'});retire(r);}if(!parent.isCurrent()){try{parent.releaseAbandoned();}catch(error){console.error(NAME,error);}}else G.$gameMessage?.add(text('failed',{reason:String(e)}));return null;}

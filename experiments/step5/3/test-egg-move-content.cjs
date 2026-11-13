@@ -6,8 +6,8 @@ const M={...E.contentCompile,...E.contentRuntime,...E.learningActions},clone=F.c
 const teacher=(c,member=F.member({item:''}),moveId='unlisted')=>E.learningActions.planTeachingAction(member,c,{kind:'generic',moveId},F.context());
 function ancestor(base,id,eggs){return {...clone(base),id,showdownId:id,nameKey:'species.'+id,tutorMoves:[],eggMoves:eggs,evolutions:[{target:'learner',method:'Level',parameter:16}]};}
 function compile(raw){const r=E.contentCompile.compileContent(raw,{}, {showdownSha:F.SHA});assert.equal(r.ok,true,JSON.stringify(r.errors));return r.data;}
-test('author1 egg list reaches cache3 and canonical runtime move identity; absent and explicit empty remain distinct',async()=>{
- const c=await F.content(M,raw=>raw.species[0].eggMoves=['unlisted']);assert.equal(c.meta.compiledSemantics,3);assert.deepEqual(c.species.learner.eggMoves,['Only Egg Unknown']);assert.equal(teacher(c).status,'ready');
+test('author1 egg list reaches cache4 and canonical runtime move identity; absent and explicit empty remain distinct',async()=>{
+ const c=await F.content(M,raw=>raw.species[0].eggMoves=['unlisted']);assert.equal(c.meta.compiledSemantics,4);assert.deepEqual(c.species.learner.eggMoves,['Only Egg Unknown']);assert.equal(teacher(c).status,'ready');
  const unknown=await F.content(M);assert.equal(Object.hasOwn(unknown.species.learner,'eggMoves'),false);assert.equal(teacher(unknown).reason,'compatibility-unavailable');
  const empty=await F.content(M,raw=>raw.species[0].eggMoves=[]);assert.deepEqual(empty.species.learner.eggMoves,[]);assert.equal(teacher(empty).reason,'incompatible');
 });
@@ -32,7 +32,7 @@ test('author/overlay/cache malformed egg tables reject, missing pinned move is a
  const overlay=F.inputs();overlay.overlays=[{target:'species/learner',set:{eggMoves:null},reason:'invalid'}];assert.equal(E.contentCompile.compileContent(overlay,{}, {showdownSha:F.SHA}).ok,false);
 });
 test('cache2 requires rebuild; save schema stays7; egg data and semantic version alter strong identity without relayout',()=>{
- const raw=F.inputs(),unknown=compile(raw);raw.species[0].eggMoves=[];const empty=compile(raw);assert.equal(empty.schema,3);assert.notEqual(unknown.inputsHash,empty.inputsHash);assert.notEqual(unknown.contentIdentity,empty.contentIdentity);assert.equal(unknown.regionalDex.layoutIdentity,empty.regionalDex.layoutIdentity);
+ const raw=F.inputs(),unknown=compile(raw);raw.species[0].eggMoves=[];const empty=compile(raw);assert.equal(empty.schema,4);assert.notEqual(unknown.inputsHash,empty.inputsHash);assert.notEqual(unknown.contentIdentity,empty.contentIdentity);assert.equal(unknown.regionalDex.layoutIdentity,empty.regionalDex.layoutIdentity);
  assert.throws(()=>E.contentRuntime.loadCompiled({...empty,schema:2}),/needs-rebuild/);assert.match(E.contentCompile.checkFresh({...empty,schema:2},raw).message,/needs-rebuild/);
  const {content:c}=E.contentRuntime.assembleContent(empty,F.dex());const old=clone(c);old.meta.compiledSemantics=2;old.meta.contentIdentity=E.digest.sha256Hex(E.contentCompile.canonicalJson({compiledSemantics:2,inputsHash:old.meta.inputsHash,showdownSha:old.meta.showdownSha}));assert.equal(E.contentRuntime.validatedContentIdentity(old),null);assert(E.contentRuntime.validatedContentIdentity(c));
 });

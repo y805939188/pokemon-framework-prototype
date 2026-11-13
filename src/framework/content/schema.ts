@@ -1,5 +1,5 @@
 /**
- * Content pipeline: author schema 2 (standard), explicit legacy author schema 1, compiled schema 3.
+ * Content pipeline: author schema 2 (standard), explicit legacy author schema 1, compiled schema 4.
  * Authors write JSON files (see content/sample/); `compileContent` validates them and produces one deterministic
  * compiled document. Showdown-owned battle data (base stats, display names, move names) is NOT copied here: records
  * name a `showdownId` and the runtime assembly resolves it against the pinned Showdown build.
@@ -9,7 +9,8 @@ import type { CurveId, PartialStats } from "../rules/types";
 export const AUTHOR_SCHEMA_VERSION = 2;
 export const LEGACY_AUTHOR_SCHEMA_VERSION = 1;
 export type AuthorSchema = 1 | 2;
-export const COMPILED_SCHEMA_VERSION = 3;
+/** R2: author species types are effective in every consumer; empty -> Normal and identity duplicates collapse. */
+export const COMPILED_SCHEMA_VERSION = 4;
 /** Author version; compiled consumers use COMPILED_SCHEMA_VERSION. */
 export const SCHEMA_VERSION = AUTHOR_SCHEMA_VERSION;
 export const CURVES_ALLOWED: readonly CurveId[] = ["medium", "fast", "slow", "parabolic", "erratic", "fluctuating"];

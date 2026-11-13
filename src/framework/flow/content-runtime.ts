@@ -127,6 +127,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
   if (compiled.species.length || itemInputs.items.some(item=>!!item.move)) for (const move of dex.allMoves?.() ?? []) setOwn(content.moves!,move.name,{...move});
   // Empty author content needs no external battle data, including the lazy Dex's identity lookup.
   const short = compiled.species.length ? dex.sha().slice(0, 8) : null;
+  const standardTypes = compiled.species.some(sp => sp.types !== undefined) && dex.allTypes ? new Set(dex.allTypes().map(type => type.name)) : undefined;
   // Provenance fact of this assembled runtime content, never a capability or save setting.
   if (content.meta && showdownDependencyProblem(sources) === null) content.meta.showdownSourceChecked = true;
   const baseHappiness = new Map(compiled.species.filter((sp) => (sp.form ?? 0) === 0).map((sp) => [sp.id, sp.happiness]));
@@ -142,7 +143,11 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     const learnset: Record<number, string[]> = {};
     let ok = true;
     const moveRef = (ref: string, field: string): string | null => { const move=dex.move(ref); if(!move){errors.push({file:"assembly",path:`${path}.${field}`,message:`unknown move ${ref}`});ok=false;return null;} if(move.id!==undefined&&move.pp!==undefined)setOwn(content.moves!,move.name,{id:move.id,name:move.name,pp:move.pp});return move.name; };
-    for(const [j,ref] of (sp.types??[]).entries())if(!dex.type?.(ref)){errors.push({file:"assembly",path:`${path}.types[${j}]`,message:`unknown type ${ref}`});ok=false;}
+    for(const [j,ref] of (sp.types??[]).entries()) {
+      const type = dex.type?.(ref);
+      if(!type){errors.push({file:"assembly",path:`${path}.types[${j}]`,message:`unknown type ${ref}`});ok=false;}
+      else if(standardTypes && !standardTypes.has(type.name)) warnings.push({file:"assembly",path:`${path}.types[${j}]`,message:`future-type-battle-unification-open: ${type.name} remains accepted; this species record keeps native battle types`});
+    }
     for(const field of ["abilities","hiddenAbilities"] as const)for(const [j,ref] of (sp[field]??[]).entries())if(ref!==null&&!dex.abilityInfo?.(ref)){errors.push({file:"assembly",path:`${path}.${field}[${j}]`,message:`unknown ability ${ref}`});ok=false;}
     const eggMoves = sp.eggMoves?.map((ref,j)=>moveRef(ref,`eggMoves[${j}]`)).filter((ref):ref is string=>ref!==null);
     const tutorMoves=(sp.tutorMoves??[]).map((ref,j)=>moveRef(ref,`tutorMoves[${j}]`)).filter((ref):ref is string=>ref!==null);
@@ -163,7 +168,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     const happiness = sp.happiness ?? baseHappiness.get(sp.id);
     setOwn(content.species, found.name, {
       base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset, nameKey: sp.nameKey, contentId: sp.id, form, ruleSpecies: found.baseSpecies ?? found.name,
-      ...(sp.abilities !== undefined ? {abilities:sp.abilities.map(ref=>ref===null?null:dex.abilityInfo!(ref)!.name)} : found.abilities ? { abilities: [...found.abilities] } : {}), ...(sp.hiddenAbilities !== undefined ? {hiddenAbilities:sp.hiddenAbilities.map(ref=>ref===null?null:dex.abilityInfo!(ref)!.name)} : found.hiddenAbilities ? { hiddenAbilities: [...found.hiddenAbilities] } : {}), types:sp.types!==undefined?sp.types.map(ref=>dex.type!(ref)!.name):[...(found.types??[])], tutorMoves, ...(eggMoves !== undefined ? { eggMoves } : {}),
+      ...(sp.abilities !== undefined ? {abilities:sp.abilities.map(ref=>ref===null?null:dex.abilityInfo!(ref)!.name)} : found.abilities ? { abilities: [...found.abilities] } : {}), ...(sp.hiddenAbilities !== undefined ? {hiddenAbilities:sp.hiddenAbilities.map(ref=>ref===null?null:dex.abilityInfo!(ref)!.name)} : found.hiddenAbilities ? { hiddenAbilities: [...found.hiddenAbilities] } : {}), types:sp.types!==undefined?[...new Set((sp.types.length?sp.types:["Normal"]).map(ref=>dex.type!(ref)!.name))]:[...(found.types??[])], tutorMoves, ...(eggMoves !== undefined ? { eggMoves } : {}),
       ...Object.fromEntries(["evolutions","flags","defaultForm","displayForm","pokedexForm","categoryKey","entryKey","heightDm","weightHg","color","shape","formName","formNameKey","dexSortKeys"].filter(field=>Object.hasOwn(sp,field)).map(field=>[field,JSON.parse(JSON.stringify((sp as unknown as Record<string,unknown>)[field])) as unknown])), ...(happiness !== undefined ? { happiness } : {}), ...(found.gender !== undefined ? { gender: found.gender } : {}),
     });
     // the persistent key (decision D5-3): content id + form <-> Showdown name, both ways

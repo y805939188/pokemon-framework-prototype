@@ -213,7 +213,7 @@ test('C-D2 public type tracking never reads hidden opposing getTypes, including 
   const hidden=b.gw._debugBattle().sides[0].active[0];t.mock.method(hidden,'getTypes',()=>{throw Error('opponent private types read');});
   const x=addedSnapshot(a),y=addedSnapshot(b);assert.deepEqual(y,x);assert.deepEqual(y.opponent.active[0].shownTypes,['Normal','Flying','Grass']);
 });
-for(const [side,values]of [['own',[]],['own',['Normal','Flying','Grass','Ghost']],['own',['Normal','Flying','Flying']],['own',['Normal','Flying','Mystery']],['public',[]],['public',['Normal','Flying','Grass','Ghost']],['public',['Normal','Flying','Flying']],['public',['Normal','Flying','Mystery']]])test('C-D2 '+side+' invalid types '+JSON.stringify(values)+' refuse before policy RNG',async()=>{
+for(const [side,values]of [['own',[]],['own',['Normal','Flying','Flying']],['own',['Normal','Flying','Mystery']],['public',[]],['public',['Normal','Flying','Flying']],['public',['Normal','Flying','Mystery']]])test('C-D2 '+side+' invalid types '+JSON.stringify(values)+' refuse before policy RNG',async()=>{
   const w=await addedTypeFixture({npcMoves:['splash'],npcTurns:[1]});
   const snapshot=addedSnapshot(w);snapshot.request={kind:'wait'};
   if(side==='own')ownActive(snapshot).types=values;else snapshot.opponent.active[0].shownTypes=values;

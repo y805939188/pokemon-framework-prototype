@@ -49,12 +49,20 @@ function recorded(b){return{request:b.req,initial:b.initial,steps:b.steps,result
 async function run(stage,c,folder){
  folder=fs.realpathSync(folder);const tmp=fs.realpathSync(os.tmpdir());assert(path.dirname(folder)===tmp&&path.basename(folder).startsWith('pf-e-status-disk-'),'owned temporary test directory only');
  const marker=JSON.parse(fs.readFileSync(path.join(folder,'OWNED-STATUS-DISK-TEST.json')));assert.equal(marker.version,PLAN.version);assert.equal(marker.caseId,c.id);
- // Current successor regression binding; the historical PLAN.runtime remains unchanged.
+ const parentBinding=process.env.PF_HEADLESS_REGRESSION_BINDING;let candidate=null,candidateBinding=null;
+ if(parentBinding||marker.candidateBindingSHA256){
+  assert(parentBinding&&marker.candidateBindingSHA256,'parent candidate binding is required for this owned run');
+  candidateBinding=require('../../../scripts/headless-regression-binding.cjs');
+  candidate=candidateBinding.capture(ROOT,parentBinding,marker.candidateBindingSHA256);
+  assert.equal(candidate.binding.showdownSHA,PLAN.showdownSHA,'fixed status-vector Showdown pin');
+ }else{
+ // Explicit historical precision mode. Neither this binding nor PLAN.runtime is rewritten.
  const binding=require('./capture-run-current-headless-runtime.json');assert.equal(binding.schema,'capture-run-current-headless-v1');assert.equal(binding.showdownSHA,PLAN.showdownSHA);assert.equal(Object.keys(binding.runtime).length,9);
  assert.equal(require('node:child_process').execFileSync('git',['rev-parse','HEAD:src'],{cwd:ROOT,encoding:'utf8'}).trim(),binding.productSrcTree,'current product source tree');
  for(const[n,h]of Object.entries(binding.runtime))assert.equal(fileHash(path.join(ROOT,n)),h,'current headless runtime '+n);
  assert.equal(fileHash(path.join(ROOT,'js/engine/showdown/dist/config/custom-formats.js')),binding.runtime['js/engine/build/custom-formats.cjs'],'current staged extension');
  assert.equal(fs.readFileSync(path.join(ROOT,'js/engine/showdown/SOURCE_SHA'),'utf8').trim(),PLAN.showdownSHA);
+ }
  const file=path.join(folder,'game.json'),ct=content();let setupSaves=0;
  if(stage==='produce'){assert(!fs.existsSync(file),'producer cannot replace a prior save');storeFor(file,ct).save(newState(ct,c));setupSaves=1;}else assert(fs.existsSync(file),'consumer requires a real prior disk document');
  const w=application(file,ct),loaded=clone(w.state.read()),loadedRawSHA256=fileHash(file),battles=[];let ownedRetirement=false;
@@ -82,7 +90,8 @@ async function run(stage,c,folder){
    }else{await finish(w,b);assert.equal(w.installs.length,c.check==='heal-and-PPUps-after-read'?2:1);}
   }
   const final=clone(w.state.read());assert.deepEqual(w.store.load(),final);assert(!fs.existsSync(file+'.tmp'));
-  return{scope:'HEADLESS_APP_SAVESTORE_NEW_NODE_NOT_MZ_CONTINUE',id:c.id,stage,pid:process.pid,ppid:process.ppid,node:process.versions.node,loaded,loadedSHA256:stateHash(loaded),loadedRawSHA256,final,finalSHA256:stateHash(final),finalRawSHA256:fileHash(file),setupSaves,installs:w.installs,battles:battles.map(recorded),ownedRetirement,saveFile:file,saveFiles:fs.readdirSync(folder).filter(n=>n.startsWith('game.json')).sort(),NW:0};
+  if(candidate)assert.deepEqual(candidateBinding.verify(ROOT,candidate.binding),candidate.identity,'same candidate after worker');
+  return{scope:'HEADLESS_APP_SAVESTORE_NEW_NODE_NOT_MZ_CONTINUE',candidateIdentity:candidate?.identity??null,contentIdentity:E.contentRuntime.validatedContentIdentity(ct),id:c.id,stage,pid:process.pid,ppid:process.ppid,node:process.versions.node,loaded,loadedSHA256:stateHash(loaded),loadedRawSHA256,final,finalSHA256:stateHash(final),finalRawSHA256:fileHash(file),setupSaves,installs:w.installs,battles:battles.map(recorded),ownedRetirement,saveFile:file,saveFiles:fs.readdirSync(folder).filter(n=>n.startsWith('game.json')).sort(),NW:0};
  }finally{if(w.active)w.app.abortBattle(w.active.req,Error('owned disk worker failure cleanup'));}
 }
 module.exports={content,newState,storeFor,application,run,stateHash};

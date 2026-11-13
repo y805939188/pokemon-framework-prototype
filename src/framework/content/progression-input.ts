@@ -66,6 +66,16 @@ export function inheritSpecies(records: readonly SpeciesSource[]): SpeciesSource
 
 export function deriveSpeciesFields(records: SpeciesSource[], report: ProgressionReport, diagnostic?: ProgressionReport): void {
   for (const [i, sp] of records.entries()) {
+    // Approved R2 semantics. Run after inheritance and overlays, without altering author source objects.
+    if (sp.types !== undefined) {
+      const seen = new Set<string>();
+      sp.types = sp.types.filter(type => {
+        const identity = type.toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (seen.has(identity)) return false;
+        seen.add(identity); return true;
+      });
+      if (!sp.types.length) sp.types = ["Normal"];
+    }
     sp.color ??= "Red";
     sp.shape ??= "Head";
     const defaults = new Set<number>();

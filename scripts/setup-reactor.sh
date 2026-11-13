@@ -48,6 +48,9 @@ Environment:
       Install runtime + declarations from this checkout; remember it locally.
   REACTOR_SOURCE=download
       Use the commit in versions.env (must contain the declaration bundle).
+  REACTOR_ALLOW_OTHER_COMMIT=1
+      Local development override, explicitly NON-STRICT; accepts changed bytes,
+      other commits and non-git sources. Never records a strict pinned install.
 USAGE
 }
 
@@ -139,11 +142,14 @@ runtime_is_expected() {
   [[ -f "$ROOT/js/libs/pixi.js" ]] || return 1
   [[ -f "$ROOT/js/libs/pixi_compat.js" ]] || return 1
 
+  node "$SCRIPT_DIR/reactor-source.cjs" runtime-check "$ROOT" "${LOCAL_SOURCE:--}" "$REACTOR_REPO" "$REACTOR_COMMIT" "$ASSURANCE" || return 1
+
   return 0
 }
 
 types_are_expected() {
   source_matches || return 1
+  node "$SCRIPT_DIR/reactor-source.cjs" check "$ROOT" "${LOCAL_SOURCE:--}" "$REACTOR_REPO" "$REACTOR_COMMIT" "$ASSURANCE" || return 1
   if [[ -n "$LOCAL_SOURCE" ]]; then
     node "$SCRIPT_DIR/reactor-types.cjs" check "$TYPES_DEST" "$LOCAL_SOURCE"
   else
@@ -255,6 +261,11 @@ write_reactor_index() {
 HTML
 }
 
+ASSURANCE="strict"
+if [[ -n "$LOCAL_SOURCE" && "${REACTOR_ALLOW_OTHER_COMMIT:-0}" == "1" ]]; then
+  ASSURANCE="development"
+fi
+
 if [[ -n "$LOCAL_SOURCE" ]]; then
   if [[ ! -f "$LOCAL_SOURCE/runtime/reactor_main.js" ]]; then
     echo "ERROR: Invalid local Reactor source: $LOCAL_SOURCE" >&2
@@ -265,26 +276,34 @@ if [[ -n "$LOCAL_SOURCE" ]]; then
   # The pin is a commit, not a version string: refuse a checkout that moved (git pull, other branch) unless told otherwise.
   if git -C "$LOCAL_SOURCE" rev-parse --git-dir >/dev/null 2>&1; then
     LOCAL_COMMIT="$(git -C "$LOCAL_SOURCE" rev-parse HEAD)"
-    if [[ "$LOCAL_COMMIT" != "$REACTOR_COMMIT" && "${REACTOR_ALLOW_OTHER_COMMIT:-0}" != "1" ]]; then
+    if [[ "$LOCAL_COMMIT" != "$REACTOR_COMMIT" && "$ASSURANCE" == "strict" ]]; then
       echo "ERROR: Reactor checkout $LOCAL_SOURCE is at $LOCAL_COMMIT, the pin is $REACTOR_COMMIT (scripts/versions.env)." >&2
-      echo "Check out the pinned commit, or set REACTOR_ALLOW_OTHER_COMMIT=1 to accept this one (then update versions.env and the docs)." >&2
+      echo "Check out the pinned commit, or set REACTOR_ALLOW_OTHER_COMMIT=1 for explicitly non-strict local development." >&2
       exit 1
     fi
   else
-    echo "WARNING: $LOCAL_SOURCE is not a git checkout; its commit cannot be verified against the pin." >&2
+    if [[ "$ASSURANCE" == "strict" ]]; then
+      echo "ERROR: Strict pinned Reactor source must be a git checkout. Use REACTOR_ALLOW_OTHER_COMMIT=1 for non-strict local development." >&2
+      exit 1
+    fi
   fi
-  REACTOR_VERSION="$(runtime_version_for_file "$SOURCE_ROOT/runtime/reactor_main.js")"
-  REACTOR_RUNTIME_REVISION="$(runtime_revision_for_file "$SOURCE_ROOT/runtime/reactor_main.js")"
+  if [[ "$ASSURANCE" == "development" ]]; then
+    REACTOR_VERSION="$(runtime_version_for_file "$SOURCE_ROOT/runtime/reactor_main.js")"
+    REACTOR_RUNTIME_REVISION="$(runtime_revision_for_file "$SOURCE_ROOT/runtime/reactor_main.js")"
+  fi
   if [[ -z "$REACTOR_VERSION" || -z "$REACTOR_RUNTIME_REVISION" ]]; then
     echo "ERROR: Local runtime has no version/revision stamp." >&2
     exit 1
   fi
+  # Check actual files, not git diff: staged, unstaged and newly copied files
+  # all participate. This must precede idempotence and any project mutation.
+  node "$SCRIPT_DIR/reactor-source.cjs" validate "$SOURCE_ROOT" "$REACTOR_REPO" "$REACTOR_COMMIT" "$ASSURANCE"
 fi
 
-if [[ -n "$LOCAL_SOURCE" ]]; then
-  SOURCE_ID="local:$LOCAL_SOURCE"
+if [[ "$ASSURANCE" == "development" ]]; then
+  SOURCE_ID="development:local:$LOCAL_SOURCE"
 else
-  SOURCE_ID="github:$REACTOR_REPO@$REACTOR_COMMIT"
+  SOURCE_ID="pinned:$REACTOR_REPO@$REACTOR_COMMIT"
 fi
 
 echo
@@ -298,6 +317,11 @@ else
 fi
 echo "Expected version: $REACTOR_VERSION"
 echo "Runtime revision: $REACTOR_RUNTIME_REVISION"
+if [[ "$ASSURANCE" == "development" ]]; then
+  echo "Assurance:        DEVELOPMENT (NON-STRICT; no pinned-source claim)"
+else
+  echo "Assurance:        strict pinned source bytes"
+fi
 echo
 
 # ------------------------------------------------------------
@@ -436,6 +460,7 @@ echo "  revision: $SOURCE_REVISION"
 # Validate types BEFORE changing any game runtime files. Old remote snapshots
 # without the custom types must fail instead of leaving a half-working TS setup.
 node "$SCRIPT_DIR/reactor-types.cjs" validate "$TYPES_DEST" "$SOURCE_ROOT"
+node "$SCRIPT_DIR/reactor-source.cjs" validate "$SOURCE_ROOT" "$REACTOR_REPO" "$REACTOR_COMMIT" "$ASSURANCE"
 
 # ------------------------------------------------------------
 # Reject unexpected stock corescript
@@ -470,7 +495,7 @@ rm -rf "$ROOT/js/libs"
 
 find "$ROOT/js" \
   -maxdepth 1 \
-  -type f \
+  \( -type f -o -type l \) \
   -name 'reactor_*.js' \
   ! -name 'reactor_plugins.js' \
   -delete

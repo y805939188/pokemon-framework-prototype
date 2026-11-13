@@ -40,7 +40,7 @@
 | `pokemon-framework-reference` | clean-room 规格与证据（131 份正式规格、87 个 WP、去向清单 736 单元） | **只读使用**。规格在 `deliverables/final-specification-set/`，推导期望在其 `test-catalog/`，去向清单在 `planning/implementation-routing/r8-20261017/` |
 | `rpg-maker-mz-initialize` | 通用 MZ+Reactor+TS 工程模板（`b6fa1df`），本仓库由它起步 | 已不再需要修改；不要把通用模板改成实验工程 |
 
-仓库外但必需的依赖（不在 git 里，换机器要重新准备，见第 9 节）：RPGReactor 源码检出 `/Users/dingshinn/Desktop/RPGReactor`（固定 0.98.8 @ `2dc2e10e`）、已安装的 RPG Maker MZ（Steam 版）、Showdown 源码缓存 `~/Library/Caches/pokemon-framework/showdown-src`。
+仓库外但必需的依赖（不在 git 里，换机器要重新准备，见第 9 节）：RPGReactor 运行时与声明（固定 0.98.8 @ `2dc2e10e`，脚本下载或用 `REACTOR_SOURCE` 选择本地检出）、已安装的 RPG Maker MZ（Steam 版）、Showdown 源码缓存 `~/Library/Caches/pokemon-framework/showdown-src`。
 
 ## 3. 铁律
 
@@ -119,18 +119,27 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 
 ## 9. 环境准备（从零）
 
-前提：Apple Silicon Mac；Node ≥ 22（开发用 22.21.1，Showdown 要求 ≥ 22.18）；pnpm 10.20.0；git；已安装 RPG Maker MZ（Steam 版，其 NW.js 已是 0.117.0 SDK arm64——`scripts/doctor.sh` 会检查）；RPGReactor 源码检出在 `/Users/dingshinn/Desktop/RPGReactor`，必须是带类型声明的 `2dc2e10e`（0.98.8；0.98.7 标签没有类型包）——`scripts/versions.env` 已固定该提交，本地检出不是它时 `setup-reactor.sh`/`doctor.sh` 会报错（确认要用别的提交时设 `REACTOR_ALLOW_OTHER_COMMIT=1` 并同步改 versions.env 与文档）；下载模式没有为这个提交验证过。
+前提：Apple Silicon Mac；Node ≥ 22.18（本轮用 22.21.1）；pnpm 10.20.0；git；已安装 RPG Maker MZ（Steam 版，其 NW.js 应为 0.117.0 SDK arm64——`scripts/doctor.sh` 会检查）。Reactor 由脚本下载 `scripts/versions.env` 固定的 `2dc2e10e`（0.98.8，含声明；0.98.7 标签缺少类型包），也可显式选择任意路径下的同一固定本地检出。2026-11-13 已实际验证全新缓存下载／严格安装，并与本地严格来源的 40 个运行时和 12 个声明文件逐字节比对一致；这不代替完整 MZ／NW 或分发验收。
 
 ```bash
 cd pokemon-framework-prototype
-REACTOR_SOURCE=/Users/dingshinn/Desktop/RPGReactor ./scripts/bootstrap-mac.sh   # Reactor 运行时、MZ 素材、依赖、类型检查、构建、doctor（20 项应全过）
-pnpm --dir src build:engine                                                                  # 引擎包（Showdown 扩展由它暂存）
-./scripts/build-showdown.sh                                                                 # 固定提交的 Showdown → js/engine/showdown
-pnpm --dir src build                                                                        # 插件
-./scripts/test-quick.sh                                                                     # 自检
+REACTOR_SOURCE=download ./scripts/bootstrap-mac.sh   # 完成全部环境准备和构建，最后运行 doctor
+./scripts/test-quick.sh                                                    # 自检
 ```
 
+如已有固定的本地源码，可把上面环境值改为 `REACTOR_SOURCE=/path/to/RPGReactor`。本地源码和下载使用同一固定摘要；开发偏离须显式设置 `REACTOR_ALLOW_OTHER_COMMIT=1`，不会被记为严格 pin。
+
+`bootstrap` 先安装 Reactor 运行时／声明、MZ 素材与 TypeScript 依赖，再运行 `typecheck`（包含 `types:prepare`）；随后按 `pnpm --dir src build:engine` → `scripts/build-showdown.sh` → `pnpm --dir src build` → 最终检查与 `doctor` 的顺序完成准备。基础引擎构建先生成当前 `custom-formats.cjs`，Showdown 构建将它暂存到战斗运行时，完整构建中的内容编译便可使用该运行时的 Dex。冷环境没有引擎包、Showdown 暂存或编译内容时也走同一入口；上面无需追加单独的构建命令。
+
 生成物/忽略项（不提交、可重建）：`js/engine/showdown/`、`js/plugins/PS_*.js`、`RR_*.js`、`js/libs`、`js/reactor_*.js`、`index.html`、`src/node_modules`、`src/vendor/rpgreactor`、`.reactor-source`、`save/`、`build/`，以及本地复制的 MZ 素材（`.git/info/exclude`）。Showdown 源码缓存放在仓库外（`~/Library/Caches/pokemon-framework/showdown-src`，`SHOWDOWN_SRC` 可覆盖；首次 `build-showdown.sh` 时下载生成），因为 MZ 部署会复制整个项目根目录。已经 staged 的引擎不依赖缓存，只有重建才需要它。
+
+Reactor 正式准备还核对固定提交的实际消费文件集合与 SHA-256；仅 HEAD 或版本注释相同不足以通过。`REACTOR_ALLOW_OTHER_COMMIT=1` 只启用显式非严格开发模式，不代表固定来源验收；旧安装记录需执行一次 `--install` 迁移。清单、模式与测试边界见 [Reactor 来源合同](framework-remediation/reactor-source-identity.zh.md)。
+
+regular 无头测试还需要 Python 3，用于固定 canonical JSON／UTF-8／SHA-256 向量的独立字节复核；不执行原版或冻结对照业务。应用操作、正式驱动能力及跨语言值语义见 [操作合同](framework-remediation/application-operation-contract.zh.md)、[正式能力合同](framework-remediation/formal-battle-capabilities.zh.md)、[迁移向量蓝本](framework-remediation/migration-vectors.zh.md)。
+
+本轮架构整改的编译内容语义为 4（作者 schema 仍为 2／显式 legacy 1，持久存档仍为 9，战斗协议仍为 v1）。旧 compiled cache 需从作者源重新构建；不会自动修改作者 JSON 或玩家档。Gen8 标准类型列表不截断，按类型身份去重，显式空列表规范化为 Normal，并用于图鉴、静态摘要、进化和战斗基础类型。战斗临时类型另由引擎拥有。Stellar 等 Future 类型仍接受并给出 warning，但其整条记录保留原生战斗行为，一致性仍 OPEN；范围与测试见 [作者类型合同](framework-remediation/r2-author-types-contract.zh.md)。
+
+本轮架构整改的固定候选、逐批提交与独审、冷准备和三轮 regular 实绩见 [整改总回执](framework-remediation/architecture-review-remediation.zh.md)。该回执区分产品候选与后继文档提交，不替代原5.4收口／历史实机证据，也不预签NW、性能或后续功能。
 
 ## 10. 已知坑
 

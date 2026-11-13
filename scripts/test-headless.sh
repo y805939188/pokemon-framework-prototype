@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Regular headless checks for CI and release validation; historical reference replay is excluded (NOT RUN).
-# Needs: Node >= 22.18, JS dependencies installed (pnpm --dir src install), the engine staged (scripts/build-showdown.sh). Type checking of the plugins needs Reactor's
-# declaration bundle and lives in scripts/test-quick.sh (typecheck + this script).
+# Needs: Node >= 22.18, JS dependencies installed (pnpm --dir src install), the engine staged (scripts/build-showdown.sh),
+# and Reactor's installed declaration bundle. Host compiler suites also need its generated DOM compatibility declarations;
+# prepare them here for cold CI and direct regular runs. Full plugin typechecking additionally lives in scripts/test-quick.sh.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -155,6 +156,17 @@ SUITES=(
   experiments/step2/s5/test-engine-contract.cjs
   scripts/tests/headless-scope.test.cjs
   scripts/tests/reactor-install.test.cjs
+  scripts/tests/reactor-source-identity.test.cjs
+  scripts/tests/bootstrap-mac.test.cjs
+  scripts/tests/host-application-types.test.cjs
+  scripts/tests/host-input.test.cjs
+  experiments/framework-remediation/test-formal-battle-capabilities.cjs
+  experiments/framework-remediation/test-application-operation-contract.cjs
+  experiments/framework-remediation/test-field-potion-vectors.cjs
+  experiments/framework-remediation/test-value-semantics-contract.cjs
+  experiments/framework-remediation/test-r2-author-types-contract.cjs
+  experiments/framework-remediation/test-r2-ai-effectiveness-contract.cjs
+  scripts/tests/headless-regression-binding.test.cjs
   scripts/tests/showdown-build.test.cjs
   scripts/tests/package-excludes.test.cjs
   scripts/tests/check-boundaries.test.cjs
@@ -317,14 +329,27 @@ for excluded in "${EXCLUDED_SUITES[@]}"; do
   printf 'EXCLUDED (NOT RUN): %s\n' "$excluded"
 done
 [[ -d js/engine/showdown/dist ]] || { echo "engine not staged: run scripts/build-showdown.sh first" >&2; exit 1; }
+# Generate host compatibility declarations before compiler suites, including on cold CI.
+pnpm --dir src types:prepare
 # the TS framework: strict type check, import-boundary check, then rebuild runtime, declarations, sample and local delivery
 pnpm --dir src typecheck:framework
 node scripts/check-boundaries.cjs
+# Capture the ordinary regression candidate before its controlled build. Historical
+# acceptance plans stay frozen; each worker verifies this one parent-owned binding.
+binding_dir="$(mktemp -d "${TMPDIR:-/tmp}/pf-headless-binding.XXXXXX")"
+trap 'rm -rf "$binding_dir"' EXIT
+node scripts/headless-regression-binding.cjs begin "$binding_dir/begin.json"
 pnpm --dir src build:distribution > /dev/null
 # Normal held-source release verifies the compiled host and fresh-process Continue, not only developer fixtures.
 for plugin in PS_BattleFlow PS_SaveState PS_Evolution PS_BattleFlowTest; do
   RR_PLUGIN="$plugin" pnpm --dir src exec vite build > /dev/null
 done
+node scripts/headless-regression-binding.cjs finish "$binding_dir/begin.json" "$binding_dir/binding.json"
+mkdir -p "$ROOT/build/headless-regression-bindings"
+binding_receipt="$ROOT/build/headless-regression-bindings/$(basename "$binding_dir").json"
+( set -C; cat "$binding_dir/binding.json" > "$binding_receipt" )
+echo "Current synthetic Node regression binding: $binding_receipt"
+export PF_HEADLESS_REGRESSION_BINDING="$binding_dir/binding.json"
 export H3_RUNTIME_ROOT="$ROOT"
 fail=0
 for s in "${SUITES[@]}"; do
@@ -338,4 +363,5 @@ for s in "${SUITES[@]}"; do
   # PF_NO_SKIP=1 (CI since step 5.0, D5-9): a skipped test is a failure too, so "the runtime was missing" cannot pass
   if [[ "${PF_NO_SKIP:-}" == "1" && "$out" == *"# skipped "* && "$out" != *"# skipped 0"* ]]; then fail=1; echo "    skipped tests are not allowed here (PF_NO_SKIP=1)"; fi
 done
+if ! node scripts/headless-regression-binding.cjs verify "$binding_dir/binding.json"; then fail=1; fi
 exit $fail

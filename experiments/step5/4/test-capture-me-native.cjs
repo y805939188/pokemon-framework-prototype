@@ -3,6 +3,9 @@
 // contracts are exercised; audio/render scheduling is not native execution.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),{spawnSync}=require('node:child_process'),{stripTypeScriptTypes}=require('node:module');
 const ROOT=path.resolve(__dirname,'../../..'),PLAN=require('./capture-me-native-plan.json'),E=require('../../../js/engine/build/production.cjs'),{BattleSession}=require('../../../js/engine/game/session.cjs');
+const candidateBinding=process.env.PF_HEADLESS_REGRESSION_BINDING?require('../../../scripts/headless-regression-binding.cjs'):null;
+const candidate=process.env.PF_HEADLESS_REGRESSION_BINDING?candidateBinding.capture(ROOT,process.env.PF_HEADLESS_REGRESSION_BINDING):null;
+if(candidate&&process.env.PF_CAPTURE_SYNC_PRODUCT_ROOT)assert.equal(fs.realpathSync(process.env.PF_CAPTURE_SYNC_PRODUCT_ROOT),candidate.binding.root,'bound capture product root must match the parent binding');
 let tmp,mod,fixture,source,nodes,content,sceneHost,sceneTemp;
 const eq=(a,b,label)=>assert.equal(JSON.stringify(a),JSON.stringify(b),label),clone=v=>JSON.parse(JSON.stringify(v));
 function mutateNative(code){
@@ -18,7 +21,7 @@ test.before(async()=>{
  source=mutateNative(fs.readFileSync(path.join(ROOT,'src/plugins/flowtest/d2-capture-me.ts'),'utf8'));nodes=[];const parse=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]})).parseAst;
  (function walk(n){if(!n||typeof n!=='object')return;if(Array.isArray(n)){n.forEach(walk);return;}nodes.push(n);for(const x of Object.values(n))walk(x);})(parse(source,{lang:'ts'}));
 });
-test.after(()=>{if(tmp)fs.rmSync(tmp,{recursive:true,force:true});if(sceneTemp)fs.rmSync(sceneTemp,{recursive:true,force:true});});
+test.after(()=>{if(tmp)fs.rmSync(tmp,{recursive:true,force:true});if(sceneTemp)fs.rmSync(sceneTemp,{recursive:true,force:true});if(candidate)candidateBinding.verify(ROOT,candidate.binding);});
 function init(name){const n=nodes.find(n=>n.type==='VariableDeclarator'&&n.id.name===name);assert(n,name);return stripTypeScriptTypes(source.slice(n.init.start,n.init.end));}
 function helper(name,deps){return vm.runInNewContext('(({'+Object.keys(deps).join(',')+'})=>('+init(name)+'))')(deps);}
 test('native plan freezes exact product and15 ordered cases, two-process denominator',()=>{
@@ -29,7 +32,9 @@ test('native plan freezes exact product and15 ordered cases, two-process denomin
  // freeze checks actual bundle bytes against f021. This digest now records the
  // reviewed normal-observer, Pokedex-continuation, player-nickname, shared literal-message Pay Day notification and forced-turn continuation source for current headless controls only. No requalification of
  // the historical fifteen-case App/PLAN is implied: new native packaging must rebind separately.
- const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));assert.equal(crypto.createHash('sha256').update(product).digest('hex'),require('./capture-run-current-headless-runtime.json').pluginSources['src/plugins/PS_BattleFlow.ts'],'current headless source identity; historical native plan still requires rebind');
+ const crypto=require('node:crypto'),product=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'));
+ const expected=candidate?candidateBinding.boundFiles(candidate,['src/plugins/PS_BattleFlow.ts'])['src/plugins/PS_BattleFlow.ts']:require('./capture-run-current-headless-runtime.json').pluginSources['src/plugins/PS_BattleFlow.ts'];
+ assert.equal(crypto.createHash('sha256').update(product).digest('hex'),expected,'synthetic control source identity; historical native plan still requires rebind');
 });
 for(const kind of ['map','title'])test('actual driver readiness rejects unstarted/changing/incomplete '+kind,()=>{
  class Map{}class Title{}let changing=false;const G={Scene_Map:Map,Scene_Title:Title,SceneManager:{isSceneChanging:()=>changing}},v=new(kind==='map'?Map:Title)();let started=false,active=true,busy=false;
