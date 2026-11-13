@@ -135,6 +135,8 @@ Reactor 正式准备还核对固定提交的实际消费文件集合与 SHA-256�
 
 regular 无头测试还需要 Python 3，用于固定 canonical JSON／UTF-8／SHA-256 向量的独立字节复核；不执行原版或冻结对照业务。应用操作、正式驱动能力及跨语言值语义见 [操作合同](framework-remediation/application-operation-contract.zh.md)、[正式能力合同](framework-remediation/formal-battle-capabilities.zh.md)、[迁移向量蓝本](framework-remediation/migration-vectors.zh.md)。
 
+本轮架构整改的编译内容语义为 4（作者 schema 仍为 2／显式 legacy 1，持久存档仍为 9，战斗协议仍为 v1）。旧 compiled cache 需从作者源重新构建；不会自动修改作者 JSON 或玩家档。Gen8 标准类型列表不截断，按类型身份去重，显式空列表规范化为 Normal，并用于图鉴、静态摘要、进化和战斗基础类型。战斗临时类型另由引擎拥有。Stellar 等 Future 类型仍接受并给出 warning，但其整条记录保留原生战斗行为，一致性仍 OPEN；范围与测试见 [作者类型合同](framework-remediation/r2-author-types-contract.zh.md)。
+
 ## 10. 已知坑
 
 - Showdown 把昵称（我们的稳定 id）截成 20 个字符并清理分隔符，所以 id 限 1–18 个安全字符（`BattleSession.create` 会拒绝其他 id）。

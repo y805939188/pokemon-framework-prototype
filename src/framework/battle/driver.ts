@@ -16,6 +16,8 @@ export interface PlayerSpec {
 }
 
 export interface GatewayOptions {
+  /** Snapshot-owned static content binding; never a persistent Member field or temporary type override. */
+  speciesTypes?: Readonly<Record<string, readonly string[]>>;
   initialField?: InitialFieldInput;
   formatid?: string;
   seed?: number[] | string;

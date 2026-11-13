@@ -67,7 +67,7 @@ function collectPublicTypes(s:Source,type:string,a:string,b:string,c:string,d:st
   if(!slot)return;
   let current=s[slot];
   if(['switch','drag','replace','-formechange','detailschange'].includes(type)){
-    const species=s.env.sim.Dex.forGen(8).species.get(b.split(',')[0]!);
+    const species=s.battle.dex.species.get(b.split(',')[0]!);
     if(!species.exists)throw new Error('trainer-ai-unknown-public-species');
     const base=[...species.types];
     if(type==='replace'&&current){
@@ -125,7 +125,7 @@ export function trainerSourcePublic(driver:BattleDriver,lines:readonly string[])
     }
     if(!a.startsWith('p1a:'))continue;
     if(type==='switch'||type==='drag'||type==='replace'){
-      const speciesName=b.split(',')[0]!,species=s.env.sim.Dex.forGen(8).species.get(speciesName);
+      const speciesName=b.split(',')[0]!,species=s.battle.dex.species.get(speciesName);
       if(!species.exists)throw new Error('trainer-ai-unknown-public-species');
       const previous=type==='replace'?s.public:null;
       const level=Number(/(?:^|, )L(\d+)/.exec(b)?.[1]??100),bar=c?hpBar(c):previous?.hpBar;

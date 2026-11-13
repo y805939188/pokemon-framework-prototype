@@ -52,7 +52,7 @@ export function individualView(member: Member, game: GameState, content: Content
   return clone({ member, position: locateMember(game, member.id)?.position ?? null, ...(species?.nameKey ? { nameKey: species.nameKey } : {}), battleName,
     stats: species ? computeStats(species.base, member.ivs, member.evs, member.level, computedNature(member)) : null,
     modifiers: natureModifiers(computedNature(member)), currentLevelExp: species ? minExp(species.growth,member.level) : null, nextLevelExp: species && member.level < 100 ? minExp(species.growth, member.level + 1) : null,
-    publicId: publicIdText(member.owner?.id ?? 0), characteristic: characteristic(member.personalID ?? 0, member.ivs ?? {}), types: statics?.types ?? [],
+    publicId: publicIdText(member.owner?.id ?? 0), characteristic: characteristic(member.personalID ?? 0, member.ivs ?? {}), types: species?.types ?? statics?.types ?? [],
     ability: allowedDex?.abilityInfo?.(member.ability) ?? { name: member.ability, description: '' },
     moves: member.moves.map(move => ({ ...move, ...(allowedDex?.moveDetails?.(move.id) ?? { name: move.id, type: '', category: '', power: null, accuracy: 0, description: '' }) })),
     diagnostics: species ? [] : ['member-content-unavailable'] });

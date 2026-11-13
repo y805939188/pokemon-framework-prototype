@@ -260,6 +260,7 @@ export class BattleSession {
     }
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
     s.gw = await driver.create({
+      speciesTypes: Object.fromEntries(Object.entries(content.species).filter(([, data]) => data.types !== undefined).map(([name, data]) => [name, [...data.types!]])),
       ...(initialField ? { initialField } : {}),
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
       requiredSettlement,

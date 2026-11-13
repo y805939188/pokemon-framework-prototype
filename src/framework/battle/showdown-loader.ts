@@ -9,6 +9,7 @@ import path from "node:path";
 import type { ShowdownSim, ShowdownBattle } from "./showdown-types";
 import type { FormatObserver } from "../rules/battle-evidence";
 import type { HeldRuntimeObserver } from "../rules/held-facts";
+import { restoreSpeciesTypes } from './species-types';
 
 // The bundle is CommonJS, so the real Node `require` is in scope here (and is the one NW.js gives to the page).
 const nodeRequire: NodeJS.Require = require;
@@ -50,6 +51,7 @@ export function restoreSimBattle(env: LoadedSim, snapshot: string): ShowdownBatt
     }
   }
   const battle = env.sim.Battle.fromJSON(state);
+  restoreSpeciesTypes(battle, state);
   if (detached.length) {
     const { State } = nodeRequire(path.join(env.root, "dist", "sim", "state"));
     for (const saved of detached) {
