@@ -3,8 +3,9 @@
 // contracts are exercised; audio/render scheduling is not native execution.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),{spawnSync}=require('node:child_process'),{stripTypeScriptTypes}=require('node:module');
 const ROOT=path.resolve(__dirname,'../../..'),PLAN=require('./capture-me-native-plan.json'),E=require('../../../js/engine/build/production.cjs'),{BattleSession}=require('../../../js/engine/game/session.cjs');
-const candidateBinding=require('../../../scripts/headless-regression-binding.cjs');
+const candidateBinding=process.env.PF_HEADLESS_REGRESSION_BINDING?require('../../../scripts/headless-regression-binding.cjs'):null;
 const candidate=process.env.PF_HEADLESS_REGRESSION_BINDING?candidateBinding.capture(ROOT,process.env.PF_HEADLESS_REGRESSION_BINDING):null;
+if(candidate&&process.env.PF_CAPTURE_SYNC_PRODUCT_ROOT)assert.equal(fs.realpathSync(process.env.PF_CAPTURE_SYNC_PRODUCT_ROOT),candidate.binding.root,'bound capture product root must match the parent binding');
 let tmp,mod,fixture,source,nodes,content,sceneHost,sceneTemp;
 const eq=(a,b,label)=>assert.equal(JSON.stringify(a),JSON.stringify(b),label),clone=v=>JSON.parse(JSON.stringify(v));
 function mutateNative(code){

@@ -42,4 +42,16 @@ per-run 模式保留现有完整磁盘文件、raw/state/result hash、独立新
 
 作者实际执行：Node 22.21.1，`node --test scripts/tests/headless-regression-binding.test.cjs` 最终 28／28 通过，失败／取消／跳过均 0；相关 16 个 JS 文件语法与 diff 检查通过，历史 binding／PLAN 的 diff 为零。本轮未运行共享 build 或真实候选 worker 专项，后者由根协调后继记录。三套 step1 distribution／public-api／external-consumer 测试已只读核对，写入只发生在各自临时输出／副本，没有修改共享分发或运行包的负控。
 
+## d753 默认路径之后的独审修正
+
+根协调在固定 `d753807` fresh distribution＋四插件＋finish 下的八套目标 77／77 通过，仅适用于其实际默认路径。后置独审确认三处边界另需修正，不能沿用 77 项作为这些边界已通过的证据：
+
+- 无 binding 的历史模式仅在需要时加载新 helper；H3 support／Continue／install，以及 disk worker／父入口不再要求旧冻结 root 存在新脚本。新增合成缺-helper root 测试只验证到达原 source／文件身份门，不读取实际旧副本，也不宣称历史业务重跑。
+- capture 的共享 Scene initializer 实际 VM 读取的 `test-capture-me-port.cjs` 与 `test-battle-music-scene.cjs` 明确加入 controlled inputs；任一字节变化必须在消费前拒绝。
+- 受 binding 的 capture Native 入口与共享 Scene beforehook 在外 root 源码读取或构建前，核 `PF_CAPTURE_SYNC_PRODUCT_ROOT` 的 realpath 等于父 binding.root。允许同 realpath 别名，核准后使用规范 root；无 binding 的原外 root 用法保留，不建立通用环境策略。
+
+同一合成 suite 先复现 34 通过／9 失败（五个旧模式缺 helper、两个 host 漏控、两个外 root 门缺失），窄修后最终 43／43 通过，失败／取消／跳过均 0。新增十五项包含上述失败负控及 Native／Scene 的相同 root、别名和历史外 root 正控；对 Scene 还验证最终选择的消费 root。命令仍为 `node --test scripts/tests/headless-regression-binding.test.cjs`。作者未运行共享构建或新固定候选业务专项；后继 fresh build 与目标回归由根另行登记。原 PLAN、pin、默认路径旧结果和首轮冷 full 失败均保持。
+
+根协调另外将修正后的 binding 43 项与 runner 控制 18 项合跑，61／61 通过，失败／取消／跳过均 0；仍属于合成工具控制，等待后继固定候选 fresh 验证。
+
 根协调接入真实 runner 后，旧 runner sandbox 的工具白名单先复现 7／14 失败；只更新合成工具模型并增加构建顺序、binding 阶段失败、末尾核验及回执不覆盖合同。更新后的 runner 控制 18 项与 binding 负控 28 项合计 46／46 通过。合成控制不执行产品／NW，也不替代后续固定候选的真实 worker 专项与 regular 全量。

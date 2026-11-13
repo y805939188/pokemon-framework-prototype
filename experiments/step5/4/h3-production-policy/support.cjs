@@ -6,7 +6,7 @@ const fs = require('node:fs'), path = require('node:path'), crypto = require('no
 const current = require('../capture-run-current-headless-runtime.json');
 const runtime = process.env.H3_RUNTIME_ROOT;
 assert(runtime, 'explicit frozen runtime root required');
-const candidateBinding=require(path.join(runtime,'scripts/headless-regression-binding.cjs'));
+const candidateBinding=process.env.PF_HEADLESS_REGRESSION_BINDING?require(path.join(runtime,'scripts/headless-regression-binding.cjs')):null;
 const candidate=process.env.PF_HEADLESS_REGRESSION_BINDING?candidateBinding.capture(runtime,process.env.PF_HEADLESS_REGRESSION_BINDING):null;
 if(candidate)assert.equal(candidate.binding.showdownSHA,current.showdownSHA,'fixed H3-vector Showdown pin');
 if(!candidate){

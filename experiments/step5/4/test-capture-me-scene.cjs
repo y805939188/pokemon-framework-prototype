@@ -5,7 +5,12 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs');let temp,createHost,Step,planOf,config;
 const flush=async()=>{for(let i=0;i<16;i++)await Promise.resolve();};
 test.before(()=>{
- const PLUGIN_ROOT=process.env.PF_CAPTURE_SYNC_PRODUCT_ROOT||ROOT; // local: sibling suites extract this initializer into their explicit VM hosts
+ let PLUGIN_ROOT=process.env.PF_CAPTURE_SYNC_PRODUCT_ROOT||ROOT; // local: sibling suites extract this initializer into their explicit VM hosts
+ if(process.env.PF_HEADLESS_REGRESSION_BINDING){
+  const bound=require(path.join(ROOT,'scripts/headless-regression-binding.cjs')).capture(ROOT,process.env.PF_HEADLESS_REGRESSION_BINDING);
+  assert.equal(fs.realpathSync(PLUGIN_ROOT),bound.binding.root,'bound capture product root must match the parent binding');
+  PLUGIN_ROOT=bound.binding.root; // Consume the canonical bound root after accepting a same-realpath alias.
+ }
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-capture-me-scene-'));const root=path.join(ROOT,'src/plugins/battleflow');
  const cfg={compilerOptions:{target:'ES2022',module:'CommonJS',strict:true,types:[],lib:['ES2022'],rootDir:root,outDir:path.join(temp,'pure'),noEmitOnError:true},files:[path.join(root,'capture-me-scene.ts')]};fs.writeFileSync(path.join(temp,'tsconfig.json'),JSON.stringify(cfg));
  const typed=spawnSync('pnpm',['--dir','src','exec','tsc','-p',path.join(temp,'tsconfig.json')],{cwd:ROOT,encoding:'utf8'});assert.equal(typed.status,0,typed.stdout+typed.stderr);

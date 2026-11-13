@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const runtime=process.env.H3_RUNTIME_ROOT,plan=require('./plan.json'),sha=v=>crypto.createHash('sha256').update(v).digest('hex');
 assert(runtime,'explicit frozen product runtime required');
-const candidateBinding=require(path.join(runtime,'scripts/headless-regression-binding.cjs'));
+const candidateBinding=process.env.PF_HEADLESS_REGRESSION_BINDING?require(path.join(runtime,'scripts/headless-regression-binding.cjs')):null;
 const candidate=process.env.PF_HEADLESS_REGRESSION_BINDING?candidateBinding.capture(runtime,process.env.PF_HEADLESS_REGRESSION_BINDING):null;
 const current=require('../capture-run-current-headless-runtime.json');assert.match(current.helperFiles['experiments/step5/4/h3-production-policy/support.cjs'],/^[a-f0-9]{64}$/);
 const currentFiles=candidate?candidateBinding.boundFiles(candidate,Object.keys({...plan.files,...current.helperFiles})):{...plan.files,...current.helperFiles};

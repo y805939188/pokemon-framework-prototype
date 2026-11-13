@@ -3,7 +3,6 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const {E,T,inputs}=require('./trainer-ai-integration/fixtures.cjs'),PLAN=require('./e-status-disk-contracts.json');
 const ROOT=path.resolve(__dirname,'../../..'),ID='DISK-P1',clone=v=>JSON.parse(JSON.stringify(v));
-const candidateBinding=require('../../../scripts/headless-regression-binding.cjs');
 const hash=v=>crypto.createHash('sha256').update(v).digest('hex'),fileHash=f=>hash(fs.readFileSync(f)),stateHash=s=>hash(E.contentCompile.canonicalJson(s));
 function content(){
  const input=inputs({moves:['splash']});input.species.find(m=>m.id==='gengar').learnset=[{level:1,move:'toxic'}];
@@ -50,9 +49,10 @@ function recorded(b){return{request:b.req,initial:b.initial,steps:b.steps,result
 async function run(stage,c,folder){
  folder=fs.realpathSync(folder);const tmp=fs.realpathSync(os.tmpdir());assert(path.dirname(folder)===tmp&&path.basename(folder).startsWith('pf-e-status-disk-'),'owned temporary test directory only');
  const marker=JSON.parse(fs.readFileSync(path.join(folder,'OWNED-STATUS-DISK-TEST.json')));assert.equal(marker.version,PLAN.version);assert.equal(marker.caseId,c.id);
- const parentBinding=process.env.PF_HEADLESS_REGRESSION_BINDING;let candidate=null;
+ const parentBinding=process.env.PF_HEADLESS_REGRESSION_BINDING;let candidate=null,candidateBinding=null;
  if(parentBinding||marker.candidateBindingSHA256){
   assert(parentBinding&&marker.candidateBindingSHA256,'parent candidate binding is required for this owned run');
+  candidateBinding=require('../../../scripts/headless-regression-binding.cjs');
   candidate=candidateBinding.capture(ROOT,parentBinding,marker.candidateBindingSHA256);
   assert.equal(candidate.binding.showdownSHA,PLAN.showdownSHA,'fixed status-vector Showdown pin');
  }else{

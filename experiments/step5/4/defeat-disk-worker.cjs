@@ -2,7 +2,6 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const {E,inputs}=require('./trainer-ai-integration/fixtures.cjs'),{storeFor,application,stateHash}=require('./status-disk-worker.cjs');
 const PLAN=require('./e-defeat-disk-contracts.json'),ROOT=path.resolve(__dirname,'../../..'),ID='DEFEAT-P1',clone=x=>JSON.parse(JSON.stringify(x));
-const candidateBinding=require('../../../scripts/headless-regression-binding.cjs');
 const rawHash=f=>crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 function supportedNode(){const[major,minor]=process.versions.node.split('.').map(Number);assert(major>22||major===22&&minor>=18,'Node >=22.18 is required; select the supported runtime explicitly');}
 function content(){const data=inputs({moves:['splash'],party:1});data.trainers[0].party[0].level=100;data.trainers[0].party[0].moves=['tackle'];data.species.find(s=>s.id==='caterpie').learnset=[{level:1,move:'tackle'}];
@@ -16,9 +15,10 @@ function assertLossSave(game,c,result){const m=game.party[0];assert.equal(m.hp,P
 async function finish(w,s,req,before,disk){unchanged(w,before,disk);const result=clone(s.result()),count=w.installs.length,outcome=w.app.finishBattle(s,req);assert.equal(outcome.commit,'applied',JSON.stringify(outcome));assert.equal(w.installs.length,count+1);const saved=clone(w.state.read()),bytes=rawHash(w.file);
  w.app.finishBattle(s,req);assert.equal(w.installs.length,count+1);assert.equal(rawHash(w.file),bytes,'duplicate finish does not write/deduct again');assert.deepEqual(w.store.load(),saved);return{result,resultHash:E.state.resultHash(result),outcome,saved};}
 async function run(stage,id,folder){supportedNode();folder=fs.realpathSync(folder);assert.equal(path.dirname(folder),fs.realpathSync(os.tmpdir()));assert(path.basename(folder).startsWith('pf-e-defeat-disk-'));const mark=JSON.parse(fs.readFileSync(path.join(folder,'OWNED.json')));assert.equal(mark.version,PLAN.version);assert.equal(mark.id,id);
- const parentBinding=process.env.PF_HEADLESS_REGRESSION_BINDING;let candidate=null;
+ const parentBinding=process.env.PF_HEADLESS_REGRESSION_BINDING;let candidate=null,candidateBinding=null;
  if(parentBinding||mark.candidateBindingSHA256){
   assert(parentBinding&&mark.candidateBindingSHA256,'parent candidate binding is required for this owned run');
+  candidateBinding=require('../../../scripts/headless-regression-binding.cjs');
   candidate=candidateBinding.capture(ROOT,parentBinding,mark.candidateBindingSHA256);
   assert.equal(candidate.binding.showdownSHA,PLAN.showdownSHA,'fixed defeat-vector Showdown pin');
  }else{

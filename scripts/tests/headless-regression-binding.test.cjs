@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
+const vm = require('node:vm');
 const {execFileSync} = require('node:child_process');
 const H = require('../headless-regression-binding.cjs');
 const {SOURCE_INPUTS, sourceFingerprint} = require('../framework-distribution-source.cjs');
@@ -94,6 +95,8 @@ const faults = {
   'plugin-source'(f) { write(path.join(f.root, 'src/plugins/fixture.txt'), 'different plugin source'); },
   'plugin-config'(f) { write(path.join(f.root, 'src/vite.config.mts'), 'different plugin build config'); },
   'consumer-helper'(f) { write(path.join(f.root, 'experiments/step5/4/battle-music-composition-host.cjs'), 'different consumed host helper'); },
+  'capture-audio-host'(f) { write(path.join(f.root, 'experiments/step5/4/test-capture-me-port.cjs'), 'different extracted audio host'); },
+  'capture-music-host'(f) { write(path.join(f.root, 'experiments/step5/4/test-battle-music-scene.cjs'), 'different extracted Scene host'); },
   'parent-test'(f) { write(path.join(f.root, 'experiments/step5/4/h3-production-policy/test-release-sources.cjs'), 'different scenario implementation'); },
   'missing-fixture'(f) { fs.unlinkSync(path.join(f.root, 'experiments/step5/4/e-defeat-disk-contracts.json')); },
   'plugin-artifact'(f) { write(path.join(f.root, H.PLUGIN_BUNDLES[0]), 'different compiled plugin'); },
@@ -146,3 +149,88 @@ test('a freshly generated manifest for a different source fingerprint cannot aut
   write(path.join(out, 'SHA256SUMS'), files(out).filter(relative => relative !== 'SHA256SUMS').map(relative => hash(fs.readFileSync(path.join(out, relative))) + '  ' + relative).join('\n') + '\n');
   assert.throws(() => H.finish(f.root, started), /source fingerprint mismatch/);
 });
+
+const repository = path.resolve(__dirname, '../..');
+for (const relative of [
+  'experiments/step5/4/h3-production-policy/support.cjs',
+  'experiments/step5/4/h3-held-continue/worker.cjs',
+  'experiments/step5/4/h3-install-outcome/test-install.cjs',
+  'experiments/step5/4/status-disk-worker.cjs',
+  'experiments/step5/4/defeat-disk-worker.cjs',
+]) test('legacy root without the new helper still reaches its original gate: ' + relative, async t => {
+  const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pf-legacy-binding-test-'))), root = path.join(directory, 'frozen');
+  fs.mkdirSync(root); t.after(() => fs.rmSync(directory, {recursive: true, force: true}));
+  const current = {schema: 'capture-run-current-headless-v1', productSrcTree: 'f'.repeat(40), showdownSHA: PIN,
+    runtime: Object.fromEntries(Array.from({length: 9}, (_, i) => ['runtime-' + i, '0'.repeat(64)])),
+    helperFiles: {'experiments/step5/4/h3-production-policy/support.cjs': '0'.repeat(64)}};
+  const plan = {version: 'synthetic-legacy', showdownSHA: PIN, files: {'legacy-required.js': '0'.repeat(64)}};
+  const observed = {helper: 0, originalFileGate: 0, originalGitGate: 0};
+  const safeFs = {...fs, readFileSync(file, ...args) {
+    if (String(file).startsWith(root + path.sep)) { observed.originalFileGate++; throw Error('LEGACY_ORIGINAL_FILE_GATE'); }
+    return fs.readFileSync(file, ...args);
+  }};
+  function requireFixture(name) {
+    if (name.endsWith('headless-regression-binding.cjs')) { observed.helper++; return require(path.join(root, 'scripts/headless-regression-binding.cjs')); }
+    if (name === 'node:fs') return safeFs;
+    if (name === 'node:child_process') return {execFileSync() { observed.originalGitGate++; return '0'.repeat(40); }};
+    if (name === 'node:test') return Object.assign(() => {}, {after() {}});
+    if (name.startsWith('node:')) return require(name);
+    if (name.includes('capture-run-current-headless-runtime.json')) return current;
+    if (name === './plan.json') return relative.includes('test-install') ? plan.files : plan;
+    if (name.endsWith('contracts.json')) return plan;
+    if (name.includes('trainer-ai-integration/fixtures')) return {E: {}, T: {}, inputs() { throw Error('unexpected business'); }};
+    if (name === './status-disk-worker.cjs') return {};
+    throw Error('unexpected require before original gate: ' + name);
+  }
+  const exported = {exports: {}}, context = {require: requireFixture, module: exported, exports: exported.exports,
+    __dirname: path.join(root, path.dirname(relative)), process: {env: {H3_RUNTIME_ROOT: root}, versions: process.versions}, console};
+  const source = fs.readFileSync(path.join(repository, relative), 'utf8');
+  const expected = relative.endsWith('support.cjs') || relative.endsWith('disk-worker.cjs') ? /current product source tree/ : /LEGACY_ORIGINAL_FILE_GATE/;
+  if (!relative.endsWith('disk-worker.cjs')) assert.throws(() => vm.runInNewContext(source, context), expected);
+  else {
+    vm.runInNewContext(source, context);
+    const defeat = relative.endsWith('defeat-disk-worker.cjs');
+    const folder = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), defeat ? 'pf-e-defeat-disk-' : 'pf-e-status-disk-')));
+    t.after(() => fs.rmSync(folder, {recursive: true, force: true}));
+    write(path.join(folder, defeat ? 'OWNED.json' : 'OWNED-STATUS-DISK-TEST.json'), JSON.stringify({version: plan.version, id: 'case', caseId: 'case'}));
+    await assert.rejects(exported.exports.run(defeat ? 'producer' : 'produce', defeat ? 'case' : {id: 'case'}, folder), expected);
+  }
+  assert.equal(observed.helper, 0, 'legacy mode never imports a helper absent from the frozen root');
+  assert.equal(observed.originalFileGate + observed.originalGitGate, 1);
+});
+
+for (const entry of ['native', 'scene']) for (const mode of ['outside', 'same', 'alias', 'legacy-outside']) {
+  test(`bound capture ${entry} root guard: ${mode}`, t => {
+    const f = fixture(t), s = f.seal(), external = path.join(f.directory, 'outside'), alias = path.join(f.directory, 'alias');
+    fs.mkdirSync(external); fs.symlinkSync(f.root, alias, 'dir');
+    const override = mode === 'same' ? f.root : mode === 'alias' ? alias : external;
+    const env = {PF_CAPTURE_SYNC_PRODUCT_ROOT: override, ...(mode === 'legacy-outside' ? {} : {PF_HEADLESS_REGRESSION_BINDING: s.file})};
+    let externalReads = 0;
+    const safeFs = {...fs, readFileSync(file, ...args) {
+      if (String(file).startsWith(external + path.sep)) { externalReads++; throw Error('external content must not be read'); }
+      return fs.readFileSync(file, ...args);
+    }};
+    function controlledRequire(name) {
+      if (name.endsWith('headless-regression-binding.cjs')) return H;
+      if (name === 'node:fs') return safeFs;
+      if (name === 'node:test') return Object.assign(() => {}, {before() {}, after() {}});
+      if (name.startsWith('node:')) return require(name);
+      return {}; // No product runtime is loaded by this prefix-only synthetic guard probe.
+    }
+    const file = path.join(repository, `experiments/step5/4/test-capture-me-${entry}.cjs`), source = fs.readFileSync(file, 'utf8');
+    let prefix;
+    if (entry === 'native') prefix = source.slice(0, source.indexOf('test.before('));
+    else {
+      const start = source.indexOf('test.before(()=>{') + 'test.before(()=>{'.length;
+      prefix = source.slice(start, source.indexOf(' temp=fs.mkdtempSync', start));
+    }
+    assert(prefix.includes('PF_CAPTURE_SYNC_PRODUCT_ROOT') || entry === 'native');
+    const context = {ROOT: f.root, __dirname: path.join(f.root, 'experiments/step5/4'), require: controlledRequire,
+      process: {env}, fs: safeFs, path, assert};
+    const observedRoot = entry === 'scene' ? '\nglobalThis.selectedPluginRoot = PLUGIN_ROOT;' : '';
+    const run = () => vm.runInNewContext(prefix + observedRoot + '\nthrow Error("CAPTURE_PREFIX_READY");', context);
+    assert.throws(run, mode === 'outside' ? /bound capture product root/ : /CAPTURE_PREFIX_READY/);
+    if (entry === 'scene' && mode !== 'outside') assert.equal(context.selectedPluginRoot, mode === 'legacy-outside' ? external : f.root);
+    assert.equal(externalReads, 0, 'guard finishes before any external source read/build');
+  });
+}

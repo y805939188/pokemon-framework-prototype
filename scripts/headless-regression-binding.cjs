@@ -22,6 +22,7 @@ const CONTROLLED_INPUTS = [
   'experiments/step5/4/capture-run-current-headless-runtime.json',
   'experiments/step5/4/test-capture-me-native.cjs', 'experiments/step5/4/capture-me-native-plan.json',
   'experiments/step5/4/test-capture-me-scene.cjs', 'src/plugins', 'js/reactor_managers.js',
+  'experiments/step5/4/test-capture-me-port.cjs', 'experiments/step5/4/test-battle-music-scene.cjs',
   'experiments/step5/4/h3-held-continue/test-continue.cjs', 'experiments/step5/4/h3-held-continue/worker.cjs',
   'experiments/step5/4/h3-held-continue/plan.json', 'experiments/step5/4/h3-production-policy/support.cjs',
   'experiments/step5/4/h3-production-policy/test-host.cjs', 'experiments/step5/4/h3-production-policy/host-plan.json',

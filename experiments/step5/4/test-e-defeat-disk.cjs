@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process'),crypto=require('node:crypto');
 const PLAN=require('./e-defeat-disk-contracts.json'),{supportedNode}=require('./defeat-disk-worker.cjs');supportedNode();
 const {stateHash}=require('./status-disk-worker.cjs'),worker=path.join(__dirname,'defeat-disk-worker.cjs'),hash=b=>crypto.createHash('sha256').update(b).digest('hex');
-const ROOT=path.resolve(__dirname,'../../..'),candidateBinding=require('../../../scripts/headless-regression-binding.cjs');
+const ROOT=path.resolve(__dirname,'../../..'),candidateBinding=process.env.PF_HEADLESS_REGRESSION_BINDING?require('../../../scripts/headless-regression-binding.cjs'):null;
 const candidate=process.env.PF_HEADLESS_REGRESSION_BINDING?candidateBinding.capture(ROOT,process.env.PF_HEADLESS_REGRESSION_BINDING):null;
 test.after(()=>{if(candidate)candidateBinding.verify(ROOT,candidate.binding);});
 function step(c,folder,stage){const argv=[worker,stage,c.id,folder],started=new Date().toISOString(),r=spawnSync(process.execPath,argv,{cwd:path.resolve(__dirname,'../../..'),encoding:'utf8',timeout:20000,maxBuffer:4*1024*1024,env:{...process.env,NODE_OPTIONS:''}});

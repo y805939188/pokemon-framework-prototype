@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process');
-const runtime=process.env.H3_RUNTIME_ROOT,candidateBinding=require('../../../../scripts/headless-regression-binding.cjs');
+const runtime=process.env.H3_RUNTIME_ROOT,candidateBinding=process.env.PF_HEADLESS_REGRESSION_BINDING?require('../../../../scripts/headless-regression-binding.cjs'):null;
 const candidate=process.env.PF_HEADLESS_REGRESSION_BINDING?candidateBinding.capture(runtime,process.env.PF_HEADLESS_REGRESSION_BINDING):null;
 test.after(()=>{if(candidate)candidateBinding.verify(runtime,candidate.binding);});
 test('normal held item survives disk Continue, enters and consumes without overrides; abort, take and next battle persist',()=>{

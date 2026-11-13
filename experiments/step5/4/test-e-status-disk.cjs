@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),cp=require('node:child_process'),crypto=require('node:crypto');
 const PLAN=require('./e-status-disk-contracts.json'),{content,newState,storeFor,stateHash}=require('./status-disk-worker.cjs');
 const worker=path.join(__dirname,'status-disk-worker.cjs'),dirs=[],clone=v=>JSON.parse(JSON.stringify(v)),hash=f=>crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
-const ROOT=path.resolve(__dirname,'../../..'),candidateBinding=require('../../../scripts/headless-regression-binding.cjs');
+const ROOT=path.resolve(__dirname,'../../..'),candidateBinding=process.env.PF_HEADLESS_REGRESSION_BINDING?require('../../../scripts/headless-regression-binding.cjs'):null;
 const candidate=process.env.PF_HEADLESS_REGRESSION_BINDING?candidateBinding.capture(ROOT,process.env.PF_HEADLESS_REGRESSION_BINDING):null;
 test.after(()=>{for(const d of dirs)fs.rmSync(d,{recursive:true,force:true});if(candidate)candidateBinding.verify(ROOT,candidate.binding);});
 function owned(c){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pf-e-status-disk-'));dirs.push(dir);fs.writeFileSync(path.join(dir,'OWNED-STATUS-DISK-TEST.json'),JSON.stringify({version:PLAN.version,caseId:c.id,...(candidate?{candidateBindingSHA256:candidate.sha256}:{})}),{flag:'wx'});return dir;}

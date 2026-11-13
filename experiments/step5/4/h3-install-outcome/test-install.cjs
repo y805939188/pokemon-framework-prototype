@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const root=process.env.H3_RUNTIME_ROOT;assert(root,'explicit frozen runtime required');
-const candidateBinding=require(path.join(root,'scripts/headless-regression-binding.cjs'));
+const candidateBinding=process.env.PF_HEADLESS_REGRESSION_BINDING?require(path.join(root,'scripts/headless-regression-binding.cjs')):null;
 const runBinding=process.env.PF_HEADLESS_REGRESSION_BINDING?candidateBinding.capture(root,process.env.PF_HEADLESS_REGRESSION_BINDING):null;
 const current=require('../capture-run-current-headless-runtime.json');assert.match(current.helperFiles['experiments/step5/4/h3-production-policy/support.cjs'],/^[a-f0-9]{64}$/);
 const files=runBinding?candidateBinding.boundFiles(runBinding,Object.keys({...require('./plan.json'),...current.helperFiles})):{...require('./plan.json'),...current.helperFiles};
