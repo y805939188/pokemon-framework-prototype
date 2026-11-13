@@ -4,9 +4,9 @@
 
 起点是 [rpg-maker-mz-initialize](https://github.com/y805939188/rpg-maker-mz-initialize) 模板（`b6fa1df`）；第二步（验证战斗接入）已完成，结论和证据在 `docs/step2/`。
 
-## 当前阶段（2026-11-12）
+## 当前阶段（2026-11-13）
 
-5.4 当前固定产品候选为 [`2ecace8d`](https://github.com/y805939188/pokemon-framework-prototype/commit/2ecace8d9cbb2496e6a4dce273731efb3bcd8d41)，开发分支 `step5/4-rpg-held-native-items-20261113`。[CI #310](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43324413581) 两个 job 成功，278 套／5044 项通过，冻结参考回放明确排除。E74 已按最窄范围登记 72 条契约抽样＋2 条受限源级未用，不等于完整标题通过。限定原生／人工历史证据、待答的特殊战前功能范围及保留项见[当前验收索引](docs/step5/5.4-current-acceptance.md)。**完整 5.4 尚未签收，未合并 main。**
+5.4 已按批准的单打与默认呈现范围完成技术收口，固定产品 [`2ecace8d`](https://github.com/y805939188/pokemon-framework-prototype/commit/2ecace8d9cbb2496e6a4dce273731efb3bcd8d41)，src `b7db562a`；同源验收文档基线 `9b7d178` 的[CI #311](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43334587330) 两 job 成功，278 套／5044 项通过，冻结参考回放未运行。战前先统一用默认过渡；完整特殊注册／优先级和按场景、对手、事件自由编排明确留待后续，当前未实现。范围、已验证内容与保留边界见[5.4 收口记录](docs/step5/5.4-closure.md)和[当前验收索引](docs/step5/5.4-current-acceptance.md)。这不是全部参考机制、完整性能或游戏包分发完成的声明，**尚未合并 main**。
 
 ## 先读什么
 

@@ -1,10 +1,10 @@
 # 第五步：按功能族扩展
 
-## 当前状态（2026-11-12）
+## 当前状态（2026-11-13）
 
-5.4 当前固定产品候选 `2ecace8d`／开发分支 `step5/4-rpg-held-native-items-20261113` 的[精确 CI #310](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43324413581) 两 job 成功，278 套／5044 项通过；冻结参考回放明确排除。[E74 限定出口登记](5.4-E74-final-disposition.md)为 72 条最窄契约抽样＋2 条受限源级未用，不等于完整标题或全部机制通过。限定接受、历史原生／人工证据及未关闭事项见[5.4 当前验收索引](5.4-current-acceptance.md)；完整阶段未签收，未合并 main。
+5.4 在批准的单打与默认呈现范围内完成技术收口，固定产品 `2ecace8d`／src `b7db562a`；同源文档基线 `9b7d178` 的[CI #311](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43334587330) 双 job 成功，278 套／5044 项通过，冻结回放未运行。用户已决定本阶段统一默认战前过渡，完整特殊注册／优先级及场景、对手、事件自定义编排留待后续专项，当前未实现。[收口记录](5.4-closure.md)与[验收索引](5.4-current-acceptance.md)保留真实已测范围和限制；[E74 限定登记](5.4-E74-final-disposition.md)为72条契约抽样＋2条受限源级未用，不等于全机制穷举。未合并 main，也未因此完成5.5、跨平台或包分发。
 
-[RPG持物原生身份子批](5.4-rpg-held-native-items.md)在独立开发分支补齐 Lucky Egg／Amulet Coin／Luck Incense 的正常 Fling 身份，保留固定 Showdown 消费者和 Flower Sweet 既有规则。产品限域独审及278套／5044项本地回归通过；远端精确CI另记，不替换上方整合母版或宣称完整FR55／5.4关闭。
+[RPG持物原生身份子批](5.4-rpg-held-native-items.md)的最终 `2ecace8d` 即上述产品基线：补齐 Lucky Egg／Amulet Coin／Luck Incense 的正常 Fling 身份，保留固定 Showdown 消费者和 Flower Sweet 既有规则；独立限定审查、本地同源 quick 和精确产品 CI310／同源文档 CI311 分列。其三物正向证据不扩成整个 FR55 或全部持物效果穷举。
 
 ## 历史批次记录
 
