@@ -19,7 +19,7 @@ test.before(() => {
 });
 test.after(() => { if(pluginDirectory)fs.rmSync(pluginDirectory,{recursive:true,force:true}); });
 
-function menu(session) {
+function menu(session, observeAutomatic) {
   function Base() {}
   const nodeRequire = id => require(id.startsWith('./') ? path.join(ROOT, id) : id);
   nodeRequire.resolve = id => require.resolve(path.join(ROOT, id));
@@ -28,12 +28,20 @@ function menu(session) {
     Scene_MenuBase: Base, Game_Interpreter: Base };
   vm.createContext(ctx);
   vm.runInContext(pluginText, ctx);
-  ctx.window.PSFlow.translator = () => ({ t: (_key, v) => `${v.move} PP ${v.pp}/${v.maxpp}` });
+  ctx.window.PSFlow.translator = () => ({ t: (key, v) => key === 'ui.moves.none-left' ? `${v.name} has no moves left!` : `${v.move} PP ${v.pp}/${v.maxpp}`, tOr: (_key, fallback) => fallback });
+  // This isolated source consumer supplies its Session's actual content; it has
+  // no MZ PluginManager parameters or application boot/content-loader port.
+  ctx.window.PSFlow.content = () => session.content;
   const scene = Object.create(ctx.window.Scene_PSBattle.prototype);
   scene._session = session;
+  // Explicit bare-source ports: the real Scene supplies names and owns message pacing.
+  // This source consumer observes its real controller queue without running a visual lifecycle.
+  scene._names = Object.fromEntries(session.party.map(member => [member.id, member.species]));
+  ctx.window.PSFlow.fast = true;
   let items;
   scene.show = (_mode, value) => { items = value; };
   scene.showMoves();
+  observeAutomatic?.({ items, queued: Array.from(scene._queue), intent: scene._automaticMove, phase: scene._mode });
   return items;
 }
 async function make(game, foe, options = {}) {
@@ -43,23 +51,33 @@ async function make(game, foe, options = {}) {
 }
 const mon = (id, moves = ['protect']) => F.foeMember(id, 'Snorlax', 100, { moves });
 
-test('ordinary menu rejects empty/disabled moves and engine rejects an illegal index without advancing', async () => {
+test('ordinary menu exposes PP0 candidates while engine refuses them and illegal indices without advancing', async () => {
   const game = F.makeGame(); game.party[0].moves[0].pp = 0;
   const s = await make(game, mon('foe'));
-  assert.equal(menu(s)[0].enabled, false); assert.equal(menu(s)[1].enabled, true);
+  assert.equal(menu(s)[0].enabled, true); assert.equal(menu(s)[1].enabled, true);
   const before = s.gw._debugBattle().turn;
+  assert.equal((await s.chooseMove(1)).ok, false, 'focusable PP0 is still refused by the simulator');
+  assert.equal(s.gw._debugBattle().turn, before);
   assert.equal((await s.chooseMove(99)).ok, false);
   assert.equal(s.gw._debugBattle().turn, before);
   assert.equal((await s.chooseMove(4)).ok, true);
 });
 
-test('Struggle with no PP fields is selectable, executes and never displays undefined PP', async () => {
+test('Struggle with no PP fields queues the automatic notice, remains selectable and executes without undefined PP', async () => {
   const game = F.makeGame(); game.party[0].moves.forEach(m => { m.pp = 0; });
   const s = await make(game, mon('foe'));
   assert.equal(s.currentRequest().active[0].moves[0].id, 'struggle');
-  assert.equal(menu(s)[0].enabled, true);
-  assert.doesNotMatch(menu(s)[0].name, /undefined/);
   const before = s.gw._debugBattle().turn;
+  let view;
+  assert.equal(menu(s, value => { view = value; }), undefined, 'forced Struggle has no manual menu');
+  assert.equal(view.phase, 'messages');
+  assert.equal(view.queued.length, 1);
+  assert.match(view.queued[0], /has no moves left!/);
+  assert.doesNotMatch(view.queued[0], /undefined/);
+  assert.equal(view.intent.session, s);
+  assert.equal(view.intent.request, JSON.stringify(s.currentRequest()));
+  assert.equal(E.moveRequests.isSelectableMove(s.currentRequest().active[0].moves[0]), true);
+  assert.equal(s.gw._debugBattle().turn, before, 'observing the queued notice does not register an action');
   const response = await s.chooseMove(1);
   assert.equal(response.ok, true); assert.ok(s.gw._debugBattle().turn > before);
 });
@@ -71,6 +89,7 @@ test('Fly locks the next request to a PP-less move; its second turn completes', 
   assert.equal(s.currentRequest().active[0].moves[0].id, 'fly');
   assert.equal(s.currentRequest().active[0].moves[0].pp, undefined);
   assert.equal(menu(s)[0].enabled, true);
+  assert.deepEqual(s.gw.query('p1', 'automatic-encore'), { allowed: false }, 'Fly lock is not Encore');
   const response = await s.chooseMove(1);
   assert.ok(response.messages.some(m => m.kind === 'events' && m.events.some(e => e.type === 'move' && e.args[1] === 'Fly')));
   assert.equal(s.gw._debugBattle().turn, 3);
@@ -93,6 +112,7 @@ test('default AI handles a real recharge request and a doubles PP-less slot', as
   await s.chooseMove(4);
   const request = s.gw._debugBattle().getSide('p2').activeRequest;
   assert.equal(request.active[0].moves[0].id, 'recharge');
+  assert.deepEqual(s.gw.query('p2', 'automatic-encore'), { allowed: false }, 'Recharge is not Encore');
   assert.equal(BattleSession.defaultAi(request), 'move 1');
   await s.chooseMove(4); assert.equal(s.gw._debugBattle().turn, 3);
   const exhausted = F.foeMember('foe1', 'Snorlax', 40, { moves: ['tackle'] }); exhausted.moves[0].pp = 0;
@@ -117,7 +137,7 @@ test('isSelectableMove: disabled wins over any PP; PP-less requests are selectab
   assert.equal(selectable({ pp: 0, disabled: false }), false);
 });
 
-test('real disabled moves: a Choice item locks the other moves in the menu and for the default AI', async () => {
+test('real Choice lock stays focusable in the menu but is rejected by the engine and skipped by default AI', async () => {
   const game = F.makeGame(); game.party[0].item = 'choiceband';
   const foe = mon('foe', ['protect', 'tackle']); foe.item = 'choiceband';
   const s = await make(game, foe);
@@ -125,10 +145,11 @@ test('real disabled moves: a Choice item locks the other moves in the menu and f
   await s.chooseMove(4); // the other three moves are now disabled although they have PP
   const moves = s.currentRequest().active[0].moves;
   assert.deepEqual(moves.map(m => [m.disabled, m.pp > 0]), [[true, true], [true, true], [true, true], [false, true]]);
-  assert.deepEqual(menu(s).map(m => m.enabled), [false, false, false, true]);
+  assert.deepEqual(menu(s).map(m => m.enabled), [true, true, true, true]);
   const foeRequest = s.gw._debugBattle().getSide('p2').activeRequest;
   assert.equal(foeRequest.active[0].moves[1].disabled, true);
   assert.equal(BattleSession.defaultAi(foeRequest), 'move 1', 'the AI skips the locked-out move');
+  assert.deepEqual(s.gw.query('p1', 'automatic-encore'), { allowed: false }, 'Choice Band alone must not bypass the menu');
   assert.equal((await s.chooseMove(1)).ok, false, 'choosing a disabled move is still refused by the engine');
 });
 
@@ -138,4 +159,35 @@ test('the scripted demo policy uses the same rule: Struggle, locked and disabled
   assert.equal(decide(request([{ move: 'Struggle', id: 'struggle' }])), 'move 1');
   assert.equal(decide(request([{ move: 'A', pp: 3, disabled: true }, { move: 'B', pp: 2 }])), 'move 2');
   assert.equal(decide(request([{ move: 'A', pp: 0 }, { move: 'B', disabled: true }, { move: 'Fly', id: 'fly' }])), 'move 3');
+});
+
+
+// Encore query is a pure hint, including rejected public multi-seat requests.
+test('Encore query rejects a real doubles KO without adding a pass choice or changing the snapshot', async () => {
+  const {gateway:{BattleGateway}}=require('../../js/engine/build/production.cjs');
+  const gw=await BattleGateway.create({formatid:'gen8rpgdoublescustomgame',seed:[1,2,3,4],players:[
+    {name:'P1',team:[{name:'A',species:'Snorlax',level:100,moves:['tackle','growl']},{name:'B',species:'Snorlax',level:100,moves:['growl']}]},
+    {name:'P2',team:[{name:'C',species:'Pidgey',level:1,moves:['splash']},{name:'D',species:'Snorlax',level:100,moves:['splash']}]}]});
+  assert.equal(await gw.choose('p1','team 12'),true);assert.equal(await gw.choose('p2','team 12'),true);
+  assert.equal(await gw.choose('p1','move 1 1, move 1'),true);assert.equal(await gw.choose('p2','move 1, move 1'),true);
+  const battle=gw._debugBattle(),side=battle.getSide('p2');assert.equal(battle.turn,2);assert.equal(battle.requestState,'move');
+  assert(side.active[0].fainted);assert(!side.active[1].fainted);assert.deepEqual(side.choice.actions,[]);
+  const before=gw.snapshot(),actions=JSON.stringify(side.choice.actions);
+  for(const slot of [0,1,0]){
+    assert.deepEqual(gw.query('p2','automatic-encore',slot),{allowed:false});
+    assert.equal(gw.snapshot(),before,'a false hint must not append an engine pass action');
+    assert.equal(JSON.stringify(side.choice.actions),actions);
+  }
+});
+test('Encore query reads real singles permissions but does not offer an already registered action again', async () => {
+  const {gateway:{BattleGateway}}=require('../../js/engine/build/production.cjs');
+  const gw=await BattleGateway.create({formatid:'gen8rpgcustomgame',seed:[1,2,3,4],players:[
+    {name:'P1',team:[{name:'A',species:'Snorlax',level:100,moves:['tackle','growl']}]},
+    {name:'P2',team:[{name:'B',species:'Snorlax',level:1,moves:['encore']}]}]});
+  assert.equal(await gw.choose('p1','team 1'),true);assert.equal(await gw.choose('p2','team 1'),true);
+  assert.equal(await gw.choose('p1','move 2'),true);assert.equal(await gw.choose('p2','move 1'),true);
+  const side=gw._debugBattle().getSide('p1');assert.equal(side.active[0].volatiles.encore.move,'growl');
+  const before=gw.snapshot();for(let i=0;i<2;i++)assert.deepEqual(gw.query('p1','automatic-encore'),{allowed:true,moveSlot:2});assert.equal(gw.snapshot(),before);
+  assert.equal(await gw.choose('p1','move 2'),true);assert.equal(side.choice.actions.length,1);
+  const chosen=gw.snapshot();assert.deepEqual(gw.query('p1','automatic-encore'),{allowed:false});assert.equal(gw.snapshot(),chosen);assert.equal(side.choice.actions.length,1);
 });

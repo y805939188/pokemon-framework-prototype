@@ -1,12 +1,14 @@
 /**
- * Content pipeline, authoring and compiled shapes (schema version 1, the minimum this step needs).
+ * Content pipeline: author schema 2 (standard), explicit legacy author schema 1, compiled schema 3.
  * Authors write JSON files (see content/sample/); `compileContent` validates them and produces one deterministic
  * compiled document. Showdown-owned battle data (base stats, display names, move names) is NOT copied here: records
  * name a `showdownId` and the runtime assembly resolves it against the pinned Showdown build.
  */
 import type { CurveId, PartialStats } from "../rules/types";
 
-export const AUTHOR_SCHEMA_VERSION = 1;
+export const AUTHOR_SCHEMA_VERSION = 2;
+export const LEGACY_AUTHOR_SCHEMA_VERSION = 1;
+export type AuthorSchema = 1 | 2;
 export const COMPILED_SCHEMA_VERSION = 3;
 /** Author version; compiled consumers use COMPILED_SCHEMA_VERSION. */
 export const SCHEMA_VERSION = AUTHOR_SCHEMA_VERSION;
@@ -117,10 +119,16 @@ export interface ContentInputs {
   shops?: unknown;
   regionalDex?: unknown;
   mapMetadata?: unknown;
+  /** Optional A-M1 NPC catalogs; absence is fully compatible with older author content. */
+  trainerTypes?: unknown;
+  trainers?: unknown;
 }
 
+export type TrainerTypeSource = import("../rules/types").TrainerType;
+export type TrainerRecordSource = import("../rules/types").TrainerRecord;
+
 export interface ContentError {
-  file: "manifest.json" | "sources.json" | "species.json" | "overlays.json" | "grants.json" | "settings.json" | "items.json" | "shops.json" | "regional-dex.json" | "map-metadata.json" | "compiled" | "assembly";
+  file: "manifest.json" | "sources.json" | "species.json" | "overlays.json" | "grants.json" | "settings.json" | "items.json" | "shops.json" | "regional-dex.json" | "map-metadata.json" | "trainer-types.json" | "trainers.json" | "compiled" | "assembly";
   path: string;
   message: string;
 }
@@ -143,6 +151,9 @@ export interface CompiledContent {
   settings?: import("../rules/config").RuleOverrides;
   items?: import('../rules/item-catalog').ItemDefinition[];
   shops?: import('../rules/item-catalog').ShopDefinition[];
+  /** Optional A-M1 NPC data; array order of trainerTypes is the explicit PD7 registration order. */
+  trainerTypes?: TrainerTypeSource[];
+  trainers?: TrainerRecordSource[];
 }
 
 /** Grant ids stay short: the members they create are named G-<grant id>-<n>, and member ids are limited to 18 characters. */

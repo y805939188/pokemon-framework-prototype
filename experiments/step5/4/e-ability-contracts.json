@@ -1,0 +1,350 @@
+{
+  "schema": 1,
+  "kind": "bounded-gen8-common-ability-contract-sampling",
+  "baseProduct": "fc477e5cc83cd3c97de567a207b90f39272811dd",
+  "format": "gen8rpgcustomgame",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "referenceHead": "5c9805de2331f75565891851d4d7b2bc97acad94",
+  "auditPlanSHA256": "8d3e2119f25c9ce450c36f437ef10cc07f76465d55daf30e7385c05b9e416a99",
+  "headings": [
+    {
+      "featureId": "FR-000065",
+      "source": "deliverables/final-specification-set/combat-requirements/wp49-ability-phase-triggers.md",
+      "heading": "3. 入场顺序与具体反应（B）",
+      "lineRanges": [
+        [
+          43,
+          84
+        ]
+      ],
+      "sha256": "f48646d40325a44265d2a85e7459366d894bde64f206e931a7574dfc39cb368f",
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000532",
+      "source": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+      "heading": "3. 本次类型与相性",
+      "lineRanges": [
+        [
+          37,
+          65
+        ]
+      ],
+      "sha256": "6a09dfad69faa5c0c35991e9fa4eb83646b6f2162427e5bcd3df09c55fded6d3",
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000536",
+      "source": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+      "heading": "7. 伤害状态、实际损失与特殊路径",
+      "lineRanges": [
+        [
+          141,
+          158
+        ]
+      ],
+      "sha256": "6a09dfad69faa5c0c35991e9fa4eb83646b6f2162427e5bcd3df09c55fded6d3",
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000562",
+      "source": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+      "heading": "2. 输入、有效性与读取约定",
+      "lineRanges": [
+        [
+          11,
+          35
+        ]
+      ],
+      "sha256": "19c5799a7949013b85e2c0937860596db6eed875470ac7a12c53ddc4e5268e07",
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000566",
+      "source": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+      "heading": "6. 状态与阶级资格",
+      "lineRanges": [
+        [
+          155,
+          162
+        ]
+      ],
+      "sha256": "19c5799a7949013b85e2c0937860596db6eed875470ac7a12c53ddc4e5268e07",
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000568",
+      "source": "deliverables/final-specification-set/pokemon-rules/wp48-ability-calculation-modifiers.md",
+      "heading": "8. 注册表外核心与共享责任",
+      "lineRanges": [
+        [
+          181,
+          195
+        ]
+      ],
+      "sha256": "19c5799a7949013b85e2c0937860596db6eed875470ac7a12c53ddc4e5268e07",
+      "completeHeading": false
+    }
+  ],
+  "additionalSources": [
+    {
+      "source": "deliverables/final-specification-set/combat-requirements/wp40-commands-obedience-and-action-order.md",
+      "sha256": "86772d23bc60dc660713fd28d3b21da3397925e35089d4491f2baf75372a02c3",
+      "scope": "ordinary PP plus Pressure extra per target, §5.2/5.3"
+    }
+  ],
+  "profile": {
+    "level": 100,
+    "nature": "Hardy",
+    "gender": "M",
+    "item": "",
+    "ivs": {
+      "hp": 31,
+      "atk": 31,
+      "def": 31,
+      "spa": 31,
+      "spd": 31,
+      "spe": 31
+    },
+    "evs": {
+      "hp": 0,
+      "atk": 0,
+      "def": 0,
+      "spa": 0,
+      "spd": 0,
+      "spe": 0
+    }
+  },
+  "initialPP": {
+    "tackle": 35,
+    "earthquake": 10,
+    "dragonrage": 10,
+    "splash": 40
+  },
+  "scope": "four common families/eight raw Gateway battles under six of74 headings; no full heading coverage, App/UI/save/native/Ruby claim",
+  "freezeLimits": "author input/test hashes and fixed commit recorded before first behavior execution; no independent third-party pre-run seal claimed",
+  "fixtureLimits": "explicit Gen8 custom-game sets including inert Splash; no official-learnset claim. No held items, partners, suppression, weather, terrain or unrelated stat modifiers. No exact ordinary damage or random-frequency equivalence assertion.",
+  "cases": [
+    {
+      "id": "EABI-01",
+      "check": "intimidate",
+      "player": {
+        "species": "Arbok",
+        "ability": "Intimidate",
+        "moves": [
+          "tackle"
+        ]
+      },
+      "target": {
+        "species": "Metagross",
+        "ability": "Light Metal",
+        "moves": [
+          "splash"
+        ]
+      },
+      "featureIds": [
+        "FR-000065"
+      ],
+      "turns": 0,
+      "expected": {
+        "targetAttack": -1
+      }
+    },
+    {
+      "id": "EABI-02",
+      "check": "clear-body",
+      "player": {
+        "species": "Arbok",
+        "ability": "Intimidate",
+        "moves": [
+          "tackle"
+        ]
+      },
+      "target": {
+        "species": "Metagross",
+        "ability": "Clear Body",
+        "moves": [
+          "splash"
+        ]
+      },
+      "featureIds": [
+        "FR-000065",
+        "FR-000566"
+      ],
+      "turns": 0,
+      "expected": {
+        "targetAttack": 0
+      }
+    },
+    {
+      "id": "EABI-03",
+      "check": "levitate",
+      "player": {
+        "species": "Haxorus",
+        "ability": "Unnerve",
+        "moves": [
+          "earthquake"
+        ]
+      },
+      "target": {
+        "species": "Flygon",
+        "ability": "Levitate",
+        "moves": [
+          "splash"
+        ]
+      },
+      "featureIds": [
+        "FR-000532",
+        "FR-000562",
+        "FR-000568"
+      ],
+      "turns": 1,
+      "expected": {
+        "targetHP": "unchanged",
+        "PPPerUse": 1
+      }
+    },
+    {
+      "id": "EABI-04",
+      "check": "mold-breaker",
+      "player": {
+        "species": "Haxorus",
+        "ability": "Mold Breaker",
+        "moves": [
+          "earthquake"
+        ]
+      },
+      "target": {
+        "species": "Flygon",
+        "ability": "Levitate",
+        "moves": [
+          "splash"
+        ]
+      },
+      "featureIds": [
+        "FR-000532",
+        "FR-000562",
+        "FR-000568"
+      ],
+      "turns": 1,
+      "expected": {
+        "targetHP": "decreased",
+        "PPPerUse": 1
+      }
+    },
+    {
+      "id": "EABI-05",
+      "check": "pressure",
+      "player": {
+        "species": "Pidgey",
+        "ability": "Keen Eye",
+        "moves": [
+          "tackle"
+        ]
+      },
+      "target": {
+        "species": "Mewtwo",
+        "ability": "Pressure",
+        "moves": [
+          "splash"
+        ]
+      },
+      "featureIds": [
+        "FR-000568"
+      ],
+      "turns": 2,
+      "expected": {
+        "PPPerUse": 2
+      }
+    },
+    {
+      "id": "EABI-06",
+      "check": "pressure-control",
+      "player": {
+        "species": "Pidgey",
+        "ability": "Keen Eye",
+        "moves": [
+          "tackle"
+        ]
+      },
+      "target": {
+        "species": "Mewtwo",
+        "ability": "Unnerve",
+        "moves": [
+          "splash"
+        ]
+      },
+      "featureIds": [
+        "FR-000568"
+      ],
+      "turns": 2,
+      "expected": {
+        "PPPerUse": 1
+      }
+    },
+    {
+      "id": "EABI-07",
+      "check": "sturdy",
+      "player": {
+        "species": "Charizard",
+        "ability": "Blaze",
+        "moves": [
+          "dragonrage"
+        ]
+      },
+      "target": {
+        "species": "Magnemite",
+        "ability": "Sturdy",
+        "moves": [
+          "splash"
+        ],
+        "level": 1
+      },
+      "featureIds": [
+        "FR-000536"
+      ],
+      "turns": 1,
+      "expected": {
+        "initialTargetHP": 11,
+        "targetHP": 1,
+        "fainted": false,
+        "PPPerUse": 1
+      }
+    },
+    {
+      "id": "EABI-08",
+      "check": "sturdy-control",
+      "player": {
+        "species": "Charizard",
+        "ability": "Blaze",
+        "moves": [
+          "dragonrage"
+        ]
+      },
+      "target": {
+        "species": "Magnemite",
+        "ability": "Magnet Pull",
+        "moves": [
+          "splash"
+        ],
+        "level": 1
+      },
+      "featureIds": [
+        "FR-000536"
+      ],
+      "turns": 1,
+      "expected": {
+        "initialTargetHP": 11,
+        "targetHP": 0,
+        "fainted": true,
+        "PPPerUse": 1
+      }
+    }
+  ]
+}

@@ -17,6 +17,7 @@ import { BattleSession } from "../flow/session";
 import * as G from "../rules/growth";
 import * as S from "../rules/state";
 import { SaveStore } from "./save-store";
+import { createFixtureSaveStore } from "./fakes";
 import { identityKeys } from "../rules/species-key"; // the fixture world: content ids are the Showdown names
 import * as F from "./fixtures/game";
 
@@ -189,12 +190,12 @@ const SCENARIOS: Record<string, () => Promise<L>> = {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-mx-'));
 		try {
 			const file = path.join(dir, 'save.json'); fs.writeFileSync(file, JSON.stringify(game));
-			const crashing = new SaveStore(file, { at: (p: L) => { if (p === 'afterTmpWrite') throw new Error('injected'); } }, identityKeys, F.content);
+      const crashing = createFixtureSaveStore(file, { at: (p: L) => { if (p === 'afterTmpWrite') throw new Error('injected'); } }, identityKeys, F.content);
 			let threw = false; try { crashing.commit(result); } catch (e) { threw = true; }
 			ensure(threw, 'injected failure surfaced');
 			const mid = new SaveStore(file, {}, identityKeys, F.content).load();
 			ensure(!mid.appliedBattles[result.battleId], 'old state after the failure');
-			eq(new SaveStore(file, {}, identityKeys, F.content).commit(result).status, 'applied', 'retry applies');
+      eq(createFixtureSaveStore(file, {}, identityKeys, F.content).commit(result).status, 'applied', 'retry applies');
 			eq(new SaveStore(file, {}, identityKeys, F.content).commit(result).status, 'already-applied', 'second submit no-op');
 			const after = new SaveStore(file, {}, identityKeys, F.content).load();
 			eq(after.party.map((m: L) => m.id), game.party.map((m: L) => m.id), 'persistent order unchanged');

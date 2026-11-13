@@ -21,7 +21,7 @@ const LAYERS = {
 	entry: ['rules', 'content', 'battle', 'flow', 'app', 'tools', 'i18n', 'entry'], // files at the framework root: the public index and the composition root
 };
 const ENTRY_FILES = new Set(['index.ts', 'production.ts', 'testing.ts', 'composition.ts']);
-const TESTING_SOURCES = new Set(['tools/harness.ts', 'tools/matrix.ts', 'tools/fakes.ts', 'tools/scripted-driver.ts']);
+const TESTING_SOURCES = new Set(['tools/harness.ts', 'tools/matrix.ts', 'tools/fakes.ts', 'tools/scripted-driver.ts', 'tools/held-diagnostics.ts']);
 const isTestingSource = rel => rel === 'testing.ts' || rel.startsWith('tools/fixtures/') || TESTING_SOURCES.has(rel);
 // The sole flow service app uses is a host-free content check. Keep its imports in the lower pure layers too, so
 // it cannot silently turn into an indirect Showdown/session bridge.

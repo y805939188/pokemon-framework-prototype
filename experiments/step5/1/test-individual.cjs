@@ -87,9 +87,9 @@ test('P51-05/24: constructors clone metadata; frozen protocol projection has exa
   const p=E.state.protocolMember(m);assert.equal(Object.keys(p).length,18);for(const key of ['personalID','owner','origin','form','shiny','firstMoves','markings']) assert.equal(key in p,false,key);
   assert.equal(p.ot,'原名');assert.equal(p.friendship,256);
 });
-test('P51-23: PBS Happiness accepts 256, rejects malformed values without output',()=>{
+test('P51-23: explicit legacy PBS Happiness accepts 256, rejects malformed values without output',()=>{
   const input='[BULBASAUR]\nGrowthRate = Medium\nBaseExp = 64\nEVs = SPECIAL_ATTACK,1\nMoves = 1,TACKLE\nHappiness = ';
-  const good=E.pbsImport.importPbsSpecies(input+'256','author');assert.equal(good.ok,true);assert.equal(good.species[0].happiness,256);
+  const good=E.pbsImport.importPbsSpecies(input+'256','author',1);assert.equal(good.ok,true);assert.equal(good.species[0].happiness,256);
   for(const value of ['-1','1.5','9007199254740992']) { const bad=E.pbsImport.importPbsSpecies(input+value,'author');assert.equal(bad.ok,false);assert.deepEqual(bad.species,[]); }
 });
 test('P51-05: pinned Gen8 session calculation bounds friendship but result leaves persistent 256 intact',async()=>{

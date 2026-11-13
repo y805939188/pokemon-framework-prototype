@@ -13,7 +13,7 @@ function content(E, regions = [['A','B'],['B','A']]) {
 function member(id='M1',extra={}) {return {id,species:'A',form:0,level:5,exp:125,hp:0,status:'',statusCount:0,moves:[{id:'tackle',pp:7,maxpp:35,ppUps:0}],item:'',ability:'Known',nature:'hardy',gender:'N',friendship:256,abilityIndex:null,effectiveAbilityIndex:null,readyToEvolve:true,...extra};}
 function legacy6(E,C=content(E)) {
   const game=E.state.newGame({party:[member()],bag:{potion:17,pokeball:3},money:765432,content:C});
-  game.schema=6;game.dex={seen:['A'],owned:['B']};
+  game.schema=6;delete game.defeatedTrainers;game.dex={seen:['A'],owned:['B']};
   game.appliedBattles=JSON.parse('{"__proto__":{"hash":"'+'a'.repeat(64)+'"},"constructor":{"hash":"'+'b'.repeat(64)+'"}}');
   game.claims=JSON.parse('{"constructor":{"kind":"grant"}}');
   game.steps=123;game.stats.wild_battles_won=17;

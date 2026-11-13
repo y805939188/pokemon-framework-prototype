@@ -5,7 +5,7 @@ const fs=require('node:fs'),path=require('node:path'),read=n=>JSON.parse(fs.read
 const clone=E.state.clone,content=E.contentRuntime.assembleContent(E.contentCompile.compileContent(Object.fromEntries(['manifest','sources','species','overlays','grants'].map(n=>[n,read(n)]))).data,E.dex.createDexLookup()).content,auto={mode:1,naming:1};
 const fresh=()=>E.fixtures.savedFor(E.fixtures.makeGame(),content);
 const result=id=>({protocol:1,battleId:id,outcome:{kind:'run',winner:null},members:{},bag:{},captured:[],dex:{seen:[],owned:[]}});
-function setup(state=E.fakes.createMemoryState(fresh()),ports={},options={}){return new E.app.GameApplication({state,sessions:E.fakes.createFakeSessions({}),content:()=>({content}),random:()=>0,clock:()=>1000,projection:E.fakes.createRecordingProjection(),...ports},options)}
+function setup(state=E.fakes.createMemoryState(fresh()),ports={},options={}){const p={state,sessions:E.fakes.createFakeSessions({}),content:()=>({content}),random:()=>0,clock:()=>1000,projection:E.fakes.createRecordingProjection(),...ports};p.sessions=E.composition.createLegacyNoHeldSessionFactory(p.sessions);return new E.app.GameApplication(p,options)}
 test('J03: pending creation and live battle reject same/different ID manual commits; original session alone installs once',async()=>{
  const state=E.fakes.createMemoryState(fresh());let resume;const app=setup(state,{sessions:{create:()=>new Promise(r=>resume=r)}}),request={battleId:'J03',kind:'wild',foes:[{species:'Pidgey',level:5}],seq:1},before=clone(state.current());
  const opening=app.startBattle(request),template={...clone(before.party[0]),id:'FOREIGN'},raw={...result('J03'),outcome:{kind:'caught',winner:null},captured:[E.state.protocolMember(E.speciesKey.toBattleMember(template,content))]};
@@ -15,7 +15,7 @@ test('J03: pending creation and live battle reject same/different ID manual comm
  for(const r of [raw,result('J03'),result('other')])assert.throws(()=>app.commitResult(r,{templates:{FOREIGN:template},profile:auto}),/battle-active/);
  assert.equal(state.replaced.length,0);assert.equal(app.finishBattle(session,request).commit,'applied');assert.equal(state.replaced.length,1);
  assert.equal(app.commitResult(result('J03')),'already-applied');assert.equal(state.replaced.length,1);
- assert.equal(app.commitResult(result('manual')),'applied');assert.equal(state.replaced.length,2);
+ assert.throws(()=>app.commitResult(result('manual')),/source-unknown-or-retired/);assert.equal(state.replaced.length,1,'B requires a preselected direct producer; the manually supplied JSON grants none');
 });
 for(const invalidate of ['abort','load'])test(`J03: ${invalidate} invalidates pending create; late session cannot commit into new generation`,async()=>{
  const state=E.fakes.createMemoryState(fresh());let resume;const app=setup(state,{sessions:{create:()=>new Promise(r=>resume=r)}}),request={battleId:'late',kind:'wild',foes:[{species:'Pidgey',level:5}],seq:1};
@@ -41,6 +41,6 @@ for(const schema of [4,5])test(`J05: schema ${schema} refuses unknown/prototype 
   const app=setup({read:()=>game,replace(){throw Error('read-only')}});const v=app.describeIndividual(game.party[0].id);assert.ok(Object.hasOwn(v,'modifiers'));assert.equal(typeof v.modifiers,'object');
  }
 });
-test('J11: application encounter gate rejects held items before content/RNG; explicit experimental control proceeds',()=>{
- for(const allowed of [false,true]){const g=fresh();g.party[0].item='leftovers';let loads=0,draws=0;const app=setup({read:()=>g,replace(){}},{content:()=>{loads++;return {content}},random:()=>{draws++;return 0}},{capabilities:{allowExperimentalHeldItemBattle:allowed}});const out=app.prepareEncounter({regions:[],slots:[{species:'Pidgey',weight:1,minLevel:5,maxLevel:5}]},0);assert.equal(out.ok,allowed);if(allowed){assert.ok(loads>0);assert.ok(draws>0)}else{assert.equal(out.reason,'held-item-battle-disabled');assert.equal(loads,0);assert.equal(draws,0)}}
+test('J11: ordinary held encounters are open by default and developer false cannot close released battle policy',()=>{
+ for(const capabilities of [undefined,{allowExperimentalHeldItemBattle:false},{allowExperimentalHeldItemBattle:true}]){const g=fresh();g.party[0].item='leftovers';const before=clone(g);let loads=0,draws=0;const app=setup({read:()=>g,replace(){throw Error('encounter must not write')}},{content:()=>{loads++;return {content}},random:()=>{draws++;return 0}},capabilities?{capabilities}:{});const out=app.prepareEncounter({regions:[],slots:[{species:'Pidgey',weight:1,minLevel:5,maxLevel:5}]},0);assert.equal(out.ok,true);assert.deepEqual(out.foe,{species:'Pidgey',level:5});assert.ok(loads>0);assert.ok(draws>0);assert.deepEqual(g,before);}
 });

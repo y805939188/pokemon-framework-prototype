@@ -81,12 +81,18 @@ function host({ interpreter = false, saveEnabled = true, failMessage = false, ga
   vm.runInContext(plugin, ctx, { filename: 'PS_BattleFlow.js (built)' });
   const flow = ctx.PSFlow;
   flow._content = content; flow._dex = E.dex.createDexLookup(); flow.rng = lcg(1);
+  // This suite explicitly substitutes synthetic results for begin(), so select the historical no-held producer root.
+  // Actual required default composition is covered separately by B and real-host runners.
+  const Legacy = require('../step5/1/legacy-test-support.cjs').AutomaticApplication;
+  flow._app = new Legacy({ state: {read:()=>flow.game(),replace:next=>{sys._psGame=next;}},
+    content:()=>({content,dex:flow._dex}),sessions:E.fakes.createFakeSessions({}),projection:{project:out=>flow.projectOutcome(out)},random:n=>flow.random(n) });
   return { ctx, flow, sys, vars, transfers, messages, errors, game: () => sys._psGame };
 }
 /** Start a battle the way the plugin does (the scene is a stub) and end it with `result` through the scene's onEnd. */
 function battle(h, { canLose = false, resultVariable = 0, result = lost } = {}) {
   h.flow.openBattle({ kind: 'wild', foes: [{ species: 'Pidgey', level: 30 }], seq: 1, battleId: 'b#1', resultVariable, canLose });
   // This host-only fixture substitutes for begin(): give the synthetic session the same ownership begin records.
+  h.flow._op.canLose = !!h.flow._op.request.canLose;
   const session = h.flow._op.session = { result: () => result('b#1') };
   return () => h.ctx.Scene_PSBattle.prototype.onEnd.call({ _session: session, popScene() {} });
 }
@@ -168,6 +174,7 @@ test('a blackout ends the calling chain of the battle: directly, through one and
     root.setup(shape === 0 ? [startBattle(canLose), set(3, 777), END] : [c(117, [shape]), set(3, 777), END], 1);
     root.update();
     assert.equal(h.flow.running, true, 'the battle is open and the event waits');
+    h.flow._op.canLose = !!h.flow._op.request.canLose; // This fixture substitutes for the real begin policy capture.
     const session = h.flow._op.session = { result: () => lost(h.flow.request.battleId) };
     h.ctx.Scene_PSBattle.prototype.onEnd.call({ _session: session, popScene() {} });
     root.update();

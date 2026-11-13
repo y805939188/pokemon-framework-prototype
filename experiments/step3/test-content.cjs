@@ -52,7 +52,7 @@ test('errors are located by file and path', () => {
 	bad(i => { i.species[0].catchRate = 256; }, 'species.json', /^\[0\]\.catchRate$/, /0 to 255/);
 	bad(i => { i.species[0].source = 'nowhere'; }, 'species.json', /^\[0\]\.source$/, /must name an entry/);
 	bad(i => { i.sources[0].status = 'maybe'; }, 'sources.json', /^\[0\]\.status$/);
-	bad(i => { i.manifest.schema = 2; }, 'manifest.json', /^\$\.schema$/);
+	bad(i => { i.manifest.schema = 999; }, 'manifest.json', /^\$\.schema$/);
 });
 
 test('overlays: applied, and refused when they point nowhere, conflict, or give no reason', () => {

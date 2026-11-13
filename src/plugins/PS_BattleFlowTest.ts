@@ -12,8 +12,30 @@ import { runWriteScale, continueWriteScale } from "./flowtest/write-scale";
 import { runStep4Write, continueStep4Write } from "./flowtest/step4-write";
 import { runStep4Memory } from "./flowtest/step4-memory";
 import { runStep5Fixture, runStep5Sample, continueStep5Sample } from "./flowtest/step5-integration";
+import { runHeldWriteback, continueHeldWriteback } from "./flowtest/held-writeback";
+import { runTrainerAiHost, continueTrainerAiHost } from "./flowtest/trainer-ai";
+import { runD1Benchmark } from "./flowtest/d1-benchmark";
+import { runD2Status } from "./flowtest/d2-status";
+import { runD2Menu } from "./flowtest/d2-menu";
+import { runD2Backdrop } from "./flowtest/d2-backdrop";
+import { runD2Pictures } from "./flowtest/d2-pictures";
+import { runD2Damage } from "./flowtest/d2-damage";
+import { runD2Faint } from "./flowtest/d2-faint";
+import { runD2ResultFeedback } from "./flowtest/d2-result-feedback";
+import { runD2TrainerOpening } from "./flowtest/d2-trainer-opening";
+import { runD2MoveMenu } from "./flowtest/d2-move-menu";
+import { runD2OrdinaryMessage } from "./flowtest/d2-ordinary-message";
+import { runD2MenuCapture } from "./flowtest/d2-menu-capture";
+import { runD2Prebattle } from "./flowtest/d2-prebattle-wrapper";
+import { runD2AuthorDialogue } from "./flowtest/d2-author-dialogue";
+import { runD2BallFeedback } from "./flowtest/d2-ball-feedback";
+import { runD2VictoryMusic } from "./flowtest/d2-victory-music";
+import { runD2Music } from "./flowtest/d2-music";
+import { runD2CaptureME } from "./flowtest/d2-capture-me";
 import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
 import { pressKey, waitGameFrames, waitUntil } from "./flowtest/timing";
+import { classifyFlowTestRoute } from './flowtest/d2-normal-route';
+import { prepareNormalD2Entry } from './flowtest/d2-normal-entry';
 import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } from "./flowtest/evidence";
 
 (() => {
@@ -22,10 +44,15 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   const W = window as any;
   const argv: string[] = (G.nw && G.nw.App && G.nw.App.argv) || [];
   const arg = (n: string) => { const a = argv.find((x) => x.startsWith(`--${n}=`)); return a ? a.slice(n.length + 3) : undefined; };
-  const mode = arg("ps-flow-test");
-  if (!mode) return;
+  const route = classifyFlowTestRoute(argv);
+  if (route.kind === 'inactive') return;
+  const mode = route.mode;
+  if (route.kind === 'normal') {
+    W.PSNormalD2 = prepareNormalD2Entry(argv, G.require, {G,W});
+    return;
+  }
   // Backend contract modes drive their own answers; formal UI and the normal-sample integration use the default presenter.
-  if(mode!=="evolution-ui"&&mode!=="trade-ui"&&mode!=="closeout"&&mode!=="closeout-continue"&&mode!=="step5-sample"&&mode!=="step5-continue"&&W.PSEvolution)W.PSEvolution.automatic=false;
+  if(mode!=="d2-victory-music"&&mode!=="evolution-ui"&&mode!=="trade-ui"&&mode!=="closeout"&&mode!=="closeout-continue"&&mode!=="step5-sample"&&mode!=="step5-continue"&&W.PSEvolution)W.PSEvolution.automatic=false;
 
   const nodeRequire: any = G.require;
 
@@ -38,7 +65,9 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   G.SceneManager.isGameActive = () => true;
 
   // No sound during scripted runs (opt back in with --ps-sound). Belt and braces: the run scripts also pass
-  // Chromium's --mute-audio; here the AudioManager play calls are swallowed so nothing is even decoded/started.
+  // Chromium's --mute-audio; AudioManager calls are swallowed here. The isolated
+  // F2 adapter still decodes/starts its own muted nodes to qualify ownership;
+  // neither that nor these counters proves audible physical output.
   const suppressedAudio: Record<string, number> = {};
   if (!argv.includes("--ps-sound")) {
     for (const fn of ["playBgm", "playBgs", "playMe", "playSe", "playStaticSe"]) {
@@ -128,13 +157,21 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     return entry;
   }
   const names = (): string[] => battle()._menu._items.map((i: any) => i.name);
-  async function choose(re: RegExp, label?: string) {
+  async function choose(re: RegExp | { key: string | number | null }, label?: string) {
     const m = battle()._menu;
-    const idx = m._items.findIndex((i: any) => re.test(i.name));
+    const idx = "key" in re
+      ? battle().inputState().items.findIndex((i: any) => i.key === re.key)
+      : m._items.findIndex((i: any) => re.test(i.name));
     if (idx < 0) throw new Error(`menu item ${re} not found in [${names().join(" | ")}] (${label || ""})`);
     if (m._items[idx].enabled === false) throw new Error(`menu item ${re} is disabled`);
     let guard = 0;
-    while (m.index() !== idx && guard++ < 30) await press("down");
+    while (m.index() !== idx && guard++ < 30) {
+      const at=m.index(),columns=battle().inputState().columns||1;
+      const row=Math.floor(at/columns),targetRow=Math.floor(idx/columns),vertical=at+(row<targetRow?columns:-columns);
+      if(row!==targetRow&&vertical>=0&&vertical<m._items.length)await press(row<targetRow?'down':'up');
+      else await press(at%columns<idx%columns?'right':'left');
+    }
+    assert(m.index()===idx,`navigation reached exact slot ${idx} (${label||re})`);
     // A key event can be swallowed while the window is busy (e.g. right after a screenshot): confirm that OK
     // had an effect (mode or item list changed, scene left, or a request is in flight) and press again if not.
     for (let attempt = 0; attempt < 4; attempt++) {
@@ -147,7 +184,28 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     throw new Error(`OK on ${re} had no effect after 4 presses`);
   }
   const mode_ = () => (battle() ? battle()._mode : "");
-  async function inMode(m: string, label?: string) { await waitFor(() => battle() && battle()._mode === m && battle()._queue.length === 0 && !battle()._busy, `mode ${m} ${label || ""}`); }
+  // A new mandatory presentation is confirmed through the same USE input as a player.
+  // Existing scenario readiness/phase predicates still have to succeed afterwards.
+  async function waitBattlePresentation(condition: () => boolean, label: string) {
+    for (let count = 0; count < 200; count++) {
+      await waitFor(() => condition() || !!battle()?.levelStatsState?.(), label);
+      if (condition()) return;
+      const b = battle(), page = b.levelStatsState();
+      await frames(1); await press('ok');
+      (report.levelStatsConfirmations ??= []).push({ level: page.level, phase: page.phase, frame, after: b.levelStatsState?.()?.phase ?? null });
+    }
+    throw new Error('bounded level stats confirmations: ' + label);
+  }
+  async function inMode(m: string, label?: string) {
+    if (m === 'learn') {
+      await waitBattlePresentation(() => !!battle() && ['learn', 'learn-initial'].includes(battle()._mode) && battle()._queue.length === 0 && !battle()._busy, `learning choice ${label || ''}`);
+      if (battle()._mode === 'learn-initial') {
+        await frames(1); await choose({ key: 'forget-move' });
+        (report.learningInitialConfirmations ??= []).push({ frame, answer: 'forget-move' });
+      }
+    }
+    await waitBattlePresentation(() => !!battle() && battle()._mode === m && battle()._queue.length === 0 && !battle()._busy, `mode ${m} ${label || ""}`);
+  }
   async function dismissMessages() {
     for (let i = 0; i < 40 && (G.$gameMessage.isBusy() || G.$gameMap._interpreter.isRunning()); i++) { if (G.$gameMessage.isBusy()) await press("ok"); else await frames(5); }
     await waitFor(() => !G.$gameMap._interpreter.isRunning() && !G.$gameMessage.isBusy(), "interpreter idle");
@@ -190,9 +248,10 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   async function finishBattle() { await inMode("end"); await press("ok"); await dismissMessages(); await waitFor(() => !W.PSFlow.running && !battle(), "back from the battle"); await frames(5); }
   async function fightUntilEnd(moveRe: RegExp, max = 12) {
     for (let i = 0; i < max && mode_() !== "end"; i++) {
-      if (mode_() === "learn") { await choose(/Don't learn|不学习/); continue; }
-      await choose(/^Fight/); await inMode("moves"); await choose(moveRe);
-      await waitFor(() => ["main", "end", "learn"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after the move");
+      if (mode_() === "learn-initial") { await choose({ key: 'decline-learning' }); continue; }
+      if (mode_() === "learn") { await choose(/Don't learn|不学习/); await inMode('learn-giveup'); await choose({ key: 'give-up' }); continue; }
+      await choose({ key: "fight" }); await inMode("moves"); await choose(moveRe);
+      await waitBattlePresentation(() => ["main", "end", "learn", "learn-initial"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "after the move");
     }
   }
 
@@ -226,7 +285,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   let packageInfo: any = null;
   try { packageInfo = JSON.parse(fs.readFileSync(path.join(gameDir, "package-info.json"), "utf8")); } catch (e) { /* dev tree: no package-info */ }
   const pv = (G.process && G.process.versions) || {};
-  const report: any = { mode, results, focusLog, suppressedAudio, shots, get refocus() { return refocus; }, get driverClock() { return { gameFrames: frame, displayTicks: ticks, ticksPerGameFrame: frame ? Math.round(ticks / frame * 1000) / 1000 : null }; }, env: { nw: pv.nw, node: pv.node, chromium: pv.chromium, v8: pv.v8, platform: G.process && G.process.platform, arch: G.process && G.process.arch, execPath: G.process && G.process.execPath, gameDir, packageInfo } };
+  const report: any = { mode, hostDriverVersion:"D2-faint-host-driver-v2", results, focusLog, suppressedAudio, shots, get refocus() { return refocus; }, get driverClock() { return { gameFrames: frame, displayTicks: ticks, ticksPerGameFrame: frame ? Math.round(ticks / frame * 1000) / 1000 : null }; }, env: { nw: pv.nw, node: pv.node, chromium: pv.chromium, v8: pv.v8, platform: G.process && G.process.platform, arch: G.process && G.process.arch, execPath: G.process && G.process.execPath, gameDir, packageInfo } };
   const writeProgress = () => { if (!OUT) return; try { fs.writeFileSync(OUT + '.progress.json', JSON.stringify({ at: Date.now(), results, shots, management: W.PSManagement?.current(), inventory: W.PSInventory?.current() }, null, 2)); } catch (e) { /* the final report still carries the results */ } };
   // driver-selftest only: screenshot ports for the failure path of the next failing scenario
   let failureShot: { ports?: Partial<CapturePorts>; timeoutMs?: number } = {};
@@ -349,7 +408,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       assert(items[0].enabled === false, "the active member cannot be switched to itself");
       await press("cancel"); await inMode("main");
       // finish the battle: two KOs
-      for (let i = 0; i < 2; i++) { await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower/i); await frames(5); await waitFor(() => mode_() === "main" || mode_() === "end" || mode_() === "learn", "after attack"); if (mode_() === "learn") { await choose(/Don't learn/); } await frames(5); if (mode_() === "end") break; await inMode("main"); }
+      for (let i = 0; i < 2; i++) { await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower/i); await frames(5); await waitFor(() => mode_() === "main" || mode_() === "end" || mode_() === "learn" || mode_() === "learn-initial", "after attack"); if (mode_() === "learn-initial") { await choose({ key: 'decline-learning' }); } else if (mode_() === "learn") { await choose(/Don't learn/); await inMode('learn-giveup'); await choose({ key: 'give-up' }); } await frames(5); if (mode_() === "end") break; await inMode("main"); }
       await inMode("end"); await press("ok"); await dismissMessages();
       eq(W.PSFlow.lastOutcome.commit, "applied", "finished and committed");
       eq(I6.bagOf(game()), { ...I6.bagOf(before), pokeball: I6.bagOf(before).pokeball - 1 }, "committed bag: only the ball that the trainer blocked is spent");
@@ -434,7 +493,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       eq(game().party.map((m: any) => [m.species, m.form]), [["charizard", 0], ["blastoise", 0], ["venusaur", 0]], "Showdown names mapped to content id + form through the content (D5-3)");
       eq([G.$gameSystem._psSaveInfo.from, G.$gameSystem._psSaveInfo.to, G.$gameSystem._psSaveInfo.migrated], [1, api().state.GAME_SCHEMA, true], "migration recorded");
       // a state written by a newer build, and a damaged one
-      for (const [slot, doc, code] of [[3, { ...clone(game()), schema: 9 }, "unknown-version"], [4, "not a state", "corrupt"]] as [number, any, string][]) {
+      for (const [slot, doc, code] of [[3, { ...clone(game()), schema: api().state.GAME_SCHEMA + 1 }, "unknown-version"], [4, "not a state", "corrupt"]] as [number, any, string][]) {
         await writeHostFixture(slot, doc);
         G.$gameSystem._psGame = { diverged: true };
         await G.DataManager.loadGame(slot);
@@ -467,17 +526,16 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
 
     await scenario("T11 an operation fails and its rollback fails too: the session is closed with both errors kept, nothing is committed, the event still continues", async () => {
       fresh(); const before = clone(game());
-      const Gateway = nodeRequire("./js/engine/gateway.cjs").BattleGateway;
-      const restore = Gateway.restore;
+      let session: any, restore: any;
       try {
         await startEvent(1); await inMode("main");
-        const session = battle()._session;
+        session = battle()._session; restore = session._restoreCheckpoint;
         const gwChoose = session.gw.choose.bind(session.gw);
         session.gw.choose = async (...a: any[]) => { const ok = await gwChoose(...a); if (a[0] === "p2") throw new Error("injected operation failure"); return ok; };
-        Gateway.restore = async () => { throw new Error("injected rollback failure"); };
+        session._restoreCheckpoint = async () => { throw new Error("injected rollback failure"); };
         await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower/i);
         await inMode("end");
-        Gateway.restore = restore;
+        session._restoreCheckpoint = restore;
         assert(battle()._aborted, "scene shows the aborted ending");
         const msg = W.PSFlow.lastOutcome.error;
         assert(/injected operation failure/.test(msg) && /injected rollback failure/.test(msg), "both errors reach the outcome: " + msg);
@@ -490,7 +548,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         eq(game(), before, "persistent state identical: nothing was committed");
         assert(W.PSFlow.lastOutcome.aborted && W.PSFlow.lastOutcome.commit === "none" && G.$gameVariables.value(10) === 0, "aborted outcome, nothing committed, variable 0");
         assert(!W.PSFlow.running && !G.$gameMap._interpreter.isRunning(), "flow closed and interpreter released");
-      } finally { Gateway.restore = restore; }
+      } finally { if (session && restore) session._restoreCheckpoint = restore; }
     });
 
     await scenario("T12 committed but the host projection fails: the commit stands and is reported, nothing is applied twice, a retry informs the host", async () => {
@@ -875,8 +933,10 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
 
     await scenario("T30 a battle id that is also \"__proto__\" is an ordinary ledger entry through MZ's own save and load: applied once, a repeat before and after the load spends nothing", async () => {
       await slice(30); I6.setItemCount(game(), "potion", 2);
-      const r = { protocol: 1, battleId: "__proto__", outcome: { kind: "run", winner: null }, members: {}, bag: { potion: -1 }, captured: [], dex: { seen: [], owned: [] } };
-      eq([W.PSFlow.commit(r), W.PSFlow.commit(r), I6.bagOf(game()).potion], ["applied", "already-applied", 1], "applied once");
+      game().party[0].hp = 1;const targetName=W.PSFlow.speciesName(game().party[0].species);
+      W.PSFlow.openBattle({battleId:"__proto__",kind:"wild",foes:[{species:"pidgey",level:1}],seq:30,canLose:true});await inMode("main");const handle=battle()._session;
+      await choose(/^Bag/);await inMode("bag");await choose(/^Potion\b/i);await inMode("party");await choose(new RegExp(targetName,'i'));await inMode("main");await choose(/^Run/);await inMode("end");const r=handle.result();await finishBattle();
+      eq([W.PSFlow.lastOutcome.commit, W.PSFlow.commit(r), I6.bagOf(game()).potion], ["applied", "already-applied", 1], "applied once from the legitimate Session");
       assert(Object.hasOwn(game().appliedBattles, "__proto__"), "an own ledger entry");
       await G.DataManager.saveGame(12);
       I6.setItemCount(game(), "potion", 7); // diverge, so the load is visible
@@ -1201,7 +1261,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
    });
    await scenario('U51-14 J02 transient snapshot retry and T1 unusable event entries remain contained and exit to map',async()=>{
     await toMap();fresh();const app=W.PSFlow.app(),read=app.managementSnapshot.bind(app);let calls=0;app.managementSnapshot=(...args:any[])=>{if(calls++===0)throw Error('J02 transient snapshot');return read(...args);};W.PSManagement.openParty();await uiReady('party');assert(calls>=2,'initialization actually retried snapshot');await press('cancel');await uiClosed();delete app.managementSnapshot;const token=app.beginManagement();app.endManagement(token);
-    const healthy=clone(game()),raw:any={...healthy,schema:4,boxes:Array.from({length:1201},(_,i)=>({...api().state.protocolMember(healthy.party[0]),form:healthy.party[0].form,id:'T1-'+i}))};raw.party=healthy.party.map((m:any)=>({...api().state.protocolMember(m),form:m.form}));delete raw.storage;delete raw.player;delete raw.nextMemberOrdinal;raw.bag=I6.rawBagOf(healthy);delete raw.inventory;delete raw.badges;raw.dex={seen:clone(healthy.dex.seen),owned:clone(healthy.dex.owned)};/* author a schema4 payload inside an envelope captured while the current7 state is still valid */const bytes=JSON.stringify(raw),contents=G.DataManager.makeSaveContents();contents.system._psGame=raw;G.DataManager.extractSaveContents(contents);eq(G.$gameSystem._psSaveError.code,'capacity-exceeded','actual migration rejected');
+    const healthy=clone(game()),raw:any={schema:4,party:healthy.party.map((m:any)=>({...api().state.protocolMember(m),form:m.form})),boxes:Array.from({length:1201},(_,i)=>({...api().state.protocolMember(healthy.party[0]),form:healthy.party[0].form,id:'T1-'+i})),bag:I6.rawBagOf(healthy),money:healthy.money,dex:{seen:clone(healthy.dex.seen),owned:clone(healthy.dex.owned)},appliedBattles:clone(healthy.appliedBattles),claims:clone(healthy.claims),stats:clone(healthy.stats),steps:healthy.steps};/* Author a valid schema4 document; no newer top-level fields. */const bytes=JSON.stringify(raw),contents=G.DataManager.makeSaveContents();contents.system._psGame=raw;G.DataManager.extractSaveContents(contents);eq(G.$gameSystem._psSaveError.code,'capacity-exceeded','actual migration rejected');
     for(const name of ['ShowStorage','ShowParty','ShowSummary']){const plugin=name==='ShowParty'?'PS_BattleFlow':'PS_Management';G.$gameMap._interpreter.setup([{code:357,indent:0,parameters:[plugin,name,name,{id:healthy.party[0].id}]},{code:0,indent:0,parameters:[]}],0);await waitFor(()=>scene()?._psManagement&&scene()?._initialFailure&&!G.SceneManager.isSceneChanging(),'contained unavailable management '+name);await frames(3);assert(!management()?.ready,'failed scene never ready');await shot('J02-'+name);await press('cancel');await uiClosed();eq(JSON.stringify(G.$gameSystem._psGame),bytes,'unusable original unchanged');assert(!G.$gameSystem.isSaveEnabled(),'all saves remain blocked');}
     await toMap();fresh();
    });
@@ -2421,6 +2481,109 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     await scenario('E53-M1D actual level-up then normal escape still scans evolution when all-battles is off',async()=>{await helper.actualEscapeLevel(B,sourceSha,host);return{slot:79,input:'actual default Showdown KO/level-up/run plus direct cancellation and real MZ save guard'};});
   }
 
+  /** 5.4 A-M1 production contacts in the actual NW/MZ host. All input is synthetic DOM/service automation. */
+  async function runAM1Trainer() {
+    const command = (id: string, version: number, extra: Record<string, string> = {}): any => {
+      const interpreter = new G.Game_Interpreter();
+      G.PluginManager.callCommand(interpreter, "PS_BattleFlow", "StartTrainerBattle", { trainerId: id, version: String(version), canLose: "true", ...extra });
+      return interpreter;
+    };
+    await scenario("A-M1-01 StartTrainerBattle missing data has bilingual feedback; cancel has no reward or defeated record", async () => {
+      await slice(501); game().money = 1000;
+      W.PSFlow.setLanguage("zh");
+      command("route-1-rival", 99);
+      assert(!battle() && !W.PSFlow.running, "missing record opens no scene");
+      assert(G.$gameMessage._texts.some((line: string) => line.includes("训练家资料缺失") && line.includes("route-1-rival") && line.includes("99")), "localized missing-record feedback");
+      eq([game().money, game().defeatedTrainers], [1000, {}], "missing record is zero-write");
+      await dismissMessages(); W.PSFlow.setLanguage(null);
+      command("route-1-rival", 2); await inMode("main");
+      W.PSFlow.abort(new Error("A-M1 intentional cancellation")); G.SceneManager.goto(G.Scene_Map); await frames(10);
+      eq([game().money, game().defeatedTrainers], [1000, {}], "cancel has no prize or new defeated record");
+      assert(!W.PSFlow.running, "cancel releases the host battle owner");
+    });
+
+    await scenario("A-M1-02 real trainer event commits base prize once, permits rematch and writes a reload checkpoint", async () => {
+      await slice(502); game().money = 1000;
+      command("route-1-rival", 2); await inMode("main");
+      const session = battle()._session;
+      assert(session.foeTeam.every((member: any) => member.owner.name === "Avery" && member.owner.id !== game().player.id), "NPC owner is not game.player");
+      assert(session.gw._battle.rpg.obedience.members[game().party[0].id], "formal app injects every player member owner");
+      await fightUntilEnd(/ember/i, 20); await finishBattle();
+      eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit, W.PSFlow.lastOutcome.trainerReward.actual], [1, "applied", 100], "real trainer win and actual base prize");
+      eq([game().money, game().stats.battle_money_gained, game().defeatedTrainers["route-1-rival@2"]], [1100, 100, { id: "route-1-rival", version: 2 }], "one atomic prize/defeat installation");
+      eq(game().appliedBattles[W.PSFlow.lastResult.battleId].trainer, { id: "route-1-rival", version: 2 }, "ledger keeps stable id + author version");
+      const firstMoney = game().money, raw = clone(W.PSFlow.lastResult);
+      eq(W.PSFlow.commit(raw, replayTemplates(game(), raw)), "already-applied", "exact replay is a no-op");
+      eq(game().money, firstMoney, "replay never pays twice");
+      command("route-1-rival", 2); await inMode("main"); await fightUntilEnd(/ember/i, 20); await finishBattle();
+      eq(game().money, 1200, "an intentional rematch may win base prize again");
+      eq(Object.keys(game().defeatedTrainers), ["route-1-rival@2"], "rematch does not duplicate the defeat key");
+      assert(api().saveSchema.validateGame(game()).length === 0, "current save is structurally valid");
+      await settledSave(23);
+      const expected = { slot: 23, state: clone(game()), result: clone(W.PSFlow.lastResult), reward: clone(W.PSFlow.lastOutcome.trainerReward) };
+      fs.writeFileSync(path.join(path.dirname(OUT || "."), "ps-flow-expected-a-m1-trainer.json"), JSON.stringify(expected));
+      return { money: game().money, reward: expected.reward, defeated: game().defeatedTrainers, slot: 23 };
+    });
+
+    await scenario("A-M1-03 wild foreign high-level production obedience uses real engine PP/RNG/checkpoint", async () => {
+      await slice(503);
+      const member = mkMember("FOREIGN", "Snorlax", 60, { moves: [{ id: "tackle", pp: 35, maxpp: 35, ppUps: 0 }, { id: "scratch", pp: 35, maxpp: 35, ppUps: 0 }] });
+      member.owner = { id: 999, name: "foreign-trader", gender: 0, language: 2 };
+      game().party = [member]; game().badges = Array(8).fill(false);
+      let found: any = null;
+      for (let seed = 1; seed <= 40 && !found; seed++) {
+        W.PSFlow.seed = [seed, 22, 33, 44];
+        const request = { battleId: `A-M1-obedience-${seed}`, kind: "wild", foes: [{ species: "caterpie", level: 5 }], seq: 600 + seed };
+        W.PSFlow.openBattle(request); await inMode("main");
+        const session = battle()._session, token = session.gw.checkpoint(), before = session.gw.readState("p1")[0].pp;
+        await choose(/^Fight/); await inMode("moves"); await choose(/tackle/i);
+        await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy && battle()._queue.length === 0, "obedience action complete");
+        const trace = session.gw._battle.rpg.obedienceRuntime?.trace ?? [];
+        if (trace.some((entry: any) => entry.kind === "change")) {
+          const after = session.gw.readState("p1")[0].pp;
+          eq(after.tackle, before.tackle, "changed move leaves original PP untouched");
+          eq(after.scratch, before.scratch - 1, "new move pays PP exactly once");
+          assert(trace.some((entry: any) => entry.kind === "recursive"), "nested runMove is guarded");
+          const restored = await session._driver.fromCheckpoint(token);
+          await restored.choose("p1", "move 1"); await restored.choose("p2", "move 1");
+          const replay = JSON.parse(restored.snapshot()), current = JSON.parse(session.gw.snapshot());
+          eq(replay.rpg, current.rpg, "actual host checkpoint reproduces obedience/RNG state");
+          eq(replay.prng, current.prng, "actual host checkpoint reproduces engine PRNG");
+          eq(restored.readState("p1")[0].pp, session.gw.readState("p1")[0].pp, "actual host checkpoint reproduces PP");
+          found = { seed, before, after, trace };
+        }
+        if (mode_() === "end") await finishBattle();
+        else { W.PSFlow.abort(new Error("A-M1 obedience next seed")); G.SceneManager.goto(G.Scene_Map); await frames(5); }
+      }
+      assert(found, "a natural fixed seed reaches the real change-move branch");
+      return found;
+    });
+
+    await scenario("A-M1-04 moneyGain=false event preserves an over-cap wallet, records the win and saves without reward", async () => {
+      await slice(504); game().money = 1000000;
+      let rejected = false;
+      try { command("route-1-rival", 2, { moneyGain: "invalid" }); } catch { rejected = true; }
+      assert(rejected && !W.PSFlow.running, "invalid money qualifier is rejected before opening");
+      const beforeMoneyStat = game().stats.battle_money_gained;
+      command("route-1-rival", 2, { moneyGain: "false" }); await inMode("main");
+      await fightUntilEnd(/ember/i, 20); await finishBattle();
+      eq([W.PSFlow.lastOutcome.code, W.PSFlow.lastOutcome.commit], [1, "applied"], "normal trainer win remains committed");
+      eq(game().money, 1000000, "disabled settlement does not normalize the old wallet");
+      eq(game().stats.battle_money_gained, beforeMoneyStat, "no money income statistic");
+      assert(!W.PSFlow.lastOutcome.trainerReward, "no amount/normalization message result");
+      eq(game().defeatedTrainers["route-1-rival@2"], { id: "route-1-rival", version: 2 }, "the real opponent is still defeated");
+      const before = clone(game());
+      eq(W.PSFlow.app().commitResult(W.PSFlow.lastResult), "already-applied", "disabled prize replay is a no-op");
+      eq(game(), before, "no reward or ledger rewrite on replay");
+      await settledSave(24);
+      const file = path.join(path.dirname(OUT || "."), "ps-flow-expected-a-m1-trainer.json");
+      const expected = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : { slot: 24, state: clone(game()), result: clone(W.PSFlow.lastResult) };
+      expected.moneyDisabled = { slot: 24, state: clone(game()), result: clone(W.PSFlow.lastResult) };
+      fs.writeFileSync(file, JSON.stringify(expected));
+      return { money: game().money, income: game().stats.battle_money_gained, slot: 24, moneyGain: false };
+    });
+  }
+
   async function verifySave() {
     if(EXPECTED_DIR&&fs.existsSync(path.join(EXPECTED_DIR,'ps-flow-expected-pokedex-ui.json'))){await scenario('H53-UIV fresh actual NW restores twenty-three complete dex checkpoints',async()=>{const expected=readExpected('ps-flow-expected-pokedex-ui.json');eq(expected.cases.map((c:any)=>c.slot),[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119],'twenty-three dex checkpoints');for(const c of expected.cases){W.PSFlow._content=c.content;W.PSFlow._app=null;await G.DataManager.loadGame(c.slot);eq(game(),c.state,'complete dex state '+c.slot);assert(!W.PSFlow.app().saveBlocked&&!W.PSPokedex.busy(),'no transient screen/owner saved');}return{slots:[97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119],input:'fresh actual MZ JsonEx and explicit view records; no hardware input'};});return;}
 
@@ -2438,6 +2601,29 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
 
     if(EXPECTED_DIR&&fs.existsSync(path.join(EXPECTED_DIR,'ps-flow-expected-learning-ui.json'))){
       await scenario('G53-LUIV fresh real NW restores complete learning UI checkpoints',async()=>{const expected=readExpected('ps-flow-expected-learning-ui.json');eq(expected.cases.map((c:any)=>c.slot),[80,81,85,86],'four formal UI checkpoints');for(const item of expected.cases){W.PSFlow._content=item.content;W.PSFlow._app=null;await G.DataManager.loadGame(item.slot);eq(game(),item.state,'complete JsonEx state '+item.slot);assert(!W.PSFlow.app().pendingLearning&&!W.PSFlow.app().saveBlocked,'no saved transient lesson');}return{slots:[80,81,85,86],input:'fresh actual NW/MZ process, full JsonEx roundtrip; no physical keyboard'};});return;
+    }
+
+    if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-a-m1-trainer.json"))) {
+      await scenario("A-M1-V fresh actual NW reload preserves prize/defeat state and exact replay remains a no-op", async () => {
+        const expected = readExpected("ps-flow-expected-a-m1-trainer.json");
+        G.DataManager.setupNewGame();
+        await G.DataManager.loadGame(expected.slot);
+        eq(game(), expected.state, "fresh process restores complete A-M1 state");
+        const before = clone(game());
+        eq(W.PSFlow.app().commitResult(expected.result), "already-applied", "raw replay after fresh load");
+        eq(game(), before, "no second prize, defeated write or primary result");
+        assert(!W.PSFlow.app().saveBlocked, "no transient battle owner is saved");
+        if (expected.moneyDisabled) {
+          await G.DataManager.loadGame(expected.moneyDisabled.slot);
+          eq(game(), expected.moneyDisabled.state, "fresh process restores complete no-money state");
+          const disabledBefore = clone(game());
+          eq(W.PSFlow.app().commitResult(expected.moneyDisabled.result), "already-applied", "no-money replay after fresh load");
+          eq(game(), disabledBefore, "no delayed money normalization or income after restart");
+          assert(!W.PSFlow.app().saveBlocked, "no-money save contains no transient owner");
+        }
+        return { slot: expected.slot, money: game().money, defeated: game().defeatedTrainers, input: "fresh actual NW/MZ JsonEx; no physical input" };
+      });
+      return;
     }
 
     if (EXPECTED_DIR && fs.existsSync(path.join(EXPECTED_DIR, "ps-flow-expected-m1.json"))) {
@@ -2586,6 +2772,32 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   }
 
   /** A cold real-host check: empty content uses no external battle data, including for an old saved party. */
+  function compileEmptyDocument(original:any):any {
+    const B=nodeRequire("./js/engine/build/production.cjs"),authored=progressionDonorInputs();
+    const compiled=B.contentCompile.compileContent({manifest:{...authored.manifest,id:original.contentId},sources:clone(original.sources),species:[],overlays:[],grants:[]});assert(compiled.ok,JSON.stringify(compiled.errors));return compiled.data;
+  }
+  async function runD1Lifecycle() {
+    report.d1Lifecycle={version:"D1-lifecycle-v1",driverVersion:"D2-backdrop-host-driver-v1",input:"actual Scene.update and DOM end input; controlled pending callbacks, no extra battle result"};
+    for(const mode of ["idle","resolve","reject","opening"])await scenario("D1-LC "+mode+" external root abort releases scene and waiter",async()=>{
+      await toMap();fresh();const before=clone(game()),originalBegin=W.PSFlow.begin;let release:any,reject:any;
+      try {
+        if(mode==="opening"){
+          W.PSFlow.begin=function(){return Promise.resolve(originalBegin.call(this)).then((session:any)=>new Promise(resolve=>{release=()=>resolve(session);}));};
+          G.$gameMap.event(1).start();await waitFor(()=>battle()&&typeof release==="function"&&battle()._mode==="boot","controlled real opening");
+        }else{await startEvent(1);await inMode("main");}
+        const s=battle(),app=W.PSFlow.app(),abort=app.abortBattle;let aborts=0;
+        app.abortBattle=function(...args:any[]){aborts++;return abort.apply(this,args);};
+        try{
+          if(mode==="resolve"||mode==="reject"){const pending=new Promise((a,b)=>{release=a;reject=b;});s.act(()=>pending,"other");await frames(2);assert(s._busy,"actual pending action reserved");}
+          W.PSFlow.abort(Error("D1 controlled external abort"));
+          if(mode==="resolve")release({messages:[]});else if(mode==="reject")reject(Error("controlled late rejection"));else if(mode==="opening")release();
+          await inMode("end");assert(!s._busy,"closed owner busy released");assert(G.$gameSystem.isSaveEnabled(),"save mask released");assert(aborts===1,"one application abort");
+          await press("ok");await dismissMessages();await waitFor(()=>!battle()&&!G.$gameMap._interpreter.isRunning(),"actual scene and originating event released");
+          eq(game(),before,"no persistent commit after external abort");assert(W.PSFlow.lastOutcome.aborted&&W.PSFlow.lastOutcome.commit==="none","original aborted outcome retained");assert(aborts===1,"late callbacks did not abort again");return {aborts,actualUpdate:true,mode};
+        }finally{app.abortBattle=abort;}
+      }finally{W.PSFlow.begin=originalBegin;}
+    });
+  }
   async function runEmptySource() {
     const B = nodeRequire("./js/engine/build/production.cjs");
     const dataModules = () => Object.keys(nodeRequire.cache).filter((p) => p.includes("/showdown/dist/data/"));
@@ -2599,16 +2811,18 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     fs.readFileSync = function (file: any, ...args: any[]) { return String(file) === contentFile ? JSON.stringify(document) : realRead.call(this, file, ...args); };
     G.StorageManager.saveObject = function () { writes++; throw new Error("unexpected storage write in source test"); };
     try {
+      const emptyDocument=compileEmptyDocument(original);
       for (const sourceMode of ["valid", "denied", "unregistered", "no-check", "malformed"]) {
-        document = clone(original); document.species = []; document.grants = [];
+        document = clone(emptyDocument);
+        W.PSFlow.stateReplaced(); W.PSFlow._app = null; W.PSFlow._content = null; W.PSFlow._dex = null;
+        G.DataManager.setupNewGame();
+        const before = clone(game());
         const sd = document.sources.find((s: any) => s.kind === "showdown");
         if (sourceMode === "denied") sd.usageCheck.decision = "not-allowed";
         if (sourceMode === "unregistered") document.sources = document.sources.filter((s: any) => s !== sd);
         if (sourceMode === "no-check") delete sd.usageCheck;
         if (sourceMode === "malformed") sd.usageCheck = { decision: "internal-use" };
         W.PSFlow.stateReplaced(); W.PSFlow._app = null; W.PSFlow._content = null; W.PSFlow._dex = null;
-        G.DataManager.setupNewGame();
-        const before = clone(game());
         let error: string | undefined;
         try {
           W.PSFlow.app();
@@ -2666,14 +2880,14 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         // that real lifecycle starts; otherwise the normal sample has already lawfully warmed Showdown's cache.
         const file = path.join(gameDir, "data/framework/content.json");
         const read = fs.readFileSync;
-        const empty = JSON.parse(read(file, "utf8"));
-        empty.species = []; empty.grants = []; empty.sources = empty.sources.filter((s: any) => s.kind !== "showdown");
+        const empty = compileEmptyDocument(JSON.parse(read(file, "utf8")));
+        empty.sources = empty.sources.filter((s: any) => s.kind !== "showdown");
         fs.readFileSync = function (f: any, ...args: any[]) { return String(f) === file ? JSON.stringify(empty) : read.call(this, f, ...args); };
         try { startAt.call(this); } finally { fs.readFileSync = read; }
       } else startAt.call(this);
     } catch (error) { step5RestoreLoad?.(); throw error; }
     setTimeout(async () => {
-      try { if (mode === "step5-fixture") await runStep5Fixture({G,W,api,game,clone,scenario,assert,eq,entryLoads:()=>[...step5EntryLoads]}); else if (mode === "step5-sample") await runStep5Sample({G,W,fs,path,OUT,api,game,clone,scenario,assert,eq,toMapId,runEvent,stepInto,fightUntilEnd,finishBattle,choose,inMode,settledSave,entryLoads:()=>[...step5EntryLoads],seeded,I6,E,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),mzParty}); else if (mode === "step5-continue") await continueStep5Sample({G,W,fs,api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,runEvent,uiReady,uiClosed,uiChoose,inventoryReady,inventoryClosed,readExpected,replayTemplates,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),mzParty}); else if (mode === "step4-write") await runStep4Write({G,W,fs,path,OUT,nodeRequire,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,slice,settledSave,readExpected,driverFrame:()=>frame,step4Chain:arg('ps-step4-chain'),step4Input:arg('ps-step4-input')}); else if (mode === "step4-write-continue") await continueStep4Write({G,W,fs,path,OUT,nodeRequire,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,slice,settledSave,readExpected,driverFrame:()=>frame,step4Chain:arg('ps-step4-chain'),step4Input:arg('ps-step4-input')}); else if (mode === "step4-memory") await runStep4Memory({G,W,fs,path,OUT,nodeRequire,api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,toMap,toMapId,fresh,shot,settledSave,uiReady,uiClosed,uiChoose,management,driverFrame:()=>frame,step4Group:arg('ps-step4-group'),step4Input:arg('ps-step4-input'),step4Cycles:Number(arg('ps-step4-cycles'))||100,step4Warmup:Number(arg('ps-step4-warmup'))||5,step4CycleFrames:Number(arg('ps-step4-cycle-frames'))||24}); else if (mode === "write-scale") await runWriteScale({G,W,fs,path,OUT,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,slice,settledSave,readExpected,driverFrame:()=>frame}); else if (mode === "write-scale-continue") await continueWriteScale({G,W,fs,path,OUT,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,slice,settledSave,readExpected,driverFrame:()=>frame}); else if (mode === "closeout") await runCloseout({G,W,fs,path,OUT,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,toMap,toMapId,fresh,shot,settledSave,uiReady,uiClosed,uiChoose,management,slice,runLearningUI,runEvolutionUI,runTradeUI,runItemEvolutionUI,runPokedexUI,corpus:SCALE_CORPUS}); else if(mode === "closeout-lifecycle") await runCloseoutLifecycle({G,W,fs,path,OUT,lifecycleGroups:arg("ps-lifecycle-groups"),lifecycleCycles:Number(arg("ps-lifecycle-cycles"))||100,api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,toMap,toMapId,fresh,shot,settledSave,uiReady,uiClosed,uiChoose,management}); else if(mode === "closeout-continue") await continueCloseout({G,W,fs,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),scenario,assert,eq,frames,press,waitFor,scene,game,replayTemplates,readExpected,shot}); else if (mode === "pokedex-ui") await runPokedexUI(); else if (mode === "item-evolution-ui") await runItemEvolutionUI(); else if (mode === "battle-entry") await runBattleEntryOwnership(); else if (mode === "trade-ui") await runTradeUI(); else if (mode === "evolution-ui") await runEvolutionUI(); else if (mode === "learning-ui") await runLearningUI(); else if (mode === "m1") await runM1Convergence(); else if (mode === "viewing") await runDexViewing(); else if (mode === "acquisition") await runAcquisitionTransactions(); else if (mode === "trade") await runTradeTransactions(); else if (mode === "triggered") await runTriggeredEvolution(); else if (mode === "learning") await runLearningTransactions(); else if (mode === "postbattle") await runPostbattleEvolution(); else if (mode === "progression-data") await runProgressionData(); else if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
+      try { if(mode === "d2-menu-capture") await runD2MenuCapture({G,W,api,fs,path,OUT,gameDir,arg,argv,assert,eq,clone,report,results,writeProgress,frames,waitFor,scene,battle,inMode,press,toMapId,nodeRequire}); else if(mode === "d2-ordinary-message") await runD2OrdinaryMessage({G,W,api,fs,path,OUT,gameDir,arg,argv,assert,eq,clone,report,results,writeProgress,frames,waitFor,scene,battle,inMode,press,toMapId,nodeRequire}); else if(mode === "d2-move-refusal") await runD2MoveMenu({G,W,api,fs,path,OUT,gameDir,arg,argv,assert,eq,clone,report,results,writeProgress,frames,waitFor,scene,battle,inMode,press,toMapId,nodeRequire}); else if(mode === "d2-prebattle-wrapper") await runD2Prebattle({G,W,api,fs,path,OUT,gameDir,arg,argv,assert,eq,clone,report,results,writeProgress,frames,waitFor,scene,battle,inMode,press,toMapId,nodeRequire}); else if(mode === "d2-author-dialogue") await runD2AuthorDialogue({G,W,api,fs,path,OUT,gameDir,arg,argv,assert,eq,clone,report,results,writeProgress,frames,waitFor,scene,battle,inMode,press,toMapId,nodeRequire}); else if(mode === "d2-trainer-opening") await runD2TrainerOpening({G,W,api,fs,path,OUT,gameDir,arg,argv,assert,eq,clone,report,results,writeProgress,frames,waitFor,scene,battle,inMode,press,toMapId,nodeRequire}); else if(mode === "d2-result-feedback") await runD2ResultFeedback({G,W,api,fs,path,OUT,gameDir,arg,argv,assert,eq,clone,report,results,writeProgress,frames,waitFor,scene,battle,inMode,fightUntilEnd,press,toMapId,nodeRequire}); else if(mode === "d2-ball-feedback") await runD2BallFeedback({G,W,api,fs,path,OUT,gameDir,arg,argv,assert,eq,clone,report,results,writeProgress,frames,waitFor,scene,battle,inMode,press,toMapId,nodeRequire}); else if(mode === "d2-victory-music") await runD2VictoryMusic({G,W,api,fs,path,OUT,gameDir,arg,argv,assert,eq,clone,report,results,writeProgress,frames,waitFor,scene,battle,inMode,fightUntilEnd,press,toMapId,nodeRequire}); else if(mode === "d2-capture-me" || mode === "d2-capture-me-continue") await runD2CaptureME({G,W,api,fs,path,OUT,gameDir,arg,argv,assert,eq,clone,report,results,writeProgress,frames,waitFor,scene,battle,inMode,choose,fightUntilEnd,finishBattle,press,toMapId,settledSave,nodeRequire},mode === "d2-capture-me-continue"); else if(mode === "d2-music" || mode === "d2-music-continue") await runD2Music({G,W,api,fs,path,OUT,gameDir,arg,argv,assert,eq,clone,report,results,writeProgress,frames,waitFor,scene,battle,inMode,choose,fightUntilEnd,finishBattle,press,toMapId,settledSave,nodeRequire},mode === "d2-music-continue"); else if(mode === "d2-faint") await runD2Faint({G,W,scenario,toMap,fresh,startEvent,inMode,battle,choose,frames,waitFor,game,clone,finishBattle,shot,report,assert,eq}); else if(mode === "d2-damage") await runD2Damage({G,W,scenario,toMap,fresh,startEvent,inMode,battle,choose,frames,waitFor,game,clone,finishBattle,shot,report,assert,eq}); else if(mode === "d2-pictures") await runD2Pictures({G,W,scenario,toMap,fresh,startEvent,inMode,battle,choose,frames,waitFor,game,clone,finishBattle,shot,report,assert,eq}); else if(mode === "d2-backdrop") await runD2Backdrop({G,W,scenario,toMap,fresh,inMode,battle,choose,press,frames,game,clone,finishBattle,shot,report,assert,eq}); else if(mode === "d2-status") await runD2Status({G,W,scenario,toMap,fresh,startEvent,inMode,battle,choose,frames,waitFor,game,clone,api,finishBattle,shot,report,assert,eq}); else if(mode === "d2-menu") await runD2Menu({W,scenario,toMap,fresh,startEvent,inMode,battle,choose,press,frames,waitFor,game,clone,finishBattle,shot,report,assert,eq}); else if(mode === "d1-lifecycle") await runD1Lifecycle(); else if(mode === "d1-benchmark") await runD1Benchmark({G,W,api,fs,path,OUT,nodeRequire,assert,eq,game,clone,frames,waitFor,scene,toMapId,scenario,dismissMessages,report}); else if(mode === "trainer-ai") await runTrainerAiHost({G,W,fs,path,OUT,nodeRequire,api,game,clone,scenario,assert,eq,toMapId,settledSave,frames,press,waitFor,scene,readExpected,battle,inMode,fightUntilEnd,finishBattle,hashFile:(file:string)=>nodeRequire("crypto").createHash("sha256").update(fs.readFileSync(file)).digest("hex")}); else if(mode === "trainer-ai-continue") await continueTrainerAiHost({G,W,fs,path,OUT,nodeRequire,api,game,clone,scenario,assert,eq,toMapId,settledSave,frames,press,waitFor,scene,readExpected,battle,inMode,fightUntilEnd,finishBattle,hashFile:(file:string)=>nodeRequire("crypto").createHash("sha256").update(fs.readFileSync(file)).digest("hex")}); else if (mode === "held") await runHeldWriteback({G,W,fs,path,OUT,api,game,clone,scenario,assert,eq,toMapId,settledSave,frames,press,waitFor,scene,readExpected,hashFile:(file:string)=>nodeRequire("crypto").createHash("sha256").update(fs.readFileSync(file)).digest("hex")}); else if (mode === "held-continue") await continueHeldWriteback({G,W,fs,path,OUT,api,game,clone,scenario,assert,eq,toMapId,settledSave,frames,press,waitFor,scene,readExpected,hashFile:(file:string)=>nodeRequire("crypto").createHash("sha256").update(fs.readFileSync(file)).digest("hex")}); else if (mode === "step5-fixture") await runStep5Fixture({G,W,api,game,clone,scenario,assert,eq,entryLoads:()=>[...step5EntryLoads]}); else if (mode === "step5-sample") await runStep5Sample({G,W,fs,path,OUT,api,game,clone,scenario,assert,eq,toMapId,runEvent,stepInto,fightUntilEnd,finishBattle,choose,inMode,settledSave,entryLoads:()=>[...step5EntryLoads],seeded,I6,E,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),mzParty}); else if (mode === "step5-continue") await continueStep5Sample({G,W,fs,api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,runEvent,uiReady,uiClosed,uiChoose,inventoryReady,inventoryClosed,readExpected,replayTemplates,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),mzParty}); else if (mode === "step4-write") await runStep4Write({G,W,fs,path,OUT,nodeRequire,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,slice,settledSave,readExpected,driverFrame:()=>frame,step4Chain:arg('ps-step4-chain'),step4Input:arg('ps-step4-input')}); else if (mode === "step4-write-continue") await continueStep4Write({G,W,fs,path,OUT,nodeRequire,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,slice,settledSave,readExpected,driverFrame:()=>frame,step4Chain:arg('ps-step4-chain'),step4Input:arg('ps-step4-input')}); else if (mode === "step4-memory") await runStep4Memory({G,W,fs,path,OUT,nodeRequire,api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,toMap,toMapId,fresh,shot,settledSave,uiReady,uiClosed,uiChoose,management,driverFrame:()=>frame,step4Group:arg('ps-step4-group'),step4Input:arg('ps-step4-input'),step4Cycles:Number(arg('ps-step4-cycles'))||100,step4Warmup:Number(arg('ps-step4-warmup'))||5,step4CycleFrames:Number(arg('ps-step4-cycle-frames'))||24}); else if (mode === "write-scale") await runWriteScale({G,W,fs,path,OUT,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,slice,settledSave,readExpected,driverFrame:()=>frame}); else if (mode === "write-scale-continue") await continueWriteScale({G,W,fs,path,OUT,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,slice,settledSave,readExpected,driverFrame:()=>frame}); else if (mode === "closeout") await runCloseout({G,W,fs,path,OUT,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,toMap,toMapId,fresh,shot,settledSave,uiReady,uiClosed,uiChoose,management,slice,runLearningUI,runEvolutionUI,runTradeUI,runItemEvolutionUI,runPokedexUI,corpus:SCALE_CORPUS}); else if(mode === "closeout-lifecycle") await runCloseoutLifecycle({G,W,fs,path,OUT,lifecycleGroups:arg("ps-lifecycle-groups"),lifecycleCycles:Number(arg("ps-lifecycle-cycles"))||100,api,game,clone,scenario,assert,eq,frames,press,waitFor,scene,toMap,toMapId,fresh,shot,settledSave,uiReady,uiClosed,uiChoose,management}); else if(mode === "closeout-continue") await continueCloseout({G,W,fs,hashFile:(file:string)=>nodeRequire('crypto').createHash('sha256').update(fs.readFileSync(file)).digest('hex'),scenario,assert,eq,frames,press,waitFor,scene,game,replayTemplates,readExpected,shot}); else if (mode === "pokedex-ui") await runPokedexUI(); else if (mode === "item-evolution-ui") await runItemEvolutionUI(); else if (mode === "battle-entry") await runBattleEntryOwnership(); else if (mode === "trade-ui") await runTradeUI(); else if (mode === "evolution-ui") await runEvolutionUI(); else if (mode === "learning-ui") await runLearningUI(); else if (mode === "m1-trainer") await runAM1Trainer(); else if (mode === "m1") await runM1Convergence(); else if (mode === "viewing") await runDexViewing(); else if (mode === "acquisition") await runAcquisitionTransactions(); else if (mode === "trade") await runTradeTransactions(); else if (mode === "triggered") await runTriggeredEvolution(); else if (mode === "learning") await runLearningTransactions(); else if (mode === "postbattle") await runPostbattleEvolution(); else if (mode === "progression-data") await runProgressionData(); else if (mode === "capability") await runCapabilitySeam(); else if (mode === "empty-source") await runEmptySource(); else if (mode === "verify-save") await verifySave(); else if (mode === "matrix") await runMatrixMode(); else if (mode === "perf") await runPerf(); else if (mode === "leak") await runLeakBisect(); else if (mode === "leakhunt") await runLeakHunt(); else if (mode === "heap") await runHeapSnapshot(); else if (mode === "saveloc") await runSaveLocation(); else if(mode === "management") await runManagementUI(); else if(mode === "inventory") await runInventoryUI(); else if(mode === "driver-selftest") await runDriverSelftest(); else { await runAll(); await runManagementUI(); await runInventoryUI(); } }
       catch (e: any) { results.push({ id: "driver", status: "fail", error: String(e && e.stack || e) }); }
       step5RestoreLoad?.();
       try { report.contentIdentity = W.PSFlow.content().meta; } catch (e) { report.contentIdentity = { error: String(e) }; }

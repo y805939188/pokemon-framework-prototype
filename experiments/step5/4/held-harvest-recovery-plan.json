@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "kind": "directed-current-product-contract-check",
+  "productBase": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "seed": [1, 2, 3, 4],
+  "playerId": "H1",
+  "species": "Exeggutor",
+  "level": 50,
+  "item": "lumberry",
+  "moves": ["sunnyday", "rest", "recycle", "psychic"],
+  "foe": {"species": "caterpie", "level": 5, "moves": ["splash"]},
+  "expectationSources": {
+    "harvest": "WP49 section 7: empty C, berry R; sunny skips probability; restore berry, clear R, fill empty I; no wild-only qualification",
+    "recycle": "WP47-B section 5.2 RestoreUserConsumedItem: restore R to empty C; fill empty I only in a wild battle; clear R",
+    "consumption": "WP20 section 6.4 / WP50 section 2: ordinary own-item consumption clears equal I and records R",
+    "settlement": "WP20 section 6.4 / 5.4 B: current player party restores by mutable I in the same atomic primary install"
+  },
+  "syntheticFixture": "Author-provided species RPG values, low-level Splash foe and explicit move set; no claim of natural learnset or original runtime equivalence",
+  "prohibitions": ["seedState", "private-engine-write", "diagnostic-tie", "RNG-replacement", "product-patch", "NW", "save-file"],
+  "cases": [
+    {"id": "HG01", "kind": "trainer", "ability": "Harvest", "abilityIndex": 2, "turns": ["sunnyday", "rest", "psychic"], "consumed": true, "recoveredBy": "harvest", "expectedRecovery": "lumberry", "expectedInstalled": "lumberry"},
+    {"id": "HG02", "kind": "wild", "ability": "Harvest", "abilityIndex": 2, "turns": ["sunnyday", "rest", "psychic"], "consumed": true, "recoveredBy": "harvest", "expectedRecovery": "lumberry", "expectedInstalled": "lumberry"},
+    {"id": "HG03", "kind": "trainer", "ability": "Chlorophyll", "abilityIndex": 0, "turns": ["sunnyday", "rest", "psychic"], "consumed": true, "recoveredBy": null, "expectedRecovery": "", "expectedInstalled": ""},
+    {"id": "HG04", "kind": "trainer", "ability": "Harvest", "abilityIndex": 2, "turns": ["sunnyday", "psychic"], "consumed": false, "recoveredBy": null, "expectedRecovery": "lumberry", "expectedInstalled": "lumberry"},
+    {"id": "RC01", "kind": "trainer", "ability": "Chlorophyll", "abilityIndex": 0, "turns": ["rest", "recycle", "psychic"], "consumed": true, "recoveredBy": "recycle", "expectedRecovery": "", "expectedInstalled": ""},
+    {"id": "RC02", "kind": "wild", "ability": "Chlorophyll", "abilityIndex": 0, "turns": ["rest", "recycle", "psychic"], "consumed": true, "recoveredBy": "recycle", "expectedRecovery": "lumberry", "expectedInstalled": "lumberry"}
+  ]
+}

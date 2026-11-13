@@ -199,7 +199,7 @@ test('compiled-content negative machine move and absent tutor references are cau
 });
 
 test('complete teaching/forgetting/reminder ready values compose into actual schema7-validated state copies',async()=>{
-  const M=await modules,c=await F.content(M,raw=>raw.items.push({id:'pokeball',name:'Ball',flags:['PokeBall'],pocket:3,source:'author'}));
+  const M=await modules,c=await F.content(M,raw=>Object.assign(raw.items.find(item=>item.id==='pokeball'),{id:'pokeball',name:'Ball',flags:['PokeBall'],pocket:3,source:'author'}));
   const created=M.createMember({id:'created',species:'learner',level:5,form:0,context:{map:8,receivedAt:100}},c,()=>0);
   created.moves=['cut','tackle','growl','rest'].map(id=>{const move=F.moves.find(move=>move.id===id);return {id,pp:1,maxpp:Math.floor(move.pp*8/5),ppUps:3};});
   const state=M.newGame({party:[created],bag:{TM57:2},content:c}),before=F.clone(state);assert.deepEqual(M.validateGameContent(state,c),[]);F.freeze(state);

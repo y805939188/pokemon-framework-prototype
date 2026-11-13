@@ -1,11 +1,14 @@
+import { creationBattleNameOf } from "../rules/species-key";
 /**
  * Runtime side of the content pipeline: check a compiled document and assemble the `Content` the session uses by
  * joining framework-owned fields with Showdown-owned battle data (base stats, display names). Every problem is
  * reported with the record and field it comes from; nothing is repaired silently.
  */
-import { checkItemInputs } from "../content/item-input";
+import { creationFormCandidates } from "../rules/creation-form";
+import { checkItemInputs, defaultMemberBallProblem } from "../content/item-input";
+import { heldItemDescriptor, itemOf } from "../rules/item-catalog";
 import type { CompiledContent, ContentError } from "../content/schema";
-import { checkOverrides, developmentCapabilities } from "../rules/config";
+import { checkOverrides, runtimeCapabilities } from "../rules/config";
 import { COMPILED_SCHEMA_VERSION } from "../content/schema";
 import { canonicalJson, speciesFieldProblem, checkSources, preUseProblem, showdownDependencyProblem } from "../content/compile";
 import type { Content, DexLookup, Member } from "../rules/types";
@@ -16,6 +19,7 @@ import { allMembers, locateMember } from "../rules/storage";
 import type { MemberCollection } from "../rules/storage";
 import { own, setOwn } from "../rules/own";
 import { battleNameOf, memberKey } from "../rules/species-key";
+import { checkTrainerInputs, trainerSpeciesKeys } from "../content/trainer-input";
 
 /** Strong compiled identity only; id/inputsHash/anonymous fallbacks are diagnostics, never effects authority. */
 export function validatedContentIdentity(content: Content): string | null {
@@ -74,22 +78,30 @@ export function loadCompiled(json: unknown): CompiledContent {
     }
   }
   if(json.grants!==undefined&&(!dense(json.grants)||json.grants.some(g=>!obj(g)||!dense(g.members)||g.members.some(m=>!obj(m))||!obj(g.items))))report("compiled","$.grants","invalid grant records");
+  const trainerOrder = dense(json.registrationOrder) ? json.registrationOrder as unknown as import("../rules/types").SpeciesKey[] : [];
+  const trainerCatalog = checkItemInputs(json.items, json.shops, usable).catalog;
+  problems.push(...checkTrainerInputs(json.trainerTypes, json.trainers, { speciesKeys: trainerSpeciesKeys(trainerOrder, dense(json.species) ? json.species.filter(sp => obj(sp) && typeof sp.id === "string" && typeof sp.showdownId === "string") as unknown as import("../content/schema").SpeciesSource[] : []), catalog: trainerCatalog, usable }).errors);
   if(problems.length)throw new Error(problems.map(p=>`${p.file} ${p.path}: ${p.message}`).join("; "));
   return json as unknown as CompiledContent;
 }
 
-export function assembleContent(compiled: CompiledContent, dex: DexLookup, developerCapabilities: unknown = {}): { content: Content; errors: ContentError[] } {
+export function assembleContent(compiled: CompiledContent, dex: DexLookup, developerCapabilities: unknown = {}): { content: Content; errors: ContentError[]; warnings: ContentError[] } {
   const errors: ContentError[] = [];
-  const capabilities = developmentCapabilities(developerCapabilities);
-  try { loadCompiled(compiled); } catch(error) { return {content:{species:{}},errors:[{file:"compiled",path:"$",message:(error as Error).message}]}; }
+  const warnings: ContentError[] = [];
+  const capabilities = runtimeCapabilities(developerCapabilities);
+  try { loadCompiled(compiled); } catch(error) { return {content:{species:{}},errors:[{file:"compiled",path:"$",message:(error as Error).message}],warnings}; }
   const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash, compiledSemantics: COMPILED_SCHEMA_VERSION, showdownSha: compiled.showdownSha, contentIdentity: compiled.contentIdentity }, registrationOrder: compiled.registrationOrder?.map(k=>({...k})), regionalDex: JSON.parse(JSON.stringify(compiled.regionalDex)) as import("../rules/types").RegionalDex, ...(compiled.mapMetadata ? {mapMetadata:JSON.parse(JSON.stringify(compiled.mapMetadata)) as import("../rules/types").MapMetadata} : {}), moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {}, ...(compiled.settings ? { settings: { ...compiled.settings } } : {}) };
   // A compiled document may be older than the gate, or edited by hand. Validate the whole registry and every source
   // whose data will be consumed before even querying the Dex; a placeholder's exemption covers only its own fields.
   for (const p of checkOverrides(compiled.settings ?? {})) errors.push({ file: "settings.json", path: p.path, message: p.message });
   const sources = checkSources(compiled.sources, (file, path, message) => { errors.push({ file, path, message }); });
-  if (errors.length) return { content, errors };
+  if (errors.length) return { content, errors, warnings };
   const itemInputs = checkItemInputs(compiled.items, compiled.shops, id => preUseProblem(sources, id));
   errors.push(...itemInputs.errors);
+  if (compiled.species.length) {
+    const problem = defaultMemberBallProblem(itemInputs.catalog);
+    if (problem) errors.push(problem);
+  }
   if (compiled.species.length || itemInputs.items.some(item => !!item.move) || (compiled.grants ?? []).some((g) => g.members.some((m) => !!m.item))) {
     const dep = showdownDependencyProblem(sources);
     if (dep) errors.push({ file: "assembly", path: "sources", message: dep });
@@ -101,15 +113,16 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
   for (const sp of compiled.species) if (sp.happiness !== undefined && (!Number.isSafeInteger(sp.happiness) || sp.happiness < 0)) errors.push({ file: "assembly", path: `species/${sp.id}.happiness`, message: "must be a nonnegative safe integer" });
   for (const grant of compiled.grants ?? []) {
     for (const [i, member] of grant.members.entries()) if (member.item && !capabilities.allowHeldItemSources) errors.push({ file: "assembly", path: `grants/${grant.id}.members[${i}].item`, message: "held-item-source-disabled" });
+    for (const [i, member] of grant.members.entries()) if (member.item && !itemOf(itemInputs.catalog, member.item)) errors.push({ file: "assembly", path: `grants/${grant.id}.members[${i}].item`, message: "held item must be registered in the item catalog" });
     const problem = preUseProblem(sources, grant.source);
     if (problem) errors.push({ file: "assembly", path: `grants/${grant.id}.source`, message: problem });
   }
-  if (errors.length) return { content, errors };
+  if (errors.length) return { content, errors, warnings };
   for (const item of itemInputs.items) if (item.move && !dex.move(item.move)) errors.push({file:'assembly',path:`items/${item.id}.move`,message:'move is not in the pinned data'});
-  if (errors.length) return {content,errors};
+  if (errors.length) return {content,errors,warnings};
   content.items = itemInputs.catalog;
   content.shops = Object.fromEntries(itemInputs.shops.map(shop => [shop.id, shop]));
-  if (compiled.species.length && dex.sha() !== compiled.showdownSha) { errors.push({file:"assembly",path:"$.showdownSha",message:"pinned-showdown-mismatch"}); return {content,errors}; }
+  if (compiled.species.length && dex.sha() !== compiled.showdownSha) { errors.push({file:"assembly",path:"$.showdownSha",message:"pinned-showdown-mismatch"}); return {content,errors,warnings}; }
   if (compiled.species.length) content.abilities = Object.fromEntries((dex.allAbilities?.() ?? []).map(ability => [ability.id,{...ability}]));
   if (compiled.species.length || itemInputs.items.some(item=>!!item.move)) for (const move of dex.allMoves?.() ?? []) setOwn(content.moves!,move.name,{...move});
   // Empty author content needs no external battle data, including the lazy Dex's identity lookup.
@@ -167,15 +180,66 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     const members: { species: string; level: number; form?: number; item?: string }[] = [];
     let ok = true;
     for (const [j, m] of g.members.entries()) {
-      if (m.item) { const item = dex.heldItem?.(m.item); if (!item?.holdable || item.mail) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].item`, message: `unsupported held item ${m.item}` }); ok = false; continue; } }
-      if (m.form !== undefined && !compiled.species.some((sp) => sp.id === m.species && (sp.form ?? 0) === m.form)) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].form`, message: "missing exact form" }); ok = false; continue; }
+      if (m.item) { const item = heldItemDescriptor(itemInputs.catalog, m.item, id => dex.heldItem?.(id) ?? null); if (!item) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].item`, message: `unsupported held item ${m.item}; use the canonical held item id` }); ok = false; continue; } }
+      if (m.form !== undefined && !creationBattleNameOf(content, { species: m.species, form: m.form })) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].form`, message: "missing exact form" }); ok = false; continue; }
       const name = own(content.speciesIds, m.species);
       if (!name) { errors.push({ file: "assembly", path: `grants/${g.id}.members[${j}].species`, message: `"${m.species}" is not an assembled species` }); ok = false; continue; }
       members.push({ species: name, level: m.level, ...(m.form !== undefined ? { form: m.form } : {}), ...(m.item !== undefined ? { item: m.item } : {}) });
     }
     if (ok) setOwn(content.grants!, g.id, { id: g.id, members, items: { ...g.items }, money: g.money });
   }
-  return { content, errors };
+  if (compiled.trainerTypes && compiled.trainers) {
+    content.trainerTypeOrder = compiled.trainerTypes.map(type => type.id);
+    content.trainerTypes = {};
+    content.trainers = {};
+    for (const type of compiled.trainerTypes) setOwn(content.trainerTypes, type.id, JSON.parse(JSON.stringify(type)) as typeof type);
+    for (const record of compiled.trainers) {
+      for (const [index, member] of record.party.entries()) {
+        const path = `trainers/${record.id}@${record.version}.party[${index}]`;
+        const formName = creationBattleNameOf(content, { species: member.species, form: member.form ?? 0 });
+        if (!formName || !own(content.species, formName)) errors.push({ file: "assembly", path: `${path}.species`, message: "missing exact assembled species/form" });
+        for (const [moveIndex, move] of (member.moves ?? []).entries()) {
+          const resolved = dex.move(move);
+          if (!resolved) errors.push({ file: "assembly", path: `${path}.moves[${moveIndex}]`, message: `unknown move ${move}` });
+          // Dex aliases need not be registry IDs. Accept only references the pure team consumer can use.
+          else if (!Object.values(content.moves!).some(entry => entry.id === move.replace(/-/g, "") && entry.name === resolved.name))
+            errors.push({ file: "assembly", path: `${path}.moves[${moveIndex}]`, message: `unsupported trainer move reference ${move}; use canonical move id ${resolved.id ?? resolved.name}` });
+        }
+        if (member.ability !== undefined) {
+          const resolved = dex.abilityInfo?.(member.ability);
+          if (!resolved) errors.push({ file: "assembly", path: `${path}.ability`, message: `unknown ability ${member.ability}` });
+          else if (own(content.abilities, member.ability.replace(/-/g, ""))?.name !== resolved.name)
+            errors.push({ file: "assembly", path: `${path}.ability`, message: `unsupported trainer ability reference ${member.ability}; use a canonical assembled ability id for ${resolved.name}` });
+        }
+        if (member.item !== undefined) {
+          const item = heldItemDescriptor(itemInputs.catalog, member.item, id => dex.heldItem?.(id) ?? null);
+          if (!item) errors.push({ file: "assembly", path: `${path}.item`, message: "unsupported held item; use the canonical held item id; validation does not open the B battle gate" });
+        }
+      }
+      const versions = own(content.trainers, record.id) ?? [];
+      const assembledRecord = JSON.parse(JSON.stringify(record)) as typeof record;
+      // The content gate resolves these spellings through Dex; retain its canonical reference at consumption too.
+      for (const member of assembledRecord.party) {
+        if (member.moves) member.moves = member.moves.map(id => id.replace(/-/g, ""));
+        if (member.ability !== undefined) member.ability = member.ability.replace(/-/g, "");
+      }
+      versions.push(assembledRecord);
+      setOwn(content.trainers, record.id, versions);
+    }
+  }
+  // Non-fatal author guidance. Incomplete automatic-form catalogs can still support explicit
+  // player/gift forms. Do not change the compiled identity, runtime content, RNG or missing-form gate.
+  if (!errors.length) for (const [id, name] of Object.entries(content.speciesIds ?? {})) {
+    const base = own(content.species, name);
+    if (!base || (base.form ?? 0) !== 0) continue;
+    const missing = creationFormCandidates(base.ruleSpecies ?? name).filter(form => {
+      const mapped = creationBattleNameOf(content, { species: id, form });
+      return !mapped || !own(content.species, mapped);
+    });
+    if (missing.length) warnings.push({ file: "assembly", path: `species/${id}.creationForms`,
+      message: `missing-creation-forms: automatic creation of "${id}" (${base.ruleSpecies ?? name}) may select unregistered form(s) ${missing.join(", ")}. Creation then refuses without a fallback. Register the required forms before enabling automatic creation; explicit player/gift forms bypass rechecking; explicit trainer forms retain ordinary RNG before selecting their final mapping. This warning does not reject the content.` });
+  }
+  return { content, errors, warnings };
 }
 
 /** A species reference written by an author (content id "pidgey" = its base form, or a Showdown name "Pidgey") -> the battle name, or null. */

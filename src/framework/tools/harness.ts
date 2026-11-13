@@ -13,6 +13,7 @@ import { isSelectableMove } from "../battle/move-requests";
 import { BattleSession } from "../flow/session";
 import * as G from "../rules/growth";
 import { SaveStore } from "./save-store";
+import { createFixtureSaveStore } from "./fakes";
 import { identityKeys } from "../rules/species-key"; // the fixture world: content ids are the Showdown names
 import * as F from "./fixtures/game";
 
@@ -200,7 +201,7 @@ const CHECKS = {
 		const result = s.result();
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-smoke-'));
 		const file = path.join(dir, 'save.json'); fs.writeFileSync(file, JSON.stringify(game));
-		const store = new SaveStore(file, {}, identityKeys, F.content);
+    const store = createFixtureSaveStore(file, {}, identityKeys, F.content);
 		ensure(store.commit(result).status === 'applied', 'first commit applies');
 		ensure(store.commit(result).status === 'already-applied', 'second commit is a no-op');
 		const saved = store.load();

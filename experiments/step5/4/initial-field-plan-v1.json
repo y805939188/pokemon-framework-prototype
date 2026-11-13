@@ -1,0 +1,298 @@
+{
+  "schema": "D2-initial-field-plan-v1",
+  "status": "PLAN_REVISION_PENDING_INDEPENDENT_REVIEW",
+  "base": "a4dc03c8e976467c78e9fa0d2e85189642ead10b",
+  "productImplementation": "NOT_STARTED",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "format": "gen8rpgcustomgame",
+  "gen": 8,
+  "planSHA256": "9de3ede2fd769ef18663bdc239bfd7b1fc8b51e6306fceb52a9a7e71f8b46135",
+  "sources": [
+    {
+      "path": "deliverables/final-specification-set/user-interface/wp67-a-battle-interaction-and-presentation.md",
+      "sha256": "630e4bc5b0ab90c2299e2266eab7ff1d0a686fd41a67ba9313147d7beb41f98c",
+      "heading": "3.1–3.2"
+    },
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp39-battle-context-and-participants.md",
+      "sha256": "5fdde64fc1550491694ebd9610d95396a53f81b87824f9e1853168f62303b3d0",
+      "heading": "7.3"
+    },
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp45-weather-terrain-side-and-position-effects.md",
+      "sha256": "bcb8c6c7d4b86e30799d866952db35ca5448d4922d6e7873d95f368a498623da",
+      "heading": "2–5"
+    },
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp47-a-move-attributes-targeting-and-calling.md",
+      "sha256": "0e3a3fa46ab07fd82331db7b5790788c75b5aa45f6093aa9b2db5cf6c55b3fa3",
+      "heading": "3.3"
+    }
+  ],
+  "request": {
+    "field": "initialField",
+    "optional": true,
+    "perFieldPrecedence": [
+      "explicit author rule",
+      "none"
+    ],
+    "omitAndMZBlank": "none",
+    "explicitNone": "none, never previous battle",
+    "invalid": "reject before new session/sequence/resource/owner mutation"
+  },
+  "MZArguments": {
+    "defaultWeather": "initialField.weather",
+    "defaultTerrain": "initialField.terrain",
+    "battleEnvironment": "initialField.environment"
+  },
+  "weather": {
+    "none": "",
+    "sun": "sunnyday",
+    "rain": "raindance",
+    "sandstorm": "sandstorm",
+    "hail": "hail",
+    "harshsun": "desolateland",
+    "heavyrain": "primordialsea",
+    "strongwinds": "deltastream"
+  },
+  "terrain": {
+    "none": "",
+    "electric": "electricterrain",
+    "grassy": "grassyterrain",
+    "misty": "mistyterrain",
+    "psychic": "psychicterrain"
+  },
+  "environment": {
+    "none": {
+      "type": "Normal",
+      "naturePower": "triattack",
+      "secretPower": "par"
+    },
+    "grass": {
+      "type": "Grass",
+      "naturePower": "energyball",
+      "secretPower": "slp"
+    },
+    "tallgrass": {
+      "type": "Grass",
+      "naturePower": "energyball",
+      "secretPower": "slp"
+    },
+    "movingwater": {
+      "type": "Water",
+      "naturePower": "hydropump",
+      "secretPower": "atk:-1"
+    },
+    "stillwater": {
+      "type": "Water",
+      "naturePower": "hydropump",
+      "secretPower": "atk:-1"
+    },
+    "puddle": {
+      "type": "Water",
+      "naturePower": "mudbomb",
+      "secretPower": "spe:-1"
+    },
+    "underwater": {
+      "type": "Water",
+      "naturePower": "hydropump",
+      "secretPower": "atk:-1"
+    },
+    "cave": {
+      "type": "Rock",
+      "naturePower": "powergem",
+      "secretPower": "flinch"
+    },
+    "rock": {
+      "type": "Ground",
+      "naturePower": "earthpower",
+      "secretPower": "accuracy:-1"
+    },
+    "sand": {
+      "type": "Ground",
+      "naturePower": "earthpower",
+      "secretPower": "accuracy:-1"
+    },
+    "forest": {
+      "type": "Bug",
+      "naturePower": "energyball",
+      "secretPower": "slp"
+    },
+    "forestgrass": {
+      "type": "Bug",
+      "naturePower": "energyball",
+      "secretPower": "slp"
+    },
+    "snow": {
+      "type": "Ice",
+      "naturePower": "icebeam",
+      "secretPower": "frz"
+    },
+    "ice": {
+      "type": "Ice",
+      "naturePower": "icebeam",
+      "secretPower": "frz"
+    },
+    "volcano": {
+      "type": "Fire",
+      "naturePower": "lavaplume",
+      "secretPower": "brn"
+    },
+    "graveyard": {
+      "type": "Ghost",
+      "naturePower": "shadowball",
+      "secretPower": "flinch"
+    },
+    "sky": {
+      "type": "Flying",
+      "naturePower": "airslash",
+      "secretPower": "spe:-1"
+    },
+    "space": {
+      "type": "Dragon",
+      "naturePower": "dracometeor",
+      "secretPower": "flinch"
+    },
+    "ultraspace": {
+      "type": "Psychic",
+      "naturePower": "psyshock",
+      "secretPower": "def:-1"
+    }
+  },
+  "unsupportedWeather": {
+    "shadowsky": "C2 Shadow scope excluded; native condition absent",
+    "snowscape": "not a Gen8 Hail alias"
+  },
+  "engineBoundary": {
+    "initialize": "RPG format onBattleStart before first switchIn; config bound after setPlayer and before team choices",
+    "defaultLogicalDuration": -1,
+    "defaultNativeDuration": "absent, not a decrementing -1",
+    "temporaryOverride": "native engine",
+    "weatherRestore": "natural expiry or supported nondefault primal source end; restore default, apply correct remaining residual phase once",
+    "terrainRestore": "natural expiry only; direct removal does not restore",
+    "environmentConsumers": [
+      "Nature Power",
+      "Camouflage",
+      "Secret Power"
+    ],
+    "environmentTerrainPrecedence": "native current terrain first; none environment delegates unchanged",
+    "worldInference": false,
+    "mutateUpstreamShowdown": false,
+    "mutateBattleResultV1": false,
+    "saveSchemaChange": false,
+    "weatherPriorityGate": {
+      "scope": "only this batch explicit field context",
+      "read": "stored field.weather, never effectiveWeather",
+      "currentPrimal": [
+        "desolateland",
+        "primordialsea",
+        "deltastream"
+      ],
+      "rejectIncomingOrdinary": [
+        "sunnyday",
+        "raindance",
+        "sandstorm",
+        "hail"
+      ],
+      "hook": "independent SetWeather event; native setter handles refusal feedback and ordinary PP",
+      "allow": "native legal primal-to-primal and ordinary overrides outside current primal",
+      "never": "fake ability holder or silently remove supported primal values",
+      "sourceLessAnnouncement": "standard protocol names without ability/of metadata; do not invoke native primal onFieldStart without effect"
+    },
+    "secretPower": {
+      "generationHook": "independent ModifyMove priority +1 before SheerForce 0 and SereneGrace -2; do not retime whole existing RPG handler",
+      "definition": "tag only own per-use environment secondary; preserve native deletion/multiplier, never reconstruct it at finish",
+      "perHit": "record real body eligibility; remove only tagged environment secondary from native per-hit execution; leave unrelated secondaries",
+      "completionHook": "native AfterMoveSecondary after hitStepMoveHitLoop actual completion, not planned hit2",
+      "once": "consume private use+target token before native callback; only living eligible body target",
+      "nativeEvaluation": "local view with actual id/hit/flags and post-ability chance; omit only per-hit parentalbond classification for this once-at-end evaluation; original move/hitcount/damage unchanged",
+      "reentry": "private completion identity prevents own queueing; native target secondary filters and native chance/status application retained",
+      "zeroDrawCases": [
+        "Sheer Force removed definition",
+        "no successful body hit",
+        "full substitute absorption",
+        "immunity",
+        "target fainted",
+        "native secondary suppression"
+      ],
+      "sereneGrace": "one 60% environment opportunity, not 30% or 120%; sleep duration RNG separately recorded",
+      "lifecycle": "retire transient per-use tokens on finish/failure/abort; never serialize them or edit global Dex"
+    },
+    "restoredHooks": "only canonical rpg data serialized; idempotently rebuild owned events/field hooks on restore, no opening replay; if onEvent used, exclude only owned callback functions during synchronous native snapshot and restore in finally"
+  },
+  "acceptance": [
+    {
+      "id": "IF01",
+      "contract": "omitted/all none preserves prior raw, requests, PRNG and primary outcomes; only specifically recorded real t: clock differences may be normalized",
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "id": "IF02",
+      "contract": "8 weather/5 terrain/19 environment mappings; three source-less primal defaults retain native values, proper source-less announce; malformed input zero side effects at each entry before any reservation or await",
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "id": "IF03",
+      "contract": "both formal MZ commands and direct App request reach the same frozen Session/Gateway config",
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "id": "IF04",
+      "contract": "domain before entry abilities/request; one normal opening announcement after dispatch",
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "id": "IF05",
+      "contract": "defaults persist beyond five turns without move/rock source and without added RNG",
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "id": "IF06",
+      "contract": "stored-current three primal defaults reject ordinary weather moves/abilities even when suppressed; permit legal primal interchange and ordinary default override; expiry/source-end restore with correct same-turn residual once",
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "id": "IF07",
+      "contract": "native terrain override restores on natural expiry; Defog/Steel Roller removal does not immediately restore",
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "id": "IF08",
+      "contract": "real three environment moves; Secret Power PB flinch/nonflinch, SheerForce early deletion, SereneGrace one multiplier, actual early completion, Substitute/KO/immune zero opportunity; native terrain priority/none unchanged; timing/once negative controls",
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "id": "IF09",
+      "contract": "same-source checkpoint before/after temporary override and expiry restores data and all owned nonserialized hooks once, no opening/ability replay or caller rebinding",
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "id": "IF10",
+      "contract": "validate/capture before open-to-begin delay/trainer request spread/new op/content/random; before Session first await and Gateway sim construction; reject repeat begin and stale/abort/load/newgame without changing first/successor field",
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "id": "IF11",
+      "contract": "no persistent state before final confirmation; complete result and ledger installed once",
+      "status": "NOT_EXECUTED"
+    },
+    {
+      "id": "IF12",
+      "contract": "real compiled Scene controlled tests, necessary full quick/type/boundary/build/SDK and independent review before publication/native",
+      "status": "NOT_EXECUTED"
+    }
+  ],
+  "dependencyQualification": "six finite dependency-only checks stored outside repo; not acceptance IF01–IF12",
+  "NW": 0,
+  "newAPP": 0,
+  "completeD2": false,
+  "completeE": false,
+  "revision": 2,
+  "revisionOf": "87f6ee4c7a4ab42cc2d2f39de68559b7305c4cc7",
+  "planRevisionFindings": {
+    "IF-P2-01": "new stored-current primal weather guard; pending independent plan re-review",
+    "IF-P2-02": "early ability phase plus actual completed-move one secondary; pending independent plan re-review",
+    "IF-P3-01": "explicit-context citation corrected to frozen plan line185, not WP67A3.7"
+  },
+  "revisionVectors": "initial-field-plan-r2-counterexamples.json"
+}

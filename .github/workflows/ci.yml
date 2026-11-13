@@ -37,10 +37,15 @@ jobs:
         env:
           SHOWDOWN_SRC: ${{ runner.temp }}/showdown-src
         run: ./scripts/ci-run.sh build-showdown ./scripts/build-showdown.sh
-      - name: Headless checks (framework type check, import boundaries, Node suites; no test may be skipped)
+      - name: Regular headless checks (frozen reference replay excluded; no selected test may be skipped)
         env:
           PF_NO_SKIP: '1'
-        run: ./scripts/ci-run.sh headless-suites ./scripts/test-headless.sh
+        run: ./scripts/ci-run.sh headless-suites ./scripts/test-headless.sh --scope=regular
+      - name: D1 collector synthetic controls (no native host or P-4 claim)
+        run: |
+          python3 --version
+          ./scripts/ci-run.sh d1-collector python3 scripts/tests/d1-benchmark-runner.test.py -v
+          ./scripts/ci-run.sh d1-hardening python3 scripts/tests/d1-hardening.test.py -v
   plugins:
     name: plugins (Reactor types at the pinned commit, type check, build)
     runs-on: ubuntu-latest

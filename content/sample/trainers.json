@@ -1,0 +1,14 @@
+[
+  {
+    "id": "route-1-rival",
+    "type": "youngster",
+    "name": "Avery",
+    "version": 2,
+    "language": 2,
+    "source": "author-placeholder",
+    "party": [
+      { "species": "pidgey", "level": 5 },
+      { "species": "caterpie", "level": 4 }
+    ]
+  }
+]

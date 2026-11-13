@@ -1,3 +1,4 @@
+import { creationBattleNameOf } from "./species-key";
 /** Finite auxiliary composition over an already validated primary plan. The application owns installation and replay. */
 import { planBattleReadiness } from "./battle-consumption";
 import type { ResolvedBattleEffects } from "./battle-consumption";
@@ -43,17 +44,17 @@ function exactDexAppearance(content: Content, individual: DexAppearance, battleS
   if (!formNumber(individual.form)) return null;
   const forms = own(content.forms, individual.species);
   const exactName = (form: number): string | undefined => content.forms ? own(forms, String(form)) : form === 0 ? individual.species : undefined;
-  const originalName = exactName(individual.form);
+  const originalName = exactName(individual.form) ?? creationBattleNameOf(content, individual);
   if (!originalName || battleSpecies !== undefined && originalName !== battleSpecies) return null;
   const original = own(content.species, originalName);
   if (!original) return null;
   // An explicitly authored PokedexForm alias remains valid, including 0. Its target must exist too.
-  const displayForm = original.pokedexForm ?? individual.form;
+  const displayForm = original.pokedexForm ?? (exactName(individual.form) ? individual.form : 0);
   if (!formNumber(displayForm)) return null;
   const displayName = exactName(displayForm);
   if (!displayName || !own(content.species, displayName)) return null;
   // F still decides gender normalization and the permitted unnamed-display => 0 rule.
-  return normalizeDexAppearance(content, individual);
+  return normalizeDexAppearance(content, exactName(individual.form) ? individual : { ...individual, form: 0 });
 }
 
 /** Only friendship, the readiness pair and finite dex fields may differ from primary. Inputs stay detached. */
@@ -140,4 +141,33 @@ export function composeBattleEffects(input: ComposeBattleEffectsInput): Composed
     record("capture-count", member.id, { source: "capture", species: member.species, appearance: null, internalBattle }, "capturedCounts");
   }
   return { state, dispositions, captures };
+}
+
+/** Explain finite receipt outcomes without treating a legitimate no-op as missing facts.
+ * Unknown reasons fail conservatively. Partial writes with unavailable appearance still warn.
+ * A later evolution scan owns its own diagnostics; waiting here does not certify that scan.
+ */
+export function classifyBattleEffectDispositions(
+  resolved: readonly ResolvedBattleEffects["dispositions"][number][],
+  composed: readonly BattleEffectsWritebackDisposition[],
+): { degraded: boolean; entries: { source: string; group: string; memberId?: string; reason?: string;
+  category: "complete" | "no-op" | "primary-wins" | "later-scan" | "degraded" }[] } {
+  type Category = "complete" | "no-op" | "primary-wins" | "later-scan" | "degraded";
+  const entries: { source: string; group: string; memberId?: string; reason?: string; category: Category }[] = resolved.map(d => ({ source: d.source, group: d.group,
+    ...(d.memberId === undefined ? {} : { memberId: d.memberId }), ...(d.reason === undefined ? {} : { reason: d.reason }),
+    category: (d.status === "complete" ? "complete" : "degraded") as Category }));
+  for (const d of composed) {
+    let category: Category = "degraded";
+    if (d.status !== "invalid") {
+      if (d.group === "friendship" && d.status === "skipped" && d.reason === "legal-primary-friendship-wins") category = "primary-wins";
+      else if (d.group === "readiness" && d.reason === "awaiting-complete-ordered-evolution-scan") category = "later-scan";
+      else if (d.reason === undefined || d.group === "readiness" && (d.reason === "reliable-hp-zero" || d.reason === "known-faint")
+        || ["appearance", "defeat", "capture-appearance", "capture-count"].includes(d.group) && d.reason === "not-internal-battle") {
+        category = d.status === "applied" ? "complete" : "no-op";
+      }
+    }
+    entries.push({ source: "writeback", group: d.group, memberId: d.memberId,
+      ...(d.reason === undefined ? {} : { reason: d.reason }), category });
+  }
+  return { degraded: entries.some(d => d.category === "degraded"), entries };
 }

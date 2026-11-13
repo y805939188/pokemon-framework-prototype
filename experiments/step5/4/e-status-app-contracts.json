@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "format": "gen8rpgcustomgame",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "seed": [1, 2, 3, 4],
+  "playerLevel": 100,
+  "playerAbilityIndex": {"Snorlax": 1, "Venusaur": 0},
+  "foeLevel": 5,
+  "featureIds": ["FR-000544", "FR-000545"],
+  "completeHeading": false,
+  "scope": "six normal App/real Session status flows, owned in-memory state port; no disk, Scene, NW, probability or complete heading acceptance",
+  "cases": [
+    {"id":"ESAPP-01","check":"toxic-save","player":"Snorlax","foe":"Gengar","move":"toxic","status":"tox","savedStatus":"psn","savedCount":0},
+    {"id":"ESAPP-02","check":"paralysis-save","player":"Snorlax","foe":"Arbok","move":"glare","status":"par","savedStatus":"par","savedCount":0},
+    {"id":"ESAPP-03","check":"sleep-save","player":"Snorlax","foe":"Parasect","move":"spore","status":"slp","savedStatus":"slp","savedCount":"remaining"},
+    {"id":"ESAPP-04","check":"benched-cure","player":"Snorlax","foe":"Gengar","move":"toxic","status":"tox","savedStatus":"","savedCount":0},
+    {"id":"ESAPP-05","check":"poison-immunity","player":"Venusaur","foe":"Gengar","move":"toxic","status":"","savedStatus":"","savedCount":0},
+    {"id":"ESAPP-06","check":"abort-after-status","player":"Snorlax","foe":"Gengar","move":"toxic","status":"tox","savedStatus":null,"savedCount":null}
+  ],
+  "constraints": [
+    "All members start healthy with no status; actual foe moves inflict status, no seedState or private engine mutation.",
+    "Poison-type Toxic, Glare and Spore have the deterministic accuracy used here; no statistical probability claim.",
+    "Run ends each legal wild battle before another move; live values and normalized result are checked separately.",
+    "Sleep duration is observed within the specified initial range and preserved exactly, not chosen by the fixture.",
+    "Toxic reference rounding difference remains in the earlier sidecar; this first residual is exactly floor(maxHP/16).",
+    "Six actual Session battles include repeated Toxic inputs with different App lifecycle obligations; not six new status mechanics."
+  ]
+}

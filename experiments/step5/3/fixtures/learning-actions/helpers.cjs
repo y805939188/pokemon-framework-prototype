@@ -37,7 +37,8 @@ function inputs() {
       {id:'TR.unlimited',name:'Record',fieldUse:'tm',move:'chargebeam',pocket:4,consumable:true,source:'author'},
       {id:'fake-tr',name:'Technical Record',fieldUse:'hm',move:'cut',pocket:4,consumable:true,source:'author'},
       {id:'record-free',name:'Free Record',fieldUse:'tr',move:'chargebeam',pocket:4,consumable:false,source:'author'},
-      {id:'ordinary',name:'TR57',fieldUse:'none',pocket:1,source:'author'}],overlays:[]};
+      {id:'ordinary',name:'TR57',fieldUse:'none',pocket:1,source:'author'},
+      {id:'pokeball',name:'Ball',flags:['PokeBall'],pocket:3,battleUse:'ball',battleId:'pokeball',fieldUse:'none',source:'author'}],overlays:[]};
 }
 function dex() {
   return {sha:()=>SHA,species:id=>({name:id,baseSpecies:'learner',types:['Normal'],baseStats:{hp:40,atk:40,def:40,spa:40,spd:40,spe:40},abilities:['Ability A'],gender:'N'}),

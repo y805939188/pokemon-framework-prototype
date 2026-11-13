@@ -1,0 +1,108 @@
+{
+  "version": "move-menu-native-v1",
+  "productCommit": "9f897b38dd0aba2cc13deaddc1b1e87c1b770bf7",
+  "productRuntime": {
+    "js/plugins/PS_BattleFlow.js": "960f37ff1f42e12c9bfc380736d9ca07f0f3876a2c9261c8bff3792e4612b8e3",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "js/plugins/PS_Evolution.js": "294f6875f4f0d3b3e531c03b1ec387307f27b8b3f119b8bf60ba92a53843f0f4",
+    "js/engine/build/engine.cjs": "f0b3d8b2e0ec60369a22360303267f0d05b3366e3c7c279a6c28c63ab1dff9f3",
+    "js/engine/build/production.cjs": "9c43cb83cfd0fed113c5de7b5a9f3920777ff3e0f00a3f7572cfc2317c017a31"
+  },
+  "prefix": "pf_victory_music_v1/",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "worldSeed": 817,
+  "mapId": 5,
+  "deadlineSeconds": 120,
+  "cases": [
+    {
+      "id": "MM01",
+      "language": "en",
+      "cancel": "after-legal"
+    },
+    {
+      "id": "MM02",
+      "language": "zh",
+      "cancel": "queued-refusal"
+    }
+  ],
+  "groups": [
+    {
+      "name": "english-move-refusal",
+      "ids": [
+        "MM01"
+      ]
+    },
+    {
+      "name": "chinese-move-refusal",
+      "ids": [
+        "MM02"
+      ]
+    }
+  ],
+  "moves": [
+    {
+      "id": "tackle",
+      "pp": 35,
+      "maxpp": 35
+    },
+    {
+      "id": "growl",
+      "pp": 40,
+      "maxpp": 40
+    },
+    {
+      "id": "splash",
+      "pp": 0,
+      "maxpp": 40
+    },
+    {
+      "id": "protect",
+      "pp": 10,
+      "maxpp": 10
+    }
+  ],
+  "zeroPPKey": 3,
+  "validKey": 2,
+  "requiredAssets": [
+    "audio/bgm/pf_victory_music_v1/world.ogg",
+    "audio/bgm/pf_victory_music_v1/battle.ogg",
+    "audio/bgm/pf_victory_music_v1/victory.ogg",
+    "audio/bgm/pf_victory_music_v1/trainer-victory.ogg"
+  ],
+  "sourceAssetsManifestSHA256": "317e3c50b953f091156aee468bd0e76db1e7c143953c27cccfa25c44197cc083",
+  "mediaRecipe": "scripts/prepare-victory-music-native-assets.cjs",
+  "mediaPlan": "experiments/step5/4/victory-music-native-plan.json",
+  "fontResourcePaths": [
+    "data/System.json",
+    "fonts/mplus-1m-regular.woff",
+    "fonts/mplus-2p-bold-sub.woff"
+  ],
+  "worldFiles": [
+    "data/System.json",
+    "data/CommonEvents.json",
+    "data/Map005.json"
+  ],
+  "renderStages": {
+    "MM01": [
+      "refusal-hint",
+      "restored-moves",
+      "legal-main"
+    ],
+    "MM02": [
+      "refusal-hint",
+      "restored-moves",
+      "legal-main"
+    ]
+  },
+  "notProved": [
+    "physical input/hearing/Windows",
+    "full move types/PP colours/automaticEncore-Struggle/message families",
+    "fullD2/E/5.4/P4/GC/U51 and retained P3",
+    "no saveGame or cross-process Continue qualification"
+  ]
+}

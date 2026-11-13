@@ -4,6 +4,12 @@
 
 起点是 [rpg-maker-mz-initialize](https://github.com/y805939188/rpg-maker-mz-initialize) 模板（`b6fa1df`）；第二步（验证战斗接入）已完成，结论和证据在 `docs/step2/`。
 
+## 当前阶段（2026-11-13）
+
+5.4 已按批准的单打与默认呈现范围完成技术收口。当前后继产品为 [`174568dc`](https://github.com/y805939188/pokemon-framework-prototype/commit/174568dc2a0d20b5e5e2b0878c35c63bca742e27)，src `7c52b290`（源码来源 `5a41caf`）；[投球／逃跑整改](docs/step5/5.4-capture-run-followup.md)的 A1／B1／C1 已通过独立限域复审。[精确 CI #313](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43366638211) 对该产品的两 job 成功，280 套／5082 项通过，失败／取消／跳过均 0，冻结参考回放 EXCLUDED／NOT RUN。
+
+此前 `2ecace8d`／`714b674` 的阶段收口与 CI312 保留为历史，不改写旧证据。战前仍先统一用默认过渡；完整特殊注册／优先级和按场景、对手、事件自由编排未实现，后续阶段和日期未指定。范围及保留边界见[5.4 收口记录](docs/step5/5.4-closure.md)和[当前验收索引](docs/step5/5.4-current-acceptance.md)。本次仅同步后继技术事实，文档自身的精确 CI 以发布后回执为准；不代表全部参考机制、完整性能或包分发完成，**未合并 main**。
+
 ## 先读什么
 
 1. [`docs/PROJECT-GUIDE.md`](docs/PROJECT-GUIDE.md) —— 目标、路线、铁律与授权边界、协作协议、架构、仓库地图、环境准备、常用命令、已知坑、文档地图。**所有人和 AI 动手前必读。**
@@ -31,5 +37,18 @@ pnpm --dir src build
 | `src/plugins/` | MZ 插件的 TypeScript 源码 |
 | `scripts/` | 引导、构建、打包、签名、测试、诊断脚本 |
 | `experiments/step2/` | 第二步的测试、探针和证据 |
-| `docs/` | 项目指南与第二步文档 |
+| `docs/` | 项目指南、阶段合同、测试与验收文档 |
 | `data/` `img/` `audio/` … | MZ 工程内容（模板数据；MZ 素材由引导脚本从本机 MZ 复制，不提交） |
+
+
+## 历史批次截面
+
+以下保留各批次当时状态；其中“当前／下一批／待审”只指当时，不覆盖上方当前验收索引。
+
+本整改分支从已限域接受的倒下纯排期f4f5551继续：原ultra及精确CI198双job均通过，旧拒绝／失败保留。当前小批为[简单倒下的Scene／音频消费者](docs/step5/5.4-D2c-faint-view.md)，尚待固定验证与独立复审。完整D2／5.4、新P-4和GC内存增长WARN仍OPEN，原U51-16超时FAIL／输入来源UNKNOWN保留，main未合并。
+
+2026-11-01：默认F2 `9c045fb` 经独立纯路径、新包单轮81项与精确CI203限域接收；下一小批[战斗音频六入口纯选曲](docs/step5/5.4-D2c-audio-selection.md)待固定候选独立复审，只处理逻辑身份优先级，未播放／未接Scene。完整D2/5.4/E、新P4、GC WARN与旧UNKNOWN不关闭。
+
+后继音频：纯选曲 `47a84e2` 已独立 PASS_SCOPED（155套/2840项），精确分支发布另核；[BGM端口／引子记忆与MZ适配器](docs/step5/5.4-D2c-audio-host-port.md)为下一独立候选，尚未接正式 Scene 或事件，未运行新 NW，不等于实际音频或完整 WP15/16 已验收。
+
+后续接线：47a已发布且精确CI204全绿，内部端口7166f7a已获独立限域通过；当前[正式Scene开战BGM／事件引子／回程](docs/step5/5.4-D2c-audio-scene.md)是新候选待审，未运行新NW，不以纯路径代签真实宿主或整个D2。

@@ -206,7 +206,7 @@ test('real session: a won trainer battle with a level-up and an item commits the
 test('real session: a session closed by a failed rollback aborts and leaves the persistent state exactly as it was', async () => {
   const game = F.savedFor(F.makeGame({ bag: { potion: 3 } }), sample); game.party[0].hp = 50;
   const state = K.createMemoryState(game), projection = K.createRecordingProjection();
-  const sessions = E.composition.createBattleSessionFactory({ content: () => sample, seed: () => [1, 2, 3, 4] });
+  const sessions = E.composition.createLegacyNoHeldBattleSessionFactory({ content: () => sample, seed: () => [1, 2, 3, 4] });
   const app = new GameApplication({ state, sessions, projection, content: () => ({ content: sample }), random: lcg(3) });
   const r = req('real-broken#1'); const s = await app.startBattle(r); const before = snapshot(state);
   const act = s.gw.act.bind(s.gw);

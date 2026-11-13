@@ -150,7 +150,7 @@ test('3 -> 4 maps every member and the dex to content id + form, adds statistics
   const raw = v3(), before = clone(raw);
   const r = migrateGame(raw, { speciesKey: K.speciesKeyResolver(sample), content: sample });
   assert.equal(r.ok, true, JSON.stringify(r.error));
-  assert.deepEqual([r.from, r.to, r.migrated], [3, 7, true]);
+  assert.deepEqual([r.from, r.to, r.migrated], [3, E.state.GAME_SCHEMA, true]);
   assert.deepEqual(raw, before, 'the input document is never mutated');
   assert.deepEqual([r.state.party[0].species, r.state.party[0].form, E.storage.boxedMembers(r.state)[0].species, E.storage.boxedMembers(r.state)[0].form], ['charmander', 0, 'pidgey', 0]);
   assert.deepEqual(sample.regionalDex.regions, [], 'this historical fixture has only a national layout');

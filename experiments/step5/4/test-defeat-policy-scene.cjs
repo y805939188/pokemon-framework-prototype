@@ -1,0 +1,86 @@
+'use strict';
+// Real App/Gen8 Session + compiled production Scene. MZ/audio/input are controlled; no NW/physical claim.
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
+const ROOT=path.resolve(__dirname,'../../..'),{createVictoryDriverHost}=require('./victory-music-driver-host.cjs'),E=require('../../../js/engine/build/production.cjs'),PLAN=require('./victory-music-native-plan.json');let temp,plugins,entryText,fixture;
+test.before(async()=>{temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-result-feedback-'));plugins={};for(const name of ['PS_BattleFlow','PS_SaveState','PS_Evolution','PS_BattleFlowTest']){const out=path.join(temp,name),r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);const text=fs.readFileSync(path.join(out,name+'.js'),'utf8');if(name==='PS_BattleFlowTest')entryText=text;else plugins[name]=text;}
+
+ const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));await vite.build({configFile:false,root:ROOT,logLevel:'error',build:{outDir:path.join(temp,'fixture'),emptyOutDir:false,minify:false,lib:{entry:path.join(ROOT,'src/plugins/flowtest/music-native-fixture.ts'),formats:['cjs'],fileName:()=> 'entry.cjs'}}});fixture=require(path.join(temp,'fixture/entry.cjs'));});
+test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
+async function open({trainer=true,losing=false,lang='en',loseText='You won this time.',canLose=true,event=false,beforeBeginCanLose,beforeOpen}={}){const h=createVictoryDriverHost({ROOT,work:temp,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN}),w=h.w,G=h.G,content=fixture.musicNativeContent(E,assert);const type=content.trainerTypes['music-type-normal'];type.baseMoney=20;if(loseText===null)delete type.loseText;else type.loseText=loseText;type.winText='FACILITY_ONLY_WIN_TEXT';content.trainers['music-normal'][0].name='Avery';if(losing)content.trainers['music-normal'][0].party[0].level=100;
+ w.flow.stateReplaced();w.flow._app=null;w.flow._content=content;w.flow._dex=E.dex.createDexLookup();w.flow.seed=[1,2,3,4];w.flow.rng=()=>0;w.flow.fast=true;G.$gameSystem._psGame=fixture.musicNativeState(E,content);if(losing){const m=E.speciesKey.toPersistentMember(E.memberFactory.createMember({id:'MUSIC-P1',species:'Pidgey',level:5},content,()=>0),content);m.hp=1;G.$gameSystem._psGame.party=[m];}
+ const params=G.PluginManager.parameters;G.PluginManager.parameters=function(name){const value=params.call(this,name);return name==='PS_BattleFlow'?{...value,homeMapId:'5',homeX:'8',homeY:'9'}:value;};G.$dataMapInfos??=[];G.$dataMapInfos[5]??={};G.$gamePlayer??={reserveTransfer(){}};w.flow.translator=()=>E.i18n.translatorFor(lang);const queried=[],app=w.flow.app(),lookup=app.trainerRecord;app.trainerRecord=function(...args){const value=lookup.apply(this,args);if(value)queried.push(value);return value;};await h.p.toMapId(5,8,9);const req={kind:trainer?'trainer':'wild',...(trainer?{trainer:{id:'music-normal',version:1}}:{foes:[{species:'Pidgey',level:losing?100:3}]}),battleId:'result-feedback-'+path.basename(w.root),seq:1,canLose};let eventArgs=null;if(beforeOpen)beforeOpen({w,app,req});if(beforeBeginCanLose!==undefined){const begin=w.flow.begin.bind(w.flow);w.flow.begin=(...args)=>{req.canLose=beforeBeginCanLose;return begin(...args);};}if(event){eventArgs={kind:'wild',foes:'Pidgey:100',battleId:'review-event',canLose:String(canLose)};w.commands['PS_BattleFlow:StartBattle'].call({setWaitMode(){}},eventArgs);}else w.flow.openBattle(req);await h.p.inMode('main');const s=h.M._scene,lines=[],mapLines=[],add=s._log.add;s._log.add=function(line){lines.push(line);return add.call(this,line);};G.$gameMessage.add=line=>mapLines.push(line);return{...h,s,content,queried,lines,mapLines,request:w.flow.request,callerRequest:req,eventArgs,before:JSON.stringify(w.flow.game()),cleanup(){if(w.flow.running)w.flow.abort(Error('owned result test cleanup'));}};}
+
+for(const [initial,mutated,alias]of [[false,false,false],[true,true,false],[false,true,false],[true,false,false],[false,true,true],[true,false,true]])test('R2 real defeat initial='+initial+' changed='+mutated+' publicAlias='+alias,async()=>{
+ const h=await open({trainer:false,losing:true,canLose:initial});try{
+  const flow=h.w.flow;assert.strictEqual(h.request,h.callerRequest);assert.strictEqual(flow._op.request,h.callerRequest);assert.strictEqual(flow.request,h.callerRequest);assert.equal(h.request.canLose,initial);let transfers=0,doc=h.G.$gameSystem._psGame,installs=0;const reserve=h.G.$gamePlayer.reserveTransfer.bind(h.G.$gamePlayer);h.G.$gamePlayer.reserveTransfer=(...a)=>{transfers++;return reserve(...a);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  const beforeCount=flow.game().stats.blacked_out_count;(alias?flow.request:h.callerRequest).canLose=mutated;await h.p.fightUntilEnd();assert.equal(h.s._session.ended.winner,'Wild');assert.equal(JSON.stringify(flow.game()),h.before);assert.equal(installs,0);h.s.onMenuOk();await h.frames(3);
+  const outcome=flow.lastOutcome;assert.equal(outcome.code,4);assert.equal(outcome.commit,'applied');assert.equal(installs,1);const delta=flow.game().stats.blacked_out_count-beforeCount;assert.equal(delta,initial?0:1);assert.equal(!!outcome.blackout,!initial);assert.equal(transfers,initial?0:1);console.log('REVIEW_OBSERVATION '+JSON.stringify({issue:'R2',route:'retained direct openBattle request',initial,mutated,appBlackoutStatDelta:delta,hostBlackout:!!outcome.blackout,homeTransferRequests:transfers,commits:installs}));h.s.onEnd();assert.equal(installs,1);
+ }finally{h.cleanup();}
+});
+test('R2 ordinary event argument mutation after begin does not mutate the normalized internal request',async()=>{
+ const h=await open({trainer:false,losing:true,canLose:true,event:true});try{
+  const flow=h.w.flow;assert.notStrictEqual(flow.request,h.eventArgs);assert.equal(flow.request.canLose,true);h.eventArgs.canLose='false';assert.equal(flow.request.canLose,true);const count=flow.game().stats.blacked_out_count;await h.p.fightUntilEnd();h.s.onMenuOk();await h.frames(3);assert.equal(flow.lastOutcome.commit,'applied');assert.equal(flow.game().stats.blacked_out_count,count);assert.equal(!!flow.lastOutcome.blackout,false);console.log('REVIEW_OBSERVATION '+JSON.stringify({issue:'R2',route:'ordinary StartBattle event args',eventArgsAfter:h.eventArgs.canLose,internalCanLose:flow.request.canLose,appBlackoutStatDelta:0,hostBlackout:false}));
+ }finally{h.cleanup();}
+});
+
+test('R2 direct caller policy may change before begin; both consumers capture the actual begin value',async()=>{
+ const h=await open({trainer:false,losing:true,canLose:false,beforeBeginCanLose:true});try{
+  const flow=h.w.flow;assert.equal(h.callerRequest.canLose,true);assert.equal(Object.isFrozen(h.callerRequest),false,'do not freeze an object owned by the caller');
+  const count=flow.game().stats.blacked_out_count;await h.p.fightUntilEnd();assert.equal(JSON.stringify(flow.game()),h.before);h.s.onMenuOk();await h.frames(3);
+  assert.equal(flow.lastOutcome.code,4);assert.equal(flow.lastOutcome.commit,'applied');assert.equal(flow.game().stats.blacked_out_count,count);assert.equal(!!flow.lastOutcome.blackout,false);
+ }finally{h.cleanup();}
+});
+
+// A rejected public begin must not publish policy for the first accepted App operation.
+for(const phase of ['main','app-pending','app-resolved'])for(const trainer of [false,true])for(const initial of [false,true])test('R2 rejected duplicate begin '+phase+' trainer='+trainer+' initial='+initial,async()=>{
+ let rejection,duplicates=0,firstRequest;
+ function duplicate(flow,request){request.canLose=!initial;duplicates++;rejection=assert.rejects(flow.begin(),/a battle is already open/);}
+ const h=await open({trainer,losing:true,canLose:initial,beforeOpen({w,app,req}){
+  if(phase==='main')return;
+  const start=app.startBattle;let entered=false;
+  app.startBattle=function(request){
+   if(entered)return start.call(this,request);entered=true;firstRequest=request;
+   const first=start.call(this,request);assert.equal(typeof first.then,'function');
+   if(phase==='app-pending'){assert.equal(w.flow._op.session,null);duplicate(w.flow,req);return first;}
+   return first.then(session=>{assert.equal(w.flow._op.session,null);duplicate(w.flow,req);return session;});
+  };
+ }});
+ try{
+  const flow=h.w.flow,acceptedSession=h.s._session;if(phase==='main')duplicate(flow,h.callerRequest);
+  await rejection;assert.equal(duplicates,1);assert.equal(flow.running,true);assert.strictEqual(flow._op.session,acceptedSession);assert.strictEqual(flow.request,h.callerRequest);assert.equal(h.callerRequest.canLose,!initial);assert.equal(Object.isFrozen(h.callerRequest),false);if(firstRequest)assert.equal(firstRequest.canLose,initial);
+  let transfers=0,installs=0,doc=h.G.$gameSystem._psGame;const reserve=h.G.$gamePlayer.reserveTransfer.bind(h.G.$gamePlayer);h.G.$gamePlayer.reserveTransfer=(...a)=>{transfers++;return reserve(...a);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  const before=JSON.parse(h.before);await h.p.fightUntilEnd();assert.equal(installs,0);assert.equal(JSON.stringify(flow.game()),h.before);h.s.onMenuOk();await h.frames(3);
+  const outcome=flow.lastOutcome,after=flow.game();assert.equal(outcome.code,4);assert.equal(outcome.commit,'applied');assert.equal(after.stats.blacked_out_count-before.stats.blacked_out_count,initial?0:1);assert.equal(!!outcome.blackout,!initial);assert.equal(transfers,initial?0:1);assert.equal(installs,1);assert.equal(outcome.defeat.healed,true);assert.equal(after.money,before.money-outcome.defeat.moneyLost);assert(after.party[0].hp>1);assert.equal(after.party[0].status,'');assert(after.party[0].moves.every(m=>m.pp===m.maxpp));
+  const installed=JSON.stringify(after);h.s.onEnd();assert.equal(installs,1);assert.equal(transfers,initial?0:1);assert.equal(JSON.stringify(flow.game()),installed);
+  console.log('BEGIN_POLICY_OWNER_OBSERVATION '+JSON.stringify({phase,trainer,initial,mutated:!initial,duplicates,code:outcome.code,commit:outcome.commit,appBlackoutStatDelta:after.stats.blacked_out_count-before.stats.blacked_out_count,hostBlackout:!!outcome.blackout,homeTransferRequests:transfers,installs}));
+ }finally{h.cleanup();}
+});
+for(const initial of [false,true])test('R2 unchanged duplicate is rejected without disturbing accepted policy '+initial,async()=>{
+ const h=await open({trainer:false,losing:true,canLose:initial});try{
+  await assert.rejects(h.w.flow.begin(),/a battle is already open/);const before=h.w.flow.game().stats.blacked_out_count;await h.p.fightUntilEnd();h.s.onMenuOk();await h.frames(3);assert.equal(h.w.flow.lastOutcome.commit,'applied');assert.equal(h.w.flow.game().stats.blacked_out_count-before,initial?0:1);assert.equal(!!h.w.flow.lastOutcome.blackout,!initial);
+ }finally{h.cleanup();}
+});
+
+// T28's post-commit recovery boundary, made portable without claiming native transfer/Title.
+for(const fault of ['message','translation','message-and-transfer','transfer-twice'])test('D3 committed defeat survives '+fault+' without a second settlement',async()=>{
+ const h=await open({trainer:false,losing:true,canLose:false,beforeOpen:({w})=>w.flow.game().badges.fill(false)});
+ const flow=h.w.flow,G=h.G,add=G.$gameMessage.add,translator=flow.translator,reserve=G.$gamePlayer.reserveTransfer;
+ let doc=G.$gameSystem._psGame,installs=0,transfers=0,remaining=fault==='transfer-twice'?2:fault==='message-and-transfer'?1:0;
+ Object.defineProperty(G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+ G.$gamePlayer.reserveTransfer=function(...args){transfers++;if(remaining>0){remaining--;throw Error('D3 controlled transfer failure');}return reserve.apply(this,args);};
+ try{
+  const before=JSON.parse(h.before);await h.p.fightUntilEnd();assert.equal(h.s._session.ended.winner,'Wild');assert.equal(JSON.stringify(flow.game()),h.before);assert.equal(installs,0);
+  if(fault.startsWith('message'))G.$gameMessage.add=()=>{throw Error('D3 controlled message failure');};
+  if(fault==='translation')flow.translator=()=>{throw Error('D3 controlled translation failure');};
+  h.s.onMenuOk();await h.frames(3);G.$gameMessage.add=add;flow.translator=translator;
+  const outcome=flow.lastOutcome,settled=JSON.stringify(flow.game());assert.deepEqual([outcome.code,outcome.commit,outcome.blackout],[4,'applied',true]);assert.equal(outcome.defeat.moneyLost,40);assert.equal(flow.game().money,960);assert.equal(installs,1);assert.equal(flow.game().stats.blacked_out_count-before.stats.blacked_out_count,1);assert.equal(Object.keys(flow.game().appliedBattles).length,Object.keys(before.appliedBattles).length+1);assert(flow.game().party[0].hp>1);assert.equal(flow.game().party[0].status,'');assert(flow.game().party[0].moves.every(m=>m.pp===m.maxpp));assert.equal(flow.running,false);
+  assert.deepEqual(Array.from(outcome.hostErrors||[],e=>e.step),fault==='transfer-twice'?[]:['message']);
+  if(fault!=='transfer-twice')assert.match(outcome.hostErrors[0].error,/D3 controlled (message|translation) failure/);
+  const failedTrip=fault==='message-and-transfer'||fault==='transfer-twice';assert.equal(flow.lastReturn.status,failedTrip?'failed':'requested');assert.equal(!!flow.pendingReturn,failedTrip);assert.equal(transfers,1);
+  // A duplicate Scene terminal callback and a duplicate result cannot reapply money, stats or ledger.
+  h.s.onEnd();assert.equal(installs,1);assert.equal(transfers,1);assert.equal(flow.commit(flow.lastResult),'already-applied');assert.equal(JSON.stringify(flow.game()),settled);assert.equal(installs,1);
+  if(fault==='transfer-twice'){assert.equal(flow.retryReturnHome().status,'failed');assert(flow.pendingReturn);assert.equal(JSON.stringify(flow.game()),settled);assert.equal(installs,1);}
+  if(failedTrip){assert.equal(flow.retryReturnHome().status,'requested');assert.equal(flow.pendingReturn,null);}
+  assert.equal(flow.retryReturnHome().status,'none');assert.equal(transfers,fault==='transfer-twice'?3:failedTrip?2:1);assert.equal(JSON.stringify(flow.game()),settled);assert.equal(installs,1);
+ }finally{G.$gameMessage.add=add;flow.translator=translator;G.$gamePlayer.reserveTransfer=reserve;h.cleanup();}
+});

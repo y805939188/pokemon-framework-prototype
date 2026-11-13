@@ -1,0 +1,222 @@
+{
+  "schema": "C-preparation-vectors-v1",
+  "group": "switch",
+  "basisB": "995599b0f9d7014416172c921f1a38b80801a9be",
+  "productionExecution": "NOT_EXECUTED",
+  "cases": [
+    {
+      "id": "C-S01",
+      "entry": "force-switch",
+      "input": {
+        "flags": [],
+        "candidates": [
+          {
+            "id": "B",
+            "partyOrder": 1,
+            "score": 120
+          },
+          {
+            "id": "A",
+            "partyOrder": 0,
+            "score": 120
+          }
+        ]
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "choose",
+        "candidateId": "A",
+        "retryOrder": [
+          "A",
+          "B"
+        ]
+      },
+      "sourceRefs": [
+        "r2:C-3",
+        "WP51:3.2"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-S02",
+      "entry": "force-switch",
+      "input": {
+        "flags": [],
+        "candidates": [
+          {
+            "id": "A",
+            "partyOrder": 0,
+            "score": -10
+          },
+          {
+            "id": "B",
+            "partyOrder": 1,
+            "score": 20
+          }
+        ]
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "choose",
+        "candidateId": "B",
+        "retryOrder": [
+          "B",
+          "A"
+        ]
+      },
+      "sourceRefs": [
+        "r2:C-3",
+        "WP51:3.2"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": "Force mode still chooses below100/negative scores, never move/struggle."
+    },
+    {
+      "id": "C-S03",
+      "entry": "force-switch",
+      "input": {
+        "flags": [
+          "UsePokemonInOrder"
+        ],
+        "candidates": [
+          {
+            "id": "B",
+            "partyOrder": 1,
+            "score": 250
+          },
+          {
+            "id": "A",
+            "partyOrder": 0,
+            "score": 20
+          }
+        ]
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "choose",
+        "candidateId": "A"
+      },
+      "sourceRefs": [
+        "WP51:3.2"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-S04",
+      "entry": "force-switch",
+      "input": {
+        "flags": [
+          "ReserveLastPokemon"
+        ],
+        "lastOwnerPartyOrder": 5,
+        "candidates": [
+          {
+            "id": "Last",
+            "partyOrder": 5,
+            "score": 200
+          },
+          {
+            "id": "Other",
+            "partyOrder": 2,
+            "score": 100
+          }
+        ]
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "choose",
+        "candidateId": "Other"
+      },
+      "sourceRefs": [
+        "WP51:3.2"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-S05",
+      "entry": "force-switch",
+      "input": {
+        "flags": [
+          "ReserveLastPokemon"
+        ],
+        "lastOwnerPartyOrder": 5,
+        "candidates": [
+          {
+            "id": "Last",
+            "partyOrder": 5,
+            "score": -10
+          }
+        ]
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "choose",
+        "candidateId": "Last"
+      },
+      "sourceRefs": [
+        "WP51:3.2"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-S06",
+      "entry": "switch-score",
+      "input": {
+        "hp": 80,
+        "maxhp": 100,
+        "entryHpLossEstimate": 20,
+        "poisonEntryPenalty": false,
+        "stickyWebPenalty": true,
+        "ownMoveAdvantages": [
+          {
+            "power": 90,
+            "publicTypeMultiplier": [
+              2,
+              1
+            ]
+          }
+        ],
+        "publicLastMoveRisks": [
+          {
+            "power": 80,
+            "publicTypeMultiplier": [
+              1,
+              2
+            ]
+          }
+        ]
+      },
+      "randomScript": [],
+      "expected": {
+        "score": 83
+      },
+      "sourceRefs": [
+        "WP51:3.2",
+        "C-SWITCH-v1"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    },
+    {
+      "id": "C-S07",
+      "entry": "force-switch",
+      "input": {
+        "candidates": []
+      },
+      "randomScript": [],
+      "expected": {
+        "kind": "error",
+        "reason": "no-legal-action"
+      },
+      "sourceRefs": [
+        "r2:C-3"
+      ],
+      "execution": "NOT_EXECUTED",
+      "note": ""
+    }
+  ]
+}

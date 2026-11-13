@@ -1,0 +1,78 @@
+{
+  "version": 2,
+  "scope": "Normal compiled BattleFlow to Management capture receiving: terminal confirmation, decline nickname, empty-party-slot or full-party box choice, atomic single installation. Controlled host only, not NW/disk/full capture UI.",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "sources": [
+    {
+      "path": "deliverables/final-specification-set/user-interface/wp67-a-battle-interaction-and-presentation.md",
+      "sha256": "630e4bc5b0ab90c2299e2266eab7ff1d0a686fd41a67ba9313147d7beb41f98c",
+      "subsections": [
+        "8.1",
+        "8.2",
+        "8.3"
+      ],
+      "lines": [
+        211,
+        234
+      ]
+    },
+    {
+      "path": "deliverables/final-specification-set/pokemon-rules/wp38-capture-and-receiving.md",
+      "sha256": "37bcd3a5e876b6a0b6932265f90d3893e5d8e7f3f574abb0db2078998599b16e",
+      "subsection": "6",
+      "lines": [
+        104,
+        118
+      ]
+    }
+  ],
+  "projectTransactionBoundary": "Existing framework atomic battle/receiving commit, not reference partial writes before later UI; accepted acquisition/save ownership policy retained.",
+  "settings": {
+    "fast": false,
+    "receivingMode": 0,
+    "naming": 0,
+    "hasDex": false,
+    "leadLevel": 100,
+    "foeSpecies": "Pidgey",
+    "foeLevel": 3,
+    "masterballs": 2
+  },
+  "limits": "Synthetic custom author content and level100 lead; no growth question at level cap. No Pokedex page when hasDex=false, but owned registration required. No rename text entry, real font/input/audio or native pixels. Initial nickname prompt selection is not accepted by this batch: current pre-existing default No differs from reference Yes and is deferred as a minor default UI difference.",
+  "cases": [
+    {
+      "id": "D2CR-EN-PARTY",
+      "lang": "en",
+      "members": 2,
+      "destination": "party"
+    },
+    {
+      "id": "D2CR-ZH-PARTY",
+      "lang": "zh",
+      "members": 2,
+      "destination": "party"
+    },
+    {
+      "id": "D2CR-EN-BOX",
+      "lang": "en",
+      "members": 6,
+      "destination": "box"
+    },
+    {
+      "id": "D2CR-ZH-BOX",
+      "lang": "zh",
+      "members": 6,
+      "destination": "box"
+    }
+  ],
+  "completeD2": false,
+  "NW": 0,
+  "baseProduct": "1a611aa2f03fd47b305c45d91276874ddf38dd19",
+  "priorAcceptedTest": "bac206927fb3cf8c19c97a975cb3f11954586853",
+  "additionalNormalCoverage": "Both full-party cases open the replacement picker and press Back before choosing box. Assert unchanged pending token/member, zero installs, unchanged persistent state, and retained owner/save lock."
+}

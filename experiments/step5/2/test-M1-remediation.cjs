@@ -4,7 +4,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),vm=require('node:vm');
 const E=require('../../../js/engine/build/engine.cjs'),F=E.fixtures,S=E.state,I=E.inventory,C=E.itemCatalog,clone=structuredClone;
 const loss=id=>({protocol:1,battleId:id,outcome:{kind:'win',winner:'Enemy'},members:{},bag:{},captured:[],dex:{seen:[],owned:[]}});
-function appFor(game,content=F.content,options={}){const state=E.fakes.createMemoryState(game);return {state,app:new E.app.GameApplication({state,content:()=>({content}),sessions:E.fakes.createFakeSessions({}),projection:E.fakes.createRecordingProjection()},options)};}
+function appFor(game,content=F.content,options={}){const state=E.fakes.createMemoryState(game);const Legacy=require('../1/legacy-test-support.cjs').AutomaticApplication;return {state,app:new Legacy({state,content:()=>({content}),sessions:E.fakes.createFakeSessions({}),projection:E.fakes.createRecordingProjection()},options)};}
 
 test('M1-01/P52-13: real battle forgets a boosted move then relearns same ID; full result commits with reset metadata',async()=>{
  const content=clone(F.content);content.species.Charizard.learnset={51:['Slash','Flamethrower']};const game=F.makeGame();game.party[0].statNature='brave';game.party[0].moves[0]={id:'flamethrower',pp:21,maxpp:21,ppUps:2};game.party[0].exp=E.growth.minExp('parabolic',51)-1;

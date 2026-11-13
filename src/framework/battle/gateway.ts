@@ -1,3 +1,5 @@
+import { captureInitialField } from '../rules/initial-field';
+import { attachRequestSource, technicalRequestRefresh, tagRequestMessage, checkpointRequestSource, restoreRequestSource, closeRequestSource } from './request-source';
 /**
  * Thin async battle gateway over a pinned Pokemon Showdown build.
  *
@@ -5,7 +7,7 @@
  * - Callers never hold Battle/Pokemon objects. `_debugBattle()` is the single diagnostic escape hatch.
  * - Members are addressed by stable id (= the Showdown nickname we assigned), never by slot.
  */
-import { loadFormatExtension, loadSim } from "./showdown-loader";
+import { loadFormatExtension, loadSim, restoreSimBattle } from "./showdown-loader";
 import type { LoadedSim } from "./showdown-loader";
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types";
 import type { BattleEvent } from "./protocol";
@@ -14,6 +16,27 @@ import { own, setOwn } from "../rules/own";
 import type { PartialStats, Stats } from "../rules/types";
 import type { BattleObservation, EvidenceIssue, ObservationBatch } from "../rules/battle-evidence";
 import type { FormatObservation } from "../rules/battle-evidence";
+import { HeldTracker } from "./held-tracker";
+import { isSelectableMove } from './move-requests';
+import type { HeldTrackerSnapshot } from "./held-tracker";
+import type { HeldBinding, HeldRosterMember, RequiredFacts } from "../rules/held-facts";
+import { attachReplacementSource, checkpointReplacementSource, restoreReplacementSource } from './replacement-source';
+import { attachTrainerSource, trainerSourceRequest, trainerSourcePublic, checkpointTrainerSource, restoreTrainerSource } from './trainer-ai-source';
+
+/** Only the format's witnessed opening rewrite can label a permanent slot. Never consult live copies. */
+function permanentMoveId(slot: { id: string; rpgPermanentMoveId?: string }): string {
+  return slot.rpgPermanentMoveId ?? slot.id;
+}
+
+/** The input set survives native opening forme changes that also replace baseSpecies (e.g. Crowned dogs). */
+function permanentSpecies(battle: ShowdownBattle, pokemon: ShowdownPokemon): ShowdownPokemon {
+  return battle.dex.species.get(pokemon.set.species || pokemon.set.name);
+}
+function permanentStats(battle: ShowdownBattle, pokemon: ShowdownPokemon): Stats {
+  const species = permanentSpecies(battle, pokemon);
+  return species.id !== pokemon.baseSpecies.id || (pokemon.species !== pokemon.baseSpecies && !pokemon.transformed)
+    ? battle.spreadModify(species.baseStats, pokemon.set) : pokemon.baseStoredStats;
+}
 
 /** Version tag of the engine-level message stream used by the 2.2 harness only; NOT the game protocol (state.ts PROTOCOL_VERSION = 1). */
 export const PROTOCOL_VERSION = 0;
@@ -35,8 +58,45 @@ interface ObservationState {
   records: BattleObservation[]; issues: EvidenceIssue[]; displays: Record<string, string>;
   pending: Record<string, Extract<FormatObservation, { kind: "before-loss" }>>;
 }
-interface CheckpointData { snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[]; friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[]; faintSequence: number }
+type GrowthItems = Record<string, { current: string; recovery: string }>;
+interface ParticipationIdentity { side: string; id: string; slot: number }
+interface ParticipationBinding extends ParticipationIdentity { growthItems?: GrowthItems }
+interface ParticipationFact extends ParticipationBinding { type: string; ident: string }
+interface CheckpointData { participation: (ParticipationBinding | null)[][]; pendingParticipation: ParticipationFact[]; snapshot: string; engineRoot: string; queue: GatewayMessage[]; seq: number; closed: boolean; observation: ObservationState; friendshipFaints: Extract<BattleObservation, { kind: "faint" }>[]; friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[]; faintSequence: number; settlement?: { state: HeldTrackerSnapshot; lineage: object; wild: boolean } }
 const CHECKPOINTS = new WeakMap<GatewayCheckpoint, CheckpointData>();
+const FAINT_GROWTH = new WeakMap<object, WeakMap<BattleEvent, GrowthItems>>();
+const SETTLEMENTS = new WeakMap<object, { tracker: HeldTracker; lineage: object; wild: boolean }>();
+/** Internal companion queries: a look-alike driver or arbitrary restored JSON has no entry. */
+export function gatewaySettlementLineage(driver: BattleDriver): object | null { return SETTLEMENTS.get(driver)?.lineage ?? null; }
+export function gatewaySettlementFacts(driver: BattleDriver, lineage: object, binding: HeldBinding): RequiredFacts {
+  const source = SETTLEMENTS.get(driver);
+  if (!source || source.lineage !== lineage) throw new Error("required-settlement-driver-source-mismatch");
+  return source.tracker.facts(binding);
+}
+/** Internal player growth read, authenticated to the same complete required channel across rollback. */
+export function gatewayOwnGrowthItems(driver: BattleDriver, lineage: object, id: string): { current: string; recovery: string } {
+  const source = SETTLEMENTS.get(driver);
+  if (!source || source.lineage !== lineage) throw new Error("required-settlement-driver-source-mismatch");
+  return source.tracker.growthItems(id);
+}
+/** Item state at the actual source faint, not after later actions/residuals in the same engine batch. */
+export function gatewayFaintGrowthItems(driver: BattleDriver, lineage: object, event: BattleEvent): GrowthItems {
+  const source = SETTLEMENTS.get(driver);
+  if (!source || source.lineage !== lineage) throw new Error("required-settlement-driver-source-mismatch");
+  const items = FAINT_GROWTH.get(driver)?.get(event);
+  if (event.type !== "faint" || !items) throw new Error("battle-growth-faint-source-unavailable");
+  return structuredClone(items);
+}
+/** Internal own-side display read; a live query is not an ended settlement seal. */
+export function gatewayOwnSummaryItem(driver: BattleDriver, lineage: object, id: string): string {
+  const source = SETTLEMENTS.get(driver);
+  if (!source || source.lineage !== lineage) throw new Error("required-settlement-driver-source-mismatch");
+  const state = source.tracker.snapshot();
+  if (state.invalid.length) throw new Error("battle-summary-held-unavailable");
+  const member = state.members.find(m => m.side === "p1" && m.id === id);
+  if (!member) throw new Error("battle-summary-member-unavailable");
+  return member.current;
+}
 const FRIEND_CHECKPOINTS = new WeakMap<DriverCheckpoint, { owner: BattleGateway; side: string; id: string; member: ShowdownPokemon; live: number; setHad: boolean; stored: unknown }>();
 
 export class BattleGateway implements BattleDriver {
@@ -52,14 +112,19 @@ export class BattleGateway implements BattleDriver {
   private _friendshipFaintOrigins: Extract<BattleObservation, { kind: "faint" }>[] = [];
   private _faintKeys = new WeakMap<object, string>();
   private _faintSequence = 0;
+  private _participation = new WeakMap<BattleEvent, ParticipationBinding>();
+  private _pendingParticipation: ParticipationFact[] = [];
   _legacyFaintHook?: (e: unknown) => void;
 
   constructor(opts: GatewayOptions, internal?: LoadedSim) {
     this._env = internal ?? loadSim(opts.engineRoot);
     this._opts = opts;
+    FAINT_GROWTH.set(this, new WeakMap());
   }
 
   static async create(opts: GatewayOptions): Promise<BattleGateway> {
+    const initialField = captureInitialField(opts);
+    if (initialField && opts.formatid !== "gen8rpgcustomgame") throw new Error("initial-field-requires-rpg-singles");
     const gw = new BattleGateway(opts);
     const { sim } = gw._env;
     const battle = new sim.Battle({
@@ -68,9 +133,18 @@ export class BattleGateway implements BattleDriver {
       send: (type: string, data: string | string[]) => gw._onSend(type, data),
     });
     gw._battle = battle;
+    attachRequestSource(gw, battle);
+    gw.#attachTrainerSource();
+    attachReplacementSource(gw, gw._battle, gw._env, gw.snapshot.bind(gw));
     gw._attachObservations();
+    gw._attachParticipation();
     for (const [i, p] of (opts.players ?? []).entries()) {
       battle.setPlayer(`p${i + 1}`, { name: p.name, team: sim.Teams.pack(p.team) });
+    }
+    if (initialField) {
+      const fields = loadFormatExtension(gw._env.root).initialFields;
+      if (!fields) throw new Error("initial-field-extension-unavailable");
+      fields.bind(battle, initialField);
     }
     // The format's onBegin creates battle.rpg when the second player joins, so flags go after.
     if (opts.wild !== undefined || opts.noBall !== undefined || opts.noRun !== undefined) {
@@ -79,35 +153,65 @@ export class BattleGateway implements BattleDriver {
       if (opts.noBall) battle.rpg.noBall = true;
       if (opts.noRun) battle.rpg.noRun = true;
     }
+    if (opts.obedience) {
+      if (!battle.rpg) throw new Error("obedience needs the RPG format and its serialized battle context");
+      // Plain own JSON data is included in Battle#toJSON; owner/generation/content authority was established by the app.
+      battle.rpg.obedience = JSON.parse(JSON.stringify(opts.obedience));
+    }
+    if (opts.requiredSettlement) {
+      const roster: HeldRosterMember[] = (opts.players ?? []).flatMap((player, index) => player.team.map(value => {
+        const set = value as { name: string; item?: string };
+        return { id: set.name, side: index === 0 ? "p1" as const : "p2" as const, initial: set.item || "" };
+      }));
+      gw.#attachSettlement(new HeldTracker(battle, !!opts.wild, roster), {}, !!opts.wild);
+    }
     gw._pump();
     return gw;
   }
 
   /** Restore from a snapshot string produced by snapshot(). Emits no events until the next choice. */
   static async restore(snapshot: string, opts: GatewayOptions = {}): Promise<BattleGateway> {
+    if (captureInitialField(opts)) throw new Error("initial-field-restore-rebind");
     const gw = new BattleGateway(opts);
-    gw._battle = gw._env.sim.Battle.fromJSON(snapshot);
+    gw._battle = restoreSimBattle(gw._env, snapshot);
+    attachRequestSource(gw, gw._battle);
+    if (gw._battle.rpg?.initialField) {
+      const fields = loadFormatExtension(gw._env.root).initialFields;
+      if (!fields) throw new Error("initial-field-extension-unavailable");
+      fields.attach(gw._battle);
+    }
+    gw.#attachTrainerSource();
+    attachReplacementSource(gw, gw._battle, gw._env, gw.snapshot.bind(gw));
     gw._attachObservations();
+    gw._attachParticipation();
     gw._battle.restart((type: string, data: string | string[]) => gw._onSend(type, data));
     gw._opts = { ...opts, restored: true };
     return gw;
   }
 
   snapshot(): string {
-    return JSON.stringify(this._battle.toJSON());
+    const serialize = () => JSON.stringify(this._battle.toJSON());
+    return this._battle.rpg?.initialField ? loadFormatExtension(this._env.root).initialFields!.snapshot(this._battle, serialize) : serialize();
   }
 
   /** An opaque rollback point of everything this gateway owns (see GatewayCheckpoint). */
   checkpoint(): GatewayCheckpoint {
     const token = new GatewayCheckpoint();
+    const source = SETTLEMENTS.get(this);
     CHECKPOINTS.set(token, {
+      participation: this._queue.map(m => m.kind === "events" ? m.events.map(e => this._participation.get(e) ?? null) : []),
+      pendingParticipation: structuredClone(this._pendingParticipation),
       snapshot: this.snapshot(), engineRoot: this._env.root,
       queue: JSON.parse(JSON.stringify(this._queue)) as GatewayMessage[], seq: this._seq, closed: this._closed,
       observation: JSON.parse(JSON.stringify(this._observation)) as ObservationState,
       friendshipFaints: JSON.parse(JSON.stringify(this._friendshipFaints)) as typeof this._friendshipFaints,
       friendshipFaintOrigins: JSON.parse(JSON.stringify(this._friendshipFaintOrigins)) as typeof this._friendshipFaintOrigins,
       faintSequence: this._faintSequence,
+      ...(source ? { settlement: { state: source.tracker.snapshot(), lineage: source.lineage, wild: source.wild } } : {}),
     });
+    checkpointTrainerSource(this, token);
+    checkpointReplacementSource(this, token);
+    checkpointRequestSource(this, token, this._queue);
     return token;
   }
 
@@ -115,14 +219,62 @@ export class BattleGateway implements BattleDriver {
   static async fromCheckpoint(token: GatewayCheckpoint): Promise<BattleGateway> {
     const data = CHECKPOINTS.get(token);
     if (!data) throw new Error("not a gateway checkpoint");
-    const gw = await BattleGateway.restore(data.snapshot, { engineRoot: data.engineRoot });
+    const gw = await RESTORE_GATEWAY(data.snapshot, { engineRoot: data.engineRoot });
     gw._queue = JSON.parse(JSON.stringify(data.queue)) as GatewayMessage[];
+    gw._pendingParticipation = structuredClone(data.pendingParticipation);
+    gw._queue.forEach((m, i) => { if (m.kind === "events") m.events.forEach((e, j) => { const identity = data.participation[i]?.[j]; if (identity) { gw._participation.set(e, structuredClone(identity)); if (identity.growthItems) FAINT_GROWTH.get(gw)!.set(e, structuredClone(identity.growthItems)); } }); });
     gw._seq = data.seq; gw._closed = data.closed;
     gw._observation = JSON.parse(JSON.stringify(data.observation)) as ObservationState;
     gw._friendshipFaints = JSON.parse(JSON.stringify(data.friendshipFaints)) as typeof gw._friendshipFaints;
     gw._friendshipFaintOrigins = JSON.parse(JSON.stringify(data.friendshipFaintOrigins)) as typeof gw._friendshipFaintOrigins;
     gw._faintSequence = data.faintSequence;
+    if (data.settlement) gw.#attachSettlement(new HeldTracker(gw._battle, data.settlement.wild, [], data.settlement.state), data.settlement.lineage, data.settlement.wild);
+    restoreTrainerSource(gw, token);
+    restoreReplacementSource(gw, token);
+    restoreRequestSource(gw, token, gw._queue);
     return gw;
+  }
+
+  #attachTrainerSource(): void {
+    // Retain the actual operations before caller-visible callbacks or later public-method replacement.
+    const choose = this.choose.bind(this), act = this.act.bind(this), snapshot = this.snapshot.bind(this);
+    attachTrainerSource(this, this._battle, this._env, action => action.kind === 'item'
+      ? act('p2', {kind:'item',item:action.battleId,target:action.target}) : choose('p2', action.choice), snapshot);
+  }
+
+  #attachSettlement(tracker: HeldTracker, lineage: object, wild: boolean): void {
+    const extension = loadFormatExtension(this._env.root);
+    if (!extension.settlements || !["gen8rpgcustomgame", "gen8rpgdoublescustomgame"].includes(this._battle.format.id)) throw new Error("required-settlement-extension-unavailable");
+    extension.settlements.set(this._battle, tracker);
+    SETTLEMENTS.set(this, { tracker, lineage, wild });
+  }
+
+  /** Control-only identity captured at the engine log call, not at the eventual batch flush.
+   * Non-enumerable interception stays out of engine snapshots; restored engines are reattached.
+   * Public events and trainer observation keep the engine's disguised names unchanged. */
+  private _attachParticipation(): void {
+    const battle = this._battle, add = battle.add;
+    let depth = 0;
+    Object.defineProperty(battle, "add", { configurable: true, value: (...parts: any[]) => {
+      const type = parts[0], member = parts[1];
+      const tracked = depth === 0 && ["switch", "drag", "replace", "faint"].includes(type);
+      let fact: ParticipationFact | undefined;
+      if (tracked) {
+        if (!member || !battle.sides.includes(member.side) || !member.side.pokemon.includes(member)) throw new Error("participation-event-source-unavailable");
+        fact = { type, ident: String(member), side: member.side.id, id: member.name, slot: member.position };
+        const source = SETTLEMENTS.get(this);
+        if (type === "faint" && member.side.id === "p2" && source) fact.growthItems = source.tracker.playerGrowthItems();
+      }
+      depth++;
+      try { const result = add.apply(battle, parts); if (fact) this._pendingParticipation.push(fact); return result; }
+      finally { depth--; }
+    }});
+  }
+
+  participationIdentity(event: BattleEvent): ParticipationIdentity {
+    const value = this._participation.get(event);
+    if (!value) throw new Error("participation-event-binding-unavailable");
+    return { side: value.side, id: value.id, slot: value.slot };
   }
 
   _observationIssue(group: EvidenceIssue["group"], reason: string, memberId?: string): void {
@@ -311,6 +463,14 @@ export class BattleGateway implements BattleDriver {
     return this.chooseSlots(side, specs);
   }
 
+  async runAfterFaint(side: string): Promise<boolean> {
+    const evaluate = loadFormatExtension(this._env.root).runAfterFaint;
+    if (!evaluate || !evaluate(this._battle, side)) return false;
+    this._pump();
+    if (!this._battle.ended) this.refreshRequests(); // Immediate failure keeps the same mandatory replacement open.
+    return true;
+  }
+
   /**
    * Register this side's choice for every active slot in one go. Each spec is either
    *   { move: n, target?: loc } | { switch: n }                    -> ordinary engine choice
@@ -327,6 +487,16 @@ export class BattleGateway implements BattleDriver {
     if (b.requestState !== "move" || !s.activeRequest || s.activeRequest.wait) {
       this._emit({ kind: "error", side, message: "no move request pending", payload: specs });
       return false;
+    }
+    // Preflight before clearChoice/pending: a refusal must not cancel an already-staged legal move.
+    // Mirror the pinned move-choice index's skipped seats without invoking its mutating choosePass.
+    let index = 0;
+    for (const spec of specs) {
+      while (index < s.active.length && (s.active[index].fainted || s.active[index].volatiles["commanding"])) index++;
+      if (index >= s.active.length) break;
+      if (spec?.kind && this._hardLockedMove(side, index)) return false;
+      // A null/empty live spec registers nothing, so the next spec still addresses this seat.
+      if (spec && (spec.kind || spec.move !== undefined || spec.switch !== undefined)) index++;
     }
     s.clearChoice();
     for (const k of Object.keys(b.rpg.pending)) if (k.startsWith(side + ":")) delete b.rpg.pending[k];
@@ -357,13 +527,47 @@ export class BattleGateway implements BattleDriver {
   }
 
   /**
+   * Fixed Gen8 getMoveRequestData/getMoves publishes exactly {move,id} + trapped for a hard lock.
+   * This is an engine-authored permission, not "one move + trapped": ordinary single moves carry
+   * PP/target and automatic Struggle carries target. Never re-run getLockedMove/LockMove here.
+   */
+  private _hardLockedMove(side: string, slot: number): boolean {
+    const b = this._battle, s = b.getSide(side), request = s.activeRequest, active = s.active[slot];
+    const data = request?.active?.[slot], moves = data?.moves;
+    return b.gen === 8 && b.requestState === "move" && !!active && !active.fainted
+      && !!request && !request.wait && !request.forceSwitch && data?.trapped === true
+      && Array.isArray(moves) && moves.length === 1 && typeof moves[0].id === 'string'
+      && moves[0].pp === undefined && moves[0].target === undefined && !moves[0].disabled;
+  }
+
+  /**
    * Menu-layer legality (read-only, nothing consumed). Mirrors the spec's "refuse without
    * consuming" checks for the cases step 2.2 covers. Returns { allowed, reason }.
    */
-  query(side: string, what: "run" | "ball" | string, slot = 0): { allowed: boolean; reason?: string } {
+  query(side: string, what: "run" | "ball" | string, slot = 0): { allowed: boolean; reason?: string; moveSlot?: number } {
     const b = this._battle;
     const s = b.getSide(side);
     const active: ShowdownPokemon = s.active[slot];
+    const hardLocked = this._hardLockedMove(side, slot);
+    if (what === 'automatic-locked') {
+      return hardLocked && slot === 0 && s.active.length === 1 && s.choice.actions.length === 0
+        ? { allowed: true, moveSlot: 1 } : { allowed: false };
+    }
+    if (hardLocked && (what === 'item' || what === 'ball' || what === 'run')) return { allowed: false, reason: 'choice-rejected' };
+    // This new hint only gates hard locks. Keep existing item target/refund/request checks in their owners.
+    if (what === 'item') return { allowed: true };
+    if (what === 'automatic-encore') {
+      // Read the pinned engine's own condition and already-published permissions, never run a rule event here.
+      if (slot !== 0 || s.active.length !== 1 || !active || active.fainted || active.volatiles?.dynamax
+        || !active.volatiles?.encore?.move) return { allowed: false };
+      // isChoiceDone/awaitingChoice can register pass actions for empty seats. This hint only reads existing data.
+      const request = s.activeRequest, moves = request?.active?.[0]?.moves;
+      if (!request || request.wait || request.forceSwitch || s.choice.actions.length > 0 || !Array.isArray(moves)) return { allowed: false };
+      const eligible = moves.map((move: any, index: number) => ({ move, slot: index + 1 }))
+        .filter(({ move }) => isSelectableMove(move));
+      return eligible.length === 1 && eligible[0]!.move.id === active.volatiles.encore.move
+        ? { allowed: true, moveSlot: eligible[0]!.slot } : { allowed: false };
+    }
     const foes = s.foe.pokemon.filter((p: ShowdownPokemon) => !p.fainted);
     if (!b.rpg || !b.rpg.wild) {
       if (what === "run") return { allowed: false, reason: "trainer" };
@@ -379,7 +583,7 @@ export class BattleGateway implements BattleDriver {
     if (what === "run") {
       if (b.rpg.noRun) return { allowed: false, reason: "norun" };
       if (active.hasType("Ghost") || active.hasAbility("runaway") || active.hasItem("smokeball")) return { allowed: true }; // before trapping (WP41 7.1)
-      if (active.trapped || active.volatiles["partiallytrapped"]) return { allowed: false, reason: "trapped" };
+      if (active.trapped || active.volatiles["partiallytrapped"] || active.volatiles["trapped"]) return { allowed: false, reason: "trapped" };
       return { allowed: true };
     }
     if (what === "ball") {
@@ -409,7 +613,7 @@ export class BattleGateway implements BattleDriver {
     const prepared = records.map((r) => {
       const p = this._mon(sideId, r.id);
       const moves = (r.moves ?? []).map((m) => {
-        const index = p.baseMoveSlots.findIndex((slot: { id: string }) => slot.id === m.id);
+        const index = p.baseMoveSlots.findIndex((slot: { id: string }) => permanentMoveId(slot) === m.id);
         if (index < 0) throw new Error(`unknown PP slot ${r.id}.${m.id}`);
         const slot = p.baseMoveSlots[index];
         const maxpp = m.maxpp ?? slot.maxpp; // low-level legacy callers may seed only current PP
@@ -418,7 +622,8 @@ export class BattleGateway implements BattleDriver {
         const ppUps = possible.find((ups) => this._battle.calculatePP(move, ups) === maxpp);
         if (!Number.isInteger(maxpp) || ppUps === undefined) throw new Error(`invalid PP maximum for ${r.id}.${m.id}: ${maxpp}`);
         if (!Number.isInteger(m.pp) || m.pp < 0 || m.pp > maxpp) throw new Error(`invalid current PP for ${r.id}.${m.id}: ${m.pp}/${maxpp}`);
-        return { index, id: m.id, pp: m.pp, maxpp, ppUps };
+        const battleMaxpp = slot.rpgPermanentMoveId ? this._battle.calculatePP(this._battle.dex.moves.get(slot.id), ppUps) : maxpp;
+        return { index, id: m.id, pp: Math.min(m.pp, battleMaxpp), maxpp: battleMaxpp, ppUps };
       });
       return { r, p, moves };
     });
@@ -442,11 +647,25 @@ export class BattleGateway implements BattleDriver {
       for (const m of moves) {
         const base = p.baseMoveSlots[m.index];
         base.pp = m.pp; base.maxpp = m.maxpp;
-        const live = p.moveSlots.find((slot: { id: string }) => slot.id === m.id);
-        if (live) { live.pp = m.pp; live.maxpp = m.maxpp; }
+        const live = p.moveSlots.find((slot: { id: string }) => slot.id === base.id);
+        if (!p.transformed && live && !live.virtual) { live.pp = m.pp; live.maxpp = m.maxpp; }
+        if (p.rpgCrownedMove?.index === m.index) p.rpgCrownedMove.pp = m.pp;
         p.ppUps[m.index] = m.ppUps;
       }
     }
+    // Carried-in faints were never emitted through Showdown's faint queue. Keep its live-roster
+    // counter coherent without reporting a new KO, firing faint effects or awarding friendship/XP.
+    const side = this._battle.getSide(sideId);
+    side.pokemonLeft = side.pokemon.filter((p: ShowdownPokemon) => !p.fainted).length;
+  }
+
+  /** Summary order is independent of engine wrappers. Only permanent slots identify PP item targets. */
+  permanentMoveSlot(sideId: string, memberId: string, moveId: string): number | null {
+    const members = this._battle.getSide(sideId).pokemon.filter((p: ShowdownPokemon) => p.name === memberId);
+    if (members.length !== 1 || !moveId) return null;
+    const slots = members[0].baseMoveSlots;
+    const index = slots.findIndex((slot: { id: string }) => permanentMoveId(slot) === moveId);
+    return index >= 0 && slots.filter((slot: { id: string }) => permanentMoveId(slot) === moveId).length === 1 ? index : null;
   }
 
   /** Read back the engine-owned dynamic state per member: hp, persistent status, pp per move. */
@@ -456,8 +675,13 @@ export class BattleGateway implements BattleDriver {
       status: p.fainted ? "" : p.status || "",
       // persistent counter (WP20): remaining sleep turns, 1 for badly poisoned, else 0
       statusCount: p.fainted ? 0 : p.status === "slp" ? Math.max(0, (p.statusState && p.statusState.time) || 0) : p.status === "tox" ? 1 : 0,
-      pp: Object.fromEntries(p.baseMoveSlots.map((m: { id: string; pp: number }) => [m.id, m.pp])),
-      stats: { ...p.baseStoredStats }, active: !!p.isActive,
+      pp: Object.fromEntries(p.baseMoveSlots.map((m: { id: string; pp: number }) => [permanentMoveId(m), m.pp])),
+      ...(p.baseMoveSlots.some((m: { rpgPermanentMoveId?: string }) => m.rpgPermanentMoveId) ? {
+        ppMax: Object.fromEntries(p.baseMoveSlots.map((m: { id: string; maxpp: number }) => [permanentMoveId(m), m.maxpp])),
+      } : {}),
+      stats: { ...permanentStats(this._battle, p) }, active: !!p.isActive,
+      ...(p.baseSpecies.baseStats.hp !== permanentSpecies(this._battle, p).baseStats.hp
+        ? { growthHpBase: p.baseSpecies.baseStats.hp } : {}),
       confused: !!(p.volatiles && p.volatiles["confusion"]), boosts: { ...p.boosts },
     }));
   }
@@ -467,20 +691,50 @@ export class BattleGateway implements BattleDriver {
    * moves. `expect.stats` (from the game rules) is cross-checked against the engine's own
    * computation; a mismatch throws instead of silently diverging.
    */
-  applyGrowth(sideId: string, id: string, { level, evs, expect, newMoves = [], replaceSlot }: {
-    level: number; evs?: PartialStats; expect?: { stats?: Partial<Stats> }; newMoves?: string[]; replaceSlot?: number | null;
+  applyGrowth(sideId: string, id: string, { level, evs, expect, newMoves = [], replaceSlot, replaceMoveId }: {
+    level: number; evs?: PartialStats; expect?: { stats?: Partial<Stats> }; newMoves?: string[]; replaceSlot?: number | null; replaceMoveId?: string;
   }): { before: { level: number; maxhp: number; hp: number }; after: { level: number; maxhp: number; hp: number }; stats: Stats } {
     const b = this._battle;
     const p = this._mon(sideId, id);
+    if (replaceMoveId !== undefined) {
+      const index = p.baseMoveSlots.findIndex((slot: { id: string }) => permanentMoveId(slot) === replaceMoveId);
+      if (index < 0 || newMoves.length !== 1 || replaceSlot === null || replaceSlot === undefined) throw new Error('growth replacement identity unavailable');
+      replaceSlot = index;
+    }
     const before = { level: p.level, maxhp: p.maxhp, hp: p.hp };
+    // Compare natural values on the same battle-form basis, never the mutable values
+    // written by Power Trick/Split/Speed Swap. An EXP-only or sub-threshold EV update
+    // must not erase those effects when none of the five natural stats changed.
+    const battleBasis = (p.transformed ? p.baseSpecies : p.species).baseStats;
+    const priorBattleStats: Stats = b.spreadModify(battleBasis, p.set);
     p.set.level = level; p.level = level;
     if (evs) p.set.evs = { ...evs };
-    const stats: Stats = b.spreadModify(p.species.baseStats, p.set);
-    p.baseStoredStats = stats;
-    for (const k of Object.keys(p.storedStats)) p.storedStats[k] = stats[k as keyof Stats];
-    p.speed = p.storedStats.spe;
-    p.updateMaxHp(); // engine's own HP rule: current HP keeps its distance from max
-    p.details = p.getUpdatedDetails ? p.getUpdatedDetails() : p.details;
+    // Growth belongs to the permanent member, not a copied or temporary battle forme.
+    // Transform keeps copied stats; ordinary forme changes recalculate their own battle stats.
+    const growthSpecies = permanentSpecies(b, p);
+    const stats: Stats = b.spreadModify(growthSpecies.baseStats, p.set);
+    // Keep the native battle basis distinct from the stored individual. Crowned replaces
+    // baseSpecies too; Transform retains that natural battle basis beneath the copied stats.
+    const battleStats: Stats = b.spreadModify(battleBasis, p.set);
+    p.baseStoredStats = battleStats;
+    const naturalStatsChanged = (["atk", "def", "spa", "spd", "spe"] as const)
+      .some(stat => priorBattleStats[stat] !== battleStats[stat]);
+    if (!p.transformed && naturalStatsChanged) {
+      for (const k of Object.keys(p.storedStats)) p.storedStats[k] = battleStats[k as keyof Stats];
+      p.speed = p.storedStats.spe;
+    }
+    // Both native helpers read species. HP and details follow the natural battle forme,
+    // including Power Construct's increased HP, never a Transform copy. Permanent stats
+    // above remain a separate cross-checked projection of the persistent individual.
+    // Restore the visible battle species even if either helper throws.
+    const battleSpecies = p.species;
+    try {
+      p.species = p.baseSpecies;
+      p.updateMaxHp();
+      p.details = p.getUpdatedDetails ? p.getUpdatedDetails() : p.details;
+    } finally {
+      p.species = battleSpecies;
+    }
     if (expect && expect.stats) {
       for (const k of Object.keys(expect.stats) as (keyof Stats)[]) {
         if (stats[k] !== expect.stats[k]) throw new Error(`stat mismatch for ${id}.${k}: engine ${stats[k]} vs game ${expect.stats[k]}`);
@@ -489,13 +743,37 @@ export class BattleGateway implements BattleDriver {
     for (const mv of newMoves) {
       const dm = b.dex.moves.get(mv);
       const slot = { move: dm.name, id: dm.id, pp: dm.pp, maxpp: dm.pp, target: dm.target, disabled: false, disabledSource: "", used: false };
+      // Natural slots share PP. A learned move in a transformed list is a separate virtual
+      // copy; its permanent identity lets a later learning decision replace that same copy.
+      const activeSlot = p.transformed ? { ...slot, virtual: true, rpgLearnedMove: dm.id } : slot;
+      // Freeze the original copied positions before any learning can compact this list.
+      // These identities survive checkpoints; current array indexes do not.
+      if (p.transformed) p.moveSlots.forEach((move: { rpgLearnedMove?: string; rpgCopiedSlot?: number }, index: number) => {
+        if (move.rpgLearnedMove === undefined && move.rpgCopiedSlot === undefined) move.rpgCopiedSlot = index;
+      });
       if (replaceSlot !== undefined && replaceSlot !== null) {
-        p.baseMoveSlots[replaceSlot] = slot; p.moveSlots[replaceSlot] = { ...slot }; p.set.moves[replaceSlot] = dm.name;
+        const oldId = p.baseMoveSlots[replaceSlot]?.id;
+        const learnedIndex = p.transformed && oldId !== undefined
+          ? p.moveSlots.findIndex((move: { rpgLearnedMove?: string }) => move.rpgLearnedMove === oldId) : -1;
+        p.baseMoveSlots[replaceSlot] = slot;
+        if (p.transformed) {
+          // Use the learned identity first, otherwise the original copied position.
+          // A short or deduplicated list may no longer have that corresponding row;
+          // append densely rather than replacing an unrelated shifted or learned row.
+          const copiedIndex = p.moveSlots.findIndex((move: { rpgCopiedSlot?: number }) => move.rpgCopiedSlot === replaceSlot);
+          const activeIndex = learnedIndex >= 0 ? learnedIndex : copiedIndex >= 0 ? copiedIndex : p.moveSlots.length;
+          p.moveSlots.splice(activeIndex, 1, activeSlot);
+        } else p.moveSlots[replaceSlot] = activeSlot;
+        p.set.moves[replaceSlot] = dm.name;
         p.ppUps[replaceSlot] = 0;
       } else {
-        p.baseMoveSlots.push(slot); p.moveSlots.push({ ...slot }); p.set.moves.push(dm.name);
+        p.baseMoveSlots.push(slot); p.moveSlots.push(activeSlot); p.set.moves.push(dm.name);
         p.ppUps.push(0);
       }
+      // Showdown resolves actions and PP by ID. Keep the newly installed full-PP
+      // virtual slot, but retire any copied row with that same ID. Perform the normal
+      // replacement first so the selected old temporary slot is still forgotten.
+      if (p.transformed) p.moveSlots = p.moveSlots.filter((move: { id: string }) => move === activeSlot || move.id !== dm.id);
     }
     return { before, after: { level: p.level, maxhp: p.maxhp, hp: p.hp }, stats };
   }
@@ -521,6 +799,7 @@ export class BattleGateway implements BattleDriver {
    * fresh requests per side and queues nothing else.
    */
   refreshRequests(): GatewayMessage[] {
+    return technicalRequestRefresh(this, () => {
     const b = this._battle;
     const saved = this._queue.splice(0);
     b.makeRequest(b.requestState);
@@ -530,6 +809,7 @@ export class BattleGateway implements BattleDriver {
     const fresh = this._queue.splice(0);
     this._queue.push(...saved.filter((m) => m.kind !== "request"), ...fresh);
     return fresh.filter((m) => m.kind === "request");
+    });
   }
 
   /** Drop this side's registered choice (engine undo) and any pending RPG payload. */
@@ -543,10 +823,12 @@ export class BattleGateway implements BattleDriver {
   _pump(): void {
     // Showdown batches output until sendUpdates(); BattleStream does this after each write.
     this._battle.sendUpdates();
+    SETTLEMENTS.get(this)?.tracker.boundary();
   }
 
   _emit(msg: Unsequenced): void {
     const full = { ...msg, seq: this._seq++ } as GatewayMessage;
+    tagRequestMessage(this, full);
     const w = this._waiters.shift();
     if (w) w(full);
     else this._queue.push(full);
@@ -558,13 +840,22 @@ export class BattleGateway implements BattleDriver {
       const { extractChannelMessages } = this._env;
       const ch = extractChannelMessages(text, [0]);
       const lines = (ch[0] ?? []).filter((l) => l !== "");
-      this._emit({ kind: "events", events: lines.map(parseLine) });
+      trainerSourcePublic(this, lines);
+      const events = lines.map(parseLine);
+      for (const event of events) if (["switch", "drag", "replace", "faint"].includes(event.type)) {
+        const fact = this._pendingParticipation.shift();
+        if (!fact || fact.type !== event.type || fact.ident !== event.args[0]) throw new Error("participation-event-order-mismatch");
+        this._participation.set(event, { side: fact.side, id: fact.id, slot: fact.slot, ...(fact.growthItems ? { growthItems: fact.growthItems } : {}) });
+        if (fact.growthItems) FAINT_GROWTH.get(this)!.set(event, fact.growthItems);
+      }
+      this._emit({ kind: "events", events });
     } else if (type === "sideupdate") {
       const nl = text.indexOf("\n");
       const side = text.slice(0, nl);
       const body = text.slice(nl + 1);
       for (const line of body.split("\n")) {
         if (line.startsWith("|request|")) {
+          if (side === 'p2') trainerSourceRequest(this);
           this._emit({ kind: "request", side, request: JSON.parse(line.slice("|request|".length)) });
         } else if (line.startsWith("|error|")) {
           this._emit({ kind: "error", side, message: line.slice("|error|".length) });
@@ -581,6 +872,7 @@ export class BattleGateway implements BattleDriver {
         ...(outcome ? { outcome } : {}),
       });
       this._closed = true;
+      closeRequestSource(this);
       for (const w of this._waiters.splice(0)) w(null);
     }
   }
@@ -607,14 +899,19 @@ export class BattleGateway implements BattleDriver {
   }
 }
 
+// Retain the supported restoration implementation, rather than looking it up on a mutable public class later.
+const RESTORE_GATEWAY = BattleGateway.restore.bind(BattleGateway);
+const CREATE_GATEWAY = BattleGateway.create.bind(BattleGateway);
+const CHECKPOINT_GATEWAY = BattleGateway.fromCheckpoint.bind(BattleGateway);
+
 /** The Showdown implementation of the driver factory: what the game uses unless a test supplies another one. */
-export const showdownDriverFactory: BattleDriverFactory = {
-  create: (options) => BattleGateway.create(options),
-  fromCheckpoint: (token) => BattleGateway.fromCheckpoint(token),
+export const showdownDriverFactory: BattleDriverFactory = Object.freeze<BattleDriverFactory>({
+  create: CREATE_GATEWAY,
+  fromCheckpoint: CHECKPOINT_GATEWAY,
   async moveNames(formatid, seed) {
     // a throw-away battle of the same format is the cheapest way to reach the engine's move data; the cost is the one the
     // session always paid for this check
-    const probe = await BattleGateway.create({ formatid, seed, players: [{ name: "p", team: [{ name: "x", species: "Pidgey", moves: ["Tackle"] }] }, { name: "q", team: [{ name: "y", species: "Pidgey", moves: ["Tackle"] }] }] });
+    const probe = await CREATE_GATEWAY({ formatid, seed, players: [{ name: "p", team: [{ name: "x", species: "Pidgey", moves: ["Tackle"] }] }, { name: "q", team: [{ name: "y", species: "Pidgey", moves: ["Tackle"] }] }] });
     return (id: string): string => probe.moveInfo(id).name;
   },
-};
+});

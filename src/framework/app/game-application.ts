@@ -1,3 +1,8 @@
+import { captureInitialField, withInitialField } from '../rules/initial-field';
+import { planPlayerFriendshipMigration, applyPlayerFriendshipMigration, friendshipMigrationSnapshot } from "../rules/friendship-migration";
+import type { FriendshipMigrationPlan } from "../rules/friendship-migration";
+import type { Content } from "../rules/types";
+import type { FriendshipPersistencePort, FriendshipPersistenceSnapshot, FriendshipMigrationHandle, FriendshipApplicationPreview, FriendshipApplicationResult, FriendshipPersistenceResult } from "./friendship-migration-operation";
 import { normalizeMemberDexAppearance } from "../rules/acquisition-dex";
 import { PokedexOperation } from "./pokedex-operation";
 import type { DexEntryIntent, DexDecision, DexViewingCommand, DexResolution } from "./pokedex-operation";
@@ -20,7 +25,7 @@ import type { EvolutionFacts } from "../rules/evolution";
 import type { InventoryRequest, InventoryParent, InventoryOutcome } from "./inventory-session";
 import { badgeCount, hasBadge } from "../rules/economy";
 import { assertInventoryMapped, aggregateBag } from "../rules/inventory";
-import { catalogOf } from "../rules/item-catalog";
+import { catalogOf, heldItemDescriptor } from "../rules/item-catalog";
 /**
  * The game application: the use cases that coordinate a battle with the persistent game, and nothing else.
  *  - game rules stay in the core (`rules/`): the application calls `applyBattleResult`, it does not re-implement it;
@@ -32,7 +37,7 @@ import { planBattlePrimary, capturedTemplates, clone, newGame, resultHash } from
 import { assertBattleResultShape } from "../rules/battle-result-validation";
 import { resolveBattleEffects } from "../rules/battle-consumption";
 import type { EffectsBindingV2, EffectsContextV2, ResolvedBattleEffects } from "../rules/battle-consumption";
-import { composeBattleEffects } from "../rules/battle-effects-writeback";
+import { composeBattleEffects, classifyBattleEffectDispositions } from "../rules/battle-effects-writeback";
 import type { ApplyStatus, BattleCommitOptions, BattleResult, GameState } from "../rules/state";
 import { allMembers, locateMember } from "../rules/storage";
 import { DEFAULT_LIMITS, storageFull } from "../rules/limits";
@@ -46,7 +51,7 @@ import { stateIdentity } from "./state-identity";
 import type { ReceptionContext, ReceptionPending } from "./reception-types";
 import { ManagementSession } from "./management";
 import type { ManagementOutcome, ManagementRequest } from "./management";
-import { developmentCapabilities, resolveConfig } from "../rules/config";
+import { developmentCapabilities, runtimeCapabilities, resolveConfig } from "../rules/config";
 import type { DevelopmentCapabilities } from "../rules/config";
 import type { ItemDescriptor, MemberReference } from "../rules/storage-operations";
 import { healParty, recoverAll } from "../rules/heal";
@@ -56,14 +61,21 @@ import { isDefeat, settleDefeat } from "../rules/defeat";
 import { battleView, speciesKeyResolver, toBattleMember, toPersistentMember } from "../rules/species-key";
 import { addSteps, bumpStat } from "../rules/stats";
 import type { GameStats, StatCounter } from "../rules/stats";
-import type { Member } from "../rules/types";
+import type { Member, TrainerBattleProjection } from "../rules/types";
+import { buildTrainerTeam, findTrainerRecord, trainerBattleProjection } from "../rules/trainer-team";
+import { applyBattleMoneyAmount, applyTrainerPrize } from "../rules/trainer-reward";
+import type { TrainerPrizeResult } from "../rules/trainer-reward";
 import { allocateMemberId, ownerLanguage } from "../rules/member-identity";
 import { assertCapturedHeldSources, hasForcedPartyPlan, fallbackDecisions, receiveMembers, ReceivingRefused } from "../rules/receiving";
 import type { ReceivingDecision, ReceivingProfile } from "../rules/receiving";
-import { validateGameContent } from "../rules/save-schema";
+import { snapshotForSave, validateGameContent } from "../rules/save-schema";
 import { own } from "../rules/own";
 import { findDanglingReferences, resolveSpecies, validatedContentIdentity } from "../flow/content-runtime";
-import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, ClaimOutcome, ClockPort, ContentPort, CreationContext, EncounterPlan, GameStatePort, GiftOutcome, GiftRequest, HealOutcome, OutcomeProjection, PartyView, RandomPort, StepsOutcome } from "./ports";
+import { planHeldWriteback, resolveRequiredFacts } from "../rules/held-facts";
+import type { HeldRosterMember, RequiredFacts } from "../rules/held-facts";
+import { claimSettlementHandle, registerLegacyAdmissionRoot, settlementFactorySource } from "./settlement-source";
+import type { SettlementFactorySource } from "./settlement-source";
+import type { BattleHandle, BattleOutcome, BattleSessionFactory, BattleSetup, BattleStartRequest, TrainerBattleStartRequest, ClaimOutcome, ClockPort, ContentPort, CreationContext, EncounterPlan, GameStatePort, GiftOutcome, GiftRequest, HealOutcome, OutcomeProjection, PartyView, RandomPort, StepsOutcome } from "./ports";
 
 export interface GameApplicationPorts<S extends BattleHandle> {
   state: GameStatePort;
@@ -109,7 +121,7 @@ export function outcomeCode(result: BattleResult): number {
 }
 
 /** What a commit needs to know about the battle beyond its result: for the statistics (WP06 §4.2, WP53 §183, WP61 §7). */
-interface BattleFacts { kind: "wild" | "trainer"; canLose: boolean; experimentalHeld?: boolean }
+interface BattleFacts { kind: "wild" | "trainer"; canLose: boolean; moneyGain: boolean; trainer?: { projection: TrainerBattleProjection; levels: number[] } }
 
 /**
  * Battle statistics of one committed result (host code: 1 win, 2 caught, 3 ran, 4 lost or drawn). Wild: a win or a
@@ -131,12 +143,21 @@ function battleStats(stats: GameStats, facts: BattleFacts, code: number, defeat:
 interface OwnedBattleEffects {
   battleId: string; generation: number; context: EffectsContextV2; contentIdentity: string | null;
 }
+interface SettlementAdmission {
+  source: SettlementFactorySource | null; generation: number; battleId: string; contentIdentity: string | null;
+  roster: HeldRosterMember[]; wild: boolean; handle: object | null; invalid: boolean;
+  read: boolean; facts?: RequiredFacts; pairHash?: string;
+  contentObserved?: boolean;
+}
 interface PreparedBattle {
   rawHash: string; generation: number; before: GameState; effects: ResolvedBattleEffects; captureMembers: Member[];
   sourceIdentity: string | null; sourceInvalidated: boolean; expectedContext: EffectsContextV2;
   next?: GameState; nextIdentity?: string | null; defeat?: { moneyLost: number; healed: true }; attempted: boolean; indeterminate: boolean; completed: boolean;
+  trainerReward?: TrainerPrizeResult & { id: string; version: number };
+  payDayReward?: TrainerPrizeResult;
   diagnostics: string[];
   entries?: DexEntryIntent[];
+  required?: RequiredFacts; pairHash?: string;
 }
 export type CommitResultStatus = ApplyStatus | "pending" | "no-template";
 
@@ -147,6 +168,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private readonly startMoney: number;
   private readonly noMoneyLoss: boolean;
   private readonly capabilities: DevelopmentCapabilities;
+  /** Explicit legacy roots remain no-held even after the production release. */
+  private readonly legacyHeldRequested: boolean;
   private readonly management: ManagementSession;
   private readonly depositHeal: boolean;
   private readonly profile: ReceivingProfile;
@@ -179,21 +202,33 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   private dexBattleCompletion: { parentToken: string; generation: number; outcome: BattleOutcome & { result?: BattleResult } } | null = null;
   private readonly acquisition: AcquisitionOperation;
   private evolutionCompletion: { token: string; generation: number; outcome: BattleOutcome & { result?: BattleResult } } | null = null;
+  readonly #friendshipRawState: GameStatePort;
+  #friendshipRevision = 0;
+  #friendshipOwner: { invalid: boolean } | null = null;
+  readonly #friendshipPreviews = new WeakMap<FriendshipMigrationHandle, {
+    generation: number; revision: number; content: Content; contentHash: string; before: string; target: FriendshipPersistenceSnapshot;
+    plan: FriendshipMigrationPlan; persistence: FriendshipPersistencePort; result?: FriendshipApplicationResult; completedHostIdentity?: string;
+  }>();
   private generation = 0;
   private readonly bornIn = new WeakMap<object, number>();
   private readonly completedEvidence = new WeakMap<object, BattleEvidence>();
   private readonly ownedBattleEffects = new WeakMap<object, OwnedBattleEffects>();
   private readonly receptionActions = new WeakSet<ReceptionContext>();
   private readonly preparedBattles = new WeakMap<ReceptionContext, PreparedBattle>();
+  readonly #settlementAdmissions = new WeakMap<ReceptionContext, SettlementAdmission>();
+  readonly #settlementFactoryRoot: SettlementFactorySource | null;
+  #currentSettlementAdmission: SettlementAdmission | null = null;
   private battleCommitOwner: ReceptionContext | null = null;
   private readonly finishing = new WeakSet<object>();
   private readonly terminatedBattles = new WeakSet<ReceptionContext>();
-  private get battleBusy(): boolean { return !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active || !!this.triggered?.active || !!this.trade?.active || !!this.acquisition?.active || !!this.pokedex?.active || !!this.dexBattleCompletion; }
+  private get battleBusy(): boolean { return !!this.#friendshipOwner || !!this.op || !!this.battleCommitOwner || !!this.evolutions?.active || !!this.learning?.active || !!this.triggered?.active || !!this.trade?.active || !!this.acquisition?.active || !!this.pokedex?.active || !!this.dexBattleCompletion; }
   private assertBattleContext(context: ReceptionContext, requireOwner = false): void {
     if (context.generation !== this.generation || this.terminatedBattles.has(context)
       || requireOwner && this.battleCommitOwner !== context) throw new Error("stale battle commit generation or owner");
   }
   private invalidatePreparedSource(prepared: PreparedBattle, battleId: string): void {
+    const admission = this.battleCommitOwner ? this.#settlementAdmissions.get(this.battleCommitOwner) : undefined;
+    if (admission?.source?.mode === "required") { admission.invalid = true; throw new Error("required-settlement-source-permanently-invalidated"); }
     this.evolutions.discardPrepared();
     this.pokedex.discardReserved(this.battleCommitOwner?.token ?? "");
     prepared.sourceInvalidated = true;
@@ -201,7 +236,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       battleId, generation: prepared.generation, rawHash: prepared.rawHash,
       contentIdentity: prepared.sourceIdentity ?? "0".repeat(64),
     }, expectedContext: prepared.expectedContext, membersBefore: prepared.before.party });
-    delete prepared.next; delete prepared.nextIdentity; delete prepared.defeat;
+    delete prepared.next; delete prepared.nextIdentity; delete prepared.defeat; delete prepared.payDayReward;
     delete prepared.entries;
     prepared.diagnostics = [];
   }
@@ -212,14 +247,47 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     return value?.context.generation === this.generation ? clone(value) : null;
   }
 
+  private readonly retireSession:((handle:S)=>void)|null;
   constructor(ports: GameApplicationPorts<S>, options: GameApplicationOptions = {}) {
-    this.battleStatePort = ports.state;
-    this.ports = {...ports,state:{read:()=>ports.state.read(),replace:next=>{const problems=validateGameContent(next,ports.content().content);if(problems.length)throw new Error(`invalid next state: ${problems[0]!.path} ${problems[0]!.message}`);ports.state.replace(next);this.inventory?.stateChanged(next);}}};
+    this.retireSession=ports.sessions?.retire?.bind(ports.sessions)??null;
+    this.#settlementFactoryRoot = settlementFactorySource(ports.sessions);
+    this.#friendshipRawState = ports.state;
+    this.battleStatePort = {read:()=>ports.state.read(),replace:next=>{this.assertNoFriendshipWrite();this.#friendshipRevision++;ports.state.replace(next);}};
+    this.ports = {...ports,state:{read:()=>ports.state.read(),replace:next=>{this.assertNoFriendshipWrite();const problems=validateGameContent(next,ports.content().content);if(problems.length)throw new Error(`invalid next state: ${problems[0]!.path} ${problems[0]!.message}`);this.#friendshipRevision++;ports.state.replace(next);this.inventory?.stateChanged(next);}}};
+    const contentPort = ports.content;
+    this.ports.content = () => {
+      const result = contentPort.call(this.ports), admission = this.#currentSettlementAdmission;
+      if (admission?.source?.mode === "required") {
+        const identity = validatedContentIdentity(result.content);
+        if (!admission.contentObserved) { admission.contentObserved = true; admission.contentIdentity = identity; }
+        else if (identity !== admission.contentIdentity) admission.invalid = true;
+      }
+      return result;
+    };
+    registerLegacyAdmissionRoot(this, {
+      open: (battleId, options) => this.openLegacyProducer(battleId, options),
+      commit: (battleId, options) => {
+        const handle = this.openLegacyProducer(battleId, options), context = this.battleContexts.get(handle)!;
+        try {
+          const raw = handle.result(); assertBattleResultShape(raw); this.assertBattleContext(context, true);
+          if (raw.battleId !== battleId) throw new Error("legacy-producer-battle-id-mismatch");
+          return this.commitResultWithContext(clone(raw), context, handle as S);
+        } catch (error) {
+          if (context.generation === this.generation && this.battleCommitOwner === context && this.reception?.context !== context
+            && !this.preparedBattles.get(context)?.indeterminate) {
+            this.terminatedBattles.add(context); this.battleCommitOwner = null;
+          }
+          throw error;
+        }
+      },
+    });
     this.limits = options.limits ?? DEFAULT_LIMITS;
     this.startMoney = options.startMoney ?? 3000;
     if (!Number.isSafeInteger(this.startMoney) || this.startMoney < 0) throw new Error("invalid-start-money");
     this.noMoneyLoss = options.noMoneyLoss ?? false;
-    this.capabilities = developmentCapabilities(options.capabilities);
+    this.capabilities = runtimeCapabilities(options.capabilities);
+    const developer = developmentCapabilities(options.capabilities);
+    this.legacyHeldRequested = developer.allowHeldItemSources || developer.allowExperimentalHeldItemBattle;
     this.depositHeal = options.depositHeal ?? false;
     this.profile = { ...(options.receivingProfile ?? { mode: 0, naming: 0 }) };
     if (![0, 1, 2].includes(this.profile.mode) || !Number.isSafeInteger(this.profile.naming) || this.profile.naming < 0) throw new Error("invalid receiving profile");
@@ -227,7 +295,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.describeHeldItem = options.describeHeldItem ?? ((id) => {
       const { content, dex } = this.ports.content();
       if (!content.meta?.showdownSourceChecked) throw new ReceivingRefused("held-item-source-unchecked");
-      return dex?.heldItem?.(id) ?? null;
+      return heldItemDescriptor(catalogOf(content), id, ref => dex?.heldItem?.(ref) ?? null);
     });
     this.management = new ManagementSession(this.ports.state, () => this.ports.content().content, { limits: this.limits, depositHeal: this.depositHeal, sourceAllowed: this.capabilities.allowHeldItemSources, describeItem: this.describeHeldItem });
     this.pokedex = new PokedexOperation({ state: this.battleStatePort, content: this.ports.content, generation: () => this.generation,
@@ -312,8 +380,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         moreOften: resolveConfig(content.settings).SHOW_NEW_SPECIES_POKEDEX_ENTRY_MORE_OFTEN }) };
   }
   get pendingPokedex() { return this.pokedex.view; }
-  beginSummaryPokedex(parentToken:string,memberId:string):DexResolution {return this.pokedex.beginSummary(parentToken,memberId);}
-  updatePokedex(command: DexViewingCommand): DexResolution { return this.pokedex.begin(command); }
+  beginSummaryPokedex(parentToken:string,memberId:string):DexResolution { this.assertNoFriendshipWrite();return this.pokedex.beginSummary(parentToken,memberId);}
+  updatePokedex(command: DexViewingCommand): DexResolution { this.assertNoFriendshipWrite(); return this.pokedex.begin(command); }
   /** Read-only directory from the source-checked adapter, never inferred from species currently in the dex. */
   pokedexSearchDirectory(locale: string) {
     const generation = this.generation, source = this.ports.content();
@@ -349,7 +417,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (generation !== this.generation || current?.token !== token || current.revision !== revision) throw Error("stale-trade-entry-query");
     return pokedexEntryWithMeasurements(info, locale);
   }
-  resolvePokedex(token: string, revision: number, decision: DexDecision) {
+  resolvePokedex(token: string, revision: number, decision: DexDecision) { this.assertNoFriendshipWrite();
     const generation = this.generation, before = this.pokedex.view, outcome = this.pokedex.resolve(token, revision, decision);
     if (generation !== this.generation) return { status: "refused" as const, reason: "stale-pokedex-operation" };
     if (outcome.status === "pending" || outcome.status === "refused" || !before) return outcome;
@@ -379,19 +447,19 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const { content, dex } = this.ports.content();
     return learningMoveView(content, dex, id);
   }
-  beginLearning(intent: LearningIntent, parent?: LearningParent) { return this.learning.begin(intent, parent); }
-  resolveLearning(token: string, revision: number, decision: LearningDecision) { return this.learning.resolve(token, revision, decision); }
+  beginLearning(intent: LearningIntent, parent?: LearningParent) { this.assertNoFriendshipWrite(); return this.learning.begin(intent, parent); }
+  resolveLearning(token: string, revision: number, decision: LearningDecision) { this.assertNoFriendshipWrite(); return this.learning.resolve(token, revision, decision); }
   get pendingTrade() { return this.trade.view; }
-  beginTrade(requestId: string, intent: TradeIntent) { return this.trade.begin(requestId, intent); }
-  resolveTrade(token: string, revision: number, decision: TradeDecision) { return this.trade.resolve(token, revision, decision); }
+  beginTrade(requestId: string, intent: TradeIntent) { this.assertNoFriendshipWrite(); return this.trade.begin(requestId, intent); }
+  resolveTrade(token: string, revision: number, decision: TradeDecision) { this.assertNoFriendshipWrite(); return this.trade.resolve(token, revision, decision); }
   tradeCandidates(requiredSpecies?: string) {
     const game = this.ports.state.read(), world = clone(this.ports.itemWorld?.() ?? {});
     return tradeCandidateViews(game, world, requiredSpecies);
   }
   get pendingTriggeredEvolution() { return this.triggered.view; }
-  beginEvolutionItem(parent: string, requestId: string, intent: EvolutionItemIntent) { return this.triggered.beginItem(parent, requestId, intent); }
-  beginEventEvolution(intent: EventEvolutionIntent = {}) { return this.triggered.beginEvent(intent); }
-  resolveTriggeredEvolution(token: string, revision: number, decision: TriggeredDecision) { return this.triggered.resolve(token, revision, decision); }
+  beginEvolutionItem(parent: string, requestId: string, intent: EvolutionItemIntent) { this.assertNoFriendshipWrite(); return this.triggered.beginItem(parent, requestId, intent); }
+  beginEventEvolution(intent: EventEvolutionIntent = {}) { this.assertNoFriendshipWrite(); return this.triggered.beginEvent(intent); }
+  resolveTriggeredEvolution(token: string, revision: number, decision: TriggeredDecision) { this.assertNoFriendshipWrite(); return this.triggered.resolve(token, revision, decision); }
   private evolutionOutcome(outcome: BattleOutcome & { result?: BattleResult }, resolved: EvolutionResolution): BattleOutcome & { result?: BattleResult } {
     if (resolved.status === "refused") return { ...outcome, error: resolved.reason };
     const next = { ...clone(outcome), ...(resolved.diagnostics.length ? { diagnostics: [...new Set([...(outcome.diagnostics ?? []), ...resolved.diagnostics])] } : {}) };
@@ -400,7 +468,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (resolved.status === "technically-terminated") next.diagnostics = [...(next.diagnostics ?? []), "战后进化后续已技术终止，已提交战果保留"];
     return next;
   }
-  resolveEvolution(token: string, revision: number, decision: EvolutionDecision): (BattleOutcome & { result?: BattleResult }) | TriggeredEvolutionOutcome | TradeOutcome | { status: "refused"; reason: string } {
+  resolveEvolution(token: string, revision: number, decision: EvolutionDecision): (BattleOutcome & { result?: BattleResult }) | TriggeredEvolutionOutcome | TradeOutcome | { status: "refused"; reason: string } { this.assertNoFriendshipWrite();
     if (this.trade.matchesContinuation(token)) return this.trade.resolveEvolution(token, revision, decision);
     if (this.triggered.matchesContinuation(token)) return this.triggered.resolveContinuation(token, revision, decision);
     const completion = this.evolutionCompletion;
@@ -413,32 +481,32 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     return outcome;
   }
 
-  beginInventoryOperation(kind:'bag'|'item'|'shop'='bag',parent?:InventoryParent):string { return this.inventory.begin(kind,parent); }
-  endInventoryOperation(token:string):InventoryOutcome { return this.inventory.end(token); }
+  beginInventoryOperation(kind:'bag'|'item'|'shop'='bag',parent?:InventoryParent):string { this.assertNoFriendshipWrite(); return this.inventory.begin(kind,parent); }
+  endInventoryOperation(token:string):InventoryOutcome { this.assertNoFriendshipWrite(); return this.inventory.end(token); }
   inventorySnapshot(token:string,filter?:Parameters<InventorySession['snapshot']>[1]) { return this.inventory.snapshot(token,filter); }
   queryInventoryItemQuantity(token:string,itemId:string):number { return this.inventory.quantity(token,itemId); }
   inventoryTicket(token:string,pocket:number,index:number) { return this.inventory.ticket(token,pocket,index); }
-  inventoryRequest(token:string,requestId:string,request:InventoryRequest,present?:(outcome:InventoryOutcome)=>void):InventoryOutcome { return this.inventory.execute(token,requestId,request,present); }
-  beginInventorySort(token:string,pocket:number,index:number,filtered=false):InventoryOutcome { return this.inventory.beginSort(token,pocket,index,filtered); }
-  moveInventorySort(token:string,to:number):InventoryOutcome { return this.inventory.moveSort(token,to); }
-  endInventorySort(token:string,cancel=false):InventoryOutcome { return this.inventory.endSort(token,cancel); }
+  inventoryRequest(token:string,requestId:string,request:InventoryRequest,present?:(outcome:InventoryOutcome)=>void):InventoryOutcome { this.assertNoFriendshipWrite(); return this.inventory.execute(token,requestId,request,present); }
+  beginInventorySort(token:string,pocket:number,index:number,filtered=false):InventoryOutcome { this.assertNoFriendshipWrite(); return this.inventory.beginSort(token,pocket,index,filtered); }
+  moveInventorySort(token:string,to:number):InventoryOutcome { this.assertNoFriendshipWrite(); return this.inventory.moveSort(token,to); }
+  endInventorySort(token:string,cancel=false):InventoryOutcome { this.assertNoFriendshipWrite(); return this.inventory.endSort(token,cancel); }
   queryItemUse(token:string,itemId:string,quantity=1,memberId?:string) { return this.inventory.queryUse(token,itemId,quantity,memberId); }
-  beginMoneyShop(input:Parameters<InventorySession['configureShop']>[1]):string {const token=this.inventory.begin('shop');try{this.inventory.configureShop(token,input);return token;}catch(error){this.inventory.end(token);throw error;}}
+  beginMoneyShop(input:Parameters<InventorySession['configureShop']>[1]):string { this.assertNoFriendshipWrite();const token=this.inventory.begin('shop');try{this.inventory.configureShop(token,input);return token;}catch(error){this.inventory.end(token);throw error;}}
   shopView(token:string){return this.inventory.shopView(token);}
   shopQuote(token:string,itemId:string,selling=false){return this.inventory.quote(token,itemId,selling);}
-  setShopPrices(token:string,itemId:string,buy:number,sell?:number):void{this.inventory.setPrices(token,itemId,buy,sell);}
-  clearShopPrices(token:string):void{this.inventory.clearPrices(token);}
-  beginItemSelection(...args:Parameters<InventorySession['beginSelection']>){return this.inventory.beginSelection(...args);}
+  setShopPrices(token:string,itemId:string,buy:number,sell?:number):void{ this.assertNoFriendshipWrite();this.inventory.setPrices(token,itemId,buy,sell);}
+  clearShopPrices(token:string):void{ this.assertNoFriendshipWrite();this.inventory.clearPrices(token);}
+  beginItemSelection(...args:Parameters<InventorySession['beginSelection']>){ this.assertNoFriendshipWrite();return this.inventory.beginSelection(...args);}
   itemSelectionView(...args:Parameters<InventorySession['selectionView']>){return this.inventory.selectionView(...args);}
-  browseItemSelection(...args:Parameters<InventorySession['selectionBrowse']>){return this.inventory.selectionBrowse(...args);}
-  finishItemSelection(...args:Parameters<InventorySession['finishSelection']>){return this.inventory.finishSelection(...args);}
-  tossItems(...args:Parameters<InventorySession['toss']>){return this.inventory.toss(...args);}
+  browseItemSelection(...args:Parameters<InventorySession['selectionBrowse']>){ this.assertNoFriendshipWrite();return this.inventory.selectionBrowse(...args);}
+  finishItemSelection(...args:Parameters<InventorySession['finishSelection']>){ this.assertNoFriendshipWrite();return this.inventory.finishSelection(...args);}
+  tossItems(...args:Parameters<InventorySession['toss']>){ this.assertNoFriendshipWrite();return this.inventory.toss(...args);}
   queryBadges(index?:number):{count:number;owned?:boolean}{const game=this.ports.state.read();return {count:badgeCount(game.badges),...(index===undefined?{}:{owned:hasBadge(game.badges,index)})};}
   hasBoxLink():boolean {return this.inventory.hasBoxLink();}
   heldItemSourcesEnabled():boolean {return this.capabilities.allowHeldItemSources;}
 
   /** A new game: the formal empty state (no members; the player receives them through grants). Throws only if the store refuses. */
-  startNewGame(): { status: "started"; state: GameState } {
+  startNewGame(): { status: "started"; state: GameState } { this.assertNoFriendshipWrite();
     const random = this.ports.random;
     if (!random) throw new Error("no-random: a new player's trainer ID needs an injected random source");
     const content = this.ports.content().content;
@@ -450,20 +518,20 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   /** Give a content grant once per save timeline. Never throws; a refusal commits nothing (and writes no claim). */
-  claimGrant(grantId: string, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): ClaimOutcome {
+  claimGrant(grantId: string, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): ClaimOutcome { this.assertNoFriendshipWrite();
     const refused = (reason: string, error: unknown): ClaimOutcome => ({ status: "refused", grantId, reason, error: message(error) });
     if (this.reception?.grantId === grantId) return { status: "pending", grantId, token: this.reception.context.token };
     if (this.battleBusy || this.management.active || this.reception || this.inventory.active) return refused(this.battleBusy ? "battle-active" : "operation-active", "another operation is open");
     return this.acquisition.claimGrant(grantId, options);
   }
 
-  receiveGift(request: GiftRequest, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): GiftOutcome {
+  receiveGift(request: GiftRequest, options: { decisions?: Record<string, ReceivingDecision>; profile?: ReceivingProfile } = {}): GiftOutcome { this.assertNoFriendshipWrite();
     if (this.battleBusy || this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "operation-active" };
     return this.acquisition.receiveGift(request, options);
   }
 
   /** Discard only a proved uninstalled acquisition. An installed result is acknowledged, never rolled back. */
-  terminateAcquisition(token: string): { status: "aborted" | "already-installed" | "refused" | "reload-required"; reason?: string } {
+  terminateAcquisition(token: string): { status: "aborted" | "already-installed" | "refused" | "reload-required"; reason?: string } { this.assertNoFriendshipWrite();
     const pending = this.reception;
     if (!pending || pending.context.token !== token || pending.context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
     if (!this.acquisition.hasPrepared(pending.context)) return { status: "refused", reason: "not-an-acquisition" };
@@ -502,7 +570,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     return { ...clone(options), profile, token: `receive:${this.generation}:${++this.operationSequence}`, generation: this.generation };
   }
   get pendingReceiving(): { token: string; members: Member[]; profile: ReceivingProfile } | null { return this.reception ? { token: this.reception.context.token, members: clone(this.reception.members), profile: { ...(this.reception.context.profile ?? this.profile) } } : null; }
-  resolveReceiving(token: string, decisions: Record<string, ReceivingDecision> = {}, signal?: "scene-aborted" | "rebuild-failed"): ReturnType<ReceptionPending["resume"]> {
+  resolveReceiving(token: string, decisions: Record<string, ReceivingDecision> = {}, signal?: "scene-aborted" | "rebuild-failed"): ReturnType<ReceptionPending["resume"]> { this.assertNoFriendshipWrite();
     const receipt = this.receptionReceipts.get(token); if (receipt) return clone(receipt);
     const pending = this.reception;
     if (!pending || pending.context.token !== token || pending.context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
@@ -529,7 +597,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   /** Technical termination of a proved zero-write battle attempt. It never rolls back an installed primary result. */
-  terminateBattleCommit(token: string): { status: "aborted" | "refused" | "reload-required"; reason?: string } {
+  terminateBattleCommit(token: string): { status: "aborted" | "refused" | "reload-required"; reason?: string } { this.assertNoFriendshipWrite();
     const context = this.battleCommitOwner;
     if (!context || context.token !== token || context.generation !== this.generation) return { status: "refused", reason: "stale-operation" };
     const prepared = this.preparedBattles.get(context);
@@ -558,7 +626,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   /** Heal the party (HP, status, PP). Safe to repeat: an already healed party writes nothing. Never throws. */
-  healParty(): HealOutcome {
+  healParty(): HealOutcome { this.assertNoFriendshipWrite();
     if (this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "management-active" };
     if (this.battleBusy) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
     let game: GameState;
@@ -568,6 +636,114 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (JSON.stringify(next.party) === JSON.stringify(game.party)) return { status: "unchanged" };
     try { this.ports.state.replace(next); } catch (error) { return { status: "refused", reason: "commit-failed", error: message(error) }; }
     return { status: "healed" };
+  }
+
+  /** Read-only preview over an application-owned plan and an explicitly selected persistence adapter. */
+  async previewFriendshipMigration(persistence: FriendshipPersistencePort, paths?: readonly string[]): Promise<FriendshipApplicationPreview | FriendshipApplicationResult> {
+    this.assertNoFriendshipWrite();
+    if (this.encounterBlocked || this.saveBlocked) return {status:"refused",reason:"operation-active"};
+    const owner = {invalid:false}; this.#friendshipOwner = owner;
+    try {
+      const generation = this.generation, revision = this.#friendshipRevision, content = this.ports.content().content;
+      const contentHash = semanticFingerprint(JSON.parse(JSON.stringify(content)) as unknown);
+      const current = snapshotForSave(this.ports.state.read(),content);
+      if (!current.ok) throw Error("friendship-state-invalid");
+      const before = friendshipMigrationSnapshot(current.state);
+      const target = clone(await persistence.preview());
+      if (owner.invalid || generation !== this.generation || revision !== this.#friendshipRevision || this.ports.content().content !== content || semanticFingerprint(JSON.parse(JSON.stringify(content)) as unknown) !== contentHash
+        || friendshipMigrationSnapshot(this.ports.state.read()) !== before || owner.invalid) throw Error("friendship-preview-stale");
+      if (friendshipMigrationSnapshot(target.state) !== before) throw Error("friendship-selected-save-mismatch");
+      const preview = planPlayerFriendshipMigration(current.state,paths);
+      if (preview.status !== "ready") throw Error(preview.reason);
+      const handle = Object.freeze({}) as FriendshipMigrationHandle;
+      this.#friendshipPreviews.set(handle,{generation,revision,content,contentHash,before,target,plan:preview.plan,persistence});
+      return {status:"ready",handle,target:target.target,rawHash:target.rawHash,planHash:preview.plan.planHash,
+        targets:clone(preview.plan.targets),candidates:clone(preview.plan.candidates),outOfScope:clone(preview.plan.outOfScope)};
+    } catch (error) { return {status:"refused",reason:"preview-rejected",error:message(error)}; }
+    finally { if (this.#friendshipOwner === owner) this.#friendshipOwner = null; }
+  }
+  cancelFriendshipMigration(handle: FriendshipMigrationHandle): FriendshipApplicationResult {
+    this.assertNoFriendshipWrite();
+    const preview = this.#friendshipPreviews.get(handle);
+    if (!preview) return {status:"refused",reason:"unknown-preview"};
+    // This describes the historical operation, without making a claim about a subsequently loaded save.
+    // Retain the handle so repeated confirmation still performs its full current-state verification.
+    if (preview.result) return {status:"refused",reason:"preview-completed"};
+    this.#friendshipPreviews.delete(handle);
+    return {status:"cancelled"};
+  }
+  /** Confirm only the opaque handle. Caller-supplied plans, signatures and candidates confer no authority. */
+  async confirmFriendshipMigration(handle: FriendshipMigrationHandle): Promise<FriendshipApplicationResult> {
+    this.assertNoFriendshipWrite();
+    const preview = this.#friendshipPreviews.get(handle);
+    if (!preview) return {status:"refused",reason:"unknown-preview"};
+    if (this.encounterBlocked || this.saveBlocked) return {status:"refused",reason:"operation-active"};
+    const owner = {invalid:false}; this.#friendshipOwner = owner;
+    let committed = false, release = true;
+    let persisted: FriendshipPersistenceResult | undefined;
+    const assertCurrent = () => {
+      const content = this.ports.content().content;
+      const contentHash = semanticFingerprint(JSON.parse(JSON.stringify(content)) as unknown);
+      const before = friendshipMigrationSnapshot(this.ports.state.read());
+      if (owner.invalid || this.#friendshipOwner !== owner || preview.generation !== this.generation || preview.revision !== this.#friendshipRevision || content !== preview.content
+        || contentHash !== preview.contentHash || before !== preview.before) throw Error("friendship-confirmation-stale");
+    };
+    try {
+      if (preview.result) {
+        const now = await preview.persistence.preview();
+        if (preview.generation !== this.generation || preview.revision !== this.#friendshipRevision || this.ports.content().content !== preview.content
+          || semanticFingerprint(JSON.parse(JSON.stringify(preview.content)) as unknown) !== preview.contentHash
+          || friendshipMigrationSnapshot(this.ports.state.read()) !== preview.plan.afterSnapshot
+          || friendshipMigrationSnapshot(now.state) !== preview.plan.afterSnapshot || now.target !== preview.target.target
+          || now.rawHash !== preview.result.persistence?.rawHash || now.hostIdentity !== preview.completedHostIdentity || owner.invalid) throw Error("friendship-replay-stale");
+        return clone({...preview.result,status:preview.result.status === "unchanged" ? "unchanged" : "already-applied"});
+      }
+      assertCurrent();
+      const target = clone(await preview.persistence.preview()); assertCurrent();
+      if (friendshipMigrationSnapshot(target) !== friendshipMigrationSnapshot(preview.target)) throw Error("friendship-selected-save-stale");
+      const applied = applyPlayerFriendshipMigration(JSON.parse(preview.before) as unknown,preview.plan,{planHash:preview.plan.planHash,targetPaths:preview.plan.targets.map(t=>t.path)});
+      if (applied.status === "refused") throw Error(applied.reason);
+      const candidate = snapshotForSave(applied.data,preview.content);
+      if (!candidate.ok || friendshipMigrationSnapshot(candidate.state) !== preview.plan.afterSnapshot) throw Error("friendship-candidate-invalid");
+      if (applied.status === "unchanged") {
+        const result: FriendshipApplicationResult = {status:"unchanged",persistence:{status:"committed",rawHash:target.rawHash}};
+        preview.result = result; preview.completedHostIdentity = target.hostIdentity; return clone(result);
+      }
+      try { persisted = await preview.persistence.commit({before:clone(preview.target),next:clone(candidate.state),plan:clone(preview.plan),receipt:clone(applied.receipt),contentHash:preview.contentHash,contentIdentity:validatedContentIdentity(preview.content),assertCurrent}); }
+      catch (error) { release = false; return {status:"reload-required",reason:"persistence-unknown",persistence:{status:"unknown",error:message(error)},error:message(error)}; }
+      if (persisted.status === "unknown") { release = false; return {status:"reload-required",reason:"persistence-unknown",persistence:persisted}; }
+      if (persisted.status === "not-committed") return {status:"refused",reason:"persistence-not-committed",persistence:persisted};
+      committed = true;
+      assertCurrent();
+      const installedFile = await preview.persistence.preview(); assertCurrent();
+      if (installedFile.target !== preview.target.target || installedFile.rawHash !== persisted.rawHash || installedFile.hostIdentity !== preview.target.hostIdentity || friendshipMigrationSnapshot(installedFile.state) !== preview.plan.afterSnapshot) throw Error("friendship-persistence-readback-mismatch");
+      let installError: unknown;
+      try { this.#friendshipRawState.replace(clone(candidate.state)); } catch (error) { installError = error; }
+      if (owner.invalid || preview.generation !== this.generation || this.ports.content().content !== preview.content
+        || semanticFingerprint(JSON.parse(JSON.stringify(preview.content)) as unknown) !== preview.contentHash
+        || friendshipMigrationSnapshot(this.#friendshipRawState.read()) !== preview.plan.afterSnapshot || owner.invalid) throw Error("friendship-install-readback-mismatch");
+      const completed = await preview.persistence.preview();
+      if (owner.invalid || preview.generation !== this.generation || this.ports.content().content !== preview.content
+        || semanticFingerprint(JSON.parse(JSON.stringify(preview.content)) as unknown) !== preview.contentHash
+        || friendshipMigrationSnapshot(this.#friendshipRawState.read()) !== preview.plan.afterSnapshot
+        || completed.target !== preview.target.target || completed.rawHash !== persisted.rawHash
+        || friendshipMigrationSnapshot(completed.state) !== preview.plan.afterSnapshot || owner.invalid) throw Error("friendship-completed-host-unverified");
+      preview.completedHostIdentity = completed.hostIdentity;
+      this.#friendshipRevision++; preview.revision = this.#friendshipRevision;
+      this.inventory.stateChanged(candidate.state);
+      const result: FriendshipApplicationResult = {status:"applied",persistence:persisted,...(installError?{error:message(installError)}:{})};
+      preview.result = clone(result);
+      return result;
+    } catch (error) {
+      if (committed) { release = false; return {status:"reload-required",reason:"committed-install-unverified",persistence:persisted,error:message(error)}; }
+      return {status:"refused",reason:"confirmation-rejected",error:message(error)};
+    } finally { if (release && this.#friendshipOwner === owner) { this.#friendshipOwner = null; if (owner.invalid && !preview.result) this.#friendshipPreviews.delete(handle); } }
+  }
+  /** Host must call BEFORE replacing any host objects, including asynchronous load callbacks. */
+  assertHostStateReplacementAllowed(): void { this.assertNoFriendshipWrite(); }
+  get friendshipMigrationPending(): boolean { return !!this.#friendshipOwner; }
+  private assertNoFriendshipWrite(): void {
+    if (this.#friendshipOwner) { this.#friendshipOwner.invalid = true; throw Error("friendship-migration-active"); }
   }
 
   /** Root management sessions may contain independent edits and one pending movement chain. */
@@ -595,16 +771,16 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (!this.capabilities.allowHeldItemSources) throw new Error("held-item-source-disabled");
     return Object.entries(aggregateBag(this.ports.state.read().inventory)).filter(([id, count]) => { const item = this.describeHeldItem(id); return count > 0 && item?.holdable && !item.mail; }).map(([id, count]) => ({ id, count }));
   }
-  beginManagement(): string { if (this.battleBusy || this.reception || this.inventory.active) throw new Error("operation-active"); return this.management.begin(); }
-  manage(token: string, requestId: string, request: ManagementRequest): ManagementOutcome {
+  beginManagement(): string { this.assertNoFriendshipWrite(); if (this.battleBusy || this.reception || this.inventory.active) throw new Error("operation-active"); return this.management.begin(); }
+  manage(token: string, requestId: string, request: ManagementRequest): ManagementOutcome { this.assertNoFriendshipWrite();
     if (this.battleBusy) return { status: "refused", reason: "battle-active" };
     return this.management.execute(token, requestId, request);
   }
-  endManagement(token: string): ManagementOutcome { return this.management.end(token); }
+  endManagement(token: string): ManagementOutcome { this.assertNoFriendshipWrite(); return this.management.end(token); }
   heldMemberReference(token: string): MemberReference | null { return this.management.heldReference(token); }
   get encounterBlocked(): boolean { return this.battleBusy || !!this.reception || this.management.active || this.inventory.active; }
   get saveBlocked(): boolean { return this.battleBusy || !!this.reception || this.management.saveBlocked || this.inventory.saveBlocked; }
-  recoverAll(): HealOutcome {
+  recoverAll(): HealOutcome { this.assertNoFriendshipWrite();
     if (this.battleBusy || this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: this.battleBusy ? "battle-active" : "management-active" };
     try { const game = this.ports.state.read(); const next = recoverAll(game, this.ports.content().content, this.depositHeal); if (JSON.stringify(next) === JSON.stringify(game)) return { status: "unchanged" }; this.ports.state.replace(next); return { status: "healed" }; }
     catch (error) { return { status: "refused", reason: "invalid", error: message(error) }; }
@@ -625,7 +801,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   }
 
   /** Count steps the player took (WP06 §4.1: the global counter, wrapping at 2^31). The host applies the guards of that step. */
-  recordSteps(n = 1): StepsOutcome {
+  recordSteps(n = 1): StepsOutcome { this.assertNoFriendshipWrite();
     if (this.management.active || this.reception || this.inventory.active) return { status: "refused", reason: "management-active" };
     if (this.battleBusy) return { status: "refused", reason: "battle-active", error: "a battle is open: its result would overwrite the state" };
     let game: GameState;
@@ -641,8 +817,11 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * still open belongs to the replaced state: its operation is released (otherwise grants, heals and battles would stay
    * refused for good, final review P4-2), and its session, should it still finish, commits nothing.
    */
-  stateReplacedByHost(): void {
+  stateReplacedByHost(): void { this.assertNoFriendshipWrite();
+    const retiring=this.op?.session;
     this.generation++;
+    if (this.#currentSettlementAdmission) this.#currentSettlementAdmission.invalid = true;
+    this.#currentSettlementAdmission = null;
     this.acquisition.invalidate();
     this.op = null;
     this.battleCommitOwner = null;
@@ -656,6 +835,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.reception = null;
     this.receptionReceipts.clear();
     this.receptionNotices.clear();
+    if(retiring)try{this.retireSession?.(retiring);}catch{/* generation already retired; host completion stays authoritative */}
   }
 
   /**
@@ -666,61 +846,134 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * Only one battle at a time: while another is open (also while its session is still being created) this throws. When
    * the battle is aborted before its session exists, a session that arrives later is not kept or returned (rejects).
    */
-  async startBattle(request: BattleStartRequest): Promise<S> {
+  /** Stable id + author-version query; C/D receive projections only, not behavior claims. */
+  trainerRecord(id: string, version: number): TrainerBattleProjection | null {
+    if (typeof id !== "string" || !Number.isSafeInteger(version) || version < 0 || version > 255) throw new Error("invalid trainer record identity");
+    const found = findTrainerRecord(this.ports.content().content, id, version);
+    return found ? trainerBattleProjection(found.record, found.type) : null;
+  }
+
+  async startTrainerBattle(request: TrainerBattleStartRequest): Promise<S> { this.assertNoFriendshipWrite();
+    const initialField = captureInitialField(request);
+    return this.startBattle({ ...request, initialField, kind: "trainer", foes: [], trainer: { ...request.trainer } });
+  }
+
+  async startBattle(request: BattleStartRequest): Promise<S> { this.assertNoFriendshipWrite();
     if (this.management.active || this.reception || this.inventory.active) throw new Error("operation-active");
     if (this.op) throw new Error(`a battle is already open (${this.op.battleId})`);
     if (this.battleCommitOwner) throw new Error("battle-commit-active");
     if (this.evolutions.active) throw new Error("evolution-operation-active");
     if (this.battleBusy) throw new Error("operation-active");
+    const initialField = captureInitialField(request);
     const generation = this.generation;
-    const op: { battleId: string; session: S | null; facts: BattleFacts } = { battleId: request.battleId, session: null, facts: { kind: request.kind, canLose: !!request.canLose } };
+    // The mode is fixed before the first host callback. Returning a handle or omitting a method cannot downgrade it.
+    const settlementSource = this.#settlementFactoryRoot;
+    const op: { battleId: string; session: S | null; facts: BattleFacts } = { battleId: request.battleId, session: null, facts: { kind: request.kind, canLose: !!request.canLose, moneyGain: true } };
     this.op = op; // reserve before synchronous host ports, not merely before the first await
+    const admission: SettlementAdmission = { source: settlementSource, generation, battleId: op.battleId, contentIdentity: null,
+      roster: [], wild: op.facts.kind === "wild", handle: null, invalid: false, read: false, contentObserved: false };
+    this.#currentSettlementAdmission = admission;
     const assertCurrent = () => { if (this.op !== op || this.generation !== generation) throw new Error(`battle ${request.battleId} was aborted while its session was being created; the late session is not used`); };
     try {
+      const canSwitch = request.canSwitch; assertCurrent();
+      if (canSwitch !== undefined && typeof canSwitch !== "boolean") throw new Error("canSwitch must be boolean when provided");
+      const battleStyle = request.battleStyle; assertCurrent();
+      if (battleStyle !== undefined && battleStyle !== "switch" && battleStyle !== "set") throw new Error("battleStyle must be switch or set when provided");
+      const expGain = request.expGain; assertCurrent();
+      if (expGain !== undefined && typeof expGain !== "boolean") throw new Error("expGain must be boolean when provided");
+      const moneyGain = request.moneyGain; assertCurrent();
+      if (moneyGain !== undefined && typeof moneyGain !== "boolean") throw new Error("moneyGain must be boolean when provided");
+      op.facts.moneyGain = moneyGain ?? true;
       const game = this.ports.state.read(); assertCurrent();
-      op.facts.experimentalHeld = game.party.some(m => !!m.item);
       if (!this.capabilities.allowExperimentalHeldItemBattle && game.party.some((m) => !!m.item)) throw new Error("held-item-battle-disabled: battle item write-back is incomplete");
+      if (settlementSource?.mode === "legacy-no-held" && (this.legacyHeldRequested || game.party.some(m => !!m.item))) throw new Error("legacy-no-held-source-gate");
       const { content, dex } = this.ports.content(); assertCurrent();
+      const trainer = request.trainer ? findTrainerRecord(content, request.trainer.id, request.trainer.version) : null;
+      if (request.trainer && (request.kind !== "trainer" || !trainer)) throw new Error(`missing trainer record "${request.trainer.id}" version ${request.trainer.version}`);
+      if (trainer) op.facts.trainer = { projection: trainerBattleProjection(trainer.record, trainer.type), levels: trainer.record.party.map(member => member.level) };
+      assertCurrent();
       const dangling = findDanglingReferences(game, content, dex); assertCurrent();
       if (dangling.length) throw new Error("the save refers to content that no longer exists: " + dangling.slice(0, 3).map((d) => `${d.path} ${d.message}`).join("; "));
       if (!game.party.some((m) => !m.isEgg && m.hp > 0)) throw new Error("no party member can battle");
       const sourceRandom = this.ports.random;
       if (!sourceRandom) throw new Error("no random source is configured for this application (needed to create the foes)");
       const random = (n: number) => { assertCurrent(); const value = sourceRandom(n); assertCurrent(); return value; };
-      if (!request.foes.length) throw new Error("a battle needs at least one foe");
+      if (!trainer && !request.foes.length) throw new Error("a battle needs at least one foe");
       const templates: Record<string, Member> = {};
       let ordinal = game.nextMemberOrdinal;
       const taken = new Set(allMembers(game).map((m) => m.id));
+      const allocate = (): string => { const allocated = allocateMemberId(ordinal, taken); ordinal = allocated.nextMemberOrdinal; taken.add(allocated.id); return allocated.id; };
       const createdAt = Math.floor(this.now() / 1000); assertCurrent();
       const creationContext = this.ports.creationContext?.() ?? {}; assertCurrent();
-      const foes: Member[] = request.foes.map((f, i) => {
+      const foes: Member[] = [];
+      if (trainer) {
+        if (!content.registrationOrder || !content.trainerTypeOrder) throw new Error("trainer content requires explicit species and trainer-type registration orders");
+        const generatedOwner = personalId(random), ownerId = generatedOwner === game.player.id ? (generatedOwner ^ 1) >>> 0 : generatedOwner;
+        const owner = { id: ownerId, name: trainer.record.name, gender: trainer.type.gender, language: trainer.record.language ?? 2 };
+        const built = buildTrainerTeam({ content, registrationOrder: content.registrationOrder, trainerTypeOrder: content.trainerTypeOrder,
+          record: trainer.record, type: trainer.type, owner, random, receivedAt: createdAt, allocateId: () => allocate(), context: creationContext });
+        for (const [i, member] of built.entries()) {
+          if (!member.moves.length) throw new Error(`trainer foe ${i + 1}: ${member.species} at level ${member.level} knows no move`);
+          templates[member.id] = toPersistentMember(member, content);
+          foes.push(toBattleMember(templates[member.id]!, content));
+        }
+      } else for (const [i, f] of request.foes.entries()) {
         const species = resolveSpecies(content, f.species);
         if (!species) throw new Error(`foe ${i + 1}: species "${f.species}" is not in the content`);
-        const allocated = allocateMemberId(ordinal, taken); ordinal = allocated.nextMemberOrdinal; taken.add(allocated.id);
-        const m = createMember({ id: allocated.id, species, level: f.level, owner: game.player, context: { ...creationContext, receivedAt: createdAt, playerId: game.player.id } }, content, random);
+        const m = createMember({ id: allocate(), species, level: f.level, owner: game.player, context: { ...creationContext, receivedAt: createdAt, playerId: game.player.id } }, content, random);
         if (!m.moves.length) throw new Error(`foe ${i + 1}: ${species} at level ${f.level} knows no move in the content (its learnset has nothing at or below that level)`);
         templates[m.id] = toPersistentMember(m, content);
-        return toBattleMember(templates[m.id]!, content);
-      });
+        foes.push(toBattleMember(templates[m.id]!, content));
+      }
       assertCurrent();
+      const heldBattle = game.party.some(m => !!m.item) || foes.some(m => !!m.item);
+      if (heldBattle && !this.capabilities.allowExperimentalHeldItemBattle) throw new Error("held-item-battle-disabled: held battle capability required for either side");
+      for (const member of [...game.party, ...foes]) if (member.item) {
+        const item = heldItemDescriptor(catalogOf(content), member.item, id => dex?.heldItem?.(id) ?? null); assertCurrent();
+        if (!item) throw new Error(`unsupported battle held item ${member.item}; use a canonical held item id allowed by the author; take the item off the member before battling`);
+      }
       const context = this.newReceptionContext({ templates, decisions: {}, profile: request.forceParty ? { ...this.profile, mode: 2 } : this.profile, nextMemberOrdinal: ordinal });
       const full = storageFull(game, this.limits);
       const forcedNoRoom = context.profile?.mode === 2 && !Object.values(templates).every((member) => hasForcedPartyPlan(game, member, { limits: this.limits, content, profile: context.profile!, depositHeal: this.depositHeal }));
-      const diagnostics = [...(forcedNoRoom ? ["forced-party-no-target"] : []), ...(game.party.some((m) => !!m.item) ? ["战后持物写回未完成"] : [])];
-      const setup: BattleSetup = { foes, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full, ...(diagnostics.length ? { diagnostics } : {}), ...(game.party.some((m) => !!m.item) ? { experimentalHeldBattle: true } : {}) };
+      const diagnostics = [...(forcedNoRoom ? ["forced-party-no-target"] : [])];
+      const config = resolveConfig(content.settings), contentIdentity = validatedContentIdentity(content) ?? content.meta?.inputsHash ?? content.meta?.id ?? "anonymous-content";
+      const memberOwners = Object.fromEntries(game.party.map(member => {
+        if (!member.owner) throw new Error(`player member ${member.id} has no authoritative owner for obedience`);
+        return [member.id, { ...member.owner }];
+      }));
+      const setup: BattleSetup = { ...(initialField ? { initialField } : {}), foes, canSwitch: canSwitch ?? true, battleStyle: battleStyle ?? "switch", expGain: expGain ?? true, captureExpGain: config.GAIN_EXP_FOR_CAPTURE, noRun: !!request.noRun, noBall: !!request.noBall || full || forcedNoRoom, storageFull: full,
+        obedience: { player: { ...game.player }, members: memberOwners, badges: badgeCount(game.badges), anyHighLevel: config.ANY_HIGH_LEVEL_POKEMON_CAN_DISOBEY,
+          foreignHighLevel: config.FOREIGN_HIGH_LEVEL_POKEMON_CAN_DISOBEY, generation, contentIdentity },
+        // This host-facing DTO must never alias the private settlement facts.
+        ...(op.facts.trainer ? { trainer: clone(op.facts.trainer.projection), isCurrentBattle: () => this.op === op && this.generation === generation } : {}),
+        ...(diagnostics.length ? { diagnostics } : {}), ...(heldBattle ? { experimentalHeldBattle: true } : {}) };
       let mapId: number | undefined;
       try { mapId = this.ports.itemWorld?.().mapId ?? creationContext.map; } catch { /* optional companion context unavailable */ }
       assertCurrent(); // a swallowed optional-port failure must not swallow a timeline/owner replacement
       setup.evidenceContext = {
-        battleId: request.battleId, generation, contentIdentity: validatedContentIdentity(content) ?? content.meta?.inputsHash ?? content.meta?.id ?? "anonymous-content",
+        battleId: request.battleId, generation, contentIdentity,
         playerIds: game.party.map(m => m.id), initialLevels: Object.fromEntries(game.party.map(m => [m.id, m.level])),
         ...(Number.isSafeInteger(mapId) && mapId! >= 0 ? { mapId } : {}),
       };
       const view = battleView(game, content);
       view.party = view.party.filter((m) => !m.isEgg); // the session speaks Showdown names (protocol v1); the save keeps content ids
+      admission.roster = [
+          ...view.party.slice(0, 6).map(m => ({ id: m.id, side: "p1" as const, initial: m.item })),
+          ...foes.map(m => ({ id: m.id, side: "p2" as const, initial: m.item })),
+        ];
+      this.#settlementAdmissions.set(context, admission);
+      if (settlementSource?.mode === "required" && (!admission.contentIdentity || admission.invalid)) throw new Error("required-settlement-content-identity-unavailable-or-changed");
+      if (settlementSource?.mode === "legacy-no-held" && (this.legacyHeldRequested || admission.roster.some(m => !!m.initial))) throw new Error("legacy-no-held-source-gate");
       assertCurrent();
-      const session = await this.ports.sessions.create(request, view, setup);
+      // The required source sees the operation's captured kind/id, not fields a prior host callback changed.
+      // Explicit old adapters retain their historical request object contract.
+      const acceptedRequest = initialField ? withInitialField(request, initialField) : request;
+      const factoryRequest = settlementSource?.mode === "required" ? { ...withInitialField(acceptedRequest, initialField), battleId: op.battleId, kind: op.facts.kind } : acceptedRequest;
       assertCurrent();
+      const session = await (settlementSource ? settlementSource.create(factoryRequest, view, setup) : this.ports.sessions.create(factoryRequest, view, setup)) as S;
+      assertCurrent();
+      if (!claimSettlementHandle(session, this, context)) throw new Error("battle-handle-already-bound");
+      admission.handle = session;
       op.session = session;
       if (typeof session === "object" && session !== null) {
         this.bornIn.set(session, this.generation); this.battleContexts.set(session, context);
@@ -730,7 +983,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
         } });
       }
       return session;
-    } catch (error) { if (this.op === op) this.op = null; throw error; }
+    } catch (error) { if (this.op === op) { this.op = null; if (this.#currentSettlementAdmission) this.#currentSettlementAdmission.invalid = true; this.#currentSettlementAdmission = null; } throw error; }
   }
 
   /**
@@ -761,7 +1014,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * same battle is refused. Throws on a contract violation and then the state is exactly as it was. Without a battle
    * operation the application does not know the battle's kind, so no battle statistics are counted (finishBattle does).
    */
-  commitResult(result: BattleResult, options: BattleCommitOptions = {}): CommitResultStatus {
+  commitResult(result: BattleResult, options: BattleCommitOptions = {}): CommitResultStatus { this.assertNoFriendshipWrite();
     if (this.management.active || this.inventory.active) throw new Error("management-active");
     if (this.battleBusy) throw new Error("battle-active: use the current battle/receiving operation");
     if (this.reception) throw new Error("receiving-active: use its receiving token");
@@ -769,13 +1022,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const context = this.newReceptionContext(options);
     return this.commitResultWithContext(clone(result), context);
   }
-  private commitResultWithContext(result: BattleResult, context: ReceptionContext): CommitResultStatus {
-    try { const status = this.commit(result, undefined, context).status; if (status === "applied") this.pokedex.activate(context.token); return status; }
+  private commitResultWithContext(result: BattleResult, context: ReceptionContext, handle?: S): CommitResultStatus {
+    try { const status = this.commit(result, undefined, context, handle).status; if (status === "applied") this.pokedex.activate(context.token); return status; }
     catch (error) {
       this.assertBattleContext(context);
       if (error instanceof StateInstallFailed || error instanceof ReceivingRefused && error.reason === "pending") {
         const members = this.preparedBattles.get(context)?.captureMembers ?? [];
-        this.reception = { context, members: clone(members), resume: () => ({ status: this.commitResultWithContext(result, context) }) };
+        this.reception = { context, members: clone(members), resume: () => ({ status: this.commitResultWithContext(result, context, handle) }) };
         return "pending";
       }
       if (!(error instanceof ReceivingRefused)) throw error;
@@ -786,12 +1039,62 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     }
   }
 
+  private openLegacyProducer(battleId: string, options: BattleCommitOptions): BattleHandle {
+    const source = this.#settlementFactoryRoot;
+    if (source?.mode !== "legacy-no-held" || !source.legacyProduce) throw new Error("legacy-producer-not-selected-at-composition");
+    if (!battleId || typeof battleId !== "string") throw new Error("invalid-legacy-producer");
+    if (this.battleBusy || this.reception || this.management.active || this.inventory.active) throw new Error("operation-active");
+    if (this.legacyHeldRequested) throw new Error("legacy-no-held-source-gate");
+    const generation = this.generation, context = this.newReceptionContext(options);
+    if (this.battleBusy || this.reception || this.management.active || this.inventory.active || generation !== this.generation) throw new Error("operation-active");
+    this.battleCommitOwner = context;
+    const produce = source.legacyProduce;
+    let produced: BattleResult | undefined;
+    const handle: BattleHandle = { result: () => {
+      this.assertBattleContext(context);
+      if (produced) return clone(produced); // Original exact query never invokes a newer producer or needs fresh ownership.
+      this.assertBattleContext(context, true);
+      const game = this.ports.state.read(); this.assertBattleContext(context, true);
+      if (game.party.some(m => !!m.item)) { admission.invalid = true; throw new Error("legacy-no-held-source-gate"); }
+      admission.roster = game.party.filter(m => !m.isEgg).map(m => ({ id: m.id, side: "p1", initial: "" }));
+      const received = produce(battleId); assertBattleResultShape(received);
+      this.assertBattleContext(context, true);
+      produced = clone(received);
+      return clone(produced);
+    } };
+    const admission: SettlementAdmission = { source,
+      generation, battleId, contentIdentity: null, roster: [], wild: false, handle, invalid: false, read: false };
+    this.#settlementAdmissions.set(context, admission);
+    if (!claimSettlementHandle(handle, this, context)) throw new Error("battle-handle-already-bound");
+    this.battleContexts.set(handle, context); this.bornIn.set(handle, generation);
+    return handle;
+  }
+
+  /** Read only the source's already sealed final pair, once. No engine or newer content is consulted for replay. */
+  private readRequiredSettlement(admission: SettlementAdmission, hash: string, context: ReceptionContext, handle: S): void {
+    if (admission.source?.mode !== "required") return;
+    if (admission.invalid || admission.generation !== this.generation || admission.handle !== handle || !admission.contentIdentity) throw new Error("required-settlement-source-unknown-or-retired");
+    if (!admission.read) {
+      admission.read = true;
+      try {
+        const binding = { battleId: admission.battleId, generation: admission.generation, rawHash: hash, contentIdentity: admission.contentIdentity };
+        const sealed = admission.source.collect?.(handle, binding);
+        this.assertBattleContext(context);
+        if (admission.invalid) throw new Error("required-settlement-source-permanently-invalidated");
+        const resolved = resolveRequiredFacts(sealed, { binding, roster: admission.roster, wild: admission.wild });
+        if (!resolved.ok) throw new Error(resolved.reason);
+        admission.facts = resolved.facts; admission.pairHash = resolved.pairHash;
+      } catch (error) { admission.invalid = true; throw error; }
+    }
+    if (!admission.facts || admission.facts.binding.rawHash !== hash) { admission.invalid = true; throw new Error("required-settlement-paired-result-changed"); }
+  }
+
   /**
    * One state replacement per result: the result (species mapped to persistent keys through the content, D5-3), for a
    * lost or drawn battle the defeat settlement (money loss and party heal, D3), and the battle statistics. All are
    * identified by the result's battleId + hash in appliedBattles, so a repeat (already-applied) never settles again.
    */
-  private commit(result: BattleResult, facts: BattleFacts | undefined, context: ReceptionContext, handle?: S): { status: ApplyStatus; defeat?: { moneyLost: number; healed: true }; diagnostics?: string[] } {
+  private commit(result: BattleResult, facts: BattleFacts | undefined, context: ReceptionContext, handle?: S): { status: ApplyStatus; defeat?: { moneyLost: number; healed: true }; trainerReward?: TrainerPrizeResult & { id: string; version: number }; payDayReward?: TrainerPrizeResult; diagnostics?: string[] } {
     assertBattleResultShape(result);
     this.assertBattleContext(context);
     const authority = handle ? this.ownedBattleEffects.get(handle) : undefined;
@@ -805,21 +1108,55 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     this.assertBattleContext(context);
     let prepared = this.preparedBattles.get(context);
     const previous = own(current.appliedBattles, result.battleId);
+    let admission = this.#settlementAdmissions.get(context);
     if (previous) {
       if (previous.hash !== hash) throw new Error(`battle ${result.battleId} already applied with a different result`);
+      if (previous.settlement && admission?.source?.mode === "required") {
+        // Only this original, authenticated cached pair may outlive fresh-source invalidation. A new handle
+        // must still authenticate its own seal before querying a ledger with a paired identity.
+        if (!admission.facts) this.readRequiredSettlement(admission, hash, context, handle!);
+        if (admission.handle !== handle || admission.generation !== this.generation
+          || admission.facts?.binding.rawHash !== hash || !admission.pairHash) throw new Error("required-settlement-paired-result-changed");
+      }
+      if (previous.settlement && admission?.pairHash && previous.settlement.pairHash !== admission.pairHash) throw new Error("battle settlement pair conflict");
+      if (previous.trainer && facts?.trainer && (previous.trainer.id !== facts.trainer.projection.id || previous.trainer.version !== facts.trainer.projection.version)) throw new Error("trainer battle ledger identity conflict");
       if (prepared?.attempted && !prepared.completed && prepared.next) {
         if (stateIdentity(current) !== stateIdentity(prepared.next)) { prepared.indeterminate = true; throw new StateInstallFailed("state-install-indeterminate: reload the last complete save", true); }
         prepared.completed = true; prepared.indeterminate = false;
         this.noteReception(context, result.captured, current); this.reception = null;
-        return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), diagnostics: [...prepared.diagnostics, "状态已完整安装，已核定原提交"] };
+        return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), ...(prepared.trainerReward ? { trainerReward: prepared.trainerReward } : {}), ...(prepared.payDayReward ? { payDayReward: prepared.payDayReward } : {}), diagnostics: [...prepared.diagnostics, "状态已完整安装，已核定原提交"] };
       }
-      // Exact replay is content-independent and never fetches a newer effects seal.
+      // Exact replay is content-independent and never fetches a newer effects seal or a second prize.
       return { status: "already-applied" };
     }
+    // A closed external source refuses before any content/producer lookup. This is not a legacy admission.
+    if (!this.capabilities.allowHeldItemSources || admission?.source?.mode === "legacy-no-held" || this.#settlementFactoryRoot?.mode === "legacy-no-held") assertCapturedHeldSources(result.captured, context.templates ?? {}, { allowed: false, describe: this.describeHeldItem });
+    // A deliberately selected legacy direct producer can preserve the old public direct API. The supplied JSON is
+    // compared to that preselected producer, never used to choose a mode or manufacture a source capability.
+    if (!handle && !admission && this.#settlementFactoryRoot?.mode === "legacy-no-held" && this.#settlementFactoryRoot.legacyProduce) {
+      if (this.legacyHeldRequested || current.party.some(m => !!m.item)) throw new Error("legacy-no-held-source-gate");
+      const source = this.#settlementFactoryRoot, producedHandle: BattleHandle = { result: () => source.legacyProduce!(result.battleId) };
+      admission = { source, generation: context.generation, battleId: result.battleId, contentIdentity: null, roster: [], wild: false,
+        handle: producedHandle, invalid: false, read: false };
+      this.#settlementAdmissions.set(context, admission); this.battleContexts.set(producedHandle, context); this.bornIn.set(producedHandle, context.generation);
+      if (!claimSettlementHandle(producedHandle, this, context)) throw new Error("battle-handle-already-bound");
+      try {
+        const actual = producedHandle.result(); assertBattleResultShape(actual); this.assertBattleContext(context, true);
+        if (resultHash(actual) !== hash) throw new Error("legacy-direct-producer-result-mismatch");
+      } catch (error) { admission.invalid = true; throw error; }
+    }
+    if (!handle && admission?.source?.mode === "legacy-no-held" && admission.handle) handle = admission.handle as S;
+    if (!admission?.source || admission.invalid || admission.generation !== this.generation || admission.battleId !== result.battleId || admission.handle !== handle) throw new Error("battle-settlement-source-unknown-or-retired");
+    if (admission.source.mode === "legacy-no-held" && (this.legacyHeldRequested
+      || current.party.some(m => !!m.item) || result.captured.some(m => !!m.item))) { admission.invalid = true; throw new Error("legacy-no-held-source-gate"); }
     // This fresh-only closed-source guard must not load current content or an external item catalog.
     assertCapturedHeldSources(result.captured, context.templates ?? {}, { allowed: this.capabilities.allowHeldItemSources, describe: this.describeHeldItem });
     const { content } = this.ports.content(), identity = validatedContentIdentity(content);
     this.assertBattleContext(context, true);
+    if (admission.source.mode === "required") {
+      if (identity !== admission.contentIdentity || !identity) { admission.invalid = true; throw new Error("required-settlement-content-source-changed"); }
+      this.readRequiredSettlement(admission, hash, context, handle!);
+    }
     if (prepared && (prepared.rawHash !== hash || prepared.generation !== this.generation)) throw new Error("prepared battle binding changed");
     if (prepared && stateIdentity(current) !== stateIdentity(prepared.before)) {
       prepared.indeterminate = true;
@@ -858,6 +1195,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
           effects: resolveBattleEffects({ seal, expectedBinding: binding, expectedContext, membersBefore: current.party }),
           captureMembers: capturedTemplates(result, context.templates ?? {}, speciesKeyResolver(content), content),
           sourceIdentity: owned?.contentIdentity ?? null, sourceInvalidated: !compatible, attempted: false, indeterminate: false, completed: false, diagnostics: [] };
+        if (admission.facts) { prepared.required = clone(admission.facts); prepared.pairHash = admission.pairHash; }
         this.preparedBattles.set(context, prepared);
       }
       // Content changes can only downgrade a prepared source. They never cause a new source lookup/backfill.
@@ -873,12 +1211,43 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       if (!applied || applied.status !== "applied") throw new Error("primary planning failed");
       const composed = composeBattleEffects({ before: prepared.before, primary: applied.state, raw: result, content, effects: prepared.effects, internalBattle: prepared.expectedContext.internalBattle });
       let next = composed.state;
+      if (prepared.required) {
+        next = planHeldWriteback({ before: prepared.before, primary: next, facts: prepared.required,
+          capturedOrigins: Object.fromEntries(result.captured.map(m => [m.id, m.id])) }).state;
+        const ledger = own(next.appliedBattles, result.battleId);
+        if (!ledger || !prepared.pairHash) throw new Error("required-settlement-ledger-missing");
+        ledger.settlement = { version: 1, pairHash: prepared.pairHash };
+      }
       prepared.entries = composed.captures.flatMap(capture => {
         const member = locateMember(next, capture.memberId)?.member;
         const entry = member && this.memberEntry(prepared!.before, member, content, "capture");
         return entry ? [{ ...entry, previouslyOwned: capture.previouslyOwned }] : [];
       });
       const eligibleHp = Object.fromEntries(next.party.map(member => [member.id, member.hp]));
+      if (facts?.trainer && code === 1) {
+        const { id, version, baseMoney } = facts.trainer.projection;
+        if (facts.moneyGain) {
+          const multiplier = prepared.required ? (prepared.required.money.amuletCoin ? 2 : 1) * (prepared.required.money.happyHour ? 2 : 1) : 1;
+          const prize = applyTrainerPrize(next, [{ baseMoney, levels: facts.trainer.levels }], content, this.limits, multiplier);
+          next = prize.state;
+          prepared.trainerReward = { id, version, ...prize.reward };
+          if (prize.reward.normalizationLoss > 0) prepared.diagnostics.push(`旧钱包超过上限，规范化下降 ${prize.reward.normalizationLoss}；不计负奖金`);
+        }
+        const key = `${id}@${version}`, prior = own(next.defeatedTrainers, key);
+        if (prior && (prior.id !== id || prior.version !== version)) throw new Error("defeated trainer record conflict");
+        next.defeatedTrainers[key] = { id, version };
+        const ledger = own(next.appliedBattles, result.battleId);
+        if (!ledger) throw new Error("trainer battle ledger was not prepared");
+        ledger.trainer = { id, version };
+      }
+      if (prepared.required && facts?.moneyGain && (code === 1 || code === 2) && prepared.required.money.payDay > 0) {
+        const multiplier = (prepared.required.money.amuletCoin ? 2 : 1) * (prepared.required.money.happyHour ? 2 : 1);
+        const paid = applyBattleMoneyAmount(next, prepared.required.money.payDay * multiplier, content, this.limits);
+        next = paid.state;
+        prepared.payDayReward = paid.reward;
+        if (paid.reward.actual > 0) prepared.diagnostics.push(`聚宝功获得 ${paid.reward.actual}`);
+        if (paid.reward.normalizationLoss > 0) prepared.diagnostics.push(`旧钱包超过上限，规范化下降 ${paid.reward.normalizationLoss}；不计负奖金`);
+      }
       if (isDefeat(result)) {
         const settled = settleDefeat(next, content, { noMoneyLoss: this.noMoneyLoss, badges: badgeCount(next.badges), moneyLimit: this.limits.money });
         next = settled.state; prepared.defeat = { moneyLost: settled.moneyLost, healed: true };
@@ -892,7 +1261,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
           // Technical aborts never reach this owned, validated result transaction.
           enabled: config.CHECK_EVOLUTION_AFTER_ALL_BATTLES || !isDefeat(result) }, next, content);
       }
-      if (prepared.effects.dispositions.some(d => d.status !== "complete") || composed.dispositions.some(d => d.status !== "applied")) prepared.diagnostics.push("部分战斗附加事实不可用，主战果保留");
+      if (classifyBattleEffectDispositions(prepared.effects.dispositions, composed.dispositions).degraded) prepared.diagnostics.push("部分战斗附加事实不可用，主战果保留");
       prepared.next = clone(next); prepared.nextIdentity = identity;
     }
     const next = prepared.next!;
@@ -912,6 +1281,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       this.invalidatePreparedSource(prepared, result.battleId);
       throw new StateInstallFailed("content-changed-before-battle-install: retry with stable current content");
     }
+    if (admission.invalid) throw new Error("required-settlement-source-permanently-invalidated");
     prepared.attempted = true;
     let failure: unknown;
     try { this.battleStatePort.replace(clone(next)); this.inventory.stateChanged(next); }
@@ -927,7 +1297,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (failure) prepared.diagnostics.push(`状态已完整安装，宿主确认失败: ${message(failure)}`);
     prepared.completed = true; prepared.indeterminate = false;
     this.noteReception(context, result.captured, next); this.reception = null;
-    return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), ...(prepared.diagnostics.length ? { diagnostics: [...prepared.diagnostics] } : {}) };
+    return { status: "applied", ...(prepared.defeat ? { defeat: prepared.defeat } : {}), ...(prepared.trainerReward ? { trainerReward: prepared.trainerReward } : {}), ...(prepared.payDayReward ? { payDayReward: prepared.payDayReward } : {}), ...(prepared.diagnostics.length ? { diagnostics: [...prepared.diagnostics] } : {}) };
   }
 
   /**
@@ -935,7 +1305,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * (unfinished, closed after a failure) or committed ends aborted with the persistent state untouched; once the state
    * is committed a failing host projection is reported on the outcome and does not undo or repeat the commit.
    */
-  finishBattle(handle: S, request: Pick<BattleStartRequest, "battleId"> | null): BattleOutcome & { result?: BattleResult } {
+  finishBattle(handle: S, request: Pick<BattleStartRequest, "battleId"> | null): BattleOutcome & { result?: BattleResult } { this.assertNoFriendshipWrite();
     if ((typeof handle !== "object" || handle === null) && typeof handle !== "function") return this.abortBattle(request, new Error("invalid battle handle"));
     const born = typeof handle === "object" && handle !== null ? this.bornIn.get(handle) : undefined;
     if (born !== undefined && born !== this.generation) return { code: 0, battleId: request?.battleId ?? null, commit: "none", aborted: true, error: "the game state was replaced while this battle was open (a save was loaded or a new game started); its result is not committed" };
@@ -943,6 +1313,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.op && this.op.session !== handle) return { code: 0, battleId: request?.battleId ?? null, commit: "none", aborted: true, error: "stale battle session" };
     const ownedOp = this.op?.session === handle ? this.op : null, facts = ownedOp?.facts;
     const remembered = this.battleContexts.get(handle);
+    if (this.battleCommitOwner && remembered !== this.battleCommitOwner) return { code: 0, battleId: request?.battleId ?? null, commit: "none", error: "battle-commit-active" };
     if (this.dexBattleCompletion) {
       const pending = this.pokedex.view;
       if (remembered?.token === this.dexBattleCompletion.parentToken && pending) return { ...clone(this.dexBattleCompletion.outcome), pending: true, continuationToken: pending.token, continuationRevision: pending.revision };
@@ -952,7 +1323,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       if (remembered?.token === this.evolutionCompletion.token) return this.evolutionOutcome(this.evolutionCompletion.outcome, { status: "pending", view: this.evolutions.view!, diagnostics: [] });
       return { code: 0, battleId: request?.battleId ?? null, commit: "none", error: "evolution-operation-active" };
     }
-    let context = remembered ?? this.newReceptionContext();
+    const context = remembered ?? this.newReceptionContext();
+    if (!claimSettlementHandle(handle, this, context)) return { code: 0, battleId: request?.battleId ?? null, commit: "none", aborted: true, error: "battle-handle-owned-by-another-operation" };
     if (this.terminatedBattles.has(context)) return { code: 0, battleId: request?.battleId ?? null, commit: "none", aborted: true, error: "battle-commit-terminated" };
     let result: BattleResult | undefined;
     this.finishing.add(handle);
@@ -961,10 +1333,6 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       assertBattleResultShape(received); // Before outcome, copying, hash or any source callback.
       const hash = resultHash(received);
       this.assertBattleContext(context);
-      // Legacy callers may recreate an unowned handle for an existing receiving retry. Matching the private pending
-      // hash can resume that same zero-authority context; it cannot borrow a started session's source authority.
-      if (!remembered && !this.op && this.battleCommitOwner && this.reception?.context === this.battleCommitOwner
-        && this.preparedBattles.get(this.battleCommitOwner)?.rawHash === hash) context = this.battleCommitOwner;
       this.battleContexts.set(handle, context); this.bornIn.set(handle, context.generation);
       result = clone(received);
       const code = outcomeCode(result), kind = result.outcome.kind, battleId = request?.battleId ?? result.battleId;
@@ -974,9 +1342,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       this.assertBattleContext(context);
       if (this.op === ownedOp) this.op = null;
       const outcome: BattleOutcome & { result?: BattleResult } = { code, battleId, commit: committed.status, kind,
-        ...(facts?.experimentalHeld ? { diagnostics: ["战后持物写回未完成"] } : {}),
-        ...(committed.diagnostics?.length ? { diagnostics: [...(facts?.experimentalHeld ? ["战后持物写回未完成"] : []), ...committed.diagnostics] } : {}),
-        ...(committed.defeat ? { defeat: committed.defeat } : {}) };
+        ...(committed.diagnostics?.length ? { diagnostics: [...committed.diagnostics] } : {}),
+        ...(committed.defeat ? { defeat: committed.defeat } : {}), ...(committed.trainerReward ? { trainerReward: committed.trainerReward } : {}), ...(committed.payDayReward ? { payDayReward: committed.payDayReward } : {}) };
       // Legacy diagnostics are optional and supply no authority to the V2 consumer or public options.
       if (committed.status === "applied" && this.ports.sessions.evidence) {
         try {
@@ -1025,6 +1392,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     } finally {
       this.finishing.delete(handle);
       if (this.battleCommitOwner === context && this.reception?.context !== context && !this.preparedBattles.get(context)?.indeterminate) this.battleCommitOwner = null;
+      if (this.#currentSettlementAdmission === this.#settlementAdmissions.get(context) && this.reception?.context !== context && !this.preparedBattles.get(context)?.indeterminate) this.#currentSettlementAdmission = null;
     }
   }
 
@@ -1032,18 +1400,30 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * End without a result (a failure, a cancelled scene). Nothing is committed. Never throws. Ends the open operation when
    * it is this battle (same battleId), also while its session is still being created.
    */
-  abortBattle(request: Pick<BattleStartRequest, "battleId"> | null, error: unknown): BattleOutcome {
-    if (this.op && request && this.op.battleId === request.battleId) {
-      const context = this.op.session ? this.battleContexts.get(this.op.session) : undefined;
-      if (context && !this.preparedBattles.get(context)?.indeterminate) {
-        this.evolutions.cancelPrepared(context.token);
-        this.pokedex.discardReserved(context.token);
-        this.terminatedBattles.add(context);
-        if (this.reception?.context === context) this.reception = null;
-        if (this.battleCommitOwner === context) this.battleCommitOwner = null;
+  abortBattle(request: Pick<BattleStartRequest, "battleId"> | null, error: unknown): BattleOutcome { this.assertNoFriendshipWrite();
+    const operation = this.op;
+    const context = operation?.session ? this.battleContexts.get(operation.session) : !operation ? this.battleCommitOwner : undefined;
+    const admission = context ? this.#settlementAdmissions.get(context) : this.#currentSettlementAdmission;
+    const matches = request && (operation ? operation.battleId === request.battleId
+      : admission?.source?.mode === "legacy-no-held" && admission.battleId === request.battleId);
+    if (matches) {
+      // The unowned legacy producer also reserves an operation identity. Retire exactly that reservation;
+      // incomplete/unknown installation keeps its barrier, and no callback may clear a successor owner.
+      if (!context || !this.preparedBattles.get(context)?.indeterminate) {
+        const installed = context && this.preparedBattles.get(context)?.completed;
+        if (admission && !installed) admission.invalid = true;
+        if (this.#currentSettlementAdmission === admission) this.#currentSettlementAdmission = null;
+        if (context) {
+          this.evolutions.cancelPrepared(context.token);
+          this.pokedex.discardReserved(context.token);
+          if (!installed) this.terminatedBattles.add(context);
+          if (this.reception?.context === context) this.reception = null;
+          if (this.battleCommitOwner === context) this.battleCommitOwner = null;
+        }
       }
-      this.op = null;
+      if (this.op === operation) this.op = null;
     }
+    if(matches&&operation?.session)try{this.retireSession?.(operation.session);}catch{/* the old operation is already retired */}
     const outcome: BattleOutcome = { code: 0, battleId: request ? request.battleId : null, commit: "none", aborted: true, error: message(error) };
     this.project(outcome);
     return outcome;

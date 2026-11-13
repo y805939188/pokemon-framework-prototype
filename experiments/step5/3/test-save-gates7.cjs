@@ -73,7 +73,7 @@ test('content unavailable and active operation refuse before base save and make'
 });
 test('empty legacy host gets validated current content layout; failure keeps raw object',()=>{
   const h=host();delete h.system._psGame;h.context.DataManager.extractSaveContents({});
-  assert.equal(h.system._psGame.schema,7);assert.equal(h.system._psGame.dex.layoutIdentity,h.content.regionalDex.layoutIdentity);
+  assert.equal(h.system._psGame.schema,E.state.GAME_SCHEMA);assert.equal(h.system._psGame.dex.layoutIdentity,h.content.regionalDex.layoutIdentity);
   assert.equal(h.system._psSaveInfo.created,'empty');
   const bad=host();const raw=bad.system._psGame;bad.unavailable();bad.context.DataManager.extractSaveContents({});
   assert.equal(bad.system._psGame,raw);assert.equal(bad.system._psSaveError.code,'needs-content');

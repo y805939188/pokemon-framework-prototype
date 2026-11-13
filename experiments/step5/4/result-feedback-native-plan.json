@@ -1,0 +1,94 @@
+{
+  "version": "result-feedback-native-v1",
+  "productCommit": "64c1cea4f3ccde6b11cd23abf9aadf1960110ffd",
+  "productRuntime": {
+    "js/plugins/PS_BattleFlow.js": "9e4d958ef168ad0bb46cdd58a1b64bad6f75d5f3c2df0b80ebf6ee582df039f9",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "js/plugins/PS_Evolution.js": "294f6875f4f0d3b3e531c03b1ec387307f27b8b3f119b8bf60ba92a53843f0f4",
+    "js/engine/build/engine.cjs": "99c48dea9299af2e2eb4e2c8d5c1ee65daa5bf7b24931221a922fa31ca965395",
+    "js/engine/build/production.cjs": "ef2435288e5129739c95648a1772f980c5001ba1a5350d88a0790823d6c179d2"
+  },
+  "prefix": "pf_victory_music_v1/",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "worldSeed": 817,
+  "mapId": 5,
+  "deadlineSeconds": 150,
+  "sourceAssetsManifestSHA256": "317e3c50b953f091156aee468bd0e76db1e7c143953c27cccfa25c44197cc083",
+  "mediaRecipe": "scripts/prepare-victory-music-native-assets.cjs",
+  "mediaPlan": "experiments/step5/4/victory-music-native-plan.json",
+  "groups": [
+    {
+      "name": "normal-bilingual-victory",
+      "ids": [
+        "F01",
+        "F02"
+      ]
+    },
+    {
+      "name": "normal-defeat",
+      "ids": [
+        "F03"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "F01",
+      "language": "en",
+      "trainerVersion": 1,
+      "name": "Avery",
+      "loseText": "You won this time.",
+      "baseMoney": 20,
+      "foeLevel": 3,
+      "playerLevel": 100,
+      "expectedReward": 60,
+      "expectedMoney": 1060
+    },
+    {
+      "id": "F02",
+      "language": "zh",
+      "trainerVersion": 2,
+      "name": "莉娜",
+      "loseText": "下次再战！",
+      "baseMoney": 21,
+      "foeLevel": 3,
+      "playerLevel": 100,
+      "expectedReward": 63,
+      "expectedMoney": 1063
+    },
+    {
+      "id": "F03",
+      "language": "zh",
+      "trainerVersion": 2,
+      "name": "莉娜",
+      "loseText": "NOT_FOR_PLAYER_DEFEAT",
+      "baseMoney": 21,
+      "foeLevel": 100,
+      "playerLevel": 5,
+      "playerHP": 1,
+      "canLose": true,
+      "expectedMoney": 400,
+      "expectedMoneyLost": 600
+    }
+  ],
+  "notProved": [
+    "full message/pause/brief platform",
+    "trainer slide/opening/prebattle",
+    "physical input/hearing",
+    "Windows/native signals/newP4/GC absence",
+    "fullD2/E/5.4"
+  ],
+  "nativeExtension": ".ogg",
+  "requiredAssets": [
+    "audio/bgm/pf_victory_music_v1/world.ogg",
+    "audio/bgm/pf_victory_music_v1/battle.ogg",
+    "audio/bgm/pf_victory_music_v1/victory.ogg",
+    "audio/bgm/pf_victory_music_v1/trainer-victory.ogg"
+  ],
+  "defeatBasis": "Existing D3 / rules/defeat.ts: level5 x 8-badge factor120 = 600; may-lose still heals and loses money but no blackout statistic."
+}

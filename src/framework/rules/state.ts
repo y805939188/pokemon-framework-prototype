@@ -18,7 +18,7 @@ import { sha256Hex } from "./sha256";
 import { DEFAULT_LIMITS } from "./limits";
 import { own, setOwn } from "./own";
 import { assertBattleResultShape } from "./battle-result-validation";
-import { identityKeys } from "./species-key";
+import { creationBattleNameOf, identityKeys } from "./species-key";
 import type { SpeciesKeyResolver } from "./species-key";
 import { advanceMemberOrdinal, completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity";
 import { allMembers, boxedMembers, newStorage, placeInBox } from "./storage";
@@ -33,7 +33,7 @@ export { PROTOCOL_VERSION, MEMBER_WRITE_SET } from "./battle-result";
 export type { BattleResult, BattleOutcome, MemberPatch, WriteKey, Dex } from "./battle-result";
 
 /** Version of the PERSISTENT game state document (rules/save-schema.ts migrates older ones). Not the battle protocol version. */
-export const GAME_SCHEMA = 7;
+export const GAME_SCHEMA = 9;
 
 export interface GameState {
   schema: number;
@@ -45,7 +45,9 @@ export interface GameState {
   badges: boolean[];
   money: number;
   dex: DexState;
-  appliedBattles: Record<string, { hash: string }>;
+  appliedBattles: Record<string, { hash: string; trainer?: { id: string; version: number }; settlement?: { version: 1; pairHash: string } }>;
+  /** Won trainer records keyed id@version (schema 8); versions stay distinct and intentional rematches remain allowed. */
+  defeatedTrainers: Record<string, { id: string; version: number }>;
   /** One-time claims (schema 3): a claimed grant id can never be granted again on this save timeline. */
   claims: Record<string, Claim>;
   /** Statistics record (schema 4; WP06 §4.2, 74 fields). */
@@ -128,7 +130,7 @@ export function protocolMember(member: Member): Member {
  */
 export function newGame({ party, bag = {}, money = 0, player = { ...COMPATIBLE_PLAYER }, content }: { party: NewMemberInput[]; bag?: Record<string, number>; money?: number; player?: Owner; content?: Content }): GameState {
   const members = party.map((m) => ({...completeIndividual(newMember({ ...m, form: m.form ?? 0 }), {}), statNature: m.statNature ?? null, moves: m.moves.map(move => ({...clone(move),ppUps:move.ppUps ?? 0}))}));
-  return { schema: GAME_SCHEMA, party: members, storage: newStorage(), player: { ...player }, nextMemberOrdinal: initialOrdinal(members.map((m) => m.id)), inventory: inventoryFromBag(bag, catalogOf(content), inventoryPolicy(content)), badges: Array(8).fill(false) as boolean[], money, dex: createDexState(content), appliedBattles: {}, claims: {}, stats: newStats(), steps: 0 };
+  return { schema: GAME_SCHEMA, party: members, storage: newStorage(), player: { ...player }, nextMemberOrdinal: initialOrdinal(members.map((m) => m.id)), inventory: inventoryFromBag(bag, catalogOf(content), inventoryPolicy(content)), badges: Array(8).fill(false) as boolean[], money, dex: createDexState(content), appliedBattles: {}, defeatedTrainers: {}, claims: {}, stats: newStats(), steps: 0 };
 }
 
 /** Stable hash of a result, used for idempotency (same battleId + same hash => no-op). */
@@ -155,7 +157,8 @@ export function capturedTemplates(result: BattleResult, templates: Readonly<Reco
     const template = own(templates, c.id);
     requireTemplate(template, c.id);
     const k = keys(c.species);
-    if (!k || k.species !== template.species || k.form !== (template.form ?? 0)) throw new Error(`captured member ${c.id}: "${c.species}" has no matching persistent key in its original template`);
+    const formMatches = k?.form === (template.form ?? 0) || !!content && creationBattleNameOf(content, { species: template.species, form: template.form ?? 0 }) === c.species;
+    if (!k || k.species !== template.species || !formMatches) throw new Error(`captured member ${c.id}: "${c.species}" has no matching persistent key in its original template`);
     received.push({ ...clone(template), hp: c.hp, status: c.status, statusCount: c.statusCount ?? 0, moves: mergeBattleMoves(template.moves, c.moves, content), ball: c.ball ?? template.ball, friendship: c.friendship ?? template.friendship });
   }
   return received;

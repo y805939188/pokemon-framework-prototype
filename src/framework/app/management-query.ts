@@ -37,6 +37,8 @@ export interface IndividualView {
   ability: { name: string; description: string };
   moves: { id: string; name: string; pp: number; maxpp: number; type: string; category: string; power: number | null; accuracy: number; description: string }[];
   diagnostics: string[];
+  /** Battle display may lack an authoritative current held-item source; absence retains the persistent-view contract. */
+  heldItemKnown?: boolean;
 }
 export function managementSnapshot(game: GameState, collection: MemberCollection, held: Member | null, generation: number, limits: Limits, sourceAllowed: boolean): ManagementSnapshot {
   return clone({ generation, party: collection.party, storage: collection.storage, held, player: game.player, bag: aggregateBag(game.inventory), money: game.money, limits, heldSourcesEnabled: sourceAllowed,

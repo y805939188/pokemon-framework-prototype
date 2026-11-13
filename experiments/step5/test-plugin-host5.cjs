@@ -24,7 +24,7 @@ const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s, 166452
 let dir; const plugins = {};
 test.before(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-plugin-host5-'));
-  for (const name of ['PS_SaveState', 'PS_BattleFlow']) {
+  for (const name of ['PS_SaveState', 'PS_BattleFlow', 'PS_Management']) {
     const built = spawnSync('pnpm', ['--dir', 'src', 'exec', 'vite', 'build', '--outDir', path.join(dir, name)], { cwd: ROOT, env: { ...process.env, RR_PLUGIN: name }, encoding: 'utf8' });
     assert.equal(built.status, 0, built.stdout + built.stderr);
     plugins[name] = fs.readFileSync(path.join(dir, name, `${name}.js`), 'utf8');
@@ -85,7 +85,7 @@ test('a save written by the step 4 code loads: migrated to schema 4 with the con
   const h = host(J(raw));
   h.load();
   assert.equal(h.sys._psSaveError, undefined, JSON.stringify(h.sys._psSaveError));
-  assert.deepEqual(J(h.sys._psSaveInfo).from, 3); assert.equal(h.sys._psSaveInfo.to, 7); assert.equal(h.sys._psSaveInfo.migrated, true);
+  assert.deepEqual(J(h.sys._psSaveInfo).from, 3); assert.equal(h.sys._psSaveInfo.to, E.state.GAME_SCHEMA); assert.equal(h.sys._psSaveInfo.migrated, true);
   const g = J(h.sys._psGame);
   assert.deepEqual(g.party.map(m => [m.species, m.form]), raw.party.map(m => [E.speciesKey.keyOfBattleName(content, m.species).species, 0]));
   assert.deepEqual(E.saveSchema.validateGame(g), []);
@@ -114,7 +114,7 @@ test('current schema7 and empty legacy host both require current content before 
   const raw = h.sys._psGame; h.flow.content = () => {throw Error('content unavailable');}; h.load();
   assert.equal(h.sys._psGame,raw); assert.equal(h.sys._psSaveError.code,'needs-content');
   const e = host(undefined); e.load();
-  assert.deepEqual([e.sys._psGame.schema,e.sys._psSaveInfo.created],[7,'empty']);
+  assert.deepEqual([e.sys._psGame.schema,e.sys._psSaveInfo.created],[E.state.GAME_SCHEMA,'empty']);
 });
 
 test('P4-2: loading a save (or starting a new game) releases a battle the application still held', async () => {
@@ -401,8 +401,8 @@ test('P51-14: real Showdown capture waits in host operation until decisions; dup
   const pending=h.flow.finish(session);assert.equal(pending.pending,true);assert.equal(h.flow.running,true);assert.equal(h.sys.isSaveEnabled(),false);assert.equal(JSON.stringify(h.sys._psGame),before);await assert.rejects(h.ctx.DataManager.saveGame(5),/battle is running/);
   const id=result.captured[0].id;const done=h.flow.resolveReceiving(pending.receivingToken,{[id]:{nickname:{kind:'keep'}}});assert.equal(done.commit,'applied');assert.equal(h.flow.running,false);assert.equal(h.sys.isSaveEnabled(),true);const committed=JSON.stringify(h.sys._psGame);assert.equal(h.flow.resolveReceiving(pending.receivingToken,{}).commit,'applied');assert.equal(JSON.stringify(h.sys._psGame),committed);assert.equal(h.sys._psGame.appliedBattles[request.battleId].hash,E.state.resultHash(result));assert.deepEqual(h.writes,[]);
 });
-test('P51-12: closed held battle gate rejects before loading content or opening a scene',async()=>{
-  const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';let loads=0;h.flow.content=()=>{loads++;throw Error('must not load content');};const request={battleId:'held#1',kind:'wild',seq:1,foes:[{species:'pidgey',level:3}]};assert.throws(()=>h.flow.openBattle(request),/held-item-battle-disabled/);assert.equal(loads,0);assert.equal(h.flow.running,false);assert.equal(h.flow._op,null);
+test('P51-12: normal held entry opens without prematurely loading content',async()=>{
+  const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';let loads=0;h.flow.content=()=>{loads++;throw Error('must not load content');};const request={battleId:'held#1',kind:'wild',seq:1,foes:[{species:'pidgey',level:3}]};assert.doesNotThrow(()=>h.flow.openBattle(request));assert.equal(loads,0);assert.equal(h.flow.running,true);assert(h.flow._op);h.flow.stateReplaced();
 });
 
 test('M04: present bad legacy metadata keeps raw hash and blocks menu plus every direct host save', async()=>{
@@ -415,11 +415,11 @@ test('M04: present bad legacy metadata keeps raw hash and blocks menu plus every
 });
 
 test('P51-21/F: an unusable save opens the contained failure scene; begin/abort reports diagnosis without crashing the map interpreter',async()=>{
- const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.load({...h.sys._psGame,schema:9});const before=JSON.stringify(h.sys._psGame),request={kind:'wild',foes:[{species:'pidgey',level:3}],seq:1,battleId:'unusable-host#1',resultVariable:7};
+ const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.load({...h.sys._psGame,schema:E.state.GAME_SCHEMA+1});const before=JSON.stringify(h.sys._psGame),request={kind:'wild',foes:[{species:'pidgey',level:3}],seq:1,battleId:'unusable-host#1',resultVariable:7};
  assert.doesNotThrow(()=>h.flow.openBattle(request));assert.equal(h.flow.running,true);let failure;try{await h.flow.begin();}catch(e){failure=e;}assert.match(String(failure),/unknown-version/);h.flow.abort(failure,h.flow._op);assert.equal(h.flow.lastOutcome.aborted,true);assert.match(h.flow.lastOutcome.error,/unknown-version/);assert.equal(h.flow.running,false);assert.equal(JSON.stringify(h.sys._psGame),before);assert.equal(h.sys.isSaveEnabled(),false,'unusable save remains blocked after battle root closes');
 });
-test('P51-12/F: player-facing battle entry contains a closed held-item refusal, writes result0 and opens no scene/data',()=>{
- const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';let loads=0;const messages=[],values=[];h.flow.content=()=>{loads++;throw Error('must not load content')};h.ctx.$gameMessage.add=s=>messages.push(s);h.ctx.$gameVariables.setValue=(id,value)=>values.push([id,value]);const request={battleId:'player-held#1',kind:'wild',foes:[{species:'pidgey',level:3}],seq:1,resultVariable:12};assert.equal(h.flow.tryOpenBattle(request),false);assert.equal(loads,0);assert.equal(h.flow.running,false);assert.equal(h.flow._op,null);assert.match(h.flow.lastOutcome.error,/held-item-battle-disabled/);assert.deepEqual(values,[[12,0]]);assert.equal(messages.length,1);
+test('P51-12/F: player-facing normal held entry opens without an obsolete refusal',()=>{
+ const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';let loads=0;const messages=[],values=[];h.flow.content=()=>{loads++;throw Error('must not load content')};h.ctx.$gameMessage.add=s=>messages.push(s);h.ctx.$gameVariables.setValue=(id,value)=>values.push([id,value]);const request={battleId:'player-held#1',kind:'wild',foes:[{species:'pidgey',level:3}],seq:1,resultVariable:12};assert.equal(h.flow.tryOpenBattle(request),true);assert.equal(loads,0);assert.equal(h.flow.running,true);assert(h.flow._op);assert.deepEqual(values,[]);assert.equal(messages.length,0);h.flow.stateReplaced();
 });
 
 
@@ -436,15 +436,135 @@ test('J05: invalid nature/gender in schema4/5 keeps exact raw state and masks ev
  const good=E.fixtures.savedFor(E.fixtures.makeGame(),content),raw=schema===4?H.legacyGame(good,4):good;raw.party[0][field]=value;const before=JSON.stringify(raw),h=host(raw);h.load();assert.equal(h.sys._psSaveError.code,'invalid');assert.equal(JSON.stringify(h.sys._psGame),before);assert.equal(h.sys.isSaveEnabled(),false);for(const slot of [0,1,2,17,20])await assert.rejects(h.ctx.DataManager.saveGame(slot),/not usable/);assert.deepEqual(h.writes,[]);assert.equal(JSON.stringify(h.sys._psGame),before);
  }
 });
-test('J11: cold automatic map held gate precedes app/content and all encounter RNG; experimental control proceeds',()=>{
- for(const allowed of [false,true]){const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';h.flow.developerCapabilities={allowExperimentalHeldItemBattle:allowed};let loads=0,draws=0,stepDraws=0,pushes=0;const original=h.flow.content;h.flow.content=()=>{loads++;return original()};h.flow.rng=()=>{draws++;return 0};h.player.makeEncounterCount=()=>stepDraws++;h.flow.mapEncounters=()=>({data:{table:{regions:[],slots:[{species:'pidgey',weight:1,minLevel:5,maxLevel:5}]}}});h.player._encounterCount=0;h.ctx.SceneManager.push=()=>pushes++;assert.doesNotThrow(()=>h.player.executeEncounter());assert.equal(pushes,allowed?1:0);if(allowed){assert.ok(loads>0);assert.ok(draws>0);assert.equal(stepDraws,1)}else{assert.equal(loads,0);assert.equal(draws,0);assert.equal(stepDraws,0);assert.equal(h.flow._app,null);assert.equal(h.flow.lastEncounter.reason,'held-item-battle-disabled');}}
+test('J11: normal held map encounter proceeds with either explicit developer value',()=>{
+ for(const allowed of [false,true]){const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';h.flow.developerCapabilities={allowExperimentalHeldItemBattle:allowed};let loads=0,draws=0,stepDraws=0,pushes=0;const original=h.flow.content;h.flow.content=()=>{loads++;return original()};h.flow.rng=()=>{draws++;return 0};h.player.makeEncounterCount=()=>stepDraws++;h.flow.mapEncounters=()=>({data:{table:{regions:[],slots:[{species:'pidgey',weight:1,minLevel:5,maxLevel:5}]}}});h.player._encounterCount=0;h.ctx.SceneManager.push=()=>pushes++;assert.doesNotThrow(()=>h.player.executeEncounter());assert.equal(pushes,1);assert.ok(loads>0);assert.ok(draws>0);assert.equal(stepDraws,1);h.flow.stateReplaced();}
 });
-test('O51-1: 120 held-map frames retain one cold diagnostic; state/map/party/capability changes invalidate',()=>{
- const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';let checks=0,loads=0,draws=0,counts=0,pushes=0,map=1;
- const check=h.flow.assertBattleAllowed;h.flow.assertBattleAllowed=()=>{checks++;return check();};const load=h.flow.content;h.flow.content=()=>{loads++;return load();};h.flow.rng=()=>{draws++;return 0;};h.player.makeEncounterCount=()=>counts++;h.flow.mapEncounters=()=>({data:{table:{regions:[],slots:[{species:'pidgey',weight:1,minLevel:5,maxLevel:5}]}}});h.player._encounterCount=0;h.ctx.$gameMap.mapId=()=>map;h.ctx.SceneManager.push=()=>pushes++;
- h.player.executeEncounter();const first=h.flow.lastEncounter;for(let i=1;i<120;i++)h.player.executeEncounter();assert.equal(checks,1);assert.equal(h.flow.lastEncounter,first);assert.deepEqual([loads,draws,counts,pushes],[0,0,0,0]);assert.equal(h.player._encounterCount,0);
- map=2;h.player.executeEncounter();assert.equal(checks,2);h.sys._psGame=J(h.sys._psGame);h.player.executeEncounter();assert.equal(checks,3);h.sys._psGame.party[0].id='changed';h.player.executeEncounter();assert.equal(checks,4);h.flow.developerCapabilities={allowHeldItemSources:true};h.player.executeEncounter();assert.equal(checks,5);h.sys._psGame.party[0].item='';h.player.executeEncounter();assert.equal(checks>=6,true);assert.equal(counts,1);assert.ok(draws>0);assert.equal(pushes,1);
+test('O51-1: 120 held-map frames do not create repeated encounters while a normal battle owns the map',()=>{
+ const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.sys._psGame.party[0].item='leftovers';let loads=0,draws=0,counts=0,pushes=0,map=1;
+ const load=h.flow.content;h.flow.content=()=>{loads++;return load();};h.flow.rng=()=>{draws++;return 0;};h.player.makeEncounterCount=()=>counts++;h.flow.mapEncounters=()=>({data:{table:{regions:[],slots:[{species:'pidgey',weight:1,minLevel:5,maxLevel:5}]}}});h.player._encounterCount=0;h.ctx.$gameMap.mapId=()=>map;h.ctx.SceneManager.push=()=>pushes++;
+ h.player.executeEncounter();assert.equal(pushes,1);assert.equal(counts,1);assert(loads>0&&draws>0);const first=[loads,draws,counts,pushes];for(let i=1;i<120;i++)h.player.executeEncounter();assert.deepEqual([loads,draws,counts,pushes],first);
+ h.flow.stateReplaced();map=2;h.player._encounterCount=0;h.player.executeEncounter();assert.equal(pushes,2);assert.equal(counts,2);h.flow.stateReplaced();
 });
 test('P52-28: every inventory root and management browse refuse automatic encounters before counter RNG or content',()=>{
  for(const kind of ['bag','shop','item','management']){const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content)),app=h.flow.app();const token=kind==='management'?app.beginManagement():app.beginInventoryOperation(kind);let counts=0,draws=0,loads=0;const original=h.flow.content;h.flow.content=()=>{loads++;return original();};h.player.makeEncounterCount=()=>counts++;h.flow.rng=()=>{draws++;return 0;};h.flow.mapEncounters=()=>({data:{table:{regions:[],slots:[{species:'pidgey',weight:1,minLevel:3,maxLevel:3}]}}});h.player._encounterCount=0;assert.equal(h.player.executeEncounter(),false);assert.deepEqual([counts,draws,loads,h.player._encounterCount],[0,0,0,0],kind);kind==='management'?app.endManagement(token):app.endInventoryOperation(token);}
+});
+
+test('HF-04 PSFlow.commit grants no fresh authority from legacy/required booleans or detached raw after abort',async()=>{
+ const h=host(E.fixtures.savedFor(E.fixtures.makeGame(),content));h.load();const before=J(h.sys._psGame),raw={protocol:1,battleId:'HF04',outcome:{kind:'win',winner:'Player'},members:{},bag:{},captured:[],dex:{seen:[],owned:[]}};
+ for(const options of [{},{legacy:true,required:false},{heldFactsRequired:false}]){
+   assert.throws(()=>h.flow.commit(raw,options),/source-unknown-or-retired/);assert.deepEqual(J(h.sys._psGame),before);assert.deepEqual(h.writes,[]);
+ }
+ const request={battleId:'HF04-owned',kind:'wild',seq:1,foes:[{species:'caterpie',level:5}]},app=h.flow.app(),session=await app.startBattle(request);
+ await session.run();const received=session.result();app.abortBattle(request,Error('retired control'));
+ assert.throws(()=>h.flow.commit(received,{legacy:true,required:false}),/source-unknown-or-retired/);assert.deepEqual(J(h.sys._psGame),before);assert.deepEqual(h.writes,[]);
+});
+
+function messageEscapeHost() {
+  const source = fs.readFileSync(path.join(ROOT, 'js/reactor_windows.js'), 'utf8');
+  const methods = ['Window_Base.prototype.convertEscapeCharacters', 'Window_Message.prototype.processEscapeCharacter'];
+  const G = { Window_Base: function() {}, Window_Message: function() {}, $gameVariables: { value: () => 'INJECTED_VARIABLE' }, TextManager: { currencyUnit: 'G' } };
+  vm.createContext(G);
+  for (const name of methods) {
+    const a = source.indexOf(name + ' = function'), b = source.indexOf('\n};', a);
+    assert(a >= 0 && b > a, name); vm.runInContext(source.slice(a, b + 3), G);
+  }
+  G.Window_Base.prototype.processEscapeCharacter = () => {};
+  return { G, convert: text => G.Window_Base.prototype.convertEscapeCharacters.call({ actorName: () => 'ACTOR', partyMemberName: () => 'PARTY' }, text),
+    pauseSkip(text) { const converted = this.convert(text), window = { _pauseSkip: false, _showFast: false, startPause() {}, startWait() {}, startPage() {} };
+      for (const match of converted.matchAll(/\x1b([\^.!|><$])/g)) G.Window_Message.prototype.processEscapeCharacter.call(window, match[1], {});
+      return window._pauseSkip; } };
+}
+for (const lang of ['en', 'zh']) for (const destination of ['party', 'box']) for (const raw of ['\\^Nick', '\\V[1]', '\\C[2]', '\x1b^Nick']) test('receiving ' + lang + ' ' + destination + ' safely displays literal user name ' + JSON.stringify(raw), () => {
+  const game = E.fixtures.savedFor(E.fixtures.makeGame(), content);
+  if (destination === 'box') while (game.party.length < 6) { const m = J(game.party[0]); m.id = 'LITERAL-' + game.party.length; game.party.push(m); }
+  const h = host(game), messages = []; h.ctx.$gameMessage.add = text => messages.push(text); h.flow.receiveOptions = { mode: 0, naming: 0 }; h.flow.translator = () => E.i18n.translatorFor(lang);
+  const app = h.flow.app();
+  if (destination === 'box') {
+    const token = app.beginManagement(); const renamed = app.manage(token, 'literal-box-name', { kind: 'box-name', box: 0, name: raw });
+    assert.equal(renamed.status, 'applied'); app.endManagement(token);
+  }
+  const pending = app.receiveGift({ kind: 'normal', member: { species: 'pidgey', level: 3 } });
+  assert.equal(pending.status, 'pending'); const id = app.pendingReceiving.members[0].id;
+  const done = app.resolveReceiving(pending.token, { [id]: { nickname: { kind: 'set', value: destination === 'party' ? raw : 'Review' }, ...(destination === 'box' ? { placement: { kind: 'box' } } : {}) } });
+  assert.equal(done.status, 'applied');
+  h.flow.notifyReceived([id], 'literal-' + destination); assert.equal(messages.length, 1);
+  const parser = messageEscapeHost(), converted = parser.convert(messages[0]), visible = raw.replace(/\x1b/g, '␛');
+  assert(converted.includes(visible), 'literal user text survives native MZ conversion: ' + converted);
+  assert(!converted.includes('INJECTED_VARIABLE')); assert(!converted.includes('\x1b'), 'user text never becomes a native message control'); assert.equal(parser.pauseSkip(messages[0]), false);
+  const saved = h.flow.game();
+  assert.equal(destination === 'party' ? saved.party.at(-1).nickname : saved.storage.boxes[0].name, raw, 'stored user input remains unchanged');
+  h.flow.notifyReceived([id], 'literal-' + destination); assert.equal(messages.length, 1, 'notice remains idempotent');
+  // User-only escaping must never disable authored MZ controls globally.
+  h.ctx.$gameMessage.add('Author\\^'); assert.equal(parser.pauseSkip(messages[1]), true);
+});
+
+test('receiving escapes only user substitutions while the same authored message retains its native controls', () => {
+  const h = host(E.fixtures.savedFor(E.fixtures.makeGame(), content)), messages = [];
+  h.flow.receiveOptions = { mode: 0, naming: 0 }; h.ctx.$gameMessage.add = text => messages.push(text);
+  const app = h.flow.app(), pending = app.receiveGift({ kind: 'normal', member: { species: 'pidgey', level: 3 } });
+  const id = app.pendingReceiving.members[0].id, nickname = '\\V[1]';
+  assert.equal(app.resolveReceiving(pending.token, { [id]: { nickname: { kind: 'set', value: nickname } } }).status, 'applied');
+  const translator = h.flow.translator();
+  h.flow.translator = () => ({ t(key, args) { const text = translator.t(key, args); return key === 'management.received' ? '\\C[2]' + text + '\\^' : text; } });
+  h.flow.notifyReceived([id], 'literal-authored-controls');
+  const parser = messageEscapeHost(), converted = parser.convert(messages[0]);
+  assert(converted.startsWith('\x1bC[2]')); assert(converted.includes(nickname));
+  assert(!converted.includes('INJECTED_VARIABLE')); assert.equal(parser.pauseSkip(messages[0]), true, 'authored pause-skip is still effective');
+});
+
+
+function recoveryMessageHost({ lang = 'en', name = '', destination = 'box', signal = 'scene-aborted' } = {}) {
+  const game = E.fixtures.savedFor(E.fixtures.makeGame(), content);
+  if (destination === 'box') while (game.party.length < 6) { const m = J(game.party[0]); m.id = 'RECOVER-' + game.party.length; game.party.push(m); }
+  const h = host(game), messages = [];
+  h.flow.translator = () => E.i18n.translatorFor(lang); h.flow.receiveOptions = { mode: 0, naming: 0 };
+  const app = h.flow.app();
+  if (name) { const token = app.beginManagement(); assert.equal(app.manage(token, 'recovery-box-name', { kind: 'box-name', box: 0, name }).status, 'applied'); app.endManagement(token); }
+  const pending = app.receiveGift({ kind: 'normal', member: { species: 'pidgey', level: 3 } });
+  assert.equal(pending.status, 'pending'); const id = app.pendingReceiving.members[0].id;
+  assert.equal(app.resolveReceiving(pending.token, {}, signal).status, 'applied'); assert.equal(app.receivingNotifications.length, 1);
+  const Input = { keyMapper: {}, isTriggered: () => false, isRepeated: () => false };
+  h.ctx.Input = Input; h.ctx.document = { addEventListener() {} }; h.ctx.addEventListener = () => {};
+  let mapStarts = 0; h.ctx.Scene_Map = function() {}; h.ctx.Scene_Map.prototype.start = () => { mapStarts++; };
+  vm.runInContext(plugins.PS_Management, h.ctx, { filename: 'PS_Management.js (built)' });
+  h.ctx.$gameMessage.add = text => messages.push(text);
+  const mapStart = () => h.ctx.Scene_Map.prototype.start.call({});
+  return { ...h, app, id, pending, messages, mapStart, mapStarts: () => mapStarts };
+}
+for (const lang of ['en', 'zh']) for (const signal of ['scene-aborted', 'rebuild-failed']) for (const raw of ['\\^Nick', '\\V[1]', '\\C[2]', '\x1b^Nick']) test('map recovered ' + lang + ' ' + signal + ' safely displays literal box name ' + JSON.stringify(raw), () => {
+  const h = recoveryMessageHost({ lang, name: raw, signal }), before = J(h.flow.game());
+  h.flow.notifyReceived([h.id], 'recovered-normal-control'); assert.equal(h.messages.length, 0, 'ordinary notice yields to pending recovered notice');
+  h.mapStart(); assert.equal(h.mapStarts(), 1); assert.equal(h.messages.length, 1);
+  const parser = messageEscapeHost(), converted = parser.convert(h.messages[0]), visible = raw.replace(/\x1b/g, '␛');
+  assert(converted.includes(visible), 'literal user box name survives native MZ conversion: ' + converted);
+  assert(!converted.includes('INJECTED_VARIABLE')); assert(!converted.includes('\x1b'), 'user box name cannot become a native message control'); assert.equal(parser.pauseSkip(h.messages[0]), false);
+  assert.equal(h.app.receivingNotifications.length, 0); assert.deepEqual(J(h.flow.game()), before, 'message boundary does not rewrite the saved name or member');
+  h.mapStart(); assert.equal(h.messages.length, 1, 'acknowledged recovery is not repeated');
+});
+for (const lang of ['en', 'zh']) for (const name of ['旧中文盒名', '\\\\V[1]', '']) test('map recovered ' + lang + ' preserves legacy/default box title ' + JSON.stringify(name), () => {
+  const h = recoveryMessageHost({ lang, name }), before = J(h.flow.game()); h.mapStart();
+  const dest = name || h.flow.translator().t('management.box', { n: 1 });
+  assert.equal(messageEscapeHost().convert(h.messages[0]), h.flow.translator().t('management.recovered', { dest }));
+  assert.deepEqual(J(h.flow.game()), before); assert.equal(h.flow.game().storage.boxes[0].name, name);
+});
+for (const lang of ['en', 'zh']) for (const destination of ['party', 'box']) test('map recovered ' + lang + ' keeps authored message and fallback destination controls for ' + destination, () => {
+  const h = recoveryMessageHost({ lang, destination }), original = h.flow.translator();
+  h.flow.translator = () => ({ t(key, args) { const text = original.t(key, args); return ['management.recovered', 'management.party', 'management.box'].includes(key) ? '\\C[2]' + text + '\\^' : text; } });
+  h.mapStart(); const parser = messageEscapeHost(), converted = parser.convert(h.messages[0]);
+  assert.equal((converted.match(/\x1bC\[2\]/g) || []).length, 2, 'both authored template and destination controls remain active');
+  assert.equal(parser.pauseSkip(h.messages[0]), true); assert.equal(h.app.receivingNotifications.length, 0);
+});
+test('map recovered custom box name is escaped inside an otherwise active authored message', () => {
+  const h = recoveryMessageHost({ name: '\\V[1]' }), original = h.flow.translator();
+  h.flow.translator = () => ({ t(key, args) { const text = original.t(key, args); return key === 'management.recovered' ? '\\C[2]' + text + '\\^' : text; } });
+  h.mapStart(); const parser = messageEscapeHost(), converted = parser.convert(h.messages[0]);
+  assert(converted.startsWith('\x1bC[2]')); assert(converted.includes('\\V[1]')); assert(!converted.includes('INJECTED_VARIABLE')); assert.equal(parser.pauseSkip(h.messages[0]), true);
+});
+test('map recovered message queue failure keeps its notice and unchanged save for the next map entry', () => {
+  const h = recoveryMessageHost({ name: '\\^Nick' }), before = J(h.flow.game());
+  h.ctx.$gameMessage.add = () => { throw Error('injected message queue failure'); }; h.mapStart();
+  assert.equal(h.app.receivingNotifications.length, 1); assert.deepEqual(J(h.flow.game()), before);
+  h.ctx.$gameMessage.add = text => h.messages.push(text); h.mapStart();
+  assert.equal(h.messages.length, 1); assert.equal(messageEscapeHost().pauseSkip(h.messages[0]), false);
+  assert.equal(h.app.receivingNotifications.length, 0); assert.deepEqual(J(h.flow.game()), before);
 });

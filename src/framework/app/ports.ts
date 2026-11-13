@@ -1,10 +1,12 @@
+import type { InitialField, InitialFieldInput } from '../rules/initial-field';
 /**
  * What the game application needs from the world, as small interfaces it owns. The MZ plugin implements them with
  * `$gameSystem` and `$gameVariables`; tests implement them in memory; the composition root wires the Showdown-backed
  * battle session factory. Types only.
  */
 import type { BattleResult, GameState } from "../rules/state";
-import type { Content, DexLookup, Member } from "../rules/types";
+import type { Content, DexLookup, Member, TrainerBattleProjection } from "../rules/types";
+import type { ObedienceContext } from "../rules/obedience";
 import type { BattleEvidence, BattleEvidenceContext, EvidenceBinding } from "../rules/battle-evidence";
 import type { EffectsBindingV2, EffectsSealV2 } from "../rules/battle-consumption";
 
@@ -31,6 +33,8 @@ export interface ClockPort {
 
 /** One battle as the author (StartBattle) or an encounter asks for it. */
 export interface BattleStartRequest {
+  /** Captured author field defaults; no world inference. */
+  initialField?: InitialFieldInput;
   battleId: string;
   kind: "wild" | "trainer";
   /** Species as content id or persistent name, and level; the application creates the individuals. */
@@ -40,20 +44,46 @@ export interface BattleStartRequest {
   /** Author flags of a scripted battle (protocol v1 foe descriptor). */
   noRun?: boolean;
   noBall?: boolean;
+  /** Author rule for voluntary switching. Defaults to true; forced replacements remain available. */
+  canSwitch?: boolean;
+  /** Author override. The host captures the player preference first; direct App callers default to Switch. */
+  battleStyle?: "switch" | "set";
+  /** Per-battle growth gate. Defaults to true; false skips both EV and experience distribution. */
+  expGain?: boolean;
   /** The author lets the player lose this battle (story battle): a defeat then is not a blackout (WP61 §7, statistics). */
   canLose?: boolean;
+  /** Victory money settlement (WP42). Defaults to true; false does not normalize the wallet. */
+  moneyGain?: boolean;
   /** Scripted battle rule, explicit priority over the player receive preference. */
   forceParty?: boolean;
+  /** A-M1 stable trainer record; when present, foes are built from that record rather than free-form foe specs. */
+  trainer?: { id: string; version: number };
 }
+
+export type TrainerBattleStartRequest = Omit<BattleStartRequest, "kind" | "foes" | "trainer"> & { trainer: { id: string; version: number } };
 
 /** What the application decided before a session exists: the created foes and the effective flags. */
 export interface BattleSetup {
+  initialField?: InitialField;
   /** Internal application authority for a transient companion; never read from a save or UI request. */
   evidenceContext?: BattleEvidenceContext;
+  /** Formal application path always supplies authoritative player/badges/content/generation; legacy direct sessions may omit it. */
+  obedience?: ObedienceContext;
+  trainer?: TrainerBattleProjection;
+  /** Transient application operation/generation guard, bound before a formal trainer factory can reenter. */
+  isCurrentBattle?: () => boolean;
   experimentalHeldBattle?: boolean;
   diagnostics?: string[];
   foes: Member[];
   noRun: boolean;
+  /** Captured author policy; formal starts supply a boolean, legacy custom factories may omit it. */
+  canSwitch?: boolean;
+  /** Captured per-battle style, independent of voluntary switching legality. */
+  battleStyle?: "switch" | "set";
+  /** Per-battle growth gate. Defaults to true; false skips both EV and experience distribution. */
+  expGain?: boolean;
+  /** Global author capture-growth rule captured by the application before the session factory. */
+  captureExpGain?: boolean;
   /** The author's flag, or forced on because a caught member would have nowhere to go (decision D1). */
   noBall: boolean;
   /** The party and the boxes are both full (the reason a ball is disabled, for the host's message). */
@@ -81,6 +111,8 @@ export interface BattleSessionFactory<S extends BattleHandle = BattleHandle> {
   evidence?(handle: S, binding: EvidenceBinding): BattleEvidence | null;
   /** V2 source-isolated receipts; E consumer owns binding, preparation and eventual installation. */
   effects?(handle: S, binding: EffectsBindingV2): EffectsSealV2 | null;
+  /** Retire only this handle's transient asynchronous work after application ownership has ended. */
+  retire?(handle:S):void;
 }
 
 /** The content a battle uses and, when available, the engine's data to check moves against. */
@@ -150,6 +182,10 @@ export interface BattleOutcome {
   error?: string;
   /** A lost or drawn battle that was just committed: money lost and the party healed in the same state replacement (D3). */
   defeat?: { moneyLost: number; healed: true };
+  /** Actual A-M1 base-prize delta, not a nominal amulet/HappyHour/PayDay claim. */
+  trainerReward?: { id: string; version: number; nominal: number; before: number; after: number; actual: number; normalizationLoss: number };
+  /** Actual second-stage Pay Day delta, published only after the same battle installation. */
+  payDayReward?: { nominal: number; before: number; after: number; actual: number; normalizationLoss: number };
   /** Whether the host was told. "failed" means the projection threw; `commit` separately says whether state was committed. */
   projection?: "ok" | "failed";
   projectionError?: string;

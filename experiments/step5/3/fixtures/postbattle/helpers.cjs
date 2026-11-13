@@ -24,7 +24,7 @@ function world({initial,entries=[{method:'Level',parameter:51,target:'Blastoise'
    if(changeContent)changeContent(content);return result;
   }};
  if(real){sessions=E.composition.createBattleSessionFactory({content:()=>content,seed:()=>[1,2,3,4]});const effects=sessions.effects;sessions.calls=0;sessions.seals=[];sessions.effects=(...args)=>{sessions.calls++;const seal=effects(...args);sessions.seals.push(seal);return seal;};}
- app=new E.app.GameApplication({state:statePort,sessions,projection,content:()=>contentPort?contentPort(content):({content}),random:()=>0,clock:()=>0,evolutionWorld:worldFacts},{receivingProfile:profile??{mode:1,naming:1}});
+ app=new E.app.GameApplication({state:statePort,sessions:real?sessions:E.composition.createLegacyNoHeldSessionFactory(sessions),projection,content:()=>contentPort?contentPort(content):({content}),random:()=>0,clock:()=>0,evolutionWorld:worldFacts},{receivingProfile:profile??{mode:1,naming:1}});
  const request={battleId:'postbattle-1',kind:'wild',seq:1,foes:[{species:'Pidgey',level:5}]};
  return{E,app,state,projection,sessions,content,request,async finish(){const h=await app.startBattle(request);return{h,outcome:app.finishBattle(h,request)};},answer(decision){const p=app.pendingEvolution;if(!p)throw Error('no evolution pending');return app.resolveEvolution(p.token,p.revision,decision);}};
 }

@@ -1,0 +1,306 @@
+{
+  "schema": 1,
+  "kind": "bounded-gen8-showdown-contract-sampling",
+  "format": "gen8rpgcustomgame",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "baseProduct": "313751f9ac6056284a938f3d4243e61ce0d07e72",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "referenceHead": "5c9805de2331f75565891851d4d7b2bc97acad94",
+  "headings": [
+    {
+      "featureId": "FR-000532",
+      "source": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+      "ranges": [
+        [
+          37,
+          65
+        ]
+      ],
+      "sha256": "6a09dfad69faa5c0c35991e9fa4eb83646b6f2162427e5bcd3df09c55fded6d3"
+    },
+    {
+      "featureId": "FR-000533",
+      "source": "deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+      "ranges": [
+        [
+          66,
+          91
+        ]
+      ],
+      "sha256": "6a09dfad69faa5c0c35991e9fa4eb83646b6f2162427e5bcd3df09c55fded6d3"
+    },
+    {
+      "featureId": "FR-000544",
+      "source": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+      "ranges": [
+        [
+          29,
+          63
+        ]
+      ],
+      "sha256": "e144ad75bab96647c12220d7f7e137d534277c169f6ca64d8c6bd06044268943"
+    },
+    {
+      "featureId": "FR-000546",
+      "source": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+      "ranges": [
+        [
+          84,
+          114
+        ]
+      ],
+      "sha256": "e144ad75bab96647c12220d7f7e137d534277c169f6ca64d8c6bd06044268943"
+    }
+  ],
+  "scope": "8 selected qualitative contracts under4of74 headings; no exact reference damage/RNG or complete heading coverage; no App/UI/save/native acceptance",
+  "authoredFixture": "Explicit custom-game species/move sets, including inert Splash. No claim that every set is an official learnset. Gen8 move/type/status behavior is the subject.",
+  "cases": [
+    {
+      "id": "ECORE-01",
+      "featureIds": [
+        "FR-000532"
+      ],
+      "check": "type-immune",
+      "player": {
+        "species": "Snorlax",
+        "ability": "Thick Fat",
+        "level": 100,
+        "moves": [
+          "tackle"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "target": {
+        "species": "Gengar",
+        "ability": "Cursed Body",
+        "level": 100,
+        "moves": [
+          "splash"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "setupTurns": 0,
+      "turns": 1,
+      "moveSlot": 1
+    },
+    {
+      "id": "ECORE-02",
+      "featureIds": [
+        "FR-000532"
+      ],
+      "check": "super-effective",
+      "player": {
+        "species": "Squirtle",
+        "ability": "Torrent",
+        "level": 100,
+        "moves": [
+          "watergun"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "target": {
+        "species": "Charmander",
+        "ability": "Blaze",
+        "level": 100,
+        "moves": [
+          "splash"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "setupTurns": 0,
+      "turns": 1,
+      "moveSlot": 1
+    },
+    {
+      "id": "ECORE-03",
+      "featureIds": [
+        "FR-000532"
+      ],
+      "check": "resisted",
+      "player": {
+        "species": "Squirtle",
+        "ability": "Torrent",
+        "level": 100,
+        "moves": [
+          "watergun"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "target": {
+        "species": "Squirtle",
+        "ability": "Torrent",
+        "level": 100,
+        "moves": [
+          "splash"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "setupTurns": 0,
+      "turns": 1,
+      "moveSlot": 1
+    },
+    {
+      "id": "ECORE-04",
+      "featureIds": [
+        "FR-000533"
+      ],
+      "check": "guaranteed-hit",
+      "player": {
+        "species": "Snorlax",
+        "ability": "Thick Fat",
+        "level": 100,
+        "moves": [
+          "splash",
+          "swift"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "target": {
+        "species": "Snorlax",
+        "ability": "Thick Fat",
+        "level": 100,
+        "moves": [
+          "doubleteam"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "setupTurns": 6,
+      "turns": 1,
+      "moveSlot": 2
+    },
+    {
+      "id": "ECORE-05",
+      "featureIds": [
+        "FR-000544"
+      ],
+      "check": "poison-immune",
+      "player": {
+        "species": "Venusaur",
+        "ability": "Overgrow",
+        "level": 100,
+        "moves": [
+          "toxic"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "target": {
+        "species": "Venusaur",
+        "ability": "Overgrow",
+        "level": 100,
+        "moves": [
+          "splash"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "setupTurns": 0,
+      "turns": 1,
+      "moveSlot": 1
+    },
+    {
+      "id": "ECORE-06",
+      "featureIds": [
+        "FR-000544"
+      ],
+      "check": "poison-applied",
+      "player": {
+        "species": "Venusaur",
+        "ability": "Overgrow",
+        "level": 100,
+        "moves": [
+          "toxic"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "target": {
+        "species": "Snorlax",
+        "ability": "Thick Fat",
+        "level": 100,
+        "moves": [
+          "splash"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "setupTurns": 0,
+      "turns": 1,
+      "moveSlot": 1
+    },
+    {
+      "id": "ECORE-07",
+      "featureIds": [
+        "FR-000532",
+        "FR-000533"
+      ],
+      "check": "type-immune",
+      "player": {
+        "species": "Pikachu",
+        "ability": "Static",
+        "level": 100,
+        "moves": [
+          "thunderwave"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "target": {
+        "species": "Donphan",
+        "ability": "Sturdy",
+        "level": 100,
+        "moves": [
+          "splash"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "setupTurns": 0,
+      "turns": 1,
+      "moveSlot": 1
+    },
+    {
+      "id": "ECORE-08",
+      "featureIds": [
+        "FR-000546"
+      ],
+      "check": "stat-cap",
+      "player": {
+        "species": "Snorlax",
+        "ability": "Thick Fat",
+        "level": 100,
+        "moves": [
+          "growl"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "target": {
+        "species": "Snorlax",
+        "ability": "Thick Fat",
+        "level": 100,
+        "moves": [
+          "splash"
+        ],
+        "nature": "Hardy",
+        "item": ""
+      },
+      "setupTurns": 0,
+      "turns": 7,
+      "moveSlot": 1
+    }
+  ]
+}

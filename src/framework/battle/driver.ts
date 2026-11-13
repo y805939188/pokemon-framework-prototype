@@ -1,3 +1,4 @@
+import type { InitialFieldInput } from '../rules/initial-field';
 /**
  * The seam between the game flow and a battle engine: everything the session needs, as plain data and controlled
  * operations. `BattleGateway` (Pokemon Showdown) implements it; a scripted fake can stand in for it in tests. Types
@@ -7,6 +8,7 @@ import type { BattleEvent } from "./protocol";
 import type { MonView } from "../rules/rules";
 import type { PartialStats, Stats } from "../rules/types";
 import type { ObservationBatch, BattleObservation } from "../rules/battle-evidence";
+import type { ObedienceContext } from "../rules/obedience";
 
 export interface PlayerSpec {
   name: string;
@@ -14,6 +16,7 @@ export interface PlayerSpec {
 }
 
 export interface GatewayOptions {
+  initialField?: InitialFieldInput;
   formatid?: string;
   seed?: number[] | string;
   players?: PlayerSpec[];
@@ -21,12 +24,20 @@ export interface GatewayOptions {
   wild?: boolean;
   noBall?: boolean;
   noRun?: boolean;
+  /** Formal app-owned control; absence is the explicit legacy direct-session compatibility path. */
+  obedience?: ObedienceContext;
+  /** Records a complete required channel. A boolean is not source authority; the composition/app own that binding. */
+  requiredSettlement?: boolean;
   restored?: boolean;
 }
 
+/** Internal non-enumerable observation header, outside request payload and protocol-v1 projection. */
+export interface DriverRequestSource {
+  readonly version: 'player-forced-choice-source-v1'; readonly side: 'p1'; readonly occurrenceId: string;
+}
 export type GatewayMessage =
   | { kind: "events"; seq: number; events: BattleEvent[] }
-  | { kind: "request"; seq: number; side: string; request: Record<string, any> }
+  | { kind: "request"; seq: number; side: string; request: Record<string, any>; readonly source?: DriverRequestSource }
   | { kind: "error"; seq: number; side: string; message: string; choice?: string; payload?: unknown }
   | { kind: "end"; seq: number; winner: string | null; turn: number; reason: string; outcome?: Record<string, unknown> };
 
@@ -53,7 +64,11 @@ export interface MemberState extends MonView {
   level: number;
   statusCount: number;
   pp: Record<string, number>;
+  /** Battle caps keyed by persistent move identity when an opening rewrite changes total PP. */
+  ppMax?: Record<string, number>;
   stats: Stats;
+  /** Natural battle-form HP base, only when it differs from the persistent species (never a Transform copy). */
+  growthHpBase?: number;
 }
 
 /** An opaque in-memory rollback point (see GatewayCheckpoint); nothing can be read from it. */
@@ -61,6 +76,8 @@ export interface DriverCheckpoint { readonly opaque?: never }
 
 export interface GrowthApplication {
   level: number; evs?: PartialStats; expect?: { stats?: Partial<Stats> }; newMoves?: string[]; replaceSlot?: number | null;
+  /** Permanent identity before replacement; individual order can differ from battle wrapper order. */
+  replaceMoveId?: string;
 }
 export interface GrowthOutcome {
   before: { level: number; maxhp: number; hp: number };
@@ -69,15 +86,21 @@ export interface GrowthOutcome {
 }
 
 export interface BattleDriver {
+  /** Private control identity for the exact event object; never part of public event JSON. */
+  participationIdentity?(event: BattleEvent): { side: string; id: string; slot: number };
   /** Submit a choice string for a side; false when the engine refuses it. */
   choose(side: string, choice: string): Promise<boolean>;
   /** Register a non-move action (item, ball, run) as the whole choice of one slot. */
   act(side: string, payload: SlotSpec, slot?: number): Promise<boolean>;
+  /** Immediate wild faint replacement escape; true means evaluated, not necessarily escaped. */
+  runAfterFaint?(side: string): Promise<boolean>;
   chooseSlots(side: string, specs: (SlotSpec | null)[]): Promise<boolean>;
   cancel(side: string): Promise<void>;
-  /** May this side try to run/throw a ball now, and if not, why. */
-  query(side: string, what: "run" | "ball" | string, slot?: number): { allowed: boolean; reason?: string };
+  /** Menu query. automatic-locked/automatic-encore may return a one-based moveSlot; allowed without a slot is not an automatic choice. */
+  query(side: string, what: "run" | "ball" | string, slot?: number): { allowed: boolean; reason?: string; moveSlot?: number };
   readState(side: string): MemberState[];
+  /** Unique permanent engine slot for a move identity; unavailable/missing/ambiguous means refuse a selected PP item. */
+  permanentMoveSlot?(side: string, memberId: string, moveId: string): number | null;
   seedState(side: string, records: StateRecord[]): void;
   applyGrowth(side: string, id: string, change: GrowthApplication): GrowthOutcome;
   /** Internal optional capabilities. Absence means unavailable, never an empty/complete observation. */

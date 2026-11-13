@@ -1,0 +1,30 @@
+{
+  "schema": "capture-run-current-headless-v1",
+  "scope": "Current successor Node/headless regression identity only. No historical native-plan or old acceptance rebinding. Expected hashes are static committed values, never filled by tests.",
+  "productSourceCommit": "5a41caf1ab9c896cfcae093b6638824540d89723",
+  "productSrcTree": "7c52b29035f4170df493570c3a5d5e88eb1faaad",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "runtime": {
+    "js/engine/build/content-cli.cjs": "f604726dabdc8a3f0afc81c78df5318b10991696132f5ba79c458e86cd582c33",
+    "js/engine/build/core.cjs": "49d71a04cc97ed616155c1ebb678262460e99f7c4fc7d4ba4046ebe2ff078728",
+    "js/engine/build/custom-formats.cjs": "00079175d78db1399be527c4dd95a6f7233de497cf51058b61d94aa19a7eff27",
+    "js/engine/build/engine.cjs": "590f776801fa712060f6ab87d830702ffa0da43b688e0f1cf8904390bd173fb1",
+    "js/engine/build/production.cjs": "868b8e86f93173d6aa19cc97359f219258d725343178adfdff50b63ee95fe611",
+    "js/engine/build/public-presentation-D4XFDEFj.js": "5f851e66ce74535df83d1bbad56aaf78b6a81aa1f84917f423f25c3828bd0dc0",
+    "js/engine/build/session-ok9qiVac.js": "184ed460f1e7acd5b50a78a66950fb87492b5fb660e91dab8d7206afa48f71ca",
+    "js/engine/build/testing.cjs": "e11feabdc3ba313a94be95adb3bd3091f928fcfba8c452274ed5a878858fe7c0",
+    "js/engine/build/trainer-ai-diagnostics-BaIaNGh5.js": "074c8e3b95eef9142083e60439f7b8494dae274f360b2d584ef7c6af27f6661a"
+  },
+  "pluginBundles": {
+    "js/plugins/PS_BattleFlow.js": "37cfa2f81e76ee81b979e666ae8301e6a26c1fa24255a0df1ffaccb12a242996",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "js/plugins/PS_Evolution.js": "983ed74deb687eb6048e9a80199f3b0261d483b99aa4844383544b25f2d8d72b",
+    "js/plugins/PS_BattleFlowTest.js": "4aee409872466c817e3a148bac9ca8322bb45d9351b51ea4ce70d13287a5c4fc"
+  },
+  "pluginSources": {
+    "src/plugins/PS_BattleFlow.ts": "0f6cab32a3e3b3bae4b2723714052307184be6be6e5d6da0cf18636f4f4f8081"
+  },
+  "helperFiles": {
+    "experiments/step5/4/h3-production-policy/support.cjs": "c1d36aa765010336a775ca57a7946c6a15a45615033af225489e80b4693a21e2"
+  }
+}

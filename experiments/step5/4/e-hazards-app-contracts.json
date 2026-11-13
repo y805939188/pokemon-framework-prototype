@@ -1,0 +1,177 @@
+{
+  "schema": 1,
+  "format": "gen8rpgcustomgame",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "player": {
+    "species": "cloyster",
+    "level": 50,
+    "party": 2,
+    "nature": "hardy",
+    "abilityIndex": 0,
+    "form": 0,
+    "creationRanges": [
+      65536,
+      65536,
+      32,
+      32,
+      32,
+      32,
+      32,
+      32
+    ],
+    "creationValues": [
+      0,
+      0,
+      4,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "expectedHP": 112
+  },
+  "foe": {
+    "species": "slowbro",
+    "level": 60,
+    "moves": "one hazard per case"
+  },
+  "featureIds": [
+    "FR-000039",
+    "FR-000041"
+  ],
+  "sourceHead": "5c9805de2331f75565891851d4d7b2bc97acad94",
+  "sources": [
+    {
+      "path": "deliverables/final-specification-set/combat-requirements/wp45-weather-terrain-side-and-position-effects.md",
+      "sha256": "bcb8c6c7d4b86e30799d866952db35ca5448d4922d6e7873d95f368a498623da"
+    },
+    {
+      "path": "deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+      "sha256": "e144ad75bab96647c12220d7f7e137d534277c169f6ca64d8c6bd06044268943"
+    },
+    {
+      "path": "deliverables/final-specification-set/test-catalog/combat-requirements-wp39-40-41-42-45.md",
+      "sha256": "4f814411a1b8f098b0cc3aef9aa8e0cc05ac8aa57260db1f6d016b97ab56e4e7"
+    }
+  ],
+  "completeHeading": false,
+  "headings": [
+    {
+      "featureId": "FR-000039",
+      "range": [
+        102,
+        146
+      ],
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000041",
+      "range": [
+        178,
+        192
+      ],
+      "completeHeading": false
+    }
+  ],
+  "scope": "7 ordinary single-battle contracts, 8 actual Sessions including fresh entry observation; not complete headings, hazards formula family or Title/NW",
+  "cases": [
+    {
+      "id": "EHZA-01",
+      "hazard": "stealthrock",
+      "layers": 1,
+      "check": "rocks-next-battle-reset",
+      "exit": "run",
+      "expected": {
+        "hp": 84,
+        "status": "",
+        "statusCount": 0,
+        "speedStage": 0
+      }
+    },
+    {
+      "id": "EHZA-02",
+      "hazard": "spikes",
+      "layers": 1,
+      "check": "one-layer-spikes",
+      "exit": "run",
+      "expected": {
+        "hp": 98,
+        "status": "",
+        "statusCount": 0,
+        "speedStage": 0
+      }
+    },
+    {
+      "id": "EHZA-03",
+      "hazard": "spikes",
+      "layers": 2,
+      "check": "two-layer-spikes",
+      "exit": "run",
+      "expected": {
+        "hp": 94,
+        "status": "",
+        "statusCount": 0,
+        "speedStage": 0
+      }
+    },
+    {
+      "id": "EHZA-04",
+      "hazard": "spikes",
+      "layers": 3,
+      "check": "three-layer-spikes",
+      "exit": "run",
+      "expected": {
+        "hp": 84,
+        "status": "",
+        "statusCount": 0,
+        "speedStage": 0
+      }
+    },
+    {
+      "id": "EHZA-05",
+      "hazard": "toxicspikes",
+      "layers": 1,
+      "check": "ordinary-poison-entry-and-writeback",
+      "exit": "run",
+      "expected": {
+        "hp": 98,
+        "status": "psn",
+        "statusCount": 0,
+        "speedStage": 0
+      }
+    },
+    {
+      "id": "EHZA-06",
+      "hazard": "stickyweb",
+      "layers": 1,
+      "check": "web-stage-not-persistent",
+      "exit": "run",
+      "expected": {
+        "hp": 112,
+        "status": "",
+        "statusCount": 0,
+        "speedStage": -1
+      }
+    },
+    {
+      "id": "EHZA-07",
+      "hazard": "stealthrock",
+      "layers": 1,
+      "check": "abort-entry-zero-install",
+      "exit": "abort",
+      "expected": {
+        "hp": 84,
+        "status": "",
+        "statusCount": 0,
+        "speedStage": 0
+      }
+    }
+  ]
+}

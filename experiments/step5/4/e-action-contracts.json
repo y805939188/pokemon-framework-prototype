@@ -1,0 +1,620 @@
+{
+  "schema": 1,
+  "kind": "bounded-gen8-action-and-switch-contract-sampling",
+  "baseProduct": "d1c8bf7e2fa221a4bad687a53705a30092041f56",
+  "format": "gen8rpgcustomgame",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "referenceHead": "5c9805de2331f75565891851d4d7b2bc97acad94",
+  "auditPlanSHA256": "8d3e2119f25c9ce450c36f437ef10cc07f76465d55daf30e7385c05b9e416a99",
+  "headings": [
+    {
+      "featureId": "FR-000013",
+      "name": "6. 行动顺序",
+      "source": "deliverables/final-specification-set/combat-requirements/wp40-commands-obedience-and-action-order.md",
+      "lineRanges": [
+        [
+          251,
+          273
+        ]
+      ],
+      "sha256": "86772d23bc60dc660713fd28d3b21da3397925e35089d4491f2baf75372a02c3",
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000018",
+      "name": "3. 换人资格",
+      "source": "deliverables/final-specification-set/combat-requirements/wp41-switching-positioning-and-escape.md",
+      "lineRanges": [
+        [
+          46,
+          72
+        ]
+      ],
+      "sha256": "22a57a362a3bfb8efa55390127903cf1ef655525eb29e6b320f8c2d846821789",
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000019",
+      "name": "4. 换人执行与出入场次序",
+      "source": "deliverables/final-specification-set/combat-requirements/wp41-switching-positioning-and-escape.md",
+      "lineRanges": [
+        [
+          73,
+          113
+        ]
+      ],
+      "sha256": "22a57a362a3bfb8efa55390127903cf1ef655525eb29e6b320f8c2d846821789",
+      "completeHeading": false
+    },
+    {
+      "featureId": "FR-000028",
+      "name": "3. 主阶段与裁判（A）",
+      "source": "deliverables/final-specification-set/combat-requirements/wp42-growth-end-of-round-and-battle-outcomes.md",
+      "lineRanges": [
+        [
+          35,
+          58
+        ]
+      ],
+      "sha256": "ec2203f1cf58cbf9327ef6361a82510fab3ec51174d39f72dbec233dfeed87e8",
+      "completeHeading": false
+    }
+  ],
+  "additionalSources": [
+    {
+      "source": "deliverables/final-specification-set/combat-requirements/wp40-commands-obedience-and-action-order.md",
+      "sha256": "86772d23bc60dc660713fd28d3b21da3397925e35089d4491f2baf75372a02c3",
+      "scope": "§3.3/5.1 register versus execute; switch/item/move stages"
+    },
+    {
+      "source": "deliverables/final-specification-set/creature-rpg/wp20-hp-status-moves-helditem.md",
+      "sha256": "03f6e924fab7e9440129950443b46aca462acd3c3a4ff01a59cc8ed657e5dfee",
+      "scope": "§5.4/5.5 per-use PP"
+    },
+    {
+      "source": "deliverables/final-specification-set/creature-rpg/wp28-item-use-and-training.md",
+      "sha256": "276da36f1de9b2d7d2f08702ca864529d3328a54bc4d65e124f6c8993cb3f12e",
+      "scope": "§5.1 modern Potion20"
+    }
+  ],
+  "ppSetup": {
+    "tackle": 35,
+    "quickattack": 30
+  },
+  "scope": "six hand-selected scenario groups, eight independent raw Gateway battles, four of74 headings sampled; no full heading coverage/App/UI/save/native/Ruby equivalence",
+  "fixtureLimits": "Explicit custom-game move sets, no claim all official learnsets. No priority ability/item, speed modifier, tie, weather, room, or hazard; no damage-formula equality assertion.",
+  "freezeLimits": "Commit input/test source and author hash receipt before first behavior execution. Independent third-party pre-run seal not claimed.",
+  "cases": [
+    {
+      "id": "EACT-01",
+      "featureIds": [
+        "FR-000013"
+      ],
+      "check": "move-priority",
+      "player": [
+        {
+          "name": "A",
+          "species": "Snorlax",
+          "level": 100,
+          "moves": [
+            "quickattack"
+          ],
+          "ability": "Immunity",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        }
+      ],
+      "foe": [
+        {
+          "name": "B",
+          "species": "Pidgey",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Keen Eye",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        }
+      ],
+      "turns": 2,
+      "expected": {
+        "firstActor": "p1a: A",
+        "firstMove": "Quick Attack",
+        "playerIsSlower": true,
+        "PPPerUse": 1
+      }
+    },
+    {
+      "id": "EACT-02",
+      "featureIds": [
+        "FR-000013"
+      ],
+      "check": "normal-speed",
+      "player": [
+        {
+          "name": "A",
+          "species": "Pidgey",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Keen Eye",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        }
+      ],
+      "foe": [
+        {
+          "name": "B",
+          "species": "Snorlax",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Immunity",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        }
+      ],
+      "turns": 2,
+      "expected": {
+        "firstActor": "p1a: A",
+        "firstMove": "Tackle",
+        "playerIsFaster": true,
+        "PPPerUse": 1
+      }
+    },
+    {
+      "id": "EACT-03",
+      "featureIds": [
+        "FR-000018"
+      ],
+      "check": "switch-refusals",
+      "player": [
+        {
+          "name": "A",
+          "species": "Snorlax",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Immunity",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        },
+        {
+          "name": "R",
+          "species": "Blastoise",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Torrent",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        }
+      ],
+      "foe": [
+        {
+          "name": "B",
+          "species": "Pidgey",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Keen Eye",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        }
+      ],
+      "variants": [
+        {
+          "name": "already-active",
+          "choice": "switch 1"
+        },
+        {
+          "name": "outside-party",
+          "choice": "switch 9"
+        },
+        {
+          "name": "fainted",
+          "choice": "switch 2",
+          "benchHP": 0
+        }
+      ],
+      "expected": {
+        "registered": false,
+        "combatStateUnchanged": true,
+        "noMoveOrSwitchEvents": true
+      }
+    },
+    {
+      "id": "EACT-04",
+      "featureIds": [
+        "FR-000019"
+      ],
+      "check": "switch-before-move",
+      "player": [
+        {
+          "name": "A",
+          "species": "Snorlax",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Immunity",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        },
+        {
+          "name": "R",
+          "species": "Blastoise",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Torrent",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        }
+      ],
+      "foe": [
+        {
+          "name": "B",
+          "species": "Pidgey",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Keen Eye",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        }
+      ],
+      "expected": {
+        "activeAfter": "R",
+        "moveTarget": "p1a: R",
+        "outgoingHPUnchanged": true,
+        "reserveTakesDamage": true,
+        "noPlayerMovePPSpent": true
+      }
+    },
+    {
+      "id": "EACT-05",
+      "featureIds": [
+        "FR-000019"
+      ],
+      "check": "cancel-switch",
+      "player": [
+        {
+          "name": "A",
+          "species": "Snorlax",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Immunity",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        },
+        {
+          "name": "R",
+          "species": "Blastoise",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Torrent",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        }
+      ],
+      "foe": [
+        {
+          "name": "B",
+          "species": "Pidgey",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Keen Eye",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        }
+      ],
+      "expected": {
+        "activeWhileRegistered": "A",
+        "activeAfterCancel": "A",
+        "noSwitchEvent": true,
+        "movePPAfterActualRound": 34
+      }
+    },
+    {
+      "id": "EACT-06",
+      "featureIds": [
+        "FR-000028"
+      ],
+      "check": "item-before-move",
+      "player": [
+        {
+          "name": "A",
+          "species": "Snorlax",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Immunity",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        }
+      ],
+      "foe": [
+        {
+          "name": "B",
+          "species": "Pidgey",
+          "level": 100,
+          "moves": [
+            "tackle"
+          ],
+          "ability": "Keen Eye",
+          "nature": "Hardy",
+          "item": "",
+          "ivs": {
+            "hp": 31,
+            "atk": 31,
+            "def": 31,
+            "spa": 31,
+            "spd": 31,
+            "spe": 31
+          },
+          "evs": {
+            "hp": 0,
+            "atk": 0,
+            "def": 0,
+            "spa": 0,
+            "spd": 0,
+            "spe": 0
+          }
+        }
+      ],
+      "missingHP": 40,
+      "expected": {
+        "healed": 20,
+        "itemBeforeFoeMove": true,
+        "noPlayerMovePPSpent": true,
+        "foePPAfter": 34
+      }
+    }
+  ]
+}

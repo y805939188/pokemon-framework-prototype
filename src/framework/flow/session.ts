@@ -1,3 +1,8 @@
+import { captureInitialField } from '../rules/initial-field';
+import { initializeRequestView, clearRequestView, publishRequestView, checkpointRequestView, beginRequestViewRestore, finishRequestViewRestore, failRequestViewRestore } from './request-view';
+export { readSessionRequestContext } from './request-view';
+export type { SessionRequestContext } from './request-view';
+import type { InitialFieldInput } from '../rules/initial-field';
 import { battleBag } from "../rules/inventory";
 import { catalogOf } from "../rules/item-catalog";
 /**
@@ -15,10 +20,11 @@ import type { BattleDriver, BattleDriverFactory } from "../battle/driver";
 import { isSelectableMove } from "../battle/move-requests";
 import type { GatewayMessage, MemberState } from "../battle/gateway";
 import * as G from "../rules/growth";
-import { HEAL_ITEMS, STAT_ITEMS, STATUS_ITEMS, itemEligibility } from "../rules/rules";
+import { HEAL_ITEMS, REVIVE_ITEMS, STAT_ITEMS, STATUS_ITEMS, PP_ITEMS, ESCAPE_ITEMS, itemEligibility } from "../rules/rules";
 import * as S from "../rules/state";
 import type { BattleResult, GameState } from "../rules/state";
-import type { Content, Member } from "../rules/types";
+import type { Content, Member, Stats } from "../rules/types";
+import type { ObedienceContext } from "../rules/obedience";
 import type { BattleEvent, SessionMessage } from "../battle/protocol";
 import type { LogLevel, LogSink } from "./log";
 import { EvidenceRecorder } from "./battle-evidence";
@@ -28,6 +34,13 @@ import { battleFriendshipValue } from "../rules/battle-evidence";
 import type { BattleEvidenceContext, EvidenceBinding, BattleEvidence, FriendEvidence, BattleObservation } from "../rules/battle-evidence";
 import { resolveConfig } from "../rules/config";
 import { own, setOwn } from "../rules/own";
+import { bindRequiredSettlement, checkpointRequiredSettlement, finalizeRequiredSettlement, requiredCaptureItem, requiredGrowthItems, requiredFaintGrowthItems, restoreRequiredSettlement } from "./required-settlement";
+import { bindTrainerAi, runTrainerAi, trainerAiEvent, checkpointTrainerAi, restoreTrainerAi, preflightTrainerAiRestore, prepareTrainerAiRestore, failTrainerAiRestore, assertTrainerAiCheckpointReady, cancelTrainerAiDecision } from './trainer-ai';
+import type { TrainerAiConfiguration } from './trainer-ai';
+import { _publishGrowthDisplay, _capturePresentation, _restorePresentation, readBattleLearnProtection } from './presentation';
+import { bindReplacementOffer, hasReplacementOffer, prepareReplacementOffer, checkpointReplacementOffer, preflightReplacementOffer, restoreReplacementOffer } from './replacement-offer';
+export { readTrainerReplacement, readTrainerReplacementTarget, resolveTrainerReplacement } from './replacement-offer';
+import type { GrowthDisplay } from './presentation';
 
 /** Frozen protocol vocabulary (protocol-v1.md); the freeze test checks observed values against these. */
 export const END_REASONS = ["caught", "run", "tie", "win"] as const;
@@ -61,7 +74,7 @@ export function sealBattleEffects(session: BattleSession, binding: EffectsBindin
   return session._effects.seal(session.result(), binding, session._pendingFriendFaints.length ? session.party.map(m => m.id) : session._friendUnavailable);
 }
 
-const ITEM_IDS = new Set([...Object.keys(HEAL_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS)]);
+const ITEM_IDS = new Set(["fullrestore", ...Object.keys(HEAL_ITEMS), ...Object.keys(REVIVE_ITEMS), ...Object.keys(STATUS_ITEMS), ...Object.keys(STAT_ITEMS), ...Object.keys(PP_ITEMS), ...ESCAPE_ITEMS]);
 
 function toSet(m: Member, moveName: (id: string) => string): Record<string, unknown> {
   return {
@@ -82,6 +95,14 @@ export interface FoeSpec {
 export type FoeAi = (request: Req) => string | null | undefined;
 
 export interface CreateOptions {
+  /** Internal opt-in ports; the current default Scene has no replacement-offer consumer yet. */
+  replacementOffers?: boolean;
+  /** Voluntary choice policy only; never a replacement for simulator switch legality. */
+  canSwitch?: boolean;
+  /** Immutable growth policy of this battle, independent of the capture EXP setting. */
+  expGain?: boolean;
+  /** Composition-time capture rule; absent direct/legacy callers use the author content profile. */
+  captureExpGain?: boolean;
   game: GameState;
   battleId: string;
   foe: FoeSpec;
@@ -89,7 +110,10 @@ export interface CreateOptions {
   seed?: number[] | string;
   doubles?: boolean;
   /** Explicit controlled test/developer path; held-item write-back is incomplete. Never a player/save setting. */
+  initialField?: InitialFieldInput;
   experimentalHeldBattle?: boolean;
+  /** Composition-owned complete settlement channel; arbitrary custom drivers do not acquire it. */
+  requiredSettlement?: boolean;
   formatid?: string;
   ai?: FoeAi;
   rules?: G.ExpRules;
@@ -99,6 +123,10 @@ export interface CreateOptions {
   driver?: BattleDriverFactory;
   /** App-owned companion authority, not a player flag or protocol-v1 field. */
   evidence?: BattleEvidenceContext;
+  /** Formal application obedience control; omitted only by legacy direct-session callers. */
+  obedience?: ObedienceContext;
+  /** Selected only by the formal trainer composition, never by wild/defaultAi callers. */
+  trainerAi?: TrainerAiConfiguration;
 }
 
 export type Refusal = { ok: false; reason: string };
@@ -125,7 +153,8 @@ interface LedgerEntry {
 }
 
 type GrowthTask =
-  | { kind: "award"; foeId: string }
+  | { kind: "award"; foeId: string; items?: Record<string, { current: string; recovery: string }> }
+  | { kind: "growth"; memberId: string; exp: number; evs: Member["evs"]; level: number; hp: number; stats: Stats; levelUps: number[]; changed: boolean; message: Extract<SessionMessage, { kind: "growth" }>; display: GrowthDisplay }
   | { kind: "learn"; memberId: string; move: { id: string; name: string; pp: number } };
 
 /**
@@ -145,6 +174,11 @@ export class SessionBrokenError extends Error {
 }
 
 export class BattleSession {
+  /** Fixed for this session; not saved, checkpointed, or part of the result protocol. */
+  readonly canSwitch: boolean;
+  readonly expGain: boolean;
+  readonly captureExpGain: boolean;
+  constructor(canSwitch = true, expGain = true, captureExpGain = true) { this.canSwitch = canSwitch; this.expGain = expGain; this.captureExpGain = captureExpGain; initializeRequestView(this); }
   content!: Content;
   rules!: G.ExpRules;
   battleId!: string;
@@ -159,6 +193,8 @@ export class BattleSession {
   held: GatewayMessage[] = [];
   growthQueue: GrowthTask[] = [];
   pendingLearn: { memberId: string; move: { id: string; name: string; pp: number } } | null = null;
+  _waitForLearnedMessages = false;
+  _pendingLearned: { memberId: string; move: { id: string; name: string; pp: number } } | null = null;
   participants: Record<string, Set<string>> = {};
   activeNow: Record<string, (string | null)[]> = { p1: [], p2: [] };
   doubles = false;
@@ -173,6 +209,9 @@ export class BattleSession {
   _result?: BattleResult;
   logger?: LogSink;
   _operation = false;
+  _operationEpoch = 0;
+  _operationDone: Promise<void> | null = null;
+  _restoring = false;
   _staged = false;
   _broken: SessionBrokenError | null = null;
   _evidence: EvidenceRecorder | null = null;
@@ -180,7 +219,16 @@ export class BattleSession {
   _friendUnavailable: string[] = [];
   _pendingFriendFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
 
-  static async create({ game, battleId, foe, content, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, evidence }: CreateOptions): Promise<BattleSession> {
+  static async create(options: CreateOptions): Promise<BattleSession> {
+    const initialField = captureInitialField(options);
+    const { replacementOffers = false, game, battleId, foe, content, canSwitch = true, expGain = true, captureExpGain, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi } = options;
+    if (initialField && (doubles || formatid !== "gen8rpgcustomgame")) throw new Error("initial-field-requires-rpg-singles");
+    if (typeof replacementOffers !== "boolean") throw new Error("replacementOffers must be boolean when provided");
+    if (replacementOffers && (!trainerAi || doubles || foe.kind !== "trainer")) throw new Error("replacement-offer-formal-single-trainer-required");
+    if (typeof expGain !== "boolean") throw new Error("expGain must be boolean when provided");
+    if (captureExpGain !== undefined && typeof captureExpGain !== "boolean") throw new Error("captureExpGain must be boolean when provided");
+    const captureGrowth = captureExpGain ?? resolveConfig(content.settings).GAIN_EXP_FOR_CAPTURE;
+    if (typeof canSwitch !== "boolean") throw new Error("canSwitch must be boolean when provided");
     if (!experimentalHeldBattle && [...game.party, ...foe.team].some((m) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成");
     // Dangling references fail here, with the member and the thing that is missing, not deep inside a battle.
     for (const m of [...game.party, ...foe.team]) {
@@ -197,7 +245,7 @@ export class BattleSession {
     }
     const party = S.clone(game.party).filter((m) => !m.isEgg).slice(0, 6);
     const lead = [...party.filter((m) => m.hp > 0), ...party.filter((m) => m.hp <= 0)];
-    const s = new BattleSession();
+    const s = new BattleSession(canSwitch, expGain, captureGrowth);
     s.content = content; s.rules = rules || G.DEFAULT_RULES; s.battleId = battleId; s.foe = foe;
     s.party = party; s.foeTeam = S.clone(foe.team);
     s.startBag = battleBag(game.inventory, catalogOf(content)); s.bag = S.clone(s.startBag);
@@ -212,15 +260,32 @@ export class BattleSession {
     }
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
     s.gw = await driver.create({
+      ...(initialField ? { initialField } : {}),
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
+      requiredSettlement,
+      ...(obedience ? { obedience } : {}),
       players: [{ name: "Player", team: lead.map((m) => toSet(m, moveName)) }, { name: foe.kind === "wild" ? "Wild" : "Trainer", team: s.foeTeam.map((m) => toSet(m, moveName)) }],
     });
+    if (requiredSettlement) {
+      if (!evidence) throw new Error("required-settlement-app-context-missing");
+      // Retain the chosen supported restorer before any user action can replace a public factory method.
+      const restore = driver.fromCheckpoint.bind(driver);
+      bindRequiredSettlement(s, s.gw, { battleId, generation: evidence.generation, contentIdentity: evidence.contentIdentity }, restore);
+    }
     s._effects?.startControl(!doubles && !!s.gw.drainFriendshipFaints && !!s.gw.validateFriendshipFaints && !!s.gw.applyFriendship && !!s.gw.checkpointFriendship && !!s.gw.restoreFriendship);
-    await s.gw.choose("p1", "team " + lead.map((_, i) => i + 1).join(""));
-    await s.gw.choose("p2", "team " + s.foeTeam.map((_, i) => i + 1).join(""));
+    // Both rosters exist during Team Preview. Import dynamic state before the second team
+    // choice starts switchIn: native send-out conditions and entry effects must see the saved
+    // HP/status/PP, and no later seed may overwrite an effect that already resolved on entry.
     s.gw.seedState("p1", lead);
     s.gw.seedState("p2", s.foeTeam);
+    await s.gw.choose("p1", "team " + lead.map((_, i) => i + 1).join(""));
+    await s.gw.choose("p2", "team " + s.foeTeam.map((_, i) => i + 1).join(""));
     s.gw.refreshRequests();
+    if (trainerAi) {
+      if (foe.kind !== 'trainer' || doubles || !requiredSettlement || ai) throw new Error('trainer-ai-formal-composition-required');
+      bindTrainerAi(s, s.gw, content, trainerAi);
+    }
+    bindReplacementOffer(s, replacementOffers);
     s._ingest();
     s._finishTurn();
     s._log("info", "session.create", { content: content.meta ? { kind: content.meta.kind, id: content.meta.id, hash: content.meta.inputsHash?.slice(0, 12) } : null, format: formatid, doubles, foe: { kind: foe.kind, members: foe.team.length }, party: party.map((m) => m.id), seed: seed ?? null });
@@ -247,25 +312,30 @@ export class BattleSession {
     this._assertUsable();
     if (this._operation) throw new Error("battle session operation already in progress");
     this._operation = true;
+    const epoch=++this._operationEpoch;
+    let complete!:()=>void;
+    const done=new Promise<void>(resolve=>{complete=resolve;});this._operationDone=done;
     try {
       const checkpoint = this._checkpoint();
       try { return await action(); }
       catch (error) {
-        try { await this._restoreCheckpoint(checkpoint); }
+        if(this._operationEpoch!==epoch)throw error;
+        try { await this._restoreCheckpoint(checkpoint,epoch); }
         catch (restoreError) {
+          if(this._operationEpoch!==epoch)throw error;
           this._broken = new SessionBrokenError(error, restoreError);
           this._log("error", "session.broken", { original: error instanceof Error ? error.message : String(error), rollback: restoreError instanceof Error ? restoreError.message : String(restoreError) });
           throw this._broken;
         }
         throw error;
       }
-    } finally { this._operation = false; }
+    } finally { complete();if(this._operationDone===done)this._operationDone=null;if(this._operationEpoch===epoch)this._operation = false; }
   }
 
   /** Protocol-v1 action refusal; no new reason or request-id semantics are introduced. */
   async _action(action: () => Promise<TurnResult>, replace = true): Promise<TurnResult> {
     this._assertUsable();
-    if (this._operation || this.finished || this.pendingLearn) return this._refuse("choice-rejected");
+    if (this._operation || this.finished || this.pendingLearn || this._pendingLearned || hasReplacementOffer(this)) return this._refuse("choice-rejected");
     return this._exclusive(async () => {
       if (replace && this._staged) {
         await this.gw.cancel("p1");
@@ -280,11 +350,16 @@ export class BattleSession {
 
   /** In-memory operation rollback, not a battle-time save. Include PRNG, pending choices and undelivered messages. */
   _checkpoint() {
-    return {
-      engine: this.gw.checkpoint(),
+    assertTrainerAiCheckpointReady(this);
+    const engine = this.gw.checkpoint();
+    checkpointRequiredSettlement(this, engine);
+    checkpointTrainerAi(this, this.gw, engine);
+    checkpointReplacementOffer(this, engine);
+    const checkpoint = {
+      engine,
       state: S.clone({
         party: this.party, bag: this.bag, ledger: this.ledger, out: this.out, held: this.held,
-        growthQueue: this.growthQueue, pendingLearn: this.pendingLearn, activeNow: this.activeNow,
+        growthQueue: this.growthQueue, pendingLearn: this.pendingLearn, _pendingLearned: this._pendingLearned, activeNow: this.activeNow,
         participants: Object.entries(this.participants).map(([id, members]) => [id, [...members]] as const),
         ended: this.ended, finished: this.finished, requests: this.requests, grew: this.grew,
         _caughtAwarded: this._caughtAwarded, _result: this._result, _staged: this._staged,
@@ -292,18 +367,42 @@ export class BattleSession {
       }),
       evidence: this._evidence?.snapshot(),
       effects: this._effects?.snapshot(),
+      presentation: _capturePresentation(this, this.out),
     };
+    checkpointRequestView(this, checkpoint);
+    return checkpoint;
   }
 
-  async _restoreCheckpoint(checkpoint: ReturnType<BattleSession["_checkpoint"]>): Promise<void> {
-    this.gw = await this._driver.fromCheckpoint(checkpoint.engine);
-    const { participants, ...state } = checkpoint.state;
+  async _restoreCheckpoint(checkpoint: ReturnType<BattleSession["_checkpoint"]>,ownedEpoch?:number): Promise<void> {
+    if(this._restoring)throw new Error('battle session restore already in progress');
+    if(ownedEpoch!==undefined&&ownedEpoch!==this._operationEpoch)throw new Error('battle session operation retired');
+    const entryEpoch=this._operationEpoch,entryDriver=this.gw;
+    preflightTrainerAiRestore(this,entryDriver,checkpoint.engine);
+    preflightReplacementOffer(this,checkpoint.engine);
+    // Preflight is read-only but calls trusted ports: a reentrant restore/operation may now own the Session.
+    if(this._restoring)throw new Error('battle session restore already in progress');
+    if(this._operationEpoch!==entryEpoch||this.gw!==entryDriver)throw new Error('battle session operation retired during restore preflight');
+    beginRequestViewRestore(this);
+    const external=ownedEpoch===undefined;
+    const epoch=external?++this._operationEpoch:this._operationEpoch;
+    let complete:()=>void=()=>{},done:Promise<void>|null=null;
+    if(external){this._operation=true;done=new Promise<void>(resolve=>{complete=resolve;});this._operationDone=done;}
+    this._restoring=true;prepareTrainerAiRestore(this);
+    try {
+    this.gw = await restoreRequiredSettlement(this, checkpoint.engine, () => this._driver.fromCheckpoint(checkpoint.engine));
+    restoreTrainerAi(this, this.gw, checkpoint.engine);
+    const { participants, ...state } = S.clone(checkpoint.state);
     Object.assign(this, state);
     this.participants = Object.fromEntries(participants.map(([id, members]) => [id, new Set(members)]));
     // JSON omits undefined properties, so explicitly clear these after a failed first assignment.
     this.requests = state.requests; this._result = state._result;
+    _restorePresentation(this, this.out, checkpoint.presentation);
     if (checkpoint.evidence) this._evidence?.restore(checkpoint.evidence);
     if (checkpoint.effects) this._effects?.restore(checkpoint.effects);
+    restoreReplacementOffer(this, checkpoint.engine);
+    finishRequestViewRestore(this, checkpoint);
+    }catch(error){failRequestViewRestore(this);failTrainerAiRestore(this);throw error;}
+    finally{this._restoring=false;if(external){complete?.();if(this._operationDone===done)this._operationDone=null;if(this._operationEpoch===epoch)this._operation=false;}}
   }
 
   static defaultAi(request: Req): string {
@@ -339,6 +438,9 @@ export class BattleSession {
 
   async chooseMove(index: number): Promise<TurnResult> { this._log("info", "choice", { action: "move", index }); return this._action(() => this._turn(async () => this.gw.choose("p1", `move ${index}`))); }
   async chooseSwitch(memberId: string): Promise<TurnResult> {
+    this._assertUsable();
+    const forced = this.currentRequest()?.forceSwitch;
+    if (!this.canSwitch && !(Array.isArray(forced) ? forced[0] === true : forced === true)) return this._refuse('choice-rejected');
     return this._action(async () => {
       this._log("info", "choice", { action: "switch", member: memberId });
       const i = (this.requests!["p1"]!["side"].pokemon as Req[]).findIndex((p) => p["ident"] === `p1: ${memberId}`);
@@ -348,24 +450,49 @@ export class BattleSession {
   async chooseForcedSwitch(memberId: string): Promise<TurnResult> { return this.chooseSwitch(memberId); }
 
   /** Reserve the item (deduct now), register the action; refunded on cancel/no-effect. */
-  async useItem(itemId: string, targetId: string, { commit = true }: { commit?: boolean } = {}): Promise<TurnResult> {
+  async useItem(itemId: string, targetId: string, { commit = true, moveSlot }: { commit?: boolean; moveSlot?: number } = {}): Promise<TurnResult> {
     return this._action(async () => {
-      this._log("info", "choice", { action: "item", item: itemId, target: targetId, commit });
+      this._log("info", "choice", { action: "item", item: itemId, target: targetId, commit, moveSlot });
+      const q = this.gw.query("p1", "item");
+      if (!q.allowed) return this._refuse(q.reason ?? "refused");
       if (!ITEM_IDS.has(itemId)) return this._refuse("unknown-item");
       if ((this.bag[itemId] || 0) < 1) return this._refuse("none-left");
-      const el = this.canUseItem(itemId, targetId);
+      const el = this.canUseItem(itemId, targetId, moveSlot);
       if (!el.ok) return this._refuse(el.reason); // refused before registration: nothing consumed, no turn used
+      const engineSlot = this._itemMoveSlot(itemId, targetId, moveSlot);
+      if (engineSlot === null) return this._refuse("item-no-effect");
       const entry = this._reserve("item", itemId, targetId);
-      const ok = await this.gw.act("p1", { kind: "item", item: itemId, target: targetId });
+      const ok = await this.gw.act("p1", { kind: "item", item: itemId, target: targetId, ...(engineSlot === undefined ? {} : { moveSlot: engineSlot }) });
       if (!ok) { this._refund(entry, "not-registered"); return this._refuse("not-registered"); }
       return commit ? this._resolveTurn() : { ok: true, staged: true };
     });
   }
 
   /** Registration-time eligibility of an item for a party member (same rule the menu uses to grey out targets). */
-  canUseItem(itemId: string, targetId: unknown): ReturnType<typeof itemEligibility> {
+  canUseItem(itemId: string, targetId: unknown, moveSlot?: number): ReturnType<typeof itemEligibility> {
+    if (!this.gw.query("p1", "item").allowed) return { ok: false, reason: "item-no-effect" };
     const mon = this.gw.readState("p1").find((x: MemberState) => x.id === targetId);
-    return itemEligibility(itemId, mon);
+    if (ESCAPE_ITEMS.includes(itemId)) {
+      if (!mon || targetId !== this.gw.activeId("p1")) return { ok: false, reason: "unknown-target" };
+      return this.foe.kind === "wild" && !this.foe.noRun && mon.hp > 0 && !mon.fainted
+        ? { ok: true } : { ok: false, reason: "item-no-effect" };
+    }
+    const moves = Object.hasOwn(PP_ITEMS, itemId) ? this.party.find(m => m.id === targetId)?.moves.map(m => ({ ...m, pp: mon?.pp[m.id] ?? m.pp, maxpp: mon?.ppMax?.[m.id] ?? m.maxpp })) : undefined;
+    const eligibility = itemEligibility(itemId, mon, { moves, moveSlot });
+    if (!eligibility.ok) return eligibility;
+    if (this._itemMoveSlot(itemId, targetId, moveSlot) === null) return { ok: false, reason: "item-no-effect" };
+    return eligibility;
+  }
+
+  /** Translate the selected individual slot before reservation; never guess from temporary moveSlots or PP-map order. */
+  private _itemMoveSlot(itemId: string, targetId: unknown, moveSlot?: number): number | undefined | null {
+    if (!Object.hasOwn(PP_ITEMS, itemId) || PP_ITEMS[itemId]!.all) return moveSlot;
+    const member = this.party.find(m => m.id === targetId);
+    if (!member || !Number.isSafeInteger(moveSlot)) return null;
+    const move = member.moves[moveSlot!];
+    if (!move || member.moves.filter(m => m.id === move.id).length !== 1) return null;
+    const slot = this.gw.permanentMoveSlot?.("p1", member.id, move.id);
+    return Number.isSafeInteger(slot) && slot! >= 0 ? slot! : null;
   }
 
   /**
@@ -373,6 +500,9 @@ export class BattleSession {
    * and resolve the turn. Items/balls are reserved in the ledger first and refunded if the choice is refused.
    */
   async chooseDoubles(specs: (DoublesSpec | null)[], { commit = true }: { commit?: boolean } = {}): Promise<TurnResult> {
+    this._assertUsable();
+    const forced = this.currentRequest()?.forceSwitch;
+    if (!this.canSwitch && specs.some((spec, i) => spec?.switch !== undefined && !(Array.isArray(forced) ? forced[i] === true : forced === true))) return this._refuse('choice-rejected');
     return this._action(async () => {
       this._log("info", "choice", { action: "doubles", specs: specs.map((x) => (x ? x.kind ?? (x.switch !== undefined ? "switch" : "move") : null)), commit });
       // validate every spec BEFORE reserving anything: a refusal consumes nothing (WP38 2 / WP28 3.5)
@@ -388,13 +518,20 @@ export class BattleSession {
           if (!q.allowed) return this._refuse(q.reason ?? "refused");
         } else if (sp && sp.kind === "item") {
           if (!ITEM_IDS.has(sp.item as string)) return this._refuse("unknown-item");
-          const el = this.canUseItem(sp.item as string, sp.target);
+          const el = this.canUseItem(sp.item as string, sp.target, sp.moveSlot as number | undefined);
           if (!el.ok) return this._refuse(el.reason);
         }
         if (sp) acted = true;
       }
+      const engineSpecs = specs.map(sp => sp ? { ...sp } : null);
+      for (const sp of engineSpecs) {
+        if (sp?.kind !== "item") continue;
+        const slot = this._itemMoveSlot(sp.item as string, sp.target, sp.moveSlot as number | undefined);
+        if (slot === null) return this._refuse("item-no-effect");
+        if (slot !== undefined) sp.moveSlot = slot;
+      }
       const entries: LedgerEntry[] = [];
-      for (const sp of specs) {
+      for (const sp of engineSpecs) {
         if (!sp || !sp.kind || sp.kind === "run") continue;
         const id = (sp.kind === "item" ? sp.item : sp.ball) as string;
         if ((this.bag[id] || 0) < 1) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("none-left"); }
@@ -406,7 +543,7 @@ export class BattleSession {
         }
         entries.push(this._reserve(sp.kind, id, sp.target));
       }
-      const ok = await this.gw.chooseSlots("p1", specs);
+      const ok = await this.gw.chooseSlots("p1", engineSpecs);
       if (!ok) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("choice-rejected"); }
       return commit ? this._resolveTurn() : { ok: true, staged: true };
     });
@@ -434,9 +571,14 @@ export class BattleSession {
     });
   }
 
-  async run(): Promise<TurnResult> {
+  async run({ duringReplacement = false }: { duringReplacement?: boolean } = {}): Promise<TurnResult> {
     return this._action(async () => {
       this._log("info", "choice", { action: "run" });
+      if (duringReplacement) {
+        if (this.foe.kind !== 'wild' || !this.currentRequest()?.forceSwitch?.[0]
+          || !this.gw.runAfterFaint || !await this.gw.runAfterFaint('p1')) return this._refuse('choice-rejected');
+        return this._resolveTurn();
+      }
       const q = this.gw.query("p1", "run");
       if (!q.allowed) return this._refuse(q.reason ?? "refused");
       if (!await this.gw.act("p1", { kind: "run" })) return this._refuse("not-registered");
@@ -446,6 +588,8 @@ export class BattleSession {
 
   /** Cancel the registered (not yet executed) choice; reserved items return to the bag. */
   async cancel(): Promise<void> {
+    const interrupted=cancelTrainerAiDecision(this),running=this._operationDone;
+    if(interrupted&&running)await running;
     return this._exclusive(async () => {
       await this.gw.cancel("p1");
       for (const e of this.ledger.filter((x) => x.state === "reserved")) this._refund(e, "cancelled");
@@ -457,6 +601,9 @@ export class BattleSession {
     return this._exclusive(async () => {
       const p = this.pendingLearn;
       if (!p) throw new Error("no learn decision pending");
+      // A normal refused HM replacement keeps the existing question and all working state.
+      // Empty output introduces no new protocol-v1 message; the read-only companion explains the refusal.
+      if (slotOrNull !== null && slotOrNull !== undefined && readBattleLearnProtection(this, slotOrNull)) return [];
       this.pendingLearn = null;
       if (slotOrNull !== null && slotOrNull !== undefined) this._learn(p.memberId, p.move, slotOrNull);
       await this._continueGrowth();
@@ -494,14 +641,19 @@ export class BattleSession {
   }
 
   async _resolveTurn(): Promise<TurnResult> {
-    // auto-choose the foe from its own pending request, then process whatever the engine produced
+    // Choose ordinary foe actions here. A queued foe action may already have let
+    // playerAction finish the turn; any resulting forced replacement must wait
+    // for growth and the existing replacement-offer path below.
     const foeRequest = this.gw.awaitingChoice("p2");
-    if (foeRequest) {
-      const c = this.ai(foeRequest);
-      if (!c || !await this.gw.choose("p2", c)) throw new Error("foe AI did not provide a legal choice");
+    if (foeRequest && !foeRequest.forceSwitch) {
+      if (!await runTrainerAi(this, this.gw)) {
+        const c = this.ai(foeRequest);
+        if (!c || !await this.gw.choose("p2", c)) throw new Error("foe AI did not provide a legal choice");
+      }
     }
     this._ingest();
     await this._continueGrowth();
+    this._syncWorkingFromEngine(true); // Ready working move PP; retain existing HP/status synchronization points.
     const messages = this.take();
     const kinds: Record<string, number> = {};
     for (const m of messages) kinds[m.kind] = (kinds[m.kind] ?? 0) + 1;
@@ -625,9 +777,11 @@ export class BattleSession {
   _onEvent(e: BattleEvent): void {
     const idOf = (s: string): string => s.replace(/^p\d[a-z]?: /, "");
     const arg0 = e.args[0] ?? "";
+    const identity = ["switch", "drag", "replace", "faint"].includes(e.type)
+      ? this.gw.participationIdentity?.(e) ?? { side: arg0.slice(0, 2), id: idOf(arg0), slot: arg0.charCodeAt(2) - 97 } : null;
+    if (e.type === "replace") return; // disguise reveal is not a new participant or encounter
     if (e.type === "switch" || e.type === "drag") {
-      const side = arg0.slice(0, 2); const id = idOf(arg0);
-      const slot = arg0.charCodeAt(2) - 97; // 'a' -> 0, 'b' -> 1
+      const { side, id, slot } = identity!; // 'a' -> 0, 'b' -> 1
       (this.activeNow[side] ??= [])[slot] = id;
       const ours = (this.activeNow["p1"] ?? []).filter(Boolean) as string[], theirs = (this.activeNow["p2"] ?? []).filter(Boolean) as string[];
       if (side === "p2") this.participants[id] = new Set(ours);
@@ -642,10 +796,11 @@ export class BattleSession {
           this._friendUnavailable = [...this._evidence.value.context.playerIds];
         }
       }
-      const side = arg0.slice(0, 2); const id = idOf(arg0);
-      (this.activeNow[side] ??= [])[arg0.charCodeAt(2) - 97] = null; // off the field: not a participant for later arrivals
-      if (side === "p2") this.growthQueue.push({ kind: "award", foeId: id });
+      const { side, id, slot } = identity!;
+      (this.activeNow[side] ??= [])[slot] = null; // off the field: not a participant for later arrivals
+      if (side === "p2") this.growthQueue.push({ kind: "award", foeId: id, items: requiredFaintGrowthItems(this, this.gw, e) });
     } else if (e.type === "rpg") {
+      trainerAiEvent(this, e);
       const [what, side, itemId, , res] = e.args;
       if (side !== "p1") return;
       if (what === "item") {
@@ -660,29 +815,30 @@ export class BattleSession {
   }
 
   // ------------------------------------------------------------------ growth
-  _syncWorkingFromEngine(): void {
+  _syncWorkingFromEngine(ppOnly = false): void {
     const st = Object.fromEntries(this.gw.readState("p1").map((x) => [x.id, x]));
     for (const m of this.party) {
       const e = st[m.id]; if (!e) continue;
-      m.hp = e.hp; m.status = e.status; m.statusCount = e.statusCount;
+      if (!ppOnly) { m.hp = e.hp; m.status = e.status; m.statusCount = e.statusCount; }
       for (const mv of m.moves) if (e.pp[mv.id] !== undefined) mv.pp = e.pp[mv.id]!;
     }
   }
 
   async _continueGrowth(): Promise<void> {
     for (;;) {
-      if (this.pendingLearn) return; // blocked on a UI decision
+      if (this.pendingLearn || this._pendingLearned) return; // blocked on a decision or the empty-slot learned message
       // a caught battle awards exp for the caught target before the result is built (WP38 step 3)
       if (this.ended && this.ended.reason === "caught" && !this._caughtAwarded) {
         this._caughtAwarded = true;
-        this.growthQueue.push({ kind: "award", foeId: (this.ended.outcome as { target: string }).target });
+        if (this.captureExpGain) this.growthQueue.push({ kind: "award", foeId: (this.ended.outcome as { target: string }).target });
       }
       while (this.growthQueue.length) {
         const task = this.growthQueue.shift()!;
-        if (task.kind === "award") { this._award(task.foeId); continue; }
+        if (task.kind === "award") { this._award(task.foeId, task.items); continue; }
+        if (task.kind === "growth") { this._applyGrowthStage(task); continue; }
         const m = this.party.find((x) => x.id === task.memberId)!;
         if (m.moves.some((x) => x.id === task.move.id)) continue;
-        if (m.moves.length < 4) { this._learn(task.memberId, task.move, null); continue; }
+        if (m.moves.length < 4) { this._learn(task.memberId, task.move, null); if (this._pendingLearned) return; continue; }
         this.pendingLearn = { memberId: task.memberId, move: task.move };
         this.out.push({ kind: "learn-prompt", member: task.memberId, move: task.move, slots: m.moves.map((x) => x.id) });
         return;
@@ -698,56 +854,126 @@ export class BattleSession {
   async _autoFoeReplacement(): Promise<boolean> {
     const req = this.gw.awaitingChoice("p2");
     if (!req || !req.forceSwitch) return false;
+    if (await prepareReplacementOffer(this)) return false;
+    if (await runTrainerAi(this, this.gw)) return true;
     const choice = this.ai(req);
     if (!choice || !await this.gw.choose("p2", choice)) throw new Error("foe AI did not provide a legal replacement");
     return true;
   }
 
-  _award(foeId: string): void {
+  _award(foeId: string, items?: Record<string, { current: string; recovery: string }>): void {
+    // WP42 §4.1: the growth gate precedes EV/EXP and leaves participation records intact.
+    if (!this.expGain) return;
     this._syncWorkingFromEngine();
     const foe = this.foeTeam.find((m) => m.id === foeId)!;
     const foeC = this.content.species[foe.species]!;
     const parts = [...(this.participants[foeId] || [])];
-    const alive = new Set(this.gw.readState("p1").filter((x) => !x.fainted).map((x) => x.id));
+    const liveMembers = this.gw.readState("p1");
+    const alive = new Set(liveMembers.filter((x) => !x.fainted).map((x) => x.id));
     const receivers = this.party.filter((m) => parts.includes(m.id) && alive.has(m.id));
-    const learns: GrowthTask[] = [];
+    const initialStages: GrowthTask[] = [], stages: GrowthTask[] = [];
     for (const m of receivers) {
-      const evs = G.gainEvs(m.evs ?? {}, foeC.evYield);
+      // A legacy/custom driver without the required channel does not acquire held-item authority from save data.
+      const pair = items ? own(items, m.id) : requiredGrowthItems(this, this.gw, m.id);
+      if (items && !pair) throw new Error("battle-growth-member-source-unavailable");
+      const held = G.heldGrowthModifiers(foeC.evYield, pair ?? { current: "", recovery: "" });
+      const evs = G.gainEvs(m.evs ?? {}, held.evYield);
       const withEv: Member = { ...m, evs };
-      const amount = G.battleExp({ foe: { level: foe.level, baseExp: foeC.baseExp }, receiver: withEv, participants: receivers.length, rules: this.rules, trainer: this.foe.kind === "trainer" });
+      const amount = G.battleExp({ foe: { level: foe.level, baseExp: foeC.baseExp }, receiver: withEv, participants: receivers.length, rules: this.rules, trainer: this.foe.kind === "trainer", luckyEgg: held.luckyEgg });
       const res = G.applyExp(withEv, amount, this.content, m);
-      const idx = this.party.indexOf(m);
-      this.party[idx] = res.member;
-      if (this.gw.readState("p1").some(p => p.id === m.id && p.active && !p.fainted)) {
-        for (const _level of res.log.levels) this._changeBattleFriendship(m.id, "levelup");
-      }
-      const changed = amount > 0 || JSON.stringify(evs) !== JSON.stringify(m.evs);
-      if (changed) {
-        const eng = this.gw.applyGrowth("p1", m.id, { level: res.member.level, evs, expect: { stats: res.after.stats } });
-        if (eng.after.hp !== res.member.hp && m.hp > 0) {
-          this._log("error", "failure", { what: "hp-rule-mismatch", member: m.id, engine: eng.after.hp, game: res.member.hp });
-          throw new Error(`HP rule mismatch for ${m.id}: engine ${eng.after.hp} vs game ${res.member.hp}`);
+      // EXP/EVs and permanent stat validation keep their original species identity.
+      // HP alone can have a different natural battle-form base (Power Construct).
+      // Recompute it with the independent rules formula, not the engine's result.
+      const live = liveMembers.find(member => member.id === m.id)!;
+      const hpStats = (level: number): number => G.computeStats({
+        ...this.content.species[m.species]!.base,
+        ...(live.growthHpBase === undefined ? {} : { hp: live.growthHpBase }),
+      }, m.ivs, evs, level, m.statNature ?? m.nature).hp;
+      let battleHp = m.hp, battleMaxhp = live.maxhp;
+      if (live.growthHpBase !== undefined) {
+        for (const up of res.log.levels) {
+          const maxhp = hpStats(up.level);
+          battleHp = G.hpAfterRecalc(battleHp, battleMaxhp, maxhp); battleMaxhp = maxhp;
+          up.hp = battleHp; up.maxhp = maxhp;
         }
-        this.grew = true;
+        if (!res.log.levels.length) battleHp = G.hpAfterRecalc(battleHp, battleMaxhp, hpStats(res.after.level));
+        res.member.hp = battleHp; res.after.hp = battleHp;
       }
+      const displayStats = (stats: Stats, level: number): Stats => live.growthHpBase === undefined ? stats : { ...stats, hp: hpStats(level) };
+      const changed = amount > 0 || JSON.stringify(evs) !== JSON.stringify(m.evs);
       this._log("info", "growth", { member: m.id, foe: foeId, exp: amount, level: res.member.level, levelUps: res.log.levels.length });
-      this.out.push({ kind: "growth", member: m.id, foe: foeId, exp: amount, level: res.member.level, levelUps: res.log.levels.map((l) => l.level), hp: res.member.hp });
-      for (const pm of res.log.pendingMoves) learns.push({ kind: "learn", memberId: m.id, move: this.gw.moveInfo(pm.move) });
+      // Publish the already computed interval, so the view never reconstructs growth from mutable live state.
+      const segments: GrowthDisplay['segments'] = [];
+      const curve = this.content.species[m.species]!.growth;
+      for (let level = res.before.level; level <= res.after.level; level++) {
+        const floor = G.minExp(curve, level), ceiling = G.minExp(curve, level + 1);
+        const start = Math.max(floor, res.before.exp), stop = Math.min(ceiling, res.after.exp);
+        const levelUp = res.log.levels.find(item => item.level === level + 1);
+        if (ceiling > floor && (stop > start || levelUp)) segments.push({ level, from: stop > start ? (start - floor) / (ceiling - floor) : 1, to: stop > start ? (stop - floor) / (ceiling - floor) : 1,
+          ...(levelUp ? { levelUp: { level: levelUp.level, hp: levelUp.hp, maxhp: levelUp.maxhp, stats: { before: { ...displayStats(res.log.levels.find(item => item.level === level)?.stats ?? res.before.stats, level),
+            ...(live.growthHpBase !== undefined && level === res.before.level ? { hp: live.maxhp } : {}) }, after: { ...displayStats(levelUp.stats, levelUp.level) } } } } : {}) });
+      }
+      const finalFloor = G.minExp(curve, res.after.level), finalCeiling = G.minExp(curve, res.after.level + 1);
+      // Pause application as well as presentation at each level that may learn a move.
+      // Tasks are plain data in the existing rollback queue; future stages preserve any learned slots/PP.
+      const cuts = [...new Set(res.log.pendingMoves.map(pm => pm.level).filter(level => level < res.after.level)), res.after.level].sort((a, b) => a - b);
+      let segmentIndex = 0, fromLevel = res.before.level;
+      for (let index = 0; index < cuts.length; index++) {
+        const level = cuts[index]!, last = index === cuts.length - 1;
+        const stop = last ? segments.length : segments.findIndex(segment => segment.levelUp?.level === level) + 1;
+        const up = res.log.levels.find(item => item.level === level);
+        const hp = last ? res.after.hp : up!.hp, stats = last ? res.after.stats : up!.stats;
+        const levelUps = res.log.levels.filter(item => item.level > fromLevel && item.level <= level).map(item => item.level);
+        const message: Extract<SessionMessage, { kind: 'growth' }> = { kind: "growth", member: m.id, foe: foeId, exp: index === 0 ? amount : 0, level, levelUps, hp };
+        const display: GrowthDisplay = { version: 1,
+          fromExp: index === 0 ? res.before.exp : Math.max(res.before.exp, G.minExp(curve, fromLevel)),
+          toExp: last ? res.after.exp : Math.max(res.before.exp, G.minExp(curve, level)),
+          fromLevel, toLevel: level, hp, maxhp: displayStats(stats, level).hp,
+          ratio: last ? (finalCeiling > finalFloor ? (res.after.exp - finalFloor) / (finalCeiling - finalFloor) : 1) : 0,
+          segments: segments.slice(segmentIndex, stop),
+          ...(cuts.length > 1 ? { experienceGained: index === 0 ? res.after.exp - res.before.exp : 0 } : {}) };
+        (index === 0 ? initialStages : stages).push({ kind: "growth", memberId: m.id, exp: res.after.exp, evs, level, hp, stats, levelUps, changed, message, display });
+        for (const pm of res.log.pendingMoves.filter(pm => pm.level > fromLevel && pm.level <= level)) stages.push({ kind: "learn", memberId: m.id, move: this.gw.moveInfo(pm.move) });
+        segmentIndex = stop; fromLevel = level;
+      }
     }
-    this.growthQueue.unshift(...learns);
+    // Preserve the existing per-foe payment boundary for every eligible participant before the first decision.
+    this.growthQueue.unshift(...initialStages, ...stages);
     this.participants[foeId] = new Set(); // paid once per foe
+  }
+
+  _applyGrowthStage(task: Extract<GrowthTask, { kind: "growth" }>): void {
+    const index = this.party.findIndex(member => member.id === task.memberId), prior = this.party[index]!;
+    this.party[index] = { ...prior, exp: task.exp, evs: { ...task.evs }, level: task.level, hp: task.hp };
+    if (task.changed) {
+      const applied = this.gw.applyGrowth("p1", task.memberId, { level: task.level, evs: task.evs, expect: { stats: task.stats } });
+      if (applied.after.hp !== task.hp && prior.hp > 0) {
+        this._log("error", "failure", { what: "hp-rule-mismatch", member: task.memberId, engine: applied.after.hp, game: task.hp });
+        throw new Error(`HP rule mismatch for ${task.memberId}: engine ${applied.after.hp} vs game ${task.hp}`);
+      }
+      this.grew = true;
+    }
+    if (this.gw.readState("p1").some(member => member.id === task.memberId && member.active && !member.fainted)) {
+      for (const _level of task.levelUps) this._changeBattleFriendship(task.memberId, "levelup");
+    }
+    _publishGrowthDisplay(this, task.message, task.display);
+    this.out.push(task.message);
   }
 
   _learn(memberId: string, move: { id: string; name: string; pp: number }, replaceSlot: number | null | undefined): void {
     const m = this.party.find((x) => x.id === memberId)!;
+    const replaceMoveId = replaceSlot === null || replaceSlot === undefined ? undefined : m.moves[replaceSlot]!.id;
     const rec = { id: move.id, pp: move.pp, maxpp: move.pp };
     if (replaceSlot === null || replaceSlot === undefined) m.moves.push(rec); else m.moves[replaceSlot] = rec;
-    this.gw.applyGrowth("p1", memberId, { level: m.level, evs: m.evs, newMoves: [move.name], replaceSlot });
+    if (this._waitForLearnedMessages && (replaceSlot === null || replaceSlot === undefined)) {
+      this._pendingLearned = { memberId, move: { ...move } };
+    } else this.gw.applyGrowth("p1", memberId, { level: m.level, evs: m.evs, newMoves: [move.name], replaceSlot, replaceMoveId });
     this.grew = true;
     this.out.push({ kind: "learned", member: memberId, move: move.id, replaced: replaceSlot ?? null });
   }
 
   _finishTurn(): void {
+    if (hasReplacementOffer(this)) { this.requests = {}; clearRequestView(this); return; }
     if (this.ended) {
       this._buildResult(); this.finished = true;
       this._log("info", "end", { reason: this.ended.reason, winner: this.ended.winner, bag: this._result?.bag, members: Object.keys(this._result?.members ?? {}).length });
@@ -757,7 +983,8 @@ export class BattleSession {
     let reqs = this.held.splice(0).filter((m) => !(m.kind === "request" && m.side === "p2" && m.request["forceSwitch"])); // foe replacements are internal
     if (this.grew) { this.grew = false; reqs = this.gw.refreshRequests(); this.gw.discardQueued(); }
     this.requests = {};
-    for (const m of reqs) if (m.kind === "request") { this.requests[m.side] = m.request; this.out.push(m); this._log("info", "request", { side: m.side, seq: m.seq, forceSwitch: !!m.request["forceSwitch"], wait: !!m.request["wait"] }); }
+    clearRequestView(this);
+    for (const m of reqs) if (m.kind === "request") { this.requests[m.side] = m.request; publishRequestView(this, m); this.out.push(m); this._log("info", "request", { side: m.side, seq: m.seq, forceSwitch: !!m.request["forceSwitch"], wait: !!m.request["wait"] }); }
   }
 
   _buildResult(): void {
@@ -766,7 +993,15 @@ export class BattleSession {
     for (const e of this.ledger) if (e.state === "reserved") this._refund(e, "unexecuted");
     this._syncWorkingFromEngine();
     const members: BattleResult["members"] = {};
-    for (const m of this.party) members[m.id] = { level: m.level, exp: m.exp, hp: m.hp, ...persistentStatus(m.status, m.statusCount), moves: m.moves.map(({id,pp,maxpp}) => ({id,pp,maxpp})), evs: m.evs! };
+    const liveMembers = this.gw.readState("p1");
+    for (const m of this.party) {
+      const live = liveMembers.find(member => member.id === m.id);
+      // Native in-battle formes remain live through the final KO. Protocol v1 writes the
+      // persistent individual, so end-of-battle form regression uses the same HP delta rule.
+      const hp = live?.growthHpBase === undefined ? m.hp : G.hpAfterRecalc(m.hp, live.maxhp,
+        G.computeStats(this.content.species[m.species]!.base, m.ivs, m.evs, m.level, m.statNature ?? m.nature).hp);
+      members[m.id] = { level: m.level, exp: m.exp, hp, ...persistentStatus(m.status, m.statusCount), moves: m.moves.map(({id,pp,maxpp}) => ({id,pp,maxpp})), evs: m.evs! };
+    }
     const bag: Record<string, number> = {};
     for (const k of new Set([...Object.keys(this.startBag), ...Object.keys(this.bag)])) {
       const d = (this.bag[k] || 0) - (this.startBag[k] || 0);
@@ -784,11 +1019,57 @@ export class BattleSession {
       const eng = this.gw.readState("p2").find((x) => x.id === c.id)!;
       const curve = this.content.species[c.species]!.growth;
       result.captured.push(S.protocolMember({
-        ...c, exp: G.minExp(curve, c.level), hp: eng.hp, ...persistentStatus(eng.status, eng.statusCount),
+        ...c, exp: G.minExp(curve, c.level), hp: eng.growthHpBase === undefined ? eng.hp : G.hpAfterRecalc(eng.hp, eng.maxhp,
+          G.computeStats(this.content.species[c.species]!.base, c.ivs, c.evs, c.level, c.statNature ?? c.nature).hp), ...persistentStatus(eng.status, eng.statusCount),
+        item: requiredCaptureItem(this, this.gw, c.id) ?? c.item,
         moves: c.moves.map((mv) => ({ id: mv.id, pp: eng.pp[mv.id] ?? mv.pp, maxpp: mv.maxpp })), ball: outcomeInfo!.ball,
       }));
       result.dex.owned.push(c.species);
     }
     this._result = result;
+    finalizeRequiredSettlement(this, this.gw, result);
   }
+}
+
+
+/** Host presentation companion, outside the frozen protocol-v1 Session call set.
+ * Real Scenes opt in before growth; legacy direct/headless consumers remain automatic.
+ */
+export function bindLearningPresentation(session: BattleSession): void {
+  if (!(session instanceof BattleSession)) return; // Existing controlled host handles have no growth presenter.
+  session._assertUsable();
+  if (session._operation || session.finished || session.pendingLearn || session._pendingLearned || session.growthQueue.length) throw new Error('learning presentation must bind before growth');
+  session._waitForLearnedMessages = true;
+}
+export function readLearnedMessagePending(session: BattleSession): boolean { return !!session._pendingLearned; }
+
+/** WP66-A: swap whole individual records. Battle wrappers keep their independent order (WP20 5.5).
+ * Session-owned command outside the frozen prototype, never a persistent management transaction or turn.
+ */
+export async function reorderBattleSummaryMoves(session: BattleSession, id: string, from: number, to: number,
+  expectedOrder: readonly string[]): Promise<boolean> {
+  if (session._operation || session.finished || session.ended || session.broken || session._staged ||
+    session.pendingLearn || session._pendingLearned || session.growthQueue.length) return false;
+  const member = session.party.find(member => member.id === id);
+  if (!member || member.isEgg || (member as Member & { shadow?: boolean }).shadow || !Array.isArray(expectedOrder) ||
+    expectedOrder.length !== member.moves.length || member.moves.some((move, i) => move.id !== expectedOrder[i]) ||
+    !Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || to < 0 ||
+    from >= member.moves.length || to >= member.moves.length || !session.gw.readState('p1').some(live => live.id === id)) return false;
+  return session._exclusive(async () => {
+    [member.moves[from], member.moves[to]] = [member.moves[to]!, member.moves[from]!];
+    return true;
+  });
+}
+
+/** Owned Scene completion only; no protocol-v1 message or result field is added. */
+export async function completeLearnedMessage(session: BattleSession): Promise<TurnResult> {
+  return session._exclusive(async () => {
+    const pending = session._pendingLearned;
+    if (!pending) throw new Error('no learned message pending');
+    const member = session.party.find(m => m.id === pending.memberId)!;
+    session.gw.applyGrowth('p1', member.id, { level: member.level, evs: member.evs, newMoves: [pending.move.name], replaceSlot: null });
+    session._pendingLearned = null;
+    await session._continueGrowth();
+    return { ok: true, messages: session.take() };
+  });
 }

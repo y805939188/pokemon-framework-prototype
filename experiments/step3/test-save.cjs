@@ -19,7 +19,7 @@ const migrateGame = (raw, o = { speciesKey: E.speciesKey.identityKeys, content: 
 const addedByNewerSchemas = s => ['claims', 'schema', 'stats', 'steps', ...['party', 'boxes'].flatMap(k => s[k].map((_, i) => `${k}.${i}.form`))].sort();
 const { SaveStore, SaveError } = E.store;
 // the fixture world (content ids = Showdown names) is chosen explicitly: the store guesses no species keys (step 5.0 review F03)
-const store = (f, hooks = {}) => new SaveStore(f, hooks, E.speciesKey.identityKeys, E.fixtures.content);
+const store = (f, hooks = {}) => E.fakes.createFixtureSaveStore(f, hooks, E.speciesKey.identityKeys, E.fixtures.content);
 const S = E.state;
 const F = E.fixtures;
 
@@ -65,7 +65,7 @@ test('the oldest prototype shape: counters are added, bad poison becomes plain p
 	assert.deepEqual([a.status, a.statusCount], ['', 0]);
 	assert.deepEqual([b.status, b.statusCount], ['psn', 0]);
 	assert.deepEqual([c.status, c.statusCount], ['slp', undefined], 'no number is invented for a sleeper');
-	assert.equal(r.notes.length, 7); assert.match(r.notes.join('|'), /schema 7: existing readiness is known/); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /schema 4/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
+	assert.equal(r.notes.length, E.saveSchema.SUPPORTED_SCHEMAS.length); assert.match(r.notes.join('|'), /schema 7: existing readiness is known/); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /schema 4/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
 	assert.deepEqual(validateGame(r.state), []);
 });
 

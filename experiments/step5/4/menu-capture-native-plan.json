@@ -1,0 +1,127 @@
+{
+  "version": "menu-capture-native-v1",
+  "productCommit": "e9ea723e4b8d0ec28d2109de368d7ddbd184581c",
+  "productRuntime": {
+    "js/plugins/PS_BattleFlow.js": "9f8432c5e9c9817a4b29e802e2413cdf1ba416e1f76171d3f030eb8d07768035",
+    "js/plugins/PS_SaveState.js": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "js/plugins/PS_Evolution.js": "294f6875f4f0d3b3e531c03b1ec387307f27b8b3f119b8bf60ba92a53843f0f4",
+    "js/engine/build/engine.cjs": "ff1b01d47122e07462c28bc52277629b75b13c134808afef4e2fda3cb7991734",
+    "js/engine/build/production.cjs": "ba805c45a55dcc50a600a2474e2342f71641aed72fff2b0771eb8efba0b4fc87"
+  },
+  "prefix": "pf_capture_me_v1/",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "mapId": 5,
+  "deadlineSeconds": 180,
+  "waitMs": 3500,
+  "zeroPPKey": 4,
+  "moves": [
+    {
+      "id": "ember",
+      "pp": 6,
+      "maxpp": 25
+    },
+    {
+      "id": "watergun",
+      "pp": 12,
+      "maxpp": 25
+    },
+    {
+      "id": "growl",
+      "pp": 40,
+      "maxpp": 40
+    },
+    {
+      "id": "tackle",
+      "pp": 0,
+      "maxpp": 35
+    }
+  ],
+  "cards": [
+    {
+      "type": "Fire",
+      "typeColour": "#cf6a38",
+      "pp": "PP 6/25",
+      "ppColour": "#b35d00"
+    },
+    {
+      "type": "Water",
+      "typeColour": "#4d7cbd",
+      "pp": "PP 12/25",
+      "ppColour": "#8b7300"
+    },
+    {
+      "type": "Normal",
+      "typeColour": "#8b8b74",
+      "pp": "PP 40/40",
+      "ppColour": "#202028"
+    },
+    {
+      "type": "Normal",
+      "typeColour": "#8b8b74",
+      "pp": "PP 0/35",
+      "ppColour": "#bd2929"
+    }
+  ],
+  "cases": [
+    {
+      "id": "MC01",
+      "language": "en",
+      "ending": "after-complete"
+    },
+    {
+      "id": "MC02",
+      "language": "zh",
+      "ending": "during-melody"
+    }
+  ],
+  "groups": [
+    {
+      "name": "menu-and-normal-capture",
+      "ids": [
+        "MC01",
+        "MC02"
+      ]
+    }
+  ],
+  "renderStages": {
+    "MC01": [
+      "move-cards",
+      "gotcha-full",
+      "melody-visible"
+    ],
+    "MC02": [
+      "move-cards",
+      "gotcha-full",
+      "melody-visible"
+    ]
+  },
+  "fontResourcePaths": [
+    "data/System.json",
+    "fonts/mplus-1m-regular.woff",
+    "fonts/mplus-2p-bold-sub.woff"
+  ],
+  "worldFiles": [
+    "data/System.json",
+    "data/CommonEvents.json",
+    "data/Map005.json"
+  ],
+  "mediaRecipe": "scripts/prepare-capture-me-native-assets.cjs",
+  "mediaPlan": "experiments/step5/4/capture-me-native-plan.json",
+  "requiredAssets": [
+    "audio/bgm/pf_capture_me_v1/world.ogg",
+    "audio/bgm/pf_capture_me_v1/battle.ogg",
+    "audio/me/pf_capture_me_v1/long.ogg"
+  ],
+  "notProved": [
+    "physical input/hearing/Windows",
+    "full inventory UI: ball via Scene.act plus real Session.throwBall",
+    "final capture receiving/save/Continue commit: both cases deliberately abort with zero persistent writes",
+    "all18type images/dynamic move types",
+    "full D2/E/5.4/P4/GC/U51 and retained issues"
+  ]
+}

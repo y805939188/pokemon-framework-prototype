@@ -9,6 +9,40 @@ import legacy = require("@pokemon-framework/engine/legacy");
 import legacyStore = require("@pokemon-framework/engine/legacy/game/store.cjs");
 import compiledSample = require("@pokemon-framework/engine/content/sample.json");
 
+const strategyRef: production.composition.TrainerAiStrategyReference = {id: "basic-gen8", version: "1", parameters: {}};
+const trainerType: production.trainerTeam.BuildTrainerTeamInput["type"] = {id:"sdk-type",nameKey:"sdk.type",gender:0,baseMoney:1,skillLevel:0,flags:[],items:[],source:"sdk",aiStrategy:strategyRef};
+const trainerRecord: production.trainerTeam.BuildTrainerTeamInput["record"] = {id:"sdk-record",type:"sdk-type",name:"SDK",version:37,party:[],source:"sdk"};
+const trainerProjection = production.trainerTeam.trainerBattleProjection(trainerRecord,trainerType);
+assert.deepEqual(trainerProjection.ai.aiStrategy,strategyRef);
+const strategyPin = production.composition.createTrainerAiStrategyRegistry().resolve(trainerProjection.ai.aiStrategy);
+assert.equal(strategyPin.binding.id,"basic-gen8");
+assert.equal(strategyPin.binding.version,"1");
+assert.deepEqual(strategyPin.parameters,strategyRef.parameters);
+assert.equal(production.composition.createTrainerAiStrategyRegistry,legacy.composition.createTrainerAiStrategyRegistry);
+assert.equal(trainerProjection.version,37);
+
+// Ordinary methods and private-field classes are part of the public extension contract.
+class ReceiverRegistration implements production.composition.TrainerAiStrategyRegistration {
+  #slot = 2;
+  id = "consumer-receiver"; version = "1"; implementationIdentity = "consumer/receiver/1";
+  validateParameters(parameters: production.composition.StrategyParameters): void { assert.equal(parameters.slot,this.#slot); }
+  create(catalog: production.trainerAi.TrainerAiCatalog): production.composition.TrainerAiStrategy {
+    assert.equal(this.#slot,2);
+    const policy = production.trainerAi.createTrainerAiPolicy(catalog);
+    return {decide: (snapshot,_parameters,random) => policy.decide(snapshot,random)};
+  }
+}
+class ReceiverRegistry implements production.composition.TrainerAiStrategyRegistry {
+  #backing = production.composition.createTrainerAiStrategyRegistry();
+  register(entry: production.composition.TrainerAiStrategyRegistration,active = true): void { this.#backing.register(entry,active); }
+  setActive(id: string,version: string): void { this.#backing.setActive(id,version); }
+  resolve(reference?: production.composition.TrainerAiStrategyReference) { return this.#backing.resolve(reference); }
+}
+const receiverRegistry = new ReceiverRegistry();
+receiverRegistry.register(new ReceiverRegistration());
+const receiverCatalog: production.trainerAi.TrainerAiCatalog = {gen:8,moves:{},types:{Normal:{Normal:{numerator:1,denominator:1}}},items:{}};
+assert.equal(receiverRegistry.resolve({id:"consumer-receiver",parameters:{slot:2}}).instantiate(receiverCatalog,"consumer-value-only").binding.version,"1");
+
 type GameState = production.state.GameState;
 type BattleResult = production.state.BattleResult;
 
@@ -69,7 +103,7 @@ const sessions: production.app.BattleSessionFactory<production.app.BattleHandle>
 function application(state: MemoryState, projection: RecordingProjection) {
   return new production.app.GameApplication({
     state,
-    sessions,
+    sessions: production.composition.createLegacyNoHeldSessionFactory(sessions),
     projection,
     content: () => ({ content }),
     random: lcg(11),
@@ -177,6 +211,21 @@ async function main() {
   const realSession = await realApp.startBattle(realRequest);
   assert.equal((await realSession.run()).ok, true);
   assert.deepEqual([realApp.finishBattle(realSession, realRequest).commit, realApp.finishBattle(realSession, realRequest).commit], ["applied", "already-applied"]);
+
+  // Public migration uses an application-owned opaque preview and a real local Store adapter.
+  const migrationFile = path.join(process.cwd(), "consumer-output/friendship.json");
+  fs.mkdirSync(path.dirname(migrationFile), {recursive:true});
+  const migrationGame = JSON.parse(JSON.stringify(state.read())) as GameState;
+  migrationGame.party[0]!.friendship = 256;
+  const migrationState = new MemoryState(migrationGame);
+  const migrationStore = new production.store.SaveStore(migrationFile, {}, production.speciesKey.speciesKeyResolver(content), content);
+  migrationStore.save(migrationGame);
+  const migrationApp = new production.app.GameApplication({state:migrationState,content:()=>({content}),sessions:production.composition.createBattleSessionFactory({content:()=>content}),projection:{project(){}}});
+  const migrationPreview = await migrationApp.previewFriendshipMigration(migrationStore.friendshipMigration());
+  if (migrationPreview.status !== "ready") throw Error(JSON.stringify(migrationPreview));
+  assert.equal((await migrationApp.confirmFriendshipMigration(migrationPreview.handle)).status,"applied");
+  assert.equal((await migrationApp.confirmFriendshipMigration(migrationPreview.handle)).status,"already-applied");
+  assert.equal(migrationState.read().party[0]!.friendship,255);
 
   // The author CLI is resolved through package exports and runs from this external cwd.
   const cli = require.resolve("@pokemon-framework/engine/content-cli");

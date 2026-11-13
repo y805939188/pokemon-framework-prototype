@@ -1,3 +1,4 @@
+import { migrateFriendshipAuthorFiles } from "./friendship-author-files";
 /**
  * Content tooling entry (built to js/engine/build/content-cli.cjs): `build`, `check`, `check-item-pockets`, `inventory`, `import-pbs`.
  *   build      compile content/<src> into data/framework/content.json (a failed build REMOVES the old output, so a
@@ -19,7 +20,8 @@ import { checkItemInputs } from "../content/item-input";
 import { importPbsBundle, importPbsSpecies } from "../content/pbs-import";
 import { importPbsRegionalDex } from "../content/pbs-regional-dex";
 import type { PbsFile } from "../content/pbs-regional-dex";
-import type { CompiledContent, ContentError, ContentInputs } from "../content/schema";
+import type { AuthorSchema, CompiledContent, ContentError, ContentInputs } from "../content/schema";
+import { authorCompatibilityDiagnostics, authorSchemaProblem } from "../content/friendship-author-domain";
 import { createDexLookup } from "../battle/dex";
 import { CONTENT_SHOWDOWN_SHA } from "../content/showdown-pin";
 import { loadCompiled, assembleContent } from "../flow/content-runtime";
@@ -36,14 +38,16 @@ function readInputs(dir: string): { inputs: ContentInputs; errors: ContentError[
     try { return JSON.parse(fs.readFileSync(path.join(dir, file), "utf8")); }
     catch (e) { errors.push({ file, path: "$", message: `cannot read as JSON: ${(e as Error).message}` }); return undefined; }
   };
-  // grants.json (step 4) and settings.json (step 5.0) are optional; every other file is required
+  // Optional feature files are absent from legacy content; every file named by the base pipeline remains required.
   const grants = fs.existsSync(path.join(dir, "grants.json")) ? read("grants.json") : undefined;
   const settings = fs.existsSync(path.join(dir, "settings.json")) ? read("settings.json") : undefined;
   const items = fs.existsSync(path.join(dir, "items.json")) ? read("items.json") : undefined;
   const shops = fs.existsSync(path.join(dir, "shops.json")) ? read("shops.json") : undefined;
   const regionalDex = fs.existsSync(path.join(dir, "regional-dex.json")) ? read("regional-dex.json") : undefined;
   const mapMetadata = fs.existsSync(path.join(dir, "map-metadata.json")) ? read("map-metadata.json") : undefined;
-  const inputs = { ...(regionalDex !== undefined ? {regionalDex} : {}), ...(mapMetadata !== undefined ? {mapMetadata} : {}), ...(items !== undefined ? {items} : {}), ...(shops !== undefined ? {shops} : {}), manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json"), ...(grants !== undefined ? { grants } : {}), ...(settings !== undefined ? { settings } : {}) };
+  const trainerTypes = fs.existsSync(path.join(dir, "trainer-types.json")) ? read("trainer-types.json") : undefined;
+  const trainers = fs.existsSync(path.join(dir, "trainers.json")) ? read("trainers.json") : undefined;
+  const inputs = { ...(regionalDex !== undefined ? {regionalDex} : {}), ...(mapMetadata !== undefined ? {mapMetadata} : {}), ...(items !== undefined ? {items} : {}), ...(shops !== undefined ? {shops} : {}), manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json"), ...(grants !== undefined ? { grants } : {}), ...(settings !== undefined ? { settings } : {}), ...(trainerTypes !== undefined ? {trainerTypes} : {}), ...(trainers !== undefined ? {trainers} : {}) };
   return { inputs, errors };
 }
 
@@ -53,6 +57,15 @@ function buildPin(): string {
   return sha;
 }
 const show = (errors: ContentError[]): void => { for (const e of errors) console.error(`${e.file} ${e.path}: ${e.message}`); };
+const warn = (warnings: ContentError[]): void => { for (const w of warnings) console.warn(`WARNING ${w.file} ${w.path}: ${w.message}`); };
+/** Importers must choose from the owning manifest before reading PBS; never infer legacy from data. */
+function authorContext(inputs: ContentInputs): AuthorSchema | null {
+  const schema = (inputs.manifest as {schema?: unknown} | null)?.schema;
+  const problem = authorSchemaProblem(schema);
+  if (problem) { show([{file:"manifest.json",path:"$.schema",message:problem}]); return null; }
+  warn(authorCompatibilityDiagnostics(schema));
+  return schema as AuthorSchema;
+}
 
 export function build(src: string, out: string): number {
   const fail = (errors: ContentError[]): number => {
@@ -72,9 +85,10 @@ export function build(src: string, out: string): number {
     const { inputs, errors } = readInputs(src);
     const r = errors.length ? { ok: false as const, errors } : compileContent(inputs, {}, {showdownSha:buildPin()});
     if (!r.ok) return fail(r.errors);
+    warn(r.warnings);
     const assembled = assembleContent(r.data, createDexLookup());
     if (assembled.errors.length) return fail(assembled.errors);
-    for (const warning of r.warnings) console.warn(`WARNING ${warning.file} ${warning.path}: ${warning.message}`);
+    warn(assembled.warnings);
     const text = canonicalJson(r.data, 2) + "\n";
     fs.mkdirSync(path.dirname(out), { recursive: true });
     if (!fs.existsSync(out) || fs.readFileSync(out, "utf8") !== text) fs.writeFileSync(out, text);
@@ -88,6 +102,7 @@ export function build(src: string, out: string): number {
 export function check(src: string, out: string): number {
   const { inputs, errors } = readInputs(src);
   if (errors.length) { show(errors); return 1; }
+  if (authorContext(inputs) === null) return 1;
   let compiled: unknown;
   try { compiled = JSON.parse(fs.readFileSync(out, "utf8")); } catch { compiled = undefined; }
   const stale = checkFresh(compiled, inputs);
@@ -102,9 +117,11 @@ export function inventory(src: string, report: string): number {
   const { inputs, errors } = readInputs(src);
   const r = errors.length ? { ok: false as const, errors } : compileContent(inputs, {}, {showdownSha:buildPin()});
   if (!r.ok) { show(r.errors); return 1; }
+  warn(r.warnings);
   const dex = createDexLookup();
   const assembled = assembleContent(r.data as CompiledContent, dex);
   if (assembled.errors.length) { show(assembled.errors); return 1; }
+  warn(assembled.warnings);
   const tally: Record<Cmp, number> = { consistent: 0, differs: 0, "framework-only": 0 };
   const rows = r.data.species.map((sp) => {
     const sd = dex.levelUpMoves(sp.showdownId) ?? {};
@@ -126,6 +143,7 @@ export function inventory(src: string, report: string): number {
     note: "Field-level inventory only. Equal data is not equal behaviour. Framework-only fields have no Showdown counterpart to compare; the sample learnsets are synthetic placeholders, so 'differs' and 'framework-only' are expected there.",
     summary: { species: rows.length, learnComparisons: tally },
     species: rows,
+    creationWarnings: assembled.warnings,
   };
   fs.mkdirSync(path.dirname(report), { recursive: true });
   fs.writeFileSync(report, canonicalJson(doc, 2) + "\n");
@@ -138,6 +156,7 @@ export function checkItemPockets(src:string,previousFile:string):number {
   const {inputs,errors}=readInputs(src);
   const compiled=errors.length?{ok:false as const,errors}:compileContent(inputs, {}, {showdownSha:buildPin()});
   if(!compiled.ok){show(compiled.errors);return 1;}
+  warn(compiled.warnings);
   let previous:unknown;
   try{previous=JSON.parse(fs.readFileSync(previousFile,"utf8"));}catch(error){console.error(`previous items: cannot read JSON: ${(error as Error).message}`);return 1;}
   if(!Array.isArray(previous)){console.error("previous items: supply an explicit published items.json array; historical fallback pockets cannot be inferred");return 1;}
@@ -162,6 +181,8 @@ export function importPbs(src: string, file: string, sourceId: string, report: s
   if (problems.length) { show(problems); console.error("sources.json has problems: nothing was imported"); return 1; }
   const gate = preUseProblem(sources, sourceId);
   if (gate) { console.error(`sources.json ${sourceId}: ${gate}; nothing was imported`); return 1; }
+  const authorSchema = authorContext(inputs);
+  if (authorSchema === null) return 1;
   let text: string;
   try { text = fs.readFileSync(file, "utf8"); } catch (e) { console.error(`cannot read ${file}: ${(e as Error).message}`); return 1; }
   if (itemMode) {
@@ -171,10 +192,10 @@ export function importPbs(src: string, file: string, sourceId: string, report: s
     fs.writeFileSync(report, canonicalJson({schema:1,source:sourceId,...r,ok,items:checked.items,contentErrors:checked.errors},2)+'\n');
     return ok ? 0 : 1;
   }
-  const r = importPbsSpecies(text, sourceId);
+  const r = importPbsSpecies(text, sourceId, authorSchema);
   for (const e of r.errors) console.error(`${path.basename(file)}:${e.line} ${e.path}: ${e.message}`);
   fs.mkdirSync(path.dirname(report), { recursive: true });
-  fs.writeFileSync(report, canonicalJson({ schema: 1, file: path.basename(file), source: sourceId, ok: r.ok, species: r.species, records: r.records, errors: r.errors }, 2) + "\n");
+  fs.writeFileSync(report, canonicalJson({ schema: 1, authorSchema, file: path.basename(file), source: sourceId, ok: r.ok, species: r.species, records: r.records, errors: r.errors, warnings:r.warnings }, 2) + "\n");
   console.log(`import-pbs: ${r.species.length} species record(s), ${r.errors.length} problem(s) -> ${path.relative(ROOT, report)}`);
   return r.ok ? 0 : 1;
 }
@@ -188,6 +209,8 @@ export function importPbsFiles(src: string, sourceId: string, report: string, re
   const gate=preUseProblem(sources,sourceId);
   if(gate)problems.push({file:"sources.json",path:sourceId,message:gate});
   if(problems.length){show(problems);return 1;}
+  const authorSchema = authorContext(inputs);
+  if(authorSchema === null)return 1;
   const values=(name:string):string[]=>argv.filter(value=>value.startsWith(`--${name}=`)).map(value=>value.slice(name.length+3));
   const files=(names:readonly string[]):PbsFile[]=>names.map(name=>({file:name,read:()=>fs.readFileSync(path.resolve(ROOT,name),"utf8")}));
   const regionNameKeys=values("region-name").map(value=>{const at=value.indexOf(":");return {id:/^[0-9]+$/.test(value.slice(0,at))?Number(value.slice(0,at)):NaN,nameKey:at<0?"":value.slice(at+1)};});
@@ -205,13 +228,13 @@ export function importPbsFiles(src: string, sourceId: string, report: string, re
   const formFiles=files(values("form-file"));
   const regionalFiles=files(regionalOnly?(plainFiles.length?plainFiles:["regional_dexes.txt"]):values("regional-file"));
   const sourceProblem=(id:string):string|null=>preUseProblem(sources,id);
-  const bundle=importPbsBundle({sourceId,sourceProblem,baseFiles,formFiles,...(!regionalOnly?{regionalFiles,regionNameKeys}:{}),resolveFormShowdownId:(symbol,form)=>formIds.get(`${symbol},${form}`)??null});
+  const bundle=importPbsBundle({authorSchema,sourceId,sourceProblem,baseFiles,formFiles,...(!regionalOnly?{regionalFiles,regionNameKeys}:{}),resolveFormShowdownId:(symbol,form)=>formIds.get(`${symbol},${form}`)??null});
   if(!regionalOnly){
     const checked=bundle.ok?compileContent({manifest:inputs.manifest,sources:inputs.sources,species:bundle.species,overlays:[],...(inputs.items!==undefined?{items:inputs.items}:{}),...(bundle.regionalDex!==undefined?{regionalDex:bundle.regionalDex}:{})}, {}, {showdownSha:buildPin()}):null;
     const ok=bundle.ok&&checked?.ok===true;
     if(!bundle.ok)for(const error of bundle.errors)console.error(`${error.file??"PBS"}:${error.line} ${error.path}: ${error.message}`);
     if(checked&&!checked.ok)show(checked.errors);
-    write({schema:1,source:sourceId,...bundle,ok,...(!ok?{species:[],regionalDex:undefined}:{}),contentErrors:checked&&!checked.ok?checked.errors:[]});
+    write({schema:1,authorSchema,source:sourceId,...bundle,ok,...(!ok?{species:[],regionalDex:undefined}:{}),contentErrors:checked&&!checked.ok?checked.errors:[]});
     return ok?0:1;
   }
   if(!bundle.ok){write({schema:1,source:sourceId,ok:false,errors:bundle.errors});return 1;}
@@ -228,7 +251,21 @@ export function importPbsFiles(src: string, sourceId: string, report: string, re
 
 const cmd = process.argv[2];
 const SRC = arg("src", "content/sample");
-if (cmd === "build") process.exit(build(SRC, arg("out", "data/framework/content.json")));
+if (cmd === "friendship-preview" || cmd === "friendship-migrate") {
+  try {
+    const schema = process.argv.find(a=>a.startsWith("--author-schema="))?.slice(16) ?? "2";
+    if (schema !== "1" && schema !== "2") throw Error("choose --author-schema=1 or 2");
+    const confirm = process.argv.find(a=>a.startsWith("--confirm="))?.slice(10);
+    const output = process.argv.find(a=>a.startsWith("--out="))?.slice(6);
+    if (cmd === "friendship-migrate" && (!confirm || !output)) throw Error("friendship-migrate requires --out=<NEW directory> --confirm=<previewHash>");
+    if (cmd === "friendship-preview" && confirm) throw Error("preview does not accept confirmation");
+    const result = migrateFriendshipAuthorFiles(SRC,output?path.resolve(ROOT,output):undefined,confirm,Number(schema) as 1|2,
+      src=>{const r=readInputs(src);if(r.errors.length)throw Error(JSON.stringify(r.errors));if(authorContext(r.inputs)===null)throw Error("invalid author version");return r.inputs;},
+      inputs=>{const r=compileContent(inputs,{}, {showdownSha:buildPin()});if(!r.ok)throw Error(JSON.stringify(r.errors));const assembled=assembleContent(r.data,createDexLookup());if(assembled.errors.length)throw Error(JSON.stringify(assembled.errors));warn(r.warnings);warn(assembled.warnings);});
+    console.log(JSON.stringify(result,null,2)); process.exit(0);
+  } catch(error) {console.error(error instanceof Error?error.message:String(error));process.exit(1);}
+}
+else if (cmd === "build") process.exit(build(SRC, arg("out", "data/framework/content.json")));
 else if (cmd === "check") process.exit(check(SRC, arg("out", "data/framework/content.json")));
 else if (cmd === "check-item-pockets") {
   const previous=process.argv.find(a=>a.startsWith("--previous-items="))?.slice(17);
@@ -244,4 +281,4 @@ else if (cmd === "import-pbs-items") {
   const source = process.argv.find((a) => a.startsWith("--source="))?.slice(9) ?? "";
   process.exit(importPbs(SRC, arg("file", "pokemon.txt"), source, arg("report", "build/pbs-import.json"), cmd === "import-pbs-items"));
 }
-else { console.error("usage: content-cli.cjs build|check|check-item-pockets|inventory|import-pbs|import-pbs-regional [--src=content/sample] [--out=...] [--report=...] [--file=... --source=<id>] [--base-file=pokemon.txt (repeat; required for nonempty regional symbols)] [--form-file=pokemon_forms.txt --form-id=SYMBOL,N:showdownid] [--regional-file=regional_dexes.txt --region-name=0:region.kanto (repeat)]"); process.exit(2); }
+else { console.error("usage: content-cli.cjs friendship-preview|friendship-migrate (--out=<new-directory> --confirm=<previewHash> --author-schema=1|2)|build|check|check-item-pockets|inventory|import-pbs|import-pbs-regional [--src=content/sample] [--out=...] [--report=...] [--file=... --source=<id>] [--base-file=pokemon.txt (repeat; required for nonempty regional symbols)] [--form-file=pokemon_forms.txt --form-id=SYMBOL,N:showdownid] [--regional-file=regional_dexes.txt --region-name=0:region.kanto (repeat)]"); process.exit(2); }

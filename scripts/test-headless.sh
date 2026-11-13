@@ -1,16 +1,149 @@
 #!/usr/bin/env bash
-# Headless check: every Node test suite, no windows, no MZ, no Reactor sources (this is what CI layer 1 runs).
+# Regular headless checks for CI and release validation; historical reference replay is excluded (NOT RUN).
 # Needs: Node >= 22.18, JS dependencies installed (pnpm --dir src install), the engine staged (scripts/build-showdown.sh). Type checking of the plugins needs Reactor's
 # declaration bundle and lives in scripts/test-quick.sh (typecheck + this script).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-[[ -d js/engine/showdown/dist ]] || { echo "engine not staged: run scripts/build-showdown.sh first" >&2; exit 1; }
-# the TS framework: strict type check, import-boundary check, then rebuild runtime, declarations, sample and local delivery
-pnpm --dir src typecheck:framework
-node scripts/check-boundaries.cjs
-pnpm --dir src build:distribution > /dev/null
 SUITES=(
+  experiments/step5/4/test-rpg-held-native-items.cjs
+  experiments/step5/4/test-growth-held-items.cjs
+  experiments/step5/4/test-creation-form-diagnostics.cjs
+  experiments/step5/4/test-content-member-items.cjs
+  experiments/step5/4/test-trainer-public-type-transitions.cjs
+  experiments/step5/4/test-p4-request-source.cjs
+  experiments/step5/4/test-p4-request-source-scene.cjs
+  experiments/step5/4/test-normal-consumer-compat.cjs
+  experiments/step5/4/test-p4-normal-continuation.cjs
+  experiments/step5/4/test-cant-description.cjs
+  experiments/step5/4/test-cant-engine.cjs
+  experiments/step5/4/test-cant-scene.cjs
+  experiments/step5/4/h3-production-policy/test-policy.cjs
+  experiments/step5/4/h3-production-policy/test-take-conservation-oracle.cjs
+  experiments/step5/4/test-trainer-initial-field.cjs
+  experiments/step5/4/test-initial-field-engine.cjs
+  experiments/step5/4/test-initial-field-entry.cjs
+  experiments/step5/4/test-config-file-io.cjs
+  experiments/step5/4/test-battle-effects-settings.cjs
+  experiments/step5/4/test-battle-effects-scene.cjs
+  experiments/step5/4/test-learned-move-pp.cjs
+  experiments/step5/4/test-stance-growth.cjs
+  experiments/step5/4/test-illusion-participation.cjs
+  experiments/step5/4/test-transform-growth.cjs
+  experiments/step5/4/test-transform-learning.cjs
+  experiments/step5/4/test-transform-learning-scene.cjs
+  experiments/step5/4/test-capture-run-review-fixes.cjs
+  experiments/step5/4/test-hard-lock-scene.cjs
+  experiments/step5/4/test-escape-items.cjs
+  experiments/step5/4/test-wild-faint-escape.cjs
+
+  experiments/step5/4/test-battle-pp-items.cjs
+  experiments/step5/4/test-crowned-move-pp.cjs
+  experiments/step5/4/test-crowned-growth.cjs
+  experiments/step5/4/test-growth-raw-stat-refresh.cjs
+  experiments/step5/4/test-power-construct-growth.cjs
+
+  experiments/step5/4/test-switch-style-ports.cjs
+  experiments/step5/4/test-battle-style-settings.cjs
+  experiments/step5/4/test-battle-revive-items.cjs
+  experiments/step5/4/test-exp-gain-rule.cjs
+  experiments/step5/4/test-capture-exp-rule.cjs
+  experiments/step5/4/test-e-basic-contracts.cjs
+  experiments/step5/4/test-e-action-contracts.cjs
+  experiments/step5/4/test-e-status-contracts.cjs
+  experiments/step5/4/test-e-status-app.cjs
+  experiments/step5/4/test-e-status-disk.cjs
+  experiments/step5/4/test-e-defeat-disk.cjs
+  experiments/step5/4/test-e-ability-contracts.cjs
+  experiments/step5/4/test-e-damage-contracts.cjs
+  experiments/step5/4/test-e-hazards-app-contracts.cjs
+  experiments/step5/4/test-e-locked-turn-app-contracts.cjs
+  experiments/step5/4/test-e-hp-app-contracts.cjs
+  experiments/step5/4/test-e-multihit-app-contracts.cjs
+  experiments/step5/4/test-e-stages-app-contracts.cjs
+  experiments/step5/4/test-e-position-entry.cjs
+  experiments/step5/4/test-e-residual-outcome.cjs
+  experiments/step5/4/test-e1-choice-lock-scene.cjs
+  experiments/step5/4/test-e2-status-feedback-scene.cjs
+  experiments/step5/4/test-e-status-carry.cjs
+  experiments/step5/4/test-opening-state-scene.cjs
+  experiments/step5/4/test-capture-receiving-scene.cjs
+  experiments/step5/4/test-learn-pp-trainer-chain.cjs
+  experiments/step5/4/test-learn-pp-trainer-chain-lifecycle.cjs
+  experiments/step5/4/test-auxiliary-diagnostics.cjs
+  experiments/step5/4/test-prebattle-wrapper.cjs
+  experiments/step5/4/test-return-autosave.cjs
+  experiments/step5/4/test-prebattle-native.cjs
+  experiments/step5/4/test-prebattle-menu.cjs
+  experiments/step5/4/test-menu-grid.cjs
+  experiments/step5/4/test-move-choice.cjs
+  experiments/step5/4/test-move-details-scene.cjs
+  experiments/step5/4/test-move-menu-refusal.cjs
+  experiments/step5/4/test-move-menu-native.cjs
+  experiments/step5/4/test-growth-display.cjs
+  experiments/step5/4/test-ordinary-message-native.cjs
+  experiments/step5/4/test-menu-capture-native.cjs
+  experiments/step5/4/test-ordinary-message.cjs
+  experiments/step5/4/test-paused-message.cjs
+  experiments/step5/4/test-brief-message.cjs
+  experiments/step5/4/test-brief-message-scene.cjs
+  experiments/step5/4/test-battle-bag.cjs
+  experiments/step5/4/test-battle-bag-scene.cjs
+  experiments/step5/4/test-status-card.cjs
+  experiments/step5/4/test-status-card-scene.cjs
+  experiments/step5/4/test-ordinary-message-scene.cjs
+  experiments/step5/4/test-levelup-stats.cjs
+  experiments/step5/4/test-levelup-stats-scene.cjs
+  experiments/step5/4/test-display-playback.cjs
+  experiments/step5/4/test-visual-timing.cjs
+  experiments/step5/4/test-battleback-resources.cjs
+  experiments/step5/4/test-battleback-view.cjs
+  experiments/step5/4/test-picture-playback.cjs
+  experiments/step5/4/test-faint-schedule.cjs
+  experiments/step5/4/test-battle-audio-selection.cjs
+  experiments/step5/4/test-battle-music.cjs
+  experiments/step5/4/test-battle-music-scene.cjs
+  experiments/step5/4/test-victory-bgm-scene.cjs
+  experiments/step5/4/test-victory-music-native.cjs
+  experiments/step5/4/test-trainer-opening.cjs
+  experiments/step5/4/test-wild-opening-scene.cjs
+  experiments/step5/4/test-trainer-dispatch-scene.cjs
+  experiments/step5/4/test-party-switch-menu-scene.cjs
+  experiments/step5/4/test-battle-summary-scene.cjs
+  experiments/step5/4/test-author-dialogue-pages.cjs
+  experiments/step5/4/test-author-dialogue-native.cjs
+  experiments/step5/4/test-trainer-opening-native.cjs
+  experiments/step5/4/test-result-native.cjs
+  experiments/step5/4/test-result-feedback.cjs
+  experiments/step5/4/test-defeat-policy-scene.cjs
+  experiments/step5/4/test-ball-native.cjs
+  experiments/step5/4/test-ball-scene.cjs
+  experiments/step5/4/test-ball-scene-integration.cjs
+  experiments/step5/4/test-ball-feedback.cjs
+  experiments/step5/4/test-battle-music-composition.cjs
+  experiments/step5/4/test-capture-melody.cjs
+  experiments/step5/4/test-capture-me-port.cjs
+  experiments/step5/4/test-capture-me-scene.cjs
+  experiments/step5/4/test-capture-me-native.cjs
+  scripts/tests/music-native-assets.test.cjs
+  experiments/step5/4/test-faint-view.cjs
+  experiments/step5/4/test-d1-timing.cjs
+  experiments/step5/4/test-scene-controller.cjs
+  experiments/step5/4/test-trainer-ai.cjs
+  experiments/step5/4/test-trainer-ai-integration.cjs
+  experiments/step5/4/test-trainer-ai-strategy.cjs
+  experiments/step5/4/test-trainer-ai-async.cjs
+  experiments/step5/4/test-trainer-ai-c2-remediation.cjs
+  experiments/step5/4/test-trainer-ai-realms.cjs
+  experiments/step5/4/test-carried-faint.cjs
+  experiments/step5/4/test-trainer-ai-remediation.cjs
+  experiments/friendship-standard-domain/test-author.cjs
+  experiments/friendship-standard-domain/test-pbs-cli.cjs
+  experiments/friendship-standard-domain/test-migration.cjs
+  experiments/friendship-standard-domain/test-app-integration.cjs
+  experiments/friendship-standard-domain/test-file-integration.cjs
+  experiments/friendship-standard-domain/test-author-files.cjs
+  experiments/friendship-standard-domain/test-mz-integration.cjs
   experiments/step2/test-headless.cjs
   experiments/step2/s2/test-actions.cjs
   experiments/step2/s3/test-growth.cjs
@@ -20,7 +153,10 @@ SUITES=(
   experiments/step2/s5/test-matrix.cjs
   experiments/step2/s5/test-protocol-freeze.cjs
   experiments/step2/s5/test-engine-contract.cjs
+  scripts/tests/headless-scope.test.cjs
   scripts/tests/reactor-install.test.cjs
+  scripts/tests/showdown-build.test.cjs
+  scripts/tests/package-excludes.test.cjs
   scripts/tests/check-boundaries.test.cjs
   experiments/framework-remediation/test-step1-public-api.cjs
   experiments/framework-remediation/test-step1-distribution.cjs
@@ -29,7 +165,6 @@ SUITES=(
   experiments/step3/test-i18n.cjs
   experiments/step3/test-save.cjs
   experiments/step3/test-integration.cjs
-  experiments/step3/test-growth-differential.cjs
   experiments/step3/test-move-requests.cjs
   experiments/step3/test-pp-sync.cjs
   experiments/step3/test-session-operations.cjs
@@ -130,7 +265,67 @@ SUITES=(
   experiments/step5/3/test-member-bridges7.cjs
   experiments/step5/3/test-save-gates7.cjs
   experiments/step5/3/test-perf-write-regression.cjs
+  experiments/step5/4/test-trainer-m1.cjs
+  experiments/step5/4/test-held-facts.cjs
+  experiments/step5/4/test-held-harvest-facts.cjs
+  experiments/step5/4/test-held-harvest-recovery.cjs
+  experiments/step5/4/test-held-engine.cjs
+  experiments/step5/4/test-held-corrosivegas.cjs
+  experiments/step5/4/test-held-pickup.cjs
+  experiments/step5/4/test-held-ability-transfer.cjs
+  experiments/step5/4/test-held-ability-app-lifecycle.cjs
+  experiments/step5/4/test-held-app.cjs
+  experiments/step5/4/test-held-policy-entry.cjs
+  experiments/step5/4/test-held-store.cjs
+  experiments/step5/4/test-trainer-app-m1.cjs
+  experiments/step5/4/test-obedience-scene.cjs
+  experiments/step5/4/test-obedience-remediation.cjs
+  experiments/step5/4/test-obedience-m1.cjs
+  experiments/step5/4/closeout-chains/test-held-management-chain.cjs
+  experiments/step5/4/closeout-chains/test-status-capture-chain.cjs
+  experiments/step5/4/h3-production-policy/test-release-sources.cjs
+  experiments/step5/4/h3-production-policy/test-release-cancel.cjs
+  experiments/step5/4/h3-production-policy/test-host.cjs
+  experiments/step5/4/h3-install-outcome/test-install.cjs
+  experiments/step5/4/h3-held-continue/test-continue.cjs
 )
+# Explicit policy exclusions, not skipped tests and never counted as passes.
+# There is no environment switch or automatic-runner option that enables this replay.
+EXCLUDED_SUITES=(
+  experiments/step3/test-growth-differential.cjs
+)
+for s in "${SUITES[@]}"; do
+  for excluded in "${EXCLUDED_SUITES[@]}"; do
+    if [[ "$s" == "$excluded" ]]; then
+      echo "excluded suite was registered for execution: $s" >&2
+      exit 2
+    fi
+  done
+done
+if [[ $# -gt 1 ]]; then
+  echo "usage: $0 [--scope=regular|--list|--list-exclusions]" >&2
+  exit 2
+fi
+case "${1:-}" in
+  --list) printf '%s\n' "${SUITES[@]}"; exit 0 ;;
+  --list-exclusions) printf '%s\n' "${EXCLUDED_SUITES[@]}"; exit 0 ;;
+  ''|--scope=regular) ;;
+  *) echo "usage: $0 [--scope=regular|--list|--list-exclusions]" >&2; exit 2 ;;
+esac
+printf 'Headless scope=regular: %s selected suites; %s policy exclusion(s), NOT RUN and not passes.\n' "${#SUITES[@]}" "${#EXCLUDED_SUITES[@]}"
+for excluded in "${EXCLUDED_SUITES[@]}"; do
+  printf 'EXCLUDED (NOT RUN): %s\n' "$excluded"
+done
+[[ -d js/engine/showdown/dist ]] || { echo "engine not staged: run scripts/build-showdown.sh first" >&2; exit 1; }
+# the TS framework: strict type check, import-boundary check, then rebuild runtime, declarations, sample and local delivery
+pnpm --dir src typecheck:framework
+node scripts/check-boundaries.cjs
+pnpm --dir src build:distribution > /dev/null
+# Normal held-source release verifies the compiled host and fresh-process Continue, not only developer fixtures.
+for plugin in PS_BattleFlow PS_SaveState PS_Evolution PS_BattleFlowTest; do
+  RR_PLUGIN="$plugin" pnpm --dir src exec vite build > /dev/null
+done
+export H3_RUNTIME_ROOT="$ROOT"
 fail=0
 for s in "${SUITES[@]}"; do
   set +e

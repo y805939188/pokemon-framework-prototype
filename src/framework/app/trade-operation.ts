@@ -1,3 +1,4 @@
+import { normalizeMemberDexAppearance } from "../rules/acquisition-dex";
 /** Local script trade: an owned draft, never a third persistent member collection. */
 import { clone } from "../rules/value";
 import { semanticFingerprint } from "../rules/semantic";
@@ -11,7 +12,7 @@ import { requireTemplate } from "../rules/receiving";
 import { allMembers } from "../rules/storage";
 import { scanEvolution } from "../rules/evolution";
 import type { EvolutionFacts } from "../rules/evolution";
-import { normalizeDexAppearance, planDexRecord, planDexLastSeen, applyDexPatch, dexShouldOfferEntry } from "../rules/pokedex";
+import { planDexRecord, planDexLastSeen, applyDexPatch, dexShouldOfferEntry } from "../rules/pokedex";
 import type { DexAppearance } from "../rules/pokedex";
 import { dexInUnlockedRegion } from "../rules/pokedex-query";
 import { resolveConfig } from "../rules/config";
@@ -139,7 +140,7 @@ export class TradeOperation {
   }
   private member(op: Operation): Member { const member = op.draft?.party.find(value => value.id === op.incomingId); if (!member) throw Error("trade-draft-missing"); return member; }
   private appearance(member: Member, content: Content): DexAppearance {
-    const result = normalizeDexAppearance(content, { species: member.species, form: member.form!, gender: member.gender === "M" ? 0 : member.gender === "F" ? 1 : 2, shiny: member.shiny! });
+    const result = normalizeMemberDexAppearance(content, member);
     if (!result) throw Error("invalid-trade-appearance"); return result;
   }
   private offerEntry(op: Operation, stage: Entry["stage"], previouslyOwned: boolean, content: Content): boolean {
@@ -147,7 +148,7 @@ export class TradeOperation {
     if (!content.regionalDex) throw Error("trade-dex-layout-missing");
     if (!dexShouldOfferEntry({ source: stage === "received" ? "trade" : "evolution", previouslyOwned, hasDex: dex.hasDex,
       inUnlockedDex: dexInUnlockedRegion(dex, content.regionalDex, member.species), moreOften: resolveConfig(content.settings).SHOW_NEW_SPECIES_POKEDEX_ENTRY_MORE_OFTEN })) return false;
-    const appearance = normalizeDexAppearance(content, { species: member.species, form: member.form!, gender: member.gender === "M" ? 0 : member.gender === "F" ? 1 : 2, shiny: member.shiny! }, "recent");
+    const appearance = normalizeMemberDexAppearance(content, member, "recent");
     if (!appearance) throw Error("invalid-trade-recent-appearance");
     op.entry = { stage, species: member.species, appearance, previouslyOwned, opened: false }; op.phase = "entry"; return true;
   }

@@ -1,0 +1,227 @@
+{
+  "schema": 1,
+  "kind": "bounded-real-effects-compiled-Scene-feedback",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "completeHeading": false,
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "base": "b3319a65abd21c63a5e7748f11d3545e59e4b9b0",
+  "cases": [
+    {
+      "id": "E2-TOXIC-en",
+      "kind": "toxic",
+      "lang": "en",
+      "featureIds": [
+        "FR-000544",
+        "FR-000545"
+      ],
+      "player": {
+        "species": "machamp",
+        "abilityIndex": 1,
+        "level": 50,
+        "moves": [
+          "splash",
+          "tackle"
+        ]
+      },
+      "reserve": {
+        "species": "gengar",
+        "abilityIndex": 0,
+        "level": 50,
+        "moves": [
+          "splash",
+          "shadowball"
+        ]
+      },
+      "foe": {
+        "species": "snorlax",
+        "level": 10,
+        "moves": [
+          "toxic"
+        ]
+      }
+    },
+    {
+      "id": "E2-PROTECT-en",
+      "kind": "protect",
+      "lang": "en",
+      "featureIds": [
+        "FR-000050",
+        "FR-000536"
+      ],
+      "player": {
+        "species": "machamp",
+        "abilityIndex": 1,
+        "level": 50,
+        "moves": [
+          "protect",
+          "splash",
+          "tackle"
+        ]
+      },
+      "foe": {
+        "species": "snorlax",
+        "level": 20,
+        "moves": [
+          "tackle"
+        ]
+      }
+    },
+    {
+      "id": "E2-TOXIC-zh",
+      "kind": "toxic",
+      "lang": "zh",
+      "featureIds": [
+        "FR-000544",
+        "FR-000545"
+      ],
+      "player": {
+        "species": "machamp",
+        "abilityIndex": 1,
+        "level": 50,
+        "moves": [
+          "splash",
+          "tackle"
+        ]
+      },
+      "reserve": {
+        "species": "gengar",
+        "abilityIndex": 0,
+        "level": 50,
+        "moves": [
+          "splash",
+          "shadowball"
+        ]
+      },
+      "foe": {
+        "species": "snorlax",
+        "level": 10,
+        "moves": [
+          "toxic"
+        ]
+      }
+    },
+    {
+      "id": "E2-PROTECT-zh",
+      "kind": "protect",
+      "lang": "zh",
+      "featureIds": [
+        "FR-000050",
+        "FR-000536"
+      ],
+      "player": {
+        "species": "machamp",
+        "abilityIndex": 1,
+        "level": 50,
+        "moves": [
+          "protect",
+          "splash",
+          "tackle"
+        ]
+      },
+      "foe": {
+        "species": "snorlax",
+        "level": 20,
+        "moves": [
+          "tackle"
+        ]
+      }
+    },
+    {
+      "id": "E2-FIRST-KO-en",
+      "kind": "ko",
+      "lang": "en",
+      "featureIds": [
+        "FR-000555",
+        "FR-000536"
+      ],
+      "player": {
+        "species": "cloyster",
+        "abilityIndex": 1,
+        "level": 50,
+        "moves": [
+          "iciclespear",
+          "splash"
+        ]
+      },
+      "foe": {
+        "species": "caterpie",
+        "level": 1,
+        "moves": [
+          "splash"
+        ]
+      }
+    },
+    {
+      "id": "E2-REAL-STATUS-ABORT-zh",
+      "kind": "abort",
+      "lang": "zh",
+      "featureIds": [
+        "FR-000545"
+      ],
+      "player": {
+        "species": "machamp",
+        "abilityIndex": 1,
+        "level": 50,
+        "moves": [
+          "splash",
+          "tackle"
+        ]
+      },
+      "foe": {
+        "species": "snorlax",
+        "level": 10,
+        "moves": [
+          "toxic"
+        ]
+      }
+    }
+  ],
+  "sources": [
+    {
+      "feature_id": "FR-000050",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/combat-requirements/wp47-a-move-attributes-targeting-and-calling.md",
+      "sha256": "0e3a3fa46ab07fd82331db7b5790788c75b5aa45f6093aa9b2db5cf6c55b3fa3",
+      "currentHeadingStart": 112,
+      "currentHeadingEnd": 135
+    },
+    {
+      "feature_id": "FR-000536",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/pokemon-rules/wp43-types-accuracy-and-damage.md",
+      "sha256": "6a09dfad69faa5c0c35991e9fa4eb83646b6f2162427e5bcd3df09c55fded6d3",
+      "currentHeadingStart": 141,
+      "currentHeadingEnd": 158
+    },
+    {
+      "feature_id": "FR-000544",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+      "sha256": "e144ad75bab96647c12220d7f7e137d534277c169f6ca64d8c6bd06044268943",
+      "currentHeadingStart": 29,
+      "currentHeadingEnd": 63
+    },
+    {
+      "feature_id": "FR-000545",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/pokemon-rules/wp44-statuses-stat-stages-and-immunities.md",
+      "sha256": "e144ad75bab96647c12220d7f7e137d534277c169f6ca64d8c6bd06044268943",
+      "currentHeadingStart": 64,
+      "currentHeadingEnd": 83
+    },
+    {
+      "feature_id": "FR-000555",
+      "source": "/Users/dingshinn/Desktop/pokemon-framework/pokemon-framework-reference/deliverables/final-specification-set/pokemon-rules/wp46-damage-multihit-and-healing.md",
+      "sha256": "7e65ae4945ab1cd101b357f3edcadbff2cbaa94630c609244519a688901e1841",
+      "currentHeadingStart": 13,
+      "currentHeadingEnd": 44
+    }
+  ],
+  "notCovered": [
+    "full FR headings",
+    "old PP0/Encore business repetition",
+    "native NW/pixels/audio/physical input",
+    "complete E74/D2/5.4/P4"
+  ]
+}

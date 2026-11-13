@@ -15,6 +15,7 @@ import type { Limits } from "./limits";
 import { own } from "./own";
 
 export interface RuleConfig {
+  GAIN_EXP_FOR_CAPTURE: boolean;
   CHECK_EVOLUTION_AFTER_ALL_BATTLES: boolean;
   CHECK_EVOLUTION_FOR_FAINTED_POKEMON: boolean;
   MOVE_RELEARNER_CAN_TEACH_MORE_MOVES: boolean;
@@ -37,15 +38,18 @@ export interface RuleConfig {
   REBALANCED_HEALING_ITEM_AMOUNTS: boolean;
   RAGE_CANDY_BAR_CURES_STATUS_PROBLEMS: boolean;
   TAUGHT_MACHINES_KEEP_OLD_PP: boolean;
+  ANY_HIGH_LEVEL_POKEMON_CAN_DISOBEY: boolean;
+  FOREIGN_HIGH_LEVEL_POKEMON_CAN_DISOBEY: boolean;
 }
 
 /** Slots per box (WP25 §3.1); not a setting of the reference. */
 export const BOX_SIZE = 30;
 
-export const GEN8_DEFAULTS: Readonly<RuleConfig> = Object.freeze({ CHECK_EVOLUTION_AFTER_ALL_BATTLES: true, CHECK_EVOLUTION_FOR_FAINTED_POKEMON: true, MOVE_RELEARNER_CAN_TEACH_MORE_MOVES: true, RARE_CANDY_USABLE_AT_MAX_LEVEL: true, SHOW_NEW_SPECIES_POKEDEX_ENTRY_MORE_OFTEN: true, USE_CURRENT_REGION_DEX: false, DEX_SHOWS_ALL_FORMS: false, DEXES_WITH_OFFSETS: Object.freeze([]) as unknown as number[],  MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999,
+export const GEN8_DEFAULTS: Readonly<RuleConfig> = Object.freeze({ GAIN_EXP_FOR_CAPTURE: true, CHECK_EVOLUTION_AFTER_ALL_BATTLES: true, CHECK_EVOLUTION_FOR_FAINTED_POKEMON: true, MOVE_RELEARNER_CAN_TEACH_MORE_MOVES: true, RARE_CANDY_USABLE_AT_MAX_LEVEL: true, SHOW_NEW_SPECIES_POKEDEX_ENTRY_MORE_OFTEN: true, USE_CURRENT_REGION_DEX: false, DEX_SHOWS_ALL_FORMS: false, DEXES_WITH_OFFSETS: Object.freeze([]) as unknown as number[],  MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999,
   BAG_POCKET_SLOTS: Object.freeze([-1,-1,-1,-1,-1,-1,-1,-1]) as unknown as number[], BAG_AUTO_SORT: Object.freeze([false,false,false,true,true,false,false,false]) as unknown as boolean[],
   AFFECTION_EFFECTS: false, MORE_BONUS_PREMIER_BALLS: true, USE_MULTIPLE_STAT_ITEMS_AT_ONCE: true, NO_VITAMIN_EV_CAP: true,
-  REBALANCED_HEALING_ITEM_AMOUNTS: true, RAGE_CANDY_BAR_CURES_STATUS_PROBLEMS: true, TAUGHT_MACHINES_KEEP_OLD_PP: false });
+  REBALANCED_HEALING_ITEM_AMOUNTS: true, RAGE_CANDY_BAR_CURES_STATUS_PROBLEMS: true, TAUGHT_MACHINES_KEEP_OLD_PP: false,
+  ANY_HIGH_LEVEL_POKEMON_CAN_DISOBEY: false, FOREIGN_HIGH_LEVEL_POKEMON_CAN_DISOBEY: true });
 
 const RANGES: Partial<Record<keyof RuleConfig, [number, number, string?]>> = {
   MECHANICS_GENERATION: [8, 8, "this build supports mechanics generation 8 only (the battle format is Gen 8)"],
@@ -101,6 +105,23 @@ export function developmentCapabilities(raw: unknown = {}): DevelopmentCapabilit
   const record = raw as Record<string, unknown>;
   for (const [key, value] of Object.entries(record)) if (!["allowHeldItemSources", "allowExperimentalHeldItemBattle"].includes(key) || typeof value !== "boolean") throw new Error(`invalid development capability ${key}`);
   return { allowHeldItemSources: false, allowExperimentalHeldItemBattle: false, ...record } as DevelopmentCapabilities;
+}
+
+/** Normal production policy is a code-reviewed release decision, never a runtime input.
+ * B-3 release admission is reviewed on the exact development branch; merging main is not a prerequisite.
+ * One value controls both sources and battle admission so release wiring cannot open only one side.
+ */
+const ORDINARY_HELD_ITEMS_RELEASED: boolean = true;
+
+/** Effective policy for production callers. The only override remains the existing developer port.
+ * Do not pass settings, plugin parameters or saved state here. Validation deliberately remains strict.
+ */
+export function runtimeCapabilities(developerOverrides: unknown = {}): Readonly<DevelopmentCapabilities> {
+  const developer = developmentCapabilities(developerOverrides);
+  return Object.freeze({
+    allowHeldItemSources: ORDINARY_HELD_ITEMS_RELEASED || developer.allowHeldItemSources,
+    allowExperimentalHeldItemBattle: ORDINARY_HELD_ITEMS_RELEASED || developer.allowExperimentalHeldItemBattle,
+  });
 }
 
 export type { RuleOverrides } from "./settings-types";

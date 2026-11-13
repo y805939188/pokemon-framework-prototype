@@ -7,7 +7,9 @@ export * as rules from "./rules/rules";
 export * as state from "./rules/state";
 export * as digest from "./rules/sha256";
 export * as store from "./tools/save-store";
-export * as gateway from "./battle/gateway";
+export * as gateway from "./battle/public-gateway";
+export * as heldFacts from "./rules/held-facts";
+export * as heldDiagnostics from "./tools/held-diagnostics";
 export * as moveRequests from "./battle/move-requests";
 export * as describe from "./flow/describe";
 export * as session from "./flow/session";
@@ -73,3 +75,11 @@ export * as pokedex from "./rules/pokedex";
 export * as pokedexQuery from "./rules/pokedex-query";
 
 export * as acquisitionDex from "./rules/acquisition-dex";
+export * as trainerTeam from "./rules/trainer-team";
+export * as trainerReward from "./rules/trainer-reward";
+export * as obedience from "./rules/obedience";
+
+export * as trainerAi from "./rules/trainer-ai-public";
+
+export * as trainerAiDiagnostics from "./tools/trainer-ai-diagnostics";
+export * as battlePresentation from "./flow/public-presentation";

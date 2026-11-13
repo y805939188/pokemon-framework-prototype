@@ -1,0 +1,95 @@
+{
+  "version": "victory-music-native-v1",
+  "productCommit": "bbb5b5dcefad25d6e2507779a55c9c3bc0711a85",
+  "productPlugins": {
+    "PS_BattleFlow": "997aab8a6f11500ffab1a358a069cb6fe8058753c5f283cb6229089f6872606a",
+    "PS_SaveState": "1497d90b4f1e8bbad88417597ee858ddcb654b7774383a2d4d9a56fbdad9aea3",
+    "PS_Evolution": "294f6875f4f0d3b3e531c03b1ec387307f27b8b3f119b8bf60ba92a53843f0f4"
+  },
+  "prefix": "pf_victory_music_v1/",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "worldSeed": 817,
+  "mapId": 5,
+  "musicVolume": 47,
+  "initialPosition": 0.25,
+  "nativeExtension": ".ogg",
+  "sampleRate": 44100,
+  "seekToleranceFrames": 2,
+  "seekToleranceSamples": 2,
+  "deadlineSeconds": 360,
+  "intentionalMissingBgm": "audio/bgm/pf_victory_music_v1/missing.ogg",
+  "sequence": {
+    "entries": [
+      {
+        "type": "track",
+        "name": "pf_victory_music_v1/world"
+      },
+      {
+        "type": "silence",
+        "duration": 1
+      }
+    ]
+  },
+  "sequenceKey": "library:1",
+  "sequenceFallback": {
+    "volume": 63,
+    "pitch": 92,
+    "pan": -17
+  },
+  "nativeSequenceScope": "active library track+silence restart only",
+  "nativeSequenceNotRun": [
+    "pending map sequence",
+    "map sequence",
+    "looped/once",
+    "original sequence sample position or random history"
+  ],
+  "groups": [
+    {
+      "name": "normal-wild-trainer-victory",
+      "ids": [
+        "V01",
+        "V02"
+      ]
+    },
+    {
+      "name": "defeat-run-no-victory",
+      "ids": [
+        "V03",
+        "V04"
+      ]
+    },
+    {
+      "name": "formal-evolution-and-sequence-return",
+      "ids": [
+        "V05",
+        "V06"
+      ]
+    }
+  ],
+  "sourceMediaMap": {
+    "world": "world",
+    "battle": "battle",
+    "victory": "long",
+    "trainer-victory": "foreign"
+  },
+  "wildVictoryPreset": {
+    "volume": 70,
+    "pitch": 120,
+    "pan": 0
+  },
+  "scopeNotProved": [
+    "physical keys/hearing",
+    "trainer slide/loseText/pause-brief platform",
+    "capture-no-exp setting",
+    "Windows",
+    "real NW signal",
+    "newP4/GC leak absence",
+    "fullD2/E/5.4"
+  ],
+  "sourceAssetsManifestSHA256": "14f3ce58ef377b65cc399fa31f3e495b40fb7fa5bba87702b5c9e5ca0a3eb748"
+}

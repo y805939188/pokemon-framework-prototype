@@ -70,3 +70,11 @@ js/engine/build/
 
 # Compiled content (built from content/ by `pnpm --dir src content:build`)
 data/framework/
+
+# Explicitly generated test-only image fixtures, never game artwork.
+/img/pokemon/battlebacks/__tests__/
+
+# Author-generated PCM tones used only in the isolated F2 qualification tree.
+# Fixture bytes/hashes and generation are recorded outside the product repository.
+/audio/se/Cries/pidgey_faint.wav
+/audio/se/Pkmn faint.wav

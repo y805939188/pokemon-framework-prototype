@@ -25,7 +25,7 @@ function fixture(E,sourceSha,host={},options={}){
  const trusted=clone(c.meta);if(options.anonymous)delete c.meta;
  let state=initial,writes=0;host.install?.(c,clone(initial));const read=()=>host.read?host.read():state;
  const replace=next=>{writes++;if(host.replace)host.replace(next);else state=next;};
- const sessions=E.composition.createBattleSessionFactory({content:()=>c,seed:()=>[1,2,3,4]}),effects=sessions.effects,seals=[];let calls=0;
+ const sessions=(options.anonymous?E.composition.createLegacyNoHeldBattleSessionFactory:E.composition.createBattleSessionFactory)({content:()=>c,seed:()=>[1,2,3,4]}),effects=sessions.effects,seals=[];let calls=0;
  sessions.effects=(...args)=>{calls++;const s=effects(...args);seals.push(clone(s));return s;};
  const app=new E.app.GameApplication({state:{read,replace},content:()=>({content:c}),sessions,projection:{project:()=>{}},random:()=>0,clock:()=>0,itemWorld:()=>({mapId:0})},{receivingProfile:{mode:1,naming:1},depositHeal:options.depositHeal===true});host.bind?.(app,c);
  return{c,app,read,replace,seals,heroId:hero.id,restoreIdentity:()=>{c.meta=clone(trusted);},calls:()=>calls,writes:()=>writes,checkpoint:async(label,result)=>{assert.deepEqual(E.saveSchema.validateGameContent(read(),c),[]);assert(!app.saveBlocked);return host.checkpoint?.(label,{app,content:c,state:clone(read()),result:clone(result)});}};

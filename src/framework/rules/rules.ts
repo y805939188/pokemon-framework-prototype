@@ -24,6 +24,13 @@ export const HEAL_ITEMS: Record<string, { amount: HealAmount }> = {
   sitrusberry: { amount: "quarter" },
 };
 
+/** WP28 §5.1 manual battle revives. Revival Herb's friendship effect is a separate family. */
+export const REVIVE_ITEMS: Record<string, { half: boolean }> = {
+  revive: { half: true },
+  maxrevive: { half: false },
+  maxhoney: { half: false },
+};
+
 /** Status cures: `cures` lists persistent statuses it removes ('all' = any; confusion handled separately). */
 export const STATUS_ITEMS: Record<string, { cures: readonly string[] | "all"; confusion?: boolean }> = {
   antidote: { cures: ["psn", "tox"] },
@@ -33,6 +40,26 @@ export const STATUS_ITEMS: Record<string, { cures: readonly string[] | "all"; co
   iceheal: { cures: ["frz"] },
   fullheal: { cures: "all", confusion: true },
 };
+
+/** WP28 §5.2 manual battle PP items; held Leppa and PP growth are different consumers. */
+export const PP_ITEMS: Record<string, { amount: number | "full"; all?: boolean }> = {
+  ether: { amount: 10 }, maxether: { amount: "full" }, leppaberry: { amount: 10 },
+  elixir: { amount: 10, all: true }, maxelixir: { amount: "full", all: true },
+};
+export interface PPMove { id: string; pp: number; maxpp: number }
+/** Aligned actual gains, without mutating the permanent moves or guessing a missing move index. */
+export function ppRecovery(item: string, moves: readonly PPMove[], moveSlot?: number): number[] {
+  const spec = Object.hasOwn(PP_ITEMS, item) ? PP_ITEMS[item] : undefined;
+  return moves.map((move, index) => {
+    if (!spec || (!spec.all && (!Number.isSafeInteger(moveSlot) || index !== moveSlot))
+      || !move.id || !Number.isSafeInteger(move.pp) || move.pp < 0
+      || !Number.isSafeInteger(move.maxpp) || move.maxpp <= 0) return 0;
+    return Math.max(0, Math.min(move.maxpp - move.pp, spec.amount === "full" ? move.maxpp : spec.amount));
+  });
+}
+
+/** WP28 §5.5 manual no-target escape toys; not the normal speed-based Run command. */
+export const ESCAPE_ITEMS: readonly string[] = ["pokedoll", "fluffytail", "poketoy"];
 
 /** Battle stat items (step 2.2 sample; stage amounts follow the modern +2 convention, WP28 5.5 to confirm). */
 export const STAT_ITEMS: Record<string, { boosts: Record<string, number> }> = {
@@ -210,9 +237,15 @@ export type Eligibility = { ok: true } | { ok: false; reason: "unknown-target" |
  * the choice is registered; a refusal stays in the menu and consumes nothing). `mon` is the readState() record.
  * The in-turn handler (battle/custom-formats resolveItem) re-checks at execution time as a safety net.
  */
-export function itemEligibility(item: string, mon: MonView | undefined): Eligibility {
+export function itemEligibility(item: string, mon: MonView | undefined, pp: { moves?: readonly PPMove[]; moveSlot?: number } = {}): Eligibility {
   if (!mon) return { ok: false, reason: "unknown-target" };
+  if (REVIVE_ITEMS[item]) return mon.fainted && mon.hp === 0
+    ? { ok: true } : { ok: false, reason: "item-no-effect" };
   if (mon.fainted || mon.hp <= 0) return { ok: false, reason: "item-no-effect" };
+  if (Object.hasOwn(PP_ITEMS, item)) return ppRecovery(item, pp.moves ?? [], pp.moveSlot).some(n => n > 0)
+    ? { ok: true } : { ok: false, reason: "item-no-effect" };
+  if (item === "fullrestore") return mon.hp < mon.maxhp || !!mon.status || !!(mon.active && mon.confused)
+    ? { ok: true } : { ok: false, reason: "item-no-effect" };
   if (HEAL_ITEMS[item]) return mon.hp < mon.maxhp ? { ok: true } : { ok: false, reason: "item-no-effect" };
   const st = STATUS_ITEMS[item];
   if (st) {

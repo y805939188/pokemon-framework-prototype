@@ -1,0 +1,431 @@
+{
+  "version": "battle-audio-selection-formal-v2",
+  "evidenceKind": "SOURCE_STATIC/DERIVED_VECTOR; not actual Ruby or media execution",
+  "source": [
+    "WP24§5.4",
+    "WP67-A§3.7",
+    "test-catalog/creature-rpg-wp18-20-24-25-26.md PT-41..57/PT-63"
+  ],
+  "excludedIDs": [
+    "PT-58",
+    "PT-59",
+    "PT-60",
+    "PT-61",
+    "PT-62"
+  ],
+  "cases": [
+    {
+      "id": "PT-41",
+      "kind": "trainer-pair",
+      "map": {
+        "trainerBattle": "M",
+        "trainerVictory": "Mv"
+      },
+      "origin": "trainer",
+      "index": 1,
+      "trainers": [
+        {
+          "battleBgm": "A",
+          "victoryBgm": "Av"
+        },
+        {
+          "battleBgm": "B",
+          "victoryBgm": "Bv"
+        }
+      ],
+      "global": {
+        "trainerBattle": "G",
+        "trainerVictory": "Gv"
+      },
+      "expectedNames": [
+        "B",
+        "Bv"
+      ]
+    },
+    {
+      "id": "PT-42",
+      "kind": "trainer-pair",
+      "map": {
+        "trainerBattle": "M",
+        "trainerVictory": "Mv"
+      },
+      "origin": "trainer",
+      "index": 1,
+      "trainers": [
+        {
+          "battleBgm": "B",
+          "victoryBgm": "Bv"
+        },
+        {
+          "battleBgm": "A",
+          "victoryBgm": "Av"
+        }
+      ],
+      "global": {
+        "trainerBattle": "G",
+        "trainerVictory": "Gv"
+      },
+      "expectedNames": [
+        "A",
+        "Av"
+      ]
+    },
+    {
+      "id": "PT-43",
+      "kind": "trainer-pair",
+      "map": {
+        "trainerBattle": "M",
+        "trainerVictory": "Mv"
+      },
+      "origin": "trainer",
+      "index": 0,
+      "trainers": [
+        {
+          "battleBgm": "A",
+          "victoryBgm": "Av"
+        },
+        {
+          "battleBgm": null,
+          "victoryBgm": null
+        }
+      ],
+      "global": {
+        "trainerBattle": "G",
+        "trainerVictory": "Gv"
+      },
+      "expectedNames": [
+        "A",
+        "Av"
+      ]
+    },
+    {
+      "id": "PT-44",
+      "kind": "trainer-pair",
+      "map": {
+        "trainerBattle": "M",
+        "trainerVictory": "Mv"
+      },
+      "origin": "map",
+      "index": null,
+      "trainers": [
+        {
+          "battleBgm": null,
+          "victoryBgm": null
+        },
+        {
+          "battleBgm": null,
+          "victoryBgm": null
+        }
+      ],
+      "global": {
+        "trainerBattle": "G",
+        "trainerVictory": "Gv"
+      },
+      "expectedNames": [
+        "M",
+        "Mv"
+      ]
+    },
+    {
+      "id": "PT-45",
+      "kind": "trainer-pair",
+      "map": null,
+      "origin": "global",
+      "index": null,
+      "trainers": [
+        {
+          "battleBgm": null,
+          "victoryBgm": null
+        },
+        {
+          "battleBgm": null,
+          "victoryBgm": null
+        }
+      ],
+      "global": {
+        "trainerBattle": "G",
+        "trainerVictory": "Gv"
+      },
+      "expectedNames": [
+        "G",
+        "Gv"
+      ]
+    },
+    {
+      "id": "PT-46",
+      "kind": "trainer-pair",
+      "map": {
+        "trainerBattle": "",
+        "trainerVictory": ""
+      },
+      "origin": "global",
+      "index": null,
+      "trainers": [
+        {
+          "battleBgm": null,
+          "victoryBgm": null
+        },
+        {
+          "battleBgm": null,
+          "victoryBgm": null
+        }
+      ],
+      "global": {
+        "trainerBattle": "G",
+        "trainerVictory": "Gv"
+      },
+      "expectedNames": [
+        "G",
+        "Gv"
+      ]
+    },
+    {
+      "id": "PT-47",
+      "kind": "trainer-pair",
+      "map": null,
+      "origin": "default",
+      "index": null,
+      "trainers": [
+        {
+          "battleBgm": null,
+          "victoryBgm": null
+        },
+        {
+          "battleBgm": null,
+          "victoryBgm": null
+        }
+      ],
+      "global": {
+        "trainerBattle": null,
+        "trainerVictory": null
+      },
+      "expectedNames": [
+        "Battle trainer",
+        "Battle victory"
+      ]
+    },
+    {
+      "id": "PT-48",
+      "kind": "trainer-pair",
+      "map": {
+        "trainerBattle": "",
+        "trainerVictory": ""
+      },
+      "origin": "default",
+      "index": null,
+      "trainers": [
+        {
+          "battleBgm": null,
+          "victoryBgm": null
+        },
+        {
+          "battleBgm": null,
+          "victoryBgm": null
+        }
+      ],
+      "global": {
+        "trainerBattle": "",
+        "trainerVictory": ""
+      },
+      "expectedNames": [
+        "Battle trainer",
+        "Battle victory"
+      ]
+    },
+    {
+      "id": "PT-49",
+      "kind": "trainer-pair",
+      "map": {
+        "trainerBattle": "M",
+        "trainerVictory": "Mv"
+      },
+      "origin": "map",
+      "index": null,
+      "trainers": [
+        {
+          "battleBgm": "A",
+          "victoryBgm": "Av"
+        },
+        {
+          "battleBgm": "",
+          "victoryBgm": ""
+        }
+      ],
+      "global": {
+        "trainerBattle": "G",
+        "trainerVictory": "Gv"
+      },
+      "expectedNames": [
+        "M",
+        "Mv"
+      ]
+    },
+    {
+      "id": "PT-50",
+      "kind": "from-type",
+      "typeName": "",
+      "map": "M",
+      "globalName": "G",
+      "expectedName": "",
+      "origin": "trainer-type"
+    },
+    {
+      "id": "PT-51",
+      "kind": "from-type",
+      "typeName": null,
+      "map": "M",
+      "globalName": "G",
+      "expectedName": "M",
+      "origin": "map"
+    },
+    {
+      "id": "PT-52",
+      "kind": "from-type",
+      "typeName": "A",
+      "map": "M",
+      "globalName": "G",
+      "expectedName": "A",
+      "origin": "trainer-type"
+    },
+    {
+      "id": "PT-53",
+      "kind": "trainer-pair",
+      "map": {
+        "trainerBattle": "M",
+        "trainerVictory": "Mv"
+      },
+      "presets": {
+        "battle": "Xb",
+        "victory": "Xv"
+      },
+      "expectedNames": [
+        "Xb",
+        "Xv"
+      ],
+      "origin": "preset",
+      "index": null,
+      "trainers": [
+        {
+          "battleBgm": "A",
+          "victoryBgm": "Av"
+        },
+        {
+          "battleBgm": "B",
+          "victoryBgm": "Bv"
+        }
+      ],
+      "global": {
+        "trainerBattle": "G",
+        "trainerVictory": "Gv"
+      }
+    },
+    {
+      "id": "PT-54",
+      "kind": "wild-triple",
+      "map": [
+        "W",
+        "V",
+        "C"
+      ],
+      "globalNames": [
+        "G",
+        "G",
+        "G"
+      ],
+      "expectedNames": [
+        "W",
+        "V",
+        "C"
+      ],
+      "origin": "map"
+    },
+    {
+      "id": "PT-55",
+      "kind": "wild-triple",
+      "map": null,
+      "globalNames": [
+        "Gb",
+        "Gv",
+        "Gc"
+      ],
+      "expectedNames": [
+        "Gb",
+        "Gv",
+        "Gc"
+      ],
+      "origin": "global"
+    },
+    {
+      "id": "PT-56",
+      "kind": "wild-defaults",
+      "missingVariants": [
+        null,
+        ""
+      ],
+      "expectedNames": [
+        "Battle wild",
+        "Battle victory",
+        "Battle capture success"
+      ],
+      "origin": "default"
+    },
+    {
+      "id": "PT-57",
+      "kind": "wild-independent",
+      "presetsVariants": [
+        {
+          "battle": "X"
+        },
+        {
+          "victory": "X"
+        },
+        {
+          "capture": "X"
+        }
+      ],
+      "expectedVariants": [
+        [
+          "X",
+          "V",
+          "C"
+        ],
+        [
+          "W",
+          "X",
+          "C"
+        ],
+        [
+          "W",
+          "V",
+          "X"
+        ]
+      ]
+    },
+    {
+      "id": "PT-63",
+      "kind": "wild-triple",
+      "map": [
+        "W",
+        "V",
+        "C"
+      ],
+      "globalNames": [
+        "G",
+        "G",
+        "G"
+      ],
+      "presets": {
+        "battle": "Xb",
+        "victory": "Xv",
+        "capture": "Xc"
+      },
+      "expectedNames": [
+        "Xb",
+        "Xv",
+        "Xc"
+      ],
+      "origin": "preset"
+    }
+  ],
+  "instantiation": "Trainer battle/victory use distinct logical names; null/empty and formal precedence remain unchanged."
+}

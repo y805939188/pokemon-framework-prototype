@@ -1,0 +1,37 @@
+{
+  "version": "capture-me-native-v1",
+  "productCommit": "f021b33767fae6969d735ffde981f968a80d2218",
+  "productPluginSHA256": "3eaf336a57e9c9ad407f161bdf17ffc15f79f847dc1d4aeb506e2250fb3834d2",
+  "prefix": "pf_capture_me_v1/",
+  "seed": [1,2,3,4],
+  "worldSeed": 817,
+  "mapId": 5,
+  "slot": 1,
+  "loadControlSlot": 2,
+  "blockedSlot": 99,
+  "waitMs": 3500,
+  "musicVolume": 47,
+  "sampleRate": 44100,
+  "amplitude": 3800,
+  "encodedChannels": 2,
+  "nativeExtension": ".ogg",
+  "assets": [
+    {"kind":"bgm","name":"world","seconds":2,"frequency":220},
+    {"kind":"bgm","name":"battle","seconds":2,"frequency":330},
+    {"kind":"me","name":"long","seconds":6,"frequency":440},
+    {"kind":"me","name":"short","seconds":0.15,"frequency":550},
+    {"kind":"me","name":"foreign","seconds":8,"frequency":660}
+  ],
+  "aliases": [],
+  "intentionalBadAsset": "audio/me/pf_capture_me_v1/corrupt.ogg",
+  "intentionalMissingAsset": "audio/me/pf_capture_me_v1/missing.ogg",
+  "groups": [
+    {"name":"normal-and-native-media","ids":["ME01","ME02","ME03","ME04"]},
+    {"name":"publication-deadline-and-cancel","ids":["ME05","ME06","ME07"]},
+    {"name":"successor-ownership","ids":["ME08","ME09"]},
+    {"name":"host-state-replacement","ids":["ME10","ME11"]},
+    {"name":"no-capture-no-trigger","ids":["ME12","ME13"]},
+    {"name":"unconfirmed-stop-fail-closed","ids":["ME14"]},
+    {"name":"fresh-process-continue","ids":["ME15"]}
+  ]
+}

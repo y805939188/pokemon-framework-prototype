@@ -31,7 +31,9 @@
       "species.evYield",
       "species.catchRate",
       "species.learnset",
-      "grants"
+      "grants",
+      "trainer-types",
+      "trainers"
     ]
   }
 ]

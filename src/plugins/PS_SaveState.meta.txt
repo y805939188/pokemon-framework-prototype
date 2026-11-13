@@ -1,4 +1,12 @@
 /*:
  * @target MZ
  * @plugindesc Step 3: versioned game state inside the MZ save. Migrates older prototype states on load, refuses (and keeps) states it cannot understand, validates before saving.
+ * @command MigrateFriendship
+ * @text 预览并确认友好度迁移
+ * @desc 只迁移明确槽内的256为255，确认后保存并保留原始备份；不会随加载自动运行。
+ * @arg slot
+ * @text 存档槽
+ * @type number
+ * @min 1
+ * @default 1
  */

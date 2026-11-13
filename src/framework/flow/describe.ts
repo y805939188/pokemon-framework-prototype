@@ -25,11 +25,39 @@ export function make(names: Record<string, string> = {}, tr: Translator = defaul
   const status = (a0: string, id: string, kind: "inflicted" | "cured"): string =>
     tr.has(`battle.status.${id}.${kind}`) ? tr.t(`battle.status.${id}.${kind}`, { name: nm(a0) }) : tr.t(`battle.status_${kind}`, { name: nm(a0), status: id });
 
+  // In the pinned protocol the actor of these reasons is the affected Pokémon.
+  // Other cant reasons can instead name an ability holder, with the prevented
+  // actor in [of]. Never guess an actor or echo unrecognised protocol text.
+  function cant(ident: string, reason: string): string {
+    let key: string;
+    switch (reason) {
+      // Sleep-usable moves may still execute after cant|slp: this is only a sleep notice.
+      case "slp": case "par": case "frz": case "flinch": case "recharge": case "nopp": key = reason; break;
+      case "ability: Truant": key = "truant"; break;
+      case "Attract": key = "attract"; break;
+      case "Disable": key = "disable"; break;
+      case "Focus Punch": key = "focuspunch"; break;
+      case "Shell Trap": key = "shelltrap"; break;
+      case "move: Taunt": key = "taunt"; break;
+      case "move: Imprison": key = "imprison"; break;
+      case "move: Gravity": key = "gravity"; break;
+      case "move: Heal Block": key = "healblock"; break;
+      case "move: Throat Chop": key = "throatchop"; break;
+      default: return tr.t("battle.cant.unknown");
+    }
+    const actor = /^(p[12])[a-z]?: ([A-Za-z0-9#._:-]{1,18})$/.exec(ident);
+    if (!actor) return tr.t("battle.cant.unknown");
+    const mapped = Object.prototype.hasOwnProperty.call(names, actor[2]!) ? names[actor[2]!] : undefined;
+    const name = typeof mapped === "string" && mapped ? mapped : actor[2]!;
+    return tr.t(`battle.cant.${key}`, { name: actor[1] === "p1" ? name : tr.t("battle.foe_prefix", { name }) });
+  }
+
   function event(e: BattleEvent): string[] {
     const a = e.args;
     const a0 = a[0] ?? "", a1 = a[1] ?? "";
     switch (e.type) {
       case "switch": case "drag": return a0.startsWith("p1") ? [tr.t("battle.go", { name: names[idOf(a0)] || idOf(a0) })] : [tr.t("battle.foe_sent_out", { name: names[idOf(a0)] || a0 })];
+      case "cant": return [cant(a0, a1)];
       case "move": return [tr.t("battle.used_move", { user: nm(a0), move: a1 })];
       case "-damage": { if (/\[from\]/.test(a.join("|"))) return [tr.t("battle.hurt", { name: nm(a0), hp: pct(a1) })]; return a1.startsWith("0") ? [] : [tr.t("battle.hp_left", { name: nm(a0), hp: pct(a1) })]; }
       case "-heal": return /\[silent\]/.test(a.join("|")) ? [] : [tr.t("battle.recovered", { name: nm(a0), hp: pct(a1) })];
@@ -43,6 +71,15 @@ export function make(names: Record<string, string> = {}, tr: Translator = defaul
       case "-curestatus": return [status(a0, a1, "cured")];
       case "-boost": return [tr.t(Number(a[2]) > 1 ? "battle.boost_rose_sharply" : "battle.boost_rose", { name: nm(a0), stat: statName(a1) })];
       case "-unboost": return [tr.t("battle.stat_fell", { name: nm(a0), stat: statName(a1) })];
+      case "-weather": {
+        if (a.includes("[upkeep]")) return [];
+        const id = a0.toLowerCase().replace(/[^a-z]/g, "");
+        return tr.has(`battle.weather.${id}`) ? [tr.t(`battle.weather.${id}`)] : [];
+      }
+      case "-fieldstart": {
+        const id = a0.replace(/^move: /, "").toLowerCase().replace(/[^a-z]/g, "");
+        return tr.has(`battle.terrain.${id}`) ? [tr.t(`battle.terrain.${id}`)] : [];
+      }
       case "rpg": return rpg(a);
       case "win": return [];
       default: return [];
@@ -52,6 +89,16 @@ export function make(names: Record<string, string> = {}, tr: Translator = defaul
   function rpg(a: string[]): string[] {
     const what = a[0], x = a[2] ?? "", target = a[3] ?? "", res = a[4];
     const tn = names[target] || target;
+    if (what === "obedience") {
+      // |rpg|obedience|side|memberId|result|detail. Only recognized outcomes become text.
+      const result = a[3], detail = a[4];
+      const keys: Record<string, string> = { sleep: "sleep", ignored: "ignored", change: "change", "self-sleep": "self_sleep", "self-hit": "self_hit" };
+      const key = result === "refuse" && /^[0-3]$/.test(detail ?? "") ? `refuse${detail}`
+        : result && Object.prototype.hasOwnProperty.call(keys, result) ? keys[result] : undefined;
+      if (!key || !["p1", "p2"].includes(a[1] ?? "")) return [];
+      const name = Object.prototype.hasOwnProperty.call(names, x) && typeof names[x] === "string" ? names[x]! : x;
+      return [tr.t(`battle.obedience.${key}`, { name: a[1] === "p1" ? name : tr.t("battle.foe_prefix", { name }) })];
+    }
     if (what === "item") {
       if (res === "ok") return [a[5] !== undefined && /^\d+$/.test(a[5]) ? tr.t("item.used_recovered", { item: itemName(x), target: tn, hp: a[5] }) : tr.t("item.used", { item: itemName(x), target: tn })];
       if (res === "noeffect") return [tr.t("item.no_effect", { item: itemName(x) })];

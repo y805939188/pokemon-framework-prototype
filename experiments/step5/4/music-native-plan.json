@@ -1,0 +1,133 @@
+{
+  "version": "battle-music-native-v2",
+  "productCommit": "f3d7a574819e619c150f0e31c62a9ac7396ce071",
+  "productPluginSHA256": "bed217e97e319335e40d239a36b0bdf052d01c78f3481c4a38aface989a95034",
+  "seed": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "worldSeed": 817,
+  "slot": 1,
+  "loadControlSlot": 2,
+  "mapId": 5,
+  "frameAfterIntro": 1,
+  "nativeExtension": ".ogg",
+  "musicVolume": 40,
+  "prefix": "__music_native_v2__/",
+  "groups": [
+    {
+      "name": "start-and-options",
+      "ids": [
+        "M01",
+        "M02"
+      ]
+    },
+    {
+      "name": "event-intro",
+      "ids": [
+        "M03",
+        "M04",
+        "M05",
+        "M06"
+      ]
+    },
+    {
+      "name": "root-return",
+      "ids": [
+        "M07",
+        "M08",
+        "M09"
+      ]
+    },
+    {
+      "name": "cancel-and-successor",
+      "ids": [
+        "M10",
+        "M11",
+        "M12",
+        "M13"
+      ]
+    },
+    {
+      "name": "default-and-ME-save-producer",
+      "ids": [
+        "M14",
+        "M15",
+        "M16"
+      ]
+    },
+    {
+      "name": "fresh-continue",
+      "ids": [
+        "M17"
+      ]
+    }
+  ],
+  "assets": [
+    {
+      "kind": "bgm",
+      "name": "world",
+      "frequency": 220,
+      "seconds": 2
+    },
+    {
+      "kind": "bgm",
+      "name": "wild",
+      "frequency": 330,
+      "seconds": 2
+    },
+    {
+      "kind": "bgm",
+      "name": "trainer",
+      "frequency": 440,
+      "seconds": 2
+    },
+    {
+      "kind": "bgm",
+      "name": "intro",
+      "frequency": 550,
+      "seconds": 0.8
+    },
+    {
+      "kind": "bgm",
+      "name": "preset",
+      "frequency": 660,
+      "seconds": 2
+    },
+    {
+      "kind": "bgm",
+      "name": "next",
+      "frequency": 770,
+      "seconds": 2
+    },
+    {
+      "kind": "bgm",
+      "name": "default",
+      "frequency": 880,
+      "seconds": 2
+    },
+    {
+      "kind": "me",
+      "name": "signal",
+      "frequency": 990,
+      "seconds": 8
+    }
+  ],
+  "intentionalBadAsset": "audio/bgm/__music_native_v2__/corrupt.ogg",
+  "intentionalMissingAsset": "audio/bgm/__music_native_v2__/missing.ogg",
+  "sampleRate": 44100,
+  "amplitude": 1000,
+  "physicalHearing": "NOT_VERIFIED",
+  "execution": "NOT_RUN_REQUIRES_FROZEN_APP_AND_EXPLICIT_ADMISSION",
+  "aliases": [
+    {
+      "source": "wild",
+      "path": "audio/bgm/Battle wild.ogg"
+    }
+  ],
+  "MEFixtureReason": "Eight-second synthetic clip fixed before execution to span real Scene startup/terminal result; production timing and five-second preparation deadline are unchanged.",
+  "encodedChannels": 2,
+  "encoder": "installed ffmpeg native vorbis (-strict experimental); no installation"
+}

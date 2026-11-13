@@ -155,6 +155,7 @@ const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
    const op=this.operation,r=this.application.inventoryRequest(this.token,op.id,op.request);
    if(r.status==='pending'){this.answer(r.result.selection);return;}
    if(r.status==='refused'){
+    if(r.reason==='no-effect'){this.operation=null;this.selectedTicket=null;}
     const retired=r.reason==='stale-item-selection'||r.reason==='stale-slot'||r.reason==='stale-target'||r.reason==='stale-content';
     this.fail(r,()=>retired||this.request.kind==='use'?this.close(r):this.bagView());return;
    }

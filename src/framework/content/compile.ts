@@ -1,18 +1,23 @@
+import { storedCreationForms } from "../rules/creation-form";
 /**
  * Pure content compiler: validate authored JSON (every problem is located by file and path), apply overlays with
  * conflict detection, emit one canonical document whose `inputsHash` covers every input. No file system, no Showdown.
  */
 import { sha256Hex } from "../rules/sha256";
-import { checkItemInputs } from "./item-input";
+import { checkItemInputs, defaultMemberBallProblem } from "./item-input";
+import { holdableItem, itemOf } from "../rules/item-catalog";
 import { DEFAULT_LIMITS } from "../rules/limits";
 import { MAX_FORM } from "../rules/species-key";
-import { checkOverrides, developmentCapabilities } from "../rules/config";
+import { checkOverrides, runtimeCapabilities } from "../rules/config";
 import {
-  CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, AUTHOR_SCHEMA_VERSION, COMPILED_SCHEMA_VERSION, SOURCE_KINDS, STAT_KEYS_ALLOWED, USAGE_DECISIONS,
+  CURVES_ALLOWED, GRANT_ID, OVERRIDABLE, COMPILED_SCHEMA_VERSION, SOURCE_KINDS, STAT_KEYS_ALLOWED, USAGE_DECISIONS,
 } from "./schema";
 import { CONTENT_SHOWDOWN_SHA } from "./showdown-pin";
 import { PROGRESSION_FIELDS, progressionFieldProblem, inheritSpecies, deriveSpeciesFields, checkProgressionReferences, checkRegionalDex, checkMapMetadata } from "./progression-input";
 import type { CompiledContent, ContentError, ContentInputs, GrantSource, Overlay, SourceEntry, SpeciesSource } from "./schema";
+import { checkTrainerInputs, trainerSpeciesKeys } from "./trainer-input";
+import { authorCompatibilityDiagnostics, authorHappinessProblem, authorSchemaProblem } from "./friendship-author-domain";
+import type { AuthorSchema } from "./schema";
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -25,8 +30,8 @@ export function canonicalJson(v: unknown, indent = 0): string {
 }
 
 export function hashInputs(inputs: ContentInputs): string {
-  // grants/settings are undefined for content without those files: JSON drops the key, so older hashes are unchanged
-  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants, settings: inputs.settings, items: inputs.items, shops: inputs.shops, regionalDex: inputs.regionalDex, mapMetadata: inputs.mapMetadata }));
+  // Optional files are undefined for older content: JSON drops those keys, so legacy input hashes stay unchanged.
+  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants, settings: inputs.settings, items: inputs.items, shops: inputs.shops, regionalDex: inputs.regionalDex, mapMetadata: inputs.mapMetadata, trainerTypes: inputs.trainerTypes, trainers: inputs.trainers }));
 }
 
 const ID = /^[a-z][a-z0-9-]{0,30}$/;
@@ -133,17 +138,21 @@ export function showdownDependencyProblem(sources: readonly SourceEntry[]): stri
 }
 
 export function compileContent(inputs: ContentInputs, developerCapabilities: unknown = {}, context: { showdownSha: string } = { showdownSha: CONTENT_SHOWDOWN_SHA }): CompileResult {
-  const capabilities = developmentCapabilities(developerCapabilities);
+  const capabilities = runtimeCapabilities(developerCapabilities);
   const errors: ContentError[] = [];
+  const warnings: ContentError[] = [];
   const report: Report = (file, path, message) => { errors.push({ file, path, message }); };
 
   // ---- manifest
   let contentId = "";
+  let authorSchema: AuthorSchema | undefined;
   if (!isObj(inputs.manifest)) report("manifest.json", "$", "must be an object");
   else {
     const m = inputs.manifest;
     checkKnownKeys(m, ["schema", "id", "title"], "manifest.json", "$", report);
-    if (m["schema"] !== AUTHOR_SCHEMA_VERSION) report("manifest.json", "$.schema", `must be ${AUTHOR_SCHEMA_VERSION} (this compiler only knows schema ${AUTHOR_SCHEMA_VERSION})`);
+    const problem = authorSchemaProblem(m["schema"]);
+    if (problem) report("manifest.json", "$.schema", problem);
+    else { authorSchema = m["schema"] as AuthorSchema; warnings.push(...authorCompatibilityDiagnostics(authorSchema)); }
     if (typeof m["id"] !== "string" || !ID.test(m["id"])) report("manifest.json", "$.id", "must be an id like \"sample\"");
     else contentId = m["id"];
     if (typeof m["title"] !== "string" || !m["title"]) report("manifest.json", "$.title", "must be a non-empty string");
@@ -161,6 +170,10 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
 
   const itemInputs = checkItemInputs(inputs.items, inputs.shops, usable);
   errors.push(...itemInputs.errors);
+  if (Array.isArray(inputs.species) && inputs.species.length) {
+    const problem = defaultMemberBallProblem(itemInputs.catalog);
+    if (problem) errors.push(problem);
+  }
 
   // ---- species
   const species: SpeciesSource[] = [];
@@ -182,7 +195,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
       else { keys.add(key); if (!form) ids.add(s["id"]); }
     }
     if (typeof s["showdownId"] !== "string" || !SHOWDOWN_ID.test(s["showdownId"])) report("species.json", `${p}.showdownId`, "must be a Showdown species id (lowercase letters and digits)");
-    if (s["happiness"] !== undefined) { const issue = FIELD_CHECK["happiness"]!(s["happiness"]); if (issue) report("species.json", `${p}.happiness`, issue); }
+    if (s["happiness"] !== undefined && authorSchema !== undefined) { const issue = authorHappinessProblem(s["happiness"], authorSchema); if (issue) report("species.json", `${p}.happiness`, issue); }
     for (const f of ["nameKey", "growth", "baseExp", "catchRate", "evYield", "learnset"] as const) {
       if (!(f in s)) { if (form !== 0) continue; report("species.json", `${p}.${f}`, `missing required field "${f}" in ${label}`); continue; }
       const problem = FIELD_CHECK[f]!(s[f]);
@@ -219,7 +232,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
     let ok = true;
     for (const [f, v] of Object.entries(o["set"])) {
       if (!(OVERRIDABLE as readonly string[]).includes(f)) { report("overlays.json", `${p}.set.${f}`, `field "${f}" cannot be overridden (allowed: ${OVERRIDABLE.join(", ")})`); ok = false; continue; }
-      const problem = FIELD_CHECK[f]!(v);
+      const problem = f === "happiness" && authorSchema !== undefined ? authorHappinessProblem(v, authorSchema) : FIELD_CHECK[f]!(v);
       if (problem) { report("overlays.json", `${p}.set.${f}`, problem); ok = false; continue; }
       const key = `${o["target"]}#${f}`;
       if (setBy.has(key)) { report("overlays.json", `${p}.set.${f}`, `conflicts with overlay [${setBy.get(key)}]: both replace ${f} of ${o["target"]}`); ok = false; continue; }
@@ -266,9 +279,12 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
       if (!Array.isArray(members) || members.length > DEFAULT_LIMITS.party) report("grants.json", `${p}.members`, `must be an array of at most ${DEFAULT_LIMITS.party} {species, level}`);
       else for (const [j, m] of members.entries()) {
         if (!isObj(m) || typeof m["species"] !== "string" || !isInt(m["level"], 1, 100) || Object.keys(m).some((k) => !["species", "level", "form", "item"].includes(k))) { report("grants.json", `${p}.members[${j}]`, "must be {species: <species id>, level: 1..100}"); continue; }
-        if (m["form"] !== undefined && (!isInt(m["form"], 0, MAX_FORM) || !keys.has(recordKey(m["species"], m["form"] as number)))) report("grants.json", `${p}.members[${j}].form`, "must name an existing exact form");
+        if (m["form"] !== undefined && (!isInt(m["form"], 0, MAX_FORM) || !keys.has(recordKey(m["species"], m["form"] as number)) && ![...merged.values()].some(sp => sp.id === m["species"] && (sp.form ?? 0) === 0 && storedCreationForms(sp.showdownId).includes(m["form"] as number)))) report("grants.json", `${p}.members[${j}].form`, "must name an existing exact form");
         if (m["item"] !== undefined && (typeof m["item"] !== "string" || (m["item"] !== "" && !SHOWDOWN_ID.test(m["item"])))) report("grants.json", `${p}.members[${j}].item`, "must be a held item id");
         if (m["item"] && !capabilities.allowHeldItemSources) report("grants.json", `${p}.members[${j}].item`, "held-item-source-disabled: controlled developer injection required; not a player setting");
+        const heldDefinition = typeof m["item"] === "string" ? itemOf(itemInputs.catalog, m["item"]) : undefined;
+        if (m["item"] && !heldDefinition) report("grants.json", `${p}.members[${j}].item`, "held item must be registered in the item catalog");
+        if (heldDefinition && !holdableItem(heldDefinition)) report("grants.json", `${p}.members[${j}].item`, "author item rules forbid holding this item");
         if (!ids.has(m["species"])) report("grants.json", `${p}.members[${j}].species`, `"${m["species"]}" is not a species id of species.json`);
       }
       const items = g["items"];
@@ -290,8 +306,9 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
 
   if (errors.length) return {ok:false,errors};
   const registrationOrder = species.map(sp => ({species: sp.id, form: sp.form ?? 0}));
+  const trainerData = checkTrainerInputs(inputs.trainerTypes, inputs.trainers, { speciesKeys: trainerSpeciesKeys(registrationOrder, [...merged.values()]), catalog: itemInputs.catalog, usable });
+  errors.push(...trainerData.errors);
   const effective = [...merged.values()];
-  const warnings: ContentError[] = [];
   deriveSpeciesFields(effective, report, (file,path,message)=>warnings.push({file,path,message}));
   const effectiveByKey = new Map(effective.map(sp=>[recordKey(sp.id,sp.form??0),sp]));
   for (const [i,sp] of effective.entries()) for (const [j,entry] of (sp.evolutions??[]).entries()) {
@@ -313,6 +330,8 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
     ...(inputs.shops !== undefined ? { shops: itemInputs.shops } : {}),
     ...(inputs.grants !== undefined ? { grants: [...grants].sort((a, b) => a.id.localeCompare(b.id)) } : {}),
     ...(inputs.settings !== undefined ? { settings: { ...(inputs.settings as import("../rules/config").RuleOverrides) } } : {}),
+    ...(trainerData.types ? { trainerTypes: trainerData.types } : {}),
+    ...(trainerData.records ? { trainers: trainerData.records } : {}),
   };
   return { ok: true, data, errors: [], warnings };
 }

@@ -161,6 +161,33 @@ export function battleExp({ foe, receiver, participants, rules = DEFAULT_RULES, 
   return share;
 }
 
+/** WP30 §4.2/4.4 + WP50 §6: current handler first, otherwise the updatable recovery item.
+ * EXP and EV handlers resolve separately; no field-effective-item gate and no double application.
+ * The caller owns the authoritative battle item pair. Gen 8 Power items add 8 before normal EV caps.
+ */
+export function heldGrowthModifiers(yieldTable: PartialStats, items: { current: string; recovery: string }): { luckyEgg: boolean; evYield: PartialStats } {
+  const powerStat = (item: string): StatKey | undefined => {
+    switch (item) {
+      case "powerweight": return "hp";
+      case "powerbracer": return "atk";
+      case "powerbelt": return "def";
+      case "powerlens": return "spa";
+      case "powerband": return "spd";
+      case "poweranklet": return "spe";
+      default: return undefined;
+    }
+  };
+  const hasEvHandler = (item: string): boolean => item === "machobrace" || powerStat(item) !== undefined;
+  const evItem = hasEvHandler(items.current) ? items.current : items.recovery;
+  const evYield = { ...yieldTable };
+  if (evItem === "machobrace") for (const stat of STAT_KEYS) evYield[stat] = (evYield[stat] ?? 0) * 2;
+  else {
+    const stat = powerStat(evItem);
+    if (stat) evYield[stat] = (evYield[stat] ?? 0) + 8;
+  }
+  return { luckyEgg: items.current === "luckyegg" || items.recovery === "luckyegg", evYield };
+}
+
 /** WP30 4.4 EV gain: per stat clamp to per-stat and total caps. Returns a NEW evs object. */
 export function gainEvs(evs: PartialStats, yieldTable: PartialStats, { perStat = 252, total = 510, multiplier = 1 } = {}): PartialStats {
   const out: PartialStats = { ...evs };
