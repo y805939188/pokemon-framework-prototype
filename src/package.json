@@ -9,7 +9,7 @@
     "build:engine": "ENGINE_ENTRY=runtime vite build -c vite.engine.config.mts && ENGINE_ENTRY=custom-formats vite build -c vite.engine.config.mts && ENGINE_ENTRY=core vite build -c vite.engine.config.mts && ENGINE_ENTRY=content-cli vite build -c vite.engine.config.mts",
     "build:distribution": "node ../scripts/build-framework-distribution.cjs",
     "typecheck:framework": "tsc --noEmit -p framework/tsconfig.json && tsc --noEmit -p framework/tsconfig.core.json && tsc --noEmit -p framework/tsconfig.app.json",
-    "content:build": "node ../js/engine/build/content-cli.cjs build",
+    "content:build": "node ../scripts/check-showdown-staging.cjs && node ../js/engine/build/content-cli.cjs build",
     "content:check": "node ../js/engine/build/content-cli.cjs check",
     "content:inventory": "node ../js/engine/build/content-cli.cjs inventory"
   },

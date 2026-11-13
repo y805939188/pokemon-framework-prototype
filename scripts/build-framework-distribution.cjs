@@ -8,6 +8,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
 const { sourceFingerprint: fingerprintSource } = require('./framework-distribution-source.cjs');
+const { checkShowdownStaging } = require('./check-showdown-staging.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'src');
@@ -73,23 +74,6 @@ function copyAndRename(fromRel, toRel) {
   fs.copyFileSync(from, to);
 }
 
-function stagedShowdownSha() {
-  const pinText = fs.readFileSync(path.join(ROOT, 'scripts/showdown.env'), 'utf8');
-  const sha = /^SHOWDOWN_SHA="([a-f0-9]{40})"$/m.exec(pinText)?.[1];
-  if (!sha) throw new Error('scripts/showdown.env has no valid SHOWDOWN_SHA');
-  const staged = path.join(ENGINE, 'showdown');
-  for (const rel of ['dist/sim', 'dist/data', 'dist/lib', 'dist/config', 'node_modules/ts-chacha20', 'LICENSE', 'SOURCE_SHA']) {
-    if (!fs.existsSync(path.join(staged, rel))) throw new Error(`staged Showdown is incomplete: missing js/engine/showdown/${rel}`);
-  }
-  const actual = fs.readFileSync(path.join(staged, 'SOURCE_SHA'), 'utf8').trim();
-  if (actual !== sha) throw new Error(`staged Showdown SHA ${actual} does not match ${sha}`);
-  const builtFormat = path.join(BUILD, 'custom-formats.cjs');
-  const stagedFormat = path.join(staged, 'dist/config/custom-formats.js');
-  if (!fs.existsSync(builtFormat) || !fs.existsSync(stagedFormat) || !fs.readFileSync(builtFormat).equals(fs.readFileSync(stagedFormat)))
-    throw new Error('staged Showdown custom-formats.js differs from the current build; run the approved local staging step');
-  return sha;
-}
-
 function entry(types, runtime) {
   return { types, require: runtime, default: runtime };
 }
@@ -136,7 +120,7 @@ function packageJson() {
 
 const before = sourceFingerprint();
 run('pnpm', ['--dir', SRC, 'build:engine']);
-const showdownSha = stagedShowdownSha();
+const showdownSha = checkShowdownStaging(ROOT);
 run('pnpm', ['--dir', SRC, 'content:build']);
 
 // Only this script's ignored output is removed. Source, prior evidence and all other build directories stay untouched.
