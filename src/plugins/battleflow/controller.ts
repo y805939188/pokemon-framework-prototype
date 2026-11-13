@@ -149,7 +149,7 @@ export class BattleSceneController<Session = unknown> {
     } finally { this.ticking = false; }
   }
 
-  run(action: () => unknown, fulfilled: (result: unknown) => void, kind = 'other'): boolean {
+  run<Result>(action: () => Result, fulfilled: (result: Awaited<Result>) => void, kind = 'other'): boolean {
     if (!this.canChoose()) return false;
     const epoch = ++this.epoch;
     this.busy = true;
@@ -158,15 +158,15 @@ export class BattleSceneController<Session = unknown> {
     catch (error) { this.fail(error); return false; }
     void Promise.resolve().then(() => {
       if (!this.at(epoch) || !this.ports.active()) return;
-      return action();
-    }).then(result => {
-      if (!this.at(epoch) || !this.ports.active()) return;
-      const elapsed = this.ports.now() - start;
-      if (!this.at(epoch) || !this.ports.active()) return;
-      this.ports.actionMeasured(kind, elapsed);
-      if (!this.at(epoch) || !this.ports.active()) return;
-      fulfilled(result);
-      if (this.at(epoch)) this.busy = false;
+      return Promise.resolve(action()).then(result => {
+        if (!this.at(epoch) || !this.ports.active()) return;
+        const elapsed = this.ports.now() - start;
+        if (!this.at(epoch) || !this.ports.active()) return;
+        this.ports.actionMeasured(kind, elapsed);
+        if (!this.at(epoch) || !this.ports.active()) return;
+        fulfilled(result);
+        if (this.at(epoch)) this.busy = false;
+      });
     }).catch(error => { if (this.at(epoch)) this.fail(error); });
     return true;
   }

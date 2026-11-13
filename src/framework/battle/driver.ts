@@ -4,6 +4,7 @@ import type { InitialFieldInput } from '../rules/initial-field';
  * operations. `BattleGateway` (Pokemon Showdown) implements it; a scripted fake can stand in for it in tests. Types
  * only: no behaviour lives here.
  */
+import type { BattleRequest } from "./request";
 import type { BattleEvent } from "./protocol";
 import type { MonView } from "../rules/rules";
 import type { PartialStats, Stats } from "../rules/types";
@@ -41,7 +42,7 @@ export interface DriverRequestSource {
 }
 export type GatewayMessage =
   | { kind: "events"; seq: number; events: BattleEvent[] }
-  | { kind: "request"; seq: number; side: string; request: Record<string, any>; readonly source?: DriverRequestSource }
+  | { kind: "request"; seq: number; side: string; request: BattleRequest | null; readonly source?: DriverRequestSource }
   | { kind: "error"; seq: number; side: string; message: string; choice?: string; payload?: unknown }
   | { kind: "end"; seq: number; winner: string | null; turn: number; reason: string; outcome?: Record<string, unknown> };
 
@@ -123,7 +124,7 @@ export interface BattleDriver {
   /** Stable id of the member currently in a side's slot, or null. */
   activeId(side: string, slot?: number): string | null;
   /** A copy of the side's pending request while it still has to choose, else null. */
-  awaitingChoice(side: string): Record<string, unknown> | null;
+  awaitingChoice(side: string): BattleRequest | null;
   drain(): GatewayMessage[];
   discardQueued(): void;
   /** An opaque in-memory rollback point; only the factory that made the driver can open it. */

@@ -1,3 +1,4 @@
+import type { BattleSessionView } from "../framework/flow/session-view";
 /** Compile-time MZ boundary. Imports are types only; no second application/runtime is bundled into a plugin. */
 import type { GameApplication } from '../framework/app';
 import type { BattleSessionFactory } from '../framework/app';
@@ -6,7 +7,7 @@ import type { LogSink, RingLogger } from '../framework/flow/log';
 import type { GameState } from '../framework/rules/state';
 import type { Limits } from '../framework/rules/limits';
 
-export type HostApplication = GameApplication;
+export type HostApplication = GameApplication<BattleSessionView>;
 type CommandKey = 'beginLearning' | 'resolveLearning' | 'beginEvolutionItem' | 'beginEventEvolution' | 'resolveTriggeredEvolution'
   | 'terminateAcquisition' | 'pokedexSnapshot' | 'updatePokedex' | 'resolvePokedex' | 'beginTrade' | 'resolveTrade'
   | 'resolveReceiving' | 'resolveEvolution';
@@ -21,6 +22,7 @@ export interface ApplicationHost extends ApplicationCommands {
   _app: HostApplication | null;
 }
 export interface ApplicationCompositionHost extends ApplicationHost {
+  begin(): Promise<BattleSessionView>;
   game(): GameState;
   content(): Content;
   limits(): Limits;
@@ -48,8 +50,8 @@ interface SessionOptions {
 export interface ProductionRuntime {
   app: Pick<typeof import('../framework/app'), 'GameApplication' | 'individualView'>;
   composition: {
-    createBattleSessionFactory(options: SessionOptions): BattleSessionFactory;
-    createLegacyNoHeldBattleSessionFactory(options: SessionOptions): BattleSessionFactory;
+    createBattleSessionFactory(options: SessionOptions): BattleSessionFactory<BattleSessionView>;
+    createLegacyNoHeldBattleSessionFactory(options: SessionOptions): BattleSessionFactory<BattleSessionView>;
   };
   dex: { createDexLookup(engineRoot?: string): DexLookup };
   log: { createRingLogger(capacity?: number): RingLogger };
