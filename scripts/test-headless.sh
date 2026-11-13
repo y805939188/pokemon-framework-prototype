@@ -158,6 +158,7 @@ SUITES=(
   scripts/tests/reactor-source-identity.test.cjs
   scripts/tests/bootstrap-mac.test.cjs
   scripts/tests/host-application-types.test.cjs
+  scripts/tests/host-input.test.cjs
   scripts/tests/showdown-build.test.cjs
   scripts/tests/package-excludes.test.cjs
   scripts/tests/check-boundaries.test.cjs

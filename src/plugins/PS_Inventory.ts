@@ -2,6 +2,7 @@ import type { ItemResult } from '../framework/rules/item-effects';
 import type { ApplicationHost, InventoryApplication } from './application-host';
 /** 5.2 host presentation. Application plans/install resources; this adapter owns focus and answers. */
 import {InputLatch} from './management/model';
+import {hostInput} from './host-input';
 import type {InputFrame} from './management/model';
 import {quantityStep,nextPocket,animationPhase,itemIconFrame} from './inventory/model';
 import {itemCatalog as Catalog} from '../framework/rules/index';
@@ -10,6 +11,7 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
 const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Inventory',clone=structuredClone;
+ const inputs=hostInput(G);
  const flow=():ApplicationHost & Record<string, any>=>W.PSFlow,app=():InventoryApplication=>flow().app(),tr=(k:string,p?:Record<string,string|number>)=>flow().translator().t('inventory.'+k,p);
  const why=(o:any)=>String(o?.reason??o?.error??o?.message??o),detail=(o:any)=>flow().translator().tOr('inventory.reason.'+why(o),why(o));
  const name=(it:ItemDefinition)=>flow().translator().tOr(it.nameKey??'item.name.'+it.id,it.name);
@@ -66,7 +68,7 @@ const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
    else if(this.request.kind==='use'){if(this.machine(this.request.itemId!))this.machineOpening(this.request.itemId!,()=>this.request.memberId?this.beginUse(this.request.itemId!,this.request.memberId,1):this.machineTargets(this.request.itemId!));else if(this.triggerItem(this.request.itemId!)&&!this.request.memberId)this.target(this.request.itemId!);else this.beginUse(this.request.itemId!,this.request.memberId,this.request.quantity??1);}
    else this.bagView();
   }
-  sample():InputFrame {return W.PSManagement.inputFrame();}
+  sample():InputFrame {return inputs.inputFrame();}
   boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;const pressed=this.sample().pressed;this.latch.arm(pressed);G.Input.clear();G.TouchInput.clear();record({event:'boundary',token:this.handle.id,frame:this.frame,view:this.view?.kind,pressed});}
   set(v:View){this.view=v;this.error='';this.boundary();this.draw();}
   refreshBag(){const bag=this.selection?this.application.itemSelectionView(this.token,this.selection):this.application.inventorySnapshot(this.token,this.request.parent?(it:ItemDefinition)=>(this.triggerItem(it.id)||['tm','hm','tr'].includes(it.fieldUse)||this.application.queryItemUse(this.token,it.id,1,this.request.parent!.memberId).ready):undefined);this.bag={...bag,pockets:bag.pockets.map((rows:Omit<InventoryRow,'pocket'>[],pocket:number)=>rows.map(row=>({...row,pocket:pocket+1})))};}

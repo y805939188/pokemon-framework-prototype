@@ -1,5 +1,6 @@
 import type { ApplicationHost, ManagementApplication } from './application-host';
 import { messageLiteral } from './message-literal';
+import { eventKey, hostInput, INPUT_ALIASES as ALIAS } from './host-input';
 /** 5.1 management adapter. The application owns all records; this scene owns focus and decisions only. */
 import { boxCursor, boxLinkAvailable, editMark, InputLatch, inputIntent, markCursor, panelCursor, partyCursor, ribbonCursor, summaryCursor } from './management/model';
 import type { Action, Direction, InputFrame } from './management/model';
@@ -15,45 +16,14 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
  type View={kind:string;cursor:number;[key:string]:any};
  type BattleSummarySource={views:IndividualView[];isCurrent:()=>boolean;swapMoves?:(id:string,from:number,to:number,expectedOrder:string[])=>Promise<IndividualView|null>};
  type OpenRequest={kind:'party'|'pc'|'summary'|'selector'|'receiving'|'battle-summary';id?:string;qualifier?:(m:Member)=>boolean;done?:(result:any)=>void;battleSummary?:BattleSummarySource};
- const KEY:Record<string,Action|Direction>={Enter:'use',Space:'use',KeyZ:'use',Escape:'back',KeyX:'back',Numpad0:'back',ShiftLeft:'action',ShiftRight:'action',ControlLeft:'special',ControlRight:'special',KeyA:'jumpup',PageUp:'jumpup',KeyS:'jumpdown',PageDown:'jumpdown',ArrowUp:'up',ArrowLeft:'left',ArrowRight:'right',ArrowDown:'down'};
- const ALIAS:Record<Action|Direction,string>={use:'ok',back:'cancel',action:'shift',special:'control',jumpup:'pageup',jumpdown:'pagedown',up:'up',left:'left',right:'right',down:'down'};
- const LEGACY_KEY:Record<number,Action|Direction>={13:'use',32:'use',90:'use',27:'back',88:'back',96:'back',16:'action',17:'special',33:'jumpup',65:'jumpup',34:'jumpdown',83:'jumpdown',38:'up',37:'left',39:'right',40:'down'};
- const eventKey=(e:any):Action|Direction|undefined=>KEY[e.code]||LEGACY_KEY[e.keyCode];
- // A/S are adapter bindings for the specification's abstract JUMPUP/JUMPDOWN actions.
- G.Input.keyMapper[65]='pageup';G.Input.keyMapper[83]='pagedown';
+ const inputs=hostInput(G);
  let nextRequest:OpenRequest|null=null,sequence=0,current:any=null,queuedScene:any=null,initializingScene:any=null;
  function queuedBindingValid(s:any):boolean {const bound=s._psQueuedApp,changed=bound?(bound!==flow()._app||s._psQueuedGeneration!==bound.stateGeneration):(s._psQueuedSystem!==G.$gameSystem||s._psQueuedState!==G.$gameSystem?._psGame);if(s._invalid||changed){s._invalid=true;if(queuedScene===s)queuedScene=null;return false;}return true;}
  function adoptControllerBinding(s:any):boolean {if(!queuedBindingValid(s))return false;if(!s._psQueuedApp&&s._controller){s._psQueuedApp=s._controller.application;s._psQueuedGeneration=s._controller.generation;}return queuedBindingValid(s);}
  function presentationPending():boolean {const s=queuedScene,m=G.SceneManager;if(s&&s!==initializingScene){const orphan=('_scene'in m)&&('_nextScene'in m)&&s!==m._scene&&s!==m._nextScene;if(!queuedBindingValid(s)||orphan){s._invalid=true;if(queuedScene===s)queuedScene=null;}}return !!nextRequest||!!queuedScene;}
 
- // Native inputs stop propagation before MZ sees their initial keydown. Keep that consumed action blocked
- // until the real keyup, including after the input or its entire scene has been removed.
- const nativeConsumed=new Map<string,Action|Direction>();
- // Only actual DOM keys enter this registry. Service/gamepad state is sampled separately each frame.
- const keyboardKeys=new Map<string,Action|Direction>();
- const physicalCode=(e:any)=>e.code||String(e.keyCode??e.key);
- document.addEventListener('keydown',(e:any)=>{const key=eventKey(e);if(key)keyboardKeys.set(physicalCode(e),key);});
- const nativeKey=(e:any):string=>e.code||(['Enter','Escape'].includes(e.key)?e.key:e.keyCode===13?'Enter':e.keyCode===27?'Escape':'');
- for(const method of ['isTriggered','isRepeated']){const original=G.Input[method];G.Input[method]=function(button:string){const key=button==='ok'?'use':['cancel','menu','escape'].includes(button)?'back':undefined;if(key)for(const consumed of nativeConsumed.values())if(consumed===key)return false;return original.call(this,button);};}
- document.addEventListener('keyup',(e:any)=>{nativeConsumed.delete(nativeKey(e));keyboardKeys.delete(physicalCode(e));});
- window.addEventListener('blur',()=>{nativeConsumed.clear();keyboardKeys.clear();if(current){current.physical.clear();for(const key of Object.keys(ALIAS))current.latch.release(key);}});
+ inputs.onBlur(()=>{if(current){current.physical.clear();for(const key of Object.keys(ALIAS))current.latch.release(key);}});
  const debugFrames:any[]=[];
- let inventorySampleFrame=-1,inventorySample:InputFrame={pressed:{},triggered:{},repeated:{}};
- const inventoryDomStarts=new Map<Action|Direction,number>();
- function inventoryInputFrame():InputFrame {
-  const frame=G.Graphics.frameCount??0;
-  if(frame!==inventorySampleFrame){
-   inventorySampleFrame=frame;const sample:InputFrame={pressed:{},triggered:{},repeated:{}},dom=new Set([...keyboardKeys.values(),...nativeConsumed.values()]);
-   for(const key of Object.keys(ALIAS)as(Action|Direction)[]){
-    const was=inventoryDomStarts.has(key);if(dom.has(key)&&!was)inventoryDomStarts.set(key,frame);else if(!dom.has(key))inventoryDomStarts.delete(key);
-    const edge=dom.has(key)&&!was,age=frame-(inventoryDomStarts.get(key)??frame),repeat=edge||dom.has(key)&&age>=(G.Input.keyRepeatWait??24)&&(age-(G.Input.keyRepeatWait??24))%(G.Input.keyRepeatInterval??6)===0;
-    sample.pressed[key]=dom.has(key)||G.Input.isPressed(ALIAS[key]);
-    sample.triggered[key]=edge||G.Input.isTriggered(ALIAS[key]);if(['up','left','right','down'].includes(key))sample.repeated[key as Direction]=repeat||G.Input.isRepeated(ALIAS[key]);
-   }
-   if(G.TouchInput.isCancelled())sample.triggered.back=true;inventorySample=sample;
-  }
-  return {pressed:{...inventorySample.pressed},triggered:{...inventorySample.triggered},repeated:{...inventorySample.repeated}};
- }
  function record(data:any){debugFrames.push(data);if(debugFrames.length>256)debugFrames.shift();}
  function open(request:OpenRequest):boolean {if(current||presentationPending())return false;nextRequest=request;try{G.SceneManager.push(Scene_PSManagement);return true;}catch(error){if(nextRequest===request)nextRequest=null;presentationPending();throw error;}}
  function boxTitle(s:ManagementSnapshot,box:number):string{return s.storage.boxes[box]?.name||tr('box',{n:box+1});}
@@ -65,7 +35,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   presentationPending,
   replaceBattleWithReceiving:()=>{if(current||presentationPending())return false;nextRequest={kind:'receiving'};G.SceneManager.goto(Scene_PSManagement);return true;},
   current:()=>current&&!current.closed&&current.top()?{token:current.token,generation:current.generation,ready:current.ready,text:[...current.renderedText],view:{...current.top(),items:current.top().items?.map((x:MenuItem)=>({key:x.key,label:x.label,enabled:x.enabled}))},heldId:current.snapshot?.held?.id??null,frames:[...debugFrames]}:null,
-  inputFrame:inventoryInputFrame,
+  inputFrame:()=>inputs.inputFrame(),
   hasBoxLink:()=>app().hasBoxLink?.()??false, // default reads authoritative inventory; explicit developer override stays process-local
   retryReceiving:()=>{if(!app().pendingReceiving)return false;return open({kind:'receiving'});},
   // Dormant read-only normal observer. Existing current()/player input do not depend on it.
@@ -81,13 +51,14 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
  class Controller {
   scene:any;window:any;request:OpenRequest;application:ManagementApplication;token='';generation:number;ready=false;started=false;closed=false;frame=0;serial=0;
   renderedText:string[]=[];snapshot!:ManagementSnapshot;stack:View[]=[];latch=new InputLatch();physical=new Set<Action|Direction>();input:any=null;composition=false;error='';qualified=new Set<string>();
+  detachInput:(()=>void)|null=null;
   storageQuick=false;inventoryChild:any=null;dexChild:any=null;
   reception:any=null;decisions:Record<string,ReceivingDecision>={};receiveIndex=0;readonly=false;completion:any=null;
   summaryViews:Map<string,IndividualView>|null=null;
   summarySorting=false;
   onKeyDown=(e:any)=>{const key=eventKey(e);if(key)this.physical.add(key);};
   // keyup clears only its DOM source. The next merged frame releases the latch after gamepad polling.
-  onKeyUp=(e:any)=>{const key=eventKey(e);if(key&&!Array.from(keyboardKeys.values()).includes(key)&&!Array.from(nativeConsumed.values()).includes(key)){this.physical.delete(key);}};
+  onKeyUp=(e:any)=>{const key=eventKey(e);if(key&&!inputs.domPressed(key)){this.physical.delete(key);}};
   constructor(scene:any,request:OpenRequest){this.scene=scene;this.request=request;this.application=app();this.generation=this.application.stateGeneration;this.token='ui:'+this.generation+':'+(++sequence);}
   valid(){try{return !this.closed&&this.application===app()&&this.generation===this.application.stateGeneration&&current===this&&(!this.request.battleSummary||this.request.battleSummary.isCurrent());}catch{return false;}}
   top():View{return this.stack[this.stack.length-1]!;}
@@ -100,8 +71,8 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    if(this.closed||this.application!==flow()._app||this.generation!==this.application.stateGeneration||
     ('_scene'in manager&&manager._scene!==this.scene)||manager._nextScene&&manager._nextScene!==this.scene){this.closed=true;this.scene._invalid=true;return;}
    this.window=win;this.started=false;current=this;
-   for(const key of keyboardKeys.values())this.physical.add(key);
-   document.addEventListener('keydown',this.onKeyDown);document.addEventListener('keyup',this.onKeyUp);
+   for(const key of inputs.keyboardActions())this.physical.add(key);
+   this.detachInput?.();this.detachInput=inputs.subscribeKeyboard(this.onKeyDown,this.onKeyUp);
    if(this.request.kind==='battle-summary'){
     const source=this.request.battleSummary;if(!source?.isCurrent())throw Error('stale-operation');
     const views:IndividualView[]=structuredClone(source.views);
@@ -123,7 +94,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   }
   resetInitialization(){
    this.ready=false;this.started=false;this.stack=[];this.removeInput();
-   document.removeEventListener('keydown',this.onKeyDown);document.removeEventListener('keyup',this.onKeyUp);
+   this.detachInput?.();this.detachInput=null;
    if(this.managementToken&&this.generation===this.application.stateGeneration){this.application.manage(this.managementToken,'cleanup-'+(++this.serial),{kind:'cancel-held'});this.application.endManagement(this.managementToken);}
    this.managementToken='';
   }
@@ -165,7 +136,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    Object.assign(element.style,{position:'fixed',left:'15%',top:'40%',width:'70%',fontSize:'24px',zIndex:'99999',background:'#fff',color:'#111',padding:'12px'});document.body.appendChild(element);
    const token=this.token,finish=(text:string|null)=>{if(!this.valid()||this.token!==token||this.top()!==view||this.composition)return;this.removeInput();this.dismiss();done(text===null?null:Array.from(text).slice(0,max).join(''));};
    element.addEventListener('compositionstart',()=>{if(this.valid())this.composition=true;});element.addEventListener('compositionend',()=>{if(this.valid())this.composition=false;});
-   element.addEventListener('keydown',(e:any)=>{e.stopPropagation();if(!this.valid()||e.isComposing||this.composition||e.keyCode===229)return;if(e.key==='Enter'||e.key==='Escape'){const key=e.key==='Enter'?'use':'back';nativeConsumed.set(nativeKey(e),key);this.physical.add(key);e.preventDefault();finish(e.key==='Enter'?element.value:escapeEmpty?'':null);}});element.focus();
+   element.addEventListener('keydown',(e:any)=>{e.stopPropagation();if(!this.valid()||e.isComposing||this.composition||e.keyCode===229)return;if(e.key==='Enter'||e.key==='Escape'){const key=e.key==='Enter'?'use':'back';inputs.consumeNative(e,key);this.physical.add(key);e.preventDefault();finish(e.key==='Enter'?element.value:escapeEmpty?'':null);}});element.focus();
   }
   removeInput(){this.input?.remove();this.input=null;this.composition=false;}
   summary(ids:(string|null)[],index:number,held=false){this.push({kind:'summary',cursor:index,ids,page:0,held,detail:null,selected:null,detailCursor:0});}
@@ -332,7 +303,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    this.closed=true;this.removeInput();this.completion=result;this.scene._result=result;this.scene._done=this.request.done;
    if(G.SceneManager._scene===this.scene)this.scene.popScene();
   }
-  dispose(){const wasClosed=this.closed;this.closed=true;this.dexChild?.dispose();this.dexChild=null;this.inventoryChild?.close({status:'cancelled'},true);this.inventoryChild=null;document.removeEventListener('keydown',this.onKeyDown);document.removeEventListener('keyup',this.onKeyUp);this.removeInput();
+  dispose(){const wasClosed=this.closed;this.closed=true;this.dexChild?.dispose();this.dexChild=null;this.inventoryChild?.close({status:'cancelled'},true);this.inventoryChild=null;this.detachInput?.();this.detachInput=null;this.removeInput();
    if(!wasClosed&&this.application===flow()._app&&this.generation===this.application.stateGeneration){if(this.managementToken){this.application.manage(this.managementToken,'cleanup-'+(++this.serial),{kind:'cancel-held'});this.application.endManagement(this.managementToken);}else if(this.reception&&this.application.pendingReceiving?.token===this.reception.token){const result=flow().resolveReceiving(this.reception.token,this.decisions,'scene-aborted');this.completion=result;if(!pending(result)&&result.status!=='refused'){this.scene._result=result;this.scene._done=this.request.done;}}}
    this.closed=true;if(current===this)current=null;
   }

@@ -3,9 +3,11 @@ import type { ApplicationHost, LearningApplication } from './application-host';
 import { drawLearningPage } from './progression/learning-draw';
 import { LearningScreen } from './progression/learning-screen';
 import { InputLatch } from './management/model';
+import { hostInput } from './host-input';
 import type { LearningIntent, LearningParent, LearningOutcome } from '../framework/app/index';
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Progression',flow=()=>W.PSFlow,app=():LearningApplication=>(flow() as ApplicationHost).app();
+ const inputs=hostInput(G);
  const tr=(key:string,params?:Record<string,string|number>)=>flow().translator().t('progression.'+key,params);
  type Handle={application:LearningApplication;generation:number;done:boolean;result?:LearningOutcome};
  type Request={scene?:any;constructing?:boolean;intent?:LearningIntent;resume?:boolean;handle:Handle;done?:(o:LearningOutcome)=>void};
@@ -39,11 +41,11 @@ import type { LearningIntent, LearningParent, LearningOutcome } from '../framewo
    this.boundary();this.draw();
   }
   move(id:string){if(!this.moves.has(id))this.moves.set(id,this.request.handle.application.describeLearningMove(id));return this.moves.get(id);}
-  boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;this.latch.arm(W.PSManagement.inputFrame().pressed);G.Input.clear();G.TouchInput.clear();}
+  boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;this.latch.arm(inputs.inputFrame().pressed);G.Input.clear();G.TouchInput.clear();}
   update(){
    if(!this.valid()){this.close({status:'refused',reason:'stale-learning-screen'});return;}
    const frame=G.Graphics.frameCount??0;if(!this.ready&&(frame<=this.frame||G.SceneManager.isSceneChanging()))return;
-   const sample=this.latch.filter(W.PSManagement.inputFrame());if(!this.ready){this.ready=true;return;}
+   const sample=this.latch.filter(inputs.inputFrame());if(!this.ready){this.ready=true;return;}
    if(G.$gameMessage?.isBusy?.())return;
    const page=this.model.page;
    if(sample.triggered.back)this.model.back();

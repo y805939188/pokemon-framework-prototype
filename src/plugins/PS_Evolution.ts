@@ -7,10 +7,12 @@ import { EvolutionTimeline } from './progression/evolution-timeline';
 import { LearningScreen } from './progression/learning-screen';
 import { drawLearningPage } from './progression/learning-draw';
 import { InputLatch } from './management/model';
+import { hostInput } from './host-input';
 const { catalogOf } = itemCatalog;
 const { publicIdText } = memberIdentity;
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Evolution',flow=():ApplicationHost & Record<string, any>=>W.PSFlow,app=():EvolutionApplication=>flow().app();
+ const inputs=hostInput(G);
  const tr=(key:string,p?:Record<string,string|number>)=>flow().translator().t('evolution.'+key,p);
  type Request={scene?:any;constructing?:boolean;application:EvolutionApplication;generation:number;owner:string;trigger:boolean;battleId?:string;battleOp?:object;done:boolean;result?:string;outcome?:any;event?:{event:number;memberId?:string};item?:EvolutionItemIntent;trade?:true|{requestId:string;intent:any};selectorStage?:'selecting'|'ready';selectorScene?:any};
  let queued:Request|null=null,reserved:Request|null=null,active:Controller|null=null,feedbackRecovery:Request|null=null,recoveryChoice:{request:Request;title:boolean}|null=null;
@@ -51,7 +53,7 @@ const { publicIdText } = memberIdentity;
    const d=a.pendingPokedex;
    return {e:e&&this.knownTokens.has(e.token)?e:null,d:d&&(d.parentToken===this.request.owner||this.knownTokens.has(d.parentToken!))?d:null,t,q:null};
   }
-  boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;this.latch.arm(W.PSManagement.inputFrame().pressed);G.Input.clear();G.TouchInput.clear();}
+  boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;this.latch.arm(inputs.inputFrame().pressed);G.Input.clear();G.TouchInput.clear();}
   start(){if(!this.valid()){this.close('stale');return;}
    const f=flow(),op=f._op,owner=op?.musicPlan?.owner;
    // A battle-bound continuation leaves save/stop/replay to its exact root.
@@ -120,7 +122,7 @@ const { publicIdText } = memberIdentity;
   update(){
    if(!this.valid()){this.close('stale');return;}
    const frame=G.Graphics.frameCount??0;if(!this.ready&&(frame<=this.frame||G.SceneManager.isSceneChanging()))return;
-   const input=this.latch.filter(W.PSManagement.inputFrame());if(!this.ready){this.ready=true;return;} // Messages queued by the completed host are displayed on Map after our final ACK.
+   const input=this.latch.filter(inputs.inputFrame());if(!this.ready){this.ready=true;return;} // Messages queued by the completed host are displayed on Map after our final ACK.
    const use=!!input.triggered.use,back=!!input.triggered.back||this.backRequested;this.backRequested=false;
    if(this.layer==='item-growth'&&(use||back)){this.growthShown=true;this.sync();return;}
    else if(this.layer==='item-result'&&(use||back)){this.close('complete');return;}

@@ -3,8 +3,10 @@ import type { ApplicationHost, PokedexApplication } from './application-host';
 import { PokedexScreen } from './pokedex/screen';
 import { pokedexQuery as Q, config as C, semantic } from '../framework/rules/index';
 import { InputLatch } from './management/model';
+import { hostInput } from './host-input';
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Pokedex',flow=():ApplicationHost & Record<string, any>=>W.PSFlow;
+ const inputs=hostInput(G);
  const text=(key:string,p?:Record<string,string|number>)=>flow().translator().t('pokedex.'+key,p);
  type Request={application:PokedexApplication|null;generation:number;scene?:any;constructing:boolean;done:boolean;status:string;fingerprint:string;parent?:{token:string;memberId:string;isCurrent:()=>boolean;releaseAbandoned:()=>void};summary?:{parentToken:string;memberId:string;species:string};edit?:{token:string;revision:number}};
  let reserved:Request|null=null,active:Controller|null=null;const waits=new WeakMap<object,Request>();
@@ -33,15 +35,15 @@ import { InputLatch } from './management/model';
  class Controller {
   description={identity:'',offset:0,max:0,step:1,total:0};closed=false;ready=false;disposing=false;frame=0;latch=new InputLatch();screen!:PokedexScreen;text:string[]=[];
   constructor(readonly scene:any,readonly request:Request,readonly window:any,readonly attached=false){}
-  boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;this.latch.arm(W.PSManagement.inputFrame().pressed);G.Input.clear();G.TouchInput.clear();}
+  boundary(){this.ready=false;this.frame=G.Graphics.frameCount??0;this.latch.arm(inputs.inputFrame().pressed);G.Input.clear();G.TouchInput.clear();}
   start(){const r=this.request,application=r.application!;const guard=()=>{if(active!==this)throw Error('stale-pokedex-ui');check(r);};guard();
    const pending=r.edit?application.pendingPokedex:null;
    const single=r.summary?(()=>{const snap=application.pokedexSnapshot(dictionary(flow().content()),region()),cfg=C.resolveConfig(flow().content().settings);guard();return{species:r.summary!.species,number:Q.dexCompleteEntryNumber(snap.dex,snap.catalog.layout,r.summary!.species,{locale:flow().translator().lang,offsets:cfg.DEXES_WITH_OFFSETS,useCurrentRegion:cfg.USE_CURRENT_REGION_DEX,currentRegion:region()})};})():undefined;
    this.screen=new PokedexScreen({...(single?{single}:{}),snapshot:()=>{guard();const s=application.pokedexSnapshot(dictionary(flow().content()),region());guard();return s;},content:()=>{guard();const c=flow().content();guard();return c;},directory:()=>{guard();const d=application.pokedexSearchDirectory(flow().translator().lang);guard();return d;},locale:flow().translator().lang,text:dictionary(flow().content()),currentRegion:region(),edit:command=>{guard();if(r.parent){if(command.kind!=='form'||command.species!==r.summary?.species||!r.edit)throw Error('pokedex-summary-edit-required');return returned(r,application.resolvePokedex(r.edit.token,r.edit.revision,{kind:'summary-form',baseFrontsEqual:command.baseFrontsEqual,selected:command.selected,text:command.text,currentRegion:command.currentRegion}));}return returned(r,application.updatePokedex(command));},resolve:(token,revision,decision)=>{guard();if(!r.edit||r.edit.token!==token||r.edit.revision!==revision)throw Error('stale-pokedex-edit-owner');return returned(r,application.resolvePokedex(token,revision,decision));},...(pending&&(!r.parent||pending.error)?{pending:{status:'pending' as const,view:pending}}:{}),finish:()=>this.finish(),reload:()=>{this.retireStale();G.SceneManager.goto(G.Scene_Title);},stopCry:()=>G.AudioManager?.stopSe?.(),cry:()=>{ /* Placeholder media. No audio/resource-success claim. */ }});
    guard();if(this.screen.done){this.finish();return;}this.boundary();guard();this.draw();
   }
-  update(){if(!valid(this.request)){this.retireStale();return;}if(this.screen?.done){this.finish();return;}if(!this.ready){if((G.Graphics.frameCount??0)<=this.frame||G.SceneManager.isSceneChanging())return;this.ready=true;this.latch.filter(W.PSManagement.inputFrame());return;}
-   const input=this.latch.filter(W.PSManagement.inputFrame()),before=JSON.stringify(this.screen.view),v=this.screen.view;
+  update(){if(!valid(this.request)){this.retireStale();return;}if(this.screen?.done){this.finish();return;}if(!this.ready){if((G.Graphics.frameCount??0)<=this.frame||G.SceneManager.isSceneChanging())return;this.ready=true;this.latch.filter(inputs.inputFrame());return;}
+   const input=this.latch.filter(inputs.inputFrame()),before=JSON.stringify(this.screen.view),v=this.screen.view;
    const directions=['up','down','left','right']as const;const direction=directions.find(d=>input.repeated[d]&&(v.kind!=='forms'||G.Input.isTriggered(d)));
    const action=direction??(input.triggered.back?'back':input.triggered.use?'use':input.triggered.action?'action':undefined);
    const scroll=v.kind==='entry'&&v.page===0&&!direction?(input.triggered.jumpup?-1:input.triggered.jumpdown?1:0):0;
