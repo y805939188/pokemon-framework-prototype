@@ -61,6 +61,7 @@ esac
   fs.writeFileSync(path.join(dir, 'bin/pnpm'), `#!/bin/bash
 printf 'pnpm %s\\n' "$*" >> "$CONTROL_LOG"
 case "$*" in
+  '--dir src types:prepare') exit "\${CONTROL_TYPES_PREPARE_RC:-0}" ;;
   '--dir src typecheck:framework'|'--dir src build:distribution'|'--dir src exec vite build') exit "\${CONTROL_PREFLIGHT_RC:-0}" ;;
   *) exit 93 ;;
 esac
@@ -120,6 +121,20 @@ test('default and explicit regular scope select every listed suite and no replay
   }
 });
 
+test('cold host declarations are prepared once before framework checks and suite dispatch', t => {
+  const result = sandbox(t).run();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.commands[0], 'pnpm --dir src types:prepare');
+  assert.equal(result.commands.filter(command => command === 'pnpm --dir src types:prepare').length, 1);
+  assert.equal(result.commands[1], 'pnpm --dir src typecheck:framework');
+});
+
+test('host declaration preparation failure stops before builds or suites', t => {
+  const result = sandbox(t).run([], { CONTROL_TYPES_PREPARE_RC: '45' });
+  assert.equal(result.status, 45, result.stderr);
+  assert.deepEqual(result.commands, ['pnpm --dir src types:prepare']);
+});
+
 test('parent binding spans the controlled build, every suite and final verification; receipts never overwrite', t => {
   const fixture = sandbox(t);
   for (let run = 0; run < 2; run++) {
@@ -174,7 +189,7 @@ test('engine and preflight failures still stop the run', t => {
   assert.deepEqual(missing.commands, []);
   const failed = sandbox(t).run([], { CONTROL_PREFLIGHT_RC: '17' });
   assert.equal(failed.status, 17);
-  assert.deepEqual(failed.commands, ['pnpm --dir src typecheck:framework']);
+  assert.deepEqual(failed.commands, ['pnpm --dir src types:prepare', 'pnpm --dir src typecheck:framework']);
 });
 
 for (const [label, overrides] of [

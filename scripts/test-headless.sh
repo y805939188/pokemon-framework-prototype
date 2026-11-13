@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Regular headless checks for CI and release validation; historical reference replay is excluded (NOT RUN).
-# Needs: Node >= 22.18, JS dependencies installed (pnpm --dir src install), the engine staged (scripts/build-showdown.sh). Type checking of the plugins needs Reactor's
-# declaration bundle and lives in scripts/test-quick.sh (typecheck + this script).
+# Needs: Node >= 22.18, JS dependencies installed (pnpm --dir src install), the engine staged (scripts/build-showdown.sh),
+# and Reactor's installed declaration bundle. Host compiler suites also need its generated DOM compatibility declarations;
+# prepare them here for cold CI and direct regular runs. Full plugin typechecking additionally lives in scripts/test-quick.sh.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -328,6 +329,8 @@ for excluded in "${EXCLUDED_SUITES[@]}"; do
   printf 'EXCLUDED (NOT RUN): %s\n' "$excluded"
 done
 [[ -d js/engine/showdown/dist ]] || { echo "engine not staged: run scripts/build-showdown.sh first" >&2; exit 1; }
+# Generate host compatibility declarations before compiler suites, including on cold CI.
+pnpm --dir src types:prepare
 # the TS framework: strict type check, import-boundary check, then rebuild runtime, declarations, sample and local delivery
 pnpm --dir src typecheck:framework
 node scripts/check-boundaries.cjs
