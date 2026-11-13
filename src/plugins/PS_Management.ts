@@ -1,3 +1,4 @@
+import type { ApplicationHost, ManagementApplication } from './application-host';
 import { messageLiteral } from './message-literal';
 /** 5.1 management adapter. The application owns all records; this scene owns focus and decisions only. */
 import { boxCursor, boxLinkAvailable, editMark, InputLatch, inputIntent, markCursor, panelCursor, partyCursor, ribbonCursor, summaryCursor } from './management/model';
@@ -6,7 +7,7 @@ import type { ManagementRequest, ManagementSnapshot, IndividualView, StorageSear
 import type { Member, MemberPosition, MemberReference, ReceivingDecision } from '../framework/rules/index';
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Management';
- const flow=()=>W.PSFlow,app=()=>flow().app();
+ const flow=():ApplicationHost & Record<string, any>=>W.PSFlow,app=():ManagementApplication=>flow().app();
  const tr=(key:string,params?:Record<string,string|number>)=>flow().translator().t('management.'+key,params);
  const memberName=(m:Member)=>m.nickname||flow().speciesName(m.species,m.form);
  const pending=(o:any)=>!!o&&(o.pending===true||o.status==='pending');
@@ -78,7 +79,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   },
  };
  class Controller {
-  scene:any;window:any;request:OpenRequest;application:any;token='';generation:number;ready=false;started=false;closed=false;frame=0;serial=0;
+  scene:any;window:any;request:OpenRequest;application:ManagementApplication;token='';generation:number;ready=false;started=false;closed=false;frame=0;serial=0;
   renderedText:string[]=[];snapshot!:ManagementSnapshot;stack:View[]=[];latch=new InputLatch();physical=new Set<Action|Direction>();input:any=null;composition=false;error='';qualified=new Set<string>();
   storageQuick=false;inventoryChild:any=null;dexChild:any=null;
   reception:any=null;decisions:Record<string,ReceivingDecision>={};receiveIndex=0;readonly=false;completion:any=null;
@@ -137,7 +138,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    const out=app().manage(this.managementToken,'ui-'+(++this.serial),request);record({token:this.token,event:'operation',kind:request.kind,status:out.status,reason:out.reason});
    if(out.status==='refused'){this.fail(out.reason||out.error);return false;}this.refresh();return true;
   }
-  fail(reason:string){this.error=tr('refused',{reason:String(reason)});G.SoundManager.playBuzzer();this.draw();}
+  fail(reason:unknown){this.error=tr('refused',{reason:String(reason)});G.SoundManager.playBuzzer();this.draw();}
   menu(title:string,items:MenuItem[],cursor=0,cancel?:()=>void){this.push({kind:'menu',title,items,cursor,cancel});}
   confirm(title:string,yes:()=>void,defaultYes=false,no?:()=>void){this.menu(title,[{key:'yes',label:tr('yes'),run:()=>{this.dismiss();yes();}},{key:'no',label:tr('no'),run:()=>{this.dismiss();no?.();}}],defaultYes?0:1,()=>{this.dismiss();no?.();});}
   refreshPCMenu(view:View){
@@ -417,13 +418,13 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
  G.PluginManager.registerCommand('PS_BattleFlow','ShowParty',function(){ui.openParty();});
  G.PluginManager.registerCommand(NAME,'ShowStorage',function(){ui.openStorage();});
  G.PluginManager.registerCommand(NAME,'ShowSummary',function(args:any){ui.openSummary(String(args.id));});
- G.PluginManager.registerCommand(NAME,'RecoverAll',function(){const o=app().recoverAll();if(o.status==='refused')G.$gameMessage.add(tr('refused',{reason:o.reason}));});
- G.PluginManager.registerCommand(NAME,'ReceiveGift',function(this:any,args:any){let request:any;try{request=JSON.parse(String(args.request));}catch{G.$gameMessage.add(tr('refused',{reason:'invalid JSON'}));return;}const result=app().receiveGift(request);if(pending(result)){ui.openReceiving();this.setWaitMode('psReceiving');}else if(result.status==='refused')G.$gameMessage.add(tr('refused',{reason:result.reason}));else flow().waitForPokedex(this);});
+ G.PluginManager.registerCommand(NAME,'RecoverAll',function(){const o=app().recoverAll();if(o.status==='refused')G.$gameMessage.add(tr('refused',{reason:String(o.reason)}));});
+ G.PluginManager.registerCommand(NAME,'ReceiveGift',function(this:any,args:any){let request:any;try{request=JSON.parse(String(args.request));}catch{G.$gameMessage.add(tr('refused',{reason:'invalid JSON'}));return;}const result=app().receiveGift(request);if(pending(result)){ui.openReceiving();this.setWaitMode('psReceiving');}else if(result.status==='refused')G.$gameMessage.add(tr('refused',{reason:String(result.reason)}));else flow().waitForPokedex(this);});
  const wait=G.Game_Interpreter.prototype.updateWaitMode;
  G.Game_Interpreter.prototype.updateWaitMode=function(){if(this._waitMode==='psReceiving'){if(app().pendingReceiving||app().pendingEvolution||app().pendingPokedex)return true;this._waitMode='';return false;}return wait.call(this);};
  // A recovered placement is acknowledged only after its visible host notification has been queued.
  const mapStart=G.Scene_Map.prototype.start;
- G.Scene_Map.prototype.start=function(){mapStart.call(this);if(!flow()._app||flow()._app.pendingEvolution)return;for(const notice of flow()._app.receivingNotifications){try{const snap=app().managementSnapshot();const dest=notice.placements.map((p:any)=>{
+ G.Scene_Map.prototype.start=function(){mapStart.call(this);if(!flow()._app||flow()._app!.pendingEvolution)return;for(const notice of flow()._app!.receivingNotifications){try{const snap=app().managementSnapshot();const dest=notice.placements.map((p:any)=>{
    if(p.to==='party')return tr('party');
    const title=boxTitle(snap,p.box);
    return snap.storage.boxes[p.box]?.name?messageLiteral(title):title;

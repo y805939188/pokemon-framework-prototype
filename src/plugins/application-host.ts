@@ -7,7 +7,16 @@ import type { GameState } from '../framework/rules/state';
 import type { Limits } from '../framework/rules/limits';
 
 export type HostApplication = GameApplication;
-export interface ApplicationHost {
+type CommandKey = 'beginLearning' | 'resolveLearning' | 'beginEvolutionItem' | 'beginEventEvolution' | 'resolveTriggeredEvolution'
+  | 'terminateAcquisition' | 'pokedexSnapshot' | 'updatePokedex' | 'resolvePokedex' | 'beginTrade' | 'resolveTrade'
+  | 'resolveReceiving' | 'resolveEvolution';
+// These mixed continuations historically inspect absent fields as undefined. Preserve that fact without any,
+// while retaining each real discriminator and its associated payload.
+type HostResult<T> = T extends object ? T & {
+  [K in Exclude<'status' | 'reason' | 'error' | 'continuation' | 'continuationToken' | 'battleId', keyof T>]?: never;
+} : T;
+type ApplicationCommands = { [K in CommandKey]: (...args: Parameters<HostApplication[K]>) => HostResult<ReturnType<HostApplication[K]>> };
+export interface ApplicationHost extends ApplicationCommands {
   app(): HostApplication;
   _app: HostApplication | null;
 }
@@ -44,3 +53,90 @@ export interface ProductionRuntime {
   log: { createRingLogger(capacity?: number): RingLogger };
 }
 
+
+export type InventoryApplication = Pick<HostApplication,
+  'beginInventoryOperation'
+  | 'beginInventorySort'
+  | 'beginItemSelection'
+  | 'beginManagement'
+  | 'beginMoneyShop'
+  | 'browseItemSelection'
+  | 'describeParty'
+  | 'encounterBlocked'
+  | 'endInventoryOperation'
+  | 'endInventorySort'
+  | 'endManagement'
+  | 'finishItemSelection'
+  | 'heldItemSourcesEnabled'
+  | 'inventoryRequest'
+  | 'inventorySnapshot'
+  | 'inventoryTicket'
+  | 'itemSelectionView'
+  | 'manage'
+  | 'managementSnapshot'
+  | 'moveInventorySort'
+  | 'now'
+  | 'pendingEvolution'
+  | 'pendingPokedex'
+  | 'pendingTriggeredEvolution'
+  | 'queryBadges'
+  | 'queryInventoryItemQuantity'
+  | 'queryItemUse'
+  | 'saveBlocked'
+  | 'setShopPrices'
+  | 'shopQuote'
+  | 'shopView'
+  | 'stateGeneration'
+  | 'teachingCandidates'
+  | 'tossItems'>;
+
+export type ManagementApplication = Pick<HostApplication,
+  'acknowledgeReceivingNotification'
+  | 'beginManagement'
+  | 'describeIndividual'
+  | 'endManagement'
+  | 'hasBoxLink'
+  | 'holdableBagItems'
+  | 'manage'
+  | 'managementSnapshot'
+  | 'pendingEvolution'
+  | 'pendingPokedex'
+  | 'pendingReceiving'
+  | 'pokedexSnapshot'
+  | 'previewReceiving'
+  | 'receiveGift'
+  | 'receivingNotifications'
+  | 'recoverAll'
+  | 'resolveReceiving'
+  | 'searchStorage'
+  | 'stateGeneration'>;
+
+export type EvolutionApplication = Pick<HostApplication,
+  'beginEventEvolution'
+  | 'beginEvolutionItem'
+  | 'beginTrade'
+  | 'describeLearningMove'
+  | 'describePokedexEntry'
+  | 'describeTradeEntry'
+  | 'encounterBlocked'
+  | 'now'
+  | 'pendingEvolution'
+  | 'pendingPokedex'
+  | 'pendingTrade'
+  | 'pendingTriggeredEvolution'
+  | 'resolveEvolution'
+  | 'resolvePokedex'
+  | 'resolveTrade'
+  | 'resolveTriggeredEvolution'
+  | 'stateGeneration'
+  | 'tradeCandidates'>;
+
+export type PokedexApplication = Pick<HostApplication,
+  'beginSummaryPokedex'
+  | 'encounterBlocked'
+  | 'pendingPokedex'
+  | 'pokedexSearchDirectory'
+  | 'pokedexSnapshot'
+  | 'resolvePokedex'
+  | 'stateGeneration'
+  | 'updatePokedex'>;

@@ -55,6 +55,7 @@ type NoAny<T extends false> = T;
 type AccessorIsTyped = NoAny<IsAny<ReturnType<ApplicationHost['app']>>>;
 type ConstructorIsTyped = NoAny<IsAny<ProductionRuntime['app']['GameApplication']>>;
 type LearningIsTyped = NoAny<IsAny<ReturnType<LearningApplication['beginLearning']>>>;
+type FacadeIsTyped = NoAny<IsAny<ReturnType<ApplicationHost['resolveEvolution']>>>;
 declare const actual: typeof import(${JSON.stringify(PRODUCTION)});
 const checked: ProductionRuntime = actual;
 declare const host: ApplicationHost, runtime: ProductionRuntime;
@@ -70,6 +71,7 @@ void created;
 });
 for (const [name, source] of [
   ['accessor-argument', `declare const host: ApplicationHost; host.app().resolveLearning('token', 'wrong revision', {kind:'retry'});`],
+  ['facade-argument', `declare const host: ApplicationHost; host.resolveEvolution('token', 'wrong revision', {kind:'retry'});`],
   ['learning-intent', `declare const app: LearningApplication; app.beginLearning({kind:'forget',memberId:42});`],
   ['port-return', `const state: GameApplicationPorts<BattleHandle>['state'] = {read:()=>42,replace:()=>{}};`],
   ['production-port', `declare const runtime: ProductionRuntime; new runtime.app.GameApplication({state:{read:()=>42,replace:()=>{}},sessions:{create:async()=>({result:()=>42})},content:()=>({content:{species:{}}}),projection:{project:()=>{}}});`],
@@ -100,4 +102,20 @@ test('actual production construction rejects a wrongly wired state port', () => 
   });
   assert.notEqual(result.code, 0, 'production port configuration lost its type');
   assert.match(result.output, /TS2322/, result.output);
+});
+for (const [plugin, call] of [
+  ['PS_Inventory', "app().inventoryRequest('token', 42, {kind:'browse',pocket:1,index:0});"],
+  ['PS_Management', "app().manage('token', 42, {kind:'cancel'});"],
+  ['PS_Evolution', 'app().describeLearningMove(42);'],
+  ['PS_Pokedex', "flow().app().resolvePokedex('token', 'invalid revision', {kind:'technical-terminate'});"],
+]) test(`actual ${plugin} local application cannot erase argument types`, () => {
+  const positive = compilePlugin(plugin);
+  assert.equal(positive.code, 0, positive.output);
+  const negative = compilePlugin(plugin, source => {
+    const marker = ' class Controller {';
+    assert(source.includes(marker));
+    return source.replace(marker, call + '\n' + marker);
+  });
+  assert.notEqual(negative.code, 0, 'UI application accessor became any');
+  assert.match(negative.output, /TS2345/, negative.output);
 });

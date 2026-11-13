@@ -1,3 +1,5 @@
+import type { ItemResult } from '../framework/rules/item-effects';
+import type { ApplicationHost, InventoryApplication } from './application-host';
 /** 5.2 host presentation. Application plans/install resources; this adapter owns focus and answers. */
 import {InputLatch} from './management/model';
 import type {InputFrame} from './management/model';
@@ -8,24 +10,24 @@ import type {InventoryOutcome,InventoryParent,InventoryTicket} from '../framewor
 const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Inventory',clone=structuredClone;
- const flow=()=>W.PSFlow,app=()=>flow().app(),tr=(k:string,p?:Record<string,string|number>)=>flow().translator().t('inventory.'+k,p);
+ const flow=():ApplicationHost & Record<string, any>=>W.PSFlow,app=():InventoryApplication=>flow().app(),tr=(k:string,p?:Record<string,string|number>)=>flow().translator().t('inventory.'+k,p);
  const why=(o:any)=>String(o?.reason??o?.error??o?.message??o),detail=(o:any)=>flow().translator().tOr('inventory.reason.'+why(o),why(o));
  const name=(it:ItemDefinition)=>flow().translator().tOr(it.nameKey??'item.name.'+it.id,it.name);
  type Request={kind:'bag'|'select'|'shop'|'use';parent?:InventoryParent;itemId?:string;quantity?:number;memberId?:string;filter?:(item:ItemDefinition)=>boolean;variableId?:number;shop?:any;prices?:{itemId:string;buy:number;sell?:number}[];done?:(o:InventoryOutcome)=>void;retireParent?:()=>void};
- type Handle={id:string;application:any;generation:number;done:boolean;result?:InventoryOutcome};
+ type Handle={id:string;application:InventoryApplication;generation:number;done:boolean;result?:InventoryOutcome};
  type Choice={key:string;label:string;displayName?:string;details?:string[];enabled?:boolean;run:()=>void};
  type InventoryRow={item:ItemDefinition;quantity:number;index:number;pocket:number};
  type View={kind:string;cursor:number;title?:string;items?:Choice[];[key:string]:any};
  type Queued={request:Request;handle:Handle;scene?:any;constructing?:boolean};
  let active:Controller|null=null,queued:Queued|null=null,reserved:Queued|null=null,sequence=0;
  // A dead presentation can retain a child recovery barrier. Transfer only its exact process-local parent token.
- const abandoned:{application:any;generation:number;token:string;owner:string;retireParent?:()=>void}[]=[];
+ const abandoned:{application:InventoryApplication;generation:number;token:string;owner:string;retireParent?:()=>void}[]=[];
  const sameHandle=(h:Handle)=>h.application===flow()._app&&h.generation===h.application.stateGeneration;
  function retireQueued(q:Queued,result:InventoryOutcome){if(queued===q)queued=null;if(reserved===q)reserved=null;if(q.handle.done)return;q.handle.done=true;q.handle.result=clone(result);if(sameHandle(q.handle)&&q.request.done)notices.push({application:q.handle.application,generation:q.handle.generation,result:clone(result),done:q.request.done});}
  function retireOrphan(){for(let i=abandoned.length-1;i>=0;i--)if(abandoned[i]!.application!==flow()._app||abandoned[i]!.generation!==abandoned[i]!.application.stateGeneration)abandoned.splice(i,1);const q=reserved;if(!q||q.constructing)return;const m=G.SceneManager;if(q.handle.done||!sameHandle(q.handle)||q.scene&&'_nextScene'in m&&q.scene!==m._scene&&q.scene!==m._nextScene)retireQueued(q,{status:'refused',reason:'stale-operation'});}
  function queuedValid(scene:any){const q=scene._request;if(!q||q.handle.done||!sameHandle(q.handle)){if(q)retireQueued(q,{status:'refused',reason:'stale-operation'});scene._finished=true;scene._controller?.close({status:'refused',reason:'stale-operation'},true);return false;}return true;}
- const hasAbandonedItem=(application:any,generation:number,owner:string)=>application===flow()._app&&generation===application.stateGeneration&&abandoned.some(e=>e.application===application&&e.generation===generation&&e.owner===owner);
- function acknowledgeRecoveredItem(application:any,generation:number,owner:string){
+ const hasAbandonedItem=(application:InventoryApplication,generation:number,owner:string)=>application===flow()._app&&generation===application.stateGeneration&&abandoned.some(e=>e.application===application&&e.generation===generation&&e.owner===owner);
+ function acknowledgeRecoveredItem(application:InventoryApplication,generation:number,owner:string){
   for(let i=abandoned.length-1;i>=0;i--){const entry=abandoned[i]!;if(entry.application!==flow()._app||entry.generation!==entry.application.stateGeneration){abandoned.splice(i,1);continue;}
    if(entry.application!==application||entry.generation!==generation||entry.owner!==owner)continue;
    if(application.pendingTriggeredEvolution||application.pendingEvolution||application.pendingPokedex)return;
@@ -33,7 +35,7 @@ const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
   }
  }
  const waits=new WeakMap<object,Handle>(),outcomes=new WeakMap<object,InventoryOutcome>();
- const notices:{application:any;generation:number;result:InventoryOutcome;done:(o:InventoryOutcome)=>void}[]=[];
+ const notices:{application:InventoryApplication;generation:number;result:InventoryOutcome;done:(o:InventoryOutcome)=>void}[]=[];
  const discardStaleNotices=()=>{for(let i=notices.length-1;i>=0;i--)if(notices[i]!.application!==flow()._app||notices[i]!.generation!==notices[i]!.application.stateGeneration)notices.splice(i,1);};
  const frames:any[]=[];const record=(row:any)=>{frames.push(row);if(frames.length>256)frames.shift();};
  const handle=():Handle=>{const application=app(),h={id:'inventory-ui:'+ ++sequence,done:false}as Handle;Object.defineProperties(h,{application:{value:application},generation:{value:application.stateGeneration}});return h;};
@@ -44,9 +46,9 @@ const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
   try{G.SceneManager.push(Scene_PSInventory);}catch(error){const created=active as Controller|null;if(created?.handle===h)created.close({status:'refused',reason:'presentation-failed',error:String(error)},true);retireQueued(q,{status:'refused',reason:'presentation-failed',error:String(error)});throw error;}finally{q.constructing=false;}return h;
  }
  class Controller {
-  readonly application:any;readonly generation:number;readonly handle:Handle;readonly request:Request;
+  readonly application:InventoryApplication;readonly generation:number;readonly handle:Handle;readonly request:Request;
   token='';selection='';giveToken='';selectedTicket:InventoryTicket|null=null;closed=false;closing=false;ready=false;frame=0;serial=0;window:any;view!:View;error='';text:string[]=[];latch=new InputLatch();
-  pocket=1;indices:number[]=Array(8).fill(0);visited=new Set<number>();bag:any;sorting=false;busy=false;operation:any=null;presentationOutcome:InventoryOutcome|null=null;afterMessage:(()=>void)|null=null;cancelWait:(()=>void)|null=null;lastPhase='';
+  pocket=1;indices:number[]=Array(8).fill(0);visited=new Set<number>();bag!:{pockets:InventoryRow[][];lastPocket:number;indices:number[];revision:string};sorting=false;busy=false;operation:any=null;presentationOutcome:InventoryOutcome|null=null;afterMessage:(()=>void)|null=null;cancelWait:(()=>void)|null=null;lastPhase='';
   // Sort cancellation restores the live row, while indices retain the last moved saved position.
   restoredSortCursor:number|null=null;evolutionOwner='';evolutionChild:any=null;evolutionIntent:{itemId:string;memberId:string;quantity:number}|null=null;learningChild:any=null;learningItem:{itemId:string;memberId:string}|null=null;machineBrowse:{itemId:string;annotations:any[];members:any[]}|null=null;
   constructor(request:Request,h:Handle,readonly finish:(o:InventoryOutcome)=>void){this.request=request;this.handle=h;this.application=h.application;this.generation=h.generation;}
@@ -153,7 +155,7 @@ const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
   }
   submitUse(){
    const op=this.operation,r=this.application.inventoryRequest(this.token,op.id,op.request);
-   if(r.status==='pending'){this.answer(r.result.selection);return;}
+   if(r.status==='pending'){this.answer(r.result!.selection);return;}
    if(r.status==='refused'){
     if(r.reason==='no-effect'){this.operation=null;this.selectedTicket=null;}
     const retired=r.reason==='stale-item-selection'||r.reason==='stale-slot'||r.reason==='stale-target'||r.reason==='stale-content';
@@ -162,7 +164,7 @@ const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
    this.operation=null;this.selectedTicket=null;
    if(r.status==='cancelled'){this.request.kind==='use'?this.close(r):this.bagView();return;}
    this.presentationOutcome=r;
-   const result=r.result??{},text=tr('used',{quantity:op.request.quantity,item:name(this.catalog()[op.request.itemId]!)})+(result.newLevel!==undefined?` Lv.${result.oldLevel} → ${result.newLevel}`:'')+(result.actualHp?` HP ${result.actualHp>0?'+':''}${result.actualHp}`:'')+(result.learned?.length?tr('learned',{moves:result.learned.join(', ')}):'')+(result.skipped?.length?tr('skipped',{moves:result.skipped.join(', ')}):'');
+   const result=(r.result??{}) as Partial<ItemResult>,text=tr('used',{quantity:op.request.quantity,item:name(this.catalog()[op.request.itemId]!)})+(result.newLevel!==undefined?` Lv.${result.oldLevel} → ${result.newLevel}`:'')+(result.actualHp?` HP ${result.actualHp>0?'+':''}${result.actualHp}`:'')+(result.learned?.length?tr('learned',{moves:result.learned.join(', ')}):'')+(result.skipped?.length?tr('skipped',{moves:result.skipped.join(', ')}):'');
    this.message(text,()=>this.request.kind==='use'?this.close(r):this.request.parent?this.bagView():this.target(op.request.itemId));
   }
   answer(s:any){
@@ -183,7 +185,7 @@ const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
   closeShop(){const definition=this.request.shop?.shopId?flow().content().shops?.[this.request.shop.shopId]:undefined;if(definition?.farewellKey)this.message(this.shopText('farewellKey','farewell'),()=>this.close({status:'cancelled'}));else this.close({status:'cancelled'});}
   shopMenu(){const stock=this.application.shopView(this.token);this.choose(this.shopText('greetingKey','welcome'),[{key:'buy',label:tr('buy'),run:()=>this.shopList(false)},...(stock.allowSell?[{key:'sell',label:tr('sell'),run:()=>this.shopList(true)}]:[]),{key:'close',label:tr('leave'),run:()=>this.closeShop()}],()=>this.closeShop());}
   catalog():Record<string,ItemDefinition>{return catalogOf(flow().content());}
-  shopList(selling:boolean){this.refreshBag();const ids=selling?[...new Set(this.bag.pockets.flat().map((r:any)=>r.item.id))]:this.application.shopView(this.token).stock;
+  shopList(selling:boolean){this.refreshBag();const ids=selling?[...new Set<string>(this.bag.pockets.flat().map((r:InventoryRow)=>r.item.id))]:this.application.shopView(this.token).stock;
    this.choose(tr(selling?'sell':'buy'),[...ids.map((id:string)=>{const item=this.catalog()[id]!;try{const quote=this.application.shopQuote(this.token,id,selling);return {key:id,label:`${name(item)}  ${tr('price',{price:quote.price})}  ${tr('owned',{quantity:this.total(id)})}`,displayName:name(item),details:[tr('price',{price:quote.price}),tr('owned',{quantity:this.total(id)})],enabled:quote.maximum>0,run:()=>this.shopQuantity(id,selling)};}catch(error){if(!selling||why(error)!=='not-sellable')throw error;return {key:id,label:name(item)+' · '+detail(error),displayName:name(item),details:[detail(error)],enabled:false,run:()=>{}};}}),{key:'close',label:tr('back'),run:()=>this.shopMenu()}],()=>this.shopMenu());}
   shopQuantity(itemId:string,selling:boolean){const quote=this.application.shopQuote(this.token,itemId,selling);this.quantity(quote.maximum,true,q=>{if(!q){this.shopList(selling);return;}if(!Number.isSafeInteger(quote.price*q)){this.fail({reason:'integer-overflow'},()=>this.shopList(selling));return;}this.confirm(tr('confirmTrade',{quantity:q,item:name(this.catalog()[itemId]!),total:quote.price*q}),()=>{const r=this.application.inventoryRequest(this.token,this.id(),{kind:selling?'sell':'buy',itemId,quantity:q,confirmed:true,expectedPrice:quote.price,expectedRevision:quote.revision});if(r.status==='refused'){this.fail(r,()=>this.shopList(selling));return;}this.presentationOutcome=r;this.message(tr('tradeDone',{quantity:q,item:name(this.catalog()[itemId]!)} )+(r.result?.bonus?tr('bonus',{quantity:r.result.bonus as number}):''),()=>this.shopList(selling));},()=>this.shopList(selling));this.view.summary=[tr('quantity')+': '+q,tr('price',{price:quote.price}),tr('total',{total:quote.price*q})];this.draw();});if(this.view.kind==='quantity'){this.view.unitPrice=quote.price;this.view.title=tr('quantity')+' · '+name(this.catalog()[itemId]!);this.draw();}}
   update(){
@@ -217,14 +219,14 @@ const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
    if(this.selection){this.finishSelection(row.item.id);return;}this.itemMenu(row);
   }else {const it=v.items?.[v.cursor];if(it?.enabled===false){G.SoundManager.playBuzzer();return;}it?.run();}}
   back(){if(this.evolutionChild){this.evolutionChild.back();return;}if(this.learningChild){this.learningChild.model.back();this.learningChild.boundary();this.learningChild.draw();return;}const v=this.view;if(v.kind==='message'){this.use();return;}if(v.kind==='bag'){
-   if(this.sorting){const r=this.application.endInventorySort(this.token,true);this.sorting=false;if(r.status==='refused')this.fail(r);else{this.restoredSortCursor=r.result.index;this.bagView();}return;}
+   if(this.sorting){const r=this.application.endInventorySort(this.token,true);this.sorting=false;if(r.status==='refused')this.fail(r);else{this.restoredSortCursor=r.result!.index as number;this.bagView();}return;}
    if(this.selection)this.finishSelection(null);else{this.flushBrowse();this.close({status:'cancelled'});}return;
   }v.back?.();}
   close(result:InventoryOutcome,invalid=false){
    if(this.closed||this.closing)return;this.closing=true;try{if(this.evolutionChild){const child=this.evolutionChild;this.evolutionChild=null;child.dispose();const outcome=this.evolutionOutcome(child);if(outcome.status==='committed')this.presentationOutcome=outcome;else result={...outcome,...(result.reason&&outcome.reason!=='evolution-recovery-required'?{reason:result.reason}:{})};}if(this.learningChild){const child=this.learningChild;this.learningChild=null;child.dispose();const done=child.completedOutcome;if(done?.status==='committed')this.presentationOutcome={status:'committed',result:{...this.learningItem}};else if(done?.status==='refused'&&done.reason==='learning-recovery-required')result={status:'refused',reason:done.reason,presentation:'failed'};}const same=this.application===flow()._app&&this.generation===this.application.stateGeneration;
    if(invalid&&this.presentationOutcome&&['cancelled','refused'].includes(result.status))result={...clone(this.presentationOutcome),presentation:'failed',error:result.error??why(result)};
-   if(this.giveToken&&same){const out=this.application.endManagement(this.giveToken);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close(out,true));return;}}
-   if(this.token&&same){const out=this.application.endInventoryOperation(this.token);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close(out,true));return;}if(out.reason==='child-operation-active'&&this.evolutionOwner&&this.application.pendingTriggeredEvolution?.token===this.evolutionOwner&&!abandoned.some(e=>e.application===this.application&&e.token===this.token))abandoned.push({application:this.application,generation:this.generation,token:this.token,owner:this.evolutionOwner,retireParent:this.request.retireParent});}
+   if(this.giveToken&&same){const out=this.application.endManagement(this.giveToken);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close({...out,status:'refused'},true));return;}}
+   if(this.token&&same){const out=this.application.endInventoryOperation(this.token);if(out.status==='refused'&&!invalid){this.fail(out,()=>this.close({...out,status:'refused'},true));return;}if(out.reason==='child-operation-active'&&this.evolutionOwner&&this.application.pendingTriggeredEvolution?.token===this.evolutionOwner&&!abandoned.some(e=>e.application===this.application&&e.token===this.token))abandoned.push({application:this.application,generation:this.generation,token:this.token,owner:this.evolutionOwner,retireParent:this.request.retireParent});}
    this.closed=true;this.handle.done=true;this.handle.result=clone(result);if(active===this)active=null;
    const pending=this.cancelWait;this.cancelWait=null;this.afterMessage=null;pending?.();this.finish(result);
    if(same&&this.request.done)notices.push({application:this.application,generation:this.generation,result:clone(result),done:this.request.done});
