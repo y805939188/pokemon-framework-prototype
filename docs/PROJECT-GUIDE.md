@@ -139,6 +139,8 @@ regular 无头测试还需要 Python 3，用于固定 canonical JSON／UTF-8／S
 
 本轮架构整改的编译内容语义为 4（作者 schema 仍为 2／显式 legacy 1，持久存档仍为 9，战斗协议仍为 v1）。旧 compiled cache 需从作者源重新构建；不会自动修改作者 JSON 或玩家档。Gen8 标准类型列表不截断，按类型身份去重，显式空列表规范化为 Normal，并用于图鉴、静态摘要、进化和战斗基础类型。战斗临时类型另由引擎拥有。Stellar 等 Future 类型仍接受并给出 warning，但其整条记录保留原生战斗行为，一致性仍 OPEN；范围与测试见 [作者类型合同](framework-remediation/r2-author-types-contract.zh.md)。
 
+本轮架构整改的固定候选、逐批提交与独审、冷准备和三轮 regular 实绩见 [整改总回执](framework-remediation/architecture-review-remediation.zh.md)。该回执区分产品候选与后继文档提交，不替代原5.4收口／历史实机证据，也不预签NW、性能或后续功能。
+
 ## 10. 已知坑
 
 - Showdown 把昵称（我们的稳定 id）截成 20 个字符并清理分隔符，所以 id 限 1–18 个安全字符（`BattleSession.create` 会拒绝其他 id）。
