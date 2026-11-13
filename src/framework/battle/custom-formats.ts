@@ -345,6 +345,11 @@ export function runAfterFaint(battle: ShowdownBattle, sideId: string): boolean {
   return true;
 }
 
+/** Stable rule family of the actual individual, not Illusion's display or Transform's borrowed species. */
+function originalSpeciesFamily(battle: ShowdownBattle, pokemon: ShowdownPokemon): string {
+  return battle.dex.species.get(pokemon.set.species || pokemon.set.name).baseSpecies;
+}
+
 function resolveBall(battle: ShowdownBattle, user: ShowdownPokemon, payload: Payload): void {
   const side = user.side;
   const ball = payload.ball as string;
@@ -364,7 +369,16 @@ function resolveBall(battle: ShowdownBattle, user: ShowdownPokemon, payload: Pay
     weightHg: target.getWeight(),
     userMaxLevel: Math.max(...own.map((p: ShowdownPokemon) => p.level as number)),
     ultraBeast: !!(target.species.tags && target.species.tags.includes("Ultra Beast")),
-  }, payload.ctx || {});
+  }, payload.ctx || {}, {
+    // These facts belong to the engine at the actual throw, not to the caller's optional world context.
+    underwater: battle.rpg.initialField?.environment === "underwater",
+    sameSpeciesOppositeGender: (target.gender === "M" || target.gender === "F") && own.some((p: ShowdownPokemon) =>
+      (p.gender === "M" || p.gender === "F") && p.gender !== target.gender
+      && originalSpeciesFamily(battle, p) === originalSpeciesFamily(battle, target)),
+    // WP48's non-ignorable status check is species-qualified, not ordinary effective-ability gating.
+    // The actual status below stays unchanged: Comatose alone must not also get sleep's x2.5 bonus.
+    asleepLike: target.status === "slp" || (target.ability === "comatose" && originalSpeciesFamily(battle, target) === "Komala"),
+  });
   const nums = captureNumbers({ ballId: ball, baseRate: payload.catchRate as number, maxHp: target.maxhp, hp: target.hp, status: target.status || "", ctx });
   const res = rollCapture(nums, ctx, (n) => battle.random(n));
   emit(battle, "ball", side.id, ball, target.name, res.shakes === 4 ? "caught" : "escaped", res.shakes, res.critical ? 1 : 0, nums.x, nums.y === null ? "-" : nums.y);

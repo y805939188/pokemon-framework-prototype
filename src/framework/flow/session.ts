@@ -453,6 +453,8 @@ export class BattleSession {
   async useItem(itemId: string, targetId: string, { commit = true, moveSlot }: { commit?: boolean; moveSlot?: number } = {}): Promise<TurnResult> {
     return this._action(async () => {
       this._log("info", "choice", { action: "item", item: itemId, target: targetId, commit, moveSlot });
+      const q = this.gw.query("p1", "item");
+      if (!q.allowed) return this._refuse(q.reason ?? "refused");
       if (!ITEM_IDS.has(itemId)) return this._refuse("unknown-item");
       if ((this.bag[itemId] || 0) < 1) return this._refuse("none-left");
       const el = this.canUseItem(itemId, targetId, moveSlot);
@@ -468,6 +470,7 @@ export class BattleSession {
 
   /** Registration-time eligibility of an item for a party member (same rule the menu uses to grey out targets). */
   canUseItem(itemId: string, targetId: unknown, moveSlot?: number): ReturnType<typeof itemEligibility> {
+    if (!this.gw.query("p1", "item").allowed) return { ok: false, reason: "item-no-effect" };
     const mon = this.gw.readState("p1").find((x: MemberState) => x.id === targetId);
     if (ESCAPE_ITEMS.includes(itemId)) {
       if (!mon || targetId !== this.gw.activeId("p1")) return { ok: false, reason: "unknown-target" };

@@ -32,6 +32,8 @@ SUITES=(
   experiments/step5/4/test-transform-growth.cjs
   experiments/step5/4/test-transform-learning.cjs
   experiments/step5/4/test-transform-learning-scene.cjs
+  experiments/step5/4/test-capture-run-review-fixes.cjs
+  experiments/step5/4/test-hard-lock-scene.cjs
   experiments/step5/4/test-escape-items.cjs
   experiments/step5/4/test-wild-faint-escape.cjs
 

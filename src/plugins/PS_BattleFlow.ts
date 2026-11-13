@@ -1766,6 +1766,12 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   P.pictureState = function () { return this._pictures?.snapshot() ?? null; };
   P.captureMelodyState = function () { return this._captureMelody?.snapshot() ?? null; };
   P.showMain = function () {
+    const automatic = this._session.gw?.query?.('p1', 'automatic-locked');
+    if (automatic?.allowed && automatic.moveSlot === 1) {
+      // The engine already published a forced continuation, so there is no command menu this turn.
+      if (sceneController(this).show('automatic-move')) this.act(() => this._session.chooseMove(1), 'move');
+      return;
+    }
     const tr = PSFlow.translator();
     this.show("main", [
       { name: tr.t("ui.menu.fight"), ext: "fight" }, { name: tr.t("ui.menu.bag"), ext: "bag" }, { name: tr.t("ui.menu.party"), ext: "party" }, { name: tr.t("ui.menu.run"), ext: "run" },

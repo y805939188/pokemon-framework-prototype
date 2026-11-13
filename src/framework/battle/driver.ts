@@ -96,7 +96,7 @@ export interface BattleDriver {
   runAfterFaint?(side: string): Promise<boolean>;
   chooseSlots(side: string, specs: (SlotSpec | null)[]): Promise<boolean>;
   cancel(side: string): Promise<void>;
-  /** Menu query. automatic-encore may return a one-based moveSlot; allowed without a slot is not an automatic choice. */
+  /** Menu query. automatic-locked/automatic-encore may return a one-based moveSlot; allowed without a slot is not an automatic choice. */
   query(side: string, what: "run" | "ball" | string, slot?: number): { allowed: boolean; reason?: string; moveSlot?: number };
   readState(side: string): MemberState[];
   /** Unique permanent engine slot for a move identity; unavailable/missing/ambiguous means refuse a selected PP item. */

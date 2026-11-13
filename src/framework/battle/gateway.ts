@@ -488,6 +488,15 @@ export class BattleGateway implements BattleDriver {
       this._emit({ kind: "error", side, message: "no move request pending", payload: specs });
       return false;
     }
+    // Preflight before clearChoice/pending: a refusal must not cancel an already-staged legal move.
+    // Mirror the pinned move-choice index's skipped seats without invoking its mutating choosePass.
+    let index = 0;
+    for (const spec of specs) {
+      while (index < s.active.length && (s.active[index].fainted || s.active[index].volatiles["commanding"])) index++;
+      if (index >= s.active.length) break;
+      if (spec?.kind && this._hardLockedMove(side, index)) return false;
+      index++;
+    }
     s.clearChoice();
     for (const k of Object.keys(b.rpg.pending)) if (k.startsWith(side + ":")) delete b.rpg.pending[k];
     let ok = true;
@@ -517,6 +526,20 @@ export class BattleGateway implements BattleDriver {
   }
 
   /**
+   * Fixed Gen8 getMoveRequestData/getMoves publishes exactly {move,id} + trapped for a hard lock.
+   * This is an engine-authored permission, not "one move + trapped": ordinary single moves carry
+   * PP/target and automatic Struggle carries target. Never re-run getLockedMove/LockMove here.
+   */
+  private _hardLockedMove(side: string, slot: number): boolean {
+    const b = this._battle, s = b.getSide(side), request = s.activeRequest, active = s.active[slot];
+    const data = request?.active?.[slot], moves = data?.moves;
+    return b.gen === 8 && b.requestState === "move" && !!active && !active.fainted
+      && !!request && !request.wait && !request.forceSwitch && data?.trapped === true
+      && Array.isArray(moves) && moves.length === 1 && typeof moves[0].id === 'string'
+      && moves[0].pp === undefined && moves[0].target === undefined && !moves[0].disabled;
+  }
+
+  /**
    * Menu-layer legality (read-only, nothing consumed). Mirrors the spec's "refuse without
    * consuming" checks for the cases step 2.2 covers. Returns { allowed, reason }.
    */
@@ -524,6 +547,12 @@ export class BattleGateway implements BattleDriver {
     const b = this._battle;
     const s = b.getSide(side);
     const active: ShowdownPokemon = s.active[slot];
+    const hardLocked = this._hardLockedMove(side, slot);
+    if (what === 'automatic-locked') {
+      return hardLocked && slot === 0 && s.active.length === 1 && s.choice.actions.length === 0
+        ? { allowed: true, moveSlot: 1 } : { allowed: false };
+    }
+    if (hardLocked && (what === 'item' || what === 'ball' || what === 'run')) return { allowed: false, reason: 'choice-rejected' };
     if (what === 'automatic-encore') {
       // Read the pinned engine's own condition and already-published permissions, never run a rule event here.
       if (slot !== 0 || s.active.length !== 1 || !active || active.fainted || active.volatiles?.dynamax
@@ -551,7 +580,7 @@ export class BattleGateway implements BattleDriver {
     if (what === "run") {
       if (b.rpg.noRun) return { allowed: false, reason: "norun" };
       if (active.hasType("Ghost") || active.hasAbility("runaway") || active.hasItem("smokeball")) return { allowed: true }; // before trapping (WP41 7.1)
-      if (active.trapped || active.volatiles["partiallytrapped"]) return { allowed: false, reason: "trapped" };
+      if (active.trapped || active.volatiles["partiallytrapped"] || active.volatiles["trapped"]) return { allowed: false, reason: "trapped" };
       return { allowed: true };
     }
     if (what === "ball") {
