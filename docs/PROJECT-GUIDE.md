@@ -40,7 +40,7 @@
 | `pokemon-framework-reference` | clean-room 规格与证据（131 份正式规格、87 个 WP、去向清单 736 单元） | **只读使用**。规格在 `deliverables/final-specification-set/`，推导期望在其 `test-catalog/`，去向清单在 `planning/implementation-routing/r8-20261017/` |
 | `rpg-maker-mz-initialize` | 通用 MZ+Reactor+TS 工程模板（`b6fa1df`），本仓库由它起步 | 已不再需要修改；不要把通用模板改成实验工程 |
 
-仓库外但必需的依赖（不在 git 里，换机器要重新准备，见第 9 节）：RPGReactor 源码检出 `/Users/dingshinn/Desktop/RPGReactor`（固定 0.98.8 @ `2dc2e10e`）、已安装的 RPG Maker MZ（Steam 版）、Showdown 源码缓存 `~/Library/Caches/pokemon-framework/showdown-src`。
+仓库外但必需的依赖（不在 git 里，换机器要重新准备，见第 9 节）：RPGReactor 运行时与声明（固定 0.98.8 @ `2dc2e10e`，脚本下载或用 `REACTOR_SOURCE` 选择本地检出）、已安装的 RPG Maker MZ（Steam 版）、Showdown 源码缓存 `~/Library/Caches/pokemon-framework/showdown-src`。
 
 ## 3. 铁律
 
@@ -119,13 +119,15 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 
 ## 9. 环境准备（从零）
 
-前提：Apple Silicon Mac；Node ≥ 22（开发用 22.21.1，Showdown 要求 ≥ 22.18）；pnpm 10.20.0；git；已安装 RPG Maker MZ（Steam 版，其 NW.js 已是 0.117.0 SDK arm64——`scripts/doctor.sh` 会检查）；RPGReactor 源码检出在 `/Users/dingshinn/Desktop/RPGReactor`，必须是带类型声明的 `2dc2e10e`（0.98.8；0.98.7 标签没有类型包）——`scripts/versions.env` 已固定该提交，本地检出不是它时 `setup-reactor.sh`/`doctor.sh` 会报错（开发偏离须显式设 `REACTOR_ALLOW_OTHER_COMMIT=1`，不作严格 pin 声明；正式升级须同步版本与来源清单）；下载模式没有为这个提交验证过。
+前提：Apple Silicon Mac；Node ≥ 22.18（本轮用 22.21.1）；pnpm 10.20.0；git；已安装 RPG Maker MZ（Steam 版，其 NW.js 应为 0.117.0 SDK arm64——`scripts/doctor.sh` 会检查）。Reactor 由脚本下载 `scripts/versions.env` 固定的 `2dc2e10e`（0.98.8，含声明；0.98.7 标签缺少类型包），也可显式选择任意路径下的同一固定本地检出。2026-11-13 已实际验证全新缓存下载／严格安装，并与本地严格来源的 40 个运行时和 12 个声明文件逐字节比对一致；这不代替完整 MZ／NW 或分发验收。
 
 ```bash
 cd pokemon-framework-prototype
-REACTOR_SOURCE=/Users/dingshinn/Desktop/RPGReactor ./scripts/bootstrap-mac.sh   # 完成全部环境准备和构建，最后运行 doctor
+REACTOR_SOURCE=download ./scripts/bootstrap-mac.sh   # 完成全部环境准备和构建，最后运行 doctor
 ./scripts/test-quick.sh                                                    # 自检
 ```
+
+如已有固定的本地源码，可把上面环境值改为 `REACTOR_SOURCE=/path/to/RPGReactor`。本地源码和下载使用同一固定摘要；开发偏离须显式设置 `REACTOR_ALLOW_OTHER_COMMIT=1`，不会被记为严格 pin。
 
 `bootstrap` 先安装 Reactor 运行时／声明、MZ 素材与 TypeScript 依赖，再运行 `typecheck`（包含 `types:prepare`）；随后按 `pnpm --dir src build:engine` → `scripts/build-showdown.sh` → `pnpm --dir src build` → 最终检查与 `doctor` 的顺序完成准备。基础引擎构建先生成当前 `custom-formats.cjs`，Showdown 构建将它暂存到战斗运行时，完整构建中的内容编译便可使用该运行时的 Dex。冷环境没有引擎包、Showdown 暂存或编译内容时也走同一入口；上面无需追加单独的构建命令。
 
