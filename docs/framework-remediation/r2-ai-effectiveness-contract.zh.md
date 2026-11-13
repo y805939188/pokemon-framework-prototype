@@ -56,3 +56,44 @@
 独审发现P3诊断回归：非标准原生 `MissingNo.` 在作者省略types时可编译／开场，但其原生 `Bird` 不在固定AI标准目录。旧采集器明确拒绝 `trainer-ai-public-type-missing`，8a共享函数仍拒绝却返回空消息。后继仅恢复这个错误字符串，继续fail-closed，不新增对Bird／MissingNo.的战斗AI支持。正式作者→App→Session拒绝及状态不变回归在8a实跑红测exit1（`diagnostic-before.tap`），随后加入本专项成为26项，定向合计384/384通过；完整类型、完整构建及AST检查也通过。后继完整regular和独立复核必须绑定新固定SHA，不能把8a的记录算作后继已通过。
 
 上文错误分类指公开快照／评分的 `invalid-snapshot`、`invalid-random-result` 等值合同；缺少可信表单元的内部诊断另外按上述旧token保留，不声称所有内部异常字符串都是公开SDK。
+
+## 最终固定交付
+
+最终产品／断言提交为 **`c6536a326f6f0c01477426d1cfb7585f29142c12`**，tree `ca2a43f27f16af3d86a2136d7fc73a13e4eef6ee`，src tree `7fe59a57f8bcb415e70eda941c604d4d252a639d`。提交链为 `0b4f32b` → `8a47b0f`（倍率与25项合同）→ `c6536a3`（原诊断及第26项回归）。后继文档记录不冒充新产品候选重新跑过测试。
+
+| 实际验证 | 固定对象／结果 | 本地原始记录 |
+| --- | --- | --- |
+| Node22 定向13文件 | c653：384通过，fail/cancel/skip/todo均0，exit0；含新专项26项 | `build/r2-ai-effectiveness/followup-directed.tap` |
+| 完整类型与完整构建 | c653提交前的相同源码：均exit0 | 同目录 `followup-typecheck.log`、`followup-full-build.log` |
+| AST依赖边界 | 146文件，exit0 | 同目录 `followup-boundaries.log`；regular另执行一次 |
+| 完整regular | c653：291套，5,282通过，fail/cancel/skip均0，exit0 | 同目录 `regular-final.log`、`final-regular-summary.json` |
+| 独立复审 | c653：GPT-6 Astra / ultra，`PASS_SCOPED`，首轮P3关闭，无新阻断 | 同目录 `reviewer-astra-c6536a3.tap`、`reviewer-astra-c6536a3-probes.log` |
+
+最终独审另跑五文件 **135/135**（本专项、作者类型合同、作者类型能力诊断、既有Trainer AI集成、既有Trainer AI修复），零失败／取消／跳过，exit0；在c653重新核对4,718,574个标准基础表值。公开policy未知类型仍 `invalid-snapshot` 且零抽样。正式MissingNo省略types时精确拒绝原token，driver身份、引擎快照、持久状态均未变；这里发生在取checkpoint的采集前置检查，**不是执行后回滚证明**，恢复／重放证明来自Forest's Curse及邻近checkpoint合同。同一物种显式配置五个标准抗草属性时倍率为1/32且行动成功。8a的6个替补选择与4个坏目录探针单列，不冒充c653重跑。独审未独立跑完整regular。
+
+实际命令如下，测试、pnpm构建与regular使用显式Node22.21.1的PATH（本机前缀 `/Users/dingshinn/.nvm/versions/node/v22.21.1/bin`）；没有依赖某个测试“碰巧跳过”来制造通过：
+
+```sh
+pnpm --dir src build
+pnpm --dir src typecheck
+node scripts/check-boundaries.cjs
+node --test \
+  experiments/framework-remediation/test-r2-ai-effectiveness-contract.cjs \
+  experiments/framework-remediation/test-r2-author-types-contract.cjs \
+  experiments/step5/4/test-trainer-ai.cjs \
+  experiments/step5/4/test-trainer-ai-integration.cjs \
+  experiments/step5/4/test-trainer-ai-strategy.cjs \
+  experiments/step5/4/test-trainer-ai-async.cjs \
+  experiments/step5/4/test-trainer-ai-c2-remediation.cjs \
+  experiments/step5/4/test-trainer-ai-realms.cjs \
+  experiments/step5/4/test-trainer-ai-remediation.cjs \
+  experiments/step5/4/test-trainer-public-type-transitions.cjs \
+  experiments/step5/4/test-transform-growth.cjs \
+  experiments/step5/4/test-stance-growth.cjs \
+  experiments/step5/4/test-transform-learning.cjs
+PF_NO_SKIP=1 ./scripts/test-headless.sh --scope=regular
+```
+
+最终regular绑定为 `build/headless-regression-bindings/pf-headless-binding.I9pAUs.json`，runId `7e9bd98b-9c55-43b6-b6af-77db71126081`。末尾重新核对固定HEAD、src、输入及实际运行时字节，dirty 的 before/build/after均false。原始日志SHA256 `7b9077a00eb6103ac3ae43e11aa2eb52622d28ddffbb778f6a80ea622f02c35b`，binding SHA256 `02020902ff9fc70cc754ef261d89a4c2718eb125899ec5fc10d6860d5032328a`；保留 `c6536a3-manifest.json`、`c6536a3-SHA256SUMS` 和 `EVIDENCE-SHA256.json`。这些本地ignored证据没有上传。
+
+本轮只关闭R2倍率缺口和本次引入的拒绝诊断回归，不宣称整个架构整改、全部游戏机制或概率验收完成。保留作者静态类型、不改策略API形状／玩家存档／原生Showdown；普通已有效的一至两类型及既有功能由上述回归保护。Stellar / Future 一致性继续OPEN；非标准原生Bird在未显式给标准类型时仍按原边界拒绝。验证使用已准备的本地依赖与stage，不是另一次冷下载／全新环境准备证明。regular既定的1项冻结回放排除明确NOT RUN，不算通过；真实NW、原版/OA、玩家档、跨平台、历史NW/P4性能和新CI均未运行。未推送、创建PR、合并main或清理工作区。
