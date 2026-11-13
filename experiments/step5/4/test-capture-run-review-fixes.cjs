@@ -60,10 +60,14 @@ for(const [player,foe,rest,x,label]of [
  [set('P'),set('F','Snorlax',['Splash'],{gender:'F'}),[],80,'same opposite'],
  [set('P'),set('F'),[],10,'same gender'],
  [set('P'),set('F','Pidgey',['Splash'],{gender:'F'}),[],10,'different species'],
- [set('P','Magnemite'),set('F','Magnemite'),[],10,'genderless'],
+ [set('P','Magnemite',['Splash'],{gender:'N'}),set('F','Magnemite',['Splash'],{gender:'N'}),[],10,'genderless'],
  [set('P','Pidgey'),set('F','Snorlax',['Splash'],{gender:'F'}),[set('R')],10,'bench excluded'],
  [set('P','Meowth-Alola'),set('F','Meowth',['Splash'],{gender:'F'}),[],80,'same rule family across forms'],
-])test('Love Ball engine '+label,async()=>{assert.equal(await throwRaw(await gateway({player,foe,rest}),'loveball'),x);});
+])test('Love Ball engine '+label,async()=>{
+ const gw=await gateway({player,foe,rest});
+ if(label==='genderless')for(const side of gw._debugBattle().sides)assert.equal(side.active[0].gender,'','native Gen8 genderless, not the helper default M');
+ assert.equal(await throwRaw(gw,'loveball'),x);
+});
 for(const [ball,options,x]of [['dreamball',{status:'slp'},100],['diveball',{initialField:{environment:'underwater'}},35],['loveball',{},80]])test('Session wires '+ball+' and leaves persistent game untouched',async()=>{
  const{s,game,before}=await session({move:'Splash',ball,...options});const result=await s.throwBall(ball);assert(result.ok,JSON.stringify(result));const e=ballEvent(result.messages);assert(e);assert.equal(Number(e.args[7]),x);assert.equal(s.bag[ball],1);assert.equal(JSON.stringify(game),before);
 });
