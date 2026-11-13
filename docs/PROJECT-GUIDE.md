@@ -133,6 +133,8 @@ REACTOR_SOURCE=/Users/dingshinn/Desktop/RPGReactor ./scripts/bootstrap-mac.sh   
 
 Reactor 正式准备还核对固定提交的实际消费文件集合与 SHA-256；仅 HEAD 或版本注释相同不足以通过。`REACTOR_ALLOW_OTHER_COMMIT=1` 只启用显式非严格开发模式，不代表固定来源验收；旧安装记录需执行一次 `--install` 迁移。清单、模式与测试边界见 [Reactor 来源合同](framework-remediation/reactor-source-identity.zh.md)。
 
+regular 无头测试还需要 Python 3，用于固定 canonical JSON／UTF-8／SHA-256 向量的独立字节复核；不执行原版或冻结对照业务。应用操作、正式驱动能力及跨语言值语义见 [操作合同](framework-remediation/application-operation-contract.zh.md)、[正式能力合同](framework-remediation/formal-battle-capabilities.zh.md)、[迁移向量蓝本](framework-remediation/migration-vectors.zh.md)。
+
 ## 10. 已知坑
 
 - Showdown 把昵称（我们的稳定 id）截成 20 个字符并清理分隔符，所以 id 限 1–18 个安全字符（`BattleSession.create` 会拒绝其他 id）。

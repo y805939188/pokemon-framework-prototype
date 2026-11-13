@@ -159,6 +159,10 @@ SUITES=(
   scripts/tests/bootstrap-mac.test.cjs
   scripts/tests/host-application-types.test.cjs
   scripts/tests/host-input.test.cjs
+  experiments/framework-remediation/test-formal-battle-capabilities.cjs
+  experiments/framework-remediation/test-application-operation-contract.cjs
+  experiments/framework-remediation/test-field-potion-vectors.cjs
+  experiments/framework-remediation/test-value-semantics-contract.cjs
   scripts/tests/showdown-build.test.cjs
   scripts/tests/package-excludes.test.cjs
   scripts/tests/check-boundaries.test.cjs
