@@ -47,7 +47,7 @@ function compile(name, source) {
   if (result.error) throw result.error;
   return { code: result.status, output: result.stdout + result.stderr };
 }
-const imports = `import type { ApplicationHost, HostApplication, ProductionRuntime, LearningApplication } from ${JSON.stringify(HOST)};\nimport type { BattleHandle, GameApplicationPorts } from ${JSON.stringify(APP)};\n`;
+const imports = `import type { ApplicationHost, HostApplication, ProductionRuntime, LearningApplication, SaveApplication } from ${JSON.stringify(HOST)};\nimport type { BattleHandle, GameApplicationPorts, FriendshipPersistencePort } from ${JSON.stringify(APP)};\n`;
 test('host accessor, production constructor and narrow learning view retain real application signatures', () => {
   const r = compile('consumer', imports + `
 type IsAny<T> = 0 extends (1 & T) ? true : false;
@@ -56,6 +56,10 @@ type AccessorIsTyped = NoAny<IsAny<ReturnType<ApplicationHost['app']>>>;
 type ConstructorIsTyped = NoAny<IsAny<ProductionRuntime['app']['GameApplication']>>;
 type LearningIsTyped = NoAny<IsAny<ReturnType<LearningApplication['beginLearning']>>>;
 type FacadeIsTyped = NoAny<IsAny<ReturnType<ApplicationHost['resolveEvolution']>>>;
+type SavePreviewIsTyped = NoAny<IsAny<Awaited<ReturnType<SaveApplication['previewFriendshipMigration']>>>>;
+type SaveConfirmIsTyped = NoAny<IsAny<Awaited<ReturnType<SaveApplication['confirmFriendshipMigration']>>>>;
+type SavePortStateIsTyped = NoAny<IsAny<Awaited<ReturnType<FriendshipPersistencePort['preview']>>['state']>>;
+type SavePortRequestIsTyped = NoAny<IsAny<Parameters<FriendshipPersistencePort['commit']>[0]>>;
 declare const actual: typeof import(${JSON.stringify(PRODUCTION)});
 const checked: ProductionRuntime = actual;
 declare const host: ApplicationHost, runtime: ProductionRuntime;
@@ -63,6 +67,14 @@ declare const ports: ConstructorParameters<ProductionRuntime['app']['GameApplica
 const created = new runtime.app.GameApplication(ports);
 const application: HostApplication = host.app();
 const learning: LearningApplication = application;
+const save: SaveApplication = application;
+declare const persistence: FriendshipPersistencePort;
+save.previewFriendshipMigration(persistence).then(preview => {
+  if (preview.status === 'ready') {
+    save.confirmFriendshipMigration(preview.handle);
+    save.cancelFriendshipMigration(preview.handle);
+  }
+});
 const outcome = learning.beginLearning({ kind: 'forget', memberId: 'P1' });
 if (outcome.status === 'pending') learning.resolveLearning(outcome.view.token, outcome.view.revision, { kind: 'forget', slot: null });
 void created;
@@ -76,6 +88,11 @@ for (const [name, source] of [
   ['port-return', `const state: GameApplicationPorts<BattleHandle>['state'] = {read:()=>42,replace:()=>{}};`],
   ['production-port', `declare const runtime: ProductionRuntime; new runtime.app.GameApplication({state:{read:()=>42,replace:()=>{}},sessions:{create:async()=>({result:()=>42})},content:()=>({content:{species:{}}}),projection:{project:()=>{}}});`],
   ['narrow-view', `declare const app: LearningApplication; app.startNewGame();`],
+  ['save-confirm', `declare const app: SaveApplication; app.confirmFriendshipMigration(42);`],
+  ['save-preview-paths', `declare const app: SaveApplication, port: FriendshipPersistencePort; app.previewFriendshipMigration(port,42);`],
+  ['save-port-preview', `declare const app: SaveApplication; app.previewFriendshipMigration({preview:async()=>42,commit:async()=>({status:'not-committed'})});`],
+  ['save-port-commit', `declare const snapshot: Awaited<ReturnType<FriendshipPersistencePort['preview']>>; const port: FriendshipPersistencePort={preview:async()=>snapshot,commit:async()=>42};`],
+  ['save-narrow-view', `declare const app: SaveApplication; app.startNewGame();`],
 ]) test(`invalid ${name} remains a compiler error`, () => {
   const r = compile(name, imports + source);
   assert.notEqual(r.code, 0, 'invalid host consumer compiled');
@@ -118,4 +135,25 @@ for (const [plugin, call] of [
   });
   assert.notEqual(negative.code, 0, 'UI application accessor became any');
   assert.match(negative.output, /TS2345/, negative.output);
+});
+
+test('actual PS_SaveState compiles without ambient Node types', () => {
+  const r = compilePlugin('PS_SaveState');
+  assert.equal(r.code, 0, r.output);
+});
+for (const [name, before, after, diagnostic] of [
+  ['confirm handle', '.confirmFriendshipMigration(handle)', '.confirmFriendshipMigration(42)', /TS2345/],
+  ['cancel handle', '.cancelFriendshipMigration(handle)', '.cancelFriendshipMigration(42)', /TS2345/],
+  ['preview paths', '.previewFriendshipMigration(migrationPort(slot,assertModal),paths)', '.previewFriendshipMigration(migrationPort(slot,assertModal),42)', /TS2345/],
+  ['preview state', 'state:migrated.state', 'state:42', /TS(?:2322|2353)/],
+  ['commit request', 'request.before.hostIdentity', 'request.before.unknownHostIdentity', /TS2339/],
+  ['commit result', 'status:"not-committed",error:', 'status:"invalid-commit-result",error:', /TS2322/],
+]) test(`actual PS_SaveState ${name} mutation is rejected by the compiler`, () => {
+  const r = compilePlugin('PS_SaveState', source => {
+    assert(source.includes(before), 'actual save consumer mutation point must exist');
+    return source.replace(before, after);
+  });
+  assert.notEqual(r.code, 0, 'actual save application or persistence port became any');
+  assert.match(r.output, diagnostic, r.output);
+  assert.doesNotMatch(r.output, /Cannot find module|Cannot find type definition/, r.output);
 });

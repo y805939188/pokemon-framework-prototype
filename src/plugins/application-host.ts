@@ -35,6 +35,8 @@ export interface ApplicationCompositionHost extends ApplicationHost {
 }
 export type LearningApplication = Pick<HostApplication,
   'stateGeneration' | 'encounterBlocked' | 'pendingLearning' | 'beginLearning' | 'resolveLearning' | 'describeLearningMove'>;
+export type SaveApplication = Pick<HostApplication,
+  'previewFriendshipMigration' | 'confirmFriendshipMigration' | 'cancelFriendshipMigration' | 'assertHostStateReplacementAllowed'>;
 
 /** Only the dynamically loaded exports consumed by application construction. Remaining MZ edges stay separate. */
 interface SessionOptions {
