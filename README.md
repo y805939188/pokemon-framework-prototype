@@ -6,7 +6,7 @@
 
 ## 当前阶段（2026-11-12）
 
-5.4 处于固定候选收尾，产品为 [`fdf25c7`](https://github.com/y805939188/pokemon-framework-prototype/commit/fdf25c7f1f3230e23a239c6bd72351f0c45df561)，开发分支 `step5/4-stored-form-integration-20261112`。[CI #304](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43157940579) 两个 job 成功，274 套／4968 项自动回归通过，冻结参考回放排除。限定实机、已接受的人工补测、待审结果及保留项见[当前验收索引](docs/step5/5.4-current-acceptance.md)。**完整 5.4 尚未签收，未合并 main。**
+5.4 当前固定产品候选为 [`2ecace8d`](https://github.com/y805939188/pokemon-framework-prototype/commit/2ecace8d9cbb2496e6a4dce273731efb3bcd8d41)，开发分支 `step5/4-rpg-held-native-items-20261113`。[CI #310](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43324413581) 两个 job 成功，278 套／5044 项通过，冻结参考回放明确排除。E74 已按最窄范围登记 72 条契约抽样＋2 条受限源级未用，不等于完整标题通过。限定原生／人工历史证据、待答的特殊战前功能范围及保留项见[当前验收索引](docs/step5/5.4-current-acceptance.md)。**完整 5.4 尚未签收，未合并 main。**
 
 ## 先读什么
 

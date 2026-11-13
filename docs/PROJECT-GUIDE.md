@@ -4,7 +4,7 @@
 
 ## 2026-11-12 当前阶段增补
 
-当前 5.4 固定产品为 `fdf25c7f1f3230e23a239c6bd72351f0c45df561`，开发分支 `step5/4-stored-form-integration-20261112`；[CI #304](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43157940579) 两 job 成功，自动回归 274 套／4968 项通过，冻结参考回放排除。完整 5.4 尚未正式签收，未合并 main。限定接受、已完成的人工补测、待审结果及性能／退出保留项统一见[当前验收索引](step5/5.4-current-acceptance.md)。
+当前 5.4 固定产品候选为 `2ecace8d9cbb2496e6a4dce273731efb3bcd8d41`，开发分支 `step5/4-rpg-held-native-items-20261113`；[CI #310](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43324413581) 两 job 成功，278 套／5044 项通过，冻结参考回放明确排除。E74 已中央登记 72 条最窄契约抽样＋2 条受限源级未用，不签完整标题；非 E74 的 FR 事实、验证层次和范围仍分列。完整 5.4 尚未正式签收，未合并 main。限定接受、历史原生／人工证据、待答范围及性能／退出保留项统一见[当前验收索引](step5/5.4-current-acceptance.md)。
 
 下列路线表中第五步的细分状态及文末旧增补为其注明日期的历史截面，不是当前仍在运行／待审的证据；保留原结果，不把历史失败抹去。交接时先读本增补和当前验收索引，再按所需版本读取历史记录。
 
