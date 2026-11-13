@@ -18,7 +18,7 @@ export interface PublicOpponent {
   readonly displayedSpecies: string;
   readonly displayedForm: number;
   readonly level: number;
-  /** Up to two public base types plus Gen8's current added type. `???` is neutral, never privately inferred. */
+  /** Public authored base types plus the current added type, bounded by the catalog's unique types and `???`; never privately inferred. */
   readonly shownTypes: readonly string[];
   readonly hpBar: PublicHpBar;
   readonly status: PersistentStatus;
@@ -43,7 +43,7 @@ export interface OwnMember {
   readonly maxhp: number;
   readonly status: PersistentStatus;
   readonly confusionTurns: number;
-  /** Up to three current Gen8 types. Exact `???` is typeless: neutral defense and no move-type STAB. */
+  /** Unique current types from the catalog plus `???`; no fixed two/three-type cap. `???` gives neutral defense and no move-type STAB. */
   readonly types: readonly string[];
   readonly knownAbility: string;
   readonly knownHeldItem: string;
