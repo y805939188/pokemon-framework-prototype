@@ -2,6 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const {E,inputs}=require('./trainer-ai-integration/fixtures.cjs'),{storeFor,application,stateHash}=require('./status-disk-worker.cjs');
 const PLAN=require('./e-defeat-disk-contracts.json'),ROOT=path.resolve(__dirname,'../../..'),ID='DEFEAT-P1',clone=x=>JSON.parse(JSON.stringify(x));
+const candidateBinding=require('../../../scripts/headless-regression-binding.cjs');
 const rawHash=f=>crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 function supportedNode(){const[major,minor]=process.versions.node.split('.').map(Number);assert(major>22||major===22&&minor>=18,'Node >=22.18 is required; select the supported runtime explicitly');}
 function content(){const data=inputs({moves:['splash'],party:1});data.trainers[0].party[0].level=100;data.trainers[0].party[0].moves=['tackle'];data.species.find(s=>s.id==='caterpie').learnset=[{level:1,move:'tackle'}];
@@ -15,12 +16,19 @@ function assertLossSave(game,c,result){const m=game.party[0];assert.equal(m.hp,P
 async function finish(w,s,req,before,disk){unchanged(w,before,disk);const result=clone(s.result()),count=w.installs.length,outcome=w.app.finishBattle(s,req);assert.equal(outcome.commit,'applied',JSON.stringify(outcome));assert.equal(w.installs.length,count+1);const saved=clone(w.state.read()),bytes=rawHash(w.file);
  w.app.finishBattle(s,req);assert.equal(w.installs.length,count+1);assert.equal(rawHash(w.file),bytes,'duplicate finish does not write/deduct again');assert.deepEqual(w.store.load(),saved);return{result,resultHash:E.state.resultHash(result),outcome,saved};}
 async function run(stage,id,folder){supportedNode();folder=fs.realpathSync(folder);assert.equal(path.dirname(folder),fs.realpathSync(os.tmpdir()));assert(path.basename(folder).startsWith('pf-e-defeat-disk-'));const mark=JSON.parse(fs.readFileSync(path.join(folder,'OWNED.json')));assert.equal(mark.version,PLAN.version);assert.equal(mark.id,id);
- // Current successor regression binding; the historical PLAN.runtime remains unchanged.
+ const parentBinding=process.env.PF_HEADLESS_REGRESSION_BINDING;let candidate=null;
+ if(parentBinding||mark.candidateBindingSHA256){
+  assert(parentBinding&&mark.candidateBindingSHA256,'parent candidate binding is required for this owned run');
+  candidate=candidateBinding.capture(ROOT,parentBinding,mark.candidateBindingSHA256);
+  assert.equal(candidate.binding.showdownSHA,PLAN.showdownSHA,'fixed defeat-vector Showdown pin');
+ }else{
+ // Explicit historical precision mode. Neither this binding nor PLAN.runtime is rewritten.
  const binding=require('./capture-run-current-headless-runtime.json');assert.equal(binding.schema,'capture-run-current-headless-v1');assert.equal(binding.showdownSHA,PLAN.showdownSHA);assert.equal(Object.keys(binding.runtime).length,9);
  assert.equal(require('node:child_process').execFileSync('git',['rev-parse','HEAD:src'],{cwd:ROOT,encoding:'utf8'}).trim(),binding.productSrcTree,'current product source tree');
  for(const[p,h]of Object.entries(binding.runtime))assert.equal(rawHash(path.join(ROOT,p)),h,'current headless runtime '+p);
  assert.equal(fs.readFileSync(path.join(ROOT,'js/engine/showdown/SOURCE_SHA'),'utf8').trim(),binding.showdownSHA);
  assert.equal(rawHash(path.join(ROOT,'js/engine/showdown/dist/config/custom-formats.js')),binding.runtime['js/engine/build/custom-formats.cjs'],'current staged extension');
+ }
  const c=PLAN.cases.find(c=>c.id===id);assert(c);const ct=content(),file=path.join(folder,'game.json');let setupSaves=0;if(stage==='producer'){assert(!fs.existsSync(file));storeFor(file,ct).save(initial(ct));setupSaves=1;}else assert(fs.existsSync(file),'consumer may only load the existing producer document');
  const w=application(file,ct),loaded=clone(w.state.read()),entrySHA=rawHash(file),before=clone(loaded);let s=null,req=null,record=null,trace=[];
  try{
@@ -39,7 +47,8 @@ async function run(stage,id,folder){supportedNode();folder=fs.realpathSync(folde
    assert.equal(s.ended.winner,'Player');record=await finish(w,s,req,before,entrySHA);assert.equal(record.outcome.code,1);assert.equal(w.state.read().money,before.money);assert.equal(w.state.read().stats.wild_battles_won,1);assert.equal(w.state.read().stats.trainer_battles_lost,c.abort?0:1);assert.equal(w.state.read().stats.blacked_out_count,!c.abort&&!c.canLose?1:0);record.actualMoves=moves;
   }
   assert.equal(w.app.saveBlocked,false);const final=clone(w.state.read());assert.deepEqual(final.inventory,loaded.inventory,'neither defeat nor retry consumes unrelated inventory');assert.equal(final.party[0].id,ID);assert.equal(final.party[0].moves[0].ppUps,0);assert.deepEqual(w.store.load(),final);assert(!fs.existsSync(file+'.tmp'));const raw=fs.readFileSync(file);
-  return{id,stage,pid:process.pid,ppid:process.ppid,node:process.versions.node,setupSaves,scope:PLAN.scope,loaded,loadedSHA256:stateHash(loaded),loadedRawSHA256:entrySHA,final,finalSHA256:stateHash(final),finalRawSHA256:rawHash(file),savedBytesBase64:raw.toString('base64'),installs:w.installs,request:req,trace,record,NW:0};
+  if(candidate)assert.deepEqual(candidateBinding.verify(ROOT,candidate.binding),candidate.identity,'same candidate after worker');
+  return{candidateIdentity:candidate?.identity??null,contentIdentity:E.contentRuntime.validatedContentIdentity(ct),id,stage,pid:process.pid,ppid:process.ppid,node:process.versions.node,setupSaves,scope:PLAN.scope,loaded,loadedSHA256:stateHash(loaded),loadedRawSHA256:entrySHA,final,finalSHA256:stateHash(final),finalRawSHA256:rawHash(file),savedBytesBase64:raw.toString('base64'),installs:w.installs,request:req,trace,record,NW:0};
  }finally{if(s&&req&&w.app.saveBlocked)w.app.abortBattle(req,Error('owned defeat-disk worker exit'));}
 }
 module.exports={supportedNode,content,initial,run};

@@ -2,13 +2,16 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const runtime=process.env.H3_RUNTIME_ROOT,plan=require('./plan.json'),sha=v=>crypto.createHash('sha256').update(v).digest('hex');
 assert(runtime,'explicit frozen product runtime required');
+const candidateBinding=require(path.join(runtime,'scripts/headless-regression-binding.cjs'));
+const candidate=process.env.PF_HEADLESS_REGRESSION_BINDING?candidateBinding.capture(runtime,process.env.PF_HEADLESS_REGRESSION_BINDING):null;
 const current=require('../capture-run-current-headless-runtime.json');assert.match(current.helperFiles['experiments/step5/4/h3-production-policy/support.cjs'],/^[a-f0-9]{64}$/);
-const currentFiles={...plan.files,...current.helperFiles};
+const currentFiles=candidate?candidateBinding.boundFiles(candidate,Object.keys({...plan.files,...current.helperFiles})):{...plan.files,...current.helperFiles};
 for(const [p,h]of Object.entries(currentFiles))assert.equal(sha(fs.readFileSync(path.join(runtime,p))),h,p);
 const {fixture,acquireReady,E,T,clone,capabilities}=require(path.join(runtime,'experiments/step5/4/h3-production-policy/support.cjs'));
 const {createContinueHost}=require(path.join(runtime,'experiments/step5/4/continue-host.cjs'));
 async function run(stage,folder){
- folder=fs.realpathSync(folder);assert(path.basename(folder).startsWith('pf-h3-held-continue-'));assert.equal(JSON.parse(fs.readFileSync(path.join(folder,'OWNED.json'))).scope,'held-continue');
+ folder=fs.realpathSync(folder);assert(path.basename(folder).startsWith('pf-h3-held-continue-'));const marker=JSON.parse(fs.readFileSync(path.join(folder,'OWNED.json')));assert.equal(marker.scope,'held-continue');
+ if(candidate||marker.candidateBindingSHA256){assert(candidate&&marker.candidateBindingSHA256,'parent candidate binding is required for this owned run');candidateBinding.capture(runtime,process.env.PF_HEADLESS_REGRESSION_BINDING,marker.candidateBindingSHA256);}
  const seed=fixture('give');const host=createContinueHost(runtime,runtime,folder,seed.content,currentFiles),g=host.context;let loaded=null,route=null;
  const slot=path.join(folder,'file1.rmmzsave');let slotBefore=null;
  if(stage==='producer'){
@@ -51,6 +54,7 @@ async function run(stage,folder){
  if(stage!=='verifier'){
   assert.equal(await g.DataManager.saveGame(1),0);await host.drain();const decoded=await g.StorageManager.loadObject('file1');assert.deepEqual(JSON.parse(decoded.system._psGame.data),final);
  }
- return {stage,pid:process.pid,loaded,final,afterTake,refusal,writes,route,slotBefore,slotAfter:sha(fs.readFileSync(slot)),raw,NW:0};
+ if(candidate)assert.deepEqual(candidateBinding.verify(runtime,candidate.binding),candidate.identity,'same candidate after Continue worker');
+ return {candidateIdentity:candidate?.identity??null,contentIdentity:E.contentRuntime.validatedContentIdentity(seed.content),stage,pid:process.pid,loaded,final,afterTake,refusal,writes,route,slotBefore,slotAfter:sha(fs.readFileSync(slot)),raw,NW:0};
 }
 run(...process.argv.slice(2)).then(x=>console.log(JSON.stringify(x))).catch(e=>{console.error(e);process.exitCode=1;});

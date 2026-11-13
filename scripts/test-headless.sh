@@ -164,6 +164,7 @@ SUITES=(
   experiments/framework-remediation/test-field-potion-vectors.cjs
   experiments/framework-remediation/test-value-semantics-contract.cjs
   experiments/framework-remediation/test-r2-author-types-contract.cjs
+  scripts/tests/headless-regression-binding.test.cjs
   scripts/tests/showdown-build.test.cjs
   scripts/tests/package-excludes.test.cjs
   scripts/tests/check-boundaries.test.cjs
@@ -329,11 +330,22 @@ done
 # the TS framework: strict type check, import-boundary check, then rebuild runtime, declarations, sample and local delivery
 pnpm --dir src typecheck:framework
 node scripts/check-boundaries.cjs
+# Capture the ordinary regression candidate before its controlled build. Historical
+# acceptance plans stay frozen; each worker verifies this one parent-owned binding.
+binding_dir="$(mktemp -d "${TMPDIR:-/tmp}/pf-headless-binding.XXXXXX")"
+trap 'rm -rf "$binding_dir"' EXIT
+node scripts/headless-regression-binding.cjs begin "$binding_dir/begin.json"
 pnpm --dir src build:distribution > /dev/null
 # Normal held-source release verifies the compiled host and fresh-process Continue, not only developer fixtures.
 for plugin in PS_BattleFlow PS_SaveState PS_Evolution PS_BattleFlowTest; do
   RR_PLUGIN="$plugin" pnpm --dir src exec vite build > /dev/null
 done
+node scripts/headless-regression-binding.cjs finish "$binding_dir/begin.json" "$binding_dir/binding.json"
+mkdir -p "$ROOT/build/headless-regression-bindings"
+binding_receipt="$ROOT/build/headless-regression-bindings/$(basename "$binding_dir").json"
+( set -C; cat "$binding_dir/binding.json" > "$binding_receipt" )
+echo "Current synthetic Node regression binding: $binding_receipt"
+export PF_HEADLESS_REGRESSION_BINDING="$binding_dir/binding.json"
 export H3_RUNTIME_ROOT="$ROOT"
 fail=0
 for s in "${SUITES[@]}"; do
@@ -347,4 +359,5 @@ for s in "${SUITES[@]}"; do
   # PF_NO_SKIP=1 (CI since step 5.0, D5-9): a skipped test is a failure too, so "the runtime was missing" cannot pass
   if [[ "${PF_NO_SKIP:-}" == "1" && "$out" == *"# skipped "* && "$out" != *"# skipped 0"* ]]; then fail=1; echo "    skipped tests are not allowed here (PF_NO_SKIP=1)"; fi
 done
+if ! node scripts/headless-regression-binding.cjs verify "$binding_dir/binding.json"; then fail=1; fi
 exit $fail

@@ -1,6 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {fixture,acquireReady,E,clone}=require('./support.cjs');
+const {fixture,acquireReady,E,clone,runtime,candidate,candidateBinding}=require('./support.cjs');
+test.after(()=>{if(candidate)candidateBinding.verify(runtime,candidate.binding);});
 for(const source of ['give','gift','grant','trade','capture-party','capture-box','capture-replace'])for(const mode of ['commit','abort','zero-write-retry'])test(`normal released source ${source} -> consume -> ${mode}`,async()=>{
  const w=fixture(source);assert(w.app.heldItemSourcesEnabled());await acquireReady(w);
  const before=clone(w.state.read()),writes=w.state.replaced.length,req={battleId:'H3-R-'+source+'-'+mode,seq:2,trainer:{id:'h3-npc',version:1},canLose:true,expGain:false,moneyGain:false};

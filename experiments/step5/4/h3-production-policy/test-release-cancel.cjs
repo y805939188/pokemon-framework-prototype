@@ -1,6 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {fixture,acquire,E,T,clone,capabilities}=require('./support.cjs');
+const {fixture,acquire,E,T,clone,capabilities,runtime,candidate,candidateBinding}=require('./support.cjs');
+test.after(()=>{if(candidate)candidateBinding.verify(runtime,candidate.binding);});
 function unchanged(w,b,n){assert.deepEqual(w.state.read(),b);assert.equal(w.state.replaced.length,n);}
 test('H3 give: leaving management before issuing give preserves source and inventory',()=>{
  const w=fixture('give'),before=clone(w.state.read()),n=w.state.replaced.length;

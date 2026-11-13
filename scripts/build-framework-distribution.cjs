@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
+const { sourceFingerprint: fingerprintSource } = require('./framework-distribution-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'src');
@@ -42,27 +43,7 @@ function hashFile(file) {
 }
 
 function sourceFingerprint() {
-  const hash = crypto.createHash('sha256');
-  const inputs = [
-    'src/framework', 'src/vite.engine.config.mts', 'src/package.json', 'src/pnpm-lock.yaml',
-    'scripts/showdown.env', 'scripts/build-framework-distribution.cjs',
-    'js/engine/fixtures', 'js/engine/game', 'js/engine/rpg',
-    'js/engine/gateway.cjs', 'js/engine/harness.cjs', 'js/engine/matrix.cjs',
-    'content/sample', 'content/examples/progression',
-    'docs/framework-remediation/step1-api.zh.md', 'docs/step5/distribution.md',
-  ];
-  for (const input of inputs) {
-    const absolute = path.join(ROOT, input);
-    if (!fs.existsSync(absolute)) throw new Error(`missing distribution source input: ${input}`);
-    const files = fs.statSync(absolute).isDirectory() ? walk(absolute).map(rel => `${input}/${rel}`) : [input];
-    for (const rel of files.sort()) {
-      hash.update(rel.replaceAll(path.sep, '/'));
-      hash.update('\0');
-      hash.update(fs.readFileSync(path.join(ROOT, rel)));
-      hash.update('\0');
-    }
-  }
-  return hash.digest('hex');
+  return fingerprintSource(ROOT);
 }
 
 function git(...args) {
