@@ -22,6 +22,12 @@
 
 旧AI测试中把四种合法类型当非法的own/public两例已移除该错误期望，由新增三／四／十八项正式正例及默认生产AI替代；空快照、重复快照与未知类型的拒绝仍保留。以上均为作者自测，不代表独立通过或完整宿主验收。
 
+### 整合后旧缓存断言的适配
+
+首轮完整 regular 另发现三个旧测试文件仍固定 compiled 3：独立定向先复现 48 项中 42 通过／6 失败，再按已批准的 compiled 4 合同修正为 48／48 通过。仅修改测试，不再改产品。显式 legacy1 的三组原 input／identity／compiled golden 字面值全部保留；输入 hash、幸福值 256／257／默认值和来源门断言保持。新身份由固定公开 pin、schema 4 与原 inputsHash 独立计算；只把 schema／contentIdentity 投影回旧 3 后仍须逐字满足原 compiled golden，同时实际旧缓存须被要求重建。不是把历史缓存改名为新版本通过。
+
+完整 regular 的其余受控宿主和候选绑定修复由整合回执另列，以上 48 项不代表全量通过。
+
 ## 已有合同
 
 正式净化规格 `pokemon-framework-reference/deliverables/final-specification-set/pokemon-rules/wp19-attributes-ability-and-stats.md` §3.1 明确：
