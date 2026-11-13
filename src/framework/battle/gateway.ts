@@ -143,6 +143,7 @@ export class BattleGateway implements BattleDriver {
     for (const [i, p] of (opts.players ?? []).entries()) {
       battle.setPlayer(`p${i + 1}`, { name: p.name, team: sim.Teams.pack(p.team) });
     }
+    if (opts.rebalancedHealingItemAmounts !== undefined && battle.rpg) battle.rpg.rebalancedHealingItemAmounts = opts.rebalancedHealingItemAmounts;
     if (initialField) {
       const fields = loadFormatExtension(gw._env.root).initialFields;
       if (!fields) throw new Error("initial-field-extension-unavailable");

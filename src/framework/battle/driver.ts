@@ -19,6 +19,8 @@ export interface GatewayOptions {
   /** Snapshot-owned static content binding; never a persistent Member field or temporary type override. */
   speciesTypes?: Readonly<Record<string, readonly string[]>>;
   initialField?: InitialFieldInput;
+  /** Snapshot-owned WP28 active recovery profile; omitted keeps the existing true default. */
+  rebalancedHealingItemAmounts?: boolean;
   formatid?: string;
   seed?: number[] | string;
   players?: PlayerSpec[];
