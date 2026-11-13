@@ -34,10 +34,7 @@ done
 # Build the engine bundles, the compiled content and every plugin from the current source first, so the package never
 # carries runtime files older than its gitHead.
 pnpm --dir "$ROOT/src" build >/dev/null || { echo "build failed: nothing packaged" >&2; exit 1; }
-[[ -d "$ROOT/js/engine/showdown/dist" ]] || { echo "engine not built: run scripts/build-showdown.sh" >&2; exit 1; }
-# Showdown runs the copy of the battle rules staged into it, not the bundle just built: they must be the same file.
-cmp -s "$ROOT/js/engine/build/custom-formats.cjs" "$ROOT/js/engine/showdown/dist/config/custom-formats.js" \
-  || { echo "the Showdown runtime holds other battle rules than this build: run scripts/build-showdown.sh" >&2; exit 1; }
+node "$ROOT/scripts/check-showdown-staging.cjs"
 [[ -f "$ROOT/js/plugins/PS_BattleFlow.js" ]] || { echo "plugins not built: run pnpm --dir src build" >&2; exit 1; }
 [[ -f "$ROOT/js/engine/build/engine.cjs" ]] || { echo "engine bundle not built: run pnpm --dir src build" >&2; exit 1; }
 # the compiled content must exist and be the build of exactly the current content sources (never package a stale one)

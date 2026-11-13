@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 const SOURCE_INPUTS = [
   'src/framework', 'src/vite.engine.config.mts', 'src/package.json', 'src/pnpm-lock.yaml',
   'scripts/showdown.env', 'scripts/build-framework-distribution.cjs', 'scripts/framework-distribution-source.cjs',
+  'scripts/check-showdown-staging.cjs',
   'js/engine/fixtures', 'js/engine/game', 'js/engine/rpg',
   'js/engine/gateway.cjs', 'js/engine/harness.cjs', 'js/engine/matrix.cjs',
   'content/sample', 'content/examples/progression',

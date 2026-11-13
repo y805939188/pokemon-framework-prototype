@@ -284,7 +284,7 @@ function resolveItem(battle: ShowdownBattle, user: ShowdownPokemon, payload: Pay
     emit(battle, "item", side.id, item, target.name, "noeffect");
     return;
   }
-  const request = healRequest(spec, target);
+  const request = healRequest(spec, target, battle.rpg.rebalancedHealingItemAmounts ?? true);
   const healed = target.heal(request); // actual = min(request, missing); no Heal Block etc.
   if (target.isActive) battle.add("-heal", target, target.getHealth);
   emit(battle, "item", side.id, item, target.name, "ok", healed, target.hp, target.maxhp);

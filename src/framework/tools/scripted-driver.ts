@@ -1,3 +1,4 @@
+import type { BattleRequest, MoveRequest } from "../battle/request";
 /**
  * A scripted stand-in for the battle engine, behind the same BattleDriver seam as Pokemon Showdown. It plays back a
  * script (one entry per turn: the event lines, who loses HP, whether the battle ends) and answers the session's
@@ -37,7 +38,7 @@ interface State {
   seq: number;
   closed: boolean;
   queue: GatewayMessage[];
-  pending: Record<string, Record<string, unknown> | null>;
+  pending: Record<string, BattleRequest | null>;
   chosen: Record<string, string | null>;
   wild: boolean;
 }
@@ -109,7 +110,7 @@ export class ScriptedDriver implements BattleDriver {
     return value;
   }
 
-  private request(side: string): Record<string, unknown> {
+  private request(side: string): MoveRequest {
     const team = this.state.teams[side]!;
     return {
       rqid: this.state.turn,
@@ -212,9 +213,9 @@ export class ScriptedDriver implements BattleDriver {
     return team && slot === 0 ? (team[this.state.active[side]!]?.id ?? null) : null;
   }
 
-  awaitingChoice(side: string): Record<string, unknown> | null {
+  awaitingChoice(side: string): BattleRequest | null {
     const request = this.state.pending[side];
-    return request && !this.state.chosen[side] ? (JSON.parse(JSON.stringify(request)) as Record<string, unknown>) : null;
+    return request && !this.state.chosen[side] ? (JSON.parse(JSON.stringify(request)) as BattleRequest) : null;
   }
 
   drain(): GatewayMessage[] { return this.state.queue.splice(0); }

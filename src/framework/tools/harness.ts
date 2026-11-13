@@ -105,7 +105,7 @@ const CHECKS = {
 		ensure(msgs.filter((m: L) => m.kind === 'end').length === 1, 'expected exactly one end');
 		ensure(msgs.find((m: L) => m.kind === 'request').request.teamPreview === true, 'first request should be team preview');
 		for (const m of msgs.filter((m: L) => m.kind === 'request'))
-			for (const p of m.request.side.pokemon) ensure(ids.has(p.ident), `unknown ident ${p.ident}`);
+			for (const p of m.request?.side?.pokemon ?? []) ensure(ids.has(p.ident), `unknown ident ${p.ident}`);
 		const events = msgs.filter((m: L) => m.kind === 'events').flatMap((m: L) => m.events);
 		for (const e of events.filter((e: L) => e.type === 'switch' || e.type === 'faint'))
 			ensure(ids.has(idOf(e.args[0])), `unknown ident in ${e.raw}`);

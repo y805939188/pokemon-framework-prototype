@@ -1,3 +1,4 @@
+import type { BattleSessionView, BattleRefusal, BattleActionResult } from "./session-view";
 import { captureInitialField } from '../rules/initial-field';
 import { initializeRequestView, clearRequestView, publishRequestView, checkpointRequestView, beginRequestViewRestore, finishRequestViewRestore, failRequestViewRestore } from './request-view';
 export { readSessionRequestContext } from './request-view';
@@ -17,6 +18,7 @@ import { catalogOf } from "../rules/item-catalog";
  */
 import { showdownDriverFactory } from "../battle/gateway";
 import type { BattleDriver, BattleDriverFactory } from "../battle/driver";
+import type { BattleRequest } from "../battle/request";
 import { isSelectableMove } from "../battle/move-requests";
 import type { GatewayMessage, MemberState } from "../battle/gateway";
 import * as G from "../rules/growth";
@@ -46,7 +48,7 @@ import type { GrowthDisplay } from './presentation';
 export const END_REASONS = ["caught", "run", "tie", "win"] as const;
 export const REFUSAL_REASONS = ["ballsdisabled", "choice-rejected", "invulnerable", "item-no-effect", "multiplefoes", "noactive", "none-left", "norun", "not-registered", "notfirst", "trainer", "trapped", "unknown-item", "unknown-target"] as const;
 
-type Req = Record<string, any>;
+type Req = BattleRequest;
 
 /**
  * Persistent form of an engine status at battle end (WP20 statusCount, WP39 after_battle): poison counters are
@@ -129,8 +131,8 @@ export interface CreateOptions {
   trainerAi?: TrainerAiConfiguration;
 }
 
-export type Refusal = { ok: false; reason: string };
-export type TurnResult = { ok: true; messages: SessionMessage[] } | { ok: true; staged: true } | Refusal;
+export type Refusal = BattleRefusal;
+export type TurnResult = BattleActionResult;
 
 export interface DoublesSpec {
   move?: number;
@@ -173,7 +175,7 @@ export class SessionBrokenError extends Error {
   }
 }
 
-export class BattleSession {
+export class BattleSession implements BattleSessionView {
   /** Fixed for this session; not saved, checkpointed, or part of the result protocol. */
   readonly canSwitch: boolean;
   readonly expGain: boolean;
@@ -203,7 +205,7 @@ export class BattleSession {
   ai!: FoeAi;
   gw!: BattleDriver;
   _driver!: BattleDriverFactory;
-  requests?: Record<string, Req>;
+  requests?: Record<string, Req | null>;
   grew = false;
   _caughtAwarded = false;
   _result?: BattleResult;
@@ -260,6 +262,7 @@ export class BattleSession {
     }
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
     s.gw = await driver.create({
+      rebalancedHealingItemAmounts: resolveConfig(content.settings).REBALANCED_HEALING_ITEM_AMOUNTS,
       speciesTypes: Object.fromEntries(Object.entries(content.species).filter(([, data]) => data.types !== undefined).map(([name, data]) => [name, [...data.types!]])),
       ...(initialField ? { initialField } : {}),
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
@@ -408,10 +411,12 @@ export class BattleSession {
 
   static defaultAi(request: Req): string {
     if (request.forceSwitch) {
-      const i = request.side.pokemon.findIndex((p: Req) => !p.active && !/ fnt$/.test(p.condition));
+      const i = request.side.pokemon.findIndex((p) => !p.active && !/ fnt$/.test(p.condition));
       return "switch " + (i + 1);
     }
-    const i = request.active[0].moves.findIndex(isSelectableMove);
+    const moves = request.active?.[0]?.moves;
+    if (!moves) throw new Error("battle request has no selectable move");
+    const i = moves.findIndex(isSelectableMove);
     if (i < 0) throw new Error("battle request has no selectable move");
     return "move " + (i + 1);
   }
@@ -420,14 +425,17 @@ export class BattleSession {
   static defaultAiDoubles(request: Req): string {
     const needsTarget = (t: string): boolean => ["normal", "any", "adjacentFoe"].includes(t);
     if (request.forceSwitch) {
-      const bench = request.side.pokemon.map((p: Req, i: number) => ({ p, i })).filter(({ p, i }: { p: Req; i: number }) => i >= request.forceSwitch.length && !/ fnt$/.test(p.condition));
+      const forced = request.forceSwitch;
+      const bench = request.side.pokemon.map((p, i) => ({ p, i })).filter(({ p, i }) => i >= forced.length && !/ fnt$/.test(p.condition));
       return request.forceSwitch.map((f: unknown) => { if (!f) return "pass"; const b = bench.shift(); return b ? `switch ${b.i + 1}` : "pass"; }).join(", ");
     }
-    return request.active.map((a: Req, i: number) => {
-      if (/ fnt$/.test(request.side.pokemon[i].condition)) return "pass";
+    if (!request.active || !request.side) throw new Error("battle request has no selectable move");
+    const side = request.side;
+    return request.active.map((a, i) => {
+      if (!a || / fnt$/.test(side.pokemon[i].condition)) return "pass";
       const mi = a.moves.findIndex(isSelectableMove);
       if (mi < 0) throw new Error("battle request has no selectable move");
-      return `move ${mi + 1}` + (needsTarget(a.moves[mi].target) ? " 1" : "");
+      return `move ${mi + 1}` + (needsTarget(a.moves[mi].target ?? "") ? " 1" : "");
     }).join(", ");
   }
 
@@ -435,7 +443,7 @@ export class BattleSession {
   /** Returns and clears everything the UI should show since the last call. */
   take(): SessionMessage[] { this._assertUsable(); return this.out.splice(0); }
 
-  currentRequest(): Req | undefined { return this.requests && this.requests["p1"]; }
+  currentRequest(): Req | null | undefined { return this.requests && this.requests["p1"]; }
 
   async chooseMove(index: number): Promise<TurnResult> { this._log("info", "choice", { action: "move", index }); return this._action(() => this._turn(async () => this.gw.choose("p1", `move ${index}`))); }
   async chooseSwitch(memberId: string): Promise<TurnResult> {
@@ -444,7 +452,9 @@ export class BattleSession {
     if (!this.canSwitch && !(Array.isArray(forced) ? forced[0] === true : forced === true)) return this._refuse('choice-rejected');
     return this._action(async () => {
       this._log("info", "choice", { action: "switch", member: memberId });
-      const i = (this.requests!["p1"]!["side"].pokemon as Req[]).findIndex((p) => p["ident"] === `p1: ${memberId}`);
+      const request = this.currentRequest();
+      if (!request?.side) return this._refuse("choice-rejected");
+      const i = request.side.pokemon.findIndex((p) => p.ident === `p1: ${memberId}`);
       return this._turn(async () => this.gw.choose("p1", `switch ${i + 1}`));
     });
   }
@@ -981,11 +991,11 @@ export class BattleSession {
       this.out.push({ kind: "end", reason: this.ended.reason, outcome: this.ended.outcome || null, winner: this.ended.winner });
       return;
     }
-    let reqs = this.held.splice(0).filter((m) => !(m.kind === "request" && m.side === "p2" && m.request["forceSwitch"])); // foe replacements are internal
+    let reqs = this.held.splice(0).filter((m) => !(m.kind === "request" && m.side === "p2" && m.request?.forceSwitch)); // foe replacements are internal
     if (this.grew) { this.grew = false; reqs = this.gw.refreshRequests(); this.gw.discardQueued(); }
     this.requests = {};
     clearRequestView(this);
-    for (const m of reqs) if (m.kind === "request") { this.requests[m.side] = m.request; publishRequestView(this, m); this.out.push(m); this._log("info", "request", { side: m.side, seq: m.seq, forceSwitch: !!m.request["forceSwitch"], wait: !!m.request["wait"] }); }
+    for (const m of reqs) if (m.kind === "request") { this.requests[m.side] = m.request; publishRequestView(this, m); this.out.push(m); this._log("info", "request", { side: m.side, seq: m.seq, forceSwitch: !!m.request?.forceSwitch, wait: !!m.request?.wait }); }
   }
 
   _buildResult(): void {

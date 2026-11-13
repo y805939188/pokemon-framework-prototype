@@ -1,3 +1,5 @@
+import type { BattleSessionView, BattleActionResult } from "../framework/flow/session-view";
+import type { SessionMessage, BattleEvent } from "../framework/battle/protocol";
 import type { ApplicationCompositionHost, HostApplication, ProductionRuntime } from './application-host';
 import type { BattleOutcome, GameApplicationPorts, GameApplicationOptions } from '../framework/app';
 import type { BattleResult, GameState } from '../framework/rules/state';
@@ -332,7 +334,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         const { B } = engine();
         if (!PSFlow.logger) PSFlow.logger = B.log.createRingLogger(500);
         if (!PSFlow._dex) PSFlow._dex = B.dex.createDexLookup();
-        const ports: GameApplicationPorts<import('../framework/app').BattleHandle> = {
+        const ports: GameApplicationPorts<BattleSessionView> = {
           state: { read: () => PSFlow.game(), replace: next => { G.$gameSystem._psGame = next; } },
           content: () => ({ content: PSFlow.content(), dex: PSFlow._dex ?? undefined }),
           sessions: ((G.PluginManager.parameters(NAME).contentSource || "sample") === "fixture"
@@ -458,7 +460,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       const current=()=>{assertHost();if(PSFlow._app!==app || app.stateGeneration!==generation)throw new Error('stale-battle-opening');};
       PSFlow.content();current();PSFlow._prepareBattlePresentation(op,app,current);current();PSFlow._startBattleMusic(op);
     },
-    async begin(): Promise<any> {
+    async begin(): Promise<BattleSessionView> {
       const op = PSFlow._op;
       if (!op) throw new Error("no battle was opened (openBattle)");
       const initialApp = PSFlow._app, initialGeneration = initialApp?.stateGeneration;
@@ -1114,7 +1116,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   }
 
   /** Classify only an actual refused switch, from the engine's public member/request views. */
-  function switchRefusalText(session: any, memberId: string): string | null {
+  function switchRefusalText(session: BattleSessionView, memberId: string): string | null {
     const live = session.gw.readState('p1'), selected = live.find((m: any) => m.id === memberId);
     const nameOf = (id: string) => {
       const member = session.party.find((m: any) => m.id === id);
@@ -1140,7 +1142,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   let requestObserverSerial = 0;
   // Only player-owned members use saved nicknames. Opponent appearance stays public-only.
   const playerBattleName = (member: any): string => member.nickname || PSFlow.speciesName(member.species);
-  function initialDisplay(session: any, names: Record<string, string>): BattleDisplayCard[] {
+  function initialDisplay(session: BattleSessionView, names: Record<string, string>): BattleDisplayCard[] {
     return ['p1', 'p2'].flatMap(side => session.gw.readState(side).map((state: any) => {
       const member = (side === 'p1' ? session.party : session.foeTeam).find((item: any) => item.id === state.id);
       let ratio: number | null = null;
@@ -1180,7 +1182,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       return;
     }
   }
-  function sceneController(scene: any, initialized = false): BattleSceneController<any> {
+  function sceneController(scene: any, initialized = false): BattleSceneController<BattleSessionView> {
     if (!initialized && scene._controller) return scene._controller;
     const op = scene._psOp === undefined ? PSFlow._op : scene._psOp;
     const owner = { app: PSFlow._app, generation: PSFlow._app?.stateGeneration, bound: initialized && !!PSFlow._app };
@@ -1188,7 +1190,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     const current = () => initialized
       ? !!op && op === PSFlow._op && (!owner.bound || PSFlow._app === owner.app && owner.app?.stateGeneration === owner.generation)
       : scene._psOp === undefined || scene._psOp === PSFlow._op;
-    const c = new BattleSceneController<any>({
+    const c = new BattleSceneController<BattleSessionView>({
       current, active: () => !initialized || PSFlow.running,
       closedFailure: () => scene._session?.finished && PSFlow.lastOutcome?.commit && PSFlow.lastOutcome.commit !== 'none'
         ? null : new Error(PSFlow.lastOutcome?.error || 'battle operation is no longer active'),
@@ -1212,13 +1214,20 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     if (!initialized) c.ready = true;
     return c;
   }
+  function activeSession(scene: { _session?: BattleSessionView | null }): BattleSessionView {
+    const session = scene._session;
+    if (!session) throw new Error('battle scene has no session');
+    return session;
+  }
   // Compatibility seams for existing test IDs. These names forward to one controller; no parallel scene state.
-  for (const [name, field] of Object.entries({ _mode: 'phase', _ready: 'ready', _failure: 'failure', _queue: 'queue', _wait: 'wait', _busy: 'busy', _session: 'session' })) {
+  function proxyControllerField<K extends 'phase' | 'ready' | 'failure' | 'queue' | 'wait' | 'busy' | 'session'>(name: string, field: K): void {
     Object.defineProperty(P, name, { configurable: true,
-      get(this: any) { return (sceneController(this) as any)[field]; },
-      set(this: any, value: any) { (sceneController(this) as any)[field] = value; },
+      get(this: object): BattleSceneController<BattleSessionView>[K] { return sceneController(this)[field]; },
+      set(this: object, value: BattleSceneController<BattleSessionView>[K]) { sceneController(this)[field] = value; },
     });
   }
+  proxyControllerField('_mode', 'phase'); proxyControllerField('_ready', 'ready'); proxyControllerField('_failure', 'failure');
+  proxyControllerField('_queue', 'queue'); proxyControllerField('_wait', 'wait'); proxyControllerField('_busy', 'busy'); proxyControllerField('_session', 'session');
   P.initialize = function () {
     G.Scene_MenuBase.prototype.initialize.call(this);
     this._psBattle = true; // marker for the test driver (constructor identity is wrapped by pixi_compat)
@@ -1386,7 +1395,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   };
 
   // --- message pacing
-  P.pushMessages = function (msgs: any[], openingBatch = false) {
+  P.pushMessages = function (msgs: SessionMessage[], openingBatch = false) {
     const c = sceneController(this);
     c.present(() => {
       const steps: BattleScenePresentation[] = [];
@@ -1409,39 +1418,39 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         }
         const growth = message.kind === 'growth' ? engine().B.battlePresentation.readGrowthDisplay(this._session, message) : null;
         if (this._display && message.kind === 'events') {
-          let events = message.events, wildEntrance: any = null;
+          let events = message.events, wildEntrance: BattleEvent | null = null;
           if (openingBatch && op?.request.kind === 'wild' && this._session.foeTeam.length === 1 && !this._wildOpeningQueued) {
-            const switches = events.filter((event: any) => event.type === 'switch');
-            const player = switches.find((event: any) => /^p1a?: /.test(event.args[0] || ''));
-            const foe = switches.find((event: any) => /^p2a?: /.test(event.args[0] || ''));
+            const switches = events.filter((event: BattleEvent) => event.type === 'switch');
+            const player = switches.find((event: BattleEvent) => /^p1a?: /.test(event.args[0] || ''));
+            const foe = switches.find((event: BattleEvent) => /^p2a?: /.test(event.args[0] || ''));
             if (switches.length === 2 && player && foe) {
               // Presentation order only. Keep the owned Session messages and all non-switch events unchanged.
               const first = events.indexOf(switches[0]);
-              events = [...events.slice(0, first), foe, player, ...events.slice(first).filter((event: any) => event !== player && event !== foe)];
+              events = [...events.slice(0, first), foe, player, ...events.slice(first).filter((event: BattleEvent) => event !== player && event !== foe)];
               wildEntrance = foe; this._wildOpeningQueued = true;
             }
           }
           if (openingBatch && op?.request.kind === 'trainer' && !this._trainerDispatchQueued) {
-            const switches = events.filter((event: any) => event.type === 'switch');
-            const player = switches.find((event: any) => /^p1a?: /.test(event.args[0] || ''));
-            const foe = switches.find((event: any) => /^p2a?: /.test(event.args[0] || ''));
+            const switches = events.filter((event: BattleEvent) => event.type === 'switch');
+            const player = switches.find((event: BattleEvent) => /^p1a?: /.test(event.args[0] || ''));
+            const foe = switches.find((event: BattleEvent) => /^p2a?: /.test(event.args[0] || ''));
             if (switches.length === 2 && player && foe) {
               // Initial trainer dispatch is foe-first too; later switches keep their owned event order.
               const first = events.indexOf(switches[0]);
-              events = [...events.slice(0, first), foe, player, ...events.slice(first).filter((event: any) => event !== player && event !== foe)];
+              events = [...events.slice(0, first), foe, player, ...events.slice(first).filter((event: BattleEvent) => event !== player && event !== foe)];
               this._trainerDispatchQueued = true;
             }
           }
           if (openingBatch && op?.initialField && !this._initialFieldAnnouncementsQueued) {
-            const lastSwitch = events.reduce((last: number, event: any, i: number) => event.type === 'switch' ? i : last, -1);
+            const lastSwitch = events.reduce((last: number, event: BattleEvent, i: number) => event.type === 'switch' ? i : last, -1);
             if (lastSwitch >= 0) {
-              const firstSwitch = events.findIndex((event: any) => event.type === 'switch');
+              const firstSwitch = events.findIndex((event: BattleEvent) => event.type === 'switch');
               const weatherId = WEATHER[op.initialField.weather as keyof typeof WEATHER], terrainId = TERRAIN[op.initialField.terrain as keyof typeof TERRAIN];
-              const notices = events.filter((event: any, i: number) => i < firstSwitch &&
+              const notices = events.filter((event: BattleEvent, i: number) => i < firstSwitch &&
                 (event.type === '-weather' && weatherId && String(event.args[0]).toLowerCase().replace(/[^a-z]/g, '') === weatherId ||
                  event.type === '-fieldstart' && terrainId && String(event.args[0]).toLowerCase().replace(/^move: /, '').replace(/[^a-z]/g, '') === terrainId));
               if (notices.length) {
-                events = [...events.slice(0, lastSwitch + 1).filter((event: any) => !notices.includes(event)), ...notices, ...events.slice(lastSwitch + 1)];
+                events = [...events.slice(0, lastSwitch + 1).filter((event: BattleEvent) => !notices.includes(event)), ...notices, ...events.slice(lastSwitch + 1)];
                 this._initialFieldAnnouncementsQueued = true;
               }
             }
@@ -1497,7 +1506,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
               }
             }
           }
-        } else if (this._display && growth?.version === 1) {
+        } else if (this._display && message.kind === 'growth' && growth?.version === 1) {
           steps.push(...this.pausedMessages(this._D.message({ ...message, exp: growth.experienceGained ?? growth.toExp - growth.fromExp, levelUps: [] })));
           for (const segment of growth.segments) {
             const animation = this._display.experience(message.member, segment); if (animation) steps.push(animation);
@@ -1571,9 +1580,10 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   };
   P.ballFeedbackState = function () { return this._ballFeedback?.snapshot() ?? null; };
   P.afterMessages = function () {
-    const s = this._session, retryMoves = this._retryMoveMenu, retryParty = this._retryPartySelection, automaticMove = this._automaticMove;
+    const retryMoves = this._retryMoveMenu, retryParty = this._retryPartySelection, automaticMove = this._automaticMove;
     this._retryMoveMenu = false; this._retryPartySelection = null; this._automaticMove = null;
     if (this._failure) { this.showEnd(true); return; }
+    const s = activeSession(this);
     if (engine().B.session?.readLearnedMessagePending?.(s)) {
       // The ordinary learned message has fully returned. Resume through the same action owner,
       // before later growth, foe replacement or the end menu can become interactive.
@@ -1737,7 +1747,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     const automatic = this._session.gw?.query?.('p1', 'automatic-locked');
     if (automatic?.allowed && automatic.moveSlot === 1) {
       // The engine already published a forced continuation, so there is no command menu this turn.
-      if (sceneController(this).show('automatic-move')) this.act(() => this._session.chooseMove(1), 'move');
+      if (sceneController(this).show('automatic-move')) this.act(() => activeSession(this).chooseMove(1), 'move');
       return;
     }
     const tr = PSFlow.translator();
@@ -1746,7 +1756,9 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     ]);
   };
   P.showMoves = function () {
-    const req = this._session.currentRequest();
+    const session = sceneController(this).session;
+    const req = session?.currentRequest();
+    if (!session || !req?.active?.[0]) return;
     const moves = req.active[0].moves;
     const tr = PSFlow.translator(), checked = PSFlow.content().meta?.showdownSourceChecked;
     // Pinned Gen8 Showdown publishes this PP-less fallback only when no move can be chosen.
@@ -1762,14 +1774,15 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
           () => s.finished, () => PSFlow.fast)));
       return;
     }
-    const encore = this._session.gw?.query?.('p1', 'automatic-encore');
-    if (encore?.allowed && Number.isSafeInteger(encore.moveSlot) && encore.moveSlot > 0 && encore.moveSlot <= moves.length
-      && engine().B.moveRequests.isSelectableMove(moves[encore.moveSlot - 1])) {
+    const encore = session.gw?.query?.('p1', 'automatic-encore');
+    const encoreSlot = encore?.moveSlot;
+    if (encore?.allowed && typeof encoreSlot === 'number' && Number.isSafeInteger(encoreSlot) && encoreSlot > 0 && encoreSlot <= moves.length
+      && engine().B.moveRequests.isSelectableMove(moves[encoreSlot - 1])) {
       // In singles the pinned request already identifies the target; use the ordinary action owner.
-      this.act(() => this._session.chooseMove(encore.moveSlot), 'move');
+      this.act(() => session.chooseMove(encoreSlot), 'move');
       return;
     }
-    this.show("moves", moves.map((m: any, i: number) => ({
+    this.show("moves", moves.map((m, i: number) => ({
       name: m.pp === undefined ? m.move : PSFlow.translator().t("ui.moves.line", { move: m.move, pp: m.pp, maxpp: m.maxpp }),
       moveView: (() => {
         // Published names preserve Gen8 display variants such as Hidden Power Ice.
@@ -2113,7 +2126,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       this.enqueueMessages([PSFlow.translator().t('progression.hm-protected')]);
       return;
     }
-    this.act(async () => ({ ok: true, messages: await this._session.decideLearn(slot) }), 'learn');
+    this.act(async () => ({ ok: true, messages: await activeSession(this).decideLearn(slot) }), 'learn');
   };
   P.askLearningGiveUp = function () {
     const c = sceneController(this), pending = this._session.pendingLearn;
@@ -2207,7 +2220,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     if (this._mode.startsWith('bag') && this._battleBag) { this.confirmBattleBag(); return; }
     if (this._mode === 'main' || this._mode === 'moves') this._menuCursor?.remember(this._mode, this._menu.index(), this._menu._items.length);
     const it = this._menu.itemAt(this._menu.index());
-    const ext = it && it.ext;
+    const ext: unknown = it && it.ext;
     switch (this._mode) {
       case 'wild-faint': this.answerWildFaint(ext === 'next'); return;
       case 'replacement-question': this.answerTrainerReplacement(ext === 'replace-yes'); return;
@@ -2215,20 +2228,21 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         if (ext === "fight") this.showMoves();
         else if (ext === "bag") this.showBag();
         else if (ext === "party") this.showParty("switch");
-        else if (ext === "run") this.act(() => this._session.run(), "run");
+        else if (ext === "run") this.act(() => activeSession(this).run(), "run");
         return;
       case "moves": {
-        const move = this._session.currentRequest()?.active?.[0]?.moves?.[Number(ext) - 1];
-        this.act(() => { if (PSFlow.debug.failNext === "move") { PSFlow.debug.failNext = null; throw new Error("injected failure"); } return this._session.chooseMove(ext); }, "move", { pp: move?.pp });
+        if (typeof ext !== 'number') { this._menu.activate(); return; }
+        const move = activeSession(this).currentRequest()?.active?.[0]?.moves?.[Number(ext) - 1];
+        this.act(() => { if (PSFlow.debug.failNext === "move") { PSFlow.debug.failNext = null; throw new Error("injected failure"); } return activeSession(this).chooseMove(ext); }, "move", { pp: move?.pp });
         return;
       }
       case "bag":
-        if (!ext) { this._menu.activate(); return; }
-        if (/ball$/.test(ext)) this.act(() => this._session.throwBall(ext), "ball");
+        if (typeof ext !== 'string' || !ext) { this._menu.activate(); return; }
+        if (/ball$/.test(ext)) this.act(() => activeSession(this).throwBall(ext), "ball");
         else { this._pendingItem = ext; this.showParty("item"); }
         return;
       case "party":
-        if (this._pendingItem) { const item = this._pendingItem; this._pendingItem = null; this.act(() => this._session.useItem(item, ext), "item"); }
+        if (this._pendingItem) { const item: unknown = this._pendingItem; this._pendingItem = null; if (typeof item === 'string' && typeof ext === 'string') this.act(() => activeSession(this).useItem(item, ext), "item"); }
         else if (ext === null) this.cancelPartyList();
         else if (typeof ext === 'string') this.showPartyCommands(ext);
         return;
@@ -2243,7 +2257,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         if (ext === 'summary' && typeof id === 'string') { this.showPartySummary(id); return; }
         if (ext === 'switch-in' && typeof id === 'string' && this._partySub === 'replacement') { this.resolveTrainerReplacement(id); return; }
         if (ext === 'switch-in' && typeof id === 'string') this.act(() => forced
-          ? this._session.chooseForcedSwitch(id) : this._session.chooseSwitch(id), 'switch', undefined, { memberId: id });
+          ? activeSession(this).chooseForcedSwitch(id) : activeSession(this).chooseSwitch(id), 'switch', undefined, { memberId: id });
         return;
       }
       case 'learn-initial':
@@ -2262,9 +2276,9 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   };
 
   /** Captured move/party context returns refused choices to their selector; other actions retain their return path. */
-  P.act = function (fn: () => Promise<any> | any, kind?: string, refusedMove?: { pp?: number }, refusedParty?: { memberId: string }) {
+  P.act = function (fn: () => BattleActionResult | Promise<BattleActionResult>, kind?: string, refusedMove?: { pp?: number }, refusedParty?: { memberId: string }) {
     const c = sceneController(this);
-    c.run(fn, (r: any) => {
+    c.run(fn, r => {
       if (r && r.ok === false) {
         this._retryMoveMenu = !!refusedMove;
         this._retryPartySelection = refusedParty ? { ...refusedParty } : null;
@@ -2274,7 +2288,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         return;
       }
       this._retryPartySelection = null;
-      this.pushMessages(r.messages || []);
+      this.pushMessages("messages" in r ? r.messages : []);
     }, kind);
   };
   P.abort = function (e: unknown) {
@@ -2288,7 +2302,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     // A delayed callback from an old scene must not pop the current scene's global SceneManager stack.
     const op = this._psOp === undefined ? PSFlow._op : this._psOp; // bare API callers refer to the current operation
     if (op !== PSFlow._op) { retireBattleBag(this); retireBrief(this); this._display?.dispose(); this._pictures?.dispose(); PSFlow.stale("finish", op); return; }
-    const c = this._controller as BattleSceneController<any> | undefined;
+    const c = this._controller as BattleSceneController<BattleSessionView> | undefined;
     if (c && !c.isCurrent()) return;
     if (!this._aborted && !this._failure && this._battleBag && this._battleBag.view().kind !== 'closed') return;
     if (!this._aborted && !this._failure && this._captureMelody?.pending()) return;
@@ -2313,7 +2327,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   };
   P.terminate = function () {
     this._learningGiveUp = null; this._learningInitial = null; this._learningRetry = null; this._automaticMove = null; this._wildFaintQuestion = null;
-    const c = this._controller as BattleSceneController<any> | undefined;
+    const c = this._controller as BattleSceneController<BattleSessionView> | undefined;
     this._menuCursor?.clear();
     retireBattleBag(this);
     retireBrief(this);

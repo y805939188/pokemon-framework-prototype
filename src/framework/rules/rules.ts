@@ -1,24 +1,25 @@
 /**
  * RPG-side rules executed inside the engine turn (step 2.2 experiment, now strict TS).
- * Numbers come from the clean-room specs (WP28 heal table "rebalanced" column, WP38 capture
+ * Numbers come from the clean-room specs (WP28 heal table and configuration, WP38 capture
  * math, WP41 escape math). Randomness goes through the battle's own PRNG (`battle.random`)
  * so results are reproducible from the seed and survive snapshot/restore.
  * Pure: no engine, Showdown or host access.
  */
 
 export type HealAmount = number | "full" | "quarter";
+export interface HealSpec { amount: HealAmount; oldAmount?: number }
 
-/** WP28 §5.1 active HP request table (配置真 column). `full` = missing HP at use time. */
-export const HEAL_ITEMS: Record<string, { amount: HealAmount }> = {
+/** Supported WP28 §5.1 battle HP requests. `amount` is the default true column; `oldAmount` is false. */
+export const HEAL_ITEMS: Record<string, HealSpec> = {
   potion: { amount: 20 },
   berryjuice: { amount: 20 },
   sweetheart: { amount: 20 },
-  superpotion: { amount: 60 },
-  hyperpotion: { amount: 120 },
+  superpotion: { amount: 60, oldAmount: 50 },
+  hyperpotion: { amount: 120, oldAmount: 200 },
   maxpotion: { amount: "full" },
-  freshwater: { amount: 30 },
-  sodapop: { amount: 50 },
-  lemonade: { amount: 70 },
+  freshwater: { amount: 30, oldAmount: 50 },
+  sodapop: { amount: 50, oldAmount: 60 },
+  lemonade: { amount: 70, oldAmount: 80 },
   moomoomilk: { amount: 100 },
   oranberry: { amount: 10 },
   sitrusberry: { amount: "quarter" },
@@ -70,10 +71,15 @@ export const STAT_ITEMS: Record<string, { boosts: Record<string, number> }> = {
   xspdef: { boosts: { spd: 2 } },
 };
 
-export function healRequest(spec: { amount: HealAmount }, pokemon: { maxhp: number; hp: number }): number {
-  if (spec.amount === "full") return pokemon.maxhp - pokemon.hp;
-  if (spec.amount === "quarter") return Math.floor(pokemon.maxhp / 4);
-  return spec.amount;
+export function healAmount(spec: HealSpec, rebalanced = true): HealAmount {
+  return rebalanced ? spec.amount : spec.oldAmount ?? spec.amount;
+}
+
+export function healRequest(spec: HealSpec, pokemon: { maxhp: number; hp: number }, rebalanced = true): number {
+  const amount = healAmount(spec, rebalanced);
+  if (amount === "full") return pokemon.maxhp - pokemon.hp;
+  if (amount === "quarter") return Math.floor(pokemon.maxhp / 4);
+  return amount;
 }
 
 // ---------------------------------------------------------------------------------------------

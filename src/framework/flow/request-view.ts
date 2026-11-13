@@ -2,7 +2,7 @@
 import type { BattleDriver, DriverRequestSource, GatewayMessage } from '../battle/driver';
 import { currentGatewayRequestSource, readRequestMessageSource, checkpointRequestMessages, restoreRequestMessages } from '../battle/request-source';
 
-type Request = Record<string, unknown>;
+type Request = import('../battle/request').BattleRequest | null;
 interface Session {
   gw: BattleDriver; requests?: Record<string, Request>; held: GatewayMessage[]; out: object[];
   _operation: boolean; _restoring: boolean; finished: boolean; ended: unknown; broken: unknown;

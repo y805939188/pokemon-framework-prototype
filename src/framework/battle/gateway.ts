@@ -1,3 +1,5 @@
+import { parseBattleRequest } from "./request";
+import type { BattleRequest } from "./request";
 import { captureInitialField } from '../rules/initial-field';
 import { bindSpeciesTypes } from './species-types';
 import { attachRequestSource, technicalRequestRefresh, tagRequestMessage, checkpointRequestSource, restoreRequestSource, closeRequestSource } from './request-source';
@@ -143,6 +145,7 @@ export class BattleGateway implements BattleDriver {
     for (const [i, p] of (opts.players ?? []).entries()) {
       battle.setPlayer(`p${i + 1}`, { name: p.name, team: sim.Teams.pack(p.team) });
     }
+    if (opts.rebalancedHealingItemAmounts !== undefined && battle.rpg) battle.rpg.rebalancedHealingItemAmounts = opts.rebalancedHealingItemAmounts;
     if (initialField) {
       const fields = loadFormatExtension(gw._env.root).initialFields;
       if (!fields) throw new Error("initial-field-extension-unavailable");
@@ -421,11 +424,11 @@ export class BattleGateway implements BattleDriver {
   }
 
   /** A copy of the side's pending move/switch request while it still has to choose, else null. */
-  awaitingChoice(sideId: string): Record<string, any> | null {
+  awaitingChoice(sideId: string): BattleRequest | null {
     const side = this._battle.sides.find((x: { id: string }) => x.id === sideId);
     const req = side && side.activeRequest;
     if (!req || req.wait || side.isChoiceDone()) return null;
-    return JSON.parse(JSON.stringify(req)) as Record<string, any>;
+    return parseBattleRequest(JSON.parse(JSON.stringify(req)));
   }
 
   /** Take every queued message (each is handed out once). */
@@ -858,7 +861,7 @@ export class BattleGateway implements BattleDriver {
       for (const line of body.split("\n")) {
         if (line.startsWith("|request|")) {
           if (side === 'p2') trainerSourceRequest(this);
-          this._emit({ kind: "request", side, request: JSON.parse(line.slice("|request|".length)) });
+          this._emit({ kind: "request", side, request: parseBattleRequest(JSON.parse(line.slice("|request|".length))) });
         } else if (line.startsWith("|error|")) {
           this._emit({ kind: "error", side, message: line.slice("|error|".length) });
         }
@@ -880,10 +883,13 @@ export class BattleGateway implements BattleDriver {
   }
 
   /** Active (non-wait) requests per side; lets a restored session resume without replaying. */
-  pendingRequests(): { side: string; request: Record<string, any> }[] {
-    return this._battle.sides
-      .map((side: { id: string; activeRequest: Record<string, any> | null }) => ({ side: side.id, request: side.activeRequest }))
-      .filter((r: { request: Record<string, any> | null }) => r.request && !r.request.wait);
+  pendingRequests(): { side: string; request: BattleRequest }[] {
+    const requests: { side: string; request: BattleRequest }[] = [];
+    for (const side of this._battle.sides as { id: string; activeRequest: unknown }[]) {
+      const request = parseBattleRequest(side.activeRequest);
+      if (request && !request.wait) requests.push({ side: side.id, request });
+    }
+    return requests;
   }
 
   /** Seed the PRNG was created with (string or array), for reproducing a default-random run. */
