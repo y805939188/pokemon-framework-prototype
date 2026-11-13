@@ -93,6 +93,23 @@ test('strict clean local and cached download consume identical pinned bytes', t 
   }
 });
 
+test('repair replaces a managed runtime symlink without writing its unrelated target', t => {
+  const f = fixture(t);
+  f.ok(f.run(['--install'], f.source));
+  const outside = path.join(f.root, 'unrelated-file.js');
+  fs.writeFileSync(outside, 'unrelated bytes must remain');
+  const installed = path.join(f.project, 'js/reactor_core.js');
+  fs.unlinkSync(installed);
+  fs.symlinkSync(outside, installed);
+  f.refused(f.run(['--check'], f.source));
+  const repaired = f.run(['--install'], f.source);
+  assert.equal(fs.readFileSync(outside, 'utf8'), 'unrelated bytes must remain');
+  f.ok(repaired);
+  assert.equal(fs.lstatSync(installed).isSymbolicLink(), false);
+  assert.deepEqual(fs.readFileSync(installed), fs.readFileSync(path.join(f.source, 'runtime/reactor_core.js')));
+  f.ok(f.run(['--check'], f.source));
+});
+
 for (const [label, file, staged] of [
   ['staged runtime change', 'runtime/reactor_main.js', true],
   ['unstaged runtime change', 'runtime/libs/pixi.js', false],

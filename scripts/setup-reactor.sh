@@ -495,7 +495,7 @@ rm -rf "$ROOT/js/libs"
 
 find "$ROOT/js" \
   -maxdepth 1 \
-  -type f \
+  \( -type f -o -type l \) \
   -name 'reactor_*.js' \
   ! -name 'reactor_plugins.js' \
   -delete
