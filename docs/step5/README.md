@@ -2,9 +2,11 @@
 
 ## 当前状态（2026-11-13）
 
-5.4 在批准的单打与默认呈现范围内完成技术收口，固定产品 `2ecace8d`／src `b7db562a`；同源文档基线 `9b7d178` 的[CI #311](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43334587330) 双 job 成功，278 套／5044 项通过，冻结回放未运行。用户已决定本阶段统一默认战前过渡，完整特殊注册／优先级及场景、对手、事件自定义编排留待后续专项，当前未实现。[收口记录](5.4-closure.md)与[验收索引](5.4-current-acceptance.md)保留真实已测范围和限制；[E74 限定登记](5.4-E74-final-disposition.md)为72条契约抽样＋2条受限源级未用，不等于全机制穷举。未合并 main，也未因此完成5.5、跨平台或包分发。
+5.4 已在批准的单打与默认呈现范围内完成技术收口。当前后继产品 `174568dc2a0d20b5e5e2b0878c35c63bca742e27`，src `7c52b29035f4170df493570c3a5d5e88eb1faaad`（源码来源 `5a41caf`）；[投球／逃跑整改](5.4-capture-run-followup.md)的 A1／B1／C1 已独审限域通过，[精确 CI #313](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43366638211) 双 job 成功，280 套／5082 项通过，失败／取消／跳过均 0，冻结回放 EXCLUDED／NOT RUN。此次纯文档后继自身的精确 CI 仍须发布后核实，不继承 CI313。
 
-[RPG持物原生身份子批](5.4-rpg-held-native-items.md)的最终 `2ecace8d` 即上述产品基线：补齐 Lucky Egg／Amulet Coin／Luck Incense 的正常 Fling 身份，保留固定 Showdown 消费者和 Flower Sweet 既有规则；独立限定审查、本地同源 quick 和精确产品 CI310／同源文档 CI311 分列。其三物正向证据不扩成整个 FR55 或全部持物效果穷举。
+用户已决定本阶段统一默认战前过渡；完整特殊注册／优先级及按场景、对手、事件自由编排当前未实现，后续阶段／日期未指定。[收口记录](5.4-closure.md)与[验收索引](5.4-current-acceptance.md)保留真实已测范围和限制；[E74 限定登记](5.4-E74-final-disposition.md)仍为 72 条契约抽样＋2 条受限源级未用，完整标题接受 0；113 条事实边界登记不等于完整 facet 验收。未合并 main，未因此完成 5.5、跨平台或包分发。
+
+此前阶段产品 `2ecace8d`／src `b7db562a`、文档 `714b674` 的 CI312（278／5044）保留为历史。[RPG 持物原生身份子批](5.4-rpg-held-native-items.md)补齐 Lucky Egg／Amulet Coin／Luck Incense 的正常 Fling 身份，保留固定 Showdown 消费者和 Flower Sweet 既有规则；其独审、本地同源 quick、精确产品 CI310 与同源文档 CI311 分列，不扩成整个 FR55 或全部持物组合。
 
 ## 历史批次记录
 

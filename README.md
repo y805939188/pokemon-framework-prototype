@@ -6,7 +6,9 @@
 
 ## 当前阶段（2026-11-13）
 
-5.4 已按批准的单打与默认呈现范围完成技术收口，固定产品 [`2ecace8d`](https://github.com/y805939188/pokemon-framework-prototype/commit/2ecace8d9cbb2496e6a4dce273731efb3bcd8d41)，src `b7db562a`；同源验收文档基线 `9b7d178` 的[CI #311](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43334587330) 两 job 成功，278 套／5044 项通过，冻结参考回放未运行。战前先统一用默认过渡；完整特殊注册／优先级和按场景、对手、事件自由编排明确留待后续，当前未实现。范围、已验证内容与保留边界见[5.4 收口记录](docs/step5/5.4-closure.md)和[当前验收索引](docs/step5/5.4-current-acceptance.md)。这不是全部参考机制、完整性能或游戏包分发完成的声明，**尚未合并 main**。
+5.4 已按批准的单打与默认呈现范围完成技术收口。当前后继产品为 [`174568dc`](https://github.com/y805939188/pokemon-framework-prototype/commit/174568dc2a0d20b5e5e2b0878c35c63bca742e27)，src `7c52b290`（源码来源 `5a41caf`）；[投球／逃跑整改](docs/step5/5.4-capture-run-followup.md)的 A1／B1／C1 已通过独立限域复审。[精确 CI #313](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43366638211) 对该产品的两 job 成功，280 套／5082 项通过，失败／取消／跳过均 0，冻结参考回放 EXCLUDED／NOT RUN。
+
+此前 `2ecace8d`／`714b674` 的阶段收口与 CI312 保留为历史，不改写旧证据。战前仍先统一用默认过渡；完整特殊注册／优先级和按场景、对手、事件自由编排未实现，后续阶段和日期未指定。范围及保留边界见[5.4 收口记录](docs/step5/5.4-closure.md)和[当前验收索引](docs/step5/5.4-current-acceptance.md)。本次仅同步后继技术事实，文档自身的精确 CI 以发布后回执为准；不代表全部参考机制、完整性能或包分发完成，**未合并 main**。
 
 ## 先读什么
 
