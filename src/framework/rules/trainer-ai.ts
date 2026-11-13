@@ -381,7 +381,8 @@ function chartTypeMultiplier(catalog:Pick<TrainerAiCatalog,'types'>,attackType:s
   for(const t of defenseTypes) {
     if(t==='???')continue;
     const row=Object.hasOwn(catalog.types,attackType)?catalog.types[attackType]:undefined;
-    const r=row&&Object.hasOwn(row,t)?row[t]:undefined;requireValue(r);
+    const r=row&&Object.hasOwn(row,t)?row[t]:undefined;
+    if(!r)throw new Error('trainer-ai-public-type-missing');
     const value=r.numerator/r.denominator;
     requireValue([0,0.5,1,2].includes(value));
     if(value===0)immune=true;

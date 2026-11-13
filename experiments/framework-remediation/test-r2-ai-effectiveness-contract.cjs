@@ -183,3 +183,21 @@ test('R2 existing injected-catalog entry estimate keeps its successful public fo
   const result = E.trainerAi.createTrainerAiPolicy(c).decide(s, () => assert.fail('forced switch drew RNG'));
   assert.equal(result.kind, 'choose'); assert.equal(result.candidateId, 'A'); assert.deepEqual(result.retryOrder, ['A', 'B']);
 });
+
+test('R2 formal unsupported native type keeps the existing diagnostic and rolls back the refused action', async t => {
+  const raw = inputs({ party: 1 });
+  raw.species.push({ id: 'missingno', showdownId: 'missingno', nameKey: 'species.missingno', source: 'author-placeholder', growth: 'medium', baseExp: 100, evYield: {}, catchRate: 45, learnset: [{ level: 1, move: 'splash' }] });
+  const built = E.contentCompile.compileContent(raw); assert.equal(built.ok, true, JSON.stringify(built.errors));
+  const assembled = E.contentRuntime.assembleContent(built.data, E.dex.createDexLookup()); assert.deepEqual(assembled.errors, []);
+  const content = assembled.content, member = E.memberFactory.createMember({ id: 'P1', species: content.speciesIds.missingno, level: 50 }, content, () => 0);
+  const game = E.state.newGame({ content, party: [E.speciesKey.toPersistentMember(member, content)], money: 1000 }); game.nextMemberOrdinal = '2';
+  const state = T.fakes.createMemoryState(game), app = new E.app.GameApplication({ state, projection: T.fakes.createRecordingProjection(),
+    sessions: E.composition.createBattleSessionFactory({ content: () => content, seed: () => [1, 2, 3, 4] }), content: () => ({ content }), random: () => 0, clock: () => 12345 });
+  const request = { battleId: 'R2-native-unknown', trainer: { id: 'c-basic', version: 1 }, seq: 1, canLose: true }, session = await app.startTrainerBattle(request);
+  t.after(() => app.abortBattle(request, Error('R2 diagnostic owned cleanup')));
+  assert.deepEqual(session.gw._debugBattle().sides[0].active[0].getTypes(), ['Bird', 'Normal']);
+  const before = JSON.parse(session.gw.snapshot()), saved = structuredClone(state.current());
+  await assert.rejects(session.chooseMove(1), /trainer-ai-public-type-missing/);
+  assert.deepEqual(JSON.parse(session.gw.snapshot()), before); assert.deepEqual(state.current(), saved);
+  assert.equal(state.replaced.length, 0); assert.equal(session.broken, null);
+});

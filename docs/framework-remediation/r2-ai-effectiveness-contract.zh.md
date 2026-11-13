@@ -46,3 +46,13 @@
 兼容回归增补后专项共25项；完整验证及独立复审结果在后继交付记录登记，旧290套／5,256项记录不作为本提交证据。
 
 上述向量可作为 C#／GDScript 的值合同：类型顺序不影响最终系数，免疫独立，所有指数先求和再限幅，整数比例、整数评分及错误分类显式保留。它不是完整战斗黄金集或概率验收，也不能替代引擎能力、部署和性能验证。
+
+## 独立复核与诊断后继
+
+首批修复固定为 `8a47b0f5eb48678ba80ea23c24b06dfa13b79784`，tree `8c3040998f1b3abe5fcdd4994ff57f4b97b51fe9`。根协调者定向13文件383/383、完整类型、完整构建、146文件AST依赖边界通过；`PF_NO_SKIP=1 ./scripts/test-headless.sh --scope=regular` 实际完成 **291套／5,281通过，失败／取消／跳过均0，exit0**，不是复用旧5,256项。日志 `build/r2-ai-effectiveness/regular.log`，绑定 `build/headless-regression-bindings/pf-headless-binding.EbJm0B.json`，其末尾复核 HEAD／源码／字节不变且 dirty 三阶段均 false。摘要及manifest／SUMS保存在同目录的 `first-regular-summary.json`、`8a47b0f-manifest.json`、`8a47b0f-SHA256SUMS`。
+
+未参与编码的独立 reviewer 请求配置为 **GPT-6 Astra（`gpt-6-astra`），ultra**；工具不提供速度档位回执，不能确认“普速”或fast。其固定8a独审为 `PASS_SCOPED`：独立重跑新专项、作者类型合同与能力诊断58/58；另按固定Dex基础表独立比较18攻击属性×262,143非空标准防御子集，共4,718,574个值组合，以及6个区分替补选择的探针、4个非法目录负控，全部通过。这是值函数及有限行为检查，不是数百万场战斗或完整概率验收。复核范围包括编译、内容、App、正式Session、引擎、采集／校验／评分、动作与恢复；reviewer未独立重跑完整regular。
+
+独审发现P3诊断回归：非标准原生 `MissingNo.` 在作者省略types时可编译／开场，但其原生 `Bird` 不在固定AI标准目录。旧采集器明确拒绝 `trainer-ai-public-type-missing`，8a共享函数仍拒绝却返回空消息。后继仅恢复这个错误字符串，继续fail-closed，不新增对Bird／MissingNo.的战斗AI支持。正式作者→App→Session拒绝及状态不变回归在8a实跑红测exit1（`diagnostic-before.tap`），随后加入本专项成为26项，定向合计384/384通过；完整类型、完整构建及AST检查也通过。后继完整regular和独立复核必须绑定新固定SHA，不能把8a的记录算作后继已通过。
+
+上文错误分类指公开快照／评分的 `invalid-snapshot`、`invalid-random-result` 等值合同；缺少可信表单元的内部诊断另外按上述旧token保留，不声称所有内部异常字符串都是公开SDK。
