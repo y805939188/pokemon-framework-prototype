@@ -240,7 +240,7 @@ export const en: LocaleTable = {
     "battle.nothing": "But nothing happened!",
     "battle.transformed": "{name} transformed into {target}!",
     "battle.ate_item": "{name} ate its {item}!",
-    "battle.frisk_item": "Frisk revealed that {name} is holding {item}!",
+    "battle.frisk_item": "{name} is holding {item} (revealed by Frisk)!",
     "battle.balloon_floating": "{name} floats in the air with its {item}!",
     "battle.balloon_popped": "{name}'s {item} popped!",
     "battle.received_item": "{name} obtained {item}!",

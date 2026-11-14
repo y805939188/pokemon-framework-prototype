@@ -5,6 +5,7 @@ import { setOwn } from '../rules/own';
 import type { ContentError } from './schema';
 import { HEAL_ITEMS } from '../rules/rules';
 import { fieldEffectProblem } from '../rules/item-families';
+import { reusableBattleHealing } from '../rules/active-hp-recovery';
 
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const integer = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0;
@@ -86,4 +87,12 @@ export function battleHealingDiagnostics(items: readonly ItemDefinition[]): Cont
       message: `battle-healing-family-mismatch: ${item.id} uses field family ${effect.family}, while battle ID ${id} heals HP; only authored HP parameters are shared with battle.` });
   }
   return out;
+}
+
+/** Warn about the unsupported flag without claiming an unknown identity is usable or that NPCs consume it. */
+export function battleConsumptionDiagnostics(items: readonly ItemDefinition[]): ContentError[] {
+  return items.flatMap((item, index) => item.consumable || item.battleUse === 'none' || reusableBattleHealing(item) ? [] : [{
+    file: 'items.json' as const, path: `$[${index}].consumable`,
+    message: `nonconsumable-battle-item-unsupported: ${item.id} (battleUse:${item.battleUse}, battleId:${item.battleId ?? 'none'}) requests consumable:false outside reusable member HP healing and Full Restore. Active player battle actions still consume this item where supported; this flag does not enable unsupported actions, and these nonconsumable resources remain unavailable to the built-in trainer AI. Use battleUse:none for field-only reuse or consumable:true for supported consuming battle use. Held-item triggers follow separate engine rules.`,
+  }]);
 }

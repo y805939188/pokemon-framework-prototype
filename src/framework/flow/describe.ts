@@ -74,6 +74,8 @@ export function make(names: Record<string, string> = {}, tr: Translator = defaul
       case "-transform": return [tr.t("battle.transformed", { name: nm(a0), target: nm(a1) })];
       case "-item": case "-enditem": {
         if (a.includes('[silent]')) return [];
+        // Resistance berries already emit [eat]; [weaken] is the same use's damage-reduction notice.
+        if (e.type === '-enditem' && a.includes('[weaken]')) return [];
         const id = a1.toLowerCase().replace(/[^a-z0-9]/g, ''), item = itemName(id, a1);
         // Protocol annotations distinguish consumption, revelation and an existing holder's item activation.
         const from = a.some(arg => arg.startsWith('[from]'));

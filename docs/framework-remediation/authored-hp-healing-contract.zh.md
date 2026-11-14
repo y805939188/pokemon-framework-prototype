@@ -60,3 +60,11 @@ Session拥有玩家台账，AI拥有独立训练家资源。登记仍先检查�
 正常速NW80/90两配置共玩家4次／NPC4次成功使用，双方各从1件连续使用，第二次菜单仍x1；字段App也保留1，两场各胜利一次提交且持久库存1，Node/NW exit0、consoleErrors=[]。测试为合法合成内容，Snorlax100、玩家初始HP1、NPC用药前重置HP1是披露前提，未直接补库存；CDP可信键盘，非实体输入。正式七模式64/4/1/1/11/6/10全exit0、无超时，最终NW0。
 
 [完整本地报告](../../build/o3-nonconsumable-healing/REPORT.zh.md) SHA256 `5ae1f316ccea1fef2eef1ce951762a8b9709466e560ced9d349242e56573cdd6`；原红例、测试夹具修正与全部最终记录保留，前3轮842份封印未变。FINAL-RECEIPT/EVIDENCE-SHA256同目录，勿覆盖重跑。只读作者复核不是另一AI独审；仓库限定Sonnet5.5而当前工具不提供，后继Claude待父协调。新nonconsumable FullRestore、中文与恢复只有headless/Scene/内部checkpoint证据，未做自定义false冷Continue NW；其它未测边界见报告。本后继只写文档，不改变受测产品与测试；main03f7e54干净，未fetch/push/PR/merge。
+
+## R5 作者诊断（2026-11-14）
+
+用户决定保留玩家与 NPC 的同一 `consumable:false` 治疗语义。内建训练家 AI 成功使用可复用 HP 回复药／Full Restore 后归还自己的资源，`count` 表示拥有数量，不是每场次数；没有新增次数上限。反复治疗可能使低伤害玩家无法取胜，因此编译成功时，对 `trainer-types.json` 和 `trainers.json` 显式资源列表逐项发出 `trainer-reusable-healing` warning，路径为 `$[i].items[j].item`。判定复用运行时的 `reusableBattleHealing`；可消耗、未列入训练家资源的可复用道具、场外或仅持有道具不报此警告。类型列表即使被记录覆盖仍是作者配置，也接受诊断。
+
+其它 `consumable:false` 且 `battleUse` 非 `none` 的道具，在 `items.json $[i].consumable` 发出 `nonconsumable-battle-item-unsupported` warning。PP、复活、状态药、强化、球、脱离等尚不支持战斗复用：玩家的已支持战斗动作仍消耗一件，这些非消耗资源对内建训练家 AI 则不可用。未知身份或不支持的用途不会因该标志变得可用。提示作者选 `battleUse:none` 限制为场外使用，或 `consumable:true` 保留已有可消耗战斗行为；持物触发遵循独立的引擎规则。两项诊断均不拒绝合法配置、不改编译数据、AI 决策、库存、快照或战果协议，不扩大可复用家族。场外与战斗的名字优先级及反复用药好感增长未改。
+
+R5 同时让抗性树果额外的 `-enditem [weaken]` 保持静默，保留 `[eat]` 与真实伤害；Frisk 英文改为以持有者开头，避免句中大写 `The`，保留专名大小写。定向测试、完整 regular、独立 review 与历史证据清单修正的实际结果见后继 [R5 回执](r5-limited-remediation.zh.md)。历史验收继续绑定各自候选，不替代本轮结果。

@@ -4,7 +4,7 @@ import { storedCreationForms } from "../rules/creation-form";
  * conflict detection, emit one canonical document whose `inputsHash` covers every input. No file system, no Showdown.
  */
 import { sha256Hex } from "../rules/sha256";
-import { checkItemInputs, defaultMemberBallProblem, battleHealingDiagnostics } from "./item-input";
+import { checkItemInputs, defaultMemberBallProblem, battleHealingDiagnostics, battleConsumptionDiagnostics } from "./item-input";
 import { holdableItem, itemOf } from "../rules/item-catalog";
 import { DEFAULT_LIMITS } from "../rules/limits";
 import { MAX_FORM } from "../rules/species-key";
@@ -15,7 +15,7 @@ import {
 import { CONTENT_SHOWDOWN_SHA } from "./showdown-pin";
 import { PROGRESSION_FIELDS, progressionFieldProblem, inheritSpecies, deriveSpeciesFields, checkProgressionReferences, checkRegionalDex, checkMapMetadata } from "./progression-input";
 import type { CompiledContent, ContentError, ContentInputs, GrantSource, Overlay, SourceEntry, SpeciesSource } from "./schema";
-import { checkTrainerInputs, trainerSpeciesKeys } from "./trainer-input";
+import { checkTrainerInputs, trainerSpeciesKeys, trainerHealingDiagnostics } from "./trainer-input";
 import { authorCompatibilityDiagnostics, authorHappinessProblem, authorSchemaProblem } from "./friendship-author-domain";
 import type { AuthorSchema } from "./schema";
 
@@ -170,7 +170,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
 
   const itemInputs = checkItemInputs(inputs.items, inputs.shops, usable);
   errors.push(...itemInputs.errors);
-  if (!itemInputs.errors.length) warnings.push(...battleHealingDiagnostics(itemInputs.items));
+  if (!itemInputs.errors.length) warnings.push(...battleHealingDiagnostics(itemInputs.items), ...battleConsumptionDiagnostics(itemInputs.items));
   if (Array.isArray(inputs.species) && inputs.species.length) {
     const problem = defaultMemberBallProblem(itemInputs.catalog);
     if (problem) errors.push(problem);
@@ -309,6 +309,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
   const registrationOrder = species.map(sp => ({species: sp.id, form: sp.form ?? 0}));
   const trainerData = checkTrainerInputs(inputs.trainerTypes, inputs.trainers, { speciesKeys: trainerSpeciesKeys(registrationOrder, [...merged.values()]), catalog: itemInputs.catalog, usable });
   errors.push(...trainerData.errors);
+  if (!trainerData.errors.length) warnings.push(...trainerHealingDiagnostics(trainerData.types ?? [], trainerData.records ?? [], itemInputs.catalog));
   const effective = [...merged.values()];
   deriveSpeciesFields(effective, report, (file,path,message)=>warnings.push({file,path,message}));
   const effectiveByKey = new Map(effective.map(sp=>[recordKey(sp.id,sp.form??0),sp]));
