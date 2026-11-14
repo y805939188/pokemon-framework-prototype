@@ -25,3 +25,11 @@ F4 去重另收窄为最近一次同目标、同最终 HP 的道具结果，保�
 完整 regular、NW 与最终固定身份以本轮外部 `build/f1-healing-consistency/REPORT.zh.md` 为准，未终态不得预填绿。此前 488dade 的 295/5356 和七模式 NW 只属于旧候选，不代替本轮。另一个 AI 对本轮代码的独立签收需父协调安排；本执行者的编码与只读自检不冒称第三方独审。
 
 作者只读审视另复现合法 fraction 分母大于当前最大 HP、请求向下取整为 0 时仍扣物品。后继修正在 Session 登记前、AI 候选构造和引擎执行期检查零量；新增回归验证场外／战内均拒绝、HP／库存／回合不变且 AI 不列此项。先前 3f3641d 的完整 regular／NW 虽通过，仍只保留为中间记录，不作为该修正的验收。
+
+## 最终本地验收回执
+
+产品／测试固定 `d47c0927826dac0f19f062cadb8ddcc00bb1a4ea`，src tree `65172be95dca6fe5a27aa3d90d5ba7fd93de7f85`。完整typecheck／build、335定向通过；PF_NO_SKIP=1 regular **295套／5368项全过，失败／取消／跳过0、exit0**，runId `93402bd6-1e7e-4f2e-9fc2-7856bf671e38`，绑定前／build／后dirty=false、末尾及另行verify通过；冻结回放EXCLUDED NOT RUN，不算通过，无新CI。
+
+最终正常速度两配置80/90的field App、玩家与NPC回合实际一致，快照绑定正确，各胜利后一次提交；均为隔离合成状态与CDP可信键盘输入，field部分为实际App服务调用，非实体输入。正式NW七模式all64/64、verify-save4/4、step5-*各1/1、held11/11、held-continue6/6、battle-entry10/10全rc0且无超时。所有自有NW结束，最终进程检查0行。先前中间3f3641d虽全绿但零量缺陷未闭，原结果保留，不作为最终资格。
+
+[完整本地报告](../../build/f1-healing-consistency/REPORT.zh.md) SHA256 `e6adc77f7efb6da69999178e26a89210ede51429a7b4f39acae10b2bfb06ffa6`；原日志、两个绑定、负例、正常速度截图、模式启动记录／保存哈希、补丁、FINAL-RECEIPT与EVIDENCE-SHA256在同目录，勿清理。此前338份证据封印全部复验未变。此节之后仅为文档提交，产品／测试字节仍为上述固定候选。另一AI对本轮的独立签收尚未执行，交父协调／Claude；本回执不冒称独立PASS，不推送或合并main。
