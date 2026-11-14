@@ -3,6 +3,7 @@ import { ITEM_ID, importantItem, itemOf, legacyCatalog } from '../rules/item-cat
 import type { FieldUse, ItemCatalog, ItemDefinition, ShopDefinition } from '../rules/item-catalog';
 import { setOwn } from '../rules/own';
 import type { ContentError } from './schema';
+import { HEAL_ITEMS, healAmount } from '../rules/rules';
 import { fieldEffectProblem } from '../rules/item-families';
 
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -72,4 +73,22 @@ export function defaultMemberBallProblem(catalog: ItemCatalog): ContentError | n
   return itemOf(catalog, 'pokeball')?.battleUse === 'ball' ? null : {
     file: 'items.json', path: '$.pokeball', message: 'default member ball pokeball must be a registered ball in the item catalog',
   };
+}
+
+/** Author HP overrides still belong to field use; supported battle IDs retain WP28's fixed table. */
+export function battleHealingDiagnostics(items: readonly ItemDefinition[]): ContentError[] {
+  const out: ContentError[] = [];
+  for (const [index, item] of items.entries()) {
+    const id = item.battleId, effect = item.effect;
+    if (item.battleUse !== 'member' || !item.consumable || !id || !Object.hasOwn(HEAL_ITEMS, id) || !effect) continue;
+    const p = effect.parameters, spec = HEAL_ITEMS[id]!;
+    const same = effect.family === 'hp' && [true, false].every(flag => {
+      const amount = healAmount(spec, flag);
+      return amount === 'full' ? p.full === true : amount === 'quarter' ? p.fraction === 4
+        : !p.full && !p.fraction && (flag ? p.amount : p.oldAmount ?? p.amount) === amount;
+    });
+    if (!same) out.push({ file: 'items.json', path: `$[${index}].effect.parameters`,
+      message: `battle-healing-parameters-differ: ${item.id} uses authored parameters outside battle; battle ID ${id} and trainer AI retain the built-in WP28 amounts (both healing configurations). Author parameters do not override battle healing.` });
+  }
+  return out;
 }

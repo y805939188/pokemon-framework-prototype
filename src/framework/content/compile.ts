@@ -4,7 +4,7 @@ import { storedCreationForms } from "../rules/creation-form";
  * conflict detection, emit one canonical document whose `inputsHash` covers every input. No file system, no Showdown.
  */
 import { sha256Hex } from "../rules/sha256";
-import { checkItemInputs, defaultMemberBallProblem } from "./item-input";
+import { checkItemInputs, defaultMemberBallProblem, battleHealingDiagnostics } from "./item-input";
 import { holdableItem, itemOf } from "../rules/item-catalog";
 import { DEFAULT_LIMITS } from "../rules/limits";
 import { MAX_FORM } from "../rules/species-key";
@@ -170,6 +170,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
 
   const itemInputs = checkItemInputs(inputs.items, inputs.shops, usable);
   errors.push(...itemInputs.errors);
+  if (!itemInputs.errors.length) warnings.push(...battleHealingDiagnostics(itemInputs.items));
   if (Array.isArray(inputs.species) && inputs.species.length) {
     const problem = defaultMemberBallProblem(itemInputs.catalog);
     if (problem) errors.push(problem);

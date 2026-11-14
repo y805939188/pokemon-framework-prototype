@@ -8,7 +8,7 @@ function content(flag,items=[]){
  const source=inputs({items,moves:['splash'],party:1});
  source.settings={...source.settings};
  if(flag===undefined)delete source.settings.REBALANCED_HEALING_ITEM_AMOUNTS;
- else source.settings.REBALANCED_HEALING_ITEM_AMOUNTS=flag;
+ else source.settings={...source.settings,REBALANCED_HEALING_ITEM_AMOUNTS:flag};
  const compiled=E.contentCompile.compileContent(source);assert.equal(compiled.ok,true,JSON.stringify(compiled.errors));
  const result=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(result.errors,[]);return result.content;
 }
@@ -92,4 +92,32 @@ test('field-only healing families remain unsupported battle items',async()=>{
  const w=await battle(false,[{item:'energypowder',count:1},{item:'energyroot',count:1}]);hp(w,'p1',1);hp(w,'p2',1);w.session.gw.refreshRequests();
  for(const id of ['energypowder','energyroot']){w.session.bag[id]=1;assert.equal((await w.session.useItem(id,active(w).name)).reason,'unknown-item');assert.equal(w.session.bag[id],1);}
  assert.deepEqual(D.captureTrainerAiRequest(w.session,w.session.gw).snapshot.request.legalItems,[]);
+});
+// Compatibility fix: expose the existing author-field/built-in-battle split before shipping content.
+test('author HP diagnostics compare both configurations, numeric, quarter and full profiles without changing compiled values',()=>{
+ const cases=[['superpotion',{amount:60,oldAmount:50},false],['superpotion',{amount:60},true],['superpotion',{amount:80,oldAmount:90},true],['potion',{amount:20},false],['sitrusberry',{fraction:4},false],['sitrusberry',{fraction:2},true],['maxpotion',{full:true},false],['maxpotion',{amount:999},true],['potion',{full:true},true]];
+ for(const [id,parameters,warn]of cases){
+  const source=inputs({party:1,moves:['splash']}),item=source.items.find(i=>i.id===id);item.effect={family:'hp',parameters};
+  const r=E.contentCompile.compileContent(source);assert(r.ok,JSON.stringify(r.errors));
+  const diagnostics=r.warnings.filter(w=>w.message.startsWith('battle-healing-parameters-differ:'));
+  assert.equal(diagnostics.length,Number(warn),id+JSON.stringify(parameters));
+  if(warn){assert.equal(diagnostics[0].file,'items.json');assert.match(diagnostics[0].path,/\.effect\.parameters$/);}
+  assert.deepEqual(r.data.items.find(i=>i.id===id).effect,item.effect,'author parameters preserved');
+  item.battleUse='none';const fieldOnly=E.contentCompile.compileContent(source);assert(fieldOnly.ok);assert(!fieldOnly.warnings.some(w=>w.message.startsWith('battle-healing-parameters-differ:')));
+ }
+ const standard=E.contentCompile.compileContent(inputs());assert(standard.ok);assert(!standard.warnings.some(w=>w.message.startsWith('battle-healing-parameters-differ:')));
+});
+test('warned author configuration preserves field/battle/AI compatibility in both columns and caps actual healing',async()=>{
+ for(const flag of [true,false]){
+  const source=inputs({party:1,moves:['splash'],items:[{item:'superpotion',count:1}]});source.settings={...source.settings,REBALANCED_HEALING_ITEM_AMOUNTS:flag};
+  source.items.find(i=>i.id==='superpotion').effect={family:'hp',parameters:{amount:80,oldAmount:90}};
+  const compiled=E.contentCompile.compileContent(source);assert(compiled.ok);assert(compiled.warnings.some(w=>w.message.startsWith('battle-healing-parameters-differ:')));
+  const assembled=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(assembled.errors,[]);
+  const x=field.setup({bag:{superpotion:2},settings:{REBALANCED_HEALING_ITEM_AMOUNTS:flag},edit:(g,c)=>{c.items.superpotion=structuredClone(assembled.content.items.superpotion);c.species.Charizard.base.hp=255;g.party[0].hp=1;}});
+  const token=x.app.beginInventoryOperation();assert.equal(x.app.inventoryRequest(token,'custom-heal',{kind:'use-item',itemId:'superpotion',quantity:1,memberId:x.game.party[0].id}).status,'committed');
+  assert.equal(x.state.current().party[0].hp,flag?81:91);x.app.endInventoryOperation(token);
+  const w=await fixture({content:assembled.content});hp(w,'p1',397);hp(w,'p2',1);w.session.bag.superpotion=1;w.session.gw.refreshRequests();
+  assert.equal(D.captureTrainerAiRequest(w.session,w.session.gw).snapshot.request.legalItems[0].estimateHp,flag?60:50);
+  const r=await w.session.useItem('superpotion',active(w).name);assert(r.ok);assert.equal(Number(itemEvent(r,'p1','superpotion').args[5]),3);assert.equal(w.session.bag.superpotion,0);
+ }
 });
