@@ -155,3 +155,11 @@ test('explicitly different field families retain a compiler diagnosis rather tha
   const source=inputs(),item=source.items.find(i=>i.id===id);item.effect=effect;const r=E.contentCompile.compileContent(source);assert(r.ok,JSON.stringify(r.errors));assert.equal(r.warnings.some(w=>w.message.startsWith('battle-healing-family-mismatch:')),warn,id);
  }
 });
+
+test('a valid custom fraction rounding to zero is refused before inventory or a turn, and excluded from AI candidates',async()=>{
+ const c=customContent(true,'potion',{fraction:1000}),w=await fixture({content:c});hp(w,'p1',1);hp(w,'p2',1);w.session.bag.potion=1;w.session.gw.refreshRequests();
+ const snap=w.session.gw.snapshot();assert.deepEqual(D.captureTrainerAiRequest(w.session,w.session.gw).snapshot.request.legalItems,[]);
+ assert.deepEqual(await w.session.useItem('potion',active(w).name),{ok:false,reason:'item-no-effect'});assert.equal(w.session.bag.potion,1);assert.equal(w.session.gw.snapshot(),snap);assert.equal(D.trainerAiDiagnostics(w.session).state.resources[0].count,2);
+ const x=field.setup({bag:{potion:1},edit:(g,c2)=>{g.party[0].hp=1;c2.items.potion.effect={family:'hp',parameters:{fraction:1000}};}}),token=x.app.beginInventoryOperation(),before=structuredClone(x.state.current());
+ const r=x.app.inventoryRequest(token,'zero',{kind:'use-item',itemId:'potion',quantity:1,memberId:x.game.party[0].id});assert.equal(r.status,'refused');assert.equal(r.reason,'no-effect');assert.deepEqual(x.state.current(),before);x.app.endInventoryOperation(token);
+});

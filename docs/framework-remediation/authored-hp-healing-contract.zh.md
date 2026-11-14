@@ -4,7 +4,7 @@
 
 ## 行为与范围
 
-场外、战斗和 AI 共用 `active-hp-recovery.ts` 的参数解析：配置真选择 `amount`，假选择 `oldAmount ?? amount`；`fraction` 按使用时最大 HP 向下取整；`full:true` 补满；实际回复封顶。只处理已有 `HEAL_ITEMS` 的战斗身份，不增加新战斗道具或扩展 PP、复活、持有触发等家族。作者 ID 与 battleId 不同也按 battleId 接入引擎，AI 仍返回作者 ID。
+场外、战斗和 AI 共用 `active-hp-recovery.ts` 的参数解析：配置真选择 `amount`，假选择 `oldAmount ?? amount`；`fraction` 按使用时最大 HP 向下取整；`full:true` 补满；实际回复封顶。只处理 `battleUse=member`、可消耗且属于已有 `HEAL_ITEMS` 的战斗身份，不增加新战斗道具或扩展 PP、复活、持有触发等家族。作者 ID 与 battleId 不同也按 battleId 接入引擎，AI 仍返回作者 ID。
 
 默认 Super Potion 60/50 等表值保持；默认 Max Potion 补满、Sitrus 1/4 保持；AI 对固定量使用相同数值，对比例／补满保留 WP51 的 1／999 估量，不把估量当实际回复量。Full Restore 的补满、状态／混乱清除与复活 half/full 行为不改。被动持有回复也不受本批主动参数控制。
 
@@ -18,8 +18,10 @@ Session 将已解析、与默认值不同的量经可选 `GatewayOptions.activeH
 
 ## 验证与风险
 
-新增行为测试先在旧运行时得到 14 pass／8 fail，随后实装通过。最新九文件定向 334/334，含现有道具、AI、复活、引擎 staging 契约、F4 文本和 Transform 学招／Scene；完整类型检查与 build 通过。固定 Showdown 源码 7244fe8 在本任务 APFS 独立副本重建，未改其它会话缓存；离线 build-deps 缺包的初次失败保留，随后按固定依赖与 integrity 正常完成。
+新增行为测试先在旧运行时得到 14 pass／8 fail，随后实装通过。首轮九文件定向 334/334，零量修正后 335/335，含现有道具、AI、复活、引擎 staging 契约、F4 文本和 Transform 学招／Scene；完整类型检查与 build 通过。固定 Showdown 源码 7244fe8 在本任务 APFS 独立副本重建，未改其它会话缓存；离线 build-deps 缺包的初次失败保留，随后按固定依赖与 integrity 正常完成。
 
 F4 去重另收窄为最近一次同目标、同最终 HP 的道具结果，保留明确其它来源及较早的回血；新增双回血事件批测试。这是防止过宽抑制的保护，不冒称已经复现新玩家缺陷。
 
 完整 regular、NW 与最终固定身份以本轮外部 `build/f1-healing-consistency/REPORT.zh.md` 为准，未终态不得预填绿。此前 488dade 的 295/5356 和七模式 NW 只属于旧候选，不代替本轮。另一个 AI 对本轮代码的独立签收需父协调安排；本执行者的编码与只读自检不冒称第三方独审。
+
+作者只读审视另复现合法 fraction 分母大于当前最大 HP、请求向下取整为 0 时仍扣物品。后继修正在 Session 登记前、AI 候选构造和引擎执行期检查零量；新增回归验证场外／战内均拒绝、HP／库存／回合不变且 AI 不列此项。先前 3f3641d 的完整 regular／NW 虽通过，仍只保留为中间记录，不作为该修正的验收。

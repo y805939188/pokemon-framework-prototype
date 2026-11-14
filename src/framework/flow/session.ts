@@ -5,7 +5,8 @@ export { readSessionRequestContext } from './request-view';
 export type { SessionRequestContext } from './request-view';
 import type { InitialFieldInput } from '../rules/initial-field';
 import { battleBag } from "../rules/inventory";
-import { activeHpRecovery } from "../rules/active-hp-recovery";
+import type { ActiveHpRecovery } from "../rules/active-hp-recovery";
+import { hpRecoveryRequest, activeHpRecovery } from "../rules/active-hp-recovery";
 import { catalogOf } from "../rules/item-catalog";
 /**
  * BattleSession: the game-side owner of one battle.
@@ -182,6 +183,8 @@ export class BattleSession implements BattleSessionView {
   readonly expGain: boolean;
   readonly captureExpGain: boolean;
   constructor(canSwitch = true, expGain = true, captureExpGain = true) { this.canSwitch = canSwitch; this.expGain = expGain; this.captureExpGain = captureExpGain; initializeRequestView(this); }
+  /** Fixed registration view of the same profile bound into this session's engine snapshots. */
+  private _activeHpRecovery?: ActiveHpRecovery;
   content!: Content;
   rules!: G.ExpRules;
   battleId!: string;
@@ -249,6 +252,8 @@ export class BattleSession implements BattleSessionView {
     const party = S.clone(game.party).filter((m) => !m.isEgg).slice(0, 6);
     const lead = [...party.filter((m) => m.hp > 0), ...party.filter((m) => m.hp <= 0)];
     const s = new BattleSession(canSwitch, expGain, captureGrowth);
+    const healingRebalanced = resolveConfig(content.settings).REBALANCED_HEALING_ITEM_AMOUNTS;
+    s._activeHpRecovery = activeHpRecovery(catalogOf(content), healingRebalanced);
     s.content = content; s.rules = rules || G.DEFAULT_RULES; s.battleId = battleId; s.foe = foe;
     s.party = party; s.foeTeam = S.clone(foe.team);
     s.startBag = battleBag(game.inventory, catalogOf(content)); s.bag = S.clone(s.startBag);
@@ -263,8 +268,8 @@ export class BattleSession implements BattleSessionView {
     }
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
     s.gw = await driver.create({
-      rebalancedHealingItemAmounts: resolveConfig(content.settings).REBALANCED_HEALING_ITEM_AMOUNTS,
-      activeHpRecovery: activeHpRecovery(catalogOf(content), resolveConfig(content.settings).REBALANCED_HEALING_ITEM_AMOUNTS),
+      rebalancedHealingItemAmounts: healingRebalanced,
+      activeHpRecovery: s._activeHpRecovery,
       speciesTypes: Object.fromEntries(Object.entries(content.species).filter(([, data]) => data.types !== undefined).map(([name, data]) => [name, [...data.types!]])),
       ...(initialField ? { initialField } : {}),
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
@@ -493,6 +498,8 @@ export class BattleSession implements BattleSessionView {
     const moves = Object.hasOwn(PP_ITEMS, itemId) ? this.party.find(m => m.id === targetId)?.moves.map(m => ({ ...m, pp: mon?.pp[m.id] ?? m.pp, maxpp: mon?.ppMax?.[m.id] ?? m.maxpp })) : undefined;
     const eligibility = itemEligibility(itemId, mon, { moves, moveSlot });
     if (!eligibility.ok) return eligibility;
+    const recovery = this._activeHpRecovery?.[itemId];
+    if (mon && recovery && hpRecoveryRequest(recovery, mon) <= 0) return { ok: false, reason: "item-no-effect" };
     if (this._itemMoveSlot(itemId, targetId, moveSlot) === null) return { ok: false, reason: "item-no-effect" };
     return eligibility;
   }

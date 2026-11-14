@@ -8,6 +8,7 @@ import { typeMultiplier } from '../rules/trainer-ai';
 import { assembleTrainerCatalog } from './trainer-ai-catalog';
 import type { AssembledTrainerCatalog } from './trainer-ai-catalog';
 import { semanticFingerprint as canonicalJson } from '../rules/semantic';
+import { battleHpRecovery, hpRecoveryRequest } from '../rules/active-hp-recovery';
 import { itemEligibility } from '../rules/rules';
 
 type Action = {kind:'move'|'switch'; choice:string} | {kind:'item'; itemId:string; battleId:string; target:string; resourceKey:string};
@@ -207,6 +208,8 @@ export function captureTrainerRequest(driver:BattleDriver,owner:object,generatio
     if(!automaticCandidateId)for(const res of resources){const meta=catalog.items[res.itemId];if(!meta)throw new Error('trainer-ai-item-catalog-missing');if(res.count<1||meta.family==='unsupported')continue;
       const battleId=s.catalog!.battleItems[res.itemId]!;
       if(!itemEligibility(battleId,{id:actor.name,hp:actor.hp,maxhp:actor.maxhp,fainted:actor.fainted,status:actor.status,active:true,confused:!!actor.volatiles.confusion}).ok)continue;
+      const recovery=battleHpRecovery(battleId,b.rpg?.rebalancedHealingItemAmounts??true,b.rpg?.activeHpRecovery);
+      if(recovery&&hpRecoveryRequest(recovery,actor)<=0)continue;
       const candidateId=key+':i:'+res.resourceKey;actions.set(candidateId,{kind:'item',itemId:res.itemId,battleId,target:actor.name,resourceKey:res.resourceKey});
       legalItems.push({candidateId,resourceKey:res.resourceKey,itemId:res.itemId,targetMemberId:actor.name,...copy(meta),family:meta.family});
     }
