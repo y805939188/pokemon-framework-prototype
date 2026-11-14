@@ -458,7 +458,8 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
         const value: unknown = JSON.parse(battle()._session.gw.snapshot());
         const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
         if (!record(value) || !Array.isArray(value.sides)) throw new Error('invalid engine snapshot sides');
-        for (const side: unknown of value.sides) {
+        const sides: readonly unknown[] = value.sides;
+        for (const side of sides) {
           if (!record(side) || !record(side.choice) || typeof side.choice.error !== 'string') throw new Error('invalid engine choice diagnostic');
           // A rejected engine choice updates only this diagnostic. All gameplay values, PRNG, logs and requests remain compared.
           delete side.choice.error;
