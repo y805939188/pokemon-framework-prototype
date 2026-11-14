@@ -13,8 +13,8 @@ test.before(()=>{
   const code=fs.readFileSync(file,'utf8');if(name==='PS_BattleFlowTest')entryText=code;else plugins[name]=code;
  }
 });test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
-async function open(learnMoves){
- const h=createVictoryDriverHost({ROOT,work:temp,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true}}),G=h.G,flow=h.w.flow,{content,game}=authored({own:1,copied:4,learnMoves});
+async function open(learnMoves,own=1){
+ const h=createVictoryDriverHost({ROOT,work:temp,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true}}),G=h.G,flow=h.w.flow,{content,game}=authored({own,copied:4,learnMoves});
  // Exercise the installed visibility rule, with only scroll position/raster ports controlled.
  G.Window_Selectable=function Selectable(){};
  const windowSource=fs.readFileSync(path.join(ROOT,'js/reactor_windows.js'),'utf8');
@@ -40,5 +40,22 @@ for(const learnMoves of [['rest'],['rest','amnesia','agility']])test('formal mov
   s.onMenuCancel();assert.equal(s._mode,'main');choose(h,'fight');assert.equal(s._menu.index(),count-1,'actual cursor memory survives cancel/reopen');
   const id=learnMoves.at(-1),pp=session.gw.readState('p1')[0].pp[id],before=session.currentRequest().active[0].moves.at(-1).pp;
   s.onMenuOk();await h.p.inMode('main');assert.equal(session.currentRequest().active[0].moves.at(-1).pp,before-1);assert.equal(session.gw.readState('p1')[0].pp[id],pp);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(session.broken,null);
+ }finally{h.cleanup();}
+});
+
+test('full-screen battle learning hides cards, log and pictures, restores exact visibility through give-up and normal next request',async()=>{
+ const h=await open(['rest'],4);try{
+  await move(h,1);const s=h.s,status=s._status,log=s._log,visibleBefore=[status.visible,log.visible];
+  const picture=s.children.find(n=>n!==s._windowLayer);if(picture)picture.visible=true;
+  choose(h,'fight');await h.p.inMode('moves');choose(h,2);await h.p.inMode('learn-initial');await h.p.frames(1);
+  choose(h,'forget-move');await h.p.inMode('learn');
+  assert.equal(status.visible,false);assert.equal(log.visible,false);if(picture)assert.equal(picture.visible,false);
+  assert(s._learningHidden.length>=2);assert(s._learningMenu.visible);
+  s.onMenuCancel();await h.p.inMode('learn-giveup');assert.deepEqual([status.visible,log.visible],visibleBefore);await h.p.frames(1);
+  choose(h,'continue-learning');await h.p.inMode('learn');assert.equal(status.visible,false);
+  choose(h,3);await h.p.inMode('main');assert.deepEqual([status.visible,log.visible],visibleBefore);if(picture)assert.equal(picture.visible,true);
+  assert.equal(s._learningHidden,null);assert.equal(s._session.pendingLearn,null);assert.equal(s._session.finished,false);
+  assert.deepEqual(s._session.currentRequest().active[0].moves.map(m=>m.id),['splash','seismictoss','growl','rest']);
+  assert.equal(JSON.stringify(h.flow.game()),h.before);
  }finally{h.cleanup();}
 });
