@@ -13,14 +13,14 @@ export interface Describer {
   event(e: BattleEvent, batch?: readonly BattleEvent[]): string[];
 }
 
-export function make(names: Record<string, string> = {}, tr: Translator = defaultTranslator(), display: { move?: (id: string) => string | undefined } = {}): Describer {
+export function make(names: Record<string, string> = {}, tr: Translator = defaultTranslator(), display: { move?: (id: string) => string | undefined; item?: (id: string) => string | undefined } = {}): Describer {
   const idOf = (ident: string): string => String(ident).replace(/^p\d[a-z]?: /, "");
   const nm = (ident: string): string => {
     const name = names[idOf(ident)] || idOf(ident);
     return String(ident).startsWith("p1") ? name : tr.t("battle.foe_prefix", { name });
   };
   const pct = (h: string): string => { const m = /^(\d+)\/(\d+)/.exec(h); return m ? `${m[1]}/${m[2]}` : h.startsWith("0") ? "0" : h; };
-  const itemName = (id: string, fallback?: string): string => tr.tOr(`item.name.${id}`, fallback ?? id.replace(/ball$/, " Ball").replace(/^./, (c) => c.toUpperCase()));
+  const itemName = (id: string, fallback?: string): string => display.item?.(id) ?? tr.tOr(`item.name.${id}`, fallback ?? id.replace(/ball$/, " Ball").replace(/^./, (c) => c.toUpperCase()));
   const statName = (id: string): string => tr.tOr(`stat.${id}`, id);
   const status = (a0: string, id: string, kind: "inflicted" | "cured"): string =>
     tr.has(`battle.status.${id}.${kind}`) ? tr.t(`battle.status.${id}.${kind}`, { name: nm(a0) }) : tr.t(`battle.status_${kind}`, { name: nm(a0), status: id });
@@ -74,8 +74,14 @@ export function make(names: Record<string, string> = {}, tr: Translator = defaul
       case "-transform": return [tr.t("battle.transformed", { name: nm(a0), target: nm(a1) })];
       case "-item": case "-enditem": {
         if (a.includes('[silent]')) return [];
-        const item = itemName(a1.toLowerCase().replace(/[^a-z0-9]/g, ''), a1);
-        const key = e.type === '-item' ? 'received_item' : a.includes('[from] move: Knock Off') ? 'knocked_off_item' : 'lost_item';
+        const id = a1.toLowerCase().replace(/[^a-z0-9]/g, ''), item = itemName(id, a1);
+        // Protocol annotations distinguish consumption, revelation and an existing holder's item activation.
+        const from = a.some(arg => arg.startsWith('[from]'));
+        const key = e.type === '-enditem'
+          ? a.includes('[eat]') ? 'ate_item' : a.includes('[from] move: Knock Off') ? 'knocked_off_item'
+            : id === 'airballoon' && !from ? 'balloon_popped' : 'lost_item'
+          : a.includes('[from] ability: Frisk') ? 'frisk_item'
+            : id === 'airballoon' && !from ? 'balloon_floating' : 'received_item';
         return [tr.t('battle.' + key, { name: nm(a0), item })];
       }
       case "faint": return [tr.t("battle.fainted", { name: nm(a0) })];
@@ -121,7 +127,7 @@ export function make(names: Record<string, string> = {}, tr: Translator = defaul
       return [tr.t(`battle.obedience.${key}`, { name: a[1] === "p1" ? name : tr.t("battle.foe_prefix", { name }) })];
     }
     if (what === "item") {
-      if (res === "ok") return [a[5] !== undefined && /^\d+$/.test(a[5]) ? tr.t("item.used_recovered", { item: itemName(x), target: tn, hp: a[5] }) : tr.t("item.used", { item: itemName(x), target: tn })];
+      if (res === "ok") return [a[5] !== undefined && /^\d+$/.test(a[5]) && Number(a[5]) > 0 ? tr.t("item.used_recovered", { item: itemName(x), target: tn, hp: a[5] }) : tr.t("item.used", { item: itemName(x), target: tn })];
       if (res === "noeffect") return [tr.t("item.no_effect", { item: itemName(x) })];
       return [tr.t("item.invalid")];
     }

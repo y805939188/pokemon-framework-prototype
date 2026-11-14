@@ -80,7 +80,13 @@ export function battleHealingDiagnostics(items: readonly ItemDefinition[]): Cont
   const out: ContentError[] = [];
   for (const [index, item] of items.entries()) {
     const id = item.battleId, effect = item.effect;
-    if (item.battleUse !== 'member' || !item.consumable || !id || (!Object.hasOwn(HEAL_ITEMS, id) && id !== 'fullrestore') || !effect || effect.family === (id === 'fullrestore' ? 'full-restore' : 'hp')) continue;
+    if (item.battleUse !== 'member' || !id || (!Object.hasOwn(HEAL_ITEMS, id) && id !== 'fullrestore')) continue;
+    if (!item.consumable) {
+      out.push({ file: 'items.json', path: `$[${index}].consumable`,
+        message: `nonconsumable-battle-healing-unsupported: ${item.id}: consumable:false is respected by field use, but this battle path still deducts one and uses its built-in effect. Set battleUse:none to prevent battle use, or consumable:true for supported active battle healing.` });
+      continue;
+    }
+    if (!effect || effect.family === (id === 'fullrestore' ? 'full-restore' : 'hp')) continue;
     out.push({ file: 'items.json', path: `$[${index}].effect.family`,
       message: `battle-healing-family-mismatch: ${item.id} uses field family ${effect.family}, while battle ID ${id} heals HP; only authored HP parameters are shared with battle.` });
   }

@@ -43,7 +43,7 @@ import { BattleBagSelection } from './battleflow/battle-bag';
 import { createBagFadeMZ } from './battleflow/bag-fade-mz';
 import { parseBattleStyle, effectiveBattleStyle, installBattleStyleSettings } from './battleflow/battle-style-settings';
 import type { BattleBagRequest } from './battleflow/battle-bag';
-import { catalogOf, itemForBattleId } from '../framework/rules/item-catalog';
+import { catalogOf, itemForBattleId, itemOf } from '../framework/rules/item-catalog';
 import { BALLS } from '../framework/rules/items';
 import { PP_ITEMS, ESCAPE_ITEMS } from '../framework/rules/rules';
 import { projectStatusCard } from './battleflow/status-card';
@@ -1293,8 +1293,15 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     for (const m of s.party) { if (!c.isCurrent()) return; this._names[m.id] = playerBattleName(m); }
     for (const m of s.foeTeam) { if (!c.isCurrent()) return; this._names[m.id] = PSFlow.speciesName(m.species); }
     if (!c.isCurrent()) return;
-    this._D = engine().D.make(this._names, PSFlow.translator(), {
+    const itemCatalog = catalogOf(s.content), tr = PSFlow.translator();
+    this._D = engine().D.make(this._names, tr, {
       move: (id: string) => PSFlow.app().describeLearningMove(id)?.name,
+      item: (id: string): string | undefined => {
+        const data = itemForBattleId(itemCatalog, id) ?? itemOf(itemCatalog, id);
+        const authored = data?.name && data.name !== 'Unnamed' ? data.name : undefined;
+        const fallback = authored ?? (tr.has('item.name.' + id) ? tr.t('item.name.' + id) : undefined);
+        return data?.nameKey ? tr.tOr(data.nameKey, fallback ?? data.id) : fallback;
+      },
     });
     this._pictures = createBattlePicturesMZ(G, this,
       () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,

@@ -33,3 +33,10 @@ F4 去重另收窄为最近一次同目标、同最终 HP 的道具结果，保�
 最终正常速度两配置80/90的field App、玩家与NPC回合实际一致，快照绑定正确，各胜利后一次提交；均为隔离合成状态与CDP可信键盘输入，field部分为实际App服务调用，非实体输入。正式NW七模式all64/64、verify-save4/4、step5-*各1/1、held11/11、held-continue6/6、battle-entry10/10全rc0且无超时。所有自有NW结束，最终进程检查0行。先前中间3f3641d虽全绿但零量缺陷未闭，原结果保留，不作为最终资格。
 
 [完整本地报告](../../build/f1-healing-consistency/REPORT.zh.md) SHA256 `e6adc77f7efb6da69999178e26a89210ede51429a7b4f39acae10b2bfb06ffa6`；原日志、两个绑定、负例、正常速度截图、模式启动记录／保存哈希、补丁、FINAL-RECEIPT与EVIDENCE-SHA256在同目录，勿清理。此前338份证据封印全部复验未变。此节之后仅为文档提交，产品／测试字节仍为上述固定候选。另一AI对本轮的独立签收尚未执行，交父协调／Claude；本回执不冒称独立PASS，不推送或合并main。
+
+
+## R4 非消耗主动治疗边界（2026-11-14）
+
+合法作者 `consumable:false`＋`battleUse:member` 的已知道具目前仍按旧战斗台账扣除一件，并使用内建效果；场外则保留库存。这是已复现的行为差异，**没有由本次修复为可重复使用**。合成 Super Potion amount80 实测场外回复80、库存1；真实战斗回复60、胜利提交后持久库存0。
+
+本次选择兼容诊断：编译仍成功、保留数据，在准确的 `.consumable` 路径发出 `nonconsumable-battle-healing-unsupported` warning，明确扣除与效果差异。作者可以设 `battleUse:none` 禁止战中使用，或设 `consumable:true` 进入已支持的主动治疗合同。完整的可重复使用战斗道具需要另行扩展台账与语义，本批未实现；这条诊断不能被称作行为已统一。复活／PP／其它家族不扩展。
