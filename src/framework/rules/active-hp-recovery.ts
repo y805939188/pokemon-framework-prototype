@@ -40,12 +40,18 @@ export function battleHpRecovery(id: string, rebalanced: boolean, overrides?: Ac
   return amount === 'full' ? { full: true } : amount === 'quarter' ? { fraction: 4 } : { amount };
 }
 
+/** Only known member HP identities acquire reusable semantics; unrelated item families retain their contract. */
+export function reusableBattleHealing(item: ItemDefinition): boolean {
+  return item.battleUse === 'member' && !item.consumable && !!item.battleId
+    && (item.battleId === 'fullrestore' || Object.hasOwn(HEAL_ITEMS, item.battleId));
+}
+
 /** Only differing, supported authored HP effects need an engine binding; default snapshots keep their old shape. */
 export function activeHpRecovery(catalog: ItemCatalog, rebalanced: boolean): ActiveHpRecovery | undefined {
   const overrides: Record<string, HpRecovery> = {};
   for (const item of Object.values(catalog)) {
     const id = item.battleId;
-    if (!id || !Object.hasOwn(HEAL_ITEMS, id) || item.battleUse !== 'member' || !item.consumable || item.effect?.family !== 'hp') continue;
+    if (!id || !Object.hasOwn(HEAL_ITEMS, id) || item.battleUse !== 'member' || item.effect?.family !== 'hp') continue;
     const authored = authoredHpRecovery(item.effect, rebalanced), baseline = battleHpRecovery(id, rebalanced)!;
     if (JSON.stringify(authored) !== JSON.stringify(baseline)) overrides[id] = authored;
   }

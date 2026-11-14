@@ -40,3 +40,14 @@ F4 去重另收窄为最近一次同目标、同最终 HP 的道具结果，保�
 合法作者 `consumable:false`＋`battleUse:member` 的已知道具目前仍按旧战斗台账扣除一件，并使用内建效果；场外则保留库存。这是已复现的行为差异，**没有由本次修复为可重复使用**。合成 Super Potion amount80 实测场外回复80、库存1；真实战斗回复60、胜利提交后持久库存0。
 
 本次选择兼容诊断：编译仍成功、保留数据，在准确的 `.consumable` 路径发出 `nonconsumable-battle-healing-unsupported` warning，明确扣除与效果差异。作者可以设 `battleUse:none` 禁止战中使用，或设 `consumable:true` 进入已支持的主动治疗合同。完整的可重复使用战斗道具需要另行扩展台账与语义，本批未实现；这条诊断不能被称作行为已统一。复活／PP／其它家族不扩展。
+
+
+## O-3 实际可重复使用语义后继（2026-11-14）
+
+本节替代上节“仅warning”的当前行为；上节及原R4验收作为历史保留。已知HEAL_ITEMS身份与Full Restore，且battleUse:member的作者consumable:false道具，现在战中成功使用后保留拥有的一件，并可在下一回合再次使用。hp参数不再因非消耗被排除，amount／oldAmount、比例、补满、实际封顶与AI估量保持同一合同；Full Restore继续补满并清状态／混乱。
+
+Session拥有玩家台账，AI拥有独立训练家资源。登记仍先检查实际拥有一件，再借出一件；成功将该条目标记retained并归还，取消／登记拒绝／无效果／未执行结束走原有一次退款。重复事件不会再次加库存。借用期间不改持久Inventory，战果只提交差额0；技术中止不提交治疗或库存变化。AI返回自有资源时推进资源revision，旧ticket失效；检查点携带借用标记和状态，异常回滚与重放保持库存、HP、随机流一致。
+
+不增加玩家存档字段、战果或引擎协议，不开放战中存档。Session既有内部恢复保存台账；新Gateway快照保存已存在的HP profile，旧缺表快照继续原固定表回退。可消耗道具的预留／消耗路径保持。移除已过时的nonconsumable-battle-healing-unsupported警告；显式跨效果家族仍有family-mismatch诊断，并不擅自统一这种作者上下文差异。复活、PP、球、强化、脱离、持有触发等其它家族没有扩展非消耗语义。
+
+新增23项覆盖单副本连续使用、作者ID别名、80/90、比例／补满／封顶、默认Potion、Full Restore、玩家及AI的库存所有权、拒绝／取消／无效果、重复事件、战果重复提交／中止、借用检查点／异常恢复、旧Gateway快照回退。原O3同一探针已从场外+80／战内+60且持久库存0，变为均+80且库存1。最终固定提交与完整regular／NW以build/o3-nonconsumable-healing/REPORT.zh.md为准，未完成不预签。

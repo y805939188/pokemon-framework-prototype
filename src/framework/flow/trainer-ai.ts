@@ -22,7 +22,7 @@ export interface TrainerAiConfiguration {
   strategy:PinnedTrainerAiStrategy; projection:TrainerBattleProjection; generation:number; contentIdentity:string;
   currentContent:()=>Content; isCurrent:()=>boolean; timing:TrainerAiTiming;
 }
-interface Reservation {key:string;itemId:string;battleId:string;target:string;state:'reserved'|'consumed'|'refunded'}
+interface Reservation {key:string;itemId:string;battleId:string;target:string;state:'reserved'|'consumed'|'retained'|'refunded';reusable?:true}
 interface Cache {capture:TrainerCapture;plan:DecisionPlan|null;attempted:string[];submitted:boolean;key:string|null}
 interface AiState {random:TrainerRandomState;resources:TrainerResource[];resourceRevision:number;ledger:Reservation[]}
 interface DecisionRecord {
@@ -205,7 +205,7 @@ export async function runTrainerAi(session:object,driver:BattleDriver):Promise<b
         if(action.kind==='item'){
           const resource=c.state.resources.find(r=>r.resourceKey===action.resourceKey);
           if(!resource||resource.count<1)throw new Error('trainer-ai-item-resource-unavailable');
-          reservation={key:resource.resourceKey,itemId:resource.itemId,battleId:action.battleId,target:action.target,state:'reserved'};
+          reservation={key:resource.resourceKey,itemId:resource.itemId,battleId:action.battleId,target:action.target,state:'reserved',...(c.catalog.reusableItems.has(resource.itemId)?{reusable:true as const}:{})};
           c.state.resources=c.state.resources.map(r=>r===resource?{...r,count:r.count-1}:r);c.state.ledger.push(reservation);
         }
         const result=await submitTrainerCandidate(driver,c.owner,cache.capture.ticket,candidateId,c.state.resourceRevision);
@@ -230,7 +230,8 @@ export function trainerAiEvent(session:object,event:BattleEvent):void {
   const c=CHANNELS.get(session);if(!c||event.type!=='rpg')return;
   const [kind,side,item,target,result]=event.args;if(kind!=='item'||side!=='p2')return;
   const entry=c.state.ledger.find(e=>e.state==='reserved'&&e.battleId===item&&e.target===target);if(!entry)return;
-  if(result==='ok')entry.state='consumed';else if(result==='noeffect'||result==='invalid')refund(c,entry);
+  if(result==='ok'){if(entry.reusable){refund(c,entry);entry.state='retained';}else entry.state='consumed';}
+  else if(result==='noeffect'||result==='invalid')refund(c,entry);
   else{c.retired='trainer-ai-unknown-item-outcome';invalidate(c,c.retired);throw new Error(c.retired);}
 }
 export function assertTrainerAiCheckpointReady(session:object):void {
