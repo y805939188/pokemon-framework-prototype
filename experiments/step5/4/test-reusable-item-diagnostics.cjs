@@ -55,7 +55,7 @@ for(const id of ['ether','revive','antidote','xattack','pokeball','poketoy'])tes
  for(const mon of party){mon.moves[0].maxpp=40;mon.moves[0].pp=id==='ether'?0:40;}
  if(id==='revive')party[1].hp=0;if(id==='antidote')party[0].status='psn';
  const game=E.state.newGame({content,party,bag:{[id]:1},money:0}),before=JSON.stringify(game);
- const s=await E.session.BattleSession.create({game,content,battleId:'unsupported-reuse-'+id,seed:[1,2,3,4],foe:{kind:'wild',team:[F.foeMember('B','Pidgey',3,{moves:['growl'],ability:'Keen Eye'})]}});s.take();
+ const s=await E.session.BattleSession.create({game,content,battleId:'unsupported-reuse-'+id,seed:[1,2,3,4],foe:{kind:'wild',team:[F.foeMember('B','Pidgey',3,{moves:['protect'],ability:'Keen Eye'})]}});s.take();
  const r=id==='pokeball'?await s.throwBall(id):await s.useItem(id,id==='revive'?'R':'A',id==='ether'?{moveSlot:0}:{});
  assert(r.ok,JSON.stringify(r));assert.equal(s.bag[id],0);assert.equal(s.ledger[0].state,'consumed');assert.equal(JSON.stringify(game),before,'persistent inventory is still owned by battle commit');
 });
