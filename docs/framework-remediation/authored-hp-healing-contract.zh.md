@@ -51,3 +51,12 @@ Session拥有玩家台账，AI拥有独立训练家资源。登记仍先检查�
 不增加玩家存档字段、战果或引擎协议，不开放战中存档。Session既有内部恢复保存台账；新Gateway快照保存已存在的HP profile，旧缺表快照继续原固定表回退。可消耗道具的预留／消耗路径保持。移除已过时的nonconsumable-battle-healing-unsupported警告；显式跨效果家族仍有family-mismatch诊断，并不擅自统一这种作者上下文差异。复活、PP、球、强化、脱离、持有触发等其它家族没有扩展非消耗语义。
 
 新增23项覆盖单副本连续使用、作者ID别名、80/90、比例／补满／封顶、默认Potion、Full Restore、玩家及AI的库存所有权、拒绝／取消／无效果、重复事件、战果重复提交／中止、借用检查点／异常恢复、旧Gateway快照回退。原O3同一探针已从场外+80／战内+60且持久库存0，变为均+80且库存1。最终固定提交与完整regular／NW以build/o3-nonconsumable-healing/REPORT.zh.md为准，未完成不预签。
+
+
+## O-3 最终本地验收回执
+
+产品／测试 `f37c5c87a338bbf72e7b3f4330a1e13a9398c82c`，tree `9ce5cb3491a9053915bbef25f9480e54461e21c7`，src `06e9e0390518b3c41eb2ad5ca192cc4e94bf7887`。完整typecheck/fullbuild、239定向通过（新23项计在其中，最终另跑23/23）；PF_NO_SKIP=1 regular **297唯一套／5411项通过，失败／取消／跳过0、exit0**，runId `720474da-e212-4889-9d33-84c686b95981`，before/build/after dirty=false、正式列表逐序匹配，末尾及另行verify过。冻结参考回放EXCLUDED NOT RUN，不计绿，无新CI。
+
+正常速NW80/90两配置共玩家4次／NPC4次成功使用，双方各从1件连续使用，第二次菜单仍x1；字段App也保留1，两场各胜利一次提交且持久库存1，Node/NW exit0、consoleErrors=[]。测试为合法合成内容，Snorlax100、玩家初始HP1、NPC用药前重置HP1是披露前提，未直接补库存；CDP可信键盘，非实体输入。正式七模式64/4/1/1/11/6/10全exit0、无超时，最终NW0。
+
+[完整本地报告](../../build/o3-nonconsumable-healing/REPORT.zh.md) SHA256 `5ae1f316ccea1fef2eef1ce951762a8b9709466e560ced9d349242e56573cdd6`；原红例、测试夹具修正与全部最终记录保留，前3轮842份封印未变。FINAL-RECEIPT/EVIDENCE-SHA256同目录，勿覆盖重跑。只读作者复核不是另一AI独审；仓库限定Sonnet5.5而当前工具不提供，后继Claude待父协调。新nonconsumable FullRestore、中文与恢复只有headless/Scene/内部checkpoint证据，未做自定义false冷Continue NW；其它未测边界见报告。本后继只写文档，不改变受测产品与测试；main03f7e54干净，未fetch/push/PR/merge。
