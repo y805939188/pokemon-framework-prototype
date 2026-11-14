@@ -127,3 +127,17 @@ for(const nextSlot of [0,1,2])test('deduplicated copied slots keep original iden
   assert.deepEqual(w.s.currentRequest().active[0].moves.map(m=>m.id),w.s.party[0].moves.map(m=>m.id));
  }finally{cleanup(w);}
 });
+for(const copied of [1,4])test('non-terminal knockout with four permanent/copy '+copied+' learns a new ID then publishes and executes the next request',async()=>{
+ const w=await open({own:4,copied,learnMoves:['rest'],replacement:true});try{
+  await transform(w);
+  // A one-move copy cannot normally KO: choose the real default struggle path after its PP is exhausted.
+  if(copied===1){actor(w).moveSlots[0].pp=0;const foe=w.s.gw._debugBattle().sides[1].active[0];foe.hp=1;w.s.gw.refreshRequests();assert((await w.s.chooseMove(1)).ok);}
+  else await knockout(w);
+  assert.equal(w.s.finished,false);assert.equal(w.s.pendingLearn.move.id,'rest');const persistentBefore=clone(w.state.read());
+  await w.s.decideLearn(3);dense(w);const offer=E.session.readTrainerReplacement(w.s);assert(offer);assert((await E.session.resolveTrainerReplacement(w.s,offer.offerId,null)).ok);
+  const expected=copied===1?['splash','rest']:['splash','seismictoss','growl','rest'];assert.deepEqual(w.s.currentRequest().active[0].moves.map(m=>m.id),expected);
+  const checkpoint=w.s._checkpoint(),before=clone(w.s.currentRequest());await w.s._restoreCheckpoint(checkpoint);assert.deepEqual(w.s.currentRequest(),before);
+  assert((await w.s.chooseMove(expected.indexOf('rest')+1)).ok);assert.equal(actor(w).moveSlots.find(m=>m.id==='rest').pp,9);assert.equal(w.s.party[0].moves[3].pp,10);
+  assert.equal(w.s.broken,null);assert.deepEqual(w.state.read(),persistentBefore);unchanged(w);
+ }finally{cleanup(w);}
+});

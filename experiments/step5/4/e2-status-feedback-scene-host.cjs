@@ -13,6 +13,7 @@ function cleanup(){console.log('SCENE_BUILD_OBSERVATION '+JSON.stringify({stem:'
 function contentFor(c){
  const dir=path.join(ROOT,'content/sample'),input=Object.fromEntries(['manifest','sources','species','overlays','grants','regional-dex','settings','map-metadata'].filter(n=>fs.existsSync(path.join(dir,n+'.json'))).map(n=>[n.replace(/-([a-z])/g,(_,x)=>x.toUpperCase()),JSON.parse(fs.readFileSync(path.join(dir,n+'.json'),'utf8'))]));
  input.manifest.id=c.id.toLowerCase();
+ if(c.items)input.items=clone(c.items);
  for(const config of [c.player,c.reserve,c.foe].filter(Boolean)){
   let s=input.species.find(s=>s.id===config.species);
   if(!s){s={id:config.species,showdownId:config.species,nameKey:'species.'+config.species,growth:'medium',baseExp:100,evYield:{},catchRate:45,source:'author-placeholder'};input.species.push(s);}s.learnset=config.moves.map(move=>({level:1,move}));delete s.evolutions;

@@ -2,6 +2,7 @@
 /** B host contracts: controlled author content/capabilities, real app/engine/MZ save/Title Continue.
  * Service choices below are programmatic, not physical input or the future D battle controller/UI acceptance.
  */
+import type { GameState } from "../../framework/rules/state";
 import { progressionDonorInputs } from "./source-fixture";
 
 function heldContent(E: any, assert: any, settings: any = {}): any {
@@ -39,6 +40,13 @@ function setup(p: any, content: any, empty = false): any {
   }
   G.$gameSystem._psGame = game;
   return W.PSFlow.app();
+}
+
+// R3: every legal item container in the persistent document (party, boxes, bag).
+function countOwnedItem(g: GameState, item: string): number {
+  const held = [...g.party, ...g.storage.boxes.flatMap(b => b.slots)].filter(m => m && m.item === item).length;
+  const bag = g.inventory.pockets.flat().filter(s => s.itemId === item).reduce((n, s) => n + s.quantity, 0);
+  return held + bag;
 }
 
 async function battle(p: any, label: string, active: string, consumption: boolean): Promise<any> {
@@ -104,7 +112,10 @@ export async function runHeldWriteback(p: any): Promise<void> {
     assert((await h.throwBall("masterball")).ok && h.finished, "actual capture terminal");
     const raw = h.result(), out = app.finishBattle(h, request); eq(out.commit, "applied", "authenticated capture source installation");
     const active = raw.captured[0].id;
-    eq(E.storage.locateMember(game(), active).member.item, "leftovers", "new stable capture identity retains C");
+    // R2 contract replacement (5.4-held-capture-conservation, HF-05): P1 reclaims its own source token, so the capture
+    // must not duplicate it. Old expectation was "leftovers" (the duplication the conservation fix removed).
+    eq(E.storage.locateMember(game(), active).member.item, "", "R2: capture does not duplicate the reclaimed source");
+    eq(countOwnedItem(game(), "leftovers"), 1, "R3: exactly one leftovers instance across party, boxes and bag");
     eq(game().party.find((m: any) => m.id === "P1").item, "leftovers", "original party restores I");
     eq(W.PSFlow.commit(raw), "already-applied", "captured raw exact replay");
     G.$gameMessage.clear(); await frames(5); const slot = 12; await settledSave(slot);
@@ -113,6 +124,32 @@ export async function runHeldWriteback(p: any): Promise<void> {
     fs.writeFileSync(path.join(path.dirname(OUT), "ps-flow-expected-B-held.json"), JSON.stringify({ kind: "B-held", version: 1, cases }));
     return { active, slot, input: "actual engine Trick/capture and MZ save; controlled content/capabilities, no physical input" };
   });
+  await scenario("B-HOST-5R R3 full-party Trick capture replaces the original holder -> captured keeps the item -> MZ save", async () => {
+    const app = setup(p, content), token = app.beginManagement();
+    eq(app.manage(token, "B-give-capture-r", { kind: "give-item", source: { id: "P1", position: { kind: "party", index: 0 } }, item: "leftovers" }).status, "applied", "formal initial held source");
+    app.endManagement(token);
+    for (let i = 2; i <= 6; i++) game().party.push(E.speciesKey.toPersistentMember(E.memberFactory.createMember({ id: "P" + i, species: "Snorlax", level: 50 }, content, (n: number) => 0), content));
+    game().nextMemberOrdinal = "7";
+    eq(countOwnedItem(game(), "leftovers"), 1, "one leftovers before the battle");
+    // forceParty is the formal author option that routes a full-party capture through the receiving decision (test-held-app.cjs:179).
+    const request = { battleId: "B-capture-replace", kind: "wild", seq: 1, foes: [{ species: "pidgey", level: 5 }], forceParty: true };
+    const h = await app.startBattle(request); assert((await h.chooseMove(2)).ok, "actual Trick transfers current held");
+    assert((await h.throwBall("masterball")).ok && h.finished, "actual capture terminal");
+    const raw = h.result(), id = raw.captured[0].id; let out = app.finishBattle(h, request);
+    eq(out.pending, true, "full party waits for the receiving decision");
+    out = app.resolveReceiving(out.receivingToken, { [id]: { placement: { kind: "replace", target: { id: "P1", position: { kind: "party", index: 0 } } } } });
+    eq(out.commit, "applied", "authenticated replace installation");
+    const caught = E.storage.locateMember(game(), id), old = E.storage.locateMember(game(), "P1");
+    eq([caught.position.kind, caught.member.item], ["party", "leftovers"], "captured replacement keeps the transferred item (HF-05 replace)");
+    eq([old.position.kind, old.member.item], ["box", ""], "replaced original holder is boxed without a clone");
+    eq(countOwnedItem(game(), "leftovers"), 1, "conserved across party, boxes and bag");
+    eq(W.PSFlow.commit(raw), "already-applied", "captured raw exact replay");
+    G.$gameMessage.clear(); await frames(5); const slot = 13; await settledSave(slot);
+    const file = G.StorageManager.filePath(G.DataManager.makeSavename(slot));
+    cases.push({ source: "capture-replace", active: id, slot, fileHash: hashFile(file), state: clone(game()), result: clone(raw), content });
+    fs.writeFileSync(path.join(path.dirname(OUT), "ps-flow-expected-B-held.json"), JSON.stringify({ kind: "B-held", version: 1, cases }));
+    return { active: id, slot, input: "actual engine Trick/full-party capture/replace receiving and MZ save; controlled content/capabilities" };
+  });
   await runHeldRemediation(p, content);
 }
 
@@ -120,7 +157,7 @@ export async function continueHeldWriteback(p: any): Promise<void> {
   const { G, W, fs, api, game, clone, scenario, assert, eq, readExpected, scene, waitFor, press, frames, hashFile } = p;
   const expected = readExpected("ps-flow-expected-B-held.json");
   assert(expected.kind === "B-held" && expected.version === 1, "versioned B checkpoint");
-  eq(expected.cases.map((c: any) => c.source), ["give", "gift", "grant", "trade", "capture"], "five complete source checkpoints");
+  eq(expected.cases.map((c: any) => c.source), ["give", "gift", "grant", "trade", "capture", "capture-replace"], "R3: five source checkpoints plus the capture-replace holder");
   for (const item of expected.cases) await scenario(`B-CONTINUE-${item.source} real Title/Continue -> next required battle`, async () => {
     W.PSFlow.stateReplaced(); W.PSFlow._app = null; W.PSFlow._content = item.content; W.PSFlow._dex = api().dex.createDexLookup();
     W.PSFlow.developerCapabilities = { allowHeldItemSources: true, allowExperimentalHeldItemBattle: true };
@@ -141,13 +178,29 @@ export async function continueHeldWriteback(p: any): Promise<void> {
     eq(W.PSFlow.app().healParty().status, "healed", "normal heal before next battle");
     const active = api().storage.locateMember(game(), item.active).member;
     const consumed = active.item === "";
-    if (item.source === "capture") {
+    if (item.source === "capture-replace") {
+      // The captured holder is appended after replacement. Switch it in so an NPC Knock Off removes its item,
+      // and the holder's own I is restored by the post-battle writeback.
+      eq(active.item, "leftovers", "captured holder starts the next battle with its item");
+      const app = W.PSFlow.app(), h = await app.startTrainerBattle({ battleId: "B-capture-replace-next", trainer: { id: "held-source-npc", version: 0 }, seq: 2, canLose: true });
+      // WP38 compacts survivors and appends the caught identity, so the holder is switched in (the NPC Knock Off lands that turn).
+      assert((await h.chooseSwitch(item.active)).ok, "captured holder actually enters the next battle");
+      eq(h.gw._debugBattle().sides[0].pokemon.find((m: { set: { name: string } }) => m.set.name === item.active).item, "", "opponent Knock Off removed the captured holder's item for this battle");
+      for (let i = 0; i < 6 && !h.finished; i++) { const ok = (await h.chooseSwitch("P2")).ok || (await h.chooseMove(1)).ok; assert(ok, "actual next battle continues"); }
+      assert(h.finished, "actual next battle completes");
+      eq(app.finishBattle(h, null).commit, "applied", "new-process source after capture-replace");
+      eq(api().storage.locateMember(game(), item.active).member.item, "leftovers", "captured holder's own I survives the temporary removal");
+      eq(countOwnedItem(game(), "leftovers"), 1, "R3: conserved across party, boxes and bag after the next battle");
+    } else if (item.source === "capture") {
       const app = W.PSFlow.app(), h = await app.startTrainerBattle({ battleId: "B-capture-next", trainer: { id: "held-source-npc", version: 0 }, seq: 2, canLose: true });
       assert((await h.chooseSwitch(item.active)).ok, "captured individual actually enters the next battle");
-      eq(h.gw._debugBattle().sides[0].pokemon.find((m: any) => m.set.name === item.active).item, "", "opponent Knock Off changed captured C");
+      eq(h.gw._debugBattle().sides[0].pokemon.find((m: { set: { name: string } }) => m.set.name === item.active).item, "", "opponent Knock Off changed captured C");
       assert((await h.chooseSwitch("P1")).ok && (await h.chooseMove(1)).ok && h.finished, "actual next battle completes");
       eq(app.finishBattle(h, null).commit, "applied", "new-process source after capture");
-      eq(api().storage.locateMember(game(), item.active).member.item, "leftovers", "capture's own I survives temporary removal in the next battle");
+      // R2 contract replacement (HF-05): the capture holds no duplicated source, so there is no I to survive; check no resurrection
+      // and conservation instead. Coverage note: this case no longer exercises Knock Off restore on a captured holder.
+      eq(api().storage.locateMember(game(), item.active).member.item, "", "R2: captured member stays empty after the next battle (no resurrection)");
+      eq(countOwnedItem(game(), "leftovers"), 1, "R3: exactly one leftovers instance across party, boxes and bag after the next battle");
     } else if (consumed) {
       // No source restoration is invented: this next real battle must preserve the already empty I.
       const h = await W.PSFlow.app().startBattle({ battleId: `B-${item.source}-next`, kind: "wild", seq: 2, foes: [{ species: "pidgey", level: 5 }] });

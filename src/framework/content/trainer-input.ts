@@ -6,6 +6,7 @@ import type { ItemCatalog } from "../rules/item-catalog";
 import type { PartialStats, SpeciesKey } from "../rules/types";
 import { strategyReference } from "../rules/trainer-ai-strategy";
 import { NATURE_ORDER } from "../rules/member-identity";
+import { reusableBattleHealing } from "../rules/active-hp-recovery";
 
 const ID = /^[a-z][a-z0-9-]{0,62}$/;
 const SHOWDOWN_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
@@ -149,6 +150,21 @@ export function trainerSpeciesKeys(order: readonly SpeciesKey[], species: readon
   for (const base of species) if ((base.form ?? 0) === 0)
     for (const form of storedCreationForms(base.showdownId)) keys.add(keyOf({ species: base.id, form }));
   return keys;
+}
+
+/** Called only after validation. Diagnose both authored resource lists without changing inheritance or counts. */
+export function trainerHealingDiagnostics(types: readonly TrainerTypeSource[], records: readonly TrainerRecordSource[], catalog: ItemCatalog): ContentError[] {
+  const warnings: ContentError[] = [];
+  for (const [file, rows] of [['trainer-types.json', types], ['trainers.json', records]] as const) {
+    for (const [index, row] of rows.entries()) for (const [resourceIndex, resource] of (row.items ?? []).entries()) {
+      const item = itemOf(catalog, resource.item);
+      if (!item || !reusableBattleHealing(item)) continue;
+      warnings.push({ file, path: `$[${index}].items[${resourceIndex}].item`,
+        message: `trainer-reusable-healing: ${row.id} lists ${resource.item} (consumable:false active healing). The built-in trainer AI returns it after every successful use and can heal repeatedly with no per-battle use limit; count is owned stock, not a use limit. This is a battle balance risk and may prevent an underpowered player from winning. Use consumable:true or remove this resource for limited trainer healing.`,
+      });
+    }
+  }
+  return warnings;
 }
 
 export type { PartialStats };

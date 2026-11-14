@@ -2,7 +2,8 @@
 import type { TrainerAiCatalog, Ratio } from '../rules/trainer-ai';
 import type { Content } from '../rules/types';
 import { catalogOf } from '../rules/item-catalog';
-import { HEAL_ITEMS, STATUS_ITEMS, healAmount } from '../rules/rules';
+import { HEAL_ITEMS, STATUS_ITEMS } from '../rules/rules';
+import { activeHpRecovery, battleHpRecovery, hpRecoveryEstimate, reusableBattleHealing } from '../rules/active-hp-recovery';
 import { resolveConfig } from '../rules/config';
 import { semanticFingerprint as canonicalJson } from '../rules/semantic';
 import { sha256Hex } from '../rules/sha256';
@@ -12,6 +13,7 @@ export const TRAINER_AI_SHOWDOWN = '7244fe8e28fa8bc4d0809ae30d183c608b62bb2b';
 export interface AssembledTrainerCatalog {
   catalog: TrainerAiCatalog; identity: string; authorIdentity: string;
   battleItems: Readonly<Record<string, string>>;
+  reusableItems: ReadonlySet<string>;
 }
 export function assembleTrainerCatalog(env: LoadedSim, content: Content, contentIdentity: string): AssembledTrainerCatalog {
   if (readEngineSha(env.root) !== TRAINER_AI_SHOWDOWN || !/^[a-f0-9]{64}$/.test(contentIdentity)) throw new Error('trainer-ai-catalog-source-mismatch');
@@ -33,16 +35,17 @@ export function assembleTrainerCatalog(env: LoadedSim, content: Content, content
     }
   }
   const items: Record<string, TrainerAiCatalog['items'][string]> = {}, battleItems: Record<string,string> = {};
-  const authors = catalogOf(content);
+  const authors = catalogOf(content), reusableItems = new Set<string>();
   const rebalanced = resolveConfig(content.settings).REBALANCED_HEALING_ITEM_AMOUNTS;
+  const hpRecovery = activeHpRecovery(authors, rebalanced);
   for (const [id,item] of Object.entries(authors)) {
     const battleId = item.battleId ?? '';
     let data: TrainerAiCatalog['items'][string] = {family:'unsupported',estimateHp:0,cures:[],curesConfusion:false};
-    if (item.battleUse === 'member' && item.consumable) {
+    if (reusableBattleHealing(item)) reusableItems.add(id);
+    if (item.battleUse === 'member' && (item.consumable || reusableItems.has(id))) {
       if (battleId === 'fullrestore') data = {family:'full-restore',estimateHp:999,cures:'all',curesConfusion:true};
       else if (HEAL_ITEMS[battleId]) {
-        const amount = healAmount(HEAL_ITEMS[battleId]!, rebalanced);
-        data = {family:'heal-hp',estimateHp:amount === 'full' ? 999 : amount === 'quarter' ? 1 : amount,cures:[],curesConfusion:false};
+        data = {family:'heal-hp',estimateHp:hpRecoveryEstimate(battleHpRecovery(battleId,rebalanced,hpRecovery)!),cures:[],curesConfusion:false};
       } else if (STATUS_ITEMS[battleId]) {
         const spec = STATUS_ITEMS[battleId]!;
         data = {family:'cure-status',estimateHp:0,cures:spec.cures as 'all' | ('slp'|'frz'|'par'|'psn'|'tox'|'brn')[],curesConfusion:!!spec.confusion};
@@ -52,5 +55,5 @@ export function assembleTrainerCatalog(env: LoadedSim, content: Content, content
   }
   const catalog: TrainerAiCatalog = {gen:8,moves,types,items};
   const authorIdentity = sha256Hex(canonicalJson(authors));
-  return {catalog,authorIdentity,battleItems,identity:sha256Hex(canonicalJson({version:'gen8-author-catalog-v1',showdown:TRAINER_AI_SHOWDOWN,contentIdentity,authorIdentity,catalog}))};
+  return {catalog,authorIdentity,battleItems,reusableItems,identity:sha256Hex(canonicalJson({version:'gen8-author-catalog-v1',showdown:TRAINER_AI_SHOWDOWN,contentIdentity,authorIdentity,catalog}))};
 }

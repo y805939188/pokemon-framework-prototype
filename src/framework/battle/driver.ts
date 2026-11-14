@@ -1,3 +1,4 @@
+import type { ActiveHpRecovery } from '../rules/active-hp-recovery';
 import type { InitialFieldInput } from '../rules/initial-field';
 /**
  * The seam between the game flow and a battle engine: everything the session needs, as plain data and controlled
@@ -22,6 +23,8 @@ export interface GatewayOptions {
   initialField?: InitialFieldInput;
   /** Snapshot-owned WP28 active recovery profile; omitted keeps the existing true default. */
   rebalancedHealingItemAmounts?: boolean;
+  /** Snapshot-owned active HP overrides, keyed by existing supported battle IDs. */
+  activeHpRecovery?: ActiveHpRecovery;
   formatid?: string;
   seed?: number[] | string;
   players?: PlayerSpec[];

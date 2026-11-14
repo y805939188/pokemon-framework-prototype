@@ -43,7 +43,7 @@ import { BattleBagSelection } from './battleflow/battle-bag';
 import { createBagFadeMZ } from './battleflow/bag-fade-mz';
 import { parseBattleStyle, effectiveBattleStyle, installBattleStyleSettings } from './battleflow/battle-style-settings';
 import type { BattleBagRequest } from './battleflow/battle-bag';
-import { catalogOf, itemForBattleId } from '../framework/rules/item-catalog';
+import { catalogOf, itemForBattleId, itemOf } from '../framework/rules/item-catalog';
 import { BALLS } from '../framework/rules/items';
 import { PP_ITEMS, ESCAPE_ITEMS } from '../framework/rules/rules';
 import { projectStatusCard } from './battleflow/status-card';
@@ -1293,7 +1293,16 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     for (const m of s.party) { if (!c.isCurrent()) return; this._names[m.id] = playerBattleName(m); }
     for (const m of s.foeTeam) { if (!c.isCurrent()) return; this._names[m.id] = PSFlow.speciesName(m.species); }
     if (!c.isCurrent()) return;
-    this._D = engine().D.make(this._names, PSFlow.translator());
+    const itemCatalog = catalogOf(s.content), tr = PSFlow.translator();
+    this._D = engine().D.make(this._names, tr, {
+      move: (id: string) => PSFlow.app().describeLearningMove(id)?.name,
+      item: (id: string): string | undefined => {
+        const data = itemForBattleId(itemCatalog, id) ?? itemOf(itemCatalog, id);
+        const authored = data?.name && data.name !== 'Unnamed' ? data.name : undefined;
+        const fallback = authored ?? (tr.has('item.name.' + id) ? tr.t('item.name.' + id) : undefined);
+        return data?.nameKey ? tr.tOr(data.nameKey, fallback ?? data.id) : fallback;
+      },
+    });
     this._pictures = createBattlePicturesMZ(G, this,
       () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
       () => this._pictureUpdate, error => c.fail(error), actor => {
@@ -1457,7 +1466,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
           }
           for (const event of events) {
             const visuals = this._display.event(event);
-            const lines = this._D.event(event), ballPlan = simpleBallPlan(event);
+            const lines = this._D.event(event, events), ballPlan = simpleBallPlan(event);
             if (event === wildEntrance) {
               const species = String(event.args[1] || '').split(',')[0];
               const text = PSFlow.translator().t('battle.wild_appeared', { name: PSFlow.speciesName(species) });
@@ -1570,6 +1579,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       }
       queued.push(step);
     }
+    if (queued.length) restoreLearningView(this);
     c.enqueue(queued); // Explicit test-only fast strings retain their existing no-pacing contract.
   };
   P.ordinaryMessageState = function () { return this._ordinaryMessage?.snapshot() ?? null; };
@@ -1685,6 +1695,12 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     const cur = PSFlow.perf.cur;
     if (cur && cur.firstMenuMs === undefined) { const ms = Math.round((performance.now() - cur.t0) * 10) / 10; if (c.isCurrent() && PSFlow.perf.cur === cur) cur.firstMenuMs = ms; }
     if (!c.isCurrent()) return;
+    if (mode !== 'learn') restoreLearningView(this);
+    else if (!this._learningHidden) {
+      const nodes = new Set([this._status, this._log, ...(this.children ?? []).filter((node: unknown) => node !== this._windowLayer && node !== this._learningMenu && node !== this._commandMenu)]);
+      this._learningHidden = [...nodes].filter(Boolean).map(node => ({ node, visible: node.visible }));
+      for (const row of this._learningHidden) row.node.visible = false;
+    }
     const menu = mode === 'learn' && this._learningMenu ? this._learningMenu : this._commandMenu ?? this._menu;
     if (this._menu !== menu) { this._menu.deactivate(); this._menu.hide(); this._menu = menu; }
     this._menu._phase = mode;
@@ -1794,6 +1810,11 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       ext: i + 1, enabled: true,
     })));
   };
+  function restoreLearningView(scene: { _learningHidden?: { node: { visible: boolean }; visible: boolean }[] | null }): void {
+    const hidden = scene._learningHidden; scene._learningHidden = null;
+    if (!hidden || !sceneController(scene).ownsHost() || G.SceneManager._scene !== scene) return;
+    for (const row of hidden) row.node.visible = row.visible;
+  }
   function restoreBagView(scene: any): void {
     scene._bagLayer = 'battle';
     const hidden = scene._bagHidden; scene._bagHidden = null;

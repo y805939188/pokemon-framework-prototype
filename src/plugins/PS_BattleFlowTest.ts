@@ -158,12 +158,22 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
   }
   const names = (): string[] => battle()._menu._items.map((i: any) => i.name);
   async function choose(re: RegExp | { key: string | number | null }, label?: string) {
+    if (!("key" in re)) {
+      if (bagUseConfirmed && /^\^?Use/.test(re.source) && mode_() !== 'bag-command') { bagUseConfirmed = false; return; }
+      bagUseConfirmed = false; observeLog();
+      if (battle() && mode_() === 'bag') return chooseBagItem(re, label);
+    } else bagUseConfirmed = false;
     const m = battle()._menu;
     const idx = "key" in re
       ? battle().inputState().items.findIndex((i: any) => i.key === re.key)
       : m._items.findIndex((i: any) => re.test(i.name));
     if (idx < 0) throw new Error(`menu item ${re} not found in [${names().join(" | ")}] (${label || ""})`);
     if (m._items[idx].enabled === false) throw new Error(`menu item ${re} is disabled`);
+    return chooseAt(idx, re, label);
+  }
+  async function chooseAt(idx: number, re: RegExp | { key: string | number | null }, label?: string) {
+    const m = battle()._menu;
+    if (idx < 0) throw new Error(`menu item ${re} not found in [${names().join(" | ")}] (${label || ""})`);
     let guard = 0;
     while (m.index() !== idx && guard++ < 30) {
       const at=m.index(),columns=battle().inputState().columns||1;
@@ -183,6 +193,35 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     }
     throw new Error(`OK on ${re} had no effect after 4 presses`);
   }
+  // Current battle-bag navigation and observation of lines actually submitted to the log.
+  // 5.4 battle bag: pocketed rows "Pocket · Name xN" (←/→ pockets), then a "Use X / Cancel" command step, then a
+  // member/move/foe list only when the model needs one (single member/active/foe targets submit directly).
+  let bagUseConfirmed = false, bagTargetLayer = '';
+  const shownLines: string[] = [];
+  function observeLog() {
+    const b = battle(); if (!b || !b._log) return;
+    const proto = Object.getPrototypeOf(b._log); if (proto.__flowTestObserved) return;
+    const add = proto.add, setLines = proto.setLines; // observation only: always calls the original
+    proto.add = function (line: string) { shownLines.push(String(line)); return add.call(this, line); };
+    proto.setLines = function (lines: string[]) { for (const l of lines || []) shownLines.push(String(l)); return setLines.call(this, lines); };
+    proto.__flowTestObserved = true;
+  }
+  async function chooseBagItem(re: RegExp, label?: string) {
+    const strip = (n: string) => { const i = n.indexOf(' · '); return i >= 0 ? n.slice(i + 3) : n; };
+    const find = () => battle()._menu._items.findIndex((i: { ext: unknown; name: string }) => i.ext != null && (re.test(i.name) || re.test(strip(i.name))));
+    for (let n = 0; n < 9 && find() < 0; n++) {
+      const pocket = battle().battleBagState?.()?.pocket; await press('right');
+      await waitFor(() => mode_() === 'bag' && battle().battleBagState?.()?.pocket !== pocket && !battle()._busy && battle()._queue.length === 0, 'R2 bag pocket change');
+    }
+    const idx = find();
+    if (idx < 0) throw new Error(`menu item ${re} not found in any battle bag pocket [${names().join(" | ")}] (${label || ""})`);
+    if (battle()._menu._items[idx].enabled === false) throw new Error(`menu item ${re} is disabled`);
+    await chooseAt(idx, re, label);
+    await waitFor(() => mode_() === 'bag-command' && !battle()._busy && battle()._queue.length === 0, 'R2 bag command step');
+    await chooseAt(battle().inputState().items.findIndex((i: { key: unknown }) => i.key === 'use'), /use/, 'R2 Use');
+    bagUseConfirmed = true; bagTargetLayer = mode_() === 'bag-members' ? 'members' : 'direct';
+    (report.bagUses ??= []).push({ item: String(re), target: bagTargetLayer, frame });
+  }
   const mode_ = () => (battle() ? battle()._mode : "");
   // A new mandatory presentation is confirmed through the same USE input as a player.
   // Existing scenario readiness/phase predicates still have to succeed afterwards.
@@ -197,6 +236,9 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
     throw new Error('bounded level stats confirmations: ' + label);
   }
   async function inMode(m: string, label?: string) {
+    if (m === 'bag-command' && bagUseConfirmed && mode_() !== 'bag-command') return; // R2: the adapter already chose Use
+    if (m === 'party' && bagTargetLayer) { const t = bagTargetLayer; bagTargetLayer = ''; if (t === 'direct') throw new Error('direct bag use has no member selection; assert its target explicitly'); m = 'bag-members'; }
+    else if (m !== 'bag-command') bagTargetLayer = '';
     if (m === 'learn') {
       await waitBattlePresentation(() => !!battle() && ['learn', 'learn-initial'].includes(battle()._mode) && battle()._queue.length === 0 && !battle()._busy, `learning choice ${label || ''}`);
       if (battle()._mode === 'learn-initial') {
@@ -364,10 +406,11 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       await inMode("main"); await shot("01-main-menu");
       assert(names().join() === "Fight,Bag,Pokémon,Run", "main menu items");
       await choose(/^Fight/); await inMode("moves"); await shot("02-moves");
+      const r2Mark = shownLines.length; // R2: the 5.4 learn prompt replaces the visible log; check the shown-line history instead
       await choose(/^flamethrower|Flamethrower/i);
       await inMode("learn"); await shot("03-learn-prompt");
-      assert(battle()._log._lines.some((l: string) => /grew to Lv. 51/.test(l)), "level-up text shown");
-      await choose(/Forget roost/i);
+      assert(shownLines.slice(r2Mark).some((l: string) => /grew to Lv. 51/.test(l)), "level-up text shown");
+      await choose(/^Roost$/i); // R2: 5.4 learn page lists the moves to forget by name (old label "Forget roost")
       await inMode("main");
       await choose(/^Fight/); await inMode("moves");
       assert(names().some((n) => /slash/i.test(n)), "learned move is offered in the next request");
@@ -398,14 +441,36 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       assert(I6.bagOf(battle()._session).pokeball === 4, "the blocked ball is spent (the run refusal consumed nothing)");
       await choose(/^Fight/); await inMode("moves"); await press("cancel"); await inMode("main");
       await choose(/^Bag/); await inMode("bag"); await choose(/Potion/); await inMode("party");
-      const targets = battle()._menu._items;
-      assert(targets.find((i: any) => /Blastoise/.test(i.name)).enabled === false, "a full-HP member is greyed out as a Potion target (refused before registration)");
+      // R2 contract replacement: greyed-out targets are OPEN in 5.4-battle-bag-scene ("成员／目标画面提示和高亮 ... OPEN").
+      // Current contract: choosing the full-HP member is refused with a reason, nothing is spent, the UI returns to the target layer.
+      const r2PotionBefore = I6.bagOf(battle()._session).potion, r2Mark = shownLines.length;
+      await choose(/Blastoise/); await inMode("bag-members");
+      assert(shownLines.slice(r2Mark).some((l: string) => /no effect|won't have any effect|refus|cannot|can't/i.test(l)), "R2: full-HP Potion target refused with a shown reason");
+      eq(I6.bagOf(battle()._session).potion, r2PotionBefore, "R2: refused Potion not spent");
       await press("cancel"); await inMode("bag");
       await press("cancel"); await inMode("main");
       eq(I6.bagOf(battle()._session), { ...I6.bagOf(before), pokeball: I6.bagOf(before).pokeball - 1 }, "bag untouched by the cancels; only the thrown ball is spent");
       await choose(/^Pokémon/); await inMode("party");
-      const items = battle()._menu._items;
-      assert(items[0].enabled === false, "the active member cannot be switched to itself");
+      // R2 contract replacement (5.4-party-switch-menu): the active row opens the command layer; Switch In on it is an
+      // actual Session refusal with the shown reason, back to the member list, nothing consumed. Old: row disabled.
+      const r2SwitchMark = shownLines.length, r2BagBefore = clone(I6.bagOf(battle()._session));
+      const r3Snap = (): unknown => {
+        const value: unknown = JSON.parse(battle()._session.gw.snapshot());
+        const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+        if (!record(value) || !Array.isArray(value.sides)) throw new Error('invalid engine snapshot sides');
+        const sides: readonly unknown[] = value.sides;
+        for (const side of sides) {
+          if (!record(side) || !record(side.choice) || typeof side.choice.error !== 'string') throw new Error('invalid engine choice diagnostic');
+          // A rejected engine choice updates only this diagnostic. All gameplay values, PRNG, logs and requests remain compared.
+          delete side.choice.error;
+        }
+        return value;
+      };
+      const r3Before = r3Snap();
+      await choose(/Charizard/); await inMode("party-command"); await choose(/^Switch In/); await inMode("party");
+      eq(r3Snap(), r3Before, "R3: refused self-switch leaves turn, both sides HP/status/PP/items and actives unchanged");
+      assert(shownLines.slice(r2SwitchMark).some((l: string) => /is already in battle/.test(l)), "the active member cannot be switched to itself");
+      eq(I6.bagOf(battle()._session), r2BagBefore, "R2: refused self-switch consumes nothing");
       await press("cancel"); await inMode("main");
       // finish the battle: two KOs
       for (let i = 0; i < 2; i++) { await choose(/^Fight/); await inMode("moves"); await choose(/flamethrower/i); await frames(5); await waitFor(() => mode_() === "main" || mode_() === "end" || mode_() === "learn" || mode_() === "learn-initial", "after attack"); if (mode_() === "learn-initial") { await choose({ key: 'decline-learning' }); } else if (mode_() === "learn") { await choose(/Don't learn/); await inMode('learn-giveup'); await choose({ key: 'give-up' }); } await frames(5); if (mode_() === "end") break; await inMode("main"); }
@@ -766,7 +831,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
           await choose(/^Bag/); await inMode("bag"); await choose(/Potion/); await inMode("party"); await choose(/Charmander/); await inMode("main");
           assert(battle()._log._lines.some((l: string) => /Recovered/.test(l)), "the Potion healed");
         }
-        for (let i = 0; i < 25 && mode_() !== "end"; i++) { if (mode_() === "party-forced") { await choose(/Caterpie/); await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy, "after the switch"); continue; } await choose(/^Bag/); await inMode("bag"); await choose(/Poké Ball/); await waitFor(() => ["main", "end", "party-forced"].includes(mode_()) && battle()._queue.length === 0 && !battle()._busy, "after the throw"); }
+        for (let i = 0; i < 25 && mode_() !== "end"; i++) { if (mode_() === "wild-faint") { await choose({ key: "next" }); await inMode("party-forced"); } /* R2: 5.4 Use-next question */ if (mode_() === "party-forced") { await choose(/Caterpie/); if (mode_() === "party-command") await choose(/^Switch In/); /* R2: 5.4 command layer */ await waitFor(() => ["main", "end"].includes(mode_()) && !battle()._busy, "after the switch"); continue; } await choose(/^Bag/); await inMode("bag"); await choose(/Poké Ball/); await waitFor(() => ["main", "end", "party-forced", "wild-faint"].includes(mode_()) && battle()._queue.length === 0 && !battle()._busy, "after the throw"); }
         await inMode("end");
         assert(!battle()._log._lines.some((l:string)=>/was sent to the boxes/.test(l)),"no destination is announced before commit");
         await press("ok");await waitFor(()=>!W.PSFlow.running&&!battle(),"automatic reception committed");const notice=W.PSFlow.lastReceivingNotice;assert(notice&&notice.placements.some((p:any)=>p.to==="boxes")&&notice.messages.some((line:string)=>G.$gameMessage._texts.includes(line)),"actual destination is shown after commit");await dismissMessages(); await waitFor(() => !W.PSFlow.running && !battle(), "back"); await frames(5);
@@ -787,8 +852,10 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       W.PSFlow.testLimits = { party: 6, boxes: 1, bagPerItem: 999, money: 999999 }; W.PSFlow._app = null;
       const before = clone(game());
       await stepInto(3, 9, 2); await waitFor(() => battle() && battle()._mode !== "boot", "battle"); await inMode("main");
-      await choose(/^Bag/); await inMode("bag"); await choose(/Poké Ball/); await inMode("main");
-      assert(battle()._log._lines.some((l: string) => /party and boxes are full/.test(l)), "the reason is shown");
+      const r2Mark19 = shownLines.length;
+      await choose(/^Bag/); await inMode("bag"); await choose(/Poké Ball/); await inMode("bag"); // R2: refusal returns to the bag items layer
+      assert(shownLines.slice(r2Mark19).some((l: string) => /party and boxes are full/.test(l)), "the reason is shown");
+      await press("cancel"); await inMode("main");
       eq(I6.bagOf(battle()._session).pokeball, I6.bagOf(before).pokeball, "nothing spent");
       await choose(/^Run/); await finishBattle();
       eq([game().party.length, boxed().length, I6.bagOf(game()).pokeball], [6, 1, I6.bagOf(before).pokeball], "nothing stored or spent");
@@ -935,7 +1002,7 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       await slice(30); I6.setItemCount(game(), "potion", 2);
       game().party[0].hp = 1;const targetName=W.PSFlow.speciesName(game().party[0].species);
       W.PSFlow.openBattle({battleId:"__proto__",kind:"wild",foes:[{species:"pidgey",level:1}],seq:30,canLose:true});await inMode("main");const handle=battle()._session;
-      await choose(/^Bag/);await inMode("bag");await choose(/^Potion\b/i);await inMode("party");await choose(new RegExp(targetName,'i'));await inMode("main");await choose(/^Run/);await inMode("end");const r=handle.result();await finishBattle();
+      await choose(/^Bag/);await inMode("bag");await choose(/^Potion\b/i);assert(bagTargetLayer === "direct", "single-member Potion submits directly");eq(handle.party.map((m: { species: string }) => W.PSFlow.speciesName(m.species)), [targetName], "direct use targets the sole member");bagTargetLayer = "";await inMode("main");await choose(/^Run/);await inMode("end");const r=handle.result();await finishBattle();
       eq([W.PSFlow.lastOutcome.commit, W.PSFlow.commit(r), I6.bagOf(game()).potion], ["applied", "already-applied", 1], "applied once from the legitimate Session");
       assert(Object.hasOwn(game().appliedBattles, "__proto__"), "an own ledger entry");
       await G.DataManager.saveGame(12);
@@ -1233,13 +1300,15 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
    await scenario('U51-08 forced party receiving cannot cancel or send to box; replacing deposits the chosen stable ID',async()=>{
     await toMap();fresh();while(game().party.length<6)game().party.push(mkMember('FORCE-FILL-'+game().party.length,'Pidgey',5));W.PSFlow.receiveOptions={mode:2,naming:1};W.PSFlow._app=null;const original=game().party[0].id,result=W.PSFlow.app().receiveGift({kind:'normal',member:{existing:mkMember('FORCE-NEW','Pidgey',5)}});eq(result.status,'pending','force pending');W.PSManagement.openReceiving();await uiReady('menu');assert(!management().view.items.some((x:any)=>x.key==='box'),'force has no box option');await press('cancel');await uiReady('menu');assert(W.PSFlow.operationPending(),'cancel cannot unlock force receiving');await uiChoose('party');await uiReady('party');await press('cancel');await uiChoose('party');await uiReady('party');await press('ok');await uiClosed();eq(game().party.at(-1).id,'FORCE-NEW','WP38 compacts survivors then appends new identity');eq(api().storage.locateMember(game(),original).position.kind,'box','chosen old member stored');
    });
-   await scenario('U51-09 source-off UI permits taking existing item; selector caches qualifier and returns stable identity; Box Link requires three gates',async()=>{
-    await toMap();fresh();game().party[0].item='leftovers';const id=game().party[0].id;W.PSManagement.openParty();await uiReady('party');await press('ok');await uiChoose('item');await uiReady('menu');assert(management().view.items.find((x:any)=>x.key==='give').enabled===false,'source off give disabled');await uiChoose('take');await uiReady('party');eq(game().party[0].item,'','taken item');eq(I6.bagOf(game()).leftovers,1,'returned exactly once');
+   await scenario('U51-09 released held-source UI permits giving and taking an existing item; selector caches qualifier and returns stable identity; Box Link requires three gates',async()=>{
+    await toMap();fresh();game().party[0].item='leftovers';const id=game().party[0].id;W.PSManagement.openParty();await uiReady('party');await press('ok');await uiChoose('item');await uiReady('menu');/* R2 contract replacement: config.ts ORDINARY_HELD_ITEMS_RELEASED=true (5.4-held-default-release) makes "source off" unreachable; the old assert was give.enabled===false */assert(management().view.items.find((x:any)=>x.key==='give').enabled!==false,'R2: 5.4 default-open source keeps Give enabled');await uiChoose('take');await uiReady('party');eq(game().party[0].item,'','taken item');eq(I6.bagOf(game()).leftovers,1,'returned exactly once');
     W.PSManagement.hasBoxLink=()=>true;G.$gameSwitches.setValue(35,true);await press('control');eq(management().view.kind,'party','switch disables link');G.$gameSwitches.setValue(35,false);await press('control');await uiReady('box');await press('cancel');await uiChoose('no');await uiReady('party');await press('cancel');await uiClosed();W.PSManagement.hasBoxLink=managementBoxLinkDefault;
     let calls=0,selected:any='pending';assert(W.PSManagement.selectMember((m:any)=>{calls++;return m.id===id;},(x:any)=>{selected=x;}),'selector open');await uiReady('party');eq(calls,game().party.length,'qualifier cached once per member');await press('ok');await uiClosed();eq(selected,{id,index:0},'selector stable ID/index');eq(calls,game().party.length,'not repeatedly called by rendering');
    });
-   await scenario('U51-10 closed held-item player battle is a visible refusal without fatal map exception; taking it restores battle eligibility',async()=>{
-    await toMap();fresh();game().party[0].item='leftovers';const before=clone(game());G.$gameMap.event(1).start();await frames(12);assert(!battle()&&!W.PSFlow.running,'held battle refused without a scene');assert(/held-item-battle-disabled/.test(W.PSFlow.lastOutcome?.error),'clear held diagnosis');eq(game(),before,'no state or item consumed');await dismissMessages();
+   await scenario('U51-10 released held-item battle accepts and restores held sources; taking it retains battle eligibility',async()=>{
+    /* R2 contract replacement: the closed held-item battle refusal is unreachable in 5.4 (ORDINARY_HELD_ITEMS_RELEASED=true).
+       Old first half: refusal without a scene + held-item-battle-disabled diagnosis + no state change. Current contract: admitted. */
+    await toMap();fresh();game().party[0].item='leftovers';const r2Id=game().party[0].id;await startEvent(1);await inMode('main');assert(W.PSFlow.running&&!!battle(),'R2: held-item party battle is admitted');await choose(/^Run/);await finishBattle();eq(api().storage.locateMember(game(),r2Id).member.item,'leftovers','R2: held item written back after the run');
     W.PSManagement.openParty();await uiReady('party');await press('ok');await uiChoose('item');await uiChoose('take');await uiReady('party');await press('cancel');await uiClosed();await startEvent(1);await inMode('main');await choose(/^Run/);await finishBattle();
    });
    await scenario('U51-11 real management window resource fails twice then explicit recovery commits once and presents destination notice',async()=>{

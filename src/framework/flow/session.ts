@@ -5,6 +5,8 @@ export { readSessionRequestContext } from './request-view';
 export type { SessionRequestContext } from './request-view';
 import type { InitialFieldInput } from '../rules/initial-field';
 import { battleBag } from "../rules/inventory";
+import type { ActiveHpRecovery } from "../rules/active-hp-recovery";
+import { hpRecoveryRequest, activeHpRecovery, reusableBattleHealing } from "../rules/active-hp-recovery";
 import { catalogOf } from "../rules/item-catalog";
 /**
  * BattleSession: the game-side owner of one battle.
@@ -150,7 +152,9 @@ interface LedgerEntry {
   kind: string;
   itemId: string;
   target: unknown;
-  state: "reserved" | "consumed" | "refunded";
+  state: "reserved" | "consumed" | "retained" | "refunded";
+  /** A reusable copy is borrowed until its action resolves, then returned exactly once. */
+  reusable?: true;
   why?: string;
 }
 
@@ -181,6 +185,9 @@ export class BattleSession implements BattleSessionView {
   readonly expGain: boolean;
   readonly captureExpGain: boolean;
   constructor(canSwitch = true, expGain = true, captureExpGain = true) { this.canSwitch = canSwitch; this.expGain = expGain; this.captureExpGain = captureExpGain; initializeRequestView(this); }
+  /** Fixed registration view of the same profile bound into this session's engine snapshots. */
+  private _activeHpRecovery?: ActiveHpRecovery;
+  private _reusableHealingItems: ReadonlySet<string> = new Set();
   content!: Content;
   rules!: G.ExpRules;
   battleId!: string;
@@ -248,6 +255,9 @@ export class BattleSession implements BattleSessionView {
     const party = S.clone(game.party).filter((m) => !m.isEgg).slice(0, 6);
     const lead = [...party.filter((m) => m.hp > 0), ...party.filter((m) => m.hp <= 0)];
     const s = new BattleSession(canSwitch, expGain, captureGrowth);
+    const healingRebalanced = resolveConfig(content.settings).REBALANCED_HEALING_ITEM_AMOUNTS;
+    s._activeHpRecovery = activeHpRecovery(catalogOf(content), healingRebalanced);
+    s._reusableHealingItems = new Set(Object.values(catalogOf(content)).filter(reusableBattleHealing).map(item => item.battleId!));
     s.content = content; s.rules = rules || G.DEFAULT_RULES; s.battleId = battleId; s.foe = foe;
     s.party = party; s.foeTeam = S.clone(foe.team);
     s.startBag = battleBag(game.inventory, catalogOf(content)); s.bag = S.clone(s.startBag);
@@ -262,7 +272,8 @@ export class BattleSession implements BattleSessionView {
     }
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
     s.gw = await driver.create({
-      rebalancedHealingItemAmounts: resolveConfig(content.settings).REBALANCED_HEALING_ITEM_AMOUNTS,
+      rebalancedHealingItemAmounts: healingRebalanced,
+      activeHpRecovery: s._activeHpRecovery,
       speciesTypes: Object.fromEntries(Object.entries(content.species).filter(([, data]) => data.types !== undefined).map(([name, data]) => [name, [...data.types!]])),
       ...(initialField ? { initialField } : {}),
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls
@@ -460,7 +471,7 @@ export class BattleSession implements BattleSessionView {
   }
   async chooseForcedSwitch(memberId: string): Promise<TurnResult> { return this.chooseSwitch(memberId); }
 
-  /** Reserve the item (deduct now), register the action; refunded on cancel/no-effect. */
+  /** Reserve one owned copy; reusable healing returns it on success as well as cancel/no-effect. */
   async useItem(itemId: string, targetId: string, { commit = true, moveSlot }: { commit?: boolean; moveSlot?: number } = {}): Promise<TurnResult> {
     return this._action(async () => {
       this._log("info", "choice", { action: "item", item: itemId, target: targetId, commit, moveSlot });
@@ -491,6 +502,8 @@ export class BattleSession implements BattleSessionView {
     const moves = Object.hasOwn(PP_ITEMS, itemId) ? this.party.find(m => m.id === targetId)?.moves.map(m => ({ ...m, pp: mon?.pp[m.id] ?? m.pp, maxpp: mon?.ppMax?.[m.id] ?? m.maxpp })) : undefined;
     const eligibility = itemEligibility(itemId, mon, { moves, moveSlot });
     if (!eligibility.ok) return eligibility;
+    const recovery = this._activeHpRecovery?.[itemId];
+    if (mon && recovery && hpRecoveryRequest(recovery, mon) <= 0) return { ok: false, reason: "item-no-effect" };
     if (this._itemMoveSlot(itemId, targetId, moveSlot) === null) return { ok: false, reason: "item-no-effect" };
     return eligibility;
   }
@@ -633,12 +646,12 @@ export class BattleSession implements BattleSessionView {
   _reserve(kind: string, itemId: string, target: unknown): LedgerEntry {
     this.bag[itemId] = (this.bag[itemId] as number) - 1;
     this._log("info", "ledger", { op: "reserve", kind, item: itemId, left: this.bag[itemId] });
-    const e: LedgerEntry = { kind, itemId, target, state: "reserved" };
+    const e: LedgerEntry = { kind, itemId, target, state: "reserved", ...(kind === "item" && this._reusableHealingItems.has(itemId) ? { reusable: true as const } : {}) };
     this.ledger.push(e);
     return e;
   }
   _refund(entry: LedgerEntry, why: string): void {
-    if (entry.state === "refunded") return;
+    if (entry.state !== "reserved") return;
     entry.state = "refunded"; entry.why = why;
     this._log("info", "ledger", { op: "refund", kind: entry.kind, item: entry.itemId, why });
     this.bag[entry.itemId] = (this.bag[entry.itemId] || 0) + 1;
@@ -816,7 +829,13 @@ export class BattleSession implements BattleSessionView {
       if (side !== "p1") return;
       if (what === "item") {
         const entry = this.ledger.find((l) => l.kind === "item" && l.state === "reserved" && l.itemId === itemId);
-        if (entry) { if (res === "ok") { entry.state = "consumed"; this._log("info", "ledger", { op: "consume", kind: "item", item: itemId }); } else this._refund(entry, res ?? "invalid"); }
+        if (entry) {
+          if (res === "ok") {
+            if (entry.reusable) { this.bag[entry.itemId] = (this.bag[entry.itemId] || 0) + 1; entry.state = "retained"; }
+            else entry.state = "consumed";
+            this._log("info", "ledger", { op: entry.reusable ? "reuse" : "consume", kind: "item", item: itemId });
+          } else this._refund(entry, res ?? "invalid");
+        }
         if (entry && res === "ok") this._changeBattleFriendship(String(entry.target), "battleitem");
       } else if (what === "ball") {
         const entry = this.ledger.find((l) => l.kind === "ball" && l.state === "reserved" && l.itemId === itemId);

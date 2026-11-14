@@ -39,3 +39,28 @@ for (const [index, lang] of ['en', 'zh'].entries()) {
   assert.deepEqual(d.event({type:'unknown-event',args:['anything'],raw:'|unknown-event|anything'}),[]);
  });
 }
+for(const lang of ['en','zh'])test(`${lang} common feedback, learned IDs resolved through content then translation; unknown events stay silent`,()=>{
+ const tr=E.i18n.translatorFor(lang),d=E.describe.make({A:'Alpha',B:'Beta'},tr,{move:id=>id==='smokescreen'?'Smoke Screen':undefined});
+ const entries=[['-fail',['p1a: A']],['-nothing',[]],['-transform',['p1a: A','p2a: B']],['-item',['p1a: A','Leftovers','[from] move: Trick']],['-enditem',['p2a: B','Leftovers','[from] move: Knock Off']],['-enditem',['p1a: A','Oran Berry','[eat]']],['-weather',['none']],...['Electric','Grassy','Misty','Psychic'].map(x=>['-fieldend',['move: '+x+' Terrain']])];
+ for(const [type,args]of entries){const e=Object.freeze({type,args:Object.freeze(args),raw:'|'+type+'|'+args.join('|')}),before=JSON.stringify(e),lines=d.event(e);assert.equal(lines.length,1,type);assert(lines[0].length>0);assert(!lines[0].includes('battle.'));assert.equal(JSON.stringify(e),before);}
+ assert.deepEqual(d.event({type:'-item',args:['p1a: A','Leftovers','[silent]']}),[]);
+ assert.deepEqual(d.event({type:'-fieldend',args:['move: Unknown Field']}),[]);assert.deepEqual(d.event({type:'-weather',args:['RainDance','[upkeep]']}),[]);
+ const learned=d.message({kind:'learned',seq:1,member:'A',move:'smokescreen',replaced:3})[0];assert(learned.includes('Smoke Screen'));assert(!learned.includes('smokescreen'));
+ const english=E.describe.make({A:'Alpha'},E.i18n.translatorFor('en'));
+ assert.deepEqual(english.event({type:'-curestatus',args:['p1a: A','slp']}),['Alpha woke up!']);assert.deepEqual(english.event({type:'-curestatus',args:['p1a: A','frz']}),['Alpha thawed out!']);
+ assert.deepEqual(tr.diagnostics(),{missingKeys:[],missingParams:[]});
+});
+
+test('manual item healing keeps the HP event for display but emits one item-first sentence',()=>{
+ const d=E.describe.make({A:'Alpha'}),heal={type:'-heal',args:['p1a: A','100/200'],raw:'|-heal|p1a: A|100/200'},item={type:'rpg',args:['item','p1','potion','A','ok','20','100','200'],raw:'|rpg|item|p1|potion|A|ok|20'};
+ assert.deepEqual(d.message({kind:'events',seq:1,events:[heal,item]}),['Used Potion on Alpha. Recovered 20 HP.']);
+ assert.deepEqual(d.event(heal),['Alpha recovered HP (100/200).']);
+ assert.equal(d.event(heal,[heal,{...item,args:['item','p1','potion','B','ok','20']}]).length,1,'other target cannot suppress ordinary recovery');
+ assert.deepEqual(heal.args,['p1a: A','100/200'],'HP presentation input is retained');
+});
+
+test('two HP updates in one batch keep the first source and deduplicate only the exact manual item update',()=>{
+ const d=E.describe.make({A:'Alpha'}),first={type:'-heal',args:['p1a: A','80/200','[from] ability: Regenerator']},manual={type:'-heal',args:['p1a: A','100/200']},item={type:'rpg',args:['item','p1','potion','A','ok','20','100','200']};
+ assert.deepEqual(d.message({kind:'events',seq:1,events:[first,manual,item]}),['Alpha recovered HP (80/200).','Used Potion on Alpha. Recovered 20 HP.']);
+ assert.equal(d.event(first,[first,item]).length,1);assert.equal(d.event(manual,[manual,{...item,args:['item','p2','potion','A','ok','20','100','200']}]).length,1);
+});

@@ -8,7 +8,7 @@ function content(flag,items=[]){
  const source=inputs({items,moves:['splash'],party:1});
  source.settings={...source.settings};
  if(flag===undefined)delete source.settings.REBALANCED_HEALING_ITEM_AMOUNTS;
- else source.settings.REBALANCED_HEALING_ITEM_AMOUNTS=flag;
+ else source.settings={...source.settings,REBALANCED_HEALING_ITEM_AMOUNTS:flag};
  const compiled=E.contentCompile.compileContent(source);assert.equal(compiled.ok,true,JSON.stringify(compiled.errors));
  const result=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(result.errors,[]);return result.content;
 }
@@ -92,4 +92,74 @@ test('field-only healing families remain unsupported battle items',async()=>{
  const w=await battle(false,[{item:'energypowder',count:1},{item:'energyroot',count:1}]);hp(w,'p1',1);hp(w,'p2',1);w.session.gw.refreshRequests();
  for(const id of ['energypowder','energyroot']){w.session.bag[id]=1;assert.equal((await w.session.useItem(id,active(w).name)).reason,'unknown-item');assert.equal(w.session.bag[id],1);}
  assert.deepEqual(D.captureTrainerAiRequest(w.session,w.session.gw).snapshot.request.legalItems,[]);
+});
+// F1 follow-up: authored HP amounts are shared by field use, actual turns and AI estimates.
+function customContent(flag,id,parameters){
+ const source=inputs({party:1,moves:['splash'],items:[{item:id,count:2}]});source.settings={...source.settings,REBALANCED_HEALING_ITEM_AMOUNTS:flag};
+ source.items.find(i=>i.id===id).effect={family:'hp',parameters};
+ const compiled=E.contentCompile.compileContent(source);assert(compiled.ok,JSON.stringify(compiled.errors));
+ assert(!compiled.warnings.some(w=>w.message.startsWith('battle-healing-parameters-differ:')));
+ const result=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(result.errors,[]);return result.content;
+}
+for(const flag of [true,false])test(`author fixed HP is identical through field, player, trainer and AI config=${flag}`,async()=>{
+ const c=customContent(flag,'superpotion',{amount:80,oldAmount:90}),amount=flag?80:90;
+ const x=field.setup({bag:{superpotion:2},settings:{REBALANCED_HEALING_ITEM_AMOUNTS:flag},edit:(g,c2)=>{c2.items.superpotion=structuredClone(c.items.superpotion);c2.species.Charizard.base.hp=255;g.party[0].hp=1;}});
+ const token=x.app.beginInventoryOperation();assert.equal(x.app.inventoryRequest(token,'custom-heal',{kind:'use-item',itemId:'superpotion',quantity:1,memberId:x.game.party[0].id}).status,'committed');assert.equal(x.state.current().party[0].hp,1+amount);x.app.endInventoryOperation(token);
+ const w=await fixture({content:c});hp(w,'p1',1);hp(w,'p2',1);w.session.bag.superpotion=2;w.session.gw.refreshRequests();
+ assert.equal(D.captureTrainerAiRequest(w.session,w.session.gw).snapshot.request.legalItems[0].estimateHp,amount);
+ const r=await w.session.useItem('superpotion',active(w).name);assert(r.ok);assert.equal(Number(itemEvent(r,'p1','superpotion').args[5]),amount);assert.equal(Number(itemEvent(r,'p2','superpotion').args[5]),amount);assert.equal(w.session.bag.superpotion,1);assert.equal(D.trainerAiDiagnostics(w.session).state.resources[0].count,1);
+});
+test('author HP true amount is also false fallback when oldAmount is omitted',async()=>{
+ for(const flag of [true,false]){const w=await fixture({content:customContent(flag,'superpotion',{amount:80})});hp(w,'p1',1);hp(w,'p2',1);w.session.bag.superpotion=1;w.session.gw.refreshRequests();assert.equal(D.captureTrainerAiRequest(w.session,w.session.gw).snapshot.request.legalItems[0].estimateHp,80);assert.equal(Number(itemEvent(await w.session.useItem('superpotion',active(w).name),'p1','superpotion').args[5]),80);}
+});
+for(const flag of [true,false])test(`author fraction/full/fixed profiles preserve field and battle capping config=${flag}`,async()=>{
+ for(const [id,parameters,current,max,expected,estimate]of [['sitrusberry',{fraction:8},1,105,13,1],['potion',{fraction:3},1,101,33,1],['superpotion',{full:true},1,101,100,999],['maxpotion',{full:true},99,101,2,999],['maxpotion',{amount:80,oldAmount:90},1,201,flag?80:90,flag?80:90],['superpotion',{amount:80,oldAmount:90},397,400,3,flag?80:90]]){
+  const c=customContent(flag,id,parameters),w=await fixture({content:c});hp(w,'p1',current,max);hp(w,'p2',1);w.session.bag[id]=1;w.session.gw.refreshRequests();
+  assert.equal(D.captureTrainerAiRequest(w.session,w.session.gw).snapshot.request.legalItems[0].estimateHp,estimate,id);const r=await w.session.useItem(id,active(w).name);assert(r.ok);assert.equal(Number(itemEvent(r,'p1',id).args[5]),expected,id);assert.equal(active(w).hp,current+expected,id);assert.equal(w.session.bag[id],0,id);
+  const x=field.setup({bag:{[id]:2},settings:{REBALANCED_HEALING_ITEM_AMOUNTS:flag},edit:(g,c2)=>{c2.items[id]=structuredClone(c.items[id]);g.party[0].hp=1;}}),maxField=field.maxHp(x.game.party[0],x.content);
+  const token=x.app.beginInventoryOperation();assert.equal(x.app.inventoryRequest(token,'profile',{kind:'use-item',itemId:id,quantity:1,memberId:x.game.party[0].id}).status,'committed');
+  const requested=parameters.full?maxField:parameters.fraction?Math.floor(maxField/parameters.fraction):(flag?parameters.amount:parameters.oldAmount??parameters.amount);assert.equal(x.state.current().party[0].hp,Math.min(maxField,1+requested));x.app.endInventoryOperation(token);
+ }
+});
+test('custom healing snapshots own copied values; restore options never rebind; legacy snapshots retain original profile',async()=>{
+ const w=await fixture({content:customContent(false,'superpotion',{amount:80,oldAmount:90})});hp(w,'p1',1);const saved=w.session.gw.snapshot();assert.equal(JSON.parse(saved).rpg.activeHpRecovery.superpotion.amount,90);
+ const restored=await E.gateway.BattleGateway.restore(saved,{activeHpRecovery:{superpotion:{amount:2}},rebalancedHealingItemAmounts:true});await restored.act('p1',{kind:'item',item:'superpotion',target:restored.activeId('p1')});await restored.choose('p2','move 1');assert.equal(restored.readState('p1')[0].hp,91);
+ const old=JSON.parse(saved);delete old.rpg.activeHpRecovery;const legacy=await E.gateway.BattleGateway.restore(JSON.stringify(old),{activeHpRecovery:{superpotion:{amount:2}}});await legacy.act('p1',{kind:'item',item:'superpotion',target:legacy.activeId('p1')});await legacy.choose('p2','move 1');assert.equal(legacy.readState('p1')[0].hp,51);
+ delete old.rpg.rebalancedHealingItemAmounts;const ancient=await E.gateway.BattleGateway.restore(JSON.stringify(old));await ancient.act('p1',{kind:'item',item:'superpotion',target:ancient.activeId('p1')});await ancient.choose('p2','move 1');assert.equal(ancient.readState('p1')[0].hp,61);
+});
+test('custom HP profile and AI catalog survive exact session checkpoint replay',async(t)=>{
+ t.mock.method(Date,'now',()=>1793350000000);const w=await fixture({content:customContent(false,'superpotion',{amount:80,oldAmount:90})});hp(w,'p1',1);hp(w,'p2',1);w.session.bag.superpotion=2;w.session.gw.refreshRequests();
+ const aiBefore=D.captureTrainerAiRequest(w.session,w.session.gw).snapshot,checkpoint=w.session._checkpoint();assert.equal(aiBefore.request.legalItems[0].estimateHp,90);
+ const first=await w.session.useItem('superpotion',active(w).name);assert(first.ok);assert.equal(Number(itemEvent(first,'p1','superpotion').args[5]),90);const after=JSON.parse(w.session.gw.snapshot()),diagnostics=D.trainerAiDiagnostics(w.session);
+ await w.session._restoreCheckpoint(checkpoint);assert.deepEqual(D.captureTrainerAiRequest(w.session,w.session.gw).snapshot,aiBefore);const second=await w.session.useItem('superpotion',active(w).name);assert(second.ok);assert.equal(Number(itemEvent(second,'p1','superpotion').args[5]),90);assert.deepEqual(JSON.parse(w.session.gw.snapshot()),after);assert.deepEqual(D.trainerAiDiagnostics(w.session),diagnostics);
+});
+test('invalid HP snapshot profiles are rejected rather than silently falling back',async()=>{
+ const w=await battle(true),saved=JSON.parse(w.session.gw.snapshot());
+ for(const profile of [null,[],{potion:{amount:0}},{potion:{amount:'80'}},{potion:{fraction:0}},{potion:{full:false}},{potion:{amount:80,full:true}},{potion:{amount:80,extra:1}},{unknown:{amount:80}}]){const bad=structuredClone(saved);bad.rpg.activeHpRecovery=profile;await assert.rejects(E.gateway.BattleGateway.restore(JSON.stringify(bad)),/invalid active HP recovery/);await assert.rejects(E.gateway.BattleGateway.create({formatid:'gen8rpgcustomgame',activeHpRecovery:profile}),/invalid active HP recovery/);}
+});
+test('default content does not rebind HP profiles; full restore retains canonical semantics',async()=>{
+ const w=await battle(false);assert.equal(JSON.parse(w.session.gw.snapshot()).rpg.activeHpRecovery,undefined);hp(w,'p1',1);w.session.bag.fullrestore=1;active(w).status='par';const r=await w.session.useItem('fullrestore',active(w).name);assert(r.ok);assert.equal(active(w).hp,400);assert.equal(active(w).status,'');
+});
+test('author identity maps to the supported battle identity for both player healing and trainer estimates',async()=>{
+ const source=inputs({party:1,moves:['splash'],items:[{item:'tonic',count:1}]});const item=source.items.find(i=>i.id==='superpotion');item.id='tonic';item.legacyIds=[];item.effect={family:'hp',parameters:{amount:80}};
+ const compiled=E.contentCompile.compileContent(source);assert(compiled.ok,JSON.stringify(compiled.errors));const joined=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(joined.errors,[]);
+ const w=await fixture({content:joined.content});hp(w,'p1',1);hp(w,'p2',1);w.session.bag.superpotion=1;w.session.gw.refreshRequests();const legal=D.captureTrainerAiRequest(w.session,w.session.gw).snapshot.request.legalItems[0];assert.equal(legal.itemId,'tonic');assert.equal(legal.estimateHp,80);assert.equal(Number(itemEvent(await w.session.useItem('superpotion',active(w).name),'p1','superpotion').args[5]),80);
+});
+test('full-HP and fainted targets still refuse custom HP items before spending inventory',async()=>{
+ const w=await fixture({content:customContent(true,'superpotion',{amount:80})});w.session.bag.superpotion=2;
+ for(const current of [400,0]){hp(w,'p1',current);if(!current)active(w).fainted=true;const before=w.session.bag.superpotion;const result=await w.session.useItem('superpotion',active(w).name);assert.equal(result.ok,false);assert.equal(w.session.bag.superpotion,before);}
+});
+
+test('explicitly different field families retain a compiler diagnosis rather than silently changing special battle semantics',()=>{
+ for(const [id,effect,warn]of [['potion',{family:'status',parameters:{status:'par'}},true],['fullrestore',{family:'hp',parameters:{amount:80}},true],['fullrestore',{family:'full-restore',parameters:{}},false]]){
+  const source=inputs(),item=source.items.find(i=>i.id===id);item.effect=effect;const r=E.contentCompile.compileContent(source);assert(r.ok,JSON.stringify(r.errors));assert.equal(r.warnings.some(w=>w.message.startsWith('battle-healing-family-mismatch:')),warn,id);
+ }
+});
+
+test('a valid custom fraction rounding to zero is refused before inventory or a turn, and excluded from AI candidates',async()=>{
+ const c=customContent(true,'potion',{fraction:1000}),w=await fixture({content:c});hp(w,'p1',1);hp(w,'p2',1);w.session.bag.potion=1;w.session.gw.refreshRequests();
+ const snap=w.session.gw.snapshot();assert.deepEqual(D.captureTrainerAiRequest(w.session,w.session.gw).snapshot.request.legalItems,[]);
+ assert.deepEqual(await w.session.useItem('potion',active(w).name),{ok:false,reason:'item-no-effect'});assert.equal(w.session.bag.potion,1);assert.equal(w.session.gw.snapshot(),snap);assert.equal(D.trainerAiDiagnostics(w.session).state.resources[0].count,2);
+ const x=field.setup({bag:{potion:1},edit:(g,c2)=>{g.party[0].hp=1;c2.items.potion.effect={family:'hp',parameters:{fraction:1000}};}}),token=x.app.beginInventoryOperation(),before=structuredClone(x.state.current());
+ const r=x.app.inventoryRequest(token,'zero',{kind:'use-item',itemId:'potion',quantity:1,memberId:x.game.party[0].id});assert.equal(r.status,'refused');assert.equal(r.reason,'no-effect');assert.deepEqual(x.state.current(),before);x.app.endInventoryOperation(token);
 });

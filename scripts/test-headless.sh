@@ -20,6 +20,9 @@ SUITES=(
   experiments/step5/4/test-p4-request-source-scene.cjs
   experiments/step5/4/test-normal-consumer-compat.cjs
   experiments/step5/4/test-p4-normal-continuation.cjs
+  experiments/step5/4/test-reusable-healing.cjs
+  experiments/step5/4/test-reusable-item-diagnostics.cjs
+  experiments/step5/4/test-held-item-description.cjs
   experiments/step5/4/test-cant-description.cjs
   experiments/step5/4/test-cant-engine.cjs
   experiments/step5/4/test-cant-scene.cjs
