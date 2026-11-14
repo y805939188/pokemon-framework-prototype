@@ -60,8 +60,15 @@ export function make(names: Record<string, string> = {}, tr: Translator = defaul
       case "cant": return [cant(a0, a1)];
       case "move": return [tr.t("battle.used_move", { user: nm(a0), move: a1 })];
       case "-damage": { if (/\[from\]/.test(a.join("|"))) return [tr.t("battle.hurt", { name: nm(a0), hp: pct(a1) })]; return a1.startsWith("0") ? [] : [tr.t("battle.hp_left", { name: nm(a0), hp: pct(a1) })]; }
-      case "-heal": return /\[silent\]/.test(a.join("|")) || batch.slice(batch.indexOf(e) + 1).some(next =>
-        next.type === 'rpg' && next.args[0] === 'item' && next.args[3] === idOf(a0) && next.args[4] === 'ok' && Number(next.args[5]) > 0) ? [] : [tr.t("battle.recovered", { name: nm(a0), hp: pct(a1) })];
+      case "-heal": {
+        const index = batch.indexOf(e), hp = /^(\d+)\/(\d+)/.exec(a1), side = /^p[12]/.exec(a0)?.[0];
+        // Only the nearest matching item outcome can describe this exact HP update. Keep other healing sources visible.
+        const next = index < 0 ? undefined : batch.slice(index + 1).find(candidate =>
+          candidate.type === '-heal' && candidate.args[0] === a0 || candidate.type === 'rpg' && candidate.args[0] === 'item' && candidate.args[1] === side && candidate.args[3] === idOf(a0));
+        const itemDuplicate = hp && !a.some(arg => arg.startsWith('[from]')) && next?.type === 'rpg' && next.args[4] === 'ok'
+          && Number(next.args[5]) > 0 && next.args[6] === hp[1] && next.args[7] === hp[2];
+        return /\[silent\]/.test(a.join("|")) || itemDuplicate ? [] : [tr.t("battle.recovered", { name: nm(a0), hp: pct(a1) })];
+      }
       case "-fail": return [tr.t("battle.failed")];
       case "-nothing": return [tr.t("battle.nothing")];
       case "-transform": return [tr.t("battle.transformed", { name: nm(a0), target: nm(a1) })];

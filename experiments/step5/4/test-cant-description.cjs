@@ -52,9 +52,15 @@ for(const lang of ['en','zh'])test(`${lang} common feedback, learned IDs resolve
 });
 
 test('manual item healing keeps the HP event for display but emits one item-first sentence',()=>{
- const d=E.describe.make({A:'Alpha'}),heal={type:'-heal',args:['p1a: A','100/200'],raw:'|-heal|p1a: A|100/200'},item={type:'rpg',args:['item','p1','potion','A','ok','20'],raw:'|rpg|item|p1|potion|A|ok|20'};
+ const d=E.describe.make({A:'Alpha'}),heal={type:'-heal',args:['p1a: A','100/200'],raw:'|-heal|p1a: A|100/200'},item={type:'rpg',args:['item','p1','potion','A','ok','20','100','200'],raw:'|rpg|item|p1|potion|A|ok|20'};
  assert.deepEqual(d.message({kind:'events',seq:1,events:[heal,item]}),['Used Potion on Alpha. Recovered 20 HP.']);
  assert.deepEqual(d.event(heal),['Alpha recovered HP (100/200).']);
  assert.equal(d.event(heal,[heal,{...item,args:['item','p1','potion','B','ok','20']}]).length,1,'other target cannot suppress ordinary recovery');
  assert.deepEqual(heal.args,['p1a: A','100/200'],'HP presentation input is retained');
+});
+
+test('two HP updates in one batch keep the first source and deduplicate only the exact manual item update',()=>{
+ const d=E.describe.make({A:'Alpha'}),first={type:'-heal',args:['p1a: A','80/200','[from] ability: Regenerator']},manual={type:'-heal',args:['p1a: A','100/200']},item={type:'rpg',args:['item','p1','potion','A','ok','20','100','200']};
+ assert.deepEqual(d.message({kind:'events',seq:1,events:[first,manual,item]}),['Alpha recovered HP (80/200).','Used Potion on Alpha. Recovered 20 HP.']);
+ assert.equal(d.event(first,[first,item]).length,1);assert.equal(d.event(manual,[manual,{...item,args:['item','p2','potion','A','ok','20','100','200']}]).length,1);
 });
