@@ -454,7 +454,17 @@ import { captureScreenshot, fileInside, screenshotFileName, type CapturePorts } 
       // R2 contract replacement (5.4-party-switch-menu): the active row opens the command layer; Switch In on it is an
       // actual Session refusal with the shown reason, back to the member list, nothing consumed. Old: row disabled.
       const r2SwitchMark = shownLines.length, r2BagBefore = clone(I6.bagOf(battle()._session));
-      const r3Snap = (): unknown => JSON.parse(battle()._session.gw.snapshot());
+      const r3Snap = (): unknown => {
+        const value: unknown = JSON.parse(battle()._session.gw.snapshot());
+        const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+        if (!record(value) || !Array.isArray(value.sides)) throw new Error('invalid engine snapshot sides');
+        for (const side: unknown of value.sides) {
+          if (!record(side) || !record(side.choice) || typeof side.choice.error !== 'string') throw new Error('invalid engine choice diagnostic');
+          // A rejected engine choice updates only this diagnostic. All gameplay values, PRNG, logs and requests remain compared.
+          delete side.choice.error;
+        }
+        return value;
+      };
       const r3Before = r3Snap();
       await choose(/Charizard/); await inMode("party-command"); await choose(/^Switch In/); await inMode("party");
       eq(r3Snap(), r3Before, "R3: refused self-switch leaves turn, both sides HP/status/PP/items and actives unchanged");
