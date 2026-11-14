@@ -5,7 +5,8 @@
  * (js/engine/build/custom-formats.cjs) and staged into the engine by scripts/build-showdown.sh; no Showdown source is
  * modified. It runs inside Showdown, so it may only depend on plain rules code (bundled in), never on the gateway.
  */
-import { HEAL_ITEMS, REVIVE_ITEMS, STAT_ITEMS, STATUS_ITEMS, PP_ITEMS, ESCAPE_ITEMS, ppRecovery, captureNumbers, escapeRate, healRequest, rollCapture } from "../rules/rules";
+import { HEAL_ITEMS, REVIVE_ITEMS, STAT_ITEMS, STATUS_ITEMS, PP_ITEMS, ESCAPE_ITEMS, ppRecovery, captureNumbers, escapeRate, rollCapture } from "../rules/rules";
+import { battleHpRecovery, hpRecoveryRequest } from "../rules/active-hp-recovery";
 import type { ShowdownBattle, ShowdownPokemon } from "./showdown-types";
 import type { FormatObserver, FormatObservation } from "../rules/battle-evidence";
 import type { BattleActor, BattleDisplaySnapshot } from "../rules/battle-evidence";
@@ -284,7 +285,7 @@ function resolveItem(battle: ShowdownBattle, user: ShowdownPokemon, payload: Pay
     emit(battle, "item", side.id, item, target.name, "noeffect");
     return;
   }
-  const request = healRequest(spec, target, battle.rpg.rebalancedHealingItemAmounts ?? true);
+  const request = hpRecoveryRequest(battleHpRecovery(item, battle.rpg.rebalancedHealingItemAmounts ?? true, battle.rpg.activeHpRecovery)!, target);
   const healed = target.heal(request); // actual = min(request, missing); no Heal Block etc.
   if (target.isActive) battle.add("-heal", target, target.getHealth);
   emit(battle, "item", side.id, item, target.name, "ok", healed, target.hp, target.maxhp);

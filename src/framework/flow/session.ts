@@ -5,6 +5,7 @@ export { readSessionRequestContext } from './request-view';
 export type { SessionRequestContext } from './request-view';
 import type { InitialFieldInput } from '../rules/initial-field';
 import { battleBag } from "../rules/inventory";
+import { activeHpRecovery } from "../rules/active-hp-recovery";
 import { catalogOf } from "../rules/item-catalog";
 /**
  * BattleSession: the game-side owner of one battle.
@@ -263,6 +264,7 @@ export class BattleSession implements BattleSessionView {
     s.ai = ai || (doubles ? BattleSession.defaultAiDoubles : BattleSession.defaultAi);
     s.gw = await driver.create({
       rebalancedHealingItemAmounts: resolveConfig(content.settings).REBALANCED_HEALING_ITEM_AMOUNTS,
+      activeHpRecovery: activeHpRecovery(catalogOf(content), resolveConfig(content.settings).REBALANCED_HEALING_ITEM_AMOUNTS),
       speciesTypes: Object.fromEntries(Object.entries(content.species).filter(([, data]) => data.types !== undefined).map(([name, data]) => [name, [...data.types!]])),
       ...(initialField ? { initialField } : {}),
       formatid, seed, wild: foe.kind === "wild", noRun: !!foe.noRun, noBall: !!foe.noBall, // encounter flags: scripted battles that forbid running / balls

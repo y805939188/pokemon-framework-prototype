@@ -1,0 +1,25 @@
+# 作者主动 HP 治疗量统一（2026-11-14 F1 后继）
+
+本批承接 `7539d3f`。此前仅增加编译 warning，没有消除 F1；该方案及原验收记录保留。本次按用户继续整改的要求，将现有战斗可用主动 HP 道具的合法作者 `hp` 参数真正接入战斗与训练家 AI。
+
+## 行为与范围
+
+场外、战斗和 AI 共用 `active-hp-recovery.ts` 的参数解析：配置真选择 `amount`，假选择 `oldAmount ?? amount`；`fraction` 按使用时最大 HP 向下取整；`full:true` 补满；实际回复封顶。只处理已有 `HEAL_ITEMS` 的战斗身份，不增加新战斗道具或扩展 PP、复活、持有触发等家族。作者 ID 与 battleId 不同也按 battleId 接入引擎，AI 仍返回作者 ID。
+
+默认 Super Potion 60/50 等表值保持；默认 Max Potion 补满、Sitrus 1/4 保持；AI 对固定量使用相同数值，对比例／补满保留 WP51 的 1／999 估量，不把估量当实际回复量。Full Restore 的补满、状态／混乱清除与复活 half/full 行为不改。被动持有回复也不受本批主动参数控制。
+
+合法 `hp` 自定义不再产生“只在场外生效”的旧 warning。显式把 HP 战斗 ID 绑定到场外另一效果家族，或把 Full Restore 显式绑定为部分 HP 家族，继续允许作者的上下文差异，但输出 `battle-healing-family-mismatch`；这些跨家族定义不在本次 HP 参数统一范围内，不能把 warning 当成已统一。合法比例参数的常用分母和补满均已测；不声称任意跨家族／极端参数组合全覆盖。
+
+## 所有权与快照
+
+Session 将已解析、与默认值不同的量经可选 `GatewayOptions.activeHpRecovery` 传入 Gateway；Gateway 严格验证并复制仅含 amount／fraction／full 的正整数或 true 条目，未知身份、额外字段、无效类型均拒绝。引擎 `rpg.activeHpRecovery` 拥有本场量并随 JSON／检查点恢复。恢复选项不重绑它。
+
+默认等值不新增表，旧快照缺表时沿用快照已有治疗配置与旧固定表；更老快照连配置字段也缺时仍按默认真。既有 battle.rpg.rebalancedHealingItemAmounts 不变。没有玩家存档字段／迁移、compiled schema 或结果协议变更；战中存档仍不开放。
+
+## 验证与风险
+
+新增行为测试先在旧运行时得到 14 pass／8 fail，随后实装通过。最新九文件定向 334/334，含现有道具、AI、复活、引擎 staging 契约、F4 文本和 Transform 学招／Scene；完整类型检查与 build 通过。固定 Showdown 源码 7244fe8 在本任务 APFS 独立副本重建，未改其它会话缓存；离线 build-deps 缺包的初次失败保留，随后按固定依赖与 integrity 正常完成。
+
+F4 去重另收窄为最近一次同目标、同最终 HP 的道具结果，保留明确其它来源及较早的回血；新增双回血事件批测试。这是防止过宽抑制的保护，不冒称已经复现新玩家缺陷。
+
+完整 regular、NW 与最终固定身份以本轮外部 `build/f1-healing-consistency/REPORT.zh.md` 为准，未终态不得预填绿。此前 488dade 的 295/5356 和七模式 NW 只属于旧候选，不代替本轮。另一个 AI 对本轮代码的独立签收需父协调安排；本执行者的编码与只读自检不冒称第三方独审。

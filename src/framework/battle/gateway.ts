@@ -1,3 +1,4 @@
+import { captureActiveHpRecovery } from '../rules/active-hp-recovery';
 import { parseBattleRequest } from "./request";
 import type { BattleRequest } from "./request";
 import { captureInitialField } from '../rules/initial-field';
@@ -127,6 +128,7 @@ export class BattleGateway implements BattleDriver {
 
   static async create(opts: GatewayOptions): Promise<BattleGateway> {
     const initialField = captureInitialField(opts);
+    const activeHpRecovery = captureActiveHpRecovery(opts.activeHpRecovery);
     if (initialField && opts.formatid !== "gen8rpgcustomgame") throw new Error("initial-field-requires-rpg-singles");
     const gw = new BattleGateway(opts);
     const { sim } = gw._env;
@@ -144,6 +146,10 @@ export class BattleGateway implements BattleDriver {
     gw._attachParticipation();
     for (const [i, p] of (opts.players ?? []).entries()) {
       battle.setPlayer(`p${i + 1}`, { name: p.name, team: sim.Teams.pack(p.team) });
+    }
+    if (activeHpRecovery !== undefined) {
+      if (!battle.rpg) throw new Error("active HP recovery requires the RPG format");
+      battle.rpg.activeHpRecovery = activeHpRecovery;
     }
     if (opts.rebalancedHealingItemAmounts !== undefined && battle.rpg) battle.rpg.rebalancedHealingItemAmounts = opts.rebalancedHealingItemAmounts;
     if (initialField) {
@@ -179,6 +185,8 @@ export class BattleGateway implements BattleDriver {
     if (captureInitialField(opts)) throw new Error("initial-field-restore-rebind");
     const gw = new BattleGateway(opts);
     gw._battle = restoreSimBattle(gw._env, snapshot);
+    const recovery = captureActiveHpRecovery(gw._battle.rpg?.activeHpRecovery);
+    if (recovery !== undefined) gw._battle.rpg.activeHpRecovery = recovery;
     attachRequestSource(gw, gw._battle);
     if (gw._battle.rpg?.initialField) {
       const fields = loadFormatExtension(gw._env.root).initialFields;

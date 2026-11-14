@@ -1,5 +1,7 @@
 # 主动治疗配置一致性（2026-11-13）
 
+作者参数 F1 后继已实际统一，见[作者主动 HP 治疗量统一](authored-hp-healing-contract.zh.md)。本页下述“不统一／仅 warning”为此前版本的历史边界。
+
 本批基线为 `02cff041078e9e98af7b6bb29df680a44ebf5839`。期望来自只读正式规格：`creature-rpg/wp28-item-use-and-training.md` §5.1，以及 `combat-requirements/wp51-ai-decision-defaults.md` §1；没有运行原版、冻结回放或玩家存档。
 
 ## 问题与修复

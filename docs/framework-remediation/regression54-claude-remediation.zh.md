@@ -1,5 +1,7 @@
 # 5.4 Claude 三轮回归整改回执（2026-11-14）
 
+本页固定 488dade 的历史验收；F1 后续已从 warning 继续接入真实治疗量，见[后继合同](authored-hp-healing-contract.zh.md)，新候选资格不可借本页旧绿。
+
 固定基线 `03f7e54d9a772d4d321554651cdbfecc907a2694`；产品／测试候选 `488dade87108a9109750c5ed2fde0511a9c5cf4d`（src tree `b59126605921b82de091ae1fb4f1b57b66b6d1f4`）。独立工作树 `.worktrees/regression54-remediation`，分支 `fix/regression54-claude-20261114`。本回执是其后的纯文档提交，不代替候选本身的运行绑定。
 
 | Finding | 本次结果 | 保留边界 |
