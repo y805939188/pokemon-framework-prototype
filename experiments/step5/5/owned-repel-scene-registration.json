@@ -1,0 +1,23 @@
+{
+  "id": "P3-C1-OWNED-REPEL-SCENE",
+  "base": "5b0eb9e13d3cda1d09a4a1e00bdf44fb83f2f576",
+  "state": "IMPLEMENTING",
+  "ownership": [
+    "App/World/ports/atomic-state-mz",
+    "completed-step-mz",
+    "PS_Inventory ownedRepel technical callbacks only"
+  ],
+  "testPlan": [
+    "original 2 native IIFE controls copied unchanged except forwarding optional hook arg (instrumentation only)",
+    "actual No and selected Repel through native push/pop/new Map return",
+    "exact permit/selection/handle/scene/manager/generation/point guards, cancelled and late callbacks",
+    "A2/A3 and 2b cleanup final position remain",
+    "strict private emit/bundle and boundary; no full/NW"
+  ],
+  "rngPlan": "callbacks and admission use 0 RNG; retain original complete-step prefix and grace/ordinary draw order, no duplicate arrival/repel consumption",
+  "pending": [
+    "actual C1 implementation/review",
+    "E3/F actual parent",
+    "final MZ joint integration"
+  ]
+}

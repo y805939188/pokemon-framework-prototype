@@ -16,10 +16,11 @@ async function host(source){
  const h=createVictoryDriverHost({ROOT:runtime,work,plugins,entryText,driverText:'H3_SYNTHETIC_CONTROL_NOT_NATIVE',PLAN,options:{productionTranslator:true}});
  const flow=h.w.flow,G=h.G;flow.stateReplaced();flow._app=null;flow._content=seed.content;flow._dex=seed.dex;flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=true;flow.receiveOptions={mode:1,naming:1};flow.developerCapabilities={};
  let current=clone(seed.state.read());const replaced=[];
- Object.defineProperty(G.$gameSystem,'_psGame',{configurable:true,enumerable:true,get:()=>current,set:next=>{current=next;replaced.push(clone(next));}});
- const state={read:()=>current,current:()=>current,replaced};const app=flow.app();await h.p.toMapId(5);
+ G.$gameSystem._psGame=current;
+ const audit=require('../../../../scripts/tests/state-install-audit.cjs'),installed=next=>{current=next;replaced.push(clone(next));};audit.observe(G,installed);
+ const state={read:()=>G.$gameSystem._psGame,current:()=>G.$gameSystem._psGame,replaced};const app=flow.app();await h.p.toMapId(5);
  const w={app,state,source,content:seed.content,dex:seed.dex};await acquireReady(w);
- return {...h,flow,w,work,commands:h.w.commands};
+ return {...h,flow,w,work,commands:h.w.commands,rebindAudit(){audit.dispose(G);audit.observe(G,installed);}};
 }
 function start(h,label){const interpreter={setWaitMode(mode){this.mode=mode;}};h.commands['PS_BattleFlow:StartTrainerBattle'].call(interpreter,{trainerId:'h3-npc',version:'1',battleId:label,canLose:'true',expGain:'false',moneyGain:'false'});return interpreter;}
 async function action(h,slot){const s=h.p.battle();let observed;s.act(async()=>{observed=await s._session.chooseMove(slot);return observed;},'move');await h.waitFor(()=>!s._busy,'Scene actual action completion');await h.frames(2);assert(observed?.ok,'actual Scene command succeeded');return observed;}
@@ -60,7 +61,7 @@ for(const injection of ['plugin-parameters','saved-host-fields'])test('H3 normal
 test('H3 normal released policy permits taking old held item then an all-empty required battle',async()=>{
  const h=await host('give'),flow=h.flow;flow.developerCapabilities={};flow._app=null;
  const takeBefore=clone(flow.game()),takeWrites=h.w.state.replaced.length;
- const app=flow.app(),token=app.beginManagement(),takeRequest={kind:'take-item',source:{id:'P1',position:{kind:'party',index:0}}};
+ const app=flow.app();h.rebindAudit();const token=app.beginManagement(),takeRequest={kind:'take-item',source:{id:'P1',position:{kind:'party',index:0}}};
  try{
  assert.equal(app.manage(token,'H3-SAFE-TAKE',takeRequest).status,'applied');
  assertTakeConserved(takeBefore,flow.game());assert.equal(h.w.state.replaced.length,takeWrites+1,'take installs once');

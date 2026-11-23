@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Test-only finite native recipe; only external supervision can qualify execution.
+import { observeStateInstalls } from './state-install-audit';
 import PLAN from '../../../experiments/step5/4/prebattle-native-plan.json';
 import { musicNativeContent, musicNativeState } from './music-native-fixture';
 import { captureHostReady } from './d2-capture-me';
@@ -23,7 +24,7 @@ export async function runD2Prebattle(p:any):Promise<void>{
  const named=(n:string)=>PLAN.prefix+n,mapReady=()=>captureHostReady(G,scene(),'map'),titleReady=()=>captureHostReady(G,scene(),'title');
  const parameters=function(this:any,name:string){const v=original.parameters.call(this,name);return name==='PS_BattleFlow'?{...v,language:'en',battleMusic:JSON.stringify({presets:{battle:named('battle'),victory:named('victory')}})}:v;};
  const covers=(s:any)=>s.children.filter((x:any)=>x.bitmap?.width===1&&x.bitmap?.height===1&&x.scale?.x===G.Graphics.boxWidth&&x.scale?.y===G.Graphics.boxHeight);
- const retireState=(h:any)=>{const desc=Object.getOwnPropertyDescriptor(h.system,'_psGame');if(desc?.get===h.get&&desc?.set===h.set)Object.defineProperty(h.system,'_psGame',{...h.descriptor,value:h.value});};
+ const retireState=(h:any)=>{h.stateAudit?.dispose();assert(!h.stateAudit?.errors.length,'state install observer completed without errors');};
  const retireCommon=(h:any)=>{for(const map of new Set([h.map,G.$gameMap]))if(map?._commonEvents)map._commonEvents=map._commonEvents.filter((v:any)=>v._commonEventId!==commonId);};
  const render=(h:any,stage:string,s:any)=>{
   const id=h.c.id+'-'+stage,owned=covers(s);assert(owned.length===(stage==='return-complete'?0:1),'one owned cover until normal completion');const cover=owned[0],renderable=cover?.renderable;let shown:any,clear:any,row:any;
@@ -78,10 +79,12 @@ export async function runD2Prebattle(p:any):Promise<void>{
  const run=async(c:any)=>{
   const began=G.performance.now();let h:any;
   try{
+   const suppliedSlot=Object.getOwnPropertyDescriptor(G.$gameSystem,'_psGame');
+   assert(suppliedSlot&&'value'in suppliedSlot&&suppliedSlot.writable&&suppliedSlot.configurable,'prebattle driver requires writable own plain state before reset');
    await wait(()=>mapReady()||first&&titleReady(),'started cold Title or later Map');first=false;assert(!flow.operationPending(),'previous root released');flow.stateReplaced();flow._app=null;flow._content=musicNativeContent(E,assert,{battle:named('battle'),victory:named('trainer-victory')});flow._content.trainerTypes['music-type-normal'].introBgm='';flow._dex=E.dex.createDexLookup();flow.setLanguage(null);flow.seed=[...PLAN.seed];worldRng=PLAN.worldSeed;flow.rng=(n:number)=>{worldRng=(Math.imul(worldRng,1664525)+1013904223)>>>0;return Math.floor(worldRng/4294967296*n);};flow.fast=false;
    G.$gameSystem._psGame=musicNativeState(E,flow._content);G.$gameMessage.clear();G.$gameMap._interpreter.clear();await toMapId(PLAN.mapId,8,9);await wait(mapReady,'actual Map.start/windows/spriteset');await press('shift');
    G.AudioManager.playBgm({name:named('world'),volume:80,pitch:100,pan:0});const map=G.$gameMap;G.$gameSwitches.setValue(switchId,true);for(const id of variableIds)G.$gameVariables.setValue(id,0);const common=map._commonEvents.find((e:any)=>e._commonEventId===commonId)??new G.Game_CommonEvent(commonId);if(!map._commonEvents.includes(common))map._commonEvents.push(common);await wait(()=>G.$gameVariables.value(variableIds[1])>0,'real parallel common event warm-up');
-   const system=G.$gameSystem,descriptor:any=Object.getOwnPropertyDescriptor(system,'_psGame');assert(descriptor?.configurable&&descriptor.writable&&'value'in descriptor,'observable plain state');h={c,map,source:scene(),main:map._interpreter,common,system,descriptor,value:descriptor.value,before:clone(flow.game()),app:flow.app(),generation:flow.app().stateGeneration,installs:[],updates:[],captures:{},sessionStarts:0,eventUpdates:0,menuCalls:0};h.get=()=>h.value;h.set=(value:any)=>{h.installs.push({at:G.performance.now(),frame:G.Graphics.frameCount});h.value=value;};Object.defineProperty(system,'_psGame',{configurable:true,enumerable:descriptor.enumerable,get:h.get,set:h.set});
+   const system=G.$gameSystem,descriptor:any=Object.getOwnPropertyDescriptor(system,'_psGame');assert(descriptor?.configurable&&descriptor.writable&&'value'in descriptor,'observable plain state');h={c,map,source:scene(),main:map._interpreter,common,system,descriptor,value:descriptor.value,before:clone(flow.game()),app:flow.app(),generation:flow.app().stateGeneration,installs:[],updates:[],captures:{},sessionStarts:0,eventUpdates:0,menuCalls:0};const vm=p.nodeRequire('node:vm'),reflection=G.Reflect??(vm.isContext(G)?vm.runInContext('Reflect',G):null);h.stateAudit=observeStateInstalls(G,h.app,system,reflection,p.nodeRequire('node:util').types.isProxy,value=>{h.installs.push({at:G.performance.now(),frame:G.Graphics.frameCount});h.value=value;});
    const args={battleId:PLAN.version+'/'+c.id,trainerId:'music-normal',version:'1',kind:c.kind,foes:'Pidgey:3',canLose:'true',resultVariable:'0',battleTime:String(c.time),prebattleLocation:String(c.location)};
    h.openVariables=variableIds.map((id:number)=>G.$gameVariables.value(id));const start={code:357,indent:0,parameters:['PS_BattleFlow',c.kind==='trainer'?'StartTrainerBattle':'StartBattle','',args]},end={code:0,indent:0,parameters:[]};if(c.launch==='idle-menu'){assert(!map.isEventRunning(),'idle main interpreter at common-event launch');common._interpreter.setup([start,increment(variableIds[1]),end]);}else h.main.setup([start,increment(variableIds[0]),end]);
    // The command starts inside actual Map.updateInterpreter; observe only after its op exists.

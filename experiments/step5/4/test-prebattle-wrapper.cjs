@@ -183,8 +183,9 @@ for(const legacy of [false,true]){
 // Controlled integration: actual Reactor interpreter scheduling + compiled product
 // blackout wrappers. A fixture supplies the blackout outcome; this is not a native
 // defeat, disk-slot or fresh-process Continue acceptance.
-test('deferred return autosave serializes only after blackout child and parent terminate',async()=>{
+for(const timing of ['return-start','after-cover-done','after-cover-done-native-busy'])test('deferred return autosave serializes only after blackout child and parent terminate: '+timing,async()=>{
  let writes=0,saved=null,sentinel=0;
+ let nativeResets=0,inNativeReset=false,ordinaryEncounters=0;const nativeDraws=[],businessDraws=[];
  const source=fs.readFileSync(path.join(ROOT,'js/reactor_objects.js'),'utf8');
  const scenes=fs.readFileSync(path.join(ROOT,'js/reactor_scenes.js'),'utf8');
  function method(text,marker){const a=text.indexOf(marker),b=text.indexOf('\n};',a);assert(a>=0&&b>a,marker);return text.slice(a,b+3);}
@@ -195,6 +196,19 @@ test('deferred return autosave serializes only after blackout child and parent t
   G.Game_Interpreter.prototype.command999=function(){sentinel++;return true;};
   G.Game_Map=function(){};
   G.Game_Map.prototype.mapId=()=>5;G.Game_Map.prototype.setupStartingEvent=()=>false;G.Game_Map.prototype.unlockEvent=()=>{};
+  vm.runInContext(method(source,'Game_Map.prototype.encounterStep = function'),G);
+  // This normal return legitimately resets MZ's native budget. Keep the actual
+  // pinned two-draw implementation; other undeclared legacy calls still throw.
+  G.Game_Player??=function Game_Player(){};
+  vm.runInContext(method(source,'Game_Player.prototype.makeEncounterCount = function'),G);
+  const core=fs.readFileSync(path.join(ROOT,'js/reactor_core.js'),'utf8');vm.runInContext(method(core,'Math.randomInt = function'),G);
+  const math=vm.runInContext('Math',G),randomInt=math.randomInt,nativeCount=G.Game_Player.prototype.makeEncounterCount;
+  math.randomInt=function(n){if(inNativeReset)nativeDraws.push(n);return Reflect.apply(randomInt,this,[n]);};
+  G.Game_Player.prototype.makeEncounterCount=function(...args){
+   assert.equal(G.PSFlow.lastOutcome?.commit,'applied','native budget reset follows the primary commit');
+   const app=G.PSFlow.app(),runtime=app.worldEncounterRuntime(),game=JSON.stringify(G.PSFlow.game()),draws=businessDraws.length;nativeResets++;inNativeReset=true;
+   try{return Reflect.apply(nativeCount,this,args);}finally{inNativeReset=false;assert.deepEqual(app.worldEncounterRuntime(),runtime);assert.equal(JSON.stringify(G.PSFlow.game()),game,'native count reset leaves business state/statistics unchanged');assert.equal(businessDraws.length,draws,'native count reset does not consume business RNG');}
+  };
   vm.runInContext(method(source,'Game_Map.prototype.updateInterpreter = function'),G);
   const update=G.Scene_Map.prototype.update,start=G.Scene_Map.prototype.start;
   G.Scene_Map.prototype.update=function(){update.call(this);G.$gameMap.updateInterpreter?.();};
@@ -210,16 +224,30 @@ test('deferred return autosave serializes only after blackout child and parent t
  }});
  try{
   const G=h.G,map=new G.Game_Map();map._interpreter=new G.Game_Interpreter();G.$gameMap=map;
+  const authoredStep=JSON.parse(fs.readFileSync(path.join(ROOT,'data/Map005.json'),'utf8')).encounterStep;
+  assert(Number.isSafeInteger(authoredStep)&&authoredStep>0);G.$dataMap.encounterStep=authoredStep;
+  const random=h.flow.rng;h.flow.rng=function(n){businessDraws.push(n);return Reflect.apply(random,this,[n]);};
+  const encounter=G.Game_Player.prototype.executeEncounter;G.Game_Player.prototype.executeEncounter=function(...args){ordinaryEncounters++;return Reflect.apply(encounter,this,args);};
   h.open();await h.waitFor(()=>!!h.p.battle()?._session,'real Session');await h.p.inMode('main');await h.p.fightUntilEnd();const s=h.p.battle();
-  await h.waitFor(()=>s._resultFeedback?.ready?.()||s._mode==='end','result');await h.frames(2);s.onEnd();
+  await h.waitFor(()=>s._resultFeedback?.ready?.()||s._mode==='end','result');await h.frames(2);assert.equal(nativeResets,0,'no native reset before terminal confirmation');s.onEnd();
   h.flow.lastOutcome.blackout=true; // Explicit fixture, not a claimed real defeat.
+  if(timing!=='return-start')await h.waitFor(()=>h.flow.prebattleState().phase==='done','cover done before F return transfer');
   const parent=new G.Game_Interpreter(),child=new G.Game_Interpreter();
   parent._list=[{code:999,indent:0,parameters:[]}];child._list=[{code:999,indent:0,parameters:[]}];parent._childInterpreter=child;
   child._waitMode='psBattle';child._psBattleId=h.flow.lastOutcome.battleId;map._interpreter=parent;G.__returnRequest=true;
-  await h.waitFor(()=>h.flow.prebattleState().phase==='done','return done');
-  assert.equal(writes,0,'the done tick must not serialize the still-blocked interpreter');assert.equal(child._waitMode,'psBattle');
+  let nativeBusy=timing==='after-cover-done-native-busy';
+  if(nativeBusy){const pending=h.flow.operationPending;h.flow.operationPending=function(){return nativeBusy||Reflect.apply(pending,this,[]);};}
+  if(timing!=='return-start'){
+   G.SceneManager._scene.requestAutosave();assert.equal(writes,0,'late F return request waits for the same blackout chain');
+   assert.equal(child._waitMode,'psBattle');await h.frames(1);assert.equal(writes,0,'one complete ordinary update is observed before serialization');
+  }else await h.waitFor(()=>h.flow.prebattleState().phase==='done','return done');
+  assert.equal(writes,0,'the done tick must not serialize the still-blocked interpreter');if(timing==='return-start')assert.equal(child._waitMode,'psBattle');else assert.equal(child._waitMode,'');
+  if(nativeBusy){await h.frames(1);assert.equal(writes,0,'native busy keeps the original save request queued');nativeBusy=false;}
   await h.frames(1);assert.equal(writes,1);assert.equal(sentinel,0);assert.equal(parent._list,null);assert.equal(parent._childInterpreter,null);
   const restored=Object.assign(new G.Game_Interpreter(),JSON.parse(saved));h.flow.stateReplaced();h.flow.lastOutcome=null;
   restored.update();assert.equal(sentinel,0,'cold outcome absence cannot resume a command after blackout');assert.equal(restored.isRunning(),false);
+  assert.equal(nativeResets,1);assert.deepEqual(nativeDraws,[authoredStep,authoredStep]);assert.equal(ordinaryEncounters,0);
+  assert(Number.isSafeInteger(G.$gamePlayer._encounterCount)&&G.$gamePlayer._encounterCount>=1&&G.$gamePlayer._encounterCount<=authoredStep*2-1);
+  console.log('RETURN_NATIVE_COUNT '+JSON.stringify({nativeResets,nativeDraws,businessDraws,ordinaryEncounters,budget:G.$gamePlayer._encounterCount}));
  }finally{h.cleanup();}
 });

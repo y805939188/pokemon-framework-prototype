@@ -83,3 +83,22 @@ export * as trainerAi from "./rules/trainer-ai-public";
 
 export * as trainerAiDiagnostics from "./tools/trainer-ai-diagnostics";
 export * as battlePresentation from "./flow/public-presentation";
+
+export * as worldData from "./rules/world-data";
+export * as worldState from "./rules/world-state";
+export * as fieldItems from "./rules/field-items";
+
+export * as worldInput from "./content/world-input";
+
+export * as encounterTrigger from "./rules/encounter-trigger";
+
+export * as encounterSelection from "./rules/encounter-selection";
+
+export * as worldBattleContext from "./rules/world-battle-context";
+
+export * as fieldPassives from "./rules/field-passives";
+
+export * as fishing from "./rules/fishing";
+
+export * as fieldShortcuts from "./rules/field-shortcuts";
+export * as wildGeneration from './rules/wild-generation';

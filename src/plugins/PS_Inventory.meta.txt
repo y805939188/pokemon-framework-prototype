@@ -6,6 +6,7 @@
  * Requires PS_BattleFlow and PS_Management before this plugin.
  * Uses framework inventory, never MZ party items/gold. Indices are zero based.
  * Interactive commands wait for their own operation and return structured status.
+ * Normal Bag item menus offer Register for supported field handlers, or Deselect for an existing registration. Registration uses the current inventory session and does not consume the item.
  * @command ShowBag
  * @text ShowBag
  * @command SelectItem

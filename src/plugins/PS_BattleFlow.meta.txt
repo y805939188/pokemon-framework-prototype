@@ -181,19 +181,19 @@
  *
  * @arg defaultWeather
  * @text Default battle weather
- * @desc none,sun,rain,sandstorm,hail,harshsun,heavyrain,strongwinds; blank means none. No world inference.
+ * @desc none,sun,rain,sandstorm,hail,harshsun,heavyrain,strongwinds; blank means none; inherit locks the current business world value before scene handoff.
  * @type string
  * @default
  *
  * @arg defaultTerrain
  * @text Default battle terrain
- * @desc none,electric,grassy,misty,psychic; blank means none.
+ * @desc none,electric,grassy,misty,psychic; blank means none; inherit uses the current business terrain.
  * @type string
  * @default
  *
  * @arg battleEnvironment
  * @text Battle rule environment
- * @desc none,grass,tallgrass,movingwater,stillwater,puddle,underwater,cave,rock,sand,forest,forestgrass,snow,ice,volcano,graveyard,sky,space,ultraspace. Independent of background.
+ * @desc none,grass,tallgrass,movingwater,stillwater,puddle,underwater,cave,rock,sand,forest,forestgrass,snow,ice,volcano,graveyard,sky,space,ultraspace. Independent of background. inherit locks the current business environment.
  * @type string
  * @default
  *
@@ -371,19 +371,19 @@
  *
  * @arg defaultWeather
  * @text Default battle weather
- * @desc none,sun,rain,sandstorm,hail,harshsun,heavyrain,strongwinds; blank means none. No world inference.
+ * @desc none,sun,rain,sandstorm,hail,harshsun,heavyrain,strongwinds; blank means none; inherit locks the current business world value before scene handoff.
  * @type string
  * @default
  *
  * @arg defaultTerrain
  * @text Default battle terrain
- * @desc none,electric,grassy,misty,psychic; blank means none.
+ * @desc none,electric,grassy,misty,psychic; blank means none; inherit uses the current business terrain.
  * @type string
  * @default
  *
  * @arg battleEnvironment
  * @text Battle rule environment
- * @desc none,grass,tallgrass,movingwater,stillwater,puddle,underwater,cave,rock,sand,forest,forestgrass,snow,ice,volcano,graveyard,sky,space,ultraspace. Independent of background.
+ * @desc none,grass,tallgrass,movingwater,stillwater,puddle,underwater,cave,rock,sand,forest,forestgrass,snow,ice,volcano,graveyard,sky,space,ultraspace. Independent of background. inherit locks the current business environment.
  * @type string
  * @default
  *

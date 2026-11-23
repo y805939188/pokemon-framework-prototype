@@ -18,6 +18,7 @@ import type { CompiledContent, ContentError, ContentInputs, GrantSource, Overlay
 import { checkTrainerInputs, trainerSpeciesKeys, trainerHealingDiagnostics } from "./trainer-input";
 import { authorCompatibilityDiagnostics, authorHappinessProblem, authorSchemaProblem } from "./friendship-author-domain";
 import type { AuthorSchema } from "./schema";
+import { checkWorldInputs } from "./world-input";
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -31,7 +32,7 @@ export function canonicalJson(v: unknown, indent = 0): string {
 
 export function hashInputs(inputs: ContentInputs): string {
   // Optional files are undefined for older content: JSON drops those keys, so legacy input hashes stay unchanged.
-  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants, settings: inputs.settings, items: inputs.items, shops: inputs.shops, regionalDex: inputs.regionalDex, mapMetadata: inputs.mapMetadata, trainerTypes: inputs.trainerTypes, trainers: inputs.trainers }));
+  return sha256Hex(canonicalJson({ manifest: inputs.manifest, sources: inputs.sources, species: inputs.species, overlays: inputs.overlays, grants: inputs.grants, settings: inputs.settings, items: inputs.items, shops: inputs.shops, regionalDex: inputs.regionalDex, mapMetadata: inputs.mapMetadata, trainerTypes: inputs.trainerTypes, trainers: inputs.trainers, encounters: inputs.encounters, regionMaps: inputs.regionMaps, mapConnections: inputs.mapConnections }));
 }
 
 const ID = /^[a-z][a-z0-9-]{0,30}$/;
@@ -202,7 +203,11 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
       const problem = FIELD_CHECK[f]!(s[f]);
       if (problem) report("species.json", `${p}.${f}`, `${problem} (in ${label})`);
     }
-    for (const field of PROGRESSION_FIELDS) if (Object.hasOwn(s, field)) { const problem = progressionFieldProblem(field, s[field]); if (problem) report("species.json", `${p}.${field}`, problem); }
+    for (const field of PROGRESSION_FIELDS) if (Object.hasOwn(s, field)) {
+      const descriptor=Object.getOwnPropertyDescriptor(s,field);
+      if(!descriptor||!("value" in descriptor)||!descriptor.enumerable){report("species.json",`${p}.${field}`,"must be an enumerable own data property");continue;}
+      const problem=progressionFieldProblem(field,descriptor.value);if(problem)report("species.json",`${p}.${field}`,problem);
+    }
     if (typeof s["nameKey"] === "string") {
       const prev = nameKeys.get(s["nameKey"]);
       if (prev !== undefined && prev.id !== s["id"]) report("species.json", `${p}.nameKey`, `text key "${s["nameKey"]}" is already used by ${prev.label}`);
@@ -217,6 +222,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
   }
 
   // ---- overlays: author patches on top of the base records, never silently conflicting
+  if(errors.length)return {ok:false,errors};
   let overlaysApplied = 0;
   const inherited = inheritSpecies(species);
   const merged = new Map<string, SpeciesSource>(inherited.map((sp) => [recordKey(sp.id, sp.form ?? 0), JSON.parse(JSON.stringify(sp)) as SpeciesSource]));
@@ -230,6 +236,12 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
     const target = typeof o["target"] === "string" ? merged.get(o["target"]) : undefined;
     if (!target) { report("overlays.json", `${p}.target`, `target ${JSON.stringify(o["target"])} does not exist (expected "species/<id>", or "species/<id>/<form>" for a form)`); continue; }
     if (!isObj(o["set"]) || !Object.keys(o["set"]).length) { report("overlays.json", `${p}.set`, "must be a non-empty object of fields to replace"); continue; }
+    let ownFields=true;
+    for(const field of PROGRESSION_FIELDS)if(Object.hasOwn(o["set"],field)) {
+      const descriptor=Object.getOwnPropertyDescriptor(o["set"],field);
+      if(!descriptor||!("value" in descriptor)||!descriptor.enumerable){report("overlays.json",`${p}.set.${field}`,"must be an enumerable own data property");ownFields=false;}
+    }
+    if(!ownFields)continue;
     let ok = true;
     for (const [f, v] of Object.entries(o["set"])) {
       if (!(OVERRIDABLE as readonly string[]).includes(f)) { report("overlays.json", `${p}.set.${f}`, `field "${f}" cannot be overridden (allowed: ${OVERRIDABLE.join(", ")})`); ok = false; continue; }
@@ -307,6 +319,15 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
 
   if (errors.length) return {ok:false,errors};
   const registrationOrder = species.map(sp => ({species: sp.id, form: sp.form ?? 0}));
+  const worldRaw:{encounters?:unknown;regionMaps?:unknown;mapConnections?:unknown}={};
+  for(const [field,file] of [["encounters","encounters.json"],["regionMaps","region-maps.json"],["mapConnections","map-connections.json"]] as const) {
+    const descriptor=Object.getOwnPropertyDescriptor(inputs,field);
+    if(!descriptor){if(field in inputs)report(file,"$","input must be an own data property");continue;}
+    if(!("value" in descriptor)||!descriptor.enumerable){report(file,"$","input must be an enumerable own data property");continue;}
+    worldRaw[field]=descriptor.value;
+  }
+  const world=checkWorldInputs(worldRaw,{speciesKeys:registrationOrder,usableSource:usable});
+  errors.push(...world.problems);
   const trainerData = checkTrainerInputs(inputs.trainerTypes, inputs.trainers, { speciesKeys: trainerSpeciesKeys(registrationOrder, [...merged.values()]), catalog: itemInputs.catalog, usable });
   errors.push(...trainerData.errors);
   if (!trainerData.errors.length) warnings.push(...trainerHealingDiagnostics(trainerData.types ?? [], trainerData.records ?? [], itemInputs.catalog));
@@ -328,6 +349,7 @@ export function compileContent(inputs: ContentInputs, developerCapabilities: unk
   const data: CompiledContent = {
     schema: COMPILED_SCHEMA_VERSION, contentId, inputsHash, showdownSha: context.showdownSha, contentIdentity: sha256Hex(canonicalJson({compiledSemantics: COMPILED_SCHEMA_VERSION, inputsHash, showdownSha: context.showdownSha})), registrationOrder, regionalDex, ...(mapMetadata ? {mapMetadata} : {}), sources: [...sources].sort((a, b) => a.id.localeCompare(b.id)),
     overlaysApplied, species: [...merged.values()].sort((a, b) => a.id.localeCompare(b.id) || (a.form ?? 0) - (b.form ?? 0)),
+    ...(Object.keys(world.value).length ? {world:world.value} : {}),
     ...(inputs.items !== undefined ? { items: itemInputs.items } : {}),
     ...(inputs.shops !== undefined ? { shops: itemInputs.shops } : {}),
     ...(inputs.grants !== undefined ? { grants: [...grants].sort((a, b) => a.id.localeCompare(b.id)) } : {}),

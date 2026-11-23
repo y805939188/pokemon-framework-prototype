@@ -87,8 +87,8 @@ test('PBS import: framework fields carried over; battle data, later fields and u
   assert.deepEqual(rat.showdown, ['Name', 'BaseStats'], 'Showdown still provides names and base stats');
   assert.deepEqual(r.species[0].types, ['normal'], 'explicit author types are imported and validated against the pinned directory');
   assert.deepEqual(r.species[0].evolutions, [{ target: 'raticate', method: 'Level', parameter: 20 }], 'step 5.3 consumes ordered typed evolution entries');
-  assert.deepEqual(rat.later.map(x => x.field), ['WildItemCommon']);
-  assert.match(rat.later[0].batch, /5\.5/);
+  assert.deepEqual(rat.later.map(x => x.field), []);
+  assert.deepEqual(r.species.find(sp => sp.id === 'rattata').wildItemCommon, ['chilanberry']);
   assert.deepEqual(rat.ignored, ['SomethingNew'], 'outside the schema: not consumed, no error (WP04 §4.2)');
   assert.deepEqual(spe.overridden, ['GrowthRate'], 'a repeated property: the later value wins (WP04 §4.2)');
   assert.deepEqual(spe.defaults, ['CatchRate = 255 (WP03 §4.3 class default)']);
@@ -276,7 +276,7 @@ test('F06: a build that fails (also on such a setting) removes the previous outp
 test('F05: assembly validates the complete registry and every consumed source before any Dex call', () => {
   const TEST_SHA = 'a'.repeat(40);
   const compiled = compileContent(inputs(), {}, { showdownSha: TEST_SHA }); assert.equal(compiled.ok, true);
-  assert.equal(compiled.data.schema, 4); assert.equal(compiled.data.showdownSha, TEST_SHA);
+  assert.equal(compiled.data.schema, 5); assert.equal(compiled.data.showdownSha, TEST_SHA);
   const lookup = E.dex.createDexLookup();
   const counted = calls => Object.fromEntries(['sha', 'species', 'move', 'type', 'levelUpMoves', 'allAbilities', 'allMoves', 'abilityInfo', 'heldItem'].map(k => [k, (...args) => { calls.push(k); return k === 'sha' ? TEST_SHA : lookup[k](...args); }]));
   const validCalls = [];

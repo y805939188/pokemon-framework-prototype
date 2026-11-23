@@ -1,3 +1,18 @@
+import { installWorldAuthorCommandsMZ } from './world/world-author-commands-mz';
+import type { WorldAuthorBlackoutRetry } from './world/world-author-commands-mz';
+import { createCompanionIngressMZ } from './world/event-companion-ingress-mz';
+import { installCompanionMotionMZ } from './world/event-companion-motion-mz';
+import type { CompanionProductionMZ } from './world/event-companion-production-mz';
+import { createWorldTravelMZ } from './world/world-travel-mz';
+import { installFieldBlackoutScriptMZ } from './world/field-blackout-script-mz';
+import { readNativeTravelLease } from './world/travel-lease-registry-mz';
+import { createBlackoutLoadRecoveryMZ } from './world/blackout-load-recovery-mz';
+import { installBlackoutRecoveryMenuMZ } from './world/blackout-recovery-menu-mz';
+import type { BlackoutLoadRecoveryMZ } from './world/blackout-load-recovery-mz';
+import type { WorldOperationOutcome } from '../framework/app/world-operation';
+import { parseTerrainMeanings } from './world/runtime-inputs-mz';
+import type { WorldTravelRequest } from '../framework/app/world-travel-ports';
+import { createWorldSceneConstructionMZ } from './world/world-scene-construction-mz';
 import type { BattleSessionView, BattleActionResult } from "../framework/flow/session-view";
 import type { SessionMessage, BattleEvent } from "../framework/battle/protocol";
 import type { ApplicationCompositionHost, HostApplication, ProductionRuntime } from './application-host';
@@ -6,7 +21,20 @@ import type { BattleResult, GameState } from '../framework/rules/state';
 import type { Content, DexLookup } from '../framework/rules/types';
 import type { Limits } from '../framework/rules/limits';
 import { messageLiteral } from './message-literal';
+import { readMZWorldFacts, readNativeCyclingMZ } from './world/world-facts-mz';
+import { worldPlugin } from './world/world-host';
+import { createMZAtomicStatePort } from './world/atomic-state-mz';
+import { createWorldBattleSceneMZ } from './world/world-battle-scene-mz';
+import { hostRecord } from './world/host-access';
+import { readWildShinySwitchMZ } from './world/wild-generation-facts-mz';
+import { createBusinessRandomUnitMZ } from './world/business-random-mz';
+import type { WorldBattleAdmission } from '../framework/app/ports';
+import type { MZEncounterMethods } from './world/world-host';
 import { captureInitialField, withInitialField, initialFieldMZ, WEATHER, TERRAIN } from '../framework/rules/initial-field';
+import { snapshotLegacyBattleArgs, legacyBattleChoices } from '../framework/app/legacy-battle-field';
+import { captureGeneratedWildBattle } from '../framework/app/generated-wild-battle';
+import { captureGivenWildBattle } from '../framework/app/given-wild-battle';
+import type { GivenWildBattleStartRequest, GeneratedWildBattleStartRequest } from '../framework/app/ports';
 /**
  * Step 2.4: MZ/RPGReactor integration of the Showdown battle session (placeholder text UI).
  *
@@ -40,6 +68,7 @@ import { createLevelStatsMZ } from "./battleflow/level-stats-mz";
 import { createOrdinaryMessageMZ, createPausedMessageMZ, createSynchronizedMessageMZ, createBriefMessageMZ, isMessageStepMZ } from "./battleflow/ordinary-message-mz";
 import { BriefMessageStep } from './battleflow/brief-message';
 import { BattleBagSelection } from './battleflow/battle-bag';
+import { createFieldMoveDataMZ } from './world/field-move-data-mz';
 import { createBagFadeMZ } from './battleflow/bag-fade-mz';
 import { parseBattleStyle, effectiveBattleStyle, installBattleStyleSettings } from './battleflow/battle-style-settings';
 import type { BattleBagRequest } from './battleflow/battle-bag';
@@ -58,6 +87,10 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   const NAME = "PS_BattleFlow";
   const W = window as any;
   const nodeRequire = (globalThis as any).require as any; // NW.js Node require (has .resolve)
+  const sceneProxyCheck = hostRecord(hostRecord(nodeRequire?.('node:util'))?.types)?.isProxy;
+  if (typeof sceneProxyCheck !== 'function') throw Error('native-proxy-detection-unavailable');
+  const businessRandomUnit = createBusinessRandomUnitMZ(value => sceneProxyCheck(value) === true);
+  const scriptedWildRequests = new WeakMap<object, { kind: 'given'; input: GivenWildBattleStartRequest } | { kind: 'generated'; input: GeneratedWildBattleStartRequest }>();
 
   // ------------------------------------------------------- production engine access (loaded lazily, runtime-relative)
   type EngineAccess = { B: ProductionRuntime & Record<string, any>; D: any; root: string };
@@ -92,6 +125,12 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   // ---------------------------------------------------------------- shared flow state / API
   let openingBattle: object | null = null;
   let replacingState = false;
+  let loadRecovery: BlackoutLoadRecoveryMZ | null = null;
+  let worldAuthor: ReturnType<typeof installWorldAuthorCommandsMZ> | null = null;
+  let companionRuntime: CompanionProductionMZ | null = null;
+  let companionIngress: ReturnType<typeof createCompanionIngressMZ> | null = null;
+  let companionMotion: ReturnType<typeof installCompanionMotionMZ> | null = null;
+  let companionTransfer: ReturnType<typeof worldTravel.transfer.installCompanionTransfer> | null = null;
   function musicSettings(presentation: any, parameters: any, next: any): any {
     let raw = presentation?.music === undefined ? parameters.battleMusic ?? {} : presentation.music;
     if (typeof raw === 'string') raw = raw === '' ? {} : JSON.parse(raw);
@@ -155,8 +194,10 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       catch (error) { op.musicError = String(error); }
     },
     developerCapabilities: {}, // explicit developer/test injection only; never plugin settings or save data
-    operationPending(): boolean { return PSFlow.running || prebattle.pending() || !!PSFlow._app?.saveBlocked || !!W.PSManagement?.presentationPending?.(); },
+    operationPending(): boolean { return PSFlow.running || prebattle.pending() || !!PSFlow._app?.saveBlocked || !!W.PSManagement?.presentationPending?.() || !!worldPlugin(W.PSWorld)?.pending(); },
     prebattleState(): any { return prebattle.snapshot(); },
+    /** WP61 direct check, including an empty party. No caller-owned return target or token. */
+    checkFieldBlackout(requestId: string) { return PSFlow.app().checkFieldBlackout(requestId); },
     /** Programmatic action bridges; formal learning screens/commands belong to G. */
     beginLearning(intent: any, parent?: any): any { return PSFlow.app().beginLearning(intent, parent); },
     resolveLearning(token: string, revision: number, decision: any): any { return PSFlow.app().resolveLearning(token, revision, decision); },
@@ -181,6 +222,8 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     resolveTrade(token: string, revision: number, decision: any): any { return PSFlow.app().resolveTrade(token, revision, decision); },
     assertBattleAllowed(): void { const capabilities = runtimeCapabilities(PSFlow.developerCapabilities); if (!capabilities.allowExperimentalHeldItemBattle && (PSFlow.game().party || []).some((m: any) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成"); },
     running: false, // a battle scene is open (the interpreter waits on this)
+    encounterHost: null as MZEncounterMethods | null,
+    observeNativeMovementIncrease: null as ((player: object) => void) | null,
     request: null as any,
     lastOutcome: null as any,
     lastResult: null as any,
@@ -207,7 +250,10 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
           catch (e) { throw new Error(`content: cannot read ${file} (run: pnpm --dir src build): ${String(e instanceof Error ? e.message : e)}`); }
           const { content, errors } = E.B.contentRuntime.assembleContent(E.B.contentRuntime.loadCompiled(json), E.B.dex.createDexLookup(), PSFlow.developerCapabilities);
           if (errors.length) throw new Error("content: " + errors.map((x: any) => `${x.path}: ${x.message}`).join("; "));
-          PSFlow._content = content;
+          // The compiled source is static until _content is replaced/invalidated. Own a detached
+          // immutable view so repeated world-boundary checks can reuse its semantic fingerprint.
+          // Fixture/custom _content values remain mutable and retain the ordinary full checks.
+          PSFlow._content = E.B.semantic.ownedImmutableSnapshot(content);
         }
       }
       return PSFlow._content!;
@@ -253,8 +299,10 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       PSFlow._app?.assertHostStateReplacementAllowed?.();
       const replacement = {}; replacingState = true; openingBattle = replacement;
       try {
+      worldAuthor?.stateReplaced(); loadRecovery?.invalidate(); companionIngress?.invalidate(); companionMotion?.invalidate(); companionTransfer?.invalidate(); worldTravel.transfer.invalidateCompanionRetainedMaps();
       PSFlow._op?.captureMelody?.cancel();
       PSFlow._op?.ballFeedback?.cancel();
+      worldPlugin(W.PSWorld)?.stepStateReplaced?.();
       if (PSFlow._app) PSFlow._app.stateReplacedByHost();
       prebattle.cancel();
       battleMusic.retire(); PSFlow._nextBattleMusic = null;
@@ -308,7 +356,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     },
     /** Randomness for members created outside a battle (grants, encounters); tests may pin it with `rng`. */
     rng: null as ((n: number) => number) | null,
-    random(n: number): number { return PSFlow.rng ? PSFlow.rng(n) : Math.floor(Math.random() * n); },
+    random(n: number): number { return PSFlow.rng ? PSFlow.rng(n) : Math.floor(businessRandomUnit() * n); },
     /** The wall clock the application reads (milliseconds since the epoch); tests may pin it with `clock`. */
     clock: null as (() => number) | null,
     now(): number { return PSFlow.clock ? PSFlow.clock() : Date.now(); },
@@ -334,15 +382,101 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         const { B } = engine();
         if (!PSFlow.logger) PSFlow.logger = B.log.createRingLogger(500);
         if (!PSFlow._dex) PSFlow._dex = B.dex.createDexLookup();
+        const util: unknown = nodeRequire('node:util');
+        const nativeIsProxy = hostRecord(hostRecord(util)?.types)?.isProxy;
+        if (typeof nativeIsProxy !== 'function') throw Error('native-proxy-detection-unavailable');
+        const fieldData = createFieldMoveDataMZ(nativeIsProxy as (value: unknown) => boolean, Object.getPrototypeOf(util));
+        const state = createMZAtomicStatePort(G, { read: () => PSFlow.game(), replace: next => { G.$gameSystem._psGame = next; } }, nativeIsProxy as (value: unknown) => boolean, { owner: PSFlow, key: '_content' }, worldTravel.host.nativeLeaseSource);
         const ports: GameApplicationPorts<BattleSessionView> = {
-          state: { read: () => PSFlow.game(), replace: next => { G.$gameSystem._psGame = next; } },
+          state,
+          worldTravel: worldTravel.host,
+          blackout: worldTravel.blackoutHost,
+          blackoutProjection: { connect(connection) {
+            const runtime = worldTravel.transfer.connectCompanionProduction(connection, {
+              ownedContentIdentity,
+              current: () => {
+                const application = PSFlow._app;
+                return application ? { application, generation: application.stateGeneration,
+                  content: Reflect.apply(movementContent, PSFlow, []) } : null;
+              },
+              passageProfile: parseTerrainMeanings(travelParameters.TerrainTags).size ? 'configured' : 'plain-mz',
+              terrainMeanings: parseTerrainMeanings(travelParameters.TerrainTags),
+              abilities: { surfing: { base: 'game-world', path: ['surfing'] } },
+              diagnostic: message => console.warn('PS_World companions:', message),
+            });
+            companionRuntime = runtime; return runtime.channel;
+          } },
+          worldBattleScene: { assertCurrent: worldBattleScenes.assertCurrent },
           content: () => ({ content: PSFlow.content(), dex: PSFlow._dex ?? undefined }),
           sessions: ((G.PluginManager.parameters(NAME).contentSource || "sample") === "fixture"
             ? B.composition.createLegacyNoHeldBattleSessionFactory : B.composition.createBattleSessionFactory)({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger!.sink, replacementOffers: (G.PluginManager.parameters(NAME).contentSource || "sample") !== "fixture" }),
           projection: { project: (outcome: { code: number }) => PSFlow.projectOutcome(outcome) },
           random: (n: number) => PSFlow.random(n),
           clock: () => PSFlow.now(),
+          wildGeneration: { switchOn: id => readWildShinySwitchMZ(G, id, value => !!sceneProxyCheck(value)), environment: () => {
+            const host = worldPlugin(W.PSWorld)?.runtimeInputs?.generation; return host ? host.environment() : { status: 'unavailable', reason: 'wild-creation-environment-unavailable' };
+          } },
           itemWorld:()=>({mapId:G.$gameMap?.mapId?.()}),
+          worldHost: { read: () => readMZWorldFacts({
+            mapId: (): unknown => { if (!G.$dataMap) throw new Error('current-map-unavailable'); return G.$gameMap?.mapId?.(); },
+            hour: (): unknown => new Date(PSFlow.now()).getHours(),
+            // Stock absence, native boolean modes and the existing canonical query remain distinct facts.
+            cycling: (): unknown => readNativeCyclingMZ(G, nativeIsProxy as (value: unknown) => boolean),
+            diving: (): unknown => false,
+          }) },
+          fieldItems: { execute: request => {
+            const world = worldPlugin(W.PSWorld);
+            return world ? world.fieldItems.execute(request) : Promise.resolve({ status: 'refused', reason: 'field-handler-unavailable' });
+          } },
+          fieldMoves: {
+            facts: () => { const host = worldPlugin(W.PSWorld)?.fieldMoves; if (!host) throw Error('field-move-host-unavailable'); return fieldData(host.facts()); },
+            run: (plan, operation) => { const host = worldPlugin(W.PSWorld)?.fieldMoves; return host ? host.run(plan, operation).then(fieldData) : Promise.resolve(fieldData({ status: 'unavailable', reason: 'field-move-host-unavailable', completedStages: 0 })); },
+            pushStrength: (input, operation) => { const host = worldPlugin(W.PSWorld)?.fieldMoves; return host ? host.pushStrength(input, operation).then(fieldData) : Promise.resolve(fieldData({ status: 'unavailable', reason: 'field-move-host-unavailable', completedStages: 0 })); },
+            registerSurfLanding: (context, receipt) => movementStart.registerSurfLanding(context, receipt),
+            takeSurfLanding: (context, receipt) => movementStart.takeSurfLanding(context, receipt),
+            landSurf: operation => {
+              const world = worldPlugin(W.PSWorld), host = world?.fieldMoves, gateway = world?.surfLandings, retire = world?.retireSurfLanding;
+              if (!host || !gateway || !retire) return Promise.resolve(fieldData({ status: 'unavailable', reason: 'surf-landing-completion-host-unavailable', completedStages: 0 }));
+              const hold = gateway.hold, candidate = movementStart.beginSurfLanding(operation, (proof, sameMotion) => Reflect.apply(hold, gateway, [proof, () => { Reflect.apply(retire, world, [operation]); }, sameMotion]));
+              const terminal = async (reason: string): Promise<void> => {
+                let receipt: object | null = null;
+                try { receipt = await candidate.failure(); } catch { /* No forged completion on a failed native observation. */ }
+                if (receipt && typeof operation.recordSurfLandingFailure === 'function') {
+                  try { operation.recordSurfLandingFailure(receipt, reason); } catch { /* Original failure remains the outcome. */ }
+                }
+                candidate.cancel();
+              };
+              return host.landSurf(operation).then(async result => {
+                const acknowledged = fieldData(result);
+                if (acknowledged.status === 'completed') {
+                  if (worldPlugin(W.PSWorld) !== world || typeof operation.recordSurfLandingCompletion !== 'function') throw Error('surf-landing-completion-caller-stale');
+                  operation.recordSurfLandingCompletion(candidate.finish());
+                } else await terminal(acknowledged.reason);
+                return acknowledged;
+              }).catch(async error => { try { await terminal(error instanceof Error ? error.message : String(error)); } catch { /* Keep the first failure. */ } throw error; });
+            },
+            cleanupSurf: (operation, notificationPlayer) => { const host = worldPlugin(W.PSWorld)?.fieldMoves; return host ? host.cleanupSurf(operation, notificationPlayer).then(fieldData) : Promise.resolve(fieldData({ status: 'unavailable', reason: 'field-move-host-unavailable', completedStages: 0 })); },
+          },
+          completedSteps: {
+            current: () => { const host = worldPlugin(W.PSWorld)?.completedSteps; if (!host) throw new Error('completed-step-host-unavailable'); return host.current(); },
+            openRepelSelection: request => { const host = worldPlugin(W.PSWorld)?.completedSteps; if (!host) return Promise.reject(new Error('completed-step-host-unavailable')); return host.openRepelSelection(request); },
+            present: request => { const host = worldPlugin(W.PSWorld)?.completedSteps; return host ? host.present(request) : Promise.resolve({ id: request.effect.id, status: 'failed', reason: 'completed-step-host-unavailable' }); },
+            dispatchArrival: request => { const host = worldPlugin(W.PSWorld)?.completedSteps; return host ? host.dispatchArrival(request) : { status: 'failed', reason: 'completed-step-host-unavailable' }; },
+          },
+          ordinaryEncounters: { read: step => {
+            const host = worldPlugin(W.PSWorld)?.runtimeInputs;
+            if (!host) throw Error('world-runtime-inputs-unavailable'); return host.ordinary.read(step);
+          } },
+          fieldEncounters: { read: () => {
+            const host = worldPlugin(W.PSWorld)?.runtimeInputs?.field;
+            if (!host) throw Error('field-encounter-inputs-unavailable'); return host.read();
+          } },
+          fishing: {
+            facts: () => { const host = worldPlugin(W.PSWorld)?.runtimeInputs; if (!host) throw Error('world-runtime-inputs-unavailable'); return host.fishing.facts(); },
+            presentation: { begin: (owner, emit, config) => {
+              const host = worldPlugin(W.PSWorld)?.runtimeInputs; if (!host) throw Error('world-runtime-inputs-unavailable'); return host.fishing.presentation.begin(owner, emit, config);
+            } },
+          },
           evolutionWorld: member => ({
             hour: () => ({ status: "value", value: new Date(PSFlow.now()).getHours() }),
             mapId: () => G.$dataMap && Number.isSafeInteger(G.$gameMap?.mapId?.()) && G.$gameMap.mapId() > 0
@@ -480,7 +614,8 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       const sessionRequest = { ...withInitialField(op.request, op.initialField), battleStyle: op.battleStyle ?? effectiveBattleStyle(G, op.request.battleStyle) };
       // Capture before awaiting, but only publish for a successfully accepted, still-current Session.
       const canLose = !!sessionRequest.canLose;
-      const session = await (op.request.trainer ? app.startTrainerBattle(sessionRequest) : app.startBattle(sessionRequest)); assertCurrent();
+      // A world admission already owns its exact request/member/context in App. The UI envelope never re-enters startBattle.
+      const session = await (op.worldAdmission ? app.startAdmittedWorldBattle(op.worldAdmission) : op.request.trainer ? app.startTrainerBattle(sessionRequest) : app.startBattle(sessionRequest)); assertCurrent();
       const elapsed = performance.now() - tCreate; assertCurrent();
       op.canLose = canLose;
       op.session = session;
@@ -519,6 +654,8 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       // trip is requested before the messages, and a failing message is recorded on the outcome without changing it.
       if (outcome.code === 4 && outcome.commit !== "none" && !op.canLose) {
         outcome.blackout = true;
+        // The actual App keeps exact battle routing history after F has taken over its return.
+        if (PSFlow._app?.isBattleBlackoutRouted(op.session, outcome.battleId) === true) return outcome;
         const ret = PSFlow.returnHome();
         PSFlow.afterCommit(outcome, "message", () => {
           const tr = PSFlow.translator();
@@ -588,7 +725,10 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         PSFlow.close(done.code, op);
         return;
       }
-      try { PSFlow.lastOutcome = PSFlow.app().abortBattle(op.request, error); }
+      try {
+        if (op.worldAdmission) PSFlow.app().abortAdmittedWorldBattle(op.worldAdmission, String(error));
+        PSFlow.lastOutcome = PSFlow.app().abortBattle(op.request, error);
+      }
       catch {
         const outcome: BattleOutcomeView = { code: 0, battleId: op.request.battleId, commit: "none", aborted: true, error: String(error instanceof Error ? error.message : error) };
         try { PSFlow.projectOutcome(outcome); outcome.projection = "ok"; }
@@ -610,12 +750,47 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       const cur = PSFlow.perf.cur;
       if (cur && !cur.totalMs) { cur.totalMs = Math.round((performance.now() - cur.t0) * 10) / 10; cur.code = code; PSFlow.perf.battles.push(cur); }
     },
+    /** Additive event-script entry: one complete individual, captured before any presentation/provider callback. */
+    openGivenWildBattle(input: unknown, presentation?: unknown, fieldChoices?: unknown): void {
+      if (sceneProxyCheck(input)) throw Error('given-wild-request-proxy');
+      const given = captureGivenWildBattle(input);
+      if (fieldChoices !== undefined && given.input.initialField !== undefined) throw Error('given-wild-field-choices-conflict');
+      if (sceneProxyCheck(fieldChoices)) throw Error('given-wild-field-choices-proxy');
+      const choices = fieldChoices === undefined
+        ? { weather: given.request.initialField?.weather ?? 'none', terrain: given.request.initialField?.terrain ?? 'none', environment: given.request.initialField?.environment ?? 'none' } as const
+        : legacyBattleChoices(snapshotLegacyBattleArgs(fieldChoices));
+      const app = PSFlow.app(), latched = app.latchLegacyBattleContext(choices);
+      if (latched.status !== 'value') throw Error('given-world-capture:' + ('reason' in latched ? latched.reason : latched.status));
+      const request = { ...given.request, initialField: latched.value.initialField };
+      scriptedWildRequests.set(request, { kind: 'given', input: given.input });
+      try { PSFlow.openBattle(request, presentation, latched.value); }
+      finally { scriptedWildRequests.delete(request); }
+    },
+    /** Complete WP36 individual generation, explicitly supplied species+level; no ordinary encounter selection. */
+    openGeneratedWildBattle(input: unknown, presentation?: unknown, fieldChoices?: unknown): void {
+      if (sceneProxyCheck(input)) throw Error('generated-wild-request-proxy');
+      const generated = captureGeneratedWildBattle(input);
+      if (fieldChoices !== undefined && generated.input.initialField !== undefined) throw Error('generated-wild-field-choices-conflict');
+      if (sceneProxyCheck(fieldChoices)) throw Error('generated-wild-field-choices-proxy');
+      const choices = fieldChoices === undefined
+        ? { weather: generated.request.initialField?.weather ?? 'none', terrain: generated.request.initialField?.terrain ?? 'none', environment: generated.request.initialField?.environment ?? 'none' } as const
+        : legacyBattleChoices(snapshotLegacyBattleArgs(fieldChoices));
+      const app = PSFlow.app(), latched = app.latchGeneratedWildBattleContext(choices);
+      if (latched.status !== 'value') throw Error('generated-world-capture:' + ('reason' in latched ? latched.reason : latched.status));
+      const request = { ...generated.request, initialField: latched.value.initialField };
+      scriptedWildRequests.set(request, { kind: 'generated', input: generated.input });
+      try { PSFlow.openBattle(request, presentation, latched.value); }
+      finally { scriptedWildRequests.delete(request); }
+    },
     /** The single way a battle opens (StartBattle command and map encounters): the same application path, the same guards. */
-    openBattle(request: any, presentation?: any): void {
+    openBattle(request: any, presentation?: any, legacyLatch?: unknown): void {
       if (PSFlow.running) throw new Error("a battle is already running");
       if (openingBattle || PSFlow.operationPending() || PSFlow._app?.encounterBlocked) throw new Error("operation-active");
       const initialField = captureInitialField(request);
+      const scripted = scriptedWildRequests.get(request);
       const opening = {}, app = PSFlow._app, generation = app?.stateGeneration;
+      let legacyAdmission: WorldBattleAdmission | undefined;
+      let retireScriptedOpening: ((reason: string) => void) | undefined;
       openingBattle = opening;
       const assertCurrent = () => {
         if (openingBattle !== opening || PSFlow._app !== app || app?.stateGeneration !== generation) throw new Error("stale-battle-opening");
@@ -633,23 +808,95 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         const presetHolder = PSFlow._nextBattleMusic;
         const settings = musicSettings(presentation, G.PluginManager.parameters(NAME), presetHolder); assertCurrent();
         const prepared = battleMusic.capture({ app: PSFlow._app, generation: PSFlow._app?.stateGeneration }); assertCurrent();
-        PSFlow._op = { request, initialField, session: null, battleStyle, battleEffects, visualContext, musicPlan: { settings, prepared, presetHolder, started: false, closed: false } };
+        if (legacyLatch !== undefined) {
+          if (!app || app !== PSFlow._app || app.stateGeneration !== generation) throw Error('legacy-battle-application-stale');
+          legacyAdmission = scripted?.kind === 'given'
+            ? app.prepareGivenWildBattle({ ...scripted.input, initialField, battleStyle }, legacyLatch)
+            : scripted?.kind === 'generated' ? app.prepareGeneratedWildBattle({ ...scripted.input, initialField, battleStyle }, legacyLatch) : app.prepareLegacyBattle({ ...request, battleStyle }, legacyLatch);
+        }
+        const operation = { request, initialField, ...(legacyAdmission ? { worldAdmission: legacyAdmission } : {}), session: null, battleStyle, battleEffects, visualContext, musicPlan: { settings, prepared, presetHolder, started: false, closed: false } };
+        PSFlow._op = operation;
         PSFlow.request = request;
         PSFlow.running = true;
         PSFlow.lastOutcome = null;
         PSFlow.perf.cur = { battleId: request.battleId, t0: started, actions: [] as any[], encounter: !!request.encounter };
         if (PSFlow.perf.encounterT0 !== undefined && request.encounter) PSFlow.perf.cur.t0 = PSFlow.perf.encounterT0;
+        if (scripted) {
+          const measurement = PSFlow.perf.cur;
+          // Only this real published operation may release its failed opening. Cleanup callbacks may publish a successor.
+          retireScriptedOpening = reason => {
+            if (PSFlow._op !== operation) return;
+            const hostErrors: { step: string; error: string }[] = [];
+            try { prebattle.finish(operation, false); } catch { hostErrors.push({ step: 'prebattle-cleanup', error: 'failed opening cleanup' }); }
+            if (PSFlow._op !== operation) return;
+            try { PSFlow._closeBattleMusic(operation, false); } catch { hostErrors.push({ step: 'music-cleanup', error: 'failed opening cleanup' }); }
+            if (PSFlow._op !== operation) return;
+            // No provider/host callbacks between this last identity check and retiring the owned host fields.
+            PSFlow.running = false;
+            if (PSFlow.request === request) PSFlow.request = null;
+            PSFlow._op = null;
+            if (PSFlow.perf.cur === measurement) PSFlow.perf.cur = null;
+            PSFlow.lastOutcome = { code: 0, battleId: request.battleId, commit: 'none', aborted: true, error: reason, ...(hostErrors.length ? { hostErrors } : {}) };
+          };
+        }
+        if (legacyAdmission) {
+          worldBattleScenes.prepareHandoff(operation);
+          if (!app || PSFlow._app !== app || app.stateGeneration !== generation || !app.isLegacyBattleAdmissionCurrent(legacyAdmission)) throw Error('legacy-battle-final-source-changed');
+          worldBattleScenes.assertHandoff(operation);
+        }
         openingBattle = null; // running now owns the host save/input barrier
         if (!prebattle.open(PSFlow._op, transition)) G.SceneManager.push(W.Scene_PSBattle);
+      } catch (error) {
+        if (retireScriptedOpening) {
+          let reason = 'given-wild-opening-failed';
+          try { reason = String(error); } catch { /* preserve the original thrown value, including a failed string hook */ }
+          try { if (legacyAdmission && app) app.abortAdmittedWorldBattle(legacyAdmission, reason); } catch { /* host retirement still owns its fields */ }
+          retireScriptedOpening(reason);
+        } else if (legacyAdmission && app) app.abortAdmittedWorldBattle(legacyAdmission, String(error));
+        throw error;
+      } finally { if (openingBattle === opening) openingBattle = null; }
+    },
+    /** Consume the exact App-issued reservation. This envelope belongs only to MZ presentation. */
+    openAdmittedWorldBattle(app: HostApplication, admission: WorldBattleAdmission): boolean {
+      if (PSFlow.running || openingBattle || PSFlow._app !== app || app.stateGeneration !== admission.generation) return false;
+      const scene: unknown = G.SceneManager._scene, player: unknown = G.$gamePlayer, map: unknown = G.$gameMap;
+      const opening = {}; openingBattle = opening;
+      const current = (): void => {
+        if (openingBattle !== opening || PSFlow.running || PSFlow._app !== app || app.stateGeneration !== admission.generation ||
+          G.SceneManager._scene !== scene || G.SceneManager._nextScene || !(scene instanceof G.Scene_Map) || G.$gamePlayer !== player || G.$gameMap !== map ||
+          G.$gamePlayer.isTransferring() || G.$gameMessage.isBusy()) throw Error('stale-world-battle-presentation');
+      };
+      try {
+        current(); PSFlow.assertBattleAllowed(); current();
+        const request = { battleId: admission.battleId, kind: 'wild', foes: [], seq: 0, encounter: true, canLose: false, resultVariable: 0 };
+        const battleEffects = effectiveBattleEffects(G, undefined); current();
+        const battleStyle = effectiveBattleStyle(G, undefined); current();
+        const parameters = G.PluginManager.parameters(NAME); current();
+        const visualContext = battlebackContext(undefined, parameters); current();
+        const transition = prebattlePlan('wild', undefined, parameters, visualContext.time); current();
+        const presetHolder = PSFlow._nextBattleMusic, settings = musicSettings(undefined, parameters, presetHolder); current();
+        const prepared = battleMusic.capture({ app, generation: admission.generation }); current();
+        const started = performance.now(); current();
+        PSFlow._op = { request, worldAdmission: admission, session: null, battleStyle, battleEffects, visualContext,
+          musicPlan: { settings, prepared, presetHolder, started: false, closed: false } };
+        PSFlow.request = request; PSFlow.running = true; PSFlow.lastOutcome = null;
+        PSFlow.perf.cur = { battleId: admission.battleId, t0: started, actions: [], encounter: true };
+        openingBattle = null;
+        if (!prebattle.open(PSFlow._op, transition)) G.SceneManager.push(W.Scene_PSBattle);
+        return true;
+      } catch (error) {
+        app.abortAdmittedWorldBattle(admission, String(error));
+        if (PSFlow._op?.worldAdmission === admission) PSFlow.abort(error, PSFlow._op);
+        console.warn('PS_BattleFlow world admission:', String(error)); return false;
       } finally { if (openingBattle === opening) openingBattle = null; }
     },
     /** Player-facing entries contain a closed held-item gate; direct developer openBattle keeps its throwing contract. */
-    tryOpenBattle(request: any, presentation?: any): boolean {
+    tryOpenBattle(request: any, presentation?: any, legacyLatch?: unknown): boolean {
       const previous=PSFlow._op;
-      try{PSFlow.openBattle(request, presentation);return true;}
+      try{PSFlow.openBattle(request, presentation, legacyLatch);return true;}
       catch(error){
         if(PSFlow._op!==previous&&PSFlow._op?.request===request)PSFlow.abort(error,PSFlow._op);
-        else if(!PSFlow.running){const outcome={code:0,battleId:request.battleId,commit:'none',aborted:true,error:String(error instanceof Error?error.message:error)};PSFlow.lastOutcome=outcome;if(request.resultVariable)G.$gameVariables.setValue(request.resultVariable,0);G.$gameMessage.add(PSFlow.translator().t('management.refused',{reason:outcome.error}));}
+        else if(!PSFlow.running)reportBattleOpenRefusal(request,error);
         return false;
       }
     },
@@ -690,6 +937,122 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       catch (e) { return { ok: false, reason: "unavailable", error: String(e instanceof Error ? e.message : e) }; }
     },
   };
+  const worldBattleScenes = createWorldBattleSceneMZ(G, sceneProxyCheck as (value: unknown) => boolean, PSFlow, player => worldTravel.transfer.captureNativeReservationGuard(player));
+  const travelParameters = hostRecord(G.PluginManager.parameters('PS_World')) ?? {};
+  function reportBattleOpenRefusal(request: { readonly battleId: string; readonly resultVariable?: number }, error: unknown): void {
+    const outcome = { code: 0, battleId: request.battleId, commit: 'none', aborted: true, error: String(error instanceof Error ? error.message : error) };
+    PSFlow.lastOutcome = outcome;
+    if (request.resultVariable) G.$gameVariables.setValue(request.resultVariable, 0);
+    G.$gameMessage.add(PSFlow.translator().t('management.refused', { reason: outcome.error }));
+  }
+  const worldTravel = createWorldTravelMZ(G, () => PSFlow._app, parseTerrainMeanings(travelParameters.TerrainTags), travelParameters,
+    message => console.warn('PS_World travel:', message), sceneProxyCheck as (value: unknown) => boolean, {}, Object.getPrototypeOf(nodeRequire('node:util')));
+  const loadGame = PSFlow.game, loadContent = PSFlow.content;
+  loadRecovery = createBlackoutLoadRecoveryMZ({ root: G, source: worldTravel.host.nativeLeaseSource,
+    application: () => PSFlow._app, game: () => Reflect.apply(loadGame, PSFlow, []), content: () => Reflect.apply(loadContent, PSFlow, []),
+    isProxy: sceneProxyCheck as (value: unknown) => boolean, diagnostic: reason => console.warn('PS_World recovery:', reason) });
+  PSFlow.blackoutLoadSucceeded = () => { PSFlow.app(); loadRecovery?.loaded(); };
+  PSFlow.blackoutLoadInvalidated = () => loadRecovery?.invalidate();
+  PSFlow.blackoutLoadEntered = (app: object, scene: object, outcome: WorldOperationOutcome | null) => loadRecovery?.entered(app, scene, outcome);
+  PSFlow.blackoutLoadPending = () => loadRecovery?.pending() ?? false;
+  PSFlow.pumpBlackoutLoadRecovery = () => loadRecovery?.pump() ?? null;
+  PSFlow.retryBlackoutLoadRecovery = () => loadRecovery?.retry() ?? null;
+  PSFlow.blackoutLoadRecoveryView = () => loadRecovery?.view() ?? null;
+  const retryReturnForAuthor: WorldAuthorBlackoutRetry = application => {
+    const actual = PSFlow._app, controller = loadRecovery;
+    if (!actual || actual !== application || !controller) return Promise.resolve({ status: 'failed', reason: 'world-author-retry-application-stale' });
+    const generation = actual.stateGeneration;
+    const route = controller.retryForApplication(actual);
+    if (PSFlow._app !== actual || actual.stateGeneration !== generation) return Promise.resolve({ status: 'failed', reason: 'world-author-retry-generation-stale' });
+    if (route.kind === 'owned') return route.result;
+    if (route.kind === 'refused') return Promise.resolve({ status: 'failed', reason: route.reason });
+    // Only the private helper's unowned branch permits this actual live-App entry.
+    // Capture a data method, never evaluate a replaceable accessor on the dynamic boundary.
+    const isProxy = sceneProxyCheck as (value: unknown) => boolean;
+    for (let owner: object | null = actual; owner; owner = Object.getPrototypeOf(owner) as object | null) {
+      if (isProxy(owner)) break;
+      const descriptor = Object.getOwnPropertyDescriptor(owner, 'recoverBlackoutReturn');
+      if (!descriptor) continue;
+      const recover: unknown = 'value' in descriptor ? descriptor.value : undefined;
+      if (typeof recover !== 'function' || isProxy(recover)) break;
+      if (PSFlow._app !== actual || actual.stateGeneration !== generation) return Promise.resolve({ status: 'failed', reason: 'world-author-retry-generation-stale' });
+      return Reflect.apply(recover, actual, []) as ReturnType<typeof actual.recoverBlackoutReturn>;
+    }
+    return Promise.resolve({ status: 'failed', reason: 'world-author-retry-live-capability-unavailable' });
+  };
+  installBlackoutRecoveryMenuMZ({ root: G, application: () => PSFlow._app, pending: () => PSFlow.operationPending() || PSFlow.companionNativePending?.() === true,
+    retry: application => {
+      const actual = PSFlow._app;
+      return actual && actual === application ? retryReturnForAuthor(actual)
+        : Promise.resolve({ status: 'failed', reason: 'blackout-retry-application-stale' });
+    },
+    text: key => PSFlow.translator().t('world.blackout.recovery.' + key),
+    diagnostic: reason => console.warn('PS_World recovery:', reason) });
+  worldAuthor = installWorldAuthorCommandsMZ(G, () => PSFlow._app,
+    reason => console.warn('PS_World author:', reason), retryReturnForAuthor);
+  // Presentation/input observation only. Never include it in operation admission/source idle.
+  PSFlow.worldAuthorInputPending = () => worldAuthor?.pending() ?? false;
+
+  // Sole Native known reloadMapIfUpdated scope may inspect local isCurrentLoad(actualApp).
+  // This technical exclusion is not public raw201/F authority and creates no owner/request.
+  const movementGame = PSFlow.game, movementContent = PSFlow.content;
+  // The plugin IIFE and required production runtime have separate semantic module registries.
+  // Query the registry that created Content; never infer ownership from a reference, freeze or external ID.
+  function ownedContentIdentity(content: unknown): string | undefined { return engine().B.semantic.ownedImmutableFingerprint(content); }
+  const movementStart = worldTravel.transfer.installMovementStart({
+    readState: () => { const application = PSFlow._app; return application ? { application, game: Reflect.apply(movementGame, PSFlow, []), content: Reflect.apply(movementContent, PSFlow, []) } : null; },
+    ownedContentIdentity,
+  });
+  // A marker alone cannot publish a proof: only the private actual native call frame may emit.
+  PSFlow.observeNativeMovementIncrease = movementStart.increased;
+  PSFlow.ownedFieldMovementJump = movementStart.ownedFieldJump;
+  companionTransfer = worldTravel.transfer.installCompanionTransfer({
+    readState: () => { const application = PSFlow._app; return application ? { application, game: Reflect.apply(movementGame, PSFlow, []), content: Reflect.apply(movementContent, PSFlow, []) } : null; },
+    isCurrentLoad: application => loadRecovery?.isCurrentLoad(application) ?? false,
+    installed: () => companionRuntime?.syncPresentation(),
+    connectionCompleted: guard => companionIngress?.connectionCompleted(guard),
+  });
+  companionIngress = createCompanionIngressMZ({ root: G, source: worldTravel.host.nativeLeaseSource,
+    isProxy: sceneProxyCheck as (value: unknown) => boolean, application: () => PSFlow._app, runtime: () => companionRuntime,
+    loadPending: () => loadRecovery?.pending() ?? false, followed: () => worldTravel.transfer.retireCompanionRetainedMaps(), diagnostic: reason => console.warn('PS_World companions:', reason) });
+  companionMotion = installCompanionMotionMZ({ root: G, source: worldTravel.host.nativeLeaseSource,
+    isProxy: sceneProxyCheck as (value: unknown) => boolean,
+    ownedContentIdentity,
+    current: () => { const application = PSFlow._app; return application ? { application, generation: application.stateGeneration, content: Reflect.apply(movementContent, PSFlow, []) } : null; },
+    captureReservationGuard: worldTravel.transfer.captureNativeReservationGuard,
+    started: notice => companionIngress?.started(notice), completed: notice => companionIngress?.completed(notice),
+    diagnostic: reason => console.warn('PS_World companions:', reason) });
+  PSFlow.companionNativeMapReady = () => companionIngress?.ready();
+  PSFlow.companionNativeMapFrame = () => { companionTransfer?.ready(); companionIngress?.mapFrame(); };
+  PSFlow.companionNativePending = () => (companionTransfer?.pending() ?? false) || (companionIngress?.pending() ?? false);
+  PSFlow.companionMovementTracked = (player: object, id: string) => companionMotion?.tracked(player, id);
+  PSFlow.companionMovementSettled = (player: object, id: string) => companionMotion?.settled(player, id);
+  PSFlow.companionMovementCancelled = (player: object, id: string) => companionMotion?.cancelled(player, id);
+
+  // Install native Map construction receipts before Main invokes MZGlobalUpgrade.
+  PSFlow.runWorldTravel = (requestId: string, request: WorldTravelRequest) => PSFlow.app().runWorldTravel(requestId, request);
+  PSFlow.retryWorldTravel = (requestId: string) => PSFlow.app().retryWorldTravel(requestId);
+  // The App authenticates the original Inventory-issued field token; no travel DTO is admitted here.
+  PSFlow.retryFieldItemTravel = (token: string) => PSFlow.app().retryFieldItemTravel(token);
+  PSFlow.cancelWorldTravel = (requestId: string) => PSFlow.app().cancelWorldTravel(requestId);
+  PSFlow.worldFlyDestinations = () => PSFlow.app().worldFlyDestinations();
+  PSFlow.ownsWorldTravelArrival = worldTravel.ownsArrival;
+  PSFlow.configureWorldTravelPresentation = worldTravel.configurePresentation;
+  const projectionStarts = new WeakMap<GameAppView, { readonly generation: number; readonly promise: ReturnType<GameAppView['initializeBlackoutCompanions']> }>();
+  PSFlow.initializeBlackoutCompanions = () => {
+    const app = PSFlow._app;
+    if (!app) return null;
+    const previous = projectionStarts.get(app);
+    if (previous?.generation === app.stateGeneration) return previous.promise;
+    const snapshot = readNativeTravelLease(worldTravel.host.nativeLeaseSource), birth = snapshot?.mapBirth, frame = birth?.frame;
+    const descriptor = (value: object, key: string): unknown => { const slot = Object.getOwnPropertyDescriptor(value, key); return slot && 'value' in slot ? slot.value : undefined; };
+    const manager = hostRecord(G.SceneManager), map = hostRecord(G.$gameMap), player = hostRecord(G.$gamePlayer);
+    if (!manager || !map || !player || !frame || birth?.manager !== manager || birth.scene !== descriptor(manager, '_scene') || descriptor(manager, '_nextScene') !== null || frame.map !== map || frame.mapId !== descriptor(map, '_mapId') || frame.player !== player || frame.data !== descriptor(G, '$dataMap') || descriptor(player, '_transferring') !== false || descriptor(birth.scene, '_started') !== true || descriptor(birth.scene, '_active') !== true || app.saveBlocked) return null;
+    const promise = app.initializeBlackoutCompanions();
+    projectionStarts.set(app, { generation: app.stateGeneration, promise });
+    void promise.then(result => { if (result.status === 'failed') console.warn('PS_World companions:', result.reason); }, error => console.warn('PS_World companions:', String(error)));
+    return promise;
+  };
   W.PSFlow = PSFlow;
 
   installBattleStyleSettings(G, () => PSFlow.translator());
@@ -700,7 +1063,13 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     frame: () => G.Graphics.frameCount,
     makePort: (current, defaultBgm) => createBattleMusicMZ(G, nodeRequire, engine().root, current, { defaultBgm }),
   });
-  const prebattle = installPrebattleHost(G, PSFlow, op => PSFlow._preparePrebattleAudio(op));
+  const prebattle = installPrebattleHost(G, PSFlow, op => PSFlow._preparePrebattleAudio(op), op => {
+    if (op !== PSFlow._op) throw Error('legacy-prebattle-operation-changed');
+    if (!worldBattleScenes.hasQueuedHandoff(op)) return;
+    const app = PSFlow._app, admission = PSFlow._op.worldAdmission;
+    if (!app || !app.isLegacyBattleAdmissionCurrent(admission)) throw Error('legacy-prebattle-source-changed');
+    worldBattleScenes.assertHandoff(op);
+  });
   installBattleEffectsSettings(G, () => PSFlow.translator());
 
   // ---------------------------------------------------------------- plugin commands + interpreter wait
@@ -726,31 +1095,47 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     });
   }
 
-  G.PluginManager.registerCommand(NAME, "StartBattle", function (this: any, args: any) {
+  G.PluginManager.registerCommand(NAME, "StartBattle", function (this: any, raw: unknown) {
+    if (sceneProxyCheck(raw)) throw Error('legacy-battle-arguments-proxy');
+    const args = snapshotLegacyBattleArgs(raw);
     if (PSFlow.running) throw new Error("a battle is already running");
-    const initialField = initialFieldMZ(args.defaultWeather, args.defaultTerrain, args.battleEnvironment);
+    const choices = legacyBattleChoices(args);
     const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle), expGain = parseExpGain(args.expGain), battleEffects = parseBattleEffects(args.battleEffects), noRun = parseProhibition(args.noRun, 'noRun'), noBall = parseProhibition(args.noBall, 'noBall'), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || "battle"}#${seq}`;
+    const foes = parseFoes(String(args.foes || "Pidgey:5"));
+    const presentation = { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
+      transition: { location: args.prebattleLocation || undefined } };
+    const kind = args.kind === 'trainer' ? 'trainer' : 'wild', resultVariable = Number(args.resultVariable) || 0;
+    const canLose = String(args.canLose) === 'true', forceParty = String(args.forceParty) === 'true';
+    const request = { kind, foes, seq, battleId, resultVariable, canLose, canSwitch, battleStyle, expGain, noRun, noBall, battleEffects, forceParty };
+    const app = PSFlow.app(), latched = app.latchLegacyBattleContext(choices);
+    if (latched.status !== 'value') {
+      if (latched.status !== 'busy') throw Error('legacy-world-capture:' + ('reason' in latched ? latched.reason : latched.status));
+      reportBattleOpenRefusal(request, Error('legacy-world-capture:' + latched.reason));
+      if (G.$gameMessage.isBusy()) this.setWaitMode('message'); return;
+    }
+    const initialField = latched.value.initialField;
     const opened=PSFlow.tryOpenBattle({
-      kind: args.kind === "trainer" ? "trainer" : "wild",
-      foes: parseFoes(args.foes || "Pidgey:5"),
+      kind,
+      foes,
       seq,
       battleId,
-      resultVariable: Number(args.resultVariable) || 0,
+      resultVariable,
       initialField,
-      canLose: String(args.canLose) === "true", canSwitch, battleStyle, expGain, noRun, noBall, battleEffects,
-      forceParty: String(args.forceParty) === "true",
-    }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
-      transition: { location: args.prebattleLocation || undefined } });
+      canLose, canSwitch, battleStyle, expGain, noRun, noBall, battleEffects,
+      forceParty,
+    }, presentation, latched.value);
     if(!opened){if(G.$gameMessage.isBusy())this.setWaitMode('message');return;}
     this._psBattleId = battleId; // this interpreter waits for THIS battle (see updateWaitMode below)
     this.setWaitMode("psBattle");
   });
 
-  G.PluginManager.registerCommand(NAME, "StartTrainerBattle", function (this: any, args: any) {
+  G.PluginManager.registerCommand(NAME, "StartTrainerBattle", function (this: any, raw: unknown) {
+    if (sceneProxyCheck(raw)) throw Error('legacy-battle-arguments-proxy');
+    const args = snapshotLegacyBattleArgs(raw);
     if (PSFlow.running) throw new Error("a battle is already running");
-    if (args.moneyGain !== undefined && ![true, false, "true", "false"].includes(args.moneyGain)) throw new Error("moneyGain must be true or false");
-    const initialField = initialFieldMZ(args.defaultWeather, args.defaultTerrain, args.battleEnvironment);
+    if (args.moneyGain !== undefined && ![true, false, "true", "false"].some(value => value === args.moneyGain)) throw new Error("moneyGain must be true or false");
+    const choices = legacyBattleChoices(args);
     const canSwitch = parseCanSwitch(args.canSwitch), battleStyle = parseBattleStyle(args.battleStyle), expGain = parseExpGain(args.expGain), battleEffects = parseBattleEffects(args.battleEffects), noRun = parseProhibition(args.noRun, 'noRun'), noBall = parseProhibition(args.noBall, 'noBall');
     const id = String(args.trainerId || args.id || ""), version = Number(args.version ?? 0), seq = PSFlow.nextSeq();
     const battleId = `${args.battleId || `trainer-${id}-v${version}`}#${seq}`;
@@ -763,15 +1148,26 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       if (G.$gameMessage.isBusy()) this.setWaitMode("message");
       return;
     }
+    const presentation = { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
+      transition: { location: args.prebattleLocation || undefined } };
+    const moneyGain = args.moneyGain !== false && args.moneyGain !== 'false', resultVariable = Number(args.resultVariable) || 0;
+    const canLose = String(args.canLose) === 'true', forceParty = String(args.forceParty) === 'true';
+    const request = { kind: 'trainer', trainer: { id, version }, seq, battleId, resultVariable, moneyGain, canLose, canSwitch, battleStyle, expGain, noRun, noBall, battleEffects, forceParty };
+    const app = PSFlow.app(), latched = app.latchLegacyBattleContext(choices);
+    if (latched.status !== 'value') {
+      if (latched.status !== 'busy') throw Error('legacy-world-capture:' + ('reason' in latched ? latched.reason : latched.status));
+      reportBattleOpenRefusal(request, Error('legacy-world-capture:' + latched.reason));
+      if (G.$gameMessage.isBusy()) this.setWaitMode('message'); return;
+    }
+    const initialField = latched.value.initialField;
     const opened = PSFlow.tryOpenBattle({
       kind: "trainer", trainer: { id, version }, foes: [], seq, battleId,
-      moneyGain: args.moneyGain !== false && args.moneyGain !== "false",
-      resultVariable: Number(args.resultVariable) || 0,
+      moneyGain,
+      resultVariable,
       initialField,
-      canLose: String(args.canLose) === "true", canSwitch, battleStyle, expGain, noRun, noBall, battleEffects,
-      forceParty: String(args.forceParty) === "true",
-    }, { background: args.battleBackground || undefined, platform: args.battlePlatform, time: args.battleTime,
-      transition: { location: args.prebattleLocation || undefined } });
+      canLose, canSwitch, battleStyle, expGain, noRun, noBall, battleEffects,
+      forceParty,
+    }, presentation, latched.value);
     if (!opened) { if (G.$gameMessage.isBusy()) this.setWaitMode("message"); return; }
     this._psBattleId = battleId;
     this.setWaitMode("psBattle");
@@ -814,10 +1210,12 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   // framework battle instead of an MZ troop battle. Busy (a battle already open) or an event running: nothing happens.
   let heldEncounterGate: {game:unknown; map:unknown; key:string; capability:unknown} | null = null;
   const baseExecuteEncounter = G.Game_Player && G.Game_Player.prototype.executeEncounter;
-  if (G.Game_Player) G.Game_Player.prototype.executeEncounter = function (this: any) {
+  const nativeMakeCount = G.Game_Player?.prototype.makeEncounterCount;
+  const nativeUpdateCount = G.Game_Player?.prototype.updateEncounterCount;
+  const legacyExecuteEncounter = function (this: any) {
     const table = PSFlow.mapEncounters();
     if (!table) return baseExecuteEncounter.call(this);
-    if (PSFlow.running || PSFlow._app?.encounterBlocked || G.$gameMap.isEventRunning() || this._encounterCount > 0) return false;
+    if (PSFlow.running || PSFlow._app?.encounterBlocked || !G.$gameSystem.isEncounterEnabled() || G.$gameMap.isEventRunning() || this._encounterCount > 0) return false;
     // Cold host gate: app() loads content, so reject before constructing it or drawing any random value.
     const gateGame=G.$gameSystem?._psGame, gateMap=G.$gameMap, gateCapability=JSON.stringify(PSFlow.developerCapabilities??{});
     const heldKey=(gateGame?.party??[]).map((m:any)=>[m.id,m.item??'']);
@@ -837,15 +1235,18 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     finally { PSFlow.perf.encounterT0 = undefined; }
     return false; // the framework scene is already pushed; MZ must not open its own battle
   };
+  if (G.Game_Player) {
+    G.Game_Player.prototype.executeEncounter = legacyExecuteEncounter;
+    PSFlow.encounterHost = {
+      nativeEncounter: (player: object) => Reflect.apply(baseExecuteEncounter, player, []) === true,
+      legacyEncounter: (player: object) => Reflect.apply(legacyExecuteEncounter, player, []) === true,
+      makeCount: (player: object, args: readonly unknown[]) => Reflect.apply(nativeMakeCount, player, args),
+      updateCount: (player: object, args: readonly unknown[]) => Reflect.apply(nativeUpdateCount, player, args),
+    };
+  }
   G.PluginManager.registerCommand(NAME, "ResetGame", () => PSFlow.resetGame());
 
-  // The global step counter (WP06 §4.1): a step taken on a forced move route or while an event runs is not counted.
-  const baseIncreaseSteps = G.Game_Player && G.Game_Player.prototype.increaseSteps;
-  if (G.Game_Player) G.Game_Player.prototype.increaseSteps = function (this: any) {
-    baseIncreaseSteps.call(this);
-    if (this.isMoveRouteForcing() || G.$gameMap.isEventRunning()) return;
-    PSFlow.steps(1);
-  };
+  // PS_World owns completed interpolation identities. Keep native increaseSteps, but never write framework steps at move start.
 
   /** Show lines as one message window and make the event wait for it (only when the author asked for messages). */
   function say(interpreter: any, lines: string[]): void {
@@ -942,6 +1343,9 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     baseClear.call(this);
     delete this._psEndChain; delete this._psBattleId; delete this._psMusicIntro;
   };
+  /** In an MZ Script command: PSFlow.waitFieldBlackout(this, 'unique-request-id'). */
+  PSFlow.waitFieldBlackout = installFieldBlackoutScriptMZ({ root: G, application: () => PSFlow._app,
+    isProxy: value => sceneProxyCheck(value) === true });
 
   // Saving is masked while a battle runs, on top of the game's own flag: the menu and autosave read isSaveEnabled, and the
   // flag itself (set by events or other systems, also during the battle) is never written by the battle. A direct
@@ -1132,12 +1536,19 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     return null;
   }
 
-  function Scene_PSBattle(this: any) { this.initialize(...(arguments as any)); }
+  function Scene_PSBattle(this: any) {
+    const completeConstruction = sceneConstruction.before(this, new.target);
+    this.initialize(...(arguments as any));
+    // The native PIXI wrapper calls orig.apply and swallows errors. Only a normal return
+    // from this original body can complete its private SceneManager allocation receipt.
+    completeConstruction();
+  }
   W.Scene_PSBattle = Scene_PSBattle;
   Scene_PSBattle.prototype = Object.create(G.Scene_MenuBase.prototype);
   Scene_PSBattle.prototype.constructor = Scene_PSBattle;
 
   const P = Scene_PSBattle.prototype;
+  const sceneConstruction = createWorldSceneConstructionMZ(G, Scene_PSBattle, P, worldBattleScenes, sceneProxyCheck as (value: unknown) => boolean);
   const requestObservers = new WeakMap<object, { op: any; app: any; session: any; generation: number; epoch: number; token: string; menu: any; menuRevision: number }>();
   let requestObserverSerial = 0;
   // Only player-owned members use saved nicknames. Opponent appearance stays public-only.

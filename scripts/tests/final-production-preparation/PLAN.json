@@ -1,0 +1,184 @@
+{
+  "schema": 1,
+  "mode": "SUPPORTED_ENTRIES_PENDING_SCOPED_REVIEW",
+  "sourceBase": "12c763dcf4fa99e6a23b7b9ccc403c48ec03ca88",
+  "sourceTree": "e0aee5ebc9b11d964ed339c95a2750f04326debc",
+  "regularRegistered": 363,
+  "regularExecutedThisTask": 0,
+  "families": [
+    {
+      "id": "native-callers",
+      "source": "12c763dcf4fa99e6a23b7b9ccc403c48ec03ca88",
+      "entry": "experiments/step5/5/world-production-final-wire/test-callers.cjs",
+      "cases": [
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "B3",
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ],
+      "selectorEnv": "PF_FINAL_CASE",
+      "registeredInCurrent360": false,
+      "bodySHA256": "7a3d3942cd7b235e8db34d814e4204561c7958bb605e07b95f292173a2d21457",
+      "scope": "SUPPORTED_ENTRY_PENDING_THIS_TASK_FINITE_VALIDATION_AND_INDEPENDENT_REVIEW",
+      "registeredInCurrent363": true
+    },
+    {
+      "id": "native-mapdata",
+      "source": "12c763dcf4fa99e6a23b7b9ccc403c48ec03ca88",
+      "entry": "experiments/step5/5/world-production-final-wire/test-native-mapdata-guard.cjs",
+      "cases": [
+        "X1",
+        "X2"
+      ],
+      "selectorEnv": "PF_FINAL_CASE",
+      "registeredInCurrent360": false,
+      "bodySHA256": "535c9c3aa7505f33b6c796cf0c800811a91cf648d9b9a64bc24616f662c043e3",
+      "scope": "SUPPORTED_ENTRY_PENDING_THIS_TASK_FINITE_VALIDATION_AND_INDEPENDENT_REVIEW",
+      "registeredInCurrent363": true
+    },
+    {
+      "id": "defeat-formal-continue",
+      "source": "f1085d6494b89e67609ac061a8b93a4c91a281cd",
+      "entry": "experiments/step5/5/event-defeat-autosave-continue-headless/test-chain.cjs",
+      "cases": [
+        "P01",
+        "C01"
+      ],
+      "selectorEnv": "PF_CHAIN_CASE",
+      "registeredInCurrent360": false,
+      "bodySHA256": "eab4610e15a3633a705ac309e1d03334958d60d00cc1c8e40978953bae6cfaaf",
+      "scope": "SUPPORTED_ENTRY_PENDING_THIS_TASK_FINITE_VALIDATION_AND_INDEPENDENT_REVIEW",
+      "previousSource": "5196a022a7998166886d4e6ec79ce2f38844f111",
+      "registeredInCurrent363": true
+    },
+    {
+      "id": "shortcut-capture-formal-continue",
+      "source": "f1085d6494b89e67609ac061a8b93a4c91a281cd",
+      "entry": "experiments/step5/5/t16-shortcut-capture-continue-headless/test-t16.cjs",
+      "cases": [
+        "P01",
+        "C01"
+      ],
+      "selectorEnv": "PF_T16_CASE",
+      "registeredInCurrent360": false,
+      "bodySHA256": "a89041a8fdfe5bf5996c9879aba2ac7feb512b048e1f5c38f971facb2b247c09",
+      "scope": "SUPPORTED_ENTRY_PENDING_THIS_TASK_FINITE_VALIDATION_AND_INDEPENDENT_REVIEW",
+      "previousSource": "db69815201f29508331cfdfd6d0d59ab32a09395",
+      "registeredInCurrent363": true
+    }
+  ],
+  "reuse": [
+    "scripts/headless-regression-binding.cjs capture/boundFiles",
+    "scripts/tests/ts-source-loader.cjs data-only fixture module",
+    "existing source-bound strict compiler helpers; JS tsc launcher or native compiler directly",
+    "current production composition; original constructor/private issuer; genuine native Reactor methods"
+  ],
+  "pending": [
+    "Independent review of new source-bound entry adapter and three supported suites",
+    "Exact final full363 (not run by assembly task)",
+    "NW/T20/Title and manual acceptance require separate authorization; no new run here"
+  ],
+  "forbidden": [
+    "Old private output paths/builders/runtime pointers",
+    "Fake replacement factories/owners/admissions/receipts",
+    "Unknown selectors or bare node --test discovery",
+    "NW/focus/system/player state changes"
+  ],
+  "e1Followup": {
+    "provenanceBase": "27c254db87a63f3fd51037849aa26489cc9ca6f0",
+    "productSrc": "1794a1dcae2b025d32403c2359c2ab0f748cb5fc",
+    "regularRegistered": 364,
+    "old363Order": "exact prefix unchanged",
+    "entry": "scripts/tests/e1-default-production.test.cjs",
+    "family": "e1",
+    "selectors": [
+      "unit",
+      "bag",
+      "visual",
+      "shortcut-cancel",
+      "entropy-failure",
+      "injected-missing",
+      "travel-priority"
+    ],
+    "wrapperTests": 7,
+    "originalWorkerTAPCases": 10,
+    "scope": "actual default PSFlow/Bag and shortcut wiring, default crypto vs pinned visual Weather pair, entropy and exact recovery identity controls",
+    "coldTargetedAuthorResult": "7 wrappers PASS and 10 original worker cases PASS, separate counts; source-bound official distribution/eight IIFEs, not full364",
+    "full364Executed": false,
+    "historicalPlanAbove": "preserved as original363 entry assembly snapshot; latest immutable candidate/report lives in E1 handoff",
+    "persistentStateDelta": false
+  },
+  "gRetryFollowup": {
+    "sourceBase": "bfcf3e9f5dc34cad09a135214d3b2d1cd2779ece",
+    "productSrc": "1794a1dcae2b025d32403c2359c2ab0f748cb5fc",
+    "regularRegistered": 365,
+    "old364Order": "exact prefix unchanged",
+    "entry": "scripts/tests/g-retry-production.test.cjs",
+    "family": "g-retry",
+    "cases": [
+      "GN06",
+      "GN07",
+      "GN08"
+    ],
+    "scope": "genuine357 live and formal-loaded failed F recovery plus phase refusal; memory JsonEx load transport disclosed",
+    "execution": "pending fixed candidate targeted runtime; not full365",
+    "SessionFactory": "actual production composition; no fake session creation or replacement",
+    "full365ExecutedThisTask": false
+  },
+  "finalUnionPreparation": {
+    "base": "0ff2adac66671cec1456de3ffa142c5dc1d06fcc",
+    "old391Order": "exact prefix unchanged",
+    "regularRegistered": 396,
+    "newWrappers": [
+      "scripts/tests/e1-fishing-character.test.cjs",
+      "scripts/tests/field-presentation-i18n.test.cjs",
+      "scripts/tests/field-presentation-terminal.test.cjs",
+      "scripts/tests/travel-presentation-initial.test.cjs",
+      "scripts/tests/travel-presentation-source-controls.test.cjs"
+    ],
+    "newSelectors": 177,
+    "newInnerTAP": 300,
+    "regularExecutedThisTask": 0,
+    "productBusinessExecutedThisTask": 0,
+    "status": "REGISTERED_NOT_RUN_PENDING_NEW_FIXED_INPUT_REVIEW",
+    "E3OBS": "0ff support review in flight; E03 transport hold same-map new XHR static gap OPEN; no business GO",
+    "P5C14MCNW": "NOT_RUN_NO_GO"
+  },
+  "e23InputRemediation": {
+    "base": "7e462a727578f2dfd28a6d2725d6168dc3808f85",
+    "productSrc": "508c287fca132b002c4859d99e97171b4ad9f01f",
+    "productChanges": 0,
+    "old396Order": "exact prefix unchanged",
+    "regularRegistered": 397,
+    "newPureSupportSuite": "scripts/tests/e3-empty-load-input-support.test.cjs",
+    "pureSupportCases": 16,
+    "old177selectors300inner": "registered unchanged; NOT_RUN",
+    "businessExecution": 0,
+    "E02": "frozen static oracle: one genuine version-reload native request/execute/fulfilled DataManager.saveGame(0), full framework state unchanged; pending independent input review",
+    "E03": "one actual old 357 request object/sequence held; fresh same URL passes; late release once after genuine successor; pending independent input review",
+    "noGOTransfer": true
+  },
+  "e1CanonicalCalleeRemediation": {
+    "base": "7acd37c2896f1f9f55c7f34e97cb8600c0d0b2e2",
+    "src": "508c287fca132b002c4859d99e97171b4ad9f01f",
+    "productChanges": 0,
+    "regularRegistered": 398,
+    "old397ExactPrefix": true,
+    "selectors22Inner145": "REGISTERED_NOT_RUN",
+    "prior177selectors300inner": "UNCHANGED_NOT_RUN",
+    "newPureControls": 10,
+    "fixes": [
+      "own parent out/src plus native objects complete fishing-host group",
+      "formal strict full10-key admission (profile9 plus own actual engine output) before legacy prepare/import/compiler",
+      "character family uses own current ui-wire runtime branch"
+    ],
+    "standaloneLegacyHelper": "BYTE_UNCHANGED",
+    "E02E03Inputs": "BYTE_UNCHANGED; separate pending input review",
+    "businessExecution": 0
+  }
+}

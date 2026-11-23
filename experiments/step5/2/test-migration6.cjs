@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const E=require('../../../js/engine/build/engine.cjs'),H=require('../1/legacy-test-support.cjs');
 const F=E.fixtures,S=E.state,I=E.inventory,clone=x=>structuredClone(x);
 const options={content:F.content,speciesKey:E.speciesKey.identityKeys};
-function old5(){const game=clone(F.makeGame());game.schema=5;delete game.defeatedTrainers;game.bag=I.aggregateBag(game.inventory);delete game.inventory;delete game.badges;game.dex={seen:clone(game.dex.seen),owned:clone(game.dex.owned)};for(const m of E.storage.allMembers(game)){delete m.evolutionReadiness;delete m.cannotTrade;delete m.statNature;for(const move of m.moves)delete move.ppUps;}return game;}
+function old5(){const game=clone(F.makeGame());game.schema=5;delete game.hallOfFame;delete game.world;delete game.defeatedTrainers;game.bag=I.aggregateBag(game.inventory);delete game.inventory;delete game.badges;game.dex={seen:clone(game.dex.seen),owned:clone(game.dex.owned)};for(const m of E.storage.allMembers(game)){delete m.evolutionReadiness;delete m.cannotTrade;delete m.statNature;for(const move of m.moves)delete move.ppUps;}return game;}
 const migrate=raw=>E.saveSchema.migrateGame(raw,options);
 test('P52-04 FR180: schema1..5 through6 to7 is deterministic, no data loss and no source mutation',()=>{
  for(const version of [1,2,3,4,5]){

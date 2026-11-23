@@ -1,4 +1,4 @@
-import { creationBattleNameOf } from "./species-key";
+import { initialWildBattleNameOf } from "./species-key";
 /** Finite auxiliary composition over an already validated primary plan. The application owns installation and replay. */
 import { planBattleReadiness } from "./battle-consumption";
 import type { ResolvedBattleEffects } from "./battle-consumption";
@@ -44,7 +44,7 @@ function exactDexAppearance(content: Content, individual: DexAppearance, battleS
   if (!formNumber(individual.form)) return null;
   const forms = own(content.forms, individual.species);
   const exactName = (form: number): string | undefined => content.forms ? own(forms, String(form)) : form === 0 ? individual.species : undefined;
-  const originalName = exactName(individual.form) ?? creationBattleNameOf(content, individual);
+  const originalName = exactName(individual.form) ?? initialWildBattleNameOf(content, individual);
   if (!originalName || battleSpecies !== undefined && originalName !== battleSpecies) return null;
   const original = own(content.species, originalName);
   if (!original) return null;

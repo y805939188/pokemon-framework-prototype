@@ -1,0 +1,83 @@
+{
+  "source": "author-placeholder",
+  "tables": [
+    {
+      "mapId": 5,
+      "version": 0,
+      "types": {
+        "Land": {
+          "stepChance": 21,
+          "slots": [
+            {
+              "species": "pidgey",
+              "weight": 100,
+              "minLevel": 3,
+              "maxLevel": 5
+            }
+          ]
+        },
+        "OldRod": {
+          "stepChance": 0,
+          "slots": [
+            {
+              "species": "blastoise",
+              "weight": 100,
+              "minLevel": 3,
+              "maxLevel": 5
+            }
+          ]
+        },
+        "GoodRod": {
+          "stepChance": 0,
+          "slots": [
+            {
+              "species": "blastoise",
+              "weight": 100,
+              "minLevel": 3,
+              "maxLevel": 5
+            }
+          ]
+        },
+        "SuperRod": {
+          "stepChance": 0,
+          "slots": [
+            {
+              "species": "blastoise",
+              "weight": 100,
+              "minLevel": 3,
+              "maxLevel": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "mapId": 6,
+      "version": 0,
+      "types": {
+        "Cave": {
+          "stepChance": 5,
+          "slots": [
+            {
+              "species": "gengar",
+              "weight": 100,
+              "minLevel": 3,
+              "maxLevel": 5
+            }
+          ]
+        },
+        "RockSmash": {
+          "stepChance": 50,
+          "slots": [
+            {
+              "species": "caterpie",
+              "weight": 100,
+              "minLevel": 3,
+              "maxLevel": 5
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

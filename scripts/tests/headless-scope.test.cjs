@@ -10,13 +10,50 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
 const source = fs.readFileSync(path.join(root, 'scripts/test-headless.sh'), 'utf8');
 const excluded = 'experiments/step3/test-growth-differential.cjs';
-const synthetic = ['control-only-a.cjs', 'control-only-b.cjs'];
+const synthetic = ['scripts/tests/control-only-a.cjs', 'scripts/tests/control-only-b.cjs'];
+const cSuites = require('./c-regular-runtime.cjs').SUITES;
+const testCommand = suite => `node --test --test-reporter=tap ${cSuites.includes(suite) ? '--require ./scripts/tests/c-regular-runtime.cjs ' : ''}${suite}`;
 function entries(name) {
   const match = source.match(new RegExp(`^${name}=\\(\\n([\\s\\S]*?)^\\)`, 'm'));
   assert.ok(match, `${name} must be an explicit array`);
   return match[1].split('\n').map(line => line.trim()).filter(Boolean);
 }
 const selected = entries('SUITES');
+
+test('final production entry refuses unknown family and selectors before Popen', () => {
+  const cp = require('node:child_process'), original = cp.spawnSync;
+  const moduleFile = require.resolve('./final-production-runner.cjs');
+  let calls = 0;
+  try {
+    cp.spawnSync = () => { calls++; throw Error('unexpected Popen'); };
+    delete require.cache[moduleFile];
+    const runner = require(moduleFile);
+    for (const [family, selector] of [['other','A1'], ['native','../A1'], ['native','C01'], ['defeat','X1'], ['t16',''], ['e1-fishing-character','POSE99'], ['field-presentation-i18n','TEXT00'], ['field-presentation-terminal','TERM00'], ['travel-presentation-initial','TRAVEL00'], ['travel-presentation-source-controls','SOURCE00']])
+      assert.throws(() => runner.runCase(family, selector), /unknown production (family|selector)/);
+    assert.equal(calls, 0);
+  } finally { cp.spawnSync = original; delete require.cache[moduleFile]; }
+});
+test('final production entry names all fifteen original cases explicitly', () => {
+  const {spec} = require('./final-production-runner.cjs');
+  for (const id of ['A1','A2','B1','B2','B3','C1','C2','C3','C4','X1','X2'])
+    assert.equal(spec('native', id).entry, path.join(root, 'experiments/step5/5/world-production-final-wire/', id[0] === 'X' ? 'test-native-mapdata-guard.cjs' : 'test-callers.cjs'));
+  for (const id of ['P01','C01']) {
+    assert.equal(spec('defeat', id).entry, path.join(root, 'experiments/step5/5/event-defeat-autosave-continue-headless/test-chain.cjs'));
+    assert.equal(spec('t16', id).entry, path.join(root, 'experiments/step5/5/t16-shortcut-capture-continue-headless/test-t16.cjs'));
+  }
+});
+test('final production entry refuses old producer and case inputs', () => {
+  const {inheritedInputs} = require('./final-production-runner.cjs');
+  inheritedInputs({});
+  for (const name of ['PF_CHAIN_PRODUCER','PF_CHAIN_CONTENT','PF_T16_PRODUCER','PF_CHAIN_CASE_ROOT','PF_FINAL_CASE','PF_FINAL_PRODUCTION_RECEIPT','PF_E1_CHARACTER_CASE','PF_E1_POSE_CASE','PF_PRESENTATION_CASE','PF_PRESENTATION_OUTPUT','PF_TERMINAL_ORIGINAL','PF_TRAVEL_ORIGINAL'])
+    assert.throws(() => inheritedInputs({[name]: '/old-evidence/input'}), /stale case input refused/);
+});
+test('final production output guard rejects paths outside its current root', () => {
+  const {inside} = require('./final-production-runner.cjs');
+  assert.equal(inside(path.join(root, 'build'), root), path.join(root, 'build'));
+  for (const target of [path.dirname(root), path.join(root, '..', 'old-evidence'), '/tmp/foreign-final-case'])
+    assert.throws(() => inside(target, root), /output leaves current private root/);
+});
 
 function sandbox(t, { actualInventory = false, overlap = false, engine = true } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-headless-scope-'));
@@ -29,6 +66,13 @@ function sandbox(t, { actualInventory = false, overlap = false, engine = true } 
     const suites = overlap ? [...synthetic, excluded] : synthetic;
     script = script.replace(/^SUITES=\(\n[\s\S]*?^\)/m, `SUITES=(\n${suites.map(s => `  ${s}`).join('\n')}\n)`);
   }
+  // The runner validates registered files before preflight. Inert placeholders
+  // satisfy that guard; the fake Node below only logs paths and never reads them.
+  for (const suite of actualInventory ? selected : synthetic) {
+    const file = path.join(dir, suite);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, '', { flag: 'wx' });
+  }
   fs.writeFileSync(path.join(dir, 'scripts/test-headless.sh'), script);
   // These executables never delegate to real Node or pnpm. Suite paths are only logged.
   fs.writeFileSync(path.join(dir, 'bin/node'), `#!/bin/bash
@@ -37,15 +81,18 @@ if [[ "$*" == 'scripts/check-boundaries.cjs' ]]; then exit 0; fi
 if [[ "$1" == 'scripts/headless-regression-binding.cjs' ]]; then
   case "$2" in
     begin) [[ $# -eq 3 ]] || exit 94; [[ "\${CONTROL_BINDING_BEGIN_RC:-0}" -eq 0 ]] || exit "$CONTROL_BINDING_BEGIN_RC"; printf '{}\\n' > "$3" ;;
-    finish) [[ $# -eq 4 ]] || exit 94; [[ "\${CONTROL_BINDING_FINISH_RC:-0}" -eq 0 ]] || exit "$CONTROL_BINDING_FINISH_RC"; printf '{"runId":"synthetic-control"}\\n' > "$4" ;;
+    finish) [[ $# -eq 5 && "$5" == '--with-c-generation-support' ]] || exit 94; [[ "\${CONTROL_BINDING_FINISH_RC:-0}" -eq 0 ]] || exit "$CONTROL_BINDING_FINISH_RC"; printf '{"runId":"synthetic-control"}\\n' > "$4" ;;
     verify) [[ $# -eq 3 ]] || exit 94; exit "\${CONTROL_BINDING_VERIFY_RC:-0}" ;;
     *) exit 94 ;;
   esac
   exit 0
 fi
-if [[ "$1" != '--test' || "$2" != '--test-reporter=tap' || $# -ne 3 ]]; then exit 91; fi
+if [[ "$1" == 'scripts/tests/c-regular-runtime.cjs' && "$2" == 'describe' && $# -eq 3 ]]; then printf '{}\\n'; exit 0; fi
+if [[ "$1" != '--test' || "$2" != '--test-reporter=tap' ]]; then exit 91; fi
+if [[ "\${3:-}" == '--require' && "\${4:-}" == './scripts/tests/c-regular-runtime.cjs' && $# -eq 5 ]]; then set -- "$1" "$2" "$5"; fi
+if [[ $# -ne 3 ]]; then exit 91; fi
 if [[ "$3" == '${excluded}' ]]; then echo 'FORBIDDEN_REPLAY_SELECTED' >&2; exit 92; fi
-if [[ "$3" != 'control-only-a.cjs' ]]; then
+if [[ "$3" != '${synthetic[0]}' ]]; then
   printf '# pass 1\\n# fail 0\\n# cancelled 0\\n# skipped 0\\n'
   exit 0
 fi
@@ -84,7 +131,7 @@ esac
   }
   return { run, receipts: () => {
     const folder = path.join(dir, 'build/headless-regression-bindings');
-    return fs.existsSync(folder) ? fs.readdirSync(folder) : [];
+    return fs.existsSync(folder) ? fs.readdirSync(folder).filter(name => name.endsWith('.json')) : [];
   } };
 }
 
@@ -110,15 +157,22 @@ test('list modes work without engine, Node, pnpm, or product execution', t => {
 
 test('default and explicit regular scope select every listed suite and no replay', t => {
   const fixture = sandbox(t, { actualInventory: true });
-  for (const args of [[], ['--scope=regular']]) {
+  for (const args of [[], [''], ['--scope=regular']]) {
     const result = fixture.run(args);
     assert.equal(result.status, 0, result.stderr);
-    assert.deepEqual(result.commands.filter(line => line.startsWith('node --test ')), selected.map(s => `node --test --test-reporter=tap ${s}`));
+    assert.deepEqual(result.commands.filter(line => line.startsWith('node --test ')), selected.map(testCommand));
     assert.ok(!result.commands.some(line => line.includes(excluded)));
     assert.match(result.stdout, /EXCLUDED \(NOT RUN\): experiments\/step3\/test-growth-differential\.cjs/);
     assert.match(result.stdout, /NOT RUN and not passes/);
     assert.doesNotMatch(result.stdout, /FORBIDDEN_REPLAY_SELECTED/);
   }
+});
+
+test('C support scope selects exactly the eight whole suites and its contract with no name filters', t => {
+  const result = sandbox(t, {actualInventory: true}).run(['--scope=c-generation-support']);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.commands.filter(line => line.startsWith('node --test ')), [...cSuites, 'scripts/tests/c-regular-runtime.test.cjs'].map(testCommand));
+  assert(!result.commands.some(line => line.includes('--test-name-pattern')));
 });
 
 test('cold host declarations are prepared once before framework checks and suite dispatch', t => {
@@ -175,7 +229,12 @@ test('registering a policy exclusion is rejected before preflight', t => {
 
 test('unsupported scope, replay option, and extra arguments fail before preflight', t => {
   const fixture = sandbox(t);
-  for (const args of [['--scope=all'], ['--include-reference-replay'], ['--list', '--scope=regular']]) {
+  for (const args of [
+    ['--scope=all'], ['--include-reference-replay'], ['--unknown'], ['control-only-a.cjs'],
+    ['--scope', 'regular'], ['--list', '--scope=regular'], ['--scope=regular', '--list'],
+    ['--list', '--list-exclusions'], ['--list', '--list'], ['--scope=regular', '--scope=regular'],
+    ['', ''], ['--scope=regular', 'extra', 'argument'],
+  ]) {
     const result = fixture.run(args);
     assert.equal(result.status, 2);
     assert.deepEqual(result.commands, []);
@@ -202,7 +261,7 @@ for (const [label, overrides] of [
   test(`${label} fails and later selected suites still run`, t => {
     const result = sandbox(t).run([], overrides);
     assert.equal(result.status, 1, result.stderr);
-    assert.ok(result.commands.includes('node --test --test-reporter=tap control-only-b.cjs'));
+    assert.ok(result.commands.includes(`node --test --test-reporter=tap ${synthetic[1]}`));
     assert.match(result.stdout, /# (fail|cancelled|skipped)/);
   });
 }

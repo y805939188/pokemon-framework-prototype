@@ -92,6 +92,10 @@ export interface SpeciesData {
   baseExp: number;
   evYield: PartialStats;
   catchRate: number;
+  /** Ordered canonical item pools; duplicates preserve their within-pool weight. Wild creation only. */
+  wildItemCommon?: string[];
+  wildItemUncommon?: string[];
+  wildItemRare?: string[];
   learnset: Record<number, string[]>;
   evolutions?: EvolutionEntry[];
   tutorMoves?: string[];
@@ -220,6 +224,7 @@ export interface TrainerBattleProjection {
 }
 
 export interface Content {
+  world?: import('./world-data').WorldContent;
   /** Absent = explicit legacy compatibility catalog; an empty catalog stays empty. */
   items?: import('./item-catalog').ItemCatalog;
   shops?: Record<string, import('./item-catalog').ShopDefinition>;
@@ -286,6 +291,6 @@ export interface EvolutionEntry { target: string; form?: number; method: Evoluti
 export interface DexLayout { national: string[]; regions: { id: number; species: string[] }[] }
 export interface DexLayoutTransition { source: string; from: string; to: string; oldLayout: DexLayout; regionMap: { from: number; to: number | null }[] }
 export interface RegionalDex extends DexLayout { source?: string; layoutIdentity: string; regions: { id: number; nameKey: string; species: string[] }[]; transitions?: DexLayoutTransition[] }
-export interface MapMetadata { source: string; maps: Record<string, { region?: number; flags?: string[]; darkMap?: boolean }> }
+export interface MapMetadata { source: string; maps: Record<string, import('./world-state').WorldMapMetadata> }
 export interface DexFormRecord { gender: 0 | 1; shiny: boolean; form: number }
 export interface DexState { seen: string[]; owned: string[]; hasDex: boolean; seenForms: Record<string, DexFormRecord[]>; lastSeenForm: Record<string, { gender: 0 | 1 | 2; shiny: boolean; form: number }>; capturedCounts: Record<string, number>; defeatedCounts: Record<string, number>; unlocked: boolean[]; view: { region: number; indices: number[]; mode: number }; layoutIdentity: string }

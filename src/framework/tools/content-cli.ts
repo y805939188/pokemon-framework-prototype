@@ -47,8 +47,11 @@ function readInputs(dir: string): { inputs: ContentInputs; errors: ContentError[
   const mapMetadata = fs.existsSync(path.join(dir, "map-metadata.json")) ? read("map-metadata.json") : undefined;
   const trainerTypes = fs.existsSync(path.join(dir, "trainer-types.json")) ? read("trainer-types.json") : undefined;
   const trainers = fs.existsSync(path.join(dir, "trainers.json")) ? read("trainers.json") : undefined;
+  const encounters = fs.existsSync(path.join(dir, "encounters.json")) ? read("encounters.json") : undefined;
+  const regionMaps = fs.existsSync(path.join(dir, "region-maps.json")) ? read("region-maps.json") : undefined;
+  const mapConnections = fs.existsSync(path.join(dir, "map-connections.json")) ? read("map-connections.json") : undefined;
   const inputs = { ...(regionalDex !== undefined ? {regionalDex} : {}), ...(mapMetadata !== undefined ? {mapMetadata} : {}), ...(items !== undefined ? {items} : {}), ...(shops !== undefined ? {shops} : {}), manifest: read("manifest.json"), sources: read("sources.json"), species: read("species.json"), overlays: read("overlays.json"), ...(grants !== undefined ? { grants } : {}), ...(settings !== undefined ? { settings } : {}), ...(trainerTypes !== undefined ? {trainerTypes} : {}), ...(trainers !== undefined ? {trainers} : {}) };
-  return { inputs, errors };
+  return { inputs: {...inputs, ...(encounters!==undefined?{encounters}:{}), ...(regionMaps!==undefined?{regionMaps}:{}), ...(mapConnections!==undefined?{mapConnections}:{})}, errors };
 }
 
 function buildPin(): string {

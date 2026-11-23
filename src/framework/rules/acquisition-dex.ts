@@ -1,4 +1,4 @@
-import { creationBattleNameOf } from "./species-key";
+import { initialWildBattleNameOf } from "./species-key";
 /** Source-aware gift/grant registration and retained first-entry facts. No installation or UI work. */
 import { applyDexPatch, normalizeDexAppearance, planDexRecord, dexShouldOfferEntry } from "./pokedex";
 import type { DexAppearance } from "./pokedex";
@@ -20,7 +20,7 @@ export function normalizeMemberDexAppearance(content: Content, member: Readonly<
     const name = content.forms ? own(own(content.forms, member.species), String(form)) : form === 0 ? member.species : undefined;
     return name === undefined ? undefined : own(content.species, name);
   };
-  const supportedName = Number.isInteger(member.form) && member.form! >= 0 && member.form! <= 999 ? creationBattleNameOf(content, { species: member.species, form: member.form! }) : null;
+  const supportedName = Number.isInteger(member.form) && member.form! >= 0 && member.form! <= 999 ? initialWildBattleNameOf(content, { species: member.species, form: member.form! }) : null;
   const sourceForm = exact(member.form!) ? member.form! : 0;
   const original = supportedName ? own(content.species, supportedName) : undefined;
   if (!original) return null;

@@ -5,10 +5,9 @@ import { computedNature } from "./member-metadata";
 import { catalogOf, itemOf } from "./item-catalog";
 import { speciesDataOf } from "./species-key";
 import type { Content, EvolutionEntry, Member, SpeciesKey } from "./types";
+import type { Fact } from './fact';
 
-export type EvolutionFact<T> = { readonly status: "value"; readonly value: T }
-  | { readonly status: "absent" }
-  | { readonly status: "unavailable" | "invalid"; readonly reason?: string };
+export type EvolutionFact<T> = Fact<T>;
 export type EvolutionFactInput<T> = EvolutionFact<T> | (() => EvolutionFact<T>);
 export interface EvolutionMapMetadata { readonly region?: number; readonly flags?: readonly string[]; readonly darkMap?: boolean }
 export interface EvolutionFacts {

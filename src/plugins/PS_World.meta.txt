@@ -1,0 +1,159 @@
+/*:
+ * @target MZ
+ * @plugindesc Framework world facts, weather command compatibility and map field-item handoff.
+ * @author pokemon-framework
+ * @help
+ * Load after PS_BattleFlow and PS_Inventory.
+ * Business weather and visited maps belong to the framework. Map input and positions belong to MZ.
+ * Configure terrain meanings explicitly. Missing tags keep movement/passives/native encounters working,
+ * while formal ordinary encounters and fishing report the missing fact.
+ * TerrainTags example: {"0":{"landAllowed":false,"fishable":false,"environment":"none"},"1":{"landAllowed":true,"fishable":false,"environment":"grass"},"2":{"landAllowed":false,"fishable":true,"environment":"stillwater"}}
+ * Numeric MZ tags have no built-in Pokémon meaning. Ice is an optional boolean per entry.
+ * canSurf is an independent optional boolean, never derived from fishable. waterfall/waterfallCrest default false.
+ * SurfPassage selects only the native tile algorithm, without changing native vehicles or walking.
+ * Missing canSurf or SurfPassage=none is an unavailable Surf fact.
+ * SurfCharacter is a real MZ character image {"name":"YourSurfCharacter","index":0}.
+ * Missing/unloaded resources refuse Surf before its business start; no default asset is inferred.
+ * World travel uses real native reserve/perform receipts. Fly destinations are derived from visited maps.
+ * PSFlow.runWorldTravel(requestId, request), retryWorldTravel(requestId), cancelWorldTravel(requestId)
+ * and worldFlyDestinations() expose the application-owned entry. Dig/Teleport require a current party member.
+ * Standard native event 201 remains native and preserves framework Surf; framework explicit transfer chooses preserveSurfing.
+ * CharacterHome and GlobalHome are one shared home source for Teleport points and blackout locations.
+ * Optional direction accepts only 2/4/6/8. Legacy three-field project values use framework compatibility direction 2.
+ * Teleport always faces down (2); blackout preserves the configured direction. Missing values mean no home.
+ * Invalid home or switch data is a configuration error, never an absent-home fallback.
+ * StartingOverSwitch defaults to the formal WP02 setting 1 and is set after native companion cleanup.
+ * PSFlow.configureWorldTravelPresentation({animate?, flyCallback?, cleanupFlight?}) installs project callbacks.
+ * New owners capture the configured presentation; active owners and retained-arrival retries keep their original snapshot.
+ * Callbacks receive the real owner and a guard to check around their own awaits. Accessors/proxies are rejected.
+ * Fly/Teleport use a short message when no project presentation provider is installed; full media is separately verified.
+ * Native transfer autosave requests defer through the App-owned travel tail and recheck native save settings once.
+ * This does not override the author's save switch or retry a rejected native autosave.
+ * Author commands register/remove event companions and explicitly retry an unfinished return.
+ * They wait for the application result while native/UI pumps continue. CommonEventId stores data only.
+ * Fishing uses the real document focus and performance clock, and does not alter system focus.
+ *
+ * @param CharacterHome
+ * @text Character home
+ * @type multiline_string
+ * @default
+ * @desc Optional {"mapId":1,"x":0,"y":0,"direction":2}. Direction 2/4/6/8; legacy missing direction defaults to 2.
+ *
+ * @param GlobalHome
+ * @text Global home fallback
+ * @type multiline_string
+ * @default
+ * @desc Optional shared home JSON as above. Used after character home; Teleport first uses healing spot and blackout first uses recent center.
+ *
+ * @param StartingOverSwitch
+ * @text Starting-over switch
+ * @type switch
+ * @default 1
+ * @desc Positive game switch ID, set by blackout prepare after native companion cleanup.
+ *
+ * @param FlashAnimationId
+ * @text Flash field animation
+ * @type animation
+ * @default 40
+ * @desc Actual native MZ animation awaited before Flash commit. Missing/invalid resources refuse the operation.
+ *
+ * @param TravelDebug
+ * @text Debug travel qualification
+ * @type boolean
+ * @default false
+ *
+ * @param TerrainTags
+ * @text Terrain tag meanings
+ * @type multiline_string
+ * @default {}
+ *
+ * @param SurfPassage
+ * @text Framework Surf tile passage
+ * @type select
+ * @option Not configured
+ * @value none
+ * @option Native boat water flags
+ * @value boat
+ * @option Native ship water flags
+ * @value ship
+ * @default none
+ *
+ * @param SurfCharacter
+ * @text Framework Surf character image
+ * @type multiline_string
+ * @default
+ *
+ * @param FishingCharacter
+ * @text Fishing character image
+ * @type multiline_string
+ * @default
+ * @desc Required for the default fishing pose: {"name":"FishingSheet[f4]","index":0}. Four-frame img/characters sheet; requires project rrMultiFrames. Index 0-7.
+ *
+ * @param SurfFishingCharacter
+ * @text Surf fishing character image
+ * @type multiline_string
+ * @default
+ * @desc Required for default fishing while surfing: {"name":"SurfFishingSheet[f4]","index":0}. Requires project rrMultiFrames; restore uses SurfCharacter.
+ *
+ * @command RecordRecentCenter
+ * @text Record current recent center
+ * @desc Record this actual map, player position and facing for blackout return; no healing. No parameters.
+ *
+ * @command RecordCaveEntrance
+ * @text Record cave entrance return
+ * @desc Record the square behind the current player with opposite facing before author presentation. No parameters.
+ *
+ * @command ClearCaveEscapePoint
+ * @text Clear cave escape point
+ * @desc Clear only escapePoint before author exit presentation. Recent center and Teleport healingSpot stay independent.
+ *
+ * @command RegisterEventCompanion
+ * @text Register event companion
+ * @desc Follow using the current map event as a stable source.
+ * @arg eventId
+ * @text Source event
+ * @type number
+ * @min 1
+ * @default 1
+ * @arg name
+ * @text Name
+ * @type string
+ * @default
+ * @arg commonEventId
+ * @text Common event data
+ * @desc Stored registration data. Interaction dispatch is not installed in this checkpoint.
+ * @type common_event
+ * @default 0
+ *
+ * @command RemoveEventCompanions
+ * @text Remove event companions
+ * @desc Remove companions by stable source, name or all.
+ * @arg mode
+ * @text Selection
+ * @type select
+ * @option Stable source
+ * @value origin
+ * @option Name
+ * @value name
+ * @option All
+ * @value all
+ * @default all
+ * @arg originMapId
+ * @text Source map
+ * @type number
+ * @min 1
+ * @default 1
+ * @arg originEventId
+ * @text Source event
+ * @type number
+ * @min 1
+ * @default 1
+ * @arg name
+ * @text Name
+ * @type string
+ * @default
+ *
+ * @command RetryBlackoutReturn
+ * @text Retry return
+ * @desc Retry the unfinished return after a failure.
+ */

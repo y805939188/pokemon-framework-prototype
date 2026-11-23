@@ -12,7 +12,7 @@ export type { TrainerAiStrategyRegistry, TrainerAiStrategyRegistration, TrainerA
  * Everything here is a choice of implementation, not logic: change the engine by changing this file (or by passing
  * another driver factory), not the application.
  */
-import { BattleSession, sealBattleEvidence, sealBattleEffects } from "./flow/session";
+import { BattleSession, sealBattleEvidence, sealBattleEffects, captureSessionWorldBallFacts } from "./flow/session";
 import type { LogSink } from "./flow/log";
 import type { BattleDriverFactory } from "./battle/driver";
 import type { BattleSessionFactory } from "./app/index";
@@ -59,11 +59,13 @@ function buildSessionFactory(options: BattleSessionFactoryOptions, required: boo
   const factory: BattleSessionFactory<BattleSession> = {
     // the application has created the foes (rules/member-factory) and decided the flags; this only wires the engine
     create: (request, game, setup) => {
+      const worldCapture = captureSessionWorldBallFacts(setup);
       const content = options.content();
       if (required && (!setup.evidenceContext || validatedContentIdentity(content) !== setup.evidenceContext.contentIdentity)) throw new Error("required-settlement-factory-content-mismatch");
       if (required && setup.trainer && !setup.isCurrentBattle) throw new Error('trainer-ai-app-owner-missing');
       return CREATE_BATTLE_SESSION({
       game, battleId: request.battleId, content, experimentalHeldBattle: setup.experimentalHeldBattle ?? false,
+      ...(worldCapture === undefined ? {} : { worldCapture }),
       ...(setup.initialField ? { initialField: setup.initialField } : {}),
       requiredSettlement: required, canSwitch: setup.canSwitch ?? true, expGain: setup.expGain ?? true, captureExpGain: setup.captureExpGain,
       replacementOffers: replacementOffers && !!setup.trainer && (setup.battleStyle ?? "switch") === "switch",

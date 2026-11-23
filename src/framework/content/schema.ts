@@ -1,5 +1,5 @@
 /**
- * Content pipeline: author schema 2 (standard), explicit legacy author schema 1, compiled schema 4.
+ * Content pipeline: author schema 2 (standard), explicit legacy author schema 1, compiled schema 5.
  * Authors write JSON files (see content/sample/); `compileContent` validates them and produces one deterministic
  * compiled document. Showdown-owned battle data (base stats, display names, move names) is NOT copied here: records
  * name a `showdownId` and the runtime assembly resolves it against the pinned Showdown build.
@@ -10,7 +10,7 @@ export const AUTHOR_SCHEMA_VERSION = 2;
 export const LEGACY_AUTHOR_SCHEMA_VERSION = 1;
 export type AuthorSchema = 1 | 2;
 /** R2: author species types are effective in every consumer; empty -> Normal and identity duplicates collapse. */
-export const COMPILED_SCHEMA_VERSION = 4;
+export const COMPILED_SCHEMA_VERSION = 5;
 /** Author version; compiled consumers use COMPILED_SCHEMA_VERSION. */
 export const SCHEMA_VERSION = AUTHOR_SCHEMA_VERSION;
 export const CURVES_ALLOWED: readonly CurveId[] = ["medium", "fast", "slow", "parabolic", "erratic", "fluctuating"];
@@ -58,6 +58,9 @@ export interface SpeciesSource {
   baseExp: number;
   evYield: PartialStats;
   catchRate: number;
+  wildItemCommon?: string[];
+  wildItemUncommon?: string[];
+  wildItemRare?: string[];
   happiness?: number;
   learnset: LearnEntry[];
   source: string;
@@ -83,8 +86,8 @@ export interface SpeciesSource {
   dexSortKeys?: Record<string, string>;
 }
 
-export type OverridableField = "nameKey" | "growth" | "baseExp" | "evYield" | "catchRate" | "happiness" | "learnset" | "evolutions" | "tutorMoves" | "eggMoves" | "types" | "abilities" | "hiddenAbilities" | "flags" | "pokedexForm" | "categoryKey" | "entryKey" | "heightDm" | "weightHg" | "color" | "shape" | "formName" | "formNameKey" | "dexSortKeys";
-export const OVERRIDABLE: readonly OverridableField[] = ["nameKey", "growth", "baseExp", "evYield", "catchRate", "happiness", "learnset", "evolutions", "tutorMoves", "eggMoves", "types", "abilities", "hiddenAbilities", "flags", "pokedexForm", "categoryKey", "entryKey", "heightDm", "weightHg", "color", "shape", "formName", "formNameKey", "dexSortKeys"];
+export type OverridableField = "nameKey" | "growth" | "baseExp" | "evYield" | "catchRate" | "happiness" | "learnset" | "evolutions" | "tutorMoves" | "eggMoves" | "types" | "abilities" | "hiddenAbilities" | "flags" | "pokedexForm" | "categoryKey" | "entryKey" | "heightDm" | "weightHg" | "color" | "shape" | "formName" | "formNameKey" | "dexSortKeys" | "wildItemCommon" | "wildItemUncommon" | "wildItemRare";
+export const OVERRIDABLE: readonly OverridableField[] = ["nameKey", "growth", "baseExp", "evYield", "catchRate", "happiness", "learnset", "evolutions", "tutorMoves", "eggMoves", "types", "abilities", "hiddenAbilities", "flags", "pokedexForm", "categoryKey", "entryKey", "heightDm", "weightHg", "color", "shape", "formName", "formNameKey", "dexSortKeys", "wildItemCommon", "wildItemUncommon", "wildItemRare"];
 
 export interface Overlay {
   target: string;
@@ -108,6 +111,9 @@ export interface GrantSource {
 }
 
 export interface ContentInputs {
+  encounters?: unknown;
+  regionMaps?: unknown;
+  mapConnections?: unknown;
   manifest: unknown;
   sources: unknown;
   species: unknown;
@@ -129,12 +135,13 @@ export type TrainerTypeSource = import("../rules/types").TrainerType;
 export type TrainerRecordSource = import("../rules/types").TrainerRecord;
 
 export interface ContentError {
-  file: "manifest.json" | "sources.json" | "species.json" | "overlays.json" | "grants.json" | "settings.json" | "items.json" | "shops.json" | "regional-dex.json" | "map-metadata.json" | "trainer-types.json" | "trainers.json" | "compiled" | "assembly";
+  file: "manifest.json" | "sources.json" | "species.json" | "overlays.json" | "grants.json" | "settings.json" | "items.json" | "shops.json" | "regional-dex.json" | "map-metadata.json" | "trainer-types.json" | "trainers.json" | "compiled" | "assembly" | 'encounters.json' | 'region-maps.json' | 'map-connections.json';
   path: string;
   message: string;
 }
 
 export interface CompiledContent {
+  world?: import('../rules/world-data').WorldContent;
   schema: number;
   contentId: string;
   inputsHash: string;

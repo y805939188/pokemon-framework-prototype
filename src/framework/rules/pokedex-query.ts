@@ -337,7 +337,7 @@ export interface DexAreaInput {
 /** Existing normalized world data only. Version>0 retains WP62's v0 enumeration compatibility; no world provider is invented. */
 export function dexArea(species: string, input?: DexAreaInput): { status: "known" | "unknown" | "invalid"; points: { x: number; y: number }[]; diagnostics: string[] } {
   if (!input) return { status: "unknown", points: [], diagnostics: ["area data unavailable"] };
-  if (!integer(input.region) || input.region < 0 || !integer(input.encounterVersion) || input.encounterVersion < 0) return { status: "invalid", points: [], diagnostics: ["invalid area region or encounter version"] };
+  if (!integer(input.region) || input.region < 0 || !integer(input.encounterVersion)) return { status: "invalid", points: [], diagnostics: ["invalid area region or encounter version"] };
   const visible = new Set(input.points.filter(p => p.region === input.region && p.visible).map(p => `${p.x},${p.y}`));
   const found = new Map<string,{x:number;y:number}>();
   for (const table of input.tables) {

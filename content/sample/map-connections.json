@@ -1,0 +1,6 @@
+{
+  "source": "author-placeholder",
+  "connections": [
+    { "a": { "mapId": 5, "anchor": "E", "offset": 0 }, "b": { "mapId": 6, "anchor": "W", "offset": 0 } }
+  ]
+}

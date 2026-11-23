@@ -4,6 +4,7 @@ import { initializeRequestView, clearRequestView, publishRequestView, checkpoint
 export { readSessionRequestContext } from './request-view';
 export type { SessionRequestContext } from './request-view';
 import type { InitialFieldInput } from '../rules/initial-field';
+import type { CapturedWorldBallFacts } from '../rules/world-battle-context';
 import { battleBag } from "../rules/inventory";
 import type { ActiveHpRecovery } from "../rules/active-hp-recovery";
 import { hpRecoveryRequest, activeHpRecovery, reusableBattleHealing } from "../rules/active-hp-recovery";
@@ -99,6 +100,8 @@ export interface FoeSpec {
 export type FoeAi = (request: Req) => string | null | undefined;
 
 export interface CreateOptions {
+  /** Captured business time/source only. Absent legacy callers retain the previous ball rules. */
+  worldCapture?: CapturedWorldBallFacts;
   /** Internal opt-in ports; the current default Scene has no replacement-offer consumer yet. */
   replacementOffers?: boolean;
   /** Voluntary choice policy only; never a replacement for simulator switch legality. */
@@ -131,6 +134,26 @@ export interface CreateOptions {
   obedience?: ObedienceContext;
   /** Selected only by the formal trainer composition, never by wild/defaultAi callers. */
   trainerAi?: TrainerAiConfiguration;
+}
+
+/** Both public construction paths copy own scalar data before callbacks or the first engine await. */
+export function captureSessionWorldBallFacts(input: { readonly worldCapture?: CapturedWorldBallFacts }): CapturedWorldBallFacts | undefined {
+  const descriptor = Object.getOwnPropertyDescriptor(input, 'worldCapture');
+  if (!descriptor) {
+    if ('worldCapture' in input) throw new Error('worldCapture must be own data');
+    return undefined;
+  }
+  if (!Object.hasOwn(descriptor, 'value')) throw new Error('worldCapture must be own data');
+  const raw: unknown = descriptor.value;
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('invalid worldCapture object');
+  const keys = Reflect.ownKeys(raw);
+  if (keys.length !== 2 || !keys.includes('timeOfDay') || !keys.includes('fishing')) throw new Error('worldCapture requires timeOfDay and fishing only');
+  const time = Object.getOwnPropertyDescriptor(raw, 'timeOfDay')!, source = Object.getOwnPropertyDescriptor(raw, 'fishing')!;
+  if (!Object.hasOwn(time, 'value') || !time.enumerable || !Object.hasOwn(source, 'value') || !source.enumerable) throw new Error('worldCapture requires own scalar data');
+  const timeOfDay: unknown = time.value, fishing: unknown = source.value;
+  if (timeOfDay !== 0 && timeOfDay !== 1 && timeOfDay !== 2 || typeof fishing !== 'boolean') throw new Error('invalid worldCapture timeOfDay or fishing');
+  return Object.freeze({ timeOfDay, fishing });
 }
 
 export type Refusal = BattleRefusal;
@@ -180,6 +203,8 @@ export class SessionBrokenError extends Error {
 }
 
 export class BattleSession implements BattleSessionView {
+  /** Per-session immutable business facts; neither a public override nor part of engine rollback/save state. */
+  #worldCapture: CapturedWorldBallFacts | undefined;
   /** Fixed for this session; not saved, checkpointed, or part of the result protocol. */
   readonly canSwitch: boolean;
   readonly expGain: boolean;
@@ -229,6 +254,7 @@ export class BattleSession implements BattleSessionView {
   _pendingFriendFaints: Extract<BattleObservation, { kind: "faint" }>[] = [];
 
   static async create(options: CreateOptions): Promise<BattleSession> {
+    const worldCapture = captureSessionWorldBallFacts(options);
     const initialField = captureInitialField(options);
     const { replacementOffers = false, game, battleId, foe, content, canSwitch = true, expGain = true, captureExpGain, seed, doubles = false, formatid = doubles ? "gen8rpgdoublescustomgame" : "gen8rpgcustomgame", ai, rules, logger, driver = showdownDriverFactory, experimentalHeldBattle = false, requiredSettlement = false, evidence, obedience, trainerAi } = options;
     if (initialField && (doubles || formatid !== "gen8rpgcustomgame")) throw new Error("initial-field-requires-rpg-singles");
@@ -255,6 +281,7 @@ export class BattleSession implements BattleSessionView {
     const party = S.clone(game.party).filter((m) => !m.isEgg).slice(0, 6);
     const lead = [...party.filter((m) => m.hp > 0), ...party.filter((m) => m.hp <= 0)];
     const s = new BattleSession(canSwitch, expGain, captureGrowth);
+    s.#worldCapture = worldCapture;
     const healingRebalanced = resolveConfig(content.settings).REBALANCED_HEALING_ITEM_AMOUNTS;
     s._activeHpRecovery = activeHpRecovery(catalogOf(content), healingRebalanced);
     s._reusableHealingItems = new Set(Object.values(catalogOf(content)).filter(reusableBattleHealing).map(item => item.battleId!));
@@ -563,7 +590,7 @@ export class BattleSession implements BattleSessionView {
           const rec = this.foeTeam.find((m) => m.id === sp.target);
           if (!rec) { entries.forEach((e) => this._refund(e, "not-registered")); return this._refuse("unknown-target"); }
           sp.catchRate = this.content.species[rec.species]!.catchRate;
-          sp.ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(rec.species) };
+          sp.ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(rec.species), ...this.#worldCapture };
         }
         entries.push(this._reserve(sp.kind, id, sp.target));
       }
@@ -588,7 +615,7 @@ export class BattleSession implements BattleSessionView {
       const foeRec = this.foeTeam.find((m) => m.id === foeId);
       if (!foeRec) return this._refuse("refused");
       const entry = this._reserve("ball", ballId, foeRec.id);
-      const ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(foeRec.species) };
+      const ctx = { ownedCount: this.startDexOwned.length, speciesOwned: this.startDexOwned.includes(foeRec.species), ...this.#worldCapture };
       const ok = await this.gw.act("p1", { kind: "ball", ball: ballId, target: foeRec.id, catchRate: this.content.species[foeRec.species]!.catchRate, ctx });
       if (!ok) { this._refund(entry, "not-registered"); return this._refuse("not-registered"); }
       return this._resolveTurn();

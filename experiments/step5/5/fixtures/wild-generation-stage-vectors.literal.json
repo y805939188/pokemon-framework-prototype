@@ -1,0 +1,1308 @@
+{
+  "qualification": "Original authority labels retained; proposed-framework rows become executable only under the separately frozen framework mapping, never reclassified as formal",
+  "sourceSha256": "cd46592da451ce194b23935b7d33c22fd366acbaaef17dab70f06ea2871bcd23",
+  "freezeSha256": "19a8a010257e85f894feeab9e05964d887dbf0dcf07bda7ae9180403eccdc309",
+  "vectors": [
+    {
+      "id": "CUTE-M-0",
+      "stage": "lead-gender",
+      "authority": "proposed-framework",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Cute Charm",
+        "leadGender": "M",
+        "targetGenderRule": 128,
+        "leadFainted": true
+      },
+      "draws": [
+        {
+          "n": 3,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "gender": "F",
+        "forced": true
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "EN19-20"
+      ],
+      "note": "Proposal: rolls 0/1 force opposite, roll2 forces same; no branch preserves the prior default gender."
+    },
+    {
+      "id": "CUTE-M-1",
+      "stage": "lead-gender",
+      "authority": "proposed-framework",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Cute Charm",
+        "leadGender": "M",
+        "targetGenderRule": 128,
+        "leadFainted": true
+      },
+      "draws": [
+        {
+          "n": 3,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "gender": "F",
+        "forced": true
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "EN19-20"
+      ],
+      "note": "Proposal: rolls 0/1 force opposite, roll2 forces same; no branch preserves the prior default gender."
+    },
+    {
+      "id": "CUTE-M-2",
+      "stage": "lead-gender",
+      "authority": "proposed-framework",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Cute Charm",
+        "leadGender": "M",
+        "targetGenderRule": 128,
+        "leadFainted": true
+      },
+      "draws": [
+        {
+          "n": 3,
+          "value": 2
+        }
+      ],
+      "expected": {
+        "gender": "M",
+        "forced": true
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "EN19-20"
+      ],
+      "note": "Proposal: rolls 0/1 force opposite, roll2 forces same; no branch preserves the prior default gender."
+    },
+    {
+      "id": "CUTE-F-0",
+      "stage": "lead-gender",
+      "authority": "proposed-framework",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Cute Charm",
+        "leadGender": "F",
+        "targetGenderRule": 128,
+        "leadFainted": true
+      },
+      "draws": [
+        {
+          "n": 3,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "gender": "M",
+        "forced": true
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "EN19-20"
+      ],
+      "note": "Proposal: rolls 0/1 force opposite, roll2 forces same; no branch preserves the prior default gender."
+    },
+    {
+      "id": "CUTE-F-1",
+      "stage": "lead-gender",
+      "authority": "proposed-framework",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Cute Charm",
+        "leadGender": "F",
+        "targetGenderRule": 128,
+        "leadFainted": true
+      },
+      "draws": [
+        {
+          "n": 3,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "gender": "M",
+        "forced": true
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "EN19-20"
+      ],
+      "note": "Proposal: rolls 0/1 force opposite, roll2 forces same; no branch preserves the prior default gender."
+    },
+    {
+      "id": "CUTE-F-2",
+      "stage": "lead-gender",
+      "authority": "proposed-framework",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Cute Charm",
+        "leadGender": "F",
+        "targetGenderRule": 128,
+        "leadFainted": true
+      },
+      "draws": [
+        {
+          "n": 3,
+          "value": 2
+        }
+      ],
+      "expected": {
+        "gender": "F",
+        "forced": true
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "EN19-20"
+      ],
+      "note": "Proposal: rolls 0/1 force opposite, roll2 forces same; no branch preserves the prior default gender."
+    },
+    {
+      "id": "CUTE-LEAD-N",
+      "stage": "lead-gender",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Cute Charm",
+        "leadGender": "N",
+        "targetGenderRule": 128
+      },
+      "draws": [],
+      "expected": {
+        "genderOverride": null
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "WP19:42-48"
+      ]
+    },
+    {
+      "id": "CUTE-TARGET-M",
+      "stage": "lead-gender",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Cute Charm",
+        "leadGender": "M",
+        "targetGenderRule": "M"
+      },
+      "draws": [],
+      "expected": {
+        "genderOverride": null
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "WP19:42-48"
+      ]
+    },
+    {
+      "id": "CUTE-TARGET-F",
+      "stage": "lead-gender",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Cute Charm",
+        "leadGender": "M",
+        "targetGenderRule": "F"
+      },
+      "draws": [],
+      "expected": {
+        "genderOverride": null
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "WP19:42-48"
+      ]
+    },
+    {
+      "id": "CUTE-TARGET-N",
+      "stage": "lead-gender",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Cute Charm",
+        "leadGender": "M",
+        "targetGenderRule": "N"
+      },
+      "draws": [],
+      "expected": {
+        "genderOverride": null
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "WP19:42-48"
+      ]
+    },
+    {
+      "id": "SYNC-True-False-None",
+      "stage": "lead-nature",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Synchronize",
+        "leadNature": "modest",
+        "oldNature": "adamant",
+        "statNature": null,
+        "expanded": true,
+        "roamer": false
+      },
+      "draws": [],
+      "expected": {
+        "nature": "modest",
+        "statsRecomputed": true,
+        "abilityRechosen": false
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "WP19:81-83"
+      ]
+    },
+    {
+      "id": "SYNC-True-True-None",
+      "stage": "lead-nature",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Synchronize",
+        "leadNature": "modest",
+        "oldNature": "adamant",
+        "statNature": null,
+        "expanded": true,
+        "roamer": true
+      },
+      "draws": [],
+      "expected": {
+        "nature": "adamant",
+        "statsRecomputed": false,
+        "abilityRechosen": false
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "WP19:81-83"
+      ]
+    },
+    {
+      "id": "SYNC-False-True-None",
+      "stage": "lead-nature",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Synchronize",
+        "leadNature": "modest",
+        "oldNature": "adamant",
+        "statNature": null,
+        "expanded": false,
+        "roamer": true
+      },
+      "draws": [],
+      "expected": {
+        "nature": "adamant",
+        "statsRecomputed": false,
+        "abilityRechosen": false
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "WP19:81-83"
+      ]
+    },
+    {
+      "id": "SYNC-False-False-49",
+      "stage": "lead-nature",
+      "authority": "proposed-framework",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Synchronize",
+        "leadNature": "modest",
+        "oldNature": "adamant",
+        "statNature": null,
+        "expanded": false,
+        "roamer": false
+      },
+      "draws": [
+        {
+          "n": 100,
+          "value": 49
+        }
+      ],
+      "expected": {
+        "nature": "modest",
+        "statsRecomputed": true,
+        "abilityRechosen": false
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "WP19:81-83"
+      ]
+    },
+    {
+      "id": "SYNC-False-False-50",
+      "stage": "lead-nature",
+      "authority": "proposed-framework",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "leadAbility": "Synchronize",
+        "leadNature": "modest",
+        "oldNature": "adamant",
+        "statNature": null,
+        "expanded": false,
+        "roamer": false
+      },
+      "draws": [
+        {
+          "n": 100,
+          "value": 50
+        }
+      ],
+      "expected": {
+        "nature": "adamant",
+        "statsRecomputed": false,
+        "abilityRechosen": false
+      },
+      "sourceRefs": [
+        "WP36:184",
+        "WP19:81-83"
+      ]
+    },
+    {
+      "id": "SCALE-EMPTY-0",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "balancedLevel": 1,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-EMPTY-1",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "balancedLevel": 1,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-EMPTY-2",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 2
+        }
+      ],
+      "expected": {
+        "balancedLevel": 1,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-EMPTY-3",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 3
+        }
+      ],
+      "expected": {
+        "balancedLevel": 1,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-EMPTY-4",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "balancedLevel": 1,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-0_0-0",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          0,
+          0
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "balancedLevel": 1,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-0_0-1",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          0,
+          0
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "balancedLevel": 1,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-0_0-2",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          0,
+          0
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 2
+        }
+      ],
+      "expected": {
+        "balancedLevel": 1,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-0_0-3",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          0,
+          0
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 3
+        }
+      ],
+      "expected": {
+        "balancedLevel": 1,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-0_0-4",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          0,
+          0
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "balancedLevel": 1,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-5_5-0",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          5,
+          5
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "balancedLevel": 7,
+        "scaledLevel": 3,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-5_5-1",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          5,
+          5
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "balancedLevel": 7,
+        "scaledLevel": 4,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-5_5-2",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          5,
+          5
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 2
+        }
+      ],
+      "expected": {
+        "balancedLevel": 7,
+        "scaledLevel": 5,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-5_5-3",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          5,
+          5
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 3
+        }
+      ],
+      "expected": {
+        "balancedLevel": 7,
+        "scaledLevel": 6,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-5_5-4",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          5,
+          5
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "balancedLevel": 7,
+        "scaledLevel": 7,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-10_50-0",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          10,
+          50
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "balancedLevel": 52,
+        "scaledLevel": 48,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-10_50-1",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          10,
+          50
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "balancedLevel": 52,
+        "scaledLevel": 49,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-10_50-2",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          10,
+          50
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 2
+        }
+      ],
+      "expected": {
+        "balancedLevel": 52,
+        "scaledLevel": 50,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-10_50-3",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          10,
+          50
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 3
+        }
+      ],
+      "expected": {
+        "balancedLevel": 52,
+        "scaledLevel": 51,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-10_50-4",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          10,
+          50
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "balancedLevel": 52,
+        "scaledLevel": 52,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-100_100-0",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          100,
+          100
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "balancedLevel": 100,
+        "scaledLevel": 96,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-100_100-1",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          100,
+          100
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "balancedLevel": 100,
+        "scaledLevel": 97,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-100_100-2",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          100,
+          100
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 2
+        }
+      ],
+      "expected": {
+        "balancedLevel": 100,
+        "scaledLevel": 98,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-100_100-3",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          100,
+          100
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 3
+        }
+      ],
+      "expected": {
+        "balancedLevel": 100,
+        "scaledLevel": 99,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-100_100-4",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          100,
+          100
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "balancedLevel": 100,
+        "scaledLevel": 100,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-1_1-0",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          1,
+          1
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "balancedLevel": 3,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-1_1-1",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          1,
+          1
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "balancedLevel": 3,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-1_1-2",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          1,
+          1
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 2
+        }
+      ],
+      "expected": {
+        "balancedLevel": 3,
+        "scaledLevel": 1,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-1_1-3",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          1,
+          1
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 3
+        }
+      ],
+      "expected": {
+        "balancedLevel": 3,
+        "scaledLevel": 2,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-1_1-4",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "partyLevels": [
+          1,
+          1
+        ],
+        "includeEggsAndFainted": true,
+        "maxLevel": 100
+      },
+      "draws": [
+        {
+          "n": 5,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "balancedLevel": 3,
+        "scaledLevel": 3,
+        "recomputeStats": true,
+        "resetMoves": true
+      },
+      "sourceRefs": [
+        "WP36:195-203",
+        "EN31"
+      ],
+      "note": "Empty and zero-level fixtures exercise the independent balance helper, not battle admission with no able player."
+    },
+    {
+      "id": "SCALE-DISABLED",
+      "stage": "balanced-level-scaling",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "scaleWildLevels": false,
+        "level": 50
+      },
+      "draws": [],
+      "expected": {
+        "level": 50,
+        "resetMoves": false
+      },
+      "sourceRefs": [
+        "WP36:195"
+      ]
+    }
+  ]
+}

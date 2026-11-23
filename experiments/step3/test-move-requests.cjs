@@ -24,8 +24,9 @@ function menu(session, observeAutomatic) {
   const nodeRequire = id => require(id.startsWith('./') ? path.join(ROOT, id) : id);
   nodeRequire.resolve = id => require.resolve(path.join(ROOT, id));
   const ctx = { window: {}, require: nodeRequire, performance, console,
-    PluginManager: { registerCommand() {} }, Window_Base: Base, Window_Command: Base,
+    PluginManager: { parameters: () => ({}), registerCommand() {} }, Window_Base: Base, Window_Command: Base,
     Scene_MenuBase: Base, Game_Interpreter: Base };
+  require('../../scripts/tests/legacy-mz-world-host.cjs').install(ctx);
   vm.createContext(ctx);
   vm.runInContext(pluginText, ctx);
   ctx.window.PSFlow.translator = () => ({ t: (key, v) => key === 'ui.moves.none-left' ? `${v.name} has no moves left!` : `${v.move} PP ${v.pp}/${v.maxpp}`, tOr: (_key, fallback) => fallback });

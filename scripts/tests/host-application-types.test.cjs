@@ -113,9 +113,9 @@ for (const plugin of ['PS_BattleFlow', 'PS_Progression']) test(`actual ${plugin}
 });
 test('actual production construction rejects a wrongly wired state port', () => {
   const result = compilePlugin('PS_BattleFlow', source => {
-    const marker = 'state: { read: () => PSFlow.game()';
+    const marker = '{ read: () => PSFlow.game()';
     assert(source.includes(marker));
-    return source.replace(marker, 'state: { read: () => 42');
+    return source.replace(marker, '{ read: () => 42');
   });
   assert.notEqual(result.code, 0, 'production port configuration lost its type');
   assert.match(result.output, /TS2322/, result.output);

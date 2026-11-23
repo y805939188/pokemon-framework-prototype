@@ -1,0 +1,7 @@
+# A 地点命令源检查点
+
+固定bbf四framework产品＋7b singleatomic按精确Git镜像；legacybbd2framework、dc89三资源也仅作为固定依赖装配，无叶重跑。DONOR-PROVENANCE在新E逐file/baseBlob/来源SHA记录。
+
+真正PS_World三无参command357：RecordRecentCenter、RecordCaveEntrance、ClearCaveEscapePoint。同步调用实际App两atomic捕获方法，不claim异步wait/pending；运行中的Map._interpreter自然继续下一条作者演出，不自锁。拒绝参数/方法accessor，不直写world；actualApp/gen前后比，App独占source/Content/gen末窗，原G异步calls不受影响。recentCenter/escapePoint/healingSpot分离，没有clearCenter。
+
+源码已写，生产caller runtime尚NOT_RUN；后续总8–10矩阵以实际Map._interpreter执行地点3命令和running/successor拒绝。

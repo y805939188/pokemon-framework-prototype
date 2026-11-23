@@ -295,7 +295,7 @@ for (const lang of ['en', 'zh']) test(lang + ' combined public cards, full-slot 
   const s = h.s._session, lead = s.party[0].id, egg = JSON.parse(h.before).party[1].id;
   const cards = () => h.s.statusCardState().filter(card => card.visible), player = cards().find(card => card.side === 'p1'), foe = cards().find(card => card.side === 'p2');
   assert.equal(player.gender.kind, 'female'); assert.equal(player.shiny, true); assert.equal(foe.gender.kind, 'male'); assert.equal(foe.owned, true);
-  let installs = 0, doc = h.G.$gameSystem._psGame; Object.defineProperty(h.G.$gameSystem, '_psGame', { configurable: true, get: () => doc, set: value => { installs++; doc = value; } });
+  let installs = 0, doc = h.G.$gameSystem._psGame; require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,value=>{installs++;doc=value;});
   await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('learn-initial');
   assert.equal(h.flow.game().party[0].level, 50); assert.equal(s.party[0].level, 51); assert.equal(installs, 0);
   await h.frames(1); await pick(h, 'forget-move'); assert.equal(h.s._mode, 'learn'); h.s._menu.select(3); h.s.onMenuCancel(); await h.p.inMode('learn-giveup');
@@ -351,7 +351,7 @@ for (const command of ['StartBattle', 'StartTrainerBattle']) test(command + ' re
 });
 test('invalid MZ policy values are rejected before opening or incrementing the event sequence', async () => {
  const h = await open(); try { h.cleanup(); const before = JSON.stringify(h.flow.game()), seq = h.G.$gameSystem._psBattleSeq;
-  for (const name of ['StartBattle', 'StartTrainerBattle']) for (const canSwitch of [null, 0, 'no', {}]) assert.throws(() => h.w.commands['PS_BattleFlow:' + name].call({ setWaitMode() {} }, { canSwitch }), /canSwitch must be true or false/);
+  for (const name of ['StartBattle', 'StartTrainerBattle']) for (const canSwitch of [null, 0, 'no', {}]) assert.throws(() => h.w.commands['PS_BattleFlow:' + name].call({ setWaitMode() {} }, { canSwitch }), canSwitch!==null&&typeof canSwitch==='object'?/legacy battle argument must be primitive: canSwitch/:/canSwitch must be true or false/);
   assert.equal(h.flow.running, false); assert.equal(h.G.$gameSystem._psBattleSeq, seq); assert.equal(JSON.stringify(h.flow.game()), before);
  } finally { h.cleanup(); }
 });
@@ -383,7 +383,7 @@ for (const lang of ['en', 'zh']) test(lang + ' combined disabled switching, shar
   const s = h.s._session, lead = s.party[0].id, reserve = s.party[1].id, egg = JSON.parse(h.before).party[1].id, app = h.flow.app();
   assert.equal(s.canSwitch, false, 'typed policy must reach this actual mixed Session');
   const beginLearning = app.beginLearning.bind(app); let learningTransactions = 0; app.beginLearning = (...args) => { learningTransactions++; return beginLearning(...args); };
-  let installs = 0, doc = h.G.$gameSystem._psGame; Object.defineProperty(h.G.$gameSystem, '_psGame', { configurable: true, get: () => doc, set: value => { installs++; doc = value; } });
+  let installs = 0, doc = h.G.$gameSystem._psGame; require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,value=>{installs++;doc=value;});
   await commands(h, reserve); assert.deepEqual(Array.from(h.s._menu._items, row => row.ext), ['summary', null]);
   await pick(h, 'summary'); await h.waitFor(() => current(h)?.ready, 'mixed pre-growth read-only Summary'); await h.p.press('cancel'); await h.p.inMode('party'); h.s.onMenuCancel(); await h.p.inMode('main');
   await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('learn-initial'); assert.equal(installs, 0); await h.frames(1); await pick(h, 'forget-move');
@@ -406,7 +406,7 @@ for (const lang of ['en', 'zh']) test(lang + ' combined disabled switching, shar
 
 const displayIds = h => Array.from(h.s._menu._items, row => row.ext).filter(id => id !== null);
 for(const lang of ['en','zh'])test(lang+' party display order follows real swaps and Summary returns a stable member without sorting the save',async()=>{
- const h=await open({lang,members:4,egg:true,trainer:true,fast:true,effects:lang!=='en'});try{const s=h.s._session,saved=JSON.parse(h.before).party.map(m=>m.id),sessionIds=s.party.map(m=>m.id),[a,egg,b,c]=saved;let installs=0,doc=h.G.$gameSystem._psGame;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:value=>{installs++;doc=value;}});
+ const h=await open({lang,members:4,egg:true,trainer:true,fast:true,effects:lang!=='en'});try{const s=h.s._session,saved=JSON.parse(h.before).party.map(m=>m.id),sessionIds=s.party.map(m=>m.id),[a,egg,b,c]=saved;let installs=0,doc=h.G.$gameSystem._psGame;require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,value=>{installs++;doc=value;});
  await commands(h,b);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),b);await party(h);assert.deepEqual(displayIds(h),[b,egg,a,c],'first switch swaps natural display ranks including the Egg');h.s.onMenuCancel();await h.p.inMode('main');
  await commands(h,c);await pick(h,'switch-in');await h.p.inMode('main');await party(h);assert.deepEqual(displayIds(h),[c,egg,a,b],'second switch swaps ranks instead of merely moving the active row to front');h.s.onMenuCancel();await h.p.inMode('main');
  const raw=s.gw.snapshot(),work=JSON.stringify(s.party);await summary(h,c);assert.deepEqual(Array.from(current(h).view.ids),[c,egg,a,b]);await h.p.press('down');assert.equal(current(h).view.ids[current(h).view.cursor],egg);assert(text(h).some(t=>t.includes('1/1')));await h.p.press('up');await h.p.press('right');await h.p.press('down');assert.equal(current(h).view.ids[current(h).view.cursor],a,'non-INFO navigation skips the Egg in displayed order');await h.p.press('down');assert.equal(current(h).view.ids[current(h).view.cursor],b);await h.p.press('cancel');await h.p.inMode('party');assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext,b);assert.equal(h.s._menu.index(),3,'display cursor is not the saved index');assert.equal(s.gw.snapshot(),raw);assert.equal(JSON.stringify(s.party),work);
@@ -445,7 +445,7 @@ function assertPausedGrowth(h,observations){
 
 test('unified party order, paused notice and private details learn for the non-active member by stable ID',async()=>{
  const h=await open({lang:'zh',members:4,egg:true,grow:true,integration:true,trainer:true,trainerMembers:2,fast:true});try{
-  const s=h.s._session,[learner,egg,actor,reserve]=JSON.parse(h.before).party.map(m=>m.id);let installs=0,doc=h.G.$gameSystem._psGame;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  const s=h.s._session,[learner,egg,actor,reserve]=JSON.parse(h.before).party.map(m=>m.id);let installs=0,doc=h.G.$gameSystem._psGame;require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{installs++;doc=v;});
   await commands(h,actor);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),actor);h.flow.fast=false;await pick(h,'fight');await pick(h,1);
   const normalGrowth=await normalGrowthBeforeStats(h);assertPausedGrowth(h,normalGrowth);for(let i=0;i<12&&h.s.levelStatsState();i++)await h.p.press('ok');
   await h.waitFor(()=>h.s.ordinaryMessageState()?.implementation==='paused-message-v1','unified full-slot paused notice');const notice=h.s._ordinaryMessage;assert.equal(s.pendingLearn.memberId,learner);assert.equal(h.s._learningInitial??null,null);await h.p.press('ok');assert.equal(notice.snapshot().phase,'full');assert(h.s._log.pause);await h.p.press('ok');await h.p.inMode('learn-initial');assert.equal(notice.snapshot().phase,'done');
@@ -458,7 +458,7 @@ test('unified party order, paused notice and private details learn for the non-a
 
 for(const lang of ['en','zh'])test(lang+' normal growth integration keeps disabled switching, paused notice, details and Summary in one owner',async()=>{
  const h=await open({lang,members:3,egg:true,grow:true,integration:true,trainer:true,trainerMembers:2,fast:true,canSwitch:false});try{
-  const s=h.s._session,lead=s.party[0].id,reserve=s.party[1].id,egg=JSON.parse(h.before).party[1].id;let installs=0,decisions=0,doc=h.G.$gameSystem._psGame;const decide=s.decideLearn.bind(s);s.decideLearn=(...args)=>{decisions++;return decide(...args);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  const s=h.s._session,lead=s.party[0].id,reserve=s.party[1].id,egg=JSON.parse(h.before).party[1].id;let installs=0,decisions=0,doc=h.G.$gameSystem._psGame;const decide=s.decideLearn.bind(s);s.decideLearn=(...args)=>{decisions++;return decide(...args);};require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{installs++;doc=v;});
   await commands(h,reserve);assert.deepEqual(Array.from(h.s._menu._items,row=>row.ext),['summary',null]);h.s.onMenuCancel();await h.p.inMode('party');h.s.onMenuCancel();await h.p.inMode('main');h.flow.fast=false;await pick(h,'fight');await pick(h,1);
   const observations=await normalGrowthBeforeStats(h);assertPausedGrowth(h,observations);assert.equal(s.ended,null,'real first KO still has a living opposing reserve');assert.equal(h.s.levelStatsState().phase,'delta');assert.equal(decisions,0);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.p.press('ok');assert.equal(h.s.levelStatsState().phase,'total');await h.p.press('ok');
   await h.waitFor(()=>!!h.s.ordinaryMessageState(),'normal full-slot announcement after numeric panels');const notice=h.s._ordinaryMessage;assert.equal(notice.snapshot().implementation,'paused-message-v1','the accepted notification must not revert to an ordinary line');assert.equal(notice.snapshot().phase,'typing');assert.equal(h.s._learningInitial??null,null);await h.p.press('ok');assert.equal(notice.snapshot().phase,'full');assert.equal(h.s._log.pause,true);await h.frames(120);assert.equal(notice.snapshot().phase,'full');assert.equal(decisions,0);await h.p.press('ok');await h.p.inMode('learn-initial');await h.frames(1);await pick(h,'forget-move');await h.p.inMode('learn');
@@ -474,7 +474,7 @@ for(const lang of ['en','zh'])test(lang+' normal growth and HM guard preserve th
  const h=await open({lang,members:4,egg:true,grow:true,integration:true,trainer:true,trainerMembers:2,fast:true,
   // Explicit author catalog classification; Tackle is not an official Gen8 HM.
   catalog:items=>{const {battleId:unused,...base}=items.potion;items['test-machine']={...base,id:'test-machine',name:'Test machine',namePlural:'Test machines',pocket:4,fieldUse:'hm',battleUse:'none',move:'tackle',legacyIds:[],consumable:false,flags:[]};}});try{
-  const s=h.s._session,[learner,egg,actor,reserve]=JSON.parse(h.before).party.map(m=>m.id);let installs=0,decisions=0,doc=h.G.$gameSystem._psGame;const decide=s.decideLearn.bind(s),completed=[],add=h.s._log.add.bind(h.s._log);s.decideLearn=(...args)=>{decisions++;return decide(...args);};h.s._log.add=line=>{completed.push(line);return add(line);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  const s=h.s._session,[learner,egg,actor,reserve]=JSON.parse(h.before).party.map(m=>m.id);let installs=0,decisions=0,doc=h.G.$gameSystem._psGame;const decide=s.decideLearn.bind(s),completed=[],add=h.s._log.add.bind(h.s._log);s.decideLearn=(...args)=>{decisions++;return decide(...args);};h.s._log.add=line=>{completed.push(line);return add(line);};require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{installs++;doc=v;});
   await commands(h,actor);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),actor);h.flow.fast=false;await pick(h,'fight');await pick(h,1);
   const observations=await normalGrowthBeforeStats(h);assertPausedGrowth(h,observations);assert.equal(s.ended,null,'a living enemy reserve makes this a genuine nonterminal KO');assert.equal(decisions,0);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.p.press('ok');assert.equal(h.s.levelStatsState().phase,'total');await h.p.press('ok');
   await h.waitFor(()=>!!h.s.ordinaryMessageState(),'normal full-slot announcement');const notice=h.s._ordinaryMessage;assert.equal(notice.snapshot().implementation,'paused-message-v1');assert.equal(h.s._learningInitial??null,null);assert.equal(s.pendingLearn.memberId,learner);await h.p.press('ok');assert.equal(notice.snapshot().phase,'full');assert.equal(decisions,0);await h.p.press('ok');await h.p.inMode('learn-initial');await h.frames(1);await pick(h,'forget-move');await h.p.inMode('learn');
@@ -499,7 +499,7 @@ for (const lang of ['en', 'zh']) test(lang + ' normal HM give-up after the last 
     const choose=s.chooseMove.bind(s),decide=s.decideLearn.bind(s);let doc=h.G.$gameSystem._psGame,installs=0;
     s.chooseMove=async slot=>{const row={slot};attempts.push(row);row.result=await choose(slot);return row.result;};
     s.decideLearn=(...args)=>{decisions.push(args[0]);return decide(...args);};
-    Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+    require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{installs++;doc=v;});
     h.flow.fast=false;await pick(h,'fight');await pick(h,1);
     const observations=await normalGrowthBeforeStats(h);assertPausedGrowth(h,observations);
     assert.equal(s.ended,null);assert.equal(s.party[0].level,51);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
@@ -542,7 +542,7 @@ for(const lang of ['en','zh'])test(lang+' learned Rest use reaches working data,
   leadMoves:[{id:'tackle',pp:1,maxpp:35},{id:'growl',pp:40,maxpp:40},{id:'splash',pp:40,maxpp:40},{id:'protect',pp:10,maxpp:10}],
   catalog:items=>{const {battleId:unused,...base}=items.potion;items['test-machine']={...base,id:'test-machine',name:'Test machine',namePlural:'Test machines',pocket:4,fieldUse:'hm',battleUse:'none',move:'tackle',legacyIds:[],consumable:false,flags:[]};}});try{
   const s=h.s._session,[lead,reserve]=s.party.map(m=>m.id),order=JSON.parse(h.before).party.map(m=>m.id),decide=s.decideLearn.bind(s),calls=[];let installs=0,doc=h.G.$gameSystem._psGame;
-  s.decideLearn=(...a)=>{calls.push(a[0]);return decide(...a);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  s.decideLearn=(...a)=>{calls.push(a[0]);return decide(...a);};require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{installs++;doc=v;});
   h.flow.fast=false;await pick(h,'fight');await pick(h,1);const observations=await normalGrowthBeforeStats(h);assertPausedGrowth(h,observations);assert.equal(s.ended,null);
   await h.p.press('ok');assert.equal(h.s.levelStatsState().phase,'total');await h.p.press('ok');
   await h.waitFor(()=>!!h.s.ordinaryMessageState(),'full-slot notice');await h.p.press('ok');await h.p.press('ok');await h.p.inMode('learn-initial');await h.frames(1);await pick(h,'forget-move');await h.p.inMode('learn');
@@ -572,7 +572,7 @@ for(const lang of ['en','zh'])test(lang+' learned permanent Growl participates i
   leadMoves:[{id:'tackle',pp:1,maxpp:35},{id:'splash',pp:0,maxpp:40},{id:'protect',pp:0,maxpp:10},{id:'rest',pp:0,maxpp:10}],
   catalog:items=>{const {battleId:unused,...base}=items.potion;items['test-machine']={...base,id:'test-machine',name:'Test machine',namePlural:'Test machines',pocket:4,fieldUse:'hm',battleUse:'none',move:'tackle',legacyIds:[],consumable:false,flags:[]};}});try{
   const s=h.s._session,[lead,reserve]=s.party.map(m=>m.id),order=JSON.parse(h.before).party.map(m=>m.id),calls=[],choose=s.chooseMove.bind(s);let installs=0,doc=h.G.$gameSystem._psGame;
-  s.chooseMove=(slot)=>{calls.push(slot);return choose(slot);};Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  s.chooseMove=(slot)=>{calls.push(slot);return choose(slot);};require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{installs++;doc=v;});
   h.flow.fast=false;await pick(h,'fight');await pick(h,1);const observed=await normalGrowthBeforeStats(h);assertPausedGrowth(h,observed);await h.p.press('ok');await h.p.press('ok');
   await h.waitFor(()=>!!h.s.ordinaryMessageState(),'full-slot learning notice');await h.p.press('ok');await h.p.press('ok');await h.p.inMode('learn-initial');await h.frames(1);await pick(h,'forget-move');await h.p.inMode('learn');
   const pending=s.pendingLearn,checkpoint=JSON.stringify(s._checkpoint());await pick(h,0);await h.p.inMode('learn');assert.equal(s.pendingLearn,pending);assert.equal(JSON.stringify(s._checkpoint()),checkpoint);
@@ -696,7 +696,7 @@ for (const route of ['no', 'list-cancel', 'set']) test('SWF03 after forced repla
   } finally { h.cleanup(); }
 });
 async function switchOffer(h,slot=1){await pick(h,'fight');await pick(h,slot);await h.waitFor(()=>['main','replacement-question'].includes(h.s._mode)&&h.s.inputState().ready,'replacement boundary');assert.equal(h.s._mode,'replacement-question');const v=E.session.readTrainerReplacement(h.s._session);assert(v);return v;}
-function observeInstalls(h){let count=0,document=h.G.$gameSystem._psGame;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>document,set:v=>{count++;document=v;}});return()=>count;}
+function observeInstalls(h){let count=0,document=h.G.$gameSystem._psGame;require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{count++;document=v;});return()=>count;}
 async function finishSwitchBattle(h,installs){await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs(),0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs(),1);h.s.onEnd();assert.equal(installs(),1);}
 for(const lang of ['en','zh'])for(const route of ['no','back','list-cancel'])test('SWC02 '+lang+' '+route+' continues the same prepared foe without a player action and saves once',async()=>{
  const h=await open({lang,trainer:true,trainerMembers:2,battleStyle:'',fast:true});try{const installs=observeInstalls(h),s=h.s._session,lead=s.gw.activeId('p1'),foe=s.gw.activeId('p2'),v=await switchOffer(h),pp=s.gw.readState('p1').map(m=>[m.id,m.pp.tackle]),random=structuredClone(SWD.trainerAiDiagnostics(s).state.random),journal=SWD.trainerAiJournal(s).entries.length;
@@ -736,7 +736,7 @@ test('SWC09 both event entry styles validate before sequence/open and declare in
 for(const lang of ['en','zh'])test('SWF02 '+lang+' unified trainer: real faint, Ether, Revive, default Switch, trainer toy refusal and one joint commit',async()=>{
  const h=await open({lang,trainer:true,trainerMembers:2,battleStyle:'',fast:true,leadHP:1,leadMoves:[{id:'splash',pp:1,maxpp:40},{id:'tackle',pp:35,maxpp:35}],benchMoves:[{id:'tackle',pp:0,maxpp:35}],bag:{ether:2,revive:2,pokedoll:2}});try{
   const s=h.s._session,[lead,reserve]=s.party.map(m=>m.id),order=JSON.parse(h.before).party.map(m=>m.id),uses=[];let installs=0,document=h.G.$gameSystem._psGame;
-  Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>document,set:v=>{installs++;document=v;}});const use=s.useItem.bind(s);s.useItem=(...a)=>{uses.push(a[0]);return use(...a);};
+  require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{installs++;document=v;});const use=s.useItem.bind(s);s.useItem=(...a)=>{uses.push(a[0]);return use(...a);};
   await pick(h,'fight');await pick(h,1);await h.p.inMode('party-forced');assert(s.gw.readState('p1').find(m=>m.id===lead).fainted);await pick(h,reserve);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),reserve);
   await pick(h,'bag');await pick(h,'ether');await pick(h,'use');await h.p.inMode('bag-members');await pick(h,reserve);await h.p.inMode('bag-moves');await pick(h,0);await h.p.inMode('main');assert.equal(s.currentRequest().active[0].moves[0].pp,10);
   await pick(h,'bag');await pick(h,'revive');await pick(h,'use');await h.p.inMode('bag-members');await pick(h,lead);await h.p.inMode('main');assert(s.gw.readState('p1').find(m=>m.id===lead).hp>0);
@@ -752,13 +752,13 @@ for(const lang of ['en','zh'])test('SWF02 '+lang+' unified trainer: real faint, 
 // Per-battle growth off: real registered MZ events, App/Session/Gen8, and compiled result presentation.
 for(const lang of ['en','zh'])for(const command of ['StartBattle','StartTrainerBattle'])test(lang+' '+command+' expGain false skips growth but preserves victory cue, feedback and single installation',async()=>{
  const h=await open({lang,command,expGain:'false',trainerMembers:2,grow:true,fast:true});try{
-  const s=h.s._session,id=s.party[0].id,baseline=structuredClone(JSON.parse(h.before).party[0]);assert.equal(s.expGain,false);let installs=0,document=h.G.$gameSystem._psGame,cues=0;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>document,set:v=>{installs++;document=v;}});const victory=h.flow._victoryBattleMusic;h.flow._victoryBattleMusic=function(...a){cues++;return victory.apply(this,a);};
+  const s=h.s._session,id=s.party[0].id,baseline=structuredClone(JSON.parse(h.before).party[0]);assert.equal(s.expGain,false);let installs=0,document=h.G.$gameSystem._psGame,cues=0;require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{installs++;document=v;});const victory=h.flow._victoryBattleMusic;h.flow._victoryBattleMusic=function(...a){cues++;return victory.apply(this,a);};
   for(let n=0;n<2&&!s.finished;n++){await pick(h,'fight');await pick(h,1);await h.waitFor(()=>['main','end'].includes(h.s._mode),'no-exp normal result or next command');assert.equal(s.party[0].level,baseline.level);assert.equal(s.party[0].exp,baseline.exp);assert.deepEqual(s.party[0].evs,baseline.evs);assert.equal(cues,s.finished?1:0);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);}
   assert(s.finished);await h.p.inMode('end');assert(!h.batches.flatMap(row=>row.value).some(m=>['growth','learn-prompt','learned'].includes(m.kind)));assert.equal(cues,1);assert(h.s._endFeedbackShown);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied',JSON.stringify(h.flow.lastOutcome));assert.equal(installs,1);const saved=h.flow.game().party.find(m=>m.id===id);assert.equal(saved.exp,baseline.exp);assert.equal(saved.level,baseline.level);assert.deepEqual(saved.evs,baseline.evs);assert(saved.moves[0].pp<baseline.moves[0].pp);h.s.onEnd();assert.equal(installs,1);
  }finally{h.cleanup();}
 });
 test('both registered events reject malformed expGain before opening or advancing sequence; metadata defaults On',async()=>{
- const h=await open();try{h.cleanup();const before=JSON.stringify(h.flow.game()),seq=h.G.$gameSystem._psBattleSeq;for(const name of ['StartBattle','StartTrainerBattle'])for(const expGain of [null,0,'off',{}])assert.throws(()=>h.w.commands['PS_BattleFlow:'+name].call({setWaitMode(){}},{expGain}),/expGain must be true or false/);assert.equal(h.flow.running,false);assert.equal(h.G.$gameSystem._psBattleSeq,seq);assert.equal(JSON.stringify(h.flow.game()),before);const meta=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.meta.txt'),'utf8');assert.equal(meta.split('@arg expGain').length-1,2);assert.equal((meta.match(/@arg expGain[\s\S]*?@default true/g)||[]).length,2);
+ const h=await open();try{h.cleanup();const before=JSON.stringify(h.flow.game()),seq=h.G.$gameSystem._psBattleSeq;for(const name of ['StartBattle','StartTrainerBattle'])for(const expGain of [null,0,'off',{}])assert.throws(()=>h.w.commands['PS_BattleFlow:'+name].call({setWaitMode(){}},{expGain}),expGain!==null&&typeof expGain==='object'?/legacy battle argument must be primitive: expGain/:/expGain must be true or false/);assert.equal(h.flow.running,false);assert.equal(h.G.$gameSystem._psBattleSeq,seq);assert.equal(JSON.stringify(h.flow.game()),before);const meta=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.meta.txt'),'utf8');assert.equal(meta.split('@arg expGain').length-1,2);assert.equal((meta.match(/@arg expGain[\s\S]*?@default true/g)||[]).length,2);
  }finally{h.cleanup();}
 });
 
@@ -766,7 +766,7 @@ test('both registered events reject malformed expGain before opening or advancin
 for(const lang of ['en','zh'])for(const command of ['StartBattle','StartTrainerBattle'])test('SR01 '+lang+' '+command+' prohibited Run and Ball preserve combat state and allow a different action to finish once',async()=>{
  const h=await open({lang,command,noRun:'true',noBall:'true',bag:{masterball:2},fast:true});try{
   const s=h.s._session;assert.deepEqual(s.gw.query('p1','ball'),{allowed:false,reason:'ballsdisabled'},'the registered event must inject noBall');assert.deepEqual(s.gw.query('p1','run'),{allowed:false,reason:command==='StartBattle'?'norun':'trainer'});
-  const engine=s.gw.snapshot(),request=JSON.stringify(s.currentRequest()),bag=JSON.stringify(s.bag);let installs=0,document=h.G.$gameSystem._psGame;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>document,set:v=>{installs++;document=v;}});
+  const engine=s.gw.snapshot(),request=JSON.stringify(s.currentRequest()),bag=JSON.stringify(s.bag);let installs=0,document=h.G.$gameSystem._psGame;require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{installs++;document=v;});
   await pick(h,'run');await h.p.inMode('main');assert.equal(s.gw.snapshot(),engine);assert.equal(JSON.stringify(s.currentRequest()),request);assert.equal(JSON.stringify(s.bag),bag);assert.equal(installs,0);
   await pick(h,'bag');await pick(h,'masterball');await pick(h,'use');await h.p.inMode('bag');assert.equal(h.s.battleBagState().kind,'items');assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext,'masterball');assert.equal(s.gw.snapshot(),engine);assert.equal(JSON.stringify(s.currentRequest()),request);assert.equal(JSON.stringify(s.bag),bag);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
   const painted=h.completed.join('').replace(/\s/g,'');assert(painted.includes(h.flow.translator().t('refusal.ball.ballsdisabled').replace(/\s/g,'')),'the actual ball refusal must be presented in the chosen language');
@@ -783,13 +783,13 @@ for(const rule of ['noRun','noBall'])test('SR03 '+rule+' is independent of the o
  const h=await open({command:'StartBattle',[rule]:true,bag:{masterball:2},fast:true});try{assert.deepEqual(h.s._session.gw.query('p1','ball'),rule==='noBall'?{allowed:false,reason:'ballsdisabled'}:{allowed:true});assert.deepEqual(h.s._session.gw.query('p1','run'),rule==='noRun'?{allowed:false,reason:'norun'}:{allowed:true});assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
 });
 test('SR04 both event commands validate prohibition types before sequence/open and declare default false metadata',async()=>{
- const h=await open();try{h.cleanup();const before=JSON.stringify(h.flow.game()),seq=h.G.$gameSystem._psBattleSeq;for(const command of ['StartBattle','StartTrainerBattle'])for(const rule of ['noRun','noBall'])for(const value of [null,0,'off',{}])assert.throws(()=>h.w.commands['PS_BattleFlow:'+command].call({setWaitMode(){}},{[rule]:value}),new RegExp(rule+' must be true or false'));assert.equal(h.flow.running,false);assert.equal(h.G.$gameSystem._psBattleSeq,seq);assert.equal(JSON.stringify(h.flow.game()),before);const meta=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.meta.txt'),'utf8');for(const rule of ['noRun','noBall'])assert.equal((meta.match(new RegExp('@arg '+rule+'[\\s\\S]*?@default false','g'))||[]).length,2);
+ const h=await open();try{h.cleanup();const before=JSON.stringify(h.flow.game()),seq=h.G.$gameSystem._psBattleSeq;for(const command of ['StartBattle','StartTrainerBattle'])for(const rule of ['noRun','noBall'])for(const value of [null,0,'off',{}])assert.throws(()=>h.w.commands['PS_BattleFlow:'+command].call({setWaitMode(){}},{[rule]:value}),new RegExp(value!==null&&typeof value==='object'?'legacy battle argument must be primitive: '+rule:rule+' must be true or false'));assert.equal(h.flow.running,false);assert.equal(h.G.$gameSystem._psBattleSeq,seq);assert.equal(JSON.stringify(h.flow.game()),before);const meta=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.meta.txt'),'utf8');for(const rule of ['noRun','noBall'])assert.equal((meta.match(new RegExp('@arg '+rule+'[\\s\\S]*?@default false','g'))||[]).length,2);
  }finally{h.cleanup();}
 });
 
 for(const lang of ['en','zh'])test('CEXP Scene '+lang+' disabled capture growth still shows success, requests victory BGM and receives once',async()=>{
  const h=await open({lang,bag:{masterball:1},hurt:false,grow:true,fast:true,captureSetting:false});try{
-  const s=h.s._session,original=JSON.stringify({level:s.party[0].level,exp:s.party[0].exp,evs:s.party[0].evs,moves:s.party[0].moves});let doc=h.G.$gameSystem._psGame,installs=0;Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:v=>{installs++;doc=v;}});
+  const s=h.s._session,original=JSON.stringify({level:s.party[0].level,exp:s.party[0].exp,evs:s.party[0].evs,moves:s.party[0].moves});let doc=h.G.$gameSystem._psGame,installs=0;require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{installs++;doc=v;});
   h.s.act(()=>s.throwBall('masterball'),'item');await h.p.inMode('end');assert.equal(s.captureExpGain,false);assert.equal(s.ended.reason,'caught');assert.equal(JSON.stringify({level:s.party[0].level,exp:s.party[0].exp,evs:s.party[0].evs,moves:s.party[0].moves}),original);assert(!h.batches.flatMap(x=>x.value).some(m=>m.kind==='growth'));assert.equal(h.flow.musicState().player.requests.filter(x=>x.kind==='victory').length,1);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
   await h.frames(1);h.s.onMenuOk();await h.frames(4);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.equal(h.flow.game().party.length,3);assert(h.flow.game().dex.owned.includes('pidgey'));assert.equal(h.flow.game().party[0].exp,JSON.parse(h.before).party[0].exp);assert.equal(h.flow.game().inventory.pockets.flat().filter(x=>x.itemId==='masterball').length,0);h.s.onEnd();assert.equal(installs,1);
  }finally{h.cleanup();}
@@ -812,7 +812,7 @@ for(const lang of ['en','zh'])for(const reserve of [false,true])test(lang+' defa
   const original=[{id:'tackle',pp:35,maxpp:35},{id:'splash',pp:7,maxpp:40}];
   const h=await open({lang,hurt:false,fast:true,bag:{ether:2},...(reserve?{benchMoves:original}:{leadMoves:original})});try{
     const s=h.s._session,id=s.party[reserve?1:0].id,engine=s.gw.snapshot();let installs=0,doc=h.G.$gameSystem._psGame;
-    Object.defineProperty(h.G.$gameSystem,'_psGame',{configurable:true,get:()=>doc,set:value=>{installs++;doc=value;}});
+    require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,value=>{installs++;doc=value;});
     await movesDetail(h,id);await h.p.press('ok');await h.p.press('down');await h.p.press('ok');
     assert.deepEqual(s.party.find(m=>m.id===id).moves,[original[1],original[0]]);assert.equal(s.gw.snapshot(),engine);
     await leaveMoves(h);await pick(h,'bag');
@@ -834,7 +834,7 @@ for (const lang of ['en', 'zh']) test(lang + ' summary move sorting swaps comple
   const h = await open({ lang, leadMoves: original, trainer: true, trainerMembers: 2, fast: true }); try {
     const s = h.s._session, id = s.party[0].id, engine = s.gw.snapshot();
     let installs = 0, doc = h.G.$gameSystem._psGame;
-    Object.defineProperty(h.G.$gameSystem, '_psGame', { configurable: true, get: () => doc, set: value => { installs++; doc = value; } });
+    require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,value=>{installs++;doc=value;});
     await movesDetail(h, id); await h.p.press('ok');
     assert.equal(current(h).view.selected, 0, 'normal USE must select the source move');
     assert.deepEqual(s.party[0].moves, original, 'source selection alone does not write');

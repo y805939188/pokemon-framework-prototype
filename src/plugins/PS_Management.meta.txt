@@ -5,6 +5,135 @@
  * @help
  * Input: arrows, Enter/Z, Escape/X, Shift, Ctrl (Box Link), A/S (box jumps).
  * Data writes go through GameApplication. Box Link reads inventory plus existing switch/map/mode gates. Developer override is runtime only.
+ * Field moves are available from the current party member menu. ShowFieldShortcuts queues a map menu after the current event naturally ends; it does not wait or change key bindings.
+ * Fly uses current-region visited destinations and rechecks the chosen point through GameApplication. Dig and Teleport keep the native travel confirmation.
+ * Failed travel can show a recovery window. ShowFieldRecovery waits for the current event naturally; actions use the issued request in the current game.
+ * The pause menu's player-name command opens the read-only Trainer Card. Time/start date await their lifecycle batch; no state is written here.
+ * ShowMessage uses the native map message window with WP17 typing/confirmation and a documented tag subset. One lowercase \ch[variable,cancel,choice,...] enters ordinary choices after the text. See docs/step5/5.6-messages.zh.md and 5.6-inline-choices.zh.md.
+ * ShowChoices writes a zero-based result to an MZ variable. Optional matching help arrays follow the cursor. Cancel >0 returns N-1, <0 returns itself, 0 disables BACK. Use ordinary Conditional Branch on the result variable.
+ * ShowNumber edits digits and writes the result to an MZ variable. Settings execute in order: default clears cancel; initial preserves it. See docs/step5/5.6-message-number.zh.md.
+ * ShowTextInput supports explicit cursor grid, keyboard naming and free text for event variables, max 1..32 characters. Cursor BACK deletes; select OK to finish. See docs/step5/5.6-cursor-text.zh.md and 5.6-event-text.zh.md.
+ * RegisterHallOfFame records the current party only when called by your confirmed champion success branch. See docs/step5/5.6-hall-of-fame-author.zh.md.
+ * @command ShowTextInput
+ * @text Text / 事件文字输入（WP17-D 子集）
+ * @arg mode
+ * @type select
+ * @option Keyboard naming / 键盘命名
+ * @value keyboard
+ * @option Free text / 自由文本
+ * @value free
+ * @option Cursor grid / 光标字符网格
+ * @value cursor
+ * @default keyboard
+ * @arg resultVariableId
+ * @text Result variable / 结果变量
+ * @type variable
+ * @default 1
+ * @arg initialVariableId
+ * @text Initial variable (0: literal) / 初值变量（0：文本）
+ * @type variable
+ * @default 0
+ * @arg titleZh
+ * @default 输入文字
+ * @arg titleEn
+ * @default Enter text
+ * @arg initialZh
+ * @default
+ * @arg initialEn
+ * @default
+ * @arg minLength
+ * @type number
+ * @min 0
+ * @max 32
+ * @default 0
+ * @arg maxLength
+ * @type number
+ * @min 1
+ * @max 32
+ * @default 12
+ * @command ShowNumber
+ * @text Number / 逐位数量输入（WP17-C）
+ * @arg resultVariableId
+ * @text Result variable / 初值及结果变量
+ * @type variable
+ * @default 1
+ * @arg settings
+ * @text Ordered settings / 按顺序设置
+ * @type struct<PSNumberSetting>[]
+ * @default []
+ * @command ShowChoices
+ * @text Choices / 消息选项（WP17-B）
+ * @arg choicesZh
+ * @text 中文选项
+ * @type string[]
+ * @default ["是","否"]
+ * @arg choicesEn
+ * @text English choices
+ * @type string[]
+ * @default ["Yes","No"]
+ * @arg helpZh
+ * @text 中文帮助（可选数组）
+ * @type string[]
+ * @default []
+ * @arg helpEn
+ * @text English help (optional array)
+ * @type string[]
+ * @default []
+ * @arg defaultIndex
+ * @text Default index / 默认索引（0起）
+ * @type number
+ * @min 0
+ * @default 0
+ * @arg cancelValue
+ * @text Cancel / 取消策略（正/负/0）
+ * @type number
+ * @min -999999
+ * @default 2
+ * @arg resultVariableId
+ * @text Result variable / 结果变量
+ * @type variable
+ * @default 1
+ * @command ShowMessage
+ * @text Message / 消息（WP17-A 子集）
+ * @arg textZh
+ * @text 中文文本
+ * @desc 支持单个 \l[N] 显式行数；N须为正整数且窗口适合当前屏幕。
+ * @type multiline_string
+ * @default 你好，\pn！
+ * @arg textEn
+ * @text English text
+ * @desc One \l[N] sets this message's rows; use a positive integer that fits the screen.
+ * @type multiline_string
+ * @default Hello, \pn!
+ * @arg position
+ * @text Position / 位置
+ * @type select
+ * @option Top / 顶部
+ * @value 0
+ * @option Middle / 中间
+ * @value 1
+ * @option Bottom / 底部
+ * @value 2
+ * @default 2
+ * @command ShowFieldRecovery
+ * @text Show Unfinished Travel
+ * @command ShowFieldShortcuts
+ * @text Show Field Shortcuts
+ * @command ShowOptions
+ * @text Open Options / 打开选项
+ * @command ShowControls
+ * @text Controls Help / 操作帮助
+ * @command ShowPC
+ * @text Open PC / 打开普通电脑
+ * @desc Map event: storage service and log off. Waits through submenus and the map return.
+ * @command RegisterHallOfFame
+ * @text Register Hall of Fame / 登记名人堂
+ * @desc Confirmed champion success branch only. Records in memory. / 仅在已确认冠军成功的分支调用，仅在内存中登记。
+ * @arg historyLimit
+ * @text Retained entry limit / 保留届数上限
+ * @desc Default 50. Negative: unlimited. 0 still counts the entry. / 默认 50，负数不限，0 仍累加届数。
+ * @type string
+ * @default 50
  * @command ShowStorage
  * @text Open Storage PC
  * @command ShowSummary
@@ -18,4 +147,33 @@
  * @arg request
  * @type multiline_string
  * @default {"kind":"normal","member":{"species":"CHARMANDER","level":5}}
+ */
+
+/*~struct~PSNumberSetting:
+ * @param operation
+ * @text Operation / 设置操作
+ * @type select
+ * @option Range / 范围（值为最小，最大值为最大）
+ * @value range
+ * @option Digits / 位数（1至15）
+ * @value digits
+ * @option Allow sign / 允许负号（值1允许，0禁止）
+ * @value negative
+ * @option Default / 默认值（清除取消值）
+ * @value default
+ * @option Initial / 初始值（保留取消值）
+ * @value initial
+ * @option Initial from variable / 变量初值（值为变量ID）
+ * @value initialVariable
+ * @option Cancel / 取消值（不夹限）
+ * @value cancel
+ * @default range
+ * @param value
+ * @text Value / 值
+ * @type string
+ * @default 0
+ * @param maximum
+ * @text Range maximum / 范围最大值（仅范围操作）
+ * @type string
+ * @default 99
  */

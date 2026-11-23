@@ -91,9 +91,10 @@ function host({opening,display=false,audio,exists,now,exp=125000}={}){
   if(typeof file==='string'&&path.resolve(file).startsWith(audioRoot)){counts.faintAudioPaths.push(file);const error=Error('controlled audio absence');error.code='ENOENT';throw error;}
   return realFS.statSync(file,...args);
  }};
- const req=p=>{if(p==='fs')return controlledFS;if(p==='path'||p==='url')return require(p);if(p.includes('production.cjs'))return require(path.join(ROOT,'js/engine/build/production.cjs'));throw Error('unexpected require '+p);};req.resolve=p=>path.resolve(ROOT,p);
+ const req=p=>{if(p==='fs')return controlledFS;if(p==='path'||p==='url'||p==='node:util')return require(p);if(p.includes('production.cjs'))return require(path.join(ROOT,'js/engine/build/production.cjs'));throw Error('unexpected require '+p);};req.resolve=p=>path.resolve(ROOT,p);
  const G={Error,structuredClone,performance,require:req,console:{log(){},warn(){},error(){}},PluginManager:{parameters:()=>({}),registerCommand(plugin,name,fn){commands[name]=fn;}},Game_Interpreter:Base,Game_System:System,Window_Base:Window,Window_Command:Window,Scene_MenuBase:Base,SceneManager:{_scene:null,push(){},isSceneChanging:()=>false},Graphics:{boxWidth:816,boxHeight:624,frameCount:0},Rectangle:function(x,y,width,height){Object.assign(this,{x,y,width,height});},Utils:{extractFileName:x=>x},Input:{isTriggered:()=>false},SoundManager:{playBuzzer(){}},$gameSystem:new System(),$gameMessage:{isBusy:()=>false,add(){}},$gameVariables:{setValue(){}}};
  G.Bitmap=Bitmap;G.Sprite=Sprite;G.AudioManager=audio;G.Utils.hasEncryptedAudio=()=>false;G.performance={now:now??(()=>sceneTime)};
+ require('../../../scripts/tests/legacy-mz-world-host.cjs').install(G);
  G.window=G;vm.createContext(G);vm.runInContext(plugin,G);
  const flow=G.PSFlow,app={describeLearningMove:id=>({id,name:id,pp:10,type:'Psychic',category:'Status',power:0,accuracy:0,description:'Controlled move metadata'}),stateGeneration:0,saveBlocked:false,pendingEvolution:null,pendingReceiving:null,pendingPokedex:null,stateReplacedByHost(){this.stateGeneration++;},finishBattle(){counts.finish++;return {code:1,commit:'applied',battleId:'scene#1'};},abortBattle(request,error){counts.abort++;return {code:0,commit:'none',battleId:request.battleId,aborted:true,error:String(error)};}};
  // This host isolates pictures/controller lifecycle from ordinary text pacing.
@@ -393,7 +394,8 @@ test('late old send-out visual and message callbacks cannot reset successor Scen
  assert.equal(s._menuCursor.index('main',4),2);assert.equal(s._menuCursor.index('moves',4),3);assert.equal(s.presentationState().cards.find(c=>c.side==='p1'&&c.active).id,'P');assert(s.inputState().ready);s.terminate();
 });
 test('compiled author commands pass image/transition choices separately from application battle requests',()=>{
- const h=host(),calls=[];h.flow.running=false;h.flow.nextSeq=()=>9;h.app.trainerRecord=()=>({});h.flow.tryOpenBattle=(request,presentation)=>{calls.push({request,presentation});return true;};
+ require('../5/regular-field-action-test-runtime.cjs').prepare('parent');
+ const real=require('../5/field-move-real-parent-fixtures.cjs').fixture(),h=host(),calls=[];h.flow.app=()=>real.app;h.flow.running=false;h.flow.nextSeq=()=>9;real.app.trainerRecord=()=>({});h.flow.tryOpenBattle=(request,presentation)=>{calls.push({request,presentation});return true;};
  const interpreter={setWaitMode(mode){assert.equal(mode,'psBattle');}};
  for(const name of ['StartBattle','StartTrainerBattle'])for(const prebattleLocation of [undefined,'','3'])h.commands[name].call(interpreter,{trainerId:'trainer',version:'1',battleBackground:'woods',battlePlatform:'water',battleTime:'2',prebattleLocation});
  assert.equal(calls.length,6);calls.forEach((c,index)=>{assert.deepEqual(JSON.parse(JSON.stringify(c.presentation)),{background:'woods',platform:'water',time:'2',transition:index%3===2?{location:'3'}:{}});assert(!('visualContext'in c.request));assert(!('background'in c.request));assert(!('transition'in c.request));assert(!('prebattleLocation'in c.request));});

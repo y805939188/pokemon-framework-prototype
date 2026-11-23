@@ -49,10 +49,10 @@ function check(w, types) {
   assert.equal(w.session.broken, null); assert.equal(w.state.replaced.length, 0);
 }
 
-test('R2 approved content4 normalizes empty to Normal and canonical duplicate identities without editing author input; old caches need rebuild', () => {
+test('R2 approved content5 normalizes empty to Normal and canonical duplicate identities without editing author input; old caches need rebuild', () => {
   for (const [input, expected] of [[[], ['Normal']], [['dark', 'DARK', 'Water', 'dark'], ['Dark', 'Water']]]) {
     const raw = inputs(), entry = species(raw, 'snorlax', input), before = clone(raw), { data, content } = assemble(raw);
-    assert.equal(data.schema, 4); assert.deepEqual(raw, before); assert.deepEqual(entry.types, input);
+    assert.equal(data.schema, 5); assert.deepEqual(raw, before); assert.deepEqual(entry.types, input);
     assert.deepEqual(content.species.Snorlax.types, expected);
     assert.deepEqual(data.species.find(s => s.id === 'snorlax').types.map(x => x.toLowerCase()), expected.map(x => x.toLowerCase()));
     assert.throws(() => E.contentRuntime.loadCompiled({ ...data, schema: 3 }), /needs-rebuild/);

@@ -195,7 +195,7 @@ test('removing the actual native abort lifecycle gate revives the real host isCl
  assert.throws(()=>f.G.SceneManager.isCurrentSceneBusy(),/isClosing/);
 });
 
-function host({ready=true,settings={},intro='Intro',emptyBgm=false,beforePlugins=()=>{}}={}){
+function host({ready=true,settings={},intro='Intro',emptyBgm=false,beforePlugins=()=>{},saveSource=savePlugin}={}){
  const root=fs.mkdtempSync(path.join(temp,'world-'));fs.mkdirSync(path.join(root,'audio/bgm'),{recursive:true});
  const f={root,time:0,timers:new Map(),seq:0,buffers:[],plays:[],queries:[],commands:{},hook:null,starts:0,finishes:0,aborts:0};
  f.write=name=>fs.writeFileSync(path.join(root,'audio/bgm',name+'.ogg'),'controlled decoder existence fixture');
@@ -209,12 +209,12 @@ function host({ready=true,settings={},intro='Intro',emptyBgm=false,beforePlugins
  class Bitmap{constructor(w,h){this.width=w;this.height=h;this.context={drawImage(){}};}fillAll(){}fillRect(){}blt(){}drawText(){}destroy(){}}
  class Sprite{constructor(bitmap){this.bitmap=bitmap;this.anchor={x:0,y:0};this.scale={x:1,y:1};}destroy(){}}
  function System(){}System.prototype.isSaveEnabled=()=>true;
- const req=name=>{if(['fs','path','url'].includes(name))return require(name);if(name.includes('production.cjs'))return E;throw Error('unexpected require '+name);};req.resolve=()=>path.join(root,'js/engine/build/production.cjs');
+ const req=name=>{if(['fs','path','url','node:util'].includes(name))return require(name);if(name.includes('production.cjs'))return E;throw Error('unexpected require '+name);};req.resolve=()=>path.join(root,'js/engine/build/production.cjs');
  const G={Error,performance:{now:()=>f.time},require:req,console:{log(){},warn(){},error(){}},setTimeout(cb,ms){const id=++f.seq;f.timers.set(id,{cb,at:f.time+ms});return id;},clearTimeout(id){f.timers.delete(id);},
  PluginManager:{parameters:()=>({battleMusic:JSON.stringify(settings)}),registerCommand(_plugin,name,fn){f.commands[name]=fn;}},Game_Interpreter:Base,Game_System:System,Window_Base:Win,Window_Command:Win,Scene_MenuBase:Base,
  SceneManager:{_scene:null,push(type){f.pushed=type;},isSceneChanging:()=>false},Graphics:{boxWidth:816,boxHeight:624,frameCount:0},Rectangle:function(x,y,width,height){Object.assign(this,{x,y,width,height});},Utils:{hasEncryptedAudio:()=>false},Input:{isTriggered:()=>false},SoundManager:{playBuzzer(){}},Bitmap,Sprite,AudioManager:audio,$gameSystem:new System(),$gameMessage:{isBusy:()=>false,add(){}},$gameVariables:{setValue(){}},
  DataManager:{setupNewGame(){},extractSaveContents(contents){G.$gameSystem=contents.system;},saveGame:async()=>true,makeSaveContents:()=>({system:G.$gameSystem})}};
- G.window=G;vm.createContext(G);beforePlugins(G,f);vm.runInContext(plugin,G);vm.runInContext(savePlugin,G);
+ G.window=G;vm.createContext(G);beforePlugins(G,f);require('../../../scripts/tests/legacy-mz-world-host.cjs').install(G);vm.runInContext(plugin,G);vm.runInContext(saveSource,G);
  const flow=G.PSFlow,projection={id:'npc',version:1,presentation:{battleBgm:'Authored',victoryBgm:'V',introBgm:intro}};
  const session={party:[],foeTeam:[],content:{},bag:{},finished:false,pendingLearn:null,take:()=>[],currentRequest:()=>({active:[{moves:[{id:'splash',move:'Splash',pp:40,maxpp:40}]}]}),gw:{readState:()=>[]}};
  const app={stateGeneration:0,saveBlocked:false,pendingEvolution:null,pendingReceiving:null,pendingPokedex:null,assertHostStateReplacementAllowed(){f.hook?.('replacement-check');},stateReplacedByHost(){this.stateGeneration++;this.saveBlocked=false;this.pendingEvolution=this.pendingReceiving=this.pendingPokedex=null;},startNewGame(){f.newGames=(f.newGames||0)+1;},trainerRecord(id,version){f.queries.push({id,version});f.hook?.('trainer-query');return projection;},async startBattle(request){f.starts++;this.saveBlocked=true;f.hook?.('session-start');return f.opening??session;},async startTrainerBattle(request){return this.startBattle(request);},finishBattle(s,r){f.finishes++;if(f.pending){this[f.pending]={token:'pending',revision:1};return{code:2,commit:'none',battleId:r.battleId,pending:true,...(f.pending==='pendingEvolution'?{continuationToken:'pending'}:{})};}this.saveBlocked=false;return{code:1,commit:'applied',battleId:r.battleId};},abortBattle(r,error){f.aborts++;this.saveBlocked=false;return{code:0,commit:'none',battleId:r.battleId,aborted:true,error:String(error)};},resolveReceiving(){this.pendingReceiving=null;this.saveBlocked=false;return{code:1,commit:'applied',battleId:flow._op.request.battleId};},resolveEvolution(){this.pendingEvolution=null;this.saveBlocked=false;return{code:1,commit:'applied',battleId:flow._op.request.battleId};}};
@@ -360,8 +360,8 @@ function nativeSavePorts(G,f){
  for(const name of ['playBgm','isCurrentBgm','updateCurrentBgm','stopBgm','updateBgmParameters','saveBgm','playMe','stopMe','updateMeParameters'])installHostMethod(G,'reactor_managers.js','AudioManager.'+name);
  G.DataManager.createGameObjects();f.clone=clone;
 }
-function nativeTailHost({source,ioError=null,extractError=null,diagnostic=false,badReturn,staleState=false}={}){
- const PLAN=require('./music-native-plan.json'),named=x=>PLAN.prefix+x,driver=nativeTailSource(source),f=host({ready:true,beforePlugins:nativeSavePorts}),G=f.G,clone=x=>JSON.parse(JSON.stringify(x));
+function nativeTailHost({source,ioError=null,extractError=null,diagnostic=false,badReturn,staleState=false,saveSource}={}){
+ const PLAN=require('./music-native-plan.json'),named=x=>PLAN.prefix+x,driver=nativeTailSource(source),f=host({ready:true,beforePlugins:nativeSavePorts,saveSource}),G=f.G,clone=x=>JSON.parse(JSON.stringify(x));
  const content=require('./trainer-ai-integration/fixtures.cjs').content({party:1});f.flow.content=()=>content;f.flow.speciesKeyResolver=()=>E.speciesKey.speciesKeyResolver(content);
  G.Scene_Map=function(){this.map=true;};G.SceneManager.goto=Type=>{G.SceneManager._scene=new Type();};
  const fresh=()=>E.state.newGame({content,party:[],money:123});G.$gameSystem._psGame=fresh();
@@ -461,19 +461,23 @@ for(const fault of ['report-hash','producer-incomplete','input','expected-hash',
 });
 test('native load wrapper preserves zero and balances ordinaryLoads on I/O and extract failures',async()=>{
  // Execute the compiled actual PS_SaveState wrapper against the installed native body,
- // also inspect the closure counter so a rejection cannot strand migration admission.
- const f=nativeTailHost();await f.actions.settledSave(2);const text=savePlugin,parse=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]})).parseAst;let node;
+ // exposing only its counters inside the original closure, with all real guards intact.
+ const text=savePlugin,parse=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]})).parseAst;let node;
  (function walk(n){if(!n||typeof n!=='object'||node)return;if(Array.isArray(n))return n.forEach(walk);if(n.type==='AssignmentExpression'&&text.slice(n.left.start,n.left.end)==='G.DataManager.loadGame')node=n;else Object.values(n).forEach(walk);})(parse(text));assert(node);
- const G={DataManager:{loadGame:f.G.DataManager.loadGame.bind(f.G.DataManager)}},context=vm.createContext({G,assertReplacement(){}});vm.runInContext('let ordinaryLoads=0;const baseLoadGame=G.DataManager.loadGame;'+text.slice(node.start,node.end)+';',context);
- assert.equal(await G.DataManager.loadGame(2),0);assert.equal(vm.runInContext('ordinaryLoads',context),0);
- for(const field of ['ioError','extractError']){const failure=Error(field);f[field]=failure;await assert.rejects(G.DataManager.loadGame(2),e=>e===failure);assert.equal(vm.runInContext('ordinaryLoads',context),0);f[field]=null;}
+ const instrumented=text.slice(0,node.end)+';G.__saveCounters=()=>({ordinaryLoads,ordinaryWrites})'+text.slice(node.end);
+ const f=nativeTailHost({saveSource:instrumented}),G=f.G;await f.actions.settledSave(2);
+ assert.equal(await G.DataManager.loadGame(2),0);assert.equal(G.__saveCounters().ordinaryLoads,0);assert.equal(G.__saveCounters().ordinaryWrites,0);
+ for(const field of ['ioError','extractError']){const failure=Error(field);f[field]=failure;await assert.rejects(G.DataManager.loadGame(2),e=>e===failure);assert.equal(G.__saveCounters().ordinaryLoads,0);assert.equal(G.__saveCounters().ordinaryWrites,0);f[field]=null;}
+ assert.equal(await G.DataManager.loadGame(2),0,'a failed load releases the real admission guard');
 });
 test('remaining native M11-M17 driver actions are reachable in declared order with a fresh controlled Continue chain',async()=>{
  const f=nativeSaveScenes(nativeTailHost());for(const id of ['M11','M12','M13','M14','M15','M16'])await f.run(id);f.makeProducer();f.audio.stopBgm();await f.run('M17');assert.equal(f.loadedNames.at(-1),'file1');
 });
-test('actual M11 refuses a native success code when the real save wrapper diagnoses a corrupt framework document',async()=>{
- const f=nativeTailHost(),base=f.G.StorageManager.loadObject;f.G.StorageManager.loadObject=async function(...args){const value=await base.apply(this,args);value.system._psGame={schema:-1};return value;};
- await assert.rejects(f.run('M11'),/validated without a diagnostic/);assert(f.G.$gameSystem._psSaveError);assert(!f.flow.running);
+test('actual M11 propagates formal load refusal for a corrupt framework document and restores the previous host',async()=>{
+ const f=nativeTailHost(),base=f.G.StorageManager.loadObject;let prior;
+ f.G.StorageManager.loadObject=async function(...args){prior={system:f.G.$gameSystem,state:f.G.$gameSystem._psGame,generation:f.app.stateGeneration,operation:f.flow._op,saveBlocked:f.app.saveBlocked};const value=await base.apply(this,args);value.system._psGame={schema:-1};return value;};
+ await assert.rejects(f.run('M11'),/state-unusable: unknown-version/);assert(prior);assert.equal(f.G.$gameSystem,prior.system);assert.equal(f.G.$gameSystem._psGame,prior.state);assert.equal(f.app.stateGeneration,prior.generation);assert.equal(f.flow._op,prior.operation);assert.equal(f.app.saveBlocked,prior.saveBlocked);assert.match(f.G.PSState.lastLoadError.message,/unknown-version/);assert.equal(f.newGames??0,0);assert(f.flow.running,'failed replacement preserves the prior battle owner');
+ await f.actions.abortScene();assert(!f.flow.running);
 });
 test('actual M11 propagates an extractSaveContents hook exception unchanged before diagnostic or newgame acceptance',async()=>{
  const f=nativeTailHost(),failure=Error('controlled actual extractSaveContents hook');let entered=0;

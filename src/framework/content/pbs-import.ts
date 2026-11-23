@@ -34,13 +34,12 @@ export interface PbsBundleImport extends PbsImport { identities: PbsIdentity[]; 
 
 const GROWTH: Record<string, CurveId> = { Medium: 'medium', Fast: 'fast', Slow: 'slow', Parabolic: 'parabolic', Erratic: 'erratic', Fluctuating: 'fluctuating' };
 const STAT: Record<string, StatKey> = { HP: 'hp', ATTACK: 'atk', DEFENSE: 'def', SPECIAL_ATTACK: 'spa', SPECIAL_DEFENSE: 'spd', SPEED: 'spe' };
-const IMPORTED = ['GrowthRate','BaseExp','EVs','CatchRate','Happiness','Moves','TutorMoves','EggMoves','Evolutions','Evolution','Types','Abilities','HiddenAbilities','Flags','PokedexForm','Category','Pokedex','Height','Weight','Color','Shape','FormName'];
+const IMPORTED = ['GrowthRate','BaseExp','EVs','CatchRate','Happiness','Moves','TutorMoves','EggMoves','Evolutions','Evolution','Types','Abilities','HiddenAbilities','Flags','PokedexForm','Category','Pokedex','Height','Weight','Color','Shape','FormName','WildItemCommon','WildItemUncommon','WildItemRare'];
 const SHOWDOWN = ['Name','BaseStats','GenderRatio'];
 const LATER: Record<string, string> = {
   Habitat: '5.3 dex', Generation: '5.3 dex',
   Incense: 'after the first version (breeding)', Offspring: 'after the first version (breeding)',
   EggGroups: 'after the first version (breeding)', HatchSteps: 'after the first version (breeding)',
-  WildItemCommon: '5.5 wild held items', WildItemUncommon: '5.5 wild held items', WildItemRare: '5.5 wild held items',
 };
 const ID = /^[a-z][a-z0-9-]{0,30}$/;
 const SYMBOL = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -142,6 +141,17 @@ function convert(sections: Section[], sourceId: string, errors: PbsProblem[], re
       const tokens=progressionCsv(value(pbs)!);
       if(!tokens.length||tokens.some(token=>!SYMBOL.test(token))){fail(pbs,'must contain one or more valid symbol references (empty PBS text is not JSON [])');continue;}
       out[key]=tokens.map(token=>token.toLowerCase().replace(/_/g,''));
+    }
+    const wildFields=[['WildItemCommon','wildItemCommon'],['WildItemUncommon','wildItemUncommon'],['WildItemRare','wildItemRare']] as const;
+    if(wildFields.some(([pbs])=>value(pbs)!==undefined)) {
+      // The PBS form starts from a base copy, so clear the whole group before applying any form pool.
+      for(const [,key] of wildFields)out[key]=[];
+      for(const [pbs,key] of wildFields)if(value(pbs)!==undefined) {
+        const tokens=csv(pbs),items:string[]=[];
+        for(const token of tokens){const identity=deriveIds(token);if(!identity)fail(pbs,'must contain valid item symbols');else items.push(identity.id);}
+        out[key]=items;
+      }
+      if(base&&wildFields.every(([,key])=>!out[key]?.length))for(const [,key] of wildFields)out[key]=[...(base[key]??[])];
     }
     if(value('Flags')!==undefined){const flags=progressionCsv(value('Flags')!);if(!flags.length||flags.some(flag=>!flag.length))fail('Flags','empty PBS string positions cannot be represented as a flags string[]');else out.flags=flags;}
     if(value('Evolutions')!==undefined||s.singles.length){const evolution=parsePbsEvolutions({plural:s.props.get('Evolutions'),singles:s.singles,resolveSpecies,fail:(line,field,message)=>fail(field,message,line)});if(evolution.length||!base)out.evolutions=evolution;}

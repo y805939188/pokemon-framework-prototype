@@ -1,3 +1,12 @@
+import { catalogOf, itemOf } from '../framework/rules/item-catalog';
+import { installOptionsControls } from './navigation/options-controls';
+import { installTrainerCard } from './navigation/trainer-card';
+import { installPausePC } from './navigation/pause-pc';
+import { installMessages } from './navigation/messages';
+import { installMessageChoices } from './navigation/message-choices';
+import { installMessageNumber } from './navigation/message-number';
+import { installEventText } from './navigation/event-text';
+import { AuthorParameterError, registerAuthorCommand } from './navigation/author-command';
 import type { ApplicationHost, ManagementApplication } from './application-host';
 import { messageLiteral } from './message-literal';
 import { eventKey, hostInput, INPUT_ALIASES as ALIAS } from './host-input';
@@ -5,27 +14,67 @@ import { eventKey, hostInput, INPUT_ALIASES as ALIAS } from './host-input';
 import { boxCursor, boxLinkAvailable, editMark, InputLatch, inputIntent, markCursor, panelCursor, partyCursor, ribbonCursor, summaryCursor } from './management/model';
 import type { Action, Direction, InputFrame } from './management/model';
 import type { ManagementRequest, ManagementSnapshot, IndividualView, StorageSearch } from '../framework/app/index';
-import type { Member, MemberPosition, MemberReference, ReceivingDecision } from '../framework/rules/index';
+import type { Member, MemberPosition, MemberReference, ReceivingDecision, Content } from '../framework/rules/index';
+import { createFieldShortcutUIMZ } from './world/field-shortcut-ui-mz';
+import { createMZFieldShortcutView } from './world/field-shortcut-window';
+import type { FieldMenuHandle } from './world/field-shortcut-menu';
+import { hostRecord, invoke } from './world/host-access';
+import { createMZFlyDestinationView } from './world/field-fly-window';
+import { createMZFieldTravelRecoveryView } from './world/field-travel-recovery-window';
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Management';
  const flow=():ApplicationHost & Record<string, any>=>W.PSFlow,app=():ManagementApplication=>flow().app();
  const tr=(key:string,params?:Record<string,string|number>)=>flow().translator().t('management.'+key,params);
  const memberName=(m:Member)=>m.nickname||flow().speciesName(m.species,m.form);
+ const trType=(type:string)=>flow().translator().tOr('pokedex.type.'+type,type);
+ const trStatus=(status:string)=>flow().translator().tOr('management.status.'+status,status);
+ const itemName=(id:string)=>{const item=itemOf(catalogOf(flow().content?.()),id);return flow().translator().tOr(item?.nameKey??'item.name.'+id,item?.name??tr('unavailable'));};
  const pending=(o:any)=>!!o&&(o.pending===true||o.status==='pending');
  type MenuItem={key:string;label:string;enabled?:boolean;run:()=>void};
  type View={kind:string;cursor:number;[key:string]:any};
  type BattleSummarySource={views:IndividualView[];isCurrent:()=>boolean;swapMoves?:(id:string,from:number,to:number,expectedOrder:string[])=>Promise<IndividualView|null>};
- type OpenRequest={kind:'party'|'pc'|'summary'|'selector'|'receiving'|'battle-summary';id?:string;qualifier?:(m:Member)=>boolean;done?:(result:any)=>void;battleSummary?:BattleSummarySource};
+ type OpenRequest={kind:'party'|'pc'|'summary'|'selector'|'receiving'|'battle-summary';id?:string;qualifier?:(m:Member)=>boolean;done?:(result:any)=>void;battleSummary?:BattleSummarySource;fieldReturn?:object|null};
+ installOptionsControls(G, () => flow().translator());
+ installTrainerCard(G, () => ({ game: () => flow().game(), content: () => flow().content(), translator: () => flow().translator() }));
+ const messageChoices=installMessageChoices(G, () => flow().translator().lang);
+ installMessages(G, () => ({ game: () => flow().game(), translator: () => flow().translator() }), messageChoices);
+ installMessageNumber(G);
+ installEventText(G, () => flow().translator().lang);
  const inputs=hostInput(G);
  let nextRequest:OpenRequest|null=null,sequence=0,current:any=null,queuedScene:any=null,initializingScene:any=null;
+ function fieldWindowHost(scene:object):Parameters<typeof createMZFieldShortcutView>[0]{
+  const graphics=hostRecord(G.Graphics),width=graphics?.boxWidth,height=graphics?.boxHeight;
+  if(typeof hostRecord(scene)?.addWindow!=='function'||typeof G.Window_Base!=='function'||typeof G.Rectangle!=='function'||
+   typeof width!=='number'||!Number.isFinite(width)||width<=0||typeof height!=='number'||!Number.isFinite(height)||height<=0)throw Error('shortcut-window-host-unavailable');
+  return {scene:{addWindow:value=>{invoke(scene,'addWindow',[value]);}},Window_Base:G.Window_Base,
+   Rectangle:G.Rectangle,width,height,translator:flow().translator()};
+ }
+ const fields=createFieldShortcutUIMZ(G,{
+  currentApplication:()=>flow()._app,application:()=>flow().app(),input:()=>inputs.inputFrame(),
+  view:scene=>createMZFieldShortcutView(fieldWindowHost(scene)),
+  recoveryView:scene=>createMZFieldTravelRecoveryView(fieldWindowHost(scene)),
+  managementIdle:()=>!current&&!queuedScene&&!nextRequest,
+  flyView(scene){
+   const host=fieldWindowHost(scene),translator=host.translator;
+   return createMZFlyDestinationView({...host,
+    regionName(regionId){const content:Content=flow().content(),region=content.world?.regionMaps?.regions.find(row=>row.id===regionId);
+     return region?translator.tOr(region.nameKey,translator.lang==='zh'?'当前地区':'Current region'):translator.lang==='zh'?'当前地区':'Current region';},
+    name(destination){const content:Content=flow().content(),point=content.world?.regionMaps?.regions.find(row=>row.id===destination.regionId)?.points[destination.pointIndex];
+     const fallback=(translator.lang==='zh'?'位置 ':'Location ')+destination.x+', '+destination.y;
+     return point?.nameKey?translator.tOr(point.nameKey,fallback):fallback;},
+   });
+  },
+  openBattle:(application,admission)=>invoke(flow(),'openAdmittedWorldBattle',[application,admission])===true,
+  diagnose:reason=>{console.warn(NAME,'field shortcut:',reason);},
+ });
  function queuedBindingValid(s:any):boolean {const bound=s._psQueuedApp,changed=bound?(bound!==flow()._app||s._psQueuedGeneration!==bound.stateGeneration):(s._psQueuedSystem!==G.$gameSystem||s._psQueuedState!==G.$gameSystem?._psGame);if(s._invalid||changed){s._invalid=true;if(queuedScene===s)queuedScene=null;return false;}return true;}
  function adoptControllerBinding(s:any):boolean {if(!queuedBindingValid(s))return false;if(!s._psQueuedApp&&s._controller){s._psQueuedApp=s._controller.application;s._psQueuedGeneration=s._controller.generation;}return queuedBindingValid(s);}
- function presentationPending():boolean {const s=queuedScene,m=G.SceneManager;if(s&&s!==initializingScene){const orphan=('_scene'in m)&&('_nextScene'in m)&&s!==m._scene&&s!==m._nextScene;if(!queuedBindingValid(s)||orphan){s._invalid=true;if(queuedScene===s)queuedScene=null;}}return !!nextRequest||!!queuedScene;}
+ function presentationPending():boolean {const s=queuedScene,m=G.SceneManager;if(s&&s!==initializingScene){const orphan=('_scene'in m)&&('_nextScene'in m)&&s!==m._scene&&s!==m._nextScene;if(!queuedBindingValid(s)||orphan){s._invalid=true;if(queuedScene===s)queuedScene=null;}}return !!nextRequest||!!queuedScene||fields.fieldPresentationPending();}
 
  inputs.onBlur(()=>{if(current){current.physical.clear();for(const key of Object.keys(ALIAS))current.latch.release(key);}});
  const debugFrames:any[]=[];
  function record(data:any){debugFrames.push(data);if(debugFrames.length>256)debugFrames.shift();}
- function open(request:OpenRequest):boolean {if(current||presentationPending())return false;nextRequest=request;try{G.SceneManager.push(Scene_PSManagement);return true;}catch(error){if(nextRequest===request)nextRequest=null;presentationPending();throw error;}}
+ function open(request:OpenRequest):boolean {if(current||presentationPending())return false;if(request.kind==='party')request.fieldReturn=fields.capturePartyReturn();nextRequest=request;try{G.SceneManager.push(Scene_PSManagement);return true;}catch(error){if(nextRequest===request)nextRequest=null;presentationPending();throw error;}}
  function boxTitle(s:ManagementSnapshot,box:number):string{return s.storage.boxes[box]?.name||tr('box',{n:box+1});}
  const ui:any=W.PSManagement={
   openParty:()=>open({kind:'party'}),openStorage:()=>open({kind:'pc'}),openSummary:(id:string)=>open({kind:'summary',id}),
@@ -33,6 +82,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   openReceiving:(done?:(result:any)=>void)=>open({kind:'receiving',done}),
   attachBattleSummary:(scene:any,id:string,source:BattleSummarySource,done:(id:string)=>void)=>attachBattleSummary(scene,id,source,done),
   presentationPending,
+  openFieldShortcuts:()=>fields.openMap(),openFieldRecovery:()=>fields.openRecovery(),fieldPresentationPending:fields.fieldPresentationPending,
   replaceBattleWithReceiving:()=>{if(current||presentationPending())return false;nextRequest={kind:'receiving'};G.SceneManager.goto(Scene_PSManagement);return true;},
   current:()=>current&&!current.closed&&current.top()?{token:current.token,generation:current.generation,ready:current.ready,text:[...current.renderedText],view:{...current.top(),items:current.top().items?.map((x:MenuItem)=>({key:x.key,label:x.label,enabled:x.enabled}))},heldId:current.snapshot?.held?.id??null,frames:[...debugFrames]}:null,
   inputFrame:()=>inputs.inputFrame(),
@@ -50,9 +100,11 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
  };
  class Controller {
   scene:any;window:any;request:OpenRequest;application:ManagementApplication;token='';generation:number;ready=false;started=false;closed=false;frame=0;serial=0;
+  language:string|undefined;
   renderedText:string[]=[];snapshot!:ManagementSnapshot;stack:View[]=[];latch=new InputLatch();physical=new Set<Action|Direction>();input:any=null;composition=false;error='';qualified=new Set<string>();
   detachInput:(()=>void)|null=null;
   storageQuick=false;inventoryChild:any=null;dexChild:any=null;
+  fieldChild:FieldMenuHandle|null=null;fieldCaller:object|null=null;fieldPaused=false;
   reception:any=null;decisions:Record<string,ReceivingDecision>={};receiveIndex=0;readonly=false;completion:any=null;
   summaryViews:Map<string,IndividualView>|null=null;
   summarySorting=false;
@@ -93,6 +145,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    this.boundary();this.draw();this.started=true;
   }
   resetInitialization(){
+   fields.releaseParty(this);this.fieldChild=null;this.fieldCaller=null;this.fieldPaused=false;
    this.ready=false;this.started=false;this.stack=[];this.removeInput();
    this.detachInput?.();this.detachInput=null;
    if(this.managementToken&&this.generation===this.application.stateGeneration){this.application.manage(this.managementToken,'cleanup-'+(++this.serial),{kind:'cancel-held'});this.application.endManagement(this.managementToken);}
@@ -113,8 +166,10 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   menu(title:string,items:MenuItem[],cursor=0,cancel?:()=>void){this.push({kind:'menu',title,items,cursor,cancel});}
   confirm(title:string,yes:()=>void,defaultYes=false,no?:()=>void){this.menu(title,[{key:'yes',label:tr('yes'),run:()=>{this.dismiss();yes();}},{key:'no',label:tr('no'),run:()=>{this.dismiss();no?.();}}],defaultYes?0:1,()=>{this.dismiss();no?.();});}
   refreshPCMenu(view:View){
+   view.title=tr('pc');
    const able=this.snapshot.party.filter(m=>!m.isEgg&&m.hp>0).length;
    for(const item of view.items??[]){
+    item.label=tr(item.key);
     if(item.key==='withdraw')item.enabled=this.snapshot.party.length<this.snapshot.limits.party;
     else if(item.key==='deposit')item.enabled=able>1;
    }
@@ -149,9 +204,28 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
     if(v.kind!=='party')items.push({key:'transfer',label:tr(v.kind==='panel'?'store':'withdraw'),run:()=>{this.back();if(held)this.operate({kind:v.kind==='panel'?'store-held':'withdraw-held'});else {let target:MemberPosition|undefined;if(v.kind==='panel'){for(let b=0;b<40&&!target;b++){const slot=this.snapshot.storage.boxes[(this.snapshot.storage.currentBox+b)%40]!.slots.findIndex(x=>!x);if(slot>=0)target={kind:'box',box:(this.snapshot.storage.currentBox+b)%40,slot};}}else target={kind:'party',index:this.snapshot.party.length};if(target)this.operate({kind:'move',source:source(),target,expectedTargetId:null});else this.fail('boxes-full');}}});
     items.push({key:'item',label:tr('item'),enabled:!m.isEgg,run:()=>{this.back();this.itemMenu(id);}},
      {key:'mark',label:tr('mark'),run:()=>{this.back();this.marking(id,false);}});
+    if(v.kind==='party'&&this.request.kind==='party'&&!held)items.push({key:'field-actions',label:flow().translator().tOr('world.shortcut.party','Field moves'),
+     enabled:!m.isEgg&&!!this.request.fieldReturn,run:()=>{this.back();this.openFieldActions(id);}});
     if(v.kind!=='party')items.push({key:'release',label:tr('release'),enabled:!m.isEgg&&!m.mail&&!m.cannotRelease,run:()=>{this.back();this.refresh();const target=this.find(id);if(!held&&this.snapshot.references[id]?.position.kind==='party'&&target&&!target.isEgg&&target.hp>0&&!this.snapshot.party.some(other=>other.id!==id&&!other.isEgg&&other.hp>0)){this.fail(tr('lastAble'));return;}this.confirm(tr('confirmRelease',{name:memberName(m)}),()=>this.confirm(tr('confirmRelease2',{name:memberName(m)}),()=>{this.operate(held?{kind:'release-held',confirmed:true}:{kind:'release',source:source(),confirmed:true});}));}});
    }
    items.push({key:'cancel',label:tr('cancel'),run:()=>this.back()});this.menu(memberName(m),items);
+  }
+  openFieldActions(memberId:string){
+   if(!this.valid()||this.readonly||this.request.kind!=='party'||this.snapshot.held||this.fieldChild||this.inventoryChild||this.dexChild||
+    this.snapshot.references[memberId]?.position.kind!=='party')return;
+   const application=flow()._app;if(!application||application!==this.application)return;
+   const lease={};this.fieldCaller=lease;
+   const isCurrent=()=>this.fieldCaller===lease&&!this.closed&&current===this&&this.application===flow()._app&&
+    this.generation===this.application.stateGeneration&&G.SceneManager._scene===this.scene&&this.scene._controller===this&&
+    !G.SceneManager.isSceneChanging()&&!this.window?.destroyed&&!this.window?._destroyed;
+   try{
+    const child=fields.openParty({owner:this,application,generation:this.generation,scene:this.scene,isCurrent,
+     pause:()=>{this.fieldPaused=true;this.ready=false;let resumed=false;return()=>{if(resumed||!isCurrent())return;resumed=true;this.fieldPaused=false;this.fieldChild=null;this.boundary();this.draw();};},
+     close:()=>{if(!isCurrent())return false;this.fieldChild=null;this.fieldPaused=false;this.close(null);return this.closed;},
+    },this.request.fieldReturn??null,memberId);
+    if(isCurrent()){this.fieldChild=child;if(!child){this.fieldCaller=null;this.fieldPaused=false;this.boundary();this.refresh();}}
+    else child?.dispose();
+   }catch(error){if(isCurrent()){this.fieldCaller=null;this.fieldPaused=false;this.fieldChild=null;this.fail(whyFieldError(error));}}
   }
   itemMenu(id:string){const m=this.find(id);if(!m)return;const source=this.reference(id);
    // Summary is not a target selector. Return to its owning list before arming a move.
@@ -159,7 +233,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    const moveView=parent&&['party','box','panel'].includes(parent.kind)?parent:null;
    this.menu(tr('item'),[
    {key:'use',label:tr('use'),enabled:!!W.PSInventory&&source.position.kind==='party'&&!m.isEgg&&!this.snapshot.held,run:()=>{this.back();this.inventoryChild=W.PSInventory.attach(this.window,{token:this.managementToken,memberId:id},()=>{this.inventoryChild=null;if(this.valid()){this.boundary();this.refresh();}},()=>{if(this.closed&&this.application===flow()._app&&this.generation===this.application.stateGeneration)this.application.endManagement(this.managementToken);});}},
-   {key:'give',label:tr('give'),enabled:this.snapshot.heldSourcesEnabled&&!m.isEgg,run:()=>{this.back();const items=app().holdableBagItems().map((it:any)=>({key:it.id,label:it.id+' ×'+it.count,run:()=>{this.back();if(m.item)this.confirm(tr('give')+' '+it.id+' → '+memberName(m),()=>this.operate({kind:'give-item',source,item:it.id}));else this.operate({kind:'give-item',source,item:it.id});}}));this.menu(tr('give'),[...items,{key:'cancel',label:tr('cancel'),run:()=>this.back()}]);}},
+   {key:'give',label:tr('give'),enabled:this.snapshot.heldSourcesEnabled&&!m.isEgg,run:()=>{this.back();const items=app().holdableBagItems().map((it:any)=>({key:it.id,label:itemName(it.id)+' ×'+it.count,run:()=>{this.back();if(m.item)this.confirm(tr('give')+' '+itemName(it.id)+' → '+memberName(m),()=>this.operate({kind:'give-item',source,item:it.id}));else this.operate({kind:'give-item',source,item:it.id});}}));this.menu(tr('give'),[...items,{key:'cancel',label:tr('cancel'),run:()=>this.back()}]);}},
    {key:'take',label:tr('take'),enabled:!!m.item&&!m.mail,run:()=>{this.back();this.operate({kind:'take-item',source});}},
    ...(moveView?[{key:'move',label:tr('move'),enabled:this.snapshot.heldSourcesEnabled&&!!m.item&&!m.mail,run:()=>{this.back();if(this.top().kind==='summary')this.back();moveView.itemSource={source,item:m.item};this.boundary();this.draw();}}]:[]),
    {key:'cancel',label:tr('cancel'),run:()=>this.back()}]);if(!this.snapshot.heldSourcesEnabled)this.error=tr('sourceOff');this.draw();}
@@ -172,7 +246,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    {key:'cancel',label:tr('cancel'),run:()=>this.back()}]);}
   searchMenu(filters:StorageSearch){this.menu(tr('search'),[
    {key:'text',label:tr('query')+': '+(filters.text||tr('all')),run:()=>{this.back();this.nameInput(tr('query'),filters.text||'',80,false,text=>{if(text!==null)filters.text=text;this.searchMenu(filters);});}},
-   {key:'form',label:tr('form')+': '+(filters.form??tr('all')),run:()=>{this.back();this.nameInput(tr('formFilter'),filters.form==null?'':String(filters.form),3,false,text=>{if(text!==null){if(text===''||/^\d{1,3}$/.test(text))filters.form=text===''?null:Number(text);else this.fail('invalid-search-form');}this.searchMenu(filters);});}},
+   {key:'form',label:tr('form')+': '+(filters.form??tr('all')),run:()=>{this.back();this.nameInput(tr('formFilter'),filters.form==null?'':String(filters.form),3,false,text=>{const invalid=text!==null&&text!==''&&!/^\d{1,3}$/.test(text);if(text!==null&&!invalid)filters.form=text===''?null:Number(text);this.searchMenu(filters);if(invalid)this.fail(tr('invalidSearchForm'));});}},
    {key:'marks',label:tr('marksFilter'),run:()=>{this.back();this.menu(tr('marksFilter'),Array.from({length:6},(_,i)=>({key:String(i),label:tr('mark')+' '+(i+1),run:()=>{this.back();this.menu(tr('mark'),[0,1,2].map(n=>({key:String(n),label:String(n),run:()=>{this.back();filters.markings=[{index:i,value:n}];this.searchMenu(filters);}})));}})));}},
    {key:'clear',label:tr('clear'),run:()=>{this.back();this.searchMenu({});}},
    {key:'find',label:tr('find'),run:()=>{this.back();const found=app().searchStorage(filters,(m:Member)=>flow().speciesName(m.species,m.form));this.push({kind:'results',cursor:0,filters,matches:found});}},
@@ -200,9 +274,13 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   update(){
    if(!this.valid()){if(!this.closed){this.closed=true;this.removeInput();this.scene._invalid=true;}return;}
    if(this.summarySorting)return;
+   if(this.fieldChild){const child=this.fieldChild;child.update(inputs.inputFrame());if(this.fieldChild===child&&!fields.partyPending()){this.fieldChild=null;this.fieldCaller=null;this.fieldPaused=false;if(this.valid()){this.boundary();this.refresh();}}return;}
+   if(this.fieldCaller&&!fields.partyPending())this.fieldCaller=null;
+   if(this.fieldPaused)return;
    if(this.dexChild){const child=this.dexChild;try{child.update();}catch(e){child.dispose();this.error=String(e);}if(this.dexChild===child&&child.closed){this.dexChild=null;if(this.valid()){this.boundary();this.refresh();}}return;}
    if(this.inventoryChild){this.inventoryChild.update();return;}
    if(!this.top()||!this.started||this.top()?.kind==='text')return;
+   if(this.language!==flow().translator().lang){for(const view of this.stack)if(view.pcRoot)this.refreshPCMenu(view);this.draw();}
    const frame=G.Graphics.frameCount??++this.frame;if(!this.ready&&(frame<=this.frame||G.SceneManager.isSceneChanging()))return;
    const sample:InputFrame={repeated:{},triggered:{},pressed:{}};
    for(const key of Object.keys(ALIAS)as(Action|Direction)[]){sample.pressed[key]=this.physical.has(key)||G.Input.isPressed(ALIAS[key]);if(['up','left','right','down'].includes(key))sample.repeated[key as Direction]=G.Input.isRepeated(ALIAS[key]);else sample.triggered[key as Action]=G.Input.isTriggered(ALIAS[key]);}
@@ -228,7 +306,7 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    }
   }
   action(action:Action){const v=this.top();
-   if(v.kind==='menu'){if(action==='back'){if(v.cancel)v.cancel();else this.back();}else if(action==='use'){const it=v.items[v.cursor];if(it?.enabled!==false)it?.run();else this.fail(it.key==='give'||it.key==='move'?tr('sourceOff'):'unavailable');}return;}
+   if(v.kind==='menu'){if(action==='back'){if(v.cancel)v.cancel();else this.back();}else if(action==='use'){const it=v.items[v.cursor];if(it?.enabled!==false)it?.run();else this.fail(v.pcRoot&&it.key==='withdraw'?tr('fullParty'):v.pcRoot&&it.key==='deposit'?tr('lastAble'):it.key==='give'||it.key==='move'?tr('sourceOff'):'unavailable');}return;}
    if(v.kind==='results'){if(action==='back'){this.back();return;}if(action==='use'){const hit=v.matches[v.cursor];if(!hit)return;this.refresh();const ref=this.snapshot.references[hit.id];if(!ref||JSON.stringify(ref.position)!==JSON.stringify(hit.position)){this.fail('stale-source');return;}this.back();const boxView=[...this.stack].reverse().find(x=>x.kind==='box');if(boxView){boxView.box=hit.position.box;boxView.cursor=hit.position.slot;this.operate({kind:'current-box',box:hit.position.box});}}return;}
    if(v.kind==='marks'){if(action==='back'){this.back();return;}if(action==='action'){v.marks=editMark(v.marks,v.cursor,true);return;}if(action==='use'){if(v.cursor===7){this.back();return;}if(v.cursor===6){const changed=JSON.stringify(v.marks)!==JSON.stringify(v.original);if(changed)this.operate({kind:'markings',source:this.reference(v.id),markings:v.marks});this.back();}else v.marks=editMark(v.marks,v.cursor,false);}return;}
    if(v.kind==='summary'){this.summaryAction(action);return;}
@@ -303,22 +381,23 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    this.closed=true;this.removeInput();this.completion=result;this.scene._result=result;this.scene._done=this.request.done;
    if(G.SceneManager._scene===this.scene)this.scene.popScene();
   }
-  dispose(){const wasClosed=this.closed;this.closed=true;this.dexChild?.dispose();this.dexChild=null;this.inventoryChild?.close({status:'cancelled'},true);this.inventoryChild=null;this.detachInput?.();this.detachInput=null;this.removeInput();
+  dispose(){const wasClosed=this.closed;this.closed=true;fields.releaseParty(this);this.fieldChild?.dispose();this.fieldChild=null;this.fieldCaller=null;this.fieldPaused=false;this.dexChild?.dispose();this.dexChild=null;this.inventoryChild?.close({status:'cancelled'},true);this.inventoryChild=null;this.detachInput?.();this.detachInput=null;this.removeInput();
    if(!wasClosed&&this.application===flow()._app&&this.generation===this.application.stateGeneration){if(this.managementToken){this.application.manage(this.managementToken,'cleanup-'+(++this.serial),{kind:'cancel-held'});this.application.endManagement(this.managementToken);}else if(this.reception&&this.application.pendingReceiving?.token===this.reception.token){const result=flow().resolveReceiving(this.reception.token,this.decisions,'scene-aborted');this.completion=result;if(!pending(result)&&result.status!=='refused'){this.scene._result=result;this.scene._done=this.request.done;}}}
    this.closed=true;if(current===this)current=null;
   }
   draw(){
+   if(this.fieldChild)return;
    if(this.dexChild){this.dexChild.draw();return;}
    if(this.inventoryChild){this.inventoryChild.draw();return;}
-   if(!this.window||!this.top())return;const win=this.window,b=win.contents,v=this.top(),w=b.width,h=b.height; b.clear();b.fontFace=flow().translator().font()||'sans-serif';b.fontSize=20;
+   if(!this.window||!this.top())return;this.language=flow().translator().lang;const win=this.window,b=win.contents,v=this.top(),w=b.width,h=b.height; b.clear();b.fontFace=flow().translator().font()||'sans-serif';b.fontSize=20;
    this.renderedText=[];const text=(s:any,x:number,y:number,width=w-x,color='#fff')=>{this.renderedText.push(String(s??''));b.textColor=color;b.drawText(String(s??''),x,y,width,28,'left');};
    const cell=(x:number,y:number,cw:number,ch:number,label:string,selected=false,color='#24334b')=>{b.fillRect(x,y,cw,ch,selected?(this.storageQuick&&['box','panel'].includes(v.kind)?'#896f3e':'#587da2'):color);text(label,x+7,y+5,cw-14);};
    const title=v.title||tr(v.kind==='panel'?'party':v.kind==='box'?v.mode:v.kind==='marks'?'mark':v.kind==='results'?'search':v.kind==='text'?'name':v.kind==='summary'?'summary':'party');text(title,4,0);
    if(v.kind==='menu'){const start=Math.max(0,v.cursor-12);for(let i=start;i<Math.min(v.items.length,start+14);i++){const it=v.items[i];cell(12,38+(i-start)*31,w-24,29,(it.enabled===false?'× ':'')+it.label,i===v.cursor,it.enabled===false?'#333':'#24334b');}}
    else if(v.kind==='party'||v.kind==='panel'){
     for(let i=0;i<6;i++){const m=this.snapshot.party[i],view=m?app().describeIndividual(m.id):null,x=(i%2)*w/2,y=42+Math.floor(i/2)*111;
-     cell(x+4,y,w/2-8,103,m?memberName(m):tr('empty'),i===v.cursor,v.selecting&&m&&!this.qualified.has(m.id)?'#3b3b3b':'#24334b');if(m){text('Lv.'+m.level+' '+m.gender+(m.isEgg?' '+tr('egg'):'')+(m.shiny?' ★':''),x+12,y+31,w/2-24);text(m.isEgg?'—':`${m.hp}/${view?.stats?.hp??'?'} HP  ${m.status||''}`,x+12,y+58,w/2-24);text(m.item?'◆ '+m.item:'',x+12,y+78,w/2-24,'#ffe29a');if(!m.isEgg){const ratio=Math.min(1,Math.max(0,m.hp/(view?.stats?.hp||1)));b.fillRect(x+w/2-115,y+63,98,5,'#111');b.fillRect(x+w/2-115,y+63,98*ratio,5,ratio>0.5?'#7de385':ratio>0.2?'#f6d563':'#ee7777');}}}
-    cell(4,382,w-8,34,tr('cancel'),v.cursor===6);if(v.switchSource)text(tr('switchTarget'),5,420);if(v.itemSource)text(tr('itemTarget'),5,420);text(tr('box',{n:this.snapshot.storage.boxes.reduce((n,b)=>n+b.slots.filter(Boolean).length,0)})+' / 1200  · '+tr('party')+' '+this.snapshot.party.length,5,449);text(Object.entries(this.snapshot.bag).map(([k,n])=>flow().translator().tOr('item.name.'+k,k)+' ×'+n).join(' / ')+'  '+flow().translator().t('ui.partyview.money',{money:this.snapshot.money}),5,477);
+     cell(x+4,y,w/2-8,103,m?memberName(m):tr('empty'),i===v.cursor,v.selecting&&m&&!this.qualified.has(m.id)?'#3b3b3b':'#24334b');if(m){text('Lv.'+m.level+' '+m.gender+(m.isEgg?' '+tr('egg'):'')+(m.shiny?' ★':''),x+12,y+31,w/2-24);text(m.isEgg?'—':`${m.hp}/${view?.stats?.hp??'?'} HP  ${m.status?trStatus(m.status):''}`,x+12,y+58,w/2-24);text(m.item?'◆ '+itemName(m.item):'',x+12,y+78,w/2-24,'#ffe29a');if(!m.isEgg){const ratio=Math.min(1,Math.max(0,m.hp/(view?.stats?.hp||1)));b.fillRect(x+w/2-115,y+63,98,5,'#111');b.fillRect(x+w/2-115,y+63,98*ratio,5,ratio>0.5?'#7de385':ratio>0.2?'#f6d563':'#ee7777');}}}
+    cell(4,382,w-8,34,tr('cancel'),v.cursor===6);if(v.switchSource)text(tr('switchTarget'),5,420);if(v.itemSource)text(tr('itemTarget'),5,420);text(tr('box',{n:this.snapshot.storage.boxes.reduce((n,b)=>n+b.slots.filter(Boolean).length,0)})+' / 1200  · '+tr('party')+' '+this.snapshot.party.length,5,449);text(Object.entries(this.snapshot.bag).map(([k,n])=>itemName(k)+' ×'+n).join(' / ')+'  '+flow().translator().t('ui.partyview.money',{money:this.snapshot.money}),5,477);
    }else if(v.kind==='box'){
     const box=this.snapshot.storage.boxes[v.box]!,color='hsl('+((box.wallpaper*137.508)%360)+',25%,22%)';b.fillRect(0,34,w,375,color);cell(4,35,w-8,34,'◀ '+boxTitle(this.snapshot,v.box)+' ▶  '+(v.box+1)+'/40',v.cursor===-1);
     const cw=w/6;for(let i=0;i<30;i++){const m=box.slots[i],x=(i%6)*cw,y=78+Math.floor(i/6)*60;cell(x+3,y,cw-6,55,m?memberName(m):'·',i===v.cursor);if(m){b.fontSize=14;text('Lv.'+m.level+(m.isEgg?' '+tr('egg'):'')+(m.shiny?' ★':''),x+8,y+26,cw-16);b.fontSize=20;}}
@@ -333,10 +412,10 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   drawSummary(v:View,text:any,cell:any,w:number){const m=this.find(v.ids[v.cursor]);if(!m)return;const view:IndividualView=this.summaryViews?this.summaryViews.get(m.id)!:app().describeIndividual(m.id),pages=['info','memo','skills','moves','ribbons'];text(m.isEgg?tr('egg'):memberName(m)+'  Lv.'+m.level+' '+m.gender+(m.shiny?' ★':''),4,32);text(tr(m.isEgg?'memo':pages[v.page]!)+' '+(v.page+1)+'/'+(m.isEgg?1:5),w-180,32,180,'#b8e3ff');
    const row=(label:string,value:any,n:number,color?:string)=>text(label+': '+value,8,88+n*30,w-16,color);const paragraph=(value:string,y:number,maxLines:number)=>{const old=this.window.contents.fontSize;this.window.contents.fontSize=17;let line='',n=0;for(const ch of Array.from(value)){if(this.window.textWidth(line+ch)>w-24&&line){text(line,8,y+n*23,w-16);line='';n++;if(n>=maxLines)break;}line+=ch;}if(n<maxLines&&line)text(line,8,y+n*23,w-16);this.window.contents.fontSize=old;};
    if(m.isEgg){row(tr('egg'),tr('unknown'),0);row(tr('owner'),m.owner?.name||tr('unknown'),1);row(tr('id'),view.publicId,2);row(tr('origin'),m.origin?.text||tr('unknown'),3);return;}
-   if(v.page===0){row(tr('name'),flow().speciesName(m.species,m.form),0);row(tr('type'),view.types.join(' / ')||tr('unknown'),1);row(tr('owner'),m.owner?.name||tr('unknown'),2,m.owner?.gender===0?'#aabfff':m.owner?.gender===1?'#ffb0b0':undefined);row(tr('id'),view.publicId,3);row(tr('item'),view.heldItemKnown===false?tr('unavailable'):m.item||tr('none'),4);row(tr('form'),m.form,5);row(tr('ball'),m.ball,6);row(tr('exp'),m.exp+' / '+(view.nextLevelExp===null?'—':Math.max(0,view.nextLevelExp-m.exp)),7);if(m.ownerCompatibilityDefault)row('',tr('compat'),8,'#ffe29a');if(view.nextLevelExp!==null&&view.currentLevelExp!==null){const ratio=Math.min(1,Math.max(0,(m.exp-view.currentLevelExp)/(view.nextLevelExp-view.currentLevelExp)));this.window.contents.fillRect(8,375,128,8,'#222');this.window.contents.fillRect(8,375,Math.floor(128*ratio/2)*2,8,'#66bdff');}}
+   if(v.page===0){row(tr('name'),flow().speciesName(m.species,m.form),0);row(tr('type'),view.types.map(trType).join(' / ')||tr('unknown'),1);row(tr('owner'),m.owner?.name||tr('unknown'),2,m.owner?.gender===0?'#aabfff':m.owner?.gender===1?'#ffb0b0':undefined);row(tr('id'),view.publicId,3);row(tr('item'),view.heldItemKnown===false?tr('unavailable'):m.item?itemName(m.item):tr('none'),4);row(tr('form'),m.form,5);row(tr('ball'),m.ball?itemName(m.ball):tr('unknown'),6);row(tr('exp'),m.exp+' / '+(view.nextLevelExp===null?'—':Math.max(0,view.nextLevelExp-m.exp)),7);if(m.ownerCompatibilityDefault)row('',tr('compat'),8,'#ffe29a');if(view.nextLevelExp!==null&&view.currentLevelExp!==null){const ratio=Math.min(1,Math.max(0,(m.exp-view.currentLevelExp)/(view.nextLevelExp-view.currentLevelExp)));this.window.contents.fillRect(8,375,128,8,'#222');this.window.contents.fillRect(8,375,Math.floor(128*ratio/2)*2,8,'#66bdff');}}
    else if(v.page===1){row(tr('nature'),tr('nature.'+m.nature.toLowerCase()),0);row(tr('origin'),m.origin?.text||String(m.origin?.map??tr('unknown')),1);row(tr('level'),m.origin?.level??tr('unknown'),2);row(tr('date'),m.origin?.receivedAt==null?tr('unknown'):new Date(m.origin.receivedAt*1000).toISOString().slice(0,10),3);row(tr('hatch'),m.origin?.hatchedAt==null?tr('unknown'):new Date(m.origin.hatchedAt*1000).toISOString().slice(0,10),4);row(tr('friendship'),m.friendship,5);row(tr('characteristic'),tr('characteristic.'+view.characteristic.stat+'.'+view.characteristic.variant),6);row(tr('method'),m.origin?.method??tr('unknown'),7);}
    else if(v.page===2){for(const [i,key]of['hp','atk','def','spa','spd','spe'].entries()){const k=key as keyof typeof view.modifiers;row(tr(key),key==='hp'?`${m.hp}/${view.stats?.hp??'?'}`:view.stats?.[k]??'?',i,key!=='hp'&&(view.modifiers?.[k]??100)>100?'#ffb0b0':key!=='hp'&&(view.modifiers?.[k]??100)<100?'#aabfff':undefined);}row(tr('ability'),view.ability.name,6);paragraph(view.ability.description||tr('unavailable'),290,3);row(tr('exp'),m.exp+' / '+(view.nextLevelExp??'—'),10);}
-   else if(v.page===3){if(!m.moves.length)row(tr('moves'),tr('none'),0);for(const [i,move]of view.moves.entries()){cell(6,76+i*48,w-12,44,move.name+'  '+move.pp+'/'+move.maxpp+' PP',v.detail==='moves'&&v.detailCursor===i);if(v.selected===i)text('↔',w-35,78+i*48,30,'#ffe29a');}const move=view.moves[v.detailCursor];if(move){row(tr('type'),move.type+' / '+move.category,7);row(tr('power'),(move.power??'—')+'   '+tr('accuracy')+': '+(move.accuracy||'—'),8);paragraph(move.description||tr('unavailable'),350,6);}}
+   else if(v.page===3){if(!m.moves.length)row(tr('moves'),tr('none'),0);for(const [i,move]of view.moves.entries()){cell(6,76+i*48,w-12,44,move.name+'  '+move.pp+'/'+move.maxpp+' PP',v.detail==='moves'&&v.detailCursor===i);if(v.selected===i)text('↔',w-35,78+i*48,30,'#ffe29a');}const move=view.moves[v.detailCursor];if(move){row(tr('type'),trType(move.type)+' / '+flow().translator().tOr('management.category.'+move.category,move.category),7);row(tr('power'),(move.power??'—')+'   '+tr('accuracy')+': '+(move.accuracy||'—'),8);paragraph(move.description||tr('unavailable'),350,6);}}
    else {const ribbons=m.ribbons??[],start=Math.floor(v.detailCursor/12)*12;for(let i=0;i<12;i++){const n=start+i;cell((i%4)*w/4+3,80+Math.floor(i/4)*70,w/4-6,63,ribbons[n]||'·',v.detail==='ribbons'&&v.detailCursor===n);if(v.selected===n)text('↔',(i%4)*w/4+8,105+Math.floor(i/4)*70,30);}row(tr('ribbons'),ribbons.length,8);}
    if(view.diagnostics.length)text(tr('unavailable'),4,390,w-8,'#ffb5b5');
   }
@@ -383,11 +462,22 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
   }
  };
  P.update=function(){if(this._invalid){if(G.SceneManager._scene===this&&!G.SceneManager.isSceneChanging())G.Scene_MenuBase.prototype.popScene.call(this);return;}G.Scene_MenuBase.prototype.update.call(this);if(this._initialFailure){if(G.Input.isTriggered('cancel')||G.Input.isTriggered('ok'))this.popScene();return;}try{this._controller?.update();}catch(error){this.rebuildFailed(error);}};
- P.popScene=function(){if(this._controller?.dexChild){this._controller.dexChild.back();return;}if(this._controller?.inventoryChild){this._controller.inventoryChild.back();return;}if(this._controller&&!this._controller.closed&&!this._invalid&&!this._initialFailure){if(this._controller.input){this._controller.input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));}else {this._controller.action('back');this._controller.draw();}return;}G.Scene_MenuBase.prototype.popScene.call(this);};
+ P.popScene=function(){if(this._controller?.fieldChild){this._controller.fieldChild.cancel();return;}if(this._controller?.dexChild){this._controller.dexChild.back();return;}if(this._controller?.inventoryChild){this._controller.inventoryChild.back();return;}if(this._controller&&!this._controller.closed&&!this._invalid&&!this._initialFailure){if(this._controller.input){this._controller.input.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));}else {this._controller.action('back');this._controller.draw();}return;}G.Scene_MenuBase.prototype.popScene.call(this);};
  P.terminate=function(){if(queuedScene===this)queuedScene=null;if(initializingScene===this)initializingScene=null;G.Scene_MenuBase.prototype.terminate.call(this);this._controller?.dispose();const done=this._done,result=this._result;if(done&&this._controller.application===flow()._app&&this._controller.generation===this._controller.application.stateGeneration){this._done=null;done(result);}};
  W.Scene_PSManagement=Scene_PSManagement;W.Scene_PSParty=Scene_PSManagement;
+ G.PluginManager.registerCommand(NAME,'ShowFieldShortcuts',()=>{fields.openMap();});
+ G.PluginManager.registerCommand(NAME,'ShowFieldRecovery',()=>{fields.openRecovery();});
  G.PluginManager.registerCommand('PS_BattleFlow','ShowParty',function(){ui.openParty();});
  G.PluginManager.registerCommand(NAME,'ShowStorage',function(){ui.openStorage();});
+ registerAuthorCommand(G, 'RegisterHallOfFame', args => {
+  const text = (args.historyLimit ?? '').trim();
+  const limit = text ? Number(text) : undefined;
+  if (limit !== undefined && (!/^[+-]?\d+$/.test(text) || !Number.isSafeInteger(limit))) {
+   throw new AuthorParameterError('historyLimit', 'Use a signed integer (default 50). / 请输入整数（默认 50）。');
+  }
+  if (flow().operationPending()) throw Error('operation-active');
+  app().registerHallOfFame(limit);
+ });
  G.PluginManager.registerCommand(NAME,'ShowSummary',function(args:any){ui.openSummary(String(args.id));});
  G.PluginManager.registerCommand(NAME,'RecoverAll',function(){const o=app().recoverAll();if(o.status==='refused')G.$gameMessage.add(tr('refused',{reason:String(o.reason)}));});
  G.PluginManager.registerCommand(NAME,'ReceiveGift',function(this:any,args:any){let request:any;try{request=JSON.parse(String(args.request));}catch{G.$gameMessage.add(tr('refused',{reason:'invalid JSON'}));return;}const result=app().receiveGift(request);if(pending(result)){ui.openReceiving();this.setWaitMode('psReceiving');}else if(result.status==='refused')G.$gameMessage.add(tr('refused',{reason:String(result.reason)}));else flow().waitForPokedex(this);});
@@ -400,4 +490,16 @@ import type { Member, MemberPosition, MemberReference, ReceivingDecision } from 
    const title=boxTitle(snap,p.box);
    return snap.storage.boxes[p.box]?.name?messageLiteral(title):title;
   }).join(', ');G.$gameMessage.add(tr('recovered',{dest}));app().acknowledgeReceivingNotification(notice.token);}catch(e){console.error(NAME,e);break;}}};
+ // Capture the genuine native Menu caller instead of manufacturing an origin from a Scene marker.
+ const menuPrototype=hostRecord(hostRecord(G.Scene_Menu)?.prototype),createCommands=menuPrototype?.createCommandWindow;
+ if(menuPrototype&&typeof createCommands==='function')menuPrototype.createCommandWindow=function(this:unknown,...args:unknown[]):unknown{
+  const result=Reflect.apply(createCommands,this,args);invoke(hostRecord(this)?._commandWindow,'setHandler',['psParty',()=>ui.openParty()]);return result;
+ };
+ installPausePC(G,flow,ui);
+ const sceneManager=hostRecord(G.SceneManager),updateScene=sceneManager?.updateScene;
+ if(sceneManager&&typeof updateScene==='function')sceneManager.updateScene=function(this:unknown,...args:unknown[]):unknown{
+  const result=Reflect.apply(updateScene,this,args);fields.update();return result;
+ };
 })();
+
+function whyFieldError(error:unknown):string{return error instanceof Error?error.message:String(error);}

@@ -21,7 +21,7 @@ const E = require('../../js/engine/build/engine.cjs');
 const REACTOR_OBJECTS = path.join(ROOT, 'js/reactor_objects.js');
 const SRC = path.join(ROOT, 'content/sample');
 const read = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
-const content = E.contentRuntime.assembleContent(E.contentCompile.compileContent({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json'), grants: read('grants.json') }).data, E.dex.createDexLookup()).content;
+const content = E.contentRuntime.assembleContent(E.contentCompile.compileContent({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json'), grants: read('grants.json'), regionalDex: read('regional-dex.json'), mapMetadata: read('map-metadata.json') }).data, E.dex.createDexLookup()).content;
 /** Values made inside the VM context have that context's prototypes: compare their JSON form. */
 const J = x => JSON.parse(JSON.stringify(x));
 const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor((s / 4294967296) * n); }; };
@@ -45,15 +45,22 @@ const ran = battleId => ({ protocol: 1, battleId, outcome: { kind: 'run', winner
 
 function host({ interpreter = false, saveEnabled = true, failMessage = false, game = losingGame() } = {}) {
   const Ctor = () => { function C() {} C.prototype = { initialize() {}, terminate() {} }; return C; };
-  const commands = {}, vars = {}, transfers = [], messages = [], errors = [];
+  const commands = {}, vars = {}, transfers = [], messages = [], errors = [];let nativeSnapshot=()=>null;
   function Game_System() {}
   Game_System.prototype.isSaveEnabled = function () { return this._saveEnabled; };
   Game_System.prototype.disableSave = function () { this._saveEnabled = false; };
   Game_System.prototype.enableSave = function () { this._saveEnabled = true; };
   const sys = Object.assign(new Game_System(), { _saveEnabled: saveEnabled, _psGame: game, _psBattleSeq: 0 });
   const req = p => {
-    if (p === 'path' || p === 'fs') return require(p);
-    if (/production\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/production.cjs'));
+    if (p === 'path' || p === 'fs' || p === 'node:util') return require(p);
+    if (/production\.cjs$/.test(p)) {
+      const product=require(path.join(ROOT,'js/engine/build/production.cjs'));
+      if(!interpreter)return product;
+      const Legacy=require('../step5/1/legacy-test-support.cjs').AutomaticApplication;
+      return {...product,app:{...product.app,GameApplication:class extends Legacy {constructor(ports,options){super({...ports,blackout:undefined,blackoutProjection:undefined,sessions:E.fakes.createFakeSessions(()=>lost(ctx.PSFlow.request.battleId))},options);
+       nativeSnapshot=()=>ports.state.atomicWorldContent(()=>actual=>{const l=actual.lifecycle,b=l.travelLease?.mapBirth;return{value:{application:l.application===this,registry:l.travelLease?.registry===ports.worldTravel?.nativeLeaseSource,epoch:!!l.travelLease?.nativeEpoch,currentNull:l.travelLease?.current===null,handoff:!!l.travelLease?.sourceHandoff,birth:!!b,scene:b?.scene===l.scene,manager:b?.manager===l.sceneTransition?.manager,frame:!!b?.frame,map:b?.frame?.map===l.map,mapId:b?.frame?.mapId===l.mapId,player:b?.frame?.player===l.player,data:b?.frame?.data===l.mapData,started:l.sceneTransition?.started,nextNull:l.sceneTransition?.nextScene===null,transfer:l.travelPlayer?.transferring,position:l.playerPosition}};});
+      }}}};
+    }
     if (/testing\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/testing.cjs'));
     throw new Error('unexpected require ' + p);
   };
@@ -68,6 +75,7 @@ function host({ interpreter = false, saveEnabled = true, failMessage = false, ga
     $dataMapInfos: [null, null, null, null, null, {}], $dataCommonEvents: [],
     $gameMessage: { isBusy: () => false, add(t) { if (failMessage && !messages.length) { messages.push(null); throw new Error('injected: message window failure'); } messages.push(t); } },
   };
+  require('../../scripts/tests/legacy-mz-world-host.cjs').install(ctx);
   ctx.window = ctx;
   vm.createContext(ctx);
   if (interpreter) {
@@ -78,14 +86,23 @@ function host({ interpreter = false, saveEnabled = true, failMessage = false, ga
     vm.runInContext(src.slice(at, end), ctx, { filename: 'reactor_objects.js (Game_Interpreter)' });
     for (const m of ['updateChild', 'command117', 'command122', 'clear', 'updateWaitMode']) assert.equal(typeof ctx.Game_Interpreter.prototype[m], 'function', m);
   }
+  if(interpreter)require('../../scripts/tests/legacy-mz-native-entry.cjs').install(ctx,ROOT);
   vm.runInContext(plugin, ctx, { filename: 'PS_BattleFlow.js (built)' });
   const flow = ctx.PSFlow;
   flow._content = content; flow._dex = E.dex.createDexLookup(); flow.rng = lcg(1);
   // This suite explicitly substitutes synthetic results for begin(), so select the historical no-held producer root.
   // Actual required default composition is covered separately by B and real-host runners.
   const Legacy = require('../step5/1/legacy-test-support.cjs').AutomaticApplication;
-  flow._app = new Legacy({ state: {read:()=>flow.game(),replace:next=>{sys._psGame=next;}},
+  if(interpreter)flow.app();
+  else flow._app = new Legacy({state:{read:()=>flow.game(),replace:next=>{sys._psGame=next;}},
     content:()=>({content,dex:flow._dex}),sessions:E.fakes.createFakeSessions({}),projection:{project:out=>flow.projectOutcome(out)},random:n=>flow.random(n) });
+  if(interpreter){require('../../scripts/tests/legacy-mz-native-entry.cjs').enter(ctx);const captured=flow.app().latchLegacyBattleContext({weather:'none',terrain:'none',environment:'none'});assert.equal(captured.status,'value','real legacy357 current App/atomic/native Map source '+(captured.status==='value'?'':JSON.stringify({captured,native:nativeSnapshot()})));assert.equal(flow.app().isLegacyBattleFieldCurrent(captured.value),true);
+    // Keep the actual original Battle constructor/initialize/private receipt and
+    // pinned native push/changeScene. Only windows/raster create is controlled;
+    // this interpreter fixture does not exercise renderer or automatic opening.
+    ctx.Scene_PSBattle.prototype.create=function(){ctx.Scene_MenuBase.prototype.create.call(this);};
+    flow.fast=true; // Supported presentation mode; source/admission guards remain unchanged.
+  }
   return { ctx, flow, sys, vars, transfers, messages, errors, game: () => sys._psGame };
 }
 /** Start a battle the way the plugin does (the scene is a stub) and end it with `result` through the scene's onEnd. */
@@ -162,32 +179,37 @@ test('before the commit an abort is still an abort: nothing is installed and the
 
 // ---- F1: the calling chain of a lost battle (Reactor's own interpreter)
 const haveReactor = fs.existsSync(REACTOR_OBJECTS);
-test('a blackout ends the calling chain of the battle: directly, through one and two common events; canLose on continues; other interpreters and later events run', { skip: haveReactor ? false : 'Reactor runtime not installed here (js/reactor_objects.js): run scripts/setup-reactor.sh' }, () => {
+test('a blackout ends the calling chain of the battle: directly, through one and two common events; canLose on continues; other interpreters and later events run', { skip: haveReactor ? false : 'Reactor runtime not installed here (js/reactor_objects.js): run scripts/setup-reactor.sh' }, async () => {
   const c = (code, parameters = []) => ({ code, indent: 0, parameters });
   const END = c(0); const set = (v, n) => c(122, [v, v, 0, 0, n]);
   const startBattle = canLose => c(357, ['PS_BattleFlow', 'StartBattle', 'Start battle', { kind: 'wild', foes: 'pidgey:30', battleId: 'chain', resultVariable: '0', canLose: String(canLose) }]);
-  function run(shape, canLose) {
+  async function run(shape, canLose) {
     const h = host({ interpreter: true });
     h.ctx.$dataCommonEvents[1] = { list: [startBattle(canLose), set(1, 555), END] };
     h.ctx.$dataCommonEvents[2] = { list: [c(117, [1]), set(2, 666), END] };
     const root = new h.ctx.Game_Interpreter();
     root.setup(shape === 0 ? [startBattle(canLose), set(3, 777), END] : [c(117, [shape]), set(3, 777), END], 1);
     root.update();
-    assert.equal(h.flow.running, true, 'the battle is open and the event waits');
+    assert.equal(h.flow.running, true, 'the battle is open and the event waits '+JSON.stringify({outcome:h.flow.lastOutcome,errors:h.errors}));
     h.flow._op.canLose = !!h.flow._op.request.canLose; // This fixture substitutes for the real begin policy capture.
-    const session = h.flow._op.session = { result: () => lost(h.flow.request.battleId) };
+    // Consume the exact actual 357-issued admission through the production App.
+    // The declared legacy-no-held factory supplies synthetic result data; its
+    // returned owned handle is never fabricated by this interpreter test.
+    h.ctx.SceneManager.changeScene();assert(h.ctx.SceneManager._scene instanceof h.ctx.Scene_PSBattle,'actual native allocation supplies the current private Battle Scene');
+    const session = await h.flow.app().startAdmittedWorldBattle(h.flow._op.worldAdmission);h.flow._op.session=session;
+    assert.equal(session.result().battleId,h.flow.request.battleId);
     h.ctx.Scene_PSBattle.prototype.onEnd.call({ _session: session, popScene() {} });
     root.update();
     return { h, root, after: [h.vars[1] || 0, h.vars[2] || 0, h.vars[3] || 0], running: root.isRunning(), blackout: !!h.flow.lastOutcome.blackout, money: h.game().money };
   }
   for (const [label, shape] of [['direct', 0], ['one common event', 1], ['two common events', 2]]) {
-    const r = run(shape, false);
+    const r = await run(shape, false);
     assert.deepEqual([r.after, r.running, r.blackout, r.money], [[0, 0, 0], false, true, 484], `${label}: nothing after the battle runs, at any level`);
   }
-  const control = run(1, true);
+  const control = await run(1, true);
   assert.deepEqual([control.after, control.blackout, control.money], [[555, 0, 777], false, 484], 'canLose on: the defeat is settled and the event goes on');
   // the end mark does not leak: the same interpreter runs the next event normally, a child included
-  const { h, root } = run(2, false);
+  const { h, root } = await run(2, false);
   h.ctx.$dataCommonEvents[3] = { list: [set(4, 1), END] };
   root.setup([c(117, [3]), set(5, 1), END], 1); root.update();
   assert.deepEqual([h.vars[4], h.vars[5], root.isRunning()], [1, 1, false], 'a later event (with a common event) runs completely');

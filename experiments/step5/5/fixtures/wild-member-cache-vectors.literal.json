@@ -1,0 +1,1162 @@
+{
+  "qualification": "Formal/current-compat stage-local vectors; no original execution claim",
+  "sourceCommit": "77c4a1e36f12426747a9218ef9c177212fcf68c2",
+  "sourceVectorSha256": "cd46592da451ce194b23935b7d33c22fd366acbaaef17dab70f06ea2871bcd23",
+  "vectors": [
+    {
+      "id": "PID-01",
+      "stage": "pid-packing",
+      "authority": "current-compat",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "high": 0,
+        "low": 0
+      },
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "personalID": 0
+      },
+      "sourceRefs": [
+        "member-factory.ts:28-30",
+        "WP18:173"
+      ]
+    },
+    {
+      "id": "PID-02",
+      "stage": "pid-packing",
+      "authority": "current-compat",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "high": 0,
+        "low": 65535
+      },
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 65535
+        }
+      ],
+      "expected": {
+        "personalID": 65535
+      },
+      "sourceRefs": [
+        "member-factory.ts:28-30",
+        "WP18:173"
+      ]
+    },
+    {
+      "id": "PID-03",
+      "stage": "pid-packing",
+      "authority": "current-compat",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "high": 1,
+        "low": 0
+      },
+      "draws": [
+        {
+          "n": 65536,
+          "value": 1
+        },
+        {
+          "n": 65536,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "personalID": 65536
+      },
+      "sourceRefs": [
+        "member-factory.ts:28-30",
+        "WP18:173"
+      ]
+    },
+    {
+      "id": "PID-04",
+      "stage": "pid-packing",
+      "authority": "current-compat",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "high": 4660,
+        "low": 43981
+      },
+      "draws": [
+        {
+          "n": 65536,
+          "value": 4660
+        },
+        {
+          "n": 65536,
+          "value": 43981
+        }
+      ],
+      "expected": {
+        "personalID": 305441741
+      },
+      "sourceRefs": [
+        "member-factory.ts:28-30",
+        "WP18:173"
+      ]
+    },
+    {
+      "id": "PID-05",
+      "stage": "pid-packing",
+      "authority": "current-compat",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "high": 65535,
+        "low": 65535
+      },
+      "draws": [
+        {
+          "n": 65536,
+          "value": 65535
+        },
+        {
+          "n": 65536,
+          "value": 65535
+        }
+      ],
+      "expected": {
+        "personalID": 4294967295
+      },
+      "sourceRefs": [
+        "member-factory.ts:28-30",
+        "WP18:173"
+      ]
+    },
+    {
+      "id": "COLOR-01",
+      "stage": "uncached-color-math",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "personalID": 0,
+        "ownerId": 0
+      },
+      "draws": [],
+      "expected": {
+        "folded": 0,
+        "shiny": true,
+        "superShiny": true
+      },
+      "sourceRefs": [
+        "WP19:52-60",
+        "ST28-ST33"
+      ],
+      "note": "Mathematical predicates only; querying one field does not cache the other."
+    },
+    {
+      "id": "COLOR-02",
+      "stage": "uncached-color-math",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "personalID": 1,
+        "ownerId": 0
+      },
+      "draws": [],
+      "expected": {
+        "folded": 1,
+        "shiny": true,
+        "superShiny": false
+      },
+      "sourceRefs": [
+        "WP19:52-60",
+        "ST28-ST33"
+      ],
+      "note": "Mathematical predicates only; querying one field does not cache the other."
+    },
+    {
+      "id": "COLOR-03",
+      "stage": "uncached-color-math",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "personalID": 15,
+        "ownerId": 0
+      },
+      "draws": [],
+      "expected": {
+        "folded": 15,
+        "shiny": true,
+        "superShiny": false
+      },
+      "sourceRefs": [
+        "WP19:52-60",
+        "ST28-ST33"
+      ],
+      "note": "Mathematical predicates only; querying one field does not cache the other."
+    },
+    {
+      "id": "COLOR-04",
+      "stage": "uncached-color-math",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "personalID": 16,
+        "ownerId": 0
+      },
+      "draws": [],
+      "expected": {
+        "folded": 16,
+        "shiny": false,
+        "superShiny": false
+      },
+      "sourceRefs": [
+        "WP19:52-60",
+        "ST28-ST33"
+      ],
+      "note": "Mathematical predicates only; querying one field does not cache the other."
+    },
+    {
+      "id": "COLOR-05",
+      "stage": "uncached-color-math",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "personalID": 65536,
+        "ownerId": 0
+      },
+      "draws": [],
+      "expected": {
+        "folded": 1,
+        "shiny": true,
+        "superShiny": false
+      },
+      "sourceRefs": [
+        "WP19:52-60",
+        "ST28-ST33"
+      ],
+      "note": "Mathematical predicates only; querying one field does not cache the other."
+    },
+    {
+      "id": "COLOR-06",
+      "stage": "uncached-color-math",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "personalID": 305402420,
+        "ownerId": 0
+      },
+      "draws": [],
+      "expected": {
+        "folded": 0,
+        "shiny": true,
+        "superShiny": true
+      },
+      "sourceRefs": [
+        "WP19:52-60",
+        "ST28-ST33"
+      ],
+      "note": "Mathematical predicates only; querying one field does not cache the other."
+    },
+    {
+      "id": "COLOR-07",
+      "stage": "uncached-color-math",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "personalID": 4294967295,
+        "ownerId": 4294967295
+      },
+      "draws": [],
+      "expected": {
+        "folded": 0,
+        "shiny": true,
+        "superShiny": true
+      },
+      "sourceRefs": [
+        "WP19:52-60",
+        "ST28-ST33"
+      ],
+      "note": "Mathematical predicates only; querying one field does not cache the other."
+    },
+    {
+      "id": "CACHE-NOFORM",
+      "stage": "pid-retry-cache",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "ownerId": 0,
+        "initialPersonalID": 128,
+        "initialNature": "adamant",
+        "genderRatio": 128,
+        "abilities": [
+          "A",
+          "B"
+        ],
+        "creationFormRegistrationRead": false,
+        "abilityExplicitlyReadBeforeRetry": false,
+        "retries": 2
+      },
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "personalID": 1,
+        "retriesPerformed": 1,
+        "retriesRemaining": 1,
+        "nature": "adamant",
+        "genderCache": null,
+        "abilityIndexCache": null,
+        "abilityCache": null,
+        "ordinaryShinyCache": true,
+        "superShinyCache": null,
+        "genderAtFinalFirstRead": "F",
+        "abilityAtFinalFirstRead": "B",
+        "superShinyAtFinalFirstRead": false
+      },
+      "sourceRefs": [
+        "WP18:177-196",
+        "WP19:43-79",
+        "WP36:182",
+        "BR24"
+      ],
+      "note": "Stops at the next loop-head shiny read. FORM0 means a genuine numeric-returning handler submitted 0 with player/dex, not the fallback no-handler branch. Ability-read fixture is a cache-unit branch, not an added default generation read."
+    },
+    {
+      "id": "CACHE-FORM0",
+      "stage": "pid-retry-cache",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "ownerId": 0,
+        "initialPersonalID": 128,
+        "initialNature": "adamant",
+        "genderRatio": 128,
+        "abilities": [
+          "A",
+          "B"
+        ],
+        "creationFormRegistrationRead": true,
+        "abilityExplicitlyReadBeforeRetry": false,
+        "retries": 2
+      },
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "personalID": 1,
+        "retriesPerformed": 1,
+        "retriesRemaining": 1,
+        "nature": "adamant",
+        "genderCache": "M",
+        "abilityIndexCache": null,
+        "abilityCache": null,
+        "ordinaryShinyCache": true,
+        "superShinyCache": null,
+        "genderAtFinalFirstRead": "M",
+        "abilityAtFinalFirstRead": "B",
+        "superShinyAtFinalFirstRead": false
+      },
+      "sourceRefs": [
+        "WP18:177-196",
+        "WP19:43-79",
+        "WP36:182",
+        "BR24"
+      ],
+      "note": "Stops at the next loop-head shiny read. FORM0 means a genuine numeric-returning handler submitted 0 with player/dex, not the fallback no-handler branch. Ability-read fixture is a cache-unit branch, not an added default generation read."
+    },
+    {
+      "id": "CACHE-ABILITY-READ",
+      "stage": "pid-retry-cache",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "ownerId": 0,
+        "initialPersonalID": 128,
+        "initialNature": "adamant",
+        "genderRatio": 128,
+        "abilities": [
+          "A",
+          "B"
+        ],
+        "creationFormRegistrationRead": false,
+        "abilityExplicitlyReadBeforeRetry": true,
+        "retries": 2
+      },
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "personalID": 1,
+        "retriesPerformed": 1,
+        "retriesRemaining": 1,
+        "nature": "adamant",
+        "genderCache": null,
+        "abilityIndexCache": 0,
+        "abilityCache": "A",
+        "ordinaryShinyCache": true,
+        "superShinyCache": null,
+        "genderAtFinalFirstRead": "F",
+        "abilityAtFinalFirstRead": "A",
+        "superShinyAtFinalFirstRead": false
+      },
+      "sourceRefs": [
+        "WP18:177-196",
+        "WP19:43-79",
+        "WP36:182",
+        "BR24"
+      ],
+      "note": "Stops at the next loop-head shiny read. FORM0 means a genuine numeric-returning handler submitted 0 with player/dex, not the fallback no-handler branch. Ability-read fixture is a cache-unit branch, not an added default generation read."
+    },
+    {
+      "id": "CACHE-LAST-UNREAD",
+      "stage": "pid-retry-cache",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "ownerId": 0,
+        "initialPersonalID": 25,
+        "retries": 2,
+        "ordinaryShinyCache": null,
+        "superShinyCache": null,
+        "nature": "hardy"
+      },
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 26
+        },
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 16
+        }
+      ],
+      "expected": {
+        "personalID": 16,
+        "retriesPerformed": 2,
+        "ordinaryShinyCache": null,
+        "superShinyCache": null,
+        "nature": "hardy",
+        "ordinaryShinyAtFinalFirstRead": false
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "BR23"
+      ]
+    },
+    {
+      "id": "CACHE-N0",
+      "stage": "pid-retry-cache",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "personalID": 16,
+        "retries": 0,
+        "ordinaryShinyCache": null,
+        "superShinyCache": null
+      },
+      "draws": [],
+      "expected": {
+        "personalID": 16,
+        "ordinaryShinyCache": null,
+        "superShinyCache": null,
+        "shinyQueries": 0
+      },
+      "sourceRefs": [
+        "BR24",
+        "WP36:182"
+      ]
+    },
+    {
+      "id": "CACHE-INITIAL-SHINY",
+      "stage": "pid-retry-cache",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "personalID": 0,
+        "ownerId": 0,
+        "retries": 7,
+        "ordinaryShinyCache": null,
+        "superShinyCache": null
+      },
+      "draws": [],
+      "expected": {
+        "personalID": 0,
+        "ordinaryShinyCache": true,
+        "superShinyCache": null,
+        "retriesPerformed": 0
+      },
+      "sourceRefs": [
+        "BR24",
+        "WP36:182"
+      ]
+    },
+    {
+      "id": "CACHE-SUPER-INDEPENDENT",
+      "stage": "independent-cache-unit",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "personalID": 16,
+        "ownerId": 0,
+        "ordinaryShinyCache": null,
+        "superShinyCache": true
+      },
+      "draws": [],
+      "expected": {
+        "ordinaryShinyAtFirstRead": false,
+        "superShinyAfterOrdinaryRead": true
+      },
+      "sourceRefs": [
+        "ST42-ST43",
+        "WP19:57-59"
+      ],
+      "note": "A valid independent-cache state, not a reachable default initial-shiny reroll path."
+    },
+    {
+      "id": "TIER-0-0",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 0,
+        "shinyCharm": true
+      },
+      "draws": [],
+      "expected": {
+        "thresholdPerThousand": 0,
+        "extraRetries": 0,
+        "totalRetries": 2
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-49-0",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 49,
+        "shinyCharm": true
+      },
+      "draws": [],
+      "expected": {
+        "thresholdPerThousand": 0,
+        "extraRetries": 0,
+        "totalRetries": 2
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-50-14",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 50,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 14
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 15,
+        "extraRetries": 1,
+        "totalRetries": 3
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-50-15",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 50,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 15
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 15,
+        "extraRetries": 0,
+        "totalRetries": 2
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-99-14",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 99,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 14
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 15,
+        "extraRetries": 1,
+        "totalRetries": 3
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-99-15",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 99,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 15
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 15,
+        "extraRetries": 0,
+        "totalRetries": 2
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-100-19",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 100,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 19
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 20,
+        "extraRetries": 2,
+        "totalRetries": 4
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-100-20",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 100,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 20
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 20,
+        "extraRetries": 0,
+        "totalRetries": 2
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-199-19",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 199,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 19
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 20,
+        "extraRetries": 2,
+        "totalRetries": 4
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-199-20",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 199,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 20
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 20,
+        "extraRetries": 0,
+        "totalRetries": 2
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-200-24",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 200,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 24
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 25,
+        "extraRetries": 3,
+        "totalRetries": 5
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-200-25",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 200,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 25
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 25,
+        "extraRetries": 0,
+        "totalRetries": 2
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-299-24",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 299,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 24
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 25,
+        "extraRetries": 3,
+        "totalRetries": 5
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-299-25",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 299,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 25
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 25,
+        "extraRetries": 0,
+        "totalRetries": 2
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-300-29",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 300,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 29
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 30,
+        "extraRetries": 4,
+        "totalRetries": 6
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-300-30",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 300,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 30
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 30,
+        "extraRetries": 0,
+        "totalRetries": 2
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-499-29",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 499,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 29
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 30,
+        "extraRetries": 4,
+        "totalRetries": 6
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-499-30",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 499,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 30
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 30,
+        "extraRetries": 0,
+        "totalRetries": 2
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-500-29",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 500,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 29
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 30,
+        "extraRetries": 5,
+        "totalRetries": 7
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-500-30",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 500,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 30
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 30,
+        "extraRetries": 0,
+        "totalRetries": 2
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-1000-29",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 1000,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 29
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 30,
+        "extraRetries": 5,
+        "totalRetries": 7
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-1000-30",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 1000,
+        "shinyCharm": true
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 30
+        }
+      ],
+      "expected": {
+        "thresholdPerThousand": 30,
+        "extraRetries": 0,
+        "totalRetries": 2
+      },
+      "sourceRefs": [
+        "WP36:182",
+        "EN18"
+      ]
+    },
+    {
+      "id": "TIER-DISABLED",
+      "stage": "battle-shiny-bonus",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": false,
+        "battledCount": 500,
+        "shinyCharm": false
+      },
+      "draws": [],
+      "expected": {
+        "extraRetries": 0,
+        "totalRetries": 0
+      },
+      "sourceRefs": [
+        "WP36:182"
+      ]
+    },
+    {
+      "id": "TIER-BEFORE-EARLY-SHINY",
+      "stage": "tier-before-retry",
+      "authority": "formal",
+      "qualification": "DERIVED_VECTOR_NOT_EXECUTED_PRODUCT",
+      "input": {
+        "enabled": true,
+        "battledCount": 500,
+        "shinyCharm": true,
+        "initialPersonalID": 0,
+        "ownerId": 0
+      },
+      "draws": [
+        {
+          "n": 1000,
+          "value": 29
+        }
+      ],
+      "expected": {
+        "totalRetries": 7,
+        "pidRerollDraws": 0,
+        "ordinaryShinyCache": true,
+        "superShinyCache": null
+      },
+      "sourceRefs": [
+        "WP36:180-184",
+        "BR24"
+      ]
+    }
+  ]
+}

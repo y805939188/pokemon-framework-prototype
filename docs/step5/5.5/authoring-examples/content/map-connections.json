@@ -1,0 +1,17 @@
+{
+  "source": "author-placeholder",
+  "connections": [
+    {
+      "a": {
+        "mapId": 5,
+        "anchor": "E",
+        "offset": 8
+      },
+      "b": {
+        "mapId": 6,
+        "anchor": "W",
+        "offset": 8
+      }
+    }
+  ]
+}

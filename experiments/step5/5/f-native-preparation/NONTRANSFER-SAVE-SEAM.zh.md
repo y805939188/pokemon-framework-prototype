@@ -1,0 +1,13 @@
+# NoTransfer 保存最小接缝（types-only）
+
+25383 的实际 App 唯一发行 opaque BlackoutNonTransferCompletion，在真正 completed/no receipt/no-home 或 home-map-missing 的当前私entry/gen、整个world父链已退役时认可。helper必须前后调用真实isBlackoutNonTransferComplete(owner,nonce)，clone/外来nonce/旧generation拒绝；不得造TravelReceipt、target201或保存请求。
+
+沿同一collector current/exacttake；新增coordinator.nonTransferCompleted可选，只为旧transfer-only实现结构兼容，实际新非转移通知缺cap必须明确失败，不得ACK。新增options.captureNonTransferSource(owner)也仅是观察能力；缺真实producer实现不得假guard或用DTO/裸null补票。由现有private source entry闭包同步返回当次ready handoff与arm时exact current physical（可为E3祖先），guard仍用原private SourceEntry、generation/currentApp、genuine birth/frame/native reservation epoch判断，不建立第二registry/队列/全局cell。
+
+调用顺序：真正App terminal nonce通知→helper capture实际source→挂terminal grant/按真实已完成source onTransferEnd尝试exacttake→caller才可精确retireSource。guard可在捕获后允许该同entry的自然retired旗与真正producer releaseArrival 的 exact old owner/receipt/lease/serial 退役；不能仅把canonical.current或sourceHandoff=null解释为自然退休。foreign reserve（含同点reserve-clear）更改reservation epoch并拒绝；新source/newgen/新Map/data/queue/birth拒绝，不清后继。普通clear本身不另bump reservation epoch，允许arm前既有cold201自然完成。
+
+唯一native producer后继必须在真实 releaseArrival 的exact检查/纯清理过程中把相应观察记入现有SourceEntry；不得从unknown caller布尔值/同坐标/字段相等补记退役。source retireSource同样只现有exact entry字段，非新权限对象。
+
+collector载体：BlackoutNativeSaveRequest是原实际请求的冻结观察，C1 genuine returned的合法接收Scene迁移必须保留这个观察object ref与identity。后续native caller只更新同一槽的私execution receiver元数据，不再用{...request,scene}替换对helper可见的观察。original native function/args保持同一真实closure；helper不靠复制identity字段追认新记录。不新增request对象队列或公开relocation许可。
+
+helper nonTransfer仅取已经实际保留的请求；无请求0执行。真正source onTransferEnd已completed才消费、保存门拒绝不自动retry。本合同只types/docs，既有producer尚未实现新capture/自然retirement观察、collector immutable-ref改动与actual联合也未执行，不得空实现冒签。旧candidate/证据不改。

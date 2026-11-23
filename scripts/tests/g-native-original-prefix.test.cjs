@@ -1,0 +1,6 @@
+'use strict';
+const test = require('node:test'), assert = require('node:assert/strict');
+assert.deepEqual(process.argv.slice(2), []);
+const {runCase} = require('./final-production-runner.cjs');
+for (const id of ['GN01', 'GN02', 'GN03', 'GN04', 'GN05', 'GN-BUSY-WILD', 'GN-BUSY-TRAINER'])
+  test(id + ' source-bound original native command357', () => runCase('g-native-commands', id));

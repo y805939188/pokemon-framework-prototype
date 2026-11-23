@@ -1,6 +1,28 @@
 # 第五步：按功能族扩展
 
-## 当前状态（2026-11-13）
+## 当前状态（2026-11-23）
+
+### 5.6 菜单、标题与存档流程
+
+5.6 在 5.5 的 `a33eabd4093d70561ab181fb1bc852af02a0bbdc` 基线上完成限定验收。固定产品候选为 `f5c8bc1bf831e0e2dfa6187a0c475c5ab4adb563`，整树 `b15a01f6443a66ae33524ac4b3902853209f23ad`，`src` 树 `9b46076b01e64fde31a207b574bb32219cdcd4f2`。以下结果均归属该产品候选。
+
+发布提交从主线 `037e79ec` 收录固定候选的最终内容，产品源码、地图与插件配置、锁文件和构建脚本逐项等同。发布整理涉及项目文档及一个独立的旧离线探针与其登记；该探针使用明确指定的冻结夹具目录。GitHub Actions 单独记录发布提交的检查结果。
+
+- **正式本地回归**通过 429 套、8,489 项，失败、取消、跳过及 TODO 均为 0。冻结成长差分未运行。
+- **独立 Claude 复核**基于静态检查与证据重算，结论为 `PASS_SCOPED`，P1、P2 均为 0，保留 3 项非阻塞 P3。
+- **独立实机**覆盖走路、败北恢复、中文首图和槽 1 同文件冷读。冷读后的 PC 与对白速度在槽 1 文件逐字节一致的隔离副本中补验。英文实机、未覆盖的功能和物理显示器未验。远端流水线以 [GitHub Actions 对应提交](https://github.com/y805939188/pokemon-framework-prototype/actions)的结果为准。
+
+[走路内容快照与指纹](5.5-walk-content-fingerprint.zh.md)记录三项 P3 的现行行为和实测范围。
+
+- [选项与操作帮助](5.6-options-controls.md)、[暂停菜单与 PC 导航](5.6-pause-pc-navigation.zh.md)、[训练家卡](5.6-trainer-card.md)、[名人堂登记与浏览](5.6-hall-of-fame-author.zh.md)
+- [地图消息](5.6-messages.zh.md)、[内嵌选项](5.6-inline-choices.zh.md)、[数字输入](5.6-message-number.zh.md)、[消息行布局](5.6-message-rows.zh.md)
+- [事件文本输入](5.6-event-text.zh.md)、[字符网格](5.6-cursor-text.zh.md)、[本地化](5.6-localization.zh.md)、[作者诊断](5.6-author-diagnostics.zh.md)
+
+## 5.5 方案归档（2026-11-15）
+
+归档资料包括 [5.5 完整方案与来源](5.5/README.md)及 [A 合同合并终稿](5.5/A-contract.zh.md)（r4＋r5）。Claude 对该版方案的静态批准归属于方案阶段。
+
+## 5.4 历史状态（2026-11-13）
 
 5.4 已在批准的单打与默认呈现范围内完成技术收口。当前后继产品 `174568dc2a0d20b5e5e2b0878c35c63bca742e27`，src `7c52b29035f4170df493570c3a5d5e88eb1faaad`（源码来源 `5a41caf`）；[投球／逃跑整改](5.4-capture-run-followup.md)的 A1／B1／C1 已独审限域通过，[精确 CI #313](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43366638211) 双 job 成功，280 套／5082 项通过，失败／取消／跳过均 0，冻结回放 EXCLUDED／NOT RUN。此次纯文档后继自身的精确 CI 仍须发布后核实，不继承 CI313。
 
@@ -29,8 +51,8 @@
 | 5.2 背包、道具与经济 | 已合并、作者树归档 | 八口袋/schema6/资源与事务及UI | **批准范围有条件收尾**（2026-10-25，PR #5，main `9a93b5c`，CI70 65套863通过）。CUA-F02真实FAIL/OPEN+条件DEFERRED、UI-MEM NEW_WARN/OPEN及未测项保留，不能写无条件全层PASS。 |
 | 5.3 成长、进化与图鉴 | 各有限批已合并；当前 `step5/3-H2-pokedex-search` | 内容/schema7迁移、C/D/F规则、E应用事务，后续学习/进化/交换/图鉴UI | **M1规则/事务中间门已接收**（PR #19，main `b977ed7`，CI126 98套1612通过）。G1经PR20/a289086、G2a经PR21/c70d441正式接收（CI134 101套1660）。G2b＋[AR01开战准入](5.3-AR01-battle-entry.md)经PR22/main34fecd8、双审与CI136/137/138接收（104套1747）；[G2c糖果／石头统一UI](5.3-G2c-item-evolution-ui.md)与AR01后续经PR23/main04a2f47正式接收（CI139/140/141，105套1816通过）；[H1默认图鉴](5.3-H1-pokedex-ui.md)整改913150a待Kimi增量／ultra，[H2完整搜索／摘要单条](5.3-H2-pokedex-search-summary.md)作者实现验证中。完整H、I包/性能/重启与J最终收口未完成。 |
 | 5.4 训练家、AI 与战斗界面 | 前置各批分开；结果反馈dc/product64c/CI225实机3/3、开场采样ef879d1/product9f/CI228实机4/4限定接受 | [普通终局反馈](5.4-D2c-result-feedback.md)与[普通训练家场内开场](5.4-D2c-trainer-opening.md)旧单行范围接受；[R9作者长台词换行分页](5.4-R9-author-dialogue-pages.md)85778b1代码／编译Scene原Ultra接受；[新两案实机准备](../../experiments/step5/4/author-dialogue-native-contract.zh.md)待静态审查 | 旧a612及1e采证失败保留。R9-TEXT-1代码布局／R9-TEST-1持久回归限定关闭，新字体／画面和本批CI未验，开场整体／战前／滑入／完整消息及完整D2／E／5.4仍OPEN，U51 UNKNOWN、GC WARN、新D2 P-4保持；未合main。 |
-| 5.5 世界与遭遇 | — | — | 未开始 |
-| 5.6 菜单、标题与存档流程 | — | — | 未开始 |
+| 5.5 世界与遭遇 | `a33eabd4` 为 5.6 的基线 | [r4＋r5 合同及来源](5.5/README.md) | [G 批交付记录](5.5/G-current-delivery.zh.md)列出受测入口与保留范围 |
+| 5.6 菜单、标题与存档流程 | 固定候选 `f5c8bc1b` | 菜单／PC、标题／存档、地图对白、走路优化 | **限定验收完成**，见[5.6 验收范围](#56-菜单标题与存档流程) |
 
 文档：[5.0.md](5.0.md)（实施记录）、[5.0-closure.md](5.0-closure.md)（收口记录）、[commands.md](commands.md)（新增作者入口与命令）、[distribution.md](distribution.md)（分发清单骨架）。
 
@@ -282,3 +304,13 @@
 - 5.4 D2 作者显式默认天气／场地与战斗环境：[实施前合同 r2](5.4-D2-initial-field-plan.md)。原87f6ee4因原始天气覆盖门／秘密之力时序及整招一次两项P2 HOLD；现仅修合同和待执行反例，待原独审复验，产品未接线，不自签关闭。
 
 - 显式初始天气／场地／环境：方案r2见 `5.4-D2-initial-field-plan.md`，产品实现及有限测试边界见 `5.4-D2-initial-field.md`。产品独立复审／CI／NW仍待，不以方案通过签收。
+
+## 5.6 早期非存档批次（历史）
+
+[普通选项与操作帮助](5.6-options-controls.md)：a33eabd 后的隔离增量，复用既有 MZ 配置与入口，新增中英说明、关闭行与四页帮助事件。该条目记录首批范围，最终验证见本页 5.6 验收范围。
+
+[消息入口与文字标签](5.6-messages.zh.md)：459b2677 后的 WP17-A 首批，原生消息窗上的独立作者入口、逐字／确认／等待及 Map005 正常事件示例；支持标签与剩余子项分列。精确候选与实际验证见工作区交接及该说明链接的外部报告。
+
+[单个内嵌普通选项](5.6-inline-choices.zh.md)：固定2a5386fe的单个ch范围已完成限定独审和418套／8265项正式regular，源码及原执行证据保留；不代表完整WP17。
+
+[光标字符网格](5.6-cursor-text.zh.md)：从2a5386fe隔离继续，在现有ShowTextInput上显式选择cursor；四组字符、导航与删除/OK交互，结果只写事件变量。轻量定向与后续正式regular状态见工作区交接。

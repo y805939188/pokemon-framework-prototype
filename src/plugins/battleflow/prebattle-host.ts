@@ -4,9 +4,9 @@ import type { PrebattlePlan } from './prebattle';
 import { capturePrebattleBGSMZ, createPrebattleOverlayMZ } from './prebattle-mz';
 
 /** The ordinary Map wrapper. Actual battle Scene/session and their internal opening stay authoritative. */
-export function installPrebattleHost(G:any, flow:any, prepareAudio:(op:any)=>void) {
+export function installPrebattleHost(G:any, flow:any, prepareAudio:(op:any)=>void, beforePush?:(op:object)=>void) {
   type Entry={op:any;source:any;app:any;generation:any;operation:PrebattleOperation};
-  type DeferredAutosave={entry:Entry;scene:any;map:any;mapId:any;args:any[];doneObserved?:boolean};
+  type DeferredAutosave={entry:Entry;scene:any;map:any;mapId:any;args:any[];blackout:boolean;doneObserved?:boolean};
   let deferredAutosave:DeferredAutosave|null=null;
   let active:Entry|null=null,last:PrebattleOperation|null=null;
   const mapClass=G.Scene_Map,prototype=mapClass?.prototype;
@@ -21,6 +21,13 @@ export function installPrebattleHost(G:any, flow:any, prepareAudio:(op:any)=>voi
   // A transfer can request autosave inside Map.start, before the return cover
   // releases the save gate. Retain only that actual request, not every battle end.
   const requestAutosave=prototype?.requestAutosave;
+  const blackoutChainPending=(e:Entry)=>{
+    const battleId=e.op.request?.battleId;
+    if(!battleId||flow.lastOutcome?.blackout!==true||flow.lastOutcome.battleId!==battleId)return false;
+    for(let node=G.$gameMap?._interpreter,depth=0;node&&depth<100;node=node._childInterpreter,depth++)
+      if(node._waitMode==='psBattle'&&node._psBattleId===battleId)return true;
+    return false;
+  };
   const flushAutosave=(afterUpdate:boolean)=>{
     const saved=deferredAutosave;if(!saved)return;
     const e=saved.entry;
@@ -33,6 +40,8 @@ export function installPrebattleHost(G:any, flow:any, prepareAudio:(op:any)=>voi
     // Let a full ordinary update retire the blackout event chain before saving.
     if(!saved.doneObserved){saved.doneObserved=true;return;}
     if(!afterUpdate)return;
+    // An issued blackout waits out native projection work; ordinary disabled requests remain one-shot.
+    if(saved.blackout&&(blackoutChainPending(e)||flow.operationPending()))return;
     deferredAutosave=null; // Consume before host callbacks, including reentrant ones.
     requestAutosave.apply(saved.scene,saved.args); // Keep all original autosave/save gates.
   };
@@ -50,8 +59,9 @@ export function installPrebattleHost(G:any, flow:any, prepareAudio:(op:any)=>voi
     if(requestAutosave)prototype.requestAutosave=function(...args:any[]){
       const e=active;
       if(e&&owner(e)&&G.SceneManager._scene===this&&
-         ['return-pending','return'].includes(e.operation.phaseName)){
-        deferredAutosave??={entry:e,scene:this,map:G.$gameMap,mapId:G.$gameMap?.mapId?.(),args};
+         (['return-pending','return'].includes(e.operation.phaseName)||
+          e.operation.phaseName==='done'&&blackoutChainPending(e))){
+        deferredAutosave??={entry:e,scene:this,map:G.$gameMap,mapId:G.$gameMap?.mapId?.(),args,blackout:blackoutChainPending(e)};
         return;
       }
       return requestAutosave.apply(this,args);
@@ -87,7 +97,7 @@ export function installPrebattleHost(G:any, flow:any, prepareAudio:(op:any)=>voi
         current:()=>owner(e),now:()=>G.performance.now(),frame:()=>G.Graphics.frameCount,
         overlay:map=>createPrebattleOverlayMZ(G,map,()=>owner(e)),
         captureBGS:()=>capturePrebattleBGSMZ(G,()=>owner(e)),prepareAudio:()=>prepareAudio(op),
-        enterBattle:()=>{if(!owner(e)||G.SceneManager._scene!==e.source)throw new Error('stale prebattle handoff');G.SceneManager.push(G.Scene_PSBattle??G.window?.Scene_PSBattle);},
+        enterBattle:()=>{if(!owner(e)||G.SceneManager._scene!==e.source)throw new Error('stale prebattle handoff');beforePush?.(op);if(!owner(e)||G.SceneManager._scene!==e.source)throw new Error('stale prebattle handoff');G.SceneManager.push(G.Scene_PSBattle??G.window?.Scene_PSBattle);},
         resetEncounter:()=>G.$gamePlayer?.makeEncounterCount?.(),
         failed:error=>{
           if(flow._op!==op)return;

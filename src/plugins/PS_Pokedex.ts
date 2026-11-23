@@ -39,7 +39,7 @@ import { hostInput } from './host-input';
   start(){const r=this.request,application=r.application!;const guard=()=>{if(active!==this)throw Error('stale-pokedex-ui');check(r);};guard();
    const pending=r.edit?application.pendingPokedex:null;
    const single=r.summary?(()=>{const snap=application.pokedexSnapshot(dictionary(flow().content()),region()),cfg=C.resolveConfig(flow().content().settings);guard();return{species:r.summary!.species,number:Q.dexCompleteEntryNumber(snap.dex,snap.catalog.layout,r.summary!.species,{locale:flow().translator().lang,offsets:cfg.DEXES_WITH_OFFSETS,useCurrentRegion:cfg.USE_CURRENT_REGION_DEX,currentRegion:region()})};})():undefined;
-   this.screen=new PokedexScreen({...(single?{single}:{}),snapshot:()=>{guard();const s=application.pokedexSnapshot(dictionary(flow().content()),region());guard();return s;},content:()=>{guard();const c=flow().content();guard();return c;},directory:()=>{guard();const d=application.pokedexSearchDirectory(flow().translator().lang);guard();return d;},locale:flow().translator().lang,text:dictionary(flow().content()),currentRegion:region(),edit:command=>{guard();if(r.parent){if(command.kind!=='form'||command.species!==r.summary?.species||!r.edit)throw Error('pokedex-summary-edit-required');return returned(r,application.resolvePokedex(r.edit.token,r.edit.revision,{kind:'summary-form',baseFrontsEqual:command.baseFrontsEqual,selected:command.selected,text:command.text,currentRegion:command.currentRegion}));}return returned(r,application.updatePokedex(command));},resolve:(token,revision,decision)=>{guard();if(!r.edit||r.edit.token!==token||r.edit.revision!==revision)throw Error('stale-pokedex-edit-owner');return returned(r,application.resolvePokedex(token,revision,decision));},...(pending&&(!r.parent||pending.error)?{pending:{status:'pending' as const,view:pending}}:{}),finish:()=>this.finish(),reload:()=>{this.retireStale();G.SceneManager.goto(G.Scene_Title);},stopCry:()=>G.AudioManager?.stopSe?.(),cry:()=>{ /* Placeholder media. No audio/resource-success claim. */ }});
+   this.screen=new PokedexScreen({...(single?{single}:{}),snapshot:()=>{guard();const s=application.pokedexSnapshot(dictionary(flow().content()),region());guard();return s;},content:()=>{guard();const c=flow().content();guard();return c;},directory:()=>{guard();const d=application.pokedexSearchDirectory(flow().translator().lang);guard();return d;},area:species=>{guard();const area=application.pokedexArea(species);guard();return area;},locale:flow().translator().lang,text:dictionary(flow().content()),currentRegion:region(),edit:command=>{guard();if(r.parent){if(command.kind!=='form'||command.species!==r.summary?.species||!r.edit)throw Error('pokedex-summary-edit-required');return returned(r,application.resolvePokedex(r.edit.token,r.edit.revision,{kind:'summary-form',baseFrontsEqual:command.baseFrontsEqual,selected:command.selected,text:command.text,currentRegion:command.currentRegion}));}return returned(r,application.updatePokedex(command));},resolve:(token,revision,decision)=>{guard();if(!r.edit||r.edit.token!==token||r.edit.revision!==revision)throw Error('stale-pokedex-edit-owner');return returned(r,application.resolvePokedex(token,revision,decision));},...(pending&&(!r.parent||pending.error)?{pending:{status:'pending' as const,view:pending}}:{}),finish:()=>this.finish(),reload:()=>{this.retireStale();G.SceneManager.goto(G.Scene_Title);},stopCry:()=>G.AudioManager?.stopSe?.(),cry:()=>{ /* Placeholder media. No audio/resource-success claim. */ }});
    guard();if(this.screen.done){this.finish();return;}this.boundary();guard();this.draw();
   }
   update(){if(!valid(this.request)){this.retireStale();return;}if(this.screen?.done){this.finish();return;}if(!this.ready){if((G.Graphics.frameCount??0)<=this.frame||G.SceneManager.isSceneChanging())return;this.ready=true;this.latch.filter(inputs.inputFrame());return;}
@@ -90,7 +90,20 @@ import { hostInput } from './host-input';
      const top=y;for(const row of wrapped.slice(this.description.offset,this.description.offset+step))line(row);y=top+step*32;
      line(text('spritePlaceholder'));if(i.footprint)line(text('footprintPlaceholder'));
      if(wrapped.length>step)line(text('entryScroll',{from:this.description.offset+1,to:Math.min(wrapped.length,this.description.offset+step),total:wrapped.length}),'#b8e3ff');
-    }else if(v.page===1)line(text('areaUnknown'));else{line(text('spritePlaceholder'));line(text('formCount',{count:v.forms.length}));for(const f of v.forms.slice(0,5))line(caption(f));}
+    }else if(v.page===1){
+     const area:ReturnType<PokedexApplication['pokedexArea']>=v.area;
+     if(area.status!=='known')line(text(area.status==='invalid'?'areaInvalid':area.diagnostics.length?'areaUnavailable':'areaUnknown'));
+     else{
+      const region=area.region,name=region?flow().translator().tOr(region.nameKey,region.nameKey):'';
+      line(text('areaRegion',{name}));line(text('areaPoints',{count:area.points.length}));
+      const {left,right,top,bottom}=area.points.reduce((bounds,point)=>({left:Math.min(bounds.left,point.x),right:Math.max(bounds.right,point.x),top:Math.min(bounds.top,point.y),bottom:Math.max(bounds.bottom,point.y)}),{left:Infinity,right:-Infinity,top:Infinity,bottom:-Infinity});
+      line(text('areaBounds',{left,top,right,bottom}));
+      const cols=right-left+1,rows=bottom-top+1,scale=Math.min(24,(width-48)/cols,Math.max(1,b.height-y-70)/rows);
+      b.fillRect(24,y,cols*scale,rows*scale,'#202b3b');
+      for(const point of area.points)b.fillRect(24+(point.x-left)*scale,y+(point.y-top)*scale,Math.max(1,scale-1),Math.max(1,scale-1),'#ffe29a');
+      y+=rows*scale+8;
+     }
+    }else{line(text('spritePlaceholder'));line(text('formCount',{count:v.forms.length}));for(const f of v.forms.slice(0,5))line(caption(f));}
    }else if(v.kind==='forms'){rows(v.rows,(r,prefix)=>line(prefix+caption(r)));line(text('formHelp'));}
    else if(v.kind==='recovery'){line(text('writeFailed'));line(v.error,'#ffb5b5');line(text(v.reloadRequired?'reloadRequired':'retryHelp'));}
    else if(v.kind==='error'){line(v.text,'#ffb5b5');line(text('exitHelp'));}else line(text('empty'));

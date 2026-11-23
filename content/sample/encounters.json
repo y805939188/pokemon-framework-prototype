@@ -1,0 +1,30 @@
+{
+  "source": "author-placeholder",
+  "tables": [
+    {
+      "mapId": 6,
+      "version": 0,
+      "types": {
+        "Cave": { "stepChance": 5, "slots": [
+          { "species": "pidgey", "weight": 70, "minLevel": 2, "maxLevel": 4 },
+          { "species": "caterpie", "weight": 30, "minLevel": 2, "maxLevel": 3 }
+        ] },
+        "OldRod": { "stepChance": 0, "slots": [
+          { "species": "blastoise", "weight": 100, "minLevel": 3, "maxLevel": 3 }
+        ] }
+      }
+    },
+    {
+      "mapId": 6,
+      "version": 1,
+      "types": {
+        "Cave": { "stepChance": 5, "slots": [
+          { "species": "gengar", "weight": 100, "minLevel": 3, "maxLevel": 5 }
+        ] },
+        "RockSmash": { "stepChance": 50, "slots": [
+          { "species": "caterpie", "weight": 100, "minLevel": 2, "maxLevel": 3 }
+        ] }
+      }
+    }
+  ]
+}

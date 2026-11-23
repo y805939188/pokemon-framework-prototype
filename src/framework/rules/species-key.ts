@@ -6,6 +6,7 @@
  * assembly). Fixture content has no mapping table: its content ids ARE the Showdown names (form 0). Pure.
  */
 import { storedCreationForms } from "./creation-form";
+import { isInitialWildDynamicForm } from "./wild-form";
 import { computedNature } from "./member-metadata";
 import { clone } from "./value";
 import type { Storage } from "./storage";
@@ -50,6 +51,15 @@ export function creationBattleNameOf(content: KeyTables, key: SpeciesKey): strin
   return key.form === 0 || storedCreationForms(base.ruleSpecies ?? baseName!).includes(key.form) ? baseName : null;
 }
 
+/** Existing exact/B creation authority, plus only the finite WP21 A initial-read result domain. */
+export function initialWildBattleNameOf(content: KeyTables, key: SpeciesKey): string | null {
+  const created = creationBattleNameOf(content, key);
+  if (created) return created;
+  const baseName = own(own(content.forms, key.species), "0") ?? (!content.forms && own(content.species, key.species) ? key.species : null);
+  const base = baseName ? own(content.species, baseName) : undefined;
+  return base && isInitialWildDynamicForm(base.ruleSpecies ?? baseName!, key.form) ? battleNameOf(content, key) : null;
+}
+
 /** Every battle name of a content id (all its forms); the dex is kept per species, the engine asks per form. */
 export function battleNamesOfSpecies(content: KeyTables, id: string): string[] {
   if (content.forms) {
@@ -83,7 +93,7 @@ export function toBattleMember(m: Member, content: Pick<Content, "species" | "fo
 export function toPersistentMember(m: Member, content: Pick<Content, "species" | "forms" | "speciesKeys" | "meta">): Member {
   const k = keyOfBattleName(content, m.species);
   if (!k) throw new Error(`member ${m.id}: "${m.species}" has no persistent species key in the content${where(content)}`);
-  const form = m.form !== undefined && creationBattleNameOf(content, { species: k.species, form: m.form }) === m.species ? m.form : k.form;
+  const form = m.form !== undefined && initialWildBattleNameOf(content, { species: k.species, form: m.form }) === m.species ? m.form : k.form;
   return { ...clone(m), species: k.species, form, statNature: m.statNature ?? null, moves: m.moves.map(move => ({...clone(move),ppUps:move.ppUps ?? 0})) };
 }
 

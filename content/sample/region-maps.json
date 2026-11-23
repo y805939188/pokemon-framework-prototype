@@ -1,0 +1,13 @@
+{
+  "source": "author-placeholder",
+  "regions": [
+    {
+      "id": 0,
+      "nameKey": "region.kanto",
+      "points": [
+        { "x": 13, "y": 12, "nameKey": "world.sample-center", "healingSpot": { "mapId": 5, "x": 10, "y": 8 } },
+        { "x": 14, "y": 12, "nameKey": "world.sample-cave" }
+      ]
+    }
+  ]
+}

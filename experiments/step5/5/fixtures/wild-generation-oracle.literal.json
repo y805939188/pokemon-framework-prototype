@@ -1,0 +1,4142 @@
+{
+  "qualification": "Independent Python arithmetic expected; technical mappings frozen by framework, not original execution evidence",
+  "freezeSha256": "19a8a010257e85f894feeab9e05964d887dbf0dcf07bda7ae9180403eccdc309",
+  "cases": [
+    {
+      "id": "ordinary-empty-default",
+      "initialPersonalID": 128,
+      "factsPatch": {},
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "initial-super-shiny",
+      "initialPersonalID": 0,
+      "factsPatch": {},
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "hardy",
+        "gender": "F",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 0,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": true,
+        "superShiny": true,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "retry-one-then-loop-head-hit",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "shinyCharm": true
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "B",
+        "nature": "adamant",
+        "gender": "F",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 1,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 1,
+        "effectiveAbilityIndex": 1,
+        "shiny": true,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "retry-last-remains-unread-until-output",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "shinyCharm": true
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 26
+        },
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 16
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "F",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 16,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "cute-M-0",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 0,
+            "level": 5,
+            "ability": "Cute Charm",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ]
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 3,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "F",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "cute-M-1",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 0,
+            "level": 5,
+            "ability": "Cute Charm",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ]
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 3,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "F",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "cute-M-2",
+      "initialPersonalID": 1,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 0,
+            "level": 5,
+            "ability": "Cute Charm",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ]
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 3,
+          "value": 2
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "B",
+        "nature": "lonely",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 1,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 1,
+        "effectiveAbilityIndex": 1,
+        "shiny": true,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "cute-F-0",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 0,
+            "level": 5,
+            "ability": "Cute Charm",
+            "gender": "F",
+            "nature": "modest"
+          }
+        ]
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 3,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "cute-F-1",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 0,
+            "level": 5,
+            "ability": "Cute Charm",
+            "gender": "F",
+            "nature": "modest"
+          }
+        ]
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 3,
+          "value": 1
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "cute-F-2",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 0,
+            "level": 5,
+            "ability": "Cute Charm",
+            "gender": "F",
+            "nature": "modest"
+          }
+        ]
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 3,
+          "value": 2
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "F",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "sync-expanded",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 0,
+            "level": 5,
+            "ability": "Synchronize",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ]
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "modest",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "sync-percentage-49",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 5,
+            "ability": "Synchronize",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ],
+        "moreAbilities": false
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 100,
+          "value": 49
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "modest",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "sync-percentage-50",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 5,
+            "ability": "Synchronize",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ],
+        "moreAbilities": false
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 100,
+          "value": 50
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "sync-roamer-no-draw",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 5,
+            "ability": "Synchronize",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ],
+        "moreAbilities": false,
+        "roamer": true
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "scale-5-5-high",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 5,
+            "ability": "",
+            "gender": "M",
+            "nature": "modest"
+          },
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 5,
+            "ability": "",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ],
+        "scaleWildLevels": true
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 5,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 7,
+        "exp": 343,
+        "hp": 25,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "scale-10-50-low",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 10,
+            "ability": "",
+            "gender": "M",
+            "nature": "modest"
+          },
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 50,
+            "ability": "",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ],
+        "scaleWildLevels": true
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 5,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 48,
+        "exp": 110592,
+        "hp": 116,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          },
+          {
+            "id": "ember",
+            "pp": 25,
+            "maxpp": 25,
+            "ppUps": 0
+          },
+          {
+            "id": "swift",
+            "pp": 20,
+            "maxpp": 20,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "scale-100-100-clamped",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 100,
+            "ability": "",
+            "gender": "M",
+            "nature": "modest"
+          },
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 100,
+            "ability": "",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ],
+        "scaleWildLevels": true
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 5,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 100,
+        "exp": 1000000,
+        "hp": 231,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          },
+          {
+            "id": "ember",
+            "pp": 25,
+            "maxpp": 25,
+            "ppUps": 0
+          },
+          {
+            "id": "swift",
+            "pp": 20,
+            "maxpp": 20,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "scale-1-1-low-clamp",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 1,
+            "ability": "",
+            "gender": "M",
+            "nature": "modest"
+          },
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 1,
+            "ability": "",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ],
+        "scaleWildLevels": true
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 5,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 1,
+        "exp": 0,
+        "hp": 12,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "egg-skipped-fainted-sync-kept-scale-all",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": true,
+            "hp": 10,
+            "level": 50,
+            "ability": "Cute Charm",
+            "gender": "M",
+            "nature": "modest"
+          },
+          {
+            "isEgg": false,
+            "hp": 0,
+            "level": 10,
+            "ability": "Synchronize",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ],
+        "scaleWildLevels": true
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 5,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 52,
+        "exp": 140608,
+        "hp": 124,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          },
+          {
+            "id": "ember",
+            "pp": 25,
+            "maxpp": 25,
+            "ppUps": 0
+          },
+          {
+            "id": "swift",
+            "pp": 20,
+            "maxpp": 20,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "modest",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "all-same-singleton",
+      "initialPersonalID": 128,
+      "factsPatch": {},
+      "pools": "same",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "leftovers",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "held-basic-49",
+      "initialPersonalID": 128,
+      "factsPatch": {},
+      "pools": "singletons",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 100,
+          "value": 49
+        },
+        {
+          "n": 1,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "leftovers",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "held-basic-50",
+      "initialPersonalID": 128,
+      "factsPatch": {},
+      "pools": "singletons",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 100,
+          "value": 50
+        },
+        {
+          "n": 1,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "oranberry",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "held-basic-55",
+      "initialPersonalID": 128,
+      "factsPatch": {},
+      "pools": "singletons",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 100,
+          "value": 55
+        },
+        {
+          "n": 1,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "sitrusberry",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "held-basic-56",
+      "initialPersonalID": 128,
+      "factsPatch": {},
+      "pools": "singletons",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 100,
+          "value": 56
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "compound-eyes-improved",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 0,
+            "level": 5,
+            "ability": "Compound Eyes",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ],
+        "moreAbilities": false
+      },
+      "pools": "singletons",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 100,
+          "value": 84
+        },
+        {
+          "n": 1,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "sitrusberry",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "super-luck-config-off",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 5,
+            "ability": "Super Luck",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ],
+        "moreAbilities": false
+      },
+      "pools": "singletons",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 100,
+          "value": 60
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "super-luck-config-on",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 10,
+            "level": 5,
+            "ability": "Super Luck",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ]
+      },
+      "pools": "singletons",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 100,
+          "value": 60
+        },
+        {
+          "n": 1,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "oranberry",
+        "ability": "A",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 128,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": false,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "held-tier-pid-cute-scale-full-prefix",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "higherShinyByBattled": true,
+        "battledCount": 500,
+        "party": [
+          {
+            "isEgg": true,
+            "hp": 10,
+            "level": 5,
+            "ability": "",
+            "gender": "M",
+            "nature": "modest"
+          },
+          {
+            "isEgg": false,
+            "hp": 0,
+            "level": 5,
+            "ability": "Cute Charm",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ],
+        "scaleWildLevels": true
+      },
+      "pools": "singletons",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 100,
+          "value": 50
+        },
+        {
+          "n": 1,
+          "value": 0
+        },
+        {
+          "n": 1000,
+          "value": 29
+        },
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 1
+        },
+        {
+          "n": 3,
+          "value": 2
+        },
+        {
+          "n": 5,
+          "value": 4
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 7,
+        "exp": 343,
+        "hp": 25,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "oranberry",
+        "ability": "B",
+        "nature": "adamant",
+        "gender": "M",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 1,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 1,
+        "effectiveAbilityIndex": 1,
+        "shiny": true,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "held-tier-two-pids-sync-scale-full-prefix",
+      "initialPersonalID": 128,
+      "factsPatch": {
+        "higherShinyByBattled": true,
+        "battledCount": 500,
+        "moreAbilities": false,
+        "party": [
+          {
+            "isEgg": false,
+            "hp": 0,
+            "level": 10,
+            "ability": "Synchronize",
+            "gender": "M",
+            "nature": "modest"
+          },
+          {
+            "isEgg": true,
+            "hp": 10,
+            "level": 50,
+            "ability": "",
+            "gender": "M",
+            "nature": "modest"
+          }
+        ],
+        "scaleWildLevels": true
+      },
+      "pools": "singletons",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 128
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 100,
+          "value": 55
+        },
+        {
+          "n": 1,
+          "value": 0
+        },
+        {
+          "n": 1000,
+          "value": 29
+        },
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 26
+        },
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 1
+        },
+        {
+          "n": 100,
+          "value": 49
+        },
+        {
+          "n": 5,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 48,
+        "exp": 110592,
+        "hp": 116,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          },
+          {
+            "id": "ember",
+            "pp": 25,
+            "maxpp": 25,
+            "ppUps": 0
+          },
+          {
+            "id": "swift",
+            "pp": 20,
+            "maxpp": 20,
+            "ppUps": 0
+          }
+        ],
+        "item": "sitrusberry",
+        "ability": "B",
+        "nature": "modest",
+        "gender": "F",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 1,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 1,
+        "effectiveAbilityIndex": 1,
+        "shiny": true,
+        "superShiny": false,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    },
+    {
+      "id": "tier-draw-before-already-shiny",
+      "initialPersonalID": 0,
+      "factsPatch": {
+        "higherShinyByBattled": true,
+        "battledCount": 500,
+        "shinyCharm": true
+      },
+      "pools": "empty",
+      "draws": [
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 31
+        },
+        {
+          "n": 32,
+          "value": 0
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 1000,
+          "value": 29
+        }
+      ],
+      "expected": {
+        "id": "W1",
+        "species": "Fixture",
+        "form": 0,
+        "nickname": null,
+        "level": 5,
+        "exp": 125,
+        "hp": 21,
+        "status": "",
+        "statusCount": 0,
+        "moves": [
+          {
+            "id": "growl",
+            "pp": 40,
+            "maxpp": 40,
+            "ppUps": 0
+          },
+          {
+            "id": "tackle",
+            "pp": 35,
+            "maxpp": 35,
+            "ppUps": 0
+          }
+        ],
+        "item": "",
+        "ability": "A",
+        "nature": "hardy",
+        "gender": "F",
+        "ivs": {
+          "hp": 31,
+          "atk": 0,
+          "def": 1,
+          "spa": 2,
+          "spd": 3,
+          "spe": 4
+        },
+        "evs": {
+          "hp": 0,
+          "atk": 0,
+          "def": 0,
+          "spa": 0,
+          "spd": 0,
+          "spe": 0
+        },
+        "friendship": 256,
+        "ball": "pokeball",
+        "owner": {
+          "id": 0,
+          "name": "Player",
+          "gender": 2,
+          "language": 2
+        },
+        "personalID": 0,
+        "ownerCompatibilityDefault": false,
+        "origin": {
+          "method": 0,
+          "map": 9,
+          "text": "",
+          "level": 5,
+          "receivedAt": 123,
+          "hatchedMap": 0,
+          "hatchedAt": null,
+          "compatibilityDefault": false
+        },
+        "abilityIndex": 0,
+        "effectiveAbilityIndex": 0,
+        "shiny": true,
+        "superShiny": true,
+        "firstMoves": [],
+        "markings": [],
+        "ribbons": [],
+        "cannotStore": false,
+        "cannotRelease": false,
+        "isEgg": false,
+        "mail": null,
+        "readyToEvolve": false,
+        "statNature": null,
+        "evolutionReadiness": "known",
+        "cannotTrade": false
+      }
+    }
+  ]
+}

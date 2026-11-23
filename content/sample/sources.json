@@ -33,7 +33,12 @@
       "species.learnset",
       "grants",
       "trainer-types",
-      "trainers"
+      "trainers",
+      "world.encounters",
+      "world.regionMaps",
+      "world.mapConnections",
+      "map-metadata",
+      "species.wildItemCommon"
     ]
   }
 ]

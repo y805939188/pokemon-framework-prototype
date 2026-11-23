@@ -16,12 +16,12 @@ function setup({evolution=false,hasDex=false}={}){
 }
 function host(w){
  const C=()=>{function T(){}T.prototype={initialize(){},terminate(){}};return T;};function System(){}System.prototype.isSaveEnabled=()=>true;const system=new System();system._psGame=w.state.current();
- const requireFromRoot=p=>{if(p==='path'||p==='fs')return require(p);if(/production\.cjs$/.test(p))return require(path.join(ROOT,'js/engine/build/production.cjs'));if(/testing\.cjs$/.test(p))return require(path.join(ROOT,'js/engine/build/testing.cjs'));throw Error('unexpected require '+p);};requireFromRoot.resolve=p=>path.resolve(ROOT,p);
+ const requireFromRoot=p=>{if(p==='path'||p==='fs'||p==='node:util')return require(p);if(/production\.cjs$/.test(p))return require(path.join(ROOT,'js/engine/build/production.cjs'));if(/testing\.cjs$/.test(p))return require(path.join(ROOT,'js/engine/build/testing.cjs'));throw Error('unexpected require '+p);};requireFromRoot.resolve=p=>path.resolve(ROOT,p);
  const pushed=[],variables={},messages=[],G={Error,performance,require:requireFromRoot,console:{log(){},warn(){},error(){}},PluginManager:{parameters:()=>({}),registerCommand(){}},Game_Interpreter:C(),Window_Base:C(),Window_Command:C(),Scene_MenuBase:C(),Game_System:System,SceneManager:{push:x=>pushed.push(x),updateScene(){},isSceneChanging:()=>false},Graphics:{frameCount:0},Utils:{extractFileName:x=>x},$gameSystem:system,$gameVariables:{setValue:(id,v)=>variables[id]=v,value:()=>0},$gameMap:{mapId:()=>5,isEventRunning:()=>false},$gamePlayer:{reserveTransfer(){}},$dataMapInfos:[],$dataCommonEvents:[],$gameMessage:{isBusy:()=>false,add:s=>messages.push(s)}};
  // Queued UI plugins initialize the shared sampler even before a scene opens.
  // This admission-only host deliberately never supplies input events.
  Object.assign(G,{Input:{keyMapper:{},isPressed:()=>false,isTriggered:()=>false,isRepeated:()=>false,clear(){}},TouchInput:{isCancelled:()=>false,clear(){}},document:{addEventListener(){},removeEventListener(){}},addEventListener(){},removeEventListener(){}});
- G.window=G;vm.createContext(G);vm.runInContext(plugin,G);G.PSFlow._app=w.app;G.PSFlow._content=w.content;return{G,flow:G.PSFlow,pushed,variables,messages};
+ require('../../../scripts/tests/legacy-mz-world-host.cjs').install(G);G.window=G;vm.createContext(G);vm.runInContext(plugin,G);G.PSFlow._app=w.app;G.PSFlow._content=w.content;return{G,flow:G.PSFlow,pushed,variables,messages};
 }
 const snapshot=w=>({state:clone(w.state.current()),generation:w.app.stateGeneration,blocked:w.app.saveBlocked,learning:clone(w.app.pendingLearning),triggered:clone(w.app.pendingTriggeredEvolution),trade:clone(w.app.pendingTrade),evolution:clone(w.app.pendingEvolution),dex:clone(w.app.pendingPokedex),receiving:clone(w.app.pendingReceiving)});
 async function activate(w,kind){
@@ -140,7 +140,7 @@ for(const entry of ['useItem','UseItemOnMember'])test(`SOL-FINAL-02 deferred ${e
  if(entry==='useItem')handle=G.PSInventory.useItem('rarecandy',w.id,1,()=>callbacks++);else{i=new G.Game_Interpreter();i.setWaitMode=function(mode){this._waitMode=mode;};commands['PS_Inventory:UseItemOnMember'].call(i,{itemId:'rarecandy',memberId:w.id,quantity:'1'});}
  const queued=m._nextScene;handle??=queued._request.handle;const before=snapshot(w),counts={...w.counts},op=flow._op;
  assert(flow.operationPending());assert.throws(()=>flow.openBattle(w.request),/operation-active/);assert.equal(m._nextScene,queued);assert.equal(flow._op,op);assert.deepEqual(w.counts,counts);assert.deepEqual(snapshot(w),before);
- m.changeScene();m.updateScene();assert(queued._controller&&!handle.done,JSON.stringify({handle,reason:queued._failure},(key,value)=>key==='application'?undefined:value));queued._controller.close({status:'cancelled'},true);m.pop();m.changeScene();m.updateScene();m.updateScene();assert(handle.done);if(i)assert(!i.updateWaitMode());else assert.equal(callbacks,1);assert(!flow.operationPending());assert(!w.app.encounterBlocked);
+ m.changeScene();m.updateScene();assert(queued._controller&&!handle.done,require('node:util').inspect({handle,reason:queued._failure},{depth:2,getters:false,customInspect:false}));queued._controller.close({status:'cancelled'},true);m.pop();m.changeScene();m.updateScene();m.updateScene();assert(handle.done);if(i)assert(!i.updateWaitMode());else assert.equal(callbacks,1);assert(!flow.operationPending());assert(!w.app.encounterBlocked);
 });
 for(const point of ['held-check','performance','initialize'])test(`SOL-FINAL-02 ${point} callback cannot overwrite an initialized item request`,()=>{
  const {w,G,m,flow}=deferredHost();let handle,queued;const queue=()=>{handle=G.PSInventory.useItem('rarecandy',w.id,1);queued=m._nextScene;assert(handle&&!handle.done);};

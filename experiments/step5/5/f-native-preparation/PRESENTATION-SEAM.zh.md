@@ -1,0 +1,9 @@
+# F 表现接缝（types-only）
+
+唯一新模块 blackout-presentation-mz.ts 返回 WorldBlackoutHost 的 announce/prepare/requestMapRefresh 三口。完整Host由唯一Flow安装器组合 source三口、configuration 与save两口。此合同没有安装或方法空实现，不签实际功能。
+
+Callbacks.capture(owner,phase,receipt?) 返回由实际App/同canonical native producer构造的guard；每个unknown native/provider调用、message/await前后执行，prepare要求实际isBlackoutPreparing。refresh由真实isWorldTravelReceipt和canPerformWorldTravel闭合：c8正常抵达及冷同点refresh时均仍有效，终态install后才false。正常refresh在performTransfer/confirm内部，genuine birth可能frame=null，不能强求整个onMapLoaded提前完成；冷分支无新physical则依实际App冷receipt+source ready已加载证明。
+
+唯一车辆prefix来自已验证的实际worldTravel.effect(cancel-vehicles,owner)。其后真实App.clearBlackoutCompanionProjection，cleared/fallback继续、rejected/cancelled拒绝；缺方法必须失败。不得业务写companions=[]，App私child终态守卫仍唯一决定可提交；不得把初始空数组/演员followers当nativeclear能力。再写配置StartingOverSwitch，不能猜ID或以零假成功。configuration四元组及参数metadata由唯一installer负责，helper不镜像三参Teleport点。
+
+message使用现有真实Game_Message.add/isBusy和frames.nextFrame ACK。debug显式来自TravelDebug===true，缺家debugfalse不显示消息；origin只有battle/field，没有虚构gameover入口。所有回调均在最终业务安装区间之外。

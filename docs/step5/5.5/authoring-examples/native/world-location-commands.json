@@ -1,0 +1,32 @@
+{
+  "RecordRecentCenter": {
+    "code": 357,
+    "indent": 0,
+    "parameters": [
+      "PS_World",
+      "RecordRecentCenter",
+      "Record current recent center",
+      {}
+    ]
+  },
+  "RecordCaveEntrance": {
+    "code": 357,
+    "indent": 0,
+    "parameters": [
+      "PS_World",
+      "RecordCaveEntrance",
+      "Record cave entrance return",
+      {}
+    ]
+  },
+  "ClearCaveEscapePoint": {
+    "code": 357,
+    "indent": 0,
+    "parameters": [
+      "PS_World",
+      "ClearCaveEscapePoint",
+      "Clear cave escape point",
+      {}
+    ]
+  }
+}

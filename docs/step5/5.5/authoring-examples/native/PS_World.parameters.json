@@ -1,0 +1,10 @@
+{
+  "CharacterHome": "{\"mapId\":5,\"x\":10,\"y\":8,\"direction\":2}",
+  "GlobalHome": "",
+  "StartingOverSwitch": "1",
+  "TravelDebug": "false",
+  "TerrainTags": "{\"0\":{\"landAllowed\":false,\"fishable\":false,\"environment\":\"none\",\"canSurf\":false},\"1\":{\"landAllowed\":true,\"fishable\":false,\"environment\":\"grass\",\"canSurf\":false},\"2\":{\"landAllowed\":false,\"fishable\":true,\"environment\":\"stillwater\",\"canSurf\":true},\"3\":{\"landAllowed\":false,\"fishable\":false,\"environment\":\"stillwater\",\"canSurf\":true},\"4\":{\"landAllowed\":false,\"fishable\":true,\"environment\":\"stillwater\",\"canSurf\":false},\"5\":{\"landAllowed\":false,\"fishable\":false,\"environment\":\"ice\",\"canSurf\":false,\"ice\":true}}",
+  "SurfPassage": "boat",
+  "SurfCharacter": "{\"name\":\"Actor1\",\"index\":0}",
+  "FlashAnimationId": "40"
+}

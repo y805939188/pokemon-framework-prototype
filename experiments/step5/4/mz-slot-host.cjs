@@ -4,7 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const ROOT=path.resolve(__dirname,'../../..'),E=require(path.join(ROOT,'js/engine/build/production.cjs'));
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 function section(source,begin,end){const a=source.indexOf(begin),b=end?source.indexOf(end,a+begin.length):source.length;assert(a>=0&&b>a,'exact installed class boundaries');return source.slice(a,b);}
-function createHost(hostRoot,productRoot,folder,content,manifest){
+function createHost(hostRoot,productRoot,folder,content,manifest,beforePlugin){
  const hashes={};function read(root,relative){const bytes=fs.readFileSync(path.join(root,relative)),h=sha(bytes);assert.equal(h,manifest[relative],'bound host/product bytes '+relative);hashes[relative]=h;return bytes.toString('utf8');}
  const managers=read(hostRoot,'js/reactor_managers.js'),core=read(hostRoot,'js/reactor_core.js'),pako=read(hostRoot,'js/libs/pako.min.js'),plugin=read(productRoot,'js/plugins/PS_SaveState.js');
  const io=[],errors=[],writes=[],checked=file=>{const value=path.resolve(file);assert(value===folder||value.startsWith(folder+path.sep),'owned synthetic save path only');return value;};
@@ -26,6 +26,7 @@ function createHost(hostRoot,productRoot,folder,content,manifest){
  context.StorageManager.saveObject=function(name,value){const record={name,started:true,completed:false};writes.push(record);const pending=originalSaveObject.call(this,name,value);record.promise=pending.then(v=>{record.completed=true;record.success=true;return v;},e=>{record.completed=true;record.success=false;throw e;});return record.promise;};
  context.DataManager._globalInfo=[];
  context.DataManager.createGameObjects();
+ beforePlugin?.(context);
  vm.runInContext(plugin,context,{filename:'bound-PS_SaveState.js'});
  return{context,hashes,io,errors,writes,async drain(){await Promise.all(writes.map(w=>w.promise));},records:()=>writes.map(({promise,...record})=>record)};
 }

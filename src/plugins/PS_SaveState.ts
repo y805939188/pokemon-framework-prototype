@@ -22,6 +22,11 @@
  */
 import type { SaveApplication } from './application-host';
 import type { FriendshipPersistencePort } from '../framework/app';
+import type { Content } from '../framework/rules/types';
+import type { GameState } from '../framework/rules/state';
+import type { SpeciesKeyResolver } from '../framework/rules/species-key';
+import type { LegacyWeatherInput } from '../framework/rules/world-state';
+import { captureGameObjects, hostRecord, ownData, invoke, legacyWeatherSnapshot } from './world/world-host';
 type MigrationHandle = Parameters<SaveApplication['confirmFriendshipMigration']>[0];
 type MigrationResult = ReturnType<SaveApplication['cancelFriendshipMigration']>;
 type MigrationSchema = Pick<typeof import('../framework/rules/save-schema'), 'migrateGame' | 'snapshotForSave'>;
@@ -58,7 +63,7 @@ type MigrationSchema = Pick<typeof import('../framework/rules/save-schema'), 'mi
     lastSaveError: null as any,
     lastSave: null as any,
     /** Called after MZ restored a save: migrate or diagnose `_psGame`. */
-    afterLoad(): void {
+    afterLoad(legacyWeather?: LegacyWeatherInput): void {
       const sys = G.$gameSystem;
       delete sys._psSaveError; delete sys._psSaveInfo; delete sys._psSaveWarning;
       const missing = sys._psGame === undefined;
@@ -77,6 +82,7 @@ type MigrationSchema = Pick<typeof import('../framework/rules/save-schema'), 'mi
       if (W.PSFlow) W.PSFlow.stateReplaced();
       if (missing) {
         const empty = state().newGame({ party: [], money: 0, content });
+        empty.hallOfFame = null;
         const problems = schema().validateGameContent(empty, content);
         if (problems.length) { sys._psSaveError = {code: "invalid", message: "empty framework state could not be initialized", problems}; return; }
         sys._psGame = empty;
@@ -89,7 +95,7 @@ type MigrationSchema = Pick<typeof import('../framework/rules/save-schema'), 'mi
         console.error("PS_SaveState: save state not usable:", sys._psSaveError.code, sys._psSaveError.message);
         return;
       }
-      const r = schema().migrateGame(document, { ...(speciesKey ? { speciesKey } : {}), ...(content ? { content } : {}) });
+      const r = schema().migrateGame(document, { ...(speciesKey ? { speciesKey } : {}), ...(content ? { content } : {}), legacyWeather });
       if (r.ok) {
         sys._psGame = r.state; // a legitimate explicit layout conversion may also replace a current-version document
         sys._psSaveInfo = { from: r.from, to: r.to, migrated: r.migrated, notes: r.notes };
@@ -100,6 +106,7 @@ type MigrationSchema = Pick<typeof import('../framework/rules/save-schema'), 'mi
     },
     /** Synchronous authority shared by saveGame and makeSaveContents. Never migrates or repairs. */
     beforeSave(capture = false): any {
+      if (ordinaryLoads) throw new Error('host-load-pending: saving is not allowed during load');
       if (friendshipModal) throw new Error("friendship-preview-active: finish the migration choice before saving");
       const sys = G.$gameSystem;
       if (!sys || sys._psGame === undefined) throw new Error("state-unusable: framework state is missing");
@@ -117,10 +124,58 @@ type MigrationSchema = Pick<typeof import('../framework/rules/save-schema'), 'mi
   });
 
   const baseExtract = G.DataManager.extractSaveContents;
+  interface SaveLoadFlow { content(): Content; speciesKeyResolver(): SpeciesKeyResolver | undefined; stateReplaced(): void }
+  function loadFlow(): SaveLoadFlow {
+    const candidate: unknown = W.PSFlow, record = hostRecord(candidate);
+    if (!record || ['content', 'speciesKeyResolver', 'stateReplaced'].some(key => typeof record[key] !== 'function')) throw new Error('needs-content: framework host unavailable');
+    return candidate as SaveLoadFlow;
+  }
+  function prepareHostLoad(contents: unknown): Record<string, unknown> {
+    const system = hostRecord(ownData(contents, 'system'));
+    if (!system) throw new Error('state-unusable: loaded contents have no own Game_System');
+    for (const key of ['screen', 'timer', 'switches', 'variables', 'selfSwitches', 'actors', 'party', 'map', 'player']) {
+      if (!hostRecord(ownData(contents, key))) throw new Error(`state-unusable: loaded contents have no own ${key}`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(system, '_psGame');
+    if (descriptor && !Object.hasOwn(descriptor, 'value')) throw new Error('state-unusable: framework save accessor is unsupported');
+    const flow = loadFlow(), content = flow.content(), speciesKey = flow.speciesKeyResolver();
+    if (!content?.regionalDex) throw new Error('needs-content: validated content layout unavailable');
+    const migration: MigrationSchema = schema();
+    const raw: unknown = descriptor?.value;
+    let next: GameState, info: { from: number | null; to: number; migrated: boolean; created?: string; notes: readonly string[] };
+    if (raw === undefined) {
+      const empty: GameState = state().newGame({ party: [], money: 0, content });
+      empty.hallOfFame = null;
+      const problems: readonly unknown[] = schema().validateGameContent(empty, content);
+      if (problems.length) throw new Error('state-unusable: empty framework state could not be initialized');
+      next = empty; info = { from: null, to: empty.schema, migrated: false, created: 'empty', notes: ['the save had no framework state: an empty one was created from validated content'] };
+    } else {
+      const result = migration.migrateGame(unpack(raw), { content, ...(speciesKey ? { speciesKey } : {}), legacyWeather: legacyWeatherSnapshot(contents) });
+      if (!result.ok) throw new Error(`state-unusable: ${result.error.code}: ${result.error.message}`);
+      next = result.state; info = { from: result.from, to: result.to, migrated: result.migrated, notes: result.notes };
+    }
+    // Preserve the loaded host class and raw source. Only the verified owned copy is installed.
+    const descriptors = Object.getOwnPropertyDescriptors(system);
+    delete descriptors._psSaveError; delete descriptors._psSaveWarning; delete descriptors._psSaveInfo;
+    descriptors._psGame = { value: next, writable: true, configurable: true, enumerable: true };
+    descriptors._psSaveInfo = { value: info, writable: true, configurable: true, enumerable: true };
+    const preparedSystem: unknown = Object.create(Object.getPrototypeOf(system), descriptors);
+    const prepared: Record<string, unknown> = {};
+    const contentsRecord = hostRecord(contents);
+    if (!contentsRecord) throw new Error('state-unusable: loaded contents unavailable');
+    Object.defineProperties(prepared, Object.getOwnPropertyDescriptors(contentsRecord));
+    Object.defineProperty(prepared, 'system', { value: preparedSystem, writable: true, configurable: true, enumerable: true });
+    return prepared;
+  }
   G.DataManager.extractSaveContents = function (this: any, contents: any) {
     assertReplacement();
-    baseExtract.call(this, contents);
-    PSState.afterLoad();
+    if (ordinaryLoads) {
+      const prepared = prepareHostLoad(contents);
+      baseExtract.call(this, prepared);
+    } else {
+      baseExtract.call(this, contents);
+      PSState.afterLoad(legacyWeatherSnapshot(contents));
+    }
   };
   const baseSaveGame = G.DataManager.saveGame;
   G.DataManager.saveGame = function (this: any, savefileId: number) {
@@ -283,16 +338,40 @@ type MigrationSchema = Pick<typeof import('../framework/rules/save-schema'), 'mi
   if (baseSaveZip) G.StorageManager.saveZip = function(this: any, ...args: any[]) {assertReplacement();return baseSaveZip.apply(this,args);};
   const baseLoadGame = G.DataManager.loadGame;
   if (baseLoadGame) G.DataManager.loadGame = function(this: any, slot: number) {
-    assertReplacement(); ordinaryLoads++;
-    try {return Promise.resolve(baseLoadGame.call(this,slot)).finally(()=>{ordinaryLoads--;});}
-    catch(error) {ordinaryLoads--;throw error;}
+    assertReplacement();
+    if (ordinaryLoads || ordinaryWrites) return Promise.reject(new Error('host-save-or-load-pending'));
+    const restore = captureGameObjects(G);
+    ordinaryLoads++;
+    let result: unknown;
+    try { result = Reflect.apply(baseLoadGame, this, [slot]); }
+    catch (error) { ordinaryLoads--; restore(); return Promise.reject(error); }
+    return Promise.resolve(result).then(value => {
+      // Native correctDataErrors runs after extract. Retire the old application only after that full load succeeds.
+      loadFlow().stateReplaced();
+      const world: unknown = W.PSWorld;
+      if (typeof hostRecord(world)?.loadSucceeded === 'function') invoke(world, 'loadSucceeded');
+      PSState.lastLoadError = null;
+      return value;
+    }).catch((error: unknown) => {
+      restore();
+      PSState.lastLoadError = { savefileId: slot, message: error instanceof Error ? error.message : String(error) };
+      throw error;
+    }).finally(() => { ordinaryLoads--; });
+  };
+  const loadScene = G.Scene_Load?.prototype;
+  const baseLoadFailure = loadScene?.onLoadFailure;
+  if (baseLoadFailure) loadScene.onLoadFailure = function(this: any) {
+    baseLoadFailure.call(this);
+    // Follow the game language without requiring the content or runtime that may have failed to load.
+    const lang = W.PSFlow?.lang || G.PluginManager?.parameters?.("PS_BattleFlow")?.language;
+    this._helpWindow?.setText(lang === "zh" ? "无法载入存档。请选择其他存档。" : "Load failed. Pick another slot.");
   };
   const baseSetup = G.DataManager.setupNewGame;
   if (baseSetup) G.DataManager.setupNewGame = function(this: any, ...args: any[]) { assertReplacement(); return baseSetup.apply(this,args); };
   if (G.Scene_Map?.prototype.updateMain) {
     const updateMain = G.Scene_Map.prototype.updateMain;
     G.Scene_Map.prototype.updateMain = function(this: any, ...args: any[]) {
-      if (friendshipModal && friendshipModal.scene === this) return;
+      if (ordinaryLoads || G.$gameSystem?._psSaveError || friendshipModal && friendshipModal.scene === this) return;
       return updateMain.apply(this,args);
     };
     for (const method of ["stop","terminate"]) {

@@ -60,6 +60,9 @@ export interface ProductionRuntime {
 
 export type InventoryApplication = Pick<HostApplication,
   'beginInventoryOperation'
+  | 'prepareFieldItemHandoff'
+  | 'runFieldItemHandoff'
+  | 'cancelFieldItemHandoff'
   | 'beginInventorySort'
   | 'beginItemSelection'
   | 'beginManagement'
@@ -111,6 +114,7 @@ export type ManagementApplication = Pick<HostApplication,
   | 'receiveGift'
   | 'receivingNotifications'
   | 'recoverAll'
+  | 'registerHallOfFame'
   | 'resolveReceiving'
   | 'searchStorage'
   | 'stateGeneration'>;
@@ -141,6 +145,7 @@ export type PokedexApplication = Pick<HostApplication,
   | 'pendingPokedex'
   | 'pokedexSearchDirectory'
   | 'pokedexSnapshot'
+  | 'pokedexArea'
   | 'resolvePokedex'
   | 'stateGeneration'
   | 'updatePokedex'>;

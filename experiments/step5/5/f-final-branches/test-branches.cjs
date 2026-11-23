@@ -1,0 +1,55 @@
+'use strict';
+// Six fresh source-bound production inputs, five remaining logical F cells.
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const id=process.env.PF_F_BRANCH_CASE,scope=process.env.PF_F_BRANCH_ROOT;
+const ids=['F-FIELD-HOME-C','F-FIELD-HOME-G','F-FIELD-MISSING','F-BATTLE-HOME','F-BATTLE-NOHOME','F-BATTLE-MISSING'];
+assert(ids.includes(id));assert.equal(process.argv.slice(2).length,0);
+const clone=x=>structuredClone(x);
+function write(value){fs.writeFileSync(path.join(scope,'RESULT.json'),JSON.stringify(value,null,2)+'\n',{flag:'wx'});}
+function fieldSpecies(game,content){
+ const {T}=require('../../../../scripts/tests/final-production-runtime.cjs').get();
+ content.species.Pidgey={...clone(T.fixtureContent.species.Pidgey),abilities:['Keen Eye'],gender:'F50',types:['Normal','Flying']};
+ content.abilities={...content.abilities,...clone(T.fixtureContent.abilities)};
+ game.party[0]={...game.party[0],species:'Pidgey',form:0,item:'',ability:'Keen Eye',abilityIndex:0,effectiveAbilityIndex:0};
+}
+async function field(){
+ const missing=id==='F-FIELD-MISSING',global=id==='F-FIELD-HOME-G',calls=[],preloads=[],announcements=[];
+ const nativeSetup=n=>{const G=n.G,p=G.Scene_Map.prototype;
+  const parameters=G.PluginManager.parameters;G.PluginManager.parameters=function(name){const value=parameters(name);return name==='PS_World'&&missing?{...value,GlobalHome:JSON.stringify({mapId:5,x:2,y:2,direction:2})}:value;};
+  const capturedOriginal=p.requestAutosave;p.requestAutosave=function(...args){calls.push({receiver:this,args:[...args],functionIdentity:capturedOriginal,map:G.$gameMap.mapId(),blocked:G.PSFlow._app?.saveBlocked});return Reflect.apply(capturedOriginal,this,args);};
+ };
+ const make=missing?require('../f-native-preparation/nontransfer-production-fixture.cjs').fixture:require('../f-native-preparation/normal-production-fixture.cjs').fixture;
+ const h=await make({home:true,characterHomeAbsent:global,missingHome:missing,edit:fieldSpecies,nativeSetup});
+ const {G,app}=h,initial=clone(h.state()),facts=clone(h.ports.worldTravel.facts());
+ const preload=h.ports.worldTravel.preload;h.ports.worldTravel.preload=async function(...args){const r=await Reflect.apply(preload,this,args);preloads.push({target:clone(args[1]),status:r.status,mapId:r.mapId});return r;};
+ const announce=h.ports.blackout.announce;h.ports.blackout.announce=async function(...args){announcements.push({kind:args[0],checkpoint:clone(args[1]),ownerCurrent:app.isBlackoutOwner(args[2])});return Reflect.apply(announce,this,args);};
+ calls.length=0;
+ const expected=global?{mapId:5,x:2,y:2,direction:2}:{mapId:7,x:1,y:1,direction:8};
+ let result;
+ try{
+  ({result}=await h.run());assert.equal(result.status,'awaiting-arrival');
+  await h.pump(()=>!app.saveBlocked&&h.saves.length===1&&(missing?h.captured.completions.length===1:G.$gameMap.mapId()===expected.mapId));
+  const state=h.state();assert.equal(state.world.pendingReturn,null);assert.equal(state.steps,4);assert.equal(state.stats.blacked_out_count,initial.stats.blacked_out_count+1);assert.equal(state.money,initial.money,'field never owns battle money');assert.equal(state.stats.battle_money_lost,initial.stats.battle_money_lost);assert.equal(state.party[0].hp,require('../../../../scripts/tests/final-production-runtime.cjs').get().E.heal.healMember(state.party[0],h.content).hp);assert.equal(state.party[0].status,'');assert.equal(h.captured.atomicErrors.length,0);assert.deepEqual(h.draws,[]);assert.deepEqual(h.nativeDraws,[]);
+  assert.equal(announcements.length,1);assert.equal(announcements[0].ownerCurrent,true);assert.equal(announcements[0].checkpoint.origin.kind,'field');assert.equal(announcements[0].checkpoint.selection.branch,'home');assert.equal(h.captured.adoptions.length,1);assert.equal(h.captured.adoptions[0].result.status,'done');
+  assert.equal(calls.length,1,'only one captured original function body');assert.equal(calls[0].receiver,G.SceneManager._scene,'exact final receiver');assert.equal(calls[0].blocked,false);assert.equal(h.saves.length,1);assert.equal(h.saves[0].scene,G.SceneManager._scene);assert.equal(h.saves[0].blocked,false);
+  if(missing){
+   assert.equal(facts.characterHome.mapId,99);assert.equal(facts.globalHome.mapId,5);assert.equal(announcements[0].kind,'debug-missing-home');assert.deepEqual(preloads.map(p=>[p.target.mapId,p.status]),[[6,'ready'],[99,'missing']]);assert.deepEqual(state.world.escapePoint,initial.world.escapePoint);assert.equal(G.$gameMap.mapId(),6);assert.equal(h.trace.filter(r=>r[0]==='native-reserve').length,1,'source connection only, F never reserves');assert.equal(h.captured.completions.length,1);assert.equal(h.captured.completions[0].result.status,'done');assert.equal(app.isBlackoutNonTransferComplete(h.captured.completions[0].owner,h.captured.completions[0].nonce),true);assert.deepEqual(calls[0].args,[]);assert.equal(h.trace.filter(r=>r[0]==='native-request-autosave').length,1);
+  }else{
+   const r=h.rendering;assert.equal(facts.characterHome===null,global);assert.equal(facts.globalHome.mapId,5);assert.equal(announcements[0].kind,'show-return-message');assert.deepEqual(announcements[0].checkpoint.selection.target,expected);assert.deepEqual(preloads.map(p=>[p.target.mapId,p.status]),[[6,'ready'],[expected.mapId,'ready'],[expected.mapId,'ready']]);assert.equal(state.world.companions.length,0);assert.equal(state.world.surfing,false);assert.equal(state.world.escapePoint,null);assert.equal(G.$gamePlayer.x,expected.x);assert.equal(G.$gamePlayer.y,expected.y);assert.equal(G.$gamePlayer.direction(),expected.direction);assert.equal(G.$gameSwitches.value(1),true);
+   assert.equal(r.clear.length,1);assert.equal(r.clear[0].before,1);assert.equal(r.clear[0].after,1);assert.equal(r.clear[0].result.status,'cleared');assert.equal(r.clear[0].result.resources.hadSurface,true);assert.equal(r.parents.reduce((n,p)=>n+p.children.length,0),0);assert.equal(r.sprites[0].destroyed,true);assert.equal(G.$gamePlayer.followers().isVisible(),true);assert(r.events.some(row=>row[0]==='remove'&&row[1]===1));assert.equal(r.reserves.filter(row=>row.blackout).length,1);assert.deepEqual(r.reserves.find(row=>row.blackout).receipt.target,expected);assert(r.refresh.some(row=>row.map===expected.mapId&&row.checkpoint==='awaiting-arrival'));
+   assert.equal(h.trace.filter(row=>row[0]==='native-reserve').length,2);assert.equal(r.raw.length,2);assert.equal(r.original.length,1);assert.equal(r.original[0].scene,G.SceneManager._scene);assert.deepEqual(r.original[0].args,['inherited-source-closure']);assert.deepEqual(calls[0].args,['inherited-source-closure']);assert.equal(r.original[0].map,expected.mapId);
+  }
+  const settled=clone(state);for(let i=0;i<12;i++){h.tick();await require('../f-native-preparation/nontransfer-production-fixture.cjs').flush();}assert.deepEqual(h.state(),settled);assert.equal(h.saves.length,1);assert.equal(calls.length,1);assert.equal(app.saveBlocked,false,'all parent save barriers retired');assert.equal(G.PSWorld.pending(),false);
+  write({id,initial,facts,result,preloads,announcements,final:clone(h.state()),trace:h.trace,requests:h.requests,nativeSaveRequestCount:h.trace.filter(r=>r[0]==='native-request-autosave').length,originalSaveCalls:calls.map(c=>({exactFinalReceiver:c.receiver===G.SceneManager._scene,immutableFunctionObserved:typeof c.functionIdentity==='function',args:c.args,map:c.map,blocked:c.blocked})),executorCount:h.saves.length,draws:h.draws,nativeDraws:h.nativeDraws,idleFrames:12,scope:'headless actual lifecycle with presentation/resource/storage facades, not NW or physical save'});
+ }catch(error){write({id,status:'FAIL',error:error.stack,initial,facts,result,preloads,announcements,final:clone(h.state()),trace:h.trace,draws:h.draws,nativeDraws:h.nativeDraws});throw error;}
+}
+async function battle(){
+ const destination=id==='F-BATTLE-HOME'?'home':id==='F-BATTLE-NOHOME'?'no-home':'missing';
+ const h=await require('../../../../scripts/tests/f-final-battle-fixture.cjs').fixture({destination});
+ try{const o=h.observed,s=h.state();assert.equal(o.normalizedRequest.canLose,false);assert.equal(o.final.outcome.code,4);assert.equal(o.final.outcome.commit,'applied');assert.equal(o.privateRouting,true,'actual canLose=false private F route, not legacy bypass');assert.equal(o.legacyCalls.length,0);assert.equal(Object.keys(o.final.appliedBattles).length,1);assert.equal(o.final.money,984);assert.equal(o.final.stats.battle_money_lost,16);assert.equal(o.final.stats.blacked_out_count,1);assert.equal(o.final.stats.wild_battles_lost,1);assert.equal(s.party[0].hp,require('../../../../scripts/tests/final-production-runtime.cjs').get().E.heal.healMember(s.party[0],h.content).hp);assert.equal(s.party[0].moves[0].pp,s.party[0].moves[0].maxpp);assert.equal(o.final.pending,null);assert.equal(o.final.blocked,false);assert.equal(o.arm.length,1);assert.equal(o.wait.length,1);assert.equal(o.announcements.length,1);assert.equal(o.announcements[0].checkpoint.origin.kind,'battle');assert.deepEqual(o.worldAfterCreate.slice(o.worldPrefixAtStart.length),[65536,65536,32,32,32,32,32,32]);assert.deepEqual(o.worldCompletePrefix,o.worldAfterCreate);assert.deepEqual(o.nativeCompletePrefix,o.nativePrefixAtStart);assert.equal(o.idleFrames,12);
+ if(destination==='home'){assert.deepEqual(o.Freserves.map(r=>r.target),[{mapId:7,x:1,y:1,direction:8}]);assert.equal(o.Freserves[0].blackout,true);assert.equal(o.final.mapId,7);assert.equal(o.final.x,1);assert.equal(o.final.y,1);assert.equal(h.G.$gamePlayer.direction(),8);assert.equal(o.final.escapePoint,null);assert.equal(o.final.switch1,true);assert.equal(o.actualSaveExecutorCalls,1);assert.equal(o.nativeOriginalRequests.length,1);assert.equal(o.completions.length,1);assert.equal(o.completions[0].result.status,'done');assert.deepEqual(o.preloads.map(p=>[p.target.mapId,p.result.status]),[[7,'ready'],[7,'ready']]);}
+ else{assert.equal(o.Freserves.length,0);assert.equal(o.rawReserves.length,0);assert.equal(o.final.mapId,5);assert.equal(o.nonTransfers.length,1);assert.equal(o.nonTransfers[0].result.status,'done');assert.equal(o.nonTransfers[0].authorized,true);assert.equal(o.nativeOriginalRequests.length,0,'actual return Map without transfer generates no native autosave request');assert.equal(o.actualSaveExecutorCalls,0,'do not manufacture a request');if(destination==='missing'){assert.equal(o.announcements[0].kind,'debug-missing-home');assert.equal(o.announcements[0].checkpoint.selection.target.mapId,99);assert.equal(o.final.escapePoint.mapId,7);assert.deepEqual(o.preloads.map(p=>[p.target.mapId,p.result.status]),[[99,'missing']]);}else{assert.equal(o.announcements[0].kind,'show-return-message');assert.equal(o.announcements[0].checkpoint.selection.branch,'no-home');assert.equal(o.final.escapePoint,null);assert.deepEqual(o.preloads,[]);}}
+ write({id,status:'PASS',observed:o});
+ }finally{h.restore();}
+}
+test(id+' actual production branch',{timeout:120000},id.startsWith('F-FIELD')?field:battle);

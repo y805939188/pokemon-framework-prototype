@@ -90,11 +90,11 @@ test('HF-10 explicit legacy producer is selected before app/operation; unregiste
   assert.equal(app.commitResult(raw),'applied');assert.equal(calls,1);assert.equal(state.replaced.length,1);
   assert.equal(app.commitResult(raw),'already-applied');assert.equal(calls,1);
 });
-test('HF-11 schema8 migration preserves old raw ledger; schema9 rejects bad pair fields without changing input',()=>{
-  const c=content(),old=E.state.newGame({content:c.content,party:[],money:1000001});old.schema=8;
+test('HF-11 schema8 migration preserves old raw ledger; current schema rejects bad pair fields without changing input',()=>{
+  const c=content(),old=E.state.newGame({content:c.content,party:[],money:1000001});old.schema=8;delete old.hallOfFame;delete old.world;delete old.inventory.registeredItems;
   old.appliedBattles.old={hash:'a'.repeat(64),trainer:{id:'old-trainer',version:1}};const before=J(old);
   const migrated=E.saveSchema.migrateGame(old,{content:c.content});assert.equal(migrated.ok,true,JSON.stringify(migrated));
-  assert.deepEqual(old,before);assert.equal(migrated.state.schema,9);assert.deepEqual(migrated.state.appliedBattles,old.appliedBattles);assert.equal(migrated.state.money,1000001);
+  assert.deepEqual(old,before);assert.equal(migrated.state.schema,E.state.GAME_SCHEMA);assert.deepEqual(migrated.state.appliedBattles,old.appliedBattles);assert.equal(migrated.state.money,1000001);
   for(const settlement of [{version:2,pairHash:'a'.repeat(64)},{version:1,pairHash:'bad'},{version:1,pairHash:'a'.repeat(64),extra:1}]){
     const bad=J(migrated.state);bad.appliedBattles.old.settlement=settlement;const copy=J(bad);assert.ok(E.saveSchema.validateGame(bad).length);assert.equal(E.saveSchema.migrateGame(bad,{content:c.content}).ok,false);assert.deepEqual(bad,copy);
   }

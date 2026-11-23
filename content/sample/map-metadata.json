@@ -4,7 +4,19 @@
     "5": {
       "region": 0,
       "flags": [],
-      "darkMap": false
+      "darkMap": false,
+      "outdoor": true,
+      "environment": "grass",
+      "weather": { "type": "None", "chance": 0 },
+      "mapPosition": { "regionId": 0, "x": 13, "y": 12 },
+      "healingSpot": { "mapId": 5, "x": 10, "y": 8 }
+    },
+    "6": {
+      "darkMap": true,
+      "outdoor": false,
+      "environment": "cave",
+      "mapPosition": { "regionId": 0, "x": 14, "y": 12 },
+      "mapSize": { "width": 1, "shape": "1" }
     }
   }
 }

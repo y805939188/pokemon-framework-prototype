@@ -1,5 +1,9 @@
 import { createDexState } from "./dex-state";
+import { newWorldState } from './world-state';
+import type { WorldState } from './world-state';
 import { moneyCap } from "./economy";
+import { emptyHallOfFame } from "./hall-of-fame";
+import type { HallOfFameHistory } from "./hall-of-fame";
 /**
  * Persistent game state model + the battle write-back contract (protocol v1).
  * Pure functions. A BattleResult is the only thing that crosses from the battle layer into persistent state;
@@ -18,7 +22,7 @@ import { sha256Hex } from "./sha256";
 import { DEFAULT_LIMITS } from "./limits";
 import { own, setOwn } from "./own";
 import { assertBattleResultShape } from "./battle-result-validation";
-import { creationBattleNameOf, identityKeys } from "./species-key";
+import { initialWildBattleNameOf, identityKeys } from "./species-key";
 import type { SpeciesKeyResolver } from "./species-key";
 import { advanceMemberOrdinal, completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity";
 import { allMembers, boxedMembers, newStorage, placeInBox } from "./storage";
@@ -33,7 +37,7 @@ export { PROTOCOL_VERSION, MEMBER_WRITE_SET } from "./battle-result";
 export type { BattleResult, BattleOutcome, MemberPatch, WriteKey, Dex } from "./battle-result";
 
 /** Version of the PERSISTENT game state document (rules/save-schema.ts migrates older ones). Not the battle protocol version. */
-export const GAME_SCHEMA = 9;
+export const GAME_SCHEMA = 12;
 
 export interface GameState {
   schema: number;
@@ -54,6 +58,9 @@ export interface GameState {
   stats: GameStats;
   /** Global step counter (schema 4; WP06 §4.1, wraps at 2^31). */
   steps: number;
+  world: WorldState;
+  /** Null means the save predates an owned archive. An empty archive has a known entry count. */
+  hallOfFame: HallOfFameHistory | null;
 }
 
 export interface Claim {
@@ -130,7 +137,7 @@ export function protocolMember(member: Member): Member {
  */
 export function newGame({ party, bag = {}, money = 0, player = { ...COMPATIBLE_PLAYER }, content }: { party: NewMemberInput[]; bag?: Record<string, number>; money?: number; player?: Owner; content?: Content }): GameState {
   const members = party.map((m) => ({...completeIndividual(newMember({ ...m, form: m.form ?? 0 }), {}), statNature: m.statNature ?? null, moves: m.moves.map(move => ({...clone(move),ppUps:move.ppUps ?? 0}))}));
-  return { schema: GAME_SCHEMA, party: members, storage: newStorage(), player: { ...player }, nextMemberOrdinal: initialOrdinal(members.map((m) => m.id)), inventory: inventoryFromBag(bag, catalogOf(content), inventoryPolicy(content)), badges: Array(8).fill(false) as boolean[], money, dex: createDexState(content), appliedBattles: {}, defeatedTrainers: {}, claims: {}, stats: newStats(), steps: 0 };
+  return { schema: GAME_SCHEMA, party: members, storage: newStorage(), player: { ...player }, nextMemberOrdinal: initialOrdinal(members.map((m) => m.id)), inventory: inventoryFromBag(bag, catalogOf(content), inventoryPolicy(content)), badges: Array(8).fill(false) as boolean[], money, dex: createDexState(content), appliedBattles: {}, defeatedTrainers: {}, claims: {}, stats: newStats(), steps: 0, world: newWorldState(), hallOfFame: emptyHallOfFame() };
 }
 
 /** Stable hash of a result, used for idempotency (same battleId + same hash => no-op). */
@@ -157,7 +164,7 @@ export function capturedTemplates(result: BattleResult, templates: Readonly<Reco
     const template = own(templates, c.id);
     requireTemplate(template, c.id);
     const k = keys(c.species);
-    const formMatches = k?.form === (template.form ?? 0) || !!content && creationBattleNameOf(content, { species: template.species, form: template.form ?? 0 }) === c.species;
+    const formMatches = k?.form === (template.form ?? 0) || !!content && initialWildBattleNameOf(content, { species: template.species, form: template.form ?? 0 }) === c.species;
     if (!k || k.species !== template.species || !formMatches) throw new Error(`captured member ${c.id}: "${c.species}" has no matching persistent key in its original template`);
     received.push({ ...clone(template), hp: c.hp, status: c.status, statusCount: c.statusCount ?? 0, moves: mergeBattleMoves(template.moves, c.moves, content), ball: c.ball ?? template.ball, friendship: c.friendship ?? template.friendship });
   }

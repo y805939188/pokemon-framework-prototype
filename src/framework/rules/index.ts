@@ -47,6 +47,7 @@ export * as economy from "./economy";
 
 export * as itemEffects from './item-effects';
 export * as shop from './shop';
+export * as blackout from './blackout';
 
 export * as dexState from "./dex-state";
 export * as evolutionReadiness from "./evolution-readiness";
@@ -65,3 +66,22 @@ export * as acquisitionDex from "./acquisition-dex";
 export * as heldFacts from "./held-facts";
 
 export * as trainerAi from "./trainer-ai-public";
+
+export * as worldData from "./world-data";
+export * as worldState from "./world-state";
+export * as fieldItems from "./field-items";
+
+export * as encounterTrigger from "./encounter-trigger";
+
+export * as encounterSelection from "./encounter-selection";
+
+export * as worldBattleContext from "./world-battle-context";
+
+export * as fieldPassives from "./field-passives";
+
+export * as fishing from "./fishing";
+
+export * as fieldShortcuts from "./field-shortcuts";
+export * as wildGeneration from './wild-generation';
+
+export * as worldTravel from './world-travel';

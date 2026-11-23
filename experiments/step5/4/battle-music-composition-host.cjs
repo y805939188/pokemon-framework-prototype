@@ -45,7 +45,10 @@ function world(opt = {}) {
   class Bitmap { constructor(width, height) { this.width = width; this.height = height; this.context = { drawImage() {} }; } fillAll() {} blt() {} drawText() {} destroy() {} }
   class Sprite { constructor(bitmap) { this.bitmap = bitmap; this.anchor = { x: 0, y: 0 }; this.scale = { x: 1, y: 1 }; } destroy() {} }
   function System() {} System.prototype.isSaveEnabled = () => true;
-  const req = name => { if (['fs', 'path', 'url'].includes(name)) return require(name); if (name.includes('production.cjs')) return E; throw Error('unexpected require ' + name); };
+  // Choose the supported optional-host composition at the real constructor call,
+  // before GameApplication wraps/sanitizes its public state port. No prior App or authority is borrowed.
+  const fixtureEngine=opt.legacyDefeatCompat?{...E,app:{...E.app,GameApplication:class extends E.app.GameApplication {constructor(ports,options){super({...ports,blackout:undefined,blackoutProjection:undefined},options);}}}}:E;
+  const req = name => { if (['fs', 'path', 'url', 'node:util'].includes(name)) return require(name); if (name.includes('production.cjs')) return fixtureEngine; throw Error('unexpected require ' + name); };
   req.resolve = () => path.join(root, 'js/engine/build/production.cjs');
   const settings = opt.settings ?? {};
   const manager = { _scene: null, pushed: [], isSceneChanging: () => false,
@@ -69,6 +72,7 @@ function world(opt = {}) {
   vm.runInContext(command241, G, { filename: 'reactor_objects.js#command241' });
   if(opt.prebattleWorld)require('./prebattle-native-world.cjs').installPrebattleWorld(G,ROOT,commands);
   if(opt.beforeProduct)opt.beforeProduct(G); // Explicit controlled-host setup before product hooks capture native methods.
+  require('../../../scripts/tests/legacy-mz-world-host.cjs').install(G);
   vm.runInContext(plugins.PS_BattleFlow, G, { filename: 'PS_BattleFlow.js' });
   vm.runInContext(plugins.PS_SaveState, G, { filename: 'PS_SaveState.js' });
   G.PSManagement = { inputFrame: () => ({ pressed: new Set() }), presentationPending: () => false };

@@ -1,0 +1,84 @@
+{
+  "candidateBase": "78aa2b7e8ecfceaede0afb75aa38406bc563fefc",
+  "candidateSrcTree": "5d5f5ba3f4e2b8e76de4098379a12d11c3fdf3b5",
+  "formalFirstHarness": "099fbd8a9a0eb8e7a388ef169f4f4ea9070e2d79",
+  "formalFirstProduct": "f80682d71484264294def1e9a18096a98cbfc970",
+  "productionSources": [
+    {
+      "path": "src/framework/rules/encounter-trigger.ts",
+      "formalFirstSha256": "ae2115e35a5d6d69de3032a1f6a214fe8360dd6b3aa86d50dcaaa7ba5ccb4606",
+      "candidateSha256": "ae2115e35a5d6d69de3032a1f6a214fe8360dd6b3aa86d50dcaaa7ba5ccb4606",
+      "sameAsFormalFirst": true
+    },
+    {
+      "path": "src/framework/rules/encounter-selection.ts",
+      "formalFirstSha256": "94ea16affcfc6bd6e4c8e5431fda13a183f1ea8878bcb83e60103bce4078b206",
+      "candidateSha256": "94ea16affcfc6bd6e4c8e5431fda13a183f1ea8878bcb83e60103bce4078b206",
+      "sameAsFormalFirst": true
+    },
+    {
+      "path": "src/framework/rules/wild-generation.ts",
+      "formalFirstSha256": "b77339ee91b016c780ee29f9dfcb1c97f1486430ee2f42442e5b2e0b083f8205",
+      "candidateSha256": "5a72d462c98e939e5e7f0783a29320535421d6f50729e119878402034e686bb8",
+      "sameAsFormalFirst": false
+    },
+    {
+      "path": "src/framework/rules/wild-member.ts",
+      "formalFirstSha256": "f83250100f94722e72249f1e99ee547cad873c7ecc403791680ada8bdddcb961",
+      "candidateSha256": "b5da9a3b81c415638e3c9ec23de0bde5a1d2884b49eb27d3dfa32d6079603cf3",
+      "sameAsFormalFirst": false
+    },
+    {
+      "path": "src/framework/rules/member-factory.ts",
+      "formalFirstSha256": "58595eb2635d21de69269ec5fdf29d92342b88c03931807db7a56d87d94b82e6",
+      "candidateSha256": "62d0d080b222c87e7591b71d4646c069feaf617208ae7a6fd9757be07bf9c534",
+      "sameAsFormalFirst": false
+    },
+    {
+      "path": "src/framework/rules/member-identity.ts",
+      "formalFirstSha256": "a854f9daab463dfa0a3e139780df129a02253b2eaa7ef6aa61892a4741081912",
+      "candidateSha256": "a854f9daab463dfa0a3e139780df129a02253b2eaa7ef6aa61892a4741081912",
+      "sameAsFormalFirst": true
+    },
+    {
+      "path": "src/framework/rules/item-catalog.ts",
+      "formalFirstSha256": "c2e6a9925d34b98994d0adcf6c87ebe7eb2435fc0b139628224ee73ed4de399c",
+      "candidateSha256": "a59b7aea00d822a050c3d704ae242b89faeb9e3eb956028d8590dc0fd4dda868",
+      "sameAsFormalFirst": false
+    },
+    {
+      "path": "src/framework/content/compile.ts",
+      "formalFirstSha256": "953b9d1282fffd83fc8afcbf3ec2206b9e315a61f6ba49715425d589c46a4037",
+      "candidateSha256": "953b9d1282fffd83fc8afcbf3ec2206b9e315a61f6ba49715425d589c46a4037",
+      "sameAsFormalFirst": true
+    },
+    {
+      "path": "src/framework/flow/content-runtime.ts",
+      "formalFirstSha256": "52ad2365a88d88cae10775e11ba3ed3a93acaf163d6fd01f3979ebc89f981bf8",
+      "candidateSha256": "52ad2365a88d88cae10775e11ba3ed3a93acaf163d6fd01f3979ebc89f981bf8",
+      "sameAsFormalFirst": true
+    },
+    {
+      "path": "src/framework/battle/dex.ts",
+      "formalFirstSha256": "6f0134f07022341bc3d36a6f9bf0b1d0c4659933cde7b325f425004176dcf37a",
+      "candidateSha256": "6f0134f07022341bc3d36a6f9bf0b1d0c4659933cde7b325f425004176dcf37a",
+      "sameAsFormalFirst": true
+    },
+    {
+      "path": "src/framework/battle/showdown-loader.ts",
+      "formalFirstSha256": "3eb5f41edc1c9db699c8a966066c527957235922f908b4ca56d8558fb8e3af49",
+      "candidateSha256": "3eb5f41edc1c9db699c8a966066c527957235922f908b4ca56d8558fb8e3af49",
+      "sameAsFormalFirst": true
+    },
+    {
+      "path": "src/framework/rules/config.ts",
+      "formalFirstSha256": "b589455fe54fa4aef626b26e5b4f9d50962e7abbb1c77c2dedba23dd1ab8ccaa",
+      "candidateSha256": "8c439056bab66d7af3afee40d0f60997ca303820aeb7872720c3667dded288cc",
+      "sameAsFormalFirst": false
+    }
+  ],
+  "decision": "G recovery ownership remediation; same twelve kernels and original47 actions/tapes/oracle; fresh exact prepare/exercise required, historical statistics retain their named scope",
+  "previousCandidateBase": "dacb84c6f53b795d169bee38705be1dc04ed948c",
+  "supportAdaptation": "real same-bundle createWorldTravelMZ/nativeLeaseSource + canonical ownedFieldJump; original literal47 actions/tapes/oracle preserved",
+  "creationSourceNotes": "shared31/32 known-off fixture explicit; hour source retained; simple/dynamic forms held gates updated; no new statistical N/seed/threshold"
+}

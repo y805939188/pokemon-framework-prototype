@@ -1,0 +1,11 @@
+'use strict';
+require('../../../scripts/tests/ts-source-loader.cjs');
+const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path'),{pathToFileURL}=require('node:url');
+const load=()=>process.env.PF_SURF_PASSAGE_BUILD?Promise.resolve(require(path.join(process.env.PF_SURF_PASSAGE_BUILD,'plugins/world/world-battle-scene-mz.js'))):import(pathToFileURL(path.resolve(__dirname,'../../../src/plugins/world/world-battle-scene-mz.ts')).href);
+async function fixture(){const{createWorldBattleSceneMZ}=await load(),admission=Object.freeze({token:'actual-test-ticket',generation:3,battleId:'world-1'}),app={stateGeneration:3},op={worldAdmission:admission},scene={_psOp:op},root={PSFlow:{_app:app,_op:op,running:true},SceneManager:{_scene:{name:'Map'}}},port=createWorldBattleSceneMZ(root);return{admission,app,op,scene,root,port};}
+test('scene binding permits owned Map→Battle create phase before isStarted',async()=>{const h=await fixture();h.port.bind(h.scene,h.op);h.root.SceneManager._scene=h.scene;h.port.assertCurrent(h.admission,h.scene);assert.equal(h.scene.isStarted,undefined);});
+for(const change of ['copied-admission','copied-op','copied-marker-scene','new-app','new-generation','new-flow','stopped','other-current-scene','mutated-scene-op'])test('MZ scene guard rejects '+change,async()=>{
+ const h=await fixture();h.port.bind(h.scene,h.op);h.root.SceneManager._scene=h.scene;let admission=h.admission,scene=h.scene;
+ if(change==='copied-admission')admission={...admission};if(change==='copied-op')h.root.PSFlow._op={...h.op};if(change==='copied-marker-scene'){scene={...h.scene,_psBattle:true};h.root.SceneManager._scene=scene;}if(change==='new-app')h.root.PSFlow._app={stateGeneration:3};if(change==='new-generation')h.app.stateGeneration++;if(change==='new-flow')h.root.PSFlow={...h.root.PSFlow};if(change==='stopped')h.root.PSFlow.running=false;if(change==='other-current-scene')h.root.SceneManager._scene={};if(change==='mutated-scene-op')h.scene._psOp={...h.op};assert.throws(()=>h.port.assertCurrent(admission,scene),/stale/);
+});
+test('legacy scene initialization grants no world admission and does not break legacy construction',async()=>{const h=await fixture(),legacy={};h.port.bind(h.scene,legacy);h.root.SceneManager._scene=h.scene;assert.throws(()=>h.port.assertCurrent(h.admission,h.scene),/stale/);});

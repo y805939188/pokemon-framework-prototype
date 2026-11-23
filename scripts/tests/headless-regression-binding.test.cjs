@@ -1,6 +1,6 @@
 'use strict';
-// Synthetic Git/source/artifact trees only. Never builds or damages the actual
-// runtime, launches a host, or reads a saved game/reference-run fixture.
+// Synthetic Git/source/artifact trees with verified copies of pinned Reactor
+// inputs. Does not build the runtime, launch a host or read saved games.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -11,9 +11,27 @@ const vm = require('node:vm');
 const {execFileSync} = require('node:child_process');
 const H = require('../headless-regression-binding.cjs');
 const {SOURCE_INPUTS, sourceFingerprint} = require('../framework-distribution-source.cjs');
+const repository = path.resolve(__dirname, '../..');
 const PIN = 'a'.repeat(40), hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const directories = new Set(['src/framework', 'js/engine/fixtures', 'js/engine/game', 'js/engine/rpg',
   'content/sample', 'content/examples/progression', 'src/plugins']);
+let pinnedFixtureFiles;
+function readPinnedFixtureFiles() {
+  const manifestPath = 'scripts/reactor-source-manifest.json';
+  const manifest = fs.readFileSync(path.join(repository, manifestPath));
+  const pinned = new Map([[manifestPath, manifest]]);
+  const controlled = new Set(H.CONTROLLED_INPUTS);
+  for (const [name, digest] of Object.entries(JSON.parse(manifest).runtime)) {
+    const relative = 'js/' + name.slice('runtime/'.length);
+    if (!controlled.has(relative)) continue;
+    const file = path.join(repository, relative);
+    assert(fs.lstatSync(file).isFile(), 'fixture requires a regular Reactor file: ' + relative);
+    const bytes = fs.readFileSync(file);
+    assert.equal(hash(bytes), digest, 'fixture Reactor input differs from manifest: ' + relative);
+    pinned.set(relative, bytes);
+  }
+  return pinned;
+}
 function write(file, bytes) { fs.mkdirSync(path.dirname(file), {recursive: true}); fs.writeFileSync(file, bytes); }
 function files(directory, prefix = '') {
   return fs.readdirSync(directory, {withFileTypes: true}).flatMap(entry => {
@@ -22,11 +40,13 @@ function files(directory, prefix = '') {
   }).sort();
 }
 function fixture(t) {
+  pinnedFixtureFiles ??= readPinnedFixtureFiles();
   const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pf-headless-binding-test-'))), root = path.join(directory, 'repo');
   t.after(() => fs.rmSync(directory, {recursive: true, force: true}));
   fs.mkdirSync(root);
   for (const relative of [...new Set([...SOURCE_INPUTS, ...H.CONTROLLED_INPUTS])]) {
-    write(path.join(root, relative, ...(directories.has(relative) ? ['fixture.txt'] : [])), 'authored fixture ' + relative + '\n');
+    const target = path.join(root, relative, ...(directories.has(relative) ? ['fixture.txt'] : []));
+    write(target, pinnedFixtureFiles.get(relative) ?? 'authored fixture ' + relative + '\n');
   }
   write(path.join(root, 'scripts/showdown.env'), `SHOWDOWN_SHA="${PIN}"\n`);
   write(path.join(root, '.gitignore'), 'build/\njs/engine/build/\njs/engine/showdown/\njs/plugins/\n');
@@ -64,6 +84,22 @@ test('fresh controlled build binds source, full distribution and local shared ru
   assert.equal(s.binding.dirtyMetadata.build, false);
   assert(s.binding.controlledInputs['src/plugins/fixture.txt']);
   assert.equal(H.capture(f.root, s.file, s.captured.sha256).sha256, s.captured.sha256);
+});
+
+test('missing pinned Reactor UI is refused at begin and capture', t => {
+  const f = fixture(t), s = f.seal();
+  fs.unlinkSync(path.join(f.root, 'js/reactor_ui.js'));
+  const error = /Missing pinned Reactor runtime required by regular tests: js\/reactor_ui\.js/;
+  assert.throws(() => H.begin(f.root), error);
+  assert.throws(() => H.capture(f.root, s.file, s.captured.sha256), error);
+});
+
+test('changed Reactor UI bytes are refused at begin and capture', t => {
+  const f = fixture(t), s = f.seal();
+  fs.appendFileSync(path.join(f.root, 'js/reactor_ui.js'), '\n// fixture-only tamper\n');
+  const error = /Reactor runtime differs from the manifest pin: js\/reactor_ui\.js/;
+  assert.throws(() => H.begin(f.root), error);
+  assert.throws(() => H.capture(f.root, s.file, s.captured.sha256), error);
 });
 
 test('dirty development inputs are allowed and explicitly recorded; unrelated untracked fixture churn does not retire them', t => {
@@ -134,7 +170,7 @@ test('consumer paths can only select existing parent-bound expected bytes', t =>
   assert.throws(() => H.boundFiles(s.captured, ['arbitrary-unbound-file']), /unbound consumer input/);
 });
 
-test('finish refuses a distribution rebuild that did not rebuild the four consumed plugins', t => {
+test('finish refuses a distribution rebuild that did not rebuild all consumed plugins', t => {
   const f = fixture(t); f.build(); const started = H.begin(f.root);
   // Simulate rebuilding only the package, retaining the original plugin inodes/times.
   const saved = path.join(f.directory, 'saved-plugins'); fs.renameSync(path.join(f.root, 'js/plugins'), saved);
@@ -150,7 +186,6 @@ test('a freshly generated manifest for a different source fingerprint cannot aut
   assert.throws(() => H.finish(f.root, started), /source fingerprint mismatch/);
 });
 
-const repository = path.resolve(__dirname, '../..');
 for (const relative of [
   'experiments/step5/4/h3-production-policy/support.cjs',
   'experiments/step5/4/h3-held-continue/worker.cjs',
@@ -234,3 +269,22 @@ for (const entry of ['native', 'scene']) for (const mode of ['outside', 'same', 
     assert.equal(externalReads, 0, 'guard finishes before any external source read/build');
   });
 }
+
+// Area's UI artifacts must belong to this same fresh parent before a product import.
+const {capturePokedexInputs}=require('./pokedex-runtime-binding.cjs');
+test('Area formal inputs bind both fresh Pokedex and Progression plugins without a private builder',t=>{
+ const f=fixture(t),s=f.seal(),p=capturePokedexInputs(f.root,{bindingFile:s.file});assert.equal(p.pluginRoot,path.join(f.root,'js/plugins'));
+ for(const name of ['PS_Pokedex','PS_Progression'])assert(s.binding.pluginBundles['js/plugins/'+name+'.js']);p.verify();
+});
+for(const plugin of ['PS_Pokedex','PS_Progression'])test('Area formal inputs reject changed '+plugin+' bytes before product admission',t=>{
+ const f=fixture(t),s=f.seal();write(path.join(f.root,'js/plugins',plugin+'.js'),'actual changed UI bytes');assert.throws(()=>capturePokedexInputs(f.root,{bindingFile:s.file}),/plugin|changed|fingerprint/);
+});
+test('Area formal inputs reject a foreign plugin root before touching it',t=>{
+ const f=fixture(t),s=f.seal();assert.throws(()=>capturePokedexInputs(f.root,{bindingFile:s.file,pluginRoot:path.join(f.directory,'never-created-foreign')}),/foreign Pokedex plugin root/);
+});
+test('Area formal inputs reject a missing controlled source before product admission',t=>{
+ const f=fixture(t),s=f.seal(),source=path.join(f.root,'experiments/step5/5/pokedex-area-host.cjs');fs.renameSync(source,source+'.held');assert.throws(()=>capturePokedexInputs(f.root,{bindingFile:s.file}),/ENOENT|missing|input/);
+});
+test('Area formal post verification observes later real artifact replacement',t=>{
+ const f=fixture(t),s=f.seal(),p=capturePokedexInputs(f.root,{bindingFile:s.file});write(path.join(f.root,'js/plugins/PS_Pokedex.js'),'later replacement');assert.throws(()=>p.verify(),/plugin|changed|fingerprint/);
+});

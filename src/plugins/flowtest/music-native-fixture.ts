@@ -17,6 +17,8 @@ export function musicNativeContent(E: any, assert: any, tracks?: { battle: strin
   const variants: [string, string | null | undefined][] = [['normal', PLAN.prefix + 'intro'], ['nil', undefined], ['empty', ''], ['missing', PLAN.prefix + 'missing'], ['corrupt', PLAN.prefix + 'corrupt']];
   input.trainerTypes = variants.map(([id, intro]) => ({ id: 'music-type-' + id, nameKey: 'trainer.music', gender: 0, source: 'author-placeholder', baseMoney: 0, skillLevel: 0, flags: [], items: [], battleBgm: tracks?.battle ?? PLAN.prefix + 'trainer', ...(tracks ? { victoryBgm: tracks.victory } : {}), ...(intro === undefined ? {} : { introBgm: intro }) }));
   input.trainers = variants.map(([id]) => ({ id: 'music-' + id, type: 'music-type-' + id, name: 'Native Music', version: 1, source: 'author-placeholder', party: [{ species: 'pidgey', level: 3, moves: ['tackle'] }] }));
+  // This author-only VM/native recipe uses one explicit controlled grass map.
+  input.mapMetadata = { source: 'author-placeholder', maps: { 5: { environment: 'grass' } } };
   const compiled = E.contentCompile.compileContent(input);
   assert(compiled.ok, JSON.stringify(compiled.errors));
   const assembled = E.contentRuntime.assembleContent(compiled.data, E.dex.createDexLookup());

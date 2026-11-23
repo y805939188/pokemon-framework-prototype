@@ -5,6 +5,7 @@ type Button = Action | Direction;
 export interface HostKeyEvent { code?: string; key?: string; keyCode?: number }
 interface InputAdapter {
   keyMapper: Record<number, string>;
+  update?(): void;
   keyRepeatWait?: number;
   keyRepeatInterval?: number;
   isPressed(button: string): boolean;
@@ -23,6 +24,7 @@ export interface HostInput {
   keyboardActions(): readonly Button[];
   domPressed(button: Button): boolean;
   consumeNative(event: HostKeyEvent, action: 'use' | 'back'): void;
+  consumeConfirmUntilRelease(): void;
   subscribeKeyboard(down: (event: HostKeyEvent) => void, up: (event: HostKeyEvent) => void): () => void;
   onBlur(callback: () => void): () => void;
 }
@@ -46,10 +48,12 @@ export function hostInput(host: InputHost): HostInput {
   const blurSubscribers = new Set<() => void>();
   const domStarts = new Map<Button, number>();
   let sampleFrame = -1, sample: InputFrame = { pressed: {}, triggered: {}, repeated: {} };
+  let consumedConfirm = false;
   const service: HostInput = {
     keyboardActions: () => [...keyboardKeys.values()],
     domPressed: button => [...keyboardKeys.values(), ...nativeConsumed.values()].includes(button),
     consumeNative: (event, action) => { nativeConsumed.set(nativeKey(event), action); },
+    consumeConfirmUntilRelease() { consumedConfirm ||= host.Input.isPressed('ok') || service.domPressed('use'); },
     subscribeKeyboard(down, up) {
       const subscriber = { down, up }; keyboardSubscribers.add(subscriber);
       return () => { keyboardSubscribers.delete(subscriber); };
@@ -77,13 +81,20 @@ export function hostInput(host: InputHost): HostInput {
     },
   };
   services[SHARED_INPUT] = service;
+  // Input.clear temporarily forgets held gamepads. Only a completed native poll
+  // can observe release; clearing scene input must not release this handoff gate.
+  const update = host.Input.update;
+  if (update) host.Input.update = function () {
+    update.call(this);
+    if (consumedConfirm && !this.isPressed('ok') && !service.domPressed('use')) consumedConfirm = false;
+  };
   // A/S are adapter bindings for the abstract JUMPUP/JUMPDOWN actions.
   host.Input.keyMapper[65] = 'pageup'; host.Input.keyMapper[83] = 'pagedown';
   for (const method of ['isTriggered', 'isRepeated'] as const) {
     const original = host.Input[method];
     host.Input[method] = function (button: string) {
       const key = button === 'ok' ? 'use' : ['cancel', 'menu', 'escape'].includes(button) ? 'back' : undefined;
-      if (key && [...nativeConsumed.values()].includes(key)) return false;
+      if (key === 'use' && consumedConfirm || key && [...nativeConsumed.values()].includes(key)) return false;
       return original.call(this, button);
     };
   }

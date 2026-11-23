@@ -65,7 +65,8 @@ test('the oldest prototype shape: counters are added, bad poison becomes plain p
 	assert.deepEqual([a.status, a.statusCount], ['', 0]);
 	assert.deepEqual([b.status, b.statusCount], ['psn', 0]);
 	assert.deepEqual([c.status, c.statusCount], ['slp', undefined], 'no number is invented for a sleeper');
-	assert.equal(r.notes.length, E.saveSchema.SUPPORTED_SCHEMAS.length); assert.match(r.notes.join('|'), /schema 7: existing readiness is known/); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /schema 4/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
+	assert.equal(r.notes.filter(note=>!note.startsWith('legacy-weather-')).length, E.saveSchema.SUPPORTED_SCHEMAS.length); assert.match(r.notes.join('|'), /legacy-weather-unavailable/); assert.match(r.notes.join('|'), /schema 7: existing readiness is known/); assert.match(r.notes.join('|'), /claims ledger/); assert.match(r.notes.join('|'), /schema 4/); assert.match(r.notes.join('|'), /badly poisoned stored as plain poison/); assert.match(r.notes.join('|'), /sleep counter unknown/);
+	assert.deepEqual(r.notes.filter(note=>/^schema \d+:/.test(note)).map(note=>Number(note.match(/^schema (\d+):/)[1])),[3,4,5,6,7,8,9,10,11,12], 'every declared migration note remains in order, including the schema11 checkpoint conversion');
 	assert.deepEqual(validateGame(r.state), []);
 });
 

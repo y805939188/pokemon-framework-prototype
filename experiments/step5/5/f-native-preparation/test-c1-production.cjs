@@ -1,0 +1,14 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');const{fixture,flush}=require('./c1-production-fixture.cjs');
+const selected=process.env.PF_F_NATIVE_CASE;assert(['C1-NO','C1-YES'].includes(selected),'explicit C1 selector');assert.deepEqual(process.argv.slice(2),[]);
+for(const choice of ['no','yes'].filter(value=>selected==='C1-'+value.toUpperCase()))test('NT04-DIAG '+choice+' actual C1 new receiver requires inherited save once',async()=>{
+ const h=await fixture({repel:1}),G=h.G;await h.run();await h.pump(()=>G.PSInventory.current()?.view?.kind==='menu');
+ const selection=h.selected(),oldMap=h.lifecycle().travelLease.current.scene,inventory=G.SceneManager._scene,priorOriginal=h.counts().original;
+ assert.equal(priorOriginal,0);assert(h.app.isOwnedRepelSelection(selection.owner,selection.selection));
+ h.choose(choice);if(choice==='yes'){assert.equal(G.PSInventory.current().view.kind,'bag');h.ready();h.press('ok');}
+ await h.pump(()=>h.phases.some(x=>x.name==='nonTransferCompleted'));for(let i=0;i<8;i++){G.$gameMessage.clear();h.tick();await flush();}
+ const receiver=G.SceneManager._scene,c=h.phases.find(x=>x.name==='nonTransferCompleted'),wait=h.phases.find(x=>x.name==='waitSource');
+ const evidence={choice,completion:c.result,adoption:h.phases.filter(x=>x.name==='adoptDeferredSave').map(x=>x.result),sourceWait:wait?.result,sameSourceContextAcrossC1:wait?.args[1].scene===receiver,receiverIsNewMap:receiver!==oldMap&&receiver!==inventory&&receiver instanceof G.Scene_Map,receiverTransferring:receiver._transfer,receiverStarted:receiver._started,counts:h.counts(),ends:h.transferEnds.map(x=>({phase:x.phase,isOldMap:x.scene===oldMap,isReceiver:x.scene===receiver,isInventory:x.scene===inventory})),steps:h.state().steps,blacked:h.state().stats.blacked_out_count,repel:h.state().world.repelSteps,blocked:h.app.saveBlocked,pending:h.state().world.pendingReturn,rng:h.rng(),replies:h.replies(),trace:h.trace.slice(h.initialCounts.trace)};
+ fs.writeFileSync(path.join(process.env.PF_F_NATIVE_ROOT,'c1-'+choice+'-diagnostic.json'),JSON.stringify(evidence,null,2)+'\n',{flag:'wx'});
+ assert.equal(c.result.status,'done');assert.equal(evidence.receiverIsNewMap,true);assert.equal(evidence.receiverStarted,true);assert.equal(h.state().steps,4);assert.equal(h.state().stats.blacked_out_count,1);assert.equal(h.replies(),1);assert.deepEqual(h.rng().increment,[]);assert.deepEqual(h.rng().nativeIncrement,[]);assert.equal(h.counts().original,1,'actual C1 '+choice+' -> actual F must release inherited original once');assert.equal(h.counts().executions,1);assert.equal(evidence.pending,null);assert.equal(evidence.blocked,false);assert.equal(evidence.repel,choice==='yes'?100:0);assert.equal(evidence.ends.filter(x=>x.isOldMap&&x.phase==='completed').length,1);assert.equal(evidence.ends.filter(x=>x.isReceiver&&x.phase==='completed').length,0);
+});

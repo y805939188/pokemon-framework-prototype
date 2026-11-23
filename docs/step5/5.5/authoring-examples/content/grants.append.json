@@ -1,0 +1,16 @@
+[
+  {
+    "id": "world-kit",
+    "members": [],
+    "items": {
+      "repel": 3,
+      "oldrod": 1,
+      "goodrod": 1,
+      "superrod": 1,
+      "honey": 2,
+      "escaperope": 2
+    },
+    "money": 0,
+    "source": "author-placeholder"
+  }
+]

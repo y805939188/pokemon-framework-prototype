@@ -1,4 +1,6 @@
 import { createMemberContentIndex, memberContentProblems } from "./member-content";
+import type { MemberContentIndex } from './member-content';
+import { ownedImmutableFingerprint } from './semantic';
 import { inventoryFromBag, inventoryPolicy, inventoryProblems } from "./inventory";
 import { catalogOf, itemOf } from "./item-catalog";
 import { baseMovePp, totalPp } from "./member-metadata";
@@ -17,6 +19,10 @@ import { baseMovePp, totalPp } from "./member-metadata";
  *   6  ordered inventory, badges and persistent move PP metadata.
  *   7  readiness certainty, cannotTrade, complete dex history and stable layout identity.
  *   8  stable trainer id + author-version defeat records and optional trainer battle-ledger identity.
+ *   9  required settlement identities.
+ *  10  world facts and ordered item registrations; transfer-only blackout checkpoint.
+ *  11  four-phase blackout checkpoint; schema10 transfer checkpoints migrate without new effects.
+ *  12  Hall of Fame display archive; older saves retain an explicit absence of history.
  * Anything else is refused with a diagnosable error ("unknown-version"/"corrupt"/"invalid") — never silently reset.
  * 3 -> 4 needs the content's species mapping (Showdown name -> content id + form): without it the migration refuses
  * ("needs-content"), and a name the content cannot map refuses the WHOLE migration ("unmapped-species", every place
@@ -26,6 +32,10 @@ import { NATURES } from "./growth";
 import { own } from "./own";
 import { createDexState, dexContentProblems, dexStateProblems, dexLayoutStateProblems, remapDexLayout } from "./dex-state";
 import { GAME_SCHEMA } from "./state";
+import { newWorldState, worldStateProblems, migrateLegacyWeather } from './world-state';
+import type { PendingBlackoutReturn } from './world-state';
+import type { LegacyWeatherInput } from './world-state';
+export type { LegacyWeatherInput } from './world-state';
 import type { GameState } from "./state";
 import { MAX_FORM, speciesDataOf } from "./species-key";
 import { completeIndividual, COMPATIBLE_PLAYER, initialOrdinal } from "./member-identity";
@@ -35,7 +45,7 @@ import type { SpeciesKeyResolver } from "./species-key";
 import { newStats, validateStats } from "./stats";
 
 const SAVE_SCHEMA = GAME_SCHEMA;
-export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+export const SUPPORTED_SCHEMAS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 export interface Problem { path: string; message: string }
 export interface SaveErrorInfo {
@@ -149,6 +159,41 @@ function knownKeys(o: Obj, allowed: readonly string[], path: string, out: Proble
   inheritedFields(o, allowed, path, out);
   for (const k of Object.keys(o)) if (!allowed.includes(k)) out.push({ path: `${path}.${k}`, message: path === "$" ? "unknown top-level field" : "unknown field" });
 }
+function validateHallOfFame(value: unknown, out: Problem[]): void {
+  if (value === null) return;
+  const path = "$.hallOfFame";
+  if (!isObj(value)) { out.push({ path, message: "must be null or a Hall of Fame archive" }); return; }
+  knownKeys(value, ["entryCount", "entries"], path, out);
+  const count = value["entryCount"], entries = value["entries"];
+  if (!isInt(count, 0)) out.push({ path: `${path}.entryCount`, message: "must be a nonnegative safe integer" });
+  if (!Array.isArray(entries)) { out.push({ path: `${path}.entries`, message: "must be an array of retained entries" }); return; }
+  if (isInt(count, 0) && entries.length > count) out.push({ path: `${path}.entries`, message: "cannot retain more entries than were registered" });
+  for (const [i, entry] of entries.entries()) {
+    const entryPath = `${path}.entries[${i}]`;
+    if (!Array.isArray(entry) || entry.length > 6) {
+      out.push({ path: entryPath, message: "must be an array of up to six display records" });
+      continue;
+    }
+    for (const [j, member] of entry.entries()) {
+      const memberPath = `${entryPath}[${j}]`;
+      if (!isObj(member)) { out.push({ path: memberPath, message: "must be a display record" }); continue; }
+      knownKeys(member, ["species", "form", "nickname", "gender", "level", "publicId", "shiny", "superShiny", "isEgg"], memberPath, out);
+      if (typeof member["species"] !== "string" || member["species"].length === 0) out.push({ path: `${memberPath}.species`, message: "must be a species content id" });
+      if (!isInt(member["form"], 0, MAX_FORM)) out.push({ path: `${memberPath}.form`, message: `must be an integer from 0 to ${MAX_FORM}` });
+      if (member["nickname"] !== null && typeof member["nickname"] !== "string") out.push({ path: `${memberPath}.nickname`, message: "must be a string or null" });
+      if (member["gender"] !== "M" && member["gender"] !== "F" && member["gender"] !== "N") out.push({ path: `${memberPath}.gender`, message: "must be M, F or N" });
+      if (!isInt(member["level"], 1, 100)) out.push({ path: `${memberPath}.level`, message: "must be an integer from 1 to 100" });
+      const id = member["publicId"];
+      if (member["isEgg"] === true ? id !== "?????" : id !== null && (typeof id !== "string" || !/^\d{5}$/.test(id))) {
+        out.push({ path: `${memberPath}.publicId`, message: "must be an egg mask, a five-digit public ID, or null when unknown" });
+      }
+      for (const key of ["shiny", "superShiny", "isEgg"]) {
+        if (typeof member[key] !== "boolean") out.push({ path: `${memberPath}.${key}`, message: "must be boolean" });
+      }
+    }
+  }
+}
+
 function validateOwner(value: unknown, path: string, out: Problem[]): void {
   if (!isObj(value)) { out.push({ path, message: "must be {id,name,gender,language}" }); return; }
   knownKeys(value, ["id", "name", "gender", "language"], path, out);
@@ -244,6 +289,8 @@ function validateGameView(input: unknown): GameValidationView {
   const allowedTop = schema >= 5 ? [...TOP_KEYS.filter((k) => k !== "boxes"), "storage", "player", "nextMemberOrdinal"] : TOP_KEYS;
   if (schema >= 6) { allowedTop.splice(allowedTop.indexOf("bag"),1); allowedTop.push("inventory","badges"); }
   if (schema >= 8) allowedTop.push("defeatedTrainers");
+  if (schema >= 10) allowedTop.push('world');
+  if (schema >= 12) allowedTop.push("hallOfFame");
   knownKeys(x, allowedTop, "$", out);
   if (schema >= 7 && out.length) return { problems: out, view: x };
   const seen = new Set<string>();
@@ -285,10 +332,10 @@ function validateGameView(input: unknown): GameValidationView {
   if (schema >= 6) {
     if (schema >= 7 && isObj(x["inventory"])) {
       const inventory = x["inventory"];
-      knownKeys(inventory, ["pockets", "lastPocket", "indices"], "$.inventory", out);
+      knownKeys(inventory, ["pockets", "lastPocket", "indices", ...(schema >= 10 ? ['registeredItems'] : [])], "$.inventory", out);
       if (Array.isArray(inventory["pockets"])) for (const [i, pocket] of inventory["pockets"].entries()) if (Array.isArray(pocket)) for (const [j, slot] of pocket.entries()) if (isObj(slot)) knownKeys(slot, ["itemId", "quantity"], `$.inventory.pockets[${i}][${j}]`, out);
     }
-    out.push(...inventoryProblems(x['inventory']));
+    out.push(...inventoryProblems(x['inventory'], schema >= 10));
     if (!Array.isArray(x['badges']) || x['badges'].length < 8 || x['badges'].some(v => typeof v !== 'boolean')) out.push({path:'$.badges',message:'must be a boolean array with at least eight positions'});
   } else if (!isObj(x["bag"])) out.push({ path: "$.bag", message: "must be an object" });
   else for (const [k, v] of Object.entries(x["bag"] as Obj)) if (!isInt(v, 1)) out.push({ path: `$.bag.${k}`, message: "must be an integer >= 1 (empty entries are removed)" });
@@ -332,11 +379,36 @@ function validateGameView(input: unknown): GameValidationView {
   }
   if (schema >= 7 && isObj(x["stats"])) knownKeys(x["stats"], Object.keys(newStats()), "$.stats", out);
   if (schema >= 4) validateStats(x["stats"], x["steps"], out);
+  // The checked view retains synthetic inherited-name prototypes. The strict checkpoint reader consumes
+  // ordinary detached data, only after the complete source descriptor/intrinsic-prototype check succeeded.
+  if (schema >= 10) out.push(...worldStateProblems(schema >= 11 ? ownDataCopy(x['world']) : x['world'], schema >= 11 ? 11 : 10));
+  if (schema >= 12) validateHallOfFame(x["hallOfFame"], out);
   return { problems: out, view: x };
 }
 
 export function validateGame(input: unknown): Problem[] { return validateGameView(input).problems; }
 
+/** A complete current-schema individual at a script boundary. No defaults, hooks, derivation or normalization. */
+export function snapshotMember(input: unknown): { ok: true; member: Member } | { ok: false; problems: Problem[] } {
+  const problems: Problem[] = [], view = validatedOwnDataCopy(input, '$.member', problems);
+  if (!problems.length) validateMember(view, '$.member', problems, SAVE_SCHEMA);
+  if (problems.length) return { ok: false, problems };
+  // The complete current member schema above owns this narrowing; the detached copy keeps every accepted value.
+  return { ok: true, member: ownDataCopy(view as Member) };
+}
+
+// These directories never escape this validator. Only this runtime's detached immutable snapshots
+// may share them; mutable/custom Content still builds a fresh directory at every gate.
+const ownedContentDirectories = new WeakMap<Content, Omit<MemberContentIndex, 'knownItems'>>();
+function validationContentIndex(content: Content): MemberContentIndex {
+  if (ownedImmutableFingerprint(content) === undefined) return createMemberContentIndex(content);
+  let directories = ownedContentDirectories.get(content);
+  if (!directories) {
+    const { catalog, abilities, moves } = createMemberContentIndex(content);
+    directories = { catalog, abilities, moves }; ownedContentDirectories.set(content, directories);
+  }
+  return { ...directories, knownItems: new Map() };
+}
 /** Synchronous installation/save gate. It validates the present state; only migrateGame may change layouts. */
 export function validateGameContent(state: unknown, content: Content): Problem[] {
   const checked = validateGameView(state), out = checked.problems;
@@ -346,10 +418,16 @@ export function validateGameContent(state: unknown, content: Content): Problem[]
   // Current-schema validation already made this detached own-data view. Reuse it only within this synchronous gate.
   out.push(...dexContentProblems(content));
   if (out.length) return out;
-  const contentIndex = createMemberContentIndex(content), catalog = contentIndex.catalog;
+  const contentIndex = validationContentIndex(content), catalog = contentIndex.catalog;
   for (const { member, path } of persistentMembers(doc)) out.push(...memberContentProblems(member as unknown as Member, content, path, contentIndex));
   const inventory = doc["inventory"] as unknown as GameState["inventory"];
   for (const [i, pocket] of inventory.pockets.entries()) for (const [j, slot] of pocket.entries()) if (!itemOf(catalog, slot.itemId)) out.push({ path: `$.inventory.pockets[${i}][${j}].itemId`, message: "unmapped item; original save must be kept" });
+  for (const [i, id] of inventory.registeredItems.entries()) if (!itemOf(catalog, id)) out.push({ path: `$.inventory.registeredItems[${i}]`, message: 'unmapped registered item; original save must be kept' });
+  const pending = (doc['world'] as unknown as GameState['world']).pendingReturn;
+  if (pending?.origin.kind === 'battle') {
+    const ledger = doc['appliedBattles'] as GameState['appliedBattles'];
+    if (own(ledger, pending.origin.battleId)?.hash !== pending.origin.rawHash) out.push({ path: '$.world.pendingReturn.origin', message: 'return must reference the installed battle result identity' });
+  }
   const dex = doc["dex"] as unknown as DexState;
   const baseKnown = (id: string): boolean => !!speciesDataOf(content, { species: id, form: 0 });
   for (const key of ["seen", "owned"] as const) dex[key].forEach((id, i) => { if (!baseKnown(id)) out.push({ path: `$.dex.${key}[${i}]`, message: "unmapped species content identity" }); });
@@ -373,6 +451,7 @@ export function snapshotForSave(state: unknown, content: Content): {ok: true; st
 }
 
 export interface MigrateOptions {
+  legacyWeather?: LegacyWeatherInput;
   /** The current content's mapping from a Showdown species name to its persistent key; needed from schema 3 to 4. */
   speciesKey?: SpeciesKeyResolver;
   /** Required for 4→5 individual defaults and every schema 7 load; validated by the content boundary. */
@@ -510,6 +589,32 @@ const MIGRATIONS: Record<number, Migrator> = {
   8: (doc, notes) => {
     doc["schema"] = 9;
     notes.push("schema 9: required settlement hashes are optional installed facts; no proof was fabricated for old raw-only battle ledgers");
+  },
+  9: (doc, notes, options) => {
+    const weather = migrateLegacyWeather(options.legacyWeather);
+    doc['world'] = { ...newWorldState(), weather: weather.intent };
+    const inventory = doc['inventory'];
+    if (!isObj(inventory)) throw new MigrationRefused('invalid', 'schema 10 requires the original ordered inventory');
+    inventory['registeredItems'] = [];
+    doc['schema'] = 10;
+    notes.push('schema 10: world defaults and ordered item registrations added; existing player records were retained', ...weather.notes);
+  },
+  10: (doc, notes) => {
+    // The original schema-10 document passed its historical shape gate before this copied migration.
+    const world = doc['world'] as Obj;
+    const pending = world['pendingReturn'] as PendingBlackoutReturn | null;
+    if (pending !== null) world['pendingReturn'] = {
+      id: pending.id, origin: pending.origin,
+      selection: { branch: pending.branch, target: pending.target },
+      phase: pending.stage, branch: pending.branch,
+    };
+    doc['schema'] = 11;
+    notes.push('schema 11: transfer checkpoints retain their frozen origin, destination and unfinished phase; no settlement or host effect was replayed');
+  },
+  11: (doc, notes) => {
+    doc["hallOfFame"] = null;
+    doc["schema"] = 12;
+    notes.push("schema 12: the source has no Hall of Fame archive; existing statistics were retained");
   },
 };
 

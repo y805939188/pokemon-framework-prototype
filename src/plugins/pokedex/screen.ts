@@ -8,6 +8,7 @@ type Result = ReturnType<GameApplication['updatePokedex']>;
 export interface DexScreenPorts {
  snapshot(): Snapshot; content(): Content; text: Record<string,string>; locale: string; currentRegion: number | null;
  directory(): Q.DexSearchDirectory; single?:{species:string;number:Q.DexNumber};
+ area?(species:string):ReturnType<GameApplication['pokedexArea']>;
  edit(command: Command): Result; resolve(token: string, revision: number, decision: {kind:'retry'|'technical-terminate'}): Result;
  finish(): void; reload(): void; pending?: Extract<Result,{status:'pending'}>; stopCry(): void; cry(species:string,form:number): void;
 }
@@ -50,7 +51,7 @@ export class PokedexScreen {
   // Translate only proven generated captions. Authored English or empty labels remain authored data.
   for(const choice of forms){const data=this.snapshot.catalog.forms.find(f=>f.species===row.species&&f.form===choice.form),authored=data?.formLabel!==undefined?data.formLabel:data?.formName;
    if(authored==null&&choice.label)(choice as Q.DexFormChoice&{autoLabel?:string}).autoLabel=({'One Form':'oneForm',Male:'male',Female:'female',Genderless:'genderless'}as Record<string,string>)[choice.label];}
-  const area=Q.dexArea(row.species); // 5.5 owns the world map provider. No fabricated habitat points.
+  const area=this.ports.area?.(row.species)??Q.dexArea(row.species);
   this.view={kind:'entry',species:row.species,page,battled,info,forms,area,measurements:info?.heightDm==null||info.weightHg==null?null:Q.dexMeasurements(info.heightDm,info.weightHg,this.ports.locale,'info')};
  }
  private form(index?:number){

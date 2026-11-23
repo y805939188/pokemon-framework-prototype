@@ -165,12 +165,22 @@ test('F11: the application reads the wall clock only through its injected clock 
   for (const bad of [NaN, -1, Infinity, '12']) assert.throws(() => mk(() => bad).now(), /not a time in milliseconds/, String(bad));
 });
 
-test('F11: the core and the application never read the host clock or randomness themselves (they get them injected)', () => {
-  const root = path.resolve(__dirname, '../../src/framework');
-  const offenders = [];
-  for (const dir of ['rules', 'app']) for (const f of fs.readdirSync(path.join(root, dir)).filter(n => n.endsWith('.ts'))) {
-    const text = fs.readFileSync(path.join(root, dir, f), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
-    for (const re of [/\bDate\.now\s*\(/, /\bnew\s+Date\s*\(/, /\bMath\.random\s*\(/, /\bperformance\.now\s*\(/, /\bprocess\.hrtime/]) if (re.test(text)) offenders.push(`${dir}/${f}: ${re}`);
+function ambientClockOrRandomReads(raw) {
+  const text=raw.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm,''),hits=[];
+  for(const re of [/\bDate\.now\s*\(/,/\bMath\.random\s*\(/,/\bperformance\.now\s*\(/,/\bprocess\.hrtime/])if(re.test(text))hits.push(String(re));
+  for(const match of text.matchAll(/\bDate\s*\(/g)){
+    const prefix=text.slice(0,match.index),args=text.slice(match.index+match[0].length);
+    // Date() reads the clock even with arguments. Only explicit-argument constructors are value conversion.
+    if(!/\bnew\s+(?:globalThis\.)?$/.test(prefix)||/^\s*(?:\)|\.\.\.)/.test(args))hits.push('ambient Date constructor/function');
   }
+  return hits;
+}
+test('F11: ambient clock/random and no-argument Date are rejected; explicit epoch conversion is allowed',()=>{
+ for(const source of ['new Date()','new Date( /* absent epoch */ )','new Date(...[])','Date(123)','globalThis.Date()','Date.now()','Math.random()','performance.now()','process.hrtime.bigint()'])assert(ambientClockOrRandomReads(source).length>0,source);
+ for(const source of ['new Date(now).getMonth()','new Date( epochMilliseconds ).getTime()','new globalThis.Date(epochMilliseconds)'])assert.deepEqual(ambientClockOrRandomReads(source),[],source);
+});
+test('F11: the core and the application never read the host clock or randomness themselves (they get them injected)', () => {
+  const root = path.resolve(__dirname, '../../src/framework'),offenders=[];
+  for(const dir of ['rules','app'])for(const f of fs.readdirSync(path.join(root,dir)).filter(n=>n.endsWith('.ts')))for(const hit of ambientClockOrRandomReads(fs.readFileSync(path.join(root,dir,f),'utf8')))offenders.push(`${dir}/${f}: ${hit}`);
   assert.deepEqual(offenders, []);
 });

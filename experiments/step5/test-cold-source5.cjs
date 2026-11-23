@@ -23,7 +23,7 @@ function host(game) {
   Game_System.prototype.isSaveEnabled = function () { return this._saveEnabled !== false; };
   const sys = Object.assign(new Game_System(), { _psGame: game, _psBattleSeq: 0 });
   const req = p => {
-    if(p==='fs') return {...fs,readFileSync(f,...args){if(String(f).endsWith('/data/framework/content.json')) return JSON.stringify(compiled);return fs.readFileSync(f,...args);}}; if(p==='path') return path;
+    if(p==='fs') return {...fs,readFileSync(f,...args){if(String(f).endsWith('/data/framework/content.json')) return JSON.stringify(compiled);return fs.readFileSync(f,...args);}}; if(p==='path') return path; if(p==='node:util') return require(p);
     if (/production\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/production.cjs'));
     if (/testing\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/testing.cjs'));
     throw new Error('unexpected require ' + p);
@@ -42,6 +42,7 @@ function host(game) {
     $gameSystem: sys, $gameVariables: { setValue() {}, value: () => 0 }, $gameMap: map, $gamePlayer: { reserveTransfer() {} }, $dataMapInfos: [], $dataCommonEvents: [],
     $gameMessage: { isBusy: () => false, add() {} },
   };
+  require('../../scripts/tests/legacy-mz-world-host.cjs').install(ctx);
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(plugins.PS_SaveState, ctx, { filename: 'PS_SaveState.js (built)' });

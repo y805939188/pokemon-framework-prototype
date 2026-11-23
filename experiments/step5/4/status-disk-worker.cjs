@@ -12,11 +12,11 @@ function content(){
 function newState(c,scenario){
  const member=E.memberFactory.createMember({id:ID,species:PLAN.player.species,level:PLAN.player.level,abilityIndex:PLAN.player.abilityIndex},c,()=>0);assert.equal(member.ability,PLAN.player.ability);
  const maxpp=PLAN.player.basePP+Math.floor(PLAN.player.basePP*scenario.ppUps/5);member.moves=[{id:'splash',pp:maxpp,maxpp,ppUps:scenario.ppUps}];
- const game=E.state.newGame({content:c,party:[E.speciesKey.toPersistentMember(member,c)],money:1000});game.nextMemberOrdinal='2';assert.equal(game.schema,PLAN.schemaVersion);return game;
+ const game=E.state.newGame({content:c,party:[E.speciesKey.toPersistentMember(member,c)],money:1000});game.nextMemberOrdinal='2';assert.equal(game.schema,E.state.GAME_SCHEMA);return game;
 }
 function storeFor(file,c,hooks={}){return new E.store.SaveStore(file,hooks,E.speciesKey.speciesKeyResolver(c),c);}
 function application(file,c){
- const store=storeFor(file,c),info=store.loadInfo();assert.equal(info.migrated,false);assert.equal(info.from,PLAN.schemaVersion);
+ const store=storeFor(file,c),info=store.loadInfo();assert.equal(info.migrated,false);assert.equal(info.from,E.state.GAME_SCHEMA);
  let current=info.state;const installs=[];
  const state={read:()=>current,replace:next=>{const before=fileHash(file);store.save(next);const persisted=store.load();assert.deepEqual(persisted,clone(next),'complete valid App candidate survives the production store');current=persisted;installs.push({beforeSHA256:before,afterSHA256:fileHash(file),stateSHA256:stateHash(current)});}};
  const app=new E.app.GameApplication({state,projection:T.fakes.createRecordingProjection(),sessions:E.composition.createBattleSessionFactory({content:()=>c,seed:()=>[...PLAN.seed]}),content:()=>({content:c}),random:()=>0,clock:()=>12345});

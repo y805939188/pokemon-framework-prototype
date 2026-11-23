@@ -5,6 +5,8 @@ import type { DexLayout, DexLayoutTransition, MapMetadata, RegionalDex, SpeciesK
 import { evolutionMethod } from "../rules/evolution-data";
 import { MAX_FORM } from "../rules/species-key";
 import { sha256Hex } from "../rules/sha256";
+import { ITEM_ID } from "../rules/item-catalog";
+import { checkWorldMapFields } from "./world-input";
 
 export type ProgressionReport = (file: ContentError["file"], path: string, message: string) => void;
 const obj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -16,9 +18,19 @@ const text = (v: unknown): v is string => typeof v === "string" && v.length > 0;
 const copy = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const stable = (v: unknown): unknown => Array.isArray(v) ? v.map(stable) : obj(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, stable(v[k])])) : v;
 const only = (v: Record<string, unknown>, keys: readonly string[]): boolean => Object.keys(v).every(k => keys.includes(k));
-export const PROGRESSION_FIELDS = ["evolutions", "tutorMoves", "eggMoves", "types", "abilities", "hiddenAbilities", "flags", "pokedexForm", "categoryKey", "entryKey", "heightDm", "weightHg", "color", "shape", "formName", "formNameKey", "dexSortKeys"] as const;
+export const WILD_ITEM_FIELDS = ["wildItemCommon", "wildItemUncommon", "wildItemRare"] as const;
+export const PROGRESSION_FIELDS = ["evolutions", "tutorMoves", "eggMoves", "types", "abilities", "hiddenAbilities", "flags", "pokedexForm", "categoryKey", "entryKey", "heightDm", "weightHg", "color", "shape", "formName", "formNameKey", "dexSortKeys", ...WILD_ITEM_FIELDS] as const;
 
 export function progressionFieldProblem(field: string, value: unknown): string | null {
+  if (WILD_ITEM_FIELDS.some(key => key === field)) {
+    if (!dense(value)) return "must be a dense ordered item identity array";
+    for (const name of Reflect.ownKeys(value)) {
+      if (name === "length") continue;
+      const descriptor = Object.getOwnPropertyDescriptor(value, name);
+      if (typeof name !== "string" || !/^(0|[1-9][0-9]*)$/.test(name) || !descriptor || !("value" in descriptor) || !descriptor.enumerable || typeof descriptor.value !== "string" || !ITEM_ID.test(descriptor.value)) return "must contain enumerable own canonical item identities only";
+    }
+    return null;
+  }
   if (["categoryKey", "entryKey", "formNameKey"].includes(field)) return key(value) ? null : "must be a text key";
   if (["heightDm", "weightHg"].includes(field)) return integer(value, 1) ? null : "must be a positive safe integer in integer units";
   if (field === "pokedexForm") return integer(value, 0, MAX_FORM) ? null : `must be an integer from 0 to ${MAX_FORM}`;
@@ -52,12 +64,17 @@ export function inheritSpecies(records: readonly SpeciesSource[]): SpeciesSource
     const base = bases.get(record.id), result = copy(record);
     if ((record.form ?? 0) !== 0 && base) {
       for (const field of ["nameKey", "growth", "baseExp", "evYield", "catchRate", "happiness", "learnset", ...PROGRESSION_FIELDS]) {
+        if (WILD_ITEM_FIELDS.some(key => key === field)) continue;
         if (field === "pokedexForm") continue;
         const own = (record as unknown as Record<string, unknown>)[field];
         if (own === undefined || ((field === "learnset" || field === "evolutions") && Array.isArray(own) && !own.length)) {
           const value = (base as unknown as Record<string, unknown>)[field];
           if (value !== undefined) (result as unknown as Record<string, unknown>)[field] = copy(value);
         }
+      }
+      // WP18: only the whole empty triple falls back, never one empty pool in a nonempty triple.
+      if (!WILD_ITEM_FIELDS.some(field => Array.isArray(record[field]) && record[field]!.length > 0) && WILD_ITEM_FIELDS.some(field => Object.hasOwn(record, field) || Object.hasOwn(base, field))) {
+        for (const field of WILD_ITEM_FIELDS) result[field] = [...(base[field] ?? [])];
       }
     }
     return result;
@@ -187,15 +204,28 @@ export function checkRegionalDex(raw: unknown, order: readonly SpeciesKey[], usa
 }
 export function checkMapMetadata(raw: unknown, regional: RegionalDex, usable: (id: unknown) => string | null, report: ProgressionReport): MapMetadata | undefined {
   if(raw===undefined)return undefined;
+  // The increment validator also rejects accessors/custom prototypes before any field is read.
+  const wrapper=checkWorldMapFields(raw,"$");
+  if(wrapper.problems.length){for(const problem of wrapper.problems)report("map-metadata.json",problem.path,problem.message);return undefined;}
   if(!obj(raw)||!only(raw,["source","maps"])||!obj(raw.maps)){report("map-metadata.json","$","must be {source,maps}");return undefined;}
-  const problem=usable(raw.source);if(problem)report("map-metadata.json","$.source",`source-unusable: ${problem}`);
+  const dictionary=checkWorldMapFields(raw.maps,"$.maps");
+  if(dictionary.problems.length){for(const problem of dictionary.problems)report("map-metadata.json",problem.path,problem.message);return undefined;}
+  let invalid=false;
+  const fail=(path:string,message:string):void=>{invalid=true;report("map-metadata.json",path,message);};
+  const problem=usable(raw.source);if(problem)fail("$.source",`source-unusable: ${problem}`);
+  if(typeof raw.source!=="string"||!raw.source)fail("$.source","must be a nonempty source identity");
+  const maps:MapMetadata["maps"]={};
   for(const [mapId,value] of Object.entries(raw.maps)) {
     const p=`$.maps.${mapId}`;
-    if(!/^[1-9][0-9]*$/.test(mapId)||!Number.isSafeInteger(Number(mapId)))report("map-metadata.json",p,"map id must be a positive safe integer");
-    if(!obj(value)||!only(value,["region","flags","darkMap"])){report("map-metadata.json",p,"must be {region?,flags?,darkMap?}");continue;}
-    if(value.region!==undefined&&!integer(value.region,0,regional.regions.length-1))report("map-metadata.json",`${p}.region`,"unknown region");
-    if(value.flags!==undefined&&(!dense(value.flags)||!value.flags.every(text)))report("map-metadata.json",`${p}.flags`,"must be an array of non-empty flags");
-    if(value.darkMap!==undefined&&typeof value.darkMap!=="boolean")report("map-metadata.json",`${p}.darkMap`,"must be boolean");
+    if(!/^[1-9][0-9]*$/.test(mapId)||!Number.isSafeInteger(Number(mapId)))fail(p,"map id must be a positive safe integer");
+    const world=checkWorldMapFields(value,p);
+    if(world.problems.length){for(const problem of world.problems)fail(problem.path,problem.message);continue;}
+    if(!obj(value)||!only(value,["region","flags","darkMap","outdoor","alwaysBicycle","weather","environment","mapPosition","mapSize","healingSpot"])){fail(p,"unknown or invalid map metadata field");continue;}
+    const entry:MapMetadata["maps"][string]={...world.value};
+    if(value.region!==undefined) { if(!integer(value.region,0,regional.regions.length-1))fail(`${p}.region`,"unknown region");else entry.region=value.region; }
+    if(value.flags!==undefined) { if(!dense(value.flags)||!value.flags.every(text))fail(`${p}.flags`,"must be an array of non-empty flags");else entry.flags=[...value.flags]; }
+    if(value.darkMap!==undefined) { if(typeof value.darkMap!=="boolean")fail(`${p}.darkMap`,"must be boolean");else entry.darkMap=value.darkMap; }
+    Object.defineProperty(maps,mapId,{value:entry,enumerable:true,writable:true,configurable:true});
   }
-  return copy(raw) as unknown as MapMetadata;
+  return !invalid&&typeof raw.source==="string"?{source:raw.source,maps}:undefined;
 }

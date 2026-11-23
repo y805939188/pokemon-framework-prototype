@@ -11,13 +11,21 @@ const rows=[['hp','hpup','health','pomeg'],['atk','protein','muscle','kelpsy'],[
 for(const [stat,vitamin,feather,berry]of rows){register([vitamin!],'vitamin',{stat:stat!});register([feather+'feather',feather+'wing'],'wing',{stat:stat!});register([berry+'berry'],'ev-berry',{stat:stat!});}
 for(const nature of ['lonely','brave','adamant','naughty','bold','relaxed','impish','lax','timid','hasty','serious','jolly','naive','modest','mild','quiet','rash','calm','gentle','sassy','careful'])register([nature+'mint'],'mint',{nature});
 register(['abilitycapsule'],'ability-capsule');register(['abilitypatch'],'ability-patch');register(['rarecandy'],'rare-candy');for(const [size,exp]of [['xs',100],['s',800],['m',3000],['l',10000],['xl',30000]] as [string,number][])register(['expcandy'+size],'exp-candy',{exp});
+register(['repel'],'repel',{steps:100});register(['superrepel'],'repel',{steps:200});register(['maxrepel'],'repel',{steps:250});
+register(['blackflute'],'flute',{color:'black'});register(['whiteflute'],'flute',{color:'white'});
+register(['honey'],'sweet-scent');register(['escaperope'],'escape-rope');
+register(['oldrod'],'fishing',{rod:1});register(['goodrod'],'fishing',{rod:2});register(['superrod'],'fishing',{rod:3});
 
 /** Unknown families remain opaque/not-ready. Known families cannot coerce scalar strings into effects. */
 export function fieldEffectProblem(effect:FieldEffect):string|null {
  const {family,parameters:p}=effect,positive=(v:unknown)=>typeof v==='number'&&Number.isSafeInteger(v)&&v>0;
  const keys:Record<string,string[]>={hp:['amount','oldAmount','full','fraction','friendship'],status:['status','friendship'],'full-restore':[],revive:['fraction','friendship'],'sacred-ash':[],'rage-candy':[],pp:['amount','full','all'],'pp-up':['max'],vitamin:['stat'],wing:['stat'],'ev-berry':['stat'],mint:['nature'],'ability-capsule':[],'ability-patch':[],'rare-candy':[],'exp-candy':['exp']};
+ Object.assign(keys,{repel:['steps'],flute:['color'],fishing:['rod'],'sweet-scent':[],'escape-rope':[]});
  if(!Object.hasOwn(keys,family))return null;
  if(Object.keys(p).some(k=>!keys[family]!.includes(k)))return 'unknown parameter for field effect';
+ if(family==='repel'&&(typeof p.steps!=='number'||![100,200,250].includes(p.steps)))return 'repel needs numeric steps 100, 200 or 250';
+ if(family==='flute'&&p.color!=='black'&&p.color!=='white')return 'flute needs black or white color';
+ if(family==='fishing'&&(typeof p.rod!=='number'||![1,2,3].includes(p.rod)))return 'fishing needs rod 1, 2 or 3';
  for(const k of ['amount','oldAmount','fraction','exp'])if(p[k]!==undefined&&!positive(p[k]))return `${k} must be a positive safe integer`;
  for(const k of ['full','all','max'])if(p[k]!==undefined&&typeof p[k]!=='boolean')return `${k} must be boolean`;
  if(p.friendship!==undefined&&!['powder','energyroot','revivalherb'].includes(String(p.friendship)))return 'invalid friendship method';

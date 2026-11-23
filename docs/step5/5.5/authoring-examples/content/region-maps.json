@@ -1,0 +1,32 @@
+{
+  "source": "author-placeholder",
+  "regions": [
+    {
+      "id": 0,
+      "nameKey": "region.sample",
+      "points": [
+        {
+          "x": 13,
+          "y": 12,
+          "nameKey": "world.example.start",
+          "healingSpot": {
+            "mapId": 5,
+            "x": 10,
+            "y": 8
+          }
+        },
+        {
+          "x": 14,
+          "y": 12,
+          "nameKey": "world.example.cave",
+          "switchId": 7,
+          "healingSpot": {
+            "mapId": 6,
+            "x": 8,
+            "y": 8
+          }
+        }
+      ]
+    }
+  ]
+}

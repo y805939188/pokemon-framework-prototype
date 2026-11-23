@@ -139,6 +139,9 @@
   },
   {
     "id": "pidgey",
+    "wildItemCommon": ["oranberry"],
+    "wildItemUncommon": [],
+    "wildItemRare": [],
     "showdownId": "pidgey",
     "nameKey": "species.pidgey",
     "growth": "parabolic",

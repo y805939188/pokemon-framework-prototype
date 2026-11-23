@@ -5,19 +5,20 @@ import {planShop,filterShopStock,shopQuote,updatePrice,assertMutableStock} from 
 import type {ShopContext,ShopIntent} from '../rules/shop';
 import { clone } from '../rules/value';
 import { semanticFingerprint } from '../rules/semantic';
-import { addItems, aggregateBag, inventoryPolicy, moveInventorySlot, positiveQuantity, removeItems, itemQuantity } from '../rules/inventory';
+import { addItems, aggregateBag, inventoryPolicy, moveInventorySlot, positiveQuantity, removeItems, itemQuantity, registerInventoryItem } from '../rules/inventory';
 import { catalogOf, hasFlag, importantItem, itemOf } from '../rules/item-catalog';
 import { changeMoney, moneyCap, setBadge } from '../rules/economy';
 import { own, setOwn } from '../rules/own';
 import type { GameState } from '../rules/state';
 import type { Content } from '../rules/types';
 import type { Limits } from '../rules/limits';
-import type { GameStatePort } from './ports';
+import type { GameStatePort, InventoryTicket } from './ports';
 import type { ItemDefinition } from '../rules/item-catalog';
 
 export interface InventoryParent { token:string; memberId:string }
-export interface InventoryTicket { token:string; generation:number; revision:string; contentRevision:string; pocket:number; index:number; itemId:string; quantity:number }
+export type { InventoryTicket } from './ports';
 export type InventoryRequest =
+  | {kind:'register-item';itemId:string;registered:boolean}
   | {kind:'add-items';itemId:string;quantity:number;claimId?:string}
   | {kind:'remove-items';itemId:string;quantity:number;ticket?:InventoryTicket}
   | {kind:'change-money';amount:number}
@@ -26,8 +27,8 @@ export type InventoryRequest =
   | ({kind:'use-item';answers?:ItemAnswers;ticket?:InventoryTicket}&ItemIntent)
   | ShopIntent;
 export interface InventoryOutcome { status:'committed'|'duplicate'|'unchanged'|'refused'|'pending'|'cancelled'|'selected';requestId?:string;reason?:string;error?:string;presentation?:'ok'|'failed';result?:Record<string,unknown> }
-interface Context { token:string;generation:number;contentRevision:string;kind:'bag'|'item'|'shop';parent?:InventoryParent;parentPartyIndex?:number }
-interface Options { world?:()=>ItemWorldContext;variables?:{count:()=>number;write:(id:number,value:string)=>void};limits:Limits;generation:()=>number;enter:(parent?:InventoryParent)=>void;leave:(parent?:InventoryParent)=>void;install:(next:GameState)=>void }
+interface Context { token:string;generation:number;contentRevision:string;kind:'bag'|'item'|'shop'|'world-repel';parent?:InventoryParent;parentPartyIndex?:number;worldChild?:object }
+interface Options { world?:()=>ItemWorldContext;variables?:{count:()=>number;write:(id:number,value:string)=>void};limits:Limits;generation:()=>number;enter:(parent?:InventoryParent)=>void;leave:(parent?:InventoryParent)=>void;install:(next:GameState)=>void;assertWorldSelection?:(child:object)=>void }
 const message=(error:unknown):string=>error instanceof Error?error.message:String(error);
 const reason=(error:unknown):string=>typeof error==='object'&&error!==null&&'reason'in error?String(error.reason):message(error);
 
@@ -40,6 +41,7 @@ export class InventorySession {
   private sorting:{pocket:number;start:number;cursor:number;order:number[];revision:string}|null=null;
   private filtering=false;
   private readingProjection=false;
+  private fieldReserved=false;
   private shop:ShopContext|null=null;
   private pendingUse:{requestId:string;fingerprint:string;revision:string;world:string;learning:boolean;stale:boolean}|null=null;
   private effectRevision=0n;
@@ -74,7 +76,7 @@ export class InventorySession {
     return world;
   }
   stateChanged(next:GameState):void{const effect=JSON.stringify([next.party,next.inventory.pockets]);if(effect!==this.observedEffect){this.effectRevision++;this.observedEffect=effect;}const value=JSON.stringify(next.inventory.pockets);if(value!==this.observedInventory){this.revision++;this.observedInventory=value;}}
-  invalidate():void{const parent=this.context?.parent;this.context=null;this.starting=null;this.learningChild=false;this.shop=null;this.pendingUse=null;this.selection=null;this.tossPending=null;this.sorting=null;this.filtering=false;this.receipts.clear();this.options.leave(parent);}
+  invalidate():void{const parent=this.context?.parent;this.context=null;this.starting=null;this.learningChild=false;this.fieldReserved=false;this.shop=null;this.pendingUse=null;this.selection=null;this.tossPending=null;this.sorting=null;this.filtering=false;this.receipts.clear();this.options.leave(parent);}
   begin(kind:'bag'|'item'|'shop'='bag',parent?:InventoryParent):string{
     if(this.active)throw new Error('inventory-operation-active');
     if(!['bag','item','shop'].includes(kind)||parent&&kind!=='item')throw new Error('invalid-operation-context');
@@ -92,16 +94,43 @@ export class InventorySession {
     } catch(error) {if(entered)this.options.leave(parent);throw error;}
     finally {if(this.starting===reservation)this.starting=null;}
   }
+  /** Only the current world's issued child can open this read-only, fixed-filter selection. */
+  beginWorldRepelSelection(child:object):{token:string;selectionId:string}{
+    if(this.active)throw Error('inventory-operation-active');
+    const reservation={generation:this.options.generation()};this.starting=reservation;
+    try{
+      if(!this.options.assertWorldSelection)throw Error('world-selection-unavailable');
+      this.options.assertWorldSelection(child);
+      const game=this.state.read(),content=this.content();
+      this.options.assertWorldSelection(child);
+      if(this.starting!==reservation||reservation.generation!==this.options.generation())throw Error('stale-operation');
+      for(const pocket of game.inventory.pockets)for(const slot of pocket)if(!itemOf(catalogOf(content),slot.itemId))throw Error('unmapped-item');
+      this.stateChanged(game);
+      const token=`inventory:${reservation.generation}:${++this.sequence}`,selectionId=`${token}:select:${++this.selectionSequence}`;
+      this.context={token,generation:reservation.generation,contentRevision:this.contentRevision(content),kind:'world-repel',worldChild:child};
+      this.selection={id:selectionId,filter:item=>hasFlag(item,'Repel'),lastPocket:1,indices:Array(8).fill(0) as number[]};
+      this.receipts.clear();return {token,selectionId};
+    }finally{if(this.starting===reservation)this.starting=null;}
+  }
+  captureWorldRepelTicket(child:object,token:string,ticket:InventoryTicket):{game:GameState;content:Content}{
+    const data=this.current(token);
+    if(data.context.kind!=='world-repel'||data.context.worldChild!==child)throw Error('stale-world-selection');
+    this.checkTicket(token,ticket);
+    return {game:data.game,content:data.content};
+  }
+  endWorldRepelSelection(child:object):void {if(this.context?.worldChild===child)this.invalidate();}
   end(token:string):InventoryOutcome{
     if(this.readingProjection)return {status:'refused',reason:'projection-active'};
     if(this.learningChild)return {status:'refused',reason:'child-operation-active'};
     if(this.context?.token!==token)return {status:'refused',reason:'stale-operation'};
+    if(this.context.kind==='world-repel')return {status:'refused',reason:'world-selection-owned'};
     if(this.sorting){const cancelled=this.endSort(token,true);if(cancelled.status==='refused'){this.invalidate();return cancelled;}}
     this.invalidate();return {status:'unchanged'};
   }
   private current(token:string):{game:GameState;content:Content;context:Context}{
     const context=this.context;
     if(!context||context.token!==token||context.generation!==this.options.generation())throw new Error('stale-operation');
+    if(context.worldChild)this.options.assertWorldSelection?.(context.worldChild);
     const content=this.content();
     if(context.contentRevision!==this.contentRevision(content)){this.invalidate();throw new Error('stale-content');}
     const game=this.state.read();this.stateChanged(game);
@@ -111,6 +140,10 @@ export class InventorySession {
   snapshot(token:string,filter?:(item:ItemDefinition)=>boolean):{pockets:{item:ItemDefinition;quantity:number;index:number}[][];lastPocket:number;indices:number[];revision:string}{
     if(this.readingProjection)throw new Error('projection-active');
     const {game,content}=this.current(token),catalog=catalogOf(content);
+    if(this.context?.kind==='world-repel'){
+      if(filter&&filter!==this.selection?.filter)throw Error('world-selection-filter-fixed');
+      filter=this.selection?.filter;
+    }
     this.filtering=!!filter;
     this.readingProjection=true;
     try{const pockets=game.inventory.pockets.map(pocket=>pocket.flatMap((slot,index)=>{
@@ -127,18 +160,32 @@ export class InventorySession {
     const {game,context}=this.current(token);
     if(!Number.isInteger(pocket)||pocket<1||pocket>8||!Number.isInteger(index)||index<0)throw new Error('invalid-slot');
     const slot=game.inventory.pockets[pocket-1]![index];if(!slot)throw new Error('stale-slot');
+    if(context.kind==='world-repel'){
+      const item=itemOf(catalogOf(this.content()),slot.itemId);
+      if(!item||!hasFlag(item,'Repel'))throw Error('invalid-world-selection-item');
+      this.current(token);
+    }
     return {token,generation:context.generation,revision:String(this.revision),contentRevision:context.contentRevision,pocket,index,itemId:slot.itemId,quantity:slot.quantity};
   }
   private checkTicket(token:string,ticket:InventoryTicket):void{
     const current=this.ticket(token,ticket.pocket,ticket.index);
     if(semanticFingerprint(current)!==semanticFingerprint(ticket))throw new Error('stale-slot');
   }
+  captureFieldTicket(token:string,ticket:InventoryTicket):{game:GameState;content:Content}{
+    if(this.fieldReserved||this.learningChild||this.pendingUse||this.selection||this.tossPending||this.sorting||this.readingProjection)throw Error('inventory-operation-pending');
+    const data=this.current(token);if(data.context.parent||data.context.kind==='shop'||data.context.worldChild)throw Error('wrong-operation');
+    this.checkTicket(token,ticket);return {game:data.game,content:data.content};
+  }
+  reserveFieldTicket(token:string):void {this.current(token);if(this.fieldReserved)throw Error('inventory-operation-pending');this.fieldReserved=true;}
+  releaseFieldTicket(token:string):void {if(this.context?.token===token)this.fieldReserved=false;}
   execute(token:string,requestId:string,request:InventoryRequest,present?:(outcome:InventoryOutcome)=>void):InventoryOutcome{
     let data:ReturnType<InventorySession['current']>,fingerprint:string;
     try{
       if(this.readingProjection)throw new Error('projection-active');
+      if(this.fieldReserved)throw new Error('field-item-pending');
       if(this.learningChild)throw new Error('child-operation-active');
       data=this.current(token);
+      if(data.context.kind==='world-repel')throw Error('world-selection-owned');
       if(typeof requestId!=='string'||!requestId||requestId.length>64)throw new Error('invalid-request-id');
       fingerprint=semanticFingerprint(request);
     }catch(error){return {status:'refused',reason:reason(error),error:message(error)};}
@@ -185,6 +232,7 @@ export class InventorySession {
           if(request.ticket&&request.ticket.itemId!==request.itemId)throw new Error('stale-slot');
           next.inventory=removeItems(game.inventory,request.itemId,request.quantity,catalogOf(content));result={itemId:request.itemId,quantity:request.quantity};break;
         case 'change-money':next.money=changeMoney(game.money,request.amount,moneyCap(content,this.options.limits.money));result={money:next.money,actual:next.money-game.money};break;
+        case 'register-item':next.inventory=registerInventoryItem(game.inventory,request.itemId,request.registered,catalogOf(content));result={itemId:request.itemId,registered:next.inventory.registeredItems.includes(request.itemId)};break;
         case 'set-badge':next=setBadge(game,request.index,request.owned);result={index:request.index,owned:request.owned};break;
         case 'browse':{
           const {pocket,index}=request;if(!Number.isInteger(pocket)||pocket<1||pocket>8||!Number.isInteger(index)||index<0||index>game.inventory.pockets[pocket-1]!.length)throw new Error('invalid-cursor');
@@ -229,7 +277,7 @@ export class InventorySession {
   selectionView(token:string,selectionId:string){if(this.selection?.id!==selectionId)throw new Error('stale-selection');const view=this.snapshot(token,this.selection.filter);return {...view,lastPocket:this.selection.lastPocket,indices:[...this.selection.indices]};}
   selectionBrowse(token:string,selectionId:string,pocket:number,index:number):void {if(this.readingProjection)throw new Error('projection-active');const view=this.selectionView(token,selectionId);if(!Number.isInteger(pocket)||pocket<1||pocket>8||!Number.isInteger(index)||index<0||index>view.pockets[pocket-1]!.length)throw new Error('invalid-cursor');this.selection!.lastPocket=pocket;this.selection!.indices[pocket-1]=index;}
   finishSelection(token:string,selectionId:string,requestId:string,itemId:string|null):InventoryOutcome {
-    try{if(this.readingProjection)throw new Error('projection-active');this.current(token);if(typeof requestId!=='string'||!requestId||requestId.length>64)throw new Error('invalid-request-id');const fingerprint=semanticFingerprint({kind:'select-item',selectionId,itemId}),old=this.receipts.get(requestId);if(old)return old.fingerprint===fingerprint?{...clone(old.outcome),status:'duplicate'}:{status:'refused',reason:'request-conflict'};
+    try{if(this.readingProjection)throw new Error('projection-active');if(this.current(token).context.kind==='world-repel')throw Error('world-selection-owned');if(typeof requestId!=='string'||!requestId||requestId.length>64)throw new Error('invalid-request-id');const fingerprint=semanticFingerprint({kind:'select-item',selectionId,itemId}),old=this.receipts.get(requestId);if(old)return old.fingerprint===fingerprint?{...clone(old.outcome),status:'duplicate'}:{status:'refused',reason:'request-conflict'};
       if(this.receipts.size>=256)throw new Error('session-request-limit');const selection=this.selection;if(selection?.id!==selectionId)throw new Error('stale-selection');const view=this.selectionView(token,selectionId);if(itemId!==null&&!view.pockets.flat().some(row=>row.item.id===itemId&&row.quantity>0))throw new Error('invalid-selection');
       if(selection.variableId!==undefined){if(!this.options.variables||selection.variableId>this.options.variables.count())throw new Error('invalid-variable');this.options.variables.write(selection.variableId,itemId??'');this.current(token);if(this.selection!==selection)throw new Error('stale-selection');}
       const outcome:InventoryOutcome={status:itemId===null?'cancelled':'selected',result:{status:itemId===null?'cancelled':'selected',itemId:itemId??''}};this.receipts.set(requestId,{fingerprint,outcome:clone(outcome)});this.selection=null;this.filtering=false;return outcome;
@@ -246,6 +294,7 @@ export class InventorySession {
   beginSort(token:string,pocket:number,index:number,filtered=false):InventoryOutcome {
     try {
       const {game,content,context}=this.current(token);
+      if(context.kind==='world-repel')throw Error('world-selection-owned');
       if(context.kind!=='bag'||this.learningChild||filtered||this.filtering||this.sorting||this.pendingUse||this.selection||this.tossPending||this.readingProjection)throw new Error('sorting-disabled');
       moveInventorySlot(game.inventory,pocket,index,index,inventoryPolicy(content,this.options.limits));
       if(game.inventory.pockets[pocket-1]!.length<2)throw new Error('sorting-disabled');
@@ -288,6 +337,7 @@ export class InventorySession {
     let ready=false;
     try{
       const {game,content,context}=this.current(token);
+      if(context.kind==='world-repel')throw Error('world-selection-owned');
       if(!itemReadiness(content,itemId))return {ready:false,eligible:'unknown',reason:'not-ready'};
       ready=true;positiveQuantity(quantity);
       const family=itemOf(catalogOf(content),itemId)!.effect!.family;

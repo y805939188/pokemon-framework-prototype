@@ -18,7 +18,7 @@ test('B08: all six party and 40×30 storage slots preserve every previous value'
   raw.storage.currentBox=39;raw.storage.unlockedWallpapers=[16,39];
   const bytes=JSON.stringify(raw),start=performance.now(),out=good(raw,C),elapsed=performance.now()-start;
   assert.equal(members(out).length,1206);
-  const stripped=F.clone(out);stripped.schema=6;stripped.dex=F.clone(raw.dex);delete stripped.defeatedTrainers;
+  const stripped=F.clone(out);stripped.schema=6;delete stripped.hallOfFame;delete stripped.world;delete stripped.inventory.registeredItems;stripped.dex=F.clone(raw.dex);delete stripped.defeatedTrainers;
   for(const m of members(stripped)){assert.equal(m.evolutionReadiness,'known');assert.equal(m.cannotTrade,false);delete m.evolutionReadiness;delete m.cannotTrade;}
   assert.deepEqual(stripped,raw);assert.equal(JSON.stringify(raw),bytes);
   assert.equal(out.party[0].hp,0);assert.equal(out.party[0].readyToEvolve,true);

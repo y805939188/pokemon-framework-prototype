@@ -38,7 +38,7 @@ test('legal nonconsumable battle healing compiles without an obsolete unsupporte
 test.before(H.prepare);test.after(H.cleanup);
 for(const lang of ['en','zh'])test(`${lang} actual Scene resolves authored names, name keys and canonical medicine labels`,async()=>{
  const items=Object.values(E.itemCatalog.legacyCatalog()).map(item=>({...item,source:'author-placeholder'})),hyper=items.find(i=>i.id==='hyperpotion');hyper.name='Workshop Tonic';hyper.nameKey=lang==='zh'?'item.name.potion':'author.missing.item.translation';const h=await H.open({id:'ITEM-NAMES-'+lang,lang,items,player:{species:'snorlax',level:50,moves:['splash']},foe:{species:'shuckle',level:50,moves:['splash']}});try{
-  const d=h.s._D,rpg=id=>event('rpg',['item','p1',id,'SCENE-P1','ok','0']),tr=h.flow.translator();assert.deepEqual(d.event(rpg('hyperpotion')),[lang==='en'?'Used Workshop Tonic on Snorlax.':'对Snorlax使用了'+tr.t('item.name.potion')+'。']);const full=d.event(rpg('fullrestore'))[0];assert(full.includes('Full Restore'));assert(!full.includes('Fullrestore'));assert(!full.includes('0 HP'));assert(!full.includes('0点'));H.unchanged(h);
+  const d=h.s._D,rpg=id=>event('rpg',['item','p1',id,'SCENE-P1','ok','0']),tr=h.flow.translator();assert.deepEqual(d.event(rpg('hyperpotion')),[lang==='en'?'Used Workshop Tonic on Snorlax.':'对Snorlax使用了'+tr.t('item.name.potion')+'。']);const full=d.event(rpg('fullrestore'))[0];assert(full.includes(lang==='zh'?'全复药':'Full Restore'));assert(!full.includes('Fullrestore'));assert(!full.includes('0 HP'));assert(!full.includes('0点'));H.unchanged(h);
  }finally{h.cleanup();}
 });
 

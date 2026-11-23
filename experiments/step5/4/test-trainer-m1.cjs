@@ -203,16 +203,17 @@ test('A-M1 base reward uses each opposing team maximum and actual capped balance
   assert.deepEqual(normalized.reward, { nominal: 435, before: 1000000, after: 999999, actual: 0, normalizationLoss: 1 });
 });
 
-test('A-M1 persistent schema 9 migrates a complete schema 7 save without inventing defeats', () => {
-  assert.equal(E.state.GAME_SCHEMA, 9);
+test('A-M1 current schema migrates a complete schema 7 save without inventing defeats', () => {
   const legacyContent = assembled(compile());
   const old = E.state.newGame({ party: [], content: legacyContent });
   old.schema = 7;
+  delete old.hallOfFame;
+  delete old.world; delete old.inventory.registeredItems;
   delete old.defeatedTrainers;
   const migrated = E.saveSchema.migrateGame(old, { content: legacyContent });
   assert.equal(migrated.ok, true, JSON.stringify(migrated.error));
   assert.equal(migrated.from, 7);
-  assert.equal(migrated.to, 9);
+  assert.equal(migrated.to, E.state.GAME_SCHEMA);
   assert.deepEqual(migrated.state.defeatedTrainers, {});
   assert.deepEqual(E.saveSchema.validateGame(migrated.state), []);
   migrated.state.defeatedTrainers['route-1-rival@2'] = { id: 'route-1-rival', version: 2 };

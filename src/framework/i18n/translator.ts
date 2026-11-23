@@ -1,8 +1,8 @@
 /**
  * Text resolution: one entry point for every player-facing string. Entity ids, text keys and display text are separate
  * things: code names a KEY (and gives parameters), a locale table supplies the text. Pure, no host access.
- * Behaviour: requested language, then the fallback chain, then a visible `[missing:key]` marker (never an exception,
- * never an empty string) and the miss is recorded for diagnostics.
+ * Behaviour: requested language, then the fallback chain, then a visible `[missing:key]` marker and a diagnostic.
+ * An explicit empty string is a translation hit and does not fall back.
  */
 export type Params = Record<string, string | number>;
 

@@ -8,13 +8,13 @@ import type { Limits } from './limits';
 import { resolveConfig } from './config';
 
 export interface InventorySlot { itemId: string; quantity: number }
-export interface Inventory { pockets: InventorySlot[][]; lastPocket: number; indices: number[] }
+export interface Inventory { pockets: InventorySlot[][]; lastPocket: number; indices: number[]; registeredItems: string[] }
 export interface InventoryPolicy { perSlot: number; pocketSlots: readonly number[]; autoSort: readonly boolean[] }
 export class InventoryRefused extends Error {
   readonly reason: string;
   constructor(reason: string, detail = reason) { super(detail); this.reason = reason; this.name = 'InventoryRefused'; }
 }
-export const newInventory = (): Inventory => ({ pockets: Array.from({ length: 8 }, () => []), lastPocket: 1, indices: Array(8).fill(0) as number[] });
+export const newInventory = (): Inventory => ({ pockets: Array.from({ length: 8 }, () => []), lastPocket: 1, indices: Array(8).fill(0) as number[], registeredItems: [] });
 export function inventoryPolicy(content?: Pick<Content, 'settings'>, limits?: Limits): InventoryPolicy {
   const config = resolveConfig(content?.settings);
   return { perSlot: typeof content?.settings?.BAG_MAX_PER_SLOT === 'number' ? config.BAG_MAX_PER_SLOT : limits?.bagPerItem ?? config.BAG_MAX_PER_SLOT, pocketSlots: config.BAG_POCKET_SLOTS, autoSort: config.BAG_AUTO_SORT };
@@ -33,6 +33,14 @@ export function aggregateBag(inventory: Inventory): Record<string, number> {
 export function itemQuantity(inventory: Inventory, id: string, catalog: ItemCatalog): number {
   const item = itemOf(catalog, id);
   return !item ? 0 : inventory.pockets[item.pocket - 1]!.reduce((sum, slot) => slot.itemId === id ? safeAdd(sum, slot.quantity) : sum, 0);
+}
+/** Registration belongs to the bag, but does not require stock or an executable handler (WP27). */
+export function registerInventoryItem(inventory: Inventory, id: string, registered: boolean, catalog: ItemCatalog): Inventory {
+  if (typeof id !== 'string' || typeof registered !== 'boolean') throw new InventoryRefused('invalid-registration');
+  if (!itemOf(catalog, id)) return clone(inventory);
+  const next = clone(inventory);
+  next.registeredItems = registered ? next.registeredItems.includes(id) ? next.registeredItems : [...next.registeredItems, id] : next.registeredItems.filter(item => item !== id);
+  return next;
 }
 /** Refuse unresolved existing identities before any inventory write; pocket replacement remains legal. */
 export function assertInventoryMapped(inventory: Inventory,catalog:ItemCatalog):void {
@@ -123,11 +131,12 @@ export function applyBattleBag(inventory: Inventory, delta: Record<string, numbe
   }
   return next;
 }
-export function inventoryProblems(raw: unknown): { path: string; message: string }[] {
+export function inventoryProblems(raw: unknown, registeredRequired = true): { path: string; message: string }[] {
   const out: { path: string; message: string }[] = [], obj = raw as Partial<Inventory> | null;
   const fail = (path: string, message: string) => { out.push({ path: `$.inventory${path}`, message }); };
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return [{ path: '$.inventory', message: 'must be an inventory' }];
-  if (Object.keys(obj).some(k => !['pockets', 'lastPocket', 'indices'].includes(k))) fail('', 'unknown inventory field');
+  if (Object.keys(obj).some(k => !['pockets', 'lastPocket', 'indices', ...(registeredRequired ? ['registeredItems'] : [])].includes(k))) fail('', 'unknown inventory field');
+  if (registeredRequired && (!Array.isArray(obj.registeredItems) || Object.keys(obj.registeredItems).length !== obj.registeredItems.length || obj.registeredItems.some(id => typeof id !== 'string' || !/^[A-Za-z0-9#._:-]{1,64}$/.test(id)) || new Set(obj.registeredItems).size !== obj.registeredItems.length)) fail('.registeredItems', 'must be an ordered list of unique item IDs');
   if (!Number.isInteger(obj.lastPocket) || obj.lastPocket! < 1 || obj.lastPocket! > 8) fail('.lastPocket', 'must be 1..8');
   if (!Array.isArray(obj.indices) || obj.indices.length !== 8 || obj.indices.some(n => !Number.isSafeInteger(n) || n < 0)) fail('.indices', 'must be eight nonnegative safe indices');
   if (!Array.isArray(obj.pockets) || obj.pockets.length !== 8) fail('.pockets', 'must be eight pockets');

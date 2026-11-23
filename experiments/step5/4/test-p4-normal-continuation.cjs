@@ -97,9 +97,18 @@ test('unchanged mode1/naming1 fixture completes actual capture/automatic receivi
 });
 test('actual entitled capture crosses owned Dex message/entry with a later-update ACK barrier and natural return to Map',async t=>{
   const x=await owned(t,{dex:true}),run=x.attach();await caught(x);await drain(x,run,{untilContinuation:true});
+  const entered=x.G.PSEvolution.normalObservationState(),enteredTick=x.G.Graphics.frameCount,currentScene=x.G.SceneManager._scene;
+  await x.waitFor(()=>x.G.PSEvolution.normalObservationState()?.ready===true,'actual current Dex presenter release boundary');
+  const readyUI=x.G.PSEvolution.normalObservationState();
+  assert.equal(x.G.SceneManager._scene,currentScene);assert.equal(x.flow._app,x.fixture.app);
+  assert.equal(readyUI.generation,x.fixture.app.stateGeneration);assert.equal(readyUI.generation,entered.generation);
+  assert.equal(readyUI.owner,entered.owner);assert.equal(readyUI.layer,entered.layer);assert.equal(readyUI.sceneToken,entered.sceneToken);
   const before=x.fixture.app.pendingPokedex,a=run.decide(x.context),b=run.decide(x.context);
   assert.equal(a.snapshot.sceneKind,'continuation');assert.equal(a.decision.kind,'wait');assert.equal(b.decision.kind,'wait');assert.deepEqual(x.fixture.app.pendingPokedex,before);
+  assert.equal(a.decision.reason,'independent later game update required');assert.equal(b.decision.reason,a.decision.reason);assert.equal(a.snapshot.pageToken,b.snapshot.pageToken);
   await x.frames(1);const ack=run.decide(x.context);assert.equal(ack.decision.kind,'acknowledge');assert.equal(ack.decision.layer,'dex-message');assert.deepEqual(x.fixture.app.pendingPokedex,before,'decision alone neither acknowledges nor advances the domain');
+  assert.equal(ack.snapshot.pageToken,a.snapshot.pageToken);
+  console.log('DEX_READY_ACK_BOUNDARY '+JSON.stringify({enteredTick,enteredReady:entered.ready,enteredLayer:entered.layer,owner:readyUI.owner,sceneToken:readyUI.sceneToken,generation:readyUI.generation,readyObservationTick:x.G.Graphics.frameCount-1,ackTick:x.G.Graphics.frameCount,domainRevision:before.revision}));
   const {out,seen}=await drain(x,run);assert.equal(out.decision.kind,'mapReady');assert(seen.some(s=>s.layer==='entry'));
   assert.equal(x.fixture.app.pendingPokedex,null);assert.equal(x.fixture.app.saveBlocked,false);assert.equal(x.context.intentIndex,0);
 });

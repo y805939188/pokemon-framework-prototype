@@ -1,0 +1,291 @@
+{
+  "manifest": {
+    "schema": 1,
+    "id": "sample",
+    "title": "Step 4 content sample: a starter, two wild species and the step 3 battle species, with one starter grant"
+  },
+  "sources": [
+    {
+      "id": "showdown",
+      "kind": "showdown",
+      "description": "Battle data (base stats, display names, move names) is read from the pinned Pokemon Showdown build at run time and is never copied into the framework content.",
+      "license": "MIT (code and data files of the smogon/pokemon-showdown repository); the data describes a franchise whose rights belong to its owners, so the MIT grant does not by itself settle redistribution of the game data inside a product",
+      "ref": "https://github.com/smogon/pokemon-showdown at the SHA in scripts/showdown.env",
+      "status": "confirmed",
+      "usedFor": [
+        "species.showdownId",
+        "learnset move names",
+        "base stats at run time"
+      ],
+      "usageCheck": {
+        "checkedOn": "2026-10-21",
+        "checkedBy": "project process record at step 5.0 (Claude Code), from the terms already registered in this entry; not a legal review",
+        "conditions": "MIT licence covers the repository's code and data files; the data describes a franchise whose rights belong to its owners, which the MIT grant does not settle for redistribution inside a product",
+        "decision": "internal-use"
+      }
+    },
+    {
+      "id": "author-placeholder",
+      "kind": "author-placeholder",
+      "description": "Numbers typed by the project authors to exercise the pipeline and the playable slice (growth curve, base experience, EV yield, catch rate, level-up moves, reward packages). They are NOT claimed to match any game and must be replaced by a properly sourced dataset before any release. Learnset entries were chosen to be legal moves of the pinned Showdown build; where that build has Gen 8 level-up data the levels agree with it (see the content inventory).",
+      "license": "project-authored test data; no third-party terms apply, and no claim of equivalence with any commercial game is made",
+      "ref": "docs/step2/2.3-report.md (stand-in values entered by hand at step 2.3)",
+      "status": "placeholder",
+      "usedFor": [
+        "species.growth",
+        "species.baseExp",
+        "species.evYield",
+        "species.catchRate",
+        "species.learnset",
+        "grants",
+        "trainer-types",
+        "trainers"
+      ]
+    }
+  ],
+  "species": [
+    {
+      "id": "charizard",
+      "showdownId": "charizard",
+      "nameKey": "species.charizard",
+      "growth": "parabolic",
+      "baseExp": 267,
+      "evYield": {
+        "spa": 3
+      },
+      "catchRate": 45,
+      "learnset": [
+        {
+          "level": 51,
+          "move": "slash"
+        },
+        {
+          "level": 52,
+          "move": "outrage"
+        },
+        {
+          "level": 53,
+          "move": "heatwave"
+        }
+      ],
+      "source": "author-placeholder",
+      "evolutions": [
+        {
+          "method": "Event",
+          "parameter": 7,
+          "target": "blastoise"
+        }
+      ]
+    },
+    {
+      "id": "blastoise",
+      "showdownId": "blastoise",
+      "nameKey": "species.blastoise",
+      "growth": "parabolic",
+      "baseExp": 265,
+      "evYield": {
+        "spd": 3
+      },
+      "catchRate": 45,
+      "learnset": [
+        {
+          "level": 51,
+          "move": "waterfall"
+        }
+      ],
+      "source": "author-placeholder"
+    },
+    {
+      "id": "venusaur",
+      "showdownId": "venusaur",
+      "nameKey": "species.venusaur",
+      "growth": "parabolic",
+      "baseExp": 263,
+      "evYield": {
+        "spa": 2,
+        "spd": 1
+      },
+      "catchRate": 45,
+      "learnset": [
+        {
+          "level": 51,
+          "move": "powerwhip"
+        }
+      ],
+      "source": "author-placeholder"
+    },
+    {
+      "id": "snorlax",
+      "showdownId": "snorlax",
+      "nameKey": "species.snorlax",
+      "growth": "slow",
+      "baseExp": 189,
+      "evYield": {
+        "hp": 2
+      },
+      "catchRate": 25,
+      "learnset": [
+        {
+          "level": 1,
+          "move": "tackle"
+        },
+        {
+          "level": 16,
+          "move": "bite"
+        },
+        {
+          "level": 20,
+          "move": "rest"
+        },
+        {
+          "level": 24,
+          "move": "crunch"
+        },
+        {
+          "level": 28,
+          "move": "bodyslam"
+        }
+      ],
+      "source": "author-placeholder"
+    },
+    {
+      "id": "gengar",
+      "showdownId": "gengar",
+      "nameKey": "species.gengar",
+      "growth": "parabolic",
+      "baseExp": 250,
+      "evYield": {
+        "spa": 3
+      },
+      "catchRate": 45,
+      "learnset": [
+        {
+          "level": 1,
+          "move": "lick"
+        },
+        {
+          "level": 1,
+          "move": "hypnosis"
+        },
+        {
+          "level": 12,
+          "move": "payback"
+        },
+        {
+          "level": 24,
+          "move": "hex"
+        },
+        {
+          "level": 30,
+          "move": "nightshade"
+        }
+      ],
+      "source": "author-placeholder"
+    },
+    {
+      "id": "pidgey",
+      "showdownId": "pidgey",
+      "nameKey": "species.pidgey",
+      "growth": "parabolic",
+      "baseExp": 50,
+      "evYield": {
+        "spe": 1
+      },
+      "catchRate": 255,
+      "learnset": [
+        {
+          "level": 1,
+          "move": "tackle"
+        },
+        {
+          "level": 5,
+          "move": "sandattack"
+        },
+        {
+          "level": 9,
+          "move": "gust"
+        }
+      ],
+      "source": "author-placeholder"
+    },
+    {
+      "id": "caterpie",
+      "showdownId": "caterpie",
+      "nameKey": "species.caterpie",
+      "growth": "medium",
+      "baseExp": 39,
+      "evYield": {
+        "hp": 1
+      },
+      "catchRate": 255,
+      "learnset": [
+        {
+          "level": 1,
+          "move": "tackle"
+        },
+        {
+          "level": 1,
+          "move": "stringshot"
+        },
+        {
+          "level": 9,
+          "move": "bugbite"
+        }
+      ],
+      "source": "author-placeholder"
+    },
+    {
+      "id": "charmander",
+      "showdownId": "charmander",
+      "nameKey": "species.charmander",
+      "growth": "parabolic",
+      "baseExp": 62,
+      "evYield": {
+        "spe": 1
+      },
+      "catchRate": 45,
+      "learnset": [
+        {
+          "level": 1,
+          "move": "scratch"
+        },
+        {
+          "level": 1,
+          "move": "growl"
+        },
+        {
+          "level": 4,
+          "move": "ember"
+        },
+        {
+          "level": 8,
+          "move": "smokescreen"
+        },
+        {
+          "level": 12,
+          "move": "dragonbreath"
+        }
+      ],
+      "source": "author-placeholder"
+    }
+  ],
+  "overlays": [],
+  "grants": [
+    {
+      "id": "starter",
+      "members": [
+        {
+          "species": "charmander",
+          "level": 5
+        }
+      ],
+      "items": {
+        "potion": 5,
+        "pokeball": 10,
+        "antidote": 2
+      },
+      "money": 0,
+      "source": "author-placeholder"
+    }
+  ]
+}

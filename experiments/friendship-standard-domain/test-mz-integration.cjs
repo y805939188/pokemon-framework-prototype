@@ -41,6 +41,8 @@ for(const after of [false,true])test('real slot rename '+(after?'postcommit':'pr
 test('a pending ordinary save/load blocks preview; its late callback cannot race migration',async()=>{
  const h=host(),G=h.ctx;await h.save(1);
  const save=G.DataManager.saveGame(2);assert.equal((await G.PSState.previewFriendshipMigration(1)).status,'refused');await save;
+ // The native save starts a separate global-info write; wait for that real write as h.save does.
+ await new Promise(r=>setImmediate(r));
  const load=G.DataManager.loadGame(1);assert.equal((await G.PSState.previewFriendshipMigration(1)).status,'refused');await load;
  assert.equal(G.$gameSystem._psGame.party[0].friendship,256);
 });

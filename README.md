@@ -4,7 +4,11 @@
 
 起点是 [rpg-maker-mz-initialize](https://github.com/y805939188/rpg-maker-mz-initialize) 模板（`b6fa1df`）；第二步（验证战斗接入）已完成，结论和证据在 `docs/step2/`。
 
-## 当前阶段（2026-11-13）
+## 当前阶段（2026-11-23）
+
+5.6 的菜单与 PC 导航、标题与存档流程、地图对白和走路优化已完成限定验收。固定产品候选 `f5c8bc1b` 的正式本地回归通过 429 套、8,489 项。独立实机验证覆盖走路、败北恢复、中文首图和槽 1 同文件冷读。读档后的 PC 与对白速度以字节一致的隔离副本补验。发布提交基于远端主线，沿用固定候选的产品源码与构建输入。见 [第五步进度与验收范围](docs/step5/README.md#56-菜单标题与存档流程)和[走路内容快照](docs/step5/5.5-walk-content-fingerprint.zh.md)。
+
+## 5.4 收口记录（2026-11-13）
 
 5.4 已按批准的单打与默认呈现范围完成技术收口。主线整合以普通合并 `580c8637` 承接已独审的最终验收文档 [`4ac83373`](https://github.com/y805939188/pokemon-framework-prototype/commit/4ac83373fac77a2a9eec24e85191a6415ac5dd4a)，产品仍为 [`174568dc`](https://github.com/y805939188/pokemon-framework-prototype/commit/174568dc2a0d20b5e5e2b0878c35c63bca742e27)，src `7c52b290`（源码来源 `5a41caf`）；产品代码和静态运行包身份不变。[投球／逃跑整改](docs/step5/5.4-capture-run-followup.md)的 A1／B1／C1 仅按正常可达范围限域通过，不扩成全部机制验收。
 

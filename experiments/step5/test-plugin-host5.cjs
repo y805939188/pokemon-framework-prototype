@@ -40,7 +40,7 @@ function host(game, missingTesting = false) {
   const sys = Object.assign(new Game_System(), { _psGame: game, _psBattleSeq: 0 });
   const req = p => {
     loads.push(p);
-    if (p === 'path' || p === 'fs') return require(p);
+    if (p === 'path' || p === 'fs' || p === 'node:util') return require(p);
     if (/production\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/production.cjs'));
     if (/testing\.cjs$/.test(p)) {
       if (missingTesting) throw new Error('testing dependency unavailable (injected)');
@@ -62,6 +62,7 @@ function host(game, missingTesting = false) {
     $gameSystem: sys, $gameVariables: { setValue() {}, value: () => 0 }, $gameMap: map, $gamePlayer: { reserveTransfer() {} }, $dataMapInfos: [], $dataCommonEvents: [],
     $gameMessage: { isBusy: () => false, add() {} },
   };
+  require('../../scripts/tests/legacy-mz-world-host.cjs').install(ctx);
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext(plugins.PS_SaveState, ctx, { filename: 'PS_SaveState.js (built)' });
@@ -130,18 +131,28 @@ test('P4-2: loading a save (or starting a new game) releases a battle the applic
   assert.equal(h.flow.app().claimGrant('starter').status, 'applied', 'released by the new game, which installed an empty state');
 });
 
-test('WP06 §4.1 step counter: a normal step counts; a forced move route or a running event does not', () => {
-  const h = host(E.state.newGame({ content, party: [], money: 0 }));
-  const p = h.player;
-  p.increaseSteps(); p.increaseSteps();
-  assert.deepEqual([p._base, h.sys._psGame.steps], [2, 2], "MZ's own step handling still runs");
-  p._forcing = true; p.increaseSteps(); p._forcing = false;
-  h.map.running = true; p.increaseSteps(); h.map.running = false;
-  assert.deepEqual([p._base, h.sys._psGame.steps], [4, 2]);
-  h.sys._psGame = J({ ...h.sys._psGame, steps: 2147483647 }); p.increaseSteps();
-  assert.equal(h.sys._psGame.steps, 0, 'wraps at 2^31');
-  h.sys._psSaveError = { code: 'invalid', message: 'x' }; p.increaseSteps(); p.increaseSteps();
-  assert.equal(h.warnings.filter(w => /steps not counted/.test(w)).length, 1, 'an unusable state is reported once, not every step');
+test('WP06 §4.1 step counter: a normal step counts; a forced move route or a running event does not', async () => {
+  // 5.5 counts completed interpolation. Actual pinned Game_Player.increaseSteps
+  // remains the native start callback, and must not commit the framework prefix.
+  const h=await require('./5/d-mz-native-frame-support.cjs').fixture(),p=h.player;
+  p._base=0;const native=h.G.Game_Character.prototype.increaseSteps;
+  h.G.Game_Character.prototype.increaseSteps=function(...args){this._base++;return Reflect.apply(native,this,args);};
+  p.directionInput=6;h.tick();p.directionInput=0;
+  assert.equal(p._base,1);assert.equal(h.state().steps,0,'start is not completed movement');
+  while(p.isMoving())h.tick();await h.settle();assert.equal(h.state().steps,1);
+  h.complete();await h.settle();
+  assert.deepEqual([p._base,h.state().steps],[2,2],"MZ's own step handling still runs");
+  p._forcing=true;p.moveStraight(6);while(p.isMoving())h.tick();h.tick();await h.settle();p._forcing=false;
+  h.map.running=true;p.moveStraight(6);while(p.isMoving())h.tick();h.tick();await h.settle();h.map.running=false;
+  assert.deepEqual([p._base,h.state().steps],[4,2]);
+  h.app.ports.state.replace({...h.state(),steps:2147483647});h.complete();await h.settle();assert.equal(h.state().steps,0,'wraps at 2^31');
+  const before=h.state().steps,draws=h.draws.length,nativeDraws=h.nativeDraws.length;
+  p.setDirection(8);p.passable=false;h.complete();await h.settle();p.passable=true;
+  assert.equal(h.state().steps,before,'turn/wall do not add completed steps');assert.equal(h.draws.length,draws);assert.equal(h.nativeDraws.length,nativeDraws);
+});
+test('WP06 explicit PSFlow.steps compatibility API reports an unusable state once without pretending native completion',()=>{
+ const h=host(E.state.newGame({content,party:[],money:0}));h.sys._psSaveError={code:'invalid',message:'x'};h.flow.steps(1);h.flow.steps(1);
+ assert.equal(h.warnings.filter(w=>/steps not counted/.test(w)).length,1,'an unusable state is reported once, not every step');
 });
 
 test('species names by content id + form or by battle name; ResetGame stores the fixture party by content id', () => {

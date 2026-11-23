@@ -3,8 +3,14 @@
 # process and verify the MZ save written by the first run. NW.js is launched directly on the project,
 # the same host the MZ editor's Playtest uses (this is not the editor's Playtest button).
 # Usage: scripts/run-flow-test-mac.sh [evidence-dir]   (default: experiments/step2/evidence/flow)
+# Optional PF_FLOW_PROJECT_ROOT selects an isolated project; PF_FLOW_TIMEOUT_SECONDS defaults to 360.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="${PF_FLOW_PROJECT_ROOT:-$ROOT}"
+[[ -d "$ROOT/src" ]] || { echo "flow project has no src directory: $ROOT" >&2; exit 2; }
+ROOT="$(cd "$ROOT" && pwd)"
+FLOW_TIMEOUT_SECONDS="${PF_FLOW_TIMEOUT_SECONDS:-360}"
+[[ "$FLOW_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || { echo "PF_FLOW_TIMEOUT_SECONDS must be a positive integer" >&2; exit 2; }
 MZ_APP="${MZ_APP:-$HOME/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.app}"
 NW="$MZ_APP/Contents/Resources/nwjs-mac/nwjs.app/Contents/MacOS/nwjs"
 EVID="${1:-$ROOT/experiments/step2/evidence/flow}"
@@ -16,7 +22,17 @@ rm -f "$EVID"/ps-flow-*.json "$EVID"/*.png
 # saves go to the evidence folder (--ps-save-dir), never to the project's save/ that a developer's Playtest uses
 SAVEDIR="$EVID/saves"; rm -rf "$SAVEDIR"
 
-wait_for() { for _ in $(seq 1 180); do [[ -f "$1" ]] && return 0; sleep 2; done; return 1; }
+wait_for() {
+  local elapsed=0 interval=2
+  while (( elapsed < FLOW_TIMEOUT_SECONDS )); do
+    [[ -f "$1" ]] && return 0
+    interval=2
+    if (( FLOW_TIMEOUT_SECONDS - elapsed < interval )); then interval=$((FLOW_TIMEOUT_SECONDS - elapsed)); fi
+    sleep "$interval"
+    elapsed=$((elapsed + interval))
+  done
+  [[ -f "$1" ]]
+}
 run() { # mode out [extra args]
   local mode="$1" out="$2"; shift 2
   "$NW" "$ROOT" "--mute-audio" "--disable-renderer-backgrounding" "--disable-background-timer-throttling" "--disable-backgrounding-occluded-windows" "--disable-features=CalculateNativeWinOcclusion" "--ps-save-dir=$SAVEDIR" "--ps-flow-test=$mode" "--ps-flow-out=$out" --ps-flow-quit "$@" >/dev/null 2>&1 &

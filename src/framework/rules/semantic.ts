@@ -9,9 +9,12 @@ function plainPrototype(proto: object | null): boolean {
   const ctor: unknown = Object.getOwnPropertyDescriptor(proto, 'constructor')?.value;
   return typeof ctor === 'function' && Object.getOwnPropertyDescriptor(ctor, 'prototype')?.value === proto && Object.getOwnPropertyDescriptor(ctor, 'name')?.value === 'Object';
 }
-export function semanticFingerprint(value: unknown): string {
+// Only this module's detached, recursively frozen copies enter the cache. Object.freeze on
+// a caller's record does not prove its children immutable or transfer ownership to us.
+const ownedFingerprints = new WeakMap<object, string>();
+function copyPlainData(value: unknown, canonicalOrder: boolean): unknown {
   const active = new Set<object>();
-  const canonical = (v: unknown): unknown => {
+  const copy = (v: unknown): unknown => {
     if (v === null || typeof v === 'string' || typeof v === 'boolean') return v;
     if (typeof v === 'number') { if (!Number.isFinite(v)) throw new Error('invalid-intent-number'); return v; }
     if (!v || typeof v !== 'object') throw new Error('invalid-intent-value');
@@ -19,8 +22,38 @@ export function semanticFingerprint(value: unknown): string {
     if (!Array.isArray(v) && !plainPrototype(Object.getPrototypeOf(v) as object|null)) throw new Error('nonplain-intent');
     active.add(v);
     for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(v))) if (descriptor.get || descriptor.set) throw new Error('intent-accessor');
-    const result: unknown = Array.isArray(v) ? Array.from(v,canonical) : Object.fromEntries(Object.keys(v).sort().map(key=>[key,canonical((v as Record<string,unknown>)[key])]));
-    active.delete(v);return result;
+    let result: unknown;
+    if (Array.isArray(v)) {
+      result = Array.from(v, copy);
+    } else {
+      const keys = Object.keys(v);
+      if (canonicalOrder) keys.sort();
+      result = Object.fromEntries(keys.map(key => [key, copy((v as Record<string, unknown>)[key])]));
+    }
+    active.delete(v);
+    return result;
   };
-  return sha256Hex(JSON.stringify(canonical(value)));
+  return copy(value);
+}
+/** Own a plain-data snapshot without freezing or retaining any of the caller's objects. */
+export function ownedImmutableSnapshot<T>(value: T): T {
+  const snapshot = copyPlainData(value, false);
+  const freeze = (part: unknown): void => {
+    if (part !== null && typeof part === 'object') {
+      for (const child of Object.values(part)) freeze(child);
+      Object.freeze(part);
+    }
+  };
+  freeze(snapshot);
+  // Only the identity sorts keys. The snapshot still has the source's business enumeration order.
+  if (snapshot !== null && typeof snapshot === 'object') ownedFingerprints.set(snapshot, semanticFingerprint(snapshot));
+  return snapshot as T;
+}
+export function semanticFingerprint(value: unknown): string {
+  const cached = ownedImmutableFingerprint(value);
+  return cached ?? sha256Hex(JSON.stringify(copyPlainData(value, true)));
+}
+/** Query this runtime's ownership registry; callers cannot register an external object or identity. */
+export function ownedImmutableFingerprint(value: unknown): string | undefined {
+  return value !== null && typeof value === 'object' ? ownedFingerprints.get(value) : undefined;
 }

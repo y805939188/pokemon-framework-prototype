@@ -1,0 +1,5 @@
+{
+  "extends": "../../../../../src/framework/tsconfig.core.json",
+  "include": [],
+  "files": ["negative.ts"]
+}

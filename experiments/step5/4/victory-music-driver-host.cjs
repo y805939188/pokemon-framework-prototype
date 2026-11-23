@@ -17,8 +17,9 @@ function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,op
   G.Input.isPressed=k=>!!input.pressed[key(k)];
   G.Input.isTriggered=k=>!!input.triggered[key(k)];
   G.Input.isRepeated=G.Input.isTriggered;
+  require('./victory-native-scenes.cjs').install(G,ROOT);
  };
- const world=createCompositionHostFactory({ROOT,work,plugins}),w=world({evolution:'plugin',productionTranslator:options.productionTranslator===true,prebattleWorld:options.prebattleWorld===true,beforeProduct}),G=w.G,M=w.manager,A=w.AM,E=require(path.join(ROOT,'js/engine/build/production.cjs'));
+ const world=createCompositionHostFactory({ROOT,work,plugins}),w=world({evolution:'plugin',productionTranslator:options.productionTranslator===true,prebattleWorld:options.prebattleWorld===true,legacyDefeatCompat:options.legacyDefeatCompat===true,beforeProduct}),G=w.G,M=w.manager,A=w.AM,E=require(path.join(ROOT,'js/engine/build/production.cjs'));
  // Run the actual entry's presenter policy before unrelated global hooks. The
  // complete driver must inherit this policy, not assume the plugin's default.
  assert.equal(typeof entryText,'string');const stop=Symbol('entry boundary'),descriptor=Object.getOwnPropertyDescriptor(M,'isGameActive'),priorNW=G.nw;
@@ -50,13 +51,15 @@ function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,op
   Title.prototype.start=function(){Base.prototype.start.call(this);this.playTitleMusic();};
   const battleReady=G.Scene_PSBattle.prototype.isReady,seenReady=new WeakMap();
   G.Scene_PSBattle.prototype.isReady=function(...a){const ready=battleReady.apply(this,a);if(!seenReady.has(this))seenReady.set(this,G.Graphics.frameCount);return ready&&G.Graphics.frameCount-seenReady.get(this)>=(options.battleReadyDelayFrames??0);};
- const evoUpdate=M.updateScene,stack=[];
- const install=C=>{const prior=M._scene;prior?.terminate?.();const s=new C();if(!s.children)s.initialize();M._scene=s;s.create();if(s instanceof G.Scene_Map){s._messageWindow={};s._spriteset={};}if(s instanceof Title){s._commandWindow={isOpenAndActive:()=>true};s.isBusy=()=>false;}return s;};
- M.goto=C=>install(C);M.push=C=>{const s=M._scene;stack.push(s instanceof G.Scene_Map?G.Scene_Map:s?.constructor??G.Scene_Map);return install(C);};M.pop=()=>install(stack.pop()??G.Scene_Map);
- M.updateScene=function(){const s=this._scene;if(!s)return;if(!s.isStarted()&&s.isReady()&&(!options.delayStart||G.Graphics.frameCount>options.delayStart))s.start();if(s.isStarted())return evoUpdate.call(this);};
+ const evoUpdate=M.updateScene,queuedGoto=M.goto;
+ // Delegate the already-installed production allocation hooks, then consume the
+ // genuine native queue. Never construct a replacement Scene behind those hooks.
+ M.goto=function(C){const result=queuedGoto.call(this,C);this.changeScene();return result;};
+ Title.prototype.create=function(){Base.prototype.create.call(this);this._commandWindow={isOpenAndActive:()=>true};this.isBusy=()=>false;};
+ M.updateScene=function(){const s=this._scene;if(!s)return;if(!s.isStarted()&&options.delayStart&&G.Graphics.frameCount<=options.delayStart)return;return evoUpdate.call(this);};
  M.goto(Title);
  G.PSManagement.inputFrame=()=>input;G.PSManagement.current=()=>null;
- G.$gameMessage.clear=()=>{};if(!options.prebattleWorld)G.$gameMap={mapId:()=>5,_interpreter:{clear(){},isRunning:()=>false}};G.$dataMap={};
+ G.$gameMessage.clear=()=>{};if(!options.prebattleWorld)G.$gameMap={_mapId:5,mapId(){return this._mapId;},_interpreter:{clear(){},isRunning:()=>false}};G.$dataMap={};
  w.flow.limits=()=>({party:6,boxes:1200,bagPerItem:999,money:999999});w.flow.app=w.applicationFactory;w.flow._app=null;w.flow.content=()=>w.flow._content;w.flow.now=()=>12345;
  const gameDir=w.root,saveRoot=path.join(work,'save-'+path.basename(gameDir));fs.mkdirSync(saveRoot);G.StorageManager={fileDirectoryPath:()=>saveRoot};
  fs.mkdirSync(path.join(gameDir,'js/plugins'),{recursive:true});
@@ -83,7 +86,7 @@ function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,op
   const s=battle();for(let i=0;i<12&&!s._session.finished;i++){s.act(()=>s._session.chooseMove(1),'move');await waitFor(()=>!s._busy,'actual action');await frames(2);}
   await waitBattlePresentation(()=>s._mode==='end'&&!s._busy&&s._queue.length===0,'actual terminal Scene');
  };
- const p={G,W:G,api:()=>E,fs,path,OUT:path.join(gameDir,'REPORT.json'),gameDir,arg:k=>args[k],argv:['--ps-sound'],assert:(v,label)=>assert(v,label),eq:(a,b,label)=>assert.equal(JSON.stringify(a),JSON.stringify(b),label),clone:v=>JSON.parse(JSON.stringify(v)),report,results:report.results,writeProgress:()=>progress++,frames,waitFor,scene,battle,inMode,fightUntilEnd,press,toMapId:async()=>{M.goto(G.Scene_Map);await frames(2);},nodeRequire:require};
+ const p={G,W:G,api:()=>E,fs,path,OUT:path.join(gameDir,'REPORT.json'),gameDir,arg:k=>args[k],argv:['--ps-sound'],assert:(v,label)=>assert(v,label),eq:(a,b,label)=>assert.equal(JSON.stringify(a),JSON.stringify(b),label),clone:v=>JSON.parse(JSON.stringify(v)),report,results:report.results,writeProgress:()=>progress++,frames,waitFor,scene,battle,inMode,fightUntilEnd,press,toMapId:async(id=5,x=8,y=9)=>{G.$gameMap._mapId=id;Object.assign(G.$gamePlayer,{_x:x,_realX:x,_y:y,_realY:y});M.goto(G.Scene_Map);await frames(2);},nodeRequire:require};
  return {w,G,M,A,p,report,frames,waitFor,context,sourceNodes,sourceStart:Source.prototype.start,bufferMethods:{play:BP.play,destroy:BP.destroy},get progress(){return progress;},inputFile,saveRoot};
 }
 module.exports={createVictoryDriverHost};

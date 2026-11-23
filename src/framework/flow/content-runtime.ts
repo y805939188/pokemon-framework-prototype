@@ -12,7 +12,8 @@ import { checkOverrides, runtimeCapabilities } from "../rules/config";
 import { COMPILED_SCHEMA_VERSION } from "../content/schema";
 import { canonicalJson, speciesFieldProblem, checkSources, preUseProblem, showdownDependencyProblem } from "../content/compile";
 import type { Content, DexLookup, Member } from "../rules/types";
-import { PROGRESSION_FIELDS, progressionFieldProblem, deriveSpeciesFields, checkProgressionReferences, checkRegionalDex, checkMapMetadata } from "../content/progression-input";
+import { PROGRESSION_FIELDS, WILD_ITEM_FIELDS, progressionFieldProblem, deriveSpeciesFields, checkProgressionReferences, checkRegionalDex, checkMapMetadata } from "../content/progression-input";
+import { checkWorldInputs } from "../content/world-input";
 import { evolutionMethod } from "../rules/evolution-data";
 import { sha256Hex } from "../rules/sha256";
 import { allMembers, locateMember } from "../rules/storage";
@@ -57,7 +58,11 @@ export function loadCompiled(json: unknown): CompiledContent {
       const recordKey=`${String(value.id)}/${String(value.form??0)}`;
       if(recordKeys.has(recordKey))report("compiled",p,"duplicate species key"); recordKeys.add(recordKey);
       for(const field of ["nameKey","growth","baseExp","evYield","catchRate","learnset"]) { const issue=speciesFieldProblem(field,value[field]);if(issue)report("compiled",`${p}.${field}`,issue); }
-      for(const field of ["happiness",...PROGRESSION_FIELDS]) if(Object.hasOwn(value,field)) { const issue=speciesFieldProblem(field,value[field]);if(issue)report("compiled",`${p}.${field}`,issue); }
+      for(const field of ["happiness",...PROGRESSION_FIELDS]) if(Object.hasOwn(value,field)) {
+        const descriptor=Object.getOwnPropertyDescriptor(value,field);
+        if(!descriptor||!("value" in descriptor)||!descriptor.enumerable){report("compiled",`${p}.${field}`,"must be an enumerable own data property");continue;}
+        const issue=speciesFieldProblem(field,descriptor.value);if(issue)report("compiled",`${p}.${field}`,issue);
+      }
       const gate=usable(value.source);if(gate)report("compiled",`${p}.source`,`source-unusable: ${gate}`);
     }
     for(const recordKey of recordKeys)if(!recordKeys.has(recordKey.split("/")[0]+"/0"))report("compiled","$.species","missing base form");
@@ -79,6 +84,15 @@ export function loadCompiled(json: unknown): CompiledContent {
   }
   if(json.grants!==undefined&&(!dense(json.grants)||json.grants.some(g=>!obj(g)||!dense(g.members)||g.members.some(m=>!obj(m))||!obj(g.items))))report("compiled","$.grants","invalid grant records");
   const trainerOrder = dense(json.registrationOrder) ? json.registrationOrder as unknown as import("../rules/types").SpeciesKey[] : [];
+  const worldDescriptor=Object.getOwnPropertyDescriptor(json,"world");
+  if(worldDescriptor) {
+    if(!("value" in worldDescriptor)||!worldDescriptor.enumerable)report("compiled","$.world","must be an enumerable own data property");
+    else {
+      const world=checkWorldInputs(worldDescriptor.value,{speciesKeys:trainerOrder,usableSource:usable});
+      problems.push(...world.problems);
+      if(!world.problems.length&&canonicalJson(worldDescriptor.value)!==canonicalJson(world.value))report("compiled","$.world","world content must use canonical merged/sorted records");
+    }
+  } else if("world" in json)report("compiled","$.world","must be an own data property");
   const trainerCatalog = checkItemInputs(json.items, json.shops, usable).catalog;
   problems.push(...checkTrainerInputs(json.trainerTypes, json.trainers, { speciesKeys: trainerSpeciesKeys(trainerOrder, dense(json.species) ? json.species.filter(sp => obj(sp) && typeof sp.id === "string" && typeof sp.showdownId === "string") as unknown as import("../content/schema").SpeciesSource[] : []), catalog: trainerCatalog, usable }).errors);
   if(problems.length)throw new Error(problems.map(p=>`${p.file} ${p.path}: ${p.message}`).join("; "));
@@ -92,6 +106,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
   try { loadCompiled(compiled); } catch(error) { return {content:{species:{}},errors:[{file:"compiled",path:"$",message:(error as Error).message}],warnings}; }
   const content: Content = { species: {}, meta: { kind: "sample", id: compiled.contentId, inputsHash: compiled.inputsHash, compiledSemantics: COMPILED_SCHEMA_VERSION, showdownSha: compiled.showdownSha, contentIdentity: compiled.contentIdentity }, registrationOrder: compiled.registrationOrder?.map(k=>({...k})), regionalDex: JSON.parse(JSON.stringify(compiled.regionalDex)) as import("../rules/types").RegionalDex, ...(compiled.mapMetadata ? {mapMetadata:JSON.parse(JSON.stringify(compiled.mapMetadata)) as import("../rules/types").MapMetadata} : {}), moves: {}, speciesIds: {}, forms: {}, speciesKeys: {}, grants: {}, ...(compiled.settings ? { settings: { ...compiled.settings } } : {}) };
   // A compiled document may be older than the gate, or edited by hand. Validate the whole registry and every source
+  if(compiled.world)content.world=JSON.parse(JSON.stringify(compiled.world)) as import("../rules/world-data").WorldContent;
   // whose data will be consumed before even querying the Dex; a placeholder's exemption covers only its own fields.
   for (const p of checkOverrides(compiled.settings ?? {})) errors.push({ file: "settings.json", path: p.path, message: p.message });
   const sources = checkSources(compiled.sources, (file, path, message) => { errors.push({ file, path, message }); });
@@ -157,6 +172,11 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
       if(kind==="type"&&!dex.type?.(ref)){errors.push({file:"assembly",path:`${path}.${field}`,message:`unknown type ${ref}`});ok=false;}
       if(kind==="item"&&!Object.hasOwn(itemInputs.catalog,ref)&&!dex.heldItem?.(ref)){errors.push({file:"assembly",path:`${path}.${field}`,message:`unknown item ${ref}`});ok=false;}
     }
+    for(const field of WILD_ITEM_FIELDS)for(const [j,id] of (sp[field]??[]).entries()) {
+      if(!heldItemDescriptor(itemInputs.catalog,id,ref=>dex.heldItem?.(ref)??null)) {
+        errors.push({file:"assembly",path:`${path}.${field}[${j}]`,message:`unsupported canonical wild held item ${id}`});ok=false;
+      }
+    }
     for (const [j, e] of sp.learnset.entries()) {
       const mv = dex.move(e.move);
       if (!mv) { errors.push({ file: "assembly", path: `${path}.learnset[${j}].move`, message: `"${e.move}" is not a move in the pinned Showdown data (${short})` }); ok = false; continue; }
@@ -169,7 +189,7 @@ export function assembleContent(compiled: CompiledContent, dex: DexLookup, devel
     setOwn(content.species, found.name, {
       base: found.baseStats, growth: sp.growth, baseExp: sp.baseExp, evYield: { ...sp.evYield }, catchRate: sp.catchRate, learnset, nameKey: sp.nameKey, contentId: sp.id, form, ruleSpecies: found.baseSpecies ?? found.name,
       ...(sp.abilities !== undefined ? {abilities:sp.abilities.map(ref=>ref===null?null:dex.abilityInfo!(ref)!.name)} : found.abilities ? { abilities: [...found.abilities] } : {}), ...(sp.hiddenAbilities !== undefined ? {hiddenAbilities:sp.hiddenAbilities.map(ref=>ref===null?null:dex.abilityInfo!(ref)!.name)} : found.hiddenAbilities ? { hiddenAbilities: [...found.hiddenAbilities] } : {}), types:sp.types!==undefined?[...new Set((sp.types.length?sp.types:["Normal"]).map(ref=>dex.type!(ref)!.name))]:[...(found.types??[])], tutorMoves, ...(eggMoves !== undefined ? { eggMoves } : {}),
-      ...Object.fromEntries(["evolutions","flags","defaultForm","displayForm","pokedexForm","categoryKey","entryKey","heightDm","weightHg","color","shape","formName","formNameKey","dexSortKeys"].filter(field=>Object.hasOwn(sp,field)).map(field=>[field,JSON.parse(JSON.stringify((sp as unknown as Record<string,unknown>)[field])) as unknown])), ...(happiness !== undefined ? { happiness } : {}), ...(found.gender !== undefined ? { gender: found.gender } : {}),
+      ...Object.fromEntries(["evolutions","flags","defaultForm","displayForm","pokedexForm","categoryKey","entryKey","heightDm","weightHg","color","shape","formName","formNameKey","dexSortKeys",...WILD_ITEM_FIELDS].filter(field=>Object.hasOwn(sp,field)).map(field=>[field,JSON.parse(JSON.stringify((sp as unknown as Record<string,unknown>)[field])) as unknown])), ...(happiness !== undefined ? { happiness } : {}), ...(found.gender !== undefined ? { gender: found.gender } : {}),
     });
     // the persistent key (decision D5-3): content id + form <-> Showdown name, both ways
     if (form === 0) setOwn(content.speciesIds!, sp.id, found.name);

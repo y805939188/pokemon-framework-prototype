@@ -7,6 +7,103 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 SUITES=(
+  experiments/step5/6/test-message-wrap.cjs
+  experiments/step5/6/test-message-rows.cjs
+  experiments/step5/6/test-cursor-text.cjs
+  experiments/step5/6/test-inline-choices.cjs
+  experiments/step5/6/test-author-diagnostics.cjs
+  experiments/step5/6/test-localization.cjs
+  experiments/step5/6/test-pause-pc.cjs
+  experiments/step5/6/test-manual-save.cjs
+  experiments/step5/6/test-continue-recovery.cjs
+  experiments/step5/6/test-hall-of-fame-rules.cjs
+  experiments/step5/6/test-hall-of-fame-persistence.cjs
+  experiments/step5/6/test-hall-of-fame-pc.cjs
+  experiments/step5/6/test-hall-of-fame-registration.cjs
+  experiments/step5/6/test-event-text.cjs
+  experiments/step5/6/test-message-number.cjs
+  experiments/step5/6/test-message-choices.cjs
+  experiments/step5/6/test-messages.cjs
+  experiments/step5/6/test-trainer-card.cjs
+  experiments/step5/6/test-options-controls.cjs
+  scripts/tests/final-native-callers.test.cjs
+  scripts/tests/final-defeat-continue.test.cjs
+  scripts/tests/final-t16-continue.test.cjs
+  experiments/step5/5/test-owned-content-snapshot.cjs
+  experiments/step5/5/test-walk-full-plugin-content.cjs
+  experiments/step5/5/test-movement-start-observer.cjs
+  scripts/tests/battle-defeat-f.test.cjs
+  experiments/step5/5/test-world-battle-native-lifecycle.cjs
+  experiments/step5/5/test-world-owned-scene-guard.cjs
+  experiments/step5/5/test-blackout-rules.cjs
+  experiments/step5/5/test-f-formal-data-gates.cjs
+  experiments/step5/5/test-atomic-field-query-mz.cjs
+  experiments/step5/5/test-field-facts-observation.cjs
+  experiments/step5/5/test-field-move-host.cjs
+  experiments/step5/5/test-field-move-operation.cjs
+  experiments/step5/5/test-field-move-real-parent.cjs
+  experiments/step5/5/test-field-move-reentry.cjs
+  experiments/step5/5/test-field-runtime-query.cjs
+  experiments/step5/5/test-field-shortcut-fishing.cjs
+  experiments/step5/5/test-field-shortcut-freshness.cjs
+  experiments/step5/5/test-field-shortcut-joint.cjs
+  experiments/step5/5/test-field-shortcut-menu.cjs
+  experiments/step5/5/test-field-shortcut-real-parent.cjs
+  experiments/step5/5/test-field-shortcut-selection.cjs
+  experiments/step5/5/test-field-shortcut-showdown.cjs
+  experiments/step5/5/test-field-shortcut-source-parent.cjs
+  experiments/step5/5/test-blackout-public-core.cjs
+  experiments/step5/5/test-world-travel-public-core.cjs
+  experiments/step5/5/test-wild-member-cache.cjs
+  experiments/step5/5/test-wild-generation.cjs
+  experiments/step5/5/test-wild-generation-completion.cjs
+  experiments/step5/5/test-wild-initial-forms.cjs
+  experiments/step5/5/test-flute-real-parent.cjs
+  experiments/step5/5/test-given-wild-application.cjs
+  experiments/step5/5/test-given-wild-production.cjs
+  experiments/step5/5/test-flute-level-consumer.cjs
+  experiments/step5/5/test-flute-production-ui.cjs
+  experiments/step5/5/test-generated-event-application.cjs
+  experiments/step5/5/test-generated-event-production.cjs
+  scripts/tests/c-regular-runtime.test.cjs
+  experiments/step5/5/test-ordinary-encounter-application.cjs
+  experiments/step5/5/test-world-capture-consumer.cjs
+  experiments/step5/5/test-completed-step-application.cjs
+  experiments/step5/5/test-d-mz-integration.cjs
+  experiments/step5/5/test-d-mz-native-frame.cjs
+  experiments/step5/5/test-native-frame-manager.cjs
+  experiments/step5/5/test-d-mz-terminal-boundary.cjs
+  experiments/step5/5/test-d-mz-terminal-exit.cjs
+  experiments/step5/5/test-fishing-operation.cjs
+  experiments/step5/5/test-fishing-guard.cjs
+  experiments/step5/5/test-fishing-atomic-parent.cjs
+  experiments/step5/5/test-fishing-host.cjs
+  experiments/step5/5/test-fishing-composed.cjs
+  experiments/step5/5/test-atomic-state-mz.cjs
+  experiments/step5/5/test-fishing-real-parent.cjs
+  experiments/step5/5/test-fishing-native-lifecycle.cjs
+  experiments/step5/5/test-fishing-encounter-application.cjs
+  experiments/step5/5/test-world-battle-handoff.cjs
+  experiments/step5/5/test-world-fishing-production.cjs
+  experiments/step5/5/test-world-mz-production.cjs
+  experiments/step5/5/test-field-step-host.cjs
+  experiments/step5/5/test-encounter-mode-host.cjs
+  experiments/step5/5/test-world-content-pipeline.cjs
+  experiments/step5/5/test-world-real-app-host.cjs
+  experiments/step5/5/test-world-content.cjs
+  experiments/step5/5/test-world-state-app.cjs
+  experiments/step5/5/test-world-notices-application.cjs
+  experiments/step5/5/test-world-host.cjs
+  experiments/step5/5/test-world-weather-entry.cjs
+  experiments/step5/5/test-world-load-host.cjs
+  experiments/step5/5/test-world-plugin-host.cjs
+  experiments/step5/5/test-b-host-notices-mz.cjs
+  experiments/step5/5/test-encounter-trigger.cjs
+  experiments/step5/5/test-encounter-selection.cjs
+  experiments/step5/5/test-world-battle-context.cjs
+  experiments/step5/5/test-field-passives.cjs
+  experiments/step5/5/test-fishing.cjs
+  experiments/step5/5/test-field-shortcuts.cjs
   scripts/tests/showdown-staging.test.cjs
   scripts/tests/battle-request-types.test.cjs
   scripts/tests/battle-requests.test.cjs
@@ -44,13 +141,11 @@ SUITES=(
   experiments/step5/4/test-hard-lock-scene.cjs
   experiments/step5/4/test-escape-items.cjs
   experiments/step5/4/test-wild-faint-escape.cjs
-
   experiments/step5/4/test-battle-pp-items.cjs
   experiments/step5/4/test-crowned-move-pp.cjs
   experiments/step5/4/test-crowned-growth.cjs
   experiments/step5/4/test-growth-raw-stat-refresh.cjs
   experiments/step5/4/test-power-construct-growth.cjs
-
   experiments/step5/4/test-switch-style-ports.cjs
   experiments/step5/4/test-battle-style-settings.cjs
   experiments/step5/4/test-battle-revive-items.cjs
@@ -256,6 +351,7 @@ SUITES=(
   experiments/step5/3/test-pokedex-summary.cjs
   experiments/step5/3/test-pokedex-final.cjs
   experiments/step5/3/test-pokedex-h2-final.cjs
+  experiments/step5/5/test-pokedex-area-production.cjs
   experiments/step5/3/test-closeout-scale.cjs
   experiments/step5/3/test-closeout-layout.cjs
   experiments/step5/3/test-closeout-runner.cjs
@@ -307,6 +403,39 @@ SUITES=(
   experiments/step5/4/h3-production-policy/test-host.cjs
   experiments/step5/4/h3-install-outcome/test-install.cjs
   experiments/step5/4/h3-held-continue/test-continue.cjs
+  scripts/tests/e1-default-production.test.cjs
+  scripts/tests/g-retry-production.test.cjs
+  scripts/tests/f-final-branches.test.cjs
+  scripts/tests/f-native-current-production.test.cjs
+  scripts/tests/f-load-current-production.test.cjs
+  scripts/tests/f-joint-support.test.cjs
+  scripts/tests/f-native-consumer-wait-support.test.cjs
+  scripts/tests/f-companion-bootstrap-support.test.cjs
+  scripts/tests/strength-interaction.test.cjs
+  scripts/tests/e3-host3-production.test.cjs
+  scripts/tests/d-start-mode-production.test.cjs
+  scripts/tests/e2-current-frontends-production.test.cjs
+  scripts/tests/cb-cycling-parity-production.test.cjs
+  scripts/tests/e1-fishing-presentation.test.cjs
+  scripts/tests/e2-party-surf-guards.test.cjs
+  scripts/tests/f-field-entry-production.test.cjs
+  scripts/tests/g-native-commands-production.test.cjs
+  scripts/tests/e3-travel-current-production.test.cjs
+  scripts/tests/e3-companion-current-production.test.cjs
+  scripts/tests/e3-companion-remove-production.test.cjs
+  scripts/tests/e3-companion-cold-production.test.cjs
+  scripts/tests/e3-companion-empty-formal-production.test.cjs
+  scripts/tests/e3-data-observer-support.test.cjs
+  scripts/tests/e3-phase-observer-support.test.cjs
+  experiments/step5/5/e3-production/test-failure-realm-support.cjs
+  scripts/tests/e1-fishing-character.test.cjs
+  scripts/tests/field-presentation-i18n.test.cjs
+  scripts/tests/field-presentation-terminal.test.cjs
+  scripts/tests/travel-presentation-initial.test.cjs
+  scripts/tests/travel-presentation-source-controls.test.cjs
+  scripts/tests/e3-empty-load-input-support.test.cjs
+  scripts/tests/e1-character-inputs.test.cjs
+  scripts/tests/e1-character-runtime-inputs.test.cjs
 )
 # Explicit policy exclusions, not skipped tests and never counted as passes.
 # There is no environment switch or automatic-runner option that enables this replay.
@@ -321,37 +450,64 @@ for s in "${SUITES[@]}"; do
     fi
   done
 done
+check_regular_inputs() {
+  local name
+  while IFS= read -r name; do
+    case "$name" in
+      PF_WALK_*|PF_SNAPSHOT_*|PF_COMPANION_SOURCE_ROOT|PF_MZ_RUNTIME*)
+        printf 'Regular headless refuses inherited fixture override: %s\n' "$name" >&2
+        return 64
+        ;;
+    esac
+  done < <(compgen -e)
+  printf 'Regular headless fixture overrides: none.\n'
+}
 if [[ $# -gt 1 ]]; then
-  echo "usage: $0 [--scope=regular|--list|--list-exclusions]" >&2
+  echo "usage: $0 [--scope=regular|--scope=c-generation-support|--list|--list-exclusions|--check-regular-env]" >&2
   exit 2
 fi
 case "${1:-}" in
   --list) printf '%s\n' "${SUITES[@]}"; exit 0 ;;
   --list-exclusions) printf '%s\n' "${EXCLUDED_SUITES[@]}"; exit 0 ;;
-  ''|--scope=regular) ;;
-  *) echo "usage: $0 [--scope=regular|--list|--list-exclusions]" >&2; exit 2 ;;
+  --check-regular-env) check_regular_inputs; exit 0 ;;
+  ''|--scope=regular) scope=regular; check_regular_inputs ;;
+  --scope=c-generation-support)
+    scope=c-generation-support
+    selected=()
+    for suite in "${SUITES[@]}"; do
+      case "$suite" in
+        experiments/step5/5/test-wild-initial-forms.cjs|experiments/step5/5/test-flute-real-parent.cjs|experiments/step5/5/test-given-wild-application.cjs|experiments/step5/5/test-given-wild-production.cjs|experiments/step5/5/test-flute-level-consumer.cjs|experiments/step5/5/test-flute-production-ui.cjs|experiments/step5/5/test-generated-event-application.cjs|experiments/step5/5/test-generated-event-production.cjs|scripts/tests/c-regular-runtime.test.cjs) selected+=("$suite") ;;
+      esac
+    done
+    SUITES=("${selected[@]}")
+    ;;
+  *) echo "usage: $0 [--scope=regular|--scope=c-generation-support|--list|--list-exclusions|--check-regular-env]" >&2; exit 2 ;;
 esac
-printf 'Headless scope=regular: %s selected suites; %s policy exclusion(s), NOT RUN and not passes.\n' "${#SUITES[@]}" "${#EXCLUDED_SUITES[@]}"
+printf 'Headless scope=%s: %s selected suites; %s policy exclusion(s), NOT RUN and not passes.\n' "$scope" "${#SUITES[@]}" "${#EXCLUDED_SUITES[@]}"
 for excluded in "${EXCLUDED_SUITES[@]}"; do
   printf 'EXCLUDED (NOT RUN): %s\n' "$excluded"
 done
 [[ -d js/engine/showdown/dist ]] || { echo "engine not staged: run scripts/build-showdown.sh first" >&2; exit 1; }
 # Generate host compatibility declarations before compiler suites, including on cold CI.
+for suite in "${SUITES[@]}"; do
+  case "$suite" in experiments/*.cjs|scripts/tests/*.cjs) ;; *) echo "Unapproved suite path: $suite" >&2; exit 64 ;; esac
+  if [[ ! -f "$suite" || -L "$suite" ]]; then echo "Missing/nonregular suite: $suite" >&2; exit 64; fi
+done
 pnpm --dir src types:prepare
 # the TS framework: strict type check, import-boundary check, then rebuild runtime, declarations, sample and local delivery
 pnpm --dir src typecheck:framework
 node scripts/check-boundaries.cjs
 # Capture the ordinary regression candidate before its controlled build. Historical
 # acceptance plans stay frozen; each worker verifies this one parent-owned binding.
-binding_dir="$(mktemp -d "${TMPDIR:-/tmp}/pf-headless-binding.XXXXXX")"
-trap 'rm -rf "$binding_dir"' EXIT
+mkdir -p "$ROOT/build/headless-regression-bindings"
+binding_dir="$(mktemp -d "$ROOT/build/headless-regression-bindings/run.XXXXXX")"
 node scripts/headless-regression-binding.cjs begin "$binding_dir/begin.json"
 pnpm --dir src build:distribution > /dev/null
 # Normal held-source release verifies the compiled host and fresh-process Continue, not only developer fixtures.
-for plugin in PS_BattleFlow PS_SaveState PS_Evolution PS_BattleFlowTest; do
+for plugin in PS_BattleFlow PS_SaveState PS_Evolution PS_BattleFlowTest PS_World PS_Inventory PS_Management PS_SaveLocation PS_Pokedex PS_Progression; do
   RR_PLUGIN="$plugin" pnpm --dir src exec vite build > /dev/null
 done
-node scripts/headless-regression-binding.cjs finish "$binding_dir/begin.json" "$binding_dir/binding.json"
+node scripts/headless-regression-binding.cjs finish "$binding_dir/begin.json" "$binding_dir/binding.json" --with-c-generation-support
 mkdir -p "$ROOT/build/headless-regression-bindings"
 binding_receipt="$ROOT/build/headless-regression-bindings/$(basename "$binding_dir").json"
 ( set -C; cat "$binding_dir/binding.json" > "$binding_receipt" )
@@ -359,9 +515,26 @@ echo "Current synthetic Node regression binding: $binding_receipt"
 export PF_HEADLESS_REGRESSION_BINDING="$binding_dir/binding.json"
 export H3_RUNTIME_ROOT="$ROOT"
 fail=0
+suite_index=0
 for s in "${SUITES[@]}"; do
   set +e
-  raw="$(node --test --test-reporter=tap "$s" 2>&1)"; rc=$?
+  suite_index=$((suite_index + 1))
+  raw_file="$binding_dir/suite-$suite_index.tap"
+  if [[ -e "$raw_file" || -L "$raw_file" ]]; then echo "Refusing raw overwrite: $raw_file" >&2; exit 64; fi
+  case "$s" in
+    experiments/step5/5/test-wild-initial-forms.cjs|experiments/step5/5/test-flute-real-parent.cjs|experiments/step5/5/test-given-wild-application.cjs|experiments/step5/5/test-given-wild-production.cjs|experiments/step5/5/test-flute-level-consumer.cjs|experiments/step5/5/test-flute-production-ui.cjs|experiments/step5/5/test-generated-event-application.cjs|experiments/step5/5/test-generated-event-production.cjs)
+      ( set -C; node scripts/tests/c-regular-runtime.cjs describe "$s" > "$binding_dir/c-inputs-$suite_index.json" )
+      prepared_rc=$?
+      if [[ $prepared_rc -ne 0 ]]; then
+        echo "C supported input verification failed: $s" >&2
+        fail=1
+        if [[ "$scope" == "c-generation-support" ]]; then break; else continue; fi
+      fi
+      ( set -C; PF_C_REGULAR_SUITE="$s" node --test --test-reporter=tap --require ./scripts/tests/c-regular-runtime.cjs "$s" > "$raw_file" 2>&1 ); rc=$?
+      ;;
+    *) ( set -C; node --test --test-reporter=tap "$s" > "$raw_file" 2>&1 ); rc=$? ;;
+  esac
+  raw="$(cat "$raw_file")"
   set -e
   out="$(printf '%s\n' "$raw" | grep -E '^# (pass|fail|cancelled|skipped)' | tr '\n' ' ')"
   echo "$s  ${out:-NO RESULT (see: node --test $s)}"
@@ -369,6 +542,7 @@ for s in "${SUITES[@]}"; do
   if [[ $rc -ne 0 || "$out" != *"# fail 0"* || "$out" != *"# cancelled 0"* ]]; then fail=1; printf '%s\n' "$raw"; fi
   # PF_NO_SKIP=1 (CI since step 5.0, D5-9): a skipped test is a failure too, so "the runtime was missing" cannot pass
   if [[ "${PF_NO_SKIP:-}" == "1" && "$out" == *"# skipped "* && "$out" != *"# skipped 0"* ]]; then fail=1; echo "    skipped tests are not allowed here (PF_NO_SKIP=1)"; fi
+  if [[ "$scope" == "c-generation-support" && $fail -ne 0 ]]; then break; fi
 done
 if ! node scripts/headless-regression-binding.cjs verify "$binding_dir/binding.json"; then fail=1; fi
 exit $fail

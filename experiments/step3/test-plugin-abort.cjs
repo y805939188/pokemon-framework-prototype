@@ -23,13 +23,14 @@ function host(failure, failVariable = false) {
   const fakeEngine = { log: { createRingLogger: () => ({ sink() {} }) }, dex: { createDexLookup() { throw new Error('dex unavailable'); } } };
   const req = p => {
     if (/production\.cjs$/.test(p)) { if (failure === 'engine') throw new Error('engine unavailable'); return fakeEngine; }
-    if (p === 'path' || p === 'fs') return require(p);
-    return {};
+    if (p === 'path' || p === 'fs' || p === 'node:util') return require(p);
+    throw new Error('unexpected require ' + p);
   };
   req.resolve = p => p;
   const ctx = { Error, performance, require: req,
     PluginManager: { registerCommand() {}, parameters: () => ({}) }, Game_Interpreter: Ctor(), Window_Base: Ctor(), Window_Command: Ctor(), Scene_MenuBase: Ctor(), SceneManager: { push() {} },
     $gameSystem: { _psGame: game }, $gameVariables: { setValue(k, v) { if (failVariable) throw new Error('variable unavailable'); vars[k] = v; }, value: k => vars[k] } };
+  require('../../scripts/tests/legacy-mz-world-host.cjs').install(ctx);
   ctx.window = ctx;
   vm.createContext(ctx); vm.runInContext(plugin, ctx);
   const flow = ctx.PSFlow;

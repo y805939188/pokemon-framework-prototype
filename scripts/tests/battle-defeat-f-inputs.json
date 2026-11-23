@@ -1,0 +1,79 @@
+{
+  "schema": "battle-defeat-f-regular-inputs-v1",
+  "suite": "scripts/tests/battle-defeat-f.test.cjs",
+  "nodeVersion": "v22.21.1",
+  "sourceMode": "fixture (explicit legacy-no-held real Session/Showdown, not compiled held content)",
+  "referenceCaseSource": "18f84361230b5b3b18e5bd571fffffec3e32e7ad",
+  "runtimeEntry": "js/engine/build/production.cjs",
+  "dataOnlySourceEntry": "src/framework/tools/fixtures/content.ts",
+  "dataLoader": "scripts/tests/ts-source-loader.cjs",
+  "pluginBundles": [
+    "js/plugins/PS_BattleFlow.js",
+    "js/plugins/PS_World.js",
+    "js/plugins/PS_Inventory.js"
+  ],
+  "pinnedNativeFiles": [
+    "js/reactor_core.js",
+    "js/reactor_objects.js",
+    "js/reactor_scenes.js",
+    "js/reactor_managers.js",
+    "js/libs/pixi_compat.js"
+  ],
+  "controlledInputs": [
+    "scripts/tests/battle-defeat-f.test.cjs",
+    "scripts/tests/battle-defeat-f-runtime.cjs",
+    "scripts/tests/battle-defeat-f-native.cjs",
+    "scripts/tests/battle-defeat-f-fixture.cjs",
+    "scripts/tests/battle-defeat-f-inputs.json",
+    "scripts/tests/ts-source-loader.cjs",
+    "scripts/versions.env",
+    "scripts/reactor-source-manifest.json",
+    "scripts/check-showdown-staging.cjs",
+    "experiments/step5/5/d-mz-integration-support.cjs",
+    "experiments/step5/5/surf-production-native-support.cjs",
+    "experiments/step5/5/world-scene-full-production-support.cjs",
+    "experiments/step5/5/d-mz-native-frame-support.cjs",
+    "experiments/step5/5/field-host-support.cjs",
+    "experiments/step5/3/fixtures-migration7/fixtures.cjs",
+    "js/reactor_core.js",
+    "js/reactor_objects.js",
+    "js/reactor_scenes.js",
+    "js/reactor_managers.js",
+    "js/libs/pixi_compat.js"
+  ],
+  "sourceEntriesCoveredByDistributionFingerprint": [
+    "src/framework/production.ts",
+    "src/framework/tools/fixtures/content.ts",
+    "src/plugins/PS_BattleFlow.ts",
+    "src/plugins/PS_World.ts",
+    "src/plugins/PS_Inventory.ts"
+  ],
+  "cases": [
+    "P01",
+    "P02",
+    "B01",
+    "B02"
+  ],
+  "scope": "HEADLESS_REAL_BUSINESS_WITH_NATIVE_FACADES_NOT_DISK_OR_NW",
+  "RNG": {
+    "worldFromBattleStart": [
+      65536,
+      65536,
+      32,
+      32,
+      32,
+      32,
+      32,
+      32
+    ],
+    "FDelta": 0,
+    "nativePrefix": [],
+    "engine": "full actual calls preserved per case; no counter reset"
+  },
+  "saveObservations": {
+    "originalClosure": "installer-captured actual original function executions",
+    "saveGame": "actual Scene_Base.executeAutosave -> DataManager.saveGame facade calls",
+    "outerRawRequest": "NOT_DIRECTLY_OBSERVED",
+    "disk": "NOT_RUN"
+  }
+}

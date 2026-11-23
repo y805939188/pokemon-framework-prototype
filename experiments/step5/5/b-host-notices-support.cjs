@@ -1,0 +1,38 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ROOT=path.resolve(__dirname,'../../..'),F=require('../3/fixtures-migration7/fixtures.cjs');let built;
+async function build(){
+ if(built)return built;const compiler=process.env.PF_B_NOTICE_COMPILER_ROOT||ROOT,art=process.env.PF_B_NOTICE_ART||path.join(ROOT,'build/step5-5-development-20261115/b-host-notices-mz-author');fs.mkdirSync(art,{recursive:true});const out=fs.mkdtempSync(path.join(art,'private-bundles-')),{build:vite}=await import(path.join(compiler,'src/node_modules/vite/dist/node/index.js'));
+ for(const [name,entry,format]of [['production','src/framework/production.ts','cjs'],['PS_World','src/plugins/PS_World.ts','iife'],['PS_Inventory','src/plugins/PS_Inventory.ts','iife']])await vite({configFile:false,root:path.join(ROOT,'src'),logLevel:'error',build:{target:'es2022',outDir:out,emptyOutDir:false,minify:false,sourcemap:true,lib:{entry:path.join(ROOT,entry),name:name+'NoticeTest',formats:[format],fileName:()=>name+(format==='cjs'?'.cjs':'.js')},rolldownOptions:{external:[/^node:/,'pixi.js']}}});
+ built={E:require(path.join(out,'production.cjs')),world:fs.readFileSync(path.join(out,'PS_World.js'),'utf8'),out};return built;
+}
+function native(source,name){const start=source.indexOf(name+' = function('),end=source.indexOf('\n};',start);assert(start>=0&&end>start,name);return source.slice(start,end+4);}
+async function fixture(options={}){
+ const B=await build(),E=B.E,content=F.content(E);content.mapMetadata={source:'notice-fixture',maps:{1:{darkMap:true},2:{darkMap:false,healingSpot:{mapId:2,x:4,y:5},weather:{type:'Rain',chance:100}},3:{darkMap:true,weather:{type:'Snow',chance:100}},4:{darkMap:false}}};options.content?.(content);let held=F.freeze(E.state.newGame({content,party:[],bag:{honey:2},money:12})),mapId=1,app,release,execute;const draws=[],installs=[],trace=[],weather=[],messages=[];
+ const state={read:()=>held,replace(next){options.beforeReplace?.(next,app);held=F.freeze(structuredClone(next));installs.push(structuredClone(next));trace.push(['install',next.world.visitedMaps.slice(),next.world.weather.type]);options.afterReplace?.(next,app);}};
+ app=new E.app.GameApplication({state,sessions:{async create(){throw Error('no battle in host notice tests');}},projection:{project(){}},content:()=>({content}),random:n=>{draws.push(n);options.onRandom?.(n,app);return 0;},clock:()=>0,worldHost:{read:()=>({mapId:{status:'value',value:mapId},hour:{status:'value',value:12},cycling:{status:'value',value:false},diving:{status:'value',value:false}})},fieldItems:{execute:req=>{execute=req;return new Promise(resolve=>{release=resolve;});}}});
+ function Screen(){this._weatherType='none';this._weatherPower=0;this._weatherPowerTarget=0;this._weatherDuration=0;}
+ // Controlled renderer only. The genuine darkness adapter still reads the
+ // current App/game/metadata and owns its own mask/resource validation.
+ function Bitmap(width,height){this.width=width;this.height=height;this.context={save(){},restore(){}};}for(const key of ['clear','fillAll','drawCircle','destroy'])Bitmap.prototype[key]=function(){};
+ function Sprite(bitmap){this.bitmap=bitmap;}Sprite.prototype.destroy=function(){};
+ function Base(){}for(const key of ['create','start','update','terminate'])Base.prototype[key]=function(){};Base.prototype.isStarted=()=>true;
+ Base.prototype.initialize=function(){this._windowLayer={};this.children=[this._windowLayer];};
+ Base.prototype.getChildIndex=function(child){return this.children.indexOf(child);};
+ Base.prototype.addChildAt=function(child,index){this.children.splice(index,0,child);child.parent=this;};
+ Base.prototype.removeChild=function(child){this.children.splice(this.children.indexOf(child),1);child.parent=null;};
+ function MapScene(){this.initialize();}MapScene.prototype=Object.create(Base.prototype);MapScene.prototype.constructor=MapScene;MapScene.prototype.createDisplayObjects=function(){trace.push(['display']);};
+ function Interpreter(){}Interpreter.prototype.wait=function(frames){this._waitCount=frames;trace.push(['wait',frames]);};
+ const manager={_scene:null,_nextScene:null,updateScene(){this._scene?.update();},isSceneChanging(){return this._nextScene!==null;}};
+ const G={console,structuredClone,Date,Bitmap,Sprite,Graphics:{width:816,height:624},Game_Screen:Screen,Game_Interpreter:Interpreter,Scene_Map:MapScene,Scene_MenuBase:Base,SceneManager:manager,DataManager:{setupNewGame(){}},$gameSystem:{},$dataMap:{meta:{},encounterList:[]},$gameMap:{mapId:()=>mapId,tileHeight:()=>48},$gamePlayer:{transferring:false,_transferring:false,screenX:()=>408,screenY:()=>312,isTransferring(){return this.transferring;},performTransfer(){this.transferring=false;this._transferring=false;trace.push(['transferred',mapId]);}},$gameParty:{battle:false,inBattle(){return this.battle;}},$gameMessage:{busy:false,isBusy(){return this.busy;},add(s){messages.push(s);}},PSFlow:{_app:app,app:()=>G.PSFlow._app,content:()=>content,game:()=>state.read()}};G.PluginManager={parameters:()=>({})};G.require=name=>{if(name==='node:util')return require(name);throw Error('unexpected notice fixture require '+name);};require('../../../scripts/tests/legacy-mz-world-host.cjs').install(G);G.window=G;vm.createContext(G);
+ const runtime=path.dirname(process.env.PF_MZ_RUNTIME||path.join(ROOT,'js/reactor_objects.js')),objects=fs.readFileSync(path.join(runtime,'reactor_objects.js'),'utf8'),scenes=fs.readFileSync(path.join(runtime,'reactor_scenes.js'),'utf8');
+ for(const name of ['Game_Screen.prototype.changeWeather','Game_Screen.prototype.updateWeather','Game_Interpreter.prototype.command236'])vm.runInContext(native(objects,name),G);vm.runInContext(native(scenes,'Scene_Map.prototype.onMapLoaded'),G);
+ G.$gameScreen=new Screen();const change=Screen.prototype.changeWeather;Screen.prototype.changeWeather=function(...args){weather.push(args);trace.push(['display-weather',...args]);const result=change.apply(this,args);options.onProject?.(args,G,app);return result;};
+ vm.runInContext(options.transformWorld?options.transformWorld(B.world):B.world,G);manager._scene=new MapScene();
+ const enter=(id,rebuild=true)=>{mapId=id;G.$gamePlayer.transferring=rebuild;G.$gamePlayer._transferring=rebuild;const scene=new MapScene();scene._transfer=rebuild;manager._scene=scene;scene.onMapLoaded();return scene;};
+ const tick=()=>manager.updateScene();
+ const prepare=()=>{const token=app.beginInventoryOperation(),snap=app.inventorySnapshot(token),pocket=snap.pockets.findIndex(rows=>rows.some(r=>r.item.id==='honey')),row=snap.pockets[pocket].find(r=>r.item.id==='honey'),ticket=app.inventoryTicket(token,pocket+1,row.index),out=app.prepareFieldItemHandoff(token,'busy:'+installs.length,ticket);assert.equal(out.status,'handoff');app.endInventoryOperation(token);return out.handoff;};
+ const command=(type,power=5,duration=0,wait=false)=>{const interpreter=new Interpreter();const result=interpreter.command236([type,power,duration,wait]);return{result,interpreter};};
+ return{B,E,G,app,content,state,draws,installs,trace,weather,messages,enter,tick,prepare,command,screen:()=>({type:G.$gameScreen._weatherType,power:G.$gameScreen._weatherPower,target:G.$gameScreen._weatherPowerTarget,remaining:G.$gameScreen._weatherDuration}),advance(n){for(let i=0;i<n;i++)G.$gameScreen.updateWeather();},newGame(){G.DataManager.setupNewGame();return enter(mapId);},load(rebuild=true){G.PSWorld.loadSucceeded();return enter(mapId,rebuild);},release:r=>release?.(r),execution:()=>execute,map:()=>mapId};
+}
+module.exports={ROOT,build,fixture};

@@ -8,7 +8,7 @@ import { creationBattleNameOf } from "./species-key";
 import { creationForm } from "./creation-form";
 import type { CreationEnvironment } from "./creation-form";
 import { COMPATIBLE_PLAYER, deriveIndividual, NATURE_ORDER, shinyFromPersonalId, uint32 } from "./member-identity";
-import type { Content, GenderRule, Member, MoveSlot, Owner, SpeciesData } from "./types";
+import type { Content, GenderRule, Member, MoveSlot, Owner, SpeciesData, Stats } from "./types";
 
 /** An integer in [0, n). Tests inject a scripted or seeded one; the MZ host uses its own generator. */
 export type Random = (n: number) => number;
@@ -74,7 +74,32 @@ export interface CreateMemberInput {
   superShiny?: boolean;
 }
 
-export function createMember(input: CreateMemberInput, content: Content, random: Random): Member {
+/** Internal shared creation prefix. This is an in-memory seed, never a persistent member. */
+export interface MemberCreationSeed {
+  input: CreateMemberInput;
+  content: Content;
+  species: SpeciesData;
+  speciesName: string;
+  form: number;
+  owner: Owner;
+  personalID: number;
+  ivs: Stats;
+  nature: string;
+  inheritedHappiness: number | undefined;
+}
+
+/** Resolved identity at the caller's actual read points; absent means the historical eager path. */
+export interface MemberCreationIdentity {
+  gender: string;
+  ability: string;
+  abilityIndex: number;
+  effectiveAbilityIndex: number | null;
+  shiny: boolean;
+  superShiny: boolean;
+}
+
+/** @internal Shared by ordinary creation and the wild-only transient draft. */
+export function initializeMemberCreation(input: CreateMemberInput, content: Content, random: Random): MemberCreationSeed {
   const { id, species, level } = input;
   if (typeof id !== "string" || !MEMBER_ID.test(id)) throw new Error(`member id "${id}" must be 1-18 characters of A-Z a-z 0-9 # . _ : -`);
   if (!Number.isInteger(level) || level < 1 || level > 100) throw new RangeError(`level must be an integer from 1 to 100 (got ${String(level)})`);
@@ -106,20 +131,32 @@ export function createMember(input: CreateMemberInput, content: Content, random:
   }
   const baseName = own(own(content.forms, contentId), "0") ?? own(content.speciesIds, contentId);
   const inheritedHappiness = baseName ? own(content.species, baseName)?.happiness : undefined;
-  const derived = deriveIndividual(pid, { ...sp, gender: sp.gender ?? "N" }, input.abilityIndex);
-  const gender = typeof sp.gender === "string" ? sp.gender : input.gender ?? derived.gender;
-  const ability = input.ability ?? derived.ability;
-  const moves = input.withMoves === false ? [] : initialMoves(sp, level, content);
-  const colors = shinyFromPersonalId(pid, owner.id);
+  return { input, content, species: sp, speciesName: finalName, form: finalForm, owner, personalID: pid, ivs, nature, inheritedHappiness };
+}
+
+/** @internal Materializes without consuming RNG. Wild drafts supply independently resolved caches. */
+export function materializeMemberCreation(seed: MemberCreationSeed, identity?: MemberCreationIdentity, creationMoves?: readonly MoveSlot[]): Member {
+  const { input, content, species: sp, speciesName: finalName, form: finalForm, owner, personalID: pid, ivs, nature, inheritedHappiness } = seed;
+  const { id, level } = input;
+  const derived = identity ?? deriveIndividual(pid, { ...sp, gender: sp.gender ?? "N" }, input.abilityIndex);
+  const gender = identity ? identity.gender : typeof sp.gender === "string" ? sp.gender : input.gender ?? derived.gender;
+  const ability = identity ? identity.ability : input.ability ?? derived.ability;
+  const moves = creationMoves ? creationMoves.map(move => ({ ...move })) : input.withMoves === false ? [] : initialMoves(sp, level, content);
+  const colors = identity ?? shinyFromPersonalId(pid, owner.id);
   const evs = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
   const stats = computeStats(sp.base, ivs, evs, level, nature);
   const created = newMember({
     id, species: finalName, form: finalForm, level, exp: minExp(sp.growth, level), hp: stats.hp, status: "", statusCount: 0, moves, item: "", ability, nature, gender,
     ivs, evs, friendship: sp.happiness ?? inheritedHappiness ?? 70, ball: input.ball ?? "pokeball",
     personalID: pid, owner, ownerCompatibilityDefault: false, abilityIndex: derived.abilityIndex, effectiveAbilityIndex: derived.effectiveAbilityIndex,
-    shiny: input.shiny ?? (input.superShiny === true ? true : colors.shiny), superShiny: input.superShiny ?? colors.superShiny,
+    shiny: identity ? identity.shiny : input.shiny ?? (input.superShiny === true ? true : colors.shiny), superShiny: identity ? identity.superShiny : input.superShiny ?? colors.superShiny,
     origin: { method: input.context?.fateful ? 4 : 0, map: input.context?.map ?? 0, text: "", level, receivedAt: input.context?.receivedAt ?? null, hatchedMap: 0, hatchedAt: null, compatibilityDefault: false },
     firstMoves: [], markings: [], ribbons: [], cannotStore: false, cannotRelease: false, isEgg: false, mail: null, readyToEvolve: false,
   });
   return { ...created, statNature: null, moves: created.moves.map(move => ({ ...move, ppUps: 0 })), evolutionReadiness: "known", cannotTrade: false };
+}
+
+/** Ordinary callers retain their eager identity values and the original PID/IV/form RNG order. */
+export function createMember(input: CreateMemberInput, content: Content, random: Random): Member {
+  return materializeMemberCreation(initializeMemberCreation(input, content, random));
 }

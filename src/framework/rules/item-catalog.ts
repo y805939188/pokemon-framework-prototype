@@ -61,6 +61,12 @@ export function legacyCatalog(): ItemCatalog {
   for (const [id,effect] of Object.entries(FIELD_EFFECTS)) {
     const previous=own(catalog,id),berry=id.endsWith('berry');
     setOwn<ItemDefinition>(catalog,id,{id,name:'Unnamed',namePlural:'Unnamed',pocket:berry?5:2,order:Object.keys(catalog).length,price:0,sellPrice:0,flags:berry?['Berry']:[],battleUse:'none',legacyIds:[id],consumable:true,source:'framework-spec-derived',...previous,fieldUse:effect.family==='sacred-ash'?'direct':'member',effect:JSON.parse(JSON.stringify(effect)) as ItemDefinition['effect']});
+    if (['repel','flute','fishing','sweet-scent','escape-rope'].includes(effect.family)) {
+      const item=own(catalog,id)!; item.fieldUse='field'; item.pocket=effect.family==='fishing'?8:1;
+      if(effect.family==='repel')item.flags=[...item.flags,'Repel'];
+      if(effect.family==='fishing'){item.flags=[...item.flags,'KeyItem'];item.consumable=false;}
+      if(effect.family==='flute')item.consumable=false;
+    }
   }
   const premier=own(catalog,'premierball')!;
   setOwn<ItemDefinition>(catalog,'premierball',{...premier,flags:[...premier.flags,'PremierBall']});

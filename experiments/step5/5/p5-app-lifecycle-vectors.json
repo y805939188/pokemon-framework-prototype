@@ -1,0 +1,1418 @@
+{
+  "format": 1,
+  "source": "WP36 formal specification §§3.1,4.2,4.3; A-contract T08/T25/P5 continuous-chain; initial/synthetic host facts are authored",
+  "statisticalSamples": 0,
+  "initialConditions": {
+    "encounterVersion": 0,
+    "runtime": {
+      "graceSteps": 0,
+      "accumulator": 0,
+      "currentMapId": null,
+      "loadedVersion": null
+    },
+    "party": "one healthy non-egg level5 neutral Known member, no held item; knows tackle and surf; badges1..4 true; no companions",
+    "weather": "None",
+    "clockMs": 1000,
+    "hour": 20,
+    "cycling": false,
+    "repelSteps": 0,
+    "bag": {
+      "repel": 1
+    },
+    "steps": 0
+  },
+  "prefixChain": [
+    {
+      "id": "prefix-new-map7",
+      "kind": "enter",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "committed",
+        "steps": 0,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "cause": "new-game",
+      "previousMapId": null,
+      "mapId": 7,
+      "version": 0,
+      "rebuilt": true
+    },
+    {
+      "id": "prefix-miss-1",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 21,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 1,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-miss-2",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 2,
+          "accumulator": 42,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 2,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-miss-3",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 3,
+          "accumulator": 63,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 3,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-miss-4",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 4,
+          "accumulator": 84,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 4,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-miss-5",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 5,
+          "accumulator": 105,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 5,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-miss-6",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 6,
+          "accumulator": 126,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 6,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-miss-7",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 6,
+          "accumulator": 147,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 7,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-miss-8",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 6,
+          "accumulator": 168,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 8,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-miss-9",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 6,
+          "accumulator": 189,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 9,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-miss-10",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 6,
+          "accumulator": 210,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 10,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-same-map7",
+      "kind": "enter",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 6,
+          "accumulator": 210,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "unchanged",
+        "steps": 10,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "cause": "transfer",
+      "previousMapId": 7,
+      "mapId": 7,
+      "version": 0,
+      "rebuilt": false
+    },
+    {
+      "id": "prefix-transfer8",
+      "kind": "enter",
+      "tape": [
+        {
+          "n": 100,
+          "value": 17
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 210,
+          "currentMapId": 8,
+          "loadedVersion": 0
+        },
+        "reason": "committed",
+        "steps": 10,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "cause": "transfer",
+      "previousMapId": 7,
+      "mapId": 8,
+      "version": 0,
+      "rebuilt": false,
+      "weatherDraw": true,
+      "world": {
+        "weather": "Rain",
+        "visitedMaps": [
+          7,
+          8
+        ],
+        "healingSpot": {
+          "mapId": 8,
+          "x": 1,
+          "y": 2
+        }
+      }
+    },
+    {
+      "id": "prefix-map8-miss",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 231,
+          "currentMapId": 8,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 11,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 3,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-same-map8",
+      "kind": "enter",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 231,
+          "currentMapId": 8,
+          "loadedVersion": 0
+        },
+        "reason": "unchanged",
+        "steps": 11,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "cause": "transfer",
+      "previousMapId": 8,
+      "mapId": 8,
+      "version": 0,
+      "rebuilt": false
+    },
+    {
+      "id": "prefix-connection7",
+      "kind": "enter",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 231,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "committed",
+        "steps": 11,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "cause": "connection",
+      "previousMapId": 8,
+      "mapId": 7,
+      "version": 0,
+      "rebuilt": false,
+      "world": {
+        "weather": "None",
+        "visitedMaps": [
+          7,
+          8
+        ],
+        "healingSpot": {
+          "mapId": 8,
+          "x": 1,
+          "y": 2
+        }
+      }
+    },
+    {
+      "id": "prefix-grace-reject",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 231,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "grace",
+        "steps": 12,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-folded-trigger",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 21
+        },
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 1,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 123
+        },
+        {
+          "n": 65536,
+          "value": 456
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 32,
+          "value": 5
+        },
+        {
+          "n": 32,
+          "value": 6
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "battle-admitted",
+        "steps": 13,
+        "sessions": 0,
+        "saveBlocked": true,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false,
+      "candidate": {
+        "species": "B",
+        "level": 2
+      }
+    },
+    {
+      "id": "prefix-session-start",
+      "kind": "session-start",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "started",
+        "steps": 13,
+        "sessions": 1,
+        "saveBlocked": true,
+        "repelSteps": 0,
+        "surfing": false
+      }
+    },
+    {
+      "id": "prefix-session-finish",
+      "kind": "session-finish",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "applied",
+        "steps": 13,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      }
+    },
+    {
+      "id": "prefix-duplicate-admitted-step",
+      "kind": "duplicate-step",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "battle-admitted",
+        "steps": 13,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "stepId": "prefix-folded-trigger"
+    },
+    {
+      "id": "prefix-after-battle-miss",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 21,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 14,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "prefix-use-repel",
+      "kind": "repel-item",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 21,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "completed",
+        "steps": 14,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 100,
+        "surfing": false
+      }
+    },
+    {
+      "id": "prefix-repel-active-miss",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 2,
+          "accumulator": 0,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 15,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 99,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": true
+    },
+    {
+      "id": "prefix-repel-blocks",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 1,
+          "value": 0
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 3,
+          "accumulator": 0,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "repel",
+        "steps": 16,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 98,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": true
+    }
+  ],
+  "combinedPublicApiChain": [
+    {
+      "id": "full-new-map7",
+      "kind": "enter",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "committed",
+        "steps": 0,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "cause": "new-game",
+      "previousMapId": null,
+      "mapId": 7,
+      "version": 0,
+      "rebuilt": true
+    },
+    {
+      "id": "full-seed-nonzero",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 21,
+          "currentMapId": 7,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 1,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "full-transfer8",
+      "kind": "enter",
+      "tape": [
+        {
+          "n": 100,
+          "value": 17
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 21,
+          "currentMapId": 8,
+          "loadedVersion": 0
+        },
+        "reason": "committed",
+        "steps": 1,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "cause": "transfer",
+      "previousMapId": 7,
+      "mapId": 8,
+      "version": 0,
+      "rebuilt": false,
+      "weatherDraw": true
+    },
+    {
+      "id": "full-map8-miss",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 42,
+          "currentMapId": 8,
+          "loadedVersion": 0
+        },
+        "reason": "miss",
+        "steps": 2,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 3,
+      "repelActive": false
+    },
+    {
+      "id": "full-version-same0",
+      "kind": "version",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 42,
+          "currentMapId": 8,
+          "loadedVersion": 0
+        },
+        "reason": "unchanged",
+        "steps": 2,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "version": 0,
+      "beforeVersion": 0
+    },
+    {
+      "id": "full-version-change1",
+      "kind": "version",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 42,
+          "currentMapId": 8,
+          "loadedVersion": 1
+        },
+        "reason": "committed",
+        "steps": 2,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "version": 1,
+      "beforeVersion": 0
+    },
+    {
+      "id": "full-version1-miss",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 47,
+          "currentMapId": 8,
+          "loadedVersion": 1
+        },
+        "reason": "miss",
+        "steps": 3,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 5,
+      "level": 4,
+      "repelActive": false
+    },
+    {
+      "id": "full-version-same1",
+      "kind": "version",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 47,
+          "currentMapId": 8,
+          "loadedVersion": 1
+        },
+        "reason": "unchanged",
+        "steps": 3,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "version": 1,
+      "beforeVersion": 1
+    },
+    {
+      "id": "full-version-fallback2",
+      "kind": "version",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 47,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "committed",
+        "steps": 3,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "version": 2,
+      "beforeVersion": 1
+    },
+    {
+      "id": "full-version2-miss",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 68,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "miss",
+        "steps": 4,
+        "sessions": 0,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 3,
+      "repelActive": false
+    },
+    {
+      "id": "full-event-start",
+      "kind": "event-start",
+      "tape": [
+        {
+          "n": 65536,
+          "value": 123
+        },
+        {
+          "n": 65536,
+          "value": 456
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 32,
+          "value": 5
+        },
+        {
+          "n": 32,
+          "value": 6
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "completed",
+        "steps": 4,
+        "sessions": 1,
+        "saveBlocked": true,
+        "repelSteps": 0,
+        "surfing": false
+      }
+    },
+    {
+      "id": "full-event-finish",
+      "kind": "session-finish",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "applied",
+        "steps": 4,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      }
+    },
+    {
+      "id": "full-before-surf-miss",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 21,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "miss",
+        "steps": 5,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 3,
+      "repelActive": false
+    },
+    {
+      "id": "full-surf-start",
+      "kind": "surf-start",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "completed",
+        "steps": 5,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": true
+      },
+      "action": {
+        "kind": "use",
+        "moveId": "surf",
+        "entry": "party",
+        "memberId": "P1"
+      }
+    },
+    {
+      "id": "full-surf-start-cleanup",
+      "kind": "surf-start-cleanup",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "completed",
+        "steps": 5,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": true
+      },
+      "action": {
+        "kind": "surf-cleanup"
+      }
+    },
+    {
+      "id": "full-water-miss",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 2,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "miss",
+        "steps": 6,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": true
+      },
+      "base": 2,
+      "level": 2,
+      "repelActive": false
+    },
+    {
+      "id": "full-surf-land",
+      "kind": "surf-land",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 2,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "completed",
+        "steps": 6,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": true
+      },
+      "action": {
+        "kind": "surf-land"
+      }
+    },
+    {
+      "id": "full-surf-end-cleanup",
+      "kind": "surf-end",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "completed",
+        "steps": 6,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "action": {
+        "kind": "surf-cleanup"
+      }
+    },
+    {
+      "id": "full-land-miss",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 99
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 1,
+          "accumulator": 21,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "miss",
+        "steps": 7,
+        "sessions": 1,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 3,
+      "repelActive": false
+    },
+    {
+      "id": "full-ordinary-admit",
+      "kind": "step",
+      "tape": [
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 100,
+          "value": 0
+        },
+        {
+          "n": 1,
+          "value": 0
+        },
+        {
+          "n": 65536,
+          "value": 123
+        },
+        {
+          "n": 65536,
+          "value": 456
+        },
+        {
+          "n": 32,
+          "value": 1
+        },
+        {
+          "n": 32,
+          "value": 2
+        },
+        {
+          "n": 32,
+          "value": 3
+        },
+        {
+          "n": 32,
+          "value": 4
+        },
+        {
+          "n": 32,
+          "value": 5
+        },
+        {
+          "n": 32,
+          "value": 6
+        }
+      ],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "battle-admitted",
+        "steps": 8,
+        "sessions": 1,
+        "saveBlocked": true,
+        "repelSteps": 0,
+        "surfing": false
+      },
+      "base": 21,
+      "level": 3,
+      "repelActive": false,
+      "candidate": {
+        "species": "C",
+        "level": 3
+      }
+    },
+    {
+      "id": "full-ordinary-start",
+      "kind": "session-start",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "started",
+        "steps": 8,
+        "sessions": 2,
+        "saveBlocked": true,
+        "repelSteps": 0,
+        "surfing": false
+      }
+    },
+    {
+      "id": "full-ordinary-finish",
+      "kind": "session-finish",
+      "tape": [],
+      "expected": {
+        "runtime": {
+          "graceSteps": 0,
+          "accumulator": 0,
+          "currentMapId": 8,
+          "loadedVersion": 2
+        },
+        "reason": "applied",
+        "steps": 8,
+        "sessions": 2,
+        "saveBlocked": false,
+        "repelSteps": 0,
+        "surfing": false
+      }
+    }
+  ],
+  "openProposalGaps": [
+    "P03",
+    "P05",
+    "FLUTE-MAP remain OPEN; not changed by this task"
+  ]
+}
