@@ -4,7 +4,7 @@
 
 ## 第六步：框架与作者入口
 
-[第六步使用说明](step6/README.md)描述可用的框架功能、作者操作和实机验证边界。正式 Demo 的美术和制作、Mac 玩家下载包的正式签名与公证另行安排。远端 CI 以对应提交的 Actions 运行记录为准。
+第一次使用请先看[作者上手指南](user-guide/README.md)。[第六步使用说明](step6/README.md)列出完整接入清单与实机验证边界。正式 Demo 的美术和制作、Mac 玩家下载包的正式签名与公证另行安排。远端 CI 以对应提交的 Actions 运行记录为准。
 
 维护根 README 时，同时更新本指南和相应阶段导航中的范围说明。公开仓库保留源码、可复用的测试及夹具、使用说明；临时方案、测试运行产物、实机存档和审查记录留在仓库外，不随框架分发。
 
@@ -116,7 +116,7 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 | 读取 CI 结果（无凭据，读公开页面） | `scripts/ci-status.sh <分支>` | 读不到就是未验证，不是通过 |
 | 打包（不用 MZ 部署） | `scripts/package-mac.sh [--harden] [--identity ID]` | 约半分钟，约 545 MiB（557,964 KB） |
 
-**旧 Mac 测试入口已停用。** `scripts/run-flow-test-mac.sh`、`scripts/run-package-tests-mac.sh` 和 `scripts/run-package-perf-mac.sh` 在任何构建、启动或文件清理前退出（退出码 64）。普通构件不会因 `--ps-save-dir`、`--ps-flow-test` 或打包时包含测试插件而取得隔离测试权限；不要把这些选项当作存档保护。
+**旧 Mac 测试入口已停用。** `scripts/run-flow-test-mac.sh`、`scripts/run-package-tests-mac.sh`、`scripts/run-package-perf-mac.sh` 和 `scripts/run-inventory-test-mac.sh` 在任何构建、启动或文件清理前退出（退出码 64）。普通构件不会因 `--ps-save-dir`、`--ps-flow-test` 或打包时包含测试插件而取得隔离测试权限；不要把这些选项当作存档保护。旧背包流程的产物与重启约定仍有常规回归，用的只是临时目录中的合成 Node 子进程，不会启动 NW/MZ。
 
 需要验证隔离启动时，使用 [6D 隔离启动 canary](step6/6d-isolated-launch.zh.md) 的专用流程。它只验证启动与隔离，不替代旧流程套件、包内性能、独立 MZ/NW 复建或冷读档。
 

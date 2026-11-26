@@ -26,7 +26,7 @@ test('existing test-plugin/map exclusions remain separate from image scratch pol
 
 // Keep public legacy entry points fail-closed even if an old command line
 // names a real evidence directory. Use only disposable evidence and HOME.
-for (const name of ['run-flow-test-mac.sh', 'run-package-tests-mac.sh', 'run-package-perf-mac.sh']) {
+for (const name of ['run-flow-test-mac.sh', 'run-package-tests-mac.sh', 'run-package-perf-mac.sh', 'run-inventory-test-mac.sh']) {
   test(`${name} refuses before launch, build, or evidence and profile writes`, () => fixture(dir => {
     const fakeHome = path.join(dir, 'home');
     const evidence = path.join(dir, 'evidence');
@@ -42,7 +42,7 @@ for (const name of ['run-flow-test-mac.sh', 'run-package-tests-mac.sh', 'run-pac
     const local = path.join(dir, 'project', 'scripts', name);
     fs.mkdirSync(path.dirname(local), {recursive:true});
     fs.copyFileSync(path.join(ROOT, 'scripts', name), local);
-    for (const command of ['rm', 'open', 'nw', 'node', 'pnpm', 'npm']) {
+    for (const command of ['rm', 'mkdir', 'open', 'nw', 'node', 'pnpm', 'npm', 'python3']) {
       const bin = path.join(dir, 'bin', command);
       fs.mkdirSync(path.dirname(bin), {recursive:true});
       fs.writeFileSync(bin, '#!/bin/sh\nprintf invoked > "$TRIPWIRE"\nexit 98\n', {mode:0o700});
@@ -54,11 +54,14 @@ for (const name of ['run-flow-test-mac.sh', 'run-package-tests-mac.sh', 'run-pac
     }
     const before = snapshot(dir), tripwire = path.join(dir, 'called');
     for (const evidencePath of [evidence, path.join(dir, 'does-not-exist')]) {
-      const args = name.includes('-perf-') ? ['3', evidencePath] : [evidencePath];
+      const args = name.includes('-perf-') ? ['3', evidencePath]
+        : name.includes('-inventory-') ? [evidencePath, 'verify-save'] : [evidencePath];
       const result = spawnSync('bash', [local, ...args], {
         cwd:path.join(dir,'project'),
         env:{PATH:`${path.join(dir,'bin')}:/usr/bin:/bin`, HOME:fakeHome, TRIPWIRE:tripwire,
-          PF_PACKAGE_ARGS:'--with-tests --harden', PF_PERF_ARGS:'--ps-perf-rounds=25'},
+          PF_PACKAGE_ARGS:'--with-tests --harden', PF_PERF_ARGS:'--ps-perf-rounds=25',
+          PF_OWNED_NW:path.join(dir,'bin','nw'), PF_OWNED_PROJECT:path.join(dir,'project'),
+          PF_OWNED_EXPECTED:evidence, PF_OWNED_SAVES:path.join(evidence,'saves')},
         encoding:'utf8', timeout:3000
       });
       assert.ifError(result.error);

@@ -1,7 +1,7 @@
 # CI layers (docs/step3/README.md): 1 = headless Node suites, 2 = plugin type check and build with Reactor's
 # declaration bundle. Since step 5.0 (decision D5-9) layer 1 also installs the Reactor runtime of the pinned commit,
 # so the host-stub suites that run Reactor's own interpreter are not skipped (PF_NO_SKIP makes a skip a failure). NOT covered here (needs MZ's NW.js and window): in-game flow, packaged-app suite, performance;
-# those run locally (scripts/run-*-mac.sh) and must be reported as not run in CI.
+# report those native checks as not run in CI. Historical Mac launchers are retired (docs/PROJECT-GUIDE.md §8).
 name: ci
 on:
   push:

@@ -2,7 +2,7 @@
 // 5.2 D-01..D-03: real-host test driver timing, failure screenshots and the restart evidence contract.
 // The D-01 refresh/update ratios are a virtual-time model (flowtest-sim.mjs), not real displays; the real-host
 // evidence is the driver-selftest/inventory/all/verify-save runs recorded outside the repository.
-const {test}=require('node:test'),assert=require('node:assert/strict'),{execFileSync,spawnSync}=require('node:child_process');
+const {test}=require('node:test'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto');
 const ROOT=path.resolve(__dirname,'../../..');
 const strip=script=>execFileSync(process.execPath,['--experimental-strip-types','--no-warnings','--input-type=module','-e',script],{cwd:ROOT,encoding:'utf8',timeout:60000});
@@ -73,19 +73,8 @@ test('D-02 source wiring guard: failure is recorded and on disk before a best-ef
  assert.doesNotMatch(s,/path\.join\(SHOTS, `\$\{name\}\.png`\)/);
 });
 
-// D-03 runner contract with a stub "NW" that writes what a real run would (no NW.js, no window, works on Linux CI).
-const STUB=`#!/usr/bin/env node
-const fs=require('fs'),path=require('path');const a=process.argv.slice(2),arg=n=>(a.find(x=>x.startsWith('--'+n+'='))||'').slice(n.length+3);
-const out=arg('ps-flow-out'),mode=arg('ps-flow-test'),saves=arg('ps-save-dir');fs.mkdirSync(path.dirname(out),{recursive:true});
-if(mode==='all'){fs.mkdirSync(saves,{recursive:true});fs.writeFileSync(path.join(saves,'file14.rmmzsave'),'save');for(const n of ['ps-flow-expected.json','ps-flow-expected-t31.json'])fs.writeFileSync(path.join(path.dirname(out),n),JSON.stringify({n}));}
-if(mode==='driver-selftest'){fs.writeFileSync(out,JSON.stringify({overall:'fail',results:[{id:'DS-01/x injected',status:'fail'},{id:'DS-99 control',status:process.env.STUB_DS99||'pass'}],argv:a}));process.exit(0);}
-fs.writeFileSync(out,JSON.stringify({overall:process.env.STUB_OVERALL||'pass',results:[{id:'stub',status:process.env.STUB_OVERALL||'pass'}],argv:a}));`;
-function runner(){
- const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ps52-d03-')),nw=path.join(dir,'nw');fs.writeFileSync(nw,STUB,{mode:0o755});fs.mkdirSync(path.join(dir,'game'));
- const run=(evid,mode,env={})=>{const r=spawnSync('bash',[path.join(ROOT,'scripts/run-inventory-test-mac.sh'),path.join(dir,evid),mode],{encoding:'utf8',env:{...process.env,PF_OWNED_NW:nw,PF_OWNED_PROJECT:path.join(dir,'game'),PF_OWNED_SKIP_BUILD:'1',...env}});
-  const launch=path.join(dir,evid,'launch.json');return {exit:r.status,out:r.stdout+r.stderr,launch:fs.existsSync(launch)?JSON.parse(fs.readFileSync(launch,'utf8')):null,report:fs.existsSync(path.join(dir,evid,'report.json'))?JSON.parse(fs.readFileSync(path.join(dir,evid,'report.json'),'utf8')):null};};
- return {dir,run,cleanup:()=>fs.rmSync(dir,{recursive:true,force:true})};
-}
+// D-03 keeps the old producer/restart contract under a fixed Node fixture.
+const {createInventoryRunnerFixture:runner}=require('../inventory-runner-fixture.cjs');
 const sha=f=>crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
 test('D-03 a producing run records the hashes of the expected-state files it wrote',()=>{
  const r=runner();try{const all=r.run('all','all');assert.equal(all.exit,0,all.out);

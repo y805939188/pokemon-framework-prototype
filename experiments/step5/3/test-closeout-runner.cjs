@@ -1,8 +1,30 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {createInventoryRunnerFixture}=require('../inventory-runner-fixture.cjs');
 for(const [mode,name,value]of [['closeout-lifecycle','PF_OWNED_LIFECYCLE_GROUPS','summary-only,unknown'],['closeout-lifecycle','PF_OWNED_LIFECYCLE_GROUPS','summary-only,summary-only'],['closeout-lifecycle','PF_OWNED_LIFECYCLE_CYCLES','201'],['inventory','PF_OWNED_LIFECYCLE_CYCLES','100'],['perf','PF_OWNED_PERF_ROUNDS','26']]){
- test('I runner rejects '+name+'='+value+' before child launch',()=>{const out=fs.mkdtempSync(path.join(os.tmpdir(),'ps53-runner-'));try{const result=spawnSync('bash',['scripts/run-inventory-test-mac.sh',out,mode],{encoding:'utf8',env:{...process.env,PF_OWNED_NW:process.execPath,PF_OWNED_SKIP_BUILD:'1',PF_OWNED_REQUIRE_IDLE:'0',[name]:value}});assert.notEqual(result.status,0);assert.match(result.stdout+result.stderr,new RegExp(name));assert(!fs.existsSync(path.join(out,'launch.json')),'no child launch record');assert(!fs.existsSync(path.join(out,'host.log')),'no process stdout opened');}finally{fs.rmSync(out,{recursive:true,force:true});}});
+ test('I runner rejects '+name+'='+value+' before child launch',()=>{
+  const fixture=createInventoryRunnerFixture();
+  try{const result=fixture.run('invalid',mode,{[name]:value});
+   assert.equal(result.exit,2);assert.match(result.out,new RegExp(name));assert.equal(result.launch,null);
+   assert(!fs.existsSync(path.join(fixture.dir,'invalid')),'no evidence directory, launch record, or process stdout');
+  }finally{fixture.cleanup();}
+ });
 }
+
+test('I synthetic inventory fixture rejects host overrides and inputs outside its own directory',()=>{
+ const fixture=createInventoryRunnerFixture();
+ try{
+  for(const [name,options,message]of [
+   ['host',{PF_OWNED_NW:process.execPath},'unsupported fixture option'],
+   ['checkout',{PF_OWNED_PROJECT:process.cwd()},'unsupported fixture option'],
+   ['outside',{PF_OWNED_EXPECTED:process.cwd(),PF_OWNED_SAVES:path.join(fixture.dir,'game')},'outside synthetic fixture'],
+  ]){
+   const result=fixture.run(name,'verify-save',options);
+   assert.equal(result.exit,2);assert.match(result.out,new RegExp(message));assert.equal(result.launch,null);
+   assert(!fs.existsSync(path.join(fixture.dir,name)));
+  }
+ }finally{fixture.cleanup();}
+});
 
 test('I offline progression donor bundles actual registered JSON inputs, needs no runtime filesystem and returns independent copies',async()=>{
  const{pathToFileURL}=require('node:url'),vm=require('node:vm'),root=process.cwd();

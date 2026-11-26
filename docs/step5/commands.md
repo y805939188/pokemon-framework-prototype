@@ -29,7 +29,7 @@
 
 ## 测量与测试
 
-旧 Mac 包内性能入口现已停用；以下历史性能场景未在普通构件上开放。现行隔离启动边界见[开发者指南 §8](../PROJECT-GUIDE.md#8-常用命令)。
+旧 Mac 包内性能和背包流程入口现已停用；以下历史场景未在普通构件上开放。现行隔离启动边界见[开发者指南 §8](../PROJECT-GUIDE.md#8-常用命令)。
 
 `test-cold-source5.cjs` 保留原17项并增加空/非空 × 5种来源状态 × 组装/正式插件/CLI边界，全部在独立冷进程运行；可用 `PF_COLD_SOURCE_ROOT=<新包的 app.nw 目录>` 验证包内实际产物。开发树和包内套件新增 `empty-source` 模式：真实宿主冷加载、旧存档成员诊断零外来数据/零保存，最后合法非空正例确实加载数据。
 
@@ -106,7 +106,7 @@ J 整改兼容收窄：`commitResult` 在会话创建中或战斗运行中均拒
 
 RJ01–RJ03 定向回归：`node --test experiments/step5/1/test-management-ui.cjs experiments/step5/1/test-held-contract.cjs`；反向使用 `node experiments/step5/probes/unfix5.cjs RJ01-mixed-source-release RJ02-withdraw-panel RJ03-fake-safe-id-write`。真实 U51-18/19 随完整开发树/新包套件执行；输入设备为实际 Reactor 轮询的虚拟 navigator 控制器，不是实体手柄。
 
-5.2 真实宿主整改（D-01～D-07、产品缺陷 P-01）与重启命令约定：[5.2-D-remediation.md](5.2-D-remediation.md)。`scripts/run-inventory-test-mac.sh <新目录> [inventory|all|verify-save|empty-source|perf|matrix|driver-selftest]`；verify-save 需 `PF_OWNED_EXPECTED=<产生期望的证据目录>` 与 `PF_OWNED_SAVES=<其存档目录>`，缺失/哈希不符拒绝启动。
+历史 5.2 真实宿主整改（D-01～D-07、产品缺陷 P-01）与重启命令约定：[5.2-D-remediation.md](5.2-D-remediation.md)。`scripts/run-inventory-test-mac.sh <新目录> [inventory|all|verify-save|empty-source|perf|matrix|driver-selftest]`；verify-save 需 `PF_OWNED_EXPECTED=<产生期望的证据目录>` 与 `PF_OWNED_SAVES=<其存档目录>`，缺失/哈希不符拒绝启动。
 
 ## 5.3 正常作者入口（默认 MZ UI，I 整包验收中）
 
@@ -146,6 +146,6 @@ RJ01–RJ03 定向回归：`node --test experiments/step5/1/test-management-ui.c
 | `step5-sample` | 正式空新游戏、真实 starter、成长/捕获/治疗及普通槽 producer |
 | `step5-continue` | 新进程正常 Title→Continue→Scene_Load、队伍/背包/图鉴返回及 claim/battle 防重放 |
 
-开发树/包内均使用 `PF_OWNED_BACKGROUND=1 PF_OWNED_SKIP_BUILD=1 scripts/run-inventory-test-mac.sh <新证据目录> <mode>`；包内另设 `PF_OWNED_NW=<APP>/Contents/MacOS/nwjs` 和 `PF_OWNED_PROJECT=<APP>/Contents/Resources/app.nw`。`step5-continue` 必须同时指定成功 producer 的 `PF_OWNED_EXPECTED` 与其隔离 `PF_OWNED_SAVES`。runner 用共享锁及自有 PID/PGID，不能启用 `PF_OWNED_REQUIRE_IDLE`，profile/save/expected 只能放在本批 author 下。
+当时开发树/包内均使用 `PF_OWNED_BACKGROUND=1 PF_OWNED_SKIP_BUILD=1 scripts/run-inventory-test-mac.sh <新证据目录> <mode>`；包内另设 `PF_OWNED_NW=<APP>/Contents/MacOS/nwjs` 和 `PF_OWNED_PROJECT=<APP>/Contents/Resources/app.nw`。`step5-continue` 必须同时指定成功 producer 的 `PF_OWNED_EXPECTED` 与其隔离 `PF_OWNED_SAVES`。runner 用共享锁及自有 PID/PGID，不能启用 `PF_OWNED_REQUIRE_IDLE`，profile/save/expected 只能放在本批 author 下。
 
 最终实测身份和结论不写进本命令表；只读 `author/DELIVERY.zh.md`、`CANDIDATE.json`、`VERIFICATION.json`、`FAILURES.zh.md`。未执行时不得把这些命令或驱动存在本身记作 PASS。

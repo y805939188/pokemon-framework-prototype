@@ -7,7 +7,7 @@
 // restores the exact bytes it changed; the final check compares every touched file and rebuilds.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'../../../..'),out=process.argv[2];if(!out||!path.isAbsolute(out)||fs.existsSync(out))throw Error('new absolute evidence directory required');fs.mkdirSync(out,{recursive:true});
-const T='src/plugins/flowtest/timing.ts',V='src/plugins/flowtest/evidence.ts',D='src/plugins/PS_BattleFlowTest.ts',R='scripts/run-inventory-test-mac.sh',S='src/framework/rules/semantic.ts';
+const T='src/plugins/flowtest/timing.ts',V='src/plugins/flowtest/evidence.ts',D='src/plugins/PS_BattleFlowTest.ts',R='experiments/step5/inventory-runner-fixture.cjs',S='src/framework/rules/semantic.ts';
 const SUITE='experiments/step5/2/test-D-remediation.cjs',UI='experiments/step5/2/test-inventory-ui.cjs',SUITES=[SUITE,UI];
 // [id, edits ([file, from, to] or [file, {deleteLineContaining}]), target test title prefixes]
 const cases=[
@@ -18,8 +18,8 @@ const cases=[
  ['D-02-no-timeout',[[V,'    timer = p.setTimer(() => finish({ ok: false, error: `screenshot callback did not return within ${timeoutMs} ms` }), timeoutMs);\n','']],['D-02 capture outcomes']],
  ['D-02-late-callback-writes',[[V,'        if (settled) return; // a callback after the timeout writes nothing\n','']],['D-02 capture outcomes']],
  ['D-02-screenshot-before-record',[[D,'      writeProgress(); // the failure is on disk before any screenshot is attempted\n','']],['D-02 source wiring guard']],
- ['D-03-no-hash-check',[[R,{deleteLineContaining:"refuse(f'expected-state file changed since it was produced"}]],['D-03 missing source']],
- ['D-03-implicit-expected-dir',[[R," extra=['--ps-flow-expected-dir='+str(src)]"," extra=[]"]],['D-03 verify-save in its own directory']],
+ ['D-03-no-hash-check',[[R,{deleteLineContaining:"if (digest(file) !== hash) return refuse("}]],['D-03 missing source']],
+ ['D-03-implicit-expected-dir',[[R,{deleteLineContaining:'argv.push(`--ps-flow-expected-dir='}]],['D-03 verify-save in its own directory']],
  ['P-01-strict-prototype',[[S,"    if (!Array.isArray(v) && !plainPrototype(Object.getPrototypeOf(v) as object|null)) throw new Error('nonplain-intent');","    if (!Array.isArray(v) && ![Object.prototype,null].includes(Object.getPrototypeOf(v) as object|null)) throw new Error('nonplain-intent');"]],['P-01 plain data from another realm','P-01 the application accepts']],
  ['D-04-battle-helper',[[D,'await startMapEvent(4);','await startEvent(4);']],['D-04/D-05 source wiring guard']],
  ['D-05-public-read',[[D,"eq([G.$gameVariables._data[3],G.$gameVariables.value(3)],['',0],'cancel writes the empty ID raw (D-05: MZ public read of an empty value is 0)')","eq(G.$gameVariables.value(3),'','cancel writes empty ID')"]],['D-04/D-05 source wiring guard']],
@@ -27,10 +27,10 @@ const cases=[
  ['D-07-schema6-fields-in-schema4',[[D,'raw.bag=I6.rawBagOf(healthy);delete raw.inventory;delete raw.badges;','']],['D-06/D-07 source wiring guard']],
  ['F-03-clear-timer-before-resolve',[[V,'      settled = true; resolve(result);\n      try { p.clearTimer(timer); } catch { /* a stray timer only calls finish again, which is ignored */ }\n','      settled = true; p.clearTimer(timer); resolve(result);\n']],['F-03/F-04 hardening']],
  ['F-04-no-keyup-after-stall',[[T,"  try { await waitGameFrames(p, hold, 'key hold'); }\n  finally { dispatch('keyup'); } // a stalled loop must not leave the key held for the next scenario\n","  await waitGameFrames(p, hold, 'key hold');\n  dispatch('keyup');\n"]],['F-03/F-04 hardening']],
- ['F-05-names-not-validated',[[R,{deleteLineContaining:"refuse('recorded expected-state entries must be plain ps-flow-expected*.json names with a digest')"}]],['F-05/F-06 restart contract']],
- ['F-06-unrecorded-files-accepted',[[R,{deleteLineContaining:"if present!=set(produced): refuse("}]],['F-05/F-06 restart contract']],
- ['F-06-failed-producer-accepted',[[R,{deleteLineContaining:"refuse(f'the producing run did not pass"}]],['F-05/F-06 restart contract']],
- ['F-10-selftest-exit-from-overall',[[R,";passed=start['selftestControl']=='pass'",'']],['F-10 driver-selftest']],
+ ['F-05-names-not-validated',[[R,{deleteLineContaining:"return refuse('recorded expected-state entries must be plain ps-flow-expected*.json names with a digest')"}]],['F-05/F-06 restart contract']],
+ ['F-06-unrecorded-files-accepted',[[R,{deleteLineContaining:"if (JSON.stringify(expectedFiles(source)) !=="}]],['F-05/F-06 restart contract']],
+ ['F-06-failed-producer-accepted',[[R,{deleteLineContaining:"return refuse('the producing run did not pass')"}]],['F-05/F-06 restart contract']],
+ ['F-10-selftest-exit-from-overall',[[R,{deleteLineContaining:"passed = launch.selftestControl === 'pass'"}]],['F-10 driver-selftest']],
 ].map(([id,edits,targets])=>({id,edits,targets}));
 const run=(cmd,args)=>spawnSync(cmd,args,{cwd:root,encoding:'utf8',timeout:600000,maxBuffer:64*1024*1024});
 const build=id=>{const r=run('pnpm',['--dir','src','build']);fs.writeFileSync(path.join(out,id+'.build.log'),(r.stdout||'')+(r.stderr||''));return r.status;};
