@@ -19,31 +19,29 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0 (node24; v4 ran on the deprecated Node 20)
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0 (node24)
         with:
           node-version: '22.21.1'
+          package-manager-cache: false
       - name: Enable the pinned pnpm (src/package.json packageManager; the repo root has none, so corepack would take the latest)
         run: ./scripts/ci-run.sh pnpm-setup bash -c 'corepack enable && corepack prepare "$(node -p "require(\"./src/package.json\").packageManager")" --activate && pnpm --version'
       - name: Reactor runtime from the pinned commit (only into this checkout; D5-9)
-        env:
-          REACTOR_SOURCE: download
-          RMMZ_TEMPLATE_CACHE: ${{ runner.temp }}/reactor
-        run: ./scripts/ci-run.sh reactor-setup ./scripts/setup-reactor.sh --install
+        run: ./scripts/ci-run.sh reactor-setup bash -c 'export REACTOR_SOURCE=download RMMZ_TEMPLATE_CACHE="${RUNNER_TEMP:?}/reactor"; exec ./scripts/setup-reactor.sh --install'
       - name: Install dependencies (lockfile)
         run: ./scripts/ci-run.sh pnpm-install pnpm --dir src install --frozen-lockfile
       - name: Build the engine bundles (the Showdown extension is staged from them)
         run: ./scripts/ci-run.sh build-engine pnpm --dir src build:engine
       - name: Build the pinned Showdown runtime
-        env:
-          SHOWDOWN_SRC: ${{ runner.temp }}/showdown-src
-        run: ./scripts/ci-run.sh build-showdown ./scripts/build-showdown.sh
+        run: ./scripts/ci-run.sh build-showdown bash -c 'export SHOWDOWN_SRC="${RUNNER_TEMP:?}/showdown-src"; exec ./scripts/build-showdown.sh'
       - name: Regular headless checks (frozen reference replay excluded; no selected test may be skipped)
         env:
           PF_NO_SKIP: '1'
         run: ./scripts/ci-run.sh headless-suites ./scripts/test-headless.sh --scope=regular
       - name: D1 collector synthetic controls (no native host or P-4 claim)
         run: |
-          python3 --version
+          ./scripts/ci-run.sh python-version python3 --version
           ./scripts/ci-run.sh d1-collector python3 scripts/tests/d1-benchmark-runner.test.py -v
           ./scripts/ci-run.sh d1-hardening python3 scripts/tests/d1-hardening.test.py -v
   plugins:
@@ -52,16 +50,16 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0 (node24; v4 ran on the deprecated Node 20)
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0 (node24)
         with:
           node-version: '22.21.1'
+          package-manager-cache: false
       - name: Enable the pinned pnpm (src/package.json packageManager; the repo root has none, so corepack would take the latest)
         run: ./scripts/ci-run.sh pnpm-setup bash -c 'corepack enable && corepack prepare "$(node -p "require(\"./src/package.json\").packageManager")" --activate && pnpm --version'
       - name: Reactor runtime and declarations from the pinned commit
-        env:
-          REACTOR_SOURCE: download
-          RMMZ_TEMPLATE_CACHE: ${{ runner.temp }}/reactor
-        run: ./scripts/ci-run.sh reactor-setup ./scripts/setup-reactor.sh --install
+        run: ./scripts/ci-run.sh reactor-setup bash -c 'export REACTOR_SOURCE=download RMMZ_TEMPLATE_CACHE="${RUNNER_TEMP:?}/reactor"; exec ./scripts/setup-reactor.sh --install'
       - name: Install dependencies (lockfile)
         run: ./scripts/ci-run.sh pnpm-install pnpm --dir src install --frozen-lockfile
       # Full content:build validates authored references against the pinned runtime too.
@@ -69,9 +67,7 @@ jobs:
       - name: Build the engine bundles (the Showdown extension is staged from them)
         run: ./scripts/ci-run.sh build-engine pnpm --dir src build:engine
       - name: Build the pinned Showdown runtime
-        env:
-          SHOWDOWN_SRC: ${{ runner.temp }}/showdown-src
-        run: ./scripts/ci-run.sh build-showdown ./scripts/build-showdown.sh
+        run: ./scripts/ci-run.sh build-showdown bash -c 'export SHOWDOWN_SRC="${RUNNER_TEMP:?}/showdown-src"; exec ./scripts/build-showdown.sh'
       - name: Type check
         run: ./scripts/ci-run.sh typecheck pnpm --dir src typecheck
       - name: Build plugins
