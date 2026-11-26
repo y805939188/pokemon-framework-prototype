@@ -1,5 +1,7 @@
 # 第三步：工程基础与首条 Ruby／TS 差分链
 
+> **历史命令说明：** 本页引用的三个旧 Mac 流程、包内测试及性能 runner 已停用，不适用于当前构件。当前验证边界见[开发者指南 §8](../PROJECT-GUIDE.md#8-常用命令)。
+
 状态：**已收口（2026-10-19，标签 `step3-closed`，记录见 `docs/step3/closure.md`）**。批次 A、B、支线 C 均已实现；首次独立验收 `step3-candidate-2` 不通过、限定整改 R1–R4 后 `step3-candidate-3` 有条件通过并已合并到 `main`。性能尚无同条件基线，未证明无退化。以下是收口前的工作记录。（工作分支 `step3/foundation`，起点 `a77b6af`）。执行方案全文在工作区 `.handoff/step3-plan.md`（不在 git 里）。
 
 ## 范围

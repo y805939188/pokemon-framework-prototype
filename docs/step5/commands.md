@@ -29,6 +29,8 @@
 
 ## 测量与测试
 
+旧 Mac 包内性能入口现已停用；以下历史性能场景未在普通构件上开放。现行隔离启动边界见[开发者指南 §8](../PROJECT-GUIDE.md#8-常用命令)。
+
 `test-cold-source5.cjs` 保留原17项并增加空/非空 × 5种来源状态 × 组装/正式插件/CLI边界，全部在独立冷进程运行；可用 `PF_COLD_SOURCE_ROOT=<新包的 app.nw 目录>` 验证包内实际产物。开发树和包内套件新增 `empty-source` 模式：真实宿主冷加载、旧存档成员诊断零外来数据/零保存，最后合法非空正例确实加载数据。
 
 | 目的 | 命令 |
@@ -37,8 +39,6 @@
 | 反向验证 | `node experiments/step5/probes/unfix5.cjs [id...] > out.json` |
 | 无头 SaveStore（工具/测试） | `new SaveStore(file, hooks, speciesKeyResolver(content), content)`；夹具世界显式传 `identityKeys`。不给映射时旧档和带物种名的结果都被拒绝 |
 | 重新生成第四步迁移样本 | `node experiments/step5/fixtures/gen-step4-saves.cjs --root <c789620 检出，已构建引擎和 Showdown>` |
-| 包内性能（含 5.0 的满盒子/大背包/打开队伍界面） | `scripts/run-package-perf-mac.sh 3 <证据目录>`（弹窗口） |
-| 100 场内存 | `PF_PERF_ARGS="--ps-perf-rounds=25 --js-flags=--expose-gc" scripts/run-package-perf-mac.sh 1 <证据目录>`（弹窗口） |
 | 对照性能预算（只报警） | `node scripts/perf-budget.cjs <perf-summary.json> [--memory100=<100 场的汇总>] [--out=<报告>]` |
 | 无头测试且不允许跳过（CI 用） | `PF_NO_SKIP=1 scripts/test-headless.sh` |
 

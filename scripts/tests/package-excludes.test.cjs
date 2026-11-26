@@ -23,3 +23,49 @@ test('existing test-plugin/map exclusions remain separate from image scratch pol
  for(const name of ['plugins/PS_BattleFlow.js','plugins/PS_BattleFlowTest.js','plugins/PS_BattleSmoke.js','plugins/PS_BattleFlow.js.map','plugins/.DS_Store'])file(source,name);
  assert.deepEqual(select(source,target,0),['plugins/PS_BattleFlow.js']);assert.deepEqual(select(source,target,1),['plugins/PS_BattleFlow.js','plugins/PS_BattleFlowTest.js','plugins/PS_BattleSmoke.js']);
 }));
+
+// Keep public legacy entry points fail-closed even if an old command line
+// names a real evidence directory. Use only disposable evidence and HOME.
+for (const name of ['run-flow-test-mac.sh', 'run-package-tests-mac.sh', 'run-package-perf-mac.sh']) {
+  test(`${name} refuses before launch, build, or evidence and profile writes`, () => fixture(dir => {
+    const fakeHome = path.join(dir, 'home');
+    const evidence = path.join(dir, 'evidence');
+    const files = [
+      'evidence/ps-flow-old.json', 'evidence/ps-matrix-old.json', 'evidence/ps-saveloc.json',
+      'evidence/previous.png', 'evidence/saves/file1.rmmzsave', 'evidence/perf/run1.json',
+      'home/Library/Application Support/PokemonFrameworkPrototype/save/file1.rmmzsave',
+      'project/save/file1.rmmzsave',
+    ];
+    for (const name of files) file(dir, name);
+    // Put launch/build/cleanup tripwires before normal tools on PATH. Copy the
+    // runner so even an accidental repo-relative write stays in the fixture.
+    const local = path.join(dir, 'project', 'scripts', name);
+    fs.mkdirSync(path.dirname(local), {recursive:true});
+    fs.copyFileSync(path.join(ROOT, 'scripts', name), local);
+    for (const command of ['rm', 'open', 'nw', 'node', 'pnpm', 'npm']) {
+      const bin = path.join(dir, 'bin', command);
+      fs.mkdirSync(path.dirname(bin), {recursive:true});
+      fs.writeFileSync(bin, '#!/bin/sh\nprintf invoked > "$TRIPWIRE"\nexit 98\n', {mode:0o700});
+    }
+    function snapshot(root) {
+      return fs.readdirSync(root, {withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))
+        .map(entry => [entry.name, entry.isDirectory() ? snapshot(path.join(root,entry.name))
+          : fs.readFileSync(path.join(root,entry.name)).toString('base64')]);
+    }
+    const before = snapshot(dir), tripwire = path.join(dir, 'called');
+    for (const evidencePath of [evidence, path.join(dir, 'does-not-exist')]) {
+      const args = name.includes('-perf-') ? ['3', evidencePath] : [evidencePath];
+      const result = spawnSync('bash', [local, ...args], {
+        cwd:path.join(dir,'project'),
+        env:{PATH:`${path.join(dir,'bin')}:/usr/bin:/bin`, HOME:fakeHome, TRIPWIRE:tripwire,
+          PF_PACKAGE_ARGS:'--with-tests --harden', PF_PERF_ARGS:'--ps-perf-rounds=25'},
+        encoding:'utf8', timeout:3000
+      });
+      assert.ifError(result.error);
+      assert.equal(result.status,64,result.stderr);
+      assert.match(result.stderr,/^LEGACY_MAC_RUNNER_DISABLED:/);
+      assert.equal(result.stdout,'');
+      assert.deepEqual(snapshot(dir),before,'no reports, saves, directories or launch/build effects');
+    }
+  }));
+}

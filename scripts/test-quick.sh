@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Cheap local check (typically well under a minute, no windows, no GUI): plugin type check + every headless Node suite.
-# It does NOT run the in-game flow, the packaged-app suite or the performance runs (those open NW.js windows:
-# scripts/run-flow-test-mac.sh, run-package-tests-mac.sh, run-package-perf-mac.sh).
+# Headless only. The historical Mac flow, package test, and package perf runners are retired.
 # Needs: dependencies installed (bootstrap), the engine staged (scripts/build-showdown.sh).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

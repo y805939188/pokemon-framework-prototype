@@ -114,12 +114,11 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 | 构建一切（引擎包、内容、插件） | `pnpm --dir src build`（只构建引擎包：`build:engine`；内容：`content:build`/`content:check`/`content:inventory`；类型检查：`typecheck`） | 便宜 |
 | 构建/裁剪 Showdown（并暂存 RPG 扩展） | `pnpm --dir src build:engine` 之后 `scripts/build-showdown.sh` | 首次约 1–2 分钟（下载依赖） |
 | 读取 CI 结果（无凭据，读公开页面） | `scripts/ci-status.sh <分支>` | 读不到就是未验证，不是通过 |
-| 游戏内流程测试（开 NW.js 窗口，真实按键/事件/存档；T1–T26 + 重启 V1–V3） | `scripts/run-flow-test-mac.sh <证据目录>` | 约 4–5 分钟，弹窗口 |
-| 打包（不用 MZ 部署） | `scripts/package-mac.sh [--with-tests] [--harden] [--identity ID]` | 约半分钟，约 545 MiB（557,964 KB） |
-| 包内完整测试（流程 + 场景矩阵 + 存档位置 + 签名封印） | `scripts/run-package-tests-mac.sh`（`PF_PACKAGE_ARGS=--harden` 用硬化运行时；只结束自己启动的实例，按精确 PID） | 几分钟，弹窗口 |
-| 包内性能与内存测量 | `scripts/run-package-perf-mac.sh [次数]` | 几分钟，弹窗口 |
+| 打包（不用 MZ 部署） | `scripts/package-mac.sh [--harden] [--identity ID]` | 约半分钟，约 545 MiB（557,964 KB） |
 
-测试脚本运行时窗口失焦、静音都不影响结果（见 `docs/step2/runtime-issues.md`）；脚本从不写玩家的存档槽（包内存档位置检查只用一个空闲的高位槽并还原；流程测试用 `--ps-save-dir`），也不会杀掉不是自己启动的进程（若已有打包应用在运行会拒绝启动）。
+**旧 Mac 测试入口已停用。** `scripts/run-flow-test-mac.sh`、`scripts/run-package-tests-mac.sh` 和 `scripts/run-package-perf-mac.sh` 在任何构建、启动或文件清理前退出（退出码 64）。普通构件不会因 `--ps-save-dir`、`--ps-flow-test` 或打包时包含测试插件而取得隔离测试权限；不要把这些选项当作存档保护。
+
+需要验证隔离启动时，使用 [6D 隔离启动 canary](step6/6d-isolated-launch.zh.md) 的专用流程。它只验证启动与隔离，不替代旧流程套件、包内性能、独立 MZ/NW 复建或冷读档。
 
 改了 `src/framework/**` 之后必须重新 `pnpm --dir src build:engine`；改了 `battle/custom-formats.ts` 或 `rules/rules.ts` 还要重新 `scripts/build-showdown.sh`（Showdown 里用的是暂存的拷贝，`test-engine-contract.cjs` 会在拷贝与构建产物不同时报错）。故意改变行为后：`node experiments/step2/s5/update-matrix-baseline.cjs`（矩阵指纹基线）与 `node experiments/step2/s5/protocol-freeze.cjs --update`（协议冻结文件）只在有意为之时运行，并在提交里说明。升级 Showdown 固定提交时先跑 `test-engine-contract.cjs`。
 
