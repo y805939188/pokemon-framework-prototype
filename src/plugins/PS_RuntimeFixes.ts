@@ -24,13 +24,15 @@
  * This belongs upstream in RPGReactor (`reactor_core.js`, Sprite/TilingSprite `_refresh`); remove this plugin
  * once the pinned Reactor version contains the fix.
  */
+import { bindIsolatedRuntimeFixes, isolatedTestScope } from "./isolated-test-scope";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 (() => {
   "use strict";
   const G: any = globalThis;
   if (G.__psRuntimeFixes) return;
   G.__psRuntimeFixes = { textureFix: false, sceneFix: false, batcherFix: false, prunedBatchers: 0 };
-  const argv: string[] = (G.nw && G.nw.App && G.nw.App.argv) || [];
+  const testScope = isolatedTestScope(G);
+  const argv: string[] = testScope ? G.nw.App.argv : [];
   const flags = (argv.find((a) => a.startsWith("--ps-fix=")) || "").slice(9).split(",");
 
   // The class the runtime reads `_emptyBaseTexture` from is looked up by name at call time: pixi_compat can
@@ -112,4 +114,5 @@
     };
     G.__psRuntimeFixes.sceneFix = true;
   }
+  bindIsolatedRuntimeFixes(G, G.__psRuntimeFixes, testScope);
 })();

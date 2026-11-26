@@ -1,4 +1,6 @@
 'use strict';
+const {diagnosticStage}=require('./author-diagnostic-stage.cjs');
+const authorRows=lang=>rowHost(lang,816,624,false,G=>diagnosticStage(G));
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const {rowHost,rowGeometry}=require('./message-rows-host.cjs');
@@ -35,7 +37,7 @@ test('escaped author text, uppercase spelling and identical variable/player valu
 });
 for(const lang of ['zh','en'])test(lang+' invalid syntax and over-screen rows fail before message admission with the existing safe author diagnostic',()=>{
  for(const text of ['\\l[]','\\l[0]','\\l[-1]','\\l[1.5]','\\l[ 2]','\\l[NaN]','\\l[9007199254740992]','\\l[2','\\l[2]\\l[3]','\\l[100]MACHINE_SECRET']){
-  const h=rowHost(lang),original=h.win.height,diagnostics=[];h.G.Utils.isOptionValid=()=>true;h.G.console={error:(...v)=>diagnostics.push(v)};
+  const h=authorRows(lang),original=h.win.height,diagnostics=[];h.G.console={error:(...v)=>diagnostics.push(v)};
   assert.throws(()=>h.show(text),e=>{assert.match(e.message,/WP07-EVENT/);assert(!e.stack.includes('MACHINE_SECRET'));return true;});
   assert(!h.G.$gameMessage.isBusy());assert.equal(h.map._interpreter._waitMode,'');assert.equal(h.win.height,original);assert.equal(h.counts.created,2);assert.equal(diagnostics.length,1);assert.equal(diagnostics[0][1].field,(lang==='zh'?'textZh':'textEn')+'.l');assert(!JSON.stringify(diagnostics).includes('MACHINE_SECRET'));assert.deepEqual(h.writes,[]);
  }
@@ -45,11 +47,11 @@ for(const height of [384,480,624])test('viewport '+height+' accepts the last fit
  assert.throws(()=>h.show('\\l['+(rows+1)+']A'),/WP07-EVENT/);assert(!h.G.$gameMessage.isBusy());
 });
 test('missing production message window fails through the safe host diagnostic before admission',()=>{
- const h=rowHost(),diagnostics=[];h.G.Utils.isOptionValid=()=>true;h.G.console={error:(...v)=>diagnostics.push(v)};delete h.G.SceneManager._scene._messageWindow;
+ const h=authorRows('zh'),diagnostics=[];h.G.console={error:(...v)=>diagnostics.push(v)};delete h.G.SceneManager._scene._messageWindow;
  assert.throws(()=>h.show('\\l[2]A'),/WP07-HOST/);assert(!h.G.$gameMessage.isBusy());assert.equal(h.counts.created,2);assert.equal(diagnostics.length,1);assert.equal(diagnostics[0][1].field,null);
 });
-test('player mode receives the safe row-parameter error without author context or raw input',()=>{
- const h=rowHost(),diagnostics=[];h.G.Utils.isOptionValid=()=>false;h.G.console={error:(...v)=>diagnostics.push(v)};
+for(const forcedFlag of [false,true])test('ordinary row-parameter error hides author context even with test flag='+forcedFlag,()=>{
+ const h=rowHost(),diagnostics=[];h.G.Utils.isOptionValid=key=>forcedFlag&&key==='test';h.G.console={error:(...v)=>diagnostics.push(v)};
  assert.throws(()=>h.show('\\l[PRIVATE_PATH]'),e=>{assert.match(e.message,/WP07-EVENT/);assert(!e.stack.includes('PRIVATE_PATH'));return true;});assert.deepEqual(diagnostics,[]);assert(!h.G.$gameMessage.isBusy());
 });
 test('typing, timed waiting, repeated keys and native page clearing allocate only on layout entry/exit',()=>{

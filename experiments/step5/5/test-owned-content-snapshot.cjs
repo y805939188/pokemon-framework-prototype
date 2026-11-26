@@ -13,16 +13,20 @@ function loader(){
  const a=source.indexOf('\n\t\t\tcontent() {'),b=source.indexOf('\n\t\t\t_content:',a);assert(a>=0&&b>a,'actual compiled Content loader');
  const G={PluginManager:{parameters:()=>({contentSource:'sample'})}},PSFlow={_content:null,developerCapabilities:{}};
  const root=process.env.PF_SNAPSHOT_RUNTIME||ROOT;
- const context=vm.createContext({G,PSFlow,NAME:'PS_BattleFlow',engine:()=>({B:E,root}),nodeRequire:require,testing:()=>{throw Error('unexpected fixture source');}});
+ let reads=0;
+ // This slice tests the admitted compiled loader/cache, not the isolated admission boundary.
+ const context=vm.createContext({G,PSFlow,NAME:'PS_BattleFlow',fixtureSource:()=>false,battleCapabilities:()=>({}),engine:()=>({B:E,root}),
+  nodeRequire:id=>id==='fs'?{readFileSync(...args){reads++;return fs.readFileSync(...args);}}:require(id),testing:()=>{throw Error('unexpected fixture source');},COMPILED_SCHEMA_VERSION:E.contentSchema.COMPILED_SCHEMA_VERSION,
+  contentFailure:kind=>assert.fail('formal positive content load unexpectedly refused: '+kind),isSafeStartupFailure:()=>false});
  vm.runInContext('PSFlow.content=({'+source.slice(a,b)+'}).content;',context,{filename:file+':actual-content-loader'});
- return PSFlow;
+ return {flow:PSFlow,reads:()=>reads};
 }
 test('owned formal load is detached, deeply immutable and cached until normal content invalidation',()=>{
- const flow=loader(),first=flow.content();assert(Object.isFrozen(first));assert(Object.isFrozen(first.moves));assert(Object.isFrozen(first.world.encounters.tables));
- assert.strictEqual(flow.content(),first);assert.equal(scanCount(()=>E.semantic.semanticFingerprint(first)).scans,0,'loaded content must not rescan');
+ const {flow,reads}=loader(),first=flow.content();assert.equal(reads(),1);assert(Object.isFrozen(first));assert(Object.isFrozen(first.moves));assert(Object.isFrozen(first.world.encounters.tables));
+ assert.strictEqual(flow.content(),first);assert.equal(reads(),1);assert.equal(scanCount(()=>E.semantic.semanticFingerprint(first)).scans,0,'loaded content must not rescan');
  assert.equal(E.semantic.ownedImmutableFingerprint(first),E.semantic.semanticFingerprint(first));
  const before=E.semantic.semanticFingerprint(first);assert.throws(()=>{first.moves.Growl.pp++;},TypeError);assert.equal(E.semantic.semanticFingerprint(first),before);
- flow._content=null;const second=flow.content();assert.notStrictEqual(second,first);assert.equal(E.semantic.semanticFingerprint(second),before);assert(Object.isFrozen(second));
+ flow._content=null;const second=flow.content();assert.equal(reads(),2);assert.notStrictEqual(second,first);assert.equal(E.semantic.semanticFingerprint(second),before);assert(Object.isFrozen(second));
  const mutable=structuredClone(first);flow._content=mutable;assert.strictEqual(flow.content(),mutable);const old=E.semantic.semanticFingerprint(mutable);mutable.moves.Growl.pp++;assert.notEqual(E.semantic.semanticFingerprint(mutable),old);assert(scanCount(()=>E.semantic.semanticFingerprint(mutable)).scans>0);
 });
 test('only a newly owned deep copy is cached; aliases and caller-frozen records remain observable',()=>{

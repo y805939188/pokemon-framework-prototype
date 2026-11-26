@@ -1,5 +1,5 @@
 'use strict';
-// Explicit regular suite: actual registered command357 -> Session/Showdown -> App/F.
+// Explicit isolated-synthetic suite, not ordinary production evidence: actual command357 -> Session/Showdown -> App/F.
 // Rendering/audio/input/XHR and DataManager.saveGame are facades, not disk or NW evidence.
 const test=require('node:test'),assert=require('node:assert/strict');
 assert.deepEqual(process.argv.slice(2),[],'this suite accepts no selectors or fallback arguments');

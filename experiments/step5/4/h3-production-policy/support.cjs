@@ -26,7 +26,7 @@ function fixture(source) {
   const input=Object.fromEntries(names.filter(n=>fs.existsSync(path.join(runtime,'content/sample',n+'.json'))).map(n=>[n.replace(/-([a-z])/g,(_,c)=>c.toUpperCase()),JSON.parse(fs.readFileSync(path.join(runtime,'content/sample',n+'.json'),'utf8'))]));
   input.species.find(s=>s.id==='snorlax').learnset=['splash','rest','payday',source.startsWith('capture')?'fling':'trick'].map(move=>({level:1,move}));
   input.species.find(s=>s.id==='pidgey').learnset=[{level:1,move:source.startsWith('capture')?'splash':'tackle'}];
-  if(source.startsWith('capture')) input.species.push({id:'meowth',showdownId:'meowth',nameKey:'species.meowth',growth:'medium',baseExp:50,evYield:{},catchRate:255,source:'author-placeholder',learnset:['splash','rest','payday'].map(move=>({level:1,move}))});
+  if(source.startsWith('capture')) input.species.push({id:'meowth',showdownId:'meowth',nameKey:'species.meowth',growth:'medium',baseExp:50,evYield:{},catchRate:255,abilities:['pickup'],hiddenAbilities:[],source:'author-placeholder',learnset:['splash','rest','payday'].map(move=>({level:1,move}))});
   input.items=Object.values(E.itemCatalog.legacyCatalog()).map(item=>({...item,source:'author-placeholder'}));
   if(!input.items.some(i=>i.id==='lumberry'))input.items.push({id:'lumberry',name:'Lum Berry',namePlural:'Lum Berries',pocket:5,price:0,source:'author-placeholder'});
   input.grants=[{id:'h3-held',source:'author-placeholder',members:[{species:'snorlax',level:50,item:'lumberry'}],items:{},money:0}];
@@ -57,7 +57,15 @@ function acquire(w) {
 }
 
 async function acquireUnchecked(w) {
- const out=acquire(w);assert.equal(out.status,w.source==='trade'?'committed':'applied');
+ let out=acquire(w);
+ if(w.source==='grant'&&out.status==='pending'){
+  assert.equal(out.grantId,'h3-held');assert(out.token&&out.pendingMember,'ordinary grant must expose nickname reception');
+  const before=clone(w.state.read());const writes=w.state.replaced.length;
+  out=w.app.resolveReceiving(out.token,{[out.pendingMember]:{nickname:{kind:'keep'}}});
+  assert.equal(w.state.replaced.length,writes+1,'explicit nickname choice installs grant exactly once');
+  assert(!Object.hasOwn(before.claims,'h3-held'));
+ }
+ assert.equal(out.status,w.source==='trade'?'committed':'applied');
  if(!w.source.startsWith('capture'))return;
  const {app,state,source}=w,before=clone(state.read()),writes=state.replaced.length;
  const req={battleId:'H3-'+source+':capture-source',kind:'wild',seq:1,canLose:true,expGain:false,moneyGain:false,foes:[{species:'meowth',level:50}],...(source==='capture-replace'?{forceParty:true}:{})};
@@ -70,7 +78,12 @@ async function acquireUnchecked(w) {
  assert((await h.throwBall('masterball')).ok);assert(h.finished);
  assert.deepEqual(state.read(),before);assert.equal(state.replaced.length,writes);
  const raw=h.result(),id=raw.captured[0].id;assert.equal(raw.captured[0].item,'lumberry');let result=app.finishBattle(h,req);
- if(source==='capture-replace'){assert(result.pending);result=app.resolveReceiving(result.receivingToken,{[id]:{placement:{kind:'replace',target:{id:'P1',position:{kind:'party',index:0}}}}});}
+ if(result.pending){
+  assert.equal(result.pendingMember,id);
+  const placement=source==='capture-replace'?{kind:'replace',target:{id:'P1',position:{kind:'party',index:0}}}:{kind:source==='capture-box'?'box':'party'};
+  result=app.resolveReceiving(result.receivingToken,{[id]:{nickname:{kind:'keep'},placement}});
+ }else assert.notEqual(source,'capture-replace','forced replacement must wait for a decision');
+
  assert.equal(result.commit,'applied',JSON.stringify(result));assert.equal(state.replaced.length,writes+1);
  const original=E.storage.locateMember(state.read(),'P1');assert.equal(original.member.item,'','Fling retired the player source; capture must not duplicate it');
  const held=[...state.read().party,...state.read().storage.boxes.flatMap(box=>box.slots)].filter(m=>m&&m.item==='lumberry');assert.equal(held.length,1,'exactly one held Lum after capture');
@@ -87,14 +100,17 @@ async function acquireReady(w) {
  if(w.source!=='give'){
   const species=w.source.startsWith('capture')?'meowth':'snorlax';
   expectedDex.seen=[...new Set([...expectedDex.seen,species])];expectedDex.owned=[...new Set([...expectedDex.owned,species])];
-  // Frozen synthetic author input: RNG always returns 0, native species gender/appearance; no engine reference equivalence claim.
-  const appearance={gender:1,form:0,shiny:true};
+  // The ordinary factory no longer accepts the legacy forced RNG. Verify the separate
+  // Dex record against the actual acquired individual, never against the actual Dex.
+  const individual=next.party[0];assert.equal(individual.species.toLowerCase(),species);
+  const appearanceOf=member=>({gender:member.gender==='F'||member.gender===1?1:0,form:member.form??0,shiny:member.shiny});
+  const appearance=appearanceOf(individual);
   expectedDex.seenForms[species]=[appearance];expectedDex.lastSeenForm[species]=appearance;
   if(w.source.startsWith('capture')) {
    expectedDex.capturedCounts[species]=(expectedDex.capturedCounts[species]??0)+1;
    // Battle also publicly shows the player's original Snorlax; it is seen, not newly owned.
    expectedDex.seen=[...new Set([...expectedDex.seen,'snorlax'])].sort();
-   expectedDex.seenForms.snorlax=[appearance];expectedDex.lastSeenForm.snorlax=appearance;
+   const original=appearanceOf(before.party[0]);expectedDex.seenForms.snorlax=[original];expectedDex.lastSeenForm.snorlax=original;
   }
  }
  assert.deepEqual(next.stats,expectedStats,'whole stats oracle for source '+w.source);

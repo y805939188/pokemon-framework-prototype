@@ -19,7 +19,12 @@ function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,op
   G.Input.isRepeated=G.Input.isTriggered;
   require('./victory-native-scenes.cjs').install(G,ROOT);
  };
- const world=createCompositionHostFactory({ROOT,work,plugins}),w=world({evolution:'plugin',productionTranslator:options.productionTranslator===true,prebattleWorld:options.prebattleWorld===true,legacyDefeatCompat:options.legacyDefeatCompat===true,beforeProduct}),G=w.G,M=w.manager,A=w.AM,E=require(path.join(ROOT,'js/engine/build/production.cjs'));
+ // A seeded status characterization may load only verified staged Flow in its own VM; never
+ // copy its bytes into the ordinary game tree or replace SaveLocation's verified storage.
+ const statusStage=options.scopedStatusStage;
+ if(statusStage){assert.equal(statusStage.scope,'EXPLICIT_ISOLATED_LEGACY_FIXTURE_NOT_ORDINARY');statusStage.verify();}
+ const vmPlugins=statusStage?{...plugins,PS_BattleFlow:fs.readFileSync(statusStage.artifacts.PS_BattleFlow,'utf8')}:plugins;
+ const world=createCompositionHostFactory({ROOT,work,plugins:vmPlugins}),w=world({evolution:'plugin',productionTranslator:options.productionTranslator===true,prebattleWorld:options.prebattleWorld===true,legacyDefeatCompat:options.legacyDefeatCompat===true,beforeProduct}),G=w.G,M=w.manager,A=w.AM,E=require(path.join(ROOT,'js/engine/build/production.cjs'));
  // Run the actual entry's presenter policy before unrelated global hooks. The
  // complete driver must inherit this policy, not assume the plugin's default.
  assert.equal(typeof entryText,'string');const stop=Symbol('entry boundary'),descriptor=Object.getOwnPropertyDescriptor(M,'isGameActive'),priorNW=G.nw;
@@ -54,14 +59,25 @@ function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,op
  const evoUpdate=M.updateScene,queuedGoto=M.goto;
  // Delegate the already-installed production allocation hooks, then consume the
  // genuine native queue. Never construct a replacement Scene behind those hooks.
- M.goto=function(C){const result=queuedGoto.call(this,C);this.changeScene();return result;};
+ // Some older probes expect synchronous scene selection. Where ownership is
+ // tested, use the original queued goto and the stock changeScene/update order.
+ if(!options.frameQueuedScenes)M.goto=function(C){const result=queuedGoto.call(this,C);this.changeScene();return result;};
  Title.prototype.create=function(){Base.prototype.create.call(this);this._commandWindow={isOpenAndActive:()=>true};this.isBusy=()=>false;};
- M.updateScene=function(){const s=this._scene;if(!s)return;if(!s.isStarted()&&options.delayStart&&G.Graphics.frameCount<=options.delayStart)return;return evoUpdate.call(this);};
+ M.updateScene=function(){if(options.frameQueuedScenes)this.changeScene();const s=this._scene;if(!s)return;if(!s.isStarted()&&options.delayStart&&G.Graphics.frameCount<=options.delayStart)return;return evoUpdate.call(this);};
  M.goto(Title);
  G.PSManagement.inputFrame=()=>input;G.PSManagement.current=()=>null;
  G.$gameMessage.clear=()=>{};if(!options.prebattleWorld)G.$gameMap={_mapId:5,mapId(){return this._mapId;},_interpreter:{clear(){},isRunning:()=>false}};G.$dataMap={};
+ if(options.returnMapCounter){
+  assert(!options.prebattleWorld);const native=fs.readFileSync(path.join(ROOT,'js/reactor_objects.js'),'utf8');
+  const body=name=>{const k=name+' = ',start=native.indexOf(k),end=native.indexOf('\n};',start);assert(start>=0&&end>start);return vm.runInContext('('+native.slice(start+k.length,end+2)+')',G);};
+  G.$dataMap.encounterStep=20;G.$gameMap.encounterStep=body('Game_Map.prototype.encounterStep');G.$gamePlayer.makeEncounterCount=body('Game_Player.prototype.makeEncounterCount');
+  const realmMath=vm.runInContext('Math',G);w.nativeEncounterBounds=[];
+  realmMath.randomInt=n=>{assert.equal(n,20);w.nativeEncounterBounds.push(n);return 0;};
+ }
  w.flow.limits=()=>({party:6,boxes:1200,bagPerItem:999,money:999999});w.flow.app=w.applicationFactory;w.flow._app=null;w.flow.content=()=>w.flow._content;w.flow.now=()=>12345;
- const gameDir=w.root,saveRoot=path.join(work,'save-'+path.basename(gameDir));fs.mkdirSync(saveRoot);G.StorageManager={fileDirectoryPath:()=>saveRoot};
+ const gameDir=w.root,saveRoot=statusStage?.saves??path.join(work,'save-'+path.basename(gameDir));
+ if(statusStage){assert.equal(G.StorageManager.fileDirectoryPath(),statusStage.saves+path.sep);statusStage.verify();}
+ else{fs.mkdirSync(saveRoot);G.StorageManager={fileDirectoryPath:()=>saveRoot};}
  fs.mkdirSync(path.join(gameDir,'js/plugins'),{recursive:true});
  for(const[name,code]of Object.entries({...plugins,PS_BattleFlowTest:driverText}))fs.writeFileSync(path.join(gameDir,'js/plugins',name+'.js'),code);
  const assets=[];
@@ -71,11 +87,55 @@ function createVictoryDriverHost({ROOT,work,plugins,driverText,entryText,PLAN,op
  if(options.badIdentity)inputValue.driverPluginSHA256='0'.repeat(64);
  const inputFile=path.join(gameDir,'INPUT.json');fs.writeFileSync(inputFile,JSON.stringify(inputValue));
  const args={'ps-victory-music-input':inputFile,'ps-save-dir':saveRoot};const report={env:{execution:'SYNTHETIC_CONTROL_NODE_VM'},results:[]};let progress=0;
+ const awardTexts=new WeakMap(),pulseFor=new WeakMap();
+ function witnessTerminalScene(){
+  const b=M._scene;if(!b?._psBattle||!options.ordinaryAwardInput)return;
+  if(!awardTexts.has(b)){
+   const whitelist=new Set();awardTexts.set(b,whitelist);const publish=b.pushMessages;
+   b.pushMessages=function(messages,...rest){
+    if(Array.isArray(messages)&&this._D)for(const m of messages){
+     if(m.kind==='growth'){
+      for(const line of this._D.message({...m,levelUps:[]}))whitelist.add(line);
+      for(const level of m.levelUps)for(const line of this._D.message({...m,exp:0,levelUps:[level]}))whitelist.add(line);
+     }else if(m.kind==='end'&&m.reason==='caught')for(const line of this._D.message(m))whitelist.add(line);
+    }
+    return Reflect.apply(publish,this,[messages,...rest]);
+   };
+  }
+  const view=b.ordinaryMessageState?.(),text=b._log?._lines?.join(' '),panel=b.levelStatsState?.();
+  if(options.onOrdinarySample)options.onOrdinarySample({frame:G.Graphics.frameCount,mode:b._mode,ball:b.ballFeedbackState?.()?.frame?.phase,closed:b.ballFeedbackState?.()?.closed,hide:b.ballFeedbackState?.()?.hideSampledUpdate,melody:b.captureMelodyState?.()?.completed,view:view?.phase,text,panel:panel?.phase,queued:b._queue?.length,finished:b._session?.finished,stamp:view?.fullyShownAt});
+  if(!b._session?.finished||panel||view?.implementation!=='paused-message-v1'||view.phase!=='full'||!awardTexts.get(b).has(text)||pulseFor.get(b)===view.fullyShownAt)return;
+  pulseFor.set(b,view.fullyShownAt);input.triggered.use=true;input.pressed.use=true;
+  (report.ordinaryAwardConfirmations??=[]).push({frame:G.Graphics.frameCount,text,stamp:view.fullyShownAt});
+ }
+ // Ordinary receiving owns user-visible input after a caught battle, even when the
+ // old fixture's debug receiveOptions is ignored. Follow only this owned operation.
+ let lastReceivePulse=-Infinity,lastSignature=null,receiveOwner=null;
+ if(options.ordinaryReceivingInput){
+  assert(options.frameQueuedScenes && typeof plugins.PS_Management==='string');
+  G.Input.keyMapper??={};G.TouchInput.isCancelled??=()=>false;
+  vm.runInContext(plugins.PS_Management,G,{filename:'ordinary-PS_Management.js'});
+ }
+ function witnessReceivingScene(){
+  if(!options.ordinaryReceivingInput)return;
+  const menu=G.PSManagement.current(),dex=G.PSEvolution.current(),pending=w.flow._app?.pendingReceiving;
+  let role,key,choice,owner;
+  if(menu?.ready&&menu.view.kind==='menu'&&pending){
+   assert.deepEqual(Array.from(menu.view.items,r=>r.key),['yes','no']);role='nickname';owner=pending.token;receiveOwner=owner;
+   const cursor=menu.view.cursor;assert(cursor===0||cursor===1);key=cursor===1?'ok':'down';choice=menu.view.items[cursor].key;
+  }else if(dex?.ready&&['dex-message','entry'].includes(dex.layer)&&dex.owner===receiveOwner){role=dex.layer;owner=dex.owner;key='ok';choice=role;}
+  else return;
+  assert.match(owner,/^receive:/);const sig=[owner,role,choice,key].join(':');
+  if(sig===lastSignature||G.Graphics.frameCount-lastReceivePulse<5)return;
+  lastSignature=sig;lastReceivePulse=G.Graphics.frameCount;const raw=key==='ok'?'use':key;
+  input.triggered[raw]=true;input.pressed[raw]=true;(report.ordinaryReceivingInputs??=[]).push({frame:G.Graphics.frameCount,role,owner,choice,key});
+ }
  const frames=async(n)=>{for(let i=0;i<n;i++){
+  witnessTerminalScene();witnessReceivingScene();
   G.Graphics.frameCount++;w.tick(1000/60);for(const b of w.created)if(!b.destroys&&!b._ready)b.load();
   M.updateScene();await flush();input={triggered:{},repeated:{},pressed:{}};
  }};
- const waitFor=async(cond,label,max=2400)=>{for(let i=0;i<max;i++){if(cond())return;await frames(1);}throw Error('bounded wait: '+label+' '+JSON.stringify({mode:M._scene?._mode,evolution:G.PSEvolution.current(),errors:w.errors,flowError:w.flow.lastOutcome?.error}));};
+ const waitFor=async(cond,label,max=2400)=>{for(let i=0;i<max;i++){if(cond())return;await frames(1);}throw Error('bounded wait: '+label+' '+JSON.stringify({mode:M._scene?._mode,message:M._scene?.ordinaryMessageState?.(),lines:M._scene?._log?._lines,stats:M._scene?.levelStatsState?.(),queue:M._scene?._queue?.map(m=>m?.kind),evolution:G.PSEvolution.current(),errors:w.errors,flowError:w.flow.lastOutcome?.error}));};
  const scene=()=>M._scene,battle=()=>scene()?._psBattle?scene():null;
  const press=async(key)=>{input={triggered:{[key==='ok'?'use':key==='cancel'?'back':key]:true},repeated:{},pressed:{[key==='ok'?'use':key==='cancel'?'back':key]:true}};await frames(3);await frames(3);};
  // Stock Window_Base has destroy; this controlled host models that lifecycle too.

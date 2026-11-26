@@ -1,3 +1,4 @@
+import { bindIsolatedTestBattleFlow, isolatedTestScope, testScopeRefused, testStorageStillBound } from "./isolated-test-scope";
 import { installWorldAuthorCommandsMZ } from './world/world-author-commands-mz';
 import type { WorldAuthorBlackoutRetry } from './world/world-author-commands-mz';
 import { createCompanionIngressMZ } from './world/event-companion-ingress-mz';
@@ -31,7 +32,9 @@ import { createBusinessRandomUnitMZ } from './world/business-random-mz';
 import type { WorldBattleAdmission } from '../framework/app/ports';
 import type { MZEncounterMethods } from './world/world-host';
 import { captureInitialField, withInitialField, initialFieldMZ, WEATHER, TERRAIN } from '../framework/rules/initial-field';
-import { snapshotLegacyBattleArgs, legacyBattleChoices } from '../framework/app/legacy-battle-field';
+import { LEGACY_BATTLE_ARGUMENTS, snapshotLegacyBattleArgs, legacyBattleChoices } from '../framework/app/legacy-battle-field';
+import { COMPILED_SCHEMA_VERSION } from '../framework/content/schema';
+import { runtimeError, ownErrorMessage } from './navigation/runtime-error';
 import { captureGeneratedWildBattle } from '../framework/app/generated-wild-battle';
 import { captureGivenWildBattle } from '../framework/app/given-wild-battle';
 import type { GivenWildBattleStartRequest, GeneratedWildBattleStartRequest } from '../framework/app/ports';
@@ -87,24 +90,54 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   const NAME = "PS_BattleFlow";
   const W = window as any;
   const nodeRequire = (globalThis as any).require as any; // NW.js Node require (has .resolve)
-  const sceneProxyCheck = hostRecord(hostRecord(nodeRequire?.('node:util'))?.types)?.isProxy;
-  if (typeof sceneProxyCheck !== 'function') throw Error('native-proxy-detection-unavailable');
+  const testScope = isolatedTestScope(G);
+  const canTest = () => testStorageStillBound(G, testScope);
+  const fixtureSource = (): boolean => {
+    const fixture = G.PluginManager.parameters(NAME).contentSource === "fixture";
+    if (fixture && !canTest()) throw testScopeRefused("TEST-CONTENT-DISABLED");
+    return fixture;
+  };
+  const fastBattle = (): boolean => canTest() && PSFlow.fast === true;
+  const battleCapabilities = (): object => canTest() ? PSFlow.developerCapabilities : {};
+  const proxyDetector = hostRecord(hostRecord(nodeRequire?.('node:util'))?.types)?.isProxy;
+  if (typeof proxyDetector !== 'function') throw Error('native-proxy-detection-unavailable');
+  const sceneProxyCheck = proxyDetector as (value: unknown) => boolean;
   const businessRandomUnit = createBusinessRandomUnitMZ(value => sceneProxyCheck(value) === true);
   const scriptedWildRequests = new WeakMap<object, { kind: 'given'; input: GivenWildBattleStartRequest } | { kind: 'generated'; input: GeneratedWildBattleStartRequest }>();
 
+  // Only errors constructed here may retain their public text across the init/command boundaries.
+  const startupFailures = new WeakSet<object>();
+  function safeStartupFailure(message: string): Error {
+    const error = Object.freeze(runtimeError(message));
+    startupFailures.add(error);
+    return error;
+  }
+  function isSafeStartupFailure(error: unknown): error is Error {
+    return error !== null && typeof error === 'object' && startupFailures.has(error);
+  }
+  function isolatedDiagnostic(label: string, details: object): void {
+    try { if (canTest()) G.console.error(label, details); }
+    catch { /* Diagnostics cannot replace the safe failure. */ }
+  }
+
   // ------------------------------------------------------- production engine access (loaded lazily, runtime-relative)
+  const productionEntry = './js/engine/build/production.cjs';
   type EngineAccess = { B: ProductionRuntime & Record<string, any>; D: any; root: string };
   let ENGINE: EngineAccess | null = null;
   function engine(): EngineAccess {
     if (!ENGINE) {
       const tLoad = performance.now();
-      if (!nodeRequire) throw new Error("Node require() is not available in this runtime");
-      const B = nodeRequire("./js/engine/build/production.cjs") as ProductionRuntime & Record<string, any>;
-      ENGINE = {
-        B,
-        D: B.describe,
-        root: nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire("path").dirname(nodeRequire.resolve("./js/engine/build/production.cjs"))))),
-      };
+      try {
+        const B = nodeRequire(productionEntry) as ProductionRuntime & Record<string, any>;
+        const { dirname } = nodeRequire("path");
+        const root = dirname(dirname(dirname(dirname(nodeRequire.resolve(productionEntry)))));
+        ENGINE = { B, D: B.describe, root };
+      } catch {
+        const code = 'PF-ENGINE-LOAD';
+        isolatedDiagnostic('PS_BattleFlow engine diagnostic', { file: productionEntry.slice(2), code,
+          hint: 'Check that the production runtime and its dependencies are installed and readable.' });
+        throw safeStartupFailure('游戏运行组件无法载入，请修复或重新安装。 / Game components could not be loaded. Repair or reinstall the game. [' + code + ']');
+      }
       W.PSFlow && (W.PSFlow.perf.engineLoadMs = Math.round((performance.now() - tLoad) * 10) / 10);
     }
     return ENGINE;
@@ -112,6 +145,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   // Only explicit fixture content and ResetGame load testing. Normal sample/new-game paths never touch this entry.
   let TESTING: any = null;
   function testing(): any {
+    if (!canTest()) throw testScopeRefused("TEST-CONTENT-DISABLED");
     if (!TESTING) {
       if (!nodeRequire) throw new Error("Node require() is not available in this runtime");
       TESTING = nodeRequire("./js/engine/build/testing.cjs").fixtures;
@@ -119,11 +153,41 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     return TESTING;
   }
 
+  const compiledContentPath = 'data/framework/content.json';
+  const contentIssues = Object.freeze({
+    read: { code: 'PF-CONTENT-READ', field: '$', hint: 'Check that the compiled content is installed and readable.' },
+    json: { code: 'PF-CONTENT-JSON', field: '$', hint: 'Rebuild the compiled content; the file is not valid JSON.' },
+    schema: { code: 'PF-CONTENT-VERSION', field: '$.schema', hint: 'Rebuild with the installed tool version and recopy the output.' },
+    invalid: { code: 'PF-CONTENT-INVALID', field: '$', hint: 'Check the source package locally, rebuild and recopy the compiled output.' },
+  });
+  function contentFailure(kind: keyof typeof contentIssues): Error {
+    const issue = contentIssues[kind];
+    isolatedDiagnostic('PS_BattleFlow content diagnostic', { file: compiledContentPath, ...issue });
+    return safeStartupFailure('游戏数据无法载入，请修复或重新安装。 / Game data could not be loaded. Repair or reinstall the game. [' + issue.code + ']');
+  }
+  const newGameFailures = new WeakMap<object, Error>();
+  // Keep useful, fixed format guidance from the known parser, never copy a supplied value.
+  const trainerArgumentRefusals = new Set([
+    'legacy-battle-arguments-proxy', 'legacy battle arguments must be an object', 'a battle is already running',
+    'moneyGain must be true or false', 'canSwitch must be true or false', 'expGain must be true or false',
+    'noRun must be true or false', 'noBall must be true or false', 'battleEffects must be on, off or inherit',
+    'battleStyle must be switch, set or inherit', 'unsupported world battle weather', 'unsupported world battle terrain',
+    'unsupported world battle environment', 'legacy-world-capture:map metadata: world-provider-unavailable',
+    ...LEGACY_BATTLE_ARGUMENTS.flatMap(key => ['legacy battle argument must be own data: ' + key, 'legacy battle argument must be primitive: ' + key]),
+  ]);
+  function trainerCommandFailure(error: unknown): Error {
+    if (isSafeStartupFailure(error)) return error;
+    const message = sceneProxyCheck(error) ? undefined : ownErrorMessage(error);
+    return runtimeError(typeof message === 'string' && trainerArgumentRefusals.has(message)
+      ? message + ' [PF-TRAINER-COMMAND]' : '无法开始训练家战斗。 / This trainer battle could not start. [PF-TRAINER-COMMAND]');
+  }
+
   type GameAppView = HostApplication;
   type BattleOutcomeView = BattleOutcome & { result?: BattleResult; hostErrors?: { step: string; error: string }[] };
 
   // ---------------------------------------------------------------- shared flow state / API
   let openingBattle: object | null = null;
+  const abortingAdmittedHostOperations = new WeakSet<object>();
   let replacingState = false;
   let loadRecovery: BlackoutLoadRecoveryMZ | null = null;
   let worldAuthor: ReturnType<typeof installWorldAuthorCommandsMZ> | null = null;
@@ -220,7 +284,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     },
     beginTrade(requestId: string, intent: any): any { return PSFlow.app().beginTrade(requestId, intent); },
     resolveTrade(token: string, revision: number, decision: any): any { return PSFlow.app().resolveTrade(token, revision, decision); },
-    assertBattleAllowed(): void { const capabilities = runtimeCapabilities(PSFlow.developerCapabilities); if (!capabilities.allowExperimentalHeldItemBattle && (PSFlow.game().party || []).some((m: any) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成"); },
+    assertBattleAllowed(): void { const capabilities = runtimeCapabilities(battleCapabilities()); if (!capabilities.allowExperimentalHeldItemBattle && (PSFlow.game().party || []).some((m: any) => !!m.item)) throw new Error("held-item-battle-disabled: 战后持物写回未完成"); },
     running: false, // a battle scene is open (the interpreter waits on this)
     encounterHost: null as MZEncounterMethods | null,
     observeNativeMovementIncrease: null as ((player: object) => void) | null,
@@ -239,21 +303,29 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
      * an error, never a silent fallback to the fixture.
      */
     content(): Content {
+      const fixture = fixtureSource();
       if (!PSFlow._content) {
-        const params = G.PluginManager.parameters(NAME) as Record<string, string>;
-        const E = engine();
-        if ((params.contentSource || "sample") === "fixture") PSFlow._content = testing().content;
+        if (fixture) PSFlow._content = testing().content;
         else {
-          const file = nodeRequire("path").join(E.root, "data", "framework", "content.json");
+          const { B, root } = engine(); // A failed engine load is not a compiled content read error.
+          let raw: string;
+          try {
+            const file = nodeRequire("path").join(root, "data", "framework", "content.json");
+            raw = nodeRequire("fs").readFileSync(file, "utf8");
+          } catch { throw contentFailure('read'); }
           let json: unknown;
-          try { json = JSON.parse(nodeRequire("fs").readFileSync(file, "utf8")); }
-          catch (e) { throw new Error(`content: cannot read ${file} (run: pnpm --dir src build): ${String(e instanceof Error ? e.message : e)}`); }
-          const { content, errors } = E.B.contentRuntime.assembleContent(E.B.contentRuntime.loadCompiled(json), E.B.dex.createDexLookup(), PSFlow.developerCapabilities);
-          if (errors.length) throw new Error("content: " + errors.map((x: any) => `${x.path}: ${x.message}`).join("; "));
-          // The compiled source is static until _content is replaced/invalidated. Own a detached
-          // immutable view so repeated world-boundary checks can reuse its semantic fingerprint.
-          // Fixture/custom _content values remain mutable and retain the ordinary full checks.
-          PSFlow._content = E.B.semantic.ownedImmutableSnapshot(content);
+          try { json = JSON.parse(raw); } catch { throw contentFailure('json'); }
+          if (json === null || typeof json !== 'object' || Array.isArray(json) ||
+              Object.getOwnPropertyDescriptor(json, 'schema')?.value !== COMPILED_SCHEMA_VERSION) throw contentFailure('schema');
+          try {
+            const { content, errors } = B.contentRuntime.assembleContent(B.contentRuntime.loadCompiled(json), B.dex.createDexLookup(), battleCapabilities());
+            if (errors.length) throw contentFailure('invalid');
+            // Own the contents only after complete validation; never fall back to fixtures.
+            PSFlow._content = B.semantic.ownedImmutableSnapshot(content);
+          } catch (error) {
+            if (isSafeStartupFailure(error)) throw error;
+            throw contentFailure('invalid');
+          }
         }
       }
       return PSFlow._content!;
@@ -344,31 +416,47 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       if (err) throw new Error(`the save state is not usable (${err.code}): ${err.message}`); // never battle on, or overwrite, a state we could not read
       // Never invent a party: a new game installs the formal empty state (setupNewGame below) and a save without one gets
       // an empty state on load (PS_SaveState). Reaching this without a state is a host wiring error, not a reason to fake one.
-      if (!G.$gameSystem._psGame) throw new Error(`there is no framework game state${G.$gameSystem._psInitError ? ` (${G.$gameSystem._psInitError})` : ""}: start a new game or load a save`);
+      if (!G.$gameSystem._psGame) {
+        // Never trust a persisted or caller-supplied diagnostic field as player-facing text.
+        const failure = newGameFailures.get(G.$gameSystem);
+        throw runtimeError(`there is no framework game state${failure ? ` (${failure.message})` : ""}: start a new game or load a save`);
+      }
       return G.$gameSystem._psGame;
     },
     /** New game: the application installs the formal empty state (no members; grants give them). */
     startNewGame(): void {
+      fixtureSource();
       PSFlow.stateReplaced();
-      delete G.$gameSystem._psInitError;
+      const system = G.$gameSystem;
+      delete system._psInitError;
+      newGameFailures.delete(system);
       try { PSFlow.app().startNewGame(); }
-      catch (e) { G.$gameSystem._psInitError = String(e instanceof Error ? e.message : e); console.error("PS_BattleFlow: the new game state could not be created:", e); }
+      catch (error) {
+        const failure = isSafeStartupFailure(error) ? error : runtimeError(
+          '无法开始新游戏，请修复或重新安装。 / A new game could not be started. Repair or reinstall the game. [PF-NEW-GAME]');
+        newGameFailures.set(system, failure);
+        system._psInitError = failure.message;
+        G.console.error("PS_BattleFlow: the new game state could not be created:", failure.message);
+      }
     },
     /** Randomness for members created outside a battle (grants, encounters); tests may pin it with `rng`. */
     rng: null as ((n: number) => number) | null,
-    random(n: number): number { return PSFlow.rng ? PSFlow.rng(n) : Math.floor(businessRandomUnit() * n); },
+    random(n: number): number { return canTest() && PSFlow.rng ? PSFlow.rng(n) : Math.floor(businessRandomUnit() * n); },
     /** The wall clock the application reads (milliseconds since the epoch); tests may pin it with `clock`. */
     clock: null as (() => number) | null,
-    now(): number { return PSFlow.clock ? PSFlow.clock() : Date.now(); },
+    now(): number { return canTest() && PSFlow.clock ? PSFlow.clock() : Date.now(); },
     /**
      * TEST AID ONLY (plugin command ResetGame, the flow test driver): installs the synthetic step 2 fixture party
      * explicitly, stored the way a save stores it (content id + form of the current content, decision D5-3).
      */
     resetGame(): void {
+      if (!canTest()) throw testScopeRefused("TEST-RESET-DISABLED");
+      // Resolve the test payload before retiring live operations or clearing diagnostics.
+      const fixtures = testing();
+      const game = fixtures.savedFor(fixtures.makeGame(), PSFlow.content());
+      if (!canTest()) throw testScopeRefused("TEST-RESET-DISABLED");
       delete G.$gameSystem._psSaveError; delete G.$gameSystem._psSaveInfo; delete G.$gameSystem._psSaveWarning; // an explicit reset is a deliberate act
       PSFlow.stateReplaced();
-      const content = PSFlow.content();
-      const game = testing().savedFor(testing().makeGame(), content);
       G.$gameSystem._psGame = game;
       G.$gameSystem._psBattleSeq = 0;
     },
@@ -378,6 +466,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
      * application's; this plugin only supplies the host side.
      */
     app(): GameAppView {
+      const fixture = fixtureSource();
       if (!PSFlow._app) {
         const { B } = engine();
         if (!PSFlow.logger) PSFlow.logger = B.log.createRingLogger(500);
@@ -408,8 +497,8 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
           } },
           worldBattleScene: { assertCurrent: worldBattleScenes.assertCurrent },
           content: () => ({ content: PSFlow.content(), dex: PSFlow._dex ?? undefined }),
-          sessions: ((G.PluginManager.parameters(NAME).contentSource || "sample") === "fixture"
-            ? B.composition.createLegacyNoHeldBattleSessionFactory : B.composition.createBattleSessionFactory)({ content: () => PSFlow.content(), seed: () => PSFlow.seed, logger: () => PSFlow.logger!.sink, replacementOffers: (G.PluginManager.parameters(NAME).contentSource || "sample") !== "fixture" }),
+          sessions: (fixture
+            ? B.composition.createLegacyNoHeldBattleSessionFactory : B.composition.createBattleSessionFactory)({ content: () => PSFlow.content(), seed: () => canTest() ? PSFlow.seed : undefined, logger: () => PSFlow.logger!.sink, replacementOffers: !fixture }),
           projection: { project: (outcome: { code: number }) => PSFlow.projectOutcome(outcome) },
           random: (n: number) => PSFlow.random(n),
           clock: () => PSFlow.now(),
@@ -496,9 +585,9 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
             // World weather, mounts and contest beauty remain explicit unavailable facts until their real providers.
           }),
           variables:{count:()=>Math.max(0,(G.$dataSystem?.variables?.length??1)-1),write:(id:number,value:string)=>G.$gameVariables.setValue(id,value)},
-          creationContext: () => ({ map: G.$gameMap?.mapId?.() ?? 0, ...(PSFlow.creationEnvironment?.() ?? {}) }),
+          creationContext: () => ({ map: G.$gameMap?.mapId?.() ?? 0, ...(canTest() ? PSFlow.creationEnvironment?.() ?? {} : {}) }),
         };
-        const options: GameApplicationOptions = { startMoney: PSFlow.param("startMoney", 3000), noMoneyLoss: PSFlow.flagParam("noMoneyLoss", false), limits: PSFlow.limits(), capabilities: PSFlow.developerCapabilities, receivingProfile: PSFlow.receiveOptions ?? { mode: 0, naming: 0 }, playerLocale: G.navigator?.language ?? "en", playerName: G.$gameParty?.leader?.()?.name?.() || "player" };
+        const options: GameApplicationOptions = { startMoney: PSFlow.param("startMoney", 3000), noMoneyLoss: PSFlow.flagParam("noMoneyLoss", false), limits: PSFlow.limits(), capabilities: battleCapabilities(), receivingProfile: (canTest() ? PSFlow.receiveOptions : undefined) ?? { mode: 0, naming: 0 }, playerLocale: G.navigator?.language ?? "en", playerName: G.$gameParty?.leader?.()?.name?.() || "player" };
         PSFlow._app = new B.app.GameApplication(ports, options);
       }
       return PSFlow._app;
@@ -510,11 +599,11 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
      */
     testLimits: null as any,
     limits(): Limits {
-      if (PSFlow.testLimits) return PSFlow.testLimits;
+      if (canTest() && PSFlow.testLimits) return PSFlow.testLimits;
       const { config } = engine().B;
       let settings: unknown = {};
       // content that cannot be loaded stops battles and grants on its own (with its error); a new game still gets a state
-      try { settings = PSFlow.content().settings || {}; } catch (e) { console.error("PS_BattleFlow: content not loaded, the Gen 8 default capacities apply:", e); }
+      try { settings = PSFlow.content().settings || {}; } catch { G.console.error("PS_BattleFlow: game data unavailable; using default capacities. [PF-CONTENT-LIMITS]"); }
       return config.limitsOf(config.resolveConfig(settings));
     },
     flagParam(name: string, dflt: boolean): boolean {
@@ -546,7 +635,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     claimLines(o: any): string[] {
       const tr = PSFlow.translator();
       if (o.status === "already-claimed") return [tr.t("grant.already")];
-      if (o.status !== "applied") return [tr.has(`grant.refused.${o.reason}`) ? tr.t(`grant.refused.${o.reason}`) : tr.t("grant.refused.default", { reason: o.reason || "?" })];
+      if (o.status !== "applied") return [tr.has(`grant.refused.${o.reason}`) ? tr.t(`grant.refused.${o.reason}`) : tr.t("grant.refused.default", { reason: "PF-GRANT-REFUSED" })];
       const lines: string[] = [];
       for (const m of o.placed || []) lines.push(tr.t(m.to === "party" ? "grant.member.party" : "grant.member.boxes", { name: PSFlow.speciesName(m.species, m.form), level: m.level }));
       for (const [k, n] of Object.entries(o.items || {})) lines.push(tr.t("grant.item", { item: tr.tOr(`item.name.${k}`, k), count: n as number }));
@@ -555,7 +644,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     },
     /** Host notification also works when the engine/application could not be constructed. */
     projectOutcome(outcome: { code: number }): void {
-      if (PSFlow.debug.failProjection) { PSFlow.debug.failProjection = false; throw new Error("injected projection failure"); } // tests
+      if (canTest() && PSFlow.debug.failProjection) { PSFlow.debug.failProjection = false; throw new Error("injected projection failure"); } // tests
       const v = PSFlow.request && PSFlow.request.resultVariable;
       if (v) G.$gameVariables.setValue(v, outcome.code);
     },
@@ -708,34 +797,60 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     /** End the battle of `op` (default: the current operation) without a result. Never throws. */
     abort(error: unknown, op: any = PSFlow._op): void {
       if (!op || op !== PSFlow._op) { PSFlow.stale("abort", op, error); return; }
-      PSFlow._closeBattleMusic(op, false); // media retires even if the application must retain a pending root for recovery
-      // A result committed for this battle stays the outcome: a later failure (e.g. in the scene's own wiring) is a host
-      // error after the commit, never an abort that would report the committed battle as not committed.
-      const done = PSFlow.lastOutcome;
-      if (done && done.commit && done.commit !== "none" && done.battleId === op.request.battleId) {
-        PSFlow.afterCommit(done, "after-commit", () => { throw error; });
-        const dex = PSFlow._app?.pendingPokedex;
-        if (dex) { PSFlow.resolvePokedex(dex.token, dex.revision, { kind: "technical-terminate" }); return; }
-        const continuation = PSFlow._app?.pendingEvolution;
-        if (continuation) {
-          const ended = PSFlow.resolveEvolution(continuation.token, continuation.revision, { kind: "technical-terminate" });
-          if (ended?.status === "refused") PSFlow.afterCommit(done, "continuation-termination", () => { throw new Error(ended.reason); });
-          return; // Unsafe/indeterminate termination keeps the original running/wait owner for recovery.
-        }
-        PSFlow.close(done.code, op);
-        return;
-      }
+      const admitted = !!op.worldAdmission;
+      if (admitted && abortingAdmittedHostOperations.has(op)) return;
+      if (admitted && !PSFlow.running && PSFlow.lastOutcome?.battleId === op.request.battleId &&
+          PSFlow.lastOutcome?.aborted === true) return;
+      if (admitted) abortingAdmittedHostOperations.add(op);
       try {
-        if (op.worldAdmission) PSFlow.app().abortAdmittedWorldBattle(op.worldAdmission, String(error));
-        PSFlow.lastOutcome = PSFlow.app().abortBattle(op.request, error);
-      }
-      catch {
-        const outcome: BattleOutcomeView = { code: 0, battleId: op.request.battleId, commit: "none", aborted: true, error: String(error instanceof Error ? error.message : error) };
-        try { PSFlow.projectOutcome(outcome); outcome.projection = "ok"; }
-        catch (e) { outcome.projection = "failed"; outcome.projectionError = String(e instanceof Error ? e.message : e); }
-        PSFlow.lastOutcome = outcome;
-      }
-      PSFlow.close(0, op);
+        const appAtEntry = PSFlow._app, generation = appAtEntry?.stateGeneration;
+        const ownHost = () => PSFlow._op === op && PSFlow.request === op.request;
+        const current = () => ownHost() && PSFlow._app === appAtEntry && appAtEntry?.stateGeneration === generation;
+        PSFlow._closeBattleMusic(op, false); // media retires even if the application must retain a pending root for recovery
+        if (!ownHost() || admitted && !current()) return;
+        // A result committed for this battle stays the outcome: a later failure (e.g. in the scene's own wiring) is a host
+        // error after the commit, never an abort that would report the committed battle as not committed.
+        const done = PSFlow.lastOutcome;
+        if (done && done.commit && done.commit !== "none" && done.battleId === op.request.battleId) {
+          PSFlow.afterCommit(done, "after-commit", () => { throw error; });
+          const dex = PSFlow._app?.pendingPokedex;
+          if (dex) { PSFlow.resolvePokedex(dex.token, dex.revision, { kind: "technical-terminate" }); return; }
+          const continuation = PSFlow._app?.pendingEvolution;
+          if (continuation) {
+            const ended = PSFlow.resolveEvolution(continuation.token, continuation.revision, { kind: "technical-terminate" });
+            if (ended?.status === "refused") PSFlow.afterCommit(done, "continuation-termination", () => { throw new Error(ended.reason); });
+            return; // Unsafe/indeterminate termination keeps the original running/wait owner for recovery.
+          }
+          PSFlow.close(done.code, op);
+          return;
+        }
+        const refused = (): BattleOutcomeView => ({
+          code: 0, battleId: op.request.battleId, commit: "none", aborted: true,
+          error: String(error instanceof Error ? error.message : error),
+        });
+        if (op.worldAdmission) {
+          let outcome: BattleOutcomeView | undefined;
+          try { outcome = appAtEntry?.abortAdmittedWorldBattleForHost(op.worldAdmission, error, current); }
+          catch { /* Refused/stale admission has no authority to publish through the generic projection fallback. */ }
+          if (!current()) return;
+          // An obsolete/unissued App terminal may release this old host waiter but cannot become its outcome.
+          if (outcome) PSFlow.lastOutcome = outcome;
+        } else {
+          // Non-admitted API/contained initialization keeps its established generic fallback.
+          let outcome: BattleOutcomeView;
+          try { outcome = PSFlow.app().abortBattle(op.request, error); }
+          catch {
+            outcome = refused();
+            if (!ownHost()) return;
+            try { PSFlow.projectOutcome(outcome); outcome.projection = "ok"; }
+            catch (e) { outcome.projection = "failed"; outcome.projectionError = String(e instanceof Error ? e.message : e); }
+          }
+          // A direct failed init may create its App for the first time. It still must not replace a successor request.
+          if (!ownHost()) return;
+          PSFlow.lastOutcome = outcome;
+        }
+        if (ownHost()) PSFlow.close(0, op);
+      } finally { if (admitted) abortingAdmittedHostOperations.delete(op); }
     },
     /**
      * Bookkeeping when a battle is over: the interpreter stops waiting, saving is no longer masked by the battle (see
@@ -911,7 +1026,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       if (!home) r = { battleId, status: "no-home" }; // WP61 7.2: no valid home -> the party is healed, no transfer
       else {
         try {
-          if (PSFlow.debug.failReturn) { PSFlow.debug.failReturn = false; throw new Error("injected return failure"); } // tests
+          if (canTest() && PSFlow.debug.failReturn) { PSFlow.debug.failReturn = false; throw new Error("injected return failure"); } // tests
           G.$gamePlayer.reserveTransfer(home.mapId, home.x, home.y, home.d, 0);
           r = { battleId, status: "requested", home };
         } catch (e) { r = { battleId, status: "failed", home, error: String(e instanceof Error ? e.message : e) }; }
@@ -943,10 +1058,12 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     const outcome = { code: 0, battleId: request.battleId, commit: 'none', aborted: true, error: String(error instanceof Error ? error.message : error) };
     PSFlow.lastOutcome = outcome;
     if (request.resultVariable) G.$gameVariables.setValue(request.resultVariable, 0);
-    G.$gameMessage.add(PSFlow.translator().t('management.refused', { reason: outcome.error }));
+    G.$gameMessage.add(PSFlow.translator().t('management.refused', {
+      reason: outcome.error === 'operation-active' || outcome.error === 'legacy-world-capture:operation-active' ? 'operation-active' : '[PF-BATTLE-REFUSED]',
+    }));
   }
   const worldTravel = createWorldTravelMZ(G, () => PSFlow._app, parseTerrainMeanings(travelParameters.TerrainTags), travelParameters,
-    message => console.warn('PS_World travel:', message), sceneProxyCheck as (value: unknown) => boolean, {}, Object.getPrototypeOf(nodeRequire('node:util')));
+    message => console.warn('PS_World travel:', message), sceneProxyCheck as (value: unknown) => boolean, {}, Object.getPrototypeOf(nodeRequire('node:util')), canTest);
   const loadGame = PSFlow.game, loadContent = PSFlow.content;
   loadRecovery = createBlackoutLoadRecoveryMZ({ root: G, source: worldTravel.host.nativeLeaseSource,
     application: () => PSFlow._app, game: () => Reflect.apply(loadGame, PSFlow, []), content: () => Reflect.apply(loadContent, PSFlow, []),
@@ -1063,7 +1180,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     frame: () => G.Graphics.frameCount,
     makePort: (current, defaultBgm) => createBattleMusicMZ(G, nodeRequire, engine().root, current, { defaultBgm }),
   });
-  const prebattle = installPrebattleHost(G, PSFlow, op => PSFlow._preparePrebattleAudio(op), op => {
+  const prebattle = installPrebattleHost(G, PSFlow, fastBattle, op => PSFlow._preparePrebattleAudio(op), op => {
     if (op !== PSFlow._op) throw Error('legacy-prebattle-operation-changed');
     if (!worldBattleScenes.hasQueuedHandoff(op)) return;
     const app = PSFlow._app, admission = PSFlow._op.worldAdmission;
@@ -1130,7 +1247,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     this.setWaitMode("psBattle");
   });
 
-  G.PluginManager.registerCommand(NAME, "StartTrainerBattle", function (this: any, raw: unknown) {
+  function startTrainerCommand(this: any, raw: unknown): void {
     if (sceneProxyCheck(raw)) throw Error('legacy-battle-arguments-proxy');
     const args = snapshotLegacyBattleArgs(raw);
     if (PSFlow.running) throw new Error("a battle is already running");
@@ -1144,7 +1261,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     if (!known) {
       const resultVariable = Number(args.resultVariable) || 0;
       if (resultVariable) G.$gameVariables.setValue(resultVariable, 0);
-      G.$gameMessage.add(PSFlow.translator().t("trainer.missing", { id, version }));
+      G.$gameMessage.add(PSFlow.translator().t("trainer.missing"));
       if (G.$gameMessage.isBusy()) this.setWaitMode("message");
       return;
     }
@@ -1171,6 +1288,10 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     if (!opened) { if (G.$gameMessage.isBusy()) this.setWaitMode("message"); return; }
     this._psBattleId = battleId;
     this.setWaitMode("psBattle");
+  }
+  G.PluginManager.registerCommand(NAME, "StartTrainerBattle", function (this: any, raw: unknown) {
+    try { startTrainerCommand.call(this, raw); }
+    catch (error) { throw trainerCommandFailure(error); }
   });
 
   G.PluginManager.registerCommand(NAME, 'PlayTrainerIntro', function (this: any, args: any) {
@@ -1217,7 +1338,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     if (!table) return baseExecuteEncounter.call(this);
     if (PSFlow.running || PSFlow._app?.encounterBlocked || !G.$gameSystem.isEncounterEnabled() || G.$gameMap.isEventRunning() || this._encounterCount > 0) return false;
     // Cold host gate: app() loads content, so reject before constructing it or drawing any random value.
-    const gateGame=G.$gameSystem?._psGame, gateMap=G.$gameMap, gateCapability=JSON.stringify(PSFlow.developerCapabilities??{});
+    const gateGame=G.$gameSystem?._psGame, gateMap=G.$gameMap, gateCapability=JSON.stringify(battleCapabilities());
     const heldKey=(gateGame?.party??[]).map((m:any)=>[m.id,m.item??'']);
     const gateKey=JSON.stringify([G.$gameMap?.mapId?.(),heldKey]);
     if(heldEncounterGate&&heldEncounterGate.game===gateGame&&heldEncounterGate.map===gateMap&&heldEncounterGate.key===gateKey&&heldEncounterGate.capability===gateCapability)return false;
@@ -1244,7 +1365,10 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       updateCount: (player: object, args: readonly unknown[]) => Reflect.apply(nativeUpdateCount, player, args),
     };
   }
-  G.PluginManager.registerCommand(NAME, "ResetGame", () => PSFlow.resetGame());
+  G.PluginManager.registerCommand(NAME, "ResetGame", () => {
+    if (!canTest()) throw testScopeRefused("TEST-RESET-DISABLED");
+    PSFlow.resetGame();
+  });
 
   // PS_World owns completed interpolation identities. Keep native increaseSteps, but never write framework steps at move start.
 
@@ -1266,7 +1390,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       return;
     }
     if (v) G.$gameVariables.setValue(v, o.status === "applied" ? 1 : o.status === "already-claimed" ? 2 : 0);
-    if (o.status === "refused") console.warn("PS_BattleFlow: grant refused:", o.grantId, o.reason, o.error);
+    if (o.status === "refused") G.console.warn("PS_BattleFlow: grant refused. [PF-GRANT-REFUSED]");
     if (flag(args.message, true)) say(this, PSFlow.claimLines(o));
     PSFlow.waitForPokedex(this);
   });
@@ -1275,7 +1399,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     PSFlow.lastHeal = o;
     const v = Number(args.resultVariable) || 0;
     if (v) G.$gameVariables.setValue(v, o.status === "refused" ? 0 : 1);
-    if (o.status === "refused") console.warn("PS_BattleFlow: heal refused:", o.reason, o.error);
+    if (o.status === "refused") G.console.warn("PS_BattleFlow: heal refused. [PF-HEAL-REFUSED]");
     const tr = PSFlow.translator();
     if (flag(args.message, true)) say(this, [o.status === "refused" ? tr.t("heal.refused") : tr.t("heal.done")]);
   });
@@ -1286,6 +1410,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   if (G.DataManager) {
     const baseSetupNewGame = G.DataManager.setupNewGame;
     G.DataManager.setupNewGame = function (this: any, ...a: any[]) {
+      fixtureSource();
       const r = baseSetupNewGame.apply(this, a);
       PSFlow.startNewGame();
       return r;
@@ -1792,13 +1917,13 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         for (const page of this._log.textPages(text)) {
           c.enqueue([createPausedMessageMZ(G, this, page.join('\n'),
             () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
-            () => s.finished, () => PSFlow.fast)]);
+            () => s.finished, () => fastBattle())]);
         }
       }
     }
     c.enqueue([this._display.initial()]);
     this.pushMessages(opening, true);
-    if(developmentCapabilities(PSFlow.developerCapabilities).allowExperimentalHeldItemBattle&&s.party.some((m:any)=>!!m.item))this._log.add(PSFlow.translator().t("management.experimental"));
+    if(developmentCapabilities(battleCapabilities()).allowExperimentalHeldItemBattle&&s.party.some((m:any)=>!!m.item))this._log.add(PSFlow.translator().t("management.experimental"));
     this.refreshStatus();
     });
   };
@@ -1883,10 +2008,10 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
               const text = PSFlow.translator().t('battle.wild_appeared', { name: PSFlow.speciesName(species) });
               steps.push(...visuals, ...this._log.textPages(text).map((page: string[]) => createPausedMessageMZ(G, this, page.join('\n'),
                 () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
-                () => this._session.finished, () => PSFlow.fast)));
+                () => this._session.finished, () => fastBattle())));
               continue;
             }
-            if (!PSFlow.fast && (event.type === 'switch' || event.type === 'drag')) {
+            if (!fastBattle() && (event.type === 'switch' || event.type === 'drag')) {
               // Recall an existing member first; the next send-out starts only after its own brief is full.
               steps.push(...visuals.slice(0, -1), ...this.briefMessages(lines), ...visuals.slice(-1));
               continue;
@@ -1916,7 +2041,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
                   request: (track, startedAt) => port.request(track, startedAt) });
                 this._captureMelody = op.captureMelody = stage;
                 const tail = steps[steps.length - 1];
-                if (!PSFlow.fast && lines.length && typeof tail === 'string' && tail === lines[lines.length - 1]) {
+                if (!fastBattle() && lines.length && typeof tail === 'string' && tail === lines[lines.length - 1]) {
                   // Full Gotcha text starts the capture block on the next update;
                   // keep it visible throughout ME instead of waiting/clearing it first.
                   steps.pop();
@@ -1945,7 +2070,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
           steps.push(...this._D.message(message).flatMap((line: string) => this._log.textPages(line).map((page: string[]) =>
             createPausedMessageMZ(G, this, page.join('\n'),
               () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
-              () => this._session.finished, () => PSFlow.fast))));
+              () => this._session.finished, () => fastBattle()))));
         } else steps.push(...this._D.message(message));
       }
       if (c.isCurrent()) this.enqueueMessages(steps);
@@ -1953,16 +2078,16 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   };
   P.briefMessages = function (lines: string[]): BattleScenePresentation[] {
     const c = sceneController(this);
-    return PSFlow.fast ? lines : lines.flatMap(line => this._log.textPages(line).map((page: string[]) =>
+    return fastBattle() ? lines : lines.flatMap(line => this._log.textPages(line).map((page: string[]) =>
       createBriefMessageMZ(G, this, page.join('\n'),
-        () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => PSFlow.fast)));
+        () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => fastBattle())));
   };
   P.pausedMessages = function (lines: string[]): BattleScenePresentation[] {
     const c = sceneController(this);
-    return PSFlow.fast ? lines : lines.flatMap(line => this._log.textPages(line).map((page: string[]) =>
+    return fastBattle() ? lines : lines.flatMap(line => this._log.textPages(line).map((page: string[]) =>
       createPausedMessageMZ(G, this, page.join('\n'),
         () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
-        () => this._session.finished, () => PSFlow.fast)));
+        () => this._session.finished, () => fastBattle())));
   };
   P.clearBriefFor = function (step: Exclude<BattleScenePresentation, string>) {
     return { kind: 'visual', advance: (now: number) => {
@@ -1982,7 +2107,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     const c = sceneController(this);
     const queued: BattleScenePresentation[] = [];
     for (const raw of steps) {
-      const step = typeof raw === 'string' && !PSFlow.fast
+      const step = typeof raw === 'string' && !fastBattle()
         ? createOrdinaryMessageMZ(G, this, raw, () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this) : raw;
       if (typeof step === 'string' || isMessageStepMZ(step)) {
         if (this._briefTail) queued.push(this._briefTail.beforeNextMessage());
@@ -1997,7 +2122,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
   P.updateQueue = function () {
     const c = sceneController(this);
     if (!c.isCurrent() || !PSFlow.running) { retireBattleBag(this); retireBrief(this); this._ballFeedback?.cancel(); this._display?.dispose(); this._pictures?.dispose(); }
-    c.tick(G.Input.isTriggered('ok'), PSFlow.fast ? 0 : 24);
+    c.tick(G.Input.isTriggered('ok'), fastBattle() ? 0 : 24);
   };
   P.ballFeedbackState = function () { return this._ballFeedback?.snapshot() ?? null; };
   P.afterMessages = function () {
@@ -2041,7 +2166,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         this._replacementQuestion = { session: s, offerId: offer.offerId, selecting: false, lines: [...this._log._lines], view: offer };
         this.enqueueMessages([createBriefMessageMZ(G, this, tr.t('ui.replacement.question', {
           trainer: this._psOp?.trainerPresentation?.name ?? tr.t('ui.who.foe'), species: PSFlow.speciesName(offer.opponentSpecies),
-        }), () => sceneController(this).isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => PSFlow.fast)]);
+        }), () => sceneController(this).isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => fastBattle())]);
         return;
       }
       if (this._replacementQuestion.selecting) this.showParty('replacement', retryParty?.memberId ?? null);
@@ -2061,7 +2186,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
         if (this._wildFaintQuestion?.session !== s || this._wildFaintQuestion?.request !== request) {
           this._wildFaintQuestion = { session: s, request, answered: false, lines: [...this._log._lines] };
           this.enqueueMessages([createBriefMessageMZ(G, this, PSFlow.translator().t('ui.wild.use_next'),
-            () => sceneController(this).isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => PSFlow.fast)]);
+            () => sceneController(this).isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => fastBattle())]);
           return;
         }
         if (!this._wildFaintQuestion.answered) {
@@ -2154,7 +2279,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     }
     if (owner.menu !== this._menu?._items) { owner.menu = this._menu?._items; owner.menuRevision++; }
     return { ...input, ...context, current: true, sceneKind: 'battle', ownerToken: owner.token,
-      menuToken: `${owner.token}/${owner.menuRevision}`, fast: PSFlow.fast, effects: op.battleEffects === true,
+      menuToken: `${owner.token}/${owner.menuRevision}`, fast: fastBattle(), effects: op.battleEffects === true,
       partySub: this._partySub ?? null, selectedMemberId: this._partySelected ?? null };
   };
   P.presentationState = function () {
@@ -2195,10 +2320,10 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       if (!c.isCurrent()) return;
       this._automaticMove = { session: s, request: JSON.stringify(req) };
       const text = tr.t('ui.moves.none-left', { name: this._names[id] ?? id });
-      c.enqueue(PSFlow.fast ? [text] : this._log.textPages(text).map((page: string[]) =>
+      c.enqueue(fastBattle() ? [text] : this._log.textPages(text).map((page: string[]) =>
         createPausedMessageMZ(G, this, page.join('\n'),
           () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this,
-          () => s.finished, () => PSFlow.fast)));
+          () => s.finished, () => fastBattle())));
       return;
     }
     const encore = session.gw?.query?.('p1', 'automatic-encore');
@@ -2269,7 +2394,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     const c = sceneController(this), view = this._battleBag?.view();
     if (!c.isCurrent() || !view || view.kind === 'submitting' || this._bagFadeReturn) return;
     const layer = view.kind === 'closed' ? 'battle' : view.kind === 'items' || view.kind === 'commands' ? 'bag' : 'target';
-    if (!PSFlow.fast && layer !== this._bagLayer) {
+    if (!fastBattle() && layer !== this._bagLayer) {
       this._bagFadeReturn = true;
       const current = () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this;
       this._bagFade = createBagFadeMZ(G, this, current, () => this._pictureUpdate, () => {
@@ -2507,7 +2632,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     const name = m.nickname || PSFlow.speciesName(m.species);
     this._learningInitial = { pending, accepted: false, lines: [...this._log._lines], declined: tr.t('ui.learn.not_learned', { name, move: pending.move.name }) };
     this.enqueueMessages([createBriefMessageMZ(G, this, tr.t('ui.learn.should_forget', { name, move: pending.move.name }),
-      () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => PSFlow.fast)]);
+      () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => fastBattle())]);
   };
   P.answerLearningInitial = function (accept: boolean) {
     const c = sceneController(this), question = this._learningInitial, session = this._session;
@@ -2567,7 +2692,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
     this._learningGiveUp = { pending, cursor: this._menu.index(), lines: [...this._log._lines],
       declined: tr.t('ui.learn.not_learned', { name: m.nickname || PSFlow.speciesName(m.species), move: pending.move.name }) };
     this.enqueueMessages([createBriefMessageMZ(G, this, tr.t('ui.learn.give_up', { move: pending.move.name }),
-      () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => PSFlow.fast)]);
+      () => c.isCurrent() && PSFlow.running && G.SceneManager._scene === this, () => fastBattle())]);
   };
   P.answerLearningGiveUp = function (giveUp: boolean) {
     const c = sceneController(this), question = this._learningGiveUp, session = this._session;
@@ -2665,7 +2790,7 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       case "moves": {
         if (typeof ext !== 'number') { this._menu.activate(); return; }
         const move = activeSession(this).currentRequest()?.active?.[0]?.moves?.[Number(ext) - 1];
-        this.act(() => { if (PSFlow.debug.failNext === "move") { PSFlow.debug.failNext = null; throw new Error("injected failure"); } return activeSession(this).chooseMove(ext); }, "move", { pp: move?.pp });
+        this.act(() => { if (canTest() && PSFlow.debug.failNext === "move") { PSFlow.debug.failNext = null; throw new Error("injected failure"); } return activeSession(this).chooseMove(ext); }, "move", { pp: move?.pp });
         return;
       }
       case "bag":
@@ -2828,4 +2953,5 @@ const { developmentCapabilities, runtimeCapabilities } = RuleConfig;
       this._commandWindow.setHandler("psParty", () => G.SceneManager.push(W.Scene_PSParty));
     };
   }
+  bindIsolatedTestBattleFlow(G, PSFlow, testScope);
 })();

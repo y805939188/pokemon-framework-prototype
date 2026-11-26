@@ -32,7 +32,7 @@ function setup(){
  vm.createContext(G);
  for(const m of ['Scene_Base.prototype.requestAutosave =','Scene_Base.prototype.isAutosaveEnabled =','Scene_Base.prototype.executeAutosave =','Scene_Base.prototype.onAutosaveSuccess =','Scene_Base.prototype.onAutosaveFailure =','Scene_Map.prototype.start =','Scene_Map.prototype.onTransferEnd =','Scene_Map.prototype.shouldAutosave ='])vm.runInContext(method(m),G);
  const original=Base.prototype.requestAutosave;Base.prototype.requestAutosave=function(...args){requests++;return original.apply(this,args);};
- const p=host.installPrebattleHost(G,flow,()=>{}),plan={version:'default-prebattle-v1',flashMs:1,mainMs:1,afterMs:1,returnMs:400};
+ const p=host.installPrebattleHost(G,flow,()=>false,()=>{}),plan={version:'default-prebattle-v1',flashMs:1,mainMs:1,afterMs:1,returnMs:400};
  function at(t,scene=G.SceneManager._scene){now=t;G.Graphics.frameCount++;scene.update();}
  function returnMap({transfer=true,first=false}={}){
   const source=G.SceneManager._scene;p.open(op,plan);at(1);at(2);at(3);assert.equal(p.snapshot().phase,'battle');source.terminate();

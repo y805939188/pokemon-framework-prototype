@@ -40,7 +40,8 @@ function navigationHost(options={}){
   const oldUpdate=G.Scene_Base.prototype.update;G.Scene_Base.prototype.update=function(){oldUpdate.call(this);if(this._fadeDuration>0)this._fadeDuration--;};
   G.SceneManager.updateScene=function(){this._scene?.update?.();};
   // The earlier BattleFlow registrar is exercised verbatim; its battle engine is outside this navigation fixture.
-  const battle=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'),'utf8'),a=battle.indexOf('    const baseOriginal = G.Window_MenuCommand'),b=battle.indexOf('\n  }\n})();',a);
+  const battle=fs.readFileSync(path.join(ROOT,'src/plugins/PS_BattleFlow.ts'),'utf8'),a=battle.indexOf('    const baseOriginal = G.Window_MenuCommand'),b=battle.indexOf('\n  }\n  bindIsolatedTestBattleFlow(',a);
+  assert(a>=0&&b>a,'current BattleFlow navigation registrar boundary');
   const registrar=battle.slice(a,b).replace(/function \(this: any\)/g,'function ()');
   vm.runInContext('const PSFlow=window.PSFlow; const W=window; const G=globalThis;'+registrar,G);
   // Production Map entry/cancel guards and invocation, with rendering/movement clocks controlled.

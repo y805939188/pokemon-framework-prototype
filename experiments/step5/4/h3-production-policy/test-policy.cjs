@@ -29,6 +29,8 @@ test('all production admission consumers use the same resolver; experimental lab
   const s=fs.readFileSync(path.join(root,name),'utf8');assert(s.includes('runtimeCapabilities('),name);if(!name.endsWith('game-application.ts'))assert(!s.includes('developmentCapabilities('),name);
  }
  const plugin=fs.readFileSync(path.join(root,'src/plugins/PS_BattleFlow.ts'),'utf8');
- assert.match(plugin,/assertBattleAllowed\(\).*runtimeCapabilities\(PSFlow.developerCapabilities\)/);
- assert.match(plugin,/developmentCapabilities\(PSFlow.developerCapabilities\).*management.experimental/);
+ // The public runtime and the developer-only label must both traverse the same fail-closed mode gate.
+ assert.match(plugin,/const battleCapabilities = \(\): object => canTest\(\) \? PSFlow\.developerCapabilities : \{\};/);
+ assert.match(plugin,/assertBattleAllowed\(\).*runtimeCapabilities\(battleCapabilities\(\)\)/);
+ assert.match(plugin,/developmentCapabilities\(battleCapabilities\(\)\).*management.experimental/);
 });

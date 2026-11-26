@@ -48,7 +48,8 @@ function world(opt = {}) {
   // Choose the supported optional-host composition at the real constructor call,
   // before GameApplication wraps/sanitizes its public state port. No prior App or authority is borrowed.
   const fixtureEngine=opt.legacyDefeatCompat?{...E,app:{...E.app,GameApplication:class extends E.app.GameApplication {constructor(ports,options){super({...ports,blackout:undefined,blackoutProjection:undefined},options);}}}}:E;
-  const req = name => { if (['fs', 'path', 'url', 'node:util'].includes(name)) return require(name); if (name.includes('production.cjs')) return fixtureEngine; throw Error('unexpected require ' + name); };
+  // The ordinary game obtains world entropy from Node, not from a debug seed.
+  const req = name => { if (['fs', 'path', 'url', 'node:util', 'node:crypto'].includes(name)) return require(name); if (name.includes('production.cjs')) return fixtureEngine; throw Error('unexpected require ' + name); };
   req.resolve = () => path.join(root, 'js/engine/build/production.cjs');
   const settings = opt.settings ?? {};
   const manager = { _scene: null, pushed: [], isSceneChanging: () => false,

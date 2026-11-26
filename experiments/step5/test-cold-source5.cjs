@@ -16,6 +16,14 @@ const dataModules = () => Object.keys(require.cache).filter(k => k.includes('/sh
 function readPlugins(dir) {
   return Object.fromEntries(['PS_SaveState','PS_BattleFlow'].map(n => [n, fs.readFileSync(path.join(dir, process.env.PF_COLD_SOURCE_ROOT ? n+'.js' : n+'/'+n+'.js'), 'utf8')]));
 }
+function finishOrdinaryGrant(h,first,before){
+  const current=h.flow.app().pendingReceiving;
+  assert.equal(first.status,'pending');assert(current&&current.token===first.token);
+  assert.equal(current.members.length,1);assert.deepEqual(JSON.parse(JSON.stringify(current.profile)),{mode:0,naming:0});
+  assert.equal(JSON.stringify(h.sys._psGame),before,'await the actual owner before installing the starter');
+  const result=h.flow.resolveReceiving(current.token,Object.fromEntries(current.members.map(m=>[m.id,{nickname:{kind:'keep'}}])));
+  assert.equal(result.status,'applied',JSON.stringify(result));return result;
+}
 function host(game) {
   const Ctor = () => { function C() {} C.prototype = { initialize() {}, terminate() {} }; return C; };
   const errors = [], warnings = [], writes = [];
@@ -23,7 +31,7 @@ function host(game) {
   Game_System.prototype.isSaveEnabled = function () { return this._saveEnabled !== false; };
   const sys = Object.assign(new Game_System(), { _psGame: game, _psBattleSeq: 0 });
   const req = p => {
-    if(p==='fs') return {...fs,readFileSync(f,...args){if(String(f).endsWith('/data/framework/content.json')) return JSON.stringify(compiled);return fs.readFileSync(f,...args);}}; if(p==='path') return path; if(p==='node:util') return require(p);
+    if(p==='fs') return {...fs,readFileSync(f,...args){if(String(f).endsWith('/data/framework/content.json')) return JSON.stringify(compiled);return fs.readFileSync(f,...args);}}; if(p==='path') return path; if(p==='node:util'||p==='node:crypto') return require(p);
     if (/production\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/production.cjs'));
     if (/testing\.cjs$/.test(p)) return require(path.join(ROOT, 'js/engine/build/testing.cjs'));
     throw new Error('unexpected require ' + p);
@@ -80,10 +88,10 @@ async function child(mode, entry, pluginDir) {
   try {
     if (entry === 'content') result = h.flow.content();
     if (entry === 'app') result = h.flow.app();
-    if (entry === 'claim') result = h.flow.claim('starter');
+    if (entry === 'claim') { const before=JSON.stringify(h.sys._psGame);result=h.flow.claim('starter');if(mode==='valid')result=finishOrdinaryGrant(h,result,before); }
     if (entry === 'begin') {
-      if (mode === 'valid') assert.equal(h.flow.claim('starter').status, 'applied');
-      h.flow.openBattle({kind:'wild', foes:[{species:'pidgey',level:3}], seq:1, battleId:'cold#1'});
+      if (mode === 'valid') { const before=JSON.stringify(h.sys._psGame);finishOrdinaryGrant(h,h.flow.claim('starter'),before); }
+      h.flow.openBattle({kind:'wild', foes:[{species:'pidgey',level:1}], seq:1, battleId:'cold#1'});
       result = await h.flow.begin();
     }
   } catch (e) { error = String(e.message); }
@@ -91,7 +99,7 @@ async function child(mode, entry, pluginDir) {
   if (mode === 'valid') {
     assert.equal(error, undefined); assert.ok(result); assert.ok(count > 0);
     if (entry === 'claim') assert.equal(result.status, 'applied');
-    if (entry === 'begin') { await result.run(); assert.equal(h.flow.finish(result).commit, 'applied'); }
+    if (entry === 'begin') { assert.equal((await result.run()).ok,true);assert.equal(result.finished,true);assert.equal(result.ended?.reason,'run');assert.equal(h.flow.finish(result).commit, 'applied'); }
   } else {
     assert.equal(count, 0, `${mode}/${entry} must reject before data loads`);
     if (entry === 'content' || entry === 'begin') assert.ok(error, 'formal content/battle consumption refuses');

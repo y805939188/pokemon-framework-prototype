@@ -5,7 +5,7 @@ const selected=process.env.PF_PRESENTATION_CASE,output=process.env.PF_PRESENTATI
 function choose(name,body){known.push(name);if(selected===name)test(name,body);}
 async function make(move='dig',lang='zh',generic=false){
  const dir=path.join(output,'fixture-'+(++sequence));fs.mkdirSync(dir);process.env.PF_E2_FRONT_ROOT=dir;
- const h=await fixture('cut',{edit(g,c){c.moves[move]={id:move,name:generic?move:move==='dig'?'Dig':'Teleport',pp:20};g.party[0].moves=[{id:move,pp:20,maxpp:20,ppUps:0}];if(move==='teleport')c.mapMetadata.maps[5].outdoor=true;}});
+ const h=await fixture('cut',{presentationMove:move});if(generic)require('../e2-current-frontends/fixture.cjs').displayNamePort(h,move,move);
  h.G.PSFlow.setLanguage(lang);h.G.$dataMapInfos[move==='dig'?7:6].name=generic?'':'Author target';h.clearable=new Set([h.G.$gameMessage]);h.reserveCalls=[];
  const reserve=h.player.reserveTransfer;h.player.reserveTransfer=function(...args){h.reserveCalls.push(structuredClone(args));return Reflect.apply(reserve,this,args);};return h;
 }

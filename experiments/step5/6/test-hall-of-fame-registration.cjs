@@ -122,14 +122,13 @@ test('zero-limit author command keeps an eligible PC entry with a safe empty vie
   assert.equal(h.x.state.replaced.length, 1);
 });
 
-test('an invalid author limit is diagnosed without any state or storage write', () => {
+test('an invalid author limit safely refuses despite raw test, without any state or storage write', () => {
   for (const historyLimit of ['1e2', '1.5', '9007199254740992']) {
     const h = setup(), logs = [], before = h.x.state.current();
     h.G.Utils.isOptionValid = key => key === 'test';
     h.G.console = {error:(...args) => logs.push(args)};
     assert.throws(() => h.enter([register({historyLimit}), {...end}]), /RegisterHallOfFame.*WP07-EVENT/);
-    assert.equal(logs[0][1].field, 'historyLimit');
-    assert.equal(logs[0][1].eventId, 11);
+    assert.deepEqual(logs, [], 'raw test flag is not authenticated author diagnostics');
     assert.equal(h.x.state.current(), before);
     assert.equal(h.x.state.replaced.length, 0);
     assert.deepEqual(h.writes, []);

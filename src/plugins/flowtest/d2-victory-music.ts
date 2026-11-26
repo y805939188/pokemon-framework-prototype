@@ -172,7 +172,9 @@ export async function runD2VictoryMusic(p: any): Promise<void> {
     assert(Math.abs(v.volume - volume) < 0.005 && Math.abs(v.pitch - pitch) < 0.005 && v.sources.every((n: any) => Math.abs(n.rate - pitch) < 0.005), 'actual distinct victory option and preset parameters');
     eq(flow.musicState().player.memo, h.memo, 'victory does not replace world memo'); assert(flow.running && h.app.saveBlocked, 'end confirmation still owns locked root'); h.buffer = audio._bgmBuffer;
   };
-  const closed = async (h: any) => { await wait(() => mapReady() && !flow.running && !h.app.saveBlocked && !W.PSEvolution.current(), 'real root and formal Scene closed'); activeRoot = null; hold = null; };
+  const closed = async (h: any) => { await wait(() => mapReady() && !flow.running && !h.app.saveBlocked && !W.PSEvolution.current() && !flow.operationPending(), 'real root, formal Scene and native return presentation closed');
+    assert(flow.prebattleState()?.phase !== 'return' && flow.prebattleState()?.phase !== 'return-pending', 'next opener waits for actual return admission');
+    mark('postbattle-ordinary-admission', { phase: flow.prebattleState()?.phase ?? null, frame: G.Graphics.frameCount }); activeRoot = null; hold = null; };
   const returnWorld = async (h: any) => {
     await wait(() => audio._currentBgm?.name === named('world') && !!audio._bgmBuffer, 'world actually registered'); const value = await active(audio._bgmBuffer, named('world'));
     const measured = native(value.row), b = value.row.buffer;

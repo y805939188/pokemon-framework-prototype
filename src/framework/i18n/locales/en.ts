@@ -419,7 +419,7 @@ export const en: LocaleTable = {
     "ui.partyview.boxes": "Boxes: {count} Pokémon (cannot be taken out in this version)",
     "ui.partyview.money": "Money: {money}",
     "ui.partyview.unusable": "The save data cannot be used: {error}",
-    "trainer.missing": "Trainer data is missing: {id} (version {version}).",
+    "trainer.missing": "Trainer data is missing. [PF-TRAINER-MISSING]",
     "trainer.reward": "Received {money} money as the trainer prize.",
     "trainer.rewardNormalized": "Your old balance was above the cap and was normalized downward by {money}; this is not a negative prize.",
     // ---- content names (text keys come from content: species.nameKey)

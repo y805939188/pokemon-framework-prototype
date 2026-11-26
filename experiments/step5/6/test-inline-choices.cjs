@@ -1,9 +1,10 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const {choicesHost,ROOT}=require('./choices-host.cjs');
+const {diagnosticStage}=require('./author-diagnostic-stage.cjs');
 const end={code:0,indent:0,parameters:[]};
-function fixture(lang='zh',width=816,height=624,touch=false){
- const h=choicesHost(lang,width,height,touch),writes=[],set=h.G.$gameVariables.setValue;
+function fixture(lang='zh',width=816,height=624,touch=false,configure=null){
+ const h=choicesHost(lang,width,height,touch,configure),writes=[],set=h.G.$gameVariables.setValue;
  h.G.$gameVariables.setValue=function(id,value){if(id>0&&id<h.G.$dataSystem.variables.length)writes.push({id,value});return set.call(this,id,value);};
  const message=(zh,en=zh)=>({code:357,indent:0,parameters:['PS_Management','ShowMessage','Message',{textZh:zh,textEn:en,position:'2'}]});
  const untilChoice=()=>h.until(()=>h.choice.active);
@@ -75,7 +76,7 @@ test('accepted language/list snapshot survives language changes during text disp
  const h=fixture();let lang='zh';h.G.PSFlow.translator=()=>({lang});h.enter([h.message('中文\\ch[13,2,甲,乙]','English\\ch[13,2,A,B]'),end]);lang='en';h.untilChoice();assert.deepEqual(Array.from(h.G.$gameMessage.choices()),['甲','乙']);assert(h.text().includes('中文'));h.tick(0,'ok');
 });
 test('inline syntax diagnostics identify the author field without exposing the text or stack',()=>{
- const h=fixture(),logs=[];h.G.Utils.isOptionValid=key=>key==='test';h.G.console={error:(...a)=>logs.push(a)};const command=h.message('secret-token\\ch[13,0,"bad]');let error;try{h.enter([command,end]);}catch(e){error=e;}assert(error);assert.match(error.message,/WP07-EVENT/);assert.equal(logs.length,1);assert.equal(logs[0][1].field,'textZh.ch');assert.equal(logs[0][1].mapId,5);assert.equal(logs[0][1].eventId,11);assert(!/secret-token|\/Users\//.test(JSON.stringify(logs)+error.stack));assert.deepEqual(h.resultWrites,[]);
+ const h=fixture('zh',816,624,false,G=>diagnosticStage(G)),logs=[];h.G.console={error:(...a)=>logs.push(a)};const command=h.message('secret-token\\ch[13,0,"bad]');let error;try{h.enter([command,end]);}catch(e){error=e;}assert(error);assert.match(error.message,/WP07-EVENT/);assert.equal(logs.length,1);assert.equal(logs[0][1].field,'textZh.ch');assert.equal(logs[0][1].mapId,5);assert.equal(logs[0][1].eventId,11);assert(!/secret-token|\/Users\//.test(JSON.stringify(logs)+error.stack));assert.deepEqual(h.resultWrites,[]);
 });
 for(const lang of ['zh','en'])for(const [width,height] of [[512,384],[640,480],[816,624]])test(lang+' '+width+'x'+height+' complete current-language event with native condition and balloon',()=>{
  const h=fixture(lang,width,height,true);let branch=0;h.G.Game_Interpreter.prototype.command998=()=>{branch++;return true;};

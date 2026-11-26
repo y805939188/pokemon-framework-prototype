@@ -17,7 +17,7 @@ test.before(async()=>{
  driverText=fs.readFileSync(path.join(temp,'driver/entry.cjs'),'utf8');mod=require(path.join(temp,'driver/entry.cjs'));
 });
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
-function host(options={}){return createVictoryDriverHost({ROOT,work:temp,plugins,driverText,entryText,PLAN:mod.victoryMusicNativePlan,options});}
+function host(options={}){return createVictoryDriverHost({ROOT,work:temp,plugins,driverText,entryText,PLAN:mod.victoryMusicNativePlan,options:{...options,returnMapCounter:true,ordinaryAwardInput:true}});}
 test('compiled entry retains formal evolution presenter only for the explicitly added native mode',()=>{
  const stop=Symbol('prefix'),evo={automatic:true},M={};Object.defineProperty(M,'isGameActive',{set(){throw stop;}});
  const G={window:{PSEvolution:evo},nw:{App:{argv:['--ps-flow-test=d2-victory-music','--ps-sound']}},SceneManager:M};

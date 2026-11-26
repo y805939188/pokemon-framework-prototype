@@ -18,11 +18,11 @@ test.before(() => {
 test.after(() => { if (dir) fs.rmSync(dir, { recursive: true, force: true }); });
 
 function host(failure, failVariable = false) {
-  const vars = { 10: 1 }, game = { schema: 2, previousBattle: 'kept' };
+  const attempts = [];const vars = { 10: 1 }, game = { schema: 2, previousBattle: 'kept' };
   const Ctor = () => { function C() {} C.prototype = { initialize() {}, terminate() {} }; return C; };
-  const fakeEngine = { log: { createRingLogger: () => ({ sink() {} }) }, dex: { createDexLookup() { throw new Error('dex unavailable'); } } };
+  const fakeEngine = { log: { createRingLogger: () => ({ sink() {} }) }, dex: { createDexLookup() { attempts.push('dex'); throw new Error('dex unavailable'); } } };
   const req = p => {
-    if (/production\.cjs$/.test(p)) { if (failure === 'engine') throw new Error('engine unavailable'); return fakeEngine; }
+    if (/production\.cjs$/.test(p)) { attempts.push('engine'); if (failure === 'engine') throw new Error('engine unavailable'); return fakeEngine; }
     if (p === 'path' || p === 'fs' || p === 'node:util') return require(p);
     throw new Error('unexpected require ' + p);
   };
@@ -36,18 +36,20 @@ function host(failure, failVariable = false) {
   const flow = ctx.PSFlow;
   // a battle opened the way the plugin opens one (since step 5.0 the open battle has its operation identity)
   flow.openBattle({ battleId: 'b#2', kind: 'wild', foes: [{ species: 'Pidgey', level: 5 }], seq: 2, resultVariable: 10 });
-  return { ctx, flow, vars, game };
+  return { ctx, flow, vars, game, attempts };
 }
 
 for (const failure of ['engine', 'dex']) test(`${failure} initialization fails: abort clears a stale win and releases the interpreter`, async () => {
-  const { ctx, flow, vars, game } = host(failure);
+  const { ctx, flow, vars, game, attempts } = host(failure);
+  const expected = failure === 'engine' ? '游戏运行组件无法载入，请修复或重新安装。 / Game components could not be loaded. Repair or reinstall the game. [PF-ENGINE-LOAD]' : 'dex unavailable';
   let error;
-  await assert.rejects(flow.begin(), e => { error = e; return e.message === `${failure} unavailable`; });
+  await assert.rejects(flow.begin(), e => { error = e; return e.message === expected; });
+  assert.deepEqual(attempts, failure === 'engine' ? ['engine'] : ['engine','dex']);
   flow.abort(error);
   assert.equal(vars[10], 0);
   assert.equal(flow.running, false); assert.equal(ctx.$gameSystem._psGame, game);
   const o = flow.lastOutcome;
-  assert.deepEqual([o.battleId, o.code, o.commit, o.aborted, o.projection, o.error, o.projectionError], ['b#2', 0, 'none', true, 'ok', `${failure} unavailable`, undefined]);
+  assert.deepEqual([o.battleId, o.code, o.commit, o.aborted, o.projection, o.error, o.projectionError], ['b#2', 0, 'none', true, 'ok', expected, undefined]);
   const itp = new ctx.Game_Interpreter(); itp._waitMode = 'psBattle';
   assert.equal(itp.updateWaitMode(), false); assert.equal(itp._waitMode, '');
 });

@@ -14,7 +14,7 @@ async function host(source){
  const seed=fixture(source),work=fs.mkdtempSync(path.join(os.tmpdir(),'pf-h3-compiled-host-'));
  const PLAN={...basePlan,productCommit:currentCommit,productPlugins:Object.fromEntries(Object.keys(plugins).map(n=>[n,currentFiles['js/plugins/'+n+'.js']]))};
  const h=createVictoryDriverHost({ROOT:runtime,work,plugins,entryText,driverText:'H3_SYNTHETIC_CONTROL_NOT_NATIVE',PLAN,options:{productionTranslator:true}});
- const flow=h.w.flow,G=h.G;flow.stateReplaced();flow._app=null;flow._content=seed.content;flow._dex=seed.dex;flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=true;flow.receiveOptions={mode:1,naming:1};flow.developerCapabilities={};
+ const flow=h.w.flow,G=h.G;flow.stateReplaced();flow._app=null;flow._content=seed.content;flow._dex=seed.dex;assert.equal(flow.rng,null);assert.equal(flow.fast,false);flow.developerCapabilities={};
  let current=clone(seed.state.read());const replaced=[];
  G.$gameSystem._psGame=current;
  const audit=require('../../../../scripts/tests/state-install-audit.cjs'),installed=next=>{current=next;replaced.push(clone(next));};audit.observe(G,installed);

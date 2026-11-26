@@ -2,7 +2,7 @@
   "schema": "battle-defeat-f-regular-inputs-v1",
   "suite": "scripts/tests/battle-defeat-f.test.cjs",
   "nodeVersion": "v22.21.1",
-  "sourceMode": "fixture (explicit legacy-no-held real Session/Showdown, not compiled held content)",
+  "sourceMode": "explicit isolated fixture build (legacy-no-held real Session/Showdown, not ordinary compiled content)",
   "referenceCaseSource": "18f84361230b5b3b18e5bd571fffffec3e32e7ad",
   "runtimeEntry": "js/engine/build/production.cjs",
   "dataOnlySourceEntry": "src/framework/tools/fixtures/content.ts",
@@ -22,6 +22,7 @@
   "controlledInputs": [
     "scripts/tests/battle-defeat-f.test.cjs",
     "scripts/tests/battle-defeat-f-runtime.cjs",
+    "scripts/tests/battle-defeat-f-isolated.cjs",
     "scripts/tests/battle-defeat-f-native.cjs",
     "scripts/tests/battle-defeat-f-fixture.cjs",
     "scripts/tests/battle-defeat-f-inputs.json",
@@ -54,7 +55,7 @@
     "B01",
     "B02"
   ],
-  "scope": "HEADLESS_REAL_BUSINESS_WITH_NATIVE_FACADES_NOT_DISK_OR_NW",
+  "scope": "HEADLESS_ISOLATED_FIXTURE_WITH_NATIVE_FACADES_NOT_ORDINARY_DISK_OR_NW",
   "RNG": {
     "worldFromBattleStart": [
       65536,

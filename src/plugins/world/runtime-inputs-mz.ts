@@ -35,7 +35,7 @@ function observed<T>(read: () => T): WorldFact<T> {
   catch (error) { return { status: 'unavailable', reason: String(error) }; }
 }
 function boolean(value: unknown, name: string): boolean { if (typeof value !== 'boolean') throw Error(`${name}-unavailable`); return value; }
-export function createRuntimeInputsMZ(root: Record<string, unknown>, meanings: MZTerrainMeanings, frameworkMode: () => boolean) {
+export function createRuntimeInputsMZ(root: Record<string, unknown>, meanings: MZTerrainMeanings, frameworkMode: () => boolean, allowTestDebug = () => false) {
   const terrain = (tag: number): Readonly<MZTerrainMeaning> => {
     const value = meanings.get(tag); if (!value) throw Error(`world-terrain-unconfigured:${tag}`); return value;
   };
@@ -47,7 +47,7 @@ export function createRuntimeInputsMZ(root: Record<string, unknown>, meanings: M
     return {
       landAllowed: meaning.status === 'value' ? { status: 'value', value: meaning.value.landAllowed } : meaning,
       encountersDisabled: observed(() => !boolean(invoke(root.$gameSystem, 'isEncounterEnabled'), 'encounter-switch')),
-      debugControl: observed(() => boolean(invoke(root.$gameTemp, 'isPlaytest'), 'debug-playtest') && boolean(invoke(root.Input, 'isPressed', ['control']), 'debug-control')),
+      debugControl: observed(() => allowTestDebug() && boolean(invoke(root.$gameTemp, 'isPlaytest'), 'debug-playtest') && boolean(invoke(root.Input, 'isPressed', ['control']), 'debug-control')),
       groundEnvironment: meaning.status === 'value' ? { status: 'value', value: meaning.value.environment } : meaning,
     };
   };

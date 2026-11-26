@@ -99,7 +99,10 @@ async function finishRun(h) {
 function report(name, h, data) { console.log('OPENING_STATE ' + JSON.stringify({name, ...data, installs: h.installs, execution: 'COMPILED_SCENE_CONTROLLED_NODE_VM', NW: 0})); }
 for (const lang of ['en', 'zh']) test(lang + ' default sample damage, escape, second Scene preserves actual 15/18 HP and PP', async () => {
   const h = await world({lang}); try {
-    await h.start(); opening(h); await move(h); const damaged = live(h).p1[0]; assert.equal(damaged.hp, 15); assert.equal(damaged.maxhp, 18); cardMatches(h);
+    await h.start(); opening(h);const before=live(h).p1[0],begin=h.batches.length;await move(h);const damaged=live(h).p1[0];
+    const hits=h.batches.slice(begin).flatMap(batch=>events(batch.messages)).filter(e=>e.type==='-damage'&&e.args[0]==='p1a: '+damaged.id);
+    assert.equal(hits.length,1);assert.equal(before.id,damaged.id);assert.equal(before.hp,18);assert.equal(damaged.maxhp,18);
+    assert(damaged.hp>0&&damaged.hp<before.hp);assert.equal(hits[0].args[1],damaged.hp+'/'+damaged.maxhp,'carried injury exactly matches the ordinary simulator wire, not a fixed random damage roll');cardMatches(h);
     const saved = await finishRun(h); assert.equal(saved.party[0].hp, damaged.hp);
     await h.start(); const wire = opening(h); assert.equal(h.initial.p1[0].hp, damaged.hp); assert.deepEqual(h.initial.p1[0].pp, damaged.pp);
     assert.equal(h.installs, 1); const final = await finishRun(h); assert.equal(final.party[0].hp, damaged.hp);

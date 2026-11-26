@@ -16,6 +16,7 @@ import { shortcutRegistrationCommand, shortcutRegistrationIcon } from '../framew
 import { worldPlugin } from './world/world-host';
 import type { WorldPlugin } from './world/world-host';
 import { fishingMessage, ordinaryFishingRefusal } from './world/fishing-messages';
+import { ownErrorMessage } from './navigation/runtime-error';
 const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
 (() => {
  const G:any=globalThis,W:any=window,NAME='PS_Inventory',clone=structuredClone;
@@ -376,8 +377,26 @@ const {importantItem,showsQuantity,catalogOf,holdableItem,hasFlag}=Catalog;
  const bool=(value:any):boolean=>{if(value!==true&&value!==false&&value!=='true'&&value!=='false')throw Error('invalid-boolean');return value===true||value==='true';};
  const variable=(id:any)=>{if(id===undefined||id==='')return undefined;const n=integer(id);if(n<1||n>=G.$dataSystem.variables.length)throw Error('invalid-variable');return n;};
  const waitFor=(interpreter:any,h:Handle|null)=>{if(!h)throw Error('inventory-operation-active');waits.set(interpreter,h);interpreter.setWaitMode('psInventory');};
- const register=(command:string,run:(self:any,args:any)=>void)=>G.PluginManager.registerCommand(NAME,command,function(this:any,args:any){try{run(this,args);}catch(error){this._psInventoryOutcome={status:'refused',reason:String(error)};G.$gameMessage.add(tr('refused',{reason:detail(error)}));}});
- const instant=(self:any,request:any)=>{const token=app().beginInventoryOperation();try{self._psInventoryOutcome=app().inventoryRequest(token,'command',request);if(self._psInventoryOutcome.status==='refused')G.$gameMessage.add(tr('refused',{reason:detail(self._psInventoryOutcome)}));}finally{app().endInventoryOperation(token);}};
+ const badgeReason=(value:unknown):string=>{
+  switch(value){
+   case 'invalid-badge-index':return 'invalid-badge-index';
+   case 'invalid-badge-value':return 'invalid-badge-value';
+   case 'invalid-integer':return 'invalid-integer';
+   case 'invalid-boolean':return 'invalid-boolean';
+   case 'invalid-variable':return 'invalid-variable';
+   default:return '[PF-BADGE-REFUSED]';
+  }
+ };
+ const register=(command:string,run:(self:any,args:any)=>void)=>G.PluginManager.registerCommand(NAME,command,function(this:any,args:any){
+  try{run(this,args);}
+  catch(error){
+   const badge=command==='QueryBadge'||command==='SetBadge';
+   const reason=badge?badgeReason(ownErrorMessage(error)):String(error);
+   this._psInventoryOutcome={status:'refused',reason};
+   G.$gameMessage.add(tr('refused',{reason:badge?reason:detail(error)}));
+  }
+ });
+ const instant=(self:any,request:any)=>{const token=app().beginInventoryOperation();try{self._psInventoryOutcome=app().inventoryRequest(token,'command',request);if(self._psInventoryOutcome.status==='refused')G.$gameMessage.add(tr('refused',{reason:request.kind==='set-badge'?badgeReason(self._psInventoryOutcome.reason):detail(self._psInventoryOutcome)}));}finally{app().endInventoryOperation(token);}};
  register('ShowBag',self=>waitFor(self,ui.showBag()));
  register('SelectItem',(self,a)=>{const ids=a.itemIds?JSON.parse(a.itemIds):undefined;if(ids!==undefined&&(!Array.isArray(ids)||ids.some(x=>typeof x!=='string')))throw Error('invalid-filter');waitFor(self,ui.selectItem(ids?(it:ItemDefinition)=>ids.includes(it.id):undefined,variable(a.variableId)));});
  register('OpenShop',(self,a)=>waitFor(self,ui.openShop(a.shopId?{shopId:a.shopId,...(a.allowSell?{allowSell:bool(a.allowSell)}:{})}:{stock:JSON.parse(a.stock),allowSell:a.allowSell?bool(a.allowSell):true},a.prices?JSON.parse(a.prices):undefined)));

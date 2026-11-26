@@ -33,7 +33,7 @@ const reason = (error: unknown): string => error instanceof Error ? error.messag
 const method = (value: unknown): value is (this: unknown, ...args: unknown[]) => unknown => typeof value === 'function';
 const natural = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 export function createWorldTravelMZ(root: Record<string, unknown>, current: () => Application | null, meanings: MZTerrainMeanings,
-  parameters: Record<string, unknown>, diagnose: (reason: string) => void, nativeIsProxy: (value: unknown) => boolean, initialPresentation: WorldTravelPresentation = {}, nodeRecordPrototype: object | null = null) {
+  parameters: Record<string, unknown>, diagnose: (reason: string) => void, nativeIsProxy: (value: unknown) => boolean, initialPresentation: WorldTravelPresentation = {}, nodeRecordPrototype: object | null = null, allowTestDebug = () => false) {
   const homes = parseMZHomeConfiguration(parameters, nativeIsProxy);
   if (!homes.blackout.characterHome && !homes.blackout.globalHome) {
     const manager = hostRecord(root.PluginManager);
@@ -442,9 +442,9 @@ export function createWorldTravelMZ(root: Record<string, unknown>, current: () =
     ...transfer,
     preload(owner, target) { if (!presentations.has(owner)) presentations.set(owner, presentation); return transfer.preload(owner, target); },
     facts() {
-      const player = root.$gamePlayer, bypass = invoke(player, 'isDebugThrough');
+      const bypass = allowTestDebug() && invoke(root.$gamePlayer, 'isDebugThrough');
       if (typeof bypass !== 'boolean') throw Error('travel-debug-through-invalid');
-      return { ...homes.travel, debug: parameters.TravelDebug === 'true', connectionBypass: bypass };
+      return { ...homes.travel, debug: allowTestDebug() && parameters.TravelDebug === 'true', connectionBypass: bypass };
     },
     confirm: (kind, target, owner) => text(check => travelText(root, kind, check, nativeIsProxy, target.mapId), owner, true),
     effect,
@@ -578,7 +578,7 @@ export function createWorldTravelMZ(root: Record<string, unknown>, current: () =
   };
   const blackoutPresentation = createBlackoutPresentationMZ({ root, application: () => blackoutApplication() ? current() : null,
     callbacks: { capture: captureBlackoutPresentation, message: blackoutMessage, cancelVehicles: owner => effect('cancel-vehicles', owner) },
-    debug: parameters.TravelDebug === 'true', startingOverSwitch: homes.startingOverSwitch, isProxy: nativeIsProxy, diagnostic: diagnose });
+    debug: allowTestDebug() && parameters.TravelDebug === 'true', startingOverSwitch: homes.startingOverSwitch, isProxy: nativeIsProxy, diagnostic: diagnose });
   const fieldBlackoutEntry = createFieldBlackoutEntryMZ({ root, application: () => blackoutApplication() ? current() : null,
     capture: owner => captureBlackoutPresentation(owner, 'announce'), message: blackoutMessage, nextFrame: nativeTick, isProxy: nativeIsProxy, copy: checkpointData });
   const blackoutHost: WorldBlackoutHost = Object.freeze<WorldBlackoutHost>({ configuration: () => homes.blackout, ...blackoutSourceHost, ...fieldBlackoutEntry,

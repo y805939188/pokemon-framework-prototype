@@ -6,7 +6,7 @@ const {createHash}=require('node:crypto'),{pathToFileURL}=require('node:url');
 const H=require('../headless-regression-binding.cjs');
 const inputs=require('./battle-defeat-f-inputs.json');
 const root=fs.realpathSync(path.resolve(__dirname,'../..'));
-let prepared,captured;
+let prepared,captured,isolated;
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 function pinnedNative(){
  const pin=JSON.parse(fs.readFileSync(path.join(root,'scripts/reactor-source-manifest.json'),'utf8'));
@@ -39,16 +39,20 @@ async function loadInputs(){
   // Do not require testing.cjs (its unrelated historical matrices are not inputs).
   require('./ts-source-loader.cjs');
   const T=await import(pathToFileURL(path.join(root,inputs.dataOnlySourceEntry)).href);
-  const B={out,E,inventory:fs.readFileSync(path.join(root,'js/plugins/PS_Inventory.js'),'utf8'),world:fs.readFileSync(path.join(root,'js/plugins/PS_World.js'),'utf8'),flow:fs.readFileSync(path.join(root,'js/plugins/PS_BattleFlow.js'),'utf8')};
-  const {fixture:joint,flush}=require('./battle-defeat-f-native.cjs').createNativeFixture({root,B});
   const parent=path.join(root,'build/headless-battle-defeat-f');fs.mkdirSync(parent,{recursive:true});
   const output=fs.mkdtempSync(path.join(parent,captured.binding.runId+'-'));
-  fs.writeFileSync(path.join(output,'INPUT-BINDING.json'),JSON.stringify({scope:inputs.scope,parentBindingSHA256:captured.sha256,identity:captured.identity,files,native,sourceEntriesCoveredByDistributionFingerprint:inputs.sourceEntriesCoveredByDistributionFingerprint,sourceMode:inputs.sourceMode,saveObservations:inputs.saveObservations},null,2)+'\n');
+  isolated=require('./battle-defeat-f-isolated.cjs').prepare(root,output);
+  const artifact=name=>fs.readFileSync(isolated.artifacts[name],'utf8');
+  const B={out,E,inventory:fs.readFileSync(path.join(root,'js/plugins/PS_Inventory.js'),'utf8'),
+    world:artifact('PS_World'),flow:artifact('PS_BattleFlow'),saveLocation:artifact('PS_SaveLocation')};
+  const {fixture:joint,flush}=require('./battle-defeat-f-native.cjs').createNativeFixture({root,B,isolated});
+  fs.writeFileSync(path.join(output,'INPUT-BINDING.json'),JSON.stringify({scope:inputs.scope,parentBindingSHA256:captured.sha256,identity:captured.identity,files,native,sourceEntriesCoveredByDistributionFingerprint:inputs.sourceEntriesCoveredByDistributionFingerprint,sourceMode:inputs.sourceMode,isolatedScope:isolated.scope,isolatedFiles:isolated.files,saveObservations:inputs.saveObservations},null,2)+'\n');
   return {E,T,root,stage,joint,flush,artifactRoot:path.join(output,'observed-P01.json')};
  })();
  return prepared;
 }
 function verifyInputs(){
  if(captured)H.capture(root,process.env.PF_HEADLESS_REGRESSION_BINDING,captured.sha256);
+ if(isolated)isolated.verify();
 }
 module.exports={loadInputs,verifyInputs};

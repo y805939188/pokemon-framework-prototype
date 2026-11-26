@@ -26,16 +26,40 @@ async function fixture(options={}){
   options.applicationPorts?.(actual);
   return new E.app.GameApplication(actual,settings);
  }}}:{}),composition:options.productionSessions?E.composition:{...E.composition,createBattleSessionFactory:()=>factory,createLegacyNoHeldBattleSessionFactory:()=>factory}};
- const req=name=>name==='./js/engine/build/production.cjs'?runtime:require(name);
- req.resolve=name=>name==='./js/engine/build/production.cjs'?path.join(B.out,'runtime/production.cjs'):require.resolve(name);G.require=req;
+ const author=options.ordinaryAuthorInput?.(),ordinaryC=options.ordinaryC;
+ if(ordinaryC)assert(!author&&!options.defaultProduction&&!fieldPorts&&typeof options.applicationPorts==='function',
+   'private C event host keeps only its original explicit App construction ports');
+ if(author)assert.strictEqual(runtime,E,'ordinary author mount requires the unchanged production runtime and factory');
+ const productionEntry='./js/engine/build/production.cjs';
+ const req=name=>{
+  if(name===productionEntry)return runtime;
+  if(ordinaryC&&name==='node:crypto')return ordinaryC.crypto;
+  if(author){
+   assert.notEqual(name,'./js/engine/build/testing.cjs','ordinary author mount cannot fall back to fixtures');
+   if(name==='fs'||name==='node:fs')return author.fs;
+   if(name==='node:crypto')return author.crypto;
+  }
+  return require(name);
+ };
+ req.resolve=name=>name===productionEntry
+  ?(author?path.join(author.root,productionEntry):path.join(B.out,'runtime/production.cjs')):require.resolve(name);
+ G.require=req;
  // The complete compiled IIFE owns constructor/issuer/ports. No extracted construction method or hand-issued test ticket.
  vm.runInContext(B.flow,G,{filename:'full-private-production:PS_BattleFlow.js'});
- const flow=G.PSFlow;flow._content=h.content;flow._dex=options.defaultProduction?E.dex.createDexLookup():{move:id=>h.content.moves[id]||null,species:()=>null,levelUpMoves:()=>null,sha:()=> 'fixture-only'};
+ const flow=G.PSFlow;
+ if(author){
+  assert.equal(flow._content,null);
+  assert.notEqual(G.PluginManager.parameters('PS_BattleFlow').contentSource,'fixture');
+  author.install(G,flow,h.draws);
+  author.confirm(flow.content(),G.$gameSystem._psGame);
+ }else flow._content=h.content;
+ flow._dex=options.defaultProduction?E.dex.createDexLookup():{move:id=>h.content.moves[id]||null,species:()=>null,levelUpMoves:()=>null,sha:()=> 'fixture-only'};
  h.flow=flow;
  const game=flow.game,content=flow.content;
  if(options.onRead)flow.game=function(){const value=game.call(this);options.onRead(h);return value;};
  if(options.onContent)flow.content=function(){const value=content.call(this);options.onContent(h);return value;};
- if(!options.defaultProduction){flow.fast=true;flow.rng=n=>{h.draws.push(n);return 0;};flow.clock=()=>0;}
+ if(ordinaryC)ordinaryC.installFlow(G,flow,h.draws);
+ if(!options.defaultProduction&&!ordinaryC){flow.fast=true;flow.rng=n=>{h.draws.push(n);return 0;};flow.clock=()=>0;}
  if(options.worldSource)await options.worldSource(G);else vm.runInContext(B.world,G,{filename:'full-private-production:PS_World.js'});
  const app=flow.app();h.app=app;h.sessions=sessions;h.handle=handle;h.retired=retired;
  return{...h,G,flow,app,sessions,retired,handle,flush,state:()=>G.$gameSystem._psGame};

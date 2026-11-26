@@ -74,12 +74,19 @@ test('actual installed AudioManager BGS stop/resume does not overwrite a later c
  assert.equal(adapter.capturePrebattleBGSMZ(G,()=>true),null);h.w.flow.stateReplaced();
 });
 async function ready({trainer=false,fast=false,intro=false,beforeProduct}={}){
- const h=world({beforeProduct}),G=h.G,flow=h.w.flow,content=fixture.musicNativeContent(E,assert);
+ const entropyFills=[];
+ const h=world({beforeProduct(G){
+  // A declared controlled-host entropy provider at the actual production require boundary.
+  // The default IIFE still owns parsing/draws; never grant its mutable test rng permission.
+  const nativeRequire=G.require, entropy={randomFillSync(words){entropyFills.push(words.length);words.fill(0);return words;}};
+  const wrapped=function(name){return name==='node:crypto'?entropy:Reflect.apply(nativeRequire,this,[name]);};
+  wrapped.resolve=nativeRequire.resolve;G.require=wrapped;beforeProduct?.(G);
+ }}),G=h.G,flow=h.w.flow,content=fixture.musicNativeContent(E,assert);
  if(intro){const type=content.trainerTypes['music-type-normal'];type.introBgm='Intro';type.battleBgm='Authored';}
  flow.stateReplaced();flow._app=null;flow._content=content;flow._dex=E.dex.createDexLookup();flow.seed=[1,2,3,4];flow.rng=()=>0;flow.fast=fast;G.$gameSystem._psGame=fixture.musicNativeState(E,content);
  const app=flow.app(),calls=[];for(const method of ['startBattle','startTrainerBattle']){const original=app[method];app[method]=function(...args){calls.push(method);return original.apply(this,args);};}
  await h.p.toMapId(5,8,9);const before=JSON.stringify(flow.game()),source=h.M._scene;
- return{...h,flow,app,calls,before,source,open(){flow.openBattle({kind:trainer?'trainer':'wild',...(trainer?{trainer:{id:'music-normal',version:1}}:{foes:[{species:'Pidgey',level:3}]}),battleId:'prebattle-'+path.basename(h.w.root),seq:1,canLose:true});},cleanup(){if(flow.running)flow.abort(Error('owned wrapper test cleanup'));flow.stateReplaced();}};
+ return{...h,flow,app,calls,before,source,entropyFills,open(){flow.openBattle({kind:trainer?'trainer':'wild',...(trainer?{trainer:{id:'music-normal',version:1}}:{foes:[{species:'Pidgey',level:3}]}),battleId:'prebattle-'+path.basename(h.w.root),seq:1,canLose:true});},cleanup(){if(flow.running)flow.abort(Error('owned wrapper test cleanup'));flow.stateReplaced();}};
 }
 for(const trainer of [false,true])test((trainer?'trainer':'wild')+' real App/Gen8 compiled Map entry waits for the complete wrapper and creates one session',async()=>{
  const h=await ready({trainer});try{
@@ -117,10 +124,10 @@ test('real scene handoff and session initialization errors abort without a late 
   }finally{h.cleanup();}
  }
 });
-test('wrapper does not add game RNG draws or alter the actual Gen8 initial request',async()=>{
+test('forged fast field on the default artifact cannot change the installed Map wrapper or Gen8 initial request',async()=>{
  const requests=[],draws=[];
- for(const fast of [false,true]){const h=await ready({fast});try{let count=0;h.flow.rng=()=>{count++;return 0;};h.open();await h.waitFor(()=>!!h.p.battle()?._session,'same seeded Session');requests.push(JSON.stringify(h.p.battle()._session.currentRequest()));draws.push(count);assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}}
- assert.equal(requests[0],requests[1]);assert.equal(draws[0],draws[1]);
+ for(const fast of [false,true]){const h=await ready({fast});try{h.open();assert.equal(h.flow._op.prebattleMode,'default-map');await h.waitFor(()=>!!h.p.battle()?._session,'same normal route Session');requests.push(JSON.stringify(h.p.battle()._session.currentRequest()));draws.push([...h.entropyFills]);assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}}
+ assert.equal(requests[0],requests[1]);assert(draws[0].length>0,'normal creation consumes the controlled host entropy provider');assert.deepEqual(draws[0],draws[1]);
 });
 test('explicit Map intro retains the world memo across the wrapper and BattleScene.start',async()=>{
  const h=await ready({trainer:true,intro:true});try{
@@ -136,7 +143,7 @@ test('host input/interpreter gates are local and release after cancellation',()=
  let generation=0;const app={get stateGeneration(){return generation;}},flow={_app:app,_op:null,running:false,fast:false},scene=new MapScene();scene._spriteset={};scene._messageWindow={};scene.addChild=()=>{};
  class Bitmap{fillAll(){}destroy(){}}class Sprite{constructor(){this.scale={};}destroy(){}}
  const G={Scene_Map:MapScene,Game_Player:Player,Game_Map:MapWorld,Game_Event:Event,Bitmap,Sprite,Graphics:{boxWidth:800,boxHeight:600,frameCount:0},performance:{now:()=>0},SceneManager:{_scene:scene},$gamePlayer:{},AudioManager:{}};
- const p=host.installPrebattleHost(G,flow,()=>{}),op={};flow._op=op;flow.running=true;assert(p.open(op,core.prebattlePlan('wild',{}, {},0)));assert.equal(new Player().canMove(),false);assert.equal(new MapWorld().updateInterpreter(),undefined);assert.equal(new Event().updateParallel(),undefined);
+ const p=host.installPrebattleHost(G,flow,()=>false,()=>{}),op={};flow._op=op;flow.running=true;assert(p.open(op,core.prebattlePlan('wild',{}, {},0)));assert.equal(new Player().canMove(),false);assert.equal(new MapWorld().updateInterpreter(),undefined);assert.equal(new Event().updateParallel(),undefined);
  p.cancel();flow.running=false;assert.equal(new Player().canMove(),true);assert.equal(new MapWorld().updateInterpreter(),42);assert.equal(new Event().updateParallel(),43);assert(!scene.isBusy());generation++;
 });
 
@@ -162,7 +169,7 @@ function actualReactorEvents(legacy){
  class MapScene{constructor(){this._spriteset={};this._messageWindow={};}isStarted(){return true;}isBusy(){return false;}update(){}start(){}terminate(){}addChild(s){s.parent=this;}removeChild(s){s.parent=null;}}
  class Bitmap{fillAll(){}destroy(){}}class Sprite{constructor(bitmap){this.bitmap=bitmap;this.scale={};}destroy(){}}
  let now=0;const op={},flow={_app:{stateGeneration:0},_op:op,running:false,fast:false},G={...C,Scene_Map:MapScene,Scene_PSBattle:class BattleScene{},SceneManager:{_scene:new MapScene(),push(Type){this._scene=new Type();}},Bitmap,Sprite,Graphics:{boxWidth:816,boxHeight:624,frameCount:0},performance:{now:()=>now},AudioManager:{},$gamePlayer:{makeEncounterCount(){}}};
- const p=host.installPrebattleHost(G,flow,()=>{}),refs=[map._interpreter,event._interpreter,common._interpreter];
+ const p=host.installPrebattleHost(G,flow,()=>false,()=>{}),refs=[map._interpreter,event._interpreter,common._interpreter];
  function sample(){const before={...counts};map.update(true);return Object.fromEntries(Object.keys(counts).map(k=>[k,counts[k]-before[k]]));}
  const advances={main:1,mapParallel:1,common:1,character:1,scroll:1,vehicles:1,parallax:1},held={...advances,main:0,mapParallel:0,common:0};
  assert.deepEqual(sample(),advances,'non-wrapper map retains normal event/graphics updates');assert.deepEqual(order,legacy?['main','common','mapParallel']:['main','mapParallel','common']);
@@ -185,7 +192,7 @@ for(const legacy of [false,true]){
 // defeat, disk-slot or fresh-process Continue acceptance.
 for(const timing of ['return-start','after-cover-done','after-cover-done-native-busy'])test('deferred return autosave serializes only after blackout child and parent terminate: '+timing,async()=>{
  let writes=0,saved=null,sentinel=0;
- let nativeResets=0,inNativeReset=false,ordinaryEncounters=0;const nativeDraws=[],businessDraws=[];
+ let nativeResets=0,inNativeReset=false,ordinaryEncounters=0;const nativeDraws=[];let businessDraws=[];
  const source=fs.readFileSync(path.join(ROOT,'js/reactor_objects.js'),'utf8');
  const scenes=fs.readFileSync(path.join(ROOT,'js/reactor_scenes.js'),'utf8');
  function method(text,marker){const a=text.indexOf(marker),b=text.indexOf('\n};',a);assert(a>=0&&b>a,marker);return text.slice(a,b+3);}
@@ -226,7 +233,7 @@ for(const timing of ['return-start','after-cover-done','after-cover-done-native-
   const G=h.G,map=new G.Game_Map();map._interpreter=new G.Game_Interpreter();G.$gameMap=map;
   const authoredStep=JSON.parse(fs.readFileSync(path.join(ROOT,'data/Map005.json'),'utf8')).encounterStep;
   assert(Number.isSafeInteger(authoredStep)&&authoredStep>0);G.$dataMap.encounterStep=authoredStep;
-  const random=h.flow.rng;h.flow.rng=function(n){businessDraws.push(n);return Reflect.apply(random,this,[n]);};
+  businessDraws=h.entropyFills;
   const encounter=G.Game_Player.prototype.executeEncounter;G.Game_Player.prototype.executeEncounter=function(...args){ordinaryEncounters++;return Reflect.apply(encounter,this,args);};
   h.open();await h.waitFor(()=>!!h.p.battle()?._session,'real Session');await h.p.inMode('main');await h.p.fightUntilEnd();const s=h.p.battle();
   await h.waitFor(()=>s._resultFeedback?.ready?.()||s._mode==='end','result');await h.frames(2);assert.equal(nativeResets,0,'no native reset before terminal confirmation');s.onEnd();
@@ -248,6 +255,6 @@ for(const timing of ['return-start','after-cover-done','after-cover-done-native-
   restored.update();assert.equal(sentinel,0,'cold outcome absence cannot resume a command after blackout');assert.equal(restored.isRunning(),false);
   assert.equal(nativeResets,1);assert.deepEqual(nativeDraws,[authoredStep,authoredStep]);assert.equal(ordinaryEncounters,0);
   assert(Number.isSafeInteger(G.$gamePlayer._encounterCount)&&G.$gamePlayer._encounterCount>=1&&G.$gamePlayer._encounterCount<=authoredStep*2-1);
-  console.log('RETURN_NATIVE_COUNT '+JSON.stringify({nativeResets,nativeDraws,businessDraws,ordinaryEncounters,budget:G.$gamePlayer._encounterCount}));
+  console.log('RETURN_NATIVE_COUNT '+JSON.stringify({nativeResets,nativeDraws,businessEntropyFills:businessDraws,ordinaryEncounters,budget:G.$gamePlayer._encounterCount}));
  }finally{h.cleanup();}
 });

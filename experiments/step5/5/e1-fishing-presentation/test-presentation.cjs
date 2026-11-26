@@ -38,7 +38,7 @@ test(id+' actual Bag or 357 rejection plus localized host messages',{timeout:120
    else{for(let i=0;i<240&&h.G.PSWorld.pending();i++){const effect=h.effects.at(-1);if(['open-message','dots','bite-message','result-message'].includes(effect?.kind)&&h.G.$gameMessage.isBusy())h.ack();h.tick(100);await flush();}assert.equal(h.G.PSWorld.pending(),false);}
    const presented=h.messages.map(row=>row.text);assert(presented.includes(outcome==='no-bite'?texts.noBite:outcome==='escaped'?texts.escaped:texts.caught));if(outcome!=='no-bite')assert(presented.includes(texts.bite+'\\^'));
    if(lang==='en')assert(presented.every(t=>!/[\u3400-\u9fff]/u.test(t)),'English actual host emits no Chinese default message');
-   if(outcome==='caught'){await h.pump(()=>!!h.G.PSFlow._op?.session);assert.equal(h.G.PSFlow._op.session.constructor.name,'BattleSession');h.G.PSFlow.abort('bounded-fishing-message-validation');}
+   if(outcome==='caught'){await h.pump(()=>!!h.G.PSFlow._op?.session);assert.equal(h.G.PSFlow._op.session.constructor.name,'BattleSession');h.assertOrdinaryHandoff();h.G.PSFlow.abort('bounded-fishing-message-validation');}
    results.push({outcome,messages:h.messages,effects:h.effects.map(e=>e.kind),business:h.business,sessionCount:h.observed.sessions.length});h.restore();h=null;
   }
   pass=true;

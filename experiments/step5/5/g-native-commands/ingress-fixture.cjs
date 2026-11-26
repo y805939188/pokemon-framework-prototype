@@ -14,14 +14,16 @@ function visuals(n,{maps}){
  G.$dataSystem.switches=Array(10).fill('');return{parent};
 }
 async function fixture(options={}){
+ if(options.ordinaryAuthorInput)assert(!options.applicationPorts&&!options.afterPrepare,'ordinary IF retains the installed App and native projection channel');
  let visual,h,prepareCount=0,channelCount=0,controller,preparedSeen,service,mapFrames=0;const characterUpdates=new Map();
- h=await base({edit:options.edit,applicationPorts(ports){
+ h=await base({edit:options.edit,ordinaryAuthorInput:options.ordinaryAuthorInput,
+   ...(options.ordinaryAuthorInput?{}:{applicationPorts(ports){
    const connect=ports.blackoutProjection.connect;
    ports.blackoutProjection={connect(connection){service=connection.service;channelCount++;const real=Reflect.apply(connect,this,[connection]);controller=real.controller;
      return{...real,companions:{...real.companions,async prepare(...args){prepareCount++;const result=await Reflect.apply(real.companions.prepare,real.companions,args);if(result.status==='value')preparedSeen=result.value;await options.afterPrepare?.({h,connection,real,result});return result;}}};
    }};
    options.applicationPorts?.(ports);
- },nativeSetup(n,more){visual=visuals(n,more);const G=n.G,frame=G.Scene_Map.prototype.update,character=G.Game_Character.prototype.update;G.Scene_Map.prototype.update=function(...args){mapFrames++;return Reflect.apply(frame,this,args);};G.Game_Character.prototype.update=function(...args){if(visual.parent.children.some(s=>s._character===this))characterUpdates.set(this,(characterUpdates.get(this)||0)+1);return Reflect.apply(character,this,args);};const original=n.G.Scene_Map.prototype.createDisplayObjects;n.G.Scene_Map.prototype.createDisplayObjects=function(...args){const out=Reflect.apply(original,this,args);this._spriteset={_tilemap:visual.parent};return out;};options.nativeSetup?.(n,more);}});
+ }}),nativeSetup(n,more){visual=visuals(n,more);const G=n.G,frame=G.Scene_Map.prototype.update,character=G.Game_Character.prototype.update;G.Scene_Map.prototype.update=function(...args){mapFrames++;return Reflect.apply(frame,this,args);};G.Game_Character.prototype.update=function(...args){if(visual.parent.children.some(s=>s._character===this))characterUpdates.set(this,(characterUpdates.get(this)||0)+1);return Reflect.apply(character,this,args);};const original=n.G.Scene_Map.prototype.createDisplayObjects;n.G.Scene_Map.prototype.createDisplayObjects=function(...args){const out=Reflect.apply(original,this,args);this._spriteset={_tilemap:visual.parent};return out;};options.nativeSetup?.(n,more);}});
  async function settle(promise){let result,error,done=false;Promise.resolve(promise).then(v=>{result=v;done=true;},e=>{error=e;done=true;});for(let i=0;i<90&&!done;i++){h.G.$gameMessage.clear();await flush();}assert(done,'bounded companion completion');if(error)throw error;return result;}
  const previous=h.G.SceneManager._scene;h.G.PSWorld.loadSucceeded();h.G.SceneManager.goto(h.G.Scene_Map);await h.pump(()=>h.G.SceneManager._scene!==previous&&h.G.SceneManager._scene?._started===true);h.G.SceneManager._scene._spriteset={_tilemap:visual.parent};
  h.tick();await h.pump(()=>!h.G.PSWorld.pending()&&!h.G.PSFlow.companionNativePending()&&!h.app.saveBlocked);const initialized=await settle(h.app.initializeBlackoutCompanions());assert(initialized&&initialized.status==='completed',JSON.stringify(initialized));

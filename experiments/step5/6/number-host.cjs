@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {host,ROOT}=require('./message-host.cjs');
-function numberHost({lang='zh',width=816,height=624,touchUI=false,animate=false}={}){
+function numberHost({lang='zh',width=816,height=624,touchUI=false,animate=false,configure=null}={}){
  let number,refreshes=0;
  const h=host(lang,width,height,animate,(G,{load,windows,objects,sounds})=>{
   vm.runInContext('Number.prototype.clamp=function(a,b){return Math.min(Math.max(this,a),b);};Number.prototype.padZero=function(n){return String(this).padStart(n,"0");};Array.prototype.clone=function(){return this.slice();};',G);
@@ -25,7 +25,7 @@ function numberHost({lang='zh',width=816,height=624,touchUI=false,animate=false}
   load(objects,['Game_Interpreter.prototype.command103','Game_Interpreter.prototype.setupNumInput','Game_Interpreter.prototype.command111','Game_Interpreter.prototype.command411','Game_Interpreter.prototype.skipBranch']);
   vm.runInContext(objects.slice(objects.indexOf('function Game_Variables()'),objects.indexOf('function Game_SelfSwitches()')),G);
   G.$dataSystem={variables:Array.from({length:21},(_,i)=>'Variable '+i)};G.$gameVariables=new G.Game_Variables();
-  return {number(win){number=new G.Window_NumberInput();number.setMessageWindow(win);return number;},update(){number.update();}};
+  return {number(win){number=new G.Window_NumberInput();number.setMessageWindow(win);return number;},update(){number.update();},...configure?.(G)};
  });
  h.G.$gameMap.requestRefresh=()=>refreshes++;
  function command(settings=[],variable=1){return {code:357,indent:0,parameters:['PS_Management','ShowNumber','Number',{settings:JSON.stringify(settings.map(s=>JSON.stringify(s))),resultVariableId:String(variable)}]};}

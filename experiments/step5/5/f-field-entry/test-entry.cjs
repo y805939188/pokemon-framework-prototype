@@ -105,12 +105,20 @@ test(id+' actual App and installed native field-entry chain',{timeout:30000},asy
   assert.equal(h.state().money,h.initial.money);assert.equal(h.state().steps,direct?3:4);assert.equal(h.state().world.pendingReturn,null);assert.deepEqual(h.draws,[]);assert.deepEqual(h.nativeDraws,[]);
   if(destination==='missing')assert.deepEqual(h.state().world.escapePoint,h.initial.world.escapePoint);else assert.equal(h.state().world.escapePoint,null);
   if(id==='DIRECT-EMPTY')assert.deepEqual(h.state().party,[]);
-  if(id.startsWith('ZH-'))assert(messages.some(e=>e.text===(destination==='missing'?'无法载入回家的地图。':'宝可梦们恢复了精神。返回家中。')));
+  if(id==='ZH-MISSING'){
+   assert.deepEqual(h.announcements,[{kind:'debug-missing-home',selection:'home',target:{mapId:99,x:1,y:1,direction:8}}]);
+   assert.equal(G.PSFlow.translator().t('world.blackout.missingHome'),'无法载入回家的地图。');
+   assert.deepEqual(messages.map(e=>e.text),['没有能战斗的宝可梦！','眼前一黑！'],'an ordinary build cannot display the translated debug-only line, even with TravelDebug=true');
+  }
+  if(id==='ZH-NOHOME'){
+   assert.deepEqual(h.announcements.map(a=>[a.kind,a.selection]),[['show-return-message','no-home']]);
+   assert(messages.some(e=>e.text==='宝可梦们恢复了精神。返回家中。'));
+  }
   if(id==='DUPLICATE'){const after=h.clone(h.state());await G.PSFlow.checkFieldBlackout('field-direct');assert.deepEqual(h.state(),after);assert.equal(h.entries.length,1);}
   for(let i=0;i<28;i++){h.tick();await flush();}assert.equal(G.$gameScreen.brightness(),255);
  }catch(error){facts.status='FAIL';facts.error=error.stack;throw error;}
  finally{
-  if(h){facts.final=h.clone(h.state());facts.events=h.events;facts.audio=h.audio;facts.entries=h.entries.map(e=>e.result);facts.leaves=h.leaves.map(e=>e.result);facts.trace=h.trace;facts.draws=h.draws;facts.nativeDraws=h.nativeDraws;facts.saveCount=h.saves.length;if(run)facts.result=run.result();}
+  if(h){facts.final=h.clone(h.state());facts.events=h.events;facts.announcements=h.announcements;facts.nativeNonTransfer=h.captured.completions.map(x=>x.result);facts.audio=h.audio;facts.entries=h.entries.map(e=>e.result);facts.leaves=h.leaves.map(e=>e.result);facts.trace=h.trace;facts.draws=h.draws;facts.nativeDraws=h.nativeDraws;facts.saveCount=h.saves.length;if(run)facts.result=run.result();}
   facts.status??='PASS';fs.writeFileSync(path.join(out,'RESULT.json'),JSON.stringify(facts,null,2)+'\n',{flag:'wx'});
  }
 });

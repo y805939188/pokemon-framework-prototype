@@ -47,7 +47,9 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
 }
 
 function row(h, key) { const i = h.s._menu._items.findIndex(r => r.ext === key); assert(i >= 0, 'actual menu key ' + key); h.s._menu.select(i); }
-async function pick(h, key) { row(h, key); h.s.onMenuOk(); await h.frames(1); }
+async function pick(h, key) {
+  const openingBag = key === 'bag' && h.s._mode === 'main'; row(h, key); h.s.onMenuOk(); await h.frames(1);
+  if (openingBag) await h.waitFor(() => h.s._mode === 'bag' && h.s.inputState().ready, 'ordinary item menu after the actual Bag fade'); }
 async function party(h) { await pick(h, 'party'); assert.equal(h.s._mode, 'party'); }
 async function commands(h, id) { await party(h); await pick(h, id); assert.equal(h.s._mode, 'party-command'); }
 // Integration: action-return PP sync must survive the new real faint question and its three exits.

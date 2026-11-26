@@ -53,6 +53,16 @@ function installFullMapFrame(h){
  function Battle(){G.Scene_MenuBase.call(this);}Battle.prototype=Object.create(G.Scene_MenuBase.prototype);Battle.prototype.constructor=Battle;G.Scene_Battle=Battle;
  return h;
 }
+// This fixture executes a slice of the compiled plugin. Keep its lexical
+// capability dependencies from that same build, rather than granting test mode
+// or substituting a function that always authorizes/denies capabilities.
+function legacyScope(source) {
+ const one=(regex,label)=>{const hits=[...source.matchAll(regex)];if(hits.length!==1)throw Error('compiled legacy scope identity: '+label);return hits[0][0];};
+ const region=name=>one(new RegExp('^\\s*//\\#region (?:src/)?plugins/'+name+'\\.ts\\r?$[\\s\\S]*?^\\s*//\\#endregion\\r?$','gm'),name);
+ const declaration=name=>one(new RegExp('^\\s*const '+name+' = [^\\n]+;\\r?$','gm'),name);
+ return [region('isolated-profile-contract'),region('isolated-test-scope'),declaration('testScope'),declaration('canTest'),declaration('battleCapabilities'),
+   'if(testScope!==null||canTest())throw Error("unexpected isolated authority in ordinary legacy fixture");'].join('\n')+'\n';
+}
 async function frameFixture(options={}){
  const h=installFullMapFrame(await fixture(options));h.offers=[];
  const observe=kind=>({kind,frame:h.G.Graphics.frameCount,x:h.player.x,realX:h.player._realX,moving:h.player.isMoving(),appPending:h.app.saveBlocked,hostPending:!!h.G.PSWorld?.pending(),nativeDraws:[...h.nativeDraws],draws:[...h.draws]});
@@ -61,7 +71,7 @@ async function frameFixture(options={}){
   // Exercise the real compiled legacy handler and real App.prepareEncounter; only the final scene handoff is a fake.
   const B=await build(),start=B.flow.indexOf('const legacyExecuteEncounter = function()'),end=B.flow.indexOf('\n\t\tif (G.Game_Player) {',start);if(start<0||end<=start)throw Error('compiled legacy handler unavailable');
   const flow=h.G.PSFlow;let seq=0;Object.assign(flow,{running:false,perf:{},nextSeq:()=>++seq,mapEncounters:()=>({data:{table:{regions:[],slots:[{species:'A',weight:1,minLevel:5,maxLevel:5}]},problems:[]}}),encounter:(table,region)=>h.app.prepareEncounter(table,region),tryOpenBattle(request){if(h.app.encounterBlocked||this.operationPending())throw Error('legacy-external-operation-gate');h.offers.push({...observe('legacy'),request});this.running=true;h.G.SceneManager.push(h.G.Scene_Battle);return true;}});
-  vm.runInContext('(function(G,PSFlow){let heldEncounterGate=null;const baseExecuteEncounter=()=>false;'+B.flow.slice(start,end)+';PSFlow.encounterHost.legacyEncounter=player=>Reflect.apply(legacyExecuteEncounter,player,[]);})(globalThis,globalThis.PSFlow);',h.G,{filename:'compiled-production:legacyExecuteEncounter'});
+  vm.runInContext('(function(G,PSFlow){let heldEncounterGate=null;const baseExecuteEncounter=()=>false;'+legacyScope(B.flow)+B.flow.slice(start,end)+';PSFlow.encounterHost.legacyEncounter=player=>Reflect.apply(legacyExecuteEncounter,player,[]);})(globalThis,globalThis.PSFlow);',h.G,{filename:'compiled-production:legacyExecuteEncounter'});
  }
  return h;
 }

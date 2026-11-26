@@ -1,6 +1,6 @@
 import type { BlackoutNonTransferSourceObservation } from './blackout-save-collector';
 /** Genuine native Map observations and App-issued F source handoffs; no second native registry. */
-import type { BlackoutApplicationQueries, BlackoutSourceContext } from '../../framework/app/blackout-ports';
+import type { BlackoutApplicationQueries, BlackoutNonTransferCompletion, BlackoutSourceContext } from '../../framework/app/blackout-ports';
 import type { TravelEffectResult } from '../../framework/app/world-travel-operation';
 import type { WorldMapBirthLifecycle, WorldTravelLeaseCurrent } from '../../framework/app/ports';
 import type { NativeMapObservation } from './world-travel-scene-mz';
@@ -186,7 +186,25 @@ export function createBlackoutSourceMZ(root: Record<string, unknown>, publicatio
         if (snapshot.current !== record.physicalAtArm && !(record.physicalReleased && record.physicalAtArm !== null && snapshot.current === null))
           throw Error('blackout-native-nontransfer-physical-changed');
       };
-      guard(); return Object.freeze({ handoff, physical: record.physicalAtArm, guard });
+      guard();
+      const directBattle = record.context.kind === 'battle' && record.context.ancestor === null && record.physicalAtArm === null;
+      const retireIdleBattleSource = (completion: BlackoutNonTransferCompletion): void => {
+        if (record.app.isBlackoutNonTransferComplete(owner, completion) !== true)
+          throw Error('blackout-native-no-request-terminal-unissued');
+        guard();
+        const snapshot = readNativeTravelLease(publication.source), target = handoff.target;
+        if (record.retired || !snapshot || snapshot.sourceHandoff !== handoff || !target?.frame ||
+          snapshot.mapBirth !== target || own(target.scene, '_started') !== true || own(target.scene, '_active') !== true)
+          throw Error('blackout-native-no-request-source-stale');
+        // Source publication advances the native epoch and can revoke other proofs.
+        // This narrow terminal cleanup must not take an arrival or another owner's work.
+        if (snapshot.current !== null || snapshot.companionPreparedOrigin || snapshot.companionTransfer ||
+          snapshot.movementStart || snapshot.surfLanding) return;
+        publication.publishSourceHandoff(null);
+        record.retired = true;
+      };
+      return Object.freeze({ handoff, physical: record.physicalAtArm, guard,
+        ...(directBattle ? { retireIdleBattleSource } : {}) });
     },
     constructionLease(): { readonly identity: object; readonly sourceScene: object } | null {
       const record = entry;

@@ -5,7 +5,7 @@
 name: ci
 on:
   push:
-    branches: [main, 'step3/**', 'step4/**', 'step5/**']
+    branches: [main, 'step3/**', 'step4/**', 'step5/**', 'step6/runtime-sanitized']
   pull_request:
 permissions:
   contents: read

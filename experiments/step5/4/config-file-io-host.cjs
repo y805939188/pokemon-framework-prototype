@@ -1,6 +1,7 @@
 'use strict';
 // Actual installed ConfigManager/StorageManager/JsonEx/pako and fs; controlled
-// Options shell, audio/render ports and NW argv. No NW or user save directory.
+// Options shell, audio/render ports and NW argv. Only a private ordinary
+// project may own the config. No NW or user save directory.
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -14,8 +15,16 @@ function section(source, start, end) {
   return source.slice(a, b);
 }
 
-function createConfigHost({ ROOT, work, plugins, configDir, lang = 'en', failWrite = false }) {
-  configDir = path.resolve(configDir);
+function createConfigHost({ ROOT, work, plugins, projectDir, lang = 'en', failWrite = false, rawSaveOverride = false }) {
+  const suiteRoot = fs.realpathSync(path.dirname(work));
+  assert.equal(fs.realpathSync(work), work);
+  assert.equal(fs.realpathSync(projectDir), projectDir);
+  const [owner, project, ...rest] = path.relative(suiteRoot, projectDir).split(path.sep);
+  assert.match(owner, /^case-[A-Za-z0-9]+$/);
+  assert.equal(project, 'project');
+  assert.equal(rest.length, 0);
+  const configDir = path.join(projectDir, 'save');
+  const ignoredSaveDir = path.join(work, 'raw-override-save');
   const operations = [], saves = [], loads = [];
   let failed = false;
   // Every actual filesystem operation goes to a new directory owned by this test.
@@ -43,12 +52,15 @@ function createConfigHost({ ROOT, work, plugins, configDir, lang = 'en', failWri
     beforeProduct(G) {
       installNativeSettings(G, ROOT);
       const nativeRequire = G.require;
-      const req = name => name === 'fs' ? disk : name === 'os' ? require('node:os') : nativeRequire(name);
-      req.resolve = name => name === './js/plugins.js' ? path.join(work, 'game/js/plugins.js') : nativeRequire.resolve(name);
+      const protectedOs = { homedir() { throw Error('DEFAULT_PLAYER_DIRECTORY_FORBIDDEN'); } };
+      const req = name => name === 'fs' || name === 'node:fs' ? disk
+        : name === 'os' || name === 'node:os' ? protectedOs : nativeRequire(name);
+      req.resolve = name => name === './js/plugins.js' ? path.join(projectDir, 'js/plugins.js') : nativeRequire.resolve(name);
       G.require = req;
       G.Utils.isNwjs = () => true;
-      G.nw = { App: { argv: ['--ps-save-dir=' + configDir], manifest: { name: 'pf-config-owned-test' } } };
-      G.process = { platform: process.platform, mainModule: { filename: path.join(work, 'game/main.js') } };
+      G.nw = { App: { argv: rawSaveOverride ? ['--ps-save-dir=' + ignoredSaveDir] : [],
+        manifest: { name: 'pf-config-owned-test' } } };
+      G.process = { platform: process.platform, mainModule: { filename: path.join(projectDir, 'main.js') } };
       // Do not replace compression with zlib or a fake JSON file pipeline.
       G.pako = require(path.join(ROOT, 'js/libs/pako.min.js'));
       const core = fs.readFileSync(path.join(ROOT, 'js/reactor_core.js'), 'utf8');
@@ -56,7 +68,9 @@ function createConfigHost({ ROOT, work, plugins, configDir, lang = 'en', failWri
       vm.runInContext(section(core, 'function JsonEx()', '\n//-----------------------------------------------------------------------------'), G, { filename: 'reactor_core.js#JsonEx' });
       vm.runInContext(section(managers, 'function ConfigManager()', '\n//-----------------------------------------------------------------------------\n// FontManager'), G, { filename: 'reactor_managers.js#ConfigAndStorage' });
       vm.runInContext(plugins.PS_SaveLocation, G, { filename: 'PS_SaveLocation.js' });
-      assert.equal(G.PSSaveLocation.why, '--ps-save-dir');
+      assert.equal(G.PSSaveLocation.why, 'project folder');
+      assert.equal(G.PSSaveLocation.dir, configDir + path.sep);
+      assert.equal(G.StorageManager.fileDirectoryPath(), configDir + path.sep);
       assert.equal(G.StorageManager.filePath('config'), path.join(configDir, 'config.rmmzsave'));
     }
   });
@@ -77,7 +91,7 @@ function createConfigHost({ ROOT, work, plugins, configDir, lang = 'en', failWri
   G.PSFlow.setLanguage(lang);
   // The settings wrappers have now been installed by the real compiled plugin.
   G.ConfigManager.applyData({});
-  return { G, operations, saves, loads, configDir, file: path.join(configDir, 'config.rmmzsave'),
+  return { G, operations, saves, loads, projectDir, configDir, ignoredSaveDir, file: path.join(configDir, 'config.rmmzsave'),
     async load() {
       assert.equal(G.ConfigManager.load(), undefined, 'native load is not a promise');
       for (let i = 0; i < 100 && !G.ConfigManager.isLoaded(); i++) await new Promise(resolve => setImmediate(resolve));

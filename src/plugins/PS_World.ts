@@ -1,3 +1,4 @@
+import { isolatedTestScope, testStorageStillBound } from "./isolated-test-scope";
 /** MZ lifecycle/command adapter. Framework owns business state; this module never replaces it. */
 import { createWorldEntryCoordinator } from './world/world-entry-mz';
 import { createFieldItemHost } from './world/field-item-host';
@@ -38,7 +39,9 @@ import { createFieldMoveMZ } from './world/field-move-mz';
   const mode = () => resolveMZEncounterMode(invoke(root.$gameMap, 'mapId'), invoke(flow(), 'content'), root.$dataMap);
   const parameters = hostRecord(invoke(root.PluginManager, 'parameters', ['PS_World'])) ?? {};
   const meanings = (() => { try { return parseTerrainMeanings(parameters.TerrainTags); } catch (error) { diagnose(errorText(error)); return parseTerrainMeanings(undefined); } })();
-  const inputs = createRuntimeInputsMZ(root, meanings, () => { const value = mode(); return value.status === 'ready' && value.mode === 'framework'; });
+  const testScope = isolatedTestScope(globalThis);
+  const allowTestDebug = () => testStorageStillBound(globalThis, testScope);
+  const inputs = createRuntimeInputsMZ(root, meanings, () => { const value = mode(); return value.status === 'ready' && value.mode === 'framework'; }, allowTestDebug);
   const fieldMoves = createFieldMoveMZ(root, meanings, parameters, diagnose);
   const fishing = createFishingMZ(root, () => worldHostInput(root), owner => { invoke(current(), 'assertFishingOwner', [owner]); }, parameters, diagnose);
   let nativeIsProxy: ((value: unknown) => boolean) | undefined;

@@ -5,7 +5,10 @@ function inside(file,root){assert.equal(typeof file,'string');const target=path.
 function method(G,text,name){const a=text.indexOf(name+' = function'),b=text.indexOf('\n};',a);assert(a>=0&&b>a,name);vm.runInContext(text.slice(a,b+4),G,{filename:'pinned-native:'+name});}
 function install(G,scope,nativeRoot,out,options={}){
  assert(options.globalInfoProfile===undefined||options.globalInfoProfile==='formal-empty-load','unknown globalInfo test profile');
- const saveRoot=inside(path.join(scope,'save'),scope),project=inside(path.join(scope,'profile/project'),scope),trace=[];
+ assert(options.saveLocation===undefined||options.saveLocation==='project','unknown storage path profile');
+ const projectSave=options.saveLocation==='project',project=inside(path.join(scope,'profile/project'),scope),
+   saveRoot=inside(projectSave?path.join(project,'save'):path.join(scope,'save'),scope),trace=[];
+ if(projectSave)fs.mkdirSync(saveRoot,{recursive:true});
  fs.mkdirSync(path.join(project,'js'),{recursive:true});fs.writeFileSync(path.join(project,'js/plugins.js'),'// owned identity placeholder; not a production plugin list\n',{flag:'wx'});
  const guarded={};for(const name of ['existsSync','mkdirSync','renameSync','unlinkSync','readFileSync','writeFileSync'])guarded[name]=(...args)=>{const targets=name==='renameSync'?[args[0],args[1]]:[args[0]];for(const file of targets){if(name==='existsSync'&&path.resolve(file).startsWith(project+path.sep))inside(file,project);else inside(file,saveRoot);}const row={sequence:trace.length+1,method:name,targets:[...targets],allowed:true};trace.push(row);try{const value=Reflect.apply(fs[name],fs,args);row.result=typeof value==='boolean'?value:'RETURNED';return value;}catch(error){row.error=String(error);throw error;}};
  const core=fs.readFileSync(path.join(nativeRoot,'js/reactor_core.js'),'utf8'),managers=fs.readFileSync(path.join(nativeRoot,'js/reactor_managers.js'),'utf8');
@@ -17,12 +20,12 @@ function install(G,scope,nativeRoot,out,options={}){
   const initial=managers.match(/^DataManager\._globalInfo = null;$/gm);assert(initial&&initial.length===1,'pinned native globalInfo initializer');
   vm.runInContext(initial[0],G,{filename:'pinned-native:DataManager-initial-globalInfo'});method(G,managers,'DataManager.isGlobalInfoLoaded');
  }else G.DataManager._globalInfo=vm.runInContext('[]',G);
- G.$gameParty=new G.Game_Party();G.$gameTimer=new G.Game_Timer();G.$dataSystem.gameTitle='Headless isolated F load';G.process={platform:'darwin'};G.nw={App:{argv:['--ps-save-dir='+saveRoot],manifest:{name:'HEADLESS_F_LOAD_JOINT'}}};
+ G.$gameParty=new G.Game_Party();G.$gameTimer=new G.Game_Timer();G.$dataSystem.gameTitle='Headless isolated F load';G.process={platform:'darwin'};G.nw={App:{argv:projectSave?[]:['--ps-save-dir='+saveRoot],manifest:{name:'HEADLESS_F_LOAD_JOINT'}}};
  const baseRequire=G.require,req=request=>{if(request==='fs'||request==='node:fs')return guarded;if(request==='path'||request==='node:path')return path;if(request==='os'||request==='node:os')return{homedir(){throw Error('DEFAULT_PLAYER_DIRECTORY_FORBIDDEN');}};if(request==='util'||request==='node:util')return require('node:util');if(request==='node:crypto')return crypto;if(request==='./js/engine/build/production.cjs')return baseRequire(request);throw Error('unregistered save require '+request);};
  req.resolve=request=>{if(request==='./js/plugins.js')return path.join(project,'js/plugins.js');if(request==='./js/engine/build/production.cjs')return path.join(out,'production.cjs');throw Error('unregistered save resolution '+request);};G.require=req;
  method(G,core,'Utils.isNwjs');vm.runInContext(fs.readFileSync(path.join(nativeRoot,'js/libs/pako.min.js'),'utf8'),G,{filename:'pinned:pako'});
  for(const name of ['PS_SaveLocation','PS_SaveState'])vm.runInContext(fs.readFileSync(require('../../../../scripts/tests/final-production-runtime.cjs').pluginFile(name),'utf8'),G,{filename:'fixed-e2:'+name});
- assert.equal(path.resolve(G.PSSaveLocation.dir),saveRoot);assert.equal(G.PSSaveLocation.why,'--ps-save-dir');assert.equal(G.StorageManager.fileDirectoryPath(),saveRoot+path.sep);assert.equal(G.StorageManager.isLocalMode(),true);
+ assert.equal(path.resolve(G.PSSaveLocation.dir),saveRoot);assert.equal(G.PSSaveLocation.why,projectSave?'project folder':'--ps-save-dir');assert.equal(G.StorageManager.fileDirectoryPath(),saveRoot+path.sep);assert.equal(G.StorageManager.isLocalMode(),true);
  const globalInfo=options.globalInfoProfile==='formal-empty-load'?require('./global-info-input-support.cjs').observeGlobalInfo(G):undefined;
  return{trace,saveRoot,project,globalInfo,sha(file){return crypto.createHash('sha256').update(fs.readFileSync(inside(file,saveRoot))).digest('hex');},assertPaths(){for(const row of trace)for(const file of row.targets){if(row.method==='existsSync'&&path.resolve(file).startsWith(project+path.sep))inside(file,project);else inside(file,saveRoot);}}};
 }

@@ -54,6 +54,9 @@ export interface BlackoutNonTransferSourceObservation {
    * observed exact native releaseArrival, rejects foreign null/source/serial/Map/birth changes.
    * It does not require raw snapshot shell identity to stay unchanged during natural retirement. */
   guard(): void;
+  /** Optional for an exact direct battle with no inherited arrival. Only the verified
+   * no-request terminal may try it. An extant native/movement/companion proof keeps its owner. */
+  retireIdleBattleSource?(completion: BlackoutNonTransferCompletion): void;
 }
 export interface BlackoutNativeSaveOptions {
   readonly root: Record<string, unknown>;

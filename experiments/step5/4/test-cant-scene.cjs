@@ -7,7 +7,7 @@ const events=r=>r.result.messages.flatMap(m=>m.kind==='events'?m.events:[]);
 function config(lang,id,player,foe){return{id:'CANT-'+id+'-'+lang,lang,seed:[9,10,11,12],player,foe};}
 const fast=(moves=['splash'],extra={})=>({species:'aerodactyl',abilityIndex:1,level:50,moves,...extra});
 const slow=(moves=['splash'])=>({species:'slowbro',level:50,moves});
-async function turn(h,slot=1,{automaticTurns=0}={}){
+async function turn(h,slot=1,{automaticTurns=0,recordBeam=false}={}){
  await H.mode(h,'main');const lineStart=h.lines.length,calls=h.calls.length;
  await H.pick(h,'fight');await H.mode(h,'moves');await H.pick(h,slot);
  await h.waitFor(()=>h.calls.length===calls+1&&h.calls.at(-1).after,'real session action completed');
@@ -30,7 +30,19 @@ async function turn(h,slot=1,{automaticTurns=0}={}){
    await h.frames(1);
   }
  }finally{h.s._display.event=displayEvent;}
- capture();const rows=h.calls.slice(calls);assert.equal(rows.length,1+automaticTurns,'only the declared hard-locked continuation may follow the first action');
+ capture();const rows=h.calls.slice(calls);
+ if(recordBeam){
+  const first=rows[0],wire=first?events(first):[];
+  // Evidence precedes the continuation-count assertion: distinguish a real miss
+  // from a scheduler that dropped a required recharge. No entropy, saves or IDs.
+  console.log('HYPERBEAM_FIRST_TURN '+JSON.stringify({language:h.flow.translator().lang,
+   namedMove:wire.some(e=>e.type==='move'&&e.args[0]?.startsWith('p1a:')&&e.args[1]==='Hyper Beam'),
+   miss:wire.some(e=>e.type==='-miss'),foeHPDelta:first?first.before.p2[0].hp-first.after.p2[0].hp:null,
+   foeAlive:!!first&&first.after.p2[0].hp>0,observedTurns:rows.length,
+   recharging:rows.slice(1).some(r=>events(r).some(e=>e.type==='cant'&&e.args[1]==='recharge')),
+   ready:h.s.inputState().ready,mode:h.s._mode,busy:!!h.s._busy,queue:h.s._queue.length}));
+ }
+ assert.equal(rows.length,1+automaticTurns,'only the declared hard-locked continuation may follow the first action');
  assert(h.s.inputState().ready&&h.s._mode==='main','normal-speed queue returns to command without injected confirmation');
  const allEvents=rows.flatMap(events),expected=allEvents.flatMap(e=>h.s._D.event(e));assert.deepEqual(h.lines.slice(lineStart),expected,'Scene publishes every actual turn in raw event description order');
  for(const [index,row]of rows.entries()){
@@ -49,7 +61,7 @@ async function turn(h,slot=1,{automaticTurns=0}={}){
 
 for(const lang of ['en','zh']){
  for(const status of ['slp','par','frz'])test(`${lang} player ${status}: real carried status, blocked PP and normal Scene waits`,async()=>{
-  const h=await H.open(config(lang,status,fast(['splash'],{status,statusCount:3}),slow()));try{let blocked=0;
+  const h=await H.open({...config(lang,status,fast(['splash'],{status,statusCount:3}),slow()),characterizeBlockedRounds:status==='par'||status==='frz'});try{let blocked=0;
    for(let i=0;i<(status==='par'?7:5);i++){const shownBefore=clone(h.s._display.snapshot()),row=await turn(h),ev=events(row),cant=ev.filter(e=>e.type==='cant'&&e.args[0]==='p1a: SCENE-P1'&&e.args[1]===status),move=ev.filter(e=>e.type==='move'&&e.args[0]==='p1a: SCENE-P1');blocked+=cant.length;assert.equal(cant.length+move.length,1);assert.equal(row.before.p1[0].pp.splash-row.after.p1[0].pp.splash,move.length);if(cant.length){assert.equal(row.after.p1[0].status,status);assert.deepEqual(clone(h.s._display.snapshot()),shownBefore,'a cant-only player turn preserves the pre-existing display projection');}}
    assert.equal(blocked,status==='par'?2:status==='slp'?2:5,'fixed sequence reaches the characterized blocked rounds');
   }finally{h.cleanup();}
@@ -61,7 +73,19 @@ for(const lang of ['en','zh']){
   const h=await H.open(config(lang,'flinch-'+side,side==='p1'?slow():fast(['fakeout','splash']),side==='p1'?fast(['fakeout']):slow()));try{const row=await turn(h),ev=events(row),cant=ev.find(e=>e.type==='cant'&&e.args[0].startsWith(side+'a:')&&e.args[1]==='flinch');assert(cant);assert.equal(row.before[side][0].pp.splash,row.after[side][0].pp.splash);assert.equal(row.after[side][0].status,'');}finally{h.cleanup();}
  });
  for(const move of ['hyperbeam','dig'])test(`${lang} ${move}: real Scene locked turn, recharge is not two-turn charging`,async()=>{
-  const h=await H.open(config(lang,move,{species:'snorlax',abilityIndex:1,level:50,moves:[move,'splash']},{species:'shuckle',level:100,moves:['splash']}));try{const [first,second]=await turn(h,1,{automaticTurns:1});assert.equal(first.before.p1[0].pp[move]-first.after.p1[0].pp[move],1);assert.equal(second.before.p1[0].pp[move],second.after.p1[0].pp[move]);const ev=events(second);
+  // Recharge is conditional on a hit. Machamp's ordinary Gen8 No Guard secures that
+  // antecedent without a seed; Dig keeps the original Snorlax and absence-of-cant check.
+  const attacker=move==='hyperbeam'?'machamp':'snorlax';
+  const h=await H.open(config(lang,move,{species:attacker,abilityIndex:1,level:50,moves:[move,'splash']},{species:'shuckle',level:100,moves:['splash']}));
+  try{
+   if(move==='hyperbeam')assert.equal(h.session.party[0].ability,'No Guard');
+   const [first,second]=await turn(h,1,{automaticTurns:1,recordBeam:move==='hyperbeam'});
+   if(move==='hyperbeam'){
+    assert(events(first).some(e=>e.type==='move'&&e.args[0].startsWith('p1a:')&&e.args[1]==='Hyper Beam'),'actual named move used');
+    assert(first.after.p2[0].hp>0 && first.after.p2[0].hp<first.before.p2[0].hp,'real first-hit damage to a surviving Shuckle');
+    assert(!events(first).some(e=>e.type==='-miss'),'ordinary No Guard prevented the move missing');
+   }
+   assert.equal(first.before.p1[0].pp[move]-first.after.p1[0].pp[move],1);assert.equal(second.before.p1[0].pp[move],second.after.p1[0].pp[move]);const ev=events(second);
    if(move==='hyperbeam'){assert(ev.some(e=>e.type==='cant'&&e.args[1]==='recharge'));assert(!ev.some(e=>e.type==='move'&&e.args[0].startsWith('p1a:')));assert(!events(first).some(e=>e.type==='cant'&&e.args[1]==='recharge'));}
    else{assert(events(first).some(e=>e.type==='-prepare'&&e.args[1]==='Dig'));assert(!ev.some(e=>e.type==='cant'));assert(ev.some(e=>e.type==='move'&&e.args[1]==='Dig'));}
   }finally{h.cleanup();}

@@ -7,7 +7,7 @@ const state=h=>({generation:h.app.stateGeneration,steps:h.state().steps,surf:h.s
 test(id+' real Party Surf lifecycle control',{timeout:120000},async()=>{
  let h,rng,restoreWarn,passed=false;const trace=[],warnings=[];
  try{
-  h=await fixture('surf',{edit(game){if(id==='E2-SURF-GEN')game.party.push({...structuredClone(game.party[0]),id:'surf-next-member'});},nativeSetup(n){
+  h=await fixture('surf',{ordinaryAuthor:true,edit(game){if(id==='E2-SURF-GEN')game.party.push({...structuredClone(game.party[0]),id:'surf-next-member'});},nativeSetup(n){
    // Install before the production plugins. Observe the real Management channel
    // while delegating the original receiver, argument values and return value.
    const output=n.G.console,warn=output.warn;
@@ -66,7 +66,7 @@ test(id+' real Party Surf lifecycle control',{timeout:120000},async()=>{
    // GEN worker/binding, after every original GEN assertion above has completed.
    const context=async(label,options,exercise)=>{
     const row={kind:label,status:'RUNNING',trace:[]};trace.push(row);let next,random;
-    try{next=await fixture('surf',options);random=require('./rng-observer.cjs').install(next.G,process.env.PF_E3_JOINT_OUT);await exercise(next,row.trace,random);assert.equal(next.saves.length,0);assert.equal(next.G.PSFlow.running,false);assert.equal(next.app.saveBlocked,false);row.status='PASS';}
+    try{next=await fixture('surf',{...options,ordinaryAuthor:true});random=require('./rng-observer.cjs').install(next.G,process.env.PF_E3_JOINT_OUT);await exercise(next,row.trace,random);assert.equal(next.saves.length,0);assert.equal(next.G.PSFlow.running,false);assert.equal(next.app.saveBlocked,false);row.status='PASS';}
     finally{if(next){row.state=state(next);row.arrivals=next.o.nativeArrivals;row.steps=next.o.completedSteps;row.RNG=random?.rows;}random?.restore();}
    };
    await context('SL-R1-real-mapId-Scene-retirement',{},async(n,observed,random)=>{

@@ -2,7 +2,8 @@
 // Native fixture adaptation from fixed 18f e3-mz-world-travel-fixture.cjs.
 // Receives only the verified regular inputs; never compiles or searches private outputs.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
-function createNativeFixture({root,B}) {
+function createNativeFixture({root,B,isolated}) {
+ if(isolated)assert.equal(isolated.scope,'EXPLICIT_ISOLATED_LEGACY_FIXTURE_NOT_ORDINARY');
  const support=require('../../experiments/step5/5/d-mz-integration-support.cjs');
  support.build=async()=>B; // Install before any downstream support captures build().
  const {frameFixture}=require('../../experiments/step5/5/d-mz-native-frame-support.cjs');
@@ -33,16 +34,24 @@ async function fullFixture(options={}){
   return new E.app.GameApplication(actual,settings);
  }}}:{})};
  const req=name=>name==='./js/engine/build/production.cjs'?runtime:require(name);
- req.resolve=name=>name==='./js/engine/build/production.cjs'?path.join(root,'js/engine/build/production.cjs'):require.resolve(name);G.require=req;
+ req.resolve=name=>name==='./js/engine/build/production.cjs'?path.join(root,'js/engine/build/production.cjs'):
+  isolated&&name==='./js/plugins.js'?isolated.manifest:require.resolve(name);G.require=req;
+ if(isolated){
+ G.nw={App:{argv:[...isolated.argv],dataPath:isolated.profile,manifest:{name:'Headless-F-Synthetic'}}};
+ G.process={platform:process.platform};
+ G.StorageManager={fileDirectoryPath(){throw Error('implicit storage layout refused');}};
+ vm.runInContext(B.saveLocation,G,{filename:'isolated-test-artifact:PS_SaveLocation.js'});
+ assert.equal(G.StorageManager.fileDirectoryPath(),isolated.saves+path.sep);
+ }
  // The complete compiled IIFE owns constructor/issuer/ports. No extracted construction method or hand-issued test ticket.
- vm.runInContext(B.flow,G,{filename:'full-private-production:PS_BattleFlow.js'});
+ vm.runInContext(B.flow,G,{filename:(isolated?'isolated-test-artifact:':'default-production:')+'PS_BattleFlow.js'});
  const flow=G.PSFlow;flow._content=h.content;flow._dex={move:id=>h.content.moves[id]||null,species:()=>null,levelUpMoves:()=>null,sha:()=> 'fixture-only'};
  h.flow=flow;
  const game=flow.game,content=flow.content;
  if(options.onRead)flow.game=function(){const value=game.call(this);options.onRead(h);return value;};
  if(options.onContent)flow.content=function(){const value=content.call(this);options.onContent(h);return value;};
- flow.fast=true;flow.rng=n=>{h.draws.push(n);return 0;};flow.clock=()=>0;
- if(options.worldSource)await options.worldSource(G);else vm.runInContext(B.world,G,{filename:'full-private-production:PS_World.js'});
+ if(isolated){flow.fast=true;flow.rng=n=>{h.draws.push(n);return 0;};flow.clock=()=>0;}
+ if(options.worldSource)await options.worldSource(G);else vm.runInContext(B.world,G,{filename:(isolated?'isolated-test-artifact:':'default-production:')+'PS_World.js'});
  const app=flow.app();h.app=app;
  return{...h,G,flow,app,flush,state:()=>G.$gameSystem._psGame};
 }

@@ -286,6 +286,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * completes after its operation was aborted, only ever touches that object, never a later operation.
    */
   private op: (BattleOperation & { session: S | null }) | null = null;
+  // A mark survives retirement without retaining a Session; never restore an older mark after a successor retires.
+  readonly #battleIssues = new WeakMap<BattleOperation, symbol>();
+  #latestBattleIssue: symbol | null = null;
+  /** Only admitted operations are enrolled; an already-projected async opening failure must not publish a second result. */
+  private readonly admittedAbortOutcomes = new WeakMap<BattleOperation, BattleOutcome | null>();
+  // Only the latest genuinely owned opening failure can defer its unprojected terminal to the host.
+  private pendingHostStartAbort: { operation: BattleOperation; generation: number; error: unknown } | null = null;
   private readonly worldBattles = new WeakMap<WorldBattleAdmission, {
     operation: BattleOperation & { session: S | null }; generation: number; prepared?: PreparedWorldEncounter; legacy?: LegacyBattleReservation;
     status: 'reserved' | 'starting' | 'started' | 'failed' | 'aborted'; promise?: Promise<S>;
@@ -1261,6 +1268,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   isOwnedSurfLandingTerminalArrival(ticket: object, entry: object): boolean { return this.world.isOwnedSurfLandingTerminalArrival(ticket, entry); }
   ownedRepelSceneHooks(owner: CompletedStepPermit, selection: OwnedRepelSelection) { return this.world.ownedRepelSceneHooks(owner, selection); }
   isOwnedRepelSelection(owner: CompletedStepPermit, selection: OwnedRepelSelection): boolean { return this.world.isOwnedRepelSelection(owner, selection); }
+  private issueBattleOperation(operation: BattleOperation & { session: S | null }): BattleOperation & { session: S | null } {
+    const issue = Symbol();
+    this.#battleIssues.set(operation, issue);
+    this.#latestBattleIssue = issue;
+    this.pendingHostStartAbort = null;
+    return operation;
+  }
   admitWorldBattle(parent: WorldBattleParentPermit, offer: WorldBattleOffer): WorldBattleAdmission {
     this.assertNoFriendshipWrite();
     const prepared = this.world.captureBattleOffer(parent, offer);
@@ -1270,13 +1284,14 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const operation: BattleOperation & { session: S | null } = { battleId: prepared.request.battleId, session: null, facts: { kind: 'wild', canLose: false, moneyGain: true } };
     const admission: WorldBattleAdmission = Object.freeze({ token: `${offer.token}:admitted`, generation: this.generation, battleId: operation.battleId });
     // No host call or await separates reserving the battle and retiring the world parent.
-    this.op = operation;
+    this.op = this.issueBattleOperation(operation);
     try { this.world.retireToBattle(parent, offer); }
     catch (error) {
       // A failed handoff owns only this reservation. Reentrant cleanup must never clear a successor.
       if (this.op === operation) this.op = null;
       throw error;
     }
+    this.admittedAbortOutcomes.set(operation, null);
     this.worldBattles.set(admission, { operation, generation: this.generation, prepared, status: 'reserved', ...(sourceLifecycle ? { sourceLifecycle } : {}) });
     return admission;
   }
@@ -1341,6 +1356,32 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (entry.status === 'aborted') return { status: 'duplicate' };
     if (this.op !== entry.operation || entry.status === 'failed') return { status: 'refused', reason: 'stale-world-battle-admission' };
     entry.status = 'aborted'; this.abortBattle({ battleId: entry.operation.battleId }, Error(reason)); return { status: 'aborted' };
+  }
+  /** Terminal presentation owns a real reservation, not a second call to generic abort/project. */
+  abortAdmittedWorldBattleForHost(admission: WorldBattleAdmission, error: unknown, isHostCurrent: () => boolean): BattleOutcome | undefined {
+    this.assertNoFriendshipWrite();
+    const entry = this.worldBattles.get(admission);
+    const issue = entry && this.#battleIssues.get(entry.operation);
+    if (!entry || !issue) return undefined;
+    const stillIssued = () => isHostCurrent() && this.generation === entry.generation && this.#latestBattleIssue === issue;
+    if (!stillIssued()) return undefined;
+    const previous = this.admittedAbortOutcomes.get(entry.operation);
+    if (previous) return { ...previous };
+    const canProject = () => stillIssued() && this.op === null;
+    const failed = this.pendingHostStartAbort;
+    if (entry.status === 'failed' && failed?.operation === entry.operation && failed.generation === entry.generation && canProject()) {
+      this.pendingHostStartAbort = null;
+      const outcome: BattleOutcome = { code: 0, battleId: entry.operation.battleId, commit: "none", aborted: true, error: message(failed.error) };
+      if (canProject()) {
+        this.admittedAbortOutcomes.set(entry.operation, outcome);
+        this.project(outcome);
+      }
+      return stillIssued() ? outcome : undefined;
+    }
+    if (this.op !== entry.operation || entry.status === 'failed' || entry.status === 'aborted') return undefined;
+    entry.status = 'aborted';
+    const outcome = this.abortBattleTerminal({ battleId: entry.operation.battleId }, error, canProject);
+    return stillIssued() ? outcome : undefined;
   }
   runWorldTravel(requestId: string, request: WorldTravelRequest) { this.assertNoFriendshipWrite(); return this.world.runTravel(requestId, request); }
   retryWorldTravel(requestId: string) { this.assertNoFriendshipWrite(); return this.world.travel.retry(requestId); }
@@ -1631,7 +1672,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const operation: BattleOperation & { session: S | null } = { battleId: accepted.battleId, session: null,
       facts: { kind: accepted.kind, canLose: !!accepted.canLose, moneyGain: accepted.moneyGain ?? true } };
     const admission: WorldBattleAdmission = Object.freeze({ token: `${accepted.battleId}:legacy-admitted`, generation: this.generation, battleId: accepted.battleId });
-    record.reserved = true; this.op = operation;
+    record.reserved = true; this.op = this.issueBattleOperation(operation);
+    this.admittedAbortOutcomes.set(operation, null);
     this.worldBattles.set(admission, { operation, generation: this.generation, legacy: { admission, request: accepted, fields, record }, sourceLifecycle: record.source, status: 'reserved' });
     return admission;
   }
@@ -1798,6 +1840,8 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
   stateReplacedByHost(): void { this.assertNoFriendshipWrite();
     const retiring=this.op?.session;
     this.generation++;
+    this.#latestBattleIssue = null;
+    this.pendingHostStartAbort = null;
     this.#companionLifecycle.invalidate(this.generation);
     this.world.invalidate();
     if (this.#currentSettlementAdmission) this.#currentSettlementAdmission.invalid = true;
@@ -1847,7 +1891,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const initialField = captureInitialField(request);
     const generation = this.generation;
     const op: BattleOperation & { session: S | null } = { battleId: request.battleId, session: null, facts: { kind: request.kind, canLose: !!request.canLose, moneyGain: true } };
-    this.op = op;
+    this.op = this.issueBattleOperation(op);
     return this.startReservedBattle(request, op, generation, undefined, initialField);
   }
   /** Additive event/script entry. The accepted individual is never passed through a member factory. */
@@ -1857,7 +1901,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     if (this.management.active || this.reception || this.inventory.active || this.op || this.battleCommitOwner || this.evolutions.active || this.businessBusy) throw Error('operation-active');
     const generation = this.generation, operation: BattleOperation & { session: S | null } = { battleId: given.request.battleId, session: null,
       facts: { kind: 'wild', canLose: !!given.request.canLose, moneyGain: given.request.moneyGain ?? true } };
-    this.op = operation;
+    this.op = this.issueBattleOperation(operation);
     return this.startReservedBattle(given.request, operation, generation, undefined, captureInitialField(given.request), undefined, undefined, given.member);
   }
   /** Direct App caller owns its Session/rendering; a revocable existing world lifecycle is required for full generation. */
@@ -1865,7 +1909,7 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     const accepted = captureGeneratedWildBattle(input); this.assertNoFriendshipWrite();
     if (this.management.active || this.reception || this.inventory.active || this.op || this.battleCommitOwner || this.evolutions.active || this.businessBusy) throw Error('operation-active');
     const generation = this.generation, op: BattleOperation & { session: S | null } = { battleId: accepted.request.battleId, session: null, facts: { kind: 'wild', canLose: !!accepted.request.canLose, moneyGain: accepted.request.moneyGain ?? true } };
-    this.op = op;
+    this.op = this.issueBattleOperation(op);
     const owned = (): void => { if (this.op !== op || this.generation !== generation) throw Error('generated-wild-owner-stale'); };
     try {
       let game = this.ports.state.read(); owned(); this.assertBusinessState(game); const { content, dex } = this.ports.content(); owned();
@@ -2056,7 +2100,13 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
       }
       return session;
     } catch (error) {
-      if (this.op === op) { this.op = null; if (this.#currentSettlementAdmission) this.#currentSettlementAdmission.invalid = true; this.#currentSettlementAdmission = null; }
+      if (this.op === op) {
+        if (this.generation === generation && this.admittedAbortOutcomes.has(op))
+          this.pendingHostStartAbort = { operation: op, generation, error };
+        this.op = null;
+        if (this.#currentSettlementAdmission) this.#currentSettlementAdmission.invalid = true;
+        this.#currentSettlementAdmission = null;
+      }
       if (createdHandleOwned && createdHandle && op.session !== createdHandle) {
         try { this.retireSession?.(createdHandle); }
         catch (retireError) { throw Error(`${message(error)}; session-retire-failed: ${message(retireError)}`); }
@@ -2511,12 +2561,19 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
    * End without a result (a failure, a cancelled scene). Nothing is committed. Never throws. Ends the open operation when
    * it is this battle (same battleId), also while its session is still being created.
    */
-  abortBattle(request: Pick<BattleStartRequest, "battleId"> | null, error: unknown): BattleOutcome { this.assertNoFriendshipWrite();
+  abortBattle(request: Pick<BattleStartRequest, "battleId"> | null, error: unknown): BattleOutcome {
+    return this.abortBattleTerminal(request, error);
+  }
+
+  private abortBattleTerminal(request: Pick<BattleStartRequest, "battleId"> | null, error: unknown, canProject?: () => boolean): BattleOutcome {
+    this.assertNoFriendshipWrite();
     const operation = this.op;
     const context = operation?.session ? this.battleContexts.get(operation.session) : !operation ? this.battleCommitOwner : undefined;
     const admission = context ? this.#settlementAdmissions.get(context) : this.#currentSettlementAdmission;
     const matches = request && (operation ? operation.battleId === request.battleId
       : admission?.source?.mode === "legacy-no-held" && admission.battleId === request.battleId);
+    const admitted = matches && operation && this.admittedAbortOutcomes.has(operation);
+    const issue = admitted ? this.#battleIssues.get(operation) : undefined;
     if (matches) {
       // The unowned legacy producer also reserves an operation identity. Retire exactly that reservation;
       // incomplete/unknown installation keeps its barrier, and no callback may clear a successor owner.
@@ -2536,7 +2593,12 @@ export class GameApplication<S extends BattleHandle = BattleHandle> {
     }
     if(matches&&operation?.session)try{this.retireSession?.(operation.session);}catch{/* the old operation is already retired */}
     const outcome: BattleOutcome = { code: 0, battleId: request ? request.battleId : null, commit: "none", aborted: true, error: message(error) };
-    this.project(outcome);
+    // Install the outcome before the projection callback can re-enter, then retain its actual projection result.
+    const allowed = (!canProject || canProject()) && (!admitted || !!issue && this.#latestBattleIssue === issue && this.op === null);
+    if (allowed) {
+      if (admitted) this.admittedAbortOutcomes.set(operation, outcome);
+      this.project(outcome);
+    }
     return outcome;
   }
 

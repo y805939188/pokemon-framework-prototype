@@ -4,7 +4,7 @@ import type { PrebattlePlan } from './prebattle';
 import { capturePrebattleBGSMZ, createPrebattleOverlayMZ } from './prebattle-mz';
 
 /** The ordinary Map wrapper. Actual battle Scene/session and their internal opening stay authoritative. */
-export function installPrebattleHost(G:any, flow:any, prepareAudio:(op:any)=>void, beforePush?:(op:object)=>void) {
+export function installPrebattleHost(G:any, flow:any, fastBattle:()=>boolean, prepareAudio:(op:any)=>void, beforePush?:(op:object)=>void) {
   type Entry={op:any;source:any;app:any;generation:any;operation:PrebattleOperation};
   type DeferredAutosave={entry:Entry;scene:any;map:any;mapId:any;args:any[];blackout:boolean;doneObserved?:boolean};
   let deferredAutosave:DeferredAutosave|null=null;
@@ -87,9 +87,9 @@ export function installPrebattleHost(G:any, flow:any, prepareAudio:(op:any)=>voi
   return {
     pending, snapshot:()=> (active?.operation??last)?.snapshot()??null,
     open(op:any,plan:Readonly<PrebattlePlan>):boolean{
-      const scene=G.SceneManager._scene;
-      op.prebattleMode=flow.fast?'developer-fast':liveMap(scene)?'default-map':'non-map-immediate';
-      if(flow.fast||!liveMap(scene))return false;
+      const scene=G.SceneManager._scene, fast=fastBattle();
+      op.prebattleMode=fast?'developer-fast':liveMap(scene)?'default-map':'non-map-immediate';
+      if(fast||!liveMap(scene))return false;
       deferredAutosave=null;
       active?.operation.cancel(false);
       const e:Entry={op,source:scene,app:flow._app,generation:flow._app?.stateGeneration,operation:null as any};

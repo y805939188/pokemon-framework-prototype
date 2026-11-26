@@ -14,11 +14,31 @@ const runtime=require('../../../../scripts/tests/final-production-runtime.cjs');
 const fieldIds=['cut','rocksmash','surf','flash','sweetscent'];
 function event(id,name,x,y){return{id,name,x,y,pages:[{conditions:{switch1Valid:false,switch2Valid:false,variableValid:false,selfSwitchValid:false,itemValid:false,actorValid:false},image:{tileId:0,characterName:'Actor2',characterIndex:0,direction:2,pattern:1},priorityType:1,through:false,trigger:0,moveType:0,moveSpeed:4,moveFrequency:3,walkAnime:true,stepAnime:false,directionFix:false,list:[{code:0,indent:0,parameters:[]}]}]};}
 async function fixture(move,options={}){
- assert(fieldIds.includes(move));const {E,T}=runtime.get();
+ assert(fieldIds.includes(move));const {E,T}=runtime.get();const family=process.env.PF_FINAL_PRODUCTION_FAMILY;
+ const presentation=['field-presentation-terminal','field-presentation-i18n','travel-presentation-initial','travel-presentation-source-controls'].includes(family);
+ const ordinaryAuthor=presentation||options.ordinaryAuthor===true, authorMove=presentation?(options.presentationMove??move):move;
  const o={effectNames:[],effects:0,radii:[],sounds:[],buffers:[],audioHardwareCalls:0,clears:0,erases:[],flashes:[],screenUpdates:0,flashUpdates:0,sessionStarts:[],openings:0,messages:[],idle:[],messageCompletions:[],nativeArrivals:[],completedSteps:[]};
- let h;
+ let h,author;
  h=await base({defaultProduction:true,autosave:false,move,
+  ...(ordinaryAuthor?{ordinaryAuthorInput(){assert(author,'case author input must be compiled before installing the ordinary IIFE');return author;}}:{}),
   edit(game,content){
+   if(ordinaryAuthor){
+    author=require('./ordinary-author-input.cjs').prepare(runtime.get(),authorMove);
+    Object.keys(content).forEach(key=>delete content[key]);Object.assign(content,author.initialContent);
+    const encounter=move==='rocksmash'||move==='sweetscent';
+    const member=E.speciesKey.toPersistentMember(E.memberFactory.createMember({
+     species:'Snorlax',level:5,id:encounter?'e2-player':game.party[0].id,owner:encounter?{id:1,name:'E2',gender:0,language:2}:game.player
+    },content,n=>Math.floor(n*.23)),content);
+    member.moves=member.moves.filter(row=>row.id===authorMove);assert.equal(member.moves.length,1);member.item='';
+    if(!encounter)member.hp=20;
+    const before=game.world;
+    const initial=E.state.newGame({content,party:[member],money:12,...(!encounter?{bag:{repel:2,potion:3}}:{})});
+    if(!encounter)Object.assign(initial.world,{visitedMaps:before.visitedMaps,escapePoint:before.escapePoint,healingSpot:before.healingSpot});
+    Object.assign(game,initial);game.badges=Array(8).fill(true);game.world.companions=[];
+    options.edit?.(game,content);
+    assert.deepEqual(E.saveSchema.validateGameContent(game,content),[],'legal compiled form0/empty-held ordinary input');
+    return;
+   }
    if(move==='rocksmash'||move==='sweetscent'){
     // The direct-battle donor's legacy fixture has no ordinary wild rule-family
     // identity. Use the same formal compile/assemble path as the accepted E1
@@ -50,12 +70,15 @@ async function fixture(move,options={}){
    assert.deepEqual(E.saveSchema.validateGameContent(game,content),[],'legal supported form0/empty-held initial input');
   },
   nativeSetup(n,context){
-   const G=n.G,parameters=G.PluginManager.parameters;
+   const G=n.G;
    const scenes=fs.readFileSync(path.join(runtime.get().root,'js/reactor_scenes.js'),'utf8'),name='Scene_Map.prototype.isReady',a=scenes.indexOf(name+' = function'),b=scenes.indexOf('\n};',a);assert(a>=0&&b>a);
    vm.runInContext(scenes.slice(a,b+4),G,{filename:'pinned-current-e2:Scene_Map.isReady'});
    G.Scene_Message.prototype.isReady=()=>true;G.DataManager.isMapLoaded=()=>G.$dataMap!==null;
-   // The ordinary Flow composition itself chooses the real LegacyNoHeld factory.
-   G.PluginManager.parameters=function(name){const p=Reflect.apply(parameters,this,[name]);return name==='PS_BattleFlow'?{...p,contentSource:'fixture'}:p;};
+   // Preserve the original sibling harness inputs without opting those workers into E2 author content.
+   if(!ordinaryAuthor){
+    const parameters=G.PluginManager.parameters;
+    G.PluginManager.parameters=function(name){const p=Reflect.apply(parameters,this,[name]);return name==='PS_BattleFlow'?{...p,contentSource:'fixture'}:p;};
+   }
    renderer(G,o);
    const raw=context.maps[5];
    if(move==='surf')for(let y=0;y<8;y++)for(let x=3;x<=5;x++)raw.data[(3*8+y)*10+x]=1;
@@ -70,14 +93,21 @@ async function fixture(move,options={}){
    options.nativeSetup?.(n,context,o);
   },
   beforeUpgrade(n){
-   n.flow.rng=size=>{n.draws.push(size);return move==='surf'&&size===100?99:0;};
-   n.flow.clock=()=>0;n.flow.seed=[1,2,3,4];n.flow.fast=true;
+   if(ordinaryAuthor){
+    assert.equal(n.flow.rng,null);assert.equal(n.flow.clock,null);assert.equal(n.flow.seed,undefined);assert.equal(n.flow.fast,false);
+   }else{
+    n.flow.rng=size=>{n.draws.push(size);return move==='surf'&&size===100?99:0;};
+    n.flow.clock=()=>0;n.flow.seed=[1,2,3,4];n.flow.fast=true;
+   }
    options.beforeUpgrade?.(n);
   }
  });
  const {G,app}=h,m=G.SceneManager;
  assert(app instanceof E.app.GameApplication);assert.strictEqual(G.PSFlow.app(),app);
- assert.equal(G.PluginManager.parameters('PS_BattleFlow').contentSource,'fixture');
+ if(ordinaryAuthor){
+  assert.notEqual(G.PluginManager.parameters('PS_BattleFlow').contentSource,'fixture');
+  assert.equal(author.reads,1);assert.equal(E.contentRuntime.validatedContentIdentity(h.flow.content()),author.evidence.contentIdentity);
+ }else assert.equal(G.PluginManager.parameters('PS_BattleFlow').contentSource,'fixture');
  assert(/orig\.apply/.test(String(G.Scene_Map)));
  const P=G.Scene_PSBattle.prototype;
  P.isReady=function(){return !!this._controller?.ready;};P.start=function(){return G.Scene_MenuBase.prototype.start.call(this);};P.update=function(){};
@@ -136,11 +166,55 @@ async function fixture(move,options={}){
   assert(h.calls.findIndex(x=>x.kind==='end-management')<h.calls.findIndex(x=>x===preparation));assert.equal(preparation.blocked,false);observeBirth('Party-returned-current-Map');const outcome=outcomes().at(-1).result;if(outcome.status==='completed')await waitIdle('after-successful-Party-before-new-input');return outcome;
  };
  const battleAccepted=async()=>{
-  await h.pump(()=>m._scene?._controller?.ready&&o.sessionStarts.some(x=>x.status==='accepted'));
+  // At 60 Hz the ordinary wild Map wrapper needs at least 129 frames for
+  // 800 + 1250 + 100 ms, before native scene change / Session readiness.
+  // Allow 3 s of the existing frame clock here; keep the shared UI pump bound.
+  const ready=()=>m._scene?._controller?.ready&&o.sessionStarts.some(x=>x.status==='accepted');
+  if(ordinaryAuthor){
+   const frameLimit=180;
+   const handoff=o.battleHandoff={frameLimit,firstFrame:G.Graphics.frameCount,mode:G.PSFlow._op?.prebattleMode??null,
+    firstPhase:G.PSFlow.prebattleState()?.phase??null};
+   try{await h.pump(ready,frameLimit);}
+   finally{
+    const current=m._scene,outcome=G.PSFlow.lastOutcome;
+    Object.assign(handoff,{lastFrame:G.Graphics.frameCount,prebattle:G.PSFlow.prebattleState(),
+     scene:current?.constructor?.name??null,nextScene:m._nextScene?.constructor?.name??null,
+     actualBattleScene:current?._psBattle===true,controllerReady:current?._controller?.ready===true,
+     controllerFailure:current?._controller?.failure?String(current._controller.failure):null,
+     lastOutcome:outcome?{aborted:outcome.aborted,commit:outcome.commit,error:outcome.error}:null});
+   }
+   assert.equal(handoff.mode,'default-map');assert.equal(handoff.actualBattleScene,true);
+   assert.equal(handoff.prebattle?.primaryError,null);assert.equal(handoff.prebattle.phase,'battle');
+   const stages=Array.from(handoff.prebattle.stages);
+   assert.deepEqual(stages.map(stage=>stage.phase),['flash','transition','after','battle']);
+   assert.deepEqual(stages.map(stage=>stage.targetMs),[800,1250,100,0]);
+   for(let i=1;i<stages.length;i++){
+    assert(stages[i].frame>stages[i-1].frame);
+    assert(stages[i].at-stages[i-1].at>=stages[i-1].targetMs);
+   }
+  }else await h.pump(ready);
   const scene=m._scene,session=scene._session;assert(session);assert.equal(session.constructor.name,'BattleSession');assert.strictEqual(G.PSFlow._op.session,session);assert.equal(session.finished,false);assert.equal(o.sessionStarts.filter(x=>x.status==='accepted').length,1);
-  const observation={class:session.constructor.name,source:G.PSFlow._op.request.kind,battleId:session.battleId,sessionActual:true,unfinished:!session.finished};
+  const observation={class:session.constructor.name,source:G.PSFlow._op.request.kind,battleId:session.battleId,sessionActual:true,unfinished:!session.finished,...(ordinaryAuthor?{engineSeed:session.gw.prngSeed()}:{})};
   G.PSFlow.abort(Error('finite E2 accepted-session verification complete'));m.pop();await h.pump(()=>m._scene instanceof G.Scene_Map&&!app.saveBlocked&&!G.PSFlow.running);assert.equal(Object.keys(h.state().appliedBattles).length,0);return observation;
  };
- return{...h,o,births,genuineMap,outcomes,waitIdle,closeOverlay,shortcut,party,battleAccepted,replayLandingCompletion,flush};
+ return{...h,o,births,...(ordinaryAuthor?{ordinaryAuthor:author.evidence,businessEntropy:author.entropyRows}:{}),genuineMap,outcomes,waitIdle,closeOverlay,shortcut,party,battleAccepted,replayLandingCompletion,flush};
 }
-module.exports={fixture,flush};
+// Adversarial display-only input: the actual author artifact has already been
+// loaded and frozen. A detached, documented host port represents third-party
+// display data, not an author-file capability or in-place product mutation.
+function displayNamePort(h,move,value){
+ const allowed={TEXT25:'Author blade',TEXT26:'Author blade',TEXT27:'cut',TEXT28:'cut',TEXT46:'',TEXT47:17,TRAVEL35:'dig',TRAVEL36:'dig',SOURCE17:'Dig'};
+ const sel=process.env.PF_FINAL_PRODUCTION_SELECTOR;
+ assert(Object.hasOwn(allowed,sel)&&Object.is(allowed[sel],value),'unregistered display control');
+ const flow=h.G.PSFlow,original=flow.content(),dictionary=original.moves;
+ assert(h.ordinaryAuthor&&Object.isFrozen(original)&&Object.isFrozen(dictionary));
+ const keys=Object.keys(dictionary).filter(key=>dictionary[key].id===move);
+ assert(keys.length&&keys.every(key=>Object.isFrozen(dictionary[key])));
+ const originalName=dictionary[keys[0]].name,copy={...dictionary[keys[0]],name:value},moves={...dictionary};
+ for(const key of keys)moves[key]=copy;
+ const port={...original,moves};flow._content=port;
+ assert.strictEqual(flow._content,port);assert.equal(original.moves[keys[0]].name,originalName);
+ h.o.controlledDisplay={selector:sel,move,originalName,label:value,kind:'detached display port; ordinary file unchanged'};
+ return copy;
+}
+module.exports={fixture,flush,displayNamePort};

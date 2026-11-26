@@ -2,14 +2,6 @@
  * @target MZ
  * @plugindesc Step 2.4: placeholder text battle scene driven by the Showdown session; map events start battles and wait.
  *
- * @param contentSource
- * @text Content source
- * @desc sample = the compiled content pipeline output (data/framework/content.json); fixture = the synthetic step 2 test content.
- * @type select
- * @option sample
- * @option fixture
- * @default sample
- *
  * @param language
  * @text Battle screen language
  * @desc en or zh (Chinese sample). Unknown values use English; keys missing in a language fall back to English.
@@ -260,10 +252,6 @@
  * @command ShowParty
  * @text Show Party
  * @desc Opens party management and summaries (also in the main menu; PS_Management).
- *
- * @command ResetGame
- * @text Reset to Test Fixture (testing aid)
- * @desc TESTING AID: replaces the framework state with the synthetic step 2 test party (three level 50 members). Not for real games.
  *
  * @command PlayTrainerIntro
  * @text Play trainer intro

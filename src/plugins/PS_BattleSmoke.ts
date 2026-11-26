@@ -12,6 +12,7 @@ interface NwApp {
 declare const nw: { App: NwApp } | undefined;
 type NodeRequire = ((id: string) => unknown) & { resolve(id: string): string };
 
+import { isolatedTestScope, testStorageStillBound } from "./isolated-test-scope";
 interface SmokeCheck { id: string; status: string; error?: string; detail?: unknown }
 interface SmokeReport { overall: string; checks: SmokeCheck[]; env: Record<string, unknown> }
 interface Harness { runSmoke(extra?: Record<string, unknown>): Promise<SmokeReport> }
@@ -23,6 +24,8 @@ interface NodeFs {
 (() => {
   "use strict";
 
+  const testScope = isolatedTestScope(globalThis);
+  if (!testScope) return;
   const PLUGIN_NAME = "PS_BattleSmoke";
   // Fetch NW.js's Node require() off globalThis. A bare `require(...)` would be rewritten by the
   // bundler into a browser-external shim, which silently breaks Node built-ins like "path".
@@ -85,7 +88,7 @@ interface NodeFs {
   }
 
   async function run(): Promise<void> {
-    if (started) return;
+    if (started || !testStorageStillBound(globalThis, testScope)) return;
     started = true;
     let report: SmokeReport;
     try {

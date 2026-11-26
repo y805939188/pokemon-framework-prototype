@@ -21,5 +21,7 @@ function rowGeometry(G,{load,draws,windows}){
   const scene=G.SceneManager._scene;scene.calcWindowHeight=G.Scene_Base.prototype.calcWindowHeight;
   return {counts,rect:()=>G.Scene_Message.prototype.messageWindowRect.call(scene)};
 }
-function rowHost(lang='zh',width=816,height=624,animate=false){return host(lang,width,height,animate,rowGeometry);}
+function rowHost(lang='zh',width=816,height=624,animate=false,configure=null){
+ return host(lang,width,height,animate,(G,context)=>({...rowGeometry(G,context),...configure?.(G,context)}));
+}
 module.exports={rowHost,rowGeometry};

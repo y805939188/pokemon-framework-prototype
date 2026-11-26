@@ -333,6 +333,16 @@ export function createBlackoutSaveMZ(options: BlackoutNativeSaveOptions): Blacko
           }
         };
         if (!request) {
+          // An already taken original can still be on the stack; null collector
+          // alone does not prove there is nothing left to deliver or preserve.
+          if (!returnedReceiver && adoption === null && grant === null && executing === null && collector.current() === null) {
+            const retirement = Object.getOwnPropertyDescriptor(observation, 'retireIdleBattleSource');
+            if (retirement) {
+              if (!('value' in retirement) || typeof retirement.value !== 'function' || isProxy(retirement.value))
+                throw Error('blackout-save-no-request-source-retire-invalid');
+              Reflect.apply(retirement.value, observation, [completion]);
+            }
+          }
           replaceGrant();
           completed.set(completion, { app: app.app, generation: app.generation, owner });
           if (adoption === inherited) adoption = null;

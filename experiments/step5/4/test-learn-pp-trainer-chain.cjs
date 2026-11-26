@@ -77,10 +77,12 @@ async function open(lang, layout) {
   };
 }
 async function pick(h, key) {
+  const openingBag = key === 'bag' && h.scene._mode === 'main';
   if (h.scene._mode === 'bag') for (let i = 0; i < 8 && !h.scene.inputState().items.some(row => row.key === key); i++) { h.scene.changeBagPocket(1); await h.frames(1); }
   const rows = h.scene.inputState().items, index = rows.findIndex(row => row.key === key);
   assert(index >= 0, 'actual menu ' + key + ' in ' + h.scene._mode + ': ' + JSON.stringify(rows));
   h.scene._menu.select(index); h.scene.onMenuOk(); await h.frames(1);
+  if (openingBag) await h.waitFor(() => h.scene._mode === 'bag' && h.scene.inputState().ready, 'ordinary item menu after the actual Bag fade');
 }
 function uncommitted(h) { assert.equal(h.installs(), 0); assert.equal(JSON.stringify(h.flow.game()), h.before); }
 const working = h => h.session.party.find(m => m.id === 'LEARN-PP-P1');
@@ -131,7 +133,7 @@ for (const lang of ['en', 'zh']) for (const layout of ['append', 'replace']) tes
     const beforeFull = s.gw.snapshot(); await etherSelector(h); await pick(h, 2); await h.p.inMode('bag-members');
     assert.equal(s.gw.snapshot(), beforeFull, 'full newly learned PP is rejected without a turn');
     assert.equal(s.bag.ether, 2); assert.equal(s.ledger.length, 0); assert.equal(h.uses.length, 0); pp(h, 40, 9);
-    h.scene.onMenuCancel(); await h.frames(1); h.scene.onMenuCancel(); await h.p.inMode('main');
+    h.scene.onMenuCancel(); await h.waitFor(()=>h.scene._mode==='bag'&&h.scene.inputState().ready,'return from member target to usable Bag'); h.scene.onMenuCancel(); await h.p.inMode('main');
     await pick(h, 'fight'); await pick(h, 3); await h.p.inMode('main'); pp(h, 39, 9);
     await etherSelector(h); h.scene.onMenuCancel(); await h.p.inMode('bag-members');
     assert.equal(h.uses.length, 0); assert.equal(s.bag.ether, 2); pp(h, 39, 9);

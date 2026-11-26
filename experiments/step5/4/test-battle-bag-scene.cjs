@@ -35,16 +35,28 @@ async function open({ lang = 'en', members = 2, hurt = true, bag = { potion: 3, 
   const before = JSON.stringify(flow.game()); await h.p.toMapId(5, 8, 9);
   flow.openBattle({ kind: trainer ? 'trainer' : 'wild', ...(trainer ? { trainer: { id: 'music-normal', version: 1 } } : { foes: [{ species: 'Pidgey', level: 3 }] }), battleId: 'bag-' + path.basename(h.w.root), seq: 1, canLose: true, noRun });
   await h.p.inMode('main'); const s = h.p.battle();
-  return { ...h, s, flow, before, cleanup() { if (flow.running) flow.abort(Error('owned bag cleanup')); s.terminate(); } };
+  return { ...h, s, flow, before, settleBagActions:fast, cleanup() { if (flow.running) flow.abort(Error('owned bag cleanup')); s.terminate(); } };
+}
+// Ordinary and deliberately frame-sampled cases run the same product speed. Only callers of
+// the older synchronous action helpers await a transition they initiated; timing/abort cases
+// keep direct access to the very first locked frame.
+async function finishBagAction(h,priorFade){
+ const next=h.s._bagFade;
+ if(h.settleBagActions&&next&&next!==priorFade){
+  await h.waitFor(()=>next.snapshot().phase==='done'&&h.s._mode!=='messages','actual owned Bag transition settled');
+  assert(!h.s.children.some(n=>n._psBagFade));
+ }
 }
 async function pick(h, key) {
+  const priorFade = h.s._bagFade;
   if (h.s._mode === 'bag' && key !== null) {
     for (let i = 0; i < 8 && !h.s.inputState().items.some(row => row.key === key); i++) { h.s.changeBagPocket(1); await h.frames(1); }
   }
   const index = h.s.inputState().items.findIndex(row => row.key === key); assert(index >= 0, 'actual menu key ' + key + ' in ' + h.s._mode);
   h.s._menu.select(index); h.s.onMenuOk(); await h.frames(1);
+  await finishBagAction(h,priorFade);
 }
-async function cancel(h) { h.s.onMenuCancel(); await h.frames(1); }
+async function cancel(h) { const priorFade=h.s._bagFade;h.s.onMenuCancel(); await h.frames(1);await finishBagAction(h,priorFade); }
 async function bag(h) { await pick(h, 'bag'); assert.equal(h.s._mode, 'bag'); }
 async function use(h, item) { await pick(h, item); assert.equal(h.s._mode, 'bag-command'); await pick(h, 'use'); }
 for (const lang of ['en', 'zh']) test(lang + ' normal bag uses real pocket/Use/Cancel/member stack without touching field inventory or the main cursor', async () => {

@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const {flush}=require('../f-native-preparation/nontransfer-production-fixture.cjs');
 const clone=value=>structuredClone(value);
 async function fixture(options={}){
- const events=[],audio=[],entries=[],leaves=[],initialAudio={name:'field',volume:60,pitch:100,pan:0,pos:3};
+ const events=[],audio=[],entries=[],leaves=[],announcements=[],initialAudio={name:'field',volume:60,pitch:100,pan:0,pos:3};
  const h=await require('../f-native-preparation/nontransfer-production-fixture.cjs').fixture({missingHome:options.destination==='missing',repel:options.repel??0,
   edit(game,content){
    if(options.direct)game.party[0].hp=options.capable?4:0;
@@ -31,7 +31,8 @@ async function fixture(options={}){
   }});
  const {G,app}=h;
  if(options.lang)G.PSFlow.translator=()=>h.E.i18n.translatorFor(options.lang);
- const enter=h.ports.blackout.enterField,leave=h.ports.blackout.leaveField;
+ const enter=h.ports.blackout.enterField,leave=h.ports.blackout.leaveField,announce=h.ports.blackout.announce;
+ h.ports.blackout.announce=function(kind,checkpoint,...rest){announcements.push({kind,selection:checkpoint.selection.branch,target:clone(checkpoint.selection.target)});return Reflect.apply(announce,this,[kind,checkpoint,...rest]);};
  h.ports.blackout.enterField=async function(owner){const r={owner,result:null};entries.push(r);r.result=await Reflect.apply(enter,this,[owner]);return r.result;};
  h.ports.blackout.leaveField=function(...args){const result=Reflect.apply(leave,this,args);leaves.push({owner:args[0],result});return result;};
  const initial=clone(h.state());
@@ -41,6 +42,6 @@ async function fixture(options={}){
  const saveBlocked=async()=>{assert.equal(h.state().world.pendingReturn,null);assert.equal(app.saveBlocked,true);const before=h.saves.length;await assert.rejects(G.DataManager.saveGame(88),/saving|operation|pending/);assert.throws(()=>G.DataManager.makeSaveContents(),/operation|saving|pending/);assert.equal(h.saves.length,before);};
  const settled=()=>assert.equal(h.state().stats.blacked_out_count,initial.stats.blacked_out_count+1);
  const unsettled=()=>{assert.equal(h.state().stats.blacked_out_count,initial.stats.blacked_out_count);assert.deepEqual(h.state().party.map(m=>m.hp),initial.party.map(m=>options.direct?m.hp:0));assert.equal(h.state().world.pendingReturn,null);};
- return {...h,events,audio,entries,leaves,initial,pump,start,installSave,saveBlocked,settled,unsettled,clone};
+ return {...h,events,audio,entries,leaves,announcements,initial,pump,start,installSave,saveBlocked,settled,unsettled,clone};
 }
 module.exports={fixture,flush};

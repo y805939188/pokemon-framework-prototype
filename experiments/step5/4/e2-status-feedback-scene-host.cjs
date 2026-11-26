@@ -9,7 +9,7 @@ function prepare(){
   const code=fs.readFileSync(path.join(out,name+'.js'),'utf8');buildRecords.at(-1).sha256=crypto.createHash('sha256').update(code).digest('hex');if(process.env.PF_E_SCENE_ARTIFACT_DIR){const artifacts=path.join(process.env.PF_E_SCENE_ARTIFACT_DIR,'compiled');fs.mkdirSync(artifacts,{recursive:true});fs.writeFileSync(path.join(artifacts,name+'.js'),code);}if(name==='PS_BattleFlowTest')entryText=code;else plugins[name]=code;
  }
 }
-function cleanup(){console.log('SCENE_BUILD_OBSERVATION '+JSON.stringify({stem:'e2-status-feedback-scene',buildRecords}));if(work)fs.rmSync(work,{recursive:true,force:true});}
+function cleanup(){seededStage?.verify();console.log('SCENE_BUILD_OBSERVATION '+JSON.stringify({stem:'e2-status-feedback-scene',buildRecords}));if(work)fs.rmSync(work,{recursive:true,force:true});}
 function contentFor(c){
  const dir=path.join(ROOT,'content/sample'),input=Object.fromEntries(['manifest','sources','species','overlays','grants','regional-dex','settings','map-metadata'].filter(n=>fs.existsSync(path.join(dir,n+'.json'))).map(n=>[n.replace(/-([a-z])/g,(_,x)=>x.toUpperCase()),JSON.parse(fs.readFileSync(path.join(dir,n+'.json'),'utf8'))]));
  input.manifest.id=c.id.toLowerCase();
@@ -20,8 +20,28 @@ function contentFor(c){
  }
  const compiled=E.contentCompile.compileContent(input);assert(compiled.ok,JSON.stringify(compiled.errors));const assembled=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(assembled.errors,[]);return {content:assembled.content,input};
 }
+// Only exact blocked-round characterizations need a simulator seed. Attach real staged
+// artifacts to their own profile/storage; all other ordinary Scene cases keep unsigned Flow.
+let seededStage;
+function seededStatusHost(){
+ if(!seededStage){
+  const logs=fs.mkdtempSync(path.join(work,'seeded-status-build-'));
+  seededStage=require('../../../scripts/tests/battle-defeat-f-isolated.cjs').prepare(ROOT,logs);
+ }
+ const stage=seededStage;stage.verify();
+ return {stage,beforeProduct(G){
+  assert.equal(G.nw,undefined);const regular=G.require;
+  function req(id){if(id==='node:fs'||id==='node:path')return require(id);if(id==='os')return {homedir(){assert.fail('scoped status case cannot use owner HOME');}};return regular(id);}
+  req.resolve=id=>id==='./js/plugins.js'?stage.manifest:regular.resolve(id);G.require=req;
+  G.nw={App:{argv:[...stage.argv],dataPath:stage.profile,manifest:{name:'Scoped-Status-Gen8'}}};
+  G.process={platform:process.platform};G.StorageManager={fileDirectoryPath(){assert.fail('status storage is not bound');}};
+  require('node:vm').runInContext(fs.readFileSync(stage.artifacts.PS_SaveLocation,'utf8'),G,{filename:'stamped-PS_SaveLocation.js'});
+  assert.equal(G.StorageManager.fileDirectoryPath(),stage.saves+path.sep);
+ }};
+}
 async function open(c){
- const h=createVictoryDriverHost({ROOT,work,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true}}),G=h.G,flow=h.w.flow,{content,input}=contentFor(c),parameters=G.PluginManager.parameters;
+ const scoped=c.characterizeBlockedRounds?seededStatusHost():null;
+ const h=createVictoryDriverHost({ROOT,work,plugins,entryText,driverText:'SYNTHETIC_UNUSED_DRIVER',PLAN,options:{productionTranslator:true,beforeProduct:scoped?.beforeProduct,scopedStatusStage:scoped?.stage}}),G=h.G,flow=h.w.flow,{content,input}=contentFor(c),parameters=G.PluginManager.parameters;
  G.Bitmap.prototype.fillRect=()=>{};G.PluginManager.parameters=function(name){const p=parameters.call(this,name);return name==='PS_BattleFlow'?{...p,language:c.lang}:p;};
  flow.setLanguage(null);flow.stateReplaced();flow._app=null;flow._content=content;flow._dex=E.dex.createDexLookup();flow.seed=c.seed??[1,2,3,4];flow.rng=()=>0;flow.fast=true;
  const state=E.state.newGame({content,party:[],money:1000});

@@ -57,6 +57,21 @@ test('normal Map fade defers the real wrapper without changing the already prepa
  for(const id of ['OM01','OM02']){const rows=d.entries.filter(r=>r.id===id);assert.deepEqual(rows.map(r=>r.stage),['before-open','after-open','main-ready']);assert(rows[0].mapBusy&&rows[0].appInitialized&&rows[0].preparedAppSame);assert.equal(rows[1].prebattlePhase,'new');assert(rows[1].preparedAppSame&&rows[1].generationSame&&rows[1].operationSame);assert.equal(rows[2].prebattlePhase,'battle');assert(rows[2].musicOwnerSame);}
  assert(d.cleanupComplete&&!d.remainingRootLocked);
 });
-test('restoring the old late-app order reproduces cancelled wrapper and no Battle Scene, without loosening the main gate',async()=>{
- const h=host({busyMapEntry:true,variant:lateApp});await assert.rejects(lateApp.mod.runD2OrdinaryMessage(h.p),/bounded wait: mode main/);const d=h.report.ordinaryMessageNative;assert.deepEqual(h.report.results.map(r=>[r.id,r.status]),[['OM01','fail']]);assert.deepEqual(d.notRunIDs,['OM02']);const last=d.entries.at(-1);assert.equal(last.stage,'failed');assert.equal(last.prebattlePhase,'cancelled');assert(last.operationSame&&!last.musicOwnerSame);assert.equal(h.p.battle(),null);assert(d.cleanupComplete&&!d.remainingRootLocked);assert.equal(Object.getOwnPropertyDescriptor(h.G.$gameSystem,'_psGame').get,undefined);
+test('late observation of the same current App no longer cancels the deferred wrapper',async()=>{
+ const h=host({busyMapEntry:true,variant:lateApp});await lateApp.mod.runD2OrdinaryMessage(h.p);
+ const d=h.report.ordinaryMessageNative;assert.deepEqual(h.report.results.map(r=>[r.id,r.status]),[['OM01','pass'],['OM02','pass']]);
+ for(const id of ['OM01','OM02']){const rows=d.entries.filter(r=>r.id===id);assert.deepEqual(rows.map(r=>r.stage),['before-open','after-open','main-ready']);assert(rows[0].mapBusy);assert(rows[1].preparedAppSame&&rows[1].operationSame&&rows[1].generationSame);assert(rows[2].musicOwnerSame);}
+ assert(d.cleanupComplete&&!d.remainingRootLocked);
+});
+test('real state replacement after the busy Map admits an opening invalidates the old owner before Battle',async()=>{
+ const h=host({busyMapEntry:true}),flow=h.w.flow,open=flow.openBattle;let seen=0;
+ flow.openBattle=function(...args){
+  const result=Reflect.apply(open,this,args);const old=this._op,app=this._app,generation=app.stateGeneration,before=JSON.stringify(this.game());
+  assert(old&&this.running);assert.equal(this.prebattleState().phase,'new');assert(h.M._scene instanceof h.G.Scene_Map);seen++;
+  this.stateReplaced();assert.notStrictEqual(this._op,old);assert(!this.running);assert(app.stateGeneration>generation);assert.equal(JSON.stringify(this.game()),before);
+  return result;
+ };
+ await assert.rejects(driver.mod.runD2OrdinaryMessage(h.p),/bounded wait: mode main/);
+ const d=h.report.ordinaryMessageNative;assert.equal(seen,1);assert.deepEqual(h.report.results.map(r=>[r.id,r.status]),[['OM01','fail']]);assert.deepEqual(d.notRunIDs,['OM02']);assert.equal(d.entries.at(-1).stage,'failed');
+ assert.equal(h.p.battle(),null);assert(!flow.running&&!flow._op);assert(d.cleanupComplete&&!d.remainingRootLocked);assert.equal(Object.getOwnPropertyDescriptor(h.G.$gameSystem,'_psGame').get,undefined);
 });

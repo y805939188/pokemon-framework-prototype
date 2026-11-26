@@ -10,7 +10,7 @@ const image=h=>{const actual=h.characters.consume();return[actual.name,actual.in
 const before=h=>({steps:h.state().steps,count:h.state().stats.fishing_count,battles:h.state().stats.fishing_battles,inventory:structuredClone(h.state().inventory),draws:h.business.length});
 async function enter(h,entry='bag'){return entry==='bag'?h.bag():h.shortcut();}
 async function pump(h,predicate,max=200){for(let i=0;i<max;i++){if(predicate())return;const last=h.effects.at(-1);if(['open-message','dots','bite-message','result-message'].includes(last?.kind)&&h.G.$gameMessage.isBusy())h.ack();h.tick(50);await flush();}assert.fail('bounded pose pump '+JSON.stringify(h.snapshot()));}
-async function finish(h,cancel=true){await h.finish({cancel});if(!cancel&&h.effects.some(e=>e.kind==='bite-message')){await h.pump(()=>!!h.G.PSFlow._op?.session);h.G.PSFlow.abort('bounded-headless-fishing-pose');}}
+async function finish(h,cancel=true){await h.finish({cancel});if(!cancel&&h.effects.some(e=>e.kind==='bite-message')){await h.pump(()=>!!h.G.PSFlow._op?.session);h.assertOrdinaryHandoff();h.G.PSFlow.abort('bounded-headless-fishing-pose');}}
 async function cancel(h){assert(h.handoffs.length);h.G.PSWorld.cancelFieldItem(h.handoffs.at(-1).token);await pump(h,()=>!h.G.PSWorld.pending()&&!h.app.saveBlocked);for(let i=0;i<3;i++){h.tick();await flush();}}
 function save(h,name){records.push({name,images:h.characters.images,loads:h.characters.loads,outcomes:h.outcomes.map(o=>({status:o.status,reason:o.reason,fishing:o.fishing})),state:before(h),effects:h.effects.map(e=>({kind:e.kind,id:e.id??null})),native:image(h)});fs.writeFileSync(path.join(h.recordScope,'OBSERVED.json'),JSON.stringify(records.at(-1),null,2)+'\n',{flag:'wx'});h.restore();}
 const suites={

@@ -4,7 +4,7 @@ const {fixture,flush}=require('../e2-current-frontends/fixture.cjs');
 const output=process.env.PF_PRESENTATION_OUTPUT,selected=process.env.PF_PRESENTATION_CASE,known=[],observations=[];let sequence=0;
 function choose(name,body){known.push(name);if(selected===name)test(name,body);}
 async function make(move){const dir=path.join(output,'fixture-'+(++sequence));fs.mkdirSync(dir);process.env.PF_E2_FRONT_ROOT=dir;
- const h=await fixture(move==='strength'?'cut':move,{nativeSetup(n,c){if(move==='strength')c.maps[5].events[1].name='Native strengthboulder';},edit(g,c){if(move==='strength'){c.moves.strength={id:'strength',name:'Strength',pp:20};g.party[0].moves=[{id:'strength',pp:20,maxpp:20,ppUps:0}];}}});h.G.PSFlow.setLanguage('zh');h.clearable=new Set([h.G.$gameMessage]);return h;}
+ const h=await fixture(move==='strength'?'cut':move,{presentationMove:move,nativeSetup(n,c){if(move==='strength')c.maps[5].events[1].name='Native strengthboulder';}});h.G.PSFlow.setLanguage('zh');h.clearable=new Set([h.G.$gameMessage]);return h;}
 async function until(h,predicate,max=180){for(let i=0;i<max;i++){if(predicate())return;const m=h.G.$gameMessage;if(h.clearable.has(m)&&m.hasText()&&!m.isChoice())m.clear();h.tick();await flush();}a.fail('terminal fixture bounded wait: '+JSON.stringify({message:h.G.$gameMessage.allText(),choice:h.G.$gameMessage.isChoice(),blocked:h.app.saveBlocked,diagnostics:h.G.PSWorld.diagnostics}));}
 function start(h,move,id){const run={result:undefined,id,action:undefined,promise:undefined};
  if(move==='strength'){const original=h.app.runFieldMove;h.app.runFieldMove=function(...args){run.id=args[0];run.action=structuredClone(args[1]);const p=Reflect.apply(original,this,args);run.promise=p;void p.then(r=>{run.result=r;});return p;};h.press('ok');}

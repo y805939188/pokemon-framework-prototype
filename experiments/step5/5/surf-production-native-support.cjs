@@ -15,7 +15,7 @@ async function fixture(options={}){
  const trace=[],bitmap={_loadingState:options.loadingState??'loaded',_url:'img/characters/SurfFixture.png',_degradedToBlank:options.degraded===true};
  const parameters={TerrainTags:JSON.stringify({'0':{landAllowed:true,fishable:false,canSurf:false,environment:'grass'},'1':{landAllowed:false,fishable:true,canSurf:true,environment:'movingwater'}}),SurfPassage:options.passage??'boat',SurfCharacter:options.profile!==undefined?options.profile:options.noCharacter?'':JSON.stringify({name:'SurfFixture',index:0})};
  let h;
- h=await fullFixture({defaultProduction:options.defaultProduction,productionSessions:options.productionSessions,applicationPorts:options.applicationPorts,worldSource:options.source?sourceWorld:undefined,edit(game,content){
+ h=await fullFixture({defaultProduction:options.defaultProduction,ordinaryC:options.ordinaryC,productionSessions:options.productionSessions,applicationPorts:options.applicationPorts,ordinaryAuthorInput:options.ordinaryAuthorInput,worldSource:options.source?sourceWorld:undefined,edit(game,content){
   content.moves.surf={id:'surf',name:'Surf',pp:15};game.party[0].moves=[{id:'surf',pp:0,maxpp:15,ppUps:0}];game.party[0].hp=Math.max(game.party[0].hp,20);game.badges=Array(8).fill(true);
   content.world.encounters.tables[0].types.Land.stepChance=1;content.world.encounters.tables[0].types.Water={stepChance:1,slots:[{species:'A',weight:1,minLevel:5,maxLevel:5}]};options.edit?.(game,content);
  },async nativeSetup(n){
@@ -43,7 +43,7 @@ async function fixture(options={}){
   G.$gameMessage=new G.Game_Message();const add=G.$gameMessage.add;G.$gameMessage.add=function(text){trace.push(['message',text]);return add.call(this,text);};
   await options.nativeSetup?.(n,{bitmap,trace});
  }});
- if(!options.defaultProduction)h.flow.rng=n=>{h.draws.push(n);return n===100?99:0;};
+ if(!options.defaultProduction&&!options.ordinaryC)h.flow.rng=n=>{h.draws.push(n);return n===100?99:0;};
  const {G,app}=h,steps=[],ordinary=[],cleanup=[];const complete=app.completeWorldStep.bind(app);
  app.completeWorldStep=input=>{steps.push({input,surfing:h.state().world.surfing,ending:app.worldFieldRuntime().endingSurf,save:app.saveBlocked});const result=complete(input);return result.then(outcome=>{steps.at(-1).outcome=outcome;return outcome;});};
  const clean=G.PSWorld.fieldMoves.cleanupSurf;G.PSWorld.fieldMoves.cleanupSurf=(operation,player)=>{cleanup.push({player,steps:h.state().steps,repel:h.state().world.repelSteps,happiness:h.state().world.happinessSteps,save:app.saveBlocked,blocked:app.encounterBlocked,surfing:h.state().world.surfing,ending:app.worldFieldRuntime().endingSurf});return clean(operation,player);};

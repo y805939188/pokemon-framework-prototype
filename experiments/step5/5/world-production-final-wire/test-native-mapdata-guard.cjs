@@ -10,12 +10,13 @@ assert(['X1', 'X2'].includes(id), 'explicit X1/X2 case required');
 // Regression input: independent ABC-R1 probe, ae3ca9c4e6a7b01e831f38f8f227a591588460f9fb5d54a43980916bf1023763.
 // The actual 357, upgraded Scene constructor, foe generation and composition Session remain in the path.
 test(id + ' legacy native source survives the foe RNG callback', async () => {
-  const h = await fixture({ realSession: true });
+  let onDraw;
+  const h = await fixture({ realSession: true, wallClock: new Date(2026, 10, 16, 21).getTime(),
+    randomPort(n) { return onDraw ? Reflect.apply(onDraw, this, [n]) : (n === 100 ? 99 : 0); } });
   const { G, app, o } = h;
   const source = { data: G.$dataMap, map: G.$gameMap, player: G.$gamePlayer,
     app: G.PSFlow._app, generation: app.stateGeneration, content: h.ports.content().content, game: h.state() };
   const originalData = JSON.stringify(source.data);
-  const random = G.PSFlow.rng;
   const calls = [];
   let changed = false, callbackScene, callbackOperation, callbackAdmission;
   const identities = () => ({ dataSame: G.$dataMap === source.data, mapSame: G.$gameMap === source.map,
@@ -23,14 +24,14 @@ test(id + ' legacy native source survives the foe RNG callback', async () => {
     generationSame: app.stateGeneration === source.generation, contentSame: h.ports.content().content === source.content,
     gameSame: h.state() === source.game, sceneSame: G.SceneManager._scene === callbackScene,
     operationSame: G.PSFlow._op === callbackOperation, admissionSame: G.PSFlow._op?.worldAdmission === callbackAdmission });
-  G.PSFlow.rng = function (...args) {
+  onDraw = function (...args) {
     callbackScene ??= G.SceneManager._scene;
     callbackOperation ??= G.PSFlow._op;
     callbackAdmission ??= callbackOperation.worldAdmission;
     const before = identities();
-    const result = Reflect.apply(random, this, args);
+    const result = args[0] === 100 ? 99 : 0;
     if (id === 'X2' && !changed) { changed = true; G.$dataMap = { ...G.$dataMap }; }
-    calls.push({ sameThis: this === G.PSFlow, args, result, sessionCount: o.sessions.length,
+    calls.push({ sameThis: this === h.ports, args, result, sessionCount: o.sessions.length,
       before, after: identities(), equalData: JSON.stringify(G.$dataMap) === originalData });
     return result;
   };

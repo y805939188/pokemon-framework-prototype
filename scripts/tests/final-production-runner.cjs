@@ -7,6 +7,10 @@ const ROOT = fs.realpathSync(path.resolve(__dirname, '../..'));
 const sha = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const families = INPUTS.families;
 const states = new Map();
+// These finite ordinary production chains use the engine's default local save path.
+const ordinaryProjectSave = new Set(['t16', 'defeat', 'e3-companion-cold', 'e3-companion-empty-formal', 'f-load-current']);
+const caseSaves = (family, scope) => ordinaryProjectSave.has(family)
+  ? path.join(scope, 'profile', 'project', 'save') : path.join(scope, 'save');
 const isConsumer = (family, selector) => family === 'f-load-current' && ['L01','L02','L03','L04'].includes(selector)
   || selector === 'C01' || ['defeat','e3-companion-cold'].includes(family) && selector === 'C02'
   || family === 'e3-companion-empty-formal' && ['E01','E02','E03'].includes(selector);
@@ -99,7 +103,6 @@ function runCase(family, selector) {
   let producer;
   if (isConsumer(family, selector)) { assert(s.receipt, 'consumer requires successful same-run producer'); producer = receiptCheck(s.receipt, s.run, s.captured, selected); }
   const scope = inside(path.join(s.run, selector), s.run); assert(!fs.existsSync(scope), 'case output already exists'); fs.mkdirSync(scope);
-  fs.mkdirSync(inside(path.join(scope, 'save'), s.run));
   const env = {...process.env, PF_FINAL_PRODUCTION_FAMILY: family, PF_FINAL_PRODUCTION_SELECTOR: selector,
     PF_FINAL_PRODUCTION_RUN: s.run, [record.selectorEnv]: record.selectorValues?.[selector] ?? selector, [record.scopeEnv]: scope};
   if (family === 'e1-fishing-character' && /^POSE\d{2}$/.test(selector)) env.PF_E1_POSE_CASE = selector;
@@ -107,12 +110,14 @@ function runCase(family, selector) {
     for (const name of ['tmp', 'cache', 'profile']) fs.mkdirSync(inside(path.join(scope, name), s.run));
     env.TMPDIR = path.join(scope, 'tmp'); env.XDG_CACHE_HOME = path.join(scope, 'cache');
   }
+  // Establish private profile roots first, before an ordinary save root nests under profile/project.
+  fs.mkdirSync(inside(caseSaves(family, scope), s.run), {recursive:true});
   delete env.NODE_TEST_CONTEXT; // This is a separately selected Node test process.
   if (family === 'defeat') env.PF_EVENT_ARTIFACT = path.join(scope, 'producer-observation.json');
   if (family === 'e1' && selector === 'visual') env.PF_E1_BASELINE = inside(path.join(s.run, 'bag/RESULT.json'), s.run);
   if (producer) { Object.assign(env, producer.consumerEnv); env.PF_FINAL_PRODUCTION_RECEIPT = s.receipt; }
   if (producer) {
-    const targetSave = inside(path.join(scope, 'save'), s.run);
+    const targetSave = inside(caseSaves(family, scope), s.run);
     for (const item of producer.saveFiles) {
       const target = inside(path.join(targetSave, item.name), scope);
       fs.copyFileSync(item.path, target, fs.constants.COPYFILE_EXCL);
@@ -138,8 +143,9 @@ function runCase(family, selector) {
     const completed = inside(path.join(scope, 'P00-input.json'), s.run);
     const value = JSON.parse(fs.readFileSync(completed, 'utf8'));
     assert(value.state?.world?.pendingReturn, 'F load producer must save a real pending checkpoint');
+    const save = inside(caseSaves(family, scope), scope);
     const saveFiles = ['file8.rmmzsave','global.rmmzsave'].map(name => {
-      const file = inside(path.join(scope, 'save', name), scope);
+      const file = inside(path.join(save, name), scope);
       const expected = name === 'file8.rmmzsave' ? value.fileSHA256 : value.globalSHA256;
       assert.equal(sha(file), expected, 'F pending producer physical observation differs');
       return {name, path: file, sha256: sha(file)};
@@ -151,7 +157,8 @@ function runCase(family, selector) {
     s.receipt = path.join(scope, 'PRODUCER-SEAL.json');
     fs.writeFileSync(s.receipt, JSON.stringify(receipt, null, 2) + '\n', {flag: 'wx'});
   } else if (selector === 'P01' && family === 'e3-companion-cold' || selector === 'P00' && family === 'e3-companion-empty-formal') {
-    const completed = inside(path.join(scope, selector+'-input.json'), s.run), save = inside(path.join(scope, 'save'), s.run);
+    const completed = inside(path.join(scope, selector+'-input.json'), s.run);
+    const save = inside(caseSaves(family, scope), s.run);
     assert(fs.lstatSync(completed).isFile(), 'formal companion producer input missing');
     const saveFiles = ['file1.rmmzsave','global.rmmzsave'].map(name => {
       const file = inside(path.join(save, name), scope);assert(fs.lstatSync(file).isFile());return {name,path:file,sha256:sha(file)};
@@ -164,7 +171,7 @@ function runCase(family, selector) {
     const completed = path.join(scope, family === 'defeat' ? 'completed.json' : 'producer-input.json');
     const value = JSON.parse(fs.readFileSync(completed, 'utf8'));
     const content = family === 'defeat' ? path.join(scope, 'content.json') : null;
-    const save = path.join(scope, 'save');
+    const save = caseSaves(family, scope);
     const consumerEnv = family === 'defeat'
       ? {PF_CHAIN_PRODUCER: completed, PF_CHAIN_CONTENT: content, PF_CHAIN_PRODUCER_SAVE: save}
       : {PF_T16_PRODUCER: completed, PF_T16_PRODUCER_SAVE: save};

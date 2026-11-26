@@ -26,6 +26,7 @@ const COPIES = {
 const INPUTS = [...SUITES, 'scripts/tests/c-regular-runtime.cjs', 'scripts/tests/c-regular-runtime.test.cjs',
   'experiments/step5/5/given-wild-support.cjs',
   'experiments/step5/5/generated-event-native-support.cjs',
+  'experiments/step5/5/c-ordinary-wild-host.cjs',
   'experiments/step5/5/fixtures/wild-generation-support.cjs',
   'experiments/step5/5/fixtures/wild-member-cache-support.cjs',
   ...require('./final-production-inputs.json').controlledInputs];

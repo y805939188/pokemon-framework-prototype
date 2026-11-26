@@ -22,7 +22,7 @@ async function fixture(options={}){
   // Retain the actual native map loader; the resource provider returns test JSON only.
   const XHR=G.XMLHttpRequest;G.XMLHttpRequest=class extends XHR{send(){if(/\.rrmap\.json$/.test(this.url)){queueMicrotask(()=>{this.status=404;this.responseText='';this.onload();});return;}if(flags.resourceFailure&&/Map007\.json$/.test(this.url)){observed.events.push('Map7-XHR-resource-error');queueMicrotask(()=>{this.status=0;this.onerror();});}else super.send();}};
  }});
- const {G}=h,io=installIO(G,scope,native,out),B=require(path.join(out,'production.cjs'));
+ const {G}=h,io=installIO(G,scope,native,out,{saveLocation:'project'}),B=require(path.join(out,'production.cjs'));
  G.process.mainModule={filename:path.join(io.project,'index.js')};
  G.$dataActors=JSON.parse(fs.readFileSync(path.join(native,'data/Actors.json'),'utf8'));
  G.$dataSystem=JSON.parse(fs.readFileSync(path.join(native,'data/System.json'),'utf8'));G.$dataSystem.optAutosave=true;G.$dataSystem.switches=['','StartingOver'];

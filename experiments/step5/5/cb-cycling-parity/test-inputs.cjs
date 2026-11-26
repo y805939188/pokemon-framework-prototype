@@ -9,6 +9,16 @@ function step(r,cycling,draws,remaining=[]){
  assert.equal(r.completed.steps,r.before.steps+1);assert.equal(r.completed.arrivals,r.before.arrivals+1);assert.deepEqual(r.completed.stats,r.start.stats);
  assert.deepEqual(r.completed.nativeDraws,r.before.nativeDraws);assert.deepEqual(r.completed.business.slice(r.before.business.length),draws);
  assert.deepEqual(r.completed.draws.slice(0,r.before.draws.length),r.before.draws);assert.deepEqual(r.unusedTape,remaining);
+ // The same packets must be observed only when the native step completes;
+ // refused cycling facts must not even attempt a private business fill.
+ assert.deepEqual(r.start.ordinaryEntropy,r.before.ordinaryEntropy);
+ assert.equal(r.completed.ordinaryEntropy.attempts-r.before.ordinaryEntropy.attempts,draws.length);
+ assert.equal(r.completed.ordinaryEntropy.fills-r.before.ordinaryEntropy.fills,draws.length);
+ const rows=r.completed.ordinaryEntropy.rows.slice(r.before.ordinaryEntropy.rows.length);
+ assert.deepEqual(rows.map(({upper,value})=>({upper,value})),draws);
+ assert.deepEqual([r.arrival.status,r.arrival.point,r.arrival.steps,r.arrival.arrivals],
+  ['ordinary-opportunity',r.completed.point,r.before.steps+1,r.before.arrivals+1]);
+ for(const row of rows)assert.deepEqual(row.phase,r.arrival,'each actual fill names the same completed native arrival');
 }
 function refused(r){step(r,null,[]);const outcome=r.completed.outcomes.at(-1);assert.equal(outcome.status,'failed');assert.equal(outcome.reason,'encounter-cycling-unavailable');assert.notEqual(r.completed.facts.cycling.status,'value');}
 test(id+' true native cycling source through production App and completed-step encounter',{timeout:120000},async()=>{
@@ -41,6 +51,6 @@ test(id+' true native cycling source through production App and completed-step e
    const player=h.player;h.player.isOnBicycle=function(){queryCalls++;h.G.$gamePlayer=Object.create(player);return true;};const replaced=h.app.worldFacts().cycling;assert.notEqual(replaced.status,'value');h.G.$gamePlayer=player;h.player.isOnBicycle=original;
    assert(receivers.every(Boolean));assert(queryCalls>0);extra={method,combined,changed,replaced,queryCalls,getterCalls,receivers};
   }
-  assert(h.movement.every(row=>row.receiver&&row.after[1]===row.before[1]+1));assert.deepEqual(h.nativeDraws,h.prefix.nativeDraws);assert.equal(h.saves.length,h.prefix.saves);assert.equal(h.sessions.length,0);pass=true;
+  assert(h.movement.every(row=>row.receiver&&row.after[1]===row.before[1]+1));assert.deepEqual(h.nativeDraws,h.prefix.nativeDraws);assert.equal(h.saves.length,h.prefix.saves);assert.equal(h.sessions.length,0);h.assertOrdinaryEntropy({CB01:1,CB02:3,CB03:0,CB04:1}[id]);pass=true;
  }finally{h.record({status:pass?'PASS':'FAIL',...extra});}
 });

@@ -35,8 +35,22 @@ async function fixture(options={}){const o={sessions:[],effectNames:[],effects:0
   content.mapMetadata.maps[5]={outdoor:false,environment:'cave',darkMap:options.dark===true};
   if(options.weather){content.mapMetadata.maps[5].weather={type:options.weather,chance:100};game.world.weather.type=options.weather;}
   options.edit?.(game,content);
- },applicationPorts(p){ports=p;if(options.realSession){const factory=E.composition.createLegacyNoHeldBattleSessionFactory({content:()=>p.content().content,seed:()=>[1,2,3,4]});const create=factory.create;factory.create=function(...args){o.sessions.push({request:structuredClone(args[0]),setup:structuredClone({...args[2],isCurrentBattle:undefined}),game:structuredClone(args[1])});return Reflect.apply(create,this,args);};p.sessions=factory;}
- },nativeSetup(n,{maps}){const G=n.G;vm.runInContext(core.slice(0,core.indexOf('function Utils()')),G,{filename:'pinned:JsExtensions'});G.PluginManager._commands={};for(const name of ['registerCommand','callCommand'])install(G,managers,'PluginManager.'+name);install(G,scenes,'Scene_Map.prototype.isReady');G.Scene_Message.prototype.isReady=()=>true;G.DataManager.isMapLoaded=()=>!!G.$dataMap;renderer(G,o);if(options.fieldEvents){for(const [id,name]of [[1,'cuttree'],[2,'smashrock'],[3,'strengthboulder']])maps[5].events[id]={id,name,x:3,y:2,pages:[{conditions:{switch1Valid:false,switch2Valid:false,variableValid:false,selfSwitchValid:false,itemValid:false,actorValid:false},image:{tileId:0,characterName:'Actor2',characterIndex:0,direction:2,pattern:1},priorityType:1,through:false,trigger:0,moveType:0,moveSpeed:4,moveFrequency:3,walkAnime:true,stepAnime:false,directionFix:false,list:[{code:0,parameters:[]}]}]};for(const id of [1,2,3])G.$gameMap._events[id]=new G.Game_Event(5,id);}options.nativeSetup?.(n,{maps,o});}});
+ },applicationPorts(p){ports=p;
+  // CB alone observes the final installed IIFE/require before the real App
+  // constructor can consume or cache its ordinary entropy provider.
+  if(options.cbObserveOrdinaryEntropyBeforeApp!==undefined){
+   assert.equal(process.env.PF_FINAL_PRODUCTION_FAMILY,'cb-cycling-parity');
+   assert(/^CB0[1-4]$/.test(process.env.PF_FINAL_PRODUCTION_SELECTOR??''));
+   assert.equal(typeof options.cbObserveOrdinaryEntropyBeforeApp,'function');
+   assert.equal(options.randomPort,undefined,'CB must use the original production random port');
+   assert.equal(options.realSession,undefined,'CB keeps its original no-Session fixture');
+   options.cbObserveOrdinaryEntropyBeforeApp(p);
+  }
+  if(options.randomPort)p.random=(n)=>Reflect.apply(options.randomPort,p,[n]);if(options.realSession){const factory=E.composition.createLegacyNoHeldBattleSessionFactory({content:()=>p.content().content,seed:()=>[1,2,3,4]});const create=factory.create;factory.create=function(...args){o.sessions.push({request:structuredClone(args[0]),setup:structuredClone({...args[2],isCurrentBattle:undefined}),game:structuredClone(args[1])});return Reflect.apply(create,this,args);};p.sessions=factory;}
+ },nativeSetup(n,{maps}){const G=n.G;if(options.wallClock!==undefined){
+   G.__finalWallClock=()=>options.wallClock;
+   vm.runInContext('Date=class extends Date{ static now(){return globalThis.__finalWallClock();} };',G,{filename:'X1/X2 synthetic host wall clock'});
+  }vm.runInContext(core.slice(0,core.indexOf('function Utils()')),G,{filename:'pinned:JsExtensions'});G.PluginManager._commands={};for(const name of ['registerCommand','callCommand'])install(G,managers,'PluginManager.'+name);install(G,scenes,'Scene_Map.prototype.isReady');G.Scene_Message.prototype.isReady=()=>true;G.DataManager.isMapLoaded=()=>!!G.$dataMap;renderer(G,o);if(options.fieldEvents){for(const [id,name]of [[1,'cuttree'],[2,'smashrock'],[3,'strengthboulder']])maps[5].events[id]={id,name,x:3,y:2,pages:[{conditions:{switch1Valid:false,switch2Valid:false,variableValid:false,selfSwitchValid:false,itemValid:false,actorValid:false},image:{tileId:0,characterName:'Actor2',characterIndex:0,direction:2,pattern:1},priorityType:1,through:false,trigger:0,moveType:0,moveSpeed:4,moveFrequency:3,walkAnime:true,stepAnime:false,directionFix:false,list:[{code:0,parameters:[]}]}]};for(const id of [1,2,3])G.$gameMap._events[id]=new G.Game_Event(5,id);}options.nativeSetup?.(n,{maps,o});}});
  const G=h.G,m=G.SceneManager,P=G.Scene_PSBattle.prototype;P.isReady=function(){return !!this._controller?.ready;};P.start=function(){return G.Scene_MenuBase.prototype.start.call(this);};P.update=function(){};
  const tick=()=>{G.Graphics.frameCount++;m.changeScene();m.updateScene();G.Input.trigger.clear();G.Input.repeat.clear();};const pump=async(predicate,max=180)=>{for(let i=0;i<max;i++){if(predicate())return;G.$gameMessage.clear();tick();await flush();}throw Error('final bounded '+JSON.stringify({last:h.flow.lastOutcome,scene:m._scene?.constructor?.name,ready:m._scene?._controller?.ready,failure:String(m._scene?._failure),pending:G.PSWorld.pending(),loadError:o.loadError,stateLoad:G.PSState?.lastLoadError,diagnostics:G.PSWorld.diagnostics}));};
  const old=m._scene;h.flow.stateReplaced();G.PSWorld.loadSucceeded();m.goto(G.Scene_Map);await pump(()=>m._scene!==old&&m._scene.isStarted()&&!h.app.saveBlocked&&!G.PSWorld.pending()&&!G.PSFlow.companionNativePending());
@@ -48,7 +62,7 @@ async function fixture(options={}){const o={sessions:[],effectNames:[],effects:0
 module.exports={fixture,flush,install};
 async function formalDarkLoads(h){
  const {G,o}=h,scope=process.env.PF_FINAL_CASE_ROOT;const{install}=require('../companion-cold-native-joint/io-adapter.cjs');
- const io=install(G,scope,root,out);G.process.mainModule={filename:path.join(io.project,'index.js')};
+ const io=install(G,scope,root,out,{saveLocation:'project'});G.process.mainModule={filename:path.join(io.project,'index.js')};
  G.$dataActors=JSON.parse(fs.readFileSync(root+'/data/Actors.json','utf8'));G.$dataSystem=JSON.parse(fs.readFileSync(root+'/data/System.json','utf8'));G.$dataSystem.optAutosave=false;G.$dataSystem.versionId=0;
  const a=scenes.indexOf('function Scene_File()'),b=scenes.indexOf('// Scene_GameEnd',a);vm.runInContext(scenes.slice(a,b),G,{filename:'pinned:Scene_File+Save+Load'});
  G.Scene_Load.prototype.create=function(){G.Scene_MenuBase.prototype.create.call(this);this._listWindow={refresh(){},activate(){}};};G.Scene_Load.prototype.fadeOutAll=function(){};G.SoundManager.playLoad=()=>{};

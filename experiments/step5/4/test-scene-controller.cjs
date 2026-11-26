@@ -3,6 +3,11 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
 const ROOT=path.resolve(__dirname,'../../..');let dir,Controller,plugin,backdropFixture,backdropPrefix;
 const advanceSceneClock=new WeakMap();
+function updateScene(scene,ms=50){advanceSceneClock.get(scene)?.(ms);scene.update();}
+function waitScene(scene,condition,label,frames,ms=50){
+ for(let i=0;i<frames&&!condition();i++)updateScene(scene,ms);
+ assert(condition(),label+': '+scene.inputState().phase+(scene._failure?' / '+scene._failure:''));
+}
 const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return{promise,resolve,reject};}
 test.before(()=>{
@@ -93,12 +98,13 @@ function host({opening,display=false,audio,exists,now,exp=125000}={}){
  }};
  const req=p=>{if(p==='fs')return controlledFS;if(p==='path'||p==='url'||p==='node:util')return require(p);if(p.includes('production.cjs'))return require(path.join(ROOT,'js/engine/build/production.cjs'));throw Error('unexpected require '+p);};req.resolve=p=>path.resolve(ROOT,p);
  const G={Error,structuredClone,performance,require:req,console:{log(){},warn(){},error(){}},PluginManager:{parameters:()=>({}),registerCommand(plugin,name,fn){commands[name]=fn;}},Game_Interpreter:Base,Game_System:System,Window_Base:Window,Window_Command:Window,Scene_MenuBase:Base,SceneManager:{_scene:null,push(){},isSceneChanging:()=>false},Graphics:{boxWidth:816,boxHeight:624,frameCount:0},Rectangle:function(x,y,width,height){Object.assign(this,{x,y,width,height});},Utils:{extractFileName:x=>x},Input:{isTriggered:()=>false},SoundManager:{playBuzzer(){}},$gameSystem:new System(),$gameMessage:{isBusy:()=>false,add(){}},$gameVariables:{setValue(){}}};
- G.Bitmap=Bitmap;G.Sprite=Sprite;G.AudioManager=audio;G.Utils.hasEncryptedAudio=()=>false;G.performance={now:now??(()=>sceneTime)};
+ // Explicit clock samples still drive exact animation edges; later drains advance that same clock.
+ G.Bitmap=Bitmap;G.Sprite=Sprite;G.AudioManager=audio;G.Utils.hasEncryptedAudio=()=>false;G.performance={now:()=>(now?.()??0)+sceneTime};
  require('../../../scripts/tests/legacy-mz-world-host.cjs').install(G);
  G.window=G;vm.createContext(G);vm.runInContext(plugin,G);
  const flow=G.PSFlow,app={describeLearningMove:id=>({id,name:id,pp:10,type:'Psychic',category:'Status',power:0,accuracy:0,description:'Controlled move metadata'}),stateGeneration:0,saveBlocked:false,pendingEvolution:null,pendingReceiving:null,pendingPokedex:null,stateReplacedByHost(){this.stateGeneration++;},finishBattle(){counts.finish++;return {code:1,commit:'applied',battleId:'scene#1'};},abortBattle(request,error){counts.abort++;return {code:0,commit:'none',battleId:request.battleId,aborted:true,error:String(error)};}};
- // This host isolates pictures/controller lifecycle from ordinary text pacing.
- flow.fast=true;flow._app=app;flow._op={request:{battleId:'scene#1',canLose:true},session};flow.request=flow._op.request;flow.running=true;flow.perf.cur={battleId:'scene#1',t0:0,actions:[]};flow.begin=()=>opening??Promise.resolve(session);if(display)flow.speciesName=x=>x;
+ // The emitted plugin runs as an ordinary consumer; the VM supplies no test storage/scope.
+ flow._app=app;flow._op={request:{battleId:'scene#1',canLose:true},session};flow.request=flow._op.request;flow.running=true;flow.perf.cur={battleId:'scene#1',t0:0,actions:[]};flow.begin=()=>opening??Promise.resolve(session);if(display)flow.speciesName=x=>x;
  const scene=new G.Scene_PSBattle();G.SceneManager._scene=scene;
  advanceSceneClock.set(scene,delta=>{sceneTime+=delta;});
  return{G,flow,app,scene,session,counts,commands,async ready(){scene.create();await flush();assert(scene.isReady());scene.start();for(let i=0;i<8&&!scene.inputState().ready;i++)scene.updateQueue();assert.equal(scene._mode,'main',String(scene._failure||''));assert(scene.inputState().ready);return this;}};
@@ -161,8 +167,58 @@ for(const mode of ['reject','throw-falsy'])test(`compiled ${mode} opening become
  const d=deferred(),h=host({opening:d.promise});if(mode==='throw-falsy')h.flow.begin=()=>{throw 0;};h.scene.create();if(mode==='reject')d.reject(Error('opening rejected'));await flush();assert(h.scene.isReady());h.scene.start();h.scene.updateQueue();assert.equal(h.scene._mode,'end');assert(h.scene.inputState().ready);assert.equal(h.counts.abort,1);assert(!h.flow.running);assert(h.G.$gameSystem.isSaveEnabled());
 });
 for(const choice of [0,null])test(`compiled terminal learning ${choice===null?'decline':'accept'} settles once after messages`,async()=>{
- const h=await host().ready(),s=h.scene;h.session.party=[{id:'P1',species:'Snorlax',moves:[{id:'splash',pp:40,maxpp:40}]}];h.session.pendingLearn={memberId:'P1',move:{id:'growl',name:'Growl'}};
- let learned;h.session.decideLearn=async slot=>{learned=slot;h.session.pendingLearn=null;h.session.finished=true;return [];};s.pushMessages([]);s.updateQueue();h.flow.fast=true;for(let i=0;i<8&&s._mode!=='learn-initial';i++)s.update();assert.equal(s._mode,'learn-initial');s.update();s._menu.select(s._menu._items.findIndex(x=>x.ext==='forget-move'));s.onMenuOk();assert.equal(s._mode,'learn');s._menu.select(s._menu._items.findIndex(x=>x.ext===choice));s.onMenuOk();if(choice===null){assert.equal(learned,undefined,'Skip must not decide before the new confirmation');h.flow.fast=true;for(let i=0;i<8&&s._mode!=='learn-giveup';i++)s.update();assert.equal(s._mode,'learn-giveup');s.update();s._menu.select(s._menu._items.findIndex(x=>x.ext==='give-up'));s.onMenuOk();}await flush();assert.equal(learned,choice);s.updateQueue();if(choice===null){assert.equal(s._mode,'messages','decline text is presented before end');assert(s._log._lines.join(' ').includes('did not learn'));s.updateQueue();}assert.equal(s._mode,'end');s.onMenuOk();s.onMenuOk();assert.equal(h.counts.finish,1);assert.equal(h.counts.pop,1);assert(!h.flow.running);
+ const h=await host().ready(),s=h.scene,decisions=[];
+ const pending={memberId:'P1',move:{id:'growl',name:'Growl',pp:40}};
+ h.session.party=[{id:'P1',species:'Snorlax',nickname:'Ada',moves:['splash','tackle','rest','bodyslam'].map(id=>({id,pp:10,maxpp:10}))}];
+ h.session.pendingLearn=pending;
+ h.session.decideLearn=async slot=>{decisions.push(slot);h.session.pendingLearn=null;h.session.finished=true;return [];};
+ let ok=false;
+ h.G.Input.isTriggered=key=>ok&&key==='ok';
+ const pressOk=()=>{ok=true;try{updateScene(s,0);}finally{ok=false;}};
+ const select=key=>{
+  const index=s.inputState().items.findIndex(item=>item.enabled&&item.key===key);
+  assert(index>=0,'missing learning menu item '+key);s._menu.select(index);s.onMenuOk();
+ };
+ const question=(phase,text,key)=>{
+  waitScene(s,()=>s.briefMessageState()?.phase==='typing','ordinary question starts typing',3,0);
+  assert.equal(s.briefMessageState().implementation,'brief-message-v1');
+  assert.equal(s.briefMessageState().visible,0,'the first ordinary frame is not instant text');
+  updateScene(s,29);assert.equal(s.briefMessageState().visible,0);
+  updateScene(s,1);assert.equal(s.briefMessageState().visible,1);
+  assert.equal(s.inputState().phase,'messages');assert(!s.inputState().ready);
+  waitScene(s,()=>s.inputState().phase===phase&&s.inputState().ready,'localized question becomes interactive',40);
+  assert.equal(s.briefMessageState().phase,'resident');assert.equal(s._log._lines.join(' '),text);
+  select(key);assert.equal(s.inputState().phase,phase,'the first visible menu frame cannot acknowledge itself');
+  assert.equal(h.session.pendingLearn,pending);assert.deepEqual(decisions,[]);
+  updateScene(s,0);select(key);
+ };
+ try{
+  s.pushMessages([]);
+  question('learn-initial','Should Ada forget a move to learn Growl?','forget-move');
+  assert.equal(s.inputState().phase,'learn');assert(s.inputState().ready);
+  select(choice);
+  if(choice===null){
+   assert.equal(h.session.pendingLearn,pending);assert.deepEqual(decisions,[],'Skip must not decide before the new confirmation');
+   question('learn-giveup','Give up on learning Growl?','give-up');
+  }
+  await flush();assert.deepEqual(decisions,[choice]);assert.equal(h.session.pendingLearn,null);
+  if(choice===null){
+   updateScene(s,0);
+   assert.equal(s.ordinaryMessageState()?.implementation,'ordinary-message-v1');
+   assert.equal(s.ordinaryMessageState().phase,'typing');assert.equal(s.ordinaryMessageState().visible,0);
+   pressOk();
+   assert.equal(s.ordinaryMessageState().phase,'full','the reveal input must not also close the text');
+   assert.equal(s._log._lines.join(' '),'Ada did not learn Growl.');
+   updateScene(s,999);
+   assert.equal(s.ordinaryMessageState().phase,'full');assert.equal(s.inputState().phase,'messages');assert(!s.inputState().ready);
+   s.onMenuOk();assert.equal(h.counts.finish,0,'a menu callback cannot commit through the text owner');
+   pressOk();assert.equal(s.ordinaryMessageState(),null);assert.equal(s.inputState().phase,'messages','closing and end routing are separate updates');
+  }
+  assert.equal(h.counts.finish,0);assert.equal(h.counts.pop,0);assert(h.flow.running);
+  updateScene(s,0);assert.equal(s.inputState().phase,'end');assert(s.inputState().ready);assert.equal(s._failure,null);
+  s.onMenuOk();s.onMenuOk();
+  assert.deepEqual(decisions,[choice]);assert.equal(h.counts.finish,1);assert.equal(h.counts.pop,1);assert.equal(h.counts.abort,0);assert(!h.flow.running);
+ }finally{s.terminate();}
 });
 test('compiled forced replacement stays mandatory and submits the legal member once',async()=>{
  const h=await host().ready(),s=h.scene;h.session.gw.activeId=()=> 'P1';h.flow.speciesName=x=>x;h.session.foe={kind:'trainer'};h.session.party=[{id:'P1',species:'Snorlax'},{id:'P2',species:'Snorlax'}];h.session.gw.readState=()=>[{id:'P1',active:true,fainted:true,level:50,hp:0,maxhp:100},{id:'P2',active:false,fainted:false,level:50,hp:100,maxhp:100}];let forced=true,chosen;
@@ -179,7 +235,12 @@ function publishBagMember(h) {
  h.session.gw.readState=side=>side==='p1'?[{id:'P',active:true,hp:10,maxhp:10}]:[];
 }
 test('compiled cancel navigation preserves bag/party intent and is blocked while action is pending',async()=>{
- const h=await host().ready(),s=h.scene,d=deferred();publishBagMember(h);s.showMoves();s.onMenuCancel();assert.equal(s._mode,'main');s.showBag();s.onMenuCancel();assert.equal(s._mode,'main');s._pendingItem='potion';s.show('party',[]);s.onMenuCancel();assert.equal(s._pendingItem,null);assert.equal(s._mode,'bag');s.onMenuCancel();s.act(()=>d.promise);await flush();const phase=s._mode;s.onMenuCancel();assert.equal(s._mode,phase);assert(s._busy);d.resolve({messages:[]});await flush();s.updateQueue();assert.equal(s._mode,'main');
+ const h=await host().ready(),s=h.scene,d=deferred();publishBagMember(h);s.showMoves();s.onMenuCancel();assert.equal(s._mode,'main');
+ s.showBag();assert(!s.inputState().ready);drainScene(s);assert.equal(s._mode,'bag');
+ s.onMenuCancel();drainScene(s);assert.equal(s._mode,'main');
+ s._pendingItem='potion';s.show('party',[]);s.onMenuCancel();assert.equal(s._pendingItem,null);drainScene(s);assert.equal(s._mode,'bag');
+ s.onMenuCancel();drainScene(s);assert.equal(s._mode,'main');
+ s.act(()=>d.promise);await flush();const phase=s._mode;s.onMenuCancel();assert.equal(s._mode,phase);assert(s._busy);d.resolve({messages:[]});await flush();s.updateQueue();assert.equal(s._mode,'main');
 });
 test('compiled postcommit message failure preserves committed outcome and never aborts application state',async()=>{
  const h=await host().ready();h.session.finished=true;h.scene.showEnd(false);h.app.finishBattle=()=>{h.counts.finish++;return {code:1,commit:'applied',battleId:'scene#1',trainerReward:{actual:10,normalizationLoss:0}};};h.G.$gameMessage.add=()=>{throw Error('message after commit');};h.scene.onMenuOk();assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(h.flow.lastOutcome.code,1);assert.equal(h.counts.abort,0);assert.equal(h.counts.finish,1);assert.equal(h.flow.lastOutcome.hostErrors[0].step,'trainer-reward-message');assert.equal(h.counts.pop,1);assert(!h.flow.running);
@@ -196,7 +257,10 @@ test('compiled command window uses two columns with occupied-grid edges and deta
 });
 test('compiled Scene keeps command and move cursors separate across cancel and bag return',async()=>{
  const h=await host().ready(),s=h.scene;publishBagMember(h);s._session.currentRequest=()=>({active:[{moves:['A','B','C','D'].map(id=>({id,move:id,pp:5,maxpp:5}))}]});
- s.showMoves();s._menu.select(3);s.onMenuCancel();assert.equal(s._mode,'main');assert.equal(s._menu.index(),0);s._menu.select(1);s.onMenuOk();assert.equal(s._mode,'bag');assert.equal(s._menu.maxCols(),1);s.onMenuCancel();assert.equal(s._menu.index(),1);s._menu.select(0);s.onMenuOk();assert.equal(s._mode,'moves');assert.equal(s._menu.index(),3);assert.equal(s._menu.maxCols(),2);assert.equal(h.counts.choose,0);
+ s.showMoves();s._menu.select(3);s.onMenuCancel();assert.equal(s._mode,'main');assert.equal(s._menu.index(),0);
+ s._menu.select(1);s.onMenuOk();drainScene(s);assert.equal(s._mode,'bag');assert.equal(s._menu.maxCols(),1);
+ s.onMenuCancel();drainScene(s);assert.equal(s._mode,'main');assert.equal(s._menu.index(),1);
+ s._menu.select(0);s.onMenuOk();assert.equal(s._mode,'moves');assert.equal(s._menu.index(),3);assert.equal(s._menu.maxCols(),2);assert.equal(h.counts.choose,0);
 });
 
 async function rememberBoth(s) {
@@ -204,8 +268,7 @@ async function rememberBoth(s) {
  assert.equal(s._menu.index(),2);assert.equal(s._menuCursor.index('moves',4),3);
 }
 function drainScene(s) {
- for(let i=0;i<1000&&!s.inputState().ready;i++){advanceSceneClock.get(s)?.(50);s.update();}
- assert(s.inputState().ready,String(s._failure));
+ waitScene(s,()=>s.inputState().ready,'scene input becomes ready',1000);
 }
 for(const roar of [false,true])test(`real Session compiled Scene resets both cursors after ${roar?'same-turn A-B-A Roar':'ordinary A-B switch'}`,async()=>{
  const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs'));
@@ -271,12 +334,16 @@ test('production Scene.update owns the picture ordinal; repeated queue reads can
  let time=0;const h=await host({display:true,now:()=>time}).ready(),s=h.scene;
  const before=JSON.stringify(h.session.party);s.pushMessages([sendOut('p1','P')]);s.update();
  const body=h.counts.sprites.find(x=>x._psPictureKey==='p1:P'&&x._psPictureRole==='body');
- assert.equal(s._pictureUpdate,1);assert.equal(body.scale.x,0);assert.equal(body.opacity,0);assert(!s.inputState().ready);
+ assert.equal(s.briefMessageState()?.phase,'typing');assert.equal(body.scale.x,1);assert.equal(s.pictureState().runningGroups,0);assert(!s.inputState().ready);
+ waitScene(s,()=>s.briefMessageState()?.phase==='resident','normal send-out brief renders',40);
+ assert.equal(s._log._lines.join(' '),'Go! Pidgey!');assert.equal(body.scale.x,1);assert.equal(s.pictureState().runningGroups,0);
+ s.update();const pictureStart=s._pictureUpdate;
+ assert.equal(body.scale.x,0);assert.equal(body.opacity,0);assert(!s.inputState().ready);
  time=500;for(let i=0;i<5;i++)s.updateQueue();
- assert.equal(s._pictureUpdate,1);assert.equal(body.scale.x,0);assert.equal(s.pictureState().runningGroups,1);
- s.update();assert.equal(s._pictureUpdate,2);assert.equal(body.scale.x,1);assert.equal(body.opacity,255);assert.equal(s.pictureState().runningGroups,1);
+ assert.equal(s._pictureUpdate,pictureStart);assert.equal(body.scale.x,0);assert.equal(s.pictureState().runningGroups,1);
+ s.update();assert.equal(s._pictureUpdate,pictureStart+1);assert.equal(body.scale.x,1);assert.equal(body.opacity,255);assert.equal(s.pictureState().runningGroups,1);
  for(let i=0;i<5;i++)s.updateQueue();assert.equal(s.pictureState().runningGroups,1);assert(!s.inputState().ready);
- s.update();assert.equal(s._pictureUpdate,3);assert.equal(s.pictureState().runningGroups,0);
+ s.update();assert.equal(s._pictureUpdate,pictureStart+2);assert.equal(s.pictureState().runningGroups,0);
  drainScene(s);assert(s.inputState().ready);assert.equal(h.counts.choose,0);assert.equal(JSON.stringify(h.session.party),before);s.terminate();
 });
 test('compiled picture recall precedes public replacement, without an early full-size successor paint',async()=>{
@@ -289,13 +356,19 @@ test('compiled picture recall precedes public replacement, without an early full
  assert.equal(old.scale.x,1);assert(!next.counts.sprites.some(x=>x._psPictureKey==='p1:Q'));
  time=125;scene.update();assert.equal(old.scale.x,.5);time=250;scene.update();assert.equal(old.scale.x,0);
  assert.equal(scene.presentationState().cards.find(c=>c.side==='p1'&&c.active).id,'P');
- scene.update();scene.update();
+ scene.update(); // Observe the recall endpoint before the queued brief can start.
+ waitScene(scene,()=>scene.briefMessageState()?.phase==='resident','normal successor brief renders after recall',40);
+ assert.equal(scene._log._lines.join(' '),'Go! Pidgey!');assert.equal(old.scale.x,0);
+ assert(!next.counts.sprites.some(x=>x._psPictureKey==='p1:Q'));assert(!scene.inputState().ready);
+ assert.equal(scene.presentationState().cards.find(c=>c.side==='p1'&&c.active).id,'P');
+ scene.update();
  const replacement=next.counts.sprites.find(x=>x._psPictureKey==='p1:Q'&&x._psPictureRole==='body');
  assert.equal(old.destroys,1);assert.equal(replacement.scale.x,0);assert.equal(replacement.opacity,0);assert.equal(scene.presentationState().cards.find(c=>c.side==='p1'&&c.active).id,'Q');
  time=750;scene.update();scene.update();drainScene(scene);assert(next.scene.inputState().ready);next.scene.terminate();
 });
 test('compiled Scene cancels owned pictures on external abort and late visual callbacks cannot touch a successor',async()=>{
- const h=await host({display:true}).ready(),old=h.scene;old.pushMessages([sendOut('p1','P')]);old.update();
+ const h=await host({display:true}).ready(),old=h.scene;old.pushMessages([sendOut('p1','P')]);
+ waitScene(old,()=>old.pictureState().runningGroups===1,'normal send-out starts before abort',40);
  const late=old._queue[0],owned=h.counts.sprites.filter(x=>x._psPictureRole),bitmaps=owned.map(x=>x.bitmap);
  h.flow.abort(Error('picture cancellation'));old.update();assert(owned.every(x=>x.destroys===1));assert(bitmaps.every(x=>x.destroys===1));
  const successor={untouched:true};h.G.SceneManager._scene=successor;const created=h.counts.sprites.length;
@@ -327,12 +400,15 @@ test('compiled faint preserves HP0 portrait, fades its own box in parallel, and 
  time=600;s.update();assert.equal(shadow.opacity,0);assert.equal(body.opacity,255);const y=body.y;
  time=850;s.update();assert.equal(body.y,y+40);assert.equal(body.opacity,128);time=1100;s.update();assert.equal(body.opacity,0);assert.equal(body.destroys,0);assert.equal(s.pictureState().runningGroups,1);
  const epoch=s._pictureUpdate;for(let i=0;i<3;i++)s.updateQueue();assert.equal(s._pictureUpdate,epoch);assert.equal(body.destroys,0);assert(!s.inputState().ready);
- s.update();assert.equal(body.destroys,1);assert.equal(shadow.destroys,1);drainScene(s);assert(s.inputState().ready);assert.equal(s.presentationState().cards.find(x=>x.id==='P').portraitVisible,false);assert.equal(JSON.stringify(h.session.party),before);
+ s.update();assert.equal(body.destroys,1);assert.equal(shadow.destroys,1);
+ waitScene(s,()=>s.ordinaryMessageState()?.phase==='full','ordinary faint notice paints after the animation',40);
+ assert.equal(s._log._lines.join(' '),'Pidgey fainted!');assert(!s.inputState().ready);
+ drainScene(s);assert(s.inputState().ready);assert.equal(s.presentationState().cards.find(x=>x.id==='P').portraitVisible,false);assert.equal(JSON.stringify(h.session.party),before);
  assert.equal(s.presentationState().audio.length,0,'faint requests must not pollute the accepted EXP cue list');
  assert.deepEqual(Array.from(s.presentationState().faintAudio,row=>row.kind),['faint-cry','faint-effect']);
  s.terminate();assert.equal(body.destroys,1);
 });
-for(const variant of [{name:'natural',reverse:false,prelude:false,fast:true},{name:'reversed-with-prefix',reverse:true,prelude:true,fast:true},{name:'paced-prefix',reverse:false,prelude:true,fast:false}])test(`real Session opening ${variant.name} keeps each queued first portrait hidden until its own send-out`,async()=>{
+for(const variant of [{name:'natural',reverse:false,prelude:false},{name:'reversed-with-prefix',reverse:true,prelude:true},{name:'paced-prefix',reverse:false,prelude:true}])test(`real Session opening ${variant.name} keeps each queued first portrait hidden until its own send-out`,async()=>{
  const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs'));
  const saved=F.makeGame();saved.party=saved.party.slice(0,2);const foe=F.foeMember('F-1','Snorlax',50);foe.moves=[{id:'splash',pp:40,maxpp:40}];
  const session=await BattleSession.create({game:saved,battleId:'r5-opening-'+variant.name,content:F.content,seed:[1,2,3,4],foe:{kind:'trainer',team:[foe]}});
@@ -343,7 +419,7 @@ for(const variant of [{name:'natural',reverse:false,prelude:false,fast:true},{na
   const positions=message.events.map((e,i)=>e.type==='switch'?i:-1).filter(i=>i>=0),values=positions.map(i=>message.events[i]).reverse(),events=[...message.events];
   positions.forEach((position,i)=>events[position]=values[i]);return {...message,events};
  });};
- let now=0;const h=host({display:true,now:()=>now}),s=h.scene;h.flow.fast=variant.fast;h.flow.begin=()=>Promise.resolve(session);h.flow._op.session=session;
+ let now=0;const h=host({display:true,now:()=>now}),s=h.scene;h.flow.begin=()=>Promise.resolve(session);h.flow._op.session=session;
  const started=new Map(),middle=new Set(),targets=['p1:A-0001','p2:F-1'];
  try{
   s.create();await flush();assert(s.isReady());

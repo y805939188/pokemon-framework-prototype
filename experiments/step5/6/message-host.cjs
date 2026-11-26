@@ -34,7 +34,7 @@ function host(lang='zh',width=816,height=624,animate=false,configure=null){
  G.Window_Command=function(){};G.Window_Command.prototype={};G.Window_Options=function(){};G.Window_Options.prototype={};G.Scene_MenuBase=function(){};G.Scene_MenuBase.prototype={};G.Window_MenuCommand=function(){};G.Window_MenuCommand.prototype={};G.Scene_Menu=function(){};G.Scene_Menu.prototype={};G.Scene_Map=function(){};G.Scene_Map.prototype={start(){}};G.SceneManager._scene=new G.Scene_Map();
  const extension=configure?.(G,{load,windows,objects,managers,draws,sounds,calls})??{};
  const native={convert:G.Window_Base.prototype.convertEscapeCharacters,fast:G.Window_Message.prototype.updateShowFast};
- vm.runInContext(fs.readFileSync(path.join(ROOT,'js/plugins/PS_Management.js'),'utf8'),G,{filename:'PS_Management.js'});
+ vm.runInContext(extension.managementSource??fs.readFileSync(path.join(ROOT,'js/plugins/PS_Management.js'),'utf8'),G,{filename:'PS_Management.js'});
  const win=new G.Window_Message(extension.rect?.()??{x:0,y:0,width,height:180}),sub={active:false,start(){},close(){}};
  G.SceneManager._scene._messageWindow=win;
  win.setGoldWindow({...sub,height:40});win.setNameBoxWindow({...sub,setName(){}});const choice=extension.choice?.(win);win.setChoiceListWindow(choice??{...sub});win.setNumberInputWindow(extension.number?.(win)??{...sub});win.setEventItemWindow({...sub});

@@ -20,9 +20,9 @@ test.before(async () => {
 });
 test.after(() => { if (temp) fs.rmSync(temp, { recursive: true, force: true }); });
 async function open({ nicknames = null, lang = 'en', members = 2, hurt = true, bag = { potion: 3, masterball: 2, xattack: 1 }, catalog, trainer = false, egg = false, reserveHP = null, trainerMembers = 1, shadowTag = false, ghost = false, suppliedContent = null, heldItem = '', mint = false, grow = false, fast = false, effects = true, eggShiny = false, integration = false, canSwitch, expGain, noRun, noBall, battleEffects, battleStyle = 'set', playerStyle, leadHP = null, command = null, pivot = false, leadingEgg = false, leadMoves = null, benchMoves = null, captureSetting } = {}) {
-  const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true } });
+  const h = createVictoryDriverHost({ ROOT, work: temp, plugins, entryText, driverText: 'SYNTHETIC_UNUSED_DRIVER', PLAN, options: { productionTranslator: true, frameQueuedScenes: captureSetting !== undefined } });
   const G = h.G, flow = h.w.flow, content = suppliedContent ?? fixture.musicNativeContent(E, assert), parameters = G.PluginManager.parameters;
-  if (captureSetting !== undefined) { content.settings = { ...content.settings, GAIN_EXP_FOR_CAPTURE: captureSetting }; flow.receiveOptions = { mode: 0, naming: 1 }; }
+  if (captureSetting !== undefined) { content.settings = { ...content.settings, GAIN_EXP_FOR_CAPTURE: captureSetting }; /* ordinary receiving uses its real default nickname prompt */ }
   G.Bitmap.prototype.fillRect = () => {}; // Existing controlled drawing port, no native pixel claim.
   if (catalog) catalog(content.items);
   if (integration) { assert(content.moves.Rest); content.species.Snorlax.learnset[51] = ['Rest']; }
@@ -66,8 +66,35 @@ async function open({ nicknames = null, lang = 'en', members = 2, hurt = true, b
   return { ...h, s, flow, before, batches, completed, windows, listeners, managementCalls: () => ({ beginManagement, manage }), cleanup() { if (flow.running) flow.abort(Error('owned party switch cleanup')); s.terminate(); } };
 }
 
-function row(h, key) { const i = h.s._menu._items.findIndex(r => r.ext === key); assert(i >= 0, 'actual menu key ' + key); h.s._menu.select(i); }
-async function pick(h, key) { row(h, key); h.s.onMenuOk(); await h.frames(1); }
+function row(h, key) { const i = h.s._menu._items.findIndex(r => r.ext === key); assert(i >= 0, 'actual menu key ' + key+' '+JSON.stringify({mode:h.s._mode,keys:h.s._menu._items.map(x=>x.ext),pocket:h.s.battleBagState()?.pocket,kind:h.s.battleBagState()?.kind})); h.s._menu.select(i); }
+async function pick(h, key) {
+ const openingBag=key==='bag'&&h.s._mode==='main';
+ row(h,key);h.s.onMenuOk();await h.frames(1);
+ if(openingBag)await h.waitFor(()=>h.s._mode==='bag'&&h.s.inputState().ready,'bag fade and real item menu');
+}
+// A real growth announcement waits for a person even after the whole line
+// was painted. Only acknowledge strings owned by an actual Session award;
+// never consume an unrelated notice, a learning choice, or Continue.
+async function waitAfterGrowth(h, condition, label, confirmStats) {
+ const growthLine=()=>{
+  const view=h.s.ordinaryMessageState?.();
+  if(view?.implementation!=='paused-message-v1'||view.phase!=='full')return false;
+  const text=h.s._log._lines.join(' ');
+  return h.batches.some(batch=>batch.value.some(m=>m.kind==='growth'&&[
+    ...h.s._D.message({...m,levelUps:[]}),
+    ...m.levelUps.flatMap(level=>h.s._D.message({...m,exp:0,levelUps:[level]}))
+  ].includes(text)));
+ };
+ for(let count=0;count<96;count++){
+  const panel=()=>confirmStats&&!!h.s.levelStatsState?.();
+  await h.waitFor(()=>condition()||growthLine()||panel(),label);
+  if(condition())return;
+  if(panel())await h.frames(1);
+  await h.p.press('ok');
+ }
+ assert.fail('bounded real growth confirmations: '+label);
+}
+const endMenu=h=>waitAfterGrowth(h,()=>h.s._mode==='end'&&!h.s._busy&&!h.s._queue.length&&h.s.inputState().ready,'real Continue menu',true);
 async function party(h) { await pick(h, 'party'); assert.equal(h.s._mode, 'party'); }
 async function commands(h, id) { await party(h); await pick(h, id); assert.equal(h.s._mode, 'party-command'); }
 
@@ -309,7 +336,7 @@ for (const lang of ['en', 'zh']) test(lang + ' combined public cards, full-slot 
   await h.p.press('cancel'); await h.p.inMode('party'); assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext, egg);
   assert.equal(cards().find(card => card.side === 'p1').gender.kind, 'female'); assert.equal(cards().find(card => card.side === 'p1').shiny, true);
   assert.equal(installs, 0); assert.equal(JSON.stringify(h.flow.game()), h.before); assert.deepEqual(h.managementCalls(), { beginManagement: 0, manage: 0 });
-  h.s.onMenuCancel(); await h.p.inMode('main'); await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('end');
+  h.s.onMenuCancel(); await h.p.inMode('main'); await pick(h, 'fight'); await pick(h, 1); await endMenu(h);
   assert.equal(installs, 0); await h.frames(1); h.s.onMenuOk(); await h.frames(3); assert.equal(h.flow.lastOutcome.commit, 'applied'); assert.equal(installs, 1);
   assert.equal(h.flow.game().party[0].level, 51); assert(h.flow.game().party[0].moves.some(move => move.id === 'rest')); const after = JSON.stringify(h.flow.game()); h.s.onEnd(); assert.equal(installs, 1); assert.equal(JSON.stringify(h.flow.game()), after);
  } finally { h.cleanup(); }
@@ -399,7 +426,7 @@ for (const lang of ['en', 'zh']) test(lang + ' combined disabled switching, shar
   await h.p.press('left'); await h.p.press('left'); await h.p.press('left'); await h.p.press('down'); assert.equal(current(h).view.ids[current(h).view.cursor], egg); assert(text(h).some(line => line.includes('1/1'))); await h.p.press('cancel'); await h.p.inMode('party'); assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext, egg);
   const player = h.s.statusCardState().find(card => card.side === 'p1'); assert.equal(player.gender.kind, 'female'); assert.equal(player.shiny, true);
   assert.equal(installs, 0); assert.equal(JSON.stringify(h.flow.game()), h.before); assert.deepEqual(h.managementCalls(), { beginManagement: 0, manage: 0 }); assert.equal(learningTransactions, 0); assert.equal(s.canSwitch, false);
-  h.s.onMenuCancel(); await h.p.inMode('main'); await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('end'); assert.equal(installs, 0); await h.frames(1); h.s.onMenuOk(); await h.frames(3); assert.equal(installs, 1); assert.equal(h.flow.lastOutcome.commit, 'applied'); assert.equal(h.flow.game().party[0].level, 51); assert(h.flow.game().party[0].moves.some(move => move.id === 'rest'));
+  h.s.onMenuCancel(); await h.p.inMode('main'); await pick(h, 'fight'); await pick(h, 1); await endMenu(h); assert.equal(installs, 0); await h.frames(1); h.s.onMenuOk(); await h.frames(3); assert.equal(installs, 1); assert.equal(h.flow.lastOutcome.commit, 'applied'); assert.equal(h.flow.game().party[0].level, 51); assert(h.flow.game().party[0].moves.some(move => move.id === 'rest'));
   const installed = JSON.stringify(h.flow.game()); h.s.onEnd(); assert.equal(installs, 1); assert.equal(JSON.stringify(h.flow.game()), installed);
  } finally { h.cleanup(); }
 });
@@ -451,7 +478,7 @@ test('unified party order, paused notice and private details learn for the non-a
   await h.waitFor(()=>h.s.ordinaryMessageState()?.implementation==='paused-message-v1','unified full-slot paused notice');const notice=h.s._ordinaryMessage;assert.equal(s.pendingLearn.memberId,learner);assert.equal(h.s._learningInitial??null,null);await h.p.press('ok');assert.equal(notice.snapshot().phase,'full');assert(h.s._log.pause);await h.p.press('ok');await h.p.inMode('learn-initial');assert.equal(notice.snapshot().phase,'done');
   await h.frames(1);await pick(h,'forget-move');await h.p.inMode('learn');const view=h.s.learningMoveState();assert.equal(view.page.rows[0].details,'35/35 PP','details use the non-active learner, not the actor which consumed Tackle');assert(s.gw.readState('p1').find(m=>m.id===actor).pp.tackle<35);await pick(h,3);await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),actor);assert.equal(s.party.find(m=>m.id===learner).moves[3].id,'rest');assert.equal(s.gw.readState('p1').find(m=>m.id===learner).pp.rest,10);
   await summary(h,learner);assert.deepEqual(Array.from(current(h).view.ids),[actor,egg,learner,reserve]);assert.equal(current(h).view.cursor,2);assert(text(h).some(t=>t.includes('Lv.51')));await h.p.press('right');await h.p.press('right');await h.p.press('right');assert(text(h).some(t=>/\brest\b.*10\/10 PP/i.test(t)));await h.p.press('cancel');await h.p.inMode('party');assert.equal(h.s._menu.index(),2);assert.equal(h.s._menu.itemAt(2).ext,learner);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
-  await pick(h,learner);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),learner);h.flow.fast=true;await pick(h,'fight');await pick(h,1);await h.p.inMode('end');await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),[learner,egg,actor,reserve]);assert.equal(h.flow.game().party[0].moves[3].id,'rest');h.s.onEnd();assert.equal(installs,1);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
+  await pick(h,learner);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),learner);h.flow.fast=true;await pick(h,'fight');await pick(h,1);await endMenu(h);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),[learner,egg,actor,reserve]);assert.equal(h.flow.game().party[0].moves[3].id,'rest');h.s.onEnd();assert.equal(installs,1);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
  }finally{h.cleanup();}
 });
 
@@ -464,7 +491,7 @@ for(const lang of ['en','zh'])test(lang+' normal growth integration keeps disabl
   await h.waitFor(()=>!!h.s.ordinaryMessageState(),'normal full-slot announcement after numeric panels');const notice=h.s._ordinaryMessage;assert.equal(notice.snapshot().implementation,'paused-message-v1','the accepted notification must not revert to an ordinary line');assert.equal(notice.snapshot().phase,'typing');assert.equal(h.s._learningInitial??null,null);await h.p.press('ok');assert.equal(notice.snapshot().phase,'full');assert.equal(h.s._log.pause,true);await h.frames(120);assert.equal(notice.snapshot().phase,'full');assert.equal(decisions,0);await h.p.press('ok');await h.p.inMode('learn-initial');await h.frames(1);await pick(h,'forget-move');await h.p.inMode('learn');
   const win=h.s._menu,normal=h.s._commandMenu;assert.notEqual(win,normal);assert.equal(h.s.learningMoveState().page.rows[0].details,'34/35 PP');win.select(4);h.s.onMenuOk();await h.p.inMode('learn-giveup');await h.frames(1);await pick(h,'continue-learning');assert.equal(h.s._menu,win);assert.equal(win.index(),4);assert.equal(decisions,0);await pick(h,3);await h.p.inMode('main');assert.equal(h.s._menu,normal);assert.equal(decisions,1);assert.equal(s.party[0].moves[3].id,'rest');assert.equal(s.gw.readState('p1').find(m=>m.id===lead).pp.rest,10);
   await summary(h,lead);assert.deepEqual(Array.from(current(h).view.ids),[lead,egg,reserve]);assert(text(h).some(t=>t.includes('Lv.51')));await h.p.press('right');await h.p.press('right');await h.p.press('right');assert(text(h).some(t=>/\brest\b.*10\/10 PP/i.test(t)));await h.p.press('cancel');await h.p.inMode('party');assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext,lead);await pick(h,reserve);assert.deepEqual(Array.from(h.s._menu._items,row=>row.ext),['summary',null]);h.s.onMenuCancel();await h.p.inMode('party');h.s.onMenuCancel();await h.p.inMode('main');const raw=s.gw.snapshot(),working=JSON.stringify(s.party);assert.deepEqual(await s.chooseSwitch(reserve),{ok:false,reason:'choice-rejected'});assert.equal(s.gw.snapshot(),raw);assert.equal(JSON.stringify(s.party),working);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
-  h.flow.fast=true;await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),[lead,egg,reserve]);assert.equal(h.flow.game().party[0].moves[3].id,'rest');h.s.onEnd();assert.equal(installs,1);
+  h.flow.fast=true;await pick(h,'fight');await pick(h,1);await endMenu(h);assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),[lead,egg,reserve]);assert.equal(h.flow.game().party[0].moves[3].id,'rest');h.s.onEnd();assert.equal(installs,1);
  }finally{h.cleanup();}
 });
 
@@ -483,7 +510,7 @@ for(const lang of ['en','zh'])test(lang+' normal growth and HM guard preserve th
   for(let i=0;i<2;i++){const firstLine=completed.length;win.select(0);h.s.onMenuOk();await h.frames(1);await h.p.inMode('learn');assert(completed.slice(firstLine).join('').replace(/\s+/g,' ').includes(warning),'the actual full HM refusal is painted in this attempt, including wrapped lines');assert.equal(decisions,0);assert.equal(h.s._menu,win);assert.equal(win.index(),0);assert.equal(s.pendingLearn,pending);assert.equal(JSON.stringify(s._checkpoint()),checkpoint);assert.equal(s.gw.activeId('p1'),actor);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);}
   h.s.onMenuCancel();await h.p.inMode('learn-giveup');await h.frames(1);await pick(h,'continue-learning');assert.equal(h.s._menu,win);assert.equal(win.index(),0);assert.equal(decisions,0);await pick(h,1);await h.p.inMode('main');assert.equal(decisions,1);assert.equal(s.gw.activeId('p1'),actor);const learned=s.party.find(m=>m.id===learner);assert.equal(learned.moves[0].id,'tackle');assert.equal(learned.moves[0].pp,35);assert.equal(learned.moves[1].id,'rest');assert.equal(s.gw.readState('p1').find(m=>m.id===learner).pp.rest,10);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
   await summary(h,learner);assert.deepEqual(Array.from(current(h).view.ids),[actor,egg,learner,reserve]);assert.equal(current(h).view.cursor,2);assert(text(h).some(line=>line.includes('Lv.51')));await h.p.press('right');await h.p.press('right');await h.p.press('right');assert(text(h).some(line=>/\brest\b.*10\/10 PP/i.test(line)));assert(text(h).some(line=>/\btackle\b.*35\/35 PP/i.test(line)));await h.p.press('cancel');await h.p.inMode('party');assert.equal(h.s._menu.index(),2);assert.equal(h.s._menu.itemAt(2).ext,learner);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
-  await pick(h,learner);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),learner);h.flow.fast=true;await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),[learner,egg,actor,reserve]);assert.equal(h.flow.game().party[0].moves[0].id,'tackle');assert.equal(h.flow.game().party[0].moves[1].id,'rest');assert.equal(h.flow.game().party[0].moves[1].pp,10);h.s.onEnd();assert.equal(installs,1);
+  await pick(h,learner);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),learner);h.flow.fast=true;await pick(h,'fight');await pick(h,1);await endMenu(h);assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),[learner,egg,actor,reserve]);assert.equal(h.flow.game().party[0].moves[0].id,'tackle');assert.equal(h.flow.game().party[0].moves[1].id,'rest');assert.equal(h.flow.game().party[0].moves[1].pp,10);h.s.onEnd();assert.equal(installs,1);
  }finally{h.cleanup();}
 });
 
@@ -528,7 +555,7 @@ for (const lang of ['en', 'zh']) test(lang + ' normal HM give-up after the last 
     assert.deepEqual(attempts.map(a=>a.slot),[1,1]);assert(attempts.every(a=>a.result.ok));assert.equal(notice.snapshot().phase,'done');
     assert(s.gw.readState('p2').every(m=>m.fainted),'actual engine Struggle resolves the remaining low-level foe');
     assert.deepEqual(s.party[0].moves.map(m=>m.pp),[0,0,0,0]);assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(installs,0);
-    h.flow.fast=true;await h.p.inMode('end');await h.frames(1);h.s.onMenuOk();await h.frames(3);
+    h.flow.fast=true;await endMenu(h);await h.frames(1);h.s.onMenuOk();await h.frames(3);
     assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),order);
     assert.equal(h.flow.game().party[0].level,51);assert.deepEqual(h.flow.game().party[0].moves.map(m=>[m.id,m.pp]),moves.map(m=>[m.id,0]));
     h.s.onEnd();assert.equal(installs,1);assert.equal(attempts.length,2);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
@@ -558,7 +585,7 @@ for(const lang of ['en','zh'])test(lang+' learned Rest use reaches working data,
   assert.equal(s.party.find(m=>m.id===lead).moves[1].pp,9,'Session working PP after actual Rest');assert.equal(JSON.stringify(h.flow.game()),h.before);assert.equal(installs,0);
   await summary(h,lead);await h.p.press('right');await h.p.press('right');await h.p.press('right');assert(text(h).some(line=>/\brest\b.*9\/10 PP/i.test(line)),'actual shared Summary uses consumed PP9');
   await h.p.press('cancel');await h.p.inMode('party');await pick(h,reserve);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),reserve);assert.equal(s.party.find(m=>m.id===lead).moves[1].pp,9);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
-  h.flow.fast=true;await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);
+  h.flow.fast=true;await pick(h,'fight');await pick(h,1);await endMenu(h);assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);
   assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),order);assert.equal(h.flow.game().party.find(m=>m.id===lead).moves[1].id,'rest');assert.equal(h.flow.game().party.find(m=>m.id===lead).moves[1].pp,9,'actual App install must not restore spent learned PP');
   h.s.onEnd();assert.equal(installs,1);assert.deepEqual(h.managementCalls(),{beginManagement:0,manage:0});
  }finally{h.cleanup();}
@@ -582,7 +609,7 @@ for(const lang of ['en','zh'])test(lang+' learned permanent Growl participates i
   const modes=[],show=h.s.show;h.s.show=function(mode,...args){modes.push(mode);return show.call(this,mode,...args);};await pick(h,'fight');h.s.onMenuOk();h.s.onMenuCancel();await h.p.inMode('main');
   assert.deepEqual(calls,[1,2,2]);assert(!modes.includes('moves'));assert.equal(s.currentRequest().active[0].moves[1].pp,38);assert.equal(s.gw.readState('p1').find(m=>m.id===lead).pp.growl,38);assert.equal(s.party[0].moves[1].pp,38);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
   await h.frames(240);assert.deepEqual(calls,[1,2,2]);await commands(h,reserve);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),reserve);
-  h.flow.fast=true;await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);
+  h.flow.fast=true;await pick(h,'fight');await pick(h,1);await endMenu(h);assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);
   assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().party.map(m=>m.id),order);assert.equal(h.flow.game().party.find(m=>m.id===lead).moves[1].id,'growl');assert.equal(h.flow.game().party.find(m=>m.id===lead).moves[1].pp,38);h.s.onEnd();assert.equal(installs,1);
  }finally{h.cleanup();}
 });
@@ -697,7 +724,7 @@ for (const route of ['no', 'list-cancel', 'set']) test('SWF03 after forced repla
 });
 async function switchOffer(h,slot=1){await pick(h,'fight');await pick(h,slot);await h.waitFor(()=>['main','replacement-question'].includes(h.s._mode)&&h.s.inputState().ready,'replacement boundary');assert.equal(h.s._mode,'replacement-question');const v=E.session.readTrainerReplacement(h.s._session);assert(v);return v;}
 function observeInstalls(h){let count=0,document=h.G.$gameSystem._psGame;require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{count++;document=v;});return()=>count;}
-async function finishSwitchBattle(h,installs){await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert.equal(installs(),0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs(),1);h.s.onEnd();assert.equal(installs(),1);}
+async function finishSwitchBattle(h,installs){await pick(h,'fight');await pick(h,1);await endMenu(h);assert.equal(installs(),0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs(),1);h.s.onEnd();assert.equal(installs(),1);}
 for(const lang of ['en','zh'])for(const route of ['no','back','list-cancel'])test('SWC02 '+lang+' '+route+' continues the same prepared foe without a player action and saves once',async()=>{
  const h=await open({lang,trainer:true,trainerMembers:2,battleStyle:'',fast:true});try{const installs=observeInstalls(h),s=h.s._session,lead=s.gw.activeId('p1'),foe=s.gw.activeId('p2'),v=await switchOffer(h),pp=s.gw.readState('p1').map(m=>[m.id,m.pp.tackle]),random=structuredClone(SWD.trainerAiDiagnostics(s).state.random),journal=SWD.trainerAiJournal(s).entries.length;
   const text=h.flow.translator().t('ui.replacement.question',{trainer:'Native Music',species:h.flow.speciesName(v.opponentSpecies)}).replace(/\s/g,'');assert(h.s._log._lines.join('').replace(/\s/g,'').includes(text),'actual bilingual question is visible');await h.frames(1);
@@ -744,7 +771,7 @@ for(const lang of ['en','zh'])test('SWF02 '+lang+' unified trainer: real faint, 
   const pp=s.gw.readState('p1').map(m=>[m.id,m.pp]).sort(),random=structuredClone(SWD.trainerAiDiagnostics(s).state.random),journal=SWD.trainerAiJournal(s).entries.length;
   await h.frames(1);await pick(h,'replace-yes');await h.p.inMode('party');await pick(h,lead);await pick(h,'switch-in');await h.p.inMode('main');assert.equal(s.gw.activeId('p1'),lead);assert.equal(E.session.readTrainerReplacement(s),null);assert.deepEqual(s.gw.readState('p1').map(m=>[m.id,m.pp]).sort(),pp);assert.deepEqual(SWD.trainerAiDiagnostics(s).state.random,random);assert.equal(SWD.trainerAiJournal(s).entries.length,journal);
   const snapshot=s.gw.snapshot(),ledger=JSON.stringify(s.ledger);await pick(h,'bag');h.s.changeBagPocket(1);await h.frames(1);await pick(h,'pokedoll');await pick(h,'use');await h.p.inMode('bag');assert.equal(s.gw.snapshot(),snapshot);assert.equal(JSON.stringify(s.ledger),ledger);assert.equal(s.bag.pokedoll,2);assert.deepEqual(uses,['ether','revive']);h.s.onMenuCancel();await h.frames(1);await h.p.inMode('main');
-  await pick(h,'fight');await pick(h,2);await h.p.inMode('end');assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);
+  await pick(h,'fight');await pick(h,2);await endMenu(h);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);
   const saved=h.flow.game();assert.deepEqual(saved.party.map(m=>m.id),order);assert(saved.party.find(m=>m.id===lead).hp>0);assert.deepEqual(saved.party.find(m=>m.id===lead).moves.map(m=>m.pp),[0,34]);assert.equal(saved.party.find(m=>m.id===reserve).moves[0].pp,9);assert.deepEqual(E.inventory.aggregateBag(saved.inventory),{ether:1,revive:1,pokedoll:2});h.s.onEnd();assert.equal(installs,1);
  }finally{h.cleanup();}
 });
@@ -754,7 +781,7 @@ for(const lang of ['en','zh'])for(const command of ['StartBattle','StartTrainerB
  const h=await open({lang,command,expGain:'false',trainerMembers:2,grow:true,fast:true});try{
   const s=h.s._session,id=s.party[0].id,baseline=structuredClone(JSON.parse(h.before).party[0]);assert.equal(s.expGain,false);let installs=0,document=h.G.$gameSystem._psGame,cues=0;require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{installs++;document=v;});const victory=h.flow._victoryBattleMusic;h.flow._victoryBattleMusic=function(...a){cues++;return victory.apply(this,a);};
   for(let n=0;n<2&&!s.finished;n++){await pick(h,'fight');await pick(h,1);await h.waitFor(()=>['main','end'].includes(h.s._mode),'no-exp normal result or next command');assert.equal(s.party[0].level,baseline.level);assert.equal(s.party[0].exp,baseline.exp);assert.deepEqual(s.party[0].evs,baseline.evs);assert.equal(cues,s.finished?1:0);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);}
-  assert(s.finished);await h.p.inMode('end');assert(!h.batches.flatMap(row=>row.value).some(m=>['growth','learn-prompt','learned'].includes(m.kind)));assert.equal(cues,1);assert(h.s._endFeedbackShown);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied',JSON.stringify(h.flow.lastOutcome));assert.equal(installs,1);const saved=h.flow.game().party.find(m=>m.id===id);assert.equal(saved.exp,baseline.exp);assert.equal(saved.level,baseline.level);assert.deepEqual(saved.evs,baseline.evs);assert(saved.moves[0].pp<baseline.moves[0].pp);h.s.onEnd();assert.equal(installs,1);
+  assert(s.finished);await endMenu(h);assert(!h.batches.flatMap(row=>row.value).some(m=>['growth','learn-prompt','learned'].includes(m.kind)));assert.equal(cues,1);assert(h.s._endFeedbackShown);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied',JSON.stringify(h.flow.lastOutcome));assert.equal(installs,1);const saved=h.flow.game().party.find(m=>m.id===id);assert.equal(saved.exp,baseline.exp);assert.equal(saved.level,baseline.level);assert.deepEqual(saved.evs,baseline.evs);assert(saved.moves[0].pp<baseline.moves[0].pp);h.s.onEnd();assert.equal(installs,1);
  }finally{h.cleanup();}
 });
 test('both registered events reject malformed expGain before opening or advancing sequence; metadata defaults On',async()=>{
@@ -770,7 +797,7 @@ for(const lang of ['en','zh'])for(const command of ['StartBattle','StartTrainerB
   await pick(h,'run');await h.p.inMode('main');assert.equal(s.gw.snapshot(),engine);assert.equal(JSON.stringify(s.currentRequest()),request);assert.equal(JSON.stringify(s.bag),bag);assert.equal(installs,0);
   await pick(h,'bag');await pick(h,'masterball');await pick(h,'use');await h.p.inMode('bag');assert.equal(h.s.battleBagState().kind,'items');assert.equal(h.s._menu.itemAt(h.s._menu.index()).ext,'masterball');assert.equal(s.gw.snapshot(),engine);assert.equal(JSON.stringify(s.currentRequest()),request);assert.equal(JSON.stringify(s.bag),bag);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
   const painted=h.completed.join('').replace(/\s/g,'');assert(painted.includes(h.flow.translator().t('refusal.ball.ballsdisabled').replace(/\s/g,'')),'the actual ball refusal must be presented in the chosen language');
-  h.s.onMenuCancel();await h.frames(1);await h.p.inMode('main');await pick(h,'fight');await pick(h,1);await h.p.inMode('end');assert(s.finished);assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().inventory,JSON.parse(h.before).inventory);assert.equal(s.bag.masterball,2);h.s.onEnd();assert.equal(installs,1);
+  h.s.onMenuCancel();await h.frames(1);await h.p.inMode('main');await pick(h,'fight');await pick(h,1);await endMenu(h);assert(s.finished);assert.equal(installs,0);await h.frames(1);h.s.onMenuOk();await h.frames(3);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.deepEqual(h.flow.game().inventory,JSON.parse(h.before).inventory);assert.equal(s.bag.masterball,2);h.s.onEnd();assert.equal(installs,1);
  }finally{h.cleanup();}
 });
 for(const flag of [undefined,'false'])for(const command of ['StartBattle','StartTrainerBattle'])test('SR02 '+command+' '+String(flag)+' retains the existing wild capture or trainer blocked-ball contract',async()=>{
@@ -790,12 +817,22 @@ test('SR04 both event commands validate prohibition types before sequence/open a
 for(const lang of ['en','zh'])test('CEXP Scene '+lang+' disabled capture growth still shows success, requests victory BGM and receives once',async()=>{
  const h=await open({lang,bag:{masterball:1},hurt:false,grow:true,fast:true,captureSetting:false});try{
   const s=h.s._session,original=JSON.stringify({level:s.party[0].level,exp:s.party[0].exp,evs:s.party[0].evs,moves:s.party[0].moves});let doc=h.G.$gameSystem._psGame,installs=0;require('../../../scripts/tests/state-install-audit.cjs').observe(h.G,v=>{installs++;doc=v;});
-  h.s.act(()=>s.throwBall('masterball'),'item');await h.p.inMode('end');assert.equal(s.captureExpGain,false);assert.equal(s.ended.reason,'caught');assert.equal(JSON.stringify({level:s.party[0].level,exp:s.party[0].exp,evs:s.party[0].evs,moves:s.party[0].moves}),original);assert(!h.batches.flatMap(x=>x.value).some(m=>m.kind==='growth'));assert.equal(h.flow.musicState().player.requests.filter(x=>x.kind==='victory').length,1);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
-  await h.frames(1);h.s.onMenuOk();await h.frames(4);assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.equal(h.flow.game().party.length,3);assert(h.flow.game().dex.owned.includes('pidgey'));assert.equal(h.flow.game().party[0].exp,JSON.parse(h.before).party[0].exp);assert.equal(h.flow.game().inventory.pockets.flat().filter(x=>x.itemId==='masterball').length,0);h.s.onEnd();assert.equal(installs,1);
+  h.s.act(()=>s.throwBall('masterball'),'item');await endMenu(h);assert.equal(s.captureExpGain,false);assert.equal(s.ended.reason,'caught');assert.equal(JSON.stringify({level:s.party[0].level,exp:s.party[0].exp,evs:s.party[0].evs,moves:s.party[0].moves}),original);assert(!h.batches.flatMap(x=>x.value).some(m=>m.kind==='growth'));assert.equal(h.flow.musicState().player.requests.filter(x=>x.kind==='victory').length,1);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await h.frames(1);h.s.onMenuOk();await h.waitFor(()=>h.G.PSManagement.current()?.ready&&h.G.PSManagement.current().view.kind==='menu','default nickname prompt');
+  const nickname=h.G.PSManagement.current();assert.deepEqual(Array.from(nickname.view.items,x=>x.key),['yes','no']);assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
+  await require('./capture-receiving-scene-host.cjs').receivingPick(h,'no');
+  // This save owns a Pokédex. Receiving its first Pidgey presents both pages
+  // under the same continuation; do not skip them or fake a completed save.
+  const dex=()=>h.G.PSEvolution.current();
+  await h.waitFor(()=>dex()?.ready&&dex().layer==='dex-message','new Pokédex entry notice');
+  const owner=dex().owner;assert.match(owner,/^receive:/);await h.p.press('ok');
+  await h.waitFor(()=>dex()?.ready&&dex().layer==='entry','actual species entry');
+  assert.equal(dex().owner,owner);assert(dex().text.some(line=>line.toLowerCase().includes('pidgey')));await h.p.press('ok');
+  await h.waitFor(()=>!h.flow.running&&!h.flow.app().saveBlocked,'receive and settle once');assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);assert.equal(h.flow.game().party.length,3);assert(h.flow.game().dex.owned.includes('pidgey'));assert.equal(h.flow.game().party[0].exp,JSON.parse(h.before).party[0].exp);assert.equal(h.flow.game().inventory.pockets.flat().filter(x=>x.itemId==='masterball').length,0);h.s.onEnd();assert.equal(installs,1);
  }finally{h.cleanup();}
 });
 test('CEXP Scene true keeps ordinary capture growth and does not duplicate its victory cue',async()=>{
- const h=await open({bag:{masterball:1},hurt:false,grow:true,fast:true,captureSetting:true});try{const s=h.s._session,before=s.party[0].exp;h.s.act(()=>s.throwBall('masterball'),'item');await h.waitFor(()=>h.s.levelStatsState?.()||h.s._mode==='end','capture growth display');if(h.s.levelStatsState()){await h.p.press('ok');await h.p.press('ok');}await h.p.inMode('end');assert.equal(s.captureExpGain,true);assert(s.party[0].exp>before);assert.equal(s.party[0].level,51);assert.equal(h.flow.musicState().player.requests.filter(x=>x.kind==='victory').length,0,'new terminal fallback is only for the disabled global rule');assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
+ const h=await open({bag:{masterball:1},hurt:false,grow:true,fast:true,captureSetting:true});try{const s=h.s._session,before=s.party[0].exp;h.s.act(()=>s.throwBall('masterball'),'item');await waitAfterGrowth(h,()=>!!h.s.levelStatsState?.()||h.s._mode==='end','capture growth display',false);if(h.s.levelStatsState()){await h.p.press('ok');await h.p.press('ok');}await endMenu(h);assert.equal(s.captureExpGain,true);assert(s.party[0].exp>before);assert.equal(s.party[0].level,51);assert.equal(h.flow.musicState().player.requests.filter(x=>x.kind==='victory').length,0,'new terminal fallback is only for the disabled global rule');assert.equal(JSON.stringify(h.flow.game()),h.before);}finally{h.cleanup();}
 });
 
 // WP66-A 6.1 + WP20 5.5: reorder individual records, retain independent battle wrappers.
@@ -823,7 +860,7 @@ for(const lang of ['en','zh'])for(const reserve of [false,true])test(lang+' defa
     assert.deepEqual(s.party.find(m=>m.id===id).moves.map(m=>[m.id,m.pp]),[['splash',17],['tackle',35]]);
     assert.equal(s.gw.readState('p1').find(m=>m.id===id).pp.splash,17);assert.equal(s.bag.ether,1);assert.equal(s.ledger.length,1);assert.equal(s.ledger[0].state,'consumed');
     assert.equal(installs,0);assert.equal(JSON.stringify(h.flow.game()),h.before);
-    await pick(h,'fight');await pick(h,1);await h.p.inMode('end');h.s.onMenuOk();await h.frames(3);
+    await pick(h,'fight');await pick(h,1);await endMenu(h);h.s.onMenuOk();await h.frames(3);
     assert.equal(h.flow.lastOutcome.commit,'applied');assert.equal(installs,1);
     assert.deepEqual(h.flow.game().party.find(m=>m.id===id).moves.map(m=>[m.id,m.pp]),[['splash',17],['tackle',reserve?35:34]]);
     const committed=JSON.stringify(h.flow.game());h.s.onEnd();assert.equal(installs,1);assert.equal(JSON.stringify(h.flow.game()),committed);
@@ -848,7 +885,7 @@ for (const lang of ['en', 'zh']) test(lang + ' summary move sorting swaps comple
     assert.equal(h.s._menu._items[0].ext, 1, 'current battle wrapper choice keeps its own slot identity');
     await pick(h, 1); await h.p.inMode('main');
     assert.equal(s.party[0].moves[1].id, 'tackle'); assert.equal(s.party[0].moves[1].pp, 31, 'actual Gen8 use synchronizes by move identity after sorting');
-    await pick(h, 'fight'); await pick(h, 1); await h.p.inMode('end');
+    await pick(h, 'fight'); await pick(h, 1); await endMenu(h);
     assert.equal(installs, 0); assert.equal(JSON.stringify(h.flow.game()), h.before);
     await h.frames(1); h.s.onMenuOk(); await h.frames(3);
     assert.equal(h.flow.lastOutcome.commit, 'applied'); assert.equal(installs, 1);
@@ -896,7 +933,7 @@ test('summary move sorting then real full-slot learning replaces the intended pe
     const pp=s.gw.readState('p1').find(m=>m.id===id).pp;
     assert.equal(pp.growl,undefined,'the selected working move is the one removed from the engine');
     assert.equal(pp.tackle,34,'the unselected used move retains its own spent PP'); assert.equal(pp.rest,10);
-    await pick(h,'fight'); await pick(h,1); await h.p.inMode('end');
+    await pick(h,'fight'); await pick(h,1); await endMenu(h);
     assert.equal(s.party[0].moves[1].pp,33); assert.equal(JSON.stringify(h.flow.game()),h.before);
     await h.frames(1); h.s.onMenuOk(); await h.frames(3); assert.equal(h.flow.lastOutcome.commit,'applied');
     assert.deepEqual(h.flow.game().party[0].moves.map(m=>m.id),['rest','tackle','splash','protect']);

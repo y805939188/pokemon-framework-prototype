@@ -100,4 +100,59 @@ async function fixture(options={}){
  await pump(()=>{const companions=G.PSFlow.companionNativePending(),author=G.PSFlow.worldAuthorInputPending();trace.push(['bootstrap-owned-pending',companions,author]);return G.SceneManager._scene!==bootstrap&&G.SceneManager._scene?._started&&!companions&&!author&&!G.PSWorld.pending()&&!app.saveBlocked;});
  return {...h,G,app,trace,saves,maps,requests,pump,pumpFailedArrival,outcomes,stepCalls,nativeConsumer,quantity:id=>B.E.inventory.itemQuantity(G.$gameSystem._psGame.inventory,id,h.content.items),arrivals:()=>arrivals,selected:()=>selected,replies:()=>replyCount,state:()=>G.$gameSystem._psGame};
 }
-module.exports={fixture,flush};
+function ordinaryObservers(baseFixture=fixture){
+// Observe the ordinary plugin port inside each private VM; neither choose nor publish entropy words.
+const crypto=require('node:crypto'),nodeFill=crypto.randomFillSync,ordinary=new WeakMap(),footThresholds=new WeakMap();
+let finishObservation=null;
+function endObservation(){try{finishObservation?.();}finally{finishObservation=null;}}
+
+async function observedFixture(options={}){
+ assert.equal(finishObservation,null);
+ let G,flow,request=null,loads=0;
+ const rows=[],thresholds=[];
+ const h=await baseFixture({...options,nativeSetup(n,m){G=n.G;return options.nativeSetup?.(n,m);},applicationPorts(ports){
+  assert(G&&!G.nw?.App);flow=G.PSFlow;
+  const load=Object.getOwnPropertyDescriptor(G,'require'),rand=Object.getOwnPropertyDescriptor(flow,'random');
+  assert(load?.writable&&rand?.writable);
+  const scoped=Object.freeze({randomFillSync(target){
+   assert(request&&request.fills===0);assert.equal(Object.prototype.toString.call(target),'[object Uint32Array]');assert.equal(target.length,2);
+   const filled=Reflect.apply(nodeFill,crypto,[target]);assert.strictEqual(filled,target);request.fills++;return filled;
+  }});
+  function readModule(...args){const real=Reflect.apply(load.value,this,args);if(args[0]!=='node:crypto'||!request)return real;
+   assert.strictEqual(real,crypto);loads++;return scoped;}
+  Object.defineProperty(readModule,'resolve',Object.getOwnPropertyDescriptor(load.value,'resolve'));
+  function readDraw(bound){
+   assert.equal(arguments.length,1);assert.strictEqual(this,flow);assert(!request&&rows.length<16);assert(Number.isSafeInteger(bound)&&bound>0);
+   const stack=new Error().stack,w=/\bdrawEntryWeather\b/.test(stack),ec=/\b(?:checkEncounterTrigger|selectEncounterCandidate|selectEncounterLevel|prepareOrdinaryEncounter)\b/.test(stack);
+   assert.notEqual(w,ec,'unexpected or ambiguous caller of ordinary world entropy');
+   const row={origin:w?'weather':'encounter',map:G.$gameMap.mapId(),bound,fills:0};
+   request=row;try{const actual=Reflect.apply(rand.value,this,[bound]);assert(Number.isSafeInteger(actual)&&actual>=0&&actual<bound);
+    assert.equal(row.fills,1);if(ec&&row.map===5&&bound===100)thresholds.push({belowFive:actual<5,belowOne:actual<1});
+    rows.push(row);return actual;
+   }finally{request=null;}
+  }
+  Object.defineProperty(G,'require',{...load,value:readModule});Object.defineProperty(flow,'random',{...rand,value:readDraw});
+  finishObservation=()=>{assert.strictEqual(G.require,readModule);assert.strictEqual(flow.random,readDraw);assert.equal(loads,rows.length?1:0,'the ordinary plugin caches its lazily resolved Node entropy provider');Object.defineProperty(G,'require',load);Object.defineProperty(flow,'random',rand);};
+  return options.applicationPorts?.(ports);
+ }});
+ assert.strictEqual(h.G,G);assert.strictEqual(h.flow,flow);assert.equal(rows.length,0,'no world RNG at bootstrap');ordinary.set(h.G,rows);footThresholds.set(h.G,thresholds);return h;
+}
+function expectOrdinary(h,bounds,origin='weather',expectedNative=[]){
+ assert.deepEqual(h.draws,[],'ordinary mode must ignore the legacy test RNG');assert.deepEqual(h.nativeDraws,expectedNative,'only the explicitly expected native encounter counter draws');
+ assert.deepEqual(ordinary.get(h.G),bounds.map(bound=>({origin,map:origin==='weather'?6:5,bound,fills:1})));
+}
+function expectFoot(h,chance){
+ assert.equal(h.outcomes.length,1);const outcome=h.outcomes[0];assert.equal(outcome.status,'no-encounter');
+ const flags=footThresholds.get(h.G);assert(flags.length>0);
+ if(chance===1){
+  const passedGrace=flags[0].belowFive;assert.equal(flags.length,passedGrace?2:1);
+  const reason=passedGrace?(flags[1].belowOne?'repel':'miss'):'grace';assert.equal(outcome.reason,reason);
+  expectOrdinary(h,{grace:[100],miss:[100,100],repel:[100,100,1,1]}[reason],'encounter');
+ }else{
+  assert.equal(flags.length,1);assert.equal(outcome.reason,'repel');
+  expectOrdinary(h,[100,1,1],'encounter');
+ }
+}
+return {fixture:observedFixture,expectOrdinary,expectFoot,endObservation,receipt:h=>ordinary.get(h.G).map(row=>({...row}))};
+}
+module.exports={fixture,flush,ordinaryObservers};

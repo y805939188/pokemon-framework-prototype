@@ -38,11 +38,13 @@ function menu(session, observeAutomatic) {
   // Explicit bare-source ports: the real Scene supplies names and owns message pacing.
   // This source consumer observes its real controller queue without running a visual lifecycle.
   scene._names = Object.fromEntries(session.party.map(member => [member.id, member.species]));
-  ctx.window.PSFlow.fast = true;
+  // Bare Scene has no real display window: observe the text passed into its one-page layout port
+  // and the ordinary queued paused-message object. This is admission, not a rendered-text claim.
+  const layout = []; scene._log = {textPages(text) { layout.push(text); return [[text]]; }};
   let items;
   scene.show = (_mode, value) => { items = value; };
   scene.showMoves();
-  observeAutomatic?.({ items, queued: Array.from(scene._queue), intent: scene._automaticMove, phase: scene._mode });
+  observeAutomatic?.({ items, queued: Array.from(scene._queue), layout, intent: scene._automaticMove, phase: scene._mode });
   return items;
 }
 async function make(game, foe, options = {}) {
@@ -73,8 +75,11 @@ test('Struggle with no PP fields queues the automatic notice, remains selectable
   assert.equal(menu(s, value => { view = value; }), undefined, 'forced Struggle has no manual menu');
   assert.equal(view.phase, 'messages');
   assert.equal(view.queued.length, 1);
-  assert.match(view.queued[0], /has no moves left!/);
-  assert.doesNotMatch(view.queued[0], /undefined/);
+  assert.equal(view.queued[0].snapshot().implementation,'paused-message-v1');
+  assert.equal(view.queued[0].snapshot().phase,'typing');
+  assert.equal(view.layout.length,1);assert.equal(view.queued[0].snapshot().total,Array.from(view.layout[0]).length);
+  assert.match(view.layout[0], /has no moves left!/);
+  assert.doesNotMatch(view.layout[0], /undefined/);
   assert.equal(view.intent.session, s);
   assert.equal(view.intent.request, JSON.stringify(s.currentRequest()));
   assert.equal(E.moveRequests.isSelectableMove(s.currentRequest().active[0].moves[0]), true);

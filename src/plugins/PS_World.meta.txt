@@ -57,11 +57,6 @@
  * @default 40
  * @desc Actual native MZ animation awaited before Flash commit. Missing/invalid resources refuse the operation.
  *
- * @param TravelDebug
- * @text Debug travel qualification
- * @type boolean
- * @default false
- *
  * @param TerrainTags
  * @text Terrain tag meanings
  * @type multiline_string
