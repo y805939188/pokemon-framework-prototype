@@ -37,7 +37,7 @@
 
 ## 先红后绿与本地验证
 
-证据统一在 [`experiments/step3/evidence/batch-review-fixes/`](../../experiments/step3/evidence/batch-review-fixes/)，路径已遮蔽；完整原始输出与测试保存仅留在 `<workspace>/.verify/step3-batch-fixes-20261020/`，不入库。原复核报告只读。
+证据统一在 [`experiments/step3/evidence/batch-review-fixes/`](https://github.com/y805939188/pokemon-framework-prototype/tree/91fe853f642bfa841bb3c93bb0ab86c9c0ac1ad0/experiments/step3/evidence/batch-review-fixes)，路径已遮蔽；完整原始输出与测试保存仅留在 `<workspace>/.verify/step3-batch-fixes-20261020/`，不入库。原复核报告只读。
 
 | 实际动作 | 结果与证据 |
 |---|---|

@@ -10,7 +10,7 @@ node scripts/type-quality-audit.cjs 02cff041078e9e98af7b6bb29df680a44ebf5839 bas
 
 脚本通过 `git ls-tree` 和 `git show <固定SHA>:<文件>` 读取提交树内全部自有 `.ts/.tsx/.mts/.cts`，包含声明和 TS 消费者测试，不读取工作树中的并发编辑，也不读取第三方源码或私有参考材料。使用项目已安装 Vite 8.3.1 / Rolldown 1.2.11 的 TypeScript ESTree parser（现有边界检查器使用同一工具）；不把注释、字符串中的 `any` 当语法。共 259 文件，解析失败 0。
 
-[机器清单](../../experiments/framework-remediation/evidence/progressive-type-audit-baseline.json) 包含逐文件计数和每个候选的文件、行、列与短片段。分类以脚本中的 `classify` 为准：框架 tools 中的 fakes/harness/matrix/scripted-driver/held-diagnostics/fixtures、flowtest 与 Smoke/FlowTest 插件计入测试；`*-mz`、`*-host` 与顶层宿主插件计入 MZ/宿主；其余 UI 模型和框架呈现模块计入 UI。通用 Session 流程单列，避免把全部 flow 混入战斗适配。
+[机器清单](https://github.com/y805939188/pokemon-framework-prototype/blob/91fe853f642bfa841bb3c93bb0ab86c9c0ac1ad0/experiments/framework-remediation/evidence/progressive-type-audit-baseline.json) 包含逐文件计数和每个候选的文件、行、列与短片段。分类以脚本中的 `classify` 为准：框架 tools 中的 fakes/harness/matrix/scripted-driver/held-diagnostics/fixtures、flowtest 与 Smoke/FlowTest 插件计入测试；`*-mz`、`*-host` 与顶层宿主插件计入 MZ/宿主；其余 UI 模型和框架呈现模块计入 UI。通用 Session 流程单列，避免把全部 flow 混入战斗适配。
 
 | 领域 | 文件 | 显式 any | 所有类型断言 | 双重断言 | 非空断言 | 动态下标访问 |
 |---|---:|---:|---:|---:|---:|---:|

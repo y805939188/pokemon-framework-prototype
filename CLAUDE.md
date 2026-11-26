@@ -1,6 +1,6 @@
 # pokemon-framework-prototype
 
-主工作仓库。**动手前先读 [`docs/PROJECT-GUIDE.md`](docs/PROJECT-GUIDE.md)**（目标、铁律与授权边界、协作协议、架构、环境、命令、已知坑、文档地图），再读工作区的 `../.handoff/STATUS.md`（当前进度与下一步，不在 git 里），最后用 `git status` 核对实际状态。
+主工作仓库。**动手前先读 [`docs/PROJECT-GUIDE.md`](docs/PROJECT-GUIDE.md)**（目标、铁律与授权边界、协作协议、架构、环境、命令、已知坑、文档地图），再用 `git status` 核对实际状态。内部协作者可另外读取独立的工作区交接记录；它不是公开贡献的前置条件。
 
 要点（细节都在指南里）：
 - clean-room：只读规格库 `../pokemon-framework-reference` 的正式规格，**不读不移植原版 Ruby**。

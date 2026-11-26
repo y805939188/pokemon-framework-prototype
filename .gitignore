@@ -4,6 +4,16 @@
 .DS_Store
 *.log
 
+# Keep local configuration, test evidence and handoffs out of the framework repository.
+.env
+.env.*
+!.env.example
+/.verify/
+/.handoff/
+/.independent-reviews/
+/.worktrees/
+experiments/**/evidence/
+
 # ------------------------------------------------------------
 # RPG Maker / RPG Reactor local state
 # ------------------------------------------------------------

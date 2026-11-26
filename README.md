@@ -1,60 +1,35 @@
-# pokemon-framework-prototype
+# Pokémon Framework for RPG Maker MZ
 
-用 TypeScript 为 **RPG Maker MZ** 实现的宝可梦游戏开发框架的主工作仓库（同时是一个可直接用 MZ 打开的工程：`game.rmmzproject`）。运行时用 RPGReactor（PixiJS 8），战斗用 Pokémon Showdown（固定提交，通过受支持的扩展点接入，不改其源码）。行为依据是 clean-room 规格库，不移植原版 Ruby 代码。
+本仓库是一个可以用 RPG Maker MZ 打开的 TypeScript 游戏框架，不是完整游戏或正式 Demo。地图与界面运行在固定版本的 RPGReactor（PixiJS 8）上，Gen 8 单打由固定版本的 Pokémon Showdown 模拟。框架通过扩展接口接入战斗，不移植 Pokémon Essentials 的 Ruby 源码。
 
-起点是 [rpg-maker-mz-initialize](https://github.com/y805939188/rpg-maker-mz-initialize) 模板（`b6fa1df`）；第二步（验证战斗接入）已完成，结论和证据在 `docs/step2/`。
+## 上手
 
-## 当前阶段（2026-11-23）
-
-5.6 的菜单与 PC 导航、标题与存档流程、地图对白和走路优化已完成限定验收。固定产品候选 `f5c8bc1b` 的正式本地回归通过 429 套、8,489 项。独立实机验证覆盖走路、败北恢复、中文首图和槽 1 同文件冷读。读档后的 PC 与对白速度以字节一致的隔离副本补验。发布提交基于远端主线，沿用固定候选的产品源码与构建输入。见 [第五步进度与验收范围](docs/step5/README.md#56-菜单标题与存档流程)和[走路内容快照](docs/step5/5.5-walk-content-fingerprint.zh.md)。
-
-## 5.4 收口记录（2026-11-13）
-
-5.4 已按批准的单打与默认呈现范围完成技术收口。主线整合以普通合并 `580c8637` 承接已独审的最终验收文档 [`4ac83373`](https://github.com/y805939188/pokemon-framework-prototype/commit/4ac83373fac77a2a9eec24e85191a6415ac5dd4a)，产品仍为 [`174568dc`](https://github.com/y805939188/pokemon-framework-prototype/commit/174568dc2a0d20b5e5e2b0878c35c63bca742e27)，src `7c52b290`（源码来源 `5a41caf`）；产品代码和静态运行包身份不变。[投球／逃跑整改](docs/step5/5.4-capture-run-followup.md)的 A1／B1／C1 仅按正常可达范围限域通过，不扩成全部机制验收。
-
-开发分支的[精确 CI #313](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43366638211) 对产品 `174568dc`、[精确 CI #314](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43369227918) 对最终验收文档 `4ac83373` 各自两 job 成功，均为 280 套／5082 项通过，失败／取消／跳过均 0；冻结参考回放 EXCLUDED／NOT RUN，D1 合成控制 7＋23 另列。它们不是 main CI；此主线整合的精确 CI 以对应 main 提交的 [Actions 实绩](https://github.com/y805939188/pokemon-framework-prototype/actions?query=branch%3Amain) 为准，不继承开发分支 CI，也不预填本 README 所属最终 main 提交的结果。
-
-此前 `2ecace8d`／`714b674` 的阶段收口与 CI312 保留为历史，不改写旧证据。战前仍统一用已实现的默认过渡；完整特殊注册／优先级和按场景、对手、事件自由编排尚未实现，后续阶段和日期未指定。范围及合并前固定验收记录见[5.4 收口记录](docs/step5/5.4-closure.md)和[验收索引](docs/step5/5.4-current-acceptance.md)。所链接文档保留 CI314 时的合并前记录；当前 main 集成事实以本节和对应 main CI 为准。旧 native／百场／HI05／CD 保留原版本；完整性能、跨平台与游戏包分发未因此通过，原 FAIL／WARN／UNKNOWN 及未测边界保持。
-
-## 先读什么
-
-1. [`docs/PROJECT-GUIDE.md`](docs/PROJECT-GUIDE.md) —— 目标、路线、铁律与授权边界、协作协议、架构、仓库地图、环境准备、常用命令、已知坑、文档地图。**所有人和 AI 动手前必读。**
-2. 工作区 `.handoff/STATUS.md` —— 现在做到哪、下一步（不在 git 里）。
-3. [`docs/step2/README.md`](docs/step2/README.md) —— 第二步总结与文档导航。
-
-## 最短上手
-
-前提与细节见 `docs/PROJECT-GUIDE.md` 第 9 节。
+在 Apple Silicon Mac 上，准备 RPG Maker MZ、Node.js、pnpm 和 Git。具体版本、固定依赖与安装选项见[项目指南](docs/PROJECT-GUIDE.md#9-环境准备从零)。
 
 ```bash
 REACTOR_SOURCE=download ./scripts/bootstrap-mac.sh
-./scripts/test-quick.sh        # 类型检查 + 全部 Node 测试，约 1 分钟，无窗口
+PF_NO_SKIP=1 ./scripts/test-headless.sh --scope=regular
 ```
 
-bootstrap 会完成依赖与类型准备、基础引擎／Showdown 扩展构建、固定 Showdown 暂存、完整内容与插件构建，最后运行 doctor；冷环境和已有构建产物的环境都使用这个顺序。Reactor 下载固定提交并验证实际消费字节；已有同一固定检出时，也可设 `REACTOR_SOURCE=/path/to/RPGReactor`，不依赖某台机器的个人路径。
+引导脚本会准备固定依赖和构建产物，默认不替换 MZ 全局 NW.js。安装完成后，在 MZ 打开 `game.rmmzproject`。仓库附带的是开发模板，需要另行准备自己的地图、美术和经授权的内容；不要把本机 MZ 素材随框架再分发。
 
-只支持 macOS Apple Silicon（Windows/Intel 暂缓）。bootstrap 默认不会改动已安装的 MZ（要替换它的 NW.js 必须显式加 `--install-nwjs`）。**不要使用 MZ 的"部署"打包**（会弄坏 NW.js 包），用 `scripts/package-mac.sh`。
+## 使用框架
 
-## 目录
+- [运行模式、测试隔离与诊断](docs/step6/README.md)：使用正常模式开发，新建隔离工程做实机测试。
+- [作者命令与内容结构](docs/step5/commands.md)：编译内容，配置事件、交易、战斗、传送、存档与界面。
+- [打包与分发](docs/step5/distribution.md)：本机构建与限制。不要使用 MZ 自带的“部署”来替代此仓库的 Mac 打包脚本。
+- [第五步](docs/step5/README.md) · [第四步](docs/step4/closure.md) · [第三步](docs/step3/closure.md) · [第二步](docs/step2/README.md)：各阶段范围与历史边界。
 
-| 路径 | 内容 |
+正式 Demo、Mac 玩家下载版签名和公证不属于这次交付。无界面 CI 不证明真实宿主或玩家安装包通过；当前提交的远程状态见 [GitHub Actions](https://github.com/y805939188/pokemon-framework-prototype/actions)。
+
+## 仓库导航
+
+| 路径 | 用途 |
 |---|---|
-| `js/engine/` | 运行时代码：Showdown 网关、成长/写回/会话、RPG 扩展、场景矩阵（引擎构建产物 `showdown/` 被 git 忽略） |
-| `src/plugins/` | MZ 插件的 TypeScript 源码 |
-| `scripts/` | 引导、构建、打包、签名、测试、诊断脚本 |
-| `experiments/step2/` | 第二步的测试、探针和证据 |
-| `docs/` | 项目指南、阶段合同、测试与验收文档 |
-| `data/` `img/` `audio/` … | MZ 工程内容（模板数据；MZ 素材由引导脚本从本机 MZ 复制，不提交） |
+| `src/framework/` | 游戏规则、状态、内容编译与战斗适配 |
+| `src/plugins/` | MZ 插件和宿主对接 |
+| `data/`、`content/` | MZ 工程及框架的开发用数据模板 |
+| `scripts/`、`experiments/` | 安装、构建、打包及回归验证 |
+| `docs/` | 使用说明、兼容边界及阶段索引 |
 
-
-## 历史批次截面
-
-以下保留各批次当时状态；其中“当前／下一批／待审”只指当时，不覆盖上方当前验收索引。
-
-本整改分支从已限域接受的倒下纯排期f4f5551继续：原ultra及精确CI198双job均通过，旧拒绝／失败保留。当前小批为[简单倒下的Scene／音频消费者](docs/step5/5.4-D2c-faint-view.md)，尚待固定验证与独立复审。完整D2／5.4、新P-4和GC内存增长WARN仍OPEN，原U51-16超时FAIL／输入来源UNKNOWN保留，main未合并。
-
-2026-11-01：默认F2 `9c045fb` 经独立纯路径、新包单轮81项与精确CI203限域接收；下一小批[战斗音频六入口纯选曲](docs/step5/5.4-D2c-audio-selection.md)待固定候选独立复审，只处理逻辑身份优先级，未播放／未接Scene。完整D2/5.4/E、新P4、GC WARN与旧UNKNOWN不关闭。
-
-后继音频：纯选曲 `47a84e2` 已独立 PASS_SCOPED（155套/2840项），精确分支发布另核；[BGM端口／引子记忆与MZ适配器](docs/step5/5.4-D2c-audio-host-port.md)为下一独立候选，尚未接正式 Scene 或事件，未运行新 NW，不等于实际音频或完整 WP15/16 已验收。
-
-后续接线：47a已发布且精确CI204全绿，内部端口7166f7a已获独立限域通过；当前[正式Scene开战BGM／事件引子／回程](docs/step5/5.4-D2c-audio-scene.md)是新候选待审，未运行新NW，不以纯路径代签真实宿主或整个D2。
+参与开发前阅读 [项目指南](docs/PROJECT-GUIDE.md)。构建生成物、运行日志、实机证据和开发交接应留在工作区，不能提交为框架内容。

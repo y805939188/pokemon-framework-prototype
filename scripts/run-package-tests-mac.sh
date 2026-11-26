@@ -5,7 +5,7 @@
 # Usage: scripts/run-package-tests-mac.sh [evidence-dir]
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-EVID="${1:-$ROOT/experiments/step2/evidence/package}"
+EVID="${1:-$ROOT/build/test-evidence/package}"
 mkdir -p "$EVID" && EVID="$(cd "$EVID" && pwd)"  # the game process writes its reports itself: needs an absolute path
 APP="$ROOT/build/package/PokemonFrameworkPrototype.app"
 SAVEDIR="$EVID/saves"

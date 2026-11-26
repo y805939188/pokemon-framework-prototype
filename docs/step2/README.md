@@ -26,7 +26,7 @@
 | `signing-plan.md` | 签名与公证：现状、已验证/未验证、有账号后的步骤 |
 | `2.2`–`2.5-report.md` | 各阶段的契约提取、对比、结果、限制 |
 | `baseline.json` | 机器可读的版本与身份基线（模板、Reactor、Showdown、工具链、夹具、包、协议、签名） |
-| `../../experiments/step2/evidence/MANIFEST.md` | 每个证据文件由什么命令、在哪个构建上产生 |
+| [第二步历史证据索引](https://github.com/y805939188/pokemon-framework-prototype/blob/91fe853f642bfa841bb3c93bb0ab86c9c0ac1ad0/experiments/step2/evidence/MANIFEST.md) | 每个证据文件由什么命令、在哪个构建上产生 |
 
 ## 关键发现（需要后续工作者记住）
 

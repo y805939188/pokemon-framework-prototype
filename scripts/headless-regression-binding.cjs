@@ -17,6 +17,7 @@ const REACTOR_INPUTS = [
 ];
 const REACTOR_PINS = require('./reactor-source-manifest.json').runtime;
 const CONTROLLED_INPUTS = [
+  'scripts/author-content.cjs', 'scripts/tests/author-content.test.cjs',
   ...REACTOR_INPUTS,
   'experiments/step5/5/test-owned-content-snapshot.cjs',
   'experiments/step5/5/test-walk-full-plugin-content.cjs',

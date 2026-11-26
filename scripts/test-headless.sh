@@ -437,6 +437,7 @@ SUITES=(
   scripts/tests/e1-character-inputs.test.cjs
   scripts/tests/e1-character-runtime-inputs.test.cjs
   scripts/tests/step6-isolated-launch.test.cjs
+  scripts/tests/author-content.test.cjs
 )
 # Explicit policy exclusions, not skipped tests and never counted as passes.
 # There is no environment switch or automatic-runner option that enables this replay.

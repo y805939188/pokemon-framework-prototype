@@ -2,7 +2,7 @@
 # Step 2.4: run the in-game battle-flow scenarios in NW.js (the MZ NW.js host), then restart the
 # process and verify the MZ save written by the first run. NW.js is launched directly on the project,
 # the same host the MZ editor's Playtest uses (this is not the editor's Playtest button).
-# Usage: scripts/run-flow-test-mac.sh [evidence-dir]   (default: experiments/step2/evidence/flow)
+# Usage: scripts/run-flow-test-mac.sh [evidence-dir]   (default: build/test-evidence/flow)
 # Optional PF_FLOW_PROJECT_ROOT selects an isolated project; PF_FLOW_TIMEOUT_SECONDS defaults to 360.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -13,7 +13,7 @@ FLOW_TIMEOUT_SECONDS="${PF_FLOW_TIMEOUT_SECONDS:-360}"
 [[ "$FLOW_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] || { echo "PF_FLOW_TIMEOUT_SECONDS must be a positive integer" >&2; exit 2; }
 MZ_APP="${MZ_APP:-$HOME/Library/Application Support/Steam/steamapps/common/RPG Maker MZ/RPGMZ.app}"
 NW="$MZ_APP/Contents/Resources/nwjs-mac/nwjs.app/Contents/MacOS/nwjs"
-EVID="${1:-$ROOT/experiments/step2/evidence/flow}"
+EVID="${1:-$ROOT/build/test-evidence/flow}"
 mkdir -p "$EVID" && EVID="$(cd "$EVID" && pwd)"  # the game process writes its reports itself: needs an absolute path
 [[ -x "$NW" ]] || { echo "NW.js not found: $NW" >&2; exit 1; }
 pnpm --dir "$ROOT/src" build >/dev/null
