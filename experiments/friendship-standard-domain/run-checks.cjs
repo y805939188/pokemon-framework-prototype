@@ -1,12 +1,13 @@
 'use strict';
 // Standalone serial checks; intentionally not registered in B-owned test-headless.sh yet.
 const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:child_process');
-const ROOT=path.resolve(__dirname,'../..'),NODE='/Users/dingshinn/.nvm/versions/node/v22.21.1/bin/node';
-if(process.execPath!==NODE)throw Error('Use the explicitly pinned Node executable: '+NODE);
+const ROOT=path.resolve(__dirname,'../..'),NODE=process.execPath;
+const EXPECTED_NODE='v22.21.1';
+if(process.version!==EXPECTED_NODE)throw Error('Use Node '+EXPECTED_NODE+' (found '+process.version+')');
 const phase=process.argv[2];if(!phase||!/^[a-z0-9-]+$/.test(phase))throw Error('usage: node experiments/friendship-standard-domain/run-checks.cjs <fresh-phase>');
 const dir=path.join(ROOT,'build/friendship-standard-domain-20261030',phase);fs.mkdirSync(dir); // refuse evidence overwrite
 const temporary=path.join(dir,'tmp');fs.mkdirSync(temporary);
-const env={...process.env,TMPDIR:temporary,PATH:path.dirname(NODE)+':'+process.env.PATH,PF_FRIENDSHIP_TEST_TMP:path.join(dir,'scratch')};
+const env={...process.env,TMPDIR:temporary,PATH:[path.dirname(NODE),process.env.PATH].filter(Boolean).join(path.delimiter),PF_FRIENDSHIP_TEST_TMP:path.join(dir,'scratch')};
 const commands=[];
 for(const config of ['tsconfig.json','tsconfig.core.json','tsconfig.app.json'])commands.push({name:'types-'+config,args:['node_modules/typescript/bin/tsc','--noEmit','-p','framework/'+config],cwd:path.join(ROOT,'src')});
 commands.push({name:'boundaries',args:['scripts/check-boundaries.cjs']});

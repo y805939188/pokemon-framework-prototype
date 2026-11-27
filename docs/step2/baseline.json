@@ -8,7 +8,7 @@
     "importMethod": "git archive of tracked files (no .git/cache); bootstrap-mac.sh (default: global NW.js untouched)"
   },
   "rpgReactor": {
-    "source": "local checkout /Users/dingshinn/Desktop/RPGReactor (recorded in git-ignored .reactor-source)",
+    "source": "local RPGReactor checkout (location recorded in git-ignored .reactor-source)",
     "commit": "2dc2e10e89445e252c929257f8bf249525045d36",
     "runtimeVersion": "0.98.8",
     "runtimeRevision": "20260927.34",

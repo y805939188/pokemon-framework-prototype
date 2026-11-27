@@ -1,6 +1,6 @@
 # E3 学习动作纯计划叶（作者自检候选）
 
-基线为未最终接收的 E2a 候选 `821ee885939b81e4c8bd072409d638b2f7d231a6`，本叶不证明其接收或整体 E／M1／5.3。分支 `step5/3-E3-learning-actions`，独占工作树 `/Users/dingshinn/Desktop/pokemon-framework/.worktrees/step5-3-E3-learning-actions`。未修改共享入口、应用／库存类型／已有 C 或友好算法、配置、runner、插件、样例、golden、STATUS 或 dashboard。
+基线为未最终接收的 E2a 候选 `821ee885939b81e4c8bd072409d638b2f7d231a6`，本叶不证明其接收或整体 E／M1／5.3。分支 `step5/3-E3-learning-actions`，使用分支专属的本地隔离工作树。未修改共享入口、应用／库存类型／已有 C 或友好算法、配置、runner、插件、样例、golden、STATUS 或 dashboard。
 
 ## 实际入口
 
@@ -26,9 +26,9 @@ planForgettingAction(member, slot?)
 
 ## 实际验证
 
-所有 Node 调用使用 `/Users/dingshinn/.nvm/versions/node/v22.21.1/bin/node`（v22.21.1）；pnpm 10.20.0 / TypeScript 7.0.2。工作树仅只读链接同锁文件的 `src/node_modules` 依赖，四包由本树自行生成，未复制其它作者的 build。测试用 Node 官方 TS loader 读取本树实际模块图；未为了测试更改公共 index。
+所有 Node 调用使用 `node`（v22.21.1）；pnpm 10.20.0 / TypeScript 7.0.2。工作树仅只读链接同锁文件的 `src/node_modules` 依赖，四包由本树自行生成，未复制其它作者的 build。测试用 Node 官方 TS loader 读取本树实际模块图；未为了测试更改公共 index。
 
-详细原始证据位于工作区 `/Users/dingshinn/Desktop/pokemon-framework/.verify/step5-3-E3-learning-actions-4cb12d1/`。下列 `logs/` 路径相对此证据目录。12份原始 `.tap`／`.log`、12份同名 `.gz` 压缩副本及原交付说明已逐文件复制并核对 SHA256，gzip 解压字节与原件一致；`COPY-VERIFICATION.json` 记录来源与核验，`SHA256SUMS` 封印26个成员。原始失败未整理或重写。本地原始日志仍在工作树原位被精确忽略，仓库 fixture 历史只保留必要辅助代码与说明，不再新增运行输出；旧 `4cb12d1` 提交保留原压缩副本。
+详细原始证据保存在仓库外的本地验证归档。下列 `logs/` 路径相对此证据目录。12份原始 `.tap`／`.log`、12份同名 `.gz` 压缩副本及原交付说明已逐文件复制并核对 SHA256，gzip 解压字节与原件一致；`COPY-VERIFICATION.json` 记录来源与核验，`SHA256SUMS` 封印26个成员。原始失败未整理或重写。本地原始日志仍在工作树原位被精确忽略，仓库 fixture 历史只保留必要辅助代码与说明，不再新增运行输出；旧 `4cb12d1` 提交保留原压缩副本。
 
 - `pnpm --dir src build:engine`：本树四包构建通过，`logs/build02.log`。
 - `pnpm --dir src typecheck:framework`：framework／core／app 三项通过，`logs/framework02.log`。
