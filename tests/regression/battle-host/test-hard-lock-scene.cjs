@@ -4,9 +4,13 @@ const test=require('node:test'),assert=require('node:assert/strict'),H=require('
 test.before(H.prepare);test.after(H.cleanup);
 for(const move of ['hyperbeam','dig','fly','outrage'])test(move+' automatically continues at main entry without opening a hard-locked menu',async()=>{
  let h;try{
-  h=await H.open({id:'hard-lock-scene-'+move,lang:'en',player:{species:'snorlax',level:100,moves:[move,'splash']},foe:{species:'regirock',level:100,moves:['splash']}});
+  // Ordinary production mode ignores debug seeds. Guarantee a hit so recharge actually occurs.
+  const hyperBeam=move==='hyperbeam';
+  h=await H.open({id:'hard-lock-scene-'+move,lang:'en',player:{species:hyperBeam?'machamp':'snorlax',level:100,...(hyperBeam?{abilityIndex:1}:{}),moves:[move,'splash']},foe:{species:'regirock',level:100,moves:['splash']}});
+  if(hyperBeam)assert.equal(h.session.gw._debugBattle().p1.active[0].ability,'noguard');
   const main=h.s.showMain,seen=[];h.s.showMain=function(){seen.push({locked:h.session.gw.query('p1','automatic-locked'),before:H.live(h.session)});return main.call(this);};
   await H.move(h,1);assert(h.calls.length>=2,'the locked request must resolve without another player choice');assert(h.calls.every(c=>c.slot===1&&c.result.ok));assert(seen.some(x=>x.locked.allowed&&x.locked.moveSlot===1),'actual main-entry lock observed');
+  if(hyperBeam){const {before,after}=h.calls[0];assert(before.p2[0].hp>after.p2[0].hp&&after.p2[0].hp>0,'Hyper Beam hits without ending the battle');}
   const req=h.session.currentRequest();assert.equal(h.session.gw.query('p1','automatic-locked').allowed,false);assert.equal(req.active[0].moves.length,2);assert.equal(h.s._mode,'main');H.unchanged(h);
   const n=h.calls.length;await h.frames(5);assert.equal(h.calls.length,n,'completed lock cannot register a duplicate continuation');assert.equal(h.installs,0);
  }finally{h?.cleanup();}
