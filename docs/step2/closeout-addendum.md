@@ -32,7 +32,7 @@
 2. `82615db` `disabled` 分支与 `seq` 连续性回归；`harness.ts` 的 `decide()` 复用 `isSelectableMove`。
 3. `4c4b62b` 用测试固定 F2 的支持范围（§4）。
 4. `8f74769` 真实窗口场景 T11（失败 + 回滚失败 → 终止、双错误、零提交）。
-5. `d48e43d` 归档 `docs/step3/second-review-report.md`（纯文档）。
+5. `d48e43d` 归档当时的复审记录（纯文档；原件不在当前文档树）。
 
 复核范围为 `git diff a761c0a..d48e43d -- src experiments scripts`（9 个文件中的运行时代码只有 `session.ts`、`harness.ts`，其余为测试与场景）。重点：
 - 回滚失败后是否所有写入口都被拒绝（含 `cancel`、`decideLearn`、`commitTurn`、`chooseDoubles`、`result()`、`take()`），没有新的扣减/退款；宿主 `finish → result()` 因此无法提交不可信结果；

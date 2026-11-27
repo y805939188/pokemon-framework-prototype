@@ -22,7 +22,7 @@
 作者证据根：
 
 ```text
-/Users/dingshinn/Desktop/pokemon-framework/.verify/framework-remediation-step5-integration-20261028/author
+<本地验证归档>
 ```
 
 固定提交后，以 `FINAL_SHA` 创建独立 `candidate-fixed-src`，复制 main donor 的本地锁定依赖；main 只读且不构建。完整 quick/type/boundary/build/distribution、外部消费者、六种加载顺序和静态 import 清单均在该固定检出运行。Showdown staged `custom-formats` 必须由当前构建复制并 `cmp`，不联网安装。

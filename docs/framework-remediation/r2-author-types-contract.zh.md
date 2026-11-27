@@ -97,7 +97,7 @@ WP31 §3 的 `LevelDarkInParty` 读取队伍中非蛋成员的恶属性。WP66-A
 Node `22.21.1` 实跑：
 
 ```text
-/Users/dingshinn/.nvm/versions/node/v22.21.1/bin/node --test experiments/framework-remediation/test-r2-author-types-diagnostics.cjs
+$HOME/.nvm/versions/node/v22.21.1/bin/node --test experiments/framework-remediation/test-r2-author-types-diagnostics.cjs
 15 tests, 15 pass, 0 fail/cancel/skip/todo, exit 0
 ```
 

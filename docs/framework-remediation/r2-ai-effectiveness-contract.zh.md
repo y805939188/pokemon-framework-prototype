@@ -71,7 +71,7 @@
 
 最终独审另跑五文件 **135/135**（本专项、作者类型合同、作者类型能力诊断、既有Trainer AI集成、既有Trainer AI修复），零失败／取消／跳过，exit0；在c653重新核对4,718,574个标准基础表值。公开policy未知类型仍 `invalid-snapshot` 且零抽样。正式MissingNo省略types时精确拒绝原token，driver身份、引擎快照、持久状态均未变；这里发生在取checkpoint的采集前置检查，**不是执行后回滚证明**，恢复／重放证明来自Forest's Curse及邻近checkpoint合同。同一物种显式配置五个标准抗草属性时倍率为1/32且行动成功。8a的6个替补选择与4个坏目录探针单列，不冒充c653重跑。独审未独立跑完整regular。
 
-实际命令如下，测试、pnpm构建与regular使用显式Node22.21.1的PATH（本机前缀 `/Users/dingshinn/.nvm/versions/node/v22.21.1/bin`）；没有依赖某个测试“碰巧跳过”来制造通过：
+实际命令如下，测试、pnpm构建与regular使用显式Node22.21.1的PATH（本机前缀 `$HOME/.nvm/versions/node/v22.21.1/bin`）；没有依赖某个测试“碰巧跳过”来制造通过：
 
 ```sh
 pnpm --dir src build

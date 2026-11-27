@@ -1,7 +1,0 @@
-# F canonical native registry 合同检查点
-
-精确消费App ports-only 1c9cdd；不装schema11、不含App F consumer或atomic安装器变化。原opaque source及known-pure readNativeTravelLease不变，同一个私factory新增publishMapBirth／publishSourceHandoff，publisher仍只由真实transfer producer闭包持有，不挂global或snapshot。
-
-新birth及loaded frame holder冻结，保留真正native引用；publishMapBirth返回canonical当前record，sourceHandoff.target只接受这个exact record，不能clone或旧issued record回放。birth推进／清空撤销仍指向旧record的sourceclaim。phase ready必须有当前loadedframe；armed可无target等待真正Map构造。普通publish(current)保原E3行为，未启用新口时不添加新snapshot键，已启用则保独立F字段。
-
-该模块不验证F业务身份、也不由DTO构造权限。真正producer必须先由真实App私owner/context确认并经nativegoto/genuinector/coldready等发布；pure模块有限测试仅证明储存／当前性／不可公开写，不代F source生产通过。新接口便于唯一atomic作者消费已固定纯reader／optional槽，禁止第二IIFE registry实例。完整actualF、coldscene、savehandoff／requestMapRefresh／entry归属仍待后继实现和独审。

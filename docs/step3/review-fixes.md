@@ -39,7 +39,7 @@
 验证均在隔离 worktree，Node **22.21.1** / pnpm **10.20.0**，无新增依赖：
 
 ```bash
-export PATH=/Users/dingshinn/.nvm/versions/node/v22.21.1/bin:$PATH
+export PATH=$HOME/.nvm/versions/node/v22.21.1/bin:$PATH
 scripts/test-quick.sh
 pnpm --dir src build
 ```

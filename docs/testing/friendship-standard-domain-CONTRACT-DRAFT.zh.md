@@ -36,7 +36,7 @@ CLI 从所属项目 manifest 读取明确作者版本，来源预使用门仍先
 精确独立命令（在本树，从未存在的新 phase 名运行，拒绝覆盖旧日志）：
 
 ```sh
-/Users/dingshinn/.nvm/versions/node/v22.21.1/bin/node experiments/friendship-standard-domain/run-checks.cjs review-fresh
+$HOME/.nvm/versions/node/v22.21.1/bin/node experiments/friendship-standard-domain/run-checks.cjs review-fresh
 ```
 
 runner 串行执行 framework/core/app 三层 types、边界、runtime/custom-formats/core/content-cli 构建、标准样例 build/check、18 个相关新旧套件。日志和构建输出为本树 ignored `build/`；旧 suite 自建临时文件通过 TMPDIR 定位到该次 ignored 目录。新三套覆盖作者门/PBS、纯迁移与正常规则回归，旧 fixtures/golden 未改；唯一旧断言调整是把 author schema2 未知改为真正未知999。边界 checker 和 runner 注册文件未改。
@@ -52,7 +52,7 @@ runner 串行执行 framework/core/app 三层 types、边界、runtime/custom-fo
 3. 公共导出/SDK、正式 CLI/宿主迁移入口与 `scripts/test-headless.sh` 注册等待共享写入窗口；建议注册本目录三个 `test-*.cjs`，不能先拿当前未注册状态宣称 CI 覆盖。
 4. 全 quick、全 SDK/消费者、完整插件、NW/Docker/跨平台及完整产品长测本批未执行；独立 ultra、CI、推送/合并均未执行。没有自签通过。
 
-外部 C：`/Users/dingshinn/Desktop/pokemon-framework/.verify/ruby-ts-differential-20261029T093035Z/friendship-exclusive-sol-xhigh-20261030T041032Z`。作者最终报告 `AUTHOR-RESULT.zh.md`；不更新共享 STATUS/PARENT-checkpoint，不封印 CLI 最后回写的 final.md 或运行中顶层 stdout/stderr。
+外部 C：`<本地验证归档>`。作者最终报告 `AUTHOR-RESULT.zh.md`；不更新共享 STATUS/PARENT-checkpoint，不封印 CLI 最后回写的 final.md 或运行中顶层 stdout/stderr。
 
 ## 2026-10-30 后继组合接线
 
