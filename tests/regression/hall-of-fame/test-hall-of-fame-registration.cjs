@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const {navigationHost, E} = require('./navigation-host.cjs');
+const {navigationHost, E} = require('../interface/navigation-host.cjs');
 
 const end = {code:0, indent:0, parameters:[]};
 const register = (args = {}) => ({code:357, indent:0, parameters:['PS_Management','RegisterHallOfFame','Register Hall of Fame',args]});

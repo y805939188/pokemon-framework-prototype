@@ -1,9 +1,9 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const {navigationHost}=require('./navigation-host.cjs');
-const {choicesHost}=require('./choices-host.cjs');
-const {textHost}=require('./text-host.cjs');
-const {host:messageHost}=require('./message-host.cjs');
+const {navigationHost}=require('../interface/navigation-host.cjs');
+const {choicesHost}=require('../messages/choices-host.cjs');
+const {textHost}=require('../messages/text-host.cjs');
+const {host:messageHost}=require('../messages/message-host.cjs');
 const {languageFlow,calls,ROOT,E}=require('./localization-host.cjs');
 const vm=require('node:vm');
 const end={code:0,indent:0,parameters:[]};

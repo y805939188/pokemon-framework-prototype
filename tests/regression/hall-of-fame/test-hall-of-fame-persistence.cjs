@@ -5,8 +5,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const {before, test} = require('node:test');
-const {createHost, sha} = require('../4/mz-slot-host.cjs');
-const F = require('../3/fixtures-migration7/fixtures.cjs');
+const {createHost, sha} = require('../../../experiments/step5/4/mz-slot-host.cjs');
+const F = require('../../../experiments/step5/3/fixtures-migration7/fixtures.cjs');
 const E = require('../../../js/engine/build/production.cjs');
 require('../../../scripts/tests/ts-source-loader.cjs');
 

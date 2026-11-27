@@ -34,7 +34,7 @@ test(id+' actual final production caller',async()=>{
   // The map shell has no drawable message window. Drive the real Window_Message
   // in a controlled rendering VM on the same queue, never clearing it by hand.
   assert.equal(typeof scene._messageWindow.updateInput,'undefined');
-  const ui=require('../../6/message-host.cjs').host('en',816,624,true);ui.G.$gameMessage=msg;
+  const ui=require('../../../../tests/regression/messages/message-host.cjs').host('en',816,624,true);ui.G.$gameMessage=msg;
   const bytes=require('node:fs').readFileSync(require('node:path').join(process.env.PF_E3_NATIVE_ROOT,'js/reactor_core.js'));
   const sha=v=>require('node:crypto').createHash('sha256').update(v).digest('hex');
   assert.equal(sha(bytes),'b18c5f887be92cd3ee199660f371d2dd9a3b383003925c42a16219aee44201ec');

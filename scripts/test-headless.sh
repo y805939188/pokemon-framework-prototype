@@ -7,25 +7,25 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 SUITES=(
-  experiments/step5/6/test-message-wrap.cjs
-  experiments/step5/6/test-message-rows.cjs
-  experiments/step5/6/test-cursor-text.cjs
-  experiments/step5/6/test-inline-choices.cjs
-  experiments/step5/6/test-author-diagnostics.cjs
-  experiments/step5/6/test-localization.cjs
-  experiments/step5/6/test-pause-pc.cjs
-  experiments/step5/6/test-manual-save.cjs
-  experiments/step5/6/test-continue-recovery.cjs
-  experiments/step5/6/test-hall-of-fame-rules.cjs
-  experiments/step5/6/test-hall-of-fame-persistence.cjs
-  experiments/step5/6/test-hall-of-fame-pc.cjs
-  experiments/step5/6/test-hall-of-fame-registration.cjs
-  experiments/step5/6/test-event-text.cjs
-  experiments/step5/6/test-message-number.cjs
-  experiments/step5/6/test-message-choices.cjs
-  experiments/step5/6/test-messages.cjs
-  experiments/step5/6/test-trainer-card.cjs
-  experiments/step5/6/test-options-controls.cjs
+  tests/regression/messages/test-message-wrap.cjs
+  tests/regression/messages/test-message-rows.cjs
+  tests/regression/messages/test-cursor-text.cjs
+  tests/regression/messages/test-inline-choices.cjs
+  tests/regression/authoring/test-author-diagnostics.cjs
+  tests/regression/localization/test-localization.cjs
+  tests/regression/interface/test-pause-pc.cjs
+  tests/regression/saves/test-manual-save.cjs
+  tests/regression/saves/test-continue-recovery.cjs
+  tests/regression/hall-of-fame/test-hall-of-fame-rules.cjs
+  tests/regression/hall-of-fame/test-hall-of-fame-persistence.cjs
+  tests/regression/hall-of-fame/test-hall-of-fame-pc.cjs
+  tests/regression/hall-of-fame/test-hall-of-fame-registration.cjs
+  tests/regression/messages/test-event-text.cjs
+  tests/regression/messages/test-message-number.cjs
+  tests/regression/messages/test-message-choices.cjs
+  tests/regression/messages/test-messages.cjs
+  tests/regression/interface/test-trainer-card.cjs
+  tests/regression/interface/test-options-controls.cjs
   scripts/tests/final-native-callers.test.cjs
   scripts/tests/final-defeat-continue.test.cjs
   scripts/tests/final-t16-continue.test.cjs
@@ -492,7 +492,7 @@ done
 [[ -d js/engine/showdown/dist ]] || { echo "engine not staged: run scripts/build-showdown.sh first" >&2; exit 1; }
 # Generate host compatibility declarations before compiler suites, including on cold CI.
 for suite in "${SUITES[@]}"; do
-  case "$suite" in experiments/*.cjs|scripts/tests/*.cjs) ;; *) echo "Unapproved suite path: $suite" >&2; exit 64 ;; esac
+  case "$suite" in experiments/*.cjs|scripts/tests/*.cjs|tests/regression/*.cjs) ;; *) echo "Unapproved suite path: $suite" >&2; exit 64 ;; esac
   if [[ ! -f "$suite" || -L "$suite" ]]; then echo "Missing/nonregular suite: $suite" >&2; exit 64; fi
 done
 pnpm --dir src types:prepare

@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const {stripTypeScriptTypes}=require('node:module');
-const {ROOT,E}=require('./navigation-host.cjs');
+const {ROOT,E}=require('../interface/navigation-host.cjs');
 const calls=[];
 // Execute the production PSFlow language members and shipped plugin parameters.
 // Other BattleFlow initialization is outside these non-battle presentation fixtures.

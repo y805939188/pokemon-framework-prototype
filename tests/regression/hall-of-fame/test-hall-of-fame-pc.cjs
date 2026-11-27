@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const {navigationHost, E} = require('./navigation-host.cjs');
+const {navigationHost, E} = require('../interface/navigation-host.cjs');
 
 const storageRows = ['storage', 'logoff'];
 const historyRows = ['storage', 'hallOfFame', 'logoff'];

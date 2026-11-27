@@ -1,7 +1,7 @@
 'use strict';
 // Native menu/selectable/stack/interpreter method bodies; bitmap, device delivery and scene scheduling are controlled.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
-const {textHost,ROOT}=require('./text-host.cjs'),{E,setup}=require('../2/ef-support.cjs');
+const {textHost,ROOT}=require('../messages/text-host.cjs'),{E,setup}=require('../../../experiments/step5/2/ef-support.cjs');
 function navigationHost(options={}){
  let x,app,virtual=null;
  const h=textHost({...options,configure(G,{load,objects,managers,scenes,sounds}){

@@ -1,5 +1,5 @@
 'use strict';
-const {diagnosticStage}=require('./author-diagnostic-stage.cjs');
+const {diagnosticStage}=require('../authoring/author-diagnostic-stage.cjs');
 const authorRows=lang=>rowHost(lang,816,624,false,G=>diagnosticStage(G));
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');

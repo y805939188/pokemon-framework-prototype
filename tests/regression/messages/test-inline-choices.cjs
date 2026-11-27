@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const {choicesHost,ROOT}=require('./choices-host.cjs');
-const {diagnosticStage}=require('./author-diagnostic-stage.cjs');
+const {diagnosticStage}=require('../authoring/author-diagnostic-stage.cjs');
 const end={code:0,indent:0,parameters:[]};
 function fixture(lang='zh',width=816,height=624,touch=false,configure=null){
  const h=choicesHost(lang,width,height,touch,configure),writes=[],set=h.G.$gameVariables.setValue;

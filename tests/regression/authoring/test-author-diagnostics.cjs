@@ -1,8 +1,8 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const {choicesHost,ROOT}=require('./choices-host.cjs');
-const {numberHost}=require('./number-host.cjs');
-const {textHost}=require('./text-host.cjs');
+const {choicesHost,ROOT}=require('../messages/choices-host.cjs');
+const {numberHost}=require('../messages/number-host.cjs');
+const {textHost}=require('../messages/text-host.cjs');
 const {diagnosticStage}=require('./author-diagnostic-stage.cjs');
 const end={code:0,indent:0,parameters:[]};
 const authorChoices=()=>choicesHost('zh',816,624,false,G=>diagnosticStage(G));
