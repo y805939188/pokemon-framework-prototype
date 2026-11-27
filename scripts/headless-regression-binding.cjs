@@ -68,7 +68,7 @@ const CONTROLLED_INPUTS = [
   'experiments/step5/5/world-scene-full-production-support.cjs',
   'experiments/step5/5/d-mz-native-frame-support.cjs',
   'experiments/step5/5/field-host-support.cjs',
-  'experiments/step5/3/fixtures-migration7/fixtures.cjs',
+  'tests/support/saves/legacy-migration/fixtures.cjs',
   'scripts/headless-regression-binding.cjs',
   'src/vite.config.mts',
   'src/tsconfig.json', 'scripts/test-headless.sh',

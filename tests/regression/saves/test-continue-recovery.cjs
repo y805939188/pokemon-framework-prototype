@@ -7,7 +7,7 @@ const path = require('node:path');
 const os = require('node:os');
 const vm = require('node:vm');
 const {createHost, section, sha} = require('../../../experiments/step5/4/mz-slot-host.cjs');
-const F = require('../../../experiments/step5/3/fixtures-migration7/fixtures.cjs');
+const F = require('../../support/saves/legacy-migration/fixtures.cjs');
 const E = require('../../../js/engine/build/production.cjs');
 
 const root = path.resolve(__dirname, '../../..');

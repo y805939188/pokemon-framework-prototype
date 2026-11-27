@@ -2,7 +2,7 @@
 require('./regular-field-action-test-runtime.cjs').prepare('parent');
 const {test}=require('node:test'),assert=require('node:assert/strict'),{pathToFileURL}=require('node:url'),path=require('node:path'),{types}=require('node:util');
 const {fixture}=require('./field-move-real-parent-fixtures.cjs');
-const E=require(process.env.PF_E2_PARENT_ENGINE),F=require('../3/fixtures-migration7/fixtures.cjs');
+const E=require(process.env.PF_E2_PARENT_ENGINE),F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 const request=(id='generated',species='B',level=2)=>({battleId:id,seq:1,species,level});
 const domains=[65536,65536,32,32,32,32,32,32];
 function world(options={}){return fixture({hour:12,clock:()=>new Date(2026,10,17,12).getTime(),...options});}

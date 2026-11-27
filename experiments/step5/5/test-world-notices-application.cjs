@@ -1,7 +1,7 @@
 'use strict';
 // Real GameApplication + notice FIFO; the production 236 adapter is loaded from actual TS source.
 const { test } = require('node:test'), assert = require('node:assert/strict'), path = require('node:path'), { pathToFileURL } = require('node:url');
-const E = require(process.env.PF55_B_ENGINE || '../../../js/engine/build/production.cjs'), F = require('../3/fixtures-migration7/fixtures.cjs');
+const E = require(process.env.PF55_B_ENGINE || '../../../js/engine/build/production.cjs'), F = require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 require('../../../scripts/tests/ts-source-loader.cjs');
 let weatherAdapter; test.before(async () => { weatherAdapter = await import(pathToFileURL(path.resolve(__dirname, '../../../src/plugins/world/world-weather-mz.ts'))); });
 const copy = value => structuredClone(value), value = v => ({ status: 'value', value: v });

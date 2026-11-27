@@ -2,7 +2,7 @@
 // Real App + trigger/selection/allowance + real supported generator. Host facts are synthetic and explicit.
 const { test } = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path');
 const E = require(process.env.PF55_B_ENGINE || '../../../js/engine/build/production.cjs');
-const F = require('../3/fixtures-migration7/fixtures.cjs');
+const F = require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 const copy = value => structuredClone(value), value = v => ({ status: 'value', value: v });
 const wait = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 const tick = () => new Promise(setImmediate);

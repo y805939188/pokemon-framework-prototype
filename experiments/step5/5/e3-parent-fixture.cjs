@@ -1,7 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict'), { types } = require('node:util');
 const E = require(process.env.PF_E3_PARENT_BUNDLE);
-const F = require('../3/fixtures-migration7/fixtures.cjs');
+const F = require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 const {host, location} = require('./e3-parent-native-fixture.cjs');
 const initialScene = require('./e3-production/native-source-scene.cjs');
 const value = value => ({status:'value',value}), clone = value => structuredClone(value), flush = () => new Promise(setImmediate);

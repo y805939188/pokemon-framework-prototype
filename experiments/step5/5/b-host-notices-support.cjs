@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
-const ROOT=path.resolve(__dirname,'../../..'),F=require('../3/fixtures-migration7/fixtures.cjs');let built;
+const ROOT=path.resolve(__dirname,'../../..'),F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs');let built;
 async function build(){
  if(built)return built;const compiler=process.env.PF_B_NOTICE_COMPILER_ROOT||ROOT,art=process.env.PF_B_NOTICE_ART||path.join(ROOT,'build/step5-5-development-20261115/b-host-notices-mz-author');fs.mkdirSync(art,{recursive:true});const out=fs.mkdtempSync(path.join(art,'private-bundles-')),{build:vite}=await import(path.join(compiler,'src/node_modules/vite/dist/node/index.js'));
  for(const [name,entry,format]of [['production','src/framework/production.ts','cjs'],['PS_World','src/plugins/PS_World.ts','iife'],['PS_Inventory','src/plugins/PS_Inventory.ts','iife']])await vite({configFile:false,root:path.join(ROOT,'src'),logLevel:'error',build:{target:'es2022',outDir:out,emptyOutDir:false,minify:false,sourcemap:true,lib:{entry:path.join(ROOT,entry),name:name+'NoticeTest',formats:[format],fileName:()=>name+(format==='cjs'?'.cjs':'.js')},rolldownOptions:{external:[/^node:/,'pixi.js']}}});

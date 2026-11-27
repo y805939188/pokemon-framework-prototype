@@ -32,7 +32,7 @@
     "data/System.json",
     "data/Troops.json",
     "data/Weapons.json",
-    "experiments/step5/3/fixtures-migration7/fixtures.cjs",
+    "tests/support/saves/legacy-migration/fixtures.cjs",
     "experiments/step5/5/blackout-formal-load-joint/bootstrap.cjs",
     "experiments/step5/5/blackout-formal-load-joint/io-adapter.cjs",
     "experiments/step5/5/blackout-formal-load-joint/map-bootstrap.cjs",

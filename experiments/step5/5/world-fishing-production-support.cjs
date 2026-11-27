@@ -4,7 +4,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const {build}=require('./d-mz-integration-support.cjs');
 const {createMZAtomicStatePort}=require(path.join(process.env.PF_FISHING_HOST_OUT,'plugins/world/atomic-state-mz.js'));
 const {runtime,nativeMessages,nativeMoveRoutes}=require('./fishing-host-fixtures.cjs');
-const F=require('../3/fixtures-migration7/fixtures.cjs');
+const F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 const flush=()=>new Promise(setImmediate),value=value=>({status:'value',value});
 async function fixture(options={}){
  const B=await build(),E=B.E,h=runtime(),ui=nativeMessages(h);nativeMoveRoutes(h);const G=h.root,events=[],effects=[],draws=[],sessions=[];let now=0,pending=null,settled,admission;

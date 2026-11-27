@@ -51,7 +51,7 @@ test('early assignment and duplicate install remain refused',async()=>{for(const
 test('removing the compiled full-state gate reproduces the in-place false green without changing install counts',async()=>{const h=host({variant:mutantState}),injected=injectState(h,'inplace');await mutantState.module.runD2Prebattle(h.p);assert(injected());assert.equal(h.report.results.filter(r=>r.status==='pass').length,5);assert.equal(h.report.prebattleNative.cases.PW01.installs.length,1);});
 
 for(const busy of [false,true])test('accessor state refuses before reset, getter, Session or install; current Inventory owner='+busy,async()=>{
- const h=host(),E=require(path.join(ROOT,'js/engine/build/production.cjs')),F=require('../3/fixtures-migration7/fixtures.cjs'),content=F.content(E);
+ const h=host(),E=require(path.join(ROOT,'js/engine/build/production.cjs')),F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs'),content=F.content(E);
  let game=E.state.newGame({content,party:[],bag:{},money:0}),reads=0,installs=0,sessions=0;
  const app=new E.app.GameApplication({state:{read:()=>game,replace(next){installs++;game=next;}},content:()=>({content}),sessions:{async create(){sessions++;throw Error('unexpected accessor Session');}},projection:{project(){}}});
  const owner=busy?app.beginInventoryOperation():null,generation=app.stateGeneration;if(busy)assert(owner);h.G.PSFlow._app=app;h.G.PSFlow.app=()=>app;

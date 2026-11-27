@@ -2,7 +2,7 @@
 // Formal complete-individual input; no real save. Factories are used only to prepare test data, before counters begin.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const E=require(process.env.PF_GIVEN_ENGINE||'../../../js/engine/build/production.cjs');
-const F=require('../3/fixtures-migration7/fixtures.cjs');
+const F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 const copy=structuredClone;
 function member(content,id='Given1',species='B'){
  const name=E.speciesKey.battleNameOf(content,{species,form:0})??species;

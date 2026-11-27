@@ -31,7 +31,7 @@ function precheck() {
 async function prepare(opts, out) {
   const { current, map } = precheck(); assert(opts['compiler-root'] && opts['old-p5-evidence']); if (opts['expected-commit']) assert.equal(current.commit, opts['expected-commit']);
   const inputFiles = harness(), protectedOld = files(opts['old-p5-evidence']);
-  const contracts = ['docs/step5/5.5/A-contract.zh.md', 'docs/step5/5.5/P5-statistics.zh.md', 'experiments/step5/3/fixtures-migration7/fixtures.cjs'].map(p => record(path.join(ROOT, p)));
+  const contracts = ['docs/step5/5.5/A-contract.zh.md', 'docs/step5/5.5/P5-statistics.zh.md', 'tests/support/saves/legacy-migration/fixtures.cjs'].map(p => record(path.join(ROOT, p)));
   if (opts['mz-runtime']) { assert(path.isAbsolute(opts['mz-runtime'])); contracts.push(record(opts['mz-runtime'])); }
   const compilerPath = require.resolve('vite', { paths: [opts['compiler-root']] }), vite = await import(pathToFileURL(compilerPath)), included = new Set();
   await vite.build({ configFile: false, root: ROOT, logLevel: 'warn', plugins: [{ name: 'p5-app-lifecycle-binding', transform(_code, id) { if (id.startsWith(ROOT + '/') && id.endsWith('.ts')) included.add(id); } }],

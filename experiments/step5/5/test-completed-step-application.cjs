@@ -3,7 +3,7 @@
 // Host event/presentation adapters are synthetic; no MZ, NW, player save or reference implementation is loaded.
 const { test } = require('node:test'), assert = require('node:assert/strict');
 const E = require(process.env.PF55_B_ENGINE || '../../../js/engine/build/production.cjs');
-const F = require('../3/fixtures-migration7/fixtures.cjs');
+const F = require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 const clone = value => JSON.parse(JSON.stringify(value));
 const tick = () => new Promise(setImmediate);
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }

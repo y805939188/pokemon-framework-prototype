@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
 const ROOT=path.resolve(__dirname,'../../..'),ART=path.join(ROOT,'build/step5-5-development-20261115/b2-author');let bundle;
-const Runtime=require(process.env.PF55_B_ENGINE||'../../../js/engine/build/production.cjs'),F=require('../3/fixtures-migration7/fixtures.cjs');
+const Runtime=require(process.env.PF55_B_ENGINE||'../../../js/engine/build/production.cjs'),F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 test.before(()=>{fs.mkdirSync(ART,{recursive:true});const out=fs.mkdtempSync(path.join(ART,'save-bundle-'));const r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,encoding:'utf8',env:{...process.env,RR_PLUGIN:'PS_SaveState'}});fs.writeFileSync(path.join(out,'build.log'),r.stdout+r.stderr);assert.equal(r.status,0,r.stdout+r.stderr);bundle=fs.readFileSync(path.join(out,'PS_SaveState.js'),'utf8');});
 const managers=fs.readFileSync(path.join(ROOT,'js/reactor_managers.js'),'utf8'),scenes=fs.readFileSync(path.join(ROOT,'js/reactor_scenes.js'),'utf8');
 function actual(source,name){const start=source.indexOf(name+' = function(');assert(start>=0,name);const end=source.indexOf('\n};',start);assert(end>start,name);return source.slice(start,end+3);}

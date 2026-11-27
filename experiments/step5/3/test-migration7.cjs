@@ -2,7 +2,7 @@
 // Derived from sealed B r3 contracts / WP62; these are synthetic tests, not reference runtime observations.
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const E=require(process.env.PS_B3_CORE || '../../../js/engine/build/core.cjs');
-const F=require('./fixtures-migration7/fixtures.cjs'),S=E.saveSchema,D=E.dexState;
+const F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs'),S=E.saveSchema,D=E.dexState;
 const options=C=>({content:C,speciesKey:name=>Object.hasOwn(C.species,name)?{species:name,form:0}:null});
 function migrate(raw,C){const before=JSON.stringify(raw),result=S.migrateGame(F.freeze(raw),options(C));assert.equal(JSON.stringify(raw),before);return result;}
 function good(raw,C){const result=migrate(raw,C);assert.equal(result.ok,true,JSON.stringify(result));assert.deepEqual(S.validateGameContent(result.state,C),[]);return result.state;}

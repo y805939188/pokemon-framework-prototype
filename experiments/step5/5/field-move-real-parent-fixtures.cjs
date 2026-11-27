@@ -1,7 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict'),path=require('node:path'),{types}=require('node:util');
 const out=process.env.PF_E2_PARENT_OUT;assert(out,'PF_E2_PARENT_OUT required');
-const E=require(process.env.PF_E2_PARENT_ENGINE),F=require('../3/fixtures-migration7/fixtures.cjs'),Leaf=require('./field-move-app-fixtures.cjs');
+const E=require(process.env.PF_E2_PARENT_ENGINE),F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs'),Leaf=require('./field-move-app-fixtures.cjs');
 const {createMZAtomicStatePort}=require(path.join(out,'src/plugins/world/atomic-state-mz.js'));
 const value=value=>({status:'value',value}),copy=x=>structuredClone(x),flush=()=>new Promise(setImmediate);
 function fixture(options={}){

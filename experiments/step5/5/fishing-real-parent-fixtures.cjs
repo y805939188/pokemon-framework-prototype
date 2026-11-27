@@ -9,7 +9,7 @@ const { createMZAtomicStatePort } = load('plugins/world/atomic-state-mz.js');
 const { readFishingHostFacts } = load('plugins/world/fishing-host.js');
 const { composeFishingPresentation } = require(path.join(out, 'experiments/step5/5/fishing-composed-port.js'));
 const { runtime, nativeMessages, nativeMoveRoutes } = require('./fishing-host-fixtures.cjs');
-const F = require('../3/fixtures-migration7/fixtures.cjs');
+const F = require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 const E = { itemCatalog: load('framework/rules/item-catalog.js'), state: load('framework/rules/state.js') };
 const clone = value => structuredClone(value), value = value => ({ status: 'value', value }), flush = () => new Promise(setImmediate);
 function fixture(options = {}) {

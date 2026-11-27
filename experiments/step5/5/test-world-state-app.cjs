@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const E=require(process.env.PF55_B_ENGINE || '../../../js/engine/build/production.cjs');
-const F=require('../3/fixtures-migration7/fixtures.cjs');
+const F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 const clone=value=>JSON.parse(JSON.stringify(value));
 function make({bag={},metadata=true,handler,random=()=>0,game:given,onRead,onContent}={}) {
  const content=F.content(E);if(metadata)content.mapMetadata={source:'fixture',maps:{1:{darkMap:true},2:{darkMap:false,weather:{type:'Rain',chance:100},healingSpot:{mapId:7,x:3,y:4}},3:{darkMap:true}}};

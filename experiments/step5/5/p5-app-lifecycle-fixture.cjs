@@ -1,7 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { types } = require('node:util');
-const F = require('../3/fixtures-migration7/fixtures.cjs');
+const F = require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 const { surfHost } = require('./p5-app-lifecycle-surf-host.cjs');
 const clone = value => structuredClone(value), value = value => ({ status: 'value', value });
 function fixture(P, options = {}) {

@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const ROOT=path.resolve(__dirname,'../../..');
 const {host:nativeHost}=require('./field-host-support.cjs');
 const {createNativeSceneManager,createNativeFrameTick}=require('./native-frame-manager-support.cjs');
-const F=require('../3/fixtures-migration7/fixtures.cjs');
+const F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 let built;
 async function build(){return require('./d-mz-integration-support.cjs').build();}
 async function fixture(options={}){
