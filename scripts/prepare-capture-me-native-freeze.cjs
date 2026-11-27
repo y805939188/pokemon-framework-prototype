@@ -1,7 +1,7 @@
 'use strict';
 // Build/static preparation only. This script never launches NW or creates a save/profile.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),cp=require('node:child_process');
-const ROOT=path.resolve(__dirname,'..'),PLAN=require('../experiments/step5/4/capture-me-native-plan.json');
+const ROOT=path.resolve(__dirname,'..'),PLAN=require('../tests/support/battle-host/native-plans/capture-me-native-plan.json');
 const {oggTiming,DURATION_CONTRACT,PAGE_DURATION_US}=require('./prepare-music-native-assets.cjs');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex'),hashFile=f=>sha(fs.readFileSync(f));
 const canonical=v=>JSON.stringify(v,(_,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);

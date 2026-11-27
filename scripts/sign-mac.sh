@@ -4,7 +4,7 @@
 # Default identity "-" = ad-hoc. With --hardened the hardened runtime is enabled (--options runtime) and the
 # entitlements in scripts/entitlements/ are applied: nwjs.plist for a real identity, nwjs-adhoc.plist (adds
 # disable-library-validation, needed only because ad-hoc code has no Team ID) for "-".
-# Notarization is a separate step (docs/step2/signing-plan.md); it needs an Apple Developer account.
+# Notarization is a separate step (docs/maintainers/macos-distribution.md); it needs an Apple Developer account.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="${1:?usage: $0 App.app [--identity ID] [--hardened] [--timestamp]}"; shift

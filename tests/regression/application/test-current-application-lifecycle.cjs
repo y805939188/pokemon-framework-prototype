@@ -1,6 +1,6 @@
 'use strict';
 const I6 = require("../../support/inventory/legacy-bag-test-bridge.cjs");
-// Step 5.0, application layer: battles see a battle view and commit through the content mapping (D5-3); battle
+// Application layer: battles see a battle view and commit through the content mapping (D5-3); battle
 // statistics are counted with the result in the same replacement (WP06 §4.2; r8 FR-000420; WP53 §183 split; WP61 §7
 // blackout), never twice; the step counter (WP06 §4.1, FR-000426); and the release of a battle operation when the host
 // installs another state (final review P4-2). Verification: spec-driven vectors and invariants over in-memory ports.

@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict'),vm=require('node:vm');
-const {frameFixture,build}=require('../../../experiments/step5/5/d-mz-native-frame-support.cjs');
+const {frameFixture,build}=require('./mz-native-frame-support.cjs');
 async function fixture(options={}){
  const h=await frameFixture({integrated:true,terrainTags:JSON.stringify({'0':{landAllowed:true,fishable:false,environment:'grass'}}),...options,edit(game,content){
   for(const[name,species]of Object.entries(content.species)){species.ruleSpecies='Fixture'+name;species.types=['Normal'];}

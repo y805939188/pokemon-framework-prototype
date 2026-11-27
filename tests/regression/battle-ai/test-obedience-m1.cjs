@@ -102,7 +102,7 @@ test('A-M1 real engine: self-sleep uses engine status and replays without extra 
 });
 function gwStatus(gw) { return gw.readState('p1')[0].status; }
 
-test('AM1-ULTRA-06 non-sleep statuses retain natural disobedience self-hit, zero PP and full checkpoint semantics', async () => {
+test('non-sleep statuses retain natural disobedience self-hit, zero PP and full checkpoint semantics', async () => {
   for (const [status, statusCount] of [['psn', 0], ['brn', 0], ['par', 0], ['psn', 1]]) {
     const gw = await create(3, { ability: 'Thick Fat', status, statusCount, foeSpecies: 'Snorlax', foeLevel: 50, foeMoves: ['Splash'], foeAbility: 'Thick Fat' });
     const beforePp = pp(gw), token = gw.checkpoint(), beforeHp = gw.readState('p1')[0].hp, messages = await turn(gw);
@@ -118,7 +118,7 @@ test('AM1-ULTRA-06 non-sleep statuses retain natural disobedience self-hit, zero
   }
 });
 
-test('AM1-ULTRA-06 no-status and sleep-immunity neighbors retain sleep then self-hit ordering', async () => {
+test('no-status and sleep-immunity neighbors retain sleep then self-hit ordering', async () => {
   const ordinary = await create(3, { ability: 'Thick Fat' });
   await turn(ordinary);
   assert.equal(trace(ordinary).find(e => e.kind === 'self-sleep').applied, true);

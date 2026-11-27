@@ -1,7 +1,7 @@
 'use strict';
 // Copy three already qualified synthetic tones, without re-encoding, NW or reference/player assets.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
-const PLAN=require('../experiments/step5/4/ball-feedback-native-plan.json');
+const PLAN=require('../tests/support/battle-host/native-plans/ball-feedback-native-plan.json');
 const {oggTiming,DURATION_CONTRACT,PAGE_DURATION_US}=require('./prepare-music-native-assets.cjs');
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex'),fileHash=f=>hash(fs.readFileSync(f));
 const inside=(root,p)=>{const r=path.relative(root,p);return !!r&&!path.isAbsolute(r)&&r!=='..'&&!r.startsWith('..'+path.sep);};

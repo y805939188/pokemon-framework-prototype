@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /** Test-only normal end feedback. Observes actual production state writes and rendered windows.
  * Native execution is established by the external supervisor, never by this report. */
-import PLAN from '../../../experiments/step5/4/result-feedback-native-plan.json';
+import PLAN from '../../../tests/support/battle-host/native-plans/result-feedback-native-plan.json';
 import { musicNativeContent } from './music-native-fixture';
 import { captureHostReady } from './d2-capture-me';
 export const resultFeedbackNativePlan = PLAN;

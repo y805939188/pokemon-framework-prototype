@@ -2,7 +2,7 @@
 // FR-000639/640/641/644. Compiled production adapters plus actual installed MZ Scene_Options,
 // Window_Options, ConfigManager and menu entry bodies. Rendering devices / clock / storage are controlled.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const ROOT=path.resolve(__dirname,'../../..'),OUT=path.join(ROOT,'build/step5-6-options-controls');
+const ROOT=path.resolve(__dirname,'../../..'),OUT=path.join(ROOT,'build/test-options-controls');
 let modules,E;const layouts=[];
 test.after(()=>fs.writeFileSync(path.join(OUT,'layout-measurements.json'),JSON.stringify({scope:'Native host button construction and line heights; controlled devices, no NW or pixel observation',layouts},null,2)+'\n'));
 test.before(async()=>{

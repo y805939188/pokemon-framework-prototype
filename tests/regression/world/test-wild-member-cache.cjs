@@ -1,6 +1,6 @@
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict');
-const H = require('../../../experiments/step5/5/fixtures/wild-member-cache-support.cjs');
+const H = require('../../support/world/wild-member-cache-support.cjs');
 const vectors = require('../../support/world/fixtures/wild-member-cache-vectors.literal.json').vectors;
 let W, F;
 test.before(async () => { ({ wild: W, factory: F } = await H.modules()); });

@@ -1,7 +1,7 @@
 'use strict';
 // Authored teams through real App/Session and pinned Gen8, plus explicit gateway protocol-shape cases.
 const test=require('node:test'),assert=require('node:assert/strict');
-const {E,T,D,inputs,clone}=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const {E,T,D,inputs,clone}=require('../../support/battle-ai/integration/fixtures.cjs');
 async function open({species,ability,moves=['splash'],npcMoves=['splash','thunderbolt'],npcTurns=[1],scripted=true,hpFraction=1}={}){
  const raw=inputs({party:1,moves:npcMoves});
  if(!raw.species.some(s=>s.id===species))raw.species.push({id:species,showdownId:species,nameKey:'species.'+species,growth:'medium',baseExp:100,evYield:{hp:1},catchRate:45,learnset:[],source:'author-placeholder'});

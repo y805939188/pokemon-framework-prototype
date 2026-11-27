@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Build a runnable macOS app from the project WITHOUT MZ's Deploy (which breaks the NW.js bundle on
-# Apple Silicon, see docs/step2/README.md): pristine NW.js host (ditto keeps symlinks) + an allow-listed
+# Apple Silicon, see docs/maintainers/macos-distribution.md): pristine NW.js host (ditto keeps symlinks) + an allow-listed
 # app.nw + ad-hoc signature. Local/testing package only: NOT Developer ID signed, NOT notarized, and it
 # contains MZ stock assets copied from the local MZ install (do not redistribute them).
 #
 # Usage: scripts/package-mac.sh [--with-tests] [--harden] [--identity ID] [--name NAME] [--out DIR]
 #   --with-tests  keep the smoke/flow-test plugins (needed by the package test matrix)
 #   --harden      sign inside-out with the hardened runtime (ad-hoc identity, see scripts/sign-mac.sh)
-#   --identity ID sign with a real identity (implies --harden --timestamp); none is available on this machine yet
+#   --identity ID sign with a real identity (implies --harden --timestamp)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -73,7 +73,7 @@ GIT_HEAD="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
 GIT_DIRTY="$(git -C "$ROOT" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
 # Hash of the code state actually built: tracked diff + every untracked (non-ignored) file, evidence/docs excluded
 # (they change while the tests run). Two packages with the same gitHead and diffSha256 were built from the same code.
-EXCL=(':(exclude)experiments/step2/evidence' ':(exclude)docs')
+EXCL=(':(exclude)docs')
 DIFF_SHA="$( { git -C "$ROOT" diff HEAD -- . "${EXCL[@]}"; git -C "$ROOT" ls-files -o --exclude-standard -z -- . "${EXCL[@]}" | (cd "$ROOT" && xargs -0 shasum -a 256 2>/dev/null); } 2>/dev/null | shasum -a 256 | cut -d' ' -f1)"
 ENGINE_SHA="$(cat "$ROOT/js/engine/showdown/SOURCE_SHA" 2>/dev/null || echo unknown)"
 BUNDLE_SHA="$(shasum -a 256 "$ROOT/js/engine/build/engine.cjs" | cut -d' ' -f1)"

@@ -43,7 +43,7 @@ function fakeApp({ content = contentWith(), game, result = win(), random = lcg(9
   return { app, state, sessions, projection, content };
 }
 
-for (const timing of ['factory', 'after-start']) test(`AM1-ULTRA-01 private reward facts survive ${timing} setup mutation`, async () => {
+for (const timing of ['factory', 'after-start']) test(`private reward facts survive ${timing} setup mutation`, async () => {
   const w = fakeApp();
   const original = w.sessions.create;
   let escaped;
@@ -70,7 +70,7 @@ for (const timing of ['factory', 'after-start']) test(`AM1-ULTRA-01 private rewa
   assert.equal(w.state.replaced.length, 1);
 });
 
-test('AM1-ULTRA-02 disabled money gain is sealed, does not normalize old wallets, and preserves atomic retry/replay', async () => {
+test('disabled money gain is sealed, does not normalize old wallets, and preserves atomic retry/replay', async () => {
   for (const money of [0, 1000, 1000000]) {
     const content = contentWith(), w = fakeApp({ content, game: gameWith(content, money) });
     const original = w.sessions.create;
@@ -95,7 +95,7 @@ test('AM1-ULTRA-02 disabled money gain is sealed, does not normalize old wallets
   }
 });
 
-test('AM1-ULTRA-02 validates the public money-gain qualification before invoking ports', async () => {
+test('validates the public money-gain qualification before invoking ports', async () => {
   const w = fakeApp(); let reads = 0; const original = w.state.read;
   w.state.read = function() { reads++; return original.call(this); };
   for (const moneyGain of ['false', 0, null]) await assert.rejects(w.app.startTrainerBattle({ ...request(), moneyGain }), /moneyGain must be boolean/);

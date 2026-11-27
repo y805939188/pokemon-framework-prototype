@@ -1,6 +1,6 @@
 'use strict';
-// Step 5.0 review of 1960b92, F03: the headless SaveStore knows no content, so it guesses no species keys. A save
-// written by the step 4 code (the P-1 sample) is refused without the content mapping (file untouched, no backup),
+// The headless SaveStore knows no content, so it guesses no species keys. A save
+// written by the schema-3 writer (the P-1 sample) is refused without the content mapping (file untouched, no backup),
 // migrated with it (the original kept byte for byte as .v3.bak), and a result naming a species is refused when the store
 // was given no mapping; the fixture world's identity mapping is only used when chosen explicitly. r8 FR-000394/428.
 const test = require('node:test');
@@ -12,7 +12,7 @@ const E = require('../../../js/engine/build/engine.cjs');
 const H = require('../../support/application/legacy-test-support.cjs');
 const { SaveStore, SaveError } = E.store;
 
-const P1 = path.join(__dirname, '../../../experiments/step5/fixtures/step4-saves');
+const P1 = path.join(__dirname, '../../support/saves/schema-v3');
 const results = JSON.parse(fs.readFileSync(path.join(P1, 'results.json'), 'utf8'));
 const read = f => JSON.parse(fs.readFileSync(path.join(__dirname, '../../../content/sample', f), 'utf8'));
 const content = E.contentRuntime.assembleContent(E.contentCompile.compileContent({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json'), grants: read('grants.json') }).data, E.dex.createDexLookup()).content;
@@ -27,7 +27,7 @@ function copy(name) {
 }
 const ls = f => fs.readdirSync(path.dirname(f)).sort();
 
-test('without a species mapping a step 4 save is refused (needs-content): nothing is upgraded, written or backed up', () => {
+test('without a species mapping a schema-3 save is refused (needs-content): nothing is upgraded, written or backed up', () => {
   const f = copy('full.json'); const bytes = fs.readFileSync(f);
   assert.throws(() => E.fakes.createFixtureSaveStore(f).loadInfo(), e => e instanceof SaveError && e.info.code === 'needs-content');
   const someResult = results[Object.keys(results)[0]];
@@ -46,7 +46,7 @@ test('with the content mapping it migrates: content id + form, the original kept
   const committed = JSON.parse(bytes).appliedBattles;
   const first = Object.keys(committed)[0];
   assert.deepEqual(store.commit(results[first], H.templatesFor(info.state, results[first])), { status: 'already-applied', migratedFrom: 3 });
-  assert.ok(fs.readFileSync(f + '.v3.bak').equals(bytes), 'the step 4 file is kept byte for byte');
+  assert.ok(fs.readFileSync(f + '.v3.bak').equals(bytes), 'the schema-3 file is kept byte for byte');
   const now = store.loadInfo();
   assert.deepEqual([now.from, now.migrated, now.state.party.map(m => m.species)], [E.state.GAME_SCHEMA, false, info.state.party.map(m => m.species)]);
   for (const id of Object.keys(committed)) assert.equal(store.commit(results[id], H.templatesFor(info.state, results[id])).status, 'already-applied', id);
@@ -68,7 +68,7 @@ test('a current store requires content; content without a result mapping refuses
   assert.throws(() => store.commit({ ...run, battleId: 'dex-without-mapping', dex: {seen:['Pidgey'],owned:[]} }), /names species .*no species mapping/);
 });
 
-test('the fixture world chooses the identity mapping explicitly; with it, the step 4 save would NOT resolve in the real content', () => {
+test('the fixture world chooses the identity mapping explicitly; with it, the schema-3 save would NOT resolve in the real content', () => {
   const f = copy('full.json');
   const bytes = fs.readFileSync(f);
   assert.throws(() => E.fakes.createFixtureSaveStore(f, {}, E.speciesKey.identityKeys, E.fixtures.content).loadInfo(), e => e.info.code === 'unmapped-species', '5.1 additionally rejects unknown individual content during 4→5');

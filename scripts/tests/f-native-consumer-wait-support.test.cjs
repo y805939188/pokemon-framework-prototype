@@ -3,8 +3,8 @@
 // use the existing observer interface; never import the real fixture/App/native.
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
-const {observer} = require('../../experiments/step5/5/e3-production/native-consumer-observer.cjs');
-const file = path.resolve(__dirname, '../../experiments/step5/5/blackout-formal-load-joint/current-fixture.cjs');
+const {observer} = require('../../tests/support/world/travel/native-consumer-observer.cjs');
+const file = path.resolve(__dirname, '../../tests/support/saves/blackout-load/current-fixture.cjs');
 function waits(nativeConsumer, onTick = () => {}) {
   const source = fs.readFileSync(file, 'utf8');
   const begin = source.indexOf('  const pump = async ('), end = source.indexOf('  const enter =', begin);

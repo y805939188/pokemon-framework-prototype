@@ -1,6 +1,6 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('parent');
-const {test}=require('node:test'),assert=require('node:assert/strict');const {fixture}=require('../../../experiments/step5/5/field-move-real-parent-fixtures.cjs');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('parent');
+const {test}=require('node:test'),assert=require('node:assert/strict');const {fixture}=require('../../support/field/field-move-real-parent-fixtures.cjs');
 for(const moveId of ['cut','rocksmash','strength','surf','flash','sweetscent'])test('actual World parent '+moveId+' production host leaf',async()=>{
  const h=fixture({moveId}),result=await h.run();assert.equal(result.status,'completed',JSON.stringify(result));
  if(moveId==='cut'){assert.equal(h.state.stats.cut_count,1);assert.equal(h.records.length,1);assert(h.native.event._erased);}

@@ -14,7 +14,7 @@ const G = require('../../../js/engine/game/growth.cjs');
 const S = require('../../../js/engine/game/state.cjs');
 const { BattleSession, END_REASONS, REFUSAL_REASONS } = require('../../../js/engine/game/session.cjs');
 
-const FILE = path.resolve(__dirname, '../../../docs/step2/protocol-v1.frozen.json');
+const FILE = path.resolve(__dirname, '../../support/battle/protocol-v1.frozen.json');
 /** Declared reasons that no scenario here can provoke; keep this list short and justified. */
 const NOT_PROVOKED = { tie: 'only a Showdown draw produces it (no fixture reaches one); the code path is `b.winner ? win : tie` in gateway.cjs' };
 const keys = o => Object.keys(o).sort();

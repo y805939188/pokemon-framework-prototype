@@ -11,7 +11,7 @@ function install(root,ROOT){
  root.SceneManager.pushed=[];root.Input??={};root.DataManager??={};root.$dataMap??={};
  root.$gameMap._mapId=root.$gameMap.mapId();
  Object.assign(root.$gamePlayer,{_x:8,_realX:8,_y:9,_realY:9,_direction:2,_transferring:false,_vehicleType:'walk',_moveRouteForcing:false});
- require('../../experiments/step5/4/victory-native-scenes.cjs').install(root,ROOT);
+ require('../../tests/support/battle-host/victory-native-scenes.cjs').install(root,ROOT);
 }
 function enter(root){
  // Normal MZ reaches a Map from an existing Boot/Title scene. A null source

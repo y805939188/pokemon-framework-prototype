@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {frameFixture}=require('../../../experiments/step5/5/d-mz-native-frame-support.cjs');
+const {frameFixture}=require('../../support/world/mz-native-frame-support.cjs');
 const flush=()=>new Promise(setImmediate);
 async function completed(h){h.player._encounterCount=1;h.player.directionInput=6;h.tick();await flush();h.tick();await flush();}
 for(const mode of ['mz-native','legacy-note'])test('terminal '+mode+' content callback replacing generation cannot spend old opportunity',async()=>{

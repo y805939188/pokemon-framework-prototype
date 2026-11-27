@@ -1,6 +1,6 @@
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict');
-const H = require('../../../experiments/step5/5/fixtures/wild-generation-support.cjs');
+const H = require('../../support/world/wild-generation-support.cjs');
 const oracle = require('../../support/world/fixtures/wild-generation-oracle.literal.json');
 const stageVectors = require('../../support/world/fixtures/wild-generation-stage-vectors.literal.json').vectors;
 let G;

@@ -1,5 +1,5 @@
 'use strict';
-// Step 4, the MZ adapter's battle lifecycle in a Node VM host stub (no MZ, no NW.js, no windows): the BUILT
+// The MZ adapter's battle lifecycle in a Node VM host stub (no MZ, no NW.js, no windows): the BUILT
 // PS_BattleFlow plugin runs against the real engine bundle and the real GameApplication; MZ globals are small stubs.
 //   - the save permission belongs to the game: a battle only masks it while it runs (any change made meanwhile stays);
 //   - a committed defeat stays committed when a message or a translation fails afterwards, and the trip home is still

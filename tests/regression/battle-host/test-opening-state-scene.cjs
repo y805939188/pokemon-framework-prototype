@@ -3,9 +3,9 @@
 // and the isolated in-memory save are controlled. No NW, player saves or reference replay.
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs');
 const path = require('node:path'), os = require('node:os'), crypto = require('node:crypto'), {spawnSync} = require('node:child_process');
-const {createVictoryDriverHost} = require('../../../experiments/step5/4/victory-music-driver-host.cjs');
+const {createVictoryDriverHost} = require('../../support/battle-host/victory-music-driver-host.cjs');
 const ROOT = path.resolve(__dirname, '../../..'), E = require('../../../js/engine/build/production.cjs');
-const PLAN = require('../../../experiments/step5/4/victory-music-native-plan.json'), clone = x => JSON.parse(JSON.stringify(x));
+const PLAN = require('../../support/battle-host/native-plans/victory-music-native-plan.json'), clone = x => JSON.parse(JSON.stringify(x));
 let work, plugins, entryText;
 test.before(() => {
   work = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-opening-state-')); plugins = {};

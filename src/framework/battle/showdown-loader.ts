@@ -1,7 +1,7 @@
 /**
  * The ONE adapter that loads the pinned Showdown build at run time (and its RPG format extension).
  * Showdown is CommonJS, resolves its data files by path and uses Node built-ins, so it cannot be bundled and cannot be
- * loaded with `import()` inside NW.js (measured: step 3 / A2 spike, `docs/step3/README.md`). `require` is therefore
+ * loaded with `import()` inside NW.js. `require` is therefore
  * allowed in this file and nowhere else in the framework sources.
  */
 import fs from "node:fs";

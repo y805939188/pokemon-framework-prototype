@@ -1,6 +1,6 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('parent');
-const {test}=require('node:test'),assert=require('node:assert/strict');const {fixture}=require('../../../experiments/step5/5/field-move-real-parent-fixtures.cjs');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('parent');
+const {test}=require('node:test'),assert=require('node:assert/strict');const {fixture}=require('../../support/field/field-move-real-parent-fixtures.cjs');
 test('public Surf runtime projects the actual start/landing/cleanup prefixes and carries no write authority',async()=>{
  const h=fixture({moveId:'surf'});assert.deepEqual(h.app.worldFieldRuntime(),{surfBase:null,endingSurf:false});assert.equal((await h.run()).status,'completed');
  const snapshot=h.app.worldFieldRuntime();assert.equal(snapshot.surfBase.mapId,7);snapshot.surfBase.x=999;snapshot.endingSurf=true;assert.equal(h.app.worldFieldRuntime().endingSurf,false);assert.notEqual(h.app.worldFieldRuntime().surfBase.x,999);

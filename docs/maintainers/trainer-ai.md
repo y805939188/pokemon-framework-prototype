@@ -6,4 +6,4 @@
 
 先核候选、可用招式、合法替补和药物条件，再调用随机源；矛盾输入、空候选和不合格药物不白耗抽样。越界的随机结果不夹成某个合法答案。强制替补以可得的局部信息估量；引擎提供的招式值与 AI 的近似估量分开。合成向量不证明真实对局质量。
 
-参见[类型有效性合同](../framework-remediation/r2-ai-effectiveness-contract.zh.md)、[当前策略](../../src/framework/rules/trainer-ai.ts)及[策略回归](../../experiments/step5/4/test-trainer-ai.cjs)。
+参见[类型有效性合同](../contracts/party-types.md)、[当前策略](../../src/framework/rules/trainer-ai.ts)及[策略回归](../../tests/regression/battle-ai/test-trainer-ai.cjs)。

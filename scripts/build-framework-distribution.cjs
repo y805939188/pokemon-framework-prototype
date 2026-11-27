@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Build the step-1 local CommonJS delivery from this worktree's current sources.
+ * Build the local CommonJS SDK from this worktree's current sources.
  * No install, fetch, npm publish, stale artifact fallback or host launch is performed.
  */
 const fs = require('node:fs');
@@ -94,7 +94,7 @@ function packageJson() {
   };
   return {
     name: PACKAGE_NAME,
-    version: '0.0.0-step1',
+    version: '0.0.0-local',
     private: true,
     license: 'UNLICENSED',
     type: 'commonjs',
@@ -133,8 +133,8 @@ run(process.execPath, [tsc, '--pretty', 'false', '-p', path.join(SRC, 'framework
 
 for (const rel of ['js/engine/build', 'js/engine/showdown', 'js/engine/fixtures', 'js/engine/game', 'js/engine/rpg', 'content/sample', 'content/examples/progression']) copyDir(rel);
 for (const rel of ['js/engine/gateway.cjs', 'js/engine/harness.cjs', 'js/engine/matrix.cjs', 'scripts/showdown.env', 'data/framework/content.json']) copyFile(rel);
-copyAndRename('docs/framework-remediation/step1-api.zh.md', 'README.zh.md');
-copyAndRename('docs/step5/distribution.md', 'THIRD-PARTY-NOTICES.md');
+copyAndRename('docs/sdk/api.zh.md', 'README.zh.md');
+copyAndRename('docs/sdk/distribution-notices.md', 'THIRD-PARTY-NOTICES.md');
 for (const rel of ['types/production.d.ts', 'types/testing.d.ts', 'types/index.d.ts', 'types/rules/index.d.ts', 'types/tools/content-cli.d.ts'])
   if (!fs.existsSync(path.join(OUT, rel))) throw new Error(`declaration build did not produce ${rel}`);
 fs.writeFileSync(path.join(OUT, 'package.json'), `${JSON.stringify(packageJson(), null, 2)}\n`);

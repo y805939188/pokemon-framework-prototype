@@ -2,7 +2,7 @@
 // Compiled product Scene + real App/Session/Gen8. Actual installed item geometry;
 // bitmap/text/audio/input delivery remain explicit controlled ports. No NW claim.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
-const {createVictoryDriverHost}=require('../../../experiments/step5/4/victory-music-driver-host.cjs'),ROOT=path.resolve(__dirname,'../../..'),PRODUCT=process.env.PF_MOVE_DETAILS_PRODUCT_ROOT||ROOT,E=require('../../../js/engine/build/production.cjs'),PLAN=require('../../../experiments/step5/4/victory-music-native-plan.json');
+const {createVictoryDriverHost}=require('../../support/battle-host/victory-music-driver-host.cjs'),ROOT=path.resolve(__dirname,'../../..'),PRODUCT=process.env.PF_MOVE_DETAILS_PRODUCT_ROOT||ROOT,E=require('../../../js/engine/build/production.cjs'),PLAN=require('../../support/battle-host/native-plans/victory-music-native-plan.json');
 let temp,plugins,entryText,fixture;
 test.before(async()=>{
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-move-details-'));plugins={};

@@ -1,7 +1,7 @@
 'use strict';
 // Authored content -> production App/Session -> pinned engine and the real Trainer AI boundary.
 const test = require('node:test'), assert = require('node:assert/strict');
-const { E, T, D, inputs, clone } = require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const { E, T, D, inputs, clone } = require('../../support/battle-ai/integration/fixtures.cjs');
 const WEAK = ['Normal', 'Ice', 'Rock', 'Dark', 'Steel'];
 const RESIST = ['Fire', 'Grass', 'Poison', 'Flying', 'Bug'];
 const GRASS_RESIST = ['Bug', 'Dragon', 'Fire', 'Flying', 'Grass', 'Poison', 'Steel'];
@@ -140,7 +140,7 @@ test('R2 formal forced replacement scores five-type advantages and risks without
 
 // Synthetic public catalogs exercise +6/+7, which the fixed standard 18-type chart cannot produce.
 // Full policy validation is used, including legal non-reduced catalog cells and snapshot ratios.
-const { catalog, snapshot } = require('../../../experiments/step5/4/trainer-ai-pure/adapter.cjs');
+const { catalog, snapshot } = require('../../support/battle-ai/decisions/adapter.cjs');
 for (const [label, cells, expected] of [
   ['positive cap', [2, 2, 2, 2, 2, 2], ratio(64)],
   ['positive beyond cap', [2, 2, 2, 2, 2, 2, 2], ratio(64)],

@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const vm = require('node:vm');
-const {createHost, section, sha} = require('../../../experiments/step5/4/mz-slot-host.cjs');
+const {createHost, section, sha} = require('../../support/saves/mz-slot-host.cjs');
 const F = require('../../support/saves/legacy-migration/fixtures.cjs');
 const E = require('../../../js/engine/build/production.cjs');
 

@@ -2,7 +2,7 @@
 // Author warnings only: no new reusable families, trainer policy or persisted data.
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process');
-const {E,inputs}=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const {E,inputs}=require('../../support/battle-ai/integration/fixtures.cjs');
 const compile=input=>{const before=JSON.stringify(input),r=E.contentCompile.compileContent(input);assert(r.ok,JSON.stringify(r.errors));assert.equal(JSON.stringify(input),before);return r;};
 const warnings=(r,code)=>r.warnings.filter(w=>w.message.startsWith(code+':'));
 const trainerCode='trainer-reusable-healing',unsupportedCode='nonconsumable-battle-item-unsupported';
@@ -60,7 +60,7 @@ for(const id of ['ether','revive','antidote','xattack','pokeball','poketoy'])tes
  assert(r.ok,JSON.stringify(r));assert.equal(s.bag[id],0);assert.equal(s.ledger[0].state,'consumed');assert.equal(JSON.stringify(game),before,'persistent inventory is still owned by battle commit');
 });
 test('real trainer AI ignores unsupported nonconsumable resources while consumable status medicine remains eligible',async()=>{
- const F=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+ const F=require('../../support/battle-ai/integration/fixtures.cjs');
  for(const consumable of [false,true]){
   const ids=['ether','revive','antidote','xattack','pokeball','poketoy'],input=inputs({items:ids.map(item=>({item,count:1})),party:1,moves:['splash']});
   for(const id of ids)input.items.find(i=>i.id===id).consumable=consumable;

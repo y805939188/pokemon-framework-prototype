@@ -1,7 +1,7 @@
 'use strict';
 // Static only: never launches NW or creates a save/profile/run directory.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto'),cp=require('node:child_process');
-const ROOT=path.resolve(__dirname,'..'),PLAN=require('../experiments/step5/4/victory-music-native-plan.json');
+const ROOT=path.resolve(__dirname,'..'),PLAN=require('../tests/support/battle-host/native-plans/victory-music-native-plan.json');
 const {manifest,canonical}=require('./prepare-capture-me-native-freeze.cjs');
 const {oggTiming,DURATION_CONTRACT,PAGE_DURATION_US}=require('./prepare-music-native-assets.cjs');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex'),fileHash=p=>sha(fs.readFileSync(p));

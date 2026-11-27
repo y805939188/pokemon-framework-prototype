@@ -1,7 +1,7 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('combined');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('combined');
 const {test}=require('node:test'),assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs');
-const {fixture}=require('../../../experiments/step5/5/field-move-real-parent-fixtures.cjs');
+const {fixture}=require('../../support/field/field-move-real-parent-fixtures.cjs');
 function production(){
   const E=require(process.env.PF_E2_PARENT_ENGINE),source=path.resolve(__dirname,'../../../content/sample');
   const names=['manifest','sources','species','overlays','grants','regional-dex','settings','map-metadata'];
@@ -23,7 +23,7 @@ for(const source of ['rocksmash','honey'])test('actual UI '+source+' -> register
   finally{h.app.abortAdmittedWorldBattle(outcome.admission,'done');}assert.equal(h.app.saveBlocked,false);
 });
 for(const entry of ['throwBall','slots'])test('actual UI fishing -> productionSessionFactory/Showdown '+entry+' gets the genuine fishing source',async()=>{
-  const p=production(),h=require('../../../experiments/step5/5/fishing-real-parent-fixtures.cjs').fixture({...p,sessionFactory:p.sessions,shortcutRead:true,bag:{lureball:4},editState(g){g.inventory.registeredItems=['oldrod'];}});
+  const p=production(),h=require('../../support/field/fishing-real-parent-fixtures.cjs').fixture({...p,sessionFactory:p.sessions,shortcutRead:true,bag:{lureball:4},editState(g){g.inventory.registeredItems=['oldrod'];}});
   const prepared=h.app.prepareFieldShortcutSelection('shortcut',{kind:'item',itemId:'oldrod'});assert.equal(prepared.status,'prepared');const pending=h.app.executeFieldShortcut(prepared.request);await h.flush();h.window();h.input(1,{confirm:true});h.finish();
   const outcome=await pending;assert.equal(outcome.status,'accepted',JSON.stringify(outcome));assert.equal(h.state.stats.fishing_count,1);assert.equal(h.state.stats.fishing_battles,1);const before=[...h.draws],session=await h.app.startAdmittedWorldBattle(outcome.admission);session.take();
   try {const result=entry==='throwBall'?await session.throwBall('lureball'):await session.chooseDoubles([{kind:'ball',ball:'lureball',target:session.gw.activeId('p2'),ctx:{fishing:false,timeOfDay:0}}]);assert.equal(result.ok,true,JSON.stringify(result));const event=result.messages.flatMap(m=>m.events||[]).find(e=>e.type==='rpg'&&e.args[0]==='ball');assert(event);assert.equal(Number(event.args[7]),50,'caller DTO cannot erase the genuine fishing context');assert.deepEqual(h.draws,before);assert.equal(h.state.steps,0);}

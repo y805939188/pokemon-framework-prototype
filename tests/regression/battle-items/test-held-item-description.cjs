@@ -1,7 +1,7 @@
 'use strict';
 // Exact presentation semantics over pinned protocol forms and real Gen8 producers; no reference replay.
 const test=require('node:test'),assert=require('node:assert/strict');
-const E=require('../../../js/engine/build/production.cjs'),F=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs'),H=require('../../support/battle/e2-status-feedback-scene-host.cjs');
+const E=require('../../../js/engine/build/production.cjs'),F=require('../../support/battle-ai/integration/fixtures.cjs'),H=require('../../support/battle/e2-status-feedback-scene-host.cjs');
 const event=(type,args)=>Object.freeze({type,args:Object.freeze(args),raw:'|'+type+'|'+args.join('|')});
 const cases=[
  ['-enditem',['p1a: A','Sitrus Berry','[eat]'],"Alpha ate its Sitrus Berry!",'Alpha吃掉了Sitrus Berry！'],

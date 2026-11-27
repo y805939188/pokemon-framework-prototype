@@ -115,7 +115,7 @@ class RunnerControls(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'verifier unavailable'):SCOPE['verify_report_hashes'](b'{}')
 
     def test_ten_group_state_comparison_and_synthetic_label(self):
-        source=json.loads((SCRIPT.parent.parent/'experiments/step5/4/d1/f100-v1.json').read_text())
+        source=json.loads((SCRIPT.parent.parent/'tests/support/performance/native/f100-v1.json').read_text())
         for fault in [None,'different-valid-state','different-valid-initial','different-state-old-hash','missing-final','native-looking-script']:
             with self.subTest(fault=fault),tempfile.TemporaryDirectory(prefix='pf-d1-ten-synthetic-')as folder:
                 root=Path(folder);apps=[]

@@ -11,7 +11,7 @@ const SOURCE_INPUTS = [
   'js/engine/fixtures', 'js/engine/game', 'js/engine/rpg',
   'js/engine/gateway.cjs', 'js/engine/harness.cjs', 'js/engine/matrix.cjs',
   'content/sample', 'content/examples/progression',
-  'docs/framework-remediation/step1-api.zh.md', 'docs/step5/distribution.md',
+  'docs/sdk/api.zh.md', 'docs/sdk/distribution-notices.md',
 ];
 function walk(directory, prefix = '') {
   const out = [];

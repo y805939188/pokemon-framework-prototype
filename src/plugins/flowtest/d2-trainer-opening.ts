@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Test-only ordinary opening. External supervision qualifies native execution.
-import PLAN from '../../../experiments/step5/4/trainer-opening-native-plan.json';
+import PLAN from '../../../tests/support/battle-host/native-plans/trainer-opening-native-plan.json';
 import { musicNativeContent, musicNativeState } from './music-native-fixture';
 import { captureHostReady } from './d2-capture-me';
 export const trainerOpeningNativePlan = PLAN;

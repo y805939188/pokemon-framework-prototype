@@ -9,7 +9,7 @@ const { spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '../..');
 const source = fs.readFileSync(path.join(root, 'scripts/test-headless.sh'), 'utf8');
-const excluded = 'experiments/step3/test-growth-differential.cjs';
+const excluded = 'tests/reference/growth/test-growth-differential.cjs';
 const synthetic = ['scripts/tests/control-only-a.cjs', 'scripts/tests/control-only-b.cjs'];
 const cSuites = require('./c-regular-runtime.cjs').SUITES;
 const testCommand = suite => `node --test --test-reporter=tap ${cSuites.includes(suite) ? '--require ./scripts/tests/c-regular-runtime.cjs ' : ''}${suite}`;
@@ -36,10 +36,10 @@ test('final production entry refuses unknown family and selectors before Popen',
 test('final production entry names all fifteen original cases explicitly', () => {
   const {spec} = require('./final-production-runner.cjs');
   for (const id of ['A1','A2','B1','B2','B3','C1','C2','C3','C4','X1','X2'])
-    assert.equal(spec('native', id).entry, path.join(root, 'experiments/step5/5/world-production-final-wire/', id[0] === 'X' ? 'test-native-mapdata-guard.cjs' : 'test-callers.cjs'));
+    assert.equal(spec('native', id).entry, path.join(root, 'tests/support/world/native-callers/', id[0] === 'X' ? 'test-native-mapdata-guard.cjs' : 'test-callers.cjs'));
   for (const id of ['P01','C01']) {
-    assert.equal(spec('defeat', id).entry, path.join(root, 'experiments/step5/5/event-defeat-autosave-continue-headless/test-chain.cjs'));
-    assert.equal(spec('t16', id).entry, path.join(root, 'experiments/step5/5/t16-shortcut-capture-continue-headless/test-t16.cjs'));
+    assert.equal(spec('defeat', id).entry, path.join(root, 'tests/support/saves/defeat-continue/test-chain.cjs'));
+    assert.equal(spec('t16', id).entry, path.join(root, 'tests/support/saves/shortcut-capture/test-t16.cjs'));
   }
 });
 test('final production entry refuses old producer and case inputs', () => {
@@ -162,7 +162,7 @@ test('default and explicit regular scope select every listed suite and no replay
     assert.equal(result.status, 0, result.stderr);
     assert.deepEqual(result.commands.filter(line => line.startsWith('node --test ')), selected.map(testCommand));
     assert.ok(!result.commands.some(line => line.includes(excluded)));
-    assert.match(result.stdout, /EXCLUDED \(NOT RUN\): experiments\/step3\/test-growth-differential\.cjs/);
+    assert.match(result.stdout, /EXCLUDED \(NOT RUN\): tests\/reference\/growth\/test-growth-differential\.cjs/);
     assert.match(result.stdout, /NOT RUN and not passes/);
     assert.doesNotMatch(result.stdout, /FORBIDDEN_REPLAY_SELECTED/);
   }

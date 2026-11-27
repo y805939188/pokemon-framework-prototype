@@ -11,7 +11,7 @@ if(!bundles){
  fs.symlinkSync(path.join(ROOT,'js/engine/build/production.cjs'),path.join(bundles,'production.cjs'));
 }
 process.env.PF_E3_JOINT_OUT=bundles;process.env.PF_E3_NATIVE_ROOT=path.dirname(path.dirname(objects));process.env.PF_MZ_RUNTIME=objects;
-const E=require(path.join(bundles,'production.cjs')),{fixture:base,flush}=require('../../../experiments/step5/5/ui-wire-e3-fixtures.cjs');
+const E=require(path.join(bundles,'production.cjs')),{fixture:base,flush}=require('../../support/field/ui-wire-world-fixtures.cjs');
 const records=[];
 test.after(()=>{if(process.env.PF_WALK_EVIDENCE)fs.writeFileSync(process.env.PF_WALK_EVIDENCE,JSON.stringify({node:process.version,bundles,runtime,objects,records,limits:['Offline complete IIFEs/native methods, controlled DOM/PIXI/device/save I/O; not NW frames','Short samples collected alongside another lane; wall-clock tails are observations, not isolated performance certification']},null,2)+'\n');});
 function native(G,name,unit='scenes'){

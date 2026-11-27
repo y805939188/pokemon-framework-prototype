@@ -1,7 +1,7 @@
 'use strict';
 // Actual formal App/AI/Gen8 ports. No replacement pause override or direct action-queue injection.
 const test=require('node:test'),assert=require('node:assert/strict');
-const F=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs'),{E,T,D}=F,clone=v=>JSON.parse(JSON.stringify(v));
+const F=require('../../support/battle-ai/integration/fixtures.cjs'),{E,T,D}=F,clone=v=>JSON.parse(JSON.stringify(v));
 const read=s=>E.session.readTrainerReplacement?.(s)??null;
 const resolve=(s,v,id)=>E.session.resolveTrainerReplacement(s,v.offerId,id);
 const target=(s,v,id)=>E.session.readTrainerReplacementTarget(s,v.offerId,id);

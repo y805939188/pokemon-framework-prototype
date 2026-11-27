@@ -1,7 +1,7 @@
 'use strict';
 // Real production App/composition/Gen8 Session; only the owned state/projection ports are controlled.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const F=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs'),{E,T}=F,plan=require('../../support/battle/e-status-app-contracts.json');
+const F=require('../../support/battle-ai/integration/fixtures.cjs'),{E,T}=F,plan=require('../../support/battle/e-status-app-contracts.json');
 const clone=v=>JSON.parse(JSON.stringify(v));
 assert.equal(plan.schema,1);assert.deepEqual(plan.seed,[1,2,3,4]);assert.equal(plan.completeHeading,false);
 assert.equal(fs.readFileSync(path.resolve(__dirname,'../../../js/engine/showdown/SOURCE_SHA'),'utf8').trim(),plan.showdownSHA);

@@ -22,7 +22,7 @@ test('B store: legacy producer mismatch/held state are rejected without installi
   assert.throws(()=>blocked.commit(input),/legacy-no-held-store-source-gate/);assert.equal(calls,0);assert.deepEqual(files(dir),held);
 }));
 
-test('B-ULTRA-06 legacy producer cannot mutate raw/template aliases after the no-held gate',()=>{
+test('legacy producer cannot mutate raw/template aliases after the no-held gate',()=>{
   for(const mode of ['normal','early-held','raw-only','template-only','both','different-result'])fixture(({dir,file,content,store})=>{
     const template=structuredClone(T.fixtures.makeGame().party[0]);template.id='Caught-1';template.nickname='Caught';template.item=mode==='early-held'?'leftovers':'';
     const captured=E.state.protocolMember(template),input={protocol:1,battleId:'callback-'+mode,outcome:{kind:'caught',winner:null,target:captured.id,ball:'pokeball'},members:{},bag:{},captured:[captured],dex:{seen:['Charizard'],owned:['Charizard']}};

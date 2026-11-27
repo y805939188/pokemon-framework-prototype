@@ -1,7 +1,7 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('leaf');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('leaf');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { fixture, clone, value } = require('../../../experiments/step5/5/field-move-app-fixtures.cjs');
+const { fixture, clone, value } = require('../../support/field/field-move-app-fixtures.cjs');
 for (const moveId of ['cut', 'rocksmash', 'strength', 'surf', 'flash', 'sweetscent']) {
   test('T25 production rules + MZ host + App ' + moveId + ' executes once from zeroHP/zeroPP actor', async () => {
     const h = fixture({ moveId }), first = h.operation.run(); assert.equal(h.operation.run(), first);

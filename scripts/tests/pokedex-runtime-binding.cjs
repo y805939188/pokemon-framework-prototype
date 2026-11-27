@@ -5,8 +5,8 @@ const H=require('../headless-regression-binding.cjs');
 const PLUGINS=['PS_Management','PS_Inventory','PS_Progression','PS_Evolution','PS_Pokedex'];
 const INPUTS=['scripts/tests/pokedex-runtime-binding.cjs','tests/support/inventory/inventory-ui-host.cjs',
  'tests/support/inventory/inventory-fixture.cjs','tests/support/evolution/postbattle/helpers.cjs',
- 'tests/support/pokedex/host/ui-host.cjs','experiments/step5/5/pokedex-area-host.cjs',
- 'experiments/step5/5/test-pokedex-area-production.cjs',...PLUGINS.map(name=>'js/plugins/'+name+'.js')];
+ 'tests/support/pokedex/host/ui-host.cjs','tests/support/pokedex/pokedex-area-host.cjs',
+ 'tests/regression/pokedex/test-pokedex-area-production.cjs',...PLUGINS.map(name=>'js/plugins/'+name+'.js')];
 function capturePokedexInputs(root,options={}){
  root=fs.realpathSync(root);
  const bindingFile=options.bindingFile??process.env.PF_HEADLESS_REGRESSION_BINDING;

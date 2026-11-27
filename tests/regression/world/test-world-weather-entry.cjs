@@ -1,7 +1,7 @@
 'use strict';
 // Actual fixed MZ weather functions + real Application, with saved screen progress and deterministic map input.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
-const ROOT=path.resolve(__dirname,'../../..'),ART=process.env.PF55_B2_ARTIFACT_ROOT||path.join(ROOT,'build/step5-5-development-20261115/b2-weather-remediation');
+const ROOT=path.resolve(__dirname,'../../..'),ART=process.env.PF55_B2_ARTIFACT_ROOT||path.join(ROOT,'build/test-world-weather');
 const E=require(process.env.PF55_B_ENGINE||'../../../js/engine/build/production.cjs'),F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 const clone=value=>structuredClone(value),native=fs.readFileSync(process.env.PF_MZ_RUNTIME||path.join(ROOT,'js/reactor_objects.js'),'utf8'),scenes=fs.readFileSync(path.join(path.dirname(process.env.PF_MZ_RUNTIME||path.join(ROOT,'js/reactor_objects.js')),'reactor_scenes.js'),'utf8');let bundle,out;
 test.before(()=>{if(process.env.PF55_B_BUNDLE_DIR){fs.mkdirSync(ART,{recursive:true});out=fs.mkdtempSync(path.join(ART,'weather-observations-'));bundle=fs.readFileSync(path.join(process.env.PF55_B_BUNDLE_DIR,'PS_World.js'),'utf8');return;}fs.mkdirSync(ART,{recursive:true});out=fs.mkdtempSync(path.join(ART,'weather-entry-bundle-'));const result=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,encoding:'utf8',env:{...process.env,RR_PLUGIN:'PS_World'}});fs.writeFileSync(path.join(out,'build.log'),result.stdout+result.stderr);assert.equal(result.status,0,result.stdout+result.stderr);bundle=fs.readFileSync(path.join(out,'PS_World.js'),'utf8');});

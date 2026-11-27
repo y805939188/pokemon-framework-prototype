@@ -4,9 +4,9 @@
 <dict>
 	<key>com.apple.security.cs.allow-jit</key>
 	<true/>
-	<!-- ONLY for the ad-hoc proof: ad-hoc code has no Team ID, so the hardened runtime rejects our own
+	<!-- Ad-hoc signing only: ad-hoc code has no Team ID, so the hardened runtime rejects our own
 	     ad-hoc signed libraries (probe: the app does not start without this). A real Developer ID signature
-	     (one team for everything) is expected not to need it: NOT verified, no certificate on this machine. -->
+	     (one team for everything) is expected not to require this; verify with the distribution identity. -->
 	<key>com.apple.security.cs.disable-library-validation</key>
 	<true/>
 </dict>

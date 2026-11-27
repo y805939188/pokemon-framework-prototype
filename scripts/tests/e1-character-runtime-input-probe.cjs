@@ -6,7 +6,7 @@ const Module = require('node:module'), cp = require('node:child_process'), os = 
 const root = path.resolve(__dirname, '../..'), H = require('../headless-regression-binding.cjs');
 const [scenario, key] = process.argv.slice(2);
 const captured = H.capture(root, process.env.PF_HEADLESS_REGRESSION_BINDING);
-H.boundFiles(captured, ['scripts/tests/e1-character-runtime-input-probe.cjs', 'scripts/tests/e1-character-inputs.cjs', 'scripts/tests/final-production-runtime.cjs', 'experiments/step5/5/regular-field-action-test-runtime.cjs']);
+H.boundFiles(captured, ['scripts/tests/e1-character-runtime-input-probe.cjs', 'scripts/tests/e1-character-inputs.cjs', 'scripts/tests/final-production-runtime.cjs', 'tests/support/field/regular-field-action-test-runtime.cjs']);
 const input = require('./e1-character-inputs.cjs'), wanted = input.environment(root, captured, {});
 for (const name of [...input.KEYS, ...input.STALE]) delete process.env[name];
 process.env.PF_FINAL_PRODUCTION_FAMILY = 'e1-fishing-character';

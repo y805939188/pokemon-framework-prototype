@@ -23,9 +23,9 @@ if (requestedStage !== undefined) {
     throw Error("isolated test build requires an absolute private workspace stage and a supported plugin");
   }
   const workspace = realpathSync(fileURLToPath(new URL("..", import.meta.url)));
-  const root = stageDirectory(requestedStage), stageParent = join(workspace, "build", "step6-isolated");
+  const root = stageDirectory(requestedStage), stageParent = join(workspace, "build", "isolated-launch");
   if (root !== resolve(requestedStage) || dirname(root) !== stageParent || stageDirectory(stageParent) !== stageParent) {
-    throw Error("isolated test stage must be directly in the workspace build/step6-isolated directory");
+    throw Error("isolated test stage must be directly in the workspace build/isolated-launch directory");
   }
   for (const dir of ["game", "game/js", "game/js/plugins", "profile", "saves"]) stageDirectory(join(root, dir));
   const stamp = join(root, ".pf-isolated-stage"), stat = lstatSync(stamp);

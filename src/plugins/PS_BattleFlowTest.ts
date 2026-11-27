@@ -7,13 +7,13 @@ import { isolatedTestScope, testBattleFlowMatches, testStorageStillBound } from 
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // the step 4 (schema 3) save written by the step 4 code (step 5.0 checkpoint P-1), for T31
-import SCALE_CORPUS from "../../experiments/step5/3/closeout/scale-fixtures.json";
+import SCALE_CORPUS from "../../tests/support/performance/scale/scale-fixtures.json";
 import { progressionDonorInputs, m1ConvergenceFixture } from "./flowtest/source-fixture";
 import { runCloseout, continueCloseout, runCloseoutLifecycle } from "./flowtest/closeout";
 import { runWriteScale, continueWriteScale } from "./flowtest/write-scale";
-import { runStep4Write, continueStep4Write } from "./flowtest/step4-write";
-import { runStep4Memory } from "./flowtest/step4-memory";
-import { runStep5Fixture, runStep5Sample, continueStep5Sample } from "./flowtest/step5-integration";
+import { runStep4Write, continueStep4Write } from "./flowtest/save-write";
+import { runStep4Memory } from "./flowtest/memory-benchmark";
+import { runStep5Fixture, runStep5Sample, continueStep5Sample } from "./flowtest/integration";
 import { runHeldWriteback, continueHeldWriteback } from "./flowtest/held-writeback";
 import { runTrainerAiHost, continueTrainerAiHost } from "./flowtest/trainer-ai";
 import { runD1Benchmark } from "./flowtest/d1-benchmark";
@@ -34,7 +34,7 @@ import { runD2BallFeedback } from "./flowtest/d2-ball-feedback";
 import { runD2VictoryMusic } from "./flowtest/d2-victory-music";
 import { runD2Music } from "./flowtest/d2-music";
 import { runD2CaptureME } from "./flowtest/d2-capture-me";
-import STEP4_FULL from "../../experiments/step5/fixtures/step4-saves/full.json";
+import STEP4_FULL from "../../tests/support/saves/schema-v3/full.json";
 import { pressKey, waitGameFrames, waitUntil } from "./flowtest/timing";
 import { classifyFlowTestRoute } from './flowtest/d2-normal-route';
 import { prepareNormalD2Entry } from './flowtest/d2-normal-entry';

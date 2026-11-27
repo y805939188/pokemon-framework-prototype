@@ -1,6 +1,6 @@
 'use strict';
-// Node headless gate for step 2.1. Run: node --test tests/regression/battle/test-headless-battle-smoke.cjs
-// Regenerate golden (deliberate): UPDATE_GOLDEN=1 node experiments/step2/update-golden.cjs
+// Headless battle smoke test. Run: node --test tests/regression/battle/test-headless-battle-smoke.cjs
+// Regenerate golden (deliberate): UPDATE_GOLDEN=1 node tests/tools/battle/update-golden.cjs
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { CHECKS } = require('../../../js/engine/harness.cjs');

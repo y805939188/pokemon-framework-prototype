@@ -1,6 +1,6 @@
 'use strict';
 const I6 = require("../../support/inventory/legacy-bag-test-bridge.cjs");
-// Step 4 / A, application use cases over in-memory ports: a formal new game (no fixture), one-time grants and the
+// Application use cases over in-memory ports: a formal new game (no fixture), one-time grants and the
 // party heal. Each is all-or-nothing: a refusal or a failing store leaves the installed state as it was.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -103,7 +103,7 @@ test('content ids that are also Object.prototype names work end to end: a "const
   const mk = initial => { const state = K.createMemoryState(initial); const sessions = K.createFakeSessions(() => { throw new Error('x'); }); return { state, sessions, app: new GameApplication({ state, sessions, projection: K.createRecordingProjection(), content: () => ({ content: ct }), random: lcg(5) }) }; };
   const w = mk(E.state.newGame({ content: ct, party: [] }));
   const first = w.app.claimGrant('constructor');
-  assert.deepEqual([first.status, first.placed.map(p => [p.id, p.species, p.form])], ['applied', [['M1', 'constructor', 0]]], 'stored by its content id since step 5.0 (D5-3)');
+  assert.deepEqual([first.status, first.placed.map(p => [p.id, p.species, p.form])], ['applied', [['M1', 'constructor', 0]]], 'stored by its content id');
   assert.equal(w.app.claimGrant('constructor').status, 'already-claimed');
   const loaded = mk(JSON.parse(JSON.stringify(w.state.current()))); // a later process reading the save
   assert.equal(loaded.app.claimGrant('constructor').status, 'already-claimed'); assert.equal(loaded.state.replaced.length, 0);
@@ -111,5 +111,5 @@ test('content ids that are also Object.prototype names work end to end: a "const
   await loaded.app.startBattle({ battleId: 'alias#1', seq: 1, kind: 'wild', foes: [{ species: 'constructor', level: 5 }] });
   assert.equal(loaded.sessions.created[0].setup.foes[0].species, 'Charmander', 'a foe named by the author id is created from its species');
   assert.deepEqual(E.contentRuntime.findDanglingReferences({ party: [{ id: 'probe', species: 'toString', form: 0, moves: [] }], storage: E.storage.newStorage() }, ct).map(d => d.path), ['$.party[0].species'], 'a saved species key must be an own key of the content (an inherited name is not)');
-  assert.deepEqual(E.contentRuntime.findDanglingReferences({ party: [{ id: 'probe', species: 'constructor', form: 0, moves: [] }], storage: E.storage.newStorage() }, ct), [], 'since step 5.0 the saved key is the content id, and "constructor" is an own one here');
+  assert.deepEqual(E.contentRuntime.findDanglingReferences({ party: [{ id: 'probe', species: 'constructor', form: 0, moves: [] }], storage: E.storage.newStorage() }, ct), [], 'the saved key is the content id, and "constructor" is an own one here');
 });

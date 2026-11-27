@@ -58,7 +58,7 @@ async function prepare() {
       sameExplicit('PF_MZ_RUNTIME_OBJECTS', path.join(ROOT, 'js/reactor_objects.js'));
       sameExplicit('PF_MZ_BATTLE_SOURCE', path.join(ROOT, 'src/plugins/PS_BattleFlow.ts'));
       sameExplicit('PF_MZ_BATTLE_COMPILED', pluginFile('PS_BattleFlow'));
-      sameExplicit('PF_E3_PARENT_BUNDLE', path.join(ROOT, 'experiments/step5/5/e3-production/parent-components.cjs'));
+      sameExplicit('PF_E3_PARENT_BUNDLE', path.join(ROOT, 'tests/support/world/travel/parent-components.cjs'));
       sameExplicit('PF_E3_CORE_BUNDLE', path.join(ROOT, 'js/engine/build/core.cjs'));
       if(characterFamily) {
         for(const [key, target] of Object.entries(characterInputs)) sameExplicit(key, target);
@@ -85,14 +85,14 @@ async function prepare() {
     sameExplicit('PF_MZ_RUNTIME_MANAGERS', path.join(ROOT, 'js/reactor_managers.js'));
     sameExplicit('PF_MZ_RUNTIME_SCENES', path.join(ROOT, 'js/reactor_scenes.js'));
     sameExplicit('PF_SHORTCUT_TRAVEL_FIXTURE', path.join(ROOT, (['e1', 'e1-fishing-presentation'].includes(process.env.PF_FINAL_PRODUCTION_FAMILY) || characterFamily || e3Family)
-      ? 'experiments/step5/5/ui-wire-e3-fixtures.cjs' : (['e2-current-frontends', 'e2-party-surf-guards'].includes(process.env.PF_FINAL_PRODUCTION_FAMILY) || displayFamily)
-        ? 'experiments/step5/5/e2-current-frontends/world-base.cjs' : 'experiments/step5/5/t16-shortcut-capture-continue-headless/world-base.cjs'));
+      ? 'tests/support/field/ui-wire-world-fixtures.cjs' : (['e2-current-frontends', 'e2-party-surf-guards'].includes(process.env.PF_FINAL_PRODUCTION_FAMILY) || displayFamily)
+        ? 'tests/support/world/field-frontends/world-base.cjs' : 'tests/support/saves/shortcut-capture/world-base.cjs'));
     sameExplicit('PF_SHORTCUT_PRODUCTION_BUNDLE', pluginFile('PS_Management'));
     for (const key of ['PF_D_NOTICE_BUNDLES', 'PF_D_MZ_COMPILER_ROOT', 'PF_D_MZ_ART'])
       assert.equal(process.env[key], undefined, 'independent private builder override refused: ' + key);
     process.env.PF_E3_JOINT_OUT = out;
     const compiled = characterFamily ? require('./e1-character-inputs.cjs').prepare(ROOT, captured)
-      : require('../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('world-scene');
+      : require('../../tests/support/field/regular-field-action-test-runtime.cjs').prepare('world-scene');
     if(coldFamily) assert.equal(compiled.mode, 'explicit', 'current production family consumes only the existing cold parent emit');
     // Fixture content is data-only and uses the existing Node 22 TS loader.
     require('./ts-source-loader.cjs');

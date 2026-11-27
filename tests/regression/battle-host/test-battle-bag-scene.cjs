@@ -1,8 +1,8 @@
 'use strict';
 // Production compiled Scene + real App/Gen8 Session. Window/input/raster ports are controlled, not NW.
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), os = require('node:os');
-const { spawnSync } = require('node:child_process'), { createVictoryDriverHost } = require('../../../experiments/step5/4/victory-music-driver-host.cjs');
-const ROOT = path.resolve(__dirname, '../../..'), E = require('../../../js/engine/build/production.cjs'), PLAN = require('../../../experiments/step5/4/victory-music-native-plan.json');
+const { spawnSync } = require('node:child_process'), { createVictoryDriverHost } = require('../../support/battle-host/victory-music-driver-host.cjs');
+const ROOT = path.resolve(__dirname, '../../..'), E = require('../../../js/engine/build/production.cjs'), PLAN = require('../../support/battle-host/native-plans/victory-music-native-plan.json');
 let temp, plugins, entryText, fixture;
 test.before(async () => {
   temp = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-battle-bag-scene-')); plugins = {};
@@ -337,7 +337,7 @@ for (const lang of ['en', 'zh']) test(lang + ' bag member rows use nicknames and
   } finally { h.cleanup(); }
 });
 function trainerBallContent(illusion) {
-  const { inputs } = require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+  const { inputs } = require('../../support/battle-ai/integration/fixtures.cjs');
   const input = inputs({ party: 2, moves: ['splash'] });
   input.species.push({ id: 'zoroark', showdownId: 'zoroark', nameKey: 'species.zoroark', growth: 'medium', baseExp: 101,
     evYield: { hp: 1 }, catchRate: 35, learnset: [{ level: 1, move: 'splash' }], source: 'author-placeholder' });

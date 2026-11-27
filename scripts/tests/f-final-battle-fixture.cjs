@@ -73,7 +73,7 @@ async function fixture(options={}){
    return result;
   },retireSource(...a){const result=Reflect.apply(original.retireSource,original,a);observed.retirements.push(result);return result;},async announce(...a){try{const r=await Reflect.apply(original.announce,original,a);observed.announcements.push({kind:a[0],checkpoint:structuredClone(a[1]),result:r});return r;}catch(error){observed.announcements.push({kind:a[0],error:String(error.stack??error)});throw error;}},async prepare(...a){try{const r=await Reflect.apply(original.prepare,original,a);observed.preparations.push(r);return r;}catch(error){observed.preparations.push({error:String(error.stack??error)});throw error;}},armSource(...a){const r=Reflect.apply(original.armSource,original,a);observed.arm.push(r);return r;},async waitSource(...a){const r=await Reflect.apply(original.waitSource,original,a);observed.wait.push(r);return r;},transferCompleted(...a){const r=Reflect.apply(original.transferCompleted,original,a);observed.completions.push({result:r,target:structuredClone(a[1].target)});return r;}};if(options.withoutF)p.blackout=undefined;
  },nativeSetup(n,{maps}){const G=n.G;
-  require('../../experiments/step5/5/production-same-source-replay/presentation.cjs').presentation(G);
+  require('../../tests/support/world/scene-replay/presentation.cjs').presentation(G);
   G.$dataSystem.switches=['','StartingOver','PostBattleTail','ParallelEnabled','ParallelPulse'];
   G.$dataSystem.variables=Array.from({length:22},(_,id)=>id===21?'BattleResult':'');
   maps[1]=structuredClone(maps[5]);G.$dataMapInfos[1]={id:1,name:'Legacy Home'};

@@ -126,7 +126,7 @@ test('B engine: unknown direct held write poisons the whole channel, rather than
   assert.throws(()=>api.gatewaySettlementFacts(s.gw,s.lineage,binding),/required-held-facts-unavailable:.*unhandled-held-receive/);
 });
 
-test('B-ULTRA-03 real Substitute Pay Day counts once; body/protect/immunity and RNG match uninstrumented engine',async()=>{
+test('real Substitute Pay Day counts once; body/protect/immunity and RNG match uninstrumented engine',async()=>{
   const api=await G;
   for(const [label,species,foeMoves,first] of [
     ['substitute','Snorlax',['Substitute','Splash'],true],['body','Snorlax',['Splash'],false],
@@ -147,7 +147,7 @@ test('B-ULTRA-03 real Substitute Pay Day counts once; body/protect/immunity and 
   }
 });
 
-test('B-ULTRA-04 wild Trick/Switcheroo attempts spend ordinary PP and fail without changing C/I/R',async()=>{
+test('wild Trick/Switcheroo attempts spend ordinary PP and fail without changing C/I/R',async()=>{
   for(const move of ['Trick','Switcheroo']){
     const s=await create({wild:true,p:set('P1','Snorlax',['Splash'],'leftovers'),f:set('F1','Persian',[move],'blacksludge')});
     const id=move.toLowerCase(),pp=s.gw.readState('p2')[0].pp[id];const messages=await turn(s.gw);
@@ -159,7 +159,7 @@ test('B-ULTRA-04 wild Trick/Switcheroo attempts spend ordinary PP and fail witho
   }
 });
 
-test('B-ULTRA-05 same opaque checkpoint after switching/Illusion preserves complete ordered facts and pair hash',async()=>{
+test('same opaque checkpoint after switching/Illusion preserves complete ordered facts and pair hash',async()=>{
   const api=await G;
   for(const illusion of [false,true]){
     const p=illusion?{...set('P1','Zoroark',['Splash'],'leftovers'),ability:'Illusion'}:set('P1','Snorlax',['Splash'],'leftovers');

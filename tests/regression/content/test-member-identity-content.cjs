@@ -1,5 +1,5 @@
 'use strict';
-// Step 5.0 / D5-2, content: the pre-use gate of the source registry (roadmap DETAILED-PLAN §280: the terms of a source
+// The source registry gate: the terms of a source
 // are checked BEFORE its data is used) and the import subset of author-provided PBS species data (WP04 §4.2 reading
 // rules, WP03 §4.3 defaults, §5.3 named EV pairs; r8 FR-000396, FR-000402, FR-000406). The PBS texts here are written
 // for the test (invented numbers), not copied from any data set.
@@ -86,7 +86,7 @@ test('PBS import: framework fields carried over; battle data, later fields and u
   const [rat, spe] = r.records;
   assert.deepEqual(rat.showdown, ['Name', 'BaseStats'], 'Showdown still provides names and base stats');
   assert.deepEqual(r.species[0].types, ['normal'], 'explicit author types are imported and validated against the pinned directory');
-  assert.deepEqual(r.species[0].evolutions, [{ target: 'raticate', method: 'Level', parameter: 20 }], 'step 5.3 consumes ordered typed evolution entries');
+  assert.deepEqual(r.species[0].evolutions, [{ target: 'raticate', method: 'Level', parameter: 20 }], 'the compiler consumes ordered typed evolution entries');
   assert.deepEqual(rat.later.map(x => x.field), []);
   assert.deepEqual(r.species.find(sp => sp.id === 'rattata').wildItemCommon, ['chilanberry']);
   assert.deepEqual(rat.ignored, ['SomethingNew'], 'outside the schema: not consumed, no error (WP04 §4.2)');
@@ -151,7 +151,7 @@ test('PBS import CLI: refused without a checked source (nothing written); with o
 test('FR-000388/389 rule configuration (WP02 subset): Gen 8 defaults, validated overrides through settings.json, the capacities they give', () => {
   const C = E.config;
   const cfg=C.resolveConfig();assert.deepEqual(Object.fromEntries(["MECHANICS_GENERATION","MAX_MONEY","MAX_PARTY_SIZE","NUM_STORAGE_BOXES","BAG_MAX_PER_SLOT"].map(k=>[k,cfg[k]])), { MECHANICS_GENERATION: 8, MAX_MONEY: 999999, MAX_PARTY_SIZE: 6, NUM_STORAGE_BOXES: 40, BAG_MAX_PER_SLOT: 999 });
-  assert.deepEqual(C.limitsOf(C.resolveConfig()), E.limits.DEFAULT_LIMITS, 'the defaults give the step 4 capacities (40 x 30 boxes)');
+  assert.deepEqual(C.limitsOf(C.resolveConfig()), E.limits.DEFAULT_LIMITS, 'the defaults specify the built-in capacities (40 x 30 boxes)');
   assert.deepEqual(C.limitsOf(C.resolveConfig({ NUM_STORAGE_BOXES: 40, MAX_PARTY_SIZE: 3 })), { party: 3, boxes: 1200, bagPerItem: 999, money: 999999 });
   const has = (o, pathRe, msgRe) => assert.ok(C.checkOverrides(o).some(p => pathRe.test(p.path) && msgRe.test(p.message)), JSON.stringify(C.checkOverrides(o)));
   has({ MECHANICS_GENERATION: 7 }, /MECHANICS_GENERATION/, /generation 8 only/);

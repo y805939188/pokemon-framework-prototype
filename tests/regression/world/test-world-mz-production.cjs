@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {fixture,flush}=require('../../support/world/world-mz-production-support.cjs');
-const {load}=require('../../../experiments/step5/5/field-host-support.cjs');
+const {load}=require('../../support/field/field-host-support.cjs');
 const domains=[100,1,1,65536,65536,32,32,32,32,32,32];
 async function complete(h){h.complete();await flush();}
 test('production formal world table is the mode authority; explicit terrain meanings are validated',async()=>{

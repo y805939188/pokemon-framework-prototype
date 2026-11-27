@@ -1,5 +1,5 @@
 {
- "generator": "experiments/step3/gen-result-hash-golden.cjs",
+ "generator": "tests/tools/battle/gen-result-hash-golden.cjs",
  "algorithm": "node:crypto SHA-256 over canonical JSON (sorted keys), as in rules/state.ts at 4ce31e1",
  "entries": [
   {

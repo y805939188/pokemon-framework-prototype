@@ -1,9 +1,5 @@
-# pokemon-framework-prototype (AGENTS.md — 与 CLAUDE.md 内容相同，供 Codex 等读取)
+# Contributing to the framework
 
-主工作仓库。**动手前先读 [`docs/PROJECT-GUIDE.md`](docs/PROJECT-GUIDE.md)**（目标、铁律与授权边界、协作协议、架构、环境、命令、已知坑、文档地图），再用 `git status` 核对实际状态。内部协作者可另外读取独立的工作区交接记录；它不是公开贡献的前置条件。
+Read the [developer guide](docs/PROJECT-GUIDE.md) for architecture, builds and test commands. Implement from the public clean-room specification, not the original Ruby source. Keep user data, locally licensed assets, test output and machine-specific settings out of commits.
 
-要点（细节都在指南里）：
-- clean-room：只读[公开行为规格](https://github.com/y805939188/pokemon-essentials-clean-room)；正文、向量与证据范围见[项目指南](docs/PROJECT-GUIDE.md)。**不读不移植原版 Ruby**。
-- 推送/合并到 `main`、强制推送、永久删除、改全局 MZ/NW.js、使用凭据、改变首版范围：**先问用户**。
-- 快速自检：`scripts/test-quick.sh`（无窗口）。会弹窗口的测试见指南第 8 节。
-- 不用 MZ 的"部署"打包；用 `scripts/package-mac.sh`。
+Work on a short-lived branch. Preserve unrelated local changes. Protect local changes and player saves; do not commit credentials or alter global MZ settings as a side effect. Run checks through the affected public entry point and report what was not tested.

@@ -117,7 +117,7 @@ test('a failed foe replacement restores partial growth and can be retried', asyn
   }
 });
 
-// ---- added with the step 2 closeout: a rolled-back and retried operation looks exactly like a clean run
+// ---- rollback: a rolled-back and retried operation looks exactly like a clean run
 const strip = messages => JSON.parse(JSON.stringify(messages, (key, value) => (Array.isArray(value) && value.length && value.every(e => e && e.type === 't:') ? [] : value)))
   .map(m => (m.kind === 'events' ? { ...m, events: m.events.filter(e => e.type !== 't:') } : m));
 

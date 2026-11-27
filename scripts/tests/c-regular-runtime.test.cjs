@@ -17,7 +17,7 @@ test('all eight complete entries and their actual input group belong to the offi
     const env = C.environment(ROOT, captured, suite, {});
     assert.equal(env.PF_E3_JOINT_OUT, verified.group);
     assert.equal(env.PF_GIVEN_ENGINE, path.join(ROOT, 'js/engine/build/production.cjs'));
-    assert.equal(env.PF_SHORTCUT_TRAVEL_FIXTURE, path.join(ROOT, 'experiments/step5/5/ui-wire-e3-fixtures.cjs'));
+    assert.equal(env.PF_SHORTCUT_TRAVEL_FIXTURE, path.join(ROOT, 'tests/support/field/ui-wire-world-fixtures.cjs'));
     assert.equal(env.PF_E2_PARENT_OUT, path.join(verified.parent, 'out'));
   }
 });

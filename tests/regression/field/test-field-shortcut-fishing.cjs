@@ -1,7 +1,7 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('fishing');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('fishing');
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {fixture,flush}=require('../../../experiments/step5/5/fishing-real-parent-fixtures.cjs');
+const {fixture,flush}=require('../../support/field/fishing-real-parent-fixtures.cjs');
 function fish(rod,shortcut=true,options={}){return fixture({...options,rod,shortcutRead:shortcut,editState(g){g.inventory.registeredItems=['oldrod','goodrod','superrod'];options.editState?.(g);}});}
 async function start(h,rod){const r=h.app.prepareFieldShortcutSelection('shortcut',{kind:'item',itemId:['oldrod','goodrod','superrod'][rod-1]});assert.equal(r.status,'prepared',JSON.stringify(r));const promise=h.app.executeFieldShortcut(r.request);assert.equal(h.app.executeFieldShortcut(r.request),promise);await flush();return {request:r.request,promise};}
 function catchFish(h){h.window();h.input(1,{confirm:true});h.finish();}

@@ -1,5 +1,5 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('ui');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('ui');
 require('../../../scripts/tests/ts-source-loader.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path'),{pathToFileURL}=require('node:url');
 const load=file=>process.env.PF_SHORTCUT_UI_BUNDLE?Promise.resolve(require(path.join(process.env.PF_SHORTCUT_UI_BUNDLE,path.basename(file)+'.cjs'))):process.env.PF_SHORTCUT_UI_OUT?Promise.resolve(require(path.join(process.env.PF_SHORTCUT_UI_OUT,file+'.js'))):import(pathToFileURL(path.resolve(__dirname,'../../../src/'+file+'.ts')).href);

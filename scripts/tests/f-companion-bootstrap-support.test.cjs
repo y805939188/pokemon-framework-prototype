@@ -23,9 +23,9 @@ export async function load(url, context, next) {
 const test = require('node:test'), assert = require('node:assert/strict');
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const {types} = require('node:util');
-const {createNativeSceneManager, createNativeFrameTick} = require('../../experiments/step5/5/native-frame-manager-support.cjs');
-const {observer} = require('../../experiments/step5/5/e3-production/native-consumer-observer.cjs');
-const {assertCurrentCompanionBootstrap: check} = require('../../experiments/step5/5/f-native-preparation/current-companion-bootstrap-support.cjs');
+const {createNativeSceneManager, createNativeFrameTick} = require('../../tests/support/world/native-frame-manager-support.cjs');
+const {observer} = require('../../tests/support/world/travel/native-consumer-observer.cjs');
+const {assertCurrentCompanionBootstrap: check} = require('../../tests/support/world/scene-lifecycle/current-companion-bootstrap-support.cjs');
 const root = path.resolve(__dirname, '../..');
 const nativePath = path.join(path.dirname(process.env.PF_MZ_RUNTIME || path.join(root, 'js/reactor_objects.js')), 'reactor_managers.js');
 const nativeSource = fs.readFileSync(nativePath, 'utf8');

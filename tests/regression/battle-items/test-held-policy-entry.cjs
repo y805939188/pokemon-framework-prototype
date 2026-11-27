@@ -2,7 +2,7 @@
 // Authored synthetic data + default production App/Gen8. Never reads or writes player saves or opens NW.
 const test = require('node:test'), assert = require('node:assert/strict'), path = require('node:path');
 const ROOT = process.env.N4_RUNTIME_ROOT || path.resolve(__dirname, '../../..');
-const { E, T, inputs } = require(path.join(ROOT, 'experiments/step5/4/trainer-ai-integration/fixtures.cjs'));
+const { E, T, inputs } = require(path.join(ROOT, 'tests/support/battle-ai/integration/fixtures.cjs'));
 const restrictions = [
   ['Unholdable', ['Unholdable'], 'none'], ['KeyItem', ['KeyItem'], 'none'],
   ['Mail', ['Mail'], 'none'], ['mixed-case', ['uNhOlDaBlE'], 'none'],

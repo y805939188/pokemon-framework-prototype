@@ -41,7 +41,7 @@ test('Showdown internals used by gateway.cjs and custom-formats.cjs exist with t
 	fn(mon, ['updateMaxHp', 'getUpdatedDetails', 'cureStatus', 'heal', 'getWeight', 'getTypes', 'hasType', 'hasAbility', 'hasItem', 'isSemiInvulnerable', 'setStatus', 'removeVolatile'], 'Pokemon');
 	has(mon, ['baseStoredStats', 'storedStats', 'moveSlots', 'baseMoveSlots', 'set', 'boosts', 'volatiles', 'position', 'isActive', 'trapped', 'statusState', 'level', 'details', 'maxhp', 'hp', 'fainted', 'name', 'species', 'speed'], 'Pokemon');
 	has(mon.species, ['baseStats', 'tags'], 'Species');
-	assert.deepEqual(problems, [], 'Showdown internals changed: update gateway.cjs/custom-formats.cjs and docs/step2/2.3 report section on internal interfaces');
+	assert.deepEqual(problems, [], 'Showdown internals changed: update gateway.cjs/custom-formats.cjs and the maintained battle interface contract');
 	// the RPG event action: order 200 (after switches 103, megas 104/105), priority 99 (before every move)
 	const [ev] = b.queue.resolveAction({ choice: 'event', event: 'RpgAction', pokemon: mon, priority: 99 });
 	assert.equal(ev.order, 200); assert.equal(ev.priority, 99);

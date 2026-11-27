@@ -2,7 +2,7 @@
 // Authored synthetic content and in-memory state only. Runtime is the locally
 // prepared production/testing pair; no host, saved game or reference replay.
 const assert = require('node:assert/strict');
-const {E, T, inputs} = require('../../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const {E, T, inputs} = require('../../battle-ai/integration/fixtures.cjs');
 const clone = value => structuredClone(value);
 
 function world(options = {}) {

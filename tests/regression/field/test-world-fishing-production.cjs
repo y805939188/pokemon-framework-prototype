@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {fixture,flush,command}=require('../../../experiments/step5/5/world-fishing-production-support.cjs');
+const {fixture,flush,command}=require('../../support/field/world-fishing-production-support.cjs');
 test('real Inventory rod returns to Map and runs the real World parent/native atomic writer exactly once',async()=>{
  const w=await fixture({noTable:true}),handle=await w.start();assert.equal(w.state().stats.fishing_count,1);assert.equal(w.state().steps,0);assert.equal(w.app.saveBlocked,true);assert.equal(w.G.PSWorld.pending(),true);assert.equal(w.G.PSInventory.current(),null);assert.equal(w.G.SceneManager._scene instanceof w.G.Scene_Map,true);assert.throws(()=>w.app.beginInventoryOperation(),/active/);
  await w.finish();assert.equal(w.G.PSWorld.pending(),false);assert.equal(w.app.saveBlocked,false);assert.equal(w.state().stats.fishing_battles,0);assert.equal(w.state().inventory.pockets.flat().filter(x=>x.itemId==='oldrod').reduce((a,x)=>a+x.quantity,0),1);assert.equal(handle.done,true);assert.equal(handle.result.status,'committed');assert.equal(w.h.message.isBusy(),false);

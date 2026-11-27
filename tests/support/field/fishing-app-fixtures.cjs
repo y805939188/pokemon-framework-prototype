@@ -1,5 +1,5 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('fishing-app');
+require('./regular-field-action-test-runtime.cjs').prepare('fishing-app');
 const assert = require('node:assert/strict'), path = require('node:path');
 assert(process.env.PF_FISHING_APP_OUT, 'PF_FISHING_APP_OUT is the private compiler output');
 const out = process.env.PF_FISHING_APP_OUT;

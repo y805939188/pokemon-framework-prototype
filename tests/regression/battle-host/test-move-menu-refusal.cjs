@@ -5,7 +5,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const vm=require('node:vm'),nodeCrypto=require('node:crypto'),{types:{isUint32Array}}=require('node:util');
 const nativeFill=nodeCrypto.randomFillSync;
 const {observe:observeStateInstalls}=require('../../../scripts/tests/state-install-audit.cjs');
-const {createVictoryDriverHost}=require('../../../experiments/step5/4/victory-music-driver-host.cjs'),ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),PLAN=require('../../../experiments/step5/4/victory-music-native-plan.json');
+const {createVictoryDriverHost}=require('../../support/battle-host/victory-music-driver-host.cjs'),ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),PLAN=require('../../support/battle-host/native-plans/victory-music-native-plan.json');
 const REACTOR=require('../../../scripts/reactor-source-manifest.json');
 let temp,plugins,entryText,fixture,native;
 function pinnedMethod(source,name){

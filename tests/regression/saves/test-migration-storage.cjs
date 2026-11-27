@@ -5,7 +5,7 @@ const read=f=>JSON.parse(fs.readFileSync(path.join(__dirname, '../../../content/
 const compiled=E.contentCompile.compileContent({manifest:read('manifest.json'),sources:read('sources.json'),species:read('species.json'),overlays:read('overlays.json'),grants:read('grants.json')}).data;
 const content=E.contentRuntime.assembleContent(compiled,E.dex.createDexLookup()).content;
 const opts={content,speciesKey:E.speciesKey.speciesKeyResolver(content)};
-const legacy3=()=>JSON.parse(fs.readFileSync(path.join(__dirname, '../../../experiments/step5/fixtures/step4-saves/full.json'),'utf8'));
+const legacy3=()=>JSON.parse(fs.readFileSync(path.join(__dirname, '../../support/saves/schema-v3/full.json'),'utf8'));
 const legacy4=()=>{const raw=legacy3();raw.schema=4;raw.stats=E.stats.newStats();raw.steps=0;for(const m of [...raw.party,...raw.boxes]){const k=E.speciesKey.keyOfBattleName(content,m.species);m.species=k.species;m.form=k.form;}for(const key of ['seen','owned'])raw.dex[key]=[...new Set(raw.dex[key].map(n=>opts.speciesKey(n).species))];return raw;};
 const migrate=raw=>{const r=E.saveSchema.migrateGame(raw,opts);assert.equal(r.ok,true,JSON.stringify(r.error));return r.state;};
 

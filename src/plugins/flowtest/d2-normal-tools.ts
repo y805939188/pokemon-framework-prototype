@@ -1,9 +1,9 @@
-/** Reviewed JS sources + authored data embedded by Vite. No runtime experiments-directory dependency. */
-import donor from '../../../experiments/step5/4/d1/f100-v1.json';
-import proposal from '../../../experiments/step5/4/d2-p4-preparation/workload-proposal.json';
-import driverSource from '../../../experiments/step5/4/d2-p4-runtime/normal-driver.cjs?raw';
-import workloadSource from '../../../experiments/step5/4/d2-p4-runtime/workload-plan.cjs?raw';
-import navigationSource from '../../../experiments/step5/4/d2-p4-native-prep/navigation.cjs?raw';
+/** Reviewed JS sources + authored data embedded by Vite. No runtime dependency on the source checkout. */
+import donor from '../../../tests/support/performance/native/f100-v1.json';
+import proposal from '../../../tests/support/performance/native/workload-proposal.json';
+import driverSource from '../../../tests/support/performance/native/normal-driver.cjs?raw';
+import workloadSource from '../../../tests/support/performance/native/workload-plan.cjs?raw';
+import navigationSource from '../../../tests/support/performance/native/navigation.cjs?raw';
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 export const normalDonorInput = () => clone(donor);
@@ -16,13 +16,13 @@ export function createReviewedNormalTools(nodeRequire: any): any {
   const root = '/bundled-normal-d2', cache: Record<string, any> = {};
   // This is an authored-data reader, never an OS filesystem shim or an alternate source of business results.
   const data = new Map([
-    [root + '/experiments/step5/4/d1/f100-v1.json', JSON.stringify(donor)],
-    [root + '/experiments/step5/4/d2-p4-preparation/workload-proposal.json', JSON.stringify(proposal)],
+    [root + '/tests/support/performance/native/f100-v1.json', JSON.stringify(donor)],
+    [root + '/tests/support/performance/native/workload-proposal.json', JSON.stringify(proposal)],
   ]);
   const files: Record<string, { source: string; directory: string }> = {
-    workload: { source: workloadSource, directory: root + '/experiments/step5/4/d2-p4-runtime' },
-    driver: { source: driverSource, directory: root + '/experiments/step5/4/d2-p4-runtime' },
-    navigation: { source: navigationSource, directory: root + '/experiments/step5/4/d2-p4-native-prep' },
+    workload: { source: workloadSource, directory: root + '/tests/support/performance/native' },
+    driver: { source: driverSource, directory: root + '/tests/support/performance/native' },
+    navigation: { source: navigationSource, directory: root + '/tests/support/performance/native' },
   };
   function load(name: string): any {
     if (cache[name]) return cache[name];
@@ -34,7 +34,7 @@ export function createReviewedNormalTools(nodeRequire: any): any {
       if (id === 'node:fs') return Object.freeze({ readFileSync(file: string, encoding: string) {
         if (encoding !== 'utf8' || !data.has(file)) throw Error('unbundled normal input path'); return data.get(file);
       } });
-      if (id === '../d2-p4-runtime/workload-plan.cjs') return load('workload');
+      if (id === './workload-plan.cjs') return load('workload');
       throw Error('unsupported bundled normal dependency: ' + id);
     };
     const factory = vm.runInThisContext('(function(require,module,exports,__dirname){\n' + item.source + '\n})', { filename: 'bundled-normal/' + name + '.cjs' });

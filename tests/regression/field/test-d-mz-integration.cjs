@@ -1,8 +1,8 @@
 'use strict';
 // Actual production App + Inventory + World + completed native player methods. Graphics/input are deterministic fakes.
 const test=require('node:test'),assert=require('node:assert/strict');
-const {fixture,build}=require('../../../experiments/step5/5/d-mz-integration-support.cjs');
-const {load}=require('../../../experiments/step5/5/field-host-support.cjs');
+const {fixture,build}=require('../../support/world/mz-integration-support.cjs');
+const {load}=require('../../support/field/field-host-support.cjs');
 const flush=()=>new Promise(setImmediate);
 
 test('D actual completed interpolation writes once, locks through arrival ack and reports C unavailable',async()=>{
@@ -82,7 +82,7 @@ test('D real map-entry wrapper retires old step before App entry admission',asyn
 });
 
 // D-ARRIVAL-ACTION: one input at the genuine parent-owned nonmoving boundary.
-const {nativeAction}=require('../../../experiments/step5/5/d-native-action-fixture.cjs');
+const {nativeAction}=require('../../support/world/native-action-fixture.cjs');
 for(const kind of ['button','touch']){
  test('D real '+kind+' without parent is a positive native action control',async()=>{const r=await nativeAction(kind,false);assert.equal(r.event,true);assert.equal(r.steps,0);});
  test('D real '+kind+' completed arrival executes once while keeping its parent barrier',async()=>{const r=await nativeAction(kind,true);assert.equal(r.steps,1);assert.equal(r.event,true);assert.equal(r.trace.filter(x=>x.triggers?.includes(0)).length,1);const first=r.trace.find(x=>x.at==='triggerAction');assert.equal(first.blocked,true);assert.equal(first.result,true);assert.equal(r.saveBlocked,false);assert.equal(r.h.app.isOwnedCompletedStepArrival(r.request.owner,r.request.step.id),false,'a retired stack cannot grant native input');});

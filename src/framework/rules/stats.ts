@@ -1,11 +1,10 @@
 /**
- * Statistics record and the global step counter (WP06 §4; field directory wp06-stats-directory.md, 74 declared fields).
- * Step 5.0 delivers the record, its initial values, validation and persistence (save schema 4). Which fields are
- * written where is decided by the batch that builds the feature; see docs/step5/5.0.md for what is wired now.
- * Field names are the reference's data identifiers (WP02 §1: data identifiers, not an API promise). Pure.
+ * Statistics record and global step counter (74 declared fields).
+ * This module defines defaults, validation and persistence (save schema 4). Callers own when fields are written.
+ * Field names are reference data identifiers, not an API promise. This module is pure.
  */
 
-/** The 72 numeric fields: counts and sums start at 0 (wp06-stats-directory.md §1–§9). */
+/** The 72 numeric fields: counts and sums start at zero. */
 export const STAT_COUNTERS = [
   // travel (8)
   "distance_walked", "distance_cycled", "distance_surfed", "distance_slid_on_ice", "bump_count", "cycle_count", "surf_count", "dive_count",

@@ -3,7 +3,7 @@
  * Explicit fault controls delay publication of genuinely decoded native buffers.
  * Root decisions are programmatic public APIs, not a full receiving/evolution UI test.
  */
-import PLAN from '../../../experiments/step5/4/music-native-plan.json';
+import PLAN from '../../../tests/support/battle-host/native-plans/music-native-plan.json';
 import { musicNativeContent, musicNativeState } from './music-native-fixture';
 
 export async function runD2Music(p: any, continuing: boolean): Promise<void> {

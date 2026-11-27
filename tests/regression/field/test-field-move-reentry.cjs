@@ -1,7 +1,7 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('leaf');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('leaf');
 const test = require('node:test'), assert = require('node:assert/strict');
-const { fixture, clone } = require('../../../experiments/step5/5/field-move-app-fixtures.cjs');
+const { fixture, clone } = require('../../support/field/field-move-app-fixtures.cjs');
 const request = { kind: 'request-encounter', source: 'rock-smash', type: 'RockSmash', trigger: 'rock-smash', allowance: 'skip', onBattleStartedStat: 'rock_smash_battles' };
 function reentrant(moveId, phase, options = {}) {
   let h, frame = null, refusals = 0, sequential = 0, expand = 0, originalCalls = 0, first = true;

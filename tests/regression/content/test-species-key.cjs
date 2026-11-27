@@ -1,6 +1,6 @@
 'use strict';
 const I6 = require("../../support/inventory/legacy-bag-test-bridge.cjs");
-// Step 5.0 / D5-3: the persistent species key is the content id + form number; the battle layer and protocol v1 keep
+// The persistent species key is the content id + form number; the battle layer and protocol v1 keep
 // the Showdown names. Covers the mapping (WP03 §3.2 "(species, form)", r8 FR-000394), content form records and their
 // errors (FR-000396), the battle view, result write-back through the mapping, and schema 4 (validation, 3 -> 4 migration:
 // needs the content, refuses unmappable names as a whole, keeps the replay ledger working).
@@ -192,7 +192,7 @@ test('replay ledger across the migration: a result committed before schema 4 is 
   const original = E.memberFactory.createMember({ id: 'W3-1', species: 'Pidgey', level: 4 }, sample, () => 2);
   const caught = S.protocolMember(original);
   const result = { protocol: 1, battleId: 'wild#3', outcome: { kind: 'caught', winner: null, target: 'W3-1', ball: 'pokeball' }, members: { 'G-starter-1': { hp: 10 } }, bag: { potion: -1 }, captured: [caught], dex: { seen: ['Pidgey'], owned: ['Pidgey'] } };
-  // what a step 4 build did: schema 3, battle names stored, the hash of the result as received in the ledger
+  // legacy save fields: schema 3, battle names stored, the hash of the result as received in the ledger
   const committed3 = { ...clone(g3), party: [...clone(g3.party), H.legacyMember(original, 3)], bag: { potion: 4999 }, appliedBattles: { 'wild#3': { hash: S.resultHash(result) } } };
   committed3.party[0].hp = 10;
   const m = migrateGame(committed3, { speciesKey: K.speciesKeyResolver(sample), content: sample });

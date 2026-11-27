@@ -1,5 +1,5 @@
 'use strict';
-// Step 3 / B4: content ids, text keys, versioned saves and the battle session working together on the
+// Content ids, text keys, versioned saves and the battle session working together on the
 // representative paths: missing and dangling references, replayed results, restore-then-retry, a legacy save through a
 // whole battle, both languages, and the log that explains it afterwards.
 const test = require('node:test');
@@ -29,7 +29,7 @@ async function win(game, id, ring) {
 test('a legacy (schema 1) save plays a whole battle with pipeline content; result, replay, restore-then-retry behave', async () => {
 	const legacy = clone(require('../../support/saves/legacy-v1-flow-state.json'));
 	const f = path.join(dir, 'legacy.json'); fs.writeFileSync(f, JSON.stringify(legacy));
-	// since step 5.0 the migration maps the legacy Showdown names to the pipeline content's ids (D5-3)
+	// the migration maps the legacy Showdown names to the pipeline content's ids (D5-3)
 	const store = E.fakes.createFixtureSaveStore(f, {}, E.speciesKey.speciesKeyResolver(content()), content());
 	const info = store.loadInfo();
 	assert.deepEqual([info.from, info.to], [1, E.state.GAME_SCHEMA]);
@@ -65,7 +65,7 @@ test('the same battle is described in both languages from content text keys, wit
 
 test('missing and dangling references are explained, not crashed on', async () => {
 	// a species the content does not have, in the party / in the foe team
-	// (a saved state names content ids since step 5.0: the fixture party is stored the way the sample content keys it)
+	// (a saved state names content ids: the fixture party is stored the way the sample content keys it)
 	const saved = () => { const s = F.makeGame(); s.party = s.party.map(m => E.speciesKey.toPersistentMember(m, content())); return s; };
 	const sg = saved(); sg.party[1].species = 'missingno';
 	assert.deepEqual(findDanglingReferences(sg, content()).map(d => d.path), ['$.party[1].species']);

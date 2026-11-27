@@ -13,7 +13,7 @@ function desired(root,captured){
  assert.deepEqual(captured.identity,actual.identity,'foreign character source identity');
  // H.capture verifies own cGenerationSupport, its complete strict output inventory,
  // Node/tool/source hashes and native pins before any profile/helper/product load.
- H.boundFiles(actual,['scripts/tests/e1-character-inputs.cjs','experiments/step5/5/regular-field-action-test-runtime.cjs','experiments/step5/5/fishing-host-fixtures.cjs','experiments/step5/5/ui-wire-e3-fixtures.cjs']);
+ H.boundFiles(actual,['scripts/tests/e1-character-inputs.cjs','tests/support/field/regular-field-action-test-runtime.cjs','tests/support/field/fishing-host-fixtures.cjs','tests/support/field/ui-wire-world-fixtures.cjs']);
  const parent=path.join(ROOT,actual.binding.cGenerationSupport.parent.directory),typed=path.join(parent,'out/src');
  for(const name of EMITTED)assert(fs.lstatSync(path.join(typed,name)).isFile(),'missing bound character callee: '+name);
  return{PF_FIELD_MOVE_APP_OUT:typed,PF_E2_PARENT_OUT:path.join(parent,'out'),PF_FIELD_MOVE_APP_BUNDLE:path.join(parent,'bundles/field-move-operation.cjs'),PF_E2_PARENT_ENGINE:path.join(ROOT,'js/engine/build/production.cjs'),PF_MZ_RUNTIME_OBJECTS:path.join(ROOT,'js/reactor_objects.js'),PF_MZ_BATTLE_SOURCE:path.join(ROOT,'src/plugins/PS_BattleFlow.ts'),PF_MZ_BATTLE_COMPILED:path.join(ROOT,'js/plugins/PS_BattleFlow.js'),PF_FISHING_HOST_OUT:typed,PF_MZ_OBJECTS:path.join(ROOT,'js/reactor_objects.js'),PF_E3_JOINT_OUT:path.join(ROOT,'js/engine/build')};
@@ -38,7 +38,7 @@ function prepare(root,captured){
  const wanted=desired(root,captured);
  for(const key of KEYS)match(key,process.env[key],wanted[key]);
  // No default prepare/import/compiler can be reached before the full group passes.
- const runtime=require('../../experiments/step5/5/regular-field-action-test-runtime.cjs');
+ const runtime=require('../../tests/support/field/regular-field-action-test-runtime.cjs');
  const world=runtime.prepare('world-scene'),host=runtime.prepare('fishing-host');
  assert.equal(world.mode,'explicit','character world-scene must be explicit');
  assert.equal(host.mode,'explicit','character fishing-host must be explicit');

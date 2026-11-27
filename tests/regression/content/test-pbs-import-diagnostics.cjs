@@ -1,6 +1,6 @@
 'use strict';
 // R04/R05 (ca879273 review): synthetic author PBS input; WP04 §4.2 and WP03 §5.3.
-// Legacy text imports retain accepted-record diagnostics; the step 5.3 CLI uses an atomic bundle proposal.
+// Legacy text imports retain accepted-record diagnostics; the CLI uses an atomic bundle proposal.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

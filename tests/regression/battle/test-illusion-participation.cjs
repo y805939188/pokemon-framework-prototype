@@ -2,7 +2,7 @@
 // Synthetic authored teams; actual App -> Session -> pinned Gen8 Illusion and KO.
 // Debug engine access is read-only and witnesses temporary stats, never seeds a result.
 const test = require('node:test'), assert = require('node:assert/strict');
-const {E, T, inputs} = require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const {E, T, inputs} = require('../../support/battle-ai/integration/fixtures.cjs');
 const clone = value => structuredClone(value);
 const actor = w => w.s.gw._debugBattle().sides[0].pokemon.find(p => p.name === 'P1');
 const permanentStats = (w, m) => E.growth.computeStats(w.content.species.Zoroark.base, m.ivs, m.evs, m.level, m.statNature ?? m.nature);

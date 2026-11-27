@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {E,D,fixture,content,clone,diag}=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const {E,D,fixture,content,clone,diag}=require('../../support/battle-ai/integration/fixtures.cjs');
 const reference={id:'async-test',version:'1',parameters:{}};
 function registry(decide,available){const r=E.composition.createTrainerAiStrategyRegistry();r.register({id:'async-test',version:'1',implementationIdentity:'test-only/async/1',validateParameters:p=>assert.deepEqual(p,{}),create:()=>({decide,...(available?{isAvailable:available}:{})})});return r;}
 function choose(s,slot=2){const candidates=s.request.kind==='move'?s.request.legalMoves:s.request.legalSwitches,c=candidates.find(x=>x.slot===slot)||candidates[0];return {kind:'choose',binding:s.binding,candidateId:c.candidateId,retryOrder:[c.candidateId],diagnostics:[]};}

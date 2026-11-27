@@ -272,7 +272,7 @@ test('B current schema rejects schema10 checkpoint fields and malformed phase at
 
 // E3 now owns Escape Rope. A generic B item callback cannot impersonate travel.
 test('B Escape Rope with a real native atomic slot refuses missing E3 instead of invoking the generic handler',async()=>{
- require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('atomic');const {types}=require('node:util');const {createMZAtomicStatePort}=require(path.join(process.env.PF_E1_PARENT_OUT,'src/plugins/world/atomic-state-mz.js'));
+ require('../../support/field/regular-field-action-test-runtime.cjs').prepare('atomic');const {types}=require('node:util');const {createMZAtomicStatePort}=require(path.join(process.env.PF_E1_PARENT_OUT,'src/plugins/world/atomic-state-mz.js'));
  const content=F.content(E),game=E.state.newGame({content,party:[],bag:{escaperope:1}}),root={$gameSystem:{_psGame:game},$gameMap:{_mapId:1},$gamePlayer:{_x:0,_y:0},SceneManager:{_scene:{}}};let generic=0;
  const raw={read:()=>root.$gameSystem._psGame,replace:next=>{root.$gameSystem._psGame=next;}},state=createMZAtomicStatePort(root,raw,types.isProxy);
  const app=new E.app.GameApplication({state,content:()=>({content}),projection:{project(){}},sessions:{async create(){assert.fail('no battle');}},worldHost:{read:()=>({mapId:{status:'value',value:1},hour:{status:'value',value:20}})},fieldItems:{execute:async()=>{generic++;return{status:'completed'};}}});

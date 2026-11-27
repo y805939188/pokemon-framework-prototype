@@ -2,8 +2,8 @@
 // Real compiled plugin/App/Gen8 paths; controlled clocks/input/raster/audio, never native evidence.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
 const vm=require('node:vm');
-const {createVictoryDriverHost}=require('../../../experiments/step5/4/victory-music-driver-host.cjs');
-const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),PLAN=require('../../../experiments/step5/4/victory-music-native-plan.json');
+const {createVictoryDriverHost}=require('../../support/battle-host/victory-music-driver-host.cjs');
+const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),PLAN=require('../../support/battle-host/native-plans/victory-music-native-plan.json');
 let temp,plugins,entryText,fixture,core,adapter,host;
 test.before(async()=>{
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-prebattle-'));plugins={};

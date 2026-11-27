@@ -1,5 +1,5 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('ui-menu');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('ui-menu');
 require('../../../scripts/tests/ts-source-loader.cjs');
 const test = require('node:test'), assert = require('node:assert/strict');
 const path = require('node:path'), { pathToFileURL } = require('node:url');

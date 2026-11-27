@@ -98,19 +98,19 @@ function optionalCreationWorld(callback){
 }
 function selfRetiringCreation(){const answer={map:this.content().content?7:9};this.creationContext=undefined;return answer;}
 const silentGift=()=>({kind:'silent',member:{species:'Pidgey',level:3}});
-test('STEP3-ULTRA-02: gift re-reads an optional creationContext after successful self-retirement',()=>{
+test('gift re-reads an optional creationContext after successful self-retirement',()=>{
  const x=optionalCreationWorld(selfRetiringCreation);assert.equal(x.app.receiveGift(silentGift()).status,'applied');assert.equal(x.app.receiveGift(silentGift()).status,'applied');
  assert.deepEqual(x.state.current().party.map(m=>m.origin.map),[7,0]);assert.equal(x.state.replaced.length,2);assert.equal(x.app.saveBlocked,false);
 });
-test('STEP3-ULTRA-02: distinct grants re-read an optional creationContext after successful self-retirement',()=>{
+test('distinct grants re-read an optional creationContext after successful self-retirement',()=>{
  const x=optionalCreationWorld(selfRetiringCreation);assert.equal(x.app.claimGrant('optional-grant').status,'applied');assert.equal(x.app.claimGrant('optional-grant-2').status,'applied');
  assert.deepEqual(x.state.current().party.map(m=>m.origin.map),[7,0]);assert.equal(x.state.replaced.length,2);assert.equal(x.app.saveBlocked,false);
 });
-test('STEP3-ULTRA-02: gift observes creationContext supplied after an initially absent first acquisition',()=>{
+test('gift observes creationContext supplied after an initially absent first acquisition',()=>{
  const x=optionalCreationWorld();assert.equal(x.app.receiveGift(silentGift()).status,'applied');x.supplyCreationContext();assert.equal(x.app.receiveGift(silentGift()).status,'applied');
  assert.deepEqual(x.state.current().party.map(m=>m.origin.map),[0,7]);assert.equal(x.state.replaced.length,2);assert.equal(x.app.saveBlocked,false);
 });
-test('STEP3-ULTRA-02: grants observe creationContext supplied after an initially absent first acquisition',()=>{
+test('grants observe creationContext supplied after an initially absent first acquisition',()=>{
  const x=optionalCreationWorld();assert.equal(x.app.claimGrant('optional-grant').status,'applied');x.supplyCreationContext();assert.equal(x.app.claimGrant('optional-grant-2').status,'applied');
  assert.deepEqual(x.state.current().party.map(m=>m.origin.map),[0,7]);assert.equal(x.state.replaced.length,2);assert.equal(x.app.saveBlocked,false);
 });

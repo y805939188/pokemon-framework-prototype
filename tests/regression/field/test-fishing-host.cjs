@@ -1,6 +1,6 @@
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict');
-const { runtime, nativeMessages, nativePresentation, nativeMoveRoutes, readFishingHostFacts } = require('../../../experiments/step5/5/fishing-host-fixtures.cjs');
+const { runtime, nativeMessages, nativePresentation, nativeMoveRoutes, readFishingHostFacts } = require('../../support/field/fishing-host-fixtures.cjs');
 test('T24 production host waits for true message close and animation end; each id ACKs once', () => {
   const h = runtime(), s = h.begin(true);
   s.run({ kind: 'open-message', id: 4 }); h.tick(); assert.equal(h.advances.length, 0);

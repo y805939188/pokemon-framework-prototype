@@ -1,8 +1,8 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('fishing');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('fishing');
 // Actual App + production fishing presentation/native slot + production encounter rules. No NW or player data.
 const { test } = require('node:test'), assert = require('node:assert/strict'), path = require('node:path'), fs = require('node:fs'), vm = require('node:vm');
-const { fixture, flush } = require('../../../experiments/step5/5/fishing-real-parent-fixtures.cjs');
+const { fixture, flush } = require('../../support/field/fishing-real-parent-fixtures.cjs');
 const F = require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 const E = require(process.env.PF_E1_PARENT_ENGINE);
 const { runWeatherCommand } = require(path.join(process.env.PF_E1_PARENT_OUT, 'src/plugins/world/world-weather-mz.js'));

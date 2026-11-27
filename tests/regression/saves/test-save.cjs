@@ -1,6 +1,6 @@
 'use strict';
 const I6 = require("../../support/inventory/legacy-bag-test-bridge.cjs");
-// Step 3 / B3: versioned game state. Declared legacy versions migrate on a copy, everything else is refused with a
+// Versioned game state. Declared legacy versions migrate on a copy, everything else is refused with a
 // diagnosis and left untouched, the store never overwrites what it cannot read, and the replay ledger keeps its guarantees.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -13,18 +13,18 @@ const E = require('../../../js/engine/build/engine.cjs');
 const H = require('../../support/application/legacy-test-support.cjs');
 const { validateGame, ledgerStats } = E.saveSchema;
 // The chain continues through schema 7; 3→4 needs species mapping and current loading needs the validated dex layout. These states
-// come from the step 2 fixture world, whose content ids are the Showdown names: the identity mapping is that content's.
+// come from the synthetic fixture world, whose content ids are the Showdown names: the identity mapping is that content's.
 const migrateGame = (raw, o = { speciesKey: E.speciesKey.identityKeys, content: E.fixtures.content }) => E.saveSchema.migrateGame(raw, o);
 /** What schemas 3 and 4 add to an older document: the claims ledger, statistics, the step counter, a form per member. */
 const addedByNewerSchemas = s => ['claims', 'schema', 'stats', 'steps', ...['party', 'boxes'].flatMap(k => s[k].map((_, i) => `${k}.${i}.form`))].sort();
 const { SaveStore, SaveError } = E.store;
-// the fixture world (content ids = Showdown names) is chosen explicitly: the store guesses no species keys (step 5.0 review F03)
+// the fixture world (content ids = Showdown names) is chosen explicitly: the store guesses no species keys
 const store = (f, hooks = {}) => E.fakes.createFixtureSaveStore(f, hooks, E.speciesKey.identityKeys, E.fixtures.content);
 const S = E.state;
 const F = E.fixtures;
 
 const clone = x => JSON.parse(JSON.stringify(x));
-const realV1 = () => clone(require('../../support/saves/legacy-v1-flow-state.json')); // captured from the MZ run at step2-closed
+const realV1 = () => clone(require('../../support/saves/legacy-v1-flow-state.json')); // captured from an MZ session
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'pf-save-'));
 const done = [];
 test.after(() => { for (const d of done) fs.rmSync(d, { recursive: true, force: true }); });
@@ -43,7 +43,7 @@ test('the current state is valid, also after results were applied', () => {
 	assert.equal(g.schema, S.GAME_SCHEMA); assert.deepEqual(validateGame(g), []);
 });
 
-test('the real step 2 state (schema 1, captured from a real MZ run) migrates; only the version and nothing else changes', () => {
+test('the captured schema-1 state (schema 1, captured from a real MZ run) migrates; only the version and nothing else changes', () => {
 	const raw = realV1(); const pristine = clone(raw);
 	const r = migrateGame(raw);
 	assert.equal(r.ok, true);

@@ -234,7 +234,7 @@ test('nonliteral dynamic imports cannot bypass layer and built-in checks', () =>
 	}
 });
 
-// ---- Step 2: resolve every local module syntax to one canonical source identity before checking it.
+// ---- Resolve every local module syntax to one canonical source identity before checking it.
 test('extensionless files, directory indexes, re-exports, type imports and literal dynamic imports form a clean graph', () => {
 	clean({
 		'rules/a.ts': 'export type A = number; export const a = 1;\n',
@@ -333,7 +333,7 @@ test('every unresolved local module syntax is an explicit failure', () => {
 	]) bad({ 'rules/a.ts': 'export const a = 1;\n', 'rules/p.ts': code }, /rules\/p\.ts: import ".*" does not resolve/);
 });
 
-// ---- STEP2-ULTRA-01: fail closed when another branch can change Vite's actual target.
+// ---- fail closed when another branch can change Vite's actual target.
 test('directory package metadata and alternate index files reject instead of inventing an index identity', () => {
 	for (const field of ['main', 'module']) {
 		bad({

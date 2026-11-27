@@ -12,7 +12,7 @@
     4
   ],
   "authority": {
-    "source": "docs/step2/deviations.md",
+    "source": "docs/maintainers/battle-differences.md",
     "item": 10,
     "decisionDate": "2026-10-18",
     "rule": "Showdown authoritative inside battle; record reference differences",

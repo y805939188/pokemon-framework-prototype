@@ -13,7 +13,7 @@ const K = E.fakes;
 const F = E.fixtures;
 
 const result = name => JSON.parse(JSON.stringify(golden.entries.find(e => e.name === name).result));
-// Since step 4 the application creates the foes (species + level) from content that carries creation data: the
+// The application creates the foes (species + level) from content that carries creation data: the
 // assembled sample (the fixture party's species are in it with the same numbers) and a seeded random.
 const fs = require('node:fs'); const path = require('node:path');
 const SRC = path.resolve(__dirname, '../../../content/sample'); const readC = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
@@ -21,7 +21,7 @@ const sample = E.contentRuntime.assembleContent(E.contentCompile.compileContent(
 const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor((s / 4294967296) * n); }; };
 const request = r => ({ battleId: r.battleId, kind: 'wild', foes: [{ species: r.captured?.[0]?.species ?? 'Pidgey', level: r.captured?.[0]?.level ?? 5 }], seq: 1 });
 const snapshot = state => JSON.stringify(state.current());
-// the save keys members by the sample content's ids since step 5.0 (D5-3); sessions still see Showdown names
+// the save keys members by the sample content's ids; sessions still see Showdown names
 const saved = () => F.savedFor(F.makeGame(), sample);
 function setup(first = result('caught with master ball'), game = saved()) {
   const state = K.createMemoryState(game), projection = K.createRecordingProjection(), sessions = K.createFakeSessions(first);

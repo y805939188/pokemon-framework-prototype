@@ -64,9 +64,9 @@ test('old ledgers keep working: a result recorded earlier is still recognised, a
 
 test('the compiled-content input hash is unchanged by the portable implementation', () => {
   const fs = require('node:fs'); const path = require('node:path');
-  // the step 3 sample as it was when the portable digest replaced node:crypto (the live sample has grown since)
+  // the frozen sample captured when the portable digest replaced node:crypto (the live sample has grown since)
   const SRC = path.resolve(__dirname, '../../support/content/synthetic-author-content'); const read = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
-  // (hashed directly: since step 5.0 these frozen inputs no longer pass the pre-use gate, whose Showdown check they predate)
+  // (hashed directly: these frozen inputs no longer pass the pre-use gate, whose Showdown check they predate)
   const inputs = { manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json') };
   assert.equal(E.contentCompile.hashInputs(inputs), 'c322d83047dc4c5b09823384d0250b6ccc8e89b7bb7e2e2875b8fde94f2b6625');
 });

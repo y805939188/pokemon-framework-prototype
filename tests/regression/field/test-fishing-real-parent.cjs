@@ -1,6 +1,6 @@
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict');
-const { fixture, clone, flush } = require('../../../experiments/step5/5/fishing-real-parent-fixtures.cjs');
+const { fixture, clone, flush } = require('../../support/field/fishing-real-parent-fixtures.cjs');
 async function finish(h, write = 2) {
   const { promise } = await h.start();
   if (write === 2 && !h.settled) { h.window(); h.input(1, { confirm: true }); h.finish(); }
