@@ -13,7 +13,7 @@ function bareCore() {
 }
 test('public built core exposes worldTravel alongside the exact existing core key contract without a host', () => {
   const context = bareCore();
-  const contract = fs.readFileSync(path.join(ROOT, 'experiments/step3/test-core-independent.cjs'), 'utf8');
+  const contract = fs.readFileSync(path.join(ROOT, 'tests/regression/application/test-core-independent.cjs'), 'utf8');
   const literal = contract.match(/Object\.keys\(core\)\.sort\(\), (\[[^\n]+\])\.sort\(\)\);/);
   assert(literal, 'canonical exact core key contract must remain present');
   assert.deepEqual(Object.keys(context.module.exports).sort(), Array.from(vm.runInNewContext(literal[1])).sort());

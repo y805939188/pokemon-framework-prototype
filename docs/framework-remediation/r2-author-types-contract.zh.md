@@ -97,7 +97,7 @@ WP31 §3 的 `LevelDarkInParty` 读取队伍中非蛋成员的恶属性。WP66-A
 Node `22.21.1` 实跑：
 
 ```text
-$HOME/.nvm/versions/node/v22.21.1/bin/node --test experiments/framework-remediation/test-r2-author-types-diagnostics.cjs
+$HOME/.nvm/versions/node/v22.21.1/bin/node --test tests/regression/content/test-author-type-diagnostics.cjs
 15 tests, 15 pass, 0 fail/cancel/skip/todo, exit 0
 ```
 
@@ -134,7 +134,7 @@ $HOME/.nvm/versions/node/v22.21.1/bin/node --test experiments/framework-remediat
 
 ## 可先独立提交的诊断与最终组合合同
 
-`experiments/framework-remediation/test-r2-author-types-diagnostics.cjs` 保留能力探针，获批空／重复断言已随新合同更新，旧运行结果保留在原日志；不把split写成永久正确行为。正式产品行为由独立的 `test-r2-author-types-contract.cjs` 断言。完整headless清单由根协调者统一登记；本专项不触发CI，不运行冻结成长回放或窗口。
+`tests/regression/content/test-author-type-diagnostics.cjs` 保留能力探针，获批空／重复断言已随新合同更新，旧运行结果保留在原日志；不把split写成永久正确行为。正式产品行为由独立的 `test-r2-author-types-contract.cjs` 断言。完整headless清单由根协调者统一登记；本专项不触发CI，不运行冻结成长回放或窗口。
 
 选定产品方向后，最终组合验收应由同一份合成作者内容贯穿以下场景，并把诊断的一致性结果升级为所选合同断言：
 

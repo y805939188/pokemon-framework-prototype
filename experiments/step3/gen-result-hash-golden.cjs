@@ -1,5 +1,5 @@
 'use strict';
-// Generates experiments/step3/fixtures/result-hash-golden.json: real and synthetic BattleResults with the hash computed by
+// Generates tests/support/battle/result-hash-golden.json: real and synthetic BattleResults with the hash computed by
 // the ORIGINAL resultHash (node:crypto SHA-256 over canonical JSON), so the portable implementation can be checked
 // against values that existed before it. Run only against an implementation that still uses node:crypto:
 //   git show 4ce31e1:src/framework/rules/state.ts   (the generating commit)
@@ -34,7 +34,7 @@ async function session(foe, id, mutate) {
   }
   const shuffled = {}; for (const k of Object.keys(base).reverse()) shuffled[k] = base[k]; add('synthetic: same result, keys in reverse insertion order', shuffled);
   const long = JSON.parse(JSON.stringify(base)); long.battleId = 'GOLD-long'; long.bag = {}; for (let i = 0; i < 300; i++) long.bag['item' + i] = i - 150; add('synthetic: long document (many bag entries)', long);
-  const out = path.join(__dirname, 'fixtures', 'result-hash-golden.json');
+  const out = path.join(__dirname, '../../tests/support/battle/result-hash-golden.json');
   fs.writeFileSync(out, JSON.stringify({ generator: 'experiments/step3/gen-result-hash-golden.cjs', algorithm: 'node:crypto SHA-256 over canonical JSON (sorted keys), as in rules/state.ts at 4ce31e1', entries }, null, 1) + '\n');
   console.log('wrote', entries.length, 'entries');
 })().catch(e => { console.error(e); process.exit(1); });

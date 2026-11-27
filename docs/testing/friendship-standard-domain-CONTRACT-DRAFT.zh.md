@@ -36,7 +36,7 @@ CLI 从所属项目 manifest 读取明确作者版本，来源预使用门仍先
 精确独立命令（在本树，从未存在的新 phase 名运行，拒绝覆盖旧日志）：
 
 ```sh
-$HOME/.nvm/versions/node/v22.21.1/bin/node experiments/friendship-standard-domain/run-checks.cjs review-fresh
+$HOME/.nvm/versions/node/v22.21.1/bin/node tests/regression/friendship/run-checks.cjs review-fresh
 ```
 
 runner 串行执行 framework/core/app 三层 types、边界、runtime/custom-formats/core/content-cli 构建、标准样例 build/check、18 个相关新旧套件。日志和构建输出为本树 ignored `build/`；旧 suite 自建临时文件通过 TMPDIR 定位到该次 ignored 目录。新三套覆盖作者门/PBS、纯迁移与正常规则回归，旧 fixtures/golden 未改；唯一旧断言调整是把 author schema2 未知改为真正未知999。边界 checker 和 runner 注册文件未改。

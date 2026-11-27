@@ -4,22 +4,22 @@
 
 | 边界 | 迁移承诺和负向向量 | 现有可执行向量 |
 |---|---|---|
-| 1→2 | 持久毒伤归 plain poison；计数补齐，旧睡眠未知时保留未知语义 | [test-save.cjs](../../experiments/step3/test-save.cjs) |
-| 2→3 | 建空 claims，不推断历史领取 | [test-schema3.cjs](../../experiments/step4/test-schema3.cjs) |
-| 3→4 | Showdown 名映射内容 ID＋form；缺 mapping／未知物种整次拒绝；stats/steps 从零开始 | [test-migration5.cjs](../../experiments/step5/test-migration5.cjs) |
-| 4→5 | 个体兼容元数据、固定 40×30 storage；确定性旧 PID，未知获得事实不伪造；容量超限拒绝 | [test-migration-storage.cjs](../../experiments/step5/1/test-migration-storage.cjs) |
-| 5→6 | 有序库存成为唯一权威；badge／计算性格／PP 元数据；未知 item／move 与冲突失败保持原文 | [test-migration6.cjs](../../experiments/step5/2/test-migration6.cjs)、[test-M1-remediation.cjs](../../experiments/step5/2/test-M1-remediation.cjs) |
-| 6→7 | readiness、cannotTrade、完整 dex 历史与布局；旧 seen／owned 独立，未知 form／count 不补事实 | [test-migration7.cjs](../../experiments/step5/3/test-migration7.cjs) |
+| 1→2 | 持久毒伤归 plain poison；计数补齐，旧睡眠未知时保留未知语义 | [test-save.cjs](../../tests/regression/saves/test-save.cjs) |
+| 2→3 | 建空 claims，不推断历史领取 | [test-schema3.cjs](../../tests/regression/saves/test-save-schema-v3.cjs) |
+| 3→4 | Showdown 名映射内容 ID＋form；缺 mapping／未知物种整次拒绝；stats/steps 从零开始 | [test-migration5.cjs](../../tests/regression/saves/test-save-migration-v5.cjs) |
+| 4→5 | 个体兼容元数据、固定 40×30 storage；确定性旧 PID，未知获得事实不伪造；容量超限拒绝 | [test-migration-storage.cjs](../../tests/regression/saves/test-migration-storage.cjs) |
+| 5→6 | 有序库存成为唯一权威；badge／计算性格／PP 元数据；未知 item／move 与冲突失败保持原文 | [test-migration6.cjs](../../tests/regression/saves/test-save-migration-v6.cjs)、[test-M1-remediation.cjs](../../tests/regression/inventory/test-member-inventory-and-save-guards.cjs) |
+| 6→7 | readiness、cannotTrade、完整 dex 历史与布局；旧 seen／owned 独立，未知 form／count 不补事实 | [test-migration7.cjs](../../tests/regression/saves/test-save-migration-v7.cjs) |
 | 7→8 | 建空 stable trainer defeat record，不从旧 result hash 推断训练家胜利 | [test-trainer-m1.cjs](../../experiments/step5/4/test-trainer-m1.cjs) |
 | 8→9 | 保留旧 raw-only ledger，不为旧记录合成 required paired proof；坏 settlement 字段拒绝 | [test-held-app.cjs](../../experiments/step5/4/test-held-app.cjs)：HF-11 |
-| 当前→当前布局变更 | 只接受一条明确 one-hop transition；缺失、重复 from、过期 target、坏 old layout／hash 拒绝 | [test-migration7.cjs](../../experiments/step5/3/test-migration7.cjs) |
-| 当前保存／载入门 | 未来 schema、非自有字段、accessor、损坏元数据、内容不匹配拒绝；不调用 getter 修复原文 | [test-save-gates7.cjs](../../experiments/step5/3/test-save-gates7.cjs) |
+| 当前→当前布局变更 | 只接受一条明确 one-hop transition；缺失、重复 from、过期 target、坏 old layout／hash 拒绝 | [test-migration7.cjs](../../tests/regression/saves/test-save-migration-v7.cjs) |
+| 当前保存／载入门 | 未来 schema、非自有字段、accessor、损坏元数据、内容不匹配拒绝；不调用 getter 修复原文 | [test-save-gates7.cjs](../../tests/regression/saves/test-save-install-gates.cjs) |
 
-friendship 的 256→255 是单独显式维护操作，历史合法值 256 不因普通 schema 迁移自动修正。其纯计划、选择路径、原始字节保留、opaque preview 与持久化不确定状态分别见 [test-migration.cjs](../../experiments/friendship-standard-domain/test-migration.cjs)、[test-app-integration.cjs](../../experiments/friendship-standard-domain/test-app-integration.cjs)、[集成合同](../testing/friendship-save-integration.zh.md)。
+friendship 的 256→255 是单独显式维护操作，历史合法值 256 不因普通 schema 迁移自动修正。其纯计划、选择路径、原始字节保留、opaque preview 与持久化不确定状态分别见 [test-migration.cjs](../../tests/regression/friendship/test-migration.cjs)、[test-app-integration.cjs](../../tests/regression/friendship/test-app-integration.cjs)、[集成合同](../testing/friendship-save-integration.zh.md)。
 
 新向量应放作者合成 fixture，至少同时声明 from/to、内容映射／layout 前提、期望结果或错误码、原文不变和重复执行语义。新例子通过 `newGame` 和公开编译器取得当前版本；有意测试历史 schema 的例子才写明历史版本。编译内容 schema 与存档 schema 独立，升级编译语义时不机械重写旧迁移 fixture 或冻结协议 golden。
 
-本批先建立上述现有向量地图，不把这些历史套件计为新测试或已重跑。共享跨层向量的首例是 [field-potion-vectors.json](../../experiments/framework-remediation/contracts/field-potion-vectors.json)：作者合成期望，只服务场外 Potion 纯规划／App 安装一致性，不是迁移或原版等价证据。
+本批先建立上述现有向量地图，不把这些历史套件计为新测试或已重跑。共享跨层向量的首例是 [field-potion-vectors.json](../../tests/support/validation/contract-vectors/field-potion-vectors.json)：作者合成期望，只服务场外 Potion 纯规划／App 安装一致性，不是迁移或原版等价证据。
 
 ## 缺失、null 与整数蓝本
 
@@ -55,7 +55,7 @@ friendship 的 256→255 是单独显式维护操作，历史合法值 256 不�
 4. 字符串保留原字符，无 NFC／NFD 归一化；`é` 与 `e`＋组合重音不同。JSON 字符串转义、有限 number 表示、−0→0 等遵守当前 JS `JSON.stringify`。合法 JSON 文本中的非配对 surrogate 被编码成转义文本，例如 `"\ud800"`；它不同于直接把一个非配对 surrogate 交给底层 UTF-8 SHA helper（后者按 U+FFFD 编码）。
 5. 跨语言实现先对固定 canonical 字符串核 UTF-8 bytes 和 SHA-256，再验证自己生成同一串；不要将本项目 canonicalizer 复制为测试 oracle，也不要在测试运行时重算并覆盖 golden。
 
-[value-semantics-vectors.json](../../experiments/framework-remediation/contracts/value-semantics-vectors.json) 固定 12 组作者手写 canonical 字符串、UTF-8 hex 和离线 Python hashlib SHA-256，包括 numeric keys、UTF-16／UTF-8 顺序差异、absent/null、数组顺序、NFC/NFD、非配对 surrogate、安全整数及 ordinal 字符串和一份合成 v1 result。[test-value-semantics-contract.cjs](../../experiments/framework-remediation/test-value-semantics-contract.cjs) 用 Node 标准 crypto 与 Python hashlib 独立检查固定字节，再调用实际 semantic／result API；Python 检查不重新实现排序或遍历。额外向量证明不合法数值不能借相同 hash 重放，以及 nullable 字段和超安全范围 ordinal 的精确字符串合同。
+[value-semantics-vectors.json](../../tests/support/validation/contract-vectors/value-semantics-vectors.json) 固定 12 组作者手写 canonical 字符串、UTF-8 hex 和离线 Python hashlib SHA-256，包括 numeric keys、UTF-16／UTF-8 顺序差异、absent/null、数组顺序、NFC/NFD、非配对 surrogate、安全整数及 ordinal 字符串和一份合成 v1 result。[test-value-semantics-contract.cjs](../../tests/regression/values/test-value-semantics-contract.cjs) 用 Node 标准 crypto 与 Python hashlib 独立检查固定字节，再调用实际 semantic／result API；Python 检查不重新实现排序或遍历。额外向量证明不合法数值不能借相同 hash 重放，以及 nullable 字段和超安全范围 ordinal 的精确字符串合同。
 
 ## 错误与阶段分类蓝本
 
@@ -70,12 +70,12 @@ friendship 的 256→255 是单独显式维护操作，历史合法值 256 不�
 | 写后异常但安装可确认 | readback 等于完整 next；投影失败、rename 后异常等 | 确认已安装，精确重放返回 already-applied／duplicate，不重复主结果、费用、领取或统计。呈现失败与持久化失败分列。 |
 | `indeterminate`／`reload-required` | readback 既不是 before 也不是完整 next，或持久化状态不可确认；可能表现为 pending view 的 `reloadRequired:true`、显式 reload-required 或仍被阻止的技术退出 | 保留 owner／保存屏障与错误事实；不盲重试覆盖、不假装取消，不释放后继到不明状态。只能沿具体 API 支持的恢复／完整宿主重载路径处理。 |
 
-上述阶段分类已有 [test-battle-transactions7.cjs](../../experiments/step5/3/test-battle-transactions7.cjs)、[test-learning-operation.cjs](../../experiments/step5/3/test-learning-operation.cjs)、[test-trade-operation.cjs](../../experiments/step5/3/test-trade-operation.cjs)、[friendship App 集成](../../experiments/friendship-standard-domain/test-app-integration.cjs) 和本批 [App 操作合同](application-operation-contract.zh.md) 的映射；本次值语义增补不将它们计为新跑或新增覆盖。
+上述阶段分类已有 [test-battle-transactions7.cjs](../../tests/regression/battle/test-battle-commit-receipts.cjs)、[test-learning-operation.cjs](../../tests/regression/move-learning/test-learning-operation.cjs)、[test-trade-operation.cjs](../../tests/regression/trading/test-trade-operation.cjs)、[friendship App 集成](../../tests/regression/friendship/test-app-integration.cjs) 和本批 [App 操作合同](application-operation-contract.zh.md) 的映射；本次值语义增补不将它们计为新跑或新增覆盖。
 
 2026-11-13，本轮值语义 18 项与将 `skipLibCheck` 关闭后的正式能力 5 项一起执行，首轮 23／23 通过，失败／取消／跳过均 0：
 
 ```bash
-node --test experiments/framework-remediation/test-formal-battle-capabilities.cjs experiments/framework-remediation/test-value-semantics-contract.cjs
+node --test tests/regression/battle/test-formal-battle-capabilities.cjs tests/regression/values/test-value-semantics-contract.cjs
 ```
 
 本轮没有产品机制修改或产品红测；固定字符串／hash 的跨语言自检不构成跨语言业务实现或原版差分。已有 Potion 六向量保持原样，本次未重跑。

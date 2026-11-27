@@ -6,7 +6,7 @@
 const assert = require('node:assert/strict');
 const { BattleGateway } = require('../../../js/engine/gateway.cjs');
 const G = require('../../../js/engine/game/growth.cjs');
-const { content, makeGame, foeMember } = require('./fixtures.cjs');
+const { content, makeGame, foeMember } = require('../../../tests/support/battle/writeback-fixture.cjs');
 const W = require('../../../js/engine/fixtures/wild-1v1.json');
 
 const drain = gw => { const o = []; while (gw._queue.length) o.push(gw._queue.shift()); return o; };

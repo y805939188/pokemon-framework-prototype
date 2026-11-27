@@ -7,8 +7,8 @@
 // restores the exact bytes it changed; the final check compares every touched file and rebuilds.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'../../../..'),out=process.argv[2];if(!out||!path.isAbsolute(out)||fs.existsSync(out))throw Error('new absolute evidence directory required');fs.mkdirSync(out,{recursive:true});
-const T='src/plugins/flowtest/timing.ts',V='src/plugins/flowtest/evidence.ts',D='src/plugins/PS_BattleFlowTest.ts',R='experiments/step5/inventory-runner-fixture.cjs',S='src/framework/rules/semantic.ts';
-const SUITE='experiments/step5/2/test-D-remediation.cjs',UI='tests/regression/inventory/test-inventory-ui.cjs',SUITES=[SUITE,UI];
+const T='src/plugins/flowtest/timing.ts',V='src/plugins/flowtest/evidence.ts',D='src/plugins/PS_BattleFlowTest.ts',R='tests/support/inventory/flowtest-runner-fixture.cjs',S='src/framework/rules/semantic.ts';
+const SUITE='tests/regression/interface/test-driver-timing-and-restart-contract.cjs',UI='tests/regression/inventory/test-inventory-ui.cjs',SUITES=[SUITE,UI];
 // [id, edits ([file, from, to] or [file, {deleteLineContaining}]), target test title prefixes]
 const cases=[
  ['D-01-waits-count-ticks',[[T,'while (p.clock.game < target) {','while (p.clock.ticks < target) {']],['D-01 every press']],

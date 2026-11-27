@@ -1,0 +1,27 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
+const inputs=require('../../../../scripts/tests/pokedex-runtime-binding.cjs').capturePokedexInputs(path.resolve(__dirname, '../../../..'));
+const explicitRoot=inputs.pluginRoot;
+const explicitBundles=explicitRoot?Object.fromEntries(['PS_Management','PS_Inventory','PS_Progression','PS_Evolution'].map(name=>[name,fs.readFileSync(path.join(explicitRoot,name+'.js'),'utf8')])):undefined;
+const base=require('../../inventory/inventory-ui-host.cjs'),{world,E,clone}=require('../../evolution/postbattle/helpers.cjs');let dir,bundle;
+let checkedShowdown;
+function checkedSource(content,override){
+ if(!checkedShowdown){const compiled=E.contentRuntime.loadCompiled(JSON.parse(fs.readFileSync('data/framework/content.json','utf8'))),assembled=E.contentRuntime.assembleContent(compiled,E.dex.createDexLookup());if(assembled.errors.length||assembled.content.meta?.showdownSourceChecked!==true)throw Error('dex UI fixture requires actual assembled source proof');checkedShowdown=assembled.content.meta.showdownSha;}
+ if(content.meta.showdownSha!==checkedShowdown)throw Error('dex UI fixture pinned source mismatch');
+ content.meta.showdownSourceChecked=true; // Fixture consumes the same verified pinned adapter; overrides explicitly exercise missing/unchecked contracts.
+ return override?override(content):{content,dex:E.dex.createDexLookup()};
+}
+function setup(options={}){
+ const w=world({port:options.port,contentPort:content=>checkedSource(content,options.contentPort),extraContent:c=>{c.regionalDex.regions=options.regions??[];c.regionalDex.layoutIdentity=E.dexState.dexLayoutIdentity(c.regionalDex);for(const x of Object.values(c.species)){x.heightDm=10;x.weightHg=100;x.categoryKey='test.category';x.entryKey='test.entry';}options.content?.(c);}}),g=clone(w.state.current());
+ checkedSource(w.content); // Establish provenance before the presenter captures its content fingerprint.
+ g.dex.layoutIdentity=w.content.regionalDex.layoutIdentity;g.dex.hasDex=options.hasDex??true;g.dex.seen=['Charizard','Venusaur'];g.dex.owned=['Charizard'];g.dex.unlocked=Array(w.content.regionalDex.regions.length+1).fill(true);g.dex.view={region:-1,mode:0,indices:Array(w.content.regionalDex.regions.length+1).fill(0)};g.dex.lastSeenForm={Charizard:{form:0,gender:0,shiny:true}};g.dex.seenForms={Charizard:[{form:0,gender:0,shiny:true},{form:0,gender:1,shiny:false}]};options.state?.(g);w.state.replace(g);w.state.replaced.length=0;
+ const h=base.host({application:w,...options.host,...(explicitBundles?{pluginBundles:explicitBundles}:{})}),G=h.G;G.PSFlow.operationPending=()=>!!w.app.saveBlocked;G.PSFlow.stateReplaced=()=>w.app.stateReplacedByHost();
+ if(fs.existsSync('src/plugins/PS_Pokedex.ts')){
+  if(explicitRoot)bundle=fs.readFileSync(path.join(explicitRoot,'PS_Pokedex.js'),'utf8');
+  if(!bundle){dir=fs.mkdtempSync(path.join(os.tmpdir(),'ps53-dex-host-'));const p=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',dir],{env:{...process.env,RR_PLUGIN:'PS_Pokedex'},encoding:'utf8'});if(p.status!==0)throw Error(p.stdout+p.stderr);bundle=fs.readFileSync(path.join(dir,'PS_Pokedex.js'),'utf8');}
+  vm.runInNewContext(bundle,G);
+ }
+ return{...w,...h,p:()=>G.PSPokedex?.current(),open:()=>{const api=G.PSPokedex;if(!api)throw Error('formal PSPokedex API absent');const r=api.open();h.ready();h.ready();return r;}};
+}
+function dispose(){inputs.verify();if(explicitRoot)return;base.disposeBuild();if(dir)fs.rmSync(dir,{recursive:true,force:true});dir=bundle=null;}
+module.exports={setup,dispose,E,clone};

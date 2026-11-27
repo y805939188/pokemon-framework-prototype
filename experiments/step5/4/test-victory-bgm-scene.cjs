@@ -37,7 +37,7 @@ async function open({trainer=false,session=null,trainerVictory=undefined,...opti
 }
 const ending=(reason='win',winner='Player')=>({kind:'end',reason,winner,outcome:null});
 for(const trainer of [false,true])test(`real Gen8 ${trainer?'trainer':'wild'} KO reaches compiled Scene: faint/EXP then victory BGM then terminal text`,async()=>{
- const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs'));
+ const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'tests/support/battle/writeback-fixture.cjs'));
  const session=await BattleSession.create({game:F.makeGame(),content:F.content,battleId:'victory-'+trainer,seed:[1,2,3,4],foe:{kind:trainer?'trainer':'wild',team:[F.foeMember('F-1','Pidgey',5)]}});
  const f=await open({trainer,session});try{
   const s=f.currentScene,result=await session.chooseMove(1);assert(result.ok);assert(session.finished);
@@ -100,6 +100,6 @@ test('abort/load/new game retire a queued cue and suppress a pending late decode
 });
 
 test('CEXP actual no-EXP capture requests victory BGM once after its capture presentation and restores the world',async()=>{
- const B=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs')),content={...B.content,settings:{GAIN_EXP_FOR_CAPTURE:false}},game=B.makeGame();game.inventory=E.inventory.inventoryFromBag({masterball:1},E.itemCatalog.catalogOf(content));const session=await E.session.BattleSession.create({game,content,battleId:'victory-no-capture-exp',seed:[1,2,3,4],foe:{kind:'wild',team:[B.foeMember('F-1','Pidgey',5)]}});
+ const B=require(path.join(ROOT,'tests/support/battle/writeback-fixture.cjs')),content={...B.content,settings:{GAIN_EXP_FOR_CAPTURE:false}},game=B.makeGame();game.inventory=E.inventory.inventoryFromBag({masterball:1},E.itemCatalog.catalogOf(content));const session=await E.session.BattleSession.create({game,content,battleId:'victory-no-capture-exp',seed:[1,2,3,4],foe:{kind:'wild',team:[B.foeMember('F-1','Pidgey',5)]}});
  const f=await open({session});try{const s=f.currentScene,r=await session.throwBall('masterball');assert(r.ok);assert(session.finished);assert(!r.messages.some(x=>x.kind==='growth'));s.pushMessages(r.messages);assert.equal(f.names().at(-1),'Battle wild','planning is not playback');await f.drain();assert.equal(f.names().at(-1),'Battle victory');assert.equal(f.flow.musicState().player.requests.filter(x=>x.kind==='victory').length,1);assert.equal(f.finishes,0);s.pushMessages([r.messages.find(m=>m.kind==='end')]);await f.drain();assert.equal(f.flow.musicState().player.requests.filter(x=>x.kind==='victory').length,1);s.onEnd();assert.equal(f.names().at(-1),'Map');assert.equal(f.plays.at(-1).pos,17);}finally{f.cleanup();}
 });

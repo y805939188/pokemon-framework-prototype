@@ -15,7 +15,7 @@ const timing={throwUnits:10,absorbUnits:4,shakeUnits:8,settleUnits:6,blockUnits:
 const event=(outcome='caught',checks=4,critical=0)=>({type:'rpg',args:['ball','p1','masterball','F-1',outcome,String(checks),String(critical)]});
 const phases=p=>p.phases.map(x=>x.id);
 async function realBall(kind,ball='masterball',species='Pidgey',level=5){
- const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs'));
+ const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'tests/support/battle/writeback-fixture.cjs'));
  const game=F.makeGame(),s=await BattleSession.create({game,content:F.content,battleId:'ball-feedback-'+kind+'-'+ball,seed:[1,2,3,4],foe:{kind,team:[F.foeMember('F-1',species,level)]}});
  s.take();const r=await s.throwBall(ball);assert(r.ok);const e=r.messages.flatMap(m=>m.kind==='events'?m.events:[]).find(e=>e.type==='rpg'&&e.args[0]==='ball');assert(e);return {s,e,game};
 }

@@ -271,7 +271,7 @@ function drainScene(s) {
  waitScene(s,()=>s.inputState().ready,'scene input becomes ready',1000);
 }
 for(const roar of [false,true])test(`real Session compiled Scene resets both cursors after ${roar?'same-turn A-B-A Roar':'ordinary A-B switch'}`,async()=>{
- const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs'));
+ const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'tests/support/battle/writeback-fixture.cjs'));
  const game=F.makeGame();game.party=game.party.slice(0,2);
  const foe=F.foeMember('F-1','Snorlax',50);foe.moves=[roar?{id:'roar',pp:20,maxpp:20}:{id:'splash',pp:40,maxpp:40}];
  const session=await BattleSession.create({game,battleId:'menu-reset-'+roar,content:F.content,seed:[1,2,3,4],foe:{kind:'trainer',team:[foe]}});
@@ -294,7 +294,7 @@ for(const roar of [false,true])test(`real Session compiled Scene resets both cur
  } finally {s.terminate();}
 });
 for(const user of ['p1','p2'])test(`real Session Pain Split by ${user} reaches compiled Scene without treating source tags as targets`,async(t)=>{
- const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs'));
+ const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'tests/support/battle/writeback-fixture.cjs'));
  // Authored synthetic moves/HP; no direct battle-object mutation or hand-written events.
  const game=F.makeGame();game.party=game.party.slice(0,1);game.party[0].hp=1;
  const pain={id:'painsplit',pp:20,maxpp:20},splash={id:'splash',pp:40,maxpp:40};
@@ -409,7 +409,7 @@ test('compiled faint preserves HP0 portrait, fades its own box in parallel, and 
  s.terminate();assert.equal(body.destroys,1);
 });
 for(const variant of [{name:'natural',reverse:false,prelude:false},{name:'reversed-with-prefix',reverse:true,prelude:true},{name:'paced-prefix',reverse:false,prelude:true}])test(`real Session opening ${variant.name} keeps each queued first portrait hidden until its own send-out`,async()=>{
- const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'experiments/step2/s3/fixtures.cjs'));
+ const {BattleSession}=require(path.join(ROOT,'js/engine/game/session.cjs')),F=require(path.join(ROOT,'tests/support/battle/writeback-fixture.cjs'));
  const saved=F.makeGame();saved.party=saved.party.slice(0,2);const foe=F.foeMember('F-1','Snorlax',50);foe.moves=[{id:'splash',pp:40,maxpp:40}];
  const session=await BattleSession.create({game:saved,battleId:'r5-opening-'+variant.name,content:F.content,seed:[1,2,3,4],foe:{kind:'trainer',team:[foe]}});
  const state=JSON.stringify(session.gw.snapshot()),take=session.take.bind(session);let takes=0;

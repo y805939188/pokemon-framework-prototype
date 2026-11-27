@@ -240,20 +240,20 @@ SUITES=(
   experiments/step5/4/test-trainer-ai-realms.cjs
   experiments/step5/4/test-carried-faint.cjs
   experiments/step5/4/test-trainer-ai-remediation.cjs
-  experiments/friendship-standard-domain/test-author.cjs
-  experiments/friendship-standard-domain/test-pbs-cli.cjs
-  experiments/friendship-standard-domain/test-migration.cjs
-  experiments/friendship-standard-domain/test-app-integration.cjs
-  experiments/friendship-standard-domain/test-file-integration.cjs
-  experiments/friendship-standard-domain/test-author-files.cjs
-  experiments/friendship-standard-domain/test-mz-integration.cjs
-  experiments/step2/test-headless.cjs
+  tests/regression/friendship/test-author.cjs
+  tests/regression/friendship/test-pbs-cli.cjs
+  tests/regression/friendship/test-migration.cjs
+  tests/regression/friendship/test-app-integration.cjs
+  tests/regression/friendship/test-file-integration.cjs
+  tests/regression/friendship/test-author-files.cjs
+  tests/regression/friendship/test-mz-integration.cjs
+  tests/regression/battle/test-headless-battle-smoke.cjs
   tests/regression/battle/test-actions.cjs
-  experiments/step2/s3/test-growth.cjs
-  experiments/step2/s3/test-writeback.cjs
-  experiments/step2/s3/test-doubles.cjs
-  experiments/step2/s4/test-describe.cjs
-  experiments/step2/s5/test-matrix.cjs
+  tests/regression/battle/test-battle-growth.cjs
+  tests/regression/battle/test-session-writeback.cjs
+  tests/regression/battle/test-multi-slot-gateway-contract.cjs
+  tests/regression/battle/test-battle-description.cjs
+  tests/regression/battle/test-battle-scenario-matrix.cjs
   tests/regression/battle/test-protocol-freeze.cjs
   tests/regression/battle/test-engine-contract.cjs
   scripts/tests/headless-scope.test.cjs
@@ -262,124 +262,124 @@ SUITES=(
   scripts/tests/bootstrap-mac.test.cjs
   scripts/tests/host-application-types.test.cjs
   scripts/tests/host-input.test.cjs
-  experiments/framework-remediation/test-formal-battle-capabilities.cjs
-  experiments/framework-remediation/test-application-operation-contract.cjs
-  experiments/framework-remediation/test-field-potion-vectors.cjs
-  experiments/framework-remediation/test-value-semantics-contract.cjs
-  experiments/framework-remediation/test-r2-author-types-contract.cjs
-  experiments/framework-remediation/test-r2-ai-effectiveness-contract.cjs
+  tests/regression/battle/test-formal-battle-capabilities.cjs
+  tests/regression/application/test-application-operation-contract.cjs
+  tests/regression/inventory/test-field-potion-vectors.cjs
+  tests/regression/values/test-value-semantics-contract.cjs
+  tests/regression/content/test-author-type-composition.cjs
+  tests/regression/battle-ai/test-ai-effectiveness-contract.cjs
   scripts/tests/headless-regression-binding.test.cjs
   scripts/tests/showdown-build.test.cjs
   scripts/tests/package-excludes.test.cjs
   scripts/tests/check-boundaries.test.cjs
-  experiments/framework-remediation/test-step1-public-api.cjs
-  experiments/framework-remediation/test-step1-distribution.cjs
-  experiments/framework-remediation/test-step1-external-consumer.cjs
-  experiments/step3/test-content.cjs
-  experiments/step3/test-i18n.cjs
-  experiments/step3/test-save.cjs
-  experiments/step3/test-integration.cjs
-  experiments/step3/test-move-requests.cjs
-  experiments/step3/test-pp-sync.cjs
-  experiments/step3/test-session-operations.cjs
-  experiments/step3/test-session-failure.cjs
-  experiments/step3/test-gateway-boundary.cjs
-  experiments/step3/test-core-digest.cjs
-  experiments/step3/test-core-independent.cjs
-  experiments/step3/test-application.cjs
-  experiments/step3/test-plugin-abort.cjs
-  experiments/step3/test-scripted-driver.cjs
-  experiments/step4/test-schema3.cjs
-  experiments/step4/test-content4.cjs
-  experiments/step4/test-core4.cjs
-  experiments/step4/test-app4.cjs
-  experiments/step4/test-battle-rules4.cjs
-  experiments/step4/test-app-battle4.cjs
-  experiments/step4/test-plugin-host4.cjs
-  experiments/step5/test-species-key5.cjs
-  experiments/step5/test-app5.cjs
-  experiments/step5/test-migration5.cjs
-  experiments/step5/test-content5.cjs
-  experiments/step5/test-plugin-host5.cjs
-  experiments/step5/test-cold-source5.cjs
-  experiments/step5/test-pbs-review5.cjs
-  experiments/step5/test-store5.cjs
-  experiments/step5/test-perf-budget5.cjs
-  experiments/step5/1/test-individual.cjs
-  experiments/step5/1/test-migration-storage.cjs
-  experiments/step5/1/test-management.cjs
-  experiments/step5/1/test-receiving.cjs
-  experiments/step5/1/test-held-sources.cjs
-  experiments/step5/1/test-M-remediation.cjs
-  experiments/step5/1/test-management-queries.cjs
-  experiments/step5/1/test-management-ui.cjs
-  experiments/step5/1/test-management-input.cjs
-  experiments/step5/1/test-J-remediation.cjs
-  experiments/step5/1/test-held-contract.cjs
+  tests/regression/distribution/test-public-entrypoints.cjs
+  tests/regression/distribution/test-package-distribution.cjs
+  tests/regression/distribution/test-package-consumer.cjs
+  tests/regression/content/test-content-manifest.cjs
+  tests/regression/localization/test-runtime-localization.cjs
+  tests/regression/saves/test-save.cjs
+  tests/regression/battle/test-integration.cjs
+  tests/regression/battle/test-move-requests.cjs
+  tests/regression/battle/test-pp-sync.cjs
+  tests/regression/battle/test-session-operations.cjs
+  tests/regression/battle/test-session-failure.cjs
+  tests/regression/battle/test-gateway-boundary.cjs
+  tests/regression/saves/test-core-digest.cjs
+  tests/regression/application/test-core-independent.cjs
+  tests/regression/application/test-application.cjs
+  tests/regression/interface/test-plugin-abort.cjs
+  tests/regression/battle/test-scripted-driver.cjs
+  tests/regression/saves/test-save-schema-v3.cjs
+  tests/regression/content/test-battle-author-content.cjs
+  tests/regression/application/test-core-public-state.cjs
+  tests/regression/application/test-runtime-application.cjs
+  tests/regression/battle/test-host-battle-rules.cjs
+  tests/regression/battle/test-runtime-battle-outcomes.cjs
+  tests/regression/interface/test-battle-projection-host.cjs
+  tests/regression/content/test-species-key.cjs
+  tests/regression/application/test-current-application-lifecycle.cjs
+  tests/regression/saves/test-save-migration-v5.cjs
+  tests/regression/content/test-member-identity-content.cjs
+  tests/regression/interface/test-battleflow-application-host.cjs
+  tests/regression/application/test-cold-start-source-identity.cjs
+  tests/regression/content/test-pbs-import-diagnostics.cjs
+  tests/regression/saves/test-save-store-identity.cjs
+  tests/regression/performance/test-member-scale-budget.cjs
+  tests/regression/management/test-individual.cjs
+  tests/regression/saves/test-migration-storage.cjs
+  tests/regression/management/test-management.cjs
+  tests/regression/management/test-receiving.cjs
+  tests/regression/items/test-held-sources.cjs
+  tests/regression/application/test-member-operation-and-save-guards.cjs
+  tests/regression/management/test-management-queries.cjs
+  tests/regression/management/test-management-ui.cjs
+  tests/regression/management/test-management-input.cjs
+  tests/regression/application/test-battle-ownership-guards.cjs
+  tests/regression/items/test-held-contract.cjs
   tests/regression/inventory/test-inventory-slots.cjs
-  experiments/step5/2/test-content6.cjs
-  experiments/step5/2/test-migration6.cjs
+  tests/regression/content/test-item-and-shop-catalog.cjs
+  tests/regression/saves/test-save-migration-v6.cjs
   tests/regression/inventory/test-inventory-transactions.cjs
-  experiments/step5/2/test-M1-remediation.cjs
+  tests/regression/inventory/test-member-inventory-and-save-guards.cjs
   tests/regression/inventory/test-item-effects.cjs
   tests/regression/inventory/test-shop.cjs
   tests/regression/inventory/test-item-workflows.cjs
   tests/regression/inventory/test-item-use-refusals.cjs
   tests/regression/inventory/test-default-pocket-contract.cjs
-  experiments/step5/2/test-D-remediation.cjs
+  tests/regression/interface/test-driver-timing-and-restart-contract.cjs
   tests/regression/inventory/test-inventory-ui.cjs
-  experiments/step5/3/test-capability-seam.cjs
-  experiments/step5/3/test-friendship.cjs
-  experiments/step5/3/test-friendship-adapters.cjs
-  experiments/step5/3/test-battle-consumption.cjs
-  experiments/step5/3/test-battle-result-validation.cjs
-  experiments/step5/3/test-battle-effects-writeback.cjs
-  experiments/step5/3/test-battle-transactions7.cjs
-  experiments/step5/3/test-evolution-commit.cjs
-  experiments/step5/3/test-learning-actions.cjs
-  experiments/step5/3/test-postbattle-evolution.cjs
-  experiments/step5/3/test-postbattle-outcomes.cjs
-  experiments/step5/3/test-battle-entry-ownership.cjs
-  experiments/step5/3/test-postbattle-host.cjs
-  experiments/step5/3/test-learning-operation.cjs
-  experiments/step5/3/test-learning-ui.cjs
-  experiments/step5/3/test-evolution-timeline.cjs
-  experiments/step5/3/test-pokedex-ui.cjs
-  experiments/step5/3/test-pokedex-lifecycle.cjs
-  experiments/step5/3/test-pokedex-search-input.cjs
-  experiments/step5/3/test-pokedex-search-ui.cjs
-  experiments/step5/3/test-pokedex-summary.cjs
-  experiments/step5/3/test-pokedex-final.cjs
-  experiments/step5/3/test-pokedex-h2-final.cjs
+  tests/regression/battle/test-battle-source-evidence.cjs
+  tests/regression/friendship/test-friendship.cjs
+  tests/regression/friendship/test-friendship-adapters.cjs
+  tests/regression/battle/test-battle-consumption.cjs
+  tests/regression/battle/test-battle-result-validation.cjs
+  tests/regression/battle/test-battle-effects-writeback.cjs
+  tests/regression/battle/test-battle-commit-receipts.cjs
+  tests/regression/evolution/test-evolution-commit.cjs
+  tests/regression/move-learning/test-learning-actions.cjs
+  tests/regression/evolution/test-postbattle-evolution.cjs
+  tests/regression/evolution/test-postbattle-outcomes.cjs
+  tests/regression/battle/test-battle-entry-ownership.cjs
+  tests/regression/evolution/test-postbattle-host.cjs
+  tests/regression/move-learning/test-learning-operation.cjs
+  tests/regression/move-learning/test-learning-ui.cjs
+  tests/regression/evolution/test-evolution-timeline.cjs
+  tests/regression/pokedex/test-pokedex-ui.cjs
+  tests/regression/pokedex/test-pokedex-lifecycle.cjs
+  tests/regression/pokedex/test-pokedex-search-input.cjs
+  tests/regression/pokedex/test-pokedex-search-ui.cjs
+  tests/regression/pokedex/test-pokedex-summary.cjs
+  tests/regression/pokedex/test-pokedex-application-integration.cjs
+  tests/regression/pokedex/test-pokedex-search-integration.cjs
   experiments/step5/5/test-pokedex-area-production.cjs
   experiments/step5/3/test-closeout-scale.cjs
-  experiments/step5/3/test-closeout-layout.cjs
-  experiments/step5/3/test-closeout-runner.cjs
-  experiments/step5/3/test-evolution-ui.cjs
-  experiments/step5/3/test-item-evolution-ui.cjs
-  experiments/step5/3/test-trade-timeline.cjs
-  experiments/step5/3/test-trade-ui.cjs
-  experiments/step5/3/test-egg-move-content.cjs
-  experiments/step5/3/test-triggered-evolution.cjs
-  experiments/step5/3/test-trade-operation.cjs
-  experiments/step5/3/test-acquisition-dex.cjs
-  experiments/step5/3/test-dex-viewing.cjs
-  experiments/step5/3/test-M1-convergence.cjs
-  experiments/step5/3/test-effects-source.cjs
-  experiments/step5/3/test-learning-candidates.cjs
-  experiments/step5/3/test-learning-plans.cjs
-  experiments/step5/3/test-evolution-rules.cjs
-  experiments/step5/3/test-evolution-success.cjs
-  experiments/step5/3/test-CD-core-integration.cjs
-  experiments/step5/3/test-pokedex-rules.cjs
-  experiments/step5/3/test-pokedex-query.cjs
-  experiments/step5/3/test-F-core-integration.cjs
-  experiments/step5/3/test-content7.cjs
-  experiments/step5/3/test-pbs7.cjs
-  experiments/step5/3/test-migration7.cjs
-  experiments/step5/3/test-member-bridges7.cjs
-  experiments/step5/3/test-save-gates7.cjs
-  experiments/step5/3/test-perf-write-regression.cjs
+  tests/regression/pokedex/test-pokedex-layout-persistence.cjs
+  tests/regression/interface/test-offline-progression-fixtures.cjs
+  tests/regression/evolution/test-evolution-ui.cjs
+  tests/regression/evolution/test-item-evolution-ui.cjs
+  tests/regression/trading/test-trade-timeline.cjs
+  tests/regression/trading/test-trade-ui.cjs
+  tests/regression/content/test-egg-move-content.cjs
+  tests/regression/evolution/test-triggered-evolution.cjs
+  tests/regression/trading/test-trade-operation.cjs
+  tests/regression/pokedex/test-acquisition-dex.cjs
+  tests/regression/pokedex/test-dex-viewing.cjs
+  tests/regression/evolution/test-postbattle-progression-integration.cjs
+  tests/regression/battle/test-effects-source.cjs
+  tests/regression/move-learning/test-learning-candidates.cjs
+  tests/regression/move-learning/test-learning-plans.cjs
+  tests/regression/evolution/test-evolution-rules.cjs
+  tests/regression/evolution/test-evolution-success.cjs
+  tests/regression/evolution/test-learning-evolution-core.cjs
+  tests/regression/pokedex/test-pokedex-rules.cjs
+  tests/regression/pokedex/test-pokedex-query.cjs
+  tests/regression/pokedex/test-pokedex-core-composition.cjs
+  tests/regression/content/test-form-and-evolution-content.cjs
+  tests/regression/content/test-pbs-evolution-and-dex-import.cjs
+  tests/regression/saves/test-save-migration-v7.cjs
+  tests/regression/saves/test-member-state-bridges.cjs
+  tests/regression/saves/test-save-install-gates.cjs
+  tests/regression/performance/test-perf-write-regression.cjs
   experiments/step5/4/test-trainer-m1.cjs
   experiments/step5/4/test-held-facts.cjs
   experiments/step5/4/test-held-harvest-facts.cjs

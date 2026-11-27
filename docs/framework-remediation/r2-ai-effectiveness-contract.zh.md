@@ -78,8 +78,8 @@ pnpm --dir src build
 pnpm --dir src typecheck
 node scripts/check-boundaries.cjs
 node --test \
-  experiments/framework-remediation/test-r2-ai-effectiveness-contract.cjs \
-  experiments/framework-remediation/test-r2-author-types-contract.cjs \
+  tests/regression/battle-ai/test-ai-effectiveness-contract.cjs \
+  tests/regression/content/test-author-type-composition.cjs \
   experiments/step5/4/test-trainer-ai.cjs \
   experiments/step5/4/test-trainer-ai-integration.cjs \
   experiments/step5/4/test-trainer-ai-strategy.cjs \

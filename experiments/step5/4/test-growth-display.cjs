@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {BattleSession}=require('../../../js/engine/game/session.cjs'),G=require('../../../js/engine/game/growth.cjs');
 const {readGrowthDisplay}=require('../../../js/engine/build/production.cjs').battlePresentation;
-const {content,makeGame,foeMember}=require('../../step2/s3/fixtures.cjs');
+const {content,makeGame,foeMember}=require('../../../tests/support/battle/writeback-fixture.cjs');
 async function award(level=50,exp){const game=makeGame();game.party[0].level=level;game.party[0].exp=exp??G.minExp('parabolic',level);const s=await BattleSession.create({game,battleId:'display-'+level,content,seed:[1,2,3,4],foe:{kind:'trainer',team:[foeMember('F-1','Pidgey',5),foeMember('F-2','Pidgey',5)]}});s.take();const result=await s.chooseMove(1);assert(result.ok);const growth=result.messages.find(m=>m.kind==='growth');assert(growth);return{s,growth};}
 test('real KO publishes the applied EXP interval and each level boundary, preserving the learning gate',async()=>{
  const from=G.minExp('parabolic',51)-1,{s,growth:m}=await award(50,from),d=readGrowthDisplay(s,m);

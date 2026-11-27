@@ -35,16 +35,16 @@ lineage 是进程内对象身份；generation 是 App 安装新时间线后的�
 | AI 异步取消、外 checkpoint、决策／随机回放、恢复前重入 | [test-trainer-ai-async.cjs](../../experiments/step5/4/test-trainer-ai-async.cjs)、[test-trainer-ai-c2-remediation.cjs](../../experiments/step5/4/test-trainer-ai-c2-remediation.cjs)。 |
 | 换人真实机会、trap、外 selector、checkpoint 新 selector、失败回滚、captured opt-in | [test-switch-style-ports.cjs](../../experiments/step5/4/test-switch-style-ports.cjs)：SSP01–14；场域序列化 SSF 向量另列于同文件。 |
 
-本轮新增 [test-formal-battle-capabilities.cjs](../../experiments/framework-remediation/test-formal-battle-capabilities.cjs)：FC01 静态证明完整基础接口兼容；FC02 正反两组 public `supported` 标记均不能授权 required；FC03 结构完整的真实 driver 包装器仍须显式 legacy admission；FC04 用真实 Fling 消费物品后，在同一个 checkpoint 恢复 held seal、AI prepared choice 与换人 offer，随后只安装一个 paired settlement。FC04 使用 authored 学习表和合成队伍，不宣称默认投放可取得这些组合。
+本轮新增 [test-formal-battle-capabilities.cjs](../../tests/regression/battle/test-formal-battle-capabilities.cjs)：FC01 静态证明完整基础接口兼容；FC02 正反两组 public `supported` 标记均不能授权 required；FC03 结构完整的真实 driver 包装器仍须显式 legacy admission；FC04 用真实 Fling 消费物品后，在同一个 checkpoint 恢复 held seal、AI prepared choice 与换人 offer，随后只安装一个 paired settlement。FC04 使用 authored 学习表和合成队伍，不宣称默认投放可取得这些组合。
 
 ## 本轮实际验证
 
 2026-11-13，Node 22.21.1 对本批稳定重建运行包执行：
 
 ```bash
-node --test experiments/framework-remediation/test-formal-battle-capabilities.cjs experiments/framework-remediation/test-application-operation-contract.cjs experiments/framework-remediation/test-field-potion-vectors.cjs
+node --test tests/regression/battle/test-formal-battle-capabilities.cjs tests/regression/application/test-application-operation-contract.cjs tests/regression/inventory/test-field-potion-vectors.cjs
 ```
 
-首轮 14／14 通过（正式能力 5、App 3、共享 Potion 6），失败／取消／跳过均 0；随后将 FC03 拒绝收紧为具体来源错误，并用 `node --test experiments/framework-remediation/test-formal-battle-capabilities.cjs` 单独重跑 5／5 通过。其中 TypeScript 检查使用独立临时 tsconfig、`noEmit` 和完整基础 driver 接口。新增测试核验现有合同，没有产品红测或产品机制修改。已有测试映射不表示本轮重跑；验证不扩大为原生 UI、全参考机制或第三方正式引擎兼容验收。
+首轮 14／14 通过（正式能力 5、App 3、共享 Potion 6），失败／取消／跳过均 0；随后将 FC03 拒绝收紧为具体来源错误，并用 `node --test tests/regression/battle/test-formal-battle-capabilities.cjs` 单独重跑 5／5 通过。其中 TypeScript 检查使用独立临时 tsconfig、`noEmit` 和完整基础 driver 接口。新增测试核验现有合同，没有产品红测或产品机制修改。已有测试映射不表示本轮重跑；验证不扩大为原生 UI、全参考机制或第三方正式引擎兼容验收。
 
 同日值语义增补将 FC01 的 `skipLibCheck` 改为 `false`；与新增值语义 18 项合跑 23／23 通过。该类型检查只引入基础 driver／pure scripted 实现，不靠跳过声明检查通过。命令与边界见[迁移和值语义蓝本](migration-vectors.zh.md#错误与阶段分类蓝本)。

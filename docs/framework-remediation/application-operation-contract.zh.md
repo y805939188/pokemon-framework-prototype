@@ -29,16 +29,16 @@
 
 | 覆盖 | 已有测试，不计本轮新增 |
 |---|---|
-| 开战准备前预留、回调重入、late resolve/reject、同 id 后继 | [test-app-battle4.cjs](../../experiments/step4/test-app-battle4.cjs)、[test-battle-entry-ownership.cjs](../../experiments/step5/3/test-battle-entry-ownership.cjs) |
-| 管理 held/child、库存根保存差异、过期 ticket／token | [test-management.cjs](../../experiments/step5/1/test-management.cjs)、[test-inventory-transactions.cjs](../../tests/regression/inventory/test-inventory-transactions.cjs)、[test-item-workflows.cjs](../../tests/regression/inventory/test-item-workflows.cjs) |
-| 机器 parent、学习回滚、写后异常／未知 readback | [test-learning-operation.cjs](../../experiments/step5/3/test-learning-operation.cjs) |
-| 接收／战后分阶段提交、未知安装屏障 | [test-battle-transactions7.cjs](../../experiments/step5/3/test-battle-transactions7.cjs)、[test-triggered-evolution.cjs](../../experiments/step5/3/test-triggered-evolution.cjs)、[test-trade-operation.cjs](../../experiments/step5/3/test-trade-operation.cjs) |
-| 图鉴 parent／generation、主提交后图鉴继续 | [test-dex-viewing.cjs](../../experiments/step5/3/test-dex-viewing.cjs)、[test-pokedex-summary.cjs](../../experiments/step5/3/test-pokedex-summary.cjs) |
-| friendship async 互斥、opaque preview、等值写失效、durable replay | [test-app-integration.cjs](../../experiments/friendship-standard-domain/test-app-integration.cjs) |
+| 开战准备前预留、回调重入、late resolve/reject、同 id 后继 | [test-app-battle4.cjs](../../tests/regression/battle/test-runtime-battle-outcomes.cjs)、[test-battle-entry-ownership.cjs](../../tests/regression/battle/test-battle-entry-ownership.cjs) |
+| 管理 held/child、库存根保存差异、过期 ticket／token | [test-management.cjs](../../tests/regression/management/test-management.cjs)、[test-inventory-transactions.cjs](../../tests/regression/inventory/test-inventory-transactions.cjs)、[test-item-workflows.cjs](../../tests/regression/inventory/test-item-workflows.cjs) |
+| 机器 parent、学习回滚、写后异常／未知 readback | [test-learning-operation.cjs](../../tests/regression/move-learning/test-learning-operation.cjs) |
+| 接收／战后分阶段提交、未知安装屏障 | [test-battle-transactions7.cjs](../../tests/regression/battle/test-battle-commit-receipts.cjs)、[test-triggered-evolution.cjs](../../tests/regression/evolution/test-triggered-evolution.cjs)、[test-trade-operation.cjs](../../tests/regression/trading/test-trade-operation.cjs) |
+| 图鉴 parent／generation、主提交后图鉴继续 | [test-dex-viewing.cjs](../../tests/regression/pokedex/test-dex-viewing.cjs)、[test-pokedex-summary.cjs](../../tests/regression/pokedex/test-pokedex-summary.cjs) |
+| friendship async 互斥、opaque preview、等值写失效、durable replay | [test-app-integration.cjs](../../tests/regression/friendship/test-app-integration.cjs) |
 
-本轮新增 [test-application-operation-contract.cjs](../../experiments/framework-remediation/test-application-operation-contract.cjs)：AC01 真实旧 battle completion 在新代次管理／库存 child 活动时，零 producer 读取、零投影、零写入且不释放 child；AC02 旧库存 cleanup 与非法旧 parent 的学习请求均不影响新代次管理／学习 lease；AC03 显式 new game 退休学习 child，随后旧答复不能干扰新管理根。这些是跨操作组合补充；既有的单操作 token／generation 测试仍属于既有覆盖。
+本轮新增 [test-application-operation-contract.cjs](../../tests/regression/application/test-application-operation-contract.cjs)：AC01 真实旧 battle completion 在新代次管理／库存 child 活动时，零 producer 读取、零投影、零写入且不释放 child；AC02 旧库存 cleanup 与非法旧 parent 的学习请求均不影响新代次管理／学习 lease；AC03 显式 new game 退休学习 child，随后旧答复不能干扰新管理根。这些是跨操作组合补充；既有的单操作 token／generation 测试仍属于既有覆盖。
 
-[共享场外 Potion 向量](../../experiments/framework-remediation/contracts/field-potion-vectors.json) 由 [test-field-potion-vectors.cjs](../../experiments/framework-remediation/test-field-potion-vectors.cjs) 同时用于纯规划和 App 库存入口，比较同一输入下的 HP／消耗／候选状态／重复请求。它统一测试输入，未另造一个物品校验器；20 HP、封顶、无效／濒死、取消和数量限制本身已有领域测试，本轮新增的是两条公开路径共用向量和安装结果一致性。
+[共享场外 Potion 向量](../../tests/support/validation/contract-vectors/field-potion-vectors.json) 由 [test-field-potion-vectors.cjs](../../tests/regression/inventory/test-field-potion-vectors.cjs) 同时用于纯规划和 App 库存入口，比较同一输入下的 HP／消耗／候选状态／重复请求。它统一测试输入，未另造一个物品校验器；20 HP、封顶、无效／濒死、取消和数量限制本身已有领域测试，本轮新增的是两条公开路径共用向量和安装结果一致性。
 
 2026-11-13 实跑本轮 App 3 项与共享 Potion 6 项均通过；同批正式能力 5 项也通过，总 14／14，失败／取消／跳过均 0，命令见[正式能力合同的实际验证](formal-battle-capabilities.zh.md#本轮实际验证)。本批测试首轮即通过，补充现有合同的跨路径覆盖，没有产品整改红测。
 

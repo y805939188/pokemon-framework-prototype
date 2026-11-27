@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'../../../..'),outDir=process.argv[2];
 if(!outDir)throw Error('usage: node reverse-M1.cjs <absolute evidence directory>');fs.mkdirSync(outDir,{recursive:true});
-const f='src/framework/',suitePaths=Object.freeze({inventory:'tests/regression/inventory/test-inventory-slots.cjs',transactions:'tests/regression/inventory/test-inventory-transactions.cjs',content:'experiments/step5/2/test-content6.cjs',migration:'experiments/step5/2/test-migration6.cjs'}),suite=id=>suitePaths[id],cases=[];
+const f='src/framework/',suitePaths=Object.freeze({inventory:'tests/regression/inventory/test-inventory-slots.cjs',transactions:'tests/regression/inventory/test-inventory-transactions.cjs',content:'tests/regression/content/test-item-and-shop-catalog.cjs',migration:'tests/regression/saves/test-save-migration-v6.cjs'}),suite=id=>suitePaths[id],cases=[];
 function add(id,file,before,after,tests){cases.push({id,file,before,after,tests});}
 add('slot-preflight',f+'rules/inventory.ts','if (quantity > capacityFor(inventory, id, catalog, policy))','if (false)','inventory');
 add('slot-fill',f+'rules/inventory.ts','for (const slot of pocket) if (slot.itemId === id) { const n = Math.min(left, Math.max(0, policy.perSlot - slot.quantity));','for (const slot of []) if (slot.itemId === id) { const n = Math.min(left, Math.max(0, policy.perSlot - slot.quantity));','inventory');
@@ -29,12 +29,12 @@ add('rare-q1-port',f+'app/inventory-session.ts',"if(family==='rare-candy'&&quant
 add('sort-cancel-order',f+'app/inventory-session.ts',"next.inventory.pockets[sort.pocket-1]=sort.order.map((original,current)=>({original,slot:rows[current]!})).sort((a,b)=>a.original-b.original).map(row=>row.slot);",'', 'transactions');
 add('item-source-gate',f+'content/item-input.ts',"const sourceProblem = usable(raw.source);","const sourceProblem = null;",'content');
 add('shop-override-validation',f+'content/item-input.ts',"if (raw.overrides !== undefined &&", "if (false &&",'content');
-add('encounter-refusal-cache','src/plugins/PS_BattleFlow.ts',"if(heldEncounterGate&&heldEncounterGate.game===gateGame&&heldEncounterGate.map===gateMap&&heldEncounterGate.key===gateKey&&heldEncounterGate.capability===gateCapability)return false;",'', ['experiments/step5/test-plugin-host5.cjs']);
-add('encounter-map-invalidation','src/plugins/PS_BattleFlow.ts','JSON.stringify([G.$gameMap?.mapId?.(),heldKey])','JSON.stringify(heldKey)',['experiments/step5/test-plugin-host5.cjs']);
-add('fake-semantic-fingerprint','experiments/step5/1/probes/held-contract-model.cjs',"require('../../../../js/engine/build/engine.cjs').semantic.semanticFingerprint(result)",'JSON.stringify(result)',['experiments/step5/1/test-held-contract.cjs']);
-add('host-root-encounter-preflight','src/plugins/PS_BattleFlow.ts',' || PSFlow._app?.encounterBlocked','',['experiments/step5/test-plugin-host5.cjs']);
+add('encounter-refusal-cache','src/plugins/PS_BattleFlow.ts',"if(heldEncounterGate&&heldEncounterGate.game===gateGame&&heldEncounterGate.map===gateMap&&heldEncounterGate.key===gateKey&&heldEncounterGate.capability===gateCapability)return false;",'', ['tests/regression/interface/test-battleflow-application-host.cjs']);
+add('encounter-map-invalidation','src/plugins/PS_BattleFlow.ts','JSON.stringify([G.$gameMap?.mapId?.(),heldKey])','JSON.stringify(heldKey)',['tests/regression/interface/test-battleflow-application-host.cjs']);
+add('fake-semantic-fingerprint','tests/support/items/held/held-contract-model.cjs',"require('../../../../js/engine/build/engine.cjs').semantic.semanticFingerprint(result)",'JSON.stringify(result)',['tests/regression/items/test-held-contract.cjs']);
+add('host-root-encounter-preflight','src/plugins/PS_BattleFlow.ts',' || PSFlow._app?.encounterBlocked','',['tests/regression/interface/test-battleflow-application-host.cjs']);
 add('app-root-encounter-preflight',f+'app/game-application.ts','    if (this.encounterBlocked) return { ok: false, reason: "operation-active" };','', 'transactions');
-const remediation=['experiments/step5/2/test-M1-remediation.cjs'];
+const remediation=['tests/regression/inventory/test-member-inventory-and-save-guards.cjs'];
 add('M1-01-relearn-reset',f+'rules/member-metadata.ts','    if (base !== undefined && move.maxpp === base && totalPp(base, ppUps) !== base) ppUps = 0;','',remediation);
 add('M1-02-field-enum-type',f+'content/item-input.ts',"typeof raw.fieldUse !== 'string' || !['none','member','direct','field','tm','hm','tr'].includes(raw.fieldUse)","!['none','member','direct','field','tm','hm','tr'].includes(String(raw.fieldUse))",remediation);
 add('M1-02-battle-enum-type',f+'content/item-input.ts',"typeof raw.battleUse !== 'string' || !['none','member','move','active','foe','direct','ball'].includes(raw.battleUse)","!['none','member','move','active','foe','direct','ball'].includes(String(raw.battleUse))",remediation);

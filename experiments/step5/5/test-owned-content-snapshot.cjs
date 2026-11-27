@@ -4,7 +4,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const ROOT=path.resolve(__dirname,'../../..');
 const E=require(process.env.PF_SNAPSHOT_ENGINE||path.join(ROOT,'js/engine/build/production.cjs'));
 const own=value=>E.semantic.ownedImmutableSnapshot?E.semantic.ownedImmutableSnapshot(value):value;
-const vectors=require('../../framework-remediation/contracts/value-semantics-vectors.json').vectors;
+const vectors=require('../../../tests/support/validation/contract-vectors/value-semantics-vectors.json').vectors;
 const F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 const flush=()=>new Promise(setImmediate);
 function scanCount(run){const original=Object.getOwnPropertyDescriptors;let scans=0;Object.getOwnPropertyDescriptors=function(value){scans++;return Reflect.apply(original,Object,[value]);};try{return {result:run(),scans};}finally{Object.getOwnPropertyDescriptors=original;}}
