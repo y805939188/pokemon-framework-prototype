@@ -9,7 +9,7 @@
 
 ## Differences found by the independent review (2026-10-18): decided and still open
 
-Found by the review; each was either a conscious interim or an open question. #5, #7 and the confirmations in #11 were decided on 2026-10-18; items still marked "needs decision" are listed again, with the options, in [`review-followups.md`](review-followups.md).
+Found by the review; each was either a conscious interim or an open question. #5, #7 and the confirmations in #11 were decided on 2026-10-18; statuses below describe that review scope. For current rules and their scope, see the [battle rules](../maintainers/battle.md#正常回合与道具守卫).
 
 | # | Topic | Spec (clean-room catalog) | Ours now | Status |
 |---|---|---|---|---|

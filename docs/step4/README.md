@@ -4,7 +4,7 @@
 
 新游戏 → 领取精灵与物品 → 地图遭遇 → 单打战斗/捕获/逃跑/用药 → 成长 → 治疗 → 存档退出读档继续。
 
-范围由用户确认（工作区 `.handoff/step4-implementation-prompt.zh.md`，决定 D1/D2/D3），实施清单在 `.handoff/step4-plan.md`。本文件记录实现后的事实：做了什么、怎么用、按什么规格、怎么验证、有哪些限制。**第四步已于 2026-10-21 收口，经 PR #2 合入 `main`**：提交、复核与验证汇总见 [closure.md](closure.md)。
+范围由用户确认（工作区 `.handoff/step4-implementation-prompt.zh.md`，决定 D1/D2/D3），实施清单在 `.handoff/step4-plan.md`。本文件记录实现后的事实：做了什么、怎么用、按什么规格、怎么验证、有哪些限制。**第四步已于 2026-10-21 收口，经 PR #2 合入 `main`**。现行流程见[玩法流程](../maintainers/world.md#正常玩法闭环)。
 
 | 批次 | 分支 | 内容 | 状态 |
 |---|---|---|---|

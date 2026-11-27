@@ -26,7 +26,7 @@
 
 5.4 已在批准的单打与默认呈现范围内完成技术收口。当前后继产品 `174568dc2a0d20b5e5e2b0878c35c63bca742e27`，src `7c52b29035f4170df493570c3a5d5e88eb1faaad`（源码来源 `5a41caf`）；[投球／逃跑整改](5.4-capture-run-followup.md)的 A1／B1／C1 已独审限域通过，[精确 CI #313](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43366638211) 双 job 成功，280 套／5082 项通过，失败／取消／跳过均 0，冻结回放 EXCLUDED／NOT RUN。此次纯文档后继自身的精确 CI 仍须发布后核实，不继承 CI313。
 
-用户已决定本阶段统一默认战前过渡；完整特殊注册／优先级及按场景、对手、事件自由编排当前未实现，后续阶段／日期未指定。[收口记录](5.4-closure.md)与[验收索引](5.4-current-acceptance.md)保留真实已测范围和限制；[E74 限定登记](5.4-E74-final-disposition.md)仍为 72 条契约抽样＋2 条受限源级未用，完整标题接受 0；113 条事实边界登记不等于完整 facet 验收。未合并 main，未因此完成 5.5、跨平台或包分发。
+用户已决定本阶段统一默认战前过渡；完整特殊注册／优先级及按场景、对手、事件自由编排当前未实现，后续阶段／日期未指定。[收口记录](5.4-closure.md)与[战斗功能与验证边界](../maintainers/battle.md#功能范围与测试证明)保留真实已测范围和限制；[E74 限定登记](5.4-E74-final-disposition.md)仍为 72 条契约抽样＋2 条受限源级未用，完整标题接受 0；113 条事实边界登记不等于完整 facet 验收。未合并 main，未因此完成 5.5、跨平台或包分发。
 
 此前阶段产品 `2ecace8d`／src `b7db562a`、文档 `714b674` 的 CI312（278／5044）保留为历史。[RPG 持物原生身份子批](5.4-rpg-held-native-items.md)补齐 Lucky Egg／Amulet Coin／Luck Incense 的正常 Fling 身份，保留固定 Showdown 消费者和 Flower Sweet 既有规则；其独审、本地同源 quick、精确产品 CI310 与同源文档 CI311 分列，不扩成整个 FR55 或全部持物组合。
 
@@ -46,7 +46,7 @@
 
 | 批次 | 分支 | 内容 | 状态 |
 |---|---|---|---|
-| 5.0 基础整固 | `step5/0-foundation` | 持久物种键（内容 ID＋形态号）、存档 schema 4、统计与计步、规则配置档、来源使用前核对与 PBS 导入子集、P4-2、CI | **已合并**（2026-10-22，PR #3，合并提交 `5dc86f6`；[收口记录](5.0-closure.md)） |
+| 5.0 基础整固 | `step5/0-foundation` | 持久物种键（内容 ID＋形态号）、存档 schema 4、统计与计步、规则配置档、来源使用前核对与 PBS 导入子集、P4-2、CI | **已合并**（2026-10-22，PR #3，合并提交 `5dc86f6`；[原生输入与性能边界](../maintainers/engineering.md#宿主输入等待与性能警告)） |
 | 5.1 个体与仓库 | `step5/1-individual-storage` | 个体、40×30 仓库、schema 5、事务、接收与 UI | **已合并**（PR #4，`c5c51a6`，精确7fd候选及main双层CI通过）；[实施记录](5.1.md) |
 | 5.2 背包、道具与经济 | 已合并、作者树归档 | 八口袋/schema6/资源与事务及UI | **批准范围有条件收尾**（2026-10-25，PR #5，main `9a93b5c`，CI70 65套863通过）。CUA-F02真实FAIL/OPEN+条件DEFERRED、UI-MEM NEW_WARN/OPEN及未测项保留，不能写无条件全层PASS。 |
 | 5.3 成长、进化与图鉴 | 各有限批已合并；当前 `step5/3-H2-pokedex-search` | 内容/schema7迁移、C/D/F规则、E应用事务，后续学习/进化/交换/图鉴UI | **M1规则/事务中间门已接收**（PR #19，main `b977ed7`，CI126 98套1612通过）。G1经PR20/a289086、G2a经PR21/c70d441正式接收（CI134 101套1660）。G2b＋[AR01开战准入](5.3-AR01-battle-entry.md)经PR22/main34fecd8、双审与CI136/137/138接收（104套1747）；[G2c糖果／石头统一UI](5.3-G2c-item-evolution-ui.md)与AR01后续经PR23/main04a2f47正式接收（CI139/140/141，105套1816通过）；[H1默认图鉴](5.3-H1-pokedex-ui.md)整改913150a待Kimi增量／ultra，[H2完整搜索／摘要单条](5.3-H2-pokedex-search-summary.md)作者实现验证中。完整H、I包/性能/重启与J最终收口未完成。 |
@@ -54,9 +54,9 @@
 | 5.5 世界与遭遇 | `a33eabd4` 为 5.6 的基线 | [r4＋r5 合同及来源](5.5/README.md) | [G 批交付记录](5.5/G-current-delivery.zh.md)列出受测入口与保留范围 |
 | 5.6 菜单、标题与存档流程 | 固定候选 `f5c8bc1b` | 菜单／PC、标题／存档、地图对白、走路优化 | **限定验收完成**，见[5.6 验收范围](#56-菜单标题与存档流程) |
 
-文档：[5.0.md](5.0.md)（实施记录）、[5.0-closure.md](5.0-closure.md)（收口记录）、[commands.md](commands.md)（新增作者入口与命令）、[distribution.md](distribution.md)（分发清单骨架）。
+文档：[5.0.md](5.0.md)（实施记录）、[原生输入与性能边界](../maintainers/engineering.md#宿主输入等待与性能警告)（收口记录）、[commands.md](commands.md)（新增作者入口与命令）、[distribution.md](distribution.md)（分发清单骨架）。
 
-5.1作者候选：批准计划r2及M独立复验后推进F–I，见[实施合同](5.1.md)、[完整候选与证据入口](5.1-candidate.md)、[持物P-2提案](5.1-held-item-contract.md)。5.1最终双审及用户条件合并门已完成，PR #4常规合并c5c51a6；原候选历史保留。5.2原专项授权和验证见其历史记录；已按自身批准范围收尾，不沿用5.1授权。
+5.1作者候选：批准计划r2及M独立复验后推进F–I，见[实施合同](5.1.md)、[现行迁移与接收规则](../maintainers/saves-and-party.md#迁移与接收)、[持物P-2提案](5.1-held-item-contract.md)。5.1最终双审及用户条件合并门已完成，PR #4常规合并c5c51a6；原候选历史保留。5.2原专项授权和验证见其历史记录；已按自身批准范围收尾，不沿用5.1授权。
 
 历史5.2 J2整改过程见[5.2-J2-remediation.md](5.2-J2-remediation.md)，原失败/错误措辞保留；当前以工作区`.verify/step5-2-remote-closeout-20261025/CLOSEOUT.zh.md`及已批风险/延期为准，不再把旧阻塞当作当前未merge。
 
@@ -72,7 +72,7 @@
 2026-10-27状态增补：H1 PR24/main d53311f、H2 PR25/main fcd6c57已分批接收；I整合验证进行中，J与完整5.3未签。H2旧CI145/146的90项失败已定位生成内容依赖并由CI147/148/149复验通过；不删除原失败。小画布P3作者窄修尚待本批独立验收，Ruby新增执行对照仍0。
 
 
-2026-10-27 I/J审查增补：固定代码29791cb经Kimi及sol ultra有限技术门通过；两次材料增补的四项P2/P3已CLOSED_SCOPED，小画布P3有限关闭。更正、600循环身份链、五项计时WARN及Renderer增长WARN_OPEN见[5.3 I/J技术收尾与风险交接](5.3-IJ-closeout.md)。该文为297之后的独立文档差异，精确CI/PR接收/main同步另行核验，不预填合并或整个5.3通过；旧候选/未完成描述按各自历史保留。
+2026-10-27 I/J审查增补：固定代码29791cb经Kimi及sol ultra有限技术门通过；两次材料增补的四项P2/P3已CLOSED_SCOPED，小画布P3有限关闭。现行待复核的[图鉴资源风险](../maintainers/engineering.md#图鉴资源生命周期风险)另列；600 循环及五项计时仅是当时证据。该文为297之后的独立文档差异，精确CI/PR接收/main同步另行核验，不预填合并或整个5.3通过；旧候选/未完成描述按各自历史保留。
 
 
 2026-11-01 R5 增补：[开场派出与临时资源打包边界](5.4-r5-opening-and-fixture-boundary.md)继承 F2 `87d0f50` 做 C1-R5-1/P2 与 B-R5-1/P3 窄修，候选待独立复审及精确 CI。原 F2 作者 101 项宿主记录保留，不冒充开场逐帧通过；完整 D2/5.4、E、新 P-4、GC WARN 与旧 UNKNOWN 不关闭。

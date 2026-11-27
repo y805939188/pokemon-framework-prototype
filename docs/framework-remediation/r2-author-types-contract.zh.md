@@ -32,7 +32,7 @@
 
 ## 已有合同
 
-正式净化规格 `pokemon-framework-reference/deliverables/final-specification-set/pokemon-rules/wp19-attributes-ability-and-stats.md` §3.1 明确：
+公开规格[《个体属性、特性与能力》§3.1](https://github.com/y805939188/pokemon-essentials-clean-room/blob/main/spec/creatures/attributes-ability-and-stats.md#31-类型)明确：
 
 - 个体类型来自物种／形态记录，形态在编译时继承或覆盖，读取返回副本。
 - 常见数据为 1–2 项，但数据／读取层没有两项硬上限；返回完整列表，类型成员判定覆盖全部列表。

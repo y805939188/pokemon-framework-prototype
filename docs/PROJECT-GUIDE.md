@@ -6,11 +6,11 @@
 
 第一次使用请先看[作者上手指南](user-guide/README.md)。[第六步使用说明](step6/README.md)列出完整接入清单与实机验证边界。正式 Demo 的美术和制作、Mac 玩家下载包的正式签名与公证另行安排。远端 CI 以对应提交的 Actions 运行记录为准。
 
-维护根 README 时，同时更新本指南和相应阶段导航中的范围说明。公开仓库保留源码、可复用的测试及夹具、使用说明；临时方案、测试运行产物、实机存档和审查记录留在仓库外，不随框架分发。
+维护根 README 时，同时更新本指南和相应阶段导航中的范围说明。公开仓库保留源码、可复用的测试及夹具、使用说明；临时方案、测试运行产物、实机存档和审查记录留在仓库外，不随框架分发。 按功能查维护说明：[战斗](maintainers/battle.md) · [训练家 AI](maintainers/trainer-ai.md) · [图鉴](maintainers/pokedex.md) · [地图与场地](maintainers/world.md) · [存档与队伍](maintainers/saves-and-party.md) · [工程与验证](maintainers/engineering.md)。
 
 ## 2026-11-13 历史阶段增补
 
-5.4 已按批准范围完成技术收口：固定产品 `2ecace8d9cbb2496e6a4dce273731efb3bcd8d41`，src `b7db562aeff5356b6d0e8e084a2f9c15560732ed`；同源验收文档 `9b7d178` 的 [CI #311](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43334587330) 双 job 成功，278 套／5044 项通过，冻结回放未运行。用户于 2026-11-13 决定 5.4 先统一播放默认战前过渡，完整特殊注册／优先级与按场景、对手、事件自由编排后续专项，当前未实现；现有内部生命周期接缝不等于已公开作者编排 API。[收口记录](step5/5.4-closure.md)与[当前验收索引](step5/5.4-current-acceptance.md)明确有限测试、历史原生／人工证据、E74 72＋2登记和全部保留边界。不宣称全参考等价或完整性能，未合并 main、未分发游戏包。
+5.4 已按批准范围完成技术收口：固定产品 `2ecace8d9cbb2496e6a4dce273731efb3bcd8d41`，src `b7db562aeff5356b6d0e8e084a2f9c15560732ed`；同源验收文档 `9b7d178` 的 [CI #311](https://github.com/y805939188/pokemon-framework-prototype/actions/runs/43334587330) 双 job 成功，278 套／5044 项通过，冻结回放未运行。用户于 2026-11-13 决定 5.4 先统一播放默认战前过渡，完整特殊注册／优先级与按场景、对手、事件自由编排后续专项，当前未实现；现有内部生命周期接缝不等于已公开作者编排 API。[收口记录](step5/5.4-closure.md)与[战斗功能与验证边界](maintainers/battle.md#功能范围与测试证明)明确有限测试、历史原生／人工证据、E74 72＋2登记和全部保留边界。不宣称全参考等价或完整性能，未合并 main、未分发游戏包。
 
 下列路线表中第五步的细分状态及文末旧增补为其注明日期的历史截面，不是当前仍在运行／待审的证据；保留原结果，不把历史失败抹去。交接时先读本增补和当前验收索引，再按所需版本读取历史记录。
 
@@ -20,14 +20,14 @@
 
 "完整覆盖"指所有决定保留的行为最终都有实现和验收证据。暂缓、未验证、未实现不算完成。与原版有意不同的行为、首版范围和长尾取舍必须由用户决定，不能因为实现困难悄悄砍功能。
 
-七步路线（详见规格库 `pokemon-framework-reference/planning/framework-roadmap/`）：
+下表记录框架的七步开发路线和当时状态；当前使用及交付范围见[作者上手指南](user-guide/README.md)和[第六步说明](step6/README.md)。
 
 | 步 | 内容 | 状态 |
 |---|---|---|
 | 1 | 提取并整改行为规格，建立去向清单 | 已完成（规格库 `dae6776`） |
-| 2 | 验证战斗接入，确定路线和首版范围 | **已完成并经用户决定（C2）**，补充修复已于 2026-10-19 收口（标签 `step2-closeout`），见 `docs/step2/README.md`、`docs/step2/closeout-addendum.md` |
-| 3 | 工程与测试基础：模块边界、构建/CI、内容数据、本地化、存档基础、第一条 Ruby/TS 对照测试链 | **已收口（2026-10-19，标签 `step3-closed`）**：独立验收先不通过、整改后有条件通过，见 `docs/step3/closure.md`；性能尚无同条件基线。第四步前短架构批次（含复核修复）已于 2026-10-20 经 PR #1 合入 `main`，见 `docs/step3/architecture-batch-closure.md` |
-| 4 | 最小可玩闭环（获得精灵→遭遇→战斗/捕获→成长→治疗→存档读档） | **已完成（2026-10-21）**：批次 A/B/C 与两轮复核整改经 PR #2 合入 `main`（合并提交 `3e3e655`），收口记录 `docs/step4/closure.md`；见 `docs/step4/README.md`、`acceptance.md`、`commands.md` |
+| 2 | 验证战斗接入，确定路线和首版范围 | **已完成并经用户决定（C2）**，补充修复已于 2026-10-19 收口（标签 `step2-closeout`），见 `docs/step2/README.md`、[请求与回滚规则](maintainers/battle.md#请求资格pp与回滚) |
+| 3 | 工程与测试基础：模块边界、构建/CI、内容数据、本地化、存档基础、第一条 Ruby/TS 对照测试链 | **已收口（2026-10-19，标签 `step3-closed`）**：独立验收先不通过、整改后有条件通过，见 [参考对照与支持平台](maintainers/engineering.md#参考对照和支持平台)；性能尚无同条件基线。第四步前短架构批次（含复核修复）已于 2026-10-20 经 PR #1 合入 `main`，见 [宿主与验证口径](maintainers/engineering.md#宿主与性能验证口径) |
+| 4 | 最小可玩闭环（获得精灵→遭遇→战斗/捕获→成长→治疗→存档读档） | **已完成（2026-10-21）**：批次 A/B/C 与两轮复核整改经 PR #2 合入 `main`（合并提交 `3e3e655`），收口记录 [玩法流程](maintainers/world.md#正常玩法闭环)；见 `docs/step4/README.md`、`acceptance.md`、`commands.md` |
 | 5 | 功能组扩展、菜单、界面、地图与存档流程 | 5.6 已按限定范围收口；各批次、兼容范围和仍未验证的条件见[第五步索引](step5/README.md) |
 | 6 | 作者工具、真实宿主验证与测试隔离 | [框架交付范围与验证入口](step6/README.md)；正式 Demo 另行制作 |
 | 7 | 平台、存档、性能、分发验收，发布可用版本 | 未开始 |
@@ -43,7 +43,7 @@
 | 目录 | 角色 | 规则 |
 |---|---|---|
 | `pokemon-framework-prototype` | **主工作仓库**（本仓库）。也是一个可直接用 MZ 打开的工程（`game.rmmzproject`） | 远端 `github.com/y805939188/pokemon-framework-prototype`，`main` 是唯一长期分支 |
-| `pokemon-framework-reference` | clean-room 规格与证据（131 份正式规格、87 个 WP、去向清单 736 单元） | **只读使用**。规格在 `deliverables/final-specification-set/`，推导期望在其 `test-catalog/`，去向清单在 `planning/implementation-routing/r8-20261017/` |
+| [Pokémon 行为规格](https://github.com/y805939188/pokemon-essentials-clean-room) | 独立的 clean-room 行为规格，按领域组织 | **只读使用**：[使用入口](https://github.com/y805939188/pokemon-essentials-clean-room/blob/main/README.md)、[行为正文](https://github.com/y805939188/pokemon-essentials-clean-room/tree/main/spec)、[验收案例](https://github.com/y805939188/pokemon-essentials-clean-room/blob/main/vectors/README.md)、[来源与证据边界](https://github.com/y805939188/pokemon-essentials-clean-room/blob/main/reference/scope-and-evidence.md)。不读、不移植原版 Ruby。 |
 | `rpg-maker-mz-initialize` | 通用 MZ+Reactor+TS 工程模板（`b6fa1df`），本仓库由它起步 | 已不再需要修改；不要把通用模板改成实验工程 |
 
 仓库外但必需的依赖（不在 git 里，换机器要重新准备，见第 9 节）：RPGReactor 运行时与声明（固定 0.98.8 @ `2dc2e10e`，脚本下载或用 `REACTOR_SOURCE` 选择本地检出）、已安装的 RPG Maker MZ（Steam 版）、Showdown 源码缓存 `~/Library/Caches/pokemon-framework/showdown-src`。
@@ -80,7 +80,7 @@
 - 道具、精灵球、逃跑作为引擎队列里的 `event` 动作（优先级 99：换人之后、招式之前）在回合内结算；载荷放在会被快照序列化的 `battle.rpg.pending`；随机数一律走战斗随机入口。
 - 游戏规则层负责成长（曲线、经验、EV、升级、学招）、背包台账、持久状态与写回；引擎只被告知结果，并与游戏规则交叉校验。
 - **第三步起源码在 `src/framework/`（严格 TS，业务模块之间一律 `import`）**，分层：`rules/`（纯规则与状态/存档 schema）、`content/`（内容 schema 与编译）、`battle/`（Showdown 适配；`showdown-loader.ts` 是**唯一**允许 `require` 的文件，因为 NW.js 里 Showdown 只能 `require`，`import()` 实测失败）、`flow/`（BattleSession、文字描述、日志、内容组装）、`i18n/`（文本 key 与翻译）、`tools/`（夹具、矩阵、harness、存档存储、内容 CLI）。依赖方向由 `scripts/check-boundaries.cjs` 强制（31 个测试证明规则会拒绝违规树，并检查文字/普通属性不误报）；它用 Vite 自带的解析器读语法树（所以要先 `pnpm --dir src install`），**网关的内部状态（`_debugBattle`、`_env`、`_queue`、`_seq`、`_closed` 等）只允许 battle 层和 tools 使用**，flow 只用网关的值查询、受控操作和不透明检查点。Vite 把它们构建成 `js/engine/build/engine.cjs`（API）、`custom-formats.cjs`（运行在 Showdown 里，由 `build-showdown.sh` 暂存）和 `content-cli.cjs`；`js/engine/**/*.cjs` 现在只是兼容门面，**不要往里加逻辑**。
-- **第四步前短架构批次后的分层（`docs/step3/architecture-batch.md`）：** `rules/` 是**核心**，公共入口 `rules/index.ts`（构建为 `js/engine/build/core.cjs`），无 Node、无 DOM、无 Showdown、无显式 `any`，用 `framework/tsconfig.core.json`（`types: []`）单独编译；摘要用 `rules/sha256.ts`（可移植、同步）。`app/` 是应用层：`GameApplication` 只依赖自己拥有的端口（状态、会话工厂、内容、投影），规则调用核心，引擎在 `battle/`、MZ 在插件里。`composition.ts`（entry 层）是把 Showdown 会话接到端口的唯一位置。`battle/driver.ts` 定义 `BattleDriver`/`BattleDriverFactory`（会话与引擎之间的类型缝），`tools/scripted-driver.ts` 与 `tools/fakes.ts` 是测试用的假适配器。插件的 `PSFlow.begin/finish/abort/commit` 是 `GameApplication` 的薄包装；应用初始化失败时，插件仍独立投影中止结果并释放事件等待。应用在持久状态提交前验证 outcome，宿主投影失败不撤销提交。检查器只允许 app 从 flow 引用 `content-runtime.ts`，该服务只依赖 rules/content，根入口限 `index.ts` / `composition.ts`，动态导入必须用可检查的字面量。复核后修复与新证据见 `docs/step3/batch-review-fixes.md`。
+- **第四步前短架构批次后的分层（`docs/step3/architecture-batch.md`）：** `rules/` 是**核心**，公共入口 `rules/index.ts`（构建为 `js/engine/build/core.cjs`），无 Node、无 DOM、无 Showdown、无显式 `any`，用 `framework/tsconfig.core.json`（`types: []`）单独编译；摘要用 `rules/sha256.ts`（可移植、同步）。`app/` 是应用层：`GameApplication` 只依赖自己拥有的端口（状态、会话工厂、内容、投影），规则调用核心，引擎在 `battle/`、MZ 在插件里。`composition.ts`（entry 层）是把 Showdown 会话接到端口的唯一位置。`battle/driver.ts` 定义 `BattleDriver`/`BattleDriverFactory`（会话与引擎之间的类型缝），`tools/scripted-driver.ts` 与 `tools/fakes.ts` 是测试用的假适配器。插件的 `PSFlow.begin/finish/abort/commit` 是 `GameApplication` 的薄包装；应用初始化失败时，插件仍独立投影中止结果并释放事件等待。应用在持久状态提交前验证 outcome，宿主投影失败不撤销提交。检查器只允许 app 从 flow 引用 `content-runtime.ts`，该服务只依赖 rules/content，根入口限 `index.ts` / `composition.ts`，动态导入必须用可检查的字面量。复核后修复与新证据见 [分层与应用规则](maintainers/engineering.md#分层检查与应用投影)。
 
 - **第四步新增（`docs/step4/README.md`）：** 核心 `rules/` 加了个体生成 `member-factory.ts`（物种+等级→成员，注入 `random(n)`）、`grants.ts`（一次性领取）、`heal.ts`、`encounter.ts`（WP36 §5.1 抽选）、`defeat.ts`（WP42 §6.1 + WP61 §7.2）、`limits.ts`（阶段容量：队伍 6、盒子 1200 扁平、背包每种 999、金钱 999999）、`items.ts`；持久状态 **schema 3**（`claims` 凭证账本，迁移 1→2→3）。应用层 `GameApplication` 加 `startNewGame`/`claimGrant`/`healParty`/`prepareEncounter`/`describeParty`，并负责**创建野生对手**（`composition.ts` 不再引用夹具）、开战守卫（可战斗成员、满队满盒 `noBall`）和**战败结算与结果同一次替换**。`app/` 也用 `tsconfig.app.json`（lib ES2022、`types: []`，含传递导入）单独编译。内容管线加可选 `grants.json`；`DexLookup` 加性扩展（特性、性别比例、招式 id/PP，读 **Gen 8** 数据）。插件：正式新游戏（`setupNewGame` 不再用夹具，`PSFlow.game()` 不伪造状态）、`ClaimGrant`/`HealParty`/`ShowParty` 命令、地图备注 `<PSEncounter:…>` 覆盖 `executeEncounter`、统一开战入口 `PSFlow.openBattle`、保存屏蔽（战斗进行时 `Game_System.isSaveEnabled` 额外返回 false，从不改写游戏自己的保存开关；战斗中直接保存也拒绝）、战败回家（可重试，不再结算；结束发起战斗的整条事件调用链，含逐层公共事件；提交后的宿主消息故障记在 `lastOutcome.hostErrors`，不改已提交结果）。内容、凭证、账本字典按自有键读写（`rules/own.ts`）；领取的物种登记图鉴；从开战创建会话起到这场战斗结束或中止，应用层拒绝领取、治疗（`battle-active`）和第二场战斗，中止后迟到的会话不被使用。切片地图 `Map005` 是新游戏起点。
 
@@ -144,7 +144,7 @@ regular 无头测试还需要 Python 3，用于固定 canonical JSON／UTF-8／S
 
 本轮架构整改的编译内容语义为 4（作者 schema 仍为 2／显式 legacy 1，持久存档仍为 9，战斗协议仍为 v1）。旧 compiled cache 需从作者源重新构建；不会自动修改作者 JSON 或玩家档。Gen8 标准类型列表不截断，按类型身份去重，显式空列表规范化为 Normal，并用于图鉴、静态摘要、进化和战斗基础类型。战斗临时类型另由引擎拥有。Stellar 等 Future 类型仍接受并给出 warning，但其整条记录保留原生战斗行为，一致性仍 OPEN；范围与测试见 [作者类型合同](framework-remediation/r2-author-types-contract.zh.md)。
 
-本轮架构整改的固定候选、逐批提交与独审、冷准备和三轮 regular 实绩见 [整改总回执](framework-remediation/architecture-review-remediation.zh.md)。该回执区分产品候选与后继文档提交，不替代原5.4收口／历史实机证据，也不预签NW、性能或后续功能。
+详见[装配边界](maintainers/engineering.md#装配与兼容边界)及[宿主验证口径](maintainers/engineering.md#宿主与性能验证口径)。架构或文档改动本身不证明 NW、性能或后续功能。
 
 ## 10. 已知坑
 
@@ -164,7 +164,7 @@ regular 无头测试还需要 Python 3，用于固定 canonical JSON／UTF-8／S
 - 第四步之后战斗对手由内容生成，测试要固定 `PSFlow.rng`（生成随机）和 `PSFlow.seed`（引擎种子）才可复现。
 - zsh 里 `echo =====` 会被当成命令展开而报错；脚本用 bash。
 - 内存、泄漏相关改动依赖 PixiJS 内部实现，升级 Pixi/Reactor 后要重跑 100 场战斗内存检查（`docs/step2/runtime-issues.md`）。
-- 真实 MZ 测试驱动（`PS_BattleFlowTest`）只等场景对象出现就按键，按键可能早于 `scene.start`。5.0 新包首轮 T24 返回菜单超时一次，根因未证实（`docs/step5/5.0-closure.md`）。改驱动时要同步可交互状态，并记录输入帧，不要靠加长超时或重跑到通过。
+- 真实 MZ 测试驱动（`PS_BattleFlowTest`）只等场景对象出现就按键，按键可能早于 `scene.start`。5.0 新包首轮 T24 返回菜单超时一次，根因未证实（[原生输入与性能边界](maintainers/engineering.md#宿主输入等待与性能警告)）。改驱动时要同步可交互状态，并记录输入帧，不要靠加长超时或重跑到通过。
 
 ## 11. 文档地图（建议阅读顺序）
 
@@ -172,19 +172,19 @@ regular 无头测试还需要 Python 3，用于固定 canonical JSON／UTF-8／S
 2. `docs/step2/README.md`（第二步总结与文档导航）
 3. `docs/step2/c2-decision.md`、`deviations.md`（用户的决定与有意差异）
 4. `docs/step2/protocol-v1.md`（冻结的协议）、`runtime-issues.md`、`signing-plan.md`
-5. 阶段报告 `docs/step2/2.2-report.md` … `2.5-report.md`（推导过程与证据，按需读）；独立评审后的修订与未决事项见 `docs/step2/review-followups.md`（先读它，再读报告里标 *(corrected)* 的地方）
+5. 阶段报告 `docs/step2/2.2-report.md` … `2.5-report.md`（推导过程与证据，按需读）；[现行战斗回合与道具规则](maintainers/battle.md#正常回合与道具守卫)单独维护。
 6. [第二步历史证据索引](https://github.com/y805939188/pokemon-framework-prototype/blob/91fe853f642bfa841bb3c93bb0ab86c9c0ac1ad0/experiments/step2/evidence/MANIFEST.md)（历史构建，不是当前回归输入）
 
 ## 12. 分支、标签与提交约定
 
 - `main` 是唯一长期分支；新工作开短期分支，合并后删除。远端与本地保持一致。
-- 阶段里程碑用标签保留：`step2.1-accepted`、`step2.2-feasibility`、`step2.3-c1`、`step2.4-mz-flow`、`step2.5-c2`、`step2.runtime-pass`；独立评审的基线标签是 `step2-review-baseline`（指向 `2e5f2e5`，评审报告审查的就是它）；`step2-review-fixes` 是评审修复完成时的状态（`c2a3e29`，在用户决定 D1–D5 落地之前）；**`step2-closed` 是第二步收尾时的最终状态**；第三步在短期分支 `step3/foundation` 上做，**独立复核通过后**才合并并打 `step3-closed`。评审后的修复与决定见 `docs/step2/review-followups.md`。
+- 阶段里程碑用标签保留：`step2.1-accepted`、`step2.2-feasibility`、`step2.3-c1`、`step2.4-mz-flow`、`step2.5-c2`、`step2.runtime-pass`；独立评审的基线标签是 `step2-review-baseline`（指向 `2e5f2e5`，评审报告审查的就是它）；`step2-review-fixes` 是评审修复完成时的状态（`c2a3e29`，在用户决定 D1–D5 落地之前）；**`step2-closed` 是第二步收尾时的最终状态**；第三步在短期分支 `step3/foundation` 上做，**独立复核通过后**才合并并打 `step3-closed`。现行规则见[战斗回合与道具规则](maintainers/battle.md#正常回合与道具守卫)。
 - 提交信息写清做了什么和为什么；AI 协作提交按所用工具要求添加署名行。
 
 
 ## 2026-10-27 I/J技术门增补
 
-5.3固定代码29791cb的Kimi/ultra技术门已有限通过，材料增补闭环与保留风险见[5.3 I/J技术收尾](step5/5.3-IJ-closeout.md)。本增补不预签精确CI、远端接收、完整5.3或原版等价；五项计时WARN、当前Renderer增长WARN_OPEN、Ruby新增执行0、FINAL-INPUT后置NOT RUN及原历史限制保持。前表为各阶段历史截面，具体新结论以上述版本化增补和实际发布回执为准。
+5.3固定代码29791cb的Kimi/ultra技术门已有限通过，现行待复核的[图鉴资源风险](maintainers/engineering.md#图鉴资源生命周期风险)另列。本增补不预签精确CI、远端接收、完整5.3或原版等价；五项计时WARN、当前Renderer增长WARN_OPEN、Ruby新增执行0、FINAL-INPUT后置NOT RUN及原历史限制保持。前表为各阶段历史截面，具体新结论以上述版本化增补和实际发布回执为准。
 
 ## 2026-10-28 框架整改组合验收入口
 

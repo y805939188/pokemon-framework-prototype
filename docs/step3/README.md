@@ -2,7 +2,7 @@
 
 > **历史命令说明：** 本页引用的三个旧 Mac 流程、包内测试及性能 runner 已停用，不适用于当前构件。当前验证边界见[开发者指南 §8](../PROJECT-GUIDE.md#8-常用命令)。
 
-状态：**已收口（2026-10-19，标签 `step3-closed`，记录见 `docs/step3/closure.md`）**。批次 A、B、支线 C 均已实现；首次独立验收 `step3-candidate-2` 不通过、限定整改 R1–R4 后 `step3-candidate-3` 有条件通过并已合并到 `main`。性能尚无同条件基线，未证明无退化。以下是收口前的工作记录。（工作分支 `step3/foundation`，起点 `a77b6af`）。执行方案全文在工作区 `.handoff/step3-plan.md`（不在 git 里）。
+状态：**已收口（2026-10-19，标签 `step3-closed`，记录见 [参考对照与支持平台](../maintainers/engineering.md#参考对照和支持平台)）**。批次 A、B、支线 C 均已实现；首次独立验收 `step3-candidate-2` 不通过、限定整改 R1–R4 后 `step3-candidate-3` 有条件通过并已合并到 `main`。性能尚无同条件基线，未证明无退化。以下是收口前的工作记录。（工作分支 `step3/foundation`，起点 `a77b6af`）。执行方案全文在工作区 `.handoff/step3-plan.md`（不在 git 里）。
 
 ## 范围
 
@@ -23,7 +23,7 @@
 - CI 通过是合并条件（所需检查在精确候选提交上全部成功；失败、未运行、读不到都不放行；本地合并后在最终 `main` 上再核验）。
 - 参考观察的隔离、交付包的 schema 与“检查前移”：见 `experiments/step3/reference/`（落库后）与工作区方案。
 
-## 遗留项分流（来自 `docs/step2/review-followups.md`）
+## 当时的遗留项分流
 
 | 项 | 归属 | 一句理由 |
 |---|---|---|
@@ -78,7 +78,7 @@
 | 8 | 遗留项处置透明、性能无未解释的重大退化 | 部分：处置透明；性能有一处**未解释到底**的小变化 | 引擎动作延迟 +1.5–2 ms（已排除引擎与日志），帧时间/到菜单/内存无变化；见 `evidence/MANIFEST.md` |
 | 9 | CI 针对精确候选提交成功（合并条件） | 见复核包“候选”一节（标签 `step3-candidate`）；读不到的结果不算通过 | `scripts/ci-status.sh` |
 
-本地 Node 套件合计 **117 个测试**（第二步 68 + 边界 14 + 内容 8 + 本地化 7 + 存档 12 + 整合 4 + 差分 4）——这是候选 `89988b2` 时的数字；并入 F1–F3 与第二步收尾后为 **20 套件 147 项**（新增套件/用例：`test-move-requests` 8、`test-pp-sync` 5、`test-session-operations` 11、`test-session-failure` 6，见 `docs/step3/review-fixes.md`、`docs/step2/closeout-addendum.md`）。**没有声明的**：Windows/Intel；Developer ID 签名与公证；窗口测试在 CI；框架独有内容数据的来源（仍是占位）；成长以外模块的原版运行证据；MZ 存档文件本身的原子性（MZ 的）。
+本地 Node 套件合计 **117 个测试**（第二步 68 + 边界 14 + 内容 8 + 本地化 7 + 存档 12 + 整合 4 + 差分 4）——这是候选 `89988b2` 时的数字；并入 F1–F3 与第二步收尾后为 **20 套件 147 项**（新增套件/用例：`test-move-requests` 8、`test-pp-sync` 5、`test-session-operations` 11、`test-session-failure` 6，见 [会话异常规则](../maintainers/battle.md#会话互斥与异常)、[请求与回滚规则](../maintainers/battle.md#请求资格pp与回滚)）。**没有声明的**：Windows/Intel；Developer ID 签名与公证；窗口测试在 CI；框架独有内容数据的来源（仍是占位）；成长以外模块的原版运行证据；MZ 存档文件本身的原子性（MZ 的）。
 
 ## 验证入口
 
@@ -86,7 +86,7 @@
 - 需要窗口、只能在本机跑：`scripts/run-flow-test-mac.sh`、`scripts/run-package-tests-mac.sh`、`scripts/run-package-perf-mac.sh`（见 `docs/PROJECT-GUIDE.md` 第 8 节）。
 - CI 与 TS 迁移的进展见下方各节（随推进补充）。
 
-- 第二步补充收尾（回滚失败封闭会话、守卫测试、F2 支持范围的文字化）：已收口并入本分支（标签 `step2-closeout`），见 `docs/step2/closeout-addendum.md`；不改变上面的第三步验收状态。
+- 第二步补充收尾（回滚失败封闭会话、守卫测试、F2 支持范围的文字化）：已收口并入本分支（标签 `step2-closeout`），见 [请求与回滚规则](../maintainers/battle.md#请求资格pp与回滚)；不改变上面的第三步验收状态。
 
 ## 边界债务与去向（第三步收口报告的固定栏目）
 
@@ -96,12 +96,12 @@
 |---|---|---|
 | 战斗内部对象穿透（v1.0 §八“业务不持有引擎内部对象”） | **已关闭（R2）**：`flow/session.ts` 不再调用 `_debugBattle()`，也不碰 `_env/_queue/_seq/_closed`；网关提供值查询、受控操作和不透明检查点；检查器按标识符禁止在 battle/tools 之外使用。`ShowdownBattle` 仍为 `any`，只在 battle 层与 tools 内可达 | **短批次已做**：`BattleDriver`/`BattleDriverFactory` 类型缝 + 脚本化驱动假适配器；不重复整改 |
 | 领域依赖 Node | **已关闭（短批次）**：`rules/sha256.ts` 可移植同步 SHA-256，旧账本与内容哈希金样一致；核心 `types: []` 独立编译，裸 `vm` 里运行 | 见 `docs/step3/architecture-batch.md` |
-| 检查器盲区 | **已关闭指定缺口**：R3 用 AST 检查模板插值；短批次补 Node 全局、rules/app 的 `any` 与核心 `types: []` 编译；复核修复补 app 的 flow 白名单及其下层依赖、根入口白名单、常见宿主全局、非字面量动态导入；普通属性名不当作全局名 | 见 [批次复核修复](batch-review-fixes.md)；检查器是保守的静态约束，未承诺任意代码绕过或完整词法绑定分析 |
+| 检查器盲区 | **已关闭指定缺口**：R3 用 AST 检查模板插值；短批次补 Node 全局、rules/app 的 `any` 与核心 `types: []` 编译；复核修复补 app 的 flow 白名单及其下层依赖、根入口白名单、常见宿主全局、非字面量动态导入；普通属性名不当作全局名 | 见 [分层与应用规则](../maintainers/engineering.md#分层检查与应用投影)；检查器是保守的静态约束，未承诺任意代码绕过或完整词法绑定分析 |
 | 插件 `any` | **部分完成**：应用视图和端口已类型化；UI/session 壳仍有 `any`，插件的两处 `s.gw.readState` 是值查询 | 第六步继续收紧 UI 类型；本批未重写界面 |
 | 保存阶段 | `PS_SaveState.beforeSave` 不检查战斗中（靠场景约束） | 第四步保存用例加守卫与场景 |
 | 性能 | 冷启动比候选记录慢约 190–200 ms、引擎动作延迟 +1.5–2 ms 的差异：**短批次建立了第一份同条件对照**（基线两遍/新版两遍交叉，`experiments/step3/evidence/batch/perf-compare.md`），差异没有出现在同条件对照里，原因未再追究；**仍不是无退化的证明**（3 次启动/遍、一台机器、无阈值） | 第四步闭环后再定预算 |
 | 范围 | 首版单打；双打、长尾后置；Windows/Intel 暂缓（用户决定） | 第四步后重估；平台见 `PROJECT-GUIDE.md` |
-| 检查器与回归后续（P4，短批次收尾时登记） | 非核心纯层的宿主名黑名单未列全（`performance`、`crypto`、`localStorage` 等）；同名枚举成员/导出别名被保守误报；缺 `winner` 的拒绝没有固化用例 | 第四步动 app 层时处理，见 [短批次收尾记录](architecture-batch-closure.md) |
+| 检查器与回归后续（P4，短批次收尾时登记） | 非核心纯层的宿主名黑名单未列全（`performance`、`crypto`、`localStorage` 等）；同名枚举成员/导出别名被保守误报；缺 `winner` 的拒绝没有固化用例 | 第四步动 app 层时处理，见 [宿主与验证口径](../maintainers/engineering.md#宿主与性能验证口径) |
 
 ## 第三步限定整改（独立验收 `e0a6be5` 后，2026-10-19）
 
