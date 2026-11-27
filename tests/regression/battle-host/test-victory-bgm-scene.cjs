@@ -17,7 +17,7 @@ test.before(()=>{
   assert.equal(process.env.PF_VICTORY_MUTATION,'omit-cue');const marker='PSFlow._victoryBattleMusic(op);';
   assert.equal(built.PS_BattleFlow.split(marker).length,2);built.PS_BattleFlow=built.PS_BattleFlow.replace(marker,'void op;');
  }
- const source=fs.readFileSync(path.join(ROOT,'experiments/step5/4/test-battle-music-scene.cjs'),'utf8');
+ const source=fs.readFileSync(path.join(ROOT,'tests/regression/battle-host/test-battle-music-scene.cjs'),'utf8');
  const parse=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]})).parseAst;
  const node=parse(source).body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='host');assert(node);
  const box={require,fs,path,os,vm,assert,E,ROOT,temp,plugin:built.PS_BattleFlow,savePlugin:built.PS_SaveState,flush};vm.createContext(box);

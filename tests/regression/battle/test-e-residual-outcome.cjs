@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),fs=require('node:fs'),path=require('node:path');
-const {E,T,inputs}=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs'),plan=require('../../support/battle/e-residual-outcome.json');
+const {E,T,inputs}=require('../../support/battle-ai/integration/fixtures.cjs'),plan=require('../../support/battle/e-residual-outcome.json');
 const {assert,clone}=require('../../support/battle/e-residual-outcome-common.cjs'),{verify}=require('../../support/battle/e-residual-outcome-oracle.cjs');
 assert.equal(plan.completeHeading,false);assert.equal(fs.readFileSync(path.resolve(__dirname,'../../../js/engine/showdown/SOURCE_SHA'),'utf8').trim(),plan.showdownSHA);
 const view=s=>({p1:clone(s.gw.readState('p1')),p2:clone(s.gw.readState('p2')),active:s.gw.activeId('p1'),request:clone(s.currentRequest())});

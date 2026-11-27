@@ -1,0 +1,49 @@
+{
+  "format": "pokemon-framework-authoring-example-overlay-v1",
+  "baseContentDirectory": "content/sample",
+  "role": "Data-only overlay recipes; this manifest is not a content-cli manifest or a saved game.",
+  "copyToContentSource": [
+    "content/map-metadata.json",
+    "content/region-maps.json",
+    "content/map-connections.json",
+    "content/encounters.json",
+    "content/settings.json"
+  ],
+  "appendByUniqueIdToGrants": "content/grants.append.json",
+  "retainFromBase": [
+    "manifest.json",
+    "sources.json",
+    "species.json",
+    "overlays.json",
+    "regional-dex.json",
+    "trainer-types.json",
+    "trainers.json"
+  ],
+  "nativeInstallation": "Use the MZ editor; never replace Map005.json wholesale. Add companion source as a new event and adjust its ID if occupied. Terrain meanings do not set tile terrain tags.",
+  "apiDataOnly": [
+    "api/shortcut-registration.json",
+    "api/field-move.json"
+  ],
+  "gCommands": {
+    "plugin": "PS_World",
+    "locationCommandExamples": "native/world-location-commands.json",
+    "locationCommands": [
+      "RecordRecentCenter",
+      "RecordCaveEntrance",
+      "ClearCaveEscapePoint"
+    ],
+    "companionCommands": [
+      "RegisterEventCompanion",
+      "RemoveEventCompanions"
+    ],
+    "blackoutRetryCommand": "RetryBlackoutReturn"
+  },
+  "notIncluded": [
+    "player-save-state",
+    "independent-fly-unlock-state",
+    "blackout-checkpoint",
+    "runtime-owner-or-receipt",
+    "automatic-common-event-interaction",
+    "complete-playable-demo"
+  ]
+}

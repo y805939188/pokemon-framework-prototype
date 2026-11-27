@@ -2,8 +2,8 @@
 // Production compiled plugins + App/Gen8, with explicit controlled renderer,
 // input/audio/clock/SceneManager ports. This is not an NW or disk-save host.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),crypto=require('node:crypto'),{spawnSync,execFileSync}=require('node:child_process');
-const {createVictoryDriverHost}=require('../../../experiments/step5/4/victory-music-driver-host.cjs');
-const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),PLAN=require('../../../experiments/step5/4/victory-music-native-plan.json');
+const {createVictoryDriverHost}=require('../battle-host/victory-music-driver-host.cjs');
+const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),PLAN=require('../battle-host/native-plans/victory-music-native-plan.json');
 const clone=v=>JSON.parse(JSON.stringify(v)),sha=x=>crypto.createHash('sha256').update(x).digest('hex');
 let temp,plugins,entryText,fixture,cache,sourceTree,pluginHashes;
 async function prepare(){

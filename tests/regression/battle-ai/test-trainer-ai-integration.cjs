@@ -1,7 +1,7 @@
 'use strict';
 // Each C gate runs the actual formal App/composition/Showdown/session implementation; no frozen expected vector is executed as the SUT.
 const test=require('node:test'),assert=require('node:assert/strict');
-const {E,T,D,clone,fixture,inspect,diag}=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const {E,T,D,clone,fixture,inspect,diag}=require('../../support/battle-ai/integration/fixtures.cjs');
 const capture=w=>D.captureTrainerAiRequest(w.session,w.session.gw);
 const active=w=>w.session.gw._debugBattle().sides[1].active[0];
 const player=w=>w.session.gw._debugBattle().sides[0].active[0];

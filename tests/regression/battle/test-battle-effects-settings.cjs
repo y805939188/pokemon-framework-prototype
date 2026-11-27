@@ -1,7 +1,7 @@
 // Installed MZ method bodies; rendering and configuration I/O are controlled.
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os');
-const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),{installNativeSettings}=require('../../../experiments/step5/4/battle-effects-settings-host.cjs');let temp,S;
+const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),{installNativeSettings}=require('../../support/battle-host/battle-effects-settings-host.cjs');let temp,S;
 test.before(async()=>{temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-battle-effects-settings-'));const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));await vite.build({configFile:false,root:ROOT,logLevel:'error',build:{outDir:temp,minify:false,lib:{entry:path.join(ROOT,'src/plugins/battleflow/battle-effects-settings.ts'),formats:['cjs'],fileName:()=>'settings.cjs'}}});S=require(path.join(temp,'settings.cjs'));});
 test.after(()=>{if(temp)fs.rmSync(temp,{recursive:true,force:true});});
 function host(lang='en'){const G=installNativeSettings({},ROOT);S.installBattleEffectsSettings(G,()=>E.i18n.translatorFor(lang));return G;}

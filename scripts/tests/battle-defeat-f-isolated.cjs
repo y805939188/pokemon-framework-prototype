@@ -6,7 +6,7 @@ const names = ['PS_SaveLocation', 'PS_BattleFlow', 'PS_World'];
 const sha = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
 function prepare(root, evidence) {
-  const parent = path.join(root, 'build', 'step6-isolated');
+  const parent = path.join(root, 'build', 'isolated-launch');
   fs.mkdirSync(parent, {recursive:true, mode:0o700});
   assert.equal(fs.realpathSync(parent),parent,'scope parent must not be linked');
   assert.equal(fs.lstatSync(parent).mode & 0o077, 0, 'scope parent must be private');

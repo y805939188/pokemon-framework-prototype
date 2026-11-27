@@ -3,7 +3,7 @@
  * Explicit fault controls delay publication of genuinely decoded native buffers.
  * Root decisions are programmatic public APIs, not a full receiving/evolution UI test.
  */
-import PLAN from '../../../experiments/step5/4/capture-me-native-plan.json';
+import PLAN from '../../../tests/support/battle-host/native-plans/capture-me-native-plan.json';
 import { musicNativeContent } from './music-native-fixture';
 
 export async function runD2CaptureME(p: any, continuing: boolean): Promise<void> {

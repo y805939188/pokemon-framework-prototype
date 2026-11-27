@@ -2,8 +2,8 @@
 // Compiled product + installed Reactor updateScene/updateCallMenu; input,
 // rendering/audio/scene scheduling are controlled. No NW or real signals.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
-const {createVictoryDriverHost}=require('../../../experiments/step5/4/victory-music-driver-host.cjs');
-const ROOT=path.resolve(__dirname,'../../..'),PLAN=require('../../../experiments/step5/4/victory-music-native-plan.json');let temp,plugins,entry,fixture;
+const {createVictoryDriverHost}=require('../../support/battle-host/victory-music-driver-host.cjs');
+const ROOT=path.resolve(__dirname,'../../..'),PLAN=require('../../support/battle-host/native-plans/victory-music-native-plan.json');let temp,plugins,entry,fixture;
 test.before(async()=>{
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-prebattle-menu-'));plugins={};
  for(const name of ['PS_BattleFlow','PS_SaveState','PS_Evolution','PS_BattleFlowTest']){const out=path.join(temp,name),r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);let code=fs.readFileSync(path.join(out,name+'.js'),'utf8');if(name==='PS_BattleFlow'&&process.env.PF_PREBATTLE_MENU_MUTATION==='omit-menu-guard'){const marker='return !pending() && isMenuEnabled.apply(this, args);';assert.equal(code.split(marker).length,2);code=code.replace(marker,'return isMenuEnabled.apply(this, args);');}if(name==='PS_BattleFlowTest')entry=code;else plugins[name]=code;}

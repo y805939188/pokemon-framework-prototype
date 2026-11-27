@@ -1,0 +1,43 @@
+{
+  "scope": "World event interpreter and native map guards",
+  "cases": [
+    [
+      "A1",
+      "actual map interpreter three location commands; synchronous business before presentation; independent healingSpot"
+    ],
+    [
+      "A2",
+      "actual 357 extra/accessor and pending201 reject unchanged; no self wait"
+    ],
+    [
+      "B1",
+      "wild actual357 mixed inherit -> actualScene/Session; HeavyRain->rain and cave business capture"
+    ],
+    [
+      "B2",
+      "trainer actual357 explicit none still business capture; original generation timing"
+    ],
+    [
+      "B3",
+      "late raw201 ABA / generation handoff rejects old admission and preserves successor"
+    ],
+    [
+      "C1",
+      "actual cut/rocksmash/strength-push sound calls through original AudioManager"
+    ],
+    [
+      "C2",
+      "Flash actual native animation completion then atomic commit and actual mask expansion"
+    ],
+    [
+      "C3",
+      "dark lifecycle saved flash carry / same-map201 / normal retirement"
+    ],
+    [
+      "C4",
+      "Flash missing-resource before commit and late/newer resource guard"
+    ]
+  ],
+  "rng": "full observed prefixes/deltas; no resets",
+  "coverage": "Node host contracts only; not physical NW.js or audiovisual verification."
+}

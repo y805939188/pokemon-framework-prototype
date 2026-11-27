@@ -8,7 +8,7 @@ const {stripTypeScriptTypes} = require('node:module');
 require('../../../scripts/tests/ts-source-loader.cjs');
 const vm = require('node:vm');
 const golden = require('../../support/battle/result-hash-golden.json');
-const frozen = require('../../../docs/step2/protocol-v1.frozen.json');
+const frozen = require('../../support/battle/protocol-v1.frozen.json');
 const S = require('../../../src/framework/rules/state.ts');
 const source = resolve(__dirname, '../../../src/framework/rules/battle-result-validation.ts');
 const rules = import('data:text/javascript;base64,' + Buffer.from(stripTypeScriptTypes(readFileSync(source, 'utf8'), {sourceUrl: source})).toString('base64'));

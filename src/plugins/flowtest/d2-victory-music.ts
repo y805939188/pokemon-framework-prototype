@@ -3,7 +3,7 @@
  * Programmatic battle controls and formal evolution Scene inputs, six normal paths. An external supervisor,
  * not this report, qualifies actual native execution.
  */
-import PLAN from '../../../experiments/step5/4/victory-music-native-plan.json';
+import PLAN from '../../../tests/support/battle-host/native-plans/victory-music-native-plan.json';
 import { musicNativeContent, musicNativeState } from './music-native-fixture';
 import { captureHostReady } from './d2-capture-me';
 export const victoryMusicNativePlan = PLAN;

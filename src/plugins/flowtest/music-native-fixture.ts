@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { progressionDonorInputs } from './source-fixture';
-import PLAN from '../../../experiments/step5/4/music-native-plan.json';
+import PLAN from '../../../tests/support/battle-host/native-plans/music-native-plan.json';
 
 /** Author-only Gen8 fixture. No saved content or observed result is an oracle. */
 export function musicNativeContent(E: any, assert: any, tracks?: { battle: string; victory: string }): any {

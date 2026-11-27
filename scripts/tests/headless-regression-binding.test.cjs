@@ -117,7 +117,7 @@ test('finish refuses a stale manifest without a controlled build after begin', t
 
 for (const mode of ['source', 'test-input']) test('finish refuses ' + mode + ' changes across the build', t => {
   const f = fixture(t), started = H.begin(f.root); f.build();
-  write(path.join(f.root, mode === 'source' ? 'src/framework/fixture.txt' : 'experiments/step5/4/e-status-disk-contracts.json'), 'changed during build');
+  write(path.join(f.root, mode === 'source' ? 'src/framework/fixture.txt' : 'tests/support/saves/status-disk-contracts.json'), 'changed during build');
   assert.throws(() => H.finish(f.root, started), /changed during/);
 });
 
@@ -127,14 +127,14 @@ const faults = {
   'shared-chunk'(f) { write(path.join(f.root, 'js/engine/build/shared-unit.js'), 'different shared chunk'); },
   'added-chunk'(f) { write(path.join(f.root, 'js/engine/build/unrecorded.js'), 'extra shared chunk'); },
   'missing-entry'(f) { fs.unlinkSync(path.join(f.root, 'js/engine/build/core.cjs')); },
-  fixture(f) { write(path.join(f.root, 'experiments/step5/4/e-defeat-disk-contracts.json'), 'different scenario'); },
+  fixture(f) { write(path.join(f.root, 'tests/support/saves/defeat-disk-contracts.json'), 'different scenario'); },
   'plugin-source'(f) { write(path.join(f.root, 'src/plugins/fixture.txt'), 'different plugin source'); },
   'plugin-config'(f) { write(path.join(f.root, 'src/vite.config.mts'), 'different plugin build config'); },
-  'consumer-helper'(f) { write(path.join(f.root, 'experiments/step5/4/battle-music-composition-host.cjs'), 'different consumed host helper'); },
-  'capture-audio-host'(f) { write(path.join(f.root, 'experiments/step5/4/test-capture-me-port.cjs'), 'different extracted audio host'); },
-  'capture-music-host'(f) { write(path.join(f.root, 'experiments/step5/4/test-battle-music-scene.cjs'), 'different extracted Scene host'); },
-  'parent-test'(f) { write(path.join(f.root, 'experiments/step5/4/h3-production-policy/test-release-sources.cjs'), 'different scenario implementation'); },
-  'missing-fixture'(f) { fs.unlinkSync(path.join(f.root, 'experiments/step5/4/e-defeat-disk-contracts.json')); },
+  'consumer-helper'(f) { write(path.join(f.root, 'tests/support/battle-host/battle-music-composition-host.cjs'), 'different consumed host helper'); },
+  'capture-audio-host'(f) { write(path.join(f.root, 'tests/regression/battle-host/test-capture-me-port.cjs'), 'different extracted audio host'); },
+  'capture-music-host'(f) { write(path.join(f.root, 'tests/regression/battle-host/test-battle-music-scene.cjs'), 'different extracted Scene host'); },
+  'parent-test'(f) { write(path.join(f.root, 'tests/regression/items/held-conservation/test-release-sources.cjs'), 'different scenario implementation'); },
+  'missing-fixture'(f) { fs.unlinkSync(path.join(f.root, 'tests/support/saves/defeat-disk-contracts.json')); },
   'plugin-artifact'(f) { write(path.join(f.root, H.PLUGIN_BUNDLES[0]), 'different compiled plugin'); },
   extension(f) { write(path.join(f.root, 'js/engine/showdown/dist/config/custom-formats.js'), 'wrong extension'); },
   'showdown-pin'(f) { write(path.join(f.root, 'js/engine/showdown/SOURCE_SHA'), 'b'.repeat(40)); },
@@ -187,17 +187,17 @@ test('a freshly generated manifest for a different source fingerprint cannot aut
 });
 
 for (const relative of [
-  'experiments/step5/4/h3-production-policy/support.cjs',
-  'experiments/step5/4/h3-held-continue/worker.cjs',
-  'experiments/step5/4/h3-install-outcome/test-install.cjs',
-  'experiments/step5/4/status-disk-worker.cjs',
-  'experiments/step5/4/defeat-disk-worker.cjs',
+  'tests/support/items/held-conservation/support.cjs',
+  'tests/support/saves/held-continue/worker.cjs',
+  'tests/regression/items/held-install/test-install.cjs',
+  'tests/support/saves/status-disk-worker.cjs',
+  'tests/support/saves/defeat-disk-worker.cjs',
 ]) test('legacy root without the new helper still reaches its original gate: ' + relative, async t => {
   const directory = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pf-legacy-binding-test-'))), root = path.join(directory, 'frozen');
   fs.mkdirSync(root); t.after(() => fs.rmSync(directory, {recursive: true, force: true}));
   const current = {schema: 'capture-run-current-headless-v1', productSrcTree: 'f'.repeat(40), showdownSHA: PIN,
     runtime: Object.fromEntries(Array.from({length: 9}, (_, i) => ['runtime-' + i, '0'.repeat(64)])),
-    helperFiles: {'experiments/step5/4/h3-production-policy/support.cjs': '0'.repeat(64)}};
+    helperFiles: {'tests/support/items/held-conservation/support.cjs': '0'.repeat(64)}};
   const plan = {version: 'synthetic-legacy', showdownSHA: PIN, files: {'legacy-required.js': '0'.repeat(64)}};
   const observed = {helper: 0, originalFileGate: 0, originalGitGate: 0};
   const safeFs = {...fs, readFileSync(file, ...args) {
@@ -210,11 +210,12 @@ for (const relative of [
     if (name === 'node:child_process') return {execFileSync() { observed.originalGitGate++; return '0'.repeat(40); }};
     if (name === 'node:test') return Object.assign(() => {}, {after() {}});
     if (name.startsWith('node:')) return require(name);
-    if (name.includes('capture-run-current-headless-runtime.json')) return current;
-    if (name === './plan.json') return relative.includes('test-install') ? plan.files : plan;
+    if (name.endsWith('/capture-runtime.json')) return current;
+    if (name.endsWith('/frozen-layout.cjs')) return require('../../tests/support/validation/frozen-layout.cjs');
+    if (name.endsWith('/plan.json')) return relative.includes('test-install') ? plan.files : plan;
     if (name.endsWith('contracts.json')) return plan;
-    if (name.includes('trainer-ai-integration/fixtures')) return {E: {}, T: {}, inputs() { throw Error('unexpected business'); }};
-    if (name === './status-disk-worker.cjs') return {};
+    if (name.includes('battle-ai/integration/fixtures')) return {E: {}, T: {}, inputs() { throw Error('unexpected business'); }};
+    if (name.endsWith('/status-disk-worker.cjs')) return {};
     throw Error('unexpected require before original gate: ' + name);
   }
   const exported = {exports: {}}, context = {require: requireFixture, module: exported, exports: exported.exports,
@@ -252,7 +253,7 @@ for (const entry of ['native', 'scene']) for (const mode of ['outside', 'same', 
       if (name.startsWith('node:')) return require(name);
       return {}; // No product runtime is loaded by this prefix-only synthetic guard probe.
     }
-    const file = path.join(repository, `experiments/step5/4/test-capture-me-${entry}.cjs`), source = fs.readFileSync(file, 'utf8');
+    const file = path.join(repository, `tests/regression/battle-host/test-capture-me-${entry}.cjs`), source = fs.readFileSync(file, 'utf8');
     let prefix;
     if (entry === 'native') prefix = source.slice(0, source.indexOf('test.before('));
     else {
@@ -260,7 +261,7 @@ for (const entry of ['native', 'scene']) for (const mode of ['outside', 'same', 
       prefix = source.slice(start, source.indexOf(' temp=fs.mkdtempSync', start));
     }
     assert(prefix.includes('PF_CAPTURE_SYNC_PRODUCT_ROOT') || entry === 'native');
-    const context = {ROOT: f.root, __dirname: path.join(f.root, 'experiments/step5/4'), require: controlledRequire,
+    const context = {ROOT: f.root, __dirname: path.join(f.root, 'tests/regression/battle-host'), require: controlledRequire,
       process: {env}, fs: safeFs, path, assert};
     const observedRoot = entry === 'scene' ? '\nglobalThis.selectedPluginRoot = PLUGIN_ROOT;' : '';
     const run = () => vm.runInNewContext(prefix + observedRoot + '\nthrow Error("CAPTURE_PREFIX_READY");', context);
@@ -283,7 +284,7 @@ test('Area formal inputs reject a foreign plugin root before touching it',t=>{
  const f=fixture(t),s=f.seal();assert.throws(()=>capturePokedexInputs(f.root,{bindingFile:s.file,pluginRoot:path.join(f.directory,'never-created-foreign')}),/foreign Pokedex plugin root/);
 });
 test('Area formal inputs reject a missing controlled source before product admission',t=>{
- const f=fixture(t),s=f.seal(),source=path.join(f.root,'experiments/step5/5/pokedex-area-host.cjs');fs.renameSync(source,source+'.held');assert.throws(()=>capturePokedexInputs(f.root,{bindingFile:s.file}),/ENOENT|missing|input/);
+ const f=fixture(t),s=f.seal(),source=path.join(f.root,'tests/support/pokedex/pokedex-area-host.cjs');fs.renameSync(source,source+'.held');assert.throws(()=>capturePokedexInputs(f.root,{bindingFile:s.file}),/ENOENT|missing|input/);
 });
 test('Area formal post verification observes later real artifact replacement',t=>{
  const f=fixture(t),s=f.seal(),p=capturePokedexInputs(f.root,{bindingFile:s.file});write(path.join(f.root,'js/plugins/PS_Pokedex.js'),'later replacement');assert.throws(()=>p.verify(),/plugin|changed|fingerprint/);

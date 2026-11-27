@@ -1,7 +1,7 @@
 'use strict';
 // Static only. Does not launch the executable or create a run/save/profile directory.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto'),cp=require('node:child_process');
-const ROOT=path.resolve(__dirname,'..'),PLAN=require('../experiments/step5/4/ball-feedback-native-plan.json');
+const ROOT=path.resolve(__dirname,'..'),PLAN=require('../tests/support/battle-host/native-plans/ball-feedback-native-plan.json');
 const {manifest,canonical}=require('./prepare-capture-me-native-freeze.cjs'),{oggTiming,DURATION_CONTRACT,PAGE_DURATION_US}=require('./prepare-music-native-assets.cjs');
 const sha=b=>crypto.createHash('sha256').update(b).digest('hex'),fileHash=f=>sha(fs.readFileSync(f));
 const inside=(parent,child)=>{const p=path.relative(parent,child);return !!p&&!path.isAbsolute(p)&&p!=='..'&&!p.startsWith('..'+path.sep);};

@@ -1,5 +1,5 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('query');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('query');
 const{test}=require('node:test'),assert=require('node:assert/strict'),path=require('node:path'),{types}=require('node:util');
 const{createMZAtomicStatePort}=require(path.join(process.env.PF_E2_PARENT_OUT,'src/plugins/world/atomic-state-mz.js'));
 function fixture(){const root={$gameSystem:{_psGame:{revision:1}},$gameMap:{_mapId:7},$gamePlayer:{_x:3,_y:4},SceneManager:{_scene:{}}},slot={current:{revision:1}};let reads=0,writes=0;const legacy={read(){reads++;return root.$gameSystem._psGame;},replace(){writes++;assert.fail('read-only query cannot assign');}},port=createMZAtomicStatePort(root,legacy,types.isProxy,{owner:slot,key:'current'});return{root,slot,port,legacy,get reads(){return reads;},get writes(){return writes;}};}

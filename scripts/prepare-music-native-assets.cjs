@@ -1,7 +1,7 @@
 'use strict';
 // Test-only synthetic tones. Never downloads, installs, plays audio, launches NW or changes an existing asset.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),cp=require('node:child_process');
-const plan=require('../experiments/step5/4/music-native-plan.json');
+const plan=require('../tests/support/battle-host/native-plans/music-native-plan.json');
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 function wav(row){const samples=Math.round(row.seconds*plan.sampleRate),bytes=samples*2,b=Buffer.alloc(44+bytes);b.write('RIFF');b.writeUInt32LE(36+bytes,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(plan.sampleRate,24);b.writeUInt32LE(plan.sampleRate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(bytes,40);for(let i=0;i<samples;i++)b.writeInt16LE(Math.round(plan.amplitude*Math.sin(2*Math.PI*row.frequency*i/plan.sampleRate)),44+i*2);return b;}
 function command(argv){const r=cp.spawnSync(argv[0],argv.slice(1),{encoding:'utf8',maxBuffer:4*1024*1024});if(r.status!==0)throw Error(argv[0]+' failed: '+r.stdout+r.stderr);return r.stdout;}

@@ -1,7 +1,7 @@
 'use strict';
 // Real built Inventory + World + GameApplication. Host drawing/input remains synthetic.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
-const ROOT=path.resolve(__dirname,'../../..'),ART=process.env.PF55_B2_ARTIFACT_ROOT||path.join(ROOT,'build/step5-5-development-20261115/b2-author');
+const ROOT=path.resolve(__dirname,'../../..'),ART=process.env.PF55_B2_ARTIFACT_ROOT||path.join(ROOT,'build/test-world-host');
 const E=require(process.env.PF55_B_ENGINE||'../../../js/engine/build/production.cjs'),F=require('../../../tests/support/saves/legacy-migration/fixtures.cjs'),H=require('../../../tests/support/inventory/inventory-ui-host.cjs');let worldBundle;
 test.before(()=>{fs.mkdirSync(ART,{recursive:true});process.env.TMPDIR=fs.mkdtempSync(path.join(ART,'real-app-helper-'));const out=fs.mkdtempSync(path.join(ART,'real-app-world-bundle-'));const result=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,encoding:'utf8',env:{...process.env,RR_PLUGIN:'PS_World'}});fs.writeFileSync(path.join(out,'build.log'),result.stdout+result.stderr);assert.equal(result.status,0,result.stdout+result.stderr);worldBundle=fs.readFileSync(path.join(out,'PS_World.js'),'utf8');});
 // Preserve this task's temporary bundles for the parent's cleanup ledger.

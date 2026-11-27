@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Test-only finite native recipe; only external supervision can qualify execution.
 import { observeStateInstalls } from './state-install-audit';
-import PLAN from '../../../experiments/step5/4/prebattle-native-plan.json';
+import PLAN from '../../../tests/support/battle-host/native-plans/prebattle-native-plan.json';
 import { musicNativeContent, musicNativeState } from './music-native-fixture';
 import { captureHostReady } from './d2-capture-me';
 export const prebattleNativePlan = PLAN;

@@ -1,0 +1,75 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const root=process.env.PF_E3_NATIVE_ROOT,out=process.env.PF_E3_JOINT_OUT,E=require(out+'/production.cjs'),T=require('../../../../scripts/tests/final-production-runtime.cjs').get().T;
+const native=(name)=>fs.readFileSync(root+'/js/'+name,'utf8'),managers=native('reactor_managers.js'),scenes=native('reactor_scenes.js'),sprites=native('reactor_sprites.js'),core=native('reactor_core.js');
+const {fixture:base,flush}=require('../travel-mz-world-travel-fixture.cjs');
+function install(G,text,name){const a=text.indexOf(name+' = function'),b=text.indexOf('\n};',a);assert(a>=0&&b>a,name);vm.runInContext(text.slice(a,b+4),G,{filename:'pinned-final:'+name});}
+function renderer(G,o){
+ function Sprite(bitmap){this.initialize(bitmap);}Object.assign(Sprite.prototype,{initialize(bitmap){this.bitmap=bitmap??null;this.children=[];this.parent=null;this.anchor={};this.scale={};this.visible=true;},update(){for(const c of this.children.slice())c.update?.();},addChild(c){this.children.push(c);c.parent=this;return c;},addChildAt(c,i){this.children.splice(i,0,c);c.parent=this;return c;},removeChild(c){this.children=this.children.filter(x=>x!==c);c.parent=null;},getChildIndex(c){return this.children.indexOf(c);},destroy(){this.destroyed=true;},setBlendColor(){}});G.Sprite=Sprite;
+ // Canvas/WebGL/Effekseer backend is headless. The native Bitmap draw calls and native animation lifecycle remain actual.
+ G.Bitmap=function(w,h){this.width=w;this.height=h;this._canvas={width:w,height:h};this._context={save(){},restore(){},clearRect(){o.clears++;},fillRect(){},beginPath(){},arc(x,y,r){o.radii.push(r);if(o.failExpansion&&r>64){o.failExpansion=false;throw Error('headless-backend-expand-failed');}},fill(){}};this._baseTexture={update(){},destroy(){}};};
+ Object.defineProperty(G.Bitmap.prototype,'context',{get(){return this._context;}});for(const name of ['clear','clearRect','fillAll','fillRect','drawCircle'])install(G,core,'Bitmap.prototype.'+name);G.Bitmap.prototype.destroy=function(){this.destroyed=true;};
+ G.Point=function(x=0,y=0){this.x=x;this.y=y;};G.Graphics.width=816;G.Graphics.height=624;
+ G.Graphics.effekseer={play(){o.effects++;const end=G.Graphics.frameCount+6;return{get exists(){return G.Graphics.frameCount<end;},setLocation(){},setRotation(){},setScale(){},setSpeed(){},stop(){}};}};
+ G.EffectManager={_cache:{},load(name){assert.equal(name,'Flash');o.effectNames.push(name);const effect={isLoaded:true};this._cache[name]=effect;return effect;},clear(){this._cache={};},checkErrors(){}};install(G,managers,'EffectManager.isReady');
+ const a=sprites.indexOf('function Sprite_Animation()'),b=sprites.indexOf('function Sprite_AnimationMV()',a);vm.runInContext(sprites.slice(a,b),G,{filename:'pinned:Sprite_Animation'});
+ G.Spriteset_Base=function(){};for(const name of ['authoredAnimationZ','updateAnimations','processAnimationRequests','createAnimation','createAnimationSprite','makeTargetSprites','lastAnimationSprite','isMVAnimation','isScreenAnimation','isAnimationForEach','animationBaseDelay','animationNextDelay','animationShouldMirror','removeAnimation'])install(G,sprites,'Spriteset_Base.prototype.'+name);
+ const ss=Object.create(G.Spriteset_Base.prototype);ss._animationSprites=vm.runInContext('[]',G);ss._effectsContainer=new Sprite();ss.findTargetSprite=target=>target===G.$gamePlayer?{setBlendColor(){},visible:true}:null;
+ const p=G.Scene_Map.prototype,create=p.createDisplayObjects;p.createDisplayObjects=function(...args){const r=Reflect.apply(create,this,args);this.children=[];this._windowLayer={};this._messageWindow={};this._spriteset??={};this.addChild=Sprite.prototype.addChild;this.children.push(this._windowLayer);this.addChildAt=Sprite.prototype.addChildAt;this.removeChild=Sprite.prototype.removeChild;this.getChildIndex=Sprite.prototype.getChildIndex;return r;};
+ const update=p.update;p.update=function(...args){const r=Reflect.apply(update,this,args);for(const s of ss._animationSprites.slice())s.update();ss.updateAnimations();return r;};
+ G.$dataAnimations=vm.runInContext('JSON.parse('+JSON.stringify(fs.readFileSync(root+'/data/Animations.json','utf8'))+')',G);o.animationSprites=ss;
+ G.AudioManager._seBuffers=[];G.AudioManager.createBuffer=(folder,name)=>{o.buffers.push({folder,name});return{frameCount:-100,isPlaying:()=>false,play(){o.audioHardwareCalls++;}};};G.AudioManager.updateBufferParameters=()=>{};G.AudioManager.cleanupSe=function(){this._seBuffers=this._seBuffers.filter(x=>x.isPlaying());};G.AudioManager._seVolume=100;
+ for(const name of ['resolveSeVariant','isMissingLocalSe','playSe','updateSeParameters'])install(G,managers,'AudioManager.'+name);
+ const play=G.AudioManager.playSe;G.AudioManager.playSe=function(se){o.sounds.push(structuredClone(se));return Reflect.apply(play,this,[se]);};
+ return ss;
+}
+async function fixture(options={}){const o={sessions:[],effectNames:[],effects:0,radii:[],sounds:[],buffers:[],audioHardwareCalls:0,clears:0};let ports;
+ const h=await base({edit(game,content){
+  const f=structuredClone(T.fixtureContent);for(const name of ['Snorlax','Pidgey'])content.species[name]={...f.species[name],abilities:[name==='Snorlax'?'Immunity':'Keen Eye'],gender:127,types:name==='Snorlax'?['Normal']:['Normal','Flying']};
+  for(const name of ['A','B','C','constructor','__proto__','toString'])delete content.species[name].types;
+  content.species.Pidgey.learnset={1:['tackle']};content.abilities={...content.abilities,...f.abilities};
+  for(const id of ['cut','rocksmash','strength','flash'])content.moves[id]={id,name:id,pp:20};
+  game.party[0]={...game.party[0],species:'Snorlax',level:5,hp:20,ability:'Immunity',abilityIndex:0,effectiveAbilityIndex:0,nature:'hardy',moves:['cut','rocksmash','strength','flash'].map(id=>({id,pp:20,maxpp:20,ppUps:0}))};
+  if(options.realSession){game.party[0].moves=[{id:'tackle',pp:35,maxpp:35,ppUps:0}];content.moves.tackle={id:'tackle',name:'Tackle',pp:35};}
+  content.trainerTypes={ace:{id:'ace',nameKey:'type.ace',gender:0,baseMoney:10,skillLevel:0,flags:[],items:[],source:'literal'}};content.trainerTypeOrder=['ace'];content.trainers={npc:[{id:'npc',type:'ace',name:'Tester',version:0,party:[{species:'Pidgey',level:5,moves:['tackle']}],source:'literal'}]};content.registrationOrder=[{species:'Snorlax',form:0},{species:'Pidgey',form:0}];
+  content.mapMetadata.maps[5]={outdoor:false,environment:'cave',darkMap:options.dark===true};
+  if(options.weather){content.mapMetadata.maps[5].weather={type:options.weather,chance:100};game.world.weather.type=options.weather;}
+  options.edit?.(game,content);
+ },applicationPorts(p){ports=p;
+  // CB alone observes the final installed IIFE/require before the real App
+  // constructor can consume or cache its ordinary entropy provider.
+  if(options.cbObserveOrdinaryEntropyBeforeApp!==undefined){
+   assert.equal(process.env.PF_FINAL_PRODUCTION_FAMILY,'cb-cycling-parity');
+   assert(/^CB0[1-4]$/.test(process.env.PF_FINAL_PRODUCTION_SELECTOR??''));
+   assert.equal(typeof options.cbObserveOrdinaryEntropyBeforeApp,'function');
+   assert.equal(options.randomPort,undefined,'CB must use the original production random port');
+   assert.equal(options.realSession,undefined,'CB keeps its original no-Session fixture');
+   options.cbObserveOrdinaryEntropyBeforeApp(p);
+  }
+  if(options.randomPort)p.random=(n)=>Reflect.apply(options.randomPort,p,[n]);if(options.realSession){const factory=E.composition.createLegacyNoHeldBattleSessionFactory({content:()=>p.content().content,seed:()=>[1,2,3,4]});const create=factory.create;factory.create=function(...args){o.sessions.push({request:structuredClone(args[0]),setup:structuredClone({...args[2],isCurrentBattle:undefined}),game:structuredClone(args[1])});return Reflect.apply(create,this,args);};p.sessions=factory;}
+ },nativeSetup(n,{maps}){const G=n.G;if(options.wallClock!==undefined){
+   G.__finalWallClock=()=>options.wallClock;
+   vm.runInContext('Date=class extends Date{ static now(){return globalThis.__finalWallClock();} };',G,{filename:'X1/X2 synthetic host wall clock'});
+  }vm.runInContext(core.slice(0,core.indexOf('function Utils()')),G,{filename:'pinned:JsExtensions'});G.PluginManager._commands={};for(const name of ['registerCommand','callCommand'])install(G,managers,'PluginManager.'+name);install(G,scenes,'Scene_Map.prototype.isReady');G.Scene_Message.prototype.isReady=()=>true;G.DataManager.isMapLoaded=()=>!!G.$dataMap;renderer(G,o);if(options.fieldEvents){for(const [id,name]of [[1,'cuttree'],[2,'smashrock'],[3,'strengthboulder']])maps[5].events[id]={id,name,x:3,y:2,pages:[{conditions:{switch1Valid:false,switch2Valid:false,variableValid:false,selfSwitchValid:false,itemValid:false,actorValid:false},image:{tileId:0,characterName:'Actor2',characterIndex:0,direction:2,pattern:1},priorityType:1,through:false,trigger:0,moveType:0,moveSpeed:4,moveFrequency:3,walkAnime:true,stepAnime:false,directionFix:false,list:[{code:0,parameters:[]}]}]};for(const id of [1,2,3])G.$gameMap._events[id]=new G.Game_Event(5,id);}options.nativeSetup?.(n,{maps,o});}});
+ const G=h.G,m=G.SceneManager,P=G.Scene_PSBattle.prototype;P.isReady=function(){return !!this._controller?.ready;};P.start=function(){return G.Scene_MenuBase.prototype.start.call(this);};P.update=function(){};
+ const tick=()=>{G.Graphics.frameCount++;m.changeScene();m.updateScene();G.Input.trigger.clear();G.Input.repeat.clear();};const pump=async(predicate,max=180)=>{for(let i=0;i<max;i++){if(predicate())return;G.$gameMessage.clear();tick();await flush();}throw Error('final bounded '+JSON.stringify({last:h.flow.lastOutcome,scene:m._scene?.constructor?.name,ready:m._scene?._controller?.ready,failure:String(m._scene?._failure),pending:G.PSWorld.pending(),loadError:o.loadError,stateLoad:G.PSState?.lastLoadError,diagnostics:G.PSWorld.diagnostics}));};
+ const old=m._scene;h.flow.stateReplaced();G.PSWorld.loadSucceeded();m.goto(G.Scene_Map);await pump(()=>m._scene!==old&&m._scene.isStarted()&&!h.app.saveBlocked&&!G.PSWorld.pending()&&!G.PSFlow.companionNativePending());
+ const command=(plugin,name,args={})=>({code:357,indent:0,parameters:[plugin,name,name,args]});
+ const event=list=>{G.$gameMap._interpreter.setup([...list,{code:0,indent:0,parameters:[]}],0);G.$gameMap._interpreter.update();};
+ let sequence=0;const run=async action=>{let result;const promise=h.app.runFieldMove('final-'+process.env.PF_FINAL_CASE+'-'+(++sequence),action).then(r=>result=r);await pump(()=>result!==undefined);await promise;return result;};
+ function record(extra){fs.writeFileSync(path.join(process.env.PF_FINAL_CASE_ROOT,'observation.json'),JSON.stringify({case:process.env.PF_FINAL_CASE,state:h.state(),draws:h.draws,nativeDraws:h.nativeDraws,diagnostics:G.PSWorld.diagnostics,observed:{...o,animationSprites:undefined},extra},null,2)+'\n',{flag:'wx'});}
+ return{...h,G,o,ports,tick,pump,event,command,run,record};}
+module.exports={fixture,flush,install};
+async function formalDarkLoads(h){
+ const {G,o}=h,scope=process.env.PF_FINAL_CASE_ROOT;const{install}=require('../../saves/companion-continue/io-adapter.cjs');
+ const io=install(G,scope,root,out,{saveLocation:'project'});G.process.mainModule={filename:path.join(io.project,'index.js')};
+ G.$dataActors=JSON.parse(fs.readFileSync(root+'/data/Actors.json','utf8'));G.$dataSystem=JSON.parse(fs.readFileSync(root+'/data/System.json','utf8'));G.$dataSystem.optAutosave=false;G.$dataSystem.versionId=0;
+ const a=scenes.indexOf('function Scene_File()'),b=scenes.indexOf('// Scene_GameEnd',a);vm.runInContext(scenes.slice(a,b),G,{filename:'pinned:Scene_File+Save+Load'});
+ G.Scene_Load.prototype.create=function(){G.Scene_MenuBase.prototype.create.call(this);this._listWindow={refresh(){},activate(){}};};G.Scene_Load.prototype.fadeOutAll=function(){};G.SoundManager.playLoad=()=>{};
+ const load=G.DataManager.loadGame;G.DataManager.loadGame=function(...a){return Reflect.apply(load,this,a).catch(e=>{o.loadError=String(e.stack??e);throw e;});};
+ await h.pump(()=>!h.app.saveBlocked&&!G.PSWorld.pending()&&!G.PSFlow.companionNativePending());
+ G.$gameSystem.onBeforeSave();await G.DataManager.saveGame(1);for(let i=0;i<40;i++){await flush();if(!fs.existsSync(G.StorageManager.filePath('global')))continue;const global=await G.StorageManager.loadObject('global');if(global?.[1]){await flush();break;}}const file=G.StorageManager.filePath('file1'),savedSHA=io.sha(file),branches=[];
+ for(const version of [0,1]){G.$dataSystem.versionId=version;G.SceneManager.goto(G.Scene_Load);h.tick();const scene=G.SceneManager._scene;scene.executeLoad(1);await h.pump(()=>scene._loadSuccess===true&&G.SceneManager._scene instanceof G.Scene_Map&&G.SceneManager._scene.isStarted()&&!G.$gamePlayer.isTransferring()&&!h.app.saveBlocked&&!G.PSFlow.companionNativePending());h.tick();const layers=G.SceneManager._scene.children.filter(c=>c.bitmap);assert.equal(layers.length,1);assert.equal(G.$gameMap.mapId(),6);assert.equal(h.state().world.flashUsed,true);assert(o.radii.includes(176));assert.equal(io.sha(file),savedSHA);branches.push({version,loaded:scene._loadSuccess,generation:h.app.stateGeneration,layers:layers.length,fileSHA:savedSHA});}
+ io.assertPaths();return{branches,fs:io.trace,fileSHA:savedSHA};
+}
+module.exports.formalDarkLoads=formalDarkLoads;

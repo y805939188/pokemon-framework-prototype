@@ -1,5 +1,5 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict');const {frameFixture}=require('../../../experiments/step5/5/d-mz-native-frame-support.cjs');const flush=()=>new Promise(setImmediate);
+const test=require('node:test'),assert=require('node:assert/strict');const {frameFixture}=require('../../support/world/mz-native-frame-support.cjs');const flush=()=>new Promise(setImmediate);
 async function completed(h){h.player._encounterCount=1;h.player.directionInput=6;h.tick();await flush();h.tick();await flush();h.player.directionInput=0;}
 for(const mode of ['mz-native','legacy-note'])for(const obstruction of ['host-query-throw','message-busy'])test(mode+' '+obstruction+(obstruction==='message-busy'?' preserves the native legal delay':' cannot revive a failed opportunity on idle poll'),async()=>{
  const h=await frameFixture({mode}),complete=h.app.completeWorldStep.bind(h.app),scene=h.manager._scene,active=scene.isActive;let armed=false,once=false;

@@ -402,7 +402,7 @@ def main():
     differences=[p for p in set(manifests['control'])|set(manifests['candidate']) if manifests['control'].get(p)!=manifests['candidate'].get(p)]
     if any(p not in allowed for p in differences):
         raise SystemExit('unexpected bridge/controller payload differences: '+repr(differences))
-    source_input=json.loads((Path(__file__).resolve().parent.parent/'experiments/step5/4/d1/f100-v1.json').read_text())
+    source_input=json.loads((Path(__file__).resolve().parent.parent/'tests/support/performance/native/f100-v1.json').read_text())
     summary=dict(kind='SYNTHETIC_TOOLING_NOT_NATIVE_NOT_P4' if args.synthetic_controls else 'FORMAL_TEN_GROUPS' if formal else 'QUALIFICATION_NOT_P4',startedUTC=utc(),packages=infos,
                  allowedPayloadDifferences=differences,input=source_input,groups=[],status='running')
     write(out/'SUMMARY.json', summary)

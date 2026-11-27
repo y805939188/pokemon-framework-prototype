@@ -1,8 +1,8 @@
 'use strict';
 // Production compiled Scene + real App/Gen8 Session. Window/input/raster ports are controlled, not NW.
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), os = require('node:os');
-const { spawnSync } = require('node:child_process'), { createVictoryDriverHost } = require('../../../experiments/step5/4/victory-music-driver-host.cjs');
-const ROOT = path.resolve(__dirname, '../../..'), E = require('../../../js/engine/build/production.cjs'), PLAN = require('../../../experiments/step5/4/victory-music-native-plan.json');
+const { spawnSync } = require('node:child_process'), { createVictoryDriverHost } = require('../../support/battle-host/victory-music-driver-host.cjs');
+const ROOT = path.resolve(__dirname, '../../..'), E = require('../../../js/engine/build/production.cjs'), PLAN = require('../../support/battle-host/native-plans/victory-music-native-plan.json');
 let temp, plugins, entryText, fixture;
 test.before(async () => {
   temp = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-party-switch-scene-')); plugins = {};

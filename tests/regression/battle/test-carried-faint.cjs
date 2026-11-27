@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const root=process.env.PF_CARRIED_FAINT_ROOT||path.resolve(__dirname,'../../..');
 const E=require(path.join(root,'js/engine/build/production.cjs')),T=require(path.join(root,'js/engine/build/testing.cjs'));
-const {inputs}=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const {inputs}=require('../../support/battle-ai/integration/fixtures.cjs');
 async function setup(deadIds=[],ids=['P1','P2']){
  const input=inputs({moves:['tackle'],party:1});input.species.find(x=>x.id==='snorlax').learnset=[{level:1,move:'memento'}];
  const compiled=E.contentCompile.compileContent(input);assert.equal(compiled.ok,true);const assembled=E.contentRuntime.assembleContent(compiled.data,E.dex.createDexLookup());assert.deepEqual(assembled.errors,[]);const content=assembled.content;

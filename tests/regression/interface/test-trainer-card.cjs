@@ -2,7 +2,7 @@
 // WP65 TC01/04/05/06: production card + installed native menu/stack/fade/button method bodies.
 // Window bitmap and input devices are controlled; this suite does not launch NW or read player saves.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const ROOT=path.resolve(__dirname,'../../..'),OUT=path.join(ROOT,'build/step5-6-trainer-card');
+const ROOT=path.resolve(__dirname,'../../..'),OUT=path.join(ROOT,'build/test-trainer-card');
 let adapter,E;
 test.before(async()=>{
  const vite=require(require.resolve('vite',{paths:[path.join(ROOT,'src')]}));

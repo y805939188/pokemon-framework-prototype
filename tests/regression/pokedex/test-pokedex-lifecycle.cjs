@@ -1,7 +1,7 @@
 
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),{spawnSync}=require('node:child_process');
-for(const name of ['installed-entry-wait','recovery-new-owner','native-terminate'])test('H1 original Kimi contract '+name,()=>{const p=spawnSync(process.execPath,['tests/support/pokedex/host/h1-regressions/'+name+'.cjs'],{encoding:'utf8'});assert.equal(p.status,0,p.stdout+p.stderr);});
+for(const name of ['installed-entry-wait','recovery-new-owner','native-terminate'])test('native Pokédex lifecycle contract '+name,()=>{const p=spawnSync(process.execPath,['tests/support/pokedex/host/h1-regressions/'+name+'.cjs'],{encoding:'utf8'});assert.equal(p.status,0,p.stdout+p.stderr);});
 
 const {setup,dispose,clone}=require('../../support/pokedex/host/ui-host.cjs');test.after(dispose);
 function faultWorld(options={}){let hook,fail=true;const w=setup({host:options.host,port:state=>({read:()=>{const f=hook;hook=null;f?.();return state.read();},replace:n=>{if(fail){if(options.partial){const next=clone(n);next.money++;state.replace(next);}throw Error('controlled viewing install');}state.replace(n);}})});return{w,setHook:f=>{hook=f;},allow:()=>{fail=false;}};}

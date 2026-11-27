@@ -1,6 +1,6 @@
 'use strict';
-// Step 5.0, plugins in a Node VM with small MZ stubs (NOT the real MZ host; that is the flow test): PS_SaveState
-// migrates a save written by the step 4 code to schema 4 through the content mapping, refuses (keeping the original)
+// Two plugins in a Node VM with small MZ stubs (NOT the real MZ host; that is the flow test): PS_SaveState
+// migrates a save written by the schema-3 writer to schema 4 through the content mapping, refuses (keeping the original)
 // when the content is missing or cannot map a species, and needs no content for a schema 4 save; a load or a new game
 // releases a battle the application still held (P4-2); the step counter hook (WP06 §4.1: not on a forced route or
 // while an event runs); species names by content id; the ResetGame test aid stores the fixture party by content id.
@@ -20,7 +20,7 @@ const SRC = path.join(ROOT, 'content/sample');
 const read = f => JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8'));
 const content = E.contentRuntime.assembleContent(E.contentCompile.compileContent({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json'), grants: read('grants.json') }).data, E.dex.createDexLookup()).content;
 const J = x => JSON.parse(JSON.stringify(x));
-const step4 = f => JSON.parse(fs.readFileSync(path.join(__dirname, '../../../experiments/step5/fixtures/step4-saves', f), 'utf8'));
+const schema3 = f => JSON.parse(fs.readFileSync(path.join(__dirname, '../../support/saves/schema-v3', f), 'utf8'));
 const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor((s / 4294967296) * n); }; };
 
 let dir, stage, stageFailure, stampedEvidence, stampedLogHashes;
@@ -217,8 +217,8 @@ function assertSessionSeed(h, battleId, expected) {
   assert.deepEqual(J(rows[0].data.seed), expected);
 }
 
-test('a save written by the step 4 code loads: migrated to schema 4 with the content mapping, reported in _psSaveInfo', () => {
-  const raw = step4('full.json');
+test('a save written by the schema-3 writer loads: migrated to schema 4 with the content mapping, reported in _psSaveInfo', () => {
+  const raw = schema3('full.json');
   const h = host(J(raw));
   h.load();
   assert.equal(h.sys._psSaveError, undefined, JSON.stringify(h.sys._psSaveError));
@@ -230,7 +230,7 @@ test('a save written by the step 4 code loads: migrated to schema 4 with the con
 });
 
 test('content that cannot be loaded, or a species it cannot map: the migration is refused and the original state stays as loaded', () => {
-  const a = host(step4('full.json')); const before = JSON.stringify(a.sys._psGame);
+  const a = host(schema3('full.json')); const before = JSON.stringify(a.sys._psGame);
   a.flow.speciesKeyResolver = () => { throw new Error('content: cannot read data/framework/content.json'); };
   a.load();
   assert.equal(a.sys._psSaveError.code, 'needs-content');
@@ -238,7 +238,7 @@ test('content that cannot be loaded, or a species it cannot map: the migration i
   assert.equal(JSON.stringify(a.sys._psGame), before, 'the raw document is kept, so saving writes it back unchanged');
   assert.throws(() => a.ctx.DataManager.makeSaveContents(), /state-unusable/); assert.equal(JSON.stringify(a.sys._psGame), before);
   assert.throws(() => a.flow.game(), /not usable \(needs-content\)/, 'no battle or grant runs on it');
-  const raw = step4('full.json'); raw.boxes[0].species = 'Mew';
+  const raw = schema3('full.json'); raw.boxes[0].species = 'Mew';
   const b = host(J(raw)); const b0 = JSON.stringify(b.sys._psGame);
   b.load();
   assert.equal(b.sys._psSaveError.code, 'unmapped-species');
@@ -260,7 +260,7 @@ test('P4-2: loading a save (or starting a new game) releases a battle the applic
   h.flow.seed = [1, 2, 3, 4];
   await h.flow.app().startBattle({ battleId: 'open#1', kind: 'wild', foes: [{ species: 'pidgey', level: 3 }], seq: 1 });
   assert.equal(h.flow.app().healParty().reason, 'battle-active');
-  h.sys._psGame = J(step4('defeat.json')); h.load();
+  h.sys._psGame = J(schema3('defeat.json')); h.load();
   assert.notEqual(h.flow.app().healParty().reason, 'battle-active', 'released by the load');
   await h.flow.app().startBattle({ battleId: 'open#2', kind: 'wild', foes: [{ species: 'pidgey', level: 3 }], seq: 2 });
   const previous = h.sys._psGame;
@@ -274,7 +274,7 @@ test('P4-2: loading a save (or starting a new game) releases a battle the applic
 test('WP06 §4.1 step counter: a normal step counts; a forced move route or a running event does not', async () => {
   // 5.5 counts completed interpolation. Actual pinned Game_Player.increaseSteps
   // remains the native start callback, and must not commit the framework prefix.
-  const h=await require('../../../experiments/step5/5/d-mz-native-frame-support.cjs').fixture(),p=h.player;
+  const h=await require('../../support/world/mz-native-frame-support.cjs').fixture(),p=h.player;
   p._base=0;const native=h.G.Game_Character.prototype.increaseSteps;
   h.G.Game_Character.prototype.increaseSteps=function(...args){this._base++;return Reflect.apply(native,this,args);};
   p.directionInput=6;h.tick();p.directionInput=0;
@@ -370,7 +370,7 @@ test('missing explicit testing fails accurately for content and ResetGame withou
 // ---- review of 1960b92 (2026-10-22): F01 save refusal, F02 host battle operation, F10 own keys, F11 clock
 
 test('F01: while the loaded state is unusable every save is refused before MZ writes anything (slot named); a good load clears it', async () => {
-  const raw = step4('full.json'); raw.boxes[0].species = 'Mew';
+  const raw = schema3('full.json'); raw.boxes[0].species = 'Mew';
   const h = host(J(raw)); const before = JSON.stringify(h.sys._psGame);
   h.load();
   assert.equal(h.sys._psSaveError.code, 'unmapped-species');
@@ -381,7 +381,7 @@ test('F01: while the loaded state is unusable every save is refused before MZ wr
   assert.deepEqual(h.writes, [], 'nothing reached the MZ save');
   assert.equal(JSON.stringify(h.sys._psGame), before, 'the original framework state is kept');
   assert.equal(h.sys.isSaveEnabled(), false, 'the save menu is masked');
-  h.load(J(step4('defeat.json')));
+  h.load(J(schema3('defeat.json')));
   assert.equal(h.sys._psSaveError, undefined);
   assert.equal(h.sys.isSaveEnabled(), true);
   await h.ctx.DataManager.saveGame(15);
@@ -412,7 +412,7 @@ test('F02: openBattle -> begin -> a save is loaded: the host operation ends (not
   assert.equal(h.flow.running, true);
   assert.equal(h.sys.isSaveEnabled(), false, 'the battle masks saving');
   await assert.rejects(h.ctx.DataManager.saveGame(1), /battle is running/);
-  const loaded = J(step4('defeat.json'));
+  const loaded = J(schema3('defeat.json'));
   h.load(loaded);
   assert.deepEqual([h.flow.running, h.flow._op, h.flow.request], [false, null, null], 'the host operation is over');
   assert.deepEqual([h.flow.lastOutcome.replaced, h.flow.lastOutcome.commit, h.flow.lastOutcome.battleId], [true, 'none', 'old#1']);
@@ -430,7 +430,7 @@ test('F02: late finish / abort / close of the replaced battle neither commit, no
   claimInOrdinaryHost(h, 'starter');
   const old = await openedBattle(h);
   await escapeNormally(old.session); // the old battle is decided (it ran away) but not ended yet
-  h.load(J(step4('defeat.json')));
+  h.load(J(schema3('defeat.json')));
   const stateAfterLoad = JSON.stringify(h.sys._psGame);
   const next = await openedBattle(h, 'old#1', 1); // a later battle, even under the same id (the loaded save's counter)
   const vars = []; h.ctx.$gameVariables.setValue = (k, v) => vars.push([k, v]);
@@ -463,7 +463,7 @@ test('F02: an application session of a replaced state never commits, also when i
   await escapeNormally(done.session);
   h.ctx.Scene_PSBattle.prototype.onEnd.call(done.scene);
   assert.equal(h.flow.lastOutcome.commit, 'applied');
-  h.load(J(step4('defeat.json')));
+  h.load(J(schema3('defeat.json')));
   const loaded = JSON.stringify(h.sys._psGame);
   const again = h.flow.app().finishBattle(done.session, done.req);
   assert.deepEqual([again.commit, again.aborted], ['none', true], 'a session of the old state is not committed into the loaded one');
@@ -509,7 +509,7 @@ test('F11: the application reads the time from the injected clock; the plugin wi
 for (const id of ['old#1', 'different#2']) test(`R01: default and explicit finish reject a replaced session while ${id} keeps both save locks`, async () => {
   const h = host(E.state.newGame({ content, party: [], money: 0 })); claimInOrdinaryHost(h, 'starter');
   const old = await openedBattle(h); await escapeNormally(old.session);
-  h.load(J(step4('defeat.json')));
+  h.load(J(schema3('defeat.json')));
   const next = await openedBattle(h, id, 2);
   const before = JSON.stringify(h.sys._psGame), outcome = h.flow.lastOutcome, result = h.flow.lastResult;
   const vars = []; h.ctx.$gameVariables.setValue = (k, v) => vars.push([k, v]);
@@ -551,7 +551,7 @@ for (const replacement of ['load', 'new-game', 'none']) test(`R02: failed defeat
   assert.equal(h.flow.debug.failReturn, false, 'the selected legacy route consumed the fault');
   assert.deepEqual(transfers, [], 'failed legacy return made no native transfer');
   const diagnostic = h.flow.lastReturn;
-  if (replacement === 'load') h.load(J(step4('defeat.json')));
+  if (replacement === 'load') h.load(J(schema3('defeat.json')));
   if (replacement === 'new-game') h.ctx.DataManager.setupNewGame();
   const before = JSON.stringify(h.sys._psGame);
   if (replacement !== 'none') {

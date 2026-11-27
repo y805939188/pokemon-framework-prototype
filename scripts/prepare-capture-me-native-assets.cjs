@@ -1,7 +1,7 @@
 'use strict';
 // Offline generation only. No NW, downloads, playback or existing-asset overwrite.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),cp=require('node:child_process');
-const plan=require('../experiments/step5/4/capture-me-native-plan.json');
+const plan=require('../tests/support/battle-host/native-plans/capture-me-native-plan.json');
 const {oggTiming,qualifyTiming,DURATION_CONTRACT,PAGE_DURATION_US}=require('./prepare-music-native-assets.cjs');
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 function wav(row){const samples=Math.round(row.seconds*plan.sampleRate),bytes=samples*2,b=Buffer.alloc(44+bytes);b.write('RIFF');b.writeUInt32LE(36+bytes,4);b.write('WAVEfmt ',8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(plan.sampleRate,24);b.writeUInt32LE(plan.sampleRate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write('data',36);b.writeUInt32LE(bytes,40);for(let i=0;i<samples;i++)b.writeInt16LE(Math.round(plan.amplitude*Math.sin(2*Math.PI*row.frequency*i/plan.sampleRate)),44+i*2);return b;}

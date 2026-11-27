@@ -61,7 +61,7 @@ test('P2-1 dex view preserves both strong gates and bounds private snapshot cano
   assert.deepEqual(violations, [], JSON.stringify(result));
 });
 
-test('STEP4-DEX-CANONICAL-01 direct private key construction preserves both strong gates and all detached clones', () => {
+test('direct private key construction preserves both strong gates and all detached clones', () => {
   const result = measure('dex');
   assert.equal(result.members, 1201);
   assert.equal(result.memberDescriptorScans, 2 * result.members, JSON.stringify(result));
@@ -250,7 +250,7 @@ function assertDexScenario(scenario) {
 }
 
 for (const kind of ['begin', 'begin-summary', 'resolve-summary', 'resolve-entry']) {
-  test(`PERF-ULTRA-01 ${kind} creates both cache slots as own data across all four creation paths`, () => {
+  test(`${kind} creates both cache slots as own data across all four creation paths`, () => {
     assertDexScenario(pollutedDexScenario(kind, 'beforeKey', 'clean'));
     for (const field of ['beforeKey', 'nextKey']) for (const mode of ['data', 'readonly-data', 'accessor']) {
       assertDexScenario(pollutedDexScenario(kind, field, mode));

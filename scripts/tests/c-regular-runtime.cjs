@@ -6,14 +6,14 @@ const {createHash} = require('node:crypto');
 const ROOT = path.resolve(__dirname, '../..');
 const SCHEMA = 'c-generation-supported-inputs-v1';
 const SUITES = [
-  'experiments/step5/5/test-wild-initial-forms.cjs',
-  'experiments/step5/5/test-flute-real-parent.cjs',
-  'experiments/step5/5/test-given-wild-application.cjs',
-  'experiments/step5/5/test-given-wild-production.cjs',
-  'experiments/step5/5/test-flute-level-consumer.cjs',
-  'experiments/step5/5/test-flute-production-ui.cjs',
-  'experiments/step5/5/test-generated-event-application.cjs',
-  'experiments/step5/5/test-generated-event-production.cjs',
+  'tests/regression/world/test-wild-initial-forms.cjs',
+  'tests/regression/field/test-flute-real-parent.cjs',
+  'tests/regression/world/test-given-wild-application.cjs',
+  'tests/regression/world/test-given-wild-production.cjs',
+  'tests/regression/field/test-flute-level-consumer.cjs',
+  'tests/regression/field/test-flute-production-ui.cjs',
+  'tests/regression/world/test-generated-event-application.cjs',
+  'tests/regression/world/test-generated-event-production.cjs',
 ];
 const NATIVE = require('./final-production-inputs.json').pinnedNativeFiles;
 const COPIES = {
@@ -24,11 +24,11 @@ const COPIES = {
   'PS_Management.js': 'js/plugins/PS_Management.js',
 };
 const INPUTS = [...SUITES, 'scripts/tests/c-regular-runtime.cjs', 'scripts/tests/c-regular-runtime.test.cjs',
-  'experiments/step5/5/given-wild-support.cjs',
-  'experiments/step5/5/generated-event-native-support.cjs',
-  'experiments/step5/5/c-ordinary-wild-host.cjs',
-  'experiments/step5/5/fixtures/wild-generation-support.cjs',
-  'experiments/step5/5/fixtures/wild-member-cache-support.cjs',
+  'tests/support/world/given-wild-support.cjs',
+  'tests/support/world/generated-event-native-support.cjs',
+  'tests/support/world/ordinary-wild-host.cjs',
+  'tests/support/world/wild-generation-support.cjs',
+  'tests/support/world/wild-member-cache-support.cjs',
   ...require('./final-production-inputs.json').controlledInputs];
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 function hash(file) { assert(fs.lstatSync(file).isFile(), 'regular C input required: ' + file); return sha(fs.readFileSync(file)); }
@@ -80,7 +80,7 @@ function prepare(root, binding) {
   // The regular parent preparer owns its strict 16-entry source/tool-bound cache.
   assert.equal(fs.realpathSync(root), ROOT, 'C preparation belongs to this checkout');
   const files = expectedSources(root, binding);
-  const built = require('../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('parent');
+  const built = require('../../tests/support/field/regular-field-action-test-runtime.cjs').prepare('parent');
   assert.equal(built.mode, 'default', 'C preparation refuses foreign explicit parent inputs');
   const parent = {directory: path.relative(root, built.directory), inputHash: built.inputHash,
     manifestSHA256: hash(path.join(built.directory, 'manifest.json'))};
@@ -126,7 +126,7 @@ function environment(root, captured, suite, inherited = process.env) {
     PF_MZ_RUNTIME_OBJECTS: path.join(root, 'js/reactor_objects.js'),
     PF_MZ_RUNTIME_MANAGERS: path.join(root, 'js/reactor_managers.js'),
     PF_MZ_RUNTIME_SCENES: path.join(root, 'js/reactor_scenes.js'),
-    PF_SHORTCUT_TRAVEL_FIXTURE: path.join(root, 'experiments/step5/5/ui-wire-e3-fixtures.cjs'),
+    PF_SHORTCUT_TRAVEL_FIXTURE: path.join(root, 'tests/support/field/ui-wire-world-fixtures.cjs'),
     PF_SHORTCUT_PRODUCTION_BUNDLE: path.join(group, 'PS_Management.js'),
     PF_FIELD_MOVE_APP_OUT: path.join(parent, 'out/src'),
     PF_FIELD_MOVE_APP_BUNDLE: path.join(parent, 'bundles/field-move-operation.cjs'),

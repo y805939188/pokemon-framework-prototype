@@ -1,7 +1,7 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('parent');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('parent');
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {fixture}=require('../../../experiments/step5/5/field-move-real-parent-fixtures.cjs');
+const {fixture}=require('../../support/field/field-move-real-parent-fixtures.cjs');
 const move=(moveId='cut',memberId='P1')=>({kind:'move',moveId,memberId});
 const item=itemId=>({kind:'item',itemId});
 function world(options={}) { const edit=options.editState;return fixture({...options,editState(g){g.inventory.registeredItems=['honey',...(options.registered??[])];edit?.(g);}}); }

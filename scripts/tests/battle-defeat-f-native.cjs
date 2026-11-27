@@ -4,9 +4,9 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
 function createNativeFixture({root,B,isolated}) {
  if(isolated)assert.equal(isolated.scope,'EXPLICIT_ISOLATED_LEGACY_FIXTURE_NOT_ORDINARY');
- const support=require('../../experiments/step5/5/d-mz-integration-support.cjs');
+ const support=require('../../tests/support/world/mz-integration-support.cjs');
  support.build=async()=>B; // Install before any downstream support captures build().
- const {frameFixture}=require('../../experiments/step5/5/d-mz-native-frame-support.cjs');
+ const {frameFixture}=require('../../tests/support/world/mz-native-frame-support.cjs');
  const flush=()=>new Promise(setImmediate);
  // Same fixed full-Scene adapter, with require.resolve pointing to the real regular
  // production file. Preserve its actual App constructor/private issuer and callbacks.
@@ -55,8 +55,8 @@ async function fullFixture(options={}){
  const app=flow.app();h.app=app;
  return{...h,G,flow,app,flush,state:()=>G.$gameSystem._psGame};
 }
- require('../../experiments/step5/5/world-scene-full-production-support.cjs').fixture=fullFixture;
- const {fixture:base}=require('../../experiments/step5/5/surf-production-native-support.cjs');
+ require('../../tests/support/world/world-scene-full-production-support.cjs').fixture=fullFixture;
+ const {fixture:base}=require('../../tests/support/field/surf-production-native-support.cjs');
  const native=path.join(root,'js'),objects=fs.readFileSync(path.join(native,'reactor_objects.js'),'utf8'),scenes=fs.readFileSync(path.join(native,'reactor_scenes.js'),'utf8'),compat=fs.readFileSync(path.join(native,'libs/pixi_compat.js'),'utf8');
 function install(G,name,text=scenes){const a=text.indexOf(name+' = function'),b=text.indexOf('\n};',a);assert(a>=0&&b>a,name);vm.runInContext(text.slice(a,b+4),G,{filename:'actual-native-e3:'+name});}
 function mapData(id){return {width:10,height:8,tilesetId:1,scrollType:0,data:Array(10*8*6).fill(0),events:[null],meta:{},encounterList:[],disableDashing:false,autoplayBgm:false,autoplayBgs:false,parallaxLoopX:false,parallaxLoopY:false,parallaxSx:0,parallaxSy:0};}

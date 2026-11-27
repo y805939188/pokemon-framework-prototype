@@ -1,11 +1,9 @@
-# CI layers (docs/step3/README.md): 1 = headless Node suites, 2 = plugin type check and build with Reactor's
-# declaration bundle. Since step 5.0 (decision D5-9) layer 1 also installs the Reactor runtime of the pinned commit,
-# so the host-stub suites that run Reactor's own interpreter are not skipped (PF_NO_SKIP makes a skip a failure). NOT covered here (needs MZ's NW.js and window): in-game flow, packaged-app suite, performance;
-# report those native checks as not run in CI. Historical Mac launchers are retired (docs/PROJECT-GUIDE.md §8).
+# The Node regressions and plugin builds use the pinned Reactor and Showdown.
+# Native NW.js, packaging and performance checks run outside hosted CI.
 name: ci
 on:
   push:
-    branches: [main, 'step3/**', 'step4/**', 'step5/**', 'step6/**']
+    branches: [main]
   pull_request:
 permissions:
   contents: read
@@ -27,7 +25,7 @@ jobs:
           package-manager-cache: false
       - name: Enable the pinned pnpm (src/package.json packageManager; the repo root has none, so corepack would take the latest)
         run: ./scripts/ci-run.sh pnpm-setup bash -c 'corepack enable && corepack prepare "$(node -p "require(\"./src/package.json\").packageManager")" --activate && pnpm --version'
-      - name: Reactor runtime from the pinned commit (only into this checkout; D5-9)
+      - name: Reactor runtime from the pinned commit (only into this checkout)
         run: ./scripts/ci-run.sh reactor-setup bash -c 'export REACTOR_SOURCE=download RMMZ_TEMPLATE_CACHE="${RUNNER_TEMP:?}/reactor"; exec ./scripts/setup-reactor.sh --install'
       - name: Install dependencies (lockfile)
         run: ./scripts/ci-run.sh pnpm-install pnpm --dir src install --frozen-lockfile
@@ -39,7 +37,7 @@ jobs:
         env:
           PF_NO_SKIP: '1'
         run: ./scripts/ci-run.sh headless-suites ./scripts/test-headless.sh --scope=regular
-      - name: D1 collector synthetic controls (no native host or P-4 claim)
+      - name: D1 collector synthetic controls (no native host)
         run: |
           ./scripts/ci-run.sh python-version python3 --version
           ./scripts/ci-run.sh d1-collector python3 scripts/tests/d1-benchmark-runner.test.py -v

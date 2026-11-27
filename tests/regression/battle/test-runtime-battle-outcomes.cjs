@@ -1,6 +1,6 @@
 'use strict';
 const I6 = require("../../support/inventory/legacy-bag-test-bridge.cjs");
-// Step 4 / B, the battle side of the application: foes are created from the content (no fixture), a battle needs an
+// The battle side of the application: foes are created from the content (no fixture), a battle needs an
 // able member, balls are disabled when a catch would have nowhere to go (D1), a lost or drawn battle settles money and
 // heal in the same replacement (D3) exactly once, and encounters are decided by the application. The first half uses
 // in-memory ports; the second half real Showdown-backed sessions with controlled state and seeds.
@@ -20,7 +20,7 @@ const content = E.contentRuntime.assembleContent(E.contentCompile.compileContent
 const lcg = seed => { let s = seed >>> 0; return n => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return Math.floor((s / 4294967296) * n); }; };
 const clone = x => JSON.parse(JSON.stringify(x));
 const mk = (id, species, level, extra = {}) => ({ ...E.memberFactory.createMember({ id, species, level }, content, lcg(level * 7 + id.length)), ...extra });
-// a save stores members by content id + form since step 5.0 (D5-3): created (battle-shaped) members are stored that way
+// a save stores members by content id + form: created (battle-shaped) members are stored that way
 const saved = m => E.speciesKey.toPersistentMember(m, content);
 const gameOf = (party, { bag = { pokeball: 5, potion: 2 }, money = 3000, boxes = [] } = {}) => { const g = S.newGame({ content, party: [] }); g.party = party.map(saved); I6.setBag(g, bag); g.money = money; H.setBoxed(g, boxes.map(saved)); g.nextMemberOrdinal = E.memberIdentity.initialOrdinal(E.storage.allMembers(g).map(m => m.id)); return g; };
 const req = (id, foes = [{ species: 'pidgey', level: 3 }], kind = 'wild', seq = 1) => ({ battleId: id, kind, foes, seq });
@@ -156,7 +156,7 @@ test('real: a won wild battle writes back HP, PP, status, exp, a level-up and a 
   assert.deepEqual(m.moves.map(x => x.id), ['scratch', 'growl', 'ember', 'smokescreen'], 'the level 8 move is learned into the free slot (same learnset as creation)');
   assert.equal(m.hp, live.hp, 'HP from the engine'); assert.equal(m.status, live.status || '');
   assert.equal(m.moves[2].pp, live.pp.ember, 'used PP written back'); assert.ok(m.moves[2].pp < m.moves[2].maxpp);
-  assert.ok(state.current().dex.seen.includes('pidgey'), 'the dex records the content id (D5-3, step 5.0)');
+  assert.ok(state.current().dex.seen.includes('pidgey'), 'the dex records the content id');
   const after = JSON.stringify(state.current());
   assert.equal(app.finishBattle(s, r).commit, 'already-applied'); assert.equal(JSON.stringify(state.current()), after);
 });
@@ -215,7 +215,7 @@ test('real: a ball can fail and succeed; the caught member is the created foe; u
     const now = w.state.current();
     assert.equal(I6.bagOf(now).pokeball, 6 - thrown); assert.equal(I6.bagOf(now).potion, undefined, 'the potion was used once');
     const c = now.party[1];
-    assert.deepEqual([c.id, c.species, c.form, c.level, c.nature, c.ability, c.gender, c.ivs, c.ball], [foe.id, 'pidgey', 0, 3, foe.nature, foe.ability, foe.gender, foe.ivs, 'pokeball'], 'stored by content id + form (D5-3, step 5.0)');
+    assert.deepEqual([c.id, c.species, c.form, c.level, c.nature, c.ability, c.gender, c.ivs, c.ball], [foe.id, 'pidgey', 0, 3, foe.nature, foe.ability, foe.gender, foe.ivs, 'pokeball'], 'stored by content id + form');
     assert.ok(now.dex.owned.includes('pidgey'));
     assert.equal(w.app.finishBattle(s, r).commit, 'already-applied'); assert.equal(w.state.current().party.length, 2, 'not received twice');
     return;

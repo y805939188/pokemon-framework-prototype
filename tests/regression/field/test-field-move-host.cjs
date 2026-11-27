@@ -1,5 +1,5 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('native');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('native');
 // E2 leaf consumer tests: formal-derived expectations + actual MZ/Reactor object methods in a fake runtime.
 // PF_MZ_RUNTIME_OBJECTS is required for isolated trees without the ignored, pinned runtime payload.
 require('../../../scripts/tests/ts-source-loader.cjs');

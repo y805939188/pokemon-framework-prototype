@@ -1,5 +1,5 @@
 'use strict';
-// Step 4 / A: the live content sample (a starter, the two wild species, one starter grant), the creation data the
+// The live content sample (a starter, the two wild species, one starter grant), the creation data the
 // assembly adds from the pinned Showdown build, and the located refusals of grants.json.
 const test = require('node:test');
 const assert = require('node:assert/strict');

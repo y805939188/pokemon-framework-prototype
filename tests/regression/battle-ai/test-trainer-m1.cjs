@@ -37,7 +37,7 @@ function build(content, compiled, record = compiled.trainers[0]) {
     owner: { id: 7, name: record.name, gender: type.gender, language: 2 }, random: lcg(42), receivedAt: 1234, allocateId: index => `T${index + 1}` });
 }
 
-test('AM1-ULTRA-03 ordinary form creation precedes omitted/explicit overrides and preserves the next member RNG', () => {
+test('ordinary form creation precedes omitted/explicit overrides and preserves the next member RNG', () => {
   const pumpkins = ['pumpkaboo', 'pumpkaboosmall', 'pumpkaboolarge', 'pumpkaboosuper'].map((showdownId, form) => ({
     id: 'pumpkin', form, showdownId, nameKey: 'species.pumpkin', growth: 'medium', baseExp: 67, evYield: { def: 1 }, catchRate: 120,
     learnset: [{ level: 1, move: form === 1 ? 'tackle' : 'astonish' }], source: 'author-placeholder',
@@ -66,7 +66,7 @@ test('AM1-ULTRA-03 ordinary form creation precedes omitted/explicit overrides an
   }
 });
 
-test('AM1-ULTRA-04 explicit legacy omitted friendship inherits legal 256 while explicit overrides retain their own domain', () => {
+test('explicit legacy omitted friendship inherits legal 256 while explicit overrides retain their own domain', () => {
   const input = baseInputs(); input.manifest.schema = 1; input.species.find(s => s.id === 'pidgey' && (s.form ?? 0) === 0).happiness = 256;
   for (const friendship of [undefined, 0]) {
     const npc = { ...trainerRecord(), party: [{ species: 'pidgey', level: 5, ...(friendship === undefined ? {} : { friendship }) }] };
@@ -80,7 +80,7 @@ test('AM1-ULTRA-04 explicit legacy omitted friendship inherits legal 256 while e
   }
 });
 
-test('AM1-ULTRA-05 canonical and hyphenated trainer references agree through cache, assembly and construction', () => {
+test('canonical and hyphenated trainer references agree through cache, assembly and construction', () => {
   for (const [move, ability] of [['quick-attack', 'keen-eye'], ['quickattack', 'keeneye']]) {
     const compiled = compile({ trainerTypes: [trainerType()], trainers: [{ ...trainerRecord(), party: [{ species: 'pidgey', level: 19, moves: [move, 'quickattack'], ability }] }] });
     const loaded = E.contentRuntime.loadCompiled(clone(compiled)), content = assembled(loaded);
@@ -97,7 +97,7 @@ test('AM1-ULTRA-05 canonical and hyphenated trainer references agree through cac
   }
 });
 
-test('AM1-ULTRA-05 registered Dex aliases fail at the content gate while canonical targets remain consumable', () => {
+test('registered Dex aliases fail at the content gate while canonical targets remain consumable', () => {
   const dex = E.dex.createDexLookup();
   for (const [alias, canonical, name, pp] of [['tbolt', 'thunderbolt', 'Thunderbolt', 15], ['eq', 'earthquake', 'Earthquake', 10]]) {
     assert.deepEqual(dex.move(alias), { id: canonical, name, pp }, 'the negative input is a real registered Dex alias');

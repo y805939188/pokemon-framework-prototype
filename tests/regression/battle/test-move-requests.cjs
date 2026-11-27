@@ -129,7 +129,7 @@ test('default AI handles a real recharge request and a doubles PP-less slot', as
   assert.equal(response.ok, true); assert.equal(d.gw._debugBattle().turn, 2);
 });
 
-// ---- guards added with the step 2 closeout: the disabled branch, and the scripted demo policy
+// ---- guards rollback: the disabled branch, and the scripted demo policy
 const E = require('../../../js/engine/build/engine.cjs');
 const selectable = E.moveRequests.isSelectableMove;
 

@@ -41,7 +41,7 @@ test('I offline M1 uses the exact existing fixture functions with only Node asse
  const{build}=await import(pathToFileURL(path.join(root,'src/node_modules/vite/dist/node/index.js')).href);
  const built=await build({configFile:false,root:path.join(root,'src'),logLevel:'silent',build:{write:false,minify:false,lib:{entry:path.join(root,'src/plugins/flowtest/source-fixture.ts'),formats:['cjs'],name:'Donor'}}});
  const code=(Array.isArray(built)?built[0]:built).output.find(x=>x.type==='chunk').code,module={exports:{}};vm.runInNewContext(code,{module,exports:module.exports},{timeout:5000});
- const loaded=module.exports.m1ConvergenceFixture(assert,vm.runInThisContext),original=require('../../../experiments/step5/3/fixtures/m1/convergence.cjs');
+ const loaded=module.exports.m1ConvergenceFixture(assert,vm.runInThisContext),original=require('../../support/saves/convergence.cjs');
  assert.deepEqual(Object.keys(loaded),Object.keys(original));
  for(const key of Object.keys(original))assert.equal(loaded[key].toString(),original[key].toString(),'original function source '+key);
  assert.match(code,/real default Showdown\/session\/application/,'original assertions and fixture retained in the bundle');

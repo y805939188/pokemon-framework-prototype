@@ -65,7 +65,7 @@ test('the no-ambient-types compile bites: host, Node and DOM names fail in a cop
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-// The application layer is host-free too (step 4): framework/tsconfig.app.json compiles app/ and everything it imports
+// The application layer is host-free too: framework/tsconfig.app.json compiles app/ and everything it imports
 // with lib ES2022 and no ambient types, so a browser or Node name anywhere on that import graph fails the build (the
 // name checker only keeps a list; the compiler does not need one).
 function appCopy() {

@@ -160,7 +160,7 @@ async function matrixChild(shape, mode, entry, pluginDir) {
   plugins = readPlugins(pluginDir);
   let party = [];
   if (entry === 'old-party') {
-    const saved = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../experiments/step5/fixtures/step4-saves/defeat.json'), 'utf8'));
+    const saved = JSON.parse(fs.readFileSync(path.join(__dirname, '../../support/saves/schema-v3/defeat.json'), 'utf8'));
     party = saved.party.map(m => ({...m, species:'charmander', form:0}));
   }
   const h = host(E.state.newGame({party, money:0}));

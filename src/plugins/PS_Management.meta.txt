@@ -8,14 +8,14 @@
  * Field moves are available from the current party member menu. ShowFieldShortcuts queues a map menu after the current event naturally ends; it does not wait or change key bindings.
  * Fly uses current-region visited destinations and rechecks the chosen point through GameApplication. Dig and Teleport keep the native travel confirmation.
  * Failed travel can show a recovery window. ShowFieldRecovery waits for the current event naturally; actions use the issued request in the current game.
- * The pause menu's player-name command opens the read-only Trainer Card. Time/start date await their lifecycle batch; no state is written here.
- * ShowMessage uses the native map message window with WP17 typing/confirmation and a documented tag subset. One lowercase \ch[variable,cancel,choice,...] enters ordinary choices after the text. See docs/step5/5.6-messages.zh.md and 5.6-inline-choices.zh.md.
+ * The pause menu's player-name command opens the read-only Trainer Card. No state is written here; unavailable time and start-date data use a placeholder.
+ * ShowMessage uses the native map message window with per-character display, confirmation and a documented tag subset. One lowercase \ch[variable,cancel,choice,...] enters ordinary choices after the text. See docs/user-guide/messages.md and docs/user-guide/choices.md.
  * ShowChoices writes a zero-based result to an MZ variable. Optional matching help arrays follow the cursor. Cancel >0 returns N-1, <0 returns itself, 0 disables BACK. Use ordinary Conditional Branch on the result variable.
- * ShowNumber edits digits and writes the result to an MZ variable. Settings execute in order: default clears cancel; initial preserves it. See docs/step5/5.6-message-number.zh.md.
- * ShowTextInput supports explicit cursor grid, keyboard naming and free text for event variables, max 1..32 characters. Cursor BACK deletes; select OK to finish. See docs/step5/5.6-cursor-text.zh.md and 5.6-event-text.zh.md.
- * RegisterHallOfFame records the current party only when called by your confirmed champion success branch. See docs/step5/5.6-hall-of-fame-author.zh.md.
+ * ShowNumber edits digits and writes the result to an MZ variable. Settings execute in order: default clears cancel; initial preserves it. See docs/user-guide/number-input.md.
+ * ShowTextInput supports explicit cursor grid, keyboard naming and free text for event variables, max 1..32 characters. Cursor BACK deletes; select OK to finish. See docs/user-guide/grid-input.md and docs/user-guide/text-input.md.
+ * RegisterHallOfFame records the current party only when called by your confirmed champion success branch. See docs/user-guide/hall-of-fame.md.
  * @command ShowTextInput
- * @text Text / 事件文字输入（WP17-D 子集）
+ * @text Text / 事件文字输入
  * @arg mode
  * @type select
  * @option Keyboard naming / 键盘命名
@@ -52,7 +52,7 @@
  * @max 32
  * @default 12
  * @command ShowNumber
- * @text Number / 逐位数量输入（WP17-C）
+ * @text Number / 逐位数量输入
  * @arg resultVariableId
  * @text Result variable / 初值及结果变量
  * @type variable
@@ -62,7 +62,7 @@
  * @type struct<PSNumberSetting>[]
  * @default []
  * @command ShowChoices
- * @text Choices / 消息选项（WP17-B）
+ * @text Choices / 消息选项
  * @arg choicesZh
  * @text 中文选项
  * @type string[]
@@ -94,7 +94,7 @@
  * @type variable
  * @default 1
  * @command ShowMessage
- * @text Message / 消息（WP17-A 子集）
+ * @text Message / 消息
  * @arg textZh
  * @text 中文文本
  * @desc 支持单个 \l[N] 显式行数；N须为正整数且窗口适合当前屏幕。

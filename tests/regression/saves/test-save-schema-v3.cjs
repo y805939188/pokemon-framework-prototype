@@ -1,6 +1,6 @@
 'use strict';
 const I6 = require("../../support/inventory/legacy-bag-test-bridge.cjs");
-// Step 4 / A: schema 3 adds the claims ledger (one-time grants). The migration chain 1 -> 2 -> 3 keeps every older
+// Schema 3 adds the claims ledger (one-time grants). The migration chain 1 -> 2 -> 3 keeps every older
 // guarantee, newer versions are still refused, and the stage capacities never delete what an existing save holds.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -8,7 +8,7 @@ const E = require('../../../js/engine/build/engine.cjs');
 const H = require('../../support/application/legacy-test-support.cjs');
 const { validateGame, SUPPORTED_SCHEMAS } = E.saveSchema;
 // The chain reaches schema 7; 3→4 needs species mapping and the current target requires validated content/layout. These states
-// come from the step 2 fixture world, whose content ids are the Showdown names (the identity mapping).
+// come from the synthetic fixture world, whose content ids are the Showdown names (the identity mapping).
 const migrateGame = raw => E.saveSchema.migrateGame(raw, { speciesKey: E.speciesKey.identityKeys, content: E.fixtures.content });
 const S = E.state;
 const F = E.fixtures;
@@ -35,7 +35,7 @@ test('2 -> 3 adds an empty claims ledger and nothing else (3 -> 4 then adds its 
   assert.match(r.notes.join('|'), /claims ledger/);
 });
 
-test('1 -> 2 -> 3 (-> 4) runs as one chain from the real step 2 state', () => {
+test('1 -> 2 -> 3 (-> 4) runs as one chain from the captured schema-1 state', () => {
   const r = migrateGame(v1());
   assert.equal(r.ok, true); assert.deepEqual([r.from, r.to], [1, S.GAME_SCHEMA]); assert.deepEqual(r.state.claims, {});
   assert.deepEqual(validateGame(r.state), []);

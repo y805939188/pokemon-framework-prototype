@@ -2,7 +2,7 @@
 /** D1 measurement driver. Same source/manifest in the C3 bridge and controller candidate.
  * Real MZ scenes/services with disclosed programmatic menu input and fixture preconditions, not hardware input.
  */
-import INPUT from '../../../experiments/step5/4/d1/f100-v1.json';
+import INPUT from '../../../tests/support/performance/native/f100-v1.json';
 import { progressionDonorInputs } from './source-fixture';
 import { createD1Timing } from './d1-timing';
 

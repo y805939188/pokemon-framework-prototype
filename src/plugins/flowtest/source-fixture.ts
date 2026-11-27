@@ -7,7 +7,7 @@ import sources from '../../../content/sample/sources.json';
 import species from '../../../content/sample/species.json';
 import overlays from '../../../content/sample/overlays.json';
 import grants from '../../../content/sample/grants.json';
-import convergenceSource from '../../../experiments/step5/3/fixtures/m1/convergence.cjs?raw';
+import convergenceSource from '../../../tests/support/saves/convergence.cjs?raw';
 export function progressionDonorInputs():any {
  return JSON.parse(JSON.stringify({manifest,sources,species,overlays,grants}));
 }

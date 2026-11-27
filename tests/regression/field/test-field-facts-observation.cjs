@@ -1,7 +1,7 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('parent');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('parent');
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
-const {fixture}=require('../../../experiments/step5/5/field-move-real-parent-fixtures.cjs');
+const {fixture}=require('../../support/field/field-move-real-parent-fixtures.cjs');
 const {createFieldFactsObservation}=require(path.join(process.env.PF_FIELD_MOVE_APP_OUT,'plugins/world/field-facts-observation-mz.js'));
 const {isProxy}=require('node:util').types;
 const value=value=>({status:'value',value});

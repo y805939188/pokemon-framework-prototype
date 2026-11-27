@@ -4,7 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { E, T, D, inputs, fixture, clone } = require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const { E, T, D, inputs, fixture, clone } = require('../../support/battle-ai/integration/fixtures.cjs');
 const ROOT = path.resolve(__dirname, '../../..');
 const sim = require(path.join(ROOT, 'js/engine/showdown/dist/sim'));
 const PIN = '7244fe8e28fa8bc4d0809ae30d183c608b62bb2b';

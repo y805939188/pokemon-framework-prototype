@@ -1,9 +1,0 @@
-# RetryBlackoutReturn 正规有限入口
-
-正规入口为 `scripts/tests/g-retry-production.test.cjs`，复用final-production parent binding、正式distribution／插件和fresh worker。仅登记原GN06、GN07与代表反控GN08：live stable-failed的实际357重试、正式Load后私记录的实际357重试，以及waiting／initializing／handed-off拒绝和completed旧load不再签发第二转移。完整365套的原364为精确前缀，登记数量不等于执行结果。
-
-checkpoint由真实普通完成步的毒伤／F失败产生，不手写CP或owner。命令从真正Game_Interpreter.command357进入原生产安装器；live走实际App recovery，loaded走由正式Load通知建立的私有路由。观察器保原this／args／return，清理、代次、Content／nonce、保存和来源守卫保持。G选择真实composition的Session factory，不使用fixture fakeSession；本有限场景不开始战斗。
-
-GN07／08通过实际DataManager.makeSaveContents、onBeforeSave、JsonEx、DataManager.loadGame、PS_SaveState和Scene_Load.onLoadSuccess载入；StorageManager.loadObject为内存传输。绑定实际序列化packed的hash、字节数、CP快照和前后真实代次，不冒充新进程物理文件冷链。物理file0／file1与global冷链已有独立范围，本任务不重复。
-
-renderer／XHR／输入资源为受控headless界面，原nativeMap／source／receipt方法照常执行；无真实NW像素、声音、实体键盘或真实失焦声明。测试使用既有注入RandomPort固定业务输入，并保draw prefix；不把它当E1默认熵隔离证明。E1、P5统计、复杂interaction commonEvent／forcedHandle与整体5.5另计。正式实际结果、固定SHA和首次失败以本轮外部报告为准。

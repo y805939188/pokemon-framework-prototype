@@ -1,5 +1,5 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('atomic');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('atomic');
 const test = require('node:test'), assert = require('node:assert/strict'), path = require('node:path'), { types } = require('node:util');
 const { createMZAtomicStatePort } = require(path.join(process.env.PF_E1_PARENT_OUT, 'src/plugins/world/atomic-state-mz.js'));
 const fixture = () => {

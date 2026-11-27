@@ -1,8 +1,8 @@
 'use strict';
 // Real App/Gen8 and compiled Scene. Font widths/renderer/input/clock are controlled, not actual NW typography.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
-const {createVictoryDriverHost}=require('../../../experiments/step5/4/victory-music-driver-host.cjs');
-const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),PLAN=require('../../../experiments/step5/4/victory-music-native-plan.json');
+const {createVictoryDriverHost}=require('../../support/battle-host/victory-music-driver-host.cjs');
+const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),PLAN=require('../../support/battle-host/native-plans/victory-music-native-plan.json');
 const FONT=JSON.parse(fs.readFileSync(path.join(ROOT,'data/System.json'))).advanced.fontSize;
 assert(Number.isFinite(FONT)&&FONT>0,'configured font size for the controlled measurement model');
 const EN=('I have trained my team with care, and I will keep learning from this battle. ').repeat(16)+'FINAL_AUTHOR_TAIL';

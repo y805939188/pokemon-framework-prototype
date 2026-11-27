@@ -1,7 +1,7 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('parent');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('parent');
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {fixture}=require('../../../experiments/step5/5/field-move-real-parent-fixtures.cjs');
+const {fixture}=require('../../support/field/field-move-real-parent-fixtures.cjs');
 const selection=moveId=>({kind:'move',memberId:'P1',moveId});
 function prepare(h,moveId='cut'){const r=h.app.prepareFieldShortcutSelection('shortcut',selection(moveId));assert.equal(r.status,'prepared');return r.request;}
 function change(h,what){if(what==='map')h.root.$gameMap=Object.assign(Object.create(Object.getPrototypeOf(h.root.$gameMap)),h.root.$gameMap);else if(what==='player')h.root.$gamePlayer=Object.assign(Object.create(Object.getPrototypeOf(h.root.$gamePlayer)),h.root.$gamePlayer);else if(what==='scene')h.root.SceneManager._scene=new h.root.Scene_Map();else if(what==='map-id')h.root.$gameMap._mapId=8;else{h.root.$gamePlayer[what==='y'?'_y':'_x']++;h.native.event[what==='y'?'_y':'_x']++;}}

@@ -1,6 +1,6 @@
 'use strict';
 const { test } = require('node:test'), assert = require('node:assert/strict');
-const { fixture, flush } = require('../../../experiments/step5/5/fishing-real-parent-fixtures.cjs');
+const { fixture, flush } = require('../../support/field/fishing-real-parent-fixtures.cjs');
 const F = require('../../../tests/support/saves/legacy-migration/fixtures.cjs');
 function world(options={}) { return fixture({party:[F.member('P1',{hp:20,friendship:70})],...options,editContent(content){content.moves.tackle=content.moves.Tackle;for(const [name,s]of Object.entries(content.species)){s.ruleSpecies='Fixture'+name;s.types=['Normal'];s.wildItemCommon=[];s.wildItemUncommon=[];s.wildItemRare=[];}}}); }
 async function caught(h){const {promise}=await h.start();h.window();h.input(1,{confirm:true});h.finish();return promise;}

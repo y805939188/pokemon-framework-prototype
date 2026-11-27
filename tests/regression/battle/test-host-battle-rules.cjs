@@ -1,6 +1,6 @@
 'use strict';
 const I6 = require("../../support/inventory/legacy-bag-test-bridge.cjs");
-// Step 4 / B, core rules: wild encounter selection (WP36 5.1), defeat settlement (WP42 6.1 money loss, WP61 7.2 full
+// Core rules: wild encounter selection (WP36 5.1), defeat settlement (WP42 6.1 money loss, WP61 7.2 full
 // heal) and the capacity backstop of applyBattleResult (D1: a capture never lands outside party/boxes and is never
 // dropped). Verification: spec-driven vectors and invariants; no reference (Ruby) run exists for these modules.
 const test = require('node:test');
@@ -53,7 +53,7 @@ test('encounter tables: regions decide where a table applies; malformed tables a
 });
 
 const member = (id, species, level, extra = {}) => ({ ...E.memberFactory.createMember({ id, species, level }, content, lcg(level)), ...extra });
-// a save stores members by content id + form since step 5.0 (D5-3): created (battle-shaped) members are stored that way
+// a save stores members by content id + form: created (battle-shaped) members are stored that way
 const gameWith = (party, money) => { const g = S.newGame({ party: [] }); g.party = party.map(m => E.speciesKey.toPersistentMember(m, content)); g.money = money; return g; };
 
 test('defeat money loss (WP42 6.1): highest party level x badge factor, at most the balance; badges 0 in this build', () => {

@@ -1,0 +1,25 @@
+{
+  "description": "Historical source identifiers reported for the four native test bodies. These values are preserved from the original manifest, not verified against this checkout and not hashes of current files or evidence of test execution. Current cases and selector guards are bound independently.",
+  "sources": [
+    {
+      "id": "native-callers",
+      "source": "12c763dcf4fa99e6a23b7b9ccc403c48ec03ca88",
+      "bodySHA256": "7a3d3942cd7b235e8db34d814e4204561c7958bb605e07b95f292173a2d21457"
+    },
+    {
+      "id": "native-mapdata",
+      "source": "12c763dcf4fa99e6a23b7b9ccc403c48ec03ca88",
+      "bodySHA256": "535c9c3aa7505f33b6c796cf0c800811a91cf648d9b9a64bc24616f662c043e3"
+    },
+    {
+      "id": "defeat-formal-continue",
+      "source": "f1085d6494b89e67609ac061a8b93a4c91a281cd",
+      "bodySHA256": "eab4610e15a3633a705ac309e1d03334958d60d00cc1c8e40978953bae6cfaaf"
+    },
+    {
+      "id": "shortcut-capture-formal-continue",
+      "source": "f1085d6494b89e67609ac061a8b93a4c91a281cd",
+      "bodySHA256": "a89041a8fdfe5bf5996c9879aba2ac7feb512b048e1f5c38f971facb2b247c09"
+    }
+  ]
+}

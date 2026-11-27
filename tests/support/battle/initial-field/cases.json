@@ -1,0 +1,450 @@
+{
+  "scope": "Authored expected behavior and counterexample recipes for initial battle fields. These scenarios are not a replay or execution result.",
+  "showdownSHA": "7244fe8e28fa8bc4d0809ae30d183c608b62bb2b",
+  "format": "gen8rpgcustomgame",
+  "gen": 8,
+  "request": {
+    "field": "initialField",
+    "optional": true,
+    "perFieldPrecedence": [
+      "explicit author rule",
+      "none"
+    ],
+    "omitAndMZBlank": "none",
+    "explicitNone": "none, never previous battle",
+    "invalid": "reject before new session/sequence/resource/owner mutation"
+  },
+  "MZArguments": {
+    "defaultWeather": "initialField.weather",
+    "defaultTerrain": "initialField.terrain",
+    "battleEnvironment": "initialField.environment"
+  },
+  "weather": {
+    "none": "",
+    "sun": "sunnyday",
+    "rain": "raindance",
+    "sandstorm": "sandstorm",
+    "hail": "hail",
+    "harshsun": "desolateland",
+    "heavyrain": "primordialsea",
+    "strongwinds": "deltastream"
+  },
+  "terrain": {
+    "none": "",
+    "electric": "electricterrain",
+    "grassy": "grassyterrain",
+    "misty": "mistyterrain",
+    "psychic": "psychicterrain"
+  },
+  "environment": {
+    "none": {
+      "type": "Normal",
+      "naturePower": "triattack",
+      "secretPower": "par"
+    },
+    "grass": {
+      "type": "Grass",
+      "naturePower": "energyball",
+      "secretPower": "slp"
+    },
+    "tallgrass": {
+      "type": "Grass",
+      "naturePower": "energyball",
+      "secretPower": "slp"
+    },
+    "movingwater": {
+      "type": "Water",
+      "naturePower": "hydropump",
+      "secretPower": "atk:-1"
+    },
+    "stillwater": {
+      "type": "Water",
+      "naturePower": "hydropump",
+      "secretPower": "atk:-1"
+    },
+    "puddle": {
+      "type": "Water",
+      "naturePower": "mudbomb",
+      "secretPower": "spe:-1"
+    },
+    "underwater": {
+      "type": "Water",
+      "naturePower": "hydropump",
+      "secretPower": "atk:-1"
+    },
+    "cave": {
+      "type": "Rock",
+      "naturePower": "powergem",
+      "secretPower": "flinch"
+    },
+    "rock": {
+      "type": "Ground",
+      "naturePower": "earthpower",
+      "secretPower": "accuracy:-1"
+    },
+    "sand": {
+      "type": "Ground",
+      "naturePower": "earthpower",
+      "secretPower": "accuracy:-1"
+    },
+    "forest": {
+      "type": "Bug",
+      "naturePower": "energyball",
+      "secretPower": "slp"
+    },
+    "forestgrass": {
+      "type": "Bug",
+      "naturePower": "energyball",
+      "secretPower": "slp"
+    },
+    "snow": {
+      "type": "Ice",
+      "naturePower": "icebeam",
+      "secretPower": "frz"
+    },
+    "ice": {
+      "type": "Ice",
+      "naturePower": "icebeam",
+      "secretPower": "frz"
+    },
+    "volcano": {
+      "type": "Fire",
+      "naturePower": "lavaplume",
+      "secretPower": "brn"
+    },
+    "graveyard": {
+      "type": "Ghost",
+      "naturePower": "shadowball",
+      "secretPower": "flinch"
+    },
+    "sky": {
+      "type": "Flying",
+      "naturePower": "airslash",
+      "secretPower": "spe:-1"
+    },
+    "space": {
+      "type": "Dragon",
+      "naturePower": "dracometeor",
+      "secretPower": "flinch"
+    },
+    "ultraspace": {
+      "type": "Psychic",
+      "naturePower": "psyshock",
+      "secretPower": "def:-1"
+    }
+  },
+  "unsupportedWeather": {
+    "shadowsky": "C2 Shadow scope excluded; native condition absent",
+    "snowscape": "not a Gen8 Hail alias"
+  },
+  "engineBoundary": {
+    "initialize": "RPG format onBattleStart before first switchIn; config bound after setPlayer and before team choices",
+    "defaultLogicalDuration": -1,
+    "defaultNativeDuration": "absent, not a decrementing -1",
+    "temporaryOverride": "native engine",
+    "weatherRestore": "natural expiry or supported nondefault primal source end; restore default, apply correct remaining residual phase once",
+    "terrainRestore": "natural expiry only; direct removal does not restore",
+    "environmentConsumers": [
+      "Nature Power",
+      "Camouflage",
+      "Secret Power"
+    ],
+    "environmentTerrainPrecedence": "native current terrain first; none environment delegates unchanged",
+    "worldInference": false,
+    "mutateUpstreamShowdown": false,
+    "mutateBattleResultV1": false,
+    "saveSchemaChange": false,
+    "weatherPriorityGate": {
+      "scope": "only this batch explicit field context",
+      "read": "stored field.weather, never effectiveWeather",
+      "currentPrimal": [
+        "desolateland",
+        "primordialsea",
+        "deltastream"
+      ],
+      "rejectIncomingOrdinary": [
+        "sunnyday",
+        "raindance",
+        "sandstorm",
+        "hail"
+      ],
+      "hook": "independent SetWeather event; native setter handles refusal feedback and ordinary PP",
+      "allow": "native legal primal-to-primal and ordinary overrides outside current primal",
+      "never": "fake ability holder or silently remove supported primal values",
+      "sourceLessAnnouncement": "standard protocol names without ability/of metadata; do not invoke native primal onFieldStart without effect"
+    },
+    "secretPower": {
+      "generationHook": "independent ModifyMove priority +1 before SheerForce 0 and SereneGrace -2; do not retime whole existing RPG handler",
+      "definition": "tag only own per-use environment secondary; preserve native deletion/multiplier, never reconstruct it at finish",
+      "perHit": "record real body eligibility; remove only tagged environment secondary from native per-hit execution; leave unrelated secondaries",
+      "completionHook": "native AfterMoveSecondary after hitStepMoveHitLoop actual completion, not planned hit2",
+      "once": "consume private use+target token before native callback; only living eligible body target",
+      "nativeEvaluation": "local view with actual id/hit/flags and post-ability chance; omit only per-hit parentalbond classification for this once-at-end evaluation; original move/hitcount/damage unchanged",
+      "reentry": "private completion identity prevents own queueing; native target secondary filters and native chance/status application retained",
+      "zeroDrawCases": [
+        "Sheer Force removed definition",
+        "no successful body hit",
+        "full substitute absorption",
+        "immunity",
+        "target fainted",
+        "native secondary suppression"
+      ],
+      "sereneGrace": "one 60% environment opportunity, not 30% or 120%; sleep duration RNG separately recorded",
+      "lifecycle": "retire transient per-use tokens on finish/failure/abort; never serialize them or edit global Dex"
+    },
+    "restoredHooks": "only canonical rpg data serialized; idempotently rebuild owned events/field hooks on restore, no opening replay; if onEvent used, exclude only owned callback functions during synchronous native snapshot and restore in finally"
+  },
+  "acceptance": [
+    {
+      "id": "IF01",
+      "contract": "omitted/all none preserves prior raw, requests, PRNG and primary outcomes; only specifically recorded real t: clock differences may be normalized"
+    },
+    {
+      "id": "IF02",
+      "contract": "8 weather/5 terrain/19 environment mappings; three source-less primal defaults retain native values, proper source-less announce; malformed input zero side effects at each entry before any reservation or await"
+    },
+    {
+      "id": "IF03",
+      "contract": "both formal MZ commands and direct App request reach the same frozen Session/Gateway config"
+    },
+    {
+      "id": "IF04",
+      "contract": "domain before entry abilities/request; one normal opening announcement after dispatch"
+    },
+    {
+      "id": "IF05",
+      "contract": "defaults persist beyond five turns without move/rock source and without added RNG"
+    },
+    {
+      "id": "IF06",
+      "contract": "stored-current three primal defaults reject ordinary weather moves/abilities even when suppressed; permit legal primal interchange and ordinary default override; expiry/source-end restore with correct same-turn residual once"
+    },
+    {
+      "id": "IF07",
+      "contract": "native terrain override restores on natural expiry; Defog/Steel Roller removal does not immediately restore"
+    },
+    {
+      "id": "IF08",
+      "contract": "real three environment moves; Secret Power PB flinch/nonflinch, SheerForce early deletion, SereneGrace one multiplier, actual early completion, Substitute/KO/immune zero opportunity; native terrain priority/none unchanged; timing/once negative controls"
+    },
+    {
+      "id": "IF09",
+      "contract": "same-source checkpoint before/after temporary override and expiry restores data and all owned nonserialized hooks once, no opening/ability replay or caller rebinding"
+    },
+    {
+      "id": "IF10",
+      "contract": "validate/capture before open-to-begin delay/trainer request spread/new op/content/random; before Session first await and Gateway sim construction; reject repeat begin and stale/abort/load/newgame without changing first/successor field"
+    },
+    {
+      "id": "IF11",
+      "contract": "no persistent state before final confirmation; complete result and ledger installed once"
+    },
+    {
+      "id": "IF12",
+      "contract": "real compiled Scene controlled tests, necessary full quick/type/boundary/build/SDK and independent review before publication/native"
+    }
+  ],
+  "weatherVectors": [
+    {
+      "id": "W01",
+      "acceptance": [
+        "IF02",
+        "IF06"
+      ],
+      "parameterizedDefaults": [
+        "harshsun",
+        "heavyrain",
+        "strongwinds"
+      ],
+      "action": "real entry Drought",
+      "expected": "each stored default primal remains unchanged and infinite; no fake default source; ordinary ability setter is refused"
+    },
+    {
+      "id": "W02",
+      "acceptance": [
+        "IF06"
+      ],
+      "default": "harshsun",
+      "action": "real Rain Dance with an ordinary active source",
+      "expected": "stored desolateland retained; move registration/use still consumes native PP once; ordinary weather effect refused with native failure path"
+    },
+    {
+      "id": "W03",
+      "acceptance": [
+        "IF06"
+      ],
+      "default": "harshsun",
+      "setup": "actual Air Lock or Cloud Nine makes effective weather none",
+      "action": "ordinary weather move or ability",
+      "expected": "effective none must not permit replacing stored desolateland; scope is stored weather, not default ID or effective weather"
+    },
+    {
+      "id": "W04",
+      "acceptance": [
+        "IF06"
+      ],
+      "default": "harshsun",
+      "action": "legitimate source of a different primal weather",
+      "expected": "native legal primal interchange accepted, current becomes that primal and original default retained for later supported restoration; no fabricated ability source"
+    },
+    {
+      "id": "W05",
+      "acceptance": [
+        "IF06"
+      ],
+      "default": "rain",
+      "action": "real entry Drought",
+      "expected": "ordinary default is not permanently locked: current sunnyday has native finite duration, later expiry restores infinite default rain with the proper single residual phase"
+    },
+    {
+      "id": "W06",
+      "acceptance": [
+        "IF04"
+      ],
+      "parameterizedDefaults": [
+        "harshsun",
+        "heavyrain",
+        "strongwinds"
+      ],
+      "action": "source-less initialization and one default announcement",
+      "expected": "canonical state before first active/ability; standard weather protocol without ability/of tags; no primal onFieldStart dereference of absent effect"
+    }
+  ],
+  "secretPowerVectors": [
+    {
+      "id": "S01",
+      "acceptance": [
+        "IF08"
+      ],
+      "environment": "cave",
+      "equivalentMappings": [
+        "graveyard",
+        "space"
+      ],
+      "ability": "Parental Bond",
+      "fixture": "Kangaskhan versus surviving Regirock, ordinary native Secret Power",
+      "expected": "two real hits where the fixture permits, exactly one 30% environment opportunity after actual hit loop; no fake hit index or changed raw hitcount"
+    },
+    {
+      "id": "S02",
+      "acceptance": [
+        "IF08"
+      ],
+      "environment": "grass",
+      "ability": "Parental Bond",
+      "expected": "one 30% sleep opportunity at completed move; native first-hit nonflinch filtering cannot swallow an eligible whole-move effect; sleep duration draw recorded separately"
+    },
+    {
+      "id": "S03",
+      "acceptance": [
+        "IF08"
+      ],
+      "environment": "grass",
+      "ability": "Sheer Force",
+      "expected": "own secondary generated before native ability, then deleted; native power boost remains, no environment chance draw/status and no recreation at completion"
+    },
+    {
+      "id": "S04",
+      "acceptance": [
+        "IF08"
+      ],
+      "environment": "grass",
+      "ability": "Serene Grace",
+      "expected": "own 30% generated before native -2 ability callback and becomes60 once; completion uses one 60% opportunity, not30 or120"
+    },
+    {
+      "id": "S05",
+      "acceptance": [
+        "IF08"
+      ],
+      "environment": "cave",
+      "ability": "Parental Bond",
+      "setup": "every actual hit absorbed by a sufficiently healthy native Substitute",
+      "expected": "no qualified body record, zero environment opportunity; do not infer eligibility merely because substitute disappeared later"
+    },
+    {
+      "id": "S06",
+      "acceptance": [
+        "IF08"
+      ],
+      "environment": "cave",
+      "ability": "Parental Bond",
+      "setup": "target actually faints on first hit",
+      "expected": "real hitcount1, zero environment opportunity, complete without waiting for planned second hit"
+    },
+    {
+      "id": "S07",
+      "acceptance": [
+        "IF08"
+      ],
+      "environment": "grass",
+      "ability": "Parental Bond",
+      "setup": "qualify actual first-hit early end with living body-hit target; candidate native Jaboca Berry and HP1 user",
+      "expected": "after actual loop finishes, one eligible whole-move opportunity without changing native hit metadata; fixture must prove the actual early-end precondition before acceptance"
+    },
+    {
+      "id": "S08",
+      "acceptance": [
+        "IF01",
+        "IF08"
+      ],
+      "parameterizedContext": [
+        "environment none",
+        "each of four native terrains overriding a non-none environment"
+      ],
+      "expected": "native original Secret Power path, ability qualification, protocol, requests, random stream and result unchanged; no tagged environment work"
+    }
+  ],
+  "negativeControls": [
+    {
+      "id": "N01",
+      "change": "omit stored-primal ordinary-weather gate",
+      "mustRejectWith": [
+        "W01",
+        "W02"
+      ]
+    },
+    {
+      "id": "N02",
+      "change": "read effectiveWeather instead of stored field.weather",
+      "mustRejectWith": [
+        "W03"
+      ]
+    },
+    {
+      "id": "N03",
+      "change": "block every weather change while a default exists",
+      "mustRejectWith": [
+        "W04",
+        "W05"
+      ]
+    },
+    {
+      "id": "N04",
+      "change": "inject environment secondaries at default priority0 after native ability processing",
+      "mustRejectWith": [
+        "S03",
+        "S04"
+      ],
+      "assertion": "native callback order/deletion and final 60% chance must be checked even if a separate safety guard suppresses a late effect"
+    },
+    {
+      "id": "N05",
+      "change": "return tagged environment flinch to native per-hit secondaries",
+      "mustRejectWith": [
+        "S01"
+      ]
+    },
+    {
+      "id": "N06",
+      "change": "treat planned move.hit2 as completed-move eligibility or omit qualified-body/alive guards",
+      "mustRejectWith": [
+        "S05",
+        "S06",
+        "S07"
+      ]
+    }
+  ],
+  "observationPolicy": "Only observe actual native random arguments and returned values, forwarding each call exactly once and restoring wrappers in finally. Never force PRNG returns, reseed/retry for favorable outcomes, or count sleep-duration [2,5] as a second 30% opportunity. Filter counts by the tagged environment opportunity, not unrelated damage/accuracy/item randomness.",
+  "lifecycleSupplement": "IF09 includes temporary cover before/after expiry and same-source restore with priority/once/clear hooks reconstructed once; IF10 includes open-to-begin caller mutation and rejected duplicate begin; all remain NOT_EXECUTED."
+}

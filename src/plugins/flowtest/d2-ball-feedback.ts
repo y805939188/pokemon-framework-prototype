@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /** Isolated five-case normal rendering qualification. Never self-qualifies native execution. */
-import PLAN from '../../../experiments/step5/4/ball-feedback-native-plan.json';
+import PLAN from '../../../tests/support/battle-host/native-plans/ball-feedback-native-plan.json';
 import { musicNativeContent } from './music-native-fixture';
 import { captureHostReady } from './d2-capture-me';
 export const ballFeedbackNativePlan = PLAN;

@@ -38,12 +38,15 @@ REACTOR_SOURCE=download ./scripts/bootstrap-mac.sh
 | [`src/framework/`](src/framework/) | TypeScript 核心。规则层管理队伍、道具、成长和持久状态；应用层协调游戏流程，战斗适配层连接 Showdown。 |
 | [`src/plugins/`](src/plugins/) | MZ 的接入层。把框架功能提供为插件命令、菜单和场景，并与 MZ 的输入、地图、事件及存档连接。RPGReactor 提供宿主运行与呈现。 |
 | [`data/`](data/) / [`content/sample/`](content/sample/) | MZ 开发样例和作者 JSON 样例。地图与事件在 MZ 中编辑；物种、训练家等内容由工具单独编译。 |
-| [`scripts/`](scripts/) / [`experiments/`](experiments/) | 安装、编译、打包、检查和回归测试。它们不是游戏内容。 |
+| [`scripts/`](scripts/) / [`tests/`](tests/) | 安装、编译、打包、检查和回归测试。它们不是游戏内容。 |
 
 ## 文档
 
 - [作者上手指南](docs/user-guide/README.md)：试玩样例、接入自己的工程、编译内容和配置第一个事件。
-- [作者命令参考](docs/step5/commands.md)：查队伍、背包、战斗、进化、交易、地图和界面命令。历史验证命令不用于当前构件。
-- [接入清单与验证边界](docs/step6/README.md)：复制哪些运行时文件、插件顺序，以及如何区分普通运行和隔离测试。
-- [分发清单](docs/step5/distribution.md)：打包、素材来源与使用条件。不要把本机的第三方素材当成仓库已授权的发布资产。
+- [作者命令参考](docs/user-guide/commands.md)：查队伍、背包、战斗、进化、交易、地图和界面命令。
+- [接入清单与验证边界](docs/user-guide/integration.md)：复制哪些运行时文件、插件顺序，以及如何区分普通运行和隔离测试。
+- [分发清单](docs/sdk/distribution-notices.md)：打包、素材来源与使用条件。不要把本机的第三方素材当成仓库已授权的发布资产。
 - [开发者指南](docs/PROJECT-GUIDE.md) · [GitHub Actions](https://github.com/y805939188/pokemon-framework-prototype/actions)：构建、贡献和当前提交的自动检查。无界面 CI 不等于真实 MZ/NW.js 或玩家下载包验收。
+
+
+[按功能浏览完整文档](docs/README.md)。

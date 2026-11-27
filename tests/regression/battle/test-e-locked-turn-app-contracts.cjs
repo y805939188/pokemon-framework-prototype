@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const {E,T,inputs}=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs'),plan=require('../../support/battle/e-locked-turn-app-contracts.json');
+const {E,T,inputs}=require('../../support/battle-ai/integration/fixtures.cjs'),plan=require('../../support/battle/e-locked-turn-app-contracts.json');
 const {clone,view,events,normalRequest,verifyTurn}=require('../../support/battle/locked-turn-app-fixture.cjs');
 assert.equal(plan.schema,1);assert.equal(plan.completeHeading,false);assert.deepEqual(plan.seed,[1,2,3,4]);
 assert.equal(fs.readFileSync(path.resolve(__dirname,'../../../js/engine/showdown/SOURCE_SHA'),'utf8').trim(),plan.showdownSHA);

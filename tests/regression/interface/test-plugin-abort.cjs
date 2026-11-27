@@ -34,7 +34,7 @@ function host(failure, failVariable = false) {
   ctx.window = ctx;
   vm.createContext(ctx); vm.runInContext(plugin, ctx);
   const flow = ctx.PSFlow;
-  // a battle opened the way the plugin opens one (since step 5.0 the open battle has its operation identity)
+  // a battle opened the way the plugin opens one (the open battle has its operation identity)
   flow.openBattle({ battleId: 'b#2', kind: 'wild', foes: [{ species: 'Pidgey', level: 5 }], seq: 2, resultVariable: 10 });
   return { ctx, flow, vars, game, attempts };
 }

@@ -1,6 +1,6 @@
 'use strict';
-// Step 3 / B1: content pipeline. Errors are located, builds are deterministic, stale output never passes, and the
-// assembled sample reproduces the step 2 fixture content exactly (so using it in the runtime changes no behaviour).
+// Content pipeline: errors are located, builds are deterministic, stale output never passes, and the
+// assembled sample reproduces the synthetic fixture content exactly (so using it in the runtime changes no behaviour).
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -12,13 +12,12 @@ const { compileContent, checkFresh, hashInputs, canonicalJson } = E.contentCompi
 const { assembleContent, loadCompiled } = E.contentRuntime;
 
 const ROOT = path.resolve(__dirname, '../../..');
-// The pipeline mechanics are tested on the step 3 sample as it was frozen at step 3 (experiments/step3/fixtures/
-// content-sample-step3); the live sample grows in step 4 and has its own tests (tests/regression/content/test-battle-author-content.cjs).
+// These tests use a frozen content sample. test-battle-author-content.cjs exercises the live sample.
 const SRC = path.join(__dirname, '../../support/content/synthetic-author-content');
 const CLI = path.join(ROOT, 'js/engine/build/content-cli.cjs');
-// Since step 5.0 the Showdown data every record depends on must pass the pre-use gate; the frozen step 3 registry
+// The Showdown data every record depends on must pass the pre-use gate; this frozen registry
 // predates it, so these tests add the recorded check in memory (and to their temporary copies); the files stay frozen.
-const SHOWDOWN_CHECK = { checkedOn: '2026-10-21', checkedBy: 'test (step 3 fixture, check added in memory)', conditions: 'as registered in content/sample/sources.json', decision: 'internal-use' };
+const SHOWDOWN_CHECK = { checkedOn: '2026-10-21', checkedBy: 'test (synthetic fixture; check added in memory)', conditions: 'as registered in content/sample/sources.json', decision: 'internal-use' };
 const withCheck = sources => sources.map(s => (s.kind === 'showdown' ? { ...s, usageCheck: SHOWDOWN_CHECK } : s));
 const read = f => { const v = JSON.parse(fs.readFileSync(path.join(SRC, f), 'utf8')); return f === 'sources.json' ? withCheck(v) : v; };
 const inputs = () => ({ manifest: read('manifest.json'), sources: read('sources.json'), species: read('species.json'), overlays: read('overlays.json') });
@@ -99,15 +98,13 @@ test('the CLI: build writes deterministic output; a failed build REMOVES the old
 	} finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('assembly against the pinned Showdown data reproduces the step 2 fixture content exactly', () => {
+test('assembly against the pinned Showdown data reproduces the synthetic fixture content exactly', () => {
 	const compiled = compileContent(inputs()).data;
 	const dex = E.dex.createDexLookup();
 	const { content, errors } = assembleContent(compiled, dex);
 	assert.deepEqual(errors, []);
 	// the sample adds one thing the fixture does not have: the text key of each display name
-	// (and, since step 4, the data needed to create an individual: abilities, gender rule, content id; since step 5.0
-	// the form number of the record, which with the content id is the persistent key; since step 5.1
-	// the stable base-species rule identity; step 5.3 adds explicit static types and dex defaults, asserted below)
+	// It also supplies member creation data, persistent species/form keys, rule identities, static types and dex defaults.
 	const withoutKeys = Object.fromEntries(Object.entries(content.species).map(([k, v]) => { const { nameKey, abilities, hiddenAbilities, gender, contentId, form, ruleSpecies, types, tutorMoves, displayForm, formName, dexSortKeys, color, shape, ...rest } = v; assert.equal(ruleSpecies, dex.species(k).baseSpecies); assert.equal(form, 0); assert.match(nameKey, /^species\.[a-z]+$/); assert.deepEqual(types, dex.species(k).types); assert.deepEqual(tutorMoves, []); assert.equal(displayForm, 0); assert.equal(formName, null); assert.deepEqual(dexSortKeys, { zh: '其他' }); assert.equal(color, 'Red'); assert.equal(shape, 'Head'); return [k, rest]; }));
 	assert.deepEqual(withoutKeys, E.fixtures.content.species, 'sample content == fixture content (same numbers, same Showdown base stats)');
 	assert.equal(content.meta.kind, 'sample'); assert.equal(content.meta.inputsHash, compiled.inputsHash);

@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { E, T, D, inputs, clone } = require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const { E, T, D, inputs, clone } = require('../../support/battle-ai/integration/fixtures.cjs');
 
 const fields = [
   ['omitted', undefined], ['empty', {}],

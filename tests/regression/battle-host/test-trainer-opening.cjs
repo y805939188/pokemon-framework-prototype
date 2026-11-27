@@ -1,7 +1,7 @@
 'use strict';
 // Real App/Gen8/compiled Scene and translator; input/raster/audio clocks controlled, no native claim.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
-const {createVictoryDriverHost}=require('../../../experiments/step5/4/victory-music-driver-host.cjs'),ROOT=path.resolve(process.env.PF_PAUSE_SCENE_ROOT||path.resolve(__dirname,'../../..')),E=require(path.join(ROOT,'js/engine/build/production.cjs')),PLAN=require('../../../experiments/step5/4/victory-music-native-plan.json');let temp,plugins,entryText,fixture;
+const {createVictoryDriverHost}=require('../../support/battle-host/victory-music-driver-host.cjs'),ROOT=path.resolve(process.env.PF_PAUSE_SCENE_ROOT||path.resolve(__dirname,'../../..')),E=require(path.join(ROOT,'js/engine/build/production.cjs')),PLAN=require('../../support/battle-host/native-plans/victory-music-native-plan.json');let temp,plugins,entryText,fixture;
 test.before(async()=>{temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-trainer-opening-'));plugins={};for(const name of ['PS_BattleFlow','PS_SaveState','PS_Evolution','PS_BattleFlowTest']){const out=path.join(temp,name),r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,env:{...process.env,RR_PLUGIN:name},encoding:'utf8'});assert.equal(r.status,0,r.stdout+r.stderr);const text=fs.readFileSync(path.join(out,name+'.js'),'utf8');if(name==='PS_BattleFlowTest')entryText=text;else plugins[name]=text;}
  if(process.env.PF_TRAINER_OPENING_MUTATION){
   const mode=process.env.PF_TRAINER_OPENING_MUTATION;

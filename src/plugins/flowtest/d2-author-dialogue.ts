@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Test-only ordinary long author dialogue. External supervision qualifies native execution.
-import PLAN from '../../../experiments/step5/4/author-dialogue-native-plan.json';
+import PLAN from '../../../tests/support/battle-host/native-plans/author-dialogue-native-plan.json';
 import { musicNativeContent, musicNativeState } from './music-native-fixture';
 import { captureHostReady } from './d2-capture-me';
 export const authorDialogueNativePlan = PLAN;

@@ -1,7 +1,7 @@
 'use strict';
 // Copy four distinct existing synthetic tones, without re-encoding or touching the original evidence.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
-const PLAN=require('../experiments/step5/4/victory-music-native-plan.json');
+const PLAN=require('../tests/support/battle-host/native-plans/victory-music-native-plan.json');
 const {oggTiming,DURATION_CONTRACT,PAGE_DURATION_US}=require('./prepare-music-native-assets.cjs');
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex'),fileHash=f=>hash(fs.readFileSync(f));
 const inside=(root,p)=>{const rel=path.relative(root,p);return !!rel&&!path.isAbsolute(rel)&&rel!=='..'&&!rel.startsWith('..'+path.sep);};

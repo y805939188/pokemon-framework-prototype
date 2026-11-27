@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Read CI results of a public repo WITHOUT credentials, from the public Actions pages (no API, no token).
-# Usage: scripts/ci-status.sh [branch] [repo]   e.g. scripts/ci-status.sh step3/foundation
+# Usage: scripts/ci-status.sh [branch] [repo]   e.g. scripts/ci-status.sh main
 # Prints one line per recent run: status text, run id, and the commit message GitHub shows for it.
 # The pages are HTML, so this is a best-effort reader: if GitHub changes its markup it prints nothing; then read the
 # Actions page in a browser. Never treat "no output" as "passed".

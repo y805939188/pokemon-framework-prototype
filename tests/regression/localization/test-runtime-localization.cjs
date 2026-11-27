@@ -1,5 +1,5 @@
 'use strict';
-// Step 3 / B2: text keys, fallback, diagnostics, the second-language sample, and the structured log.
+// Text keys, fallback, diagnostics, the second-language sample, and the structured log.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const E = require('../../../js/engine/build/engine.cjs');

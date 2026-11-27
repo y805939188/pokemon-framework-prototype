@@ -1,6 +1,6 @@
 'use strict';
-// Step 5.0 review of 1960b92, F09: the warn-only budget check (D5-8) compares a battle-derived row only when it was
-// computed over the same battles as the step 4 baseline (30 per run); other rows are compared as before; the 100-battle
+// The advisory performance check compares a battle-derived row only when it was
+// computed over the same battles as the baseline (30 per run); other rows are compared as before; the 100-battle
 // memory growth needs a 100-battle run. Synthetic summaries in temporary files; nothing is measured here.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -10,7 +10,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '../../..');
-const budget = JSON.parse(fs.readFileSync(path.join(ROOT, 'docs/step5/perf-budget.json'), 'utf8'));
+const budget = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/support/performance/perf-budget.json'), 'utf8'));
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-budget5-'));
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 const row = (label, median, samples = [median, median, median]) => ({ label, median, range: [Math.min(...samples), Math.max(...samples)], samples });
@@ -20,9 +20,9 @@ function check(rows, memoryRows, overrideBudget) {
   let script = path.join(ROOT, 'scripts/perf-budget.cjs');
   if (overrideBudget) {
     const fixture = fs.mkdtempSync(path.join(dir, 'budget-'));
-    fs.mkdirSync(path.join(fixture, 'scripts')); fs.mkdirSync(path.join(fixture, 'docs/step5'), { recursive: true });
+    fs.mkdirSync(path.join(fixture, 'scripts')); fs.mkdirSync(path.join(fixture, 'tests/support/performance'), { recursive: true });
     fs.copyFileSync(script, path.join(fixture, 'scripts/perf-budget.cjs'));
-    fs.writeFileSync(path.join(fixture, 'docs/step5/perf-budget.json'), JSON.stringify(overrideBudget));
+    fs.writeFileSync(path.join(fixture, 'tests/support/performance/perf-budget.json'), JSON.stringify(overrideBudget));
     script = path.join(fixture, 'scripts/perf-budget.cjs');
   }
   const args = [script, s, `--out=${s}.report.json`];
@@ -62,7 +62,7 @@ test('over another set of battles (e.g. 36 with the full-save battles mixed in, 
   }
 });
 
-test('the 100-battle memory growth uses the current fourth-step baseline and only a 100-battle run', () => {
+test('the 100-battle memory growth uses the current 100-battle baseline and only a 100-battle run', () => {
   const mem = (after4, last, battles) => [row('memory: app RSS after 4 battles (MB)', after4, [after4]), row('memory: app RSS after the last round (MB)', last, [last]), row('battles in the rounds (4 per round; the last memory sample follows them)', battles, [battles])];
   const growth = budget.memory100.baseline.growth;
   assert.equal(budget.memory100.warnAbove, +(growth * 1.2).toFixed(2));

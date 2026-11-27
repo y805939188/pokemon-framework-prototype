@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const F = require('../../support/world/f-blackout-fixtures.cjs');
 const B = process.env.PF55_F_RULES_FILE ? require(process.env.PF55_F_RULES_FILE)
-  : require(require('node:path').join(require('../../../experiments/step5/5/regular-world-core-runtime.cjs').output(), 'blackout.js'));
+  : require(require('node:path').join(require('../../support/world/regular-world-core-runtime.cjs').output(), 'blackout.js'));
 assert(B, 'missing integrated blackout core export; use PF55_F_RULES_FILE for isolated author tests');
 function plan(input) { const result = B.planBlackoutReturn(input); assert.equal(result.status, 'planned'); return result.plan; }
 function refusal(result, reason) { assert.equal(result.status, 'refused'); assert.equal(result.reason, reason); }

@@ -1,6 +1,6 @@
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict');
-const H = require('../../../experiments/step5/5/fixtures/wild-generation-support.cjs');
+const H = require('../../support/world/wild-generation-support.cjs');
 const L = require('../../support/world/fixtures/wild-generation-completion.literal.json');
 let G;
 test.before(async () => { G = await H.moduleUnderTest(); });

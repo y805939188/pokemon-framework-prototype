@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Test-only finite recipe. A report never establishes native execution by itself.
-import PLAN from '../../../experiments/step5/4/ordinary-message-native-plan.json';
+import PLAN from '../../../tests/support/battle-host/native-plans/ordinary-message-native-plan.json';
 import { musicNativeContent, musicNativeState } from './music-native-fixture';
 import { captureHostReady } from './d2-capture-me';
 export const ordinaryMessageNativePlan = PLAN;

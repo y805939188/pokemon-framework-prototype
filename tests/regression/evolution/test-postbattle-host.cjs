@@ -1,5 +1,5 @@
 'use strict';
-// Actual built adapter + actual GameApplication in a small Node VM host, following the existing step4 host contract.
+// Actual built adapter + actual GameApplication in a small Node VM host, following the controlled host contract.
 // This is host-lifecycle automation, not a real MZ/NW or physical-input claim.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
 const{world,E,clone}=require('../../support/evolution/postbattle/helpers.cjs'),ROOT=path.resolve(__dirname, '../../..');

@@ -72,7 +72,7 @@ test('invalid current PP or an unrepresentable cap is diagnosed before any seed 
   }
 });
 
-// ---- supported range (step 2 closeout): spec total PP = base + floor(base * ups / 5), ups 0-3; the bridge follows the pinned simulator
+// ---- supported range: spec total PP = base + floor(base * ups / 5), ups 0-3; the bridge follows the pinned simulator
 test('the supported range is stated by tests: ups 0-3 accepted, other caps and Trump Card boosts rejected before the battle starts', async () => {
   const create = move => { const game = F.makeGame(); game.party[0].moves = [move]; return make(game); };
   await create({ id: 'hydropump', pp: 8, maxpp: 8 });           // 3 PP-Ups

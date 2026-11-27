@@ -1,5 +1,5 @@
 {
-  "note": "Regenerate with experiments/step2/s5/update-matrix-baseline.cjs after an intended behaviour change; review the diff.",
+  "note": "Regenerate with tests/tools/battle/update-matrix-baseline.cjs after an intended behaviour change; review the diff.",
   "fingerprints": {
     "S1": "1d78d0a8ff4b8b542414c4e6ba695fedaef324b118241e576c3e344b7ca5457a",
     "S2": "32142bf740c3d23eca986b638434a3b28e4e885f122fda88af5627766bf28ec2",

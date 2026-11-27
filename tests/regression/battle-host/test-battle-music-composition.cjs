@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
-const {createCompositionHostFactory}=require('../../../experiments/step5/4/battle-music-composition-host.cjs');
+const {createCompositionHostFactory}=require('../../support/battle-host/battle-music-composition-host.cjs');
 const ROOT=path.resolve(__dirname,'../../..');let temp,world;
 test.before(()=>{
  temp=fs.mkdtempSync(path.join(os.tmpdir(),'pf-music-composition-'));const plugins={};

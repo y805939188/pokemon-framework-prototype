@@ -1,8 +1,8 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('world-scene');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('world-scene');
 // App-only controlled issuer revocations; no full production IIFE or private-issuer acceptance claim.
 const{test}=require('node:test'),assert=require('node:assert/strict'),path=require('node:path'),{types}=require('node:util');
-const{fixture}=require('../../../experiments/step5/5/field-move-real-parent-fixtures.cjs'),{installNativePhase}=require('../../../experiments/step5/5/world-battle-native-phase-fixture.cjs');
+const{fixture}=require('../../support/field/field-move-real-parent-fixtures.cjs'),{installNativePhase}=require('../../support/battle-host/world-battle-native-phase-fixture.cjs');
 const{createWorldBattleSceneMZ}=require(path.join(process.env.PF_E2_PARENT_OUT,'src/plugins/world/world-battle-scene-mz.js'));
 const{createMZAtomicStatePort}=require(path.join(process.env.PF_E2_PARENT_OUT,'src/plugins/world/atomic-state-mz.js'));
 function revoke(h,change){const flow=h.root.PSFlow;if(change==='manager')h.root.SceneManager={...h.root.SceneManager};else if(change==='prototype')Object.setPrototypeOf(h.root.SceneManager._scene,{});else if(change==='flow')h.root.PSFlow={...flow};else if(change==='application')flow._app={stateGeneration:h.app.stateGeneration};else if(change==='operation')flow._op={...flow._op};else if(change==='scene-operation')h.root.SceneManager._scene._psOp={...flow._op};else if(change==='running')flow.running=false;else flow._op.worldAdmission={...flow._op.worldAdmission};}

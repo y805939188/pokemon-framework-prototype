@@ -1,7 +1,7 @@
 'use strict';
-require('../../../experiments/step5/5/regular-field-action-test-runtime.cjs').prepare('parent');
+require('../../support/field/regular-field-action-test-runtime.cjs').prepare('parent');
 const{test}=require('node:test'),assert=require('node:assert/strict');
-const{fixture}=require('../../../experiments/step5/5/field-move-real-parent-fixtures.cjs');
+const{fixture}=require('../../support/field/field-move-real-parent-fixtures.cjs');
 function world(options={}){return fixture({moveId:'cut',editState(g){g.inventory.registeredItems=['honey'];options.editState?.(g);},...options});}
 test('App shortcut query captures actual registered stock and current field abilities without RNG or writes',()=>{const h=world(),before=JSON.stringify(h.state),query=h.app.fieldShortcutQueries(),rows=query.snapshot();assert.equal(rows.status,undefined,JSON.stringify(rows));assert.deepEqual(rows.items.map(x=>[x.itemId,x.quantity]),[['honey',2]]);assert.deepEqual(rows.moves.map(x=>[x.memberId,x.moveId]),[['P1','cut']]);assert.equal(query.resolve({kind:'item',itemId:'honey'}).status,'available');assert.equal(query.resolve({kind:'move',memberId:'P1',moveId:'cut'}).status,'available');assert.equal(JSON.stringify(h.state),before);assert.deepEqual(h.draws,[]);assert.equal(h.writes.length,0);assert.equal(h.app.saveBlocked,false);});
 test('party subset uses current party identity and includes no registered item column',()=>{const h=world(),query=h.app.fieldShortcutQueries();assert.equal(query.snapshot('P1').moves.length,1);assert.deepEqual(query.snapshot('P1').items,[]);assert.deepEqual(query.snapshot('boxed').moves,[]);assert.equal(query.resolve({kind:'item',itemId:'honey'},'P1').status,'refused');assert.deepEqual(h.draws,[]);});

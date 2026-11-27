@@ -86,7 +86,7 @@ test('B1 PBS imports all three ordered pools and form one-pool overrides do not 
   const deniedReads = []; const denied = pbs.importPbsBundle({ sourceId: 'blocked', sourceProblem: () => 'denied', baseFiles: [{ file: 'blocked.txt', read: () => { deniedReads.push(1); return ''; } }] }); assert.equal(denied.ok, false); assert.deepEqual(denied.species, []); assert.deepEqual(deniedReads, []);
 });
 test('B1 actual CLI reads/hashes all optional world files and invalid rebuild removes stale cache', async () => {
-  const artifacts = process.env.PF55_WORLD_CONTENT_EVIDENCE || path.join(ROOT, 'build/step5-5-development-20261115/b1-author'); fs.mkdirSync(artifacts, { recursive: true }); const dir = fs.mkdtempSync(path.join(artifacts, 'world-cli-'));
+  const artifacts = process.env.PF55_WORLD_CONTENT_EVIDENCE || path.join(ROOT, 'build/test-world-content'); fs.mkdirSync(artifacts, { recursive: true }); const dir = fs.mkdtempSync(path.join(artifacts, 'world-cli-'));
   const raw = { ...inputs(), ...world() }, out = path.join(dir, 'compiled.json'); raw.species = []; raw.encounters.tables = [];
   const filename = key => ({ regionMaps: 'region-maps', mapConnections: 'map-connections' }[key] || key) + '.json'; for (const [key, value] of Object.entries(raw)) fs.writeFileSync(path.join(dir, filename(key)), JSON.stringify(value));
   const cli = process.env.PF55_CONTENT_CLI || path.join(ROOT, 'js/engine/build/content-cli.cjs'), run = command => spawnSync(process.execPath, [cli, command, '--src=' + dir, '--out=' + out], { encoding: 'utf8' });
@@ -95,7 +95,7 @@ test('B1 actual CLI reads/hashes all optional world files and invalid rebuild re
   raw.encounters.source = 'missing'; fs.writeFileSync(path.join(dir, 'encounters.json'), JSON.stringify(raw.encounters)); result = run('build'); fs.writeFileSync(path.join(dir, 'invalid-build.log'), result.stdout + result.stderr); assert.equal(result.status, 1); assert.equal(fs.existsSync(out), false); assert.match(result.stderr, /encounters.json.*source/);
 });
 test('B1 shipped sample builds against real staged data with canonical wild pool and formal world envelopes', () => {
-  const artifacts = process.env.PF55_WORLD_CONTENT_EVIDENCE || path.join(ROOT, 'build/step5-5-development-20261115/b1-author'); fs.mkdirSync(artifacts, { recursive: true }); const dir = fs.mkdtempSync(path.join(artifacts, 'world-sample-'));
+  const artifacts = process.env.PF55_WORLD_CONTENT_EVIDENCE || path.join(ROOT, 'build/test-world-content'); fs.mkdirSync(artifacts, { recursive: true }); const dir = fs.mkdtempSync(path.join(artifacts, 'world-sample-'));
   const cli = process.env.PF55_CONTENT_CLI || path.join(ROOT, 'js/engine/build/content-cli.cjs'), out = path.join(dir, 'sample-content.json');
   const result = spawnSync(process.execPath, [cli, 'build', '--src=' + path.join(ROOT, 'content/sample'), '--out=' + out], { encoding: 'utf8' }); fs.writeFileSync(path.join(dir, 'sample-build.log'), result.stdout + result.stderr); assert.equal(result.status, 0, result.stderr);
   const cache = JSON.parse(fs.readFileSync(out)); assert.equal(cache.schema, 5); assert.deepEqual(cache.species.find(sp => sp.id === 'pidgey').wildItemCommon, ['oranberry']);

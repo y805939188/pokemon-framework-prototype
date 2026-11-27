@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
-const {E,D,fixture,diag,clone}=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const {E,D,fixture,diag,clone}=require('../../support/battle-ai/integration/fixtures.cjs');
 const parse=vm.runInNewContext('JSON.parse'),foreignPromise=vm.runInNewContext('(json)=>Promise.resolve(JSON.parse(json))');
 const ref=parse('{"id":"realm-test","version":"1","parameters":{"slot":2}}');
 function choose(s,slot=2){const c=s.request.legalMoves.find(x=>x.slot===slot);return {kind:'choose',binding:s.binding,candidateId:c.candidateId,retryOrder:[c.candidateId],diagnostics:[]};}

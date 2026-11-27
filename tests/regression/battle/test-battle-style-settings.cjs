@@ -32,6 +32,6 @@ test('legacy controlled hosts without configuration methods retain default reads
  const G={ConfigManager:{}};style.installBattleStyleSettings(G,()=>E.i18n.translatorFor('en'));assert.equal(style.playerBattleStyle(G),'switch');assert.equal(G.ConfigManager.makeData,undefined);
 });
 test('App rejects malformed author styles before session construction or persistent writes',async()=>{
- const F=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs'),content=F.content(),state=F.T.fakes.createMemoryState(E.state.newGame({content,party:[],money:1000}));let calls=0;const app=new E.app.GameApplication({state,content:()=>({content}),sessions:{async create(){calls++;throw Error('must not create');}},projection:F.T.fakes.createRecordingProjection(),random:()=>0});
+ const F=require('../../support/battle-ai/integration/fixtures.cjs'),content=F.content(),state=F.T.fakes.createMemoryState(E.state.newGame({content,party:[],money:1000}));let calls=0;const app=new E.app.GameApplication({state,content:()=>({content}),sessions:{async create(){calls++;throw Error('must not create');}},projection:F.T.fakes.createRecordingProjection(),random:()=>0});
  for(const battleStyle of [null,true,0,'inherit','bad',{}])await assert.rejects(app.startBattle({battleId:'bad-style',kind:'wild',foes:[{species:'pidgey',level:3}],seq:1,battleStyle}),/battleStyle must be/);assert.equal(calls,0);assert.equal(state.replaced.length,0);
 });

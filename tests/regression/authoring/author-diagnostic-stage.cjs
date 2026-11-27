@@ -8,7 +8,7 @@ let stage,ownedScope;
 after(()=>{if(ownedScope)fs.rmSync(ownedScope,{recursive:true,force:true});});
 function prepare(){
  if(stage)return stage;
- const parent=path.join(root,'build','step6-isolated');fs.mkdirSync(parent,{recursive:true,mode:0o700});
+ const parent=path.join(root,'build','isolated-launch');fs.mkdirSync(parent,{recursive:true,mode:0o700});
  const scope=ownedScope=fs.mkdtempSync(path.join(parent,'diagnostic-'));
  const game=path.join(scope,'game'),profile=path.join(scope,'profile'),saves=path.join(scope,'saves');
  for(const d of ['game','game/js','game/js/plugins','profile','saves'])fs.mkdirSync(path.join(scope,d),{mode:0o700});

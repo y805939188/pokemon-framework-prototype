@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {E,D,clone,inputs,content,fixture,inspect,diag}=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const {E,D,clone,inputs,content,fixture,inspect,diag}=require('../../support/battle-ai/integration/fixtures.cjs');
 const ref=(id='slot-test',parameters={slot:2},version)=>({id,...(version?{version}:{}),parameters});
 function choose(s,p){const r=s.request;if(r.kind==='wait'||r.kind==='finished')return {kind:'none',binding:s.binding,reason:r.kind};const all=r.kind==='move'?r.legalMoves:r.legalSwitches;const chosen=r.kind==='move'?all.find(c=>c.slot===p.slot)??all[0]:all[0];return {kind:'choose',binding:s.binding,candidateId:chosen.candidateId,retryOrder:[chosen.candidateId,...all.filter(c=>c!==chosen).map(c=>c.candidateId)],diagnostics:[]};}
 function registry(decide=choose){const r=E.composition.createTrainerAiStrategyRegistry();r.register({id:'slot-test',version:'1',implementationIdentity:'test-only/slot/1',validateParameters(p){if(Object.keys(p).length!==1||![1,2].includes(p.slot))throw Error('invalid-slot-parameters');},create(){return {decide};}});return r;}

@@ -1,7 +1,7 @@
 'use strict';
 // Approved R2 contract: official author inputs -> production App/Session -> actual pinned Gen8.
 const test = require('node:test'), assert = require('node:assert/strict');
-const { E, T, D, inputs, clone } = require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs');
+const { E, T, D, inputs, clone } = require('../../support/battle-ai/integration/fixtures.cjs');
 const FOUR = ['Water', 'Dark', 'Fairy', 'Steel'];
 const allTypes = () => E.dex.createDexLookup().allTypes().map(t => t.name);
 function compile(raw) {

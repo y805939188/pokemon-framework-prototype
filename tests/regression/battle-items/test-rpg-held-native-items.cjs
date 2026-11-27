@@ -1,7 +1,7 @@
 'use strict';
 // Synthetic author content through the real App/Session. Damage, guards and PRNG are compared with native items.
 const test=require('node:test'),assert=require('node:assert/strict');
-const F=require('../../../experiments/step5/4/trainer-ai-integration/fixtures.cjs'),{E,T}=F;
+const F=require('../../support/battle-ai/integration/fixtures.cjs'),{E,T}=F;
 const sim=require('../../../js/engine/showdown/dist/sim');
 const pairs=[['luckyegg','Lucky Egg',30,'lightclay'],['amuletcoin','Amulet Coin',30,'lightclay'],['luckincense','Luck Incense',10,'cloversweet']];
 const clone=v=>JSON.parse(JSON.stringify(v));

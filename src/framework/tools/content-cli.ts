@@ -275,7 +275,7 @@ else if (cmd === "check-item-pockets") {
   if(!previous){console.error("usage: check-item-pockets --previous-items=<published-items.json> [--src=content/sample]");process.exit(2);}
   process.exit(checkItemPockets(SRC,path.resolve(ROOT,previous)));
 }
-else if (cmd === "inventory") process.exit(inventory(SRC, arg("report", "docs/step3/content-inventory.json")));
+else if (cmd === "inventory") process.exit(inventory(SRC, arg("report", "build/content-inventory.json")));
 else if (cmd === "import-pbs" || cmd === "import-pbs-regional") {
   const source=process.argv.find(value=>value.startsWith("--source="))?.slice(9)??"";
   process.exit(importPbsFiles(SRC,source,arg("report","build/pbs-import.json"),cmd==="import-pbs-regional"));

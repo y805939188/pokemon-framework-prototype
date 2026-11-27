@@ -1,6 +1,6 @@
 'use strict';
 const I6 = require("../../support/inventory/legacy-bag-test-bridge.cjs");
-// Step 4 / A, core rules (no engine, no host): creating an individual from species + level (WP18 4.1/4.2, WP19
+// Core rules (no engine, no host): creating an individual from species + level (WP18 4.1/4.2, WP19
 // 3.2-3.5/5.2, WP20 5.1), one-time grants (D1 receiving order, stage capacities), and the party heal (WP20 3.2).
 // Verification: spec-driven vectors and invariants; no reference (Ruby) run exists for these modules.
 const test = require('node:test');
@@ -64,7 +64,7 @@ test('createMember: the documented random draws, then every field from species +
   assert.deepEqual([m.level, m.exp, m.hp], [5, E.growth.minExp('parabolic', 5), stats.hp], 'exp = minimum of the level, HP full');
   assert.deepEqual(m.moves.map(x => x.id), ['scratch', 'growl', 'ember']);
   assert.deepEqual([m.status, m.statusCount, m.item, m.ball, m.owner.name, m.friendship, m.nickname], ['', 0, '', 'pokeball', 'player', 70, null]);
-  // a created member is battle-shaped (Showdown name); stored with its persistent key (D5-3, step 5.0) it is a valid save member
+  // a created member is battle-shaped (Showdown name); stored with its persistent key it is a valid save member
   assert.equal(m.form, 0);
   assert.deepEqual(E.saveSchema.validateGame({ ...S.newGame({ content, party: [] }), party: [E.speciesKey.toPersistentMember(m, content)] }), [], 'a created member, stored with its key, is a valid persistent member');
 });
@@ -103,7 +103,7 @@ test('a grant is applied once: members (party first), items, money, and the clai
   const s0 = fresh(); const before = clone(s0);
   const r = starter(s0);
   assert.equal(r.status, 'applied'); assert.deepEqual(s0, before, 'the input state is not mutated');
-  assert.deepEqual(r.state.party.map(m => [m.id, m.species, m.form, m.level]), [['M1', 'charmander', 0, 5]], 'stored by content id + form (D5-3, step 5.0)');
+  assert.deepEqual(r.state.party.map(m => [m.id, m.species, m.form, m.level]), [['M1', 'charmander', 0, 5]], 'stored by content id + form');
   assert.deepEqual(I6.bagOf(r.state), { potion: 5, pokeball: 10, antidote: 2 }); assert.deepEqual(r.state.claims, { starter: { kind: 'grant' } });
   assert.deepEqual(r.placed, [{ id: 'M1', species: 'charmander', form: 0, level: 5, to: 'party' }]);
   assert.deepEqual(E.saveSchema.validateGame(r.state), []);
@@ -143,7 +143,7 @@ test('grant money follows the money cap (WP24: clamped); an explicit write clamp
 
 test('a grant registers every received species as seen and owned (WP26 3.2 gifts), once, only when the grant is applied', () => {
   const r = starter(fresh());
-  assert.deepEqual(r.state.dex, { ...expectedEmptyDex, seen: ['charmander'], owned: ['charmander'], seenForms: {charmander:[{gender:0,form:0,shiny:false}]}, lastSeenForm: {charmander:{gender:0,form:0,shiny:false}} }, 'the starter is in the dex (by content id since step 5.0)');
+  assert.deepEqual(r.state.dex, { ...expectedEmptyDex, seen: ['charmander'], owned: ['charmander'], seenForms: {charmander:[{gender:0,form:0,shiny:false}]}, lastSeenForm: {charmander:{gender:0,form:0,shiny:false}} }, 'the starter is in the dex (by content id)');
   assert.equal(starter(r.state).state, r.state, 'a repeat changes nothing, the dex included');
   const flock = { ...content, settings: {...content.settings,BAG_POCKET_SLOTS:[-1,1,-1,-1,-1,-1,-1,-1]}, grants: { flock: { id: 'flock', members: [{ species: 'Pidgey', level: 3 }, { species: 'Pidgey', level: 4 }, { species: 'Caterpie', level: 2 }], items: { potion: 1 }, money: 0 } } };
   const sighted = fresh(); sighted.dex.seen = ['pidgey'];

@@ -10,7 +10,7 @@ const K = E.fakes;
 const GameApplication = require('../../support/application/legacy-test-support.cjs').AutomaticApplication;
 
 const WIN = { events: ['|move|p1a: A-0001|Flamethrower|p2a: M4', '|-damage|p2a: M4|0 fnt', '|faint|p2a: M4'], damage: { 'M4': 9999 }, end: { winner: 'Player', reason: 'win' } };
-// Since step 4 the application creates the foes: the fixture content gets the creation data a Pidgey needs (no
+// The application creates the foes: the fixture content gets the creation data a Pidgey needs (no
 // Showdown is loaded here, so it is written out) and the random is seeded.
 const content = JSON.parse(JSON.stringify(F.content));
 Object.assign(content.species.Pidgey, { abilities: ['Keen Eye', 'Tangled Feet'], gender: 128, learnset: { 1: ['Tackle'] } });

@@ -1,6 +1,6 @@
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict');
-const { load, host } = require('../../../experiments/step5/5/field-host-support.cjs');
+const { load, host } = require('../../support/field/field-host-support.cjs');
 const stepRules = load('src/plugins/world/step-host.ts');
 const modeRules = load('src/plugins/world/encounter-mode-host.ts');
 const passives = load('src/framework/rules/field-passives.ts');

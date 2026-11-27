@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawnSync}=require('node:child_process');
-const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),{createVictoryDriverHost}=require('../../../experiments/step5/4/victory-music-driver-host.cjs'),PLAN=require('../../../experiments/step5/4/victory-music-native-plan.json');
+const ROOT=path.resolve(__dirname,'../../..'),E=require('../../../js/engine/build/production.cjs'),{createVictoryDriverHost}=require('../battle-host/victory-music-driver-host.cjs'),PLAN=require('../battle-host/native-plans/victory-music-native-plan.json');
 const crypto=require('node:crypto');const clone=v=>JSON.parse(JSON.stringify(v));let work,plugins,entryText;const buildRecords=[];
 function prepare(){
  work=fs.mkdtempSync(path.join(os.tmpdir(),'pf-e2-status-feedback-scene-'));plugins={};

@@ -122,7 +122,7 @@ class EvidenceGates(unittest.TestCase):
     def signal_window(self, window, sig):
         # Explicit synthetic child/command shims, never an RSS measurement or NW host.
         with tempfile.TemporaryDirectory(prefix='pf-d1-signal-window-') as folder:
-            root=Path(folder);apps=[];source=json.loads((base.SCRIPT.parent.parent/'experiments/step5/4/d1/f100-v1.json').read_text());mark=root/'window-entered'
+            root=Path(folder);apps=[];source=json.loads((base.SCRIPT.parent.parent/'tests/support/performance/native/f100-v1.json').read_text());mark=root/'window-entered'
             for role in ['control','candidate']:
                 app=root/(role+'.app');nw=app/'Contents/Resources/app.nw';nw.mkdir(parents=True);info=dict(gitHead=role,withTests=True,workingTreeChanges=0)
                 (nw/'package-info.json').write_text(json.dumps(info));base.install_core(nw);report=base.make_report(source,info,count=1,role=role)
@@ -232,7 +232,7 @@ class EvidenceGates(unittest.TestCase):
     def test_terminal_group_sigint_during_hash_verifier_updates_both_receipts(self):
         with tempfile.TemporaryDirectory(prefix='pf-d1-group-int-')as folder:
             root=Path(folder);apps=[];mark=root/'verifier-entered.json';shim=root/'shim';shim.mkdir()
-            source=json.loads((base.SCRIPT.parent.parent/'experiments/step5/4/d1/f100-v1.json').read_text())
+            source=json.loads((base.SCRIPT.parent.parent/'tests/support/performance/native/f100-v1.json').read_text())
             for role in ['control','candidate']:
                 app=root/(role+'.app');nw=app/'Contents/Resources/app.nw';nw.mkdir(parents=True);base.install_core(nw)
                 info=dict(gitHead=role,withTests=True,workingTreeChanges=0);(nw/'package-info.json').write_text(json.dumps(info));report=base.make_report(source,info,count=1,role=role)

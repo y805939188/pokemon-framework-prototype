@@ -1,6 +1,6 @@
 'use strict';
 const test = require('node:test'), assert = require('node:assert/strict');
-const { load, host } = require('../../../experiments/step5/5/field-host-support.cjs');
+const { load, host } = require('../../support/field/field-host-support.cjs');
 const modules = load('src/plugins/world/encounter-mode-host.ts');
 async function installed(mode = 'framework') {
   const h = host(), M = await modules; h.mode = mode; h.ticket = null;

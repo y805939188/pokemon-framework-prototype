@@ -1,6 +1,6 @@
 'use strict';
 
-// Historical Step 5 launcher contract exercised with a fixed synthetic Node
+// Legacy launcher contract exercised with a fixed synthetic Node
 // child. This is not an NW/MZ launcher and does not accept an executable,
 // game checkout, profile, environment source or evidence root from callers.
 const fs = require('node:fs');

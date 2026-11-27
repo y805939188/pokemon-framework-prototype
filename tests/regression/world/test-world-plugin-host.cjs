@@ -1,7 +1,7 @@
 'use strict';
 // Real Inventory + World bundles, a narrow application fake and deterministic MZ scene lifecycle.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{spawnSync}=require('node:child_process');
-const ROOT=path.resolve(__dirname,'../../..'),ART=process.env.PF55_B2_ARTIFACT_ROOT||path.join(ROOT,'build/step5-5-development-20261115/b2-author');let bundles;
+const ROOT=path.resolve(__dirname,'../../..'),ART=process.env.PF55_B2_ARTIFACT_ROOT||path.join(ROOT,'build/test-world-host');let bundles;
 test.before(()=>{if(process.env.PF55_B_BUNDLE_DIR){bundles=Object.fromEntries(['PS_Inventory','PS_World'].map(name=>[name,fs.readFileSync(path.join(process.env.PF55_B_BUNDLE_DIR,name+'.js'),'utf8')]));return;}fs.mkdirSync(ART,{recursive:true});const out=fs.mkdtempSync(path.join(ART,'world-inventory-bundle-'));bundles={};for(const plugin of ['PS_Inventory','PS_World']){const r=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',out],{cwd:ROOT,encoding:'utf8',env:{...process.env,RR_PLUGIN:plugin}});fs.writeFileSync(path.join(out,plugin+'.build.log'),r.stdout+r.stderr);assert.equal(r.status,0,r.stdout+r.stderr);bundles[plugin]=fs.readFileSync(path.join(out,plugin+'.js'),'utf8');}});
 function host(options={}){
  const calls=[],messages=[],commands={},events={};let pending=false,inventory=false,consumed=0,runs=0,resolveRun;
