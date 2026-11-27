@@ -4,6 +4,27 @@
 # and Reactor's installed declaration bundle. Host compiler suites also need its generated DOM compatibility declarations;
 # prepare them here for cold CI and direct regular runs. Full plugin typechecking additionally lives in scripts/test-quick.sh.
 set -euo pipefail
+# Record failures from registry control flow only, never from test output.
+# The wrapper owns this temporary directory; child processes do not receive it.
+ci_diagnostic=${PF_CI_HEADLESS_DIAGNOSTIC:-}
+unset PF_CI_HEADLESS_DIAGNOSTIC
+ci_phase=registry
+ci_failed=()
+ci_c_preparation_failed=()
+ci_suite=0
+if [[ "$ci_diagnostic" == "${TMPDIR:-/tmp}"/pf-ci-headless.??????????/failure ]]; then
+  write_ci_failure() {
+    local rc=$? IFS=, indexes c_indexes
+    if (( rc != 0 )); then
+      if (( ci_suite != 0 )); then ci_failed+=("$ci_suite"); fi
+      indexes="${ci_failed[*]:--}"
+      c_indexes="${ci_c_preparation_failed[*]:--}"
+      (set -C; printf '%s %s %s\n' "$ci_phase" "$indexes" "$c_indexes" > "$ci_diagnostic") 2>/dev/null || :
+    fi
+    exit "$rc"
+  }
+  trap write_ci_failure EXIT
+fi
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 SUITES=(
@@ -464,6 +485,7 @@ check_regular_inputs() {
   done < <(compgen -e)
   printf 'Regular headless fixture overrides: none.\n'
 }
+ci_phase=input-policy
 if [[ $# -gt 1 ]]; then
   echo "usage: $0 [--scope=regular|--scope=c-generation-support|--list|--list-exclusions|--check-regular-env]" >&2
   exit 2
@@ -489,27 +511,37 @@ printf 'Headless scope=%s: %s selected suites; %s policy exclusion(s), NOT RUN a
 for excluded in "${EXCLUDED_SUITES[@]}"; do
   printf 'EXCLUDED (NOT RUN): %s\n' "$excluded"
 done
+ci_phase=showdown-stage
 [[ -d js/engine/showdown/dist ]] || { echo "engine not staged: run scripts/build-showdown.sh first" >&2; exit 1; }
 # Generate host compatibility declarations before compiler suites, including on cold CI.
+ci_phase=registry
 for suite in "${SUITES[@]}"; do
   case "$suite" in scripts/tests/*.cjs|tests/regression/*.cjs) ;; *) echo "Unapproved suite path: $suite" >&2; exit 64 ;; esac
   if [[ ! -f "$suite" || -L "$suite" ]]; then echo "Missing/nonregular suite: $suite" >&2; exit 64; fi
 done
+ci_phase=prepare-types
 pnpm --dir src types:prepare
 # the TS framework: strict type check, import-boundary check, then rebuild runtime, declarations, sample and local delivery
+ci_phase=typecheck
 pnpm --dir src typecheck:framework
+ci_phase=boundary-check
 node scripts/check-boundaries.cjs
 # Capture the ordinary regression candidate before its controlled build. Historical
 # acceptance plans stay frozen; each worker verifies this one parent-owned binding.
+ci_phase=binding-begin
 mkdir -p "$ROOT/build/headless-regression-bindings"
 binding_dir="$(mktemp -d "$ROOT/build/headless-regression-bindings/run.XXXXXX")"
 node scripts/headless-regression-binding.cjs begin "$binding_dir/begin.json"
+ci_phase=distribution-build
 pnpm --dir src build:distribution > /dev/null
 # Normal held-source release verifies the compiled host and fresh-process Continue, not only developer fixtures.
+ci_phase=plugin-build
 for plugin in PS_BattleFlow PS_SaveState PS_Evolution PS_BattleFlowTest PS_World PS_Inventory PS_Management PS_SaveLocation PS_Pokedex PS_Progression; do
   RR_PLUGIN="$plugin" pnpm --dir src exec vite build > /dev/null
 done
+ci_phase=binding-finish
 node scripts/headless-regression-binding.cjs finish "$binding_dir/begin.json" "$binding_dir/binding.json" --with-c-generation-support
+ci_phase=binding-publish
 mkdir -p "$ROOT/build/headless-regression-bindings"
 binding_receipt="$ROOT/build/headless-regression-bindings/$(basename "$binding_dir").json"
 ( set -C; cat "$binding_dir/binding.json" > "$binding_receipt" )
@@ -518,9 +550,11 @@ export PF_HEADLESS_REGRESSION_BINDING="$binding_dir/binding.json"
 export H3_RUNTIME_ROOT="$ROOT"
 fail=0
 suite_index=0
+ci_phase=suite-run
 for s in "${SUITES[@]}"; do
   set +e
   suite_index=$((suite_index + 1))
+  ci_suite=$suite_index
   raw_file="$binding_dir/suite-$suite_index.tap"
   if [[ -e "$raw_file" || -L "$raw_file" ]]; then echo "Refusing raw overwrite: $raw_file" >&2; exit 64; fi
   case "$s" in
@@ -529,6 +563,8 @@ for s in "${SUITES[@]}"; do
       prepared_rc=$?
       if [[ $prepared_rc -ne 0 ]]; then
         echo "C supported input verification failed: $s" >&2
+        ci_c_preparation_failed+=("$suite_index")
+        ci_suite=0
         fail=1
         if [[ "$scope" == "c-generation-support" ]]; then break; else continue; fi
       fi
@@ -541,10 +577,14 @@ for s in "${SUITES[@]}"; do
   out="$(printf '%s\n' "$raw" | grep -E '^# (pass|fail|cancelled|skipped)' | tr '\n' ' ')"
   echo "$s  ${out:-NO RESULT (see: node --test $s)}"
   # a test that never settles is reported as cancelled with "# fail 0": the exit status and the cancelled count decide too
-  if [[ $rc -ne 0 || "$out" != *"# fail 0"* || "$out" != *"# cancelled 0"* ]]; then fail=1; printf '%s\n' "$raw"; fi
+  suite_failed=0
+  if [[ $rc -ne 0 || "$out" != *"# fail 0"* || "$out" != *"# cancelled 0"* ]]; then suite_failed=1; printf '%s\n' "$raw"; fi
   # PF_NO_SKIP=1: a skipped test is a failure too, so "the runtime was missing" cannot pass
-  if [[ "${PF_NO_SKIP:-}" == "1" && "$out" == *"# skipped "* && "$out" != *"# skipped 0"* ]]; then fail=1; echo "    skipped tests are not allowed here (PF_NO_SKIP=1)"; fi
+  if [[ "${PF_NO_SKIP:-}" == "1" && "$out" == *"# skipped "* && "$out" != *"# skipped 0"* ]]; then suite_failed=1; echo "    skipped tests are not allowed here (PF_NO_SKIP=1)"; fi
+  if (( suite_failed )); then fail=1; ci_failed+=("$suite_index"); fi
+  ci_suite=0
   if [[ "$scope" == "c-generation-support" && $fail -ne 0 ]]; then break; fi
 done
-if ! node scripts/headless-regression-binding.cjs verify "$binding_dir/binding.json"; then fail=1; fi
+ci_phase=binding-verify
+if node scripts/headless-regression-binding.cjs verify "$binding_dir/binding.json"; then ci_phase=suite-results; else fail=1; fi
 exit $fail
