@@ -108,138 +108,138 @@ SUITES=(
   scripts/tests/battle-request-types.test.cjs
   scripts/tests/battle-requests.test.cjs
   experiments/step5/4/test-healing-config.cjs
-  experiments/step5/4/test-rpg-held-native-items.cjs
+  tests/regression/battle-items/test-rpg-held-native-items.cjs
   experiments/step5/4/test-growth-held-items.cjs
   experiments/step5/4/test-creation-form-diagnostics.cjs
   experiments/step5/4/test-content-member-items.cjs
-  experiments/step5/4/test-trainer-public-type-transitions.cjs
+  tests/regression/battle-ai/test-trainer-public-type-transitions.cjs
   experiments/step5/4/test-p4-request-source.cjs
   experiments/step5/4/test-p4-request-source-scene.cjs
   experiments/step5/4/test-normal-consumer-compat.cjs
   experiments/step5/4/test-p4-normal-continuation.cjs
   experiments/step5/4/test-reusable-healing.cjs
-  experiments/step5/4/test-reusable-item-diagnostics.cjs
-  experiments/step5/4/test-held-item-description.cjs
-  experiments/step5/4/test-cant-description.cjs
-  experiments/step5/4/test-cant-engine.cjs
-  experiments/step5/4/test-cant-scene.cjs
+  tests/regression/battle-items/test-reusable-item-diagnostics.cjs
+  tests/regression/battle-items/test-held-item-description.cjs
+  tests/regression/battle/test-cant-description.cjs
+  tests/regression/battle/test-cant-engine.cjs
+  tests/regression/battle-host/test-cant-scene.cjs
   experiments/step5/4/h3-production-policy/test-policy.cjs
   experiments/step5/4/h3-production-policy/test-take-conservation-oracle.cjs
-  experiments/step5/4/test-trainer-initial-field.cjs
-  experiments/step5/4/test-initial-field-engine.cjs
-  experiments/step5/4/test-initial-field-entry.cjs
+  tests/regression/battle-ai/test-trainer-initial-field.cjs
+  tests/regression/battle/test-initial-field-engine.cjs
+  tests/regression/battle/test-initial-field-entry.cjs
   experiments/step5/4/test-config-file-io.cjs
-  experiments/step5/4/test-battle-effects-settings.cjs
-  experiments/step5/4/test-battle-effects-scene.cjs
+  tests/regression/battle/test-battle-effects-settings.cjs
+  tests/regression/battle-host/test-battle-effects-scene.cjs
   experiments/step5/4/test-learned-move-pp.cjs
   experiments/step5/4/test-stance-growth.cjs
-  experiments/step5/4/test-illusion-participation.cjs
+  tests/regression/battle/test-illusion-participation.cjs
   experiments/step5/4/test-transform-growth.cjs
   experiments/step5/4/test-transform-learning.cjs
   experiments/step5/4/test-transform-learning-scene.cjs
-  experiments/step5/4/test-capture-run-review-fixes.cjs
-  experiments/step5/4/test-hard-lock-scene.cjs
-  experiments/step5/4/test-escape-items.cjs
-  experiments/step5/4/test-wild-faint-escape.cjs
-  experiments/step5/4/test-battle-pp-items.cjs
+  tests/regression/battle-items/test-capture-run-review-fixes.cjs
+  tests/regression/battle-host/test-hard-lock-scene.cjs
+  tests/regression/battle-items/test-escape-items.cjs
+  tests/regression/battle/test-wild-faint-escape.cjs
+  tests/regression/battle-items/test-battle-pp-items.cjs
   experiments/step5/4/test-crowned-move-pp.cjs
   experiments/step5/4/test-crowned-growth.cjs
   experiments/step5/4/test-growth-raw-stat-refresh.cjs
   experiments/step5/4/test-power-construct-growth.cjs
-  experiments/step5/4/test-switch-style-ports.cjs
-  experiments/step5/4/test-battle-style-settings.cjs
-  experiments/step5/4/test-battle-revive-items.cjs
+  tests/regression/battle/test-switch-style-ports.cjs
+  tests/regression/battle/test-battle-style-settings.cjs
+  tests/regression/battle-items/test-battle-revive-items.cjs
   experiments/step5/4/test-exp-gain-rule.cjs
   experiments/step5/4/test-capture-exp-rule.cjs
-  experiments/step5/4/test-e-basic-contracts.cjs
-  experiments/step5/4/test-e-action-contracts.cjs
-  experiments/step5/4/test-e-status-contracts.cjs
-  experiments/step5/4/test-e-status-app.cjs
+  tests/regression/battle/test-e-basic-contracts.cjs
+  tests/regression/battle/test-e-action-contracts.cjs
+  tests/regression/battle/test-e-status-contracts.cjs
+  tests/regression/battle/test-e-status-app.cjs
   experiments/step5/4/test-e-status-disk.cjs
   experiments/step5/4/test-e-defeat-disk.cjs
-  experiments/step5/4/test-e-ability-contracts.cjs
-  experiments/step5/4/test-e-damage-contracts.cjs
-  experiments/step5/4/test-e-hazards-app-contracts.cjs
-  experiments/step5/4/test-e-locked-turn-app-contracts.cjs
-  experiments/step5/4/test-e-hp-app-contracts.cjs
-  experiments/step5/4/test-e-multihit-app-contracts.cjs
-  experiments/step5/4/test-e-stages-app-contracts.cjs
-  experiments/step5/4/test-e-position-entry.cjs
-  experiments/step5/4/test-e-residual-outcome.cjs
-  experiments/step5/4/test-e1-choice-lock-scene.cjs
-  experiments/step5/4/test-e2-status-feedback-scene.cjs
-  experiments/step5/4/test-e-status-carry.cjs
-  experiments/step5/4/test-opening-state-scene.cjs
-  experiments/step5/4/test-capture-receiving-scene.cjs
+  tests/regression/battle/test-e-ability-contracts.cjs
+  tests/regression/battle/test-e-damage-contracts.cjs
+  tests/regression/battle/test-e-hazards-app-contracts.cjs
+  tests/regression/battle/test-e-locked-turn-app-contracts.cjs
+  tests/regression/battle/test-e-hp-app-contracts.cjs
+  tests/regression/battle/test-e-multihit-app-contracts.cjs
+  tests/regression/battle/test-e-stages-app-contracts.cjs
+  tests/regression/battle/test-e-position-entry.cjs
+  tests/regression/battle/test-e-residual-outcome.cjs
+  tests/regression/battle-host/test-e1-choice-lock-scene.cjs
+  tests/regression/battle-host/test-e2-status-feedback-scene.cjs
+  tests/regression/battle/test-e-status-carry.cjs
+  tests/regression/battle-host/test-opening-state-scene.cjs
+  tests/regression/battle-host/test-capture-receiving-scene.cjs
   experiments/step5/4/test-learn-pp-trainer-chain.cjs
   experiments/step5/4/test-learn-pp-trainer-chain-lifecycle.cjs
-  experiments/step5/4/test-auxiliary-diagnostics.cjs
-  experiments/step5/4/test-prebattle-wrapper.cjs
+  tests/regression/battle/test-auxiliary-diagnostics.cjs
+  tests/regression/battle-host/test-prebattle-wrapper.cjs
   experiments/step5/4/test-return-autosave.cjs
   experiments/step5/4/test-prebattle-native.cjs
-  experiments/step5/4/test-prebattle-menu.cjs
-  experiments/step5/4/test-menu-grid.cjs
-  experiments/step5/4/test-move-choice.cjs
-  experiments/step5/4/test-move-details-scene.cjs
-  experiments/step5/4/test-move-menu-refusal.cjs
+  tests/regression/battle-host/test-prebattle-menu.cjs
+  tests/regression/battle-host/test-menu-grid.cjs
+  tests/regression/battle/test-move-choice.cjs
+  tests/regression/battle-host/test-move-details-scene.cjs
+  tests/regression/battle-host/test-move-menu-refusal.cjs
   experiments/step5/4/test-move-menu-native.cjs
   experiments/step5/4/test-growth-display.cjs
   experiments/step5/4/test-ordinary-message-native.cjs
   experiments/step5/4/test-menu-capture-native.cjs
-  experiments/step5/4/test-ordinary-message.cjs
-  experiments/step5/4/test-paused-message.cjs
-  experiments/step5/4/test-brief-message.cjs
-  experiments/step5/4/test-brief-message-scene.cjs
-  experiments/step5/4/test-battle-bag.cjs
-  experiments/step5/4/test-battle-bag-scene.cjs
-  experiments/step5/4/test-status-card.cjs
-  experiments/step5/4/test-status-card-scene.cjs
-  experiments/step5/4/test-ordinary-message-scene.cjs
+  tests/regression/battle-host/test-ordinary-message.cjs
+  tests/regression/battle-host/test-paused-message.cjs
+  tests/regression/battle-host/test-brief-message.cjs
+  tests/regression/battle-host/test-brief-message-scene.cjs
+  tests/regression/battle-items/test-battle-bag.cjs
+  tests/regression/battle-host/test-battle-bag-scene.cjs
+  tests/regression/battle-host/test-status-card.cjs
+  tests/regression/battle-host/test-status-card-scene.cjs
+  tests/regression/battle-host/test-ordinary-message-scene.cjs
   experiments/step5/4/test-levelup-stats.cjs
   experiments/step5/4/test-levelup-stats-scene.cjs
-  experiments/step5/4/test-display-playback.cjs
-  experiments/step5/4/test-visual-timing.cjs
-  experiments/step5/4/test-battleback-resources.cjs
-  experiments/step5/4/test-battleback-view.cjs
-  experiments/step5/4/test-picture-playback.cjs
-  experiments/step5/4/test-faint-schedule.cjs
-  experiments/step5/4/test-battle-audio-selection.cjs
-  experiments/step5/4/test-battle-music.cjs
+  tests/regression/battle-host/test-display-playback.cjs
+  tests/regression/battle-host/test-visual-timing.cjs
+  tests/regression/battle-host/test-battleback-resources.cjs
+  tests/regression/battle-host/test-battleback-view.cjs
+  tests/regression/battle-host/test-picture-playback.cjs
+  tests/regression/battle/test-faint-schedule.cjs
+  tests/regression/battle-host/test-battle-audio-selection.cjs
+  tests/regression/battle-host/test-battle-music.cjs
   experiments/step5/4/test-battle-music-scene.cjs
-  experiments/step5/4/test-victory-bgm-scene.cjs
+  tests/regression/battle-host/test-victory-bgm-scene.cjs
   experiments/step5/4/test-victory-music-native.cjs
-  experiments/step5/4/test-trainer-opening.cjs
-  experiments/step5/4/test-wild-opening-scene.cjs
-  experiments/step5/4/test-trainer-dispatch-scene.cjs
-  experiments/step5/4/test-party-switch-menu-scene.cjs
-  experiments/step5/4/test-battle-summary-scene.cjs
-  experiments/step5/4/test-author-dialogue-pages.cjs
+  tests/regression/battle-host/test-trainer-opening.cjs
+  tests/regression/battle-host/test-wild-opening-scene.cjs
+  tests/regression/battle-host/test-trainer-dispatch-scene.cjs
+  tests/regression/battle-host/test-party-switch-menu-scene.cjs
+  tests/regression/battle-host/test-battle-summary-scene.cjs
+  tests/regression/battle-host/test-author-dialogue-pages.cjs
   experiments/step5/4/test-author-dialogue-native.cjs
   experiments/step5/4/test-trainer-opening-native.cjs
   experiments/step5/4/test-result-native.cjs
-  experiments/step5/4/test-result-feedback.cjs
-  experiments/step5/4/test-defeat-policy-scene.cjs
+  tests/regression/battle/test-result-feedback.cjs
+  tests/regression/battle-host/test-defeat-policy-scene.cjs
   experiments/step5/4/test-ball-native.cjs
-  experiments/step5/4/test-ball-scene.cjs
-  experiments/step5/4/test-ball-scene-integration.cjs
-  experiments/step5/4/test-ball-feedback.cjs
-  experiments/step5/4/test-battle-music-composition.cjs
-  experiments/step5/4/test-capture-melody.cjs
+  tests/regression/battle-host/test-ball-scene.cjs
+  tests/regression/battle-host/test-ball-scene-integration.cjs
+  tests/regression/battle-items/test-ball-feedback.cjs
+  tests/regression/battle-host/test-battle-music-composition.cjs
+  tests/regression/battle-items/test-capture-melody.cjs
   experiments/step5/4/test-capture-me-port.cjs
   experiments/step5/4/test-capture-me-scene.cjs
   experiments/step5/4/test-capture-me-native.cjs
   scripts/tests/music-native-assets.test.cjs
-  experiments/step5/4/test-faint-view.cjs
+  tests/regression/battle-host/test-faint-view.cjs
   experiments/step5/4/test-d1-timing.cjs
-  experiments/step5/4/test-scene-controller.cjs
+  tests/regression/battle-host/test-scene-controller.cjs
   experiments/step5/4/test-trainer-ai.cjs
-  experiments/step5/4/test-trainer-ai-integration.cjs
-  experiments/step5/4/test-trainer-ai-strategy.cjs
-  experiments/step5/4/test-trainer-ai-async.cjs
-  experiments/step5/4/test-trainer-ai-c2-remediation.cjs
-  experiments/step5/4/test-trainer-ai-realms.cjs
-  experiments/step5/4/test-carried-faint.cjs
-  experiments/step5/4/test-trainer-ai-remediation.cjs
+  tests/regression/battle-ai/test-trainer-ai-integration.cjs
+  tests/regression/battle-ai/test-trainer-ai-strategy.cjs
+  tests/regression/battle-ai/test-trainer-ai-async.cjs
+  tests/regression/battle-ai/test-trainer-ai-c2-remediation.cjs
+  tests/regression/battle-ai/test-trainer-ai-realms.cjs
+  tests/regression/battle/test-carried-faint.cjs
+  tests/regression/battle-ai/test-trainer-ai-remediation.cjs
   tests/regression/friendship/test-author.cjs
   tests/regression/friendship/test-pbs-cli.cjs
   tests/regression/friendship/test-migration.cjs
@@ -380,24 +380,24 @@ SUITES=(
   tests/regression/saves/test-member-state-bridges.cjs
   tests/regression/saves/test-save-install-gates.cjs
   tests/regression/performance/test-perf-write-regression.cjs
-  experiments/step5/4/test-trainer-m1.cjs
-  experiments/step5/4/test-held-facts.cjs
-  experiments/step5/4/test-held-harvest-facts.cjs
+  tests/regression/battle-ai/test-trainer-m1.cjs
+  tests/regression/battle-items/test-held-facts.cjs
+  tests/regression/battle-items/test-held-harvest-facts.cjs
   experiments/step5/4/test-held-harvest-recovery.cjs
-  experiments/step5/4/test-held-engine.cjs
-  experiments/step5/4/test-held-corrosivegas.cjs
-  experiments/step5/4/test-held-pickup.cjs
-  experiments/step5/4/test-held-ability-transfer.cjs
-  experiments/step5/4/test-held-ability-app-lifecycle.cjs
-  experiments/step5/4/test-held-app.cjs
-  experiments/step5/4/test-held-policy-entry.cjs
-  experiments/step5/4/test-held-store.cjs
-  experiments/step5/4/test-trainer-app-m1.cjs
-  experiments/step5/4/test-obedience-scene.cjs
-  experiments/step5/4/test-obedience-remediation.cjs
-  experiments/step5/4/test-obedience-m1.cjs
-  experiments/step5/4/closeout-chains/test-held-management-chain.cjs
-  experiments/step5/4/closeout-chains/test-status-capture-chain.cjs
+  tests/regression/battle-items/test-held-engine.cjs
+  tests/regression/battle-items/test-held-corrosivegas.cjs
+  tests/regression/battle-items/test-held-pickup.cjs
+  tests/regression/battle-items/test-held-ability-transfer.cjs
+  tests/regression/battle-items/test-held-ability-app-lifecycle.cjs
+  tests/regression/battle-items/test-held-app.cjs
+  tests/regression/battle-items/test-held-policy-entry.cjs
+  tests/regression/battle-items/test-held-store.cjs
+  tests/regression/battle-ai/test-trainer-app-m1.cjs
+  tests/regression/battle-host/test-obedience-scene.cjs
+  tests/regression/battle-ai/test-obedience-remediation.cjs
+  tests/regression/battle-ai/test-obedience-m1.cjs
+  tests/regression/battle-items/closeout-chains/test-held-management-chain.cjs
+  tests/regression/battle-items/closeout-chains/test-status-capture-chain.cjs
   experiments/step5/4/h3-production-policy/test-release-sources.cjs
   experiments/step5/4/h3-production-policy/test-release-cancel.cjs
   experiments/step5/4/h3-production-policy/test-host.cjs

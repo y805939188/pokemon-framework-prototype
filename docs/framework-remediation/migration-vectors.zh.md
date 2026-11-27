@@ -10,8 +10,8 @@
 | 4→5 | 个体兼容元数据、固定 40×30 storage；确定性旧 PID，未知获得事实不伪造；容量超限拒绝 | [test-migration-storage.cjs](../../tests/regression/saves/test-migration-storage.cjs) |
 | 5→6 | 有序库存成为唯一权威；badge／计算性格／PP 元数据；未知 item／move 与冲突失败保持原文 | [test-migration6.cjs](../../tests/regression/saves/test-save-migration-v6.cjs)、[test-M1-remediation.cjs](../../tests/regression/inventory/test-member-inventory-and-save-guards.cjs) |
 | 6→7 | readiness、cannotTrade、完整 dex 历史与布局；旧 seen／owned 独立，未知 form／count 不补事实 | [test-migration7.cjs](../../tests/regression/saves/test-save-migration-v7.cjs) |
-| 7→8 | 建空 stable trainer defeat record，不从旧 result hash 推断训练家胜利 | [test-trainer-m1.cjs](../../experiments/step5/4/test-trainer-m1.cjs) |
-| 8→9 | 保留旧 raw-only ledger，不为旧记录合成 required paired proof；坏 settlement 字段拒绝 | [test-held-app.cjs](../../experiments/step5/4/test-held-app.cjs)：HF-11 |
+| 7→8 | 建空 stable trainer defeat record，不从旧 result hash 推断训练家胜利 | [test-trainer-m1.cjs](../../tests/regression/battle-ai/test-trainer-m1.cjs) |
+| 8→9 | 保留旧 raw-only ledger，不为旧记录合成 required paired proof；坏 settlement 字段拒绝 | [test-held-app.cjs](../../tests/regression/battle-items/test-held-app.cjs)：HF-11 |
 | 当前→当前布局变更 | 只接受一条明确 one-hop transition；缺失、重复 from、过期 target、坏 old layout／hash 拒绝 | [test-migration7.cjs](../../tests/regression/saves/test-save-migration-v7.cjs) |
 | 当前保存／载入门 | 未来 schema、非自有字段、accessor、损坏元数据、内容不匹配拒绝；不调用 getter 修复原文 | [test-save-gates7.cjs](../../tests/regression/saves/test-save-install-gates.cjs) |
 

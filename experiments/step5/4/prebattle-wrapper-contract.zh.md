@@ -32,7 +32,7 @@ root op + App + stateGeneration 限定所有工作；自有 Sprite/Bitmap 每次
 
 ## 可复现检查及范围
 
-`node --test experiments/step5/4/test-prebattle-wrapper.cjs`：默认表/时钟、自有清理/BGS、真实 App+Gen8+编译 Map/Scene 的野生/训练家开战与正常返场、普通取消/换档/初始化失败、同种子初始 request/游戏 RNG、宿主移动/事件门。有限反向变异：`PF_PREBATTLE_MUTATION=early-handoff` 和 `omit-return-wait` 必须使真实接线断言失败。
+`node --test tests/regression/battle-host/test-prebattle-wrapper.cjs`：默认表/时钟、自有清理/BGS、真实 App+Gen8+编译 Map/Scene 的野生/训练家开战与正常返场、普通取消/换档/初始化失败、同种子初始 request/游戏 RNG、宿主移动/事件门。有限反向变异：`PF_PREBATTLE_MUTATION=early-handoff` 和 `omit-return-wait` 必须使真实接线断言失败。
 
 受影响 R9 Node 控制计划只绑定本次实际编译 runtime；正式 `author-dialogue-native-plan.json`、旧 App 及其已接受原生证据完全不改，不把旧哈希当新 runtime。controlled composition host 的 Base.start/isStarted 现在忠实记录生命周期，避免新 Map hook 捕获一个无效果 start。
 

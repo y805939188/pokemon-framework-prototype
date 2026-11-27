@@ -30,10 +30,10 @@ lineage 是进程内对象身份；generation 是 App 安装新时间线后的�
 
 | 行为 | 已有测试，不计本轮新增 |
 |---|---|
-| required 不能降级、未知／外 App／退休 handle、同 id 后继、内容 ABA、精确重放 | [test-held-app.cjs](../../experiments/step5/4/test-held-app.cjs)：HF-01、HF-02/03/06、HF-07、HF-08、HF-10、HF06/11；并含真实 factory 选定后 options 不可换 driver。 |
-| AI owner／ticket／资源 revision、未知来源、未公开信息 | [test-trainer-ai-integration.cjs](../../experiments/step5/4/test-trainer-ai-integration.cjs)。 |
-| AI 异步取消、外 checkpoint、决策／随机回放、恢复前重入 | [test-trainer-ai-async.cjs](../../experiments/step5/4/test-trainer-ai-async.cjs)、[test-trainer-ai-c2-remediation.cjs](../../experiments/step5/4/test-trainer-ai-c2-remediation.cjs)。 |
-| 换人真实机会、trap、外 selector、checkpoint 新 selector、失败回滚、captured opt-in | [test-switch-style-ports.cjs](../../experiments/step5/4/test-switch-style-ports.cjs)：SSP01–14；场域序列化 SSF 向量另列于同文件。 |
+| required 不能降级、未知／外 App／退休 handle、同 id 后继、内容 ABA、精确重放 | [test-held-app.cjs](../../tests/regression/battle-items/test-held-app.cjs)：HF-01、HF-02/03/06、HF-07、HF-08、HF-10、HF06/11；并含真实 factory 选定后 options 不可换 driver。 |
+| AI owner／ticket／资源 revision、未知来源、未公开信息 | [test-trainer-ai-integration.cjs](../../tests/regression/battle-ai/test-trainer-ai-integration.cjs)。 |
+| AI 异步取消、外 checkpoint、决策／随机回放、恢复前重入 | [test-trainer-ai-async.cjs](../../tests/regression/battle-ai/test-trainer-ai-async.cjs)、[test-trainer-ai-c2-remediation.cjs](../../tests/regression/battle-ai/test-trainer-ai-c2-remediation.cjs)。 |
+| 换人真实机会、trap、外 selector、checkpoint 新 selector、失败回滚、captured opt-in | [test-switch-style-ports.cjs](../../tests/regression/battle/test-switch-style-ports.cjs)：SSP01–14；场域序列化 SSF 向量另列于同文件。 |
 
 本轮新增 [test-formal-battle-capabilities.cjs](../../tests/regression/battle/test-formal-battle-capabilities.cjs)：FC01 静态证明完整基础接口兼容；FC02 正反两组 public `supported` 标记均不能授权 required；FC03 结构完整的真实 driver 包装器仍须显式 legacy admission；FC04 用真实 Fling 消费物品后，在同一个 checkpoint 恢复 held seal、AI prepared choice 与换人 offer，随后只安装一个 paired settlement。FC04 使用 authored 学习表和合成队伍，不宣称默认投放可取得这些组合。
 
