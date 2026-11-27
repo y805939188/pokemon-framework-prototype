@@ -23,7 +23,7 @@
 | `c2-decision.md` | 用户的 C2 决定（继续、单打先行、平台范围） |
 | `deviations.md` | 与原版行为的 4 项已决定的有意差异，以及尚未决定的差异清单 |
 | `review-followups.md` | 独立评审（Opus 5.5）的发现：哪些已修、哪些延后、哪些需要用户决定 |
-| `protocol-v1.md` + `protocol-v1.frozen.json` | 冻结的战斗协议（所有者、同步点、消息、结果结构、持久性声明）；契约测试 `experiments/step2/s5/test-protocol-freeze.cjs` |
+| `protocol-v1.md` + `protocol-v1.frozen.json` | 冻结的战斗协议（所有者、同步点、消息、结果结构、持久性声明）；契约测试 `tests/regression/battle/test-protocol-freeze.cjs` |
 | `runtime-issues.md` | 内存泄漏诊断与修复证据、存档位置、失焦/静音、遗留问题 |
 | `signing-plan.md` | 签名与公证：现状、已验证/未验证、有账号后的步骤 |
 | `2.2`–`2.5-report.md` | 各阶段的契约提取、对比、结果、限制 |

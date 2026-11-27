@@ -248,14 +248,14 @@ SUITES=(
   experiments/friendship-standard-domain/test-author-files.cjs
   experiments/friendship-standard-domain/test-mz-integration.cjs
   experiments/step2/test-headless.cjs
-  experiments/step2/s2/test-actions.cjs
+  tests/regression/battle/test-actions.cjs
   experiments/step2/s3/test-growth.cjs
   experiments/step2/s3/test-writeback.cjs
   experiments/step2/s3/test-doubles.cjs
   experiments/step2/s4/test-describe.cjs
   experiments/step2/s5/test-matrix.cjs
-  experiments/step2/s5/test-protocol-freeze.cjs
-  experiments/step2/s5/test-engine-contract.cjs
+  tests/regression/battle/test-protocol-freeze.cjs
+  tests/regression/battle/test-engine-contract.cjs
   scripts/tests/headless-scope.test.cjs
   scripts/tests/reactor-install.test.cjs
   scripts/tests/reactor-source-identity.test.cjs

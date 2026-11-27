@@ -50,7 +50,7 @@ node --test experiments/step5/4/test-healing-config.cjs \
   experiments/step5/2/test-item-effects6.cjs \
   experiments/step5/4/test-trainer-ai.cjs \
   experiments/step5/4/test-trainer-ai-integration.cjs \
-  experiments/step2/s5/test-engine-contract.cjs
+  tests/regression/battle/test-engine-contract.cjs
 ```
 
 整合验证由本轮总回执记录精确候选 SHA、命令、计数和独立复审结果；本节作者定向测试不代替最终完整 regular 或独审证据。此批不验收 NW 窗口、性能、完整机制、原版等价或 Godot/Unity 迁移运行能力。

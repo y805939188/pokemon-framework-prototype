@@ -120,7 +120,7 @@ data/ img/ audio/ ...        MZ 工程内容（模板数据 + 本地复制的 MZ
 
 需要验证隔离启动时，使用 [6D 隔离启动 canary](step6/6d-isolated-launch.zh.md) 的专用流程。它只验证启动与隔离，不替代旧流程套件、包内性能、独立 MZ/NW 复建或冷读档。
 
-改了 `src/framework/**` 之后必须重新 `pnpm --dir src build:engine`；改了 `battle/custom-formats.ts` 或 `rules/rules.ts` 还要重新 `scripts/build-showdown.sh`（Showdown 里用的是暂存的拷贝，`test-engine-contract.cjs` 会在拷贝与构建产物不同时报错）。故意改变行为后：`node experiments/step2/s5/update-matrix-baseline.cjs`（矩阵指纹基线）与 `node experiments/step2/s5/protocol-freeze.cjs --update`（协议冻结文件）只在有意为之时运行，并在提交里说明。升级 Showdown 固定提交时先跑 `test-engine-contract.cjs`。
+改了 `src/framework/**` 之后必须重新 `pnpm --dir src build:engine`；改了 `battle/custom-formats.ts` 或 `rules/rules.ts` 还要重新 `scripts/build-showdown.sh`（Showdown 里用的是暂存的拷贝，`test-engine-contract.cjs` 会在拷贝与构建产物不同时报错）。故意改变行为后：`node experiments/step2/s5/update-matrix-baseline.cjs`（矩阵指纹基线）与 `node tests/regression/battle/protocol-freeze.cjs --update`（协议冻结文件）只在有意为之时运行，并在提交里说明。升级 Showdown 固定提交时先跑 `test-engine-contract.cjs`。
 
 ## 9. 环境准备（从零）
 

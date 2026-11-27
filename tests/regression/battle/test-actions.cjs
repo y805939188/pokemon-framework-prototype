@@ -1,6 +1,6 @@
 'use strict';
 // 2.2 gate: item / catch / run through the engine-event route, plus spec-vector checks of the math.
-// Run: node --test experiments/step2/s2/test-actions.cjs
+// Run: node --test tests/regression/battle/test-actions.cjs
 // Spec vectors are DERIVED expectations from the clean-room catalog (CP/etc.), not Ruby-executed output.
 const test = require('node:test');
 const assert = require('node:assert/strict');

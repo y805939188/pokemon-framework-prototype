@@ -17,7 +17,7 @@ commands.push({name:'sample-check',args:['js/engine/build/content-cli.cjs','chec
 const suites=[
  'experiments/friendship-standard-domain/test-author.cjs','experiments/friendship-standard-domain/test-pbs-cli.cjs','experiments/friendship-standard-domain/test-migration.cjs',
  'experiments/step3/test-content.cjs','experiments/step4/test-content4.cjs','experiments/step5/test-content5.cjs','experiments/step5/test-pbs-review5.cjs','experiments/step5/2/test-content6.cjs','experiments/step5/3/test-content7.cjs','experiments/step5/3/test-pbs7.cjs','experiments/step5/3/test-egg-move-content.cjs',
- 'experiments/step5/3/test-friendship.cjs','experiments/step5/3/test-friendship-adapters.cjs','experiments/step3/test-save.cjs','experiments/step5/test-migration5.cjs','experiments/step5/1/test-migration-storage.cjs','experiments/step5/2/test-migration6.cjs','experiments/step2/s5/test-engine-contract.cjs',
+ 'experiments/step5/3/test-friendship.cjs','experiments/step5/3/test-friendship-adapters.cjs','experiments/step3/test-save.cjs','experiments/step5/test-migration5.cjs','experiments/step5/1/test-migration-storage.cjs','experiments/step5/2/test-migration6.cjs','tests/regression/battle/test-engine-contract.cjs',
 ];
 for(const suite of suites)commands.push({name:'test-'+suite.replaceAll('/','-'),args:['--test','--test-concurrency=1',suite]});
 const git=args=>spawnSync('git',args,{cwd:ROOT,encoding:'utf8'}).stdout.trim();

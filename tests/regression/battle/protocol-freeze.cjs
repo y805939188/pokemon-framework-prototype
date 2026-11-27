@@ -6,7 +6,7 @@
 //  - end/refusal reason codes are the exported vocabularies (END_REASONS/REFUSAL_REASONS), and the test also checks
 //    that every value actually observed is declared and every declared value was provoked (or is explicitly listed
 //    as not provokable here).
-// Regenerate ONLY with a deliberate version decision: node experiments/step2/s5/protocol-freeze.cjs --update
+// Regenerate ONLY with a deliberate version decision: node tests/regression/battle/protocol-freeze.cjs --update
 const fs = require('fs');
 const path = require('path');
 const F = require('../../../js/engine/fixtures/game.cjs');
