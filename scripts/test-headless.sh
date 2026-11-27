@@ -29,34 +29,34 @@ SUITES=(
   scripts/tests/final-native-callers.test.cjs
   scripts/tests/final-defeat-continue.test.cjs
   scripts/tests/final-t16-continue.test.cjs
-  experiments/step5/5/test-owned-content-snapshot.cjs
-  experiments/step5/5/test-walk-full-plugin-content.cjs
-  experiments/step5/5/test-movement-start-observer.cjs
+  tests/regression/world/test-owned-content-snapshot.cjs
+  tests/regression/world/test-walk-full-plugin-content.cjs
+  tests/regression/field/test-movement-start-observer.cjs
   scripts/tests/battle-defeat-f.test.cjs
   experiments/step5/5/test-world-battle-native-lifecycle.cjs
-  experiments/step5/5/test-world-owned-scene-guard.cjs
-  experiments/step5/5/test-blackout-rules.cjs
-  experiments/step5/5/test-f-formal-data-gates.cjs
-  experiments/step5/5/test-atomic-field-query-mz.cjs
-  experiments/step5/5/test-field-facts-observation.cjs
-  experiments/step5/5/test-field-move-host.cjs
-  experiments/step5/5/test-field-move-operation.cjs
-  experiments/step5/5/test-field-move-real-parent.cjs
-  experiments/step5/5/test-field-move-reentry.cjs
-  experiments/step5/5/test-field-runtime-query.cjs
-  experiments/step5/5/test-field-shortcut-fishing.cjs
-  experiments/step5/5/test-field-shortcut-freshness.cjs
-  experiments/step5/5/test-field-shortcut-joint.cjs
-  experiments/step5/5/test-field-shortcut-menu.cjs
-  experiments/step5/5/test-field-shortcut-real-parent.cjs
-  experiments/step5/5/test-field-shortcut-selection.cjs
-  experiments/step5/5/test-field-shortcut-showdown.cjs
-  experiments/step5/5/test-field-shortcut-source-parent.cjs
-  experiments/step5/5/test-blackout-public-core.cjs
-  experiments/step5/5/test-world-travel-public-core.cjs
-  experiments/step5/5/test-wild-member-cache.cjs
-  experiments/step5/5/test-wild-generation.cjs
-  experiments/step5/5/test-wild-generation-completion.cjs
+  tests/regression/world/test-world-owned-scene-guard.cjs
+  tests/regression/world/test-blackout-rules.cjs
+  tests/regression/world/test-f-formal-data-gates.cjs
+  tests/regression/field/test-atomic-field-query-mz.cjs
+  tests/regression/field/test-field-facts-observation.cjs
+  tests/regression/field/test-field-move-host.cjs
+  tests/regression/field/test-field-move-operation.cjs
+  tests/regression/field/test-field-move-real-parent.cjs
+  tests/regression/field/test-field-move-reentry.cjs
+  tests/regression/field/test-field-runtime-query.cjs
+  tests/regression/field/test-field-shortcut-fishing.cjs
+  tests/regression/field/test-field-shortcut-freshness.cjs
+  tests/regression/field/test-field-shortcut-joint.cjs
+  tests/regression/field/test-field-shortcut-menu.cjs
+  tests/regression/field/test-field-shortcut-real-parent.cjs
+  tests/regression/field/test-field-shortcut-selection.cjs
+  tests/regression/field/test-field-shortcut-showdown.cjs
+  tests/regression/field/test-field-shortcut-source-parent.cjs
+  tests/regression/world/test-blackout-public-core.cjs
+  tests/regression/world/test-world-travel-public-core.cjs
+  tests/regression/world/test-wild-member-cache.cjs
+  tests/regression/world/test-wild-generation.cjs
+  tests/regression/world/test-wild-generation-completion.cjs
   experiments/step5/5/test-wild-initial-forms.cjs
   experiments/step5/5/test-flute-real-parent.cjs
   experiments/step5/5/test-given-wild-application.cjs
@@ -66,44 +66,44 @@ SUITES=(
   experiments/step5/5/test-generated-event-application.cjs
   experiments/step5/5/test-generated-event-production.cjs
   scripts/tests/c-regular-runtime.test.cjs
-  experiments/step5/5/test-ordinary-encounter-application.cjs
-  experiments/step5/5/test-world-capture-consumer.cjs
+  tests/regression/world/test-ordinary-encounter-application.cjs
+  tests/regression/world/test-world-capture-consumer.cjs
   experiments/step5/5/test-completed-step-application.cjs
-  experiments/step5/5/test-d-mz-integration.cjs
+  tests/regression/field/test-d-mz-integration.cjs
   experiments/step5/5/test-d-mz-native-frame.cjs
   experiments/step5/5/test-native-frame-manager.cjs
-  experiments/step5/5/test-d-mz-terminal-boundary.cjs
-  experiments/step5/5/test-d-mz-terminal-exit.cjs
-  experiments/step5/5/test-fishing-operation.cjs
-  experiments/step5/5/test-fishing-guard.cjs
-  experiments/step5/5/test-fishing-atomic-parent.cjs
-  experiments/step5/5/test-fishing-host.cjs
+  tests/regression/field/test-d-mz-terminal-boundary.cjs
+  tests/regression/field/test-d-mz-terminal-exit.cjs
+  tests/regression/field/test-fishing-operation.cjs
+  tests/regression/field/test-fishing-guard.cjs
+  tests/regression/field/test-fishing-atomic-parent.cjs
+  tests/regression/field/test-fishing-host.cjs
   experiments/step5/5/test-fishing-composed.cjs
-  experiments/step5/5/test-atomic-state-mz.cjs
-  experiments/step5/5/test-fishing-real-parent.cjs
+  tests/regression/field/test-atomic-state-mz.cjs
+  tests/regression/field/test-fishing-real-parent.cjs
   experiments/step5/5/test-fishing-native-lifecycle.cjs
-  experiments/step5/5/test-fishing-encounter-application.cjs
-  experiments/step5/5/test-world-battle-handoff.cjs
-  experiments/step5/5/test-world-fishing-production.cjs
-  experiments/step5/5/test-world-mz-production.cjs
-  experiments/step5/5/test-field-step-host.cjs
-  experiments/step5/5/test-encounter-mode-host.cjs
-  experiments/step5/5/test-world-content-pipeline.cjs
-  experiments/step5/5/test-world-real-app-host.cjs
-  experiments/step5/5/test-world-content.cjs
-  experiments/step5/5/test-world-state-app.cjs
-  experiments/step5/5/test-world-notices-application.cjs
-  experiments/step5/5/test-world-host.cjs
-  experiments/step5/5/test-world-weather-entry.cjs
+  tests/regression/field/test-fishing-encounter-application.cjs
+  tests/regression/world/test-world-battle-handoff.cjs
+  tests/regression/field/test-world-fishing-production.cjs
+  tests/regression/world/test-world-mz-production.cjs
+  tests/regression/field/test-field-step-host.cjs
+  tests/regression/world/test-encounter-mode-host.cjs
+  tests/regression/world/test-world-content-pipeline.cjs
+  tests/regression/world/test-world-real-app-host.cjs
+  tests/regression/world/test-world-content.cjs
+  tests/regression/world/test-world-state-app.cjs
+  tests/regression/world/test-world-notices-application.cjs
+  tests/regression/world/test-world-host.cjs
+  tests/regression/world/test-world-weather-entry.cjs
   experiments/step5/5/test-world-load-host.cjs
-  experiments/step5/5/test-world-plugin-host.cjs
-  experiments/step5/5/test-b-host-notices-mz.cjs
-  experiments/step5/5/test-encounter-trigger.cjs
-  experiments/step5/5/test-encounter-selection.cjs
-  experiments/step5/5/test-world-battle-context.cjs
+  tests/regression/world/test-world-plugin-host.cjs
+  tests/regression/world/test-b-host-notices-mz.cjs
+  tests/regression/world/test-encounter-trigger.cjs
+  tests/regression/world/test-encounter-selection.cjs
+  tests/regression/world/test-world-battle-context.cjs
   experiments/step5/5/test-field-passives.cjs
-  experiments/step5/5/test-fishing.cjs
-  experiments/step5/5/test-field-shortcuts.cjs
+  tests/regression/field/test-fishing.cjs
+  tests/regression/field/test-field-shortcuts.cjs
   scripts/tests/showdown-staging.test.cjs
   scripts/tests/battle-request-types.test.cjs
   scripts/tests/battle-requests.test.cjs

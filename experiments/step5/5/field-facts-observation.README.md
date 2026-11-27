@@ -23,7 +23,7 @@ Missing, copied, reentrant or wrong-root capabilities refuse facts explicitly.
 Execution remains owned by the actual App operation; this capability cannot
 admit an operation, change state, draw RNG, or grant a busy exemption.
 
-`test-field-facts-observation.cjs` uses the actual App query, strict private
+[`test-field-facts-observation.cjs`](../../../tests/regression/field/test-field-facts-observation.cjs) uses the actual App query, strict private
 plugin emit, and pinned native MZ object methods. It covers the original Cut
 cross-provider counterexample, stable Cut/Surf/Flash positives, native/backing
 cell changes, a change-before-later-restore counterexample, unsafe native values,
