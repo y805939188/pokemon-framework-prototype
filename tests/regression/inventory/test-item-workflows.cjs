@@ -1,6 +1,6 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {E,clone,setup,count}=require('./ef-support.cjs');
+const {E,clone,setup,count}=require('../../support/inventory/inventory-fixture.cjs');
 const req=(itemId,memberId,answers,quantity=1)=>({kind:'use-item',itemId,memberId,quantity,...(answers?{answers}:{})});
 function learning(){return setup({bag:{rarecandy:5},edit:(g,c)=>{c.species.Charizard.learnset={51:['Slash','Outrage']};g.party[0].moves[0]={id:'flamethrower',pp:8,maxpp:21,ppUps:2};}});}
 test('P52-45 pending uses no state snapshot or install; all choices lead to exactly one commit/receipt',()=>{

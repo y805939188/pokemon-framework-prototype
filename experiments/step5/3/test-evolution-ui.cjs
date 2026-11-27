@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {host,disposeBuild}=require('../2/inventory-ui-host.cjs');const {world,E,clone}=require('./fixtures/postbattle/helpers.cjs');test.after(disposeBuild);
+const {host,disposeBuild}=require('../../../tests/support/inventory/inventory-ui-host.cjs');const {world,E,clone}=require('./fixtures/postbattle/helpers.cjs');test.after(disposeBuild);
 function setup({entries=[{method:'Event',parameter:7,target:'Blastoise'}],targetMoves=[],edit,port,options={}}={}){
  const w=world({entries,targetMoves,port,contentPort:c=>({content:c,dex:E.dex.createDexLookup()}),extraContent:c=>{c.items['ui-stone']={...c.items.potion,id:'ui-stone',name:'Stone',fieldUse:'member',battleUse:'none',battleId:undefined,flags:['EvolutionStone'],effect:{family:'evolution',parameters:{}},consumable:true};}}),g=clone(w.state.current());g.inventory=E.inventory.addItems(g.inventory,'ui-stone',2,w.content.items,E.inventory.inventoryPolicy(w.content));edit?.(g,w.content);w.state.replace(g);w.state.replaced.length=0;
  const h=host({application:w,...options}),F=h.G.PSFlow;F.beginEventEvolution=(...a)=>w.app.beginEventEvolution(...a);F.resolveEvolution=(...a)=>w.app.resolveEvolution(...a);F.resolvePokedex=(...a)=>w.app.resolvePokedex(...a);F.resolveTriggeredEvolution=(...a)=>w.app.resolveTriggeredEvolution(...a);

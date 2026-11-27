@@ -1,6 +1,6 @@
 'use strict';
 const {test,after}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process');
-const {host,disposeBuild,E,clone}=require('./inventory-ui-host.cjs');after(disposeBuild);
+const {host,disposeBuild,E,clone}=require('../../support/inventory/inventory-ui-host.cjs');after(disposeBuild);
 const ROOT=process.env.PF_J2_PRODUCT_ROOT??path.resolve(__dirname,'../../..'),CLI=path.join(ROOT,'js/engine/build/content-cli.cjs');
 const mixed=()=>host({edit:(g,c)=>{g.inventory=E.inventory.replaceItemId(E.inventory.inventoryFromBag({potion:3,pokeball:1500},c.items),'pokeball','potion',c.items);}});
 const settle=()=>new Promise(resolve=>setImmediate(resolve));

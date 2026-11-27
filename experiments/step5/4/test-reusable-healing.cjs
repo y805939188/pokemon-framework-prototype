@@ -2,7 +2,7 @@
 // Legitimate authored consumable:false active healing; real App/Session/Gen8, synthetic state only.
 const test=require('node:test'),assert=require('node:assert/strict');
 const {E,T,D,inputs}=require('./trainer-ai-integration/fixtures.cjs');
-const field=require('../2/ef-support.cjs');
+const field=require('../../../tests/support/inventory/inventory-fixture.cjs');
 const clone=v=>structuredClone(v);
 const active=(w,side='p1')=>w.session.gw._debugBattle().sides[side==='p1'?0:1].active[0];
 const stock=w=>E.inventory.itemQuantity(w.state.read().inventory,w.authorId,w.content.items);

@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {host,disposeBuild}=require('../2/inventory-ui-host.cjs'),{world,E,clone}=require('./fixtures/postbattle/helpers.cjs');test.after(disposeBuild);
+const {host,disposeBuild}=require('../../../tests/support/inventory/inventory-ui-host.cjs'),{world,E,clone}=require('./fixtures/postbattle/helpers.cjs');test.after(disposeBuild);
 function setup({evolve=false,dex=false,edit,port,options={}}={}){
  const w=world({entries:[],targetMoves:['Gust'],port,contentPort:c=>({content:c,dex:E.dex.createDexLookup()}),extraContent:c=>{c.species.Pidgey.evolutions=evolve?[{method:'Trade',target:'Blastoise'}]:[];c.species.Pidgey.learnset={1:['Tackle','Rest','Roost','Flamethrower']};}}),g=clone(w.state.current());g.dex.hasDex=dex;g.dex.unlocked=Array(w.content.regionalDex.regions.length+1).fill(true);g.dex.owned=g.dex.owned.filter(s=>!['Pidgey','Blastoise'].includes(s));edit?.(g);w.state.replace(g);w.state.replaced.length=0;
  const h=host({application:w,...options}),f=h.G.PSFlow;f.beginTrade=(...a)=>w.app.beginTrade(...a);f.resolveTrade=(...a)=>w.app.resolveTrade(...a);f.resolveEvolution=(...a)=>w.app.resolveEvolution(...a);

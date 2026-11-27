@@ -3,8 +3,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const H=require('../headless-regression-binding.cjs');
 const PLUGINS=['PS_Management','PS_Inventory','PS_Progression','PS_Evolution','PS_Pokedex'];
-const INPUTS=['scripts/tests/pokedex-runtime-binding.cjs','experiments/step5/2/inventory-ui-host.cjs',
- 'experiments/step5/2/ef-support.cjs','experiments/step5/3/fixtures/postbattle/helpers.cjs',
+const INPUTS=['scripts/tests/pokedex-runtime-binding.cjs','tests/support/inventory/inventory-ui-host.cjs',
+ 'tests/support/inventory/inventory-fixture.cjs','experiments/step5/3/fixtures/postbattle/helpers.cjs',
  'experiments/step5/3/pokedex/ui-host.cjs','experiments/step5/5/pokedex-area-host.cjs',
  'experiments/step5/5/test-pokedex-area-production.cjs',...PLUGINS.map(name=>'js/plugins/'+name+'.js')];
 function capturePokedexInputs(root,options={}){

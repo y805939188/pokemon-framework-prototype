@@ -3,7 +3,8 @@
 const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'../../../..'),out=process.argv[2];if(!out)throw Error('absolute evidence directory required');fs.mkdirSync(out,{recursive:true});
 const cases=[],f='src/framework/';
-const add=(id,file,before,after,test)=>cases.push({id,file:f+file,before,after,test:`experiments/step5/2/test-${test}6.cjs`});
+const suitePaths=Object.freeze({'item-effects':'tests/regression/inventory/test-item-effects.cjs','item-workflows':'tests/regression/inventory/test-item-workflows.cjs','shop':'tests/regression/inventory/test-shop.cjs'});
+const add=(id,file,before,after,test)=>cases.push({id,file:f+file,before,after,test:suitePaths[test]});
 const effect=(id,b,a)=>add(id,'rules/item-effects.ts',b,a,'item-effects');
 const app=(id,b,a)=>add(id,'app/inventory-session.ts',b,a,'item-workflows');
 const shop=(id,b,a)=>add(id,'rules/shop.ts',b,a,'shop');
@@ -48,7 +49,7 @@ add('stock-validated-before-install','app/inventory-session.ts','try{if(this.sho
 add('known-effect-cold-gate','content/item-input.ts','const invalid=fieldEffectProblem(e as unknown as NonNullable<ItemDefinition[\'effect\']>);','const invalid=null;','item-effects');
 add('Premier-keeps-battle-identity','rules/item-catalog.ts',"{...premier,flags:[...premier.flags,'PremierBall']}","{...premier,battleId:undefined,battleUse:'none',flags:[...premier.flags,'PremierBall']}",'shop');
 add('Berry-keeps-battle-identity','rules/item-catalog.ts',"source:'framework-legacy',...previous,pocket,flags:","source:'framework-legacy',pocket,flags:",'shop');
-const remediation=(id,file,before,after)=>cases.push({id,file:f+file,before,after,test:'experiments/step5/2/test-M2-remediation.cjs'});
+const remediation=(id,file,before,after)=>cases.push({id,file:f+file,before,after,test:'tests/regression/inventory/test-item-use-refusals.cjs'});
 const retired="if(this.pendingUse&&(this.pendingUse.stale||this.pendingUse.revision!==revision||this.pendingUse.world!==worldRevision)){this.pendingUse.stale=true;throw new Error('stale-item-selection');}";
 const fixedIntent="if(this.pendingUse&&this.pendingUse.fingerprint!==identity)throw new Error('stale-item-selection');";
 remediation('M2-01-repeated-stale-resurrection','app/inventory-session.ts',retired,retired.replace('this.pendingUse.stale=true;','this.pendingUse=null;'));

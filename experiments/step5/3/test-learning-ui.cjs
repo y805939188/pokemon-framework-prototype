@@ -1,7 +1,7 @@
 'use strict';
 // Real application + bundled MZ adapters in a VM. Synthetic service inputs, not physical keyboard/NW evidence.
 const test=require('node:test'),assert=require('node:assert/strict');
-const {host,disposeBuild}=require('../2/inventory-ui-host.cjs');
+const {host,disposeBuild}=require('../../../tests/support/inventory/inventory-ui-host.cjs');
 const {world,E,clone}=require('./fixtures/postbattle/helpers.cjs');test.after(disposeBuild);
 function setup({full=true,edit,port,worldPort,hostOptions={}}={}){
  const w=world({port,contentPort:c=>({content:c,dex:E.dex.createDexLookup()}),extraContent:c=>{c.species.Charizard.tutorMoves=['Gust','Rest','Tackle'];c.species.Charizard.learnset={1:['Flamethrower','Tackle'],99:['Rest']};

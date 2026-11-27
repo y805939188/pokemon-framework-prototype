@@ -47,7 +47,7 @@ node --test experiments/step5/4/test-healing-config.cjs
 
 ```sh
 node --test experiments/step5/4/test-healing-config.cjs \
-  experiments/step5/2/test-item-effects6.cjs \
+  tests/regression/inventory/test-item-effects.cjs \
   experiments/step5/4/test-trainer-ai.cjs \
   experiments/step5/4/test-trainer-ai-integration.cjs \
   tests/regression/battle/test-engine-contract.cjs

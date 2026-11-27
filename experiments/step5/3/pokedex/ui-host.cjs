@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),vm=r
 const inputs=require('../../../../scripts/tests/pokedex-runtime-binding.cjs').capturePokedexInputs(path.resolve(__dirname,'../../../..'));
 const explicitRoot=inputs.pluginRoot;
 const explicitBundles=explicitRoot?Object.fromEntries(['PS_Management','PS_Inventory','PS_Progression','PS_Evolution'].map(name=>[name,fs.readFileSync(path.join(explicitRoot,name+'.js'),'utf8')])):undefined;
-const base=require('../../2/inventory-ui-host.cjs'),{world,E,clone}=require('../fixtures/postbattle/helpers.cjs');let dir,bundle;
+const base=require('../../../../tests/support/inventory/inventory-ui-host.cjs'),{world,E,clone}=require('../fixtures/postbattle/helpers.cjs');let dir,bundle;
 let checkedShowdown;
 function checkedSource(content,override){
  if(!checkedShowdown){const compiled=E.contentRuntime.loadCompiled(JSON.parse(fs.readFileSync('data/framework/content.json','utf8'))),assembled=E.contentRuntime.assembleContent(compiled,E.dex.createDexLookup());if(assembled.errors.length||assembled.content.meta?.showdownSourceChecked!==true)throw Error('dex UI fixture requires actual assembled source proof');checkedShowdown=assembled.content.meta.showdownSha;}

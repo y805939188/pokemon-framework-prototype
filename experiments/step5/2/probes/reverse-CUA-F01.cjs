@@ -1,8 +1,8 @@
 'use strict';
 // Author probes only: a fresh ordinary clone, never the author/reviewer worktree or a running game package.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{spawnSync}=require('node:child_process');
-const root=path.resolve(__dirname,'../../../..'),out=process.argv[2],file='src/plugins/PS_Inventory.ts',suite='experiments/step5/2/test-inventory-ui.cjs';
-const suites=[suite,'experiments/step5/2/test-transactions6.cjs'];
+const root=path.resolve(__dirname,'../../../..'),out=process.argv[2],file='src/plugins/PS_Inventory.ts',suite='tests/regression/inventory/test-inventory-ui.cjs';
+const suites=[suite,'tests/regression/inventory/test-inventory-transactions.cjs'];
 if(!fs.statSync(path.join(root,'.git')).isDirectory())throw Error('use a fresh ordinary clone, not a managed worktree');
 if(!out||!path.isAbsolute(out)||fs.existsSync(out))throw Error('new absolute evidence directory required');
 const run=(cmd,args)=>spawnSync(cmd,args,{cwd:root,encoding:'utf8',timeout:180000,maxBuffer:32*1024*1024});

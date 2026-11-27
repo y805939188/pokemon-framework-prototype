@@ -1,6 +1,6 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {E,clone,setup,count}=require('./ef-support.cjs');
+const {E,clone,setup,count}=require('../../support/inventory/inventory-fixture.cjs');
 const limits=E.limits.DEFAULT_LIMITS??{party:6,boxes:1200,bagPerItem:999,money:999999};
 function shop(x,stock=['potion'],allowSell=true){return {stock,allowSell,overrides:{},revision:0};}
 const buy=(x,s,id,q=1,extra={})=>E.shop.planShop(x.game,x.content,s,{kind:'buy',itemId:id,quantity:q,confirmed:true,...extra},limits);

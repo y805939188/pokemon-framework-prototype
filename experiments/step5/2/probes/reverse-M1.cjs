@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'../../../..'),outDir=process.argv[2];
 if(!outDir)throw Error('usage: node reverse-M1.cjs <absolute evidence directory>');fs.mkdirSync(outDir,{recursive:true});
-const f='src/framework/',suite=id=>`experiments/step5/2/test-${id}6.cjs`,cases=[];
+const f='src/framework/',suitePaths=Object.freeze({inventory:'tests/regression/inventory/test-inventory-slots.cjs',transactions:'tests/regression/inventory/test-inventory-transactions.cjs',content:'experiments/step5/2/test-content6.cjs',migration:'experiments/step5/2/test-migration6.cjs'}),suite=id=>suitePaths[id],cases=[];
 function add(id,file,before,after,tests){cases.push({id,file,before,after,tests});}
 add('slot-preflight',f+'rules/inventory.ts','if (quantity > capacityFor(inventory, id, catalog, policy))','if (false)','inventory');
 add('slot-fill',f+'rules/inventory.ts','for (const slot of pocket) if (slot.itemId === id) { const n = Math.min(left, Math.max(0, policy.perSlot - slot.quantity));','for (const slot of []) if (slot.itemId === id) { const n = Math.min(left, Math.max(0, policy.perSlot - slot.quantity));','inventory');

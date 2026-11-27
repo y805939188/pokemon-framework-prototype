@@ -1,7 +1,7 @@
 'use strict';
 // Formal-spec-derived expected values over synthetic author records, not a run of the reference program.
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {E,clone,setup,maxHp,plan,count}=require('./ef-support.cjs');
+const {E,clone,setup,maxHp,plan,count}=require('../../support/inventory/inventory-fixture.cjs');
 const zero={hp:0,atk:0,def:0,spa:0,spd:0,spe:0};
 const refusal=(fn,reason)=>assert.throws(fn,e=>e.reason===reason||e.message===reason);
 

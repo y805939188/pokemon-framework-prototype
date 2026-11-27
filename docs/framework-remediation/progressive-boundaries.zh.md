@@ -9,7 +9,7 @@
 | 各操作持有者 → 开战拒绝 | `experiments/step5/3/test-battle-entry-ownership.cjs` | management/inventory/learning/trade/receiving/pokedex/battle/evolution/dex-battle，分别经 core/host；拒绝前后 token/revision/状态、create/random/replace 计数不变，原操作出口仍可用 |
 | 交换 UI 拒绝战斗后继续 | `experiments/step5/3/test-trade-ui.cjs:38` | pending trade 拒绝 battle，原 UI 完成后只安装一次；39/40另覆盖合法后续战斗和回执退休。此项已有真实消费点保护，本轮不再复制一套 |
 | 管理交换链、取消、重复请求 | `experiments/step5/1/test-management.cjs` | held intent 不回写旧快照、取消保留独立编辑、提交一次、replace失败与旧代次拒绝；普通未持起的管理根仍允许保存 |
-| 背包事务与排序取消 | `experiments/step5/2/test-transactions6.cjs` | 请求幂等/冲突、槽位版本、零写重试、写后呈现失败不重复、读档退休、取消恢复且保留独立金钱变化 |
+| 背包事务与排序取消 | `tests/regression/inventory/test-inventory-transactions.cjs` | 请求幂等/冲突、槽位版本、零写重试、写后呈现失败不重复、读档退休、取消恢复且保留独立金钱变化 |
 | 学习原子安装/回读失败/取消 | `experiments/step5/3/test-learning-operation.cjs`、`test-learning-ui.cjs` | TR资源/招式/PP/统计一次提交，普通取消返回正确层、partial write保留屏障、旧UI/答案不能释放新代次所有者 |
 | 道具/事件进化事务 | `experiments/step5/3/test-triggered-evolution.cjs`、`test-evolution-commit.cjs` | 糖果/石头/事件不同取消语义、资源和主体原子写、回读失败确认、旧代次不干扰新操作、稳定成员身份 |
 | 交换应用事务 | `experiments/step5/3/test-trade-operation.cjs` | 报价取消零RNG/序号/状态，开始演出后仅技术终止，最终唯一替换，零写可重试、partial write保持锁、外部编辑/读档失效 |
@@ -33,6 +33,6 @@
 
 `rules/rules.ts` 的 HEAL/STATUS/REVIVE/PP/STAT 等表属于当前战斗规则支持集；`rules/item-families.ts` 的 `FIELD_EFFECTS` 描述场外主动用法和可配置参数，还包括目前没有战中支持的家族。`item-catalog.ts:legacyCatalog()` 先从 BAG_ITEMS 接战斗身份，再叠加场外效果；作者 `items.json` 又可提供独立内容ID、价格、显示名、fieldUse/battleUse/battleId。它们职责不同，不适合仅为消除“两张表”整体合并。
 
-已有 `test-item-effects6.cjs` 覆盖各场外HP道具的两种配置、拒绝/取消/扣除和严格effect参数；`test-content6.cjs` 覆盖作者参数拒绝；`test-content-member-items.cjs` 覆盖内容默认球、真实item目录和别名权限；战斗PP/复活/逃跑各有专项。这里真正需要补的是跨消费者的治疗配置贯通与实际效果/AI/恢复合同，由本轮治疗专项补足。应覆盖交集，不让对齐测试要求场外独有 energypowder/energyroot 等自动获得战斗支持，也不把 Sitrus AI估算强行等同主动实际回复。
+已有 `test-item-effects.cjs` 覆盖各场外HP道具的两种配置、拒绝/取消/扣除和严格effect参数；`test-content6.cjs` 覆盖作者参数拒绝；`test-content-member-items.cjs` 覆盖内容默认球、真实item目录和别名权限；战斗PP/复活/逃跑各有专项。这里真正需要补的是跨消费者的治疗配置贯通与实际效果/AI/恢复合同，由本轮治疗专项补足。应覆盖交集，不让对齐测试要求场外独有 energypowder/energyroot 等自动获得战斗支持，也不把 Sitrus AI估算强行等同主动实际回复。
 
 此次边界核查选择复用既有测试，不新增重复组合或统一整个物品系统。后续应按具体可达问题补用例，而不是用重复测试的数量代替风险判断。

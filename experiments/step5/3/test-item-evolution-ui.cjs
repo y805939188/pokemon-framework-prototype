@@ -1,7 +1,7 @@
 'use strict';
 // Formal Bag/party adapter with actual application transactions. VM input is not physical/NW evidence.
 const test=require('node:test'),assert=require('node:assert/strict');
-const{host,disposeBuild}=require('../2/inventory-ui-host.cjs'),{world,E,clone}=require('./fixtures/postbattle/helpers.cjs');test.after(disposeBuild);
+const{host,disposeBuild}=require('../../../tests/support/inventory/inventory-ui-host.cjs'),{world,E,clone}=require('./fixtures/postbattle/helpers.cjs');test.after(disposeBuild);
 function setup({entries=[{method:'Level',parameter:51,target:'Blastoise'}],targetMoves=[],settings={},edit=()=>{},port,facts=()=>({}),itemWorld=()=>({}),options={}}={}){
  const w=world({entries,targetMoves,settings,extraContent:c=>{c.species.Charizard.learnset={51:['Tackle'],52:['Gust'],53:['Quick Attack']};const base=c.items.potion;c.items['ui-stone']={...base,id:'ui-stone',name:'Stone',namePlural:'Stones',fieldUse:'member',battleUse:'none',battleId:undefined,flags:['EvolutionStone'],effect:{family:'evolution',parameters:{}},consumable:true};c.items['ui-exp']={...base,id:'ui-exp',name:'Exp',namePlural:'Exp',fieldUse:'member',battleUse:'none',battleId:undefined,effect:{family:'exp-candy',parameters:{exp:100000}},consumable:true};}}),g=clone(w.state.current());for(const id of ['rarecandy','ui-stone','ui-exp'])g.inventory=E.inventory.addItems(g.inventory,id,3,w.content.items,E.inventory.inventoryPolicy(w.content));edit(g,w.content);w.state.replace(g);w.state.replaced.length=0;
  let app;app=new E.app.GameApplication({state:port?port(w.state,()=>app):w.state,content:()=>({content:w.content,dex:E.dex.createDexLookup()}),sessions:w.sessions,projection:w.projection,random:()=>0,clock:()=>0,itemWorld,evolutionWorld:facts});w.app=app;

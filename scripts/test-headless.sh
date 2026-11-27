@@ -316,18 +316,18 @@ SUITES=(
   experiments/step5/1/test-management-input.cjs
   experiments/step5/1/test-J-remediation.cjs
   experiments/step5/1/test-held-contract.cjs
-  experiments/step5/2/test-inventory6.cjs
+  tests/regression/inventory/test-inventory-slots.cjs
   experiments/step5/2/test-content6.cjs
   experiments/step5/2/test-migration6.cjs
-  experiments/step5/2/test-transactions6.cjs
+  tests/regression/inventory/test-inventory-transactions.cjs
   experiments/step5/2/test-M1-remediation.cjs
-  experiments/step5/2/test-item-effects6.cjs
-  experiments/step5/2/test-shop6.cjs
-  experiments/step5/2/test-item-workflows6.cjs
-  experiments/step5/2/test-M2-remediation.cjs
-  experiments/step5/2/test-J2-remediation.cjs
+  tests/regression/inventory/test-item-effects.cjs
+  tests/regression/inventory/test-shop.cjs
+  tests/regression/inventory/test-item-workflows.cjs
+  tests/regression/inventory/test-item-use-refusals.cjs
+  tests/regression/inventory/test-default-pocket-contract.cjs
   experiments/step5/2/test-D-remediation.cjs
-  experiments/step5/2/test-inventory-ui.cjs
+  tests/regression/inventory/test-inventory-ui.cjs
   experiments/step5/3/test-capability-seam.cjs
   experiments/step5/3/test-friendship.cjs
   experiments/step5/3/test-friendship-adapters.cjs

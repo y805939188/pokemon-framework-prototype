@@ -1,7 +1,7 @@
 'use strict';
 // Author regressions for the two fixed-ef8 independent M2 findings. No reference execution or review writes.
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const {E,clone,setup,plan,count,maxHp}=require('./ef-support.cjs');
+const {E,clone,setup,plan,count,maxHp}=require('../../support/inventory/inventory-fixture.cjs');
 const intent=x=>({kind:'use-item',itemId:'rarecandy',quantity:1,memberId:x.game.party[0].id});
 const answered=(base,slot=0)=>({...base,answers:{learning:[{kind:'replace',slot}]}});
 function learning(ports={}){return setup({bag:{rarecandy:1,potion:1},world:{mapId:7},edit:(g,c)=>{c.species.Charizard.learnset={51:['Slash']};g.party[0].hp=1;},...ports});}

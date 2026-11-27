@@ -12,7 +12,7 @@ const {createMZAtomicStatePort}=require(path.join(nativeRoot,'src/plugins/world/
 const E=require(path.join(OUT,'engine.cjs')),P=require(path.join(OUT,'production.cjs'));
 assert.equal(E.app.GameApplication,P.app.GameApplication,'fixture and production must share the actual App constructor');
 const clone=x=>JSON.parse(JSON.stringify(x));
-const {world}=require('../3/fixtures/postbattle/helpers.cjs'),base=require('../2/inventory-ui-host.cjs');
+const {world}=require('../3/fixtures/postbattle/helpers.cjs'),base=require('../../../tests/support/inventory/inventory-ui-host.cjs');
 const plugins=Object.fromEntries(['PS_Management','PS_Inventory','PS_Progression','PS_Evolution','PS_Pokedex'].map(name=>[name,fs.readFileSync(path.join(inputs.pluginRoot,name+'.js'),'utf8')]));
 function authorWorld(c){
  c.world={encounters:{source:'area-test',tables:[{mapId:1,version:0,types:{Land:{stepChance:21,slots:[{species:'Charizard',weight:100,minLevel:5,maxLevel:5}]}}}]},regionMaps:{source:'area-test',regions:[{id:7,nameKey:'test.area.region',points:[{x:13,y:12,nameKey:'test.area.point',healingSpot:{mapId:1,x:0,y:0}}]}]}};

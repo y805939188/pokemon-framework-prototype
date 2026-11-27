@@ -2,7 +2,7 @@
 // WP28 §5.1 and WP51 default data over synthetic author content; no reference replay or player save.
 const test=require('node:test'),assert=require('node:assert/strict');
 const {E,D,inputs,fixture}=require('./trainer-ai-integration/fixtures.cjs');
-const field=require('../2/ef-support.cjs');
+const field=require('../../../tests/support/inventory/inventory-fixture.cjs');
 const rows=[['potion',20,20],['berryjuice',20,20],['sweetheart',20,20],['superpotion',60,50],['hyperpotion',120,200],['freshwater',30,50],['sodapop',50,60],['lemonade',70,80],['moomoomilk',100,100],['oranberry',10,10]];
 function content(flag,items=[]){
  const source=inputs({items,moves:['splash'],party:1});

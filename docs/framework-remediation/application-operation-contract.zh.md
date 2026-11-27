@@ -30,7 +30,7 @@
 | 覆盖 | 已有测试，不计本轮新增 |
 |---|---|
 | 开战准备前预留、回调重入、late resolve/reject、同 id 后继 | [test-app-battle4.cjs](../../experiments/step4/test-app-battle4.cjs)、[test-battle-entry-ownership.cjs](../../experiments/step5/3/test-battle-entry-ownership.cjs) |
-| 管理 held/child、库存根保存差异、过期 ticket／token | [test-management.cjs](../../experiments/step5/1/test-management.cjs)、[test-transactions6.cjs](../../experiments/step5/2/test-transactions6.cjs)、[test-item-workflows6.cjs](../../experiments/step5/2/test-item-workflows6.cjs) |
+| 管理 held/child、库存根保存差异、过期 ticket／token | [test-management.cjs](../../experiments/step5/1/test-management.cjs)、[test-inventory-transactions.cjs](../../tests/regression/inventory/test-inventory-transactions.cjs)、[test-item-workflows.cjs](../../tests/regression/inventory/test-item-workflows.cjs) |
 | 机器 parent、学习回滚、写后异常／未知 readback | [test-learning-operation.cjs](../../experiments/step5/3/test-learning-operation.cjs) |
 | 接收／战后分阶段提交、未知安装屏障 | [test-battle-transactions7.cjs](../../experiments/step5/3/test-battle-transactions7.cjs)、[test-triggered-evolution.cjs](../../experiments/step5/3/test-triggered-evolution.cjs)、[test-trade-operation.cjs](../../experiments/step5/3/test-trade-operation.cjs) |
 | 图鉴 parent／generation、主提交后图鉴继续 | [test-dex-viewing.cjs](../../experiments/step5/3/test-dex-viewing.cjs)、[test-pokedex-summary.cjs](../../experiments/step5/3/test-pokedex-summary.cjs) |

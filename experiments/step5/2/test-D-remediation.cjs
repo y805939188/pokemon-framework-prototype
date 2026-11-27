@@ -130,7 +130,7 @@ test('P-01 plain data from another realm fingerprints like local plain data; non
  assert.throws(()=>fp(Object.create(Object.create(null))),/nonplain-intent/);
 });
 test('P-01 the application accepts the real host shape: request and item world both built in another realm',()=>{
- const {setup}=require('./ef-support.cjs');
+ const {setup}=require('../../../tests/support/inventory/inventory-fixture.cjs');
  const x=setup({bag:{potion:3},edit:g=>{g.party[0].hp=1;},world:vm.runInNewContext('({mapId:4})')}),id=x.game.party[0].id,t=x.app.beginInventoryOperation('bag');
  assert.equal(x.app.inventoryRequest(t,'browse',vm.runInNewContext('({kind:"browse",pocket:2,index:0})')).status,'committed');
  const use=vm.runInNewContext(`({kind:"use-item",itemId:"potion",quantity:1,memberId:${JSON.stringify(id)},answers:{}})`);

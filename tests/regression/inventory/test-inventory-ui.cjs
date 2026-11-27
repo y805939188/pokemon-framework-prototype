@@ -1,6 +1,6 @@
 'use strict';
 const {test,after}=require('node:test'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
-const {host,disposeBuild,E,clone}=require('./inventory-ui-host.cjs');after(disposeBuild);
+const {host,disposeBuild,E,clone}=require('../../support/inventory/inventory-ui-host.cjs');after(disposeBuild);
 test('P52-35/FR-000196 actual quantity model preserves both priority chains and absolute animation phase',()=>{
  execFileSync(process.execPath,['--experimental-strip-types','--input-type=module','-e',`import assert from 'node:assert/strict';import {quantityStep as q,animationPhase as p,itemIconFrame as i,nextPocket as n} from './src/plugins/inventory/model.ts';const f=(repeated={},triggered={})=>({repeated,triggered,pressed:{}});
  assert.deepEqual(q(1,99,f({right:true},{use:true})),{value:1,done:true,cancelled:false});assert.deepEqual(q(1,99,f({right:true},{use:true}),true),{value:11,done:false,cancelled:false});assert.equal(q(1,99,f({},{use:true,back:true})).value,0);assert.equal(q(1,99,f({},{use:true,back:true}),true).value,1);

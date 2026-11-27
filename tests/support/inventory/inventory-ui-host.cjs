@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),os=require('node:os'),{spawnSync}=require('node:child_process');
-const {E,clone,setup}=require('./ef-support.cjs');let bundles,dir;
+const {E,clone,setup}=require('./inventory-fixture.cjs');let bundles,dir;
 function build(){if(bundles)return;dir=fs.mkdtempSync(path.join(os.tmpdir(),'ps52-inventory-host-'));bundles={};for(const plugin of ['PS_Management','PS_Inventory','PS_Progression','PS_Evolution']){const p=spawnSync('pnpm',['--dir','src','exec','vite','build','--outDir',dir],{env:{...process.env,RR_PLUGIN:plugin},encoding:'utf8'});if(p.status!==0)throw Error(p.stdout+p.stderr);bundles[plugin]=fs.readFileSync(path.join(dir,plugin+'.js'),'utf8');}}
 function disposeBuild(){if(dir)fs.rmSync(dir,{recursive:true,force:true});bundles=null;dir=null;}
 function host(options={}){
