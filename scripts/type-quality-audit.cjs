@@ -9,7 +9,7 @@ const sha=cp.execFileSync('git',['rev-parse',`${ref}^{commit}`],{cwd:root,encodi
 const files=cp.execFileSync('git',['ls-tree','-r','--name-only','-z',sha],{cwd:root,encoding:'utf8'}).split('\0').filter(f=>/\.(?:ts|tsx|mts|cts)$/.test(f));
 const uiFlow=new Set(['battle-effects.ts','battle-evidence.ts','battle-summary.ts','describe.ts','log.ts','presentation.ts','public-presentation.ts','request-view.ts']);
 function classify(f){
- if(f.startsWith('experiments/')||f.startsWith('src/plugins/flowtest/')||/PS_Battle(?:FlowTest|Smoke)\.ts$/.test(f)||f==='src/framework/testing.ts'||/^src\/framework\/tools\/(?:fakes|harness|matrix|scripted-driver|held-diagnostics)\.ts$/.test(f)||f.startsWith('src/framework/tools/fixtures/'))return 'tests';
+ if(f.startsWith('experiments/')||f.startsWith('tests/')||f.startsWith('src/plugins/flowtest/')||/PS_Battle(?:FlowTest|Smoke)\.ts$/.test(f)||f==='src/framework/testing.ts'||/^src\/framework\/tools\/(?:fakes|harness|matrix|scripted-driver|held-diagnostics)\.ts$/.test(f)||f.startsWith('src/framework/tools/fixtures/'))return 'tests';
  if(f.startsWith('src/framework/rules/'))return 'domain-rules';
  if(f.startsWith('src/framework/app/'))return 'application';
  if(f.startsWith('src/framework/battle/'))return 'battle-adaptation';
